@@ -1,0 +1,11 @@
+*~
+.ipynb_checkpoints
+__pycache__
+build
+_book
+*.pyc
+*.zip
+*.mat
+test/*.vtk
+test/*.pdf
+test/*.png
