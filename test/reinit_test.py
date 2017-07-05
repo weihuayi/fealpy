@@ -20,7 +20,9 @@ def HG(mesh, phi):
     N = mesh.number_of_points()
     NE = mesh.number_of_edges()
     nx = mesh.ds.nx 
-    ny = mesh.dx.ny
+    ny = mesh.ds.ny
+    dx = mesh.dx
+    dy = mesh.dy
 
     phiSign = sign(phi)
 
@@ -29,17 +31,40 @@ def HG(mesh, phi):
     dy0 = np.zeros(N, dtype=np.float)
     dy1 = np.zeros(N, dtype=np.float)
 
+
     edge = mesh.ds.edge
-    isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
-
-    A = point[edge[isCutEdge, 0]]
-    B = point[edge[isCutEdge, 1]]
-
-    cutPoint = find_cut_point(self.interface, A, B)
-    
 
     isXEdge = np.zeros(NE, dtype=np.bool)
     isXEdge[ny*(nx+1):] = True
+    
+    dx0[edge[isXEdge, 0]] = (phi[edge[isXEdge, 1]] - phi[edge[isXEdge, 0]])/dx
+    dx1[edge[isXEdge, 1]] = dx0[edge[isXEdge, 0]] 
+
+    dy0[edge[~isXEdge, 0]] = (phi[edge[~isXEdge, 1]] - phi[edge[~isXEdge, 0]])/dy
+    dy1[edge[~isXEdge, 1]] = dy0[edge[~isXEdge, 0]]
+
+    dx0[-ny-1:] = dx0[-2*(ny+1):-ny-1]
+    dx1[0:ny+1] = dx1[ny+1:2*(ny+1)]
+    dy0[ny::ny+1] = dy0[ny-1:-2:ny+1]
+    dy1[0:-ny-1:ny+1] = dy1[1:-ny:ny+1]
+
+    dxx = (dx0 - dx1)/dx
+    dyy = (dy0 - dyz)/dx
+
+    isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
+    A = point[edge[isCutEdge, 0]]
+    B = point[edge[isCutEdge, 1]]
+    cutPoint = find_cut_point(self.interface, A, B)
+    h = np.sqrt(np.sum((cutPoint - A)**2, axis=1))
+    dx0[edge[isXEdge & isCutEdge, 0]] = -phi[edge[isXEdge & isCutEdge, 0]]/h[isXEdge[isCutEdge]]
+    dx1[edge[isXEdge & isCutEdge, 1]] = phi[edge[isXEdge & isCutEdge, 1]]/(dx - h[isXEdge[isCutEdge]])
+    dy0[edge[~isXEdge & isCutEdge, 0]] = -phi[edge[~isXEdge & isCutEdge, 0]]/h[~isXEdge[isCutEdge]]
+    dy1[edge[~isXEdge & isCutEdge, 1]] = phi[edge[~isXEdge & isCutEdge, 1]]/(dy - h[~isXEdge[isCutEdge]])
+
+
+
+
+
 
 #
 #    Phi = phi.reshape(nx+1, ny+1) 

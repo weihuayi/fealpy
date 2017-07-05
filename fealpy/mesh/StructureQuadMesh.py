@@ -14,6 +14,7 @@ class StructureQuadMesh(Mesh2d):
         self.meshtype="quad"
         self.dx = (box[1] - box[0])/nx
         self.dy = (box[3] - box[2])/ny
+        self.data = {}
 
     @property 
     def point(self):
