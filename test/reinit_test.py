@@ -15,7 +15,7 @@ def sign(phi):
     sign[np.abs(phi) < eps] = 0
     return sign
 
-def HG(mesh, phi):
+def HG(mesh, phi, phiSign, h):
 
     N = mesh.number_of_points()
     NE = mesh.number_of_edges()
@@ -24,7 +24,6 @@ def HG(mesh, phi):
     dx = mesh.dx
     dy = mesh.dy
 
-    phiSign = sign(phi)
 
     dx0 = np.zeros(N, dtype=np.float)
     dx1 = np.zeros(N, dtype=np.float)
@@ -52,64 +51,34 @@ def HG(mesh, phi):
     dyy = (dy0 - dyz)/dx
 
     isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
-    A = point[edge[isCutEdge, 0]]
-    B = point[edge[isCutEdge, 1]]
-    cutPoint = find_cut_point(self.interface, A, B)
-    h = np.sqrt(np.sum((cutPoint - A)**2, axis=1))
     dx0[edge[isXEdge & isCutEdge, 0]] = -phi[edge[isXEdge & isCutEdge, 0]]/h[isXEdge[isCutEdge]]
     dx1[edge[isXEdge & isCutEdge, 1]] = phi[edge[isXEdge & isCutEdge, 1]]/(dx - h[isXEdge[isCutEdge]])
     dy0[edge[~isXEdge & isCutEdge, 0]] = -phi[edge[~isXEdge & isCutEdge, 0]]/h[~isXEdge[isCutEdge]]
     dy1[edge[~isXEdge & isCutEdge, 1]] = phi[edge[~isXEdge & isCutEdge, 1]]/(dy - h[~isXEdge[isCutEdge]])
 
+    minmodx0 = np.zeros(N, dtype=np.float)
+    minmodx1 = np.zeros(N, dtype=np.float)
+    minmody0 = np.zeros(N, dtype=np.float)
+    minmody1 = np.zeros(N, dtype=np.float)
+    minmodx0[edge[isXEdge, 0]] = np.minimum(np.abs(dxx[edge[isXEdge, 0]]), np.abs(dxx[edge[isXEdge, 1]]))
+    minmodx1[edge[isXEdge, 1]] = minmodx0[edge[isXEdge, 0]]
+    minmody0[edge[~isXEdge, 0]] = np.minimum(np.abs(dyy[edge[~isXEdge, 0]]), np.abs(dyy[edge[~isXEdge, 1]]))
+    minmody1[edge[~isXEdge, 1]] = minmody0[edge[~isXEdge, 0]] 
 
+    a = dx0 - 0.5*dx*minmodx0
+    b = dx1 + 0.5*dx*minmodx1
+    c = dy0 - 0.5*dy*minmody0
+    d = dy1 + 0.5*dy*minmody1
 
+    hg = np.zeros(N, dtype=np.float)
 
+    hg[phiSign>=0] = np.sqrt(np.maximum(np.minimum(a[phiSign>=0], 0)**2, np.maximum(b[phiSign>=0], 0)**2) 
+            + np.maximum(np.minimum(c[phiSign>=0], 0)**2, np.maximum(d[phiSign>=0], 0)**2))
+    hg[phiSign < 0] = np.sqrt(np.maximum(np.maximum(a[phiSign<0], 0)**2, np.minimum(b[phiSign<0], 0)**2) 
+            + np.maximum(np.maximum(c[phiSign<0], 0)**2, np.minimum(d[phiSign<0], 0)**2))
 
+    return hg
 
-#
-#    Phi = phi.reshape(nx+1, ny+1) 
-#    dx = mesh.dx
-#    dy = mesh.dy
-#
-#    dx0 = np.zeros(nx+1, ny+1)
-#    dx1 = np.zeros(nx+1, ny+1)
-#    
-#    dx0[0:-1, :] = (Phi[1:, :] - Phi[0:-1, :])/dx
-#    dx1[1:, :] = (Phi[1:, :] - Phi[0:-1, :])/dx
-#    dx0[-1, :] = dx1[-1, :]
-#    dx1[0, :] = dx0[0, :]
-#
-#    dxx = (dx0 - dx1)/dx
-#
-#    dy0 = np.zeros(nx+1, ny+1)
-#    dy1 = np.zeros(nx+1, ny+1)
-#
-#    dy0[:, 0:-1] = (Phi[:, 1:] - Phi[:, 0:-1])/dy
-#    dy1[:, 1:] = (Phi[:, 1:] - Phi[:, 0:-1])/dy
-#    dy0[:, -1] = dy1[:, -1]
-#    dy1[:, 0] = dy0[:, 0]
-#
-#    dyy = (dy0 - dy1)/dy
-#
-#    minmodx = np.minimum(np.abs(dxx[0:-1, :]),  np.abs(dxx[1:, :]))
-#    flag = dxx[0:-1, :]*dxx[1:, :] > 0
-#    dx0[0:-1, :][flag] -= dx/2*minmodx[flag]
-#    dx1[1:, :][flag] += dx/2*minmodx[flag]
-#
-#    minmody = np.minimum(np.abs(dyy[:, 0:-1]),   np.abs(dyy[:, 1:]))
-#    flag = dyy[:, 0:-1]*dyy[:, 1:] > 0
-#    dy0[:, 0:-1][flag] -= dy/2*minmody[flag]
-#    dy1[:, 1:][flag] += dy/2*minmody[flag]
-#
-#    N = mesh.number_of_points()
-#    NN = np.arange(N).reshape(nx+1, ny+1)
-
-
-
-
- 
-   
-    
 
 box = [-1, 1, -1, 1]
 cxy = (0.0, 0.0)
@@ -123,5 +92,12 @@ mesh = StructureQuadMesh(box, nx, ny)
 
 phi = interface(mesh.point)
 
+phiSign = sign(phi)
+edge = mesh.ds.edge
+isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
+A = point[edge[isCutEdge, 0]]
+B = point[edge[isCutEdge, 1]]
+cutPoint = find_cut_point(self.interface, A, B)
+h = np.sqrt(np.sum((cutPoint - A)**2, axis=1))
 
 
