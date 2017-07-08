@@ -12,7 +12,7 @@ mesh0 = unitcircledomainmesh(h)
 
 mesh1 = TriangleMeshWithInfinityPoint(mesh0)
 
-point, cell, cellLocation = mesh1.to_polygonmesh(mesh0)
+point, cell, cellLocation = mesh1.to_polygonmesh()
 
 pmesh = PolygonMesh(point, cell, cellLocation)
 

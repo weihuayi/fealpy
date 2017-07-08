@@ -4,6 +4,7 @@ import numpy as np
 
 from fealpy.mesh.TriangleMesh import TriangleMeshWithInfinityPoint
 from fealpy.mesh import rectangledomainmesh
+from fealpy.mesh.PolygonMesh import PolygonMesh
 
 import matplotlib.pyplot as plt
 
