@@ -115,7 +115,6 @@ interface0 = lambda p: dcircle(p, cxy, r)
 interface = lambda p: circle(p, cxy, r)
 
 
-
 mesh = StructureQuadMesh(box, nx, ny)
 
 dx = mesh.dx
@@ -126,6 +125,7 @@ N = point.shape[0]
 phi = interface(point)
 
 phiSign = sign(phi)
+
 edge = mesh.ds.edge
 NE = edge.shape[0]
 isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
@@ -154,7 +154,7 @@ val[~isXEdge & isCutEdge, 1] = dy - h[~isXEdge[isCutEdge]]
 
 dt = 0.45*pandas_groupby_minimum(edge.flatten(), val.flatten())
 
-d = np.sqrt(np.sum(point**2, axis=1)) - 1 
+d = interface0(point) 
 
 
 for i in range(500):
