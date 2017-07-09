@@ -42,62 +42,6 @@ class TriangleMesh(Mesh2d):
         R = np.sqrt(np.sum((c-point[cell[:,0],:])**2,axis=1))
         return c, R
 
-    def cell_quality(self):
-        point = self.point
-        cell = self.ds.cell
-
-        NC = self.number_of_cells()
-
-        localEdge = self.ds.local_edge()
-        v = [point[cell[:,j],:] - point[cell[:,i],:] for i,j in localeEdge]
-        l = np.zeros((NC, 3))
-        for i in range(3):
-            l[:, i] = np.sqrt(np.sum(v**2, axis=1))
-        p = l.sum(axis=1)
-        q = l.prod(axis=1)
-        area = self.area()
-        quality = 16*a**2/(p*q)
-        return quality
-
-    def grad_quality(self, alpha=2):
-        point = self.point
-        cell = self.ds.cell
-
-        NC = self.number_of_cells()
-        N = self.number_of_points()
-
-        localEdge = self.ds.local_edge()
-        v = [point[cell[:,j],:] - point[cell[:,i],:] for i,j in localeEdge]
-        l = np.zeros((NC, 3))
-        for i in range(3):
-            l[:, i] = np.sqrt(np.sum(v**2, axis=1))
-
-        p = l.sum(axis=1)
-        q = l.prod(axis=1)
-        area = self.area()
-        quality = p*q/(16*a**2)
-
-        c = 1/l**2 + 1/(p.reshape(-1, 1)*l)
-        b = np.zeros((NC, 6), dtype=np.float)
-        ne = [1, 2, 0]
-        pr = [2, 0, 1]
-        W = np.array([[0, 1], [-1, 0]])
-        for i in range(3):
-            ci = c[:, ne[i]] + c[:, pr[i]]
-            b[:, [2*i, 2*i+1]] = ci.reshape(-1, 1)*point[cell[:, i]]
-            b[:, [2*i, 2*i+1]] -= c[:, pr[i]].reshape(-1, 1)*point[cell[:, ne[i]]] 
-            b[:, [2*i, 2*i+1]] -= c[:, ne[i]].reshape(-1, 1)*point[cell[:, pr[i]]]
-            b[:, [2*i, 2*i+1]] -= (point[cell[:, pr[i]]] - point[cell[:, ne[i]]])@W/area.reshape(-1, 1)
-
-        b *= alpha*q**alpha
-
-        gradF = np.zeros((N, 2), dtype=np.float)
-        np.add.at(gradF[:, 0], cell.flatten(), b[:, [0, 2, 4]].flatten())
-        np.add.at(gradF[:, 1], cell.flatten(), b[:, [1, 3, 5]].flatten())
-        F = np.sum(quality**alpha)
-        return F, gradF
-
-
     def angle(self):
         NC = self.number_of_cells()
         cell = self.ds.cell
@@ -164,6 +108,7 @@ class TriangleMesh(Mesh2d):
             edge2newPoint = np.arange(N, N+NE)
             newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
             if surface is not None:
+                #TODO: just project the boundary point
                 newPoint, _ = surface.project(newPoint)
             self.point = np.concatenate((point, newPoint), axis=0)
             p = np.concatenate((cell, edge2newPoint[cell2edge]), axis=1)

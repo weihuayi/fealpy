@@ -75,6 +75,65 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
         return Dlambda, volume
 
+    def uniform_refine(self, n=1, surface=None):
+        for i in range(n):
+            N = self.number_of_points()
+            NC = self.number_of_cells()
+            NE = self.number_of_edges()
+            point = self.point
+            edge = self.ds.edge
+            cell = self.ds.cell
+            cell2edge = self.ds.cell_to_edge()
+            edge2newPoint = np.arange(N, N+NE)
+            newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
+            if surface is not None:
+                #TODO: just project the boundary point
+                newPoint, _ = surface.project(newPoint)
+            self.point = np.concatenate((point, newPoint), axis=0)
+            p = edge2newPoint[cell2edge]
+            newCell = np.zeros((8*NC, 4), dtype=np.int)
+            newCell[0:4*NC, 0] = cell.flatten('F')
+            newCell[0:NC, 0:3] = p[:, [0, 2, 1]]
+            newCell[NC:2*NC, 0:3] = p[:, [0, 3, 4]]
+            newCell[2*NC:3*NC, 0:3] = p[:, [1, 5, 3]]
+            newCell[3*NC:4*NC, 0:3] = p[:, [2, 4, 5]]
+
+            l = np.zeros((NC, 3), dtype=np.float)
+            point = self.point
+            print(point)
+            l[:, 0] = np.sum((point[p[:, 0]] - point[p[:, 5]])**2, axis=1)
+            l[:, 1] = np.sum((point[p[:, 1]] - point[p[:, 4]])**2, axis=1)
+            l[:, 2] = np.sum((point[p[:, 2]] - point[p[:, 3]])**2, axis=1)
+
+            idx = np.argmin(l, axis=1)
+            T = np.array([
+                (1, 3, 4, 2, 5, 0),
+                (0, 2, 5, 3, 4, 1),
+                (0, 4, 5, 1, 3, 2)
+                ])[idx]
+            newCell[4*NC:5*NC, 0] = p[range(NC), T[:, 0]]
+            newCell[4*NC:5*NC, 1] = p[range(NC), T[:, 1]]
+            newCell[4*NC:5*NC, 2] = p[range(NC), T[:, 4]] 
+            newCell[4*NC:5*NC, 3] = p[range(NC), T[:, 5]]
+
+            newCell[5*NC:6*NC, 0] = p[range(NC), T[:, 1]]
+            newCell[5*NC:6*NC, 1] = p[range(NC), T[:, 2]]
+            newCell[5*NC:6*NC, 2] = p[range(NC), T[:, 4]] 
+            newCell[5*NC:6*NC, 3] = p[range(NC), T[:, 5]]
+
+            newCell[6*NC:7*NC, 0] = p[range(NC), T[:, 2]]
+            newCell[6*NC:7*NC, 1] = p[range(NC), T[:, 3]]
+            newCell[6*NC:7*NC, 2] = p[range(NC), T[:, 4]] 
+            newCell[6*NC:7*NC, 3] = p[range(NC), T[:, 5]]
+
+            newCell[7*NC:, 0] = p[range(NC), T[:, 3]]
+            newCell[7*NC:, 1] = p[range(NC), T[:, 0]]
+            newCell[7*NC:, 2] = p[range(NC), T[:, 4]] 
+            newCell[7*NC:, 3] = p[range(NC), T[:, 5]]
+
+            N = self.number_of_points()
+            self.ds.reinit(N, newCell)
+
     def print(self):
         print("Point:\n", self.point)
         print("Cell:\n", self.ds.cell)
