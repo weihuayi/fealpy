@@ -51,7 +51,7 @@ class TriRadiusRatio():
         quality = p*q/(16*area**2)
         return quality
 
-    def objective_function(self, mesh):
+    def objective_function(self, mesh, weight=True):
         alpha = self.alpha
 
         point = mesh.point
@@ -97,8 +97,8 @@ class TriRadiusRatio():
         F = np.sum(quality**alpha)
         gradF = np.zeros((N, 2), dtype=np.float)
         gradF[:, 0] = A@point[:, 0] + B@point[:, 1]
-        gradF[:, 1] = point[:, 0]@B + A@point[:, 1]
-        return F, gradF, A, B 
+        gradF[:, 1] = A@point[:, 1] - B@point[:, 0] 
+        return F, gradF
 
     def show_quality(self, axes, q):
         return show_mesh_quality(axes, q)
