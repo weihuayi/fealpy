@@ -10,29 +10,24 @@ class OptAlg():
 
     def run(self, maxit=10):
         i = 0
+        mesh = self.mesh
+        quality = self.quality
+        isFreeNode = ~(mesh.ds.boundary_point_flag())
+        qmax = np.max(quality.quality(mesh.point, mesh.ds.cell))
         while i < maxit:
             try:
                 i += 1
-                self.jacobi()
+                alpha = 1
+                F, gradF = quality.objective_function(mesh.point, mesh.ds.cell)
+                newPoint = mesh.point.copy()
+                newPoint[isFreeNode] = mesh.point[isFreeNode] - alpha*gradF[isFreeNode] 
+                while ~quality.is_valid(newPoint, mesh.ds.cell) or np.max(quality.quality(newPoint, mesh.ds.cell)) > qmax: 
+                    alpha /= 2
+                    newPoint[isFreeNode] = mesh.point[isFreeNode] - alpha*gradF[isFreeNode] 
+                print(alpha)
+                mesh.point = newPoint
             except StopIteration:
                 break
-
-    def jacobi(self):
-        mesh = self.mesh
-        quality = self.quality
-
-        point = mesh.point
-        N = mesh.number_of_points()
-        F, gradF, A, B = quality.objective_function(mesh)
-        C = -(triu(A, 1) + tril(A, -1))
-        D = A.diagonal()
-        X = (C@point[:, 0] + B@point[:, 1])/D
-        Y = (C@point[:, 1] - B@point[:, 0])/D
-        isBdPoint = mesh.ds.boundary_point_flag()
-        mesh.point[~isBdPoint, 0] = X[~isBdPoint]
-        mesh.point[~isBdPoint, 1] = Y[~isBdPoint]
-        print("Value of Obj function:", F)
-        print("The norm of gradient:", np.linalg.norm(gradF)) 
 
 
 

@@ -28,77 +28,67 @@ def show_mesh_quality(axes, quality):
 
 class TriRadiusRatio():
 
-    def __init__(self, alpha=2):
-        self.alpha = alpha
+    def __call__(self, point, cell):
+        return self.quality(point, cell)
 
-    def __call__(self, mesh):
-        return self.quality(mesh)
+    def quality(self, point, cell):
 
-    def quality(self, mesh):
-        point = mesh.point
-        cell = mesh.ds.cell
-
-        NC = mesh.number_of_cells()
-
-        localEdge = mesh.ds.localEdge
+        NC = cell.shape[0] 
+        localEdge = np.array([(1, 2), (2, 0), (0, 1)])
         v = [point[cell[:,j],:] - point[cell[:,i],:] for i,j in localEdge]
         l = np.zeros((NC, 3))
         for i in range(3):
             l[:, i] = np.sqrt(np.sum(v[i]**2, axis=1))
         p = l.sum(axis=1)
         q = l.prod(axis=1)
-        area = mesh.area()
+        area = np.cross(v[2], -v[1])/2 
         quality = p*q/(16*area**2)
         return quality
 
-    def objective_function(self, mesh, weight=True):
-        alpha = self.alpha
+    def objective_function(self, point, cell):
 
-        point = mesh.point
-        cell = mesh.ds.cell
+        N = point.shape[0]
+        NC = cell.shape[0]
 
-        NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
-
-        localEdge = mesh.ds.localEdge
+        localEdge = np.array([(1, 2), (2, 0), (0, 1)])
         v = [point[cell[:,j],:] - point[cell[:,i],:] for i,j in localEdge]
         l = np.zeros((NC, 3))
         for i in range(3):
             l[:, i] = np.sqrt(np.sum(v[i]**2, axis=1))
+
         p = l.sum(axis=1)
         q = l.prod(axis=1)
-        area = mesh.area()
+        area = np.cross(v[2], -v[1])/2 
         quality = p*q/(16*area**2)
-        mu= alpha*quality**alpha
-        c = mu.reshape(-1, 1)*(1/l**2 + 1/(p.reshape(-1, 1)*l))
 
-        val = np.concatenate((
-            c[:, [1, 2]].sum(axis=1), -c[:, 2], -c[:, 1],
-            -c[:, 2], c[:, [0, 2]].sum(axis=1), -c[:, 0],
-            -c[:, 1], -c[:, 0], c[:, [0, 1]].sum(axis=1)))
+        c = 1/l**2 + 1/(p.reshape(-1, 1)*l)
+        b = np.zeros((NC, 6), dtype=np.float)
+        ne = [1, 2, 0]
+        pr = [2, 0, 1]
+        W = np.array([[0, 1], [-1, 0]])
+        weight = np.zeros(N, dtype=np.float)
+        for i in range(3):
+            ci = c[:, ne[i]] + c[:, pr[i]]
+            np.add.at(weight, cell[:, i], quality*ci)
+            b[:, [2*i, 2*i+1]] = ci.reshape(-1, 1)*point[cell[:, i]]
+            b[:, [2*i, 2*i+1]] -= c[:, pr[i]].reshape(-1, 1)*point[cell[:, ne[i]]] 
+            b[:, [2*i, 2*i+1]] -= c[:, ne[i]].reshape(-1, 1)*point[cell[:, pr[i]]]
+            b[:, [2*i, 2*i+1]] -= (point[cell[:, pr[i]]] - point[cell[:, ne[i]]])@W/area.reshape(-1, 1)
 
-        I = np.concatenate((
-            cell[:, 0], cell[:, 0], cell[:, 0],
-            cell[:, 1], cell[:, 1], cell[:, 1],
-            cell[:, 2], cell[:, 2], cell[:, 2]))
-        J = np.concatenate((
-            cell[:, 0], cell[:, 1], cell[:, 2],
-            cell[:, 0], cell[:, 1], cell[:, 2],
-            cell[:, 0], cell[:, 1], cell[:, 2],
-            ))
-        A = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.float)
+        b *= quality.reshape(-1, 1) 
 
-        cn = mu/area
-        val = np.concatenate((-cn, cn, cn, -cn, -cn, cn))
-        I = np.concatenate((cell[:, 0], cell[:, 0], cell[:, 1], cell[:, 1], cell[:, 2], cell[:, 2]))
-        J = np.concatenate((cell[:, 1], cell[:, 2], cell[:, 0], cell[:, 2], cell[:, 0], cell[:, 1]))
-        B = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.float)
-
-        F = np.sum(quality**alpha)
         gradF = np.zeros((N, 2), dtype=np.float)
-        gradF[:, 0] = A@point[:, 0] + B@point[:, 1]
-        gradF[:, 1] = A@point[:, 1] - B@point[:, 0] 
-        return F, gradF
+        np.add.at(gradF[:, 0], cell.flatten(), b[:, [0, 2, 4]].flatten())
+        np.add.at(gradF[:, 1], cell.flatten(), b[:, [1, 3, 5]].flatten())
+        F = np.sum(quality)
+        return F, gradF/weight.reshape(-1, 1)
+
+    def is_valid(self, point, cell):
+        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
+        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
+        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
+        area = np.cross(v2, -v1)/2
+        return np.all(area > 0)
 
     def show_quality(self, axes, q):
         return show_mesh_quality(axes, q)

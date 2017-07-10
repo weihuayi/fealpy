@@ -24,9 +24,9 @@ mesh_info.set_facets([[0,1], [1,2], [2,3], [3,0]])
 h = 0.05
 tmesh = mesh_2dpy(mesh_info,h)
 
-quality = TriRadiusRatio(alpha=1)
+quality = TriRadiusRatio()
 optalg = OptAlg(tmesh, quality)
-optalg.run(maxit=2)
+optalg.run(maxit=20)
 
 fig = plt.figure()
 axes = fig.gca()
@@ -37,7 +37,7 @@ point = tmesh.point
 
 fig = plt.figure()
 axes = fig.gca()
-q = quality(tmesh)
+q = quality(tmesh.point, tmesh.ds.cell)
 quality.show_quality(axes, 1/q)
 
 plt.show()
