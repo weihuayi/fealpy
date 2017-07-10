@@ -35,12 +35,13 @@ class TetrahedronMesh(Mesh3d):
         NC = self.number_of_cells()
         point = self.point
         cell = self.ds.cell
-        n = [np.cross(point[cell[:,k],:] - point[cell[:,j],:],
-            point[cell[:,m],:] - point[cell[:,j],:]) for i,j,k in localFace]
-        l = [np.sqrt(ni**2).sum(axis=1, keepdims=True) for ni in n]
-        n = [ni/li for ni in n for li in l]
-        localEdge = self.ds.local_edge()
-        angle = [np.pi - np.arccos((n[i]*n[j]).sum(axis=1)) for i,j in localEdge[-1::-1]]
+        localFace = self.ds.localFace 
+        n = [np.cross(point[cell[:, j],:] - point[cell[:, i],:],
+            point[cell[:, k],:] - point[cell[:, i],:]) for i, j, k in localFace]
+        l =[ np.sqrt(np.sum(ni**2, axis=1)) for ni in n]
+        n = [ ni/li.reshape(-1, 1) for ni, li in zip(n, l)]
+        localEdge = self.ds.localEdge
+        angle = [(np.pi - np.arccos((n[i]*n[j]).sum(axis=1)))/np.pi*180 for i,j in localEdge[-1::-1]]
         return np.array(angle).T
 
 
@@ -75,24 +76,26 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
         return Dlambda, volume
 
-    def uniform_refine(self, n=1, surface=None):
+    def uniform_refine(self, n=1):
         for i in range(n):
             N = self.number_of_points()
             NC = self.number_of_cells()
             NE = self.number_of_edges()
+
             point = self.point
             edge = self.ds.edge
             cell = self.ds.cell
             cell2edge = self.ds.cell_to_edge()
+
             edge2newPoint = np.arange(N, N+NE)
             newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
-            if surface is not None:
-                #TODO: just project the boundary point
-                newPoint, _ = surface.project(newPoint)
+
             self.point = np.concatenate((point, newPoint), axis=0)
+
             p = edge2newPoint[cell2edge]
             newCell = np.zeros((8*NC, 4), dtype=np.int)
-            newCell[0:4*NC, 0] = cell.flatten('F')
+
+            newCell[0:4*NC, 3] = cell.flatten('F')
             newCell[0:NC, 0:3] = p[:, [0, 2, 1]]
             newCell[NC:2*NC, 0:3] = p[:, [0, 3, 4]]
             newCell[2*NC:3*NC, 0:3] = p[:, [1, 5, 3]]
@@ -100,11 +103,12 @@ class TetrahedronMesh(Mesh3d):
 
             l = np.zeros((NC, 3), dtype=np.float)
             point = self.point
-            print(point)
             l[:, 0] = np.sum((point[p[:, 0]] - point[p[:, 5]])**2, axis=1)
             l[:, 1] = np.sum((point[p[:, 1]] - point[p[:, 4]])**2, axis=1)
             l[:, 2] = np.sum((point[p[:, 2]] - point[p[:, 3]])**2, axis=1)
 
+            # Here one should connect the shortest edge
+            # idx = np.argmax(l, axis=1)
             idx = np.argmin(l, axis=1)
             T = np.array([
                 (1, 3, 4, 2, 5, 0),
