@@ -92,3 +92,11 @@ class TriRadiusRatio():
 
     def show_quality(self, axes, q):
         return show_mesh_quality(axes, q)
+
+class TetRadiusRatio:
+
+    def __call__(self, point, cell):
+        return self.quality(point, cell)
+
+    def quality(self, point, cell):
+

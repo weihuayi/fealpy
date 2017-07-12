@@ -25,6 +25,7 @@ def write_vtk_mesh(mesh, fileName):
     if point.shape[1] == 2:
         point = np.concatenate((point, np.zeros((point.shape[0], 1), dtype=np.float)), axis=1)
     ug = tvtk.UnstructuredGrid(points=point)
+
     if mesh.meshtype is 'hex':
         cell_type = tvtk.Hexahedron().cell_type
         cell = mesh.ds.cell
@@ -42,7 +43,15 @@ def write_vtk_mesh(mesh, fileName):
        NC, cells = mesh.to_vtk()
        cell = tvtk.CellArray()
        cell.set_cells(NC, cells)
-        
+    elif mesh.meshtype is 'tet':
+        cell_type = tvtk.Tetra().cell_type
+        cell = mesh.ds.cell
+        for key, value in mesh.cellData.items():
+            i = ug.cell_data.add_array(value)
+            ug.cell_data.get_array(i).name = key
+        for key, value in mesh.pointData.items():
+            i = ug.point_data.add_array(value)
+            ug.point_data.get_array(i).name = key
 
     ug.set_cells(cell_type, cell) 
     write_data(ug, fileName)

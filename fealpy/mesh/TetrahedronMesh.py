@@ -10,14 +10,34 @@ class TetrahedronMesh(Mesh3d):
         self.ds = TetrahedronMeshDataStructure(N, cell)
 
         self.meshtype = 'tet'
-        self.dtype= dtype 
+        self.dtype= dtype
+
+        self.cellData = {}
+        self.pointData = {}
+
+    def direction(self, i):
+        """ Compute the direction on every vertex of 
+
+        0 <= i < 4
+        """
+        point = self.point
+        cell = self.ds.cell
+        index = self.ds.index
+        v10 = point[cell[:, index[3*i, 0]]] - point[cell[:, index[3*i, 1]]]
+        v20 = point[cell[:, index[3*i, 0]]] - point[cell[:, index[3*i, 2]]]
+        v30 = point[cell[:, index[3*i, 0]]] - point[cell[:, index[3*i, 3]]]
+        l1 = np.sum(v10**2, axis=1, keepdims=True)
+        l2 = np.sum(v20**2, axis=1, keepdims=True)
+        l3 = np.sum(v30**2, axis=1, keepdims=True)
+
+        return l1*np.cross(v20, v30) + l2*np.cross(v30, v10) + l3*np.cross(v10, v20)
 
     def volume(self):
         cell = self.ds.cell
         point = self.point
-        v01 = point[cell[:,1], :] - point[cell[:,0],:]
-        v02 = point[cell[:,2], :] - point[cell[:,0],:]
-        v03 = point[cell[:,3], :] - point[cell[:,0],:]
+        v01 = point[cell[:,1]] - point[cell[:,0]]
+        v02 = point[cell[:,2]] - point[cell[:,0]]
+        v03 = point[cell[:,3]] - point[cell[:,0]]
         volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
         return volume
 
@@ -61,6 +81,66 @@ class TetrahedronMesh(Mesh3d):
         c = point[cell[:,0],:] + d
         R = np.sqrt(np.sum(d**2,axis=1))
         return c, R
+
+    def quality(self):
+        s = self.face_area()
+        cell2face = self.ds.cell_to_face()
+        ss = np.sum(s[cell2face], axis=1)
+        d = self.direction(0)
+        ld = np.sqrt(np.sum(d**2, axis=1))
+        vol = self.volume()
+        R = ld/vol/12.0
+        r = 3.0*vol/ss
+        return R/r/3.0
+
+    def grad_quality(self):
+        cell = self.ds.cell
+        point = self.point
+
+        N = self.number_of_points()
+        NC = self.number_of_cells()
+
+        s = self.face_area()
+        cell2face = self.ds.cell_to_face()
+        s = s[cell2face]
+
+        ss = np.sum(s, axis=1)
+        d = [self.direction(i) for i in range(4)]
+        dd = np.sum(d[0]**2, axis=1)
+
+        ld = np.sqrt(np.sum(d[0]**2, axis=1))
+        vol = self.volume()
+        R = ld/vol/12.0
+        r = 3.0*vol/ss
+        q = R/r/3.0
+        index = self.ds.index
+        g = np.zeros((NC, 4, 3), dtype=np.float)
+        w = np.zeros((NC, 4), dtype=np.float)
+        for idx in range(12):
+            i = index[idx, 0]
+            j = index[idx, 1]
+            k = index[idx, 2]
+            m = index[idx, 3]
+            vji = point[cell[:, i]] - point[cell[:, j]]
+            w0 = 2.0*np.sum(np.cross(point[cell[:, i]] - point[cell[:, k]], point[cell[:, i]] - point[cell[:, m]])*d[i], axis=1)/dd
+            w1 = 0.25*(np.sum((point[cell[:, i]] - point[cell[:, m]])*(point[cell[:, j]] - point[cell[:, m]]), axis=1)/s[:, k] 
+                    + np.sum((point[cell[:, i]] - point[cell[:, k]])*(point[cell[:, j]] - point[cell[:, k]]), axis=1)/s[:, m])/ss
+
+            g[:, i, :] += (w0 + w1).reshape(-1, 1)*vji
+            w[:, i] += (w0 + w1)
+
+            w2 = (np.sum((point[cell[:, i]] - point[cell[:, m]])**2, axis=1) - np.sum((point[cell[:, i]]-point[cell[:, k]])**2, axis=1))/dd 
+            g[:, i, :] += w2.reshape(-1, 1)*np.cross(d[i], vji)
+            g[:, i, :] += np.cross(point[cell[:, k]] + point[cell[:, j]] - 2*point[cell[:, m]], vji)/vol.reshape(-1, 1)/9.0
+
+        g *= q.reshape(-1, 1, 1)
+        w *= q.reshape(-1, 1)
+        grad = np.zeros((N, 3), dtype=np.float)
+        np.add.at(grad, cell.flatten(), g.reshape(-1, 3))
+        wgt = np.zeros(N, dtype=np.float)
+        np.add.at(wgt, cell.flatten(), w.flatten())
+
+        return grad/wgt.reshape(-1, 1)
 
     def grad_lambda(self):
         localFace = self.ds.localFace
@@ -138,6 +218,10 @@ class TetrahedronMesh(Mesh3d):
             N = self.number_of_points()
             self.ds.reinit(N, newCell)
 
+    def is_valid(self):
+        vol = self.volume()
+        return np.all(vol > 1e-15)
+
     def print(self):
         print("Point:\n", self.point)
         print("Cell:\n", self.ds.cell)
@@ -151,6 +235,11 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = np.array([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
+    index = np.array([
+       (0, 1, 2, 3), (0, 2, 3, 1), (0, 3, 1, 2),
+       (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
+       (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
+       (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)]);
     V = 4
     E = 6
     F = 4
