@@ -57,6 +57,7 @@ def HG(mesh, phi, phiSign, h):
 
     dx0[-ny-1:] = dx0[-2*(ny+1):-ny-1]
     dx1[0:ny+1] = dx1[ny+1:2*(ny+1)]
+
     dy0[ny::ny+1] = dy0[ny-1:-1:ny+1]
     dy1[0:-ny:ny+1] = dy1[1:-ny+1:ny+1]
 
