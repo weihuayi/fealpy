@@ -4,7 +4,7 @@ import numpy as np
 from fealpy.mesh.simple_mesh_generator import squaremesh
 from fealpy.functionspace.tools import function_space 
 from fealpy.form.Form import BihamonicRecoveryForm, SourceForm
-from fealpy.boundarycondition.BoundaryCondition import DirichletBC, BihamonicRecoveryBC
+from fealpy.boundarycondition.BoundaryCondition import DirichletBC, BihamonicRecoveryBC1
 from fealpy.solver import solve
 from fealpy.functionspace import Interpolation
 from fealpy.functionspace.function import FiniteElementFunction
@@ -13,12 +13,12 @@ from fealpy.functionspace.tools import recover_grad
 from fealpy.model.BihamonicModel2d import BihamonicData2,BihamonicData3,BihamonicData4
 
 
-#model = BihamonicData2(1.0,1.0)
-model = BihamonicData4()
+model = BihamonicData2(1.0,1.0)
+#model = BihamonicData4()
 mesh = squaremesh(0, 1, 0, 1, r=3)
 maxit = 4
 degree = 1
-sigma = 1
+sigma = 100
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
 gerror = np.zeros((maxit,), dtype=np.float)
@@ -35,13 +35,13 @@ for i in range(maxit):
 
     bc0 = DirichletBC(V, model.dirichlet, model.is_boundary_dof)
 
-    bc1 = BihamonicRecoveryBC(V, model.neuman, sigma=sigma)
+    bc1 = BihamonicRecoveryBC1(V, model.neuman, sigma=sigma)
 
     solve(a, L, uh, dirichlet=bc0, neuman=bc1, solver='direct')
     error[i] = L2_error(model.solution, uh, order=4)
     ruh = recover_grad(uh)
     derror[i] = div_error(model.laplace, ruh, order=4)
-    gerror[i] = L2_error(model.gradient, ruh, order=4)
+    gerror[i] = L2_error(model.gradient, ruh, order=5)
 
     if i < maxit-1:
         mesh.uniform_refine()

@@ -14,9 +14,11 @@ from fealpy.erroranalysis import L2_error
 from fealpy.model.poisson_model_2d import CosCosData
 
 degree = int(sys.argv[1]) 
-qt = 11 
+qt = int(sys.argv[2])  
+n = int(sys.argv[3])
+
 box = [0, 1, 0, 1]
-n = 40 
+
 model = CosCosData()
 mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='tri') 
 maxit = 4 
@@ -31,7 +33,7 @@ for i in range(maxit):
     L = SourceForm(V, model.source, qt)
     bc = DirichletBC(V, model.dirichlet, model.is_boundary)
     point = V.interpolation_points()
-    solve(a, L, uh, dirichlet=bc, solver='amg')
+    solve(a, L, uh, dirichlet=bc, solver='direct')
     error[i] = L2_error(model.solution, uh, order=qt) 
     # error[i] = np.sqrt(np.sum((uh - model.solution(point))**2)/Ndof[i])
     if i < maxit-1:

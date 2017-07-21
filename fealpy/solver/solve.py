@@ -9,8 +9,12 @@ import pylab
 def solve(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     V = a.V
 
+    start = timer()
     A = a.get_matrix()
     b = L.get_vector()
+    end = timer()
+
+    print("Construct linear system time:", end - start)
 
     if neuman is not None:
         b += neuman.get_vector()

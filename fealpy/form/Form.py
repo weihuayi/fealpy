@@ -150,8 +150,7 @@ class BihamonicRecoveryForm:
         P = coo_matrix((N, N), dtype=np.float)
         Q = coo_matrix((N, N), dtype=np.float)
         S = coo_matrix((N, N), dtype=np.float)
-        T = coo_matrix((N, N), dtype=np.float)
-        G = coo_matrix((N, N), dtype=np.float)
+        #T = coo_matrix((N, N), dtype=np.float)
         gradphi, area = mesh.grad_lambda()
         for i in range(3):
             for j in range(3):  
@@ -164,81 +163,41 @@ class BihamonicRecoveryForm:
                 Q += coo_matrix((val01, (cell[:,i], cell[:,j])), shape=(N, N))
                 S += coo_matrix((val11, (cell[:,i], cell[:,j])), shape=(N, N))
 
-                val = np.sum(gradphi[edge2cell[isBdEdge, 0], i, :]*n, axis=1) \
-                       *np.sum(gradphi[edge2cell[isBdEdge, 0], j, :]*n, axis=1)/h
-                T += coo_matrix((self.sigma*val, (cell[edge2cell[isBdEdge,0], i], cell[edge2cell[isBdEdge,0],j])), shape=(N,N))
+                #val = np.sum(gradphi[edge2cell[isBdEdge, 0], i, :]*n, axis=1) \
+                #       *np.sum(gradphi[edge2cell[isBdEdge, 0], j, :]*n, axis=1)/h
+                #T += coo_matrix((self.sigma*val, (cell[edge2cell[isBdEdge,0], i], cell[edge2cell[isBdEdge,0],j])), shape=(N,N))
 
 
         D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
         A = D@A.tocsc()
         B = D@B.tocsc()
+
         P = P.tocsc()
         Q = Q.tocsc()
         S = S.tocsc()
-        T = T.tocsc()
+        #T = T.tocsc()
 
-        M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B + T
+        #M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B + T
+        M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
 
-        bdCellIdx = edge2cell[isBdEdge, 0]
-        bdCell = cell[bdCellIdx]
-        NBE = len(bdEdge) 
-        VM = csr_matrix((NBE, N))
-        for i in range(3):
-            VM += spdiags(gradphi[bdCellIdx, i, 0], 0, NBE, NBE) @ A[bdCell[:, i], :] 
-            VM += spdiags(gradphi[bdCellIdx, i, 1], 0, NBE, NBE) @ B[bdCell[:, i], :]
+        P = coo_matrix((N, N), dtype=np.float)
+        Q = coo_matrix((N, N), dtype=np.float)
+        S = coo_matrix((N, N), dtype=np.float)
 
-        Y = coo_matrix((N, N), dtype=np.float)
-        for i in range(3):
-            VAL = spdiags(h*np.sum(gradphi[bdCellIdx, i, :]*n, axis=1), 0, NBE, NBE)@VM
-            I, J = VAL.nonzero()
-            val = np.asarray(VAL[I, J]).reshape(-1)
-            Y += coo_matrix((val, (bdCell[I, i], J)), shape=(N, N)) 
+        for i in range(2):
+            for j in range(2):
+                if i == j:
+                    val = 1/3
+                else:
+                    val = 1/6
+                P += coo_matrix((self.sigma*val*n[:, 0]*n[:, 0]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+                Q += coo_matrix((self.sigma*val*n[:, 0]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+                S += coo_matrix((self.sigma*val*n[:, 1]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+          
+        P = P.tocsc()
+        Q = Q.tocsc()
+        S = S.tocsc()
 
-#        M -= Y.tocsr()
-
-#        nn = np.array([1, 2, 0])
-#        idx0 = edge2cell[isBdEdge, 2]
-#        idx1 = nn[idx0]
-#        idx2 = nn[idx1]
-#
-#        gidx = (cell[bdCellIdx, idx0], cell[bdCellIdx, idx1], cell[bdCellIdx, idx2])
-
-#        nn = np.array([1, 2, 0])
-#        idx0 = edge2cell[isBdEdge, 2]
-#        idx1 = nn[idx0]
-#        idx2 = nn[idx1]
-#
-#        gidx0 = cell[bdCellIdx, idx0]
-#        gidx1 = cell[bdCellIdx, idx1]
-#        gidx2 = cell[bdCellIdx, idx2]
-#
-#        VAL0 = np.asarray(A[gidx1, gidx0]).reshape(-1) + np.asarray(A[gidx2, gidx0]).reshape(-1)
-#        VAL1 = np.asarray(B[gidx1, gidx0]).reshape(-1) + np.asarray(B[gidx2, gidx0]).reshape(-1)
-#        VAL = spdiags(0.5*h*(VAL0*n[:, 0] + VAL1*n[:, 1]), 0, NBE, NBE)*VM
-#        I, J = VAL.nonzero()
-#        val = np.asarray(VAL[I, J]).reshape(-1)
-#        I = bdCell[np.arange(NBE), idx0][I]
-#        Y = coo_matrix((val, (I, J)), shape=(N, N))
-#
-#        VAL0 = np.asarray(A[gidx1, gidx1]).reshape(-1) + np.asarray(A[gidx2, gidx1]).reshape(-1)
-#        VAL1 = np.asarray(B[gidx1, gidx1]).reshape(-1) + np.asarray(B[gidx2, gidx1]).reshape(-1)
-#        VAL = spdiags(0.5*h*(VAL0*n[:, 0] + VAL1*n[:, 1]), 0, NBE, NBE)*VM
-#        I, J = VAL.nonzero()
-#        val = np.asarray(VAL[I, J]).reshape(-1)
-#        I = bdCell[np.arange(NBE), idx1][I]
-#        Y += coo_matrix((val, (I, J)), shape=(N, N))
-#
-#        VAL0 = np.asarray(A[gidx2, gidx2]).reshape(-1) + np.asarray(A[gidx1, gidx2]).reshape(-1)
-#        VAL1 = np.asarray(B[gidx2, gidx2]).reshape(-1) + np.asarray(B[gidx1, gidx2]).reshape(-1)
-#        VAL = spdiags(0.5*h*(VAL0*n[:, 0] + VAL1*n[:, 1]), 0, NBE, NBE)*VM
-#        I, J = VAL.nonzero()
-#        val = np.asarray(VAL[I, J]).reshape(-1)
-#        I = bdCell[np.arange(NBE), idx2][I]
-#        Y += coo_matrix((val, (I, J)), shape=(N, N))
-#        M -= Y.tocsr()
-
-        # u_nv_n
-        #AB0 = spdiags(n[:, 0], 0, NBE, NBE)
-
+        M += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
 
         return M
