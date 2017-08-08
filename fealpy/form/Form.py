@@ -150,7 +150,6 @@ class BihamonicRecoveryForm:
         P = coo_matrix((N, N), dtype=np.float)
         Q = coo_matrix((N, N), dtype=np.float)
         S = coo_matrix((N, N), dtype=np.float)
-        #T = coo_matrix((N, N), dtype=np.float)
         gradphi, area = mesh.grad_lambda()
         for i in range(3):
             for j in range(3):  
@@ -163,10 +162,6 @@ class BihamonicRecoveryForm:
                 Q += coo_matrix((val01, (cell[:,i], cell[:,j])), shape=(N, N))
                 S += coo_matrix((val11, (cell[:,i], cell[:,j])), shape=(N, N))
 
-                #val = np.sum(gradphi[edge2cell[isBdEdge, 0], i, :]*n, axis=1) \
-                #       *np.sum(gradphi[edge2cell[isBdEdge, 0], j, :]*n, axis=1)/h
-                #T += coo_matrix((self.sigma*val, (cell[edge2cell[isBdEdge,0], i], cell[edge2cell[isBdEdge,0],j])), shape=(N,N))
-
 
         D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
         A = D@A.tocsc()
@@ -175,15 +170,12 @@ class BihamonicRecoveryForm:
         P = P.tocsc()
         Q = Q.tocsc()
         S = S.tocsc()
-        #T = T.tocsc()
 
-        #M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B + T
         M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
 
         P = coo_matrix((N, N), dtype=np.float)
         Q = coo_matrix((N, N), dtype=np.float)
         S = coo_matrix((N, N), dtype=np.float)
-
         for i in range(2):
             for j in range(2):
                 if i == j:
@@ -199,5 +191,36 @@ class BihamonicRecoveryForm:
         S = S.tocsc()
 
         M += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
+
+#        NBE = bdEdge.shape[0]
+#        ne = np.array([1, 2, 0])
+#        pr = np.array([2, 0, 1])
+#        edge2cell = mesh.ds.edge2cell
+#        bdCellIndex = edge2cell[isBdEdge, 0]
+#        localIdx = np.zeros((NBE, 2), dtype=np.int)
+#        localIdx[:, 0] = ne[edge2cell[isBdEdge, 2]]
+#        localIdx[:, 1] = pr[edge2cell[isBdEdge, 2]]
+#    
+#
+#        P = coo_matrix((N, N), dtype=np.float)
+#        Q = coo_matrix((N, N), dtype=np.float)
+#        S = coo_matrix((N, N), dtype=np.float)
+#        T = coo_matrix((N, N), dtype=np.float)
+#        for i in range(2):
+#            for j in range(2):
+#                val0 = 0.5*gradphi[bdCellIndex, localIdx[:, j], 0]*n[:, 0]*h
+#                val1 = 0.5*gradphi[bdCellIndex, localIdx[:, j], 0]*n[:, 1]*h
+#                val3 = 0.5*gradphi[bdCellIndex, localIdx[:, j], 1]*n[:, 0]*h
+#                val4 = 0.5*gradphi[bdCellIndex, localIdx[:, j], 1]*n[:, 1]*h
+#                P += coo_matrix((val0, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+#                Q += coo_matrix((val1, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+#                S += coo_matrix((val3, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+#                T += coo_matrix((val4, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+#        P = P.tocsc()
+#        Q = Q.tocsc()
+#        S = S.tocsc()
+#        T = T.tocsc()
+#        M -= A.transpose()@P@A + B.transpose()@Q@A + A.transpose()@S@B + B.transpose()@T@B
+#        M -= A.transpose()@P.transpose()@A + A.transpose()@Q.transpose()@B + B.transpose()@S.transpose()@A + B.transpose()@T.transpose()@B
 
         return M

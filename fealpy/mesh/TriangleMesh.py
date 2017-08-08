@@ -233,6 +233,30 @@ class TriangleMesh(Mesh2d):
             area = length/2.0
         return Dlambda, area
 
+    def rot_lambda(self):
+        point = self.point
+        cell = self.ds.cell
+        NC = self.number_of_cells()
+        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
+        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
+        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
+        dim = self.geom_dimension()
+        nv = np.cross(v2, -v1)
+        Rlambda = np.zeros((NC, 3, dim), dtype=self.dtype)
+        if dim == 2:
+            length = nv
+            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+            area = length/2.0
+        elif dim == 3:
+            length = np.sqrt(np.square(nv).sum(axis=1))
+            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+            area = length/2.0
+        return Rlambda, area
+
     def area(self):
         point = self.point
         cell = self.ds.cell

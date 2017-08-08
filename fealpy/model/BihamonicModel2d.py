@@ -1,5 +1,62 @@
 import numpy as np
 
+class SinSinData:
+    def __init__(self):
+        pass
+
+    def solution(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        r = np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*y)
+        return r
+
+    def gradient(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        val = np.zeros((len(x),2), dtype=p.dtype)
+        val[:,0] = 2*pi*np.sin(pi*x)*np.cos(pi*x)*np.sin(pi*y)*np.sin(pi*y)
+        val[:,1] = 2*pi*np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.cos(pi*y)
+        return val
+
+
+    def laplace(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        r = 2*pi**2*np.cos(pi*y)**2*np.sin(pi*x)**2
+        r += 2*pi**2*np.cos(pi*x)**2*np.sin(pi*y)**2 
+        r -= 4*pi**2*np.sin(pi*x)**2*np.sin(pi*y)**2
+        return r
+
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        return self.solution(p)
+
+    def neuman(self, p, n):
+        """ Neuman boundary condition
+        """
+        val = self.gradient(p)
+        return np.sum(val*n, axis=1)
+
+    def source(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        pi4 = pi**4
+        r1 = np.sin(pi*x)**2
+        r2 = np.cos(pi*x)**2
+        r3 = np.sin(pi*y)**2
+        r4 = np.cos(pi*y)**2
+        r = 8*pi4*r2*r4 - 16*pi4*r4*r1 - 16*pi4*r2*r3 + 24*pi4*r1*r3
+        return r
+
+    def is_boundary_dof(self, p):
+        eps = 1e-14 
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+
 class BihamonicData2:
     def __init__(self,a,b):
         self.a = a

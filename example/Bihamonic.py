@@ -10,12 +10,12 @@ from fealpy.functionspace import Interpolation
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error
 from fealpy.functionspace.tools import recover_grad
-from fealpy.model.BihamonicModel2d import BihamonicData2,BihamonicData3,BihamonicData4
+from fealpy.model.BihamonicModel2d import SinSinData, BihamonicData2, BihamonicData4
 
-
-model = BihamonicData2(1.0,1.0)
+model = SinSinData()
+#model = BihamonicData2(1.0,1.0)
 #model = BihamonicData4()
-mesh = squaremesh(0, 1, 0, 1, r=3)
+mesh = squaremesh(0, 1, 0, 1, r=6)
 maxit = 4
 degree = 1
 sigma = 100
@@ -59,20 +59,20 @@ print('gradient error:\n', gerror)
 order = np.log(gerror[0:-1]/gerror[1:])/np.log(2)
 print('order:\n', order)
 
-fig, axes = plt.subplots(1, 2)
-
-#fig = plt.figure()
-#axes = fig.gca()
-
-ipoints = V.interpolation_points()
-cell2dof = V.cell_to_dof()
-u = model.solution(ipoints)
-ue = np.zeros(Ndof[-1], dtype=np.float)
-ue[:] = uh[:]
-
-e = np.sum(np.abs(u - ue)[cell2dof], axis=1)/3
-mesh.add_plot(axes[0], cellcolor=np.sum(u[cell2dof], axis=1)/3, showcolorbar=True)
-mesh.add_plot(axes[1], cellcolor=np.sum(ue[cell2dof], axis=1)/3, showcolorbar=True)
-#mesh.add_plot(axes, cellcolor=e, showcolorbar=True)
-plt.show()
-
+#fig, axes = plt.subplots(1, 2)
+#
+##fig = plt.figure()
+##axes = fig.gca()
+#
+#ipoints = V.interpolation_points()
+#cell2dof = V.cell_to_dof()
+#u = model.solution(ipoints)
+#ue = np.zeros(Ndof[-1], dtype=np.float)
+#ue[:] = uh[:]
+#
+#e = np.sum(np.abs(u - ue)[cell2dof], axis=1)/3
+#mesh.add_plot(axes[0], cellcolor=np.sum(u[cell2dof], axis=1)/3, showcolorbar=True)
+#mesh.add_plot(axes[1], cellcolor=np.sum(ue[cell2dof], axis=1)/3, showcolorbar=True)
+##mesh.add_plot(axes, cellcolor=e, showcolorbar=True)
+#plt.show()
+#

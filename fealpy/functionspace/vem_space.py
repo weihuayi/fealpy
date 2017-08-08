@@ -5,6 +5,60 @@ import numpy as np
 from ..common import ranges
 from .function import FiniteElementFunction
 
+class MonomialSpace2d():
+    def __init__(self, mesh, p = 0, dtype=np.float):
+        self.mesh = mesh
+        self.p = p
+
+    def cell_idx_matrix(self):
+        p = self.p
+        ldof = self.number_of_local_dofs() 
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        self.cellIdx = np.zeros((ldof, 2), dtype=np.int)
+        self.cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
+        self.cellIdx[:,0] = idx0 - cellIdx[:, 1]
+
+    def number_of_local_dofs():
+        p = self.p
+        return int((p+1)*(p+2)/2)
+
+    def basis(self, point):
+        p = self.p
+        cellIdx = self.cellIdx
+
+        ldof = self.number_of_local_dofs() 
+        NC = self.mesh.number_of_cells()
+        phi = np.ones((NC, ldof), dtype=self.dtype)
+
+        idx = np.sum(cellIdx, axis=1)
+        idx0 = cellIdx[:, 0] 
+        idx1 = cellIdx[:, 1]
+        for i in range(1,ldof):
+            phi[:, i] = (point[:, 0]**idx[i])*(point[:,1]**idx1[i])
+
+        return phi
+
+    def grad_basis(self, point):
+        p = self.p
+        cellIdx = self.cellIdx
+
+        NC = self.mesh.number_of_cells()
+        ldof = self.number_of_local_dofs() 
+        gradphi = np.zeros((NC, ldof, 2), dtype=self.dtype)
+
+        idx = np.sum(cellIdx, axis=1)
+        idx0 = cellIdx[:, 0] 
+        idx1 = cellIdx[:, 1]
+
+        for i in range(1, ldof):
+            if cellIdx[i, 0] > 0:
+                gradphi[:,i,0] = idx0[i]*point[:,0]**(idx0[i]-1)*point[:,1]**idx1[i]
+            if cellIdx[i, 1] > 0:
+                gradphi[:,i,1] = idx1[i]*(point[:,0]**idx0[i])*(point[:,1]**(idx1[i]-1))
+        return gradphi
+
+
 class ScaledMonomialSpace2d():
     def __init__(self, mesh, p = 1, dtype=np.float):
         self.mesh = mesh
@@ -101,7 +155,8 @@ class ScaledMonomialSpace2d():
 
     def number_of_global_dofs(self):
         ldof = self.number_of_local_dofs()
-        return self.NC*ldof
+        NC = self.mesh.number_of_cells()
+        return NC*ldof
 
 class VirtualElementSpace2d():
     def __init__(self, mesh, p = 1, dtype=np.float):
