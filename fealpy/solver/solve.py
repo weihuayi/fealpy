@@ -22,6 +22,7 @@ def solve(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     if dirichlet is not None:
         AD, b = dirichlet.apply(A, b)
 
+#    print("The condtion number is: ", np.linalg.cond(AD.todense()))
     if solver is 'cg':
         start = timer()
         D = AD.diagonal()

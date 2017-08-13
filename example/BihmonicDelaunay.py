@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
-
-from fealpy.mesh.simple_mesh_generator import squaremesh
+import sys
+from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 from fealpy.functionspace.tools import function_space 
 from fealpy.form.Form import BihamonicRecoveryForm, SourceForm
 from fealpy.boundarycondition.BoundaryCondition import DirichletBC, BihamonicRecoveryBC1
@@ -12,20 +12,29 @@ from fealpy.erroranalysis.PrioriError import L2_error, div_error
 from fealpy.functionspace.tools import recover_grad
 from fealpy.model.BihamonicModel2d import SinSinData, BihamonicData2, BihamonicData4
 
-#model = SinSinData()
-#model = BihamonicData2(1.0,1.0)
-model = BihamonicData4()
-mesh = squaremesh(0, 1, 0, 1, r=6)
+m = int(sys.argv[1]) 
+sigma = int(sys.argv[2])  
+
+if m == 1:
+    model = SinSinData()
+elif m == 2:
+    model = BihamonicData2(1.0,1.0)
+elif m == 3:
+    model = BihamonicData4()
+
+box = [0, 1, 0, 1]
+h0 = 0.02
+mesh = triangle(box, h0)
 maxit = 4
 degree = 1
-sigma = 10000
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
 gerror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
 for i in range(maxit):
-
+    #mesh = triangle(box, h0/(2**i))
+    #mesh = unitsquaredomainmesh(h0/2**i)
     V = function_space(mesh, 'Lagrange', degree)
     Ndof[i] = V.number_of_global_dofs() 
     uh = FiniteElementFunction(V)

@@ -52,7 +52,15 @@ def rectangledomainmesh(box, nx=10, ny=10, meshtype='tri', dtype=np.float):
         cell[:,3] = idx[0:-1, 1:].flatten()
         return PolygonMesh(point, cell)
 
-
+def triangle(box, h):
+    from meshpy.triangle import MeshInfo, build
+    mesh_info = MeshInfo()
+    mesh_info.set_points([(box[0], box[2]), (box[1], box[2]), (box[1], box[3]), (box[0], box[3])])
+    mesh_info.set_facets([[0,1], [1,2], [2,3], [3,0]])  
+    mesh = build(mesh_info, max_volume=h**2)
+    point = np.array(mesh.points, dtype=np.float)
+    cell = np.array(mesh.elements, dtype=np.int)
+    return TriangleMesh(point, cell)
 
 def unitsquaredomainmesh(h0, meshtype='tri', dtype=np.float):
     fd = lambda p: drectangle(p, [0, 1, 0, 1])

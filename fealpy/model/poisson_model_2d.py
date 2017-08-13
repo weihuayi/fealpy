@@ -1,5 +1,49 @@
-
 import numpy as np
+
+class LShapeRSinData:
+    def __init__(self):
+        pass
+
+    def solution(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        theta = np.arctan2(y, x)
+        u = (x*x + y*y)**(1/3)*np.sin(2/3*theta)
+        return u
+
+    def source(self, p):
+        """the right hand side of Possion equation
+        INPUT:
+            p: array object, N*2
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        rhs = 0
+        return rhs
+
+    def gradient(self, p):
+        """ The gradient of the exact solution
+        """
+        sin = np.sin
+        cos = np.cos
+        x = p[:, 0]
+        y = p[:, 1]
+        theta = np.arctan2(y, x)
+        val = np.zeros((len(x),2),dtype=p.dtype)
+        val[:, 0] =2/3*x*(x**2 + y**2)**(-2/3)*sin(2/3*theta)
+        -2/3*y*(x**2 +y**2)**(1/3)*np.cos(2/3*theta)/(x**2*(1 + y**2/x**2))
+        val[:, 1] = 2/3*y*(x**2 + y**2)**(-2/3)*np.sin(2/3*theta) + (2/3)*(x**2 +
+        y**2)**(1/3)*np.cos(2/3*theta)/(x*(1 + y**2/x**2))
+        return val
+
+    def dirichlet(self, p):
+        """Dilichlet boundary condition
+        """
+        return self.solution(p)
+
+    def is_boundary(self, p):
+        eps = 1e-14
+        return (p[:, 0] < -1.0 + eps)| (p[:, 1] > 1.0 - eps) | ((p[:, 1]< 1.0 - eps) & (p[:,0]>-eps)) | ((p[:, 1] < -eps) & (p[:, 0] > 1.0 -eps))
 
 class CosCosData:
     def __init__(self):

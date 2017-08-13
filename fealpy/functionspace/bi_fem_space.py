@@ -112,13 +112,13 @@ class QuadrangleFiniteElementSpace():
         gradphi = np.zeros((ldof, 2), dtype=np.float)
         gradphi[:, 0] = (gradphi0[I]*phi1[J]).reshape(-1)
         gradphi[:, 1] = (phi0[I]*gradphi1[J]).reshape(-1)
-        invJ = self.inv_jacobi_matrix(bc)
+        invJ, detJ = self.inv_jacobi_matrix(bc)
 
         # Here the graddients of all basis functions are the real graphi multiplied with the det of Jacobi
         # matrix
         gradphi = np.einsum('ij, kj...->ki...', gradphi, invJ)
 
-        return gradphi
+        return gradphi, detJ
 
 
     def inv_jacobi_matrix(self, bc):
@@ -145,7 +145,7 @@ class QuadrangleFiniteElementSpace():
         J[:, :, 1] = x1 - x0 + bc[0]*t
 
         # Here we return the inv of Jacobi matrix multiplied with its det 
-        return np.linalg.det(J).reshape(-1, 1, 1)*np.linalg.inv(J)
+        return np.linalg.inv(J), np.linalg.det(J)
 
     def edge_to_dof(self):
         p = self.p
