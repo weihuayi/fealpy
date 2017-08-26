@@ -9,11 +9,11 @@ if (NOT CMAKE_BUILD_TYPE)
   set (CMAKE_BUILD_TYPE "Release")
 endif ()
 
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} /usr/local/lib/cmake/modules)
 find_package(Geogram REQUIRED)
 message(STATUS "${GEOGRAM_INCLUDE_DIR}")
 
-set(GEOGRAM_LIBRAIES_DIR /home/why/software/geogram/1.4.9/lib)
+set(GEOGRAM_LIBRAIES_DIR /usr/local/lib)
 
 include_directories(${GEOGRAM_INCLUDE_DIR})
 link_directories(${GEOGRAM_LIBRAIES_DIR})

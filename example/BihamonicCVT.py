@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import sys
-from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
+from fealpy.mesh.meshio import load_mat_mesh
 from fealpy.functionspace.tools import function_space 
 from fealpy.form.Form import BihamonicRecoveryForm, SourceForm
 from fealpy.boundarycondition.BoundaryCondition import DirichletBC, BihamonicRecoveryBC1
@@ -22,9 +22,6 @@ elif m == 2:
 elif m == 3:
     model = BihamonicData4()
 
-box = [0, 1, 0, 1]
-h0 = 0.02
-mesh = triangle(box, h0)
 maxit = 4
 degree = 1
 error = np.zeros((maxit,), dtype=np.float)
@@ -32,9 +29,8 @@ derror = np.zeros((maxit,), dtype=np.float)
 gerror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
-for i in range(maxit):
-    #mesh = triangle(box, h0/(2**i))
-    #mesh = unitsquaredomainmesh(h0/2**i)
+for i in range(0, maxit):
+    mesh = load_mat_mesh('../data/square'+str(i+2)+'.mat')
     V = function_space(mesh, 'Lagrange', degree)
     Ndof[i] = V.number_of_global_dofs() 
     uh = FiniteElementFunction(V)
@@ -52,8 +48,8 @@ for i in range(maxit):
     derror[i] = div_error(model.laplace, ruh, order=4)
     gerror[i] = L2_error(model.gradient, ruh, order=5)
 
-    if i < maxit-1:
-        mesh.uniform_refine()
+#    if i < maxit-1:
+#        mesh.uniform_refine()
 
 print(Ndof)
 print('L2 error:\n', error)

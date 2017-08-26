@@ -153,10 +153,18 @@ class BihamonicRecoveryBC1():
         gradphi, area = mesh.grad_lambda()
         for i in range(3):
             for j in range(3):  
-                A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
-                B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
+                A += coo_matrix((gradphi[:,j,0]/area, (cell[:,i], cell[:,j])), shape=(N,N))
+                B += coo_matrix((gradphi[:,j,1]/area, (cell[:,i], cell[:,j])), shape=(N,N))
 
-        D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
+                #A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
+                #B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
+
+        d = np.bincount(cell[:, 0], weights=1/area, minlength=N)
+        d += np.bincount(cell[:, 1], weights=1/area, minlength=N)
+        d += np.bincount(cell[:, 2], weights=1/area, minlength=N)
+
+        D = spdiags(d, 0, N, N)
+        #D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
         A = D@A.tocsc()
         B = D@B.tocsc()
 

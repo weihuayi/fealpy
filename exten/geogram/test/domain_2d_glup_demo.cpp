@@ -19,8 +19,8 @@ namespace
     vector<vec2> points;
     Mesh domain;
     Mesh rvd_mesh;
-    Delaunay_var delaunay;
-    RestrictedVoronoiDiagram_var rvd;
+    Delaunay_var delaunay;// Delaunay 对象的指针
+    RestrictedVoronoiDiagram_var rvd; // rvd 的
 
     
 
@@ -76,6 +76,7 @@ namespace
         GEO::Graphics::initialize();
         
         glup_viewer_set_background_color(1.0, 1.0, 1.0);
+
         glup_viewer_add_toggle(
             'T', glup_viewer_is_enabled_ptr(GLUP_VIEWER_TWEAKBARS),
             "Toggle tweakbars"
@@ -83,6 +84,7 @@ namespace
 
         glup_viewer_disable(GLUP_VIEWER_BACKGROUND);
         glup_viewer_disable(GLUP_VIEWER_3D);
+
         create_domain();
         delaunay = Delaunay::create(2,"BDEL2d");
         rvd = RestrictedVoronoiDiagram::create(delaunay, &domain);
@@ -153,7 +155,7 @@ namespace
 
     void display_points() 
     {
-       glupEnable(GLUP_LIGHTING);
+       //glupEnable(GLUP_LIGHTING);
        glupSetPointSize(GLfloat(20.0));
        glupDisable(GLUP_VERTEX_COLORS);
        glupSetColor3f(GLUP_FRONT_AND_BACK_COLOR, 0.0f, 1.0f, 1.0f);
@@ -162,7 +164,7 @@ namespace
            glupVertex(points[i]);
        }
        glupEnd();
-       glupDisable(GLUP_LIGHTING);       
+       //glupDisable(GLUP_LIGHTING);       
     }
 
     void display_Delaunay_triangles() 
@@ -217,14 +219,6 @@ int main(int argc, char** argv)
     
     glup_viewer_set_init_func(init);
     glup_viewer_set_display_func(display);
-    //glup_viewer_set_overlay_func(overlay);
-    //glup_viewer_set_mouse_func(mouse);
-//    glup_viewer_add_key_func(
-//        'k', Lloyd_relaxation, "One iteration of Lloyd relaxation"
-//    );
-//    glup_viewer_add_toggle(
-//        'a', glup_viewer_is_enabled_ptr(GLUP_VIEWER_IDLE_REDRAW), "Animation"
-//    );
     
     if(GEO::CmdLine::get_arg_bool("gfx:full_screen")) {
        glup_viewer_enable(GLUP_VIEWER_FULL_SCREEN);

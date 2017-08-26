@@ -157,18 +157,20 @@ class TriangleMesh(Mesh2d):
             self.ds.reinit(N, cell)
 
     def bisect(self, markedCell):
+
         N = self.number_of_points()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
         edge = self.ds.edge
         cell2edge = self.ds.cell_to_edge()
+        cell2cell = self.ds.cell_to_cell()
 
         isCutEdge = np.zeros((NE,), dtype=np.bool)
         while len(markedCell)>0:
-            isCutEdge[cell2edge[markedCell,0]]=True
-            refineNeighbor = neighbor[markedCell,0]
-            markedCell=refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
+            isCutEdge[cell2edge[markedCell, 0]]=True
+            refineNeighbor = cell2cell[markedCell, 0]
+            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
 
         edge2newPoint = np.zeros((NE,),dtype=np.int)
         edge2newPoint[isCutEdge] = np.arange(N, N+isCutEdge.sum())
@@ -176,7 +178,7 @@ class TriangleMesh(Mesh2d):
         point = self.point
         newPoint =0.5*(point[edge[isCutEdge,0],:] + point[edge[isCutEdge,1],:]) 
         self.point = np.concatenate((point, newPoint), axis=0)
-        cell2edge0 = cell2edge[:,0]
+        cell2edge0 = cell2edge[:, 0]
 
         for k in range(2):
             idx, = np.nonzero(edge2newPoint[cell2edge0]>0)
@@ -269,7 +271,6 @@ class TriangleMesh(Mesh2d):
             a = nv/2.0
         elif dim == 3:
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
-
         return a
 
     def bc_to_point(self, bc):
