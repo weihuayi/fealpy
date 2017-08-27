@@ -15,21 +15,18 @@ from fealpy.model.poisson_model_2d import LShapeRSinData
 
 def lshape_mesh(r=1):
     point = np.array([
+        (-1, -1),
+        (0, -1),
+        (-1, 0),
         (0, 0),
         (1, 0),
+        (-1, 1),
         (0, 1),
-        (1, 1),
-        (2, 1),
-        (0, 2),
-        (1, 2),
-        (2, 2)], dtype=np.float)
+        (1, 1)], dtype=np.float)
     cell = np.array([
-        (1, 3, 0),
-        (2, 0, 3),
-        (3, 6, 2),
-        (5, 2, 6),
-        (4, 7, 3), 
-        (6, 3, 7)], dtype=np.int)
+        (0, 1, 3, 2),
+        (2, 3, 6, 5),
+        (3, 4, 7, 6)], dtype=np.int)
     tmesh = TriangleMesh(point, cell)  
     if r > 0:
         tmesh.uniform_refine(r)

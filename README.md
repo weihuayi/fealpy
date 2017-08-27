@@ -50,6 +50,7 @@ sudo -H pip3 install mpi4py
 sudo -H pip3 install pymetis
 sudo -H pip3 install PySPH
 sudo -H pip3 install nipy
+sudo -H pip3 install mayavi
 ```
 
 ## Install VTK Wrapped by Python3

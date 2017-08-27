@@ -69,7 +69,6 @@ class ScaledMonomialSpace2d():
         self.area = area
         self.h = np.sqrt(area) 
         self.dtype = dtype
-
         self.cell_idx_matrix()
 
     def cell_idx_matrix(self):
@@ -79,10 +78,9 @@ class ScaledMonomialSpace2d():
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         self.cellIdx = np.zeros((ldof, 2), dtype=np.int)
         self.cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
-        self.cellIdx[:,0] = idx0 - cellIdx[:, 1]
+        self.cellIdx[:,0] = idx0 - self.cellIdx[:, 1]
 
     def degree_of_homogeneous(self, i):
-
         if i == 0:
             return self.cellIdx.sum(axis=1)
         elif i == 1:
@@ -193,8 +191,8 @@ class VirtualElementSpace2d():
         p = self.p
         mesh = self.mesh
 
-        NE= mesh.number_of_edges()
         N = mesh.number_of_points()
+        NE= mesh.number_of_edges()
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int) 
@@ -211,7 +209,7 @@ class VirtualElementSpace2d():
 
         if p == 1:
             return cell, cellLocation
-        else
+        else:
             ldof = self.number_of_local_dofs()
             NC = mesh.number_of_cells()
             NV = mesh.number_of_vertices_of_cells()

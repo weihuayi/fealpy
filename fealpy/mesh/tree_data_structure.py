@@ -35,8 +35,9 @@ class Quadtree(QuadrangleMesh):
         else:
             return self.parent[idx, 0] == -1
     
-    def uniform_refine(self):
-        self.refine()
+    def uniform_refine(self, r=1):
+        for i in range(r):
+            self.refine()
 
     def refine(self, marker=None):
         if marker == None:
@@ -61,6 +62,7 @@ class Quadtree(QuadrangleMesh):
             child = self.child
 
             isLeafCell = self.is_leaf_cell()
+
             # Construct 
             isNeedCutCell = np.zeros(NC, dtype=np.bool)
             isNeedCutCell[idx] = True
@@ -86,6 +88,7 @@ class Quadtree(QuadrangleMesh):
             cellIdx[cell2edge[I1, J1]] = I1
             localIdx[cell2edge[I1, J1]] = J1
             del I, J, I1, J1
+
             cellIdx = cellIdx[isCuttedEdge]
             localIdx = localIdx[isCuttedEdge]
             cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
@@ -202,15 +205,10 @@ class Quadtree(QuadrangleMesh):
             cell = self.ds.cell
             NV = cell.shape[1]
 
-            pcell = np.zeros(NC*(NV+1), dtype=np.int)
-            pcellLocation = np.arange(0, (NV+1)*NC, NV+1)
+            pcell = cell.reshape(-1) 
+            pcellLocation = np.arange(0, NV*NC, NV)
 
-            pcell[pcellLocation] = NV
-
-            pcellview = pcell.reshape(NC, NV+1)[:, 1:]
-            pcellview[:] = cell
-
-            return PolygonMesh(point, pcell, pcellLocation) 
+            return PolygonMesh(point, pcell, pcellLocation, dtype=self.dtype) 
         else:
             N = self.number_of_points()
             NE = self.number_of_edges()
@@ -315,7 +313,7 @@ class Quadtree(QuadrangleMesh):
                     pcell[currentIdx + 1] = pedge[J[isEdge], 0]
                     currentIdx += 1
 
-            return PolygonMesh(self.point,  pcell, pcellLocation)
+            return self.point,  pcell, pcellLocation
 
 
 class Octree(HexahedronMesh):

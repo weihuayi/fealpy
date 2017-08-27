@@ -47,7 +47,8 @@ class PolygonMesh(Mesh2d):
 
     @classmethod
     def from_quadtree(cls, quadtree):
-        pass
+        point, cell, cellLocation = quadtree.to_polygonmesh()
+        return cls(point, cell, cellLocation)
 
     def barycenter(self, entity='cell', index=None):
         point = self.point

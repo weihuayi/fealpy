@@ -7,7 +7,8 @@ from fealpy.functionspace.vem_space import VirtualElementSpace2d
 from fealpy.functionspace.function import FiniteElementFunction
 
 from fealpy.mesh import rectangledomainmesh
-from fealpy.mesh import topolygonmesh
+from fealpy.mesh.TriangleMesh import TriangleMeshWithInfinityPoint
+from fealpy.mesh.PolygonMesh import PolygonMesh
 
 from fealpy.form.vem import LaplaceSymetricForm
 from fealpy.form.vem import SourceForm
@@ -17,9 +18,6 @@ from fealpy.solver import solve
 
 from fealpy.model.poisson_model_2d import CosCosData, PolynomialData, ExpData
 
-def isBoundaryDof(p):
-    eps = 1e-14 
-    return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
 p = 1 # degree of the vem space
 box = [0, 1, 0, 1] # domain 
@@ -32,8 +30,10 @@ model = CosCosData()
 model = PolynomialData()
 model = ExpData()
 for i in range(maxit):
-    mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='tri') 
-    mesh = topolygonmesh(mesh)
+    mesh0 = rectangledomainmesh(box, nx=n, ny=n, meshtype='tri') 
+    mesh1 = TriangleMeshWithInfinityPoint(mesh0)
+    point, cell, cellLocation = mesh1.to_polygonmesh()
+    mesh = PolygonMesh(point, cell, cellLocation)
     V = VirtualElementSpace2d(mesh, p) 
     a = LaplaceSymetricForm(V)
     L = SourceForm(V, model.source)
@@ -41,8 +41,8 @@ for i in range(maxit):
     uh = FiniteElementFunction(V)
     Ndof[i] = V.number_of_global_dofs() 
 
-    BC = DirichletBC(V, model.dirichlet, isBoundaryDof)
-    solve(a, L, uh, BC, 'direct')
+    BC = DirichletBC(V, model.dirichlet)
+    solve(a, L, uh, dirichlet=BC, solver='direct')
 
     uI = V.interpolation(model.solution)
     error[i] = np.sqrt(np.sum((uh - uI)**2)/Ndof[i])

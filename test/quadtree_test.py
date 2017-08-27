@@ -20,7 +20,8 @@ class AdaptiveMarker():
         phi = self.phi
 
         idx = qtmesh.leaf_cell_index()
-        pmesh = qtmesh.to_polygonmesh()
+        point, cell, cellLocation = qtmesh.to_polygonmesh()
+        pmesh = PolygonMesh(point, cell, cellLocation)
         cell2point = pmesh.ds.cell_to_point()
 
         point = qtmesh.point
@@ -85,7 +86,8 @@ axes0 = f0.gca()
 qtree.add_plot(axes0)
 
 
-pmesh = qtree.to_polygonmesh()
+point, cell, cellLocation = qtree.to_polygonmesh()
+pmesh = PolygonMesh(point, cell, cellLocation)
 f1 = plt.figure()
 axes1 = f1.gca()
 pmesh.add_plot(axes1)
