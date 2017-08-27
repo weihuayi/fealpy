@@ -67,7 +67,7 @@ class SourceForm:
         NV = mesh.number_of_vertices_of_cells()
         F = self.f(point)
         area = V.smspace.area
-        cell2dof , cell2dofLocation = V.cell_to_dof()
+        cell2dof, cell2dofLocation = V.cell_to_dof()
         bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
 
         gdof = V.number_of_global_dofs()

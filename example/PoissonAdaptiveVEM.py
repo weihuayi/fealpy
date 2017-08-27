@@ -4,8 +4,10 @@ from fealpy.mesh.tree_data_structure import Quadtree
 from fealpy.mesh.QuadrangleMesh import QuadrangleMesh 
 from fealpy.mesh.PolygonMesh import PolygonMesh
 
+from fealpy.functionspace.vem_space import VirtualElementSpace2d
+from fealpy.functionspace.function import FiniteElementFunction
 
-from fealpy.model.poisson_model_2d import LShapeRSinData
+from fealpy.model.poisson_model_2d import LShapeRSinData, CosCosData
 from fealpy.form.vem import LaplaceSymetricForm
 from fealpy.form.vem import SourceForm
 from fealpy.boundarycondition import DirichletBC
@@ -30,7 +32,7 @@ def lshape_mesh(r=1):
 
 
 def vem_solve(model, quadtree):
-    mesh = PolygonMesh.from_quadtree(quadtree)
+    mesh = quadtree.to_polygonmesh() 
     V = VirtualElementSpace2d(mesh, 1) 
     a = LaplaceSymetricForm(V)
     L = SourceForm(V, model.source)
@@ -46,8 +48,9 @@ point, cell = lshape_mesh(4)
 quadtree = Quadtree(point, cell)
 quadtree.uniform_refine(4)
 model = LShapeRSinData() 
+model = CosCosData()
 
-maxit = 4  
+maxit = 3  
 error = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
@@ -55,7 +58,7 @@ for i in range(maxit):
     uh = vem_solve(model, quadtree)
     uI = uh.V.interpolation(model.solution)
     error[i] = np.sqrt(np.sum((uh - uI)**2)/Ndof[i])
-    if i < mqxit - 1:
+    if i < maxit - 1:
         quadtree.uniform_refine()
 
 print(Ndof)

@@ -20,15 +20,14 @@ class AdaptiveMarker():
         phi = self.phi
 
         idx = qtmesh.leaf_cell_index()
-        point, cell, cellLocation = qtmesh.to_polygonmesh()
-        pmesh = PolygonMesh(point, cell, cellLocation)
+        pmesh = qtmesh.to_polygonmesh()
         cell2point = pmesh.ds.cell_to_point()
 
         point = qtmesh.point
         value = phi(point)
         valueSign = np.sign(value)
         valueSign[np.abs(value) < 1e-8] = 0
-        NV = pmesh.number_of_points_of_cells()
+        NV = pmesh.number_of_vertices_of_cells()
         isNeedCutCell = np.abs(cell2point*valueSign).reshape(-1) != NV
 
         return idx[isNeedCutCell]
@@ -76,8 +75,7 @@ marker = AdaptiveMarker(phi)
 for i in range(5):
     qtree.uniform_refine()
 
-
-for i in range(7):
+for i in range(4):
     qtree.refine(marker)
 
 
@@ -85,9 +83,7 @@ f0 = plt.figure()
 axes0 = f0.gca()
 qtree.add_plot(axes0)
 
-
-point, cell, cellLocation = qtree.to_polygonmesh()
-pmesh = PolygonMesh(point, cell, cellLocation)
+pmesh = qtree.to_polygonmesh()
 f1 = plt.figure()
 axes1 = f1.gca()
 pmesh.add_plot(axes1)

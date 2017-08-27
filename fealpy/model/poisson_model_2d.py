@@ -16,9 +16,7 @@ class LShapeRSinData:
         INPUT:
             p: array object, N*2
         """
-        x = p[:, 0]
-        y = p[:, 1]
-        rhs = 0
+        rhs = np.zeros(p.shape[0]) 
         return rhs
 
     def gradient(self, p):

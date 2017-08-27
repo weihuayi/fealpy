@@ -49,6 +49,7 @@ class Quadtree(QuadrangleMesh):
             return False
 
         if len(idx) > 0:
+            # Prepare data
             N = self.number_of_points()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
@@ -68,7 +69,7 @@ class Quadtree(QuadrangleMesh):
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
-            # Find 
+            # Find the cutted edge  
             cell2edge = self.ds.cell_to_edge()
 
             isCutEdge = np.zeros(NE, dtype=np.bool)
@@ -80,19 +81,22 @@ class Quadtree(QuadrangleMesh):
 
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
 
+            # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
             I, J = np.nonzero(isCuttedEdge[cell2edge])
             cellIdx = np.zeros(NE, dtype=np.int)
             localIdx = np.zeros(NE, dtype=np.int)
             I1 = I[~isLeafCell[I]]
             J1 = J[~isLeafCell[I]]
-            cellIdx[cell2edge[I1, J1]] = I1
-            localIdx[cell2edge[I1, J1]] = J1
+            cellIdx[cell2edge[I1, J1]] = I1 # the cell idx 
+            localIdx[cell2edge[I1, J1]] = J1 #
             del I, J, I1, J1
 
+            # 找到该单元相应孩子单元编号， 及对应的中点编号
             cellIdx = cellIdx[isCuttedEdge]
             localIdx = localIdx[isCuttedEdge]
             cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
             localIdx = self.localEdge2childCell[localIdx, 1]
+
             edge2center = np.zeros(NE, dtype=np.int)
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
 
@@ -124,7 +128,6 @@ class Quadtree(QuadrangleMesh):
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
-
             return True
         else:
             return False
@@ -166,6 +169,8 @@ class Quadtree(QuadrangleMesh):
             cell = cell[isRemainCell]
             child = child[isRemainCell]
             parent = parent[isRemainCell]
+
+            # 子单元不需要保留的单元， 是新的叶子单元 
             childIdx, = np.nonzero(child[:, 0] > -1)
             isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0 
             child[childIdx[isNewLeafCell], :] = -1
@@ -247,8 +252,10 @@ class Quadtree(QuadrangleMesh):
                 pedge2cell[pedgeIdx[isFound], 1] = neighborCellIdx[isFound]
 
                 edgeIdx = cell2edge[parentCellIdx, localIdx]
+
                 isCase = (edge2cell[edgeIdx, 0] != parentCellIdx) & isFound
                 pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2] 
+
                 isCase = (edge2cell[edgeIdx, 0] == parentCellIdx) & isFound
                 pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3] 
 
@@ -267,6 +274,8 @@ class Quadtree(QuadrangleMesh):
 
             pedge2cell[:, 0:2] = cellIdxMap[pedge2cell[:, 0:2]]
 
+            # 计算每个叶子四边形单元的每条边上有几条叶子边
+            # 因为叶子单元的边不一定是叶子边
             isInPEdge = (pedge2cell[:, 0] != pedge2cell[:, 1])
             cornerLocation = np.zeros((PNC, 5), dtype=np.int)
             np.add.at(cornerLocation.ravel(), 5*pedge2cell[:, 0] + pedge2cell[:, 2] + 1, 1)
@@ -274,13 +283,10 @@ class Quadtree(QuadrangleMesh):
             cornerLocation = cornerLocation.cumsum(axis=1)
 
 
-            pcellLocation = np.zeros(PNC, dtype=np.int)
-            pcellLocation[1:] = (cornerLocation[:-1, 4] + 1).cumsum()
-            nv = cornerLocation[:, 4].sum()
-            pcell = np.zeros(nv + PNC, dtype=np.int)
-            pcell[pcellLocation] = cornerLocation[:, 4] 
-
-            cornerLocation += pcellLocation.reshape(-1, 1) + 1
+            pcellLocation = np.zeros(PNC+1, dtype=np.int)
+            pcellLocation[1:] = cornerLocation[:, 4].cumsum()
+            pcell = np.zeros(pcellLocation[-1], dtype=np.int)
+            cornerLocation += pcellLocation[:-1].reshape(-1, 1) 
             pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
 
             PNE = pedge.shape[0]
@@ -313,7 +319,7 @@ class Quadtree(QuadrangleMesh):
                     pcell[currentIdx + 1] = pedge[J[isEdge], 0]
                     currentIdx += 1
 
-            return self.point,  pcell, pcellLocation
+            return PolygonMesh(self.point,  pcell, pcellLocation)
 
 
 class Octree(HexahedronMesh):

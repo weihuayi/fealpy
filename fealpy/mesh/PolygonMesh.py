@@ -15,13 +15,16 @@ class PolygonMesh(Mesh2d):
             if len(cell.shape)  == 2:
                 NC = cell.shape[0]
                 NV = cell.shape[1]
-                cellLocation = np.arange(0, (NC+1)*NV, NV)
+                cellLocation = np.arange(0, NC*NV, NV)
             else:
                 raise(ValueError("Miss `cellLocation` array!"))
 
         self.ds = PolygonMeshDataStructure(point.shape[0], cell, cellLocation)
         self.meshtype = 'polygon'
         self.dtype = dtype
+
+    def number_of_vertices_of_cells(self):
+        return self.ds.number_of_vertices_of_cells()
 
     def to_vtk(self):
         NC = self.number_of_cells()
