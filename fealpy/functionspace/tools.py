@@ -21,7 +21,6 @@ def function_space(mesh, femtype, p, dtype=np.float):
             return QuadrangleFiniteElementSpace(mesh, p, dtype=dtype)
         if mesh.meshtype is 'hex':
             return HexahedronFiniteElementSpace(mesh, p, dtype=dtype) 
-        
 
 def recover_grad(uh):
     V = uh.V

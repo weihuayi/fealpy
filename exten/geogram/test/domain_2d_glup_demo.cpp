@@ -11,6 +11,7 @@
 #include <geogram/mesh/mesh_io.h>
 
 #include <geogram/voronoi/RVD.h>
+#include <geogram/basic/geometry.h>
 
 
 namespace
@@ -37,6 +38,37 @@ namespace
                     );
         }
         update_Delaunay();
+    }
+
+    void lloyd()
+    {
+        int nb = points.size();
+        for(index_t i=0; i < nb; i++)
+        {
+            vec2 g = points[i];
+            index_t nv = rvd_mesh.facets.nb_vertices(i);
+            double area = 0.0;
+            vec2 center(0.0, 0.0);
+            for(index_t j=0; j < nv; ++j)
+            {
+                vec3 p = rvd_mesh.vertices.point(rvd_mesh.facets.vertex(i, j));
+                vec2 p0(p.x, p.y);
+                p  = rvd_mesh.vertices.point(rvd_mesh.facets.vertex(i, (j+1)%nv));
+                vec2 p1(p.x, p.y);
+
+                vec2 c = Geom::barycenter(g, p0, p1);
+                double a = Geom::triangle_area(g, p0, p1);
+                center.x += c.x*a;
+                center.y += c.y*a;
+                area += a;
+            }
+            center.x /= area;
+            center.y /= area;
+            points[i].x = center.x;
+            points[i].y = center.y;
+        }
+        update_Delaunay();
+        rvd->compute_RVD(rvd_mesh);
     }
 
 
@@ -88,7 +120,9 @@ namespace
         create_domain();
         delaunay = Delaunay::create(2,"BDEL2d");
         rvd = RestrictedVoronoiDiagram::create(delaunay, &domain);
-        create_random_points(100);
+        create_random_points(300);
+        //rvd->compute_initial_sampling_on_surface(&points.data()->x, 100);
+        update_Delaunay();
         rvd->compute_RVD(rvd_mesh);
         std::cout<<"Vertices: " << rvd_mesh.vertices.nb() << std::endl;
         std::cout<<"Edges: " << rvd_mesh.edges.nb() << std::endl;
@@ -113,23 +147,6 @@ namespace
             
         }
         glupEnd();
-
-//        index_t nf = rvd_mesh.facets.nb();
-//        glupEnable(GLUP_VERTEX_COLORS);
-//        glupBegin(GLUP_TRIANGLES);   
-//        for(index_t i=0; i < nf; ++i)
-//        {
-//            index_t nv = rvd_mesh.facets.nb_vertices(i);
-//            //glup_viewer_random_color_from_index(int(i));
-//            for(index_t j=0; j < nv; ++j)
-//            {
-//                glupVertex(points[i]);
-//                glupVertex(rvd_mesh.vertices.point(rvd_mesh.facets.vertex(i, j)));
-//                glupVertex(rvd_mesh.vertices.point(rvd_mesh.facets.vertex(i, (j+1)%nv)));
-//            }
-//        }
-//        glupEnd();
-//        glupDisable(GLUP_VERTEX_COLORS);
     }
 
     /**
@@ -188,6 +205,8 @@ namespace
     {
         display_domain();
         display_points();
+        for(int i = 0; i < 100; i++)
+            lloyd();
         display_rvd_mesh_facets();
         display_Delaunay_triangles();
     }

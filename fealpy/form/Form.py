@@ -125,6 +125,48 @@ class BihamonicRecoveryForm:
     def __init__(self, V, sigma=1):
         self.V = V
         self.sigma = sigma 
+        self.area, self.gradphi = V.mesh.grad_lambda()
+
+    def revcover_matrix(self, rtype='simple'):
+        area = self.area
+        gradphi = self.gradphi 
+
+        V = self.V
+        mesh = V.mesh
+
+        NC = mesh.number_of_cells() 
+        N = mesh.number_of_points() 
+        cell = mesh.ds.cell
+        point = mesh.point
+
+        A = coo_matrix((N, N), dtype=np.float)
+        B = coo_matrix((N, N), dtype=np.float)
+        if rtype is 'simple':
+            for i in range(3):
+                for j in range(3):  
+                    A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
+                    B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
+            D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
+            A = D@A.tocsc()
+            B = D@B.tocsc()
+        elif rtype is 'inv_area':
+            A += coo_matrix((gradphi[:,j,0]/area, (cell[:,i], cell[:,j])), shape=(N,N))
+            B += coo_matrix((gradphi[:,j,1]/area, (cell[:,i], cell[:,j])), shape=(N,N))
+            for i in range(3):
+                for j in range(3):  
+                    A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
+                    B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
+            d = np.bincount(cell[:, 0], weights=1/area, minlength=N)
+            d += np.bincount(cell[:, 1], weights=1/area, minlength=N)
+            d += np.bincount(cell[:, 2], weights=1/area, minlength=N)
+
+            D = spdiags(1/d, 0, N, N)
+            A = D@A.tocsc()
+            B = D@B.tocsc()
+        else:
+            raise ValueError("I have not coded the method {}".format(rtype))
+
+        return A, B
 
     def get_matrix(self):
         V = self.V
@@ -153,10 +195,6 @@ class BihamonicRecoveryForm:
         gradphi, area = mesh.grad_lambda()
         for i in range(3):
             for j in range(3):  
-                #A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
-                #B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
-                A += coo_matrix((gradphi[:,j,0]/area, (cell[:,i], cell[:,j])), shape=(N,N))
-                B += coo_matrix((gradphi[:,j,1]/area, (cell[:,i], cell[:,j])), shape=(N,N))
                 val00 = gradphi[:,i,0]*gradphi[:,j,0]*area 
                 val01 = gradphi[:,i,0]*gradphi[:,j,1]*area
                 val11 = gradphi[:,i,1]*gradphi[:,j,1]*area
@@ -165,14 +203,6 @@ class BihamonicRecoveryForm:
                 S += coo_matrix((val11, (cell[:,i], cell[:,j])), shape=(N, N))
 
 
-        d = np.bincount(cell[:, 0], weights=1/area, minlength=N)
-        d += np.bincount(cell[:, 1], weights=1/area, minlength=N)
-        d += np.bincount(cell[:, 2], weights=1/area, minlength=N)
-
-        D = spdiags(d, 0, N, N)
-        #D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
-        A = D@A.tocsc()
-        B = D@B.tocsc()
 
         P = P.tocsc()
         Q = Q.tocsc()
