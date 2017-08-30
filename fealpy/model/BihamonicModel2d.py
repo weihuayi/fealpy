@@ -118,26 +118,55 @@ class BihamonicData2:
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
 class BihamonicData3:
-    def __init__(self,C):
-        self.C = C
-
+    def __init__(self):
+        pass
+    
     def solution(self, p):
-        pass
+        """ The exact solution 
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        r = np.cos(2*pi*x)*np.cos(2*pi*y)
+        return r
 
-    def gradient(self, p):
-        pass
+    def gradient(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        val = np.zeros((len(x), 2), dtype=p.dtype)
+        val[:,0] = -2*pi*np.sin(2*pi*x)*np.cos(2*pi*y) 
+        val[:,1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        return val
 
-    def laplace(self, p):
-        pass
+    def laplace(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        r = -8*pi**2*self.solution(p)
+        return r
+
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
-        return np.zeros((p.shape[0],), dtype=np.float)
+        return self.solution(p) 
+
+    def neuman(self, p, n):
+        """ Neuman boundary condition
+        """
+        return np.zeros(p.shape[0], dtype=p.dtype) 
 
     def source(self,p):
-        r = C
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        r = 64*pi**4*np.cos(2*pi*x)*np.cos(2*pi*y)
         return r
+
+    def is_boundary_dof(self, p):
+        eps = 1e-14 
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
 class BihamonicData4:
     def __init__(self):

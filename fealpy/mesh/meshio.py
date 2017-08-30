@@ -14,5 +14,6 @@ def load_mat_mesh(f):
     trimesh = TriangleMesh(point, cell)
     return trimesh
 
-def write_mat_mesh(f):
-    pass
+def write_mat_mesh(mesh, f):
+    data = {'node':mesh.point, 'elem':mesh.ds.cell+1}
+    sio.matlab.savemat(f, data)

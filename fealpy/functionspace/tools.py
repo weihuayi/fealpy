@@ -21,19 +21,3 @@ def function_space(mesh, femtype, p, dtype=np.float):
             return QuadrangleFiniteElementSpace(mesh, p, dtype=dtype)
         if mesh.meshtype is 'hex':
             return HexahedronFiniteElementSpace(mesh, p, dtype=dtype) 
-
-def recover_grad(uh):
-    V = uh.V
-    if V.p==1:
-        mesh = V.mesh
-        bc = np.array([1, 0, 0], dtype=V.dtype)
-        grad = uh.grad_value(bc)
-        V2 = VectorLagrangeFiniteElementSpace2d(mesh, p=1, dtype=V.dtype)
-        ruh = FiniteElementFunction(V2)
-        point2cell = mesh.ds.point_to_cell()
-        NV = point2cell.sum(axis=1)
-        ruh[:] = (point2cell@grad)/NV.reshape((-1,1))
-    else:
-        print("We can not deal with high order fem!")
-    return ruh
-    

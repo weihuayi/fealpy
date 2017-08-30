@@ -1,2 +1,2 @@
 
-from .solve import solve
+from .solve import solve, solve1

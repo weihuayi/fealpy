@@ -28,6 +28,8 @@ def L2_error(u, uh, order=4, dtype=np.float):
         else:
             e += w_k*((uhval - uval)*(uhval - uval)).sum(axis=1)
     e *= mesh.area()
+    #isInCell = ~mesh.ds.boundary_cell_flag()
+    #return np.sqrt(e[isInCell].sum())
     return np.sqrt(e.sum())
 
 def div_error(f, ruh, order=4, dtype=np.float):
@@ -49,6 +51,8 @@ def div_error(f, ruh, order=4, dtype=np.float):
         uval = f(p)
         e += w_k*(uhval - uval)*(uhval - uval)
     e *= mesh.area()
+    #isInCell = ~mesh.ds.boundary_cell_flag()
+    #return np.sqrt(e[isInCell].sum())
     return np.sqrt(e.sum())
 
 def H1_semi_error(gu, uh, order=3, dtype=np.float):

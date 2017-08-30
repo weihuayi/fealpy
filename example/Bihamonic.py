@@ -1,50 +1,74 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import sys
 
+from fealpy.mesh.meshio import load_mat_mesh
 from fealpy.mesh.simple_mesh_generator import squaremesh
-from fealpy.functionspace.tools import function_space 
-from fealpy.form.Form import BihamonicRecoveryForm, SourceForm
-from fealpy.boundarycondition.BoundaryCondition import DirichletBC, BihamonicRecoveryBC1
-from fealpy.solver import solve
-from fealpy.functionspace import Interpolation
-from fealpy.functionspace.function import FiniteElementFunction
-from fealpy.erroranalysis.PrioriError import L2_error, div_error
-from fealpy.functionspace.tools import recover_grad
-from fealpy.model.BihamonicModel2d import SinSinData, BihamonicData2, BihamonicData4
+from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 
-#model = SinSinData()
-#model = BihamonicData2(1.0,1.0)
-model = BihamonicData4()
-mesh = squaremesh(0, 1, 0, 1, r=6)
+from fealpy.functionspace.tools import function_space 
+from fealpy.femmodel.BihamonicFEMModel import BihamonicRecoveryFEM  
+from fealpy.boundarycondition.BoundaryCondition import DirichletBC
+from fealpy.solver import solve1
+from fealpy.functionspace.function import FiniteElementFunction
+from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
+from fealpy.model.BihamonicModel2d import SinSinData, BihamonicData2, BihamonicData3, BihamonicData4
+
+m = int(sys.argv[1]) 
+sigma = int(sys.argv[2])  
+
+meshtype = int(sys.argv[3])
+
+if m == 1:
+    model = SinSinData()
+elif m == 2:
+    model = BihamonicData2(1.0,1.0)
+elif m == 3:
+    model = BihamonicData3()
+elif m == 4:
+    model = BihamonicData4()
+
 maxit = 4
 degree = 1
-sigma = 10000
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
 gerror = np.zeros((maxit,), dtype=np.float)
+H1Serror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
+if meshtype == 1:
+    mesh = squaremesh(0, 1, 0, 1, r=6)
+elif (meshtype == 3) or (meshtype == 4):
+    box = [0, 1, 0, 1]
+    h0 = 0.02
+    mesh = triangle(box, h0)
+
 for i in range(maxit):
+    if meshtype == 2:
+        mesh = load_mat_mesh('../data/square'+str(i+2)+'.mat')
+    elif meshtype == 5:
+        mesh = load_mat_mesh('../data/sqaureperturb'+str(i+2)+'.'+str(0.5) + '.mat')
 
     V = function_space(mesh, 'Lagrange', degree)
-    Ndof[i] = V.number_of_global_dofs() 
+    V2 = function_space(mesh, 'Lagrange_2', degree)
     uh = FiniteElementFunction(V)
+    ruh = FiniteElementFunction(V2)
 
-    a  = BihamonicRecoveryForm(V, sigma=sigma)
-    L = SourceForm(V, model.source, 4)
+    fem = BihamonicRecoveryFEM(V, model, sigma=sigma, rtype='simple')
+    bc = DirichletBC(V, model.dirichlet, model.is_boundary_dof)
+    solve1(fem, uh, dirichlet=bc, solver='cg')
+    fem.recover_grad(uh, ruh)
 
-    bc0 = DirichletBC(V, model.dirichlet, model.is_boundary_dof)
-
-    bc1 = BihamonicRecoveryBC1(V, model.neuman, sigma=sigma)
-
-    solve(a, L, uh, dirichlet=bc0, neuman=bc1, solver='direct')
+    Ndof[i] = V.number_of_global_dofs() 
     error[i] = L2_error(model.solution, uh, order=4)
-    ruh = recover_grad(uh)
     derror[i] = div_error(model.laplace, ruh, order=4)
     gerror[i] = L2_error(model.gradient, ruh, order=5)
+    H1Serror[i] = H1_semi_error(model.gradient, uh, order=5)
 
-    if i < maxit-1:
+    if (meshtype == 1) or (meshtype == 3):
         mesh.uniform_refine()
+    elif meshtype == 4:
+        mesh = triangle(box, h0/(2**(i+1)))
 
 print(Ndof)
 print('L2 error:\n', error)
@@ -55,7 +79,10 @@ print('div error:\n', derror)
 order = np.log(derror[0:-1]/derror[1:])/np.log(2)
 print('order:\n', order)
 
-print('gradient error:\n', gerror)
+print('revover gradient error:\n', gerror)
 order = np.log(gerror[0:-1]/gerror[1:])/np.log(2)
 print('order:\n', order)
 
+print('gradient error:\n', H1Serror)
+order = np.log(H1Serror[0:-1]/H1Serror[1:])/np.log(2)
+print('order:\n', order)
