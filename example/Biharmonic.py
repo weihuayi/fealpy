@@ -7,12 +7,12 @@ from fealpy.mesh.simple_mesh_generator import squaremesh
 from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 
 from fealpy.functionspace.tools import function_space 
-from fealpy.femmodel.BihamonicFEMModel import BihamonicRecoveryFEM  
+from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEM  
 from fealpy.boundarycondition.BoundaryCondition import DirichletBC
 from fealpy.solver import solve1
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
-from fealpy.model.BihamonicModel2d import SinSinData, BihamonicData2, BihamonicData3, BihamonicData4
+from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4
 
 m = int(sys.argv[1]) 
 sigma = int(sys.argv[2])  

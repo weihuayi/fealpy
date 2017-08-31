@@ -5,7 +5,7 @@ from ..quadrature  import TriangleQuadrature
 from ..quadrature import IntervalQuadrature
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace2d 
 
-class BihamonicRecoveryFEM:
+class BiharmonicRecoveryFEM:
     def __init__(self, V, model, sigma=1, rtype='simple', dtype=np.float):
         self.V = V
         self.model = model

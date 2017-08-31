@@ -57,7 +57,7 @@ class SinSinData:
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
-class BihamonicData2:
+class BiharmonicData2:
     def __init__(self,a,b):
         self.a = a
         self.b = b
@@ -117,7 +117,7 @@ class BihamonicData2:
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
-class BihamonicData3:
+class BiharmonicData3:
     def __init__(self):
         pass
     
@@ -168,7 +168,7 @@ class BihamonicData3:
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
-class BihamonicData4:
+class BiharmonicData4:
     def __init__(self):
         pass
     
@@ -221,4 +221,55 @@ class BihamonicData4:
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
+
+class BiharmonicData5:
+    def __init__(self):
+        pass
+    
+    def solution(self, p):
+        """ The exact solution 
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        r1 = (x - 0.5)**2 + (y - 0.5)**2 + 0.01
+        r2 = (x + 0.5)**2 + (y + 0.5)**2 + 0.01
+        return 1.0/r1 - 1.0/r2 
+
+    def gradient(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        val = np.zeros((len(x), 2), dtype=p.dtype)
+        val[:,0] = -(-2*x - 1.0)/((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**2 + (-2*x + 1.0)/((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**2
+        val[:,1] = -(-2*y - 1.0)/((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**2 + (-2*y + 1.0)/((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**2
+        return val
+
+
+    def laplace(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        r = (2*x - 1.0)*(4*x - 2.0)/((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**3 - (2*x + 1.0)*(4*x + 2.0)/((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**3 + (2*y - 1.0)*(4*y - 2.0)/((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**3 - (2*y + 1.0)*(4*y + 2.0)/((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**3 + 4/((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**2 - 4/((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**2
+        return r
+
+
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        return np.zeros((p.shape[0],), dtype=np.float)
+
+    def neuman(self, p, n):
+        """ Neuman boundary condition
+        """
+        val = self.gradient(p)
+        return np.sum(val*n, axis=1)
+
+    def source(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        r = ((6*x - 3.0)*(8*x - 4.0)*((2*x - 1.0)*(4*x - 2.0) + (2*y - 1.0)*(4*y - 2.0))*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**5 - (6*x + 3.0)*(8*x + 4.0)*((2*x + 1.0)*(4*x + 2.0) + (2*y + 1.0)*(4*y + 2.0))*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**5 + ((2*y - 1.0)*(4*y - 2.0) + 32)*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**2*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**5 - ((2*y + 1.0)*(4*y + 2.0) + 32)*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**5*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**2 + 2*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**5*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**3 + 2*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**5*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)*(3*(2*x + 1.0)*(4*x + 2.0) + 4*(2*x + 1.0)*(6*x + 3.0) + 4*(4*x + 2.0)*(6*x + 3.0) + 3*(2*y + 1.0)*(4*y + 2.0)) - 2*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**3*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**5 - 2*((x - 0.5)**2 + (y - 0.5)**2 + 0.01)*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**5*(3*(2*x - 1.0)*(4*x - 2.0) + 4*(2*x - 1.0)*(6*x - 3.0) + 4*(4*x - 2.0)*(6*x - 3.0) + 3*(2*y - 1.0)*(4*y - 2.0)))/(((x - 0.5)**2 + (y - 0.5)**2 + 0.01)**5*((x + 0.5)**2 + (y + 0.5)**2 + 0.01)**5)
+        return r
+
+    def is_boundary_dof(self, p):
+        eps = 1e-14 
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
 
