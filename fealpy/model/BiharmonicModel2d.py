@@ -255,7 +255,7 @@ class BiharmonicData5:
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
-        return np.zeros((p.shape[0],), dtype=np.float)
+        return self.solution(p)
 
     def neuman(self, p, n):
         """ Neuman boundary condition
