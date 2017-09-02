@@ -15,9 +15,42 @@ class BiharmonicRecoveryFEM:
         self.gradphi, self.area = V.mesh.grad_lambda()
         self.A, self.B = self.get_revcover_matrix()
 
-    def recover_grad(self, uh, ruh):
-        ruh[:, 0] = self.A@uh
-        ruh[:, 1] = self.B@uh
+    def recover_grad(self, uh, rgh):
+        rgh[:, 0] = self.A@uh
+        rgh[:, 1] = self.B@uh
+        mesh = self.V.mesh
+        point = mesh.point
+        isBdPoints = mesh.ds.boundary_point_flag()
+        rgh[isBdPoints] = self.model.gradient(point[isBdPoints])
+
+    def recover_laplace(self, rgh, rlh):
+        b = np.array([1/3, 1/3, 1/3])
+        val = rgh.div_value(b)
+        mesh = self.V.mesh
+        cell = mesh.ds.cell
+        N = mesh.number_of_points()
+        if self.rtype is 'simple':
+            l = np.bincount(cell[:, 0], weights=val, minlength=N)
+            l += np.bincount(cell[:, 1], weights=val, minlength=N)
+            l += np.bincount(cell[:, 2], weights=val, minlength=N)
+            l /= np.bincount(cell.flatten())
+            rlh[:] = l
+        elif self.rtype is 'inv_area':
+            area = self.area
+            val /= area
+            l = np.bincount(cell[:, 0], weights=val, minlength=N)
+            l += np.bincount(cell[:, 1], weights=val, minlength=N)
+            l += np.bincount(cell[:, 2], weights=val, minlength=N)
+            
+            val = 1/area
+            s = np.bincount(cell[:, 0], weights=val, minlength=N)
+            s += np.bincount(cell[:, 1], weights=val, minlength=N)
+            s += np.bincount(cell[:, 2], weights=val, minlength=N)
+            l /=s
+            rlh[:] = l
+        else:
+            raise ValueError("I have not coded the method {}".format(self.rtype))
+
 
     def get_revcover_matrix(self):
         area = self.area
@@ -53,7 +86,7 @@ class BiharmonicRecoveryFEM:
             A = D@A.tocsc()
             B = D@B.tocsc()
         else:
-            raise ValueError("I have not coded the method {}".format(rtype))
+            raise ValueError("I have not coded the method {}".format(self.rtype))
 
         return A, B
 
@@ -121,7 +154,7 @@ class BiharmonicRecoveryFEM:
         mesh = V.mesh
 
         NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(3)
+        qf = TriangleQuadrature(5)
         nQuad = qf.get_number_of_quad_points()
 
         gdof = V.number_of_global_dofs()

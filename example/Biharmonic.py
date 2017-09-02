@@ -13,6 +13,10 @@ from fealpy.solver import solve1
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
 from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4, BiharmonicData5 
+from fealpy.tools.show import show_error_table 
+
+
+
 
 m = int(sys.argv[1]) 
 sigma = int(sys.argv[2])  
@@ -37,11 +41,16 @@ elif m == 5:
 
 maxit = 4
 degree = 1
-error = np.zeros((maxit,), dtype=np.float)
-derror = np.zeros((maxit,), dtype=np.float)
-gerror = np.zeros((maxit,), dtype=np.float)
-H1Serror = np.zeros((maxit,), dtype=np.float)
-Ndof = np.zeros((maxit,), dtype=np.int)
+
+N = np.zeros((maxit,), dtype=np.int)
+
+errorType = ['$\| u - u_h\|$',
+         '$\|\\nabla u - \\nabla u_h\|$',
+         '$\|\\nabla u - G(\\nabla u_h)\|$',
+         '$\|\Delta u - \\nabla\cdot G(\\nabla u_h)\|$',
+         '$\|\Delta u -  G(\\nabla\cdot G(\\nabla u_h))\|$',
+         ]
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 h0 = 0.025
 if (meshtype == 3):
@@ -63,32 +72,22 @@ for i in range(maxit):
     V = function_space(mesh, 'Lagrange', degree)
     V2 = function_space(mesh, 'Lagrange_2', degree)
     uh = FiniteElementFunction(V)
-    ruh = FiniteElementFunction(V2)
+    rgh = FiniteElementFunction(V2)
+    rlh = FiniteElementFunction(V)
 
     fem = BiharmonicRecoveryFEM(V, model, sigma=sigma, rtype='inv_area')
     bc = DirichletBC(V, model.dirichlet, model.is_boundary_dof)
     solve1(fem, uh, dirichlet=bc, solver='direct')
-    fem.recover_grad(uh, ruh)
+    fem.recover_grad(uh, rgh)
+    fem.recover_laplace(rgh, rlh)
 
-    Ndof[i] = V.number_of_global_dofs() 
-    error[i] = L2_error(model.solution, uh, order=4)
-    derror[i] = div_error(model.laplace, ruh, order=4)
-    gerror[i] = L2_error(model.gradient, ruh, order=5)
-    H1Serror[i] = H1_semi_error(model.gradient, uh, order=5)
+    N[i] = V.number_of_global_dofs() 
+    errorMatrix[0, i] = L2_error(model.solution, uh, order=5)
+    errorMatrix[1, i] = H1_semi_error(model.gradient, uh, order=5)
+    errorMatrix[2, i] = L2_error(model.gradient, rgh, order=5)
+    errorMatrix[3, i] = div_error(model.laplace, rgh, order=5)
+    errorMatrix[4, i] = L2_error(model.laplace, rlh, order=5)
 
-print(Ndof)
-print('L2 error:\n', error)
-order = np.log(error[0:-1]/error[1:])/np.log(2)
-print('order:\n', order)
+#order = np.log(error[0:-1]/error[1:])/np.log(2)
 
-print('div error:\n', derror)
-order = np.log(derror[0:-1]/derror[1:])/np.log(2)
-print('order:\n', order)
-
-print('revover gradient error:\n', gerror)
-order = np.log(gerror[0:-1]/gerror[1:])/np.log(2)
-print('order:\n', order)
-
-print('gradient error:\n', H1Serror)
-order = np.log(H1Serror[0:-1]/H1Serror[1:])/np.log(2)
-print('order:\n', order)
+show_error_table(N, errorType, errorMatrix, end='\\\\\\hline\n')

@@ -162,6 +162,7 @@ class TriangleMesh(Mesh2d):
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
+        cell = self.ds.cell
         edge = self.ds.edge
         cell2edge = self.ds.cell_to_edge()
         cell2cell = self.ds.cell_to_cell()
@@ -191,7 +192,7 @@ class TriangleMesh(Mesh2d):
             p1 = cell[idx,1]
             p2 = cell[idx,2]
             p3 = edge2newPoint[cell2edge0[idx]]
-            cell = np.concatenate((self.cell, np.zeros((nc,3),dtype=np.int)), axis=0)
+            cell = np.concatenate((cell, np.zeros((nc,3),dtype=np.int)), axis=0)
             cell[L,0] = p3 
             cell[L,1] = p0 
             cell[L,2] = p1 

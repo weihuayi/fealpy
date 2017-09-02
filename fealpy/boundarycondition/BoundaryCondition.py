@@ -77,56 +77,6 @@ class DirichletBC:
 
         return b
 
-class BihamonicRecoveryBC():
-    def __init__(self, V, g, sigma=1, dtype=np.float):
-        self.V = V
-        self.g = g
-        self.sigma = sigma
-        self.dtype = dtype
-
-    def get_vector(self):
-        V = self.V
-        mesh = V.mesh
-        cell = mesh.ds.cell
-        point = mesh.point
-
-        edge = mesh.ds.edge
-        isBdEdge = mesh.ds.boundary_edge_flag()
-        bdEdge = edge[isBdEdge]
-
-        edge2cell = mesh.ds.edge2cell
-        bdCellIndex = edge2cell[isBdEdge, 0]
-        # find all boundary cell 
-        bdCell = cell[bdCellIndex, :]
-
-        NC = bdCell.shape[0] # the number of boundary cells
-
-        # the unit outward normal on boundary edge
-        W = np.array([[0, -1], [1, 0]], dtype=np.int)
-        n = (point[bdEdge[:,1],] - point[bdEdge[:,0],:])@W
-        h = np.sqrt(np.sum(n**2, axis=1)) 
-        n /= h.reshape((-1,1))
-
-        ldof = V.number_of_local_dofs() 
-        gdof = V.number_of_global_dofs()
-
-        bb = np.zeros((NC, ldof), dtype=self.dtype)
-        qf = IntervalQuadrature(5)
-        nQuad = qf.get_number_of_quad_points()
-        gradphi, _ = grad_lambda(point, bdCell)
-        for i in range(nQuad):
-            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-            p = point[bdEdge[:, 0], :]*lambda_k[0] \
-                    + point[bdEdge[:, 1], :]*lambda_k[1] 
-            val = self.g(p, n)
-            for j in range(ldof):
-                bb[:, j] += np.sum(gradphi[:, j, :]*n, axis=1)*val*w_k
-
-        bb /= (h.reshape(-1, 1))
-
-        b = np.zeros((gdof,), dtype=self.dtype)
-        np.add.at(b, bdCell.flatten(), bb.flatten())
-        return self.sigma*b
 
 
         
