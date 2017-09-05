@@ -12,10 +12,8 @@ from fealpy.boundarycondition.BoundaryCondition import DirichletBC
 from fealpy.solver import solve1
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
-from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4, BiharmonicData5 
+from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4, BiharmonicData5, BiharmonicData6
 from fealpy.tools.show import show_error_table 
-
-
 
 
 m = int(sys.argv[1]) 

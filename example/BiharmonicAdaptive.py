@@ -14,7 +14,7 @@ from fealpy.boundarycondition.BoundaryCondition import DirichletBC
 from fealpy.solver import solve1
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
-from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5
+from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, BiharmonicData6
 
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
 
@@ -57,14 +57,17 @@ def mark(mesh, eta, theta, method='L2'):
     return markedCell
 
 theta = 0.4 
-model = BiharmonicData5()
-box = [-1, 1, -1, 1]
+
+#model = BiharmonicData5()
+#box = [-1, 1, -1, 1]
 
 #model = BiharmonicData4()
 #box = [0, 1, 0, 1]
 
+model = BiharmonicData6()
+
 sigma = 1
-maxit = 80 
+maxit = 40 
 degree = 1
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
@@ -72,8 +75,10 @@ gerror = np.zeros((maxit,), dtype=np.float)
 H1Serror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
-n = 40
-mesh = rectangledomainmesh(box, nx=n, ny=n)  
+#n = 40
+#mesh = rectangledomainmesh(box, nx=n, ny=n)  
+
+mesh = model.init_mesh(n=4)
 
 for i in range(maxit):
     V = function_space(mesh, 'Lagrange', degree)
@@ -109,6 +114,6 @@ y = mesh.point[:, 1]
 axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.Spectral)
 
 axes = fig.add_subplot(1, 3, 3)
-showrate(axes, 40, Ndof, error, 'r-*')
-showrate(axes, 40, Ndof, H1Serror, 'b-o')
+showrate(axes, 20, Ndof, error, 'r-*')
+showrate(axes, 20, Ndof, H1Serror, 'b-o')
 plt.show()

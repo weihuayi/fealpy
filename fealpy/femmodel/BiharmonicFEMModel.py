@@ -21,7 +21,9 @@ class BiharmonicRecoveryFEM:
         mesh = self.V.mesh
         point = mesh.point
         isBdPoints = mesh.ds.boundary_point_flag()
-        rgh[isBdPoints] = self.model.gradient(point[isBdPoints])
+        val = self.model.gradient(point[isBdPoints])
+        isNan = np.isnan(val[:, 0])
+        rgh[isBdPoints & (~isNan)] = val[~isNan]
 
     def recover_laplace(self, rgh, rlh):
         b = np.array([1/3, 1/3, 1/3])
