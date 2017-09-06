@@ -324,6 +324,7 @@ class BiharmonicData6:
         y = p[:, 1]
         sin = np.sin
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         r = x*x + y*y
         z = r**(5/6)*np.sin(5*theta/3)
         return z
@@ -334,6 +335,7 @@ class BiharmonicData6:
         sin = np.sin
         cos = np.cos
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         r = x*x + y*y
         val = np.zeros((len(x), 2), dtype=p.dtype)
         val[:, 0] = 5*x*sin(5*theta/3)/(3*r**(1/6)) - 5*y*cos(5*theta/3)/(3*r**(1/6))

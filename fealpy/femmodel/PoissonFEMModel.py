@@ -4,7 +4,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .operator import laplace, source
 
 class PoissonFEMModel:
-    def __init__(self, V, pde, lqf, rqf, dtype=np.float):
+    def __init__(self, pde, V, lqf, rqf, dtype=np.float):
         self.V = V
         self.pde = pde  
         self.lqf = lqf
@@ -15,3 +15,6 @@ class PoissonFEMModel:
 
     def get_right_vector(self):
         return source(self.pde.source, self.V, self.rqf)
+
+    def get_neuman_vector(self):
+        pass

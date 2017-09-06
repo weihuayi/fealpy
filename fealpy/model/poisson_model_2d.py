@@ -7,7 +7,9 @@ class LShapeRSinData:
     def solution(self, p):
         x = p[:, 0]
         y = p[:, 1]
+        pi = np.pi
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         u = (x*x + y*y)**(1/3)*np.sin(2/3*theta)
         return u
 
@@ -27,11 +29,11 @@ class LShapeRSinData:
         x = p[:, 0]
         y = p[:, 1]
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x**2 + y**2
         val = np.zeros((len(x),2),dtype=p.dtype)
-        val[:, 0] =2/3*x*(x**2 + y**2)**(-2/3)*sin(2/3*theta)
-        -2/3*y*(x**2 +y**2)**(1/3)*np.cos(2/3*theta)/(x**2*(1 + y**2/x**2))
-        val[:, 1] = 2/3*y*(x**2 + y**2)**(-2/3)*np.sin(2/3*theta) + (2/3)*(x**2 +
-        y**2)**(1/3)*np.cos(2/3*theta)/(x*(1 + y**2/x**2))
+        val[:, 0] = 2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
+        val[:, 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3)) 
         return val
 
     def dirichlet(self, p):
@@ -39,9 +41,6 @@ class LShapeRSinData:
         """
         return self.solution(p)
 
-    def is_boundary(self, p):
-        eps = 1e-14
-        return (p[:, 0] < -1.0 + eps)| (p[:, 1] > 1.0 - eps) | ((p[:, 1]< 1.0 - eps) & (p[:,0]>-eps)) | ((p[:, 1] < -eps) & (p[:, 0] > 1.0 -eps))
 
 class CosCosData:
     def __init__(self):

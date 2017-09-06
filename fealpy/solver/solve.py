@@ -6,7 +6,7 @@ from timeit import default_timer as timer
 import pyamg
 import pylab
 
-def solve(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
+def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     V = a.V
 
     start = timer()
@@ -47,7 +47,7 @@ def solve(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
 
     return A 
 
-def solve1(fem, uh, dirichlet=None, solver='cg'):
+def solve(fem, uh, dirichlet=None, solver='cg'):
     V = fem.V
     start = timer()
     A = fem.get_left_matrix()
