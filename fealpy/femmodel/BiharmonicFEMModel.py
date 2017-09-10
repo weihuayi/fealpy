@@ -5,7 +5,7 @@ from ..quadrature  import TriangleQuadrature
 from ..quadrature import IntervalQuadrature
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace2d 
 
-class BiharmonicRecoveryFEM:
+class BiharmonicRecoveryFEMModel:
     def __init__(self, V, model, sigma=1, rtype='simple', dtype=np.float):
         self.V = V
         self.model = model
@@ -21,9 +21,8 @@ class BiharmonicRecoveryFEM:
         mesh = self.V.mesh
         point = mesh.point
         isBdPoints = mesh.ds.boundary_point_flag()
-        val = self.model.gradient(point[isBdPoints])
-        isNan = np.isnan(val[:, 0])
-        rgh[isBdPoints & (~isNan)] = val[~isNan]
+        isBdPoints[3] = False
+        rgh[isBdPoints] = self.model.gradient(point[isBdPoints])
 
     def recover_laplace(self, rgh, rlh):
         b = np.array([1/3, 1/3, 1/3])

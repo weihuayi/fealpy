@@ -14,6 +14,12 @@ target_link_libraries(domain_2d_glup_demo  Geogram::geogram_gfx Geogram::geogram
 add_executable(CVTMesh CVTMesh.cpp)
 target_link_libraries(CVTMesh  Geogram::geogram_gfx Geogram::geogram)
 
+add_executable(demo_app demo_app.cpp)
+target_link_libraries(demo_app  Geogram::geogram_gfx Geogram::geogram)
+
+add_executable(cvt_app cvt_app.cpp)
+target_link_libraries(cvt_app  Geogram::geogram_gfx Geogram::geogram)
+
 include(./opengl.cmake)
 add_executable(GLUP_basic_example GLUP_basic_example.cpp)
 target_link_libraries(GLUP_basic_example geogram_gfx geogram ${GLFW_LIBRARIES})

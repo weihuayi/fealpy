@@ -9,9 +9,9 @@ from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 
 from fealpy.functionspace.tools import function_space 
-from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEM  
+from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEMModel
 from fealpy.boundarycondition.BoundaryCondition import DirichletBC
-from fealpy.solver import solve1
+from fealpy.solver import solve
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
 from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, BiharmonicData6
@@ -44,7 +44,7 @@ def estimate(uh, ruh, order=2, dtype=np.float):
         ruhval = ruh.value(lambda_k)
         e += w_k*((uhval - ruhval)*(uhval - ruhval)).sum(axis=1)
     e *= mesh.area()
-    return e 
+    return np.sqrt(e) 
 
 def mark(mesh, eta, theta, method='L2'):
     NC = mesh.number_of_cells()
@@ -56,7 +56,7 @@ def mark(mesh, eta, theta, method='L2'):
     markedCell, = np.nonzero(isMarked)
     return markedCell
 
-theta = 0.4 
+theta = 0.6 
 
 #model = BiharmonicData5()
 #box = [-1, 1, -1, 1]
@@ -67,7 +67,7 @@ theta = 0.4
 model = BiharmonicData6()
 
 sigma = 1
-maxit = 40 
+maxit = 100 
 degree = 1
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
@@ -86,16 +86,16 @@ for i in range(maxit):
     uh = FiniteElementFunction(V)
     ruh = FiniteElementFunction(V2)
 
-    fem = BiharmonicRecoveryFEM(V, model, sigma=sigma, rtype='inv_area')
+    fem = BiharmonicRecoveryFEMModel(V, model, sigma=sigma, rtype='inv_area')
     bc = DirichletBC(V, model.dirichlet)
-    solve1(fem, uh, dirichlet=bc, solver='direct')
+    solve(fem, uh, dirichlet=bc, solver='direct')
     fem.recover_grad(uh, ruh)
 
     Ndof[i] = V.number_of_global_dofs() 
-    error[i] = L2_error(model.solution, uh, order=6)
+    error[i], _ = L2_error(model.solution, uh, order=6)
     derror[i] = div_error(model.laplace, ruh, order=6)
-    gerror[i] = L2_error(model.gradient, ruh, order=6)
-    H1Serror[i] = H1_semi_error(model.gradient, uh, order=5)
+    gerror[i], _ = L2_error(model.gradient, ruh, order=6)
+    H1Serror[i], _ = H1_semi_error(model.gradient, uh, order=5)
 
     eta = estimate(uh, ruh)
     markedCell = mark(mesh, eta, theta)
@@ -114,6 +114,6 @@ y = mesh.point[:, 1]
 axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.Spectral)
 
 axes = fig.add_subplot(1, 3, 3)
-showrate(axes, 20, Ndof, error, 'r-*')
-showrate(axes, 20, Ndof, H1Serror, 'b-o')
+showrate(axes, 10, Ndof, error, 'r-*')
+showrate(axes, 10, Ndof, H1Serror, 'b-o')
 plt.show()

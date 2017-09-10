@@ -39,6 +39,12 @@ class Quadtree(QuadrangleMesh):
         for i in range(r):
             self.refine()
 
+    def sizing_adaptive(self, eta):
+        ```
+        ```
+        pass 
+
+
     def refine(self, marker=None):
         if marker == None:
             idx = self.leaf_cell_index()

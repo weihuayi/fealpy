@@ -16,10 +16,7 @@ namespace {
     public:
         CVTOptGlupApplication(int argc, char** argv) :
             Application(argc, argv, "") {
-
-            show_polygon_domain_ = true;
-            attribute_min_ = 0.0f;
-            attribute_max_ = 0.0f;
+                create_domain_mesh();
         }
 
         /**
@@ -101,7 +98,7 @@ namespace {
             }
         }
 
-        virtual bool load(const std::string& filename){
+        void create_domain_mesh(){
             mesh_gfx_.set_mesh(nil);
             mesh_.clear(false, false);
 
@@ -137,8 +134,7 @@ namespace {
             mesh_.edges.create_edge(idx[3], idx[1]);
             mesh_gfx_.set_mesh(&mesh_);
             mesh_gfx_.set_animate(false);
-            glup_viewer_set_region_of_interest(-0.1, -0.1, 0, 1.1, 1.1, 0);
-            return true;
+            return; 
         }
 
         virtual void init_graphics() {
@@ -151,7 +147,7 @@ namespace {
                 return;
             }
             glup_viewer_is_enabled(GLUP_VIEWER_IDLE_REDRAW);
-            mesh_gfx_.unset_scalar_attribute();
+            glup_viewer_set_region_of_interest(-0.1, -0.1, -0.1, 1.1, 1.1, 0.1);
             mesh_gfx_.set_mesh_color(1.0, 1.0, 1.0);
             mesh_gfx_.set_points_color(0.0, 1.0, 0.0);
             mesh_gfx_.set_points_size(1.0);
@@ -159,12 +155,20 @@ namespace {
             mesh_gfx_.draw_edges();
             return;
         }
+
+        /**
+         * \brief Gets the instance.
+         * \return a pointer to the current DemoGlupApplication.
+         */
+        static CVTOptGlupApplication* instance() {
+           CVTOptGlupApplication* result =
+                dynamic_cast<CVTOptGlupApplication*>(Application::instance());
+            geo_assert(result != nil);
+            return result;
+        }
     protected:
         Mesh mesh_;
         MeshGfx mesh_gfx_;
-        bool show_polygon_domain_;
-        float attribute_min_;
-        float attribute_max_;
     };
 }
 
