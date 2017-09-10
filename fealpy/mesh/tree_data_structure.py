@@ -40,8 +40,6 @@ class Quadtree(QuadrangleMesh):
             self.refine()
 
     def sizing_adaptive(self, eta):
-        ```
-        ```
         pass 
 
 
