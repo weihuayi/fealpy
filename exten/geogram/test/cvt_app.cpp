@@ -96,6 +96,8 @@ class CVTApplication : public Application
 
             m_domain.facets.create_triangle(idx[1], idx[2], idx[0]);
             m_domain.facets.create_triangle(idx[3], idx[0], idx[2]);
+            m_domain.facets.connect();
+            m_domain.show_stats();
 
             return; 
         }
@@ -156,37 +158,46 @@ class CVTApplication : public Application
             glupSetColor3f(GLUP_BACK_COLOR, 1.0f, 0.0f, 1.0f);
             glupEnable(GLUP_LIGHTING);
             if(m_show_domain)
-                draw_domain();
+                draw_domain_border();
 
             if(m_show_delaunay)
                 draw_delaunay();
 
             if(m_show_rvd)
-                draw_rvd();
+            {
+                draw_rvd_edges();
+                draw_rvd_cells();
+            }
 
             if(m_show_points)
                 draw_points();
         }
 
-        void draw_domain()
+        void draw_domain_border()
         {
-            glupSetColor3f(GLUP_FRONT_AND_BACK_COLOR, 1.0, 1.0, 1.0);
             glupSetMeshWidth(4);
-            glupBegin(GLUP_TRIANGLES);
+            glupBegin(GLUP_LINES);
             for(index_t i=0; i< m_domain.facets.nb(); ++i)
             {
                 index_t nv = m_domain.facets.nb_vertices(i);
-                glupVertex(m_domain.vertices.point(m_domain.facets.vertex(i, 0)));
-                glupVertex(m_domain.vertices.point(m_domain.facets.vertex(i, 1)));
-                glupVertex(m_domain.vertices.point(m_domain.facets.vertex(i, 2)));
+                for(index_t j=0; j < nv; ++j)
+                {
+                    index_t idx = m_domain.facets.adjacent(i, j);
+                    if(idx == NO_FACET)
+                    {
+                        glupVertex(m_domain.vertices.point(m_domain.facets.vertex(i, j)));
+                        glupVertex(m_domain.vertices.point(m_domain.facets.vertex(i, (j+1)%nv)));
+                    }
+                }
             }
             glupEnd();
         }
 
         void draw_points()
         {
+            glupEnable(GLUP_LIGHTING);
             glupSetPointSize(GLfloat(10.0));
-            //glupDisable(GLUP_VERTEX_COLORS);
+            glupDisable(GLUP_VERTEX_COLORS);
             glupSetColor3f(GLUP_FRONT_AND_BACK_COLOR, 0.0f, 1.0f, 1.0f);
             glupBegin(GLUP_POINTS);
             for(index_t i=0; i< m_delaunay->nb_vertices(); ++i)
@@ -194,6 +205,7 @@ class CVTApplication : public Application
                 glupVertex3dv(m_delaunay->vertex_ptr(i));
             }
             glupEnd();
+            glupDisable(GLUP_LIGHTING);
         }
 
         void draw_delaunay()
@@ -213,7 +225,7 @@ class CVTApplication : public Application
             glupEnd();
         }
 
-        void draw_rvd()
+        void draw_rvd_edges()
         {
             glupSetColor3f(GLUP_FRONT_AND_BACK_COLOR, 0.0, 0.0, 0.0);
             glupSetMeshWidth(4);
@@ -234,6 +246,27 @@ class CVTApplication : public Application
                 
             }
             glupEnd();
+        }
+
+        void draw_rvd_cells()
+        {
+            glupEnable(GLUP_VERTEX_COLORS);
+            glupBegin(GLUP_TRIANGLES);
+            index_t * region = (index_t *)m_rvd_mesh.facets.attributes().find_attribute_store("region")->data();
+            for(index_t i=0; i< m_rvd_mesh.facets.nb(); ++i)
+            {
+                index_t nv = m_rvd_mesh.facets.nb_vertices(i);
+                glup_viewer_random_color_from_index(int(region[i]));
+                for(index_t j=0; j < nv; ++j)
+                {
+                    glupVertex3dv(m_delaunay->vertex_ptr(region[i]));
+                    glupVertex(m_rvd_mesh.vertices.point(m_rvd_mesh.facets.vertex(i, j)));
+                    glupVertex(m_rvd_mesh.vertices.point(m_rvd_mesh.facets.vertex(i, (j+1)%nv)));
+                }
+                
+            }
+            glupEnd();
+            glupDisable(GLUP_VERTEX_COLORS);  
         }
 
         virtual void init_graphics() 
