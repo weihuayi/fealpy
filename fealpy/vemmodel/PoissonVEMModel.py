@@ -98,19 +98,36 @@ class PoissonVEMModel:
             D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
             D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
             G = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
-            for i in range(NC):
-                K = B[:, cell2dofLocation[i]:cell2dofLocation[i+1]].T@G@B[:,
-                        cell2dofLocation[i]:cell2dofLocation[i+1]]
-                M = np.eye(ldof[i]) - D[cell2dofLocation[i]:cell2dofLocation[i+1], :]@B[:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-                K += M.T@M
-                dof = cell[cell2dofLocation[i]:cell2dofLocation[i+1]]
-                I = np.repeat(dof, ldof[i])
-                J = np.repeat(dof.reshape(1, -1), ldof[i], axis=0).flatten()
-                A += coo_matrix((K.flatten(), (I, J)), shape=(gdof, gdof), dtype=self.dtype)
+
+            BB = np.hsplit(B, cell2dofLocation[1:-1])
+            DD = np.vsplit(D, cell2dofLocation[1:-1])
+            cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+
+            f1 = lambda x: x[1].T@G@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+            f2 = lambda x: np.repeat(x, x.shape[0]) 
+            f3 = lambda x: np.tile(x, x.shape[0])
+            f4 = lambda x: x.flatten()
+
+            K = list(map(f1, zip(DD, BB)))
+            I = np.concatenate(list(map(f2, cd)))
+            J = np.concatenate(list(map(f3, cd)))
+            val = np.concatenate(list(map(f4, K)))
+            A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=self.dtype)
+        
+
+#            for i in range(NC):
+#                K = B[:, cell2dofLocation[i]:cell2dofLocation[i+1]].T@G@B[:,
+#                        cell2dofLocation[i]:cell2dofLocation[i+1]]
+#                M = np.eye(ldof[i]) - D[cell2dofLocation[i]:cell2dofLocation[i+1], :]@B[:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+#                K += M.T@M
+#                dof = cell[cell2dofLocation[i]:cell2dofLocation[i+1]]
+#                I = np.repeat(dof, ldof[i])
+#                J = np.repeat(dof.reshape(1, -1), ldof[i], axis=0).flatten()
+#                A += coo_matrix((K.flatten(), (I, J)), shape=(gdof, gdof), dtype=self.dtype)
         else:
             raise ValueError("I have not code the vem with degree > 1!")
 
-        return A.tocsr()
+        return A
 
     def get_right_vector(self):
 

@@ -7,9 +7,9 @@ from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 
 from fealpy.functionspace.tools import function_space 
-from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEM  
+from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEMModel
 from fealpy.boundarycondition.BoundaryCondition import DirichletBC
-from fealpy.solver import solve1
+from fealpy.solver import solve
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
 from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4, BiharmonicData5, BiharmonicData6
@@ -17,9 +17,15 @@ from fealpy.tools.show import show_error_table
 
 
 m = int(sys.argv[1]) 
-sigma = int(sys.argv[2])  
+meshtype = int(sys.argv[2])
+rtype = int(sys.argv[3])
+if rtype == 1:
+    rtype='simple'
+elif rtype == 2:
+    rtype='inv_area'
 
-meshtype = int(sys.argv[3])
+print('rtype:', rtype)
+sigma = 1
 
 if m == 1:
     model = SinSinData()
@@ -73,9 +79,9 @@ for i in range(maxit):
     rgh = FiniteElementFunction(V2)
     rlh = FiniteElementFunction(V)
 
-    fem = BiharmonicRecoveryFEM(V, model, sigma=sigma, rtype='inv_area')
-    bc = DirichletBC(V, model.dirichlet, model.is_boundary_dof)
-    solve1(fem, uh, dirichlet=bc, solver='direct')
+    fem = BiharmonicRecoveryFEMModel(V, model, sigma=sigma, rtype=rtype)
+    bc = DirichletBC(V, model.dirichlet)
+    solve(fem, uh, dirichlet=bc, solver='direct')
     fem.recover_grad(uh, rgh)
     fem.recover_laplace(rgh, rlh)
 

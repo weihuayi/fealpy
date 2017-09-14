@@ -218,10 +218,6 @@ class BiharmonicData4:
         r = 64*pi**4*np.sin(2*pi*x)*np.sin(2*pi*y)
         return r
 
-    def is_boundary_dof(self, p):
-        eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
-
 
 class BiharmonicData5:
     def __init__(self, a=0.1):
@@ -277,7 +273,6 @@ class BiharmonicData5:
 class BiharmonicData6:
     def __init__(self):
         pass
-
 
     def init_mesh(self, n=1):
         point = np.array([
@@ -347,6 +342,104 @@ class BiharmonicData6:
     def laplace(self,p):
         z = np.zeros((p.shape[0],), dtype=np.float)
         return z
+
+
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        return self.solution(p)
+
+    def neuman(self, p, n):
+        """ Neuman boundary condition
+        """
+        val = self.gradient(p)
+        return np.sum(val*n, axis=1)
+
+    def source(self,p):
+        z = np.zeros((p.shape[0],), dtype=np.float)
+        return z
+
+class BiharmonicData7:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=1):
+        point = np.array([
+            (-1, -1),
+            (0, -1),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 3, 0),
+            (2, 0, 3),
+            (3, 6, 2),
+            (5, 2, 6),
+            (4, 7, 3),
+            (6, 3, 7)], dtype=np.int)
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n=n)
+        return mesh 
+
+    def domain(self):
+        vertex = np.array([
+            (-1, -1),
+            (0, -1),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (1, 1)], dtype=np.float)
+        segment = np.array([
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 4),
+            (4, 5),
+            (5, 0)], dtype=np.float)
+        return point, segment
+
+    def solution(self,p):
+        """ The exact solution 
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        sin = np.sin
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x*x + y*y
+        val = r**(z/2 + 1/2)*(x**2 - 1)**2*(y**2 - 1)**2*(-(-sin(theta*(z + 1))/(z + 1) + sin(theta*(z - 1))/(z - 1))*(cos(w*(z - 1)) - cos(w*(z + 1))) + (-sin(w*(z + 1))/(z + 1) + sin(w*(z - 1))/(z - 1))*(cos(theta*(z - 1)) - cos(theta*(z + 1))))
+        return val 
+
+    def gradient(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x*x + y*y
+        val = np.zeros((len(x), 2), dtype=p.dtype)
+        val[:, 0] = (x**2 - 1)*(y**2 - 1)**2*(4*r**(z/2 + 5/2)*x*(x**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) - r**(z/2 + 5/2)*y*(x**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 16*r**(z/2 + 7/2)*x*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)))/(r**3*(z - 1)*(z + 1))
+        val[:, 1] = (x**2 - 1)**2*(y**2 - 1)*(r**(z/2 + 5/2)*x*(y**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 4*r**(z/2 + 5/2)*y*(y**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 16*r**(z/2 + 7/2)*y*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)))/(r**3*(z - 1)*(z + 1))
+        return val
+
+    def laplace(self,p):
+        x = p[:, 0]
+        y = p[:, 1]
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x*x + y*y
+        val = np.zeros((p.shape[0],), dtype=np.float)
+        val = r**(z/2 - 3/2)*((x**2 - 1)**2*(16*r**2*(3*y**2 - 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 8*r*x*y*(y**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 4*r*(y**2 - 1)*(9*y**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + x*(y**2 - 1)**2*(2*(z - 1)*(z + 1)*(x*(z - 1)*sin(theta*(z - 1)) - x*(z + 1)*sin(theta*(z + 1)) + 2*y*cos(theta*(z - 1)) - 2*y*cos(theta*(z + 1)))*sin(w)*sin(w*z) + ((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))*(x*(z - 1)**2*cos(theta*(z - 1)) - x*(z + 1)**2*cos(theta*(z + 1)) - 2*y*(z - 1)*sin(theta*(z - 1)) + 2*y*(z + 1)*sin(theta*(z + 1)))) + 2*y*(y**2 - 1)**2*(z + 1)*(x*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 2*y*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 4*y*(z*sin(theta)*sin(w)*sin(z*(theta - w)) - sin(theta*z)*sin(w*z)*sin(theta - w)))) + (y**2 - 1)**2*(16*r**2*(3*x**2 - 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) - 8*r*x*y*(x**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 4*r*(x**2 - 1)*(9*x**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 2*x*(x**2 - 1)**2*(z + 1)*(2*x*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 4*x*(z*sin(theta)*sin(w)*sin(z*(theta - w)) - sin(theta*z)*sin(w*z)*sin(theta - w)) - y*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1))))) + y*(x**2 - 1)**2*(-2*(z - 1)*(z + 1)*(2*x*cos(theta*(z - 1)) - 2*x*cos(theta*(z + 1)) - y*(z - 1)*sin(theta*(z - 1)) + y*(z + 1)*sin(theta*(z + 1)))*sin(w)*sin(w*z) + ((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))*(2*x*(z - 1)*sin(theta*(z - 1)) - 2*x*(z + 1)*sin(theta*(z + 1)) + y*(z - 1)**2*cos(theta*(z - 1)) - y*(z + 1)**2*cos(theta*(z + 1))))))/((z - 1)*(z + 1))
+        return val 
 
 
     def dirichlet(self, p):

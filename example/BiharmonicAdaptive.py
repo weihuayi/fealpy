@@ -58,16 +58,19 @@ def mark(mesh, eta, theta, method='L2'):
 
 theta = 0.6 
 
-#model = BiharmonicData5()
-#box = [-1, 1, -1, 1]
+model = BiharmonicData5()
+box = [-1, 1, -1, 1]
+n = 40
+mesh = rectangledomainmesh(box, nx=n, ny=n)  
 
 #model = BiharmonicData4()
 #box = [0, 1, 0, 1]
 
-model = BiharmonicData6()
+#model = BiharmonicData6()
+#mesh = model.init_mesh(n=4)
 
 sigma = 1
-maxit = 100 
+maxit = 80 
 degree = 1
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
@@ -75,12 +78,10 @@ gerror = np.zeros((maxit,), dtype=np.float)
 H1Serror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
-#n = 40
-#mesh = rectangledomainmesh(box, nx=n, ny=n)  
 
-mesh = model.init_mesh(n=4)
 
 for i in range(maxit):
+    print(i, 'step:')
     V = function_space(mesh, 'Lagrange', degree)
     V2 = function_space(mesh, 'Lagrange_2', degree)
     uh = FiniteElementFunction(V)
@@ -92,10 +93,10 @@ for i in range(maxit):
     fem.recover_grad(uh, ruh)
 
     Ndof[i] = V.number_of_global_dofs() 
-    error[i], _ = L2_error(model.solution, uh, order=6)
+    error[i] = L2_error(model.solution, uh, order=6)
     derror[i] = div_error(model.laplace, ruh, order=6)
-    gerror[i], _ = L2_error(model.gradient, ruh, order=6)
-    H1Serror[i], _ = H1_semi_error(model.gradient, uh, order=5)
+    gerror[i] = L2_error(model.gradient, ruh, order=6)
+    H1Serror[i] = H1_semi_error(model.gradient, uh, order=5)
 
     eta = estimate(uh, ruh)
     markedCell = mark(mesh, eta, theta)
@@ -114,6 +115,6 @@ y = mesh.point[:, 1]
 axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.Spectral)
 
 axes = fig.add_subplot(1, 3, 3)
-showrate(axes, 10, Ndof, error, 'r-*')
-showrate(axes, 10, Ndof, H1Serror, 'b-o')
+showrate(axes, 40, Ndof, error, 'r-*')
+showrate(axes, 40, Ndof, H1Serror, 'b-o')
 plt.show()

@@ -71,12 +71,13 @@ quadtree.uniform_refine(4)
 model = LShapeRSinData() 
 #model = CosCosData()
 
-maxit = 30
+maxit = 50
 error = np.zeros((maxit,), dtype=np.float)
 rerror = np.zeros((maxit,), dtype=np.float)
 Ndof = np.zeros((maxit,), dtype=np.int)
 
 for i in range(maxit):
+    print('step:', i)
     uh, Ndof[i], eta= vem_solve(model, quadtree)
     uI = uh.V.interpolation(model.solution)
     error[i] = np.sqrt(np.sum((uh - uI)**2)/Ndof[i])
@@ -96,8 +97,8 @@ c2p = mesh.ds.cell_to_point()
 mesh.add_plot(axes)
 
 axes = fig.add_subplot(1, 3, 3)
-showrate(axes, 20, Ndof, error, 'r-*')
-showrate(axes, 20, Ndof, rerror, 'b-o')
+showrate(axes, 30, Ndof, error, 'r-*')
+showrate(axes, 30, Ndof, rerror, 'b-o')
 plt.show()
 
 #print(Ndof)

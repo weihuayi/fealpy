@@ -17,7 +17,6 @@ sudo apt-get install python3 python3-pip ipython3
 sudo apt-get install python3-numpy
 sudo apt-get install python3-scipy
 sudo apt-get install python3-matplotlib
-sudo -H pip3 install spyder
 ```
 
 ```
@@ -52,6 +51,18 @@ sudo -H pip3 install PySPH
 sudo -H pip3 install nipy
 sudo -H pip3 install mayavi
 ```
+
+## Install Boost with python3 
+
+
+Dowload the latest boost from http://www.boost.org/. 
+
+```
+./bootstrap.sh --with-python=python3
+./b2
+```
+
+Here we install boost into `/usr/local` directory. 
 
 ## Install VTK Wrapped by Python3
 
