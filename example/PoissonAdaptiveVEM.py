@@ -7,7 +7,7 @@ from fealpy.mesh.PolygonMesh import PolygonMesh
 from fealpy.functionspace.vem_space import VirtualElementSpace2d
 from fealpy.functionspace.function import FiniteElementFunction
 
-from fealpy.model.poisson_model_2d import LShapeRSinData, CosCosData
+from fealpy.model.poisson_model_2d import LShapeRSinData, CosCosData, KelloggData
 from fealpy.vemmodel import PoissonVEMModel 
 from fealpy.boundarycondition import DirichletBC
 
@@ -68,7 +68,7 @@ class AdaptiveMarker():
 point, cell = lshape_mesh(4)
 quadtree = Quadtree(point, cell)
 quadtree.uniform_refine(4)
-model = LShapeRSinData() 
+#model = LShapeRSinData() 
 #model = CosCosData()
 
 maxit = 50

@@ -103,12 +103,19 @@ class PoissonVEMModel:
             DD = np.vsplit(D, cell2dofLocation[1:-1])
             cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
 
-            f1 = lambda x: x[1].T@G@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+            
+            f1 = lambda x: (x[1].T@G@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
             f2 = lambda x: np.repeat(x, x.shape[0]) 
             f3 = lambda x: np.tile(x, x.shape[0])
             f4 = lambda x: x.flatten()
 
-            K = list(map(f1, zip(DD, BB)))
+            try:
+                barycenter = V.smspace.barycenter 
+                k = self.pde.diffusion_coefficient(barycenter)
+            except  AttributeError:
+                k = np.ones(NC) 
+
+            K = list(map(f1, zip(DD, BB, k)))
             I = np.concatenate(list(map(f2, cd)))
             J = np.concatenate(list(map(f3, cd)))
             val = np.concatenate(list(map(f4, K)))
