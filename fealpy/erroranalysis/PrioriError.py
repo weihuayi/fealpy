@@ -30,7 +30,7 @@ def L2_error(u, uh, order=4, dtype=np.float):
     e *= mesh.area()
     #isInCell = ~mesh.ds.boundary_cell_flag()
     #return np.sqrt(e[isInCell].sum())
-    return np.sqrt(e.sum())
+    return np.sqrt(e.sum()) 
 
 def div_error(f, ruh, order=4, dtype=np.float):
     V = ruh.V

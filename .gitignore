@@ -9,3 +9,4 @@ _book
 test/*.vtk
 test/*.pdf
 test/*.png
+result

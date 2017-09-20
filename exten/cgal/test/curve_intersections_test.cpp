@@ -1,12 +1,14 @@
 
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Cartesian.h>
 #include <CGAL/MP_Float.h>
 #include <CGAL/Quotient.h>
 #include <CGAL/Arr_segment_traits_2.h>
 #include <CGAL/Sweep_line_2_algorithms.h>
 #include <list>
-typedef CGAL::Quotient<CGAL::MP_Float>                  NT;
-typedef CGAL::Cartesian<NT>                             Kernel;
+//typedef CGAL::Quotient<CGAL::MP_Float>                  NT;
+//typedef CGAL::Cartesian<NT>                             Kernel;
+typedef CGAL::Exact_predicates_inexact_constructions_kernel Kernel;
 typedef Kernel::Point_2                                 Point_2;
 typedef CGAL::Arr_segment_traits_2<Kernel>              Traits_2;
 typedef Traits_2::Curve_2                               Segment_2;

@@ -44,3 +44,9 @@ def show_error_table(N, errorType, errorMatrix, pre=5, sep=' & ', out=sys.stdout
     if flag:
         out.close()
 
+def showrate(axes, k, N, error, option, label=None):
+    line0, = axes.loglog(N, error, option, lw=2, label=label)
+    c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
+    s = 0.75*error[k]/N[k]**c[0] 
+    line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]))
+    axes.legend()

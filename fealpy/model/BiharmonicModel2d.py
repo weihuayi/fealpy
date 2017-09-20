@@ -222,6 +222,32 @@ class BiharmonicData4:
 class BiharmonicData5:
     def __init__(self, a=0.1):
         self.a = a
+
+    def init_mesh(self, n=5):
+        point = np.array([
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 2, 0),
+            (3, 0, 2)], dtype=np.int)
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n=n)
+        return mesh 
+
+    def domain(self):
+        point = np.array([
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1)], dtype=np.float)
+        segment = np.array([
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 0)], dtype=np.float)
+        return point, segment
     
     def solution(self, p):
         """ The exact solution 
@@ -361,7 +387,8 @@ class BiharmonicData6:
 
 class BiharmonicData7:
     def __init__(self):
-        pass
+        self.z = 0.544483736782464
+        self.w = 3*np.pi/2
 
     def init_mesh(self, n=1):
         point = np.array([
@@ -385,7 +412,7 @@ class BiharmonicData7:
         return mesh 
 
     def domain(self):
-        vertex = np.array([
+        point = np.array([
             (-1, -1),
             (0, -1),
             (0, 0),
@@ -408,8 +435,11 @@ class BiharmonicData7:
         y = p[:, 1]
         pi = np.pi
         sin = np.sin
+        cos = np.cos
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        w = self.w
+        z = self.z
         r = x*x + y*y
         val = r**(z/2 + 1/2)*(x**2 - 1)**2*(y**2 - 1)**2*(-(-sin(theta*(z + 1))/(z + 1) + sin(theta*(z - 1))/(z - 1))*(cos(w*(z - 1)) - cos(w*(z + 1))) + (-sin(w*(z + 1))/(z + 1) + sin(w*(z - 1))/(z - 1))*(cos(theta*(z - 1)) - cos(theta*(z + 1))))
         return val 
@@ -422,6 +452,8 @@ class BiharmonicData7:
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        w = self.w
+        z = self.z
         r = x*x + y*y
         val = np.zeros((len(x), 2), dtype=p.dtype)
         val[:, 0] = (x**2 - 1)*(y**2 - 1)**2*(4*r**(z/2 + 5/2)*x*(x**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) - r**(z/2 + 5/2)*y*(x**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 16*r**(z/2 + 7/2)*x*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)))/(r**3*(z - 1)*(z + 1))
@@ -436,6 +468,8 @@ class BiharmonicData7:
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        w = self.w
+        z = self.z
         r = x*x + y*y
         val = np.zeros((p.shape[0],), dtype=np.float)
         val = r**(z/2 - 3/2)*((x**2 - 1)**2*(16*r**2*(3*y**2 - 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 8*r*x*y*(y**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 4*r*(y**2 - 1)*(9*y**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + x*(y**2 - 1)**2*(2*(z - 1)*(z + 1)*(x*(z - 1)*sin(theta*(z - 1)) - x*(z + 1)*sin(theta*(z + 1)) + 2*y*cos(theta*(z - 1)) - 2*y*cos(theta*(z + 1)))*sin(w)*sin(w*z) + ((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))*(x*(z - 1)**2*cos(theta*(z - 1)) - x*(z + 1)**2*cos(theta*(z + 1)) - 2*y*(z - 1)*sin(theta*(z - 1)) + 2*y*(z + 1)*sin(theta*(z + 1)))) + 2*y*(y**2 - 1)**2*(z + 1)*(x*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 2*y*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 4*y*(z*sin(theta)*sin(w)*sin(z*(theta - w)) - sin(theta*z)*sin(w*z)*sin(theta - w)))) + (y**2 - 1)**2*(16*r**2*(3*x**2 - 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) - 8*r*x*y*(x**2 - 1)*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))) + 4*r*(x**2 - 1)*(9*x**2 - 1)*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 2*x*(x**2 - 1)**2*(z + 1)*(2*x*(z + 1)*(-z*sin(theta)*sin(w)*sin(z*(theta - w)) + sin(theta*z)*sin(w*z)*sin(theta - w)) + 4*x*(z*sin(theta)*sin(w)*sin(z*(theta - w)) - sin(theta*z)*sin(w*z)*sin(theta - w)) - y*(-4*(z - 1)*(z + 1)*sin(theta)*sin(w)*sin(theta*z)*sin(w*z) + ((z - 1)*sin(theta*(z - 1)) - (z + 1)*sin(theta*(z + 1)))*((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1))))) + y*(x**2 - 1)**2*(-2*(z - 1)*(z + 1)*(2*x*cos(theta*(z - 1)) - 2*x*cos(theta*(z + 1)) - y*(z - 1)*sin(theta*(z - 1)) + y*(z + 1)*sin(theta*(z + 1)))*sin(w)*sin(w*z) + ((z - 1)*sin(w*(z + 1)) - (z + 1)*sin(w*(z - 1)))*(2*x*(z - 1)*sin(theta*(z - 1)) - 2*x*(z + 1)*sin(theta*(z + 1)) + y*(z - 1)**2*cos(theta*(z - 1)) - y*(z + 1)**2*cos(theta*(z + 1))))))/((z - 1)*(z + 1))
@@ -454,6 +488,6 @@ class BiharmonicData7:
         return np.sum(val*n, axis=1)
 
     def source(self,p):
-        z = np.zeros((p.shape[0],), dtype=np.float)
+        z = np.ones((p.shape[0],), dtype=np.float)
         return z
 
