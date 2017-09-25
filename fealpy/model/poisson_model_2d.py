@@ -1,6 +1,10 @@
 import numpy as np
 
-class KelloggData(self, p):
+
+from ..mesh.TriangleMesh import TriangleMesh  
+from ..mesh.tree_data_structure import Quadtree 
+
+class KelloggData:
     def __init__(self):
         self.a = 161.4476387975881
         self.b = 1
@@ -90,6 +94,34 @@ class KelloggData(self, p):
 
 class LShapeRSinData:
     def __init__(self):
+        pass
+
+    def init_mesh(self, n, meshtype='quadtree'):
+        point = np.array([
+            (-1, -1),
+            (0, -1),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)], dtype=np.float)
+        cell = np.array([
+            (0, 1, 3, 2),
+            (2, 3, 6, 5),
+            (3, 4, 7, 6)], dtype=np.int)
+        if meshtype is 'quadtree':
+            mesh = Quadtree(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            mesh = TriangleMesh(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+    
+    def domain(self, n):
         pass
 
     def solution(self, p):

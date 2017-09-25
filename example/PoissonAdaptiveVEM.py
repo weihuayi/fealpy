@@ -16,28 +16,7 @@ from fealpy.solver import solve
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-def lshape_mesh(r=1):
-    point = np.array([
-        (-1, -1),
-        (0, -1),
-        (-1, 0),
-        (0, 0),
-        (1, 0),
-        (-1, 1),
-        (0, 1),
-        (1, 1)], dtype=np.float)
-    cell = np.array([
-        (0, 1, 3, 2),
-        (2, 3, 6, 5),
-        (3, 4, 7, 6)], dtype=np.int)
-    return point, cell
 
-def showrate(axes, k, N, error, option):
-    axes.loglog(N, error, option, lw=2)
-    c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
-    s = 0.75*error[0]/N[0]**c[0] 
-    axes.loglog(N, s*N**c[0], label='N^'+str(c[0]))
-    axes.legend()
 
 def vem_solve(model, quadtree):
     mesh = quadtree.to_polygonmesh() 
@@ -60,7 +39,6 @@ class AdaptiveMarker():
         m = np.mean(eta)
         theta = self.theta
         return idx[eta > 1.8*m]
-
 
     def coarsen_marker(self, qtmesh):
         pass

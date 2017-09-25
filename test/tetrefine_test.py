@@ -37,7 +37,7 @@ cell = np.array([
     [0,2,3,6]], dtype=np.int)
 
 mesh = TetrahedronMesh(point, cell)
-for i in range(6):
+for i in range(3):
     angle = mesh.dihedral_angle()
     print("max:", np.max(angle))
     print("min:", np.min(angle))

@@ -18,6 +18,8 @@ from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, Bih
 
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
 
+from fealpy.tools.show import showrate
+
 
 def smooth_eta(mesh, eta):
     m = np.max(eta)
@@ -73,7 +75,7 @@ def mark(mesh, eta, theta, method='L2'):
 
 
 m = int(sys.argv[1])
-theta = 0.2
+theta = 0.3
 
 if m == 1:
     model = BiharmonicData5(a=0.01)
@@ -92,8 +94,8 @@ else:
 
 
 sigma = 1
-maxit = 20 
-k = 10 
+maxit = 40 
+k = 20 
 degree = 1
 error = np.zeros((maxit,), dtype=np.float)
 derror = np.zeros((maxit,), dtype=np.float)
@@ -131,7 +133,8 @@ for i in range(maxit):
 fig1 = plt.figure()
 fig1.set_facecolor('white')
 axes = fig1.gca() 
-mesh.add_plot(axes, cellcolor=[1, 1, 1])
+#mesh.add_plot(axes, cellcolor=[1, 1, 1])
+mesh.add_plot(axes)
 fig1.savefig('mesh.pdf')
 
 fig2 = plt.figure()
