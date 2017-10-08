@@ -16,7 +16,7 @@ from fealpy.solver import solve
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-
+from fealpy.mesh.adaptive_tools import mark
 
 def vem_solve(model, quadtree):
     mesh = quadtree.to_polygonmesh() 
@@ -28,24 +28,9 @@ def vem_solve(model, quadtree):
     eta = vem.recover_estimate(uh)
     return uh, V.number_of_global_dofs(), eta
 
-class AdaptiveMarker():
-    def __init__(self, eta, theta=0.5):
-        self.eta = eta
-        self.theta = theta
 
-    def refine_marker(self, qtmesh):
-        idx = qtmesh.leaf_cell_index()
-        #m = np.max(eta)
-        m = np.mean(eta)
-        theta = self.theta
-        return idx[eta > 1.8*m]
-
-    def coarsen_marker(self, qtmesh):
-        pass
-
-point, cell = lshape_mesh(4)
-quadtree = Quadtree(point, cell)
-quadtree.uniform_refine(4)
+model = KelloggData()
+quadtree = model.init_mesh(n=4)
 #model = LShapeRSinData() 
 #model = CosCosData()
 

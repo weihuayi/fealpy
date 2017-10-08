@@ -9,11 +9,48 @@ class KelloggData:
         self.a = 161.4476387975881
         self.b = 1
 
+    def init_mesh(self, n=4, meshtype='quadtree'):
+        point = np.array([
+            (-1, -1),
+            (0, -1),
+            (1, -1),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)], dtype=np.float)
+        if meshtype is 'quadtree':
+            cell = np.array([
+                (0, 1, 4, 3),
+                (1, 2, 5, 4),
+                (3, 4, 7, 6),
+                (4, 5, 8, 7)], dtype=np.int)
+            mesh = Quadtree(point, cell)
+            mesh.uniform_refine(n)
+        elif meshtype is 'tri':
+            mesh = TriangleMesh(point, cell)
+            mesh.uniform_refine(n)
+        else:
+            raise ValueError("".format)
+        return mesh
+
     def diffusion_coefficient(self, p):
         idx = p[:, 0]*p[:, 1] >0
         k = np.ones((p.shape[0], ), dtype=np.float)
         k[idx] = self.a  
         return k
+
+    def subdomain(self, p):
+        """
+        get the index of the subdomain including point p.
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        pi = np.pi
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
+        return np.floor(2*theta/pi)
 
     def solution(self, p):
     
@@ -37,7 +74,6 @@ class KelloggData:
         u = r**gamma*mu
         return u
 
-#梯度
     def gradient(self, p):
         """The gradient of the exact solution
         """

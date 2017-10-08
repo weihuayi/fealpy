@@ -15,6 +15,27 @@ class BiharmonicRecoveryFEMModel:
         self.gradphi, self.area = V.mesh.grad_lambda()
         self.A, self.B = self.get_revcover_matrix()
 
+    def recover_estimate(self, uh, ruh, order=3, dtype=np.float):
+        V = uh.V
+        mesh = V.mesh
+
+        NC = mesh.number_of_cells()
+        qf = TriangleQuadrature(order)
+        nQuad = qf.get_number_of_quad_points()
+
+        gdof = V.number_of_global_dofs()
+        ldof = V.number_of_local_dofs()
+        
+        e = np.zeros((NC,), dtype=dtype)
+        for i in range(nQuad):
+            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+            uhval = uh.grad_value(lambda_k)
+            ruhval = ruh.value(lambda_k)
+            e += w_k*((uhval - ruhval)*(uhval - ruhval)).sum(axis=1)
+        e *= mesh.area()
+        e = np.sqrt(e)
+        return e 
+
     def recover_grad(self, uh, rgh):
         rgh[:, 0] = self.A@uh
         rgh[:, 1] = self.B@uh

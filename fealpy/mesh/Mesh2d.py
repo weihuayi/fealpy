@@ -57,31 +57,60 @@ class Mesh2d():
         a /=2
         return a
 
-    def edge_unit_normal(self):
+    def edge_length(self, edgeflag=None):
+        if edgeflag is None:
+            v = point[edge[:,1],:] - point[edge[:,0],:]
+        else:
+            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+        length = np.sqrt(np.sum(v**2,axis=1))
+        return length
+
+
+    def edge_unit_normal(self, edgeflag=None):
         #TODO: 3D Case
-        v = self.edge_unit_tagent()
+        v = self.edge_unit_tagent(edgeflag=edgeflag)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_unit_tagent(self):
+    def edge_unit_tagent(self, edgeflag=None):
         edge = self.ds.edge
         point = self.point
         NE = self.number_of_edges()
-        v = point[edge[:,1],:] - point[edge[:,0],:]
-        length = np.sqrt(np.sum(v**2,axis=1))
-        return v/length.reshape(-1,1)
+        if edgeflag is None:
+            v = point[edge[:,1],:] - point[edge[:,0],:]
+            length = np.sqrt(np.sum(v**2,axis=1))
+            v /= length.reshape(-1, 1)
+        else:
+            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+            length = np.sqrt(np.sum(v**2, axis=1))
+            v /= length.reshape(-1, 1)
+        return v
+
+    def edge_normal(self, edgeflag=None):
+        v = self.edge_tagent(edgeflag=edgeflag)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    def edge_tagent(self, edgeflag=None):
+        point = self.point
+        edge = self.ds.edge
+        if edgeflag is None:
+            v = point[edge[:,1],:] - point[edge[:,0],:]
+        else:
+            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+        return v 
 
     def add_plot(self, axes,
             pointcolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
             linewidths=1, markersize=2,  
-            showaxis=False, showcolorbar=False):
+            showaxis=False, showcolorbar=False, cmap='rainbow'):
 
         return show_mesh_2d(axes, self,
                 pointcolor=pointcolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
-                showaxis=showaxis, showcolorbar=showcolorbar)
+                showaxis=showaxis, showcolorbar=showcolorbar, cmap=cmap)
 
     def find_point(self, axes, point=None,
             index=None, showindex=False,
@@ -338,7 +367,7 @@ class Mesh2dDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        point2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+        point2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
         return point2edge
 
     def point_to_cell(self, localidx=False):

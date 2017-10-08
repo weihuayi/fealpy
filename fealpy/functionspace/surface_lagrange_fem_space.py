@@ -7,7 +7,7 @@ from ..common import ranges
 from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
-    def __init__(self, surface, mesh, p=1, dtype=np.float):
+    def __init__(self, surf, mesh, p=1, dtype=np.float):
         self.scalarspace = LagrangeFiniteElementSpace2d(mesh, p, dtype=dtype)
         self.point, _= surface.project(self.scalarspace.interpolation_points())
         self.dtype=dtype
@@ -75,7 +75,7 @@ class SurfaceLagrangeFiniteElementSpace:
     def __init__(self, mesh, surface, p=1, dtype=np.float):
         self.p = p
         self.dtype = dtype
-        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p, dtype=dtype) 
+        self.surface = SurfaceTriangleMesh(mesh, surface, p=p, dtype=dtype) 
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"

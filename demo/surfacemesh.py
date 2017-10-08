@@ -5,7 +5,7 @@ import scipy.io as sio
 import mpl_toolkits.mplot3d as a3
 import pylab as pl
 
-from fealpy.mesh.io import load_mat_mesh
+from fealpy.mesh.meshio import load_mat_mesh
 
 
 def u(p):

@@ -20,7 +20,8 @@ class TriangleMesh(Mesh2d):
 
         self.meshtype = 'tri'
         self.dtype = dtype
-        self.data = {}
+        self.cellData = {}
+        self.pointData = {}
 
     def circumcenter(self):
         point = self.point

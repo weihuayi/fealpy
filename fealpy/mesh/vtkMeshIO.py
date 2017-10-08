@@ -32,6 +32,12 @@ def write_vtk_mesh(mesh, fileName):
     elif mesh.meshtype is 'tri':
         cell_type = tvtk.Triangle().cell_type
         cell = mesh.ds.cell
+        for key, value in mesh.cellData.items():
+            i = ug.cell_data.add_array(value)
+            ug.cell_data.get_array(i).name=key
+        for key, value in mesh.pointData.items():
+            i = ug.point_data.add_array(value)
+            ug.point_data.get_array(i).name = key
     elif mesh.meshtype is 'polyhedron':
         cell_type = tvtk.Polygon().cell_type
         NF, faces = mesh.to_vtk()
@@ -52,7 +58,6 @@ def write_vtk_mesh(mesh, fileName):
         for key, value in mesh.pointData.items():
             i = ug.point_data.add_array(value)
             ug.point_data.get_array(i).name = key
-
     ug.set_cells(cell_type, cell) 
     write_data(ug, fileName)
 

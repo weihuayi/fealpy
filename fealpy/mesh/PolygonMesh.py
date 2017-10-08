@@ -104,30 +104,7 @@ class PolygonMesh(Mesh2d):
         d = point[idx1] - point[idx2] 
         return 0.5*d@w 
 
-    def edge_unit_normal(self):
-        v = self.edge_unit_tagent()
-        w = np.array([(0,-1),(1,0)])
-        return v@w
 
-    def edge_unit_tagent(self):
-        point = self.point
-        edge = self.ds.edge
-        NE = self.number_of_edges()
-        v = point[edge[:,1],:] - point[edge[:,0],:]
-        length = np.sqrt(np.sum(v**2,axis=1))
-        return v/length.reshape(-1,1)
-
-    def edge_normal(self):
-        v = self.edge_unit_tagent()
-        w = np.array([(0,-1),(1,0)])
-        return v@w
-
-    def edge_tagent(self):
-        point = self.point
-        edge = self.ds.edge
-        NE = self.number_of_edges()
-        v = point[edge[:,1],:] - point[edge[:,0],:]
-        return v 
 
     def print(self):
         print("Point:\n", self.point)

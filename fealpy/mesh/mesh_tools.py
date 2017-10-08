@@ -115,7 +115,7 @@ def show_mesh_2d(axes, mesh,
         pointcolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False):
+        showaxis=False, showcolorbar=False, cmap='rainbow'):
     
     axes.set_aspect(aspect)
     if showaxis == False:
@@ -127,14 +127,14 @@ def show_mesh_2d(axes, mesh,
         cmax = pointcolor.max()
         cmin = pointcolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
-        mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
+        mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         pointcolor = mapper.to_rgba(pointcolor)
 
     if (type(cellcolor) is np.ndarray) & np.isreal(cellcolor[0]):
         cmax = cellcolor.max()
         cmin = cellcolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
-        mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
+        mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         mapper.set_array(cellcolor)
         cellcolor = mapper.to_rgba(cellcolor)
         if showcolorbar:
