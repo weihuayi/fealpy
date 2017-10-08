@@ -64,13 +64,13 @@ class KelloggData:
         gamma = 0.1
         sigma = -14.9225565104455152
         rho = pi/4
-        r = np.sum(p**2, axis=1) # r=x^2+y^2
+        r = x**2 + y**2 # r=x^2+y^2
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
-        mu = ((theta >= 0) & (theta <= pi/2))*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma) \
-            + ((theta >= pi/2) & (theta <= pi))*cos(rho*gamma)*cos((theta-pi+sigma)*gamma) \
-            + ((theta >= pi) & (theta <= 1.5*pi))*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
-            + ((theta >= 1.5*pi) & (theta <= 2*pi))*cos((pi/2-rho)*gamma)*cos((theta-1.5*pi-sigma)*gamma)
+        mu = ((theta >= 0) & (theta < pi/2))*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma) \
+            + ((theta >= pi/2) & (theta < pi))*cos(rho*gamma)*cos((theta-pi+sigma)*gamma) \
+            + ((theta >= pi) & (theta < 1.5*pi))*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
+            + ((theta >= 1.5*pi) & (theta < 2*pi))*cos((pi/2-rho)*gamma)*cos((theta-1.5*pi-sigma)*gamma)
         u = r**gamma*mu
         return u
 
@@ -90,10 +90,10 @@ class KelloggData:
         sigma = -14.9225565104455152
         rho =pi/4        
     
-        theta = np.arctan2(p[:, 1], p[:, 0]) #jiaodu
+        theta = np.arctan2(y, x) 
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)    
-        t = 1 + (p[:, 1]**2/p[:, 0]**2)
-        r = np.sum(p**2, axis = 1)#r = p[:, 0]^2+p[:, 1]^2
+        t = 1 + (x**2/y**2)
+        r = x**2 + y**2 
         rg = r**gamma 
         ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*p[:, 0]*cos((theta-pi/2+rho)*gamma) \
             +rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t))
@@ -132,7 +132,7 @@ class LShapeRSinData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n, meshtype='quadtree'):
+    def init_mesh(self, n=4, meshtype='quadtree'):
         point = np.array([
             (-1, -1),
             (0, -1),
@@ -168,9 +168,6 @@ class LShapeRSinData:
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         u = (x*x + y*y)**(1/3)*np.sin(2/3*theta)
         return u
-    def diffusion_coefficient(self, p):
-
-        return 
 
     def source(self, p):
         """the right hand side of Possion equation

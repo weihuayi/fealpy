@@ -82,4 +82,4 @@ def solve(fem, uh, dirichlet=None, solver='cg'):
 
     print("Solve time:", end-start)
 
-    return AD, b 
+    return A, b 

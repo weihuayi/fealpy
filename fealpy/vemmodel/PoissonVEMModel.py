@@ -22,11 +22,17 @@ class PoissonVEMModel:
         h = V.smspace.h 
         area = V.smspace.area
 
+        try:
+            k = self.pde.diffusion_coefficient(barycenter)
+        except  AttributeError:
+            k = np.ones(NC) 
+
         S = np.zeros((NC, 3), dtype=self.dtype)
         idx = np.repeat(np.arange(NC), NV)
         for i in range(3):
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         S /=h.reshape(-1, 1)
+        S *=k.reshape(-1, 1)
             
 
         p2c = mesh.ds.point_to_cell()
@@ -42,58 +48,58 @@ class PoissonVEMModel:
         else:
             raise ValueError("I have note code method: {}!".format(rtype))
 
-        if 'subdomain' in dir(self.pde):
-            edge = mesh.ds.edge
-            edge2cell = mesh.ds.edge_to_cell()
-            isBdEdge = mesh.ds.boundary_edge_flag()
-            lp = barycenter[edge2cell[:, 0]]
-            rp = barycenter[edge2cell[:, 1]]
-            lidx = self.pde.subdomain(lp)
-            ridx = self.pde.subdomain(rp)
-            isSubDomainBdEdge = (lidx != ridx) & (~isBdEdge)
-            edge0 = edge[isSubDomainBdEdge]
-            edge2cell0 = edge2cell[isSubDomainBdEdge] 
-            n0 = mesh.edge_unit_normal(edgeflag=isSubDomainBdEdge)
-            ls = S[edge2cell0[:, 0], 1:3] - (S[edge2cell0[:, 0], 1:3]*n0).sum(axis=1, keepdims=True)*n0
-            rs = S[edge2cell0[:, 1], 1:3] - (S[edge2cell0[:, 1], 1:3]*n0).sum(axis=1, keepdims=True)*n0
-            if rtype is 'simple':
-                t = (ls + rs)/2
-            elif rtype is 'area':
-                larea = area[edge2cell0[:, 0]].reshape(-1, 1)
-                rarea = area[edge2cell0[:, 1]].reshape(-1, 1)
-                t = (larea*ls + rarea*rs)/(larea + rarea)
-            elif rtype is 'inv_area':
-                larea = 1/area[edge2cell0[:, 0]].reshape(-1, 1)
-                rarea = 1/area[edge2cell0[:, 1]].reshape(-1, 1)
-                t = (larea*ls + rarea*rs)/(larea + rarea)
-            else:
-                raise ValueError("I have note code method: {}!".format(rtype))
-
-            isSubDomainBdPoint = np.zeros(N, dtype=np.bool)
-            isSubDomainBdPoint[edge0] = True
-            idx0, = np.nonzero(isSubDomainBdPoint)
-            N0 = idx0.shape[0]
-            NE0 = edge0.shape[0]
-            idxMap = np.zeros(N, dtype=np.int)
-            idxMap[isSubDomainBdPoint] = np.arange(N0)
-
-            I = idxMap[edge0].flatten()
-            J = np.arange(NE0)
-            val = np.ones(2*NE0, dtype=np.bool)
-            p2e = csr_matrix((val, (I, np.repeat(J, 2))), shape=(N0, NE0), dtype=np.bool)
-            if rtype is 'simple':
-                d = p2e.sum(axis=1)
-                ruh[idx0, :] = p2e@t/d.reshape(-1, 1)
-            elif rtype is 'area':
-                length = mesh.edge_length()
-                d = p2e@length
-                ruh[idx0, :] = np.asarray((p2e[idx, :]@(t*length[isSubDomainBdEdge]))/d.reshape(-1, 1))
-            elif rtype is 'inv_area':
-                length = mesh.edge_length()
-                d = p2e@(1/length)
-                ruh[idx0, :] = np.asarray((p2e@(t/length[isSubDomainBdEdge].reshape(-1,1)))/d.reshape(-1, 1))
-            else:
-                raise ValueError("I have note code method: {}!".format(rtype))
+#        if 'subdomain' in dir(self.pde):
+#            edge = mesh.ds.edge
+#            edge2cell = mesh.ds.edge_to_cell()
+#            isBdEdge = mesh.ds.boundary_edge_flag()
+#            lp = barycenter[edge2cell[:, 0]]
+#            rp = barycenter[edge2cell[:, 1]]
+#            lidx = self.pde.subdomain(lp)
+#            ridx = self.pde.subdomain(rp)
+#            isSubDomainBdEdge = (lidx != ridx) & (~isBdEdge)
+#            edge0 = edge[isSubDomainBdEdge]
+#            edge2cell0 = edge2cell[isSubDomainBdEdge] 
+#            n0 = mesh.edge_unit_normal(edgeflag=isSubDomainBdEdge)
+#            ls = S[edge2cell0[:, 0], 1:3] - (S[edge2cell0[:, 0], 1:3]*n0).sum(axis=1, keepdims=True)*n0
+#            rs = S[edge2cell0[:, 1], 1:3] - (S[edge2cell0[:, 1], 1:3]*n0).sum(axis=1, keepdims=True)*n0
+#            if rtype is 'simple':
+#                t = (ls + rs)/2
+#            elif rtype is 'area':
+#                larea = area[edge2cell0[:, 0]].reshape(-1, 1)
+#                rarea = area[edge2cell0[:, 1]].reshape(-1, 1)
+#                t = (larea*ls + rarea*rs)/(larea + rarea)
+#            elif rtype is 'inv_area':
+#                larea = 1/area[edge2cell0[:, 0]].reshape(-1, 1)
+#                rarea = 1/area[edge2cell0[:, 1]].reshape(-1, 1)
+#                t = (larea*ls + rarea*rs)/(larea + rarea)
+#            else:
+#                raise ValueError("I have note code method: {}!".format(rtype))
+#
+#            isSubDomainBdPoint = np.zeros(N, dtype=np.bool)
+#            isSubDomainBdPoint[edge0] = True
+#            idx0, = np.nonzero(isSubDomainBdPoint)
+#            N0 = idx0.shape[0]
+#            NE0 = edge0.shape[0]
+#            idxMap = np.zeros(N, dtype=np.int)
+#            idxMap[isSubDomainBdPoint] = np.arange(N0)
+#
+#            I = idxMap[edge0].flatten()
+#            J = np.arange(NE0)
+#            val = np.ones(2*NE0, dtype=np.bool)
+#            p2e = csr_matrix((val, (I, np.repeat(J, 2))), shape=(N0, NE0), dtype=np.bool)
+#            if rtype is 'simple':
+#                d = p2e.sum(axis=1)
+#                ruh[idx0, :] = p2e@t/d.reshape(-1, 1)
+#            elif rtype is 'area':
+#                length = mesh.edge_length()
+#                d = p2e@length
+#                ruh[idx0, :] = np.asarray((p2e@(t*length[isSubDomainBdEdge]))/d.reshape(-1, 1))
+#            elif rtype is 'inv_area':
+#                length = mesh.edge_length()
+#                d = p2e@(1/length)
+#                ruh[idx0, :] = np.asarray((p2e@(t/length[isSubDomainBdEdge].reshape(-1,1)))/d.reshape(-1, 1))
+#            else:
+#                raise ValueError("I have note code method: {}!".format(rtype))
 
         S1 = np.zeros((NC, 3), dtype=self.dtype)
         S2 = np.zeros((NC, 3), dtype=self.dtype)
@@ -110,7 +116,7 @@ class PoissonVEMModel:
             np.repeat(S1[:, 2], NV)*phi2 - np.repeat(S[:, 1], NV)
         gy = np.repeat(S2[:,  0], NV)+ np.repeat(S2[:, 1], NV)*phi1 + \
             np.repeat(S2[:, 2], NV)*phi2 - np.repeat(S[:, 2], NV)
-        eta = np.sqrt(np.bincount(np.repeat(range(NC), NV), weights=gx**2+gy**2)/NV*area)
+        eta = np.sqrt(k*np.bincount(np.repeat(range(NC), NV), weights=gx**2+gy**2)/NV*area)
         return eta
 
     def get_left_matrix(self):
@@ -165,16 +171,6 @@ class PoissonVEMModel:
             val = np.concatenate(list(map(f4, K)))
             A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=self.dtype)
         
-
-#            for i in range(NC):
-#                K = B[:, cell2dofLocation[i]:cell2dofLocation[i+1]].T@G@B[:,
-#                        cell2dofLocation[i]:cell2dofLocation[i+1]]
-#                M = np.eye(ldof[i]) - D[cell2dofLocation[i]:cell2dofLocation[i+1], :]@B[:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-#                K += M.T@M
-#                dof = cell[cell2dofLocation[i]:cell2dofLocation[i+1]]
-#                I = np.repeat(dof, ldof[i])
-#                J = np.repeat(dof.reshape(1, -1), ldof[i], axis=0).flatten()
-#                A += coo_matrix((K.flatten(), (I, J)), shape=(gdof, gdof), dtype=self.dtype)
         else:
             raise ValueError("I have not code the vem with degree > 1!")
 
