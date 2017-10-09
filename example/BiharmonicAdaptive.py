@@ -38,7 +38,7 @@ def smooth_eta(mesh, eta):
 
 
 m = int(sys.argv[1])
-theta = 0.3
+theta = 0.2
 
 if m == 1:
     model = BiharmonicData5(a=0.01)
@@ -60,8 +60,8 @@ else:
 
 
 sigma = 1
-maxit = 40 
-k = 20 
+maxit = 80 
+k = maxit -10  
 degree = 1
 
 errorType = ['$\| u - u_h\|$',
@@ -119,7 +119,7 @@ fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
-axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet)
+axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lm=0.0)
 fig2.savefig('solution.pdf')
 
 fig3 = plt.figure()

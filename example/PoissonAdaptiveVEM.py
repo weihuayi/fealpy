@@ -57,8 +57,8 @@ elif m == 3:
     model = CosCosData()
     quadtree = model.init_mesh(n=4)
 
-maxit = 30
-k = 20
+maxit = 50 
+k = maxit-10 
 errorType = ['$\| u - u_h\|$',
              '$\|\\nabla u_I - \\nabla u_h\|$',
              '$\|\\nabla u - \\nabla u_h\|$',
@@ -74,7 +74,7 @@ for i in range(maxit):
     errorMatrix[1, i] = uIuh 
     errorMatrix[3, i] = np.sqrt(np.sum(eta*eta))
     if i < maxit - 1:
-        quadtree.refine(marker=AdaptiveMarker(eta, theta=0.45))
+        quadtree.refine(marker=AdaptiveMarker(eta, theta=0.3))
 
 mesh = uh.V.mesh
 fig1 = plt.figure()

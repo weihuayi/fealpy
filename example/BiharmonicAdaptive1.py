@@ -58,8 +58,8 @@ if m == 1:
     mesh = model.init_mesh(n=4)
 
 sigma = 1
-maxit = 40 
-k = 20 
+maxit = 80 
+k = maxit - 10 
 degree = 1
 
 errorType = ['$\|\\nabla u_h - G(\\nabla u_h) \|$']
