@@ -264,12 +264,15 @@ class PolygonMeshDataStructure():
 
     def point_to_point(self):
         N = self.N
-        NE = self.NE
         edge = self.edge
-        val = np.ones((NE,), dtype=np.bool)
-        point2point = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(N,N),dtype=np.bool)
-        point2point+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(N,N),dtype=np.bool)
-        return point2point.tocsr()
+        return point_to_point_in_edge(N, edge)
+
+    def point_to_point_in_edge(self, N, edge):
+        I = edge.flatten()
+        J = edge[:, [1, 0]].flatten()
+        val = np.ones(2*edge.shape[0], dtype=np.bool)
+        point2point = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        return point2point
 
     def point_to_edge(self):
         N = self.N

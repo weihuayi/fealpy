@@ -215,7 +215,7 @@ class Quadtree(QuadrangleMesh):
             NV = cell.shape[1]
 
             pcell = cell.reshape(-1) 
-            pcellLocation = np.arange(0, NV*NC, NV)
+            pcellLocation = np.arange(0, NV*(NC+1), NV)
 
             return PolygonMesh(point, pcell, pcellLocation, dtype=self.dtype) 
         else:

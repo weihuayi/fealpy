@@ -55,12 +55,9 @@ elif m == 4:
 else:
     raise ValueError("error!")
 
-#model = BiharmonicData4()
-#box = [0, 1, 0, 1]
-
 
 sigma = 1
-maxit = 80 
+maxit = 40 
 k = maxit -10  
 degree = 1
 
@@ -72,6 +69,7 @@ errorType = ['$\| u - u_h\|$',
          '$\|\Delta u -  G(\\nabla\cdot G(\\nabla u_h))\|$'
          ]
 
+idx = [0, 9, 19, 29, 39]
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
@@ -101,8 +99,14 @@ for i in range(maxit):
     errorMatrix[4, i] = div_error(model.laplace, rgh, order=8)
     errorMatrix[5, i] = L2_error(model.laplace, rlh, order=8)
 
-    markedCell = mark(eta, theta)
+    if i in idx:
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+        mesh.add_plot(axes, cellcolor='w')
 
+
+    markedCell = mark(eta, theta)
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
@@ -119,7 +123,7 @@ fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
-axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lm=0.0)
+axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
 fig2.savefig('solution.pdf')
 
 fig3 = plt.figure()

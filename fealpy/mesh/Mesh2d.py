@@ -359,6 +359,13 @@ class Mesh2dDataStructure():
             adjLocation[1:] = np.cumsum(nn)
             return adj.astype(np.int32), adjLocation
 
+    def point_to_point_in_edge(self, N, edge):
+        I = edge.flatten()
+        J = edge[:, [1, 0]].flatten()
+        val = np.ones(2*edge.shape[0], dtype=np.bool)
+        point2point = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        return point2point
+
     def point_to_edge(self):
         N = self.N
         NE = self.NE
