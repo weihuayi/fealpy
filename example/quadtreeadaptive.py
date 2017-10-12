@@ -7,44 +7,56 @@ from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 import  matplotlib.pyplot as plt
 
 class AdaptiveMarker():
-    def __init__(self, phi, maxh=0.01):
+    def __init__(self, phi, maxh=0.01, maxa=5):
         self.phi = phi
         self.maxh = maxh
+        self.maxa = maxa
 
     def refine_marker(self, qtmesh):
-        idx0, idx1 = self.mark(qtmesh)
-        return idx0
+        idx = qtmesh.leaf_cell_index()
+        polymesh = qtmesh.to_polygonmesh()
+        isMarkedCell = self.mark(polymesh)
+        return idx[isMarkedCell]
 
     def coarsen_marker(self, qtmesh):
         pass
 
-    def mark(self, qmesh):
-        # Get the index of the leaf cells
-        idx = qmesh.leaf_cell_index()
-
-        polymesh = qmesh.to_polygonmesh()
+    def interface_cell_flag(self, polymesh):
         phi = self.phi
+        c2p = polymesh.ds.cell_to_point()
+        phiValue = phi(qmesh.point)
+        phiSign = msign(phiValue)
+        NV = polymesh.number_of_vertices_of_cells()
+
+        eta1 = np.abs(c2p*phiSign)
+        eta2 = c2p*np.abs(phiSign)
+
+        isInterfaceCell = (eta1 < eta2) | ((eta1 == eta2) & ((NV - eta2) > 2))
+
+        return isInterfaceCell 
+
+    def mark(self, polymesh):
+        # Get the index of the leaf cells
+        phi = self.phi
+        c2p = polymesh.ds.cell_to_point()
 
         phiValue = phi(qmesh.point)
         phiSign = msign(phiValue)
+        NV = polymesh.number_of_vertices_of_cells()
 
-        cell = qmesh.ds.cell[idx, :] # the quad cell in quadtree
+        eta1 = np.abs(c2p*phiSign)
+        eta2 = c2p*np.abs(phiSign)
 
-        eta1 = np.abs(phiSign[cell].sum(axis=1))
-        eta2 = np.abs(phiSign[cell]).sum(axis=1)
-        eta3 = np.abs(phiSign[cell[:, [0, 2]]]).sum(axis=1)
-        eta4 = np.abs(phiSign[cell[:, [1, 3]]]).sum(axis=1)
-        isInterfaceCell = (eta1 <= 1 ) | ((eta1 == 2) & ((eta3 == 0) | (eta4 == 0) | (eta2 == 4)))
+        isInterfaceCell = (eta1 < eta2) | ((eta1 == eta2) & ((NV - eta2) > 2))
+
         idx0, = np.nonzero(isInterfaceCell)
 
         N = polymesh.number_of_points()
-        isInterfacePoint = np.zeros(N, dtype=np.bool)
-        isInterfacePoint[cell[idx0]] = True 
+        isInterfacePoint= np.asarray(isInterfaceCell@c2p).reshape(-1)
 
 
         NC = polymesh.number_of_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool)
-        c2p = polymesh.ds.cell_to_point()
 
         # Case 1
         NE = polymesh.number_of_edges()
@@ -91,11 +103,9 @@ class AdaptiveMarker():
             isMarkedCell0 = np.zeros(NC, dtype=np.bool)
             isMarkedCell0[edge2cell[isBigCurvatureEdge, 0:2]] = True
             isMarkedCell = isMarkedCell | (isMarkedCell0 & isInterfaceCell)
-        
-        return idx[isMarkedCell], idx[isInterfaceCell]
+        return isMarkedCell
 
-n = int(sys.argv[1])
-phi = Curve1(a=8)
+phi = Curve1(a=16)
 mesh = rectangledomainmesh(phi.box, nx=10, ny=10, meshtype='quad')
 qmesh = Quadtree(mesh.point, mesh.ds.cell)
 qmesh.uniform_refine(1)
@@ -103,18 +113,15 @@ qmesh.uniform_refine(1)
 marker = AdaptiveMarker(phi)
 
 
-for i in range(n):
-    qmesh.refine(marker=marker)
+flag = True
+while flag:
+    flag = qmesh.refine(marker=marker)
 
-NC = qmesh.number_of_cells()
-idx0, idx1 = marker.mark(qmesh) 
 
-isInterfaceCell = np.zeros(NC, dtype=np.int)
-isInterfaceCell[idx1] = 1
-isInterfaceCell[idx0] = 2
-
+polymesh = qmesh.to_polygonmesh()
+isInterfaceCell = marker.interface_cell_flag(polymesh)
 fig = plt.figure()
 axes = fig.gca()
-qmesh.add_plot(axes, cellcolor=isInterfaceCell)
+polymesh.add_plot(axes, cellcolor=isInterfaceCell)
 plt.show()
 
