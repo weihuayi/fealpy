@@ -3,6 +3,7 @@ import sys
 from fealpy.mesh.curve import Curve1, msign
 from fealpy.mesh.tree_data_structure import Quadtree
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
+from fealpy.mesh.interface_mesh_generator import find_cut_point 
 
 import  matplotlib.pyplot as plt
 
@@ -105,7 +106,7 @@ class AdaptiveMarker():
             isMarkedCell = isMarkedCell | (isMarkedCell0 & isInterfaceCell)
         return isMarkedCell
 
-phi = Curve1(a=16)
+phi = Curve1(a=3)
 mesh = rectangledomainmesh(phi.box, nx=10, ny=10, meshtype='quad')
 qmesh = Quadtree(mesh.point, mesh.ds.cell)
 qmesh.uniform_refine(1)
@@ -116,10 +117,62 @@ marker = AdaptiveMarker(phi)
 flag = True
 while flag:
     flag = qmesh.refine(marker=marker)
-
-
 polymesh = qmesh.to_polygonmesh()
+
+N = polymesh.number_of_points()
+NE = polymesh.number_of_edges()
+NC = polymesh.number_of_cells()
+
+# find the interface points 
+edge = polymesh.ds.edge
+point = polymesh.point
+phiSign = msign(phi(point))
 isInterfaceCell = marker.interface_cell_flag(polymesh)
+edge2cell = polymesh.ds.edge2cell
+
+isCutEdge0 = (phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0)
+isCutEdge1 = (phiSign[edge[:, 0]] == 0)
+isCutEdge2 = (phiSign[edge[:, 1]] == 0)
+cutEdge0 = edge[isCutEdge0]
+cutPoint = find_cut_point(phi, point[cutEdge0[:, 0]], point[cutEdge0[:, 1]])
+newPoint = np.append(point, cutPoint, axis=0)
+
+# find the cut location in each interface cell
+NV = polymesh.number_of_vertices_of_cells()
+NIC = isInterfaceCell.sum()
+cellIdxMap = np.zeros(NC, dtype=np.int)
+cellIdxMap[isInterfaceCell] = range(NIC)
+
+cell = polymesh.ds.cell
+cellLocation = polymesh.ds.cellLocation
+
+location0 = -np.ones(NIC, dtype=np.int)
+location1 = -np.ones(NIC, dtype=np.int)
+
+location0[cellIdxMap[edge2cell[isCutEdge0, 0]]] = edge2cell[isCutEdge0, 2]
+location1[cellIdxMap[edge2cell[isCutEdge0, 1]]] = edge2cell[isCutEdge0, 3]
+
+isCase = isCutEdge1 & isInterfaceCell[edge2cell[:, 0]] 
+location0[cellIdxMap[edge2cell[isCase, 0]]] = edge2cell[isCase, 2]
+isCase = isCutEdge1 & isInterfaceCell[edge2cell[:, 1]] 
+location1[cellIdxMap[edge2cell[isCase, 1]]] = (edge2cell[isCase, 3] + 1)%NV[edge2cell[isCase, 1]]
+
+isCase = isCutEdge2 & isInterfaceCell[edge2cell[:, 0]]
+location0[cellIdxMap[edge2cell[isCase, 0]]] = (edge2cell[isCase, 2] + 1)%NV[edge2cell[isCase, 0]]
+isCase = isCutEdge2 & isInterfaceCell[edge2cell[:, 1]] 
+location1[cellIdxMap[edge2cell[isCase, 1]]] = edge2cell[isCase, 3] 
+
+location = np.append(location0.reshape(-1, 1), location1.reshape(-1, 1), axis=1)
+print(location)
+
+idx0, idx1= np.nonzero(location == -1)
+print(idx0.shape[0])
+print(idx1.shape[0])
+
+NV0 = NV[isInterfaceCell]
+initLocation = cellLocation[:-1][isInterfaceCell]
+
+
 fig = plt.figure()
 axes = fig.gca()
 polymesh.add_plot(axes, cellcolor=isInterfaceCell)

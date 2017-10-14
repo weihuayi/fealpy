@@ -38,7 +38,8 @@ def smooth_eta(mesh, eta):
 
 
 m = int(sys.argv[1])
-theta = 0.2
+theta = float(sys.argv[2])
+maxit = int(sys.argv[3])
 
 if m == 1:
     model = BiharmonicData5(a=0.01)
@@ -57,8 +58,7 @@ else:
 
 
 sigma = 1
-maxit = 40 
-k = maxit -10  
+k = maxit -20  
 degree = 1
 
 errorType = ['$\| u - u_h\|$',
@@ -104,19 +104,13 @@ for i in range(maxit):
         fig.set_facecolor('white')
         axes = fig.gca() 
         mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh'+str(m-2)+'-'+str(i)+'.pdf')
 
 
     markedCell = mark(eta, theta)
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
-
-fig1 = plt.figure()
-fig1.set_facecolor('white')
-axes = fig1.gca() 
-#mesh.add_plot(axes, cellcolor=[1, 1, 1])
-mesh.add_plot(axes, cellcolor='w')
-fig1.savefig('mesh.pdf')
 
 fig2 = plt.figure()
 fig2.set_facecolor('white')

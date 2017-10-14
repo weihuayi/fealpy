@@ -51,17 +51,18 @@ def mark(mesh, eta, theta, method='L2'):
 
 
 m = int(sys.argv[1])
-theta = 0.2
+theta = float(sys.argv[2])
+maxit = int(sys.argv[3])
 
 if m == 1:
     model = KDomain()
-    mesh = model.init_mesh(n=4)
+    mesh = model.init_mesh(n=3)
 
 sigma = 1
-maxit = 80 
-k = maxit - 10 
+k = maxit - 20 
 degree = 1
 
+idx = [0, 9, 19, 29, 39]
 errorType = ['$\|\\nabla u_h - G(\\nabla u_h) \|$']
 
 Ndof = np.zeros((maxit,), dtype=np.int)
@@ -87,30 +88,30 @@ for i in range(maxit):
     Ndof[i] = V.number_of_global_dofs() 
     errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
 
+    if i in idx:
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+        mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh'+str(m-2)+'-'+str(i)+'.pdf')
+
     markedCell = mark(mesh, eta, theta)
 
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
 
-fig1 = plt.figure()
-fig1.set_facecolor('white')
-axes = fig1.gca() 
-#mesh.add_plot(axes, cellcolor=[1, 1, 1])
-mesh.add_plot(axes, cellcolor='w')
-fig1.savefig('mesh.pdf')
-
 fig2 = plt.figure()
 fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
-axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.)
+axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0., alpha=1.0)
 fig2.savefig('solution.pdf')
 
 fig3 = plt.figure()
 fig3.set_facecolor('white')
 axes = fig3.gca()
-showrate(axes, k, Ndof, errorMatrix[0], 'k-*', label=errorType[0])
+showrate(axes, k, Ndof, errorMatrix[0], 'r-*', label=errorType[0])
 fig3.savefig('error.pdf')
 plt.show()
