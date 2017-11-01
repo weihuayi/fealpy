@@ -49,7 +49,6 @@ sudo -H pip3 install mpi4py
 sudo -H pip3 install pymetis
 sudo -H pip3 install PySPH
 sudo -H pip3 install nipy
-sudo -H pip3 install mayavi
 ```
 
 ## Install Boost with python3 
@@ -64,7 +63,7 @@ Dowload the latest boost from http://www.boost.org/.
 
 Here we install boost into `/usr/local` directory. 
 
-## Install VTK Wrapped by Python3
+## Install VTK Wrapped by Python3 and Mayavi
 
 We also use VTK Python 3 wrapper, one can clone VTK from `github` first:
 
@@ -97,7 +96,7 @@ You can see the GUI of cmake, then:
 1. check the `Advanced` option
 2. Press `Configure` button, and a dialog box will pop up
 3. Press the `Finish` button on the dialog box 
-4. When configure completed, input `test` in `serach` input box, uncheck
+4. When configure completed, input `test` in `search` input box, uncheck
    `BUILD_TESTING`. If you check this argument, vtk will dowload many data
    which is very slow. 
 4. Then, replace keyword `test` by `python` in `search` input box
@@ -115,25 +114,37 @@ make -j8 # parallel compile with 8 thread (My laptop have 8 core)
 sudo make install # it will intsall vtk into /usr/local/
 ```
 
-If you want to install vtk in other path, for example `~/software/vtk/7.1.0`,
-you need to set `CMAKE_INSTALL_PREFIX` as `~/software/vtk/7.1.0` in the cmake
-configure step. But you need do more setting in `~/.bashrc` file. For my case, I
-put the following lines into my bashrc file:
+Then one should append  the following lines into your bashrc file:
+```
+# if you install vtk into /usr/local
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.5/site-packages
+```
 
 ```
+# if you install vtk into /home/why/software/vtk/7.1.0/
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/home/why/software/vtk/7.1.0/lib
 export PYTHONPATH=$PYTHONPATH:/home/why/software/vtk/7.1.0/lib/python3.5/site-packages
 ```
+
 After you update your bashrc file, please source it:
 
 ```
 source ~/.bashrc
 ```
-Then you can use vtk in your python 3 program or `ipython3`, just:
+Then you can use vtk in your python 3 program or `ipython3`,  just:
 
 ```
 import vtk
 ```
+
+At last, one can intall `mayavi`, but one should change into root user first: 
+```
+$ sudo -s
+# export PYTHONPATH=$PYTHONPATH:/home/why/software/vtk/7.1.0/lib/python3.5/site-packages
+# pip3 install mayavi
+```
+
 ## Debug python 
 
 ```

@@ -20,6 +20,9 @@ from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature
 
 from fealpy.tools.show import showrate
 
+from fealpy.tools.show import showmultirate
+
+from fealpy.mesh.adaptive_tools import mark
 
 def smooth_eta(mesh, eta):
     m = np.max(eta)
@@ -33,22 +36,6 @@ def smooth_eta(mesh, eta):
         eta = np.sum(beta[cell], axis=1)/3 
     return eta
         
-def mark(mesh, eta, theta, method='L2'):
-    NC = mesh.number_of_cells()
-    isMarked = np.zeros(NC, dtype=np.bool)
-    if method is 'MAX':
-        isMarked[eta > theta*np.max(eta)] = True
-    elif method is 'L2':
-        eta = eta**2
-        idx = np.argsort(eta)[-1::-1]
-        x = np.cumsum(eta[idx])
-        isMarked[idx[x < theta*x[-1]]] = True
-        isMarked[idx[0]] = True
-    else:
-        raise ValueError("I have not code the method")
-    markedCell, = np.nonzero(isMarked)
-    return markedCell
-
 
 m = int(sys.argv[1])
 theta = float(sys.argv[2])
@@ -95,7 +82,7 @@ for i in range(maxit):
         mesh.add_plot(axes, cellcolor='w')
         fig.savefig('mesh'+str(m-2)+'-'+str(i)+'.pdf')
 
-    markedCell = mark(mesh, eta, theta)
+    markedCell = mark(eta, theta)
 
     if i < maxit - 1:
         mesh.bisect(markedCell)
@@ -106,7 +93,8 @@ fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
-axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0., alpha=1.0)
+s = axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0., alpha=1.0)
+fig2.colorbar(s)
 fig2.savefig('solution.pdf')
 
 fig3 = plt.figure()

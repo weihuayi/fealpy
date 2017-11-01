@@ -50,6 +50,7 @@ N = np.zeros((maxit,), dtype=np.int)
 
 errorType = ['$\| u - u_h\|$',
          '$\|\\nabla u - \\nabla u_h\|$',
+         '$\|\\nabla u_h - G(\\nabla u_h) \|$',
          '$\|\\nabla u - G(\\nabla u_h)\|$',
          '$\|\Delta u - \\nabla\cdot G(\\nabla u_h)\|$',
          '$\|\Delta u -  G(\\nabla\cdot G(\\nabla u_h))\|$',
@@ -85,12 +86,15 @@ for i in range(maxit):
     fem.recover_grad(uh, rgh)
     fem.recover_laplace(rgh, rlh)
 
+    eta = fem.recover_estimate(uh, rgh)
+
     N[i] = V.number_of_global_dofs() 
     errorMatrix[0, i] = L2_error(model.solution, uh, order=5)
     errorMatrix[1, i] = H1_semi_error(model.gradient, uh, order=5)
-    errorMatrix[2, i] = L2_error(model.gradient, rgh, order=5)
-    errorMatrix[3, i] = div_error(model.laplace, rgh, order=5)
-    errorMatrix[4, i] = L2_error(model.laplace, rlh, order=5)
+    errorMatrix[2, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[3, i] = L2_error(model.gradient, rgh, order=5)
+    errorMatrix[4, i] = div_error(model.laplace, rgh, order=5)
+    errorMatrix[5, i] = L2_error(model.laplace, rlh, order=5)
 
 #order = np.log(error[0:-1]/error[1:])/np.log(2)
 

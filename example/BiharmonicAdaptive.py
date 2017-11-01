@@ -18,7 +18,7 @@ from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, Bih
 
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
 
-from fealpy.tools.show import showrate
+from fealpy.tools.show import showmultirate
 
 from fealpy.mesh.adaptive_tools import mark
 
@@ -61,6 +61,9 @@ sigma = 1
 k = maxit -20  
 degree = 1
 
+
+idx = [0, 9, 19, 29, 39]
+
 errorType = ['$\| u - u_h\|$',
          '$\|\\nabla u - \\nabla u_h\|$',
          '$\|\\nabla u_h - G(\\nabla u_h) \|$',
@@ -68,9 +71,6 @@ errorType = ['$\| u - u_h\|$',
          '$\|\Delta u - \\nabla\cdot G(\\nabla u_h)\|$',
          '$\|\Delta u -  G(\\nabla\cdot G(\\nabla u_h))\|$'
          ]
-
-idx = [0, 9, 19, 29, 39]
-
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
@@ -117,17 +117,14 @@ fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
-axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
+s = axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
+fig2.colorbar(s)
 fig2.savefig('solution.pdf')
 
 fig3 = plt.figure()
 fig3.set_facecolor('white')
 axes = fig3.gca()
-showrate(axes, k, Ndof, errorMatrix[0], 'k-*', label=errorType[0])
-showrate(axes, k, Ndof, errorMatrix[1], 'b-o', label=errorType[1])
-showrate(axes, k, Ndof, errorMatrix[2], 'r-^', label=errorType[2])
-showrate(axes, k, Ndof, errorMatrix[3], 'g->', label=errorType[3]) 
-showrate(axes, k, Ndof, errorMatrix[4], 'm-8', label=errorType[4])
-showrate(axes, k, Ndof, errorMatrix[5], 'c-D', label=errorType[5])
+optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D']
+showmultirate(axes, k, Ndof, errorMatrix, optionlist, errorType, ls=20)
 fig3.savefig('error.pdf')
 plt.show()
