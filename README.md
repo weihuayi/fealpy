@@ -107,7 +107,7 @@ You can see the GUI of cmake, then:
 6. When configure completed, press `Generate` button
 7. When generate process completed, just close the GUI of cmake
 
-Finally, we can compile VTK by make command
+Finally, we can compile VTK by `make` command
 
 ```
 make -j8 # parallel compile with 8 thread (My laptop have 8 core)
@@ -157,17 +157,6 @@ Debug python program:
 $ gdb python3
 ...
 (gdb) run <programname>.py <arguments>
-```
-
-## Anaconda
-
-Download the latest Anaconda 
-
-```
-conda create -n py35_qt4 python=3.5 pyqt=4
-conda 
-conda install -c menpo mayavi=4.5.0
-conda env remove --name py35_qt4
 ```
 
 ## Reference
