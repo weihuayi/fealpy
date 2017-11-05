@@ -44,16 +44,15 @@ def show_error_table(N, errorType, errorMatrix, pre=5, sep=' & ', out=sys.stdout
     if flag:
         out.close()
 
-def showmultirate(axes, k, N, errorMatrix, optionlist, labellist, lw=4, ms=15, ls=24):
+def showmultirate(axes, k, N, errorMatrix, optionlist, labellist, lw=4, ms=15):
     m, n = errorMatrix.shape
     for i in range(m):
-        showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms, ls=ls)
+        showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
 
-def showrate(axes, k, N, error, option, label=None, lw=4, ms=15, ls=24):
+def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
     axes.set_xlim(xmin=N[0]/2, xmax=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
     c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
     s = 0.75*error[k]/N[k]**c[0] 
     line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
             lw=lw, color=line0.get_color())
-    axes.legend(prop={'size': ls})

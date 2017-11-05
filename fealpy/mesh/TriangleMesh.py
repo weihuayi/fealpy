@@ -26,21 +26,32 @@ class TriangleMesh(Mesh2d):
     def circumcenter(self):
         point = self.point
         cell = self.ds.cell
+        dim = self.geom_dimension()
 
         v0 = point[cell[:,2],:] - point[cell[:,1],:]
         v1 = point[cell[:,0],:] - point[cell[:,2],:]
         v2 = point[cell[:,1],:] - point[cell[:,0],:]
-        W = np.array([[0, -1],[1, 0]])
-        area = self.area() 
-        x2 = np.sum(point**2, axis=1, keepdims=True)
-        w0 = x2[cell[:,2]] + x2[cell[:,1]]
-        w1 = x2[cell[:,0]] + x2[cell[:,2]]
-        w2 = x2[cell[:,1]] + x2[cell[:,0]]
-        fe0 = w0*v0@W
-        fe1 = w1*v1@W
-        fe2 = w2*v2@W
-        c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
-        R = np.sqrt(np.sum((c-point[cell[:,0],:])**2,axis=1))
+        nv = np.cross(v2, -v1)
+        length = np.sqrt(np.square(nv).sum(axis=1))
+        area = length/2.0 
+        if dim == 2:
+            x2 = np.sum(point**2, axis=1, keepdims=True)
+            w0 = x2[cell[:,2]] + x2[cell[:,1]]
+            w1 = x2[cell[:,0]] + x2[cell[:,2]]
+            w2 = x2[cell[:,1]] + x2[cell[:,0]]
+            W = np.array([[0, -1],[1, 0]])
+            fe0 = w0*v0@W 
+            fe1 = w1*v1@w 
+            fe1 = w2*v2@w 
+            c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
+            R = np.sqrt(np.sum((c-point[cell[:,0], :])**2,axis=1))
+        elif dim == 3:
+            n = nv/length.reshape((-1, 1))
+            l02 = np.sum(v1**2, axis=1, keepdims=True)
+            l01 = np.sum(v2**2, axis=1, keepdims=True)
+            d = 0.5*(l02*np.cross(n, v2) + l01*np.cross(-v1, n))/length.reshape(-1, 1)
+            c = point[cell[:, 0]] + d
+            R = np.sqrt(np.sum(d**2, axis=1))
         return c, R
 
     def angle(self):

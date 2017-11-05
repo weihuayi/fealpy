@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
+import scipy.io as sio
 
 from fealpy.mesh.meshio import load_mat_mesh
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh  
@@ -99,7 +100,7 @@ for i in range(maxit):
     errorMatrix[4, i] = div_error(model.laplace, rgh, order=8)
     errorMatrix[5, i] = L2_error(model.laplace, rlh, order=8)
 
-    if i in idx:
+    if i in []:
         fig = plt.figure()
         fig.set_facecolor('white')
         axes = fig.gca() 
@@ -112,6 +113,9 @@ for i in range(maxit):
         mesh.bisect(markedCell)
 
 
+data = {'Ndof':Ndof, 'error':errorMatrix, 'errorType':errorType}
+sio.matlab.savemat('test'+str(m)+'.mat', data)
+
 fig2 = plt.figure()
 fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
@@ -121,10 +125,13 @@ s = axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
 fig2.colorbar(s)
 fig2.savefig('solution.pdf')
 
-fig3 = plt.figure()
-fig3.set_facecolor('white')
+fig3 = plt.figure(figsize=(40, 40), facecolor='w')
 axes = fig3.gca()
 optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D']
-showmultirate(axes, k, Ndof, errorMatrix, optionlist, errorType, ls=20)
+showmultirate(axes, k, Ndof, errorMatrix, optionlist, errorType)
+axes.legend(prop={'size': 60})
+axes.legend(loc=3, prop={'size': 60})
+axes.tick_params(labelsize=40)
+axes.axis('tight')
 fig3.savefig('error.pdf')
 plt.show()

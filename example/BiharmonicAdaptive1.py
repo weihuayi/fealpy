@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
+import scipy.io as sio
 
 from fealpy.mesh.meshio import load_mat_mesh
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh  
@@ -75,7 +76,7 @@ for i in range(maxit):
     Ndof[i] = V.number_of_global_dofs() 
     errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
 
-    if i in idx:
+    if i in []:
         fig = plt.figure()
         fig.set_facecolor('white')
         axes = fig.gca() 
@@ -87,6 +88,8 @@ for i in range(maxit):
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
+data = {'Ndof':Ndof, 'error':errorMatrix, 'errorType':errorType}
+sio.matlab.savemat('test'+str(m)+'.mat', data)
 
 fig2 = plt.figure()
 fig2.set_facecolor('white')
@@ -97,9 +100,13 @@ s = axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0., 
 fig2.colorbar(s)
 fig2.savefig('solution.pdf')
 
-fig3 = plt.figure()
+fig3 = plt.figure(figsize=(40, 40), facecolor='w')
 fig3.set_facecolor('white')
 axes = fig3.gca()
 showrate(axes, k, Ndof, errorMatrix[0], 'r-*', label=errorType[0])
+axes.axis('tight')
+axes.legend(loc=3, prop={'size': 60})
+axes.tick_params(labelsize=40)
+axes.set_aspect('equal')
 fig3.savefig('error.pdf')
 plt.show()
