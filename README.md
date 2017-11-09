@@ -16,7 +16,7 @@ We still have lot work to do.
 sudo apt-get install python3 python3-pip ipython3 
 sudo apt-get install python3-numpy
 sudo apt-get install python3-scipy
-sudo apt-get install python3-matplotlib
+sudo -H pip3 install matplotlib
 ```
 
 ```
@@ -49,7 +49,7 @@ sudo -H pip3 install mpi4py
 sudo -H pip3 install pymetis
 sudo -H pip3 install PySPH
 sudo -H pip3 install nipy
-sudo -H pip3 install -U pygmsh
+sudo -H pip3 install pygmsh
 ```
 
 ## Install Boost with python3 
@@ -145,6 +145,7 @@ $ sudo -s
 # export PYTHONPATH=$PYTHONPATH:/home/why/software/vtk/7.1.0/lib/python3.5/site-packages
 # pip3 install mayavi
 ```
+
 
 ## Debug python 
 
