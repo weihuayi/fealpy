@@ -9,7 +9,7 @@ class Point(object):
         self.x = x
         self.clength = cl 
 
-        self.id = 'p{}'.format(Point._POINT_ID)
+        self.id = 'p{}'.format(Point._ID)
         Point._ID += 1
 
         # Points are always 3D in gmsh
@@ -57,7 +57,6 @@ class Line(LineBase):
 
 class LineLoop(object):
     _ID = 0
-
     def __init__(self, lines):
         self.lines = lines
 
@@ -77,12 +76,9 @@ class LineLoop(object):
 class Surface(object):
     _ID = 0
     num_edges = 0
-
-    def __init__(self, line_loop, api_level=2):
+    def __init__(self, line_loop):
         assert isinstance(line_loop, LineLoop)
-
         self.line_loop = line_loop
-
         self.id = 'rs{}'.format(Surface._ID)
         Surface._ID += 1
 
@@ -96,7 +92,6 @@ class Surface(object):
 class SurfaceBase(object):
     _ID = 0
     num_edges = 0
-
     def __init__(self, id0=None, num_edges=0):
         isinstance(id0, str)
         if id0:
@@ -110,7 +105,6 @@ class SurfaceBase(object):
 class PlaneSurface(SurfaceBase):
     def __init__(self, line_loop, holes=None):
         super(PlaneSurface, self).__init__()
-
         assert isinstance(line_loop, LineLoop)
         self.line_loop = line_loop
 
@@ -120,8 +114,7 @@ class PlaneSurface(SurfaceBase):
         # The input holes are either line loops or entities that contain line
         # loops (like polygons).
         self.holes = [
-            h if isinstance(h, LineLoop) else h.line_loop
-            for h in holes
+            h if isinstance(h, LineLoop) else h.line_loop for h in holes
             ]
 
         line_loops = [self.line_loop] + self.holes
@@ -134,7 +127,7 @@ class PlaneSurface(SurfaceBase):
         return
 
 
-class GmeshGeo(Object):
+class GmshGeo(object):
     def __init__(self):
         self._GMSH_CODE = ['// This code was created by fealpy']
 
@@ -153,11 +146,16 @@ class GmeshGeo(Object):
         self._GMSH_CODE.append(p.code)
         return p
 
-    def add_points(self, x, cl):
-        return [self.add_point(p, l) for p, l in zip(x, cl)]
+    def add_points(self, ps, cl):
+        return [self.add_point(p, cl) for p in ps]
 
     def add_line(self, p0, p1):
         p = Line(p0, p1)
+        self._GMSH_CODE.append(p.code)
+        return p
+
+    def add_line_loop(self, lines):
+        p = LineLoop(lines)
         self._GMSH_CODE.append(p.code)
         return p
 
@@ -175,10 +173,10 @@ class GmeshGeo(Object):
         code = 'Line{{{}}} In Surface{{{}}};'.format(line.id, surface.id)
         self._GMSH_CODE.append(code)
 
-    def add_plane_surface(self, *args, **kwargs):
-        p = PlaneSurface(*args, **kwargs)
-        self._GMSH_CODE.append(p.code)
-        return p
+    def add_plane_surface(self, line_loop, holes=None):
+        ps = PlaneSurface(line_loop, holes=holes)
+        self._GMSH_CODE.append(ps.code)
+        return ps
 
     def add_polygon(self, points, cl, holes=None, make_surface=True):
         if holes is None:
@@ -195,13 +193,13 @@ class GmeshGeo(Object):
         surface = self.add_plane_surface(ll, holes) if make_surface else None
 
         class Polygon(object):
-            def __init__(self, line_loop, surface, lcar):
+            def __init__(self, line_loop, surface, cl):
                 self.line_loop = line_loop
                 self.surface = surface
-                self.lcar = lcar
+                self.clength = cl 
                 return
 
-        return Polygon(ll, surface, lcar)
+        return Polygon(ll, surface, cl)
 
     ## algorithm
     def set_mesh_algorithm(self, alg):

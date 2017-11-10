@@ -6,7 +6,7 @@ import tempfile
 import meshio
 import numpy as np
 
-def generate_mesh(geo_object, dim=3, prune_vertices=True):
+def generate_mesh(geo_object, dim=3, verbose=True, prune_vertices=True):
 
     # generate the tmp files 
     handle, geo_filename = tempfile.mkstemp(suffix='.geo')
@@ -23,6 +23,13 @@ def generate_mesh(geo_object, dim=3, prune_vertices=True):
             stdout=subprocess.PIPE, 
             stderr=subprocess.STDOUT)
 
+    if verbose:
+        while True:
+            line = p.stdout.readline()
+            if not line:
+                break
+            print(line.decode('utf-8'), end='')
+
     p.communicate()
     assert p.returncode == 0, \
         'Gmsh exited with error (return code {}).'.format(p.returncode)
@@ -35,11 +42,11 @@ def generate_mesh(geo_object, dim=3, prune_vertices=True):
 
     if prune_vertices:
         # Make sure to include only those vertices which belong to a triangle.
-        uvertices, uidx = numpy.unique(cells['triangle'], return_inverse=True)
-        cells = {'triangle': uidx.reshape(cells['triangle'].shape)}
+        uvertices, uidx = np.unique(cell['triangle'], return_inverse=True)
+        cell = {'triangle': uidx.reshape(cell['triangle'].shape)}
         cell_data = {'triangle': cell_data['triangle']}
-        X = X[uvertices]
-        for key in pt_data:
-            pt_data[key] = pt_data[key][uvertices]
+        point = point[uvertices]
+        for key in point_data:
+            point_data[key] = point_data[key][uvertices]
 
-    return X, cells, pt_data, cell_data, field_data
+    return point, cell, point_data, cell_data, field_data
