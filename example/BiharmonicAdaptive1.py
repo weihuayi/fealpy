@@ -4,6 +4,7 @@ from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 import sys
 import scipy.io as sio
+import os
 
 from fealpy.mesh.meshio import load_mat_mesh
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh  
@@ -41,21 +42,25 @@ def smooth_eta(mesh, eta):
 m = int(sys.argv[1])
 theta = float(sys.argv[2])
 maxit = int(sys.argv[3])
+d = sys.argv[4]
+
+if not os.path.exists(d):
+    os.mkdir(d)
 
 if m == 1:
     model = KDomain()
-    mesh = model.init_mesh(n=3)
+    mesh = model.init_mesh(n=1)
 
 sigma = 1
 k = maxit - 20 
 degree = 1
 
-idx = [0, 9, 19, 29, 39]
-errorType = ['$\|\\nabla u_h - G(\\nabla u_h) \|$']
+errorType = ['$\|G(\\nabla\cdot G(\\nabla u_h))-\\nabla\cdot G(\\nabla u_h)\|$']
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
+idx = [0] + list(range(9, maxit, 10))
 
 for i in range(maxit):
     print(i, 'step:')
@@ -71,25 +76,29 @@ for i in range(maxit):
     fem.recover_grad(uh, rgh)
     fem.recover_laplace(rgh, rlh)
 
-    eta = fem.recover_estimate(uh, rgh)
+    eta1 = fem.grad_recover_estimate(uh, rgh, order=4)
+
+    eta2 = fem.laplace_recover_estimate(rgh, rlh, etype=1, order=2)
+    eta3 = fem.laplace_recover_estimate(rgh, rlh, etype=2, order=2)
+    eta4 = fem.laplace_recover_estimate(rgh, rlh, etype=3, order=2)
 
     Ndof[i] = V.number_of_global_dofs() 
-    errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[0, i] = np.sqrt(np.sum(eta2**2))
 
-    if i in []:
+    if i in idx:
         fig = plt.figure()
         fig.set_facecolor('white')
         axes = fig.gca() 
         mesh.add_plot(axes, cellcolor='w')
-        fig.savefig('mesh'+str(m-2)+'-'+str(i)+'.pdf')
+        fig.savefig(d+'/mesh'+str(m)+'-'+str(i)+'.pdf')
 
-    markedCell = mark(eta, theta)
+    markedCell = mark(eta2, theta)
 
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
 data = {'Ndof':Ndof, 'error':errorMatrix, 'errorType':errorType}
-sio.matlab.savemat('test'+str(m)+'.mat', data)
+sio.matlab.savemat(d+'/test'+str(m)+'.mat', data)
 
 fig2 = plt.figure()
 fig2.set_facecolor('white')
@@ -98,7 +107,7 @@ x = mesh.point[:, 0]
 y = mesh.point[:, 1]
 s = axes.plot_trisurf(x, y, uh, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0., alpha=1.0)
 fig2.colorbar(s)
-fig2.savefig('solution.pdf')
+fig2.savefig(d+'/solution.pdf')
 
 fig3 = plt.figure(figsize=(40, 40), facecolor='w')
 fig3.set_facecolor('white')
@@ -108,5 +117,5 @@ axes.axis('tight')
 axes.legend(loc=3, prop={'size': 60})
 axes.tick_params(labelsize=60)
 axes.set_aspect('equal')
-fig3.savefig('error.pdf')
+fig3.savefig(d+'/error.pdf')
 plt.show()

@@ -3,7 +3,7 @@ import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
-import pyamg
+#import pyamg
 import pylab
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
@@ -67,12 +67,12 @@ def solve(fem, uh, dirichlet=None, solver='cg'):
         uh[:], info = cg(AD, b, tol=1e-14, M=M)
         end = timer()
         print(info)
-    elif solver is 'amg':
-        start = timer()
-        ml = pyamg.ruge_stuben_solver(AD)  
-        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
-        end = timer()
-        print(ml)
+#    elif solver is 'amg':
+#        start = timer()
+#        ml = pyamg.ruge_stuben_solver(AD)  
+#        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+#        end = timer()
+#        print(ml)
     elif solver is 'direct':
         start = timer()
         uh[:] = spsolve(AD, b)

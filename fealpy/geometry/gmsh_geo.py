@@ -102,6 +102,7 @@ class SurfaceBase(object):
         self.num_edges = num_edges
         return
 
+
 class PlaneSurface(SurfaceBase):
     def __init__(self, line_loop, holes=None):
         super(PlaneSurface, self).__init__()
@@ -126,9 +127,75 @@ class PlaneSurface(SurfaceBase):
         self.num_edges = len(self.line_loop) + sum(len(h) for h in self.holes)
         return
 
+class FieldBase():
+    _ID = 0
+    def __init__(self):
+        self.id = 'field{}'.format(FieldBase._ID)
+        FieldBase._ID += 1
+
+#            'Field[{}].NodesList = {{{}}};'.format(self.id,
+#                ','.join([p.id for p in nodes])
+#                ),
+
+class AttractorField(FieldBase):
+    def __init__(self, points, edges):
+        super(EdgesAttractorField, self).__init__()
+        self.code ='\n'.join([
+            '{} = newf;'.format(self.id),
+            'Field[{}] = Attractor;'.format(self.id),
+            'Field[{}].EdgesList = {{{}}};'.format(self.id, 
+                ','.join([e.id for e in edges])),
+            'Field[{}].NodesList = {{{}}};'.format(self.id, 
+                ','.join([p.id for p in points])
+                )
+            ])
+
+class ThresholdField(FieldBase):
+    def __init__(self, ifield, clmin, clmax, distmin, distmax):
+        super(ThresholdField, self).__init__()
+        self.code = '\n'.join([
+            '{} = newf;'.format(self.id),
+            'Field[{}] = Threshold;'.format(self.id),
+            'Field[{}].IField = {};'.format(self.id, ifield.id),
+            'Field[{}].LcMin = {};'.format(self.id, clmin),
+            'Field[{}].LcMax = {};'.format(self.id, clmax),
+            'Field[{}].DistMin = {};'.format(self.id, distmin),
+            'Field[{}].DistMax = {};'.format(self.id, distmax)
+            ])
+        return 
+
+class BoundaryLayerField(FieldBase):
+    def __init__(self, points, edges, hfar, hwall_n, ratio, thickness):
+        super(BoundaryLayerField, self).__init__()
+        self.code = '\n'.join([
+            '{} = newf;'.format(self.id),
+            'Field[{}] = BoundaryLayer;'.format(self.id),
+            'Field[{}].NodesList = {{{}}};'.format(self.id, 
+                ','.join([p.id for p in points])),
+            'Field[{}].EdgesList = {{{}}};'.format(self.id, 
+                ','.join([e.id for e in edges])),
+            'Field[{}].hfar = {{{}}};'.format(self.id, hfar),
+            'Field[{}].hwall_n = {{{}}};'.format(self.id, hwall_n),
+            'Field[{}].ratio = {{{}}};'.format(self.id, ratio),
+            'Field[{}].thickness = {{{}}};'.format(self.id, thickness)
+            ])
+        return 
+
+
+class MinField(FieldBase):
+    def __init__(self, fields):
+        super(MinField, self).__init__()
+        self.code = '\n'.join([
+            '{} = newf;'.format(self.id),
+            'Field[{}] = Min;'.format(self.id),
+            'Field[{}].FieldsList = {{{}}};'.format(self.id,
+                ','.join([f.id for f in fields])
+                )
+            ])
 
 class GmshGeo(object):
     def __init__(self):
+        self._TAKEN_PHYSICALGROUP_IDS = []
         self._GMSH_CODE = ['// This code was created by fealpy']
 
     def get_code(self):
@@ -164,9 +231,14 @@ class GmshGeo(object):
         self._GMSH_CODE.append(s.code)
         return s
 
+    def add_segments_in_surface(self, points, segments, surface):
+        lines = [self.add_line(points[seg[0]], points[seg[1]]) for seg in segments]
+        for line in lines:
+            self.add_line_in_surface(line, surface)
+        return lines
+
     def add_point_in_surface(self, point, surface):
         code = 'Point{{{}}} In Surface{{{}}};'.format(point.id, surface.id)
-        print(code)
         self._GMSH_CODE.append(code)
 
     def add_line_in_surface(self, line, surface):
@@ -177,6 +249,18 @@ class GmshGeo(object):
         ps = PlaneSurface(line_loop, holes=holes)
         self._GMSH_CODE.append(ps.code)
         return ps
+
+    def add_rectangle(self, box, cl, z=0.0, holes=None, make_surface=True):
+        return self.add_polygon([
+                [box[0], box[2], z],
+                [box[1], box[2], z],
+                [box[1], box[3], z],
+                [box[0], box[3], z]
+                ],
+                cl,
+                holes=holes,
+                make_surface=make_surface
+                )
 
     def add_polygon(self, points, cl, holes=None, make_surface=True):
         if holes is None:
@@ -200,6 +284,80 @@ class GmshGeo(object):
                 return
 
         return Polygon(ll, surface, cl)
+
+    ## field
+    def add_attractor_field(self, edges):
+        field = AttractorField(edges)
+        self._GMSH_CODE.append(field.code)
+        return field
+
+    def add_threshold_field(self, ifield, clmin, clmax, distmin, distmax):
+        field = ThresholdField(ifield, clmin, clmax, distmin, distmax)
+        self._GMSH_CODE.append(field.code)
+        return field
+
+    def add_boundarylayer_field(self, points, edges, 
+            hfar=1.0, 
+            hwall_n=0.01,
+            ratio=1.1,
+            thickness = 0.03):
+        field = BoundaryLayerField(points, edges, hfar, hwall_n, ratio, thickness)
+        self._GMSH_CODE.append(field.code)
+        return field
+
+    def add_min_field(self, fields):
+        field = MinField(fields)
+        self._GMSH_CODE.append(field.code)
+        return field
+
+    def set_background_field(self, field):
+        code = 'Background Field = {};'.format(field.id)
+        self._GMSH_CODE.append(code)
+        return 
+
+    ## physical group
+
+    def _new_physical_group(self, label=None):
+        # See
+        # https://github.com/nschloe/pygmsh/issues/46#issuecomment-286684321
+        # for context.
+        max_id = \
+            0 if not self._TAKEN_PHYSICALGROUP_IDS  \
+            else max(self._TAKEN_PHYSICALGROUP_IDS)
+
+        if label is None:
+            label = max_id + 1
+
+        if isinstance(label, int):
+            assert label not in self._TAKEN_PHYSICALGROUP_IDS
+            self._TAKEN_PHYSICALGROUP_IDS += [label]
+            return str(label)
+
+        assert _is_string(label)
+        self._TAKEN_PHYSICALGROUP_IDS += [max_id + 1]
+        return '"{}"'.format(label)
+
+    def _add_physical(self, tpe, entities, label=None):
+        label = self._new_physical_group(label)
+        if not isinstance(entities, list):
+            entities = [entities]
+        self._GMSH_CODE.append(
+            'Physical {}({}) = {{{}}};'.format(
+                tpe, label, ', '.join([e.id for e in entities])
+            ))
+        return
+
+    def add_physical_point(self, points, label=None):
+        self._add_physical('Point', points, label=label)
+        return
+
+    def add_physical_line(self, lines, label=None):
+        self._add_physical('Line', lines, label=label)
+        return
+
+    def add_physical_surface(self, surfaces, label=None):
+        self._add_physical('Surface', surfaces, label=label)
+        return
 
     ## algorithm
     def set_mesh_algorithm(self, alg):

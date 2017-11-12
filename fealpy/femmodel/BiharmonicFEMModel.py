@@ -15,7 +15,7 @@ class BiharmonicRecoveryFEMModel:
         self.gradphi, self.area = V.mesh.grad_lambda()
         self.A, self.B = self.get_revcover_matrix()
 
-    def recover_estimate(self, uh, ruh, order=3, dtype=np.float):
+    def grad_recover_estimate(self, uh, ruh, order=3, dtype=np.float):
         V = uh.V
         mesh = V.mesh
 
@@ -32,6 +32,41 @@ class BiharmonicRecoveryFEMModel:
             uhval = uh.grad_value(lambda_k)
             ruhval = ruh.value(lambda_k)
             e += w_k*((uhval - ruhval)*(uhval - ruhval)).sum(axis=1)
+        e *= mesh.area()
+        e = np.sqrt(e)
+        return e 
+
+    def laplace_recover_estimate(self, rgh, rlh, etype=1, order=2):
+        V = self.V
+        mesh = V.mesh
+        NC = mesh.number_of_cells()
+        qf = TriangleQuadrature(order)
+        nQuad = qf.get_number_of_quad_points()
+
+        gdof = V.number_of_global_dofs()
+        ldof = V.number_of_local_dofs()
+        
+        e = np.zeros((NC,), dtype=self.dtype)
+
+        if etype == 1:
+            for i in range(nQuad):
+                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+                rghval = rgh.div_value(lambda_k)
+                rlhval = rlh.value(lambda_k)
+                e += w_k*(rghval - rlhval)*(rghval - rlhval)
+        elif etype == 2:
+            for i in range(nQuad):
+                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+                rghval = rgh.div_value(lambda_k)
+                e += w_k*rghval**2
+        elif etype == 3:
+            for i in range(nQuad):
+                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+                rlhval = rlh.value(lambda_k)
+                e += w_k*rlhval**2
+        else:
+            raise ValueError("1 <= etype <=3! Your input is {}".format(etype)) 
+
         e *= mesh.area()
         e = np.sqrt(e)
         return e 

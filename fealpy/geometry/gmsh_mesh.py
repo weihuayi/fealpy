@@ -6,7 +6,10 @@ import tempfile
 import meshio
 import numpy as np
 
-def generate_mesh(geo_object, dim=3, verbose=True, prune_vertices=True):
+def generate_mesh(geo_object, dim=3, verbose=True, 
+        optimize=True, 
+        num_lloyd_steps=100,
+        prune_vertices=True):
 
     # generate the tmp files 
     handle, geo_filename = tempfile.mkstemp(suffix='.geo')
@@ -17,6 +20,8 @@ def generate_mesh(geo_object, dim=3, verbose=True, prune_vertices=True):
 
     cmd = [ 'gmsh', '-{}'.format(dim),  geo_filename, '-o', msh_filename]
 
+    if optimize and num_lloyd_steps > 0:
+        cmd += ['-optimize_lloyd', str(num_lloyd_steps)]
     # http://stackoverflow.com/a/803421/353337
     p = subprocess.Popen(
             cmd, 
@@ -34,11 +39,11 @@ def generate_mesh(geo_object, dim=3, verbose=True, prune_vertices=True):
     assert p.returncode == 0, \
         'Gmsh exited with error (return code {}).'.format(p.returncode)
 
-    point, cell, point_data, cell_data, field_data = meshio.read(msh_filename)
+    point, cell, point_data, cell_data, field_data = meshio.read(msh_filename, 'gmsh')
 
     # clean up
-    os.remove(geo_filename)
-    os.remove(msh_filename)
+    #os.remove(geo_filename)
+    #os.remove(msh_filename)
 
     if prune_vertices:
         # Make sure to include only those vertices which belong to a triangle.
