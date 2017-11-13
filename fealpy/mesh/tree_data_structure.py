@@ -7,7 +7,6 @@ from .PolygonMesh import PolygonMesh
 from ..common import ranges
 
 class Quadtree(QuadrangleMesh):
-
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
 
@@ -41,7 +40,6 @@ class Quadtree(QuadrangleMesh):
 
     def sizing_adaptive(self, eta):
         pass 
-
 
     def refine(self, marker=None):
         if marker == None:
@@ -201,7 +199,7 @@ class Quadtree(QuadrangleMesh):
         else:
             return False
 
-    def to_polygonmesh(self):
+    def to_pmesh(self):
         """ Transform the quadtree data structure to polygonmesh datastructure
         """
 
@@ -568,3 +566,26 @@ class Octree(HexahedronMesh):
                 return True
         else:
             return False
+    def to_pmesh(self):
+        '''transform the Octree data structure to Polyhedral data structure
+
+            * point, pface, pfaceLocation, pface2cell 
+        '''
+        isRootCell = self.is_root_cell()
+        if np.all(isRootCell):
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
+            point = self.point
+            face = self.ds.face
+            NV = face.shape[0]
+            face2cell = self.ds.face2cell
+            faceLocation = np.arange(0, NV*(NF+1), NV)
+            return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell)
+        else:
+            # 0. 
+            pass
+
+
+            
+
+

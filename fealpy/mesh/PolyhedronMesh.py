@@ -22,11 +22,9 @@ class PolyhedronMesh():
         isIdx[np.add.accumulate(NV+1)[:-1]] = False
         faces[~isIdx] = NV
         faces[isIdx] = face
-
         return NF, faces
 
     def check(self):
-
         N = self.number_of_points()
         NC = self.number_of_cells()
         NFE = self.ds.number_of_edges_of_faces()
@@ -48,8 +46,6 @@ class PolyhedronMesh():
 
         isBadPoly = (F - E + V != 2)
         return isBadPoly.sum() == 0
-        
-        
 
     def number_of_points(self):
         return self.point.shape[0]

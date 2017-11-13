@@ -3,30 +3,48 @@ import sys
 from .curve import msign
 from .PolygonMesh import PolygonMesh 
 from .tree_data_structure import Quadtree
+from .tree_data_structure import Octree
 from .simple_mesh_generator import rectangledomainmesh
 from .interface_mesh_generator import find_cut_point 
 
-class AdaptiveMarker():
-    def __init__(self, phi, maxh=0.01, maxa=5):
+class AdaptiveMarkerBase():
+    def __init__(self, phi, maxh, maxa):
         self.phi = phi
         self.maxh = maxh
         self.maxa = maxa
 
-    def refine_marker(self, qtmesh):
-        idx = qtmesh.leaf_cell_index()
-        polymesh = qtmesh.to_polygonmesh()
-        isMarkedCell = self.mark(polymesh)
+    def refine_marker(self, treemesh):
+        idx = treemesh.leaf_cell_index()
+        pmesh = treemesh.to_pmesh()
+        isMarkedCell = self.refine_mark(pmesh)
         return idx[isMarkedCell]
 
-    def coarsen_marker(self, qtmesh):
+    def coarsen_marker(self, treemesh):
+        idx = treemesh.leaf_cell_index()
+        pmesh = treemesh.to_pmesh()
+        isMarkedCell = self.coarsen_mark(pmesh)
+        return idx[isMarkedCell]
+
+    def interface_cell_flag(self):
         pass
 
-    def interface_cell_flag(self, polymesh):
+    def refine_mark(self, pmesh):
+        pass
+
+    def coarsen_mark(self, pmesh):
+        pass
+
+
+class AdaptiveMarker2d(AdaptiveMarkerBase):
+    def __init__(self, phi, maxh=0.01, maxa=5):
+        super(AdaptiveMarker2d, self).__init__(phi, maxh, maxa)
+
+    def interface_cell_flag(self, pmesh):
         phi = self.phi
-        c2p = polymesh.ds.cell_to_point()
-        phiValue = phi(polymesh.point)
+        c2p = pmesh.ds.cell_to_point()
+        phiValue = phi(pmesh.point)
         phiSign = msign(phiValue)
-        NV = polymesh.number_of_vertices_of_cells()
+        NV = pmesh.number_of_vertices_of_cells()
 
         eta1 = np.abs(c2p*phiSign)
         eta2 = c2p*np.abs(phiSign)
@@ -35,13 +53,13 @@ class AdaptiveMarker():
 
         return isInterfaceCell 
 
-    def mark(self, polymesh):
+    def refine_mark(self, pmesh):
         phi = self.phi
-        c2p = polymesh.ds.cell_to_point()
+        c2p = pmesh.ds.cell_to_point()
 
-        phiValue = phi(polymesh.point)
+        phiValue = phi(pmesh.point)
         phiSign = msign(phiValue)
-        NV = polymesh.number_of_vertices_of_cells()
+        NV = pmesh.number_of_vertices_of_cells()
 
         eta1 = np.abs(c2p*phiSign)
         eta2 = c2p*np.abs(phiSign)
@@ -50,23 +68,23 @@ class AdaptiveMarker():
 
         idx0, = np.nonzero(isInterfaceCell)
 
-        N = polymesh.number_of_points()
+        N = pmesh.number_of_points()
         isInterfacePoint= np.asarray(isInterfaceCell@c2p).reshape(-1)
 
 
-        NC = polymesh.number_of_cells()
+        NC = pmesh.number_of_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool)
 
         # Case 1
-        NE = polymesh.number_of_edges()
-        edge = polymesh.ds.edge # the edge in polymesh
-        edge2cell = polymesh.ds.edge_to_cell()
+        NE = pmesh.number_of_edges()
+        edge = pmesh.ds.edge # the edge in polymesh
+        edge2cell = pmesh.ds.edge_to_cell()
         isInterfaceBdEdge = isInterfaceCell[edge2cell[:, 0]] & (~isInterfaceCell[edge2cell[:, 1]]) 
         isInterfaceBdEdge = isInterfaceBdEdge | ((~isInterfaceCell[edge2cell[:, 0]]) & isInterfaceCell[edge2cell[:, 1]])
         edge0 = edge[isInterfaceBdEdge]
         isInterfaceBdPoint = np.zeros(N, dtype=np.int) 
         isInterfaceBdPoint[edge0] = 1
-        p2p = polymesh.ds.point_to_point_in_edge(N, edge0)
+        p2p = pmesh.ds.point_to_point_in_edge(N, edge0)
         isInterfaceLinkPoint = np.asarray(p2p@isInterfaceBdPoint) > 2 
         nlink = np.sum(isInterfaceLinkPoint) 
 
@@ -75,7 +93,7 @@ class AdaptiveMarker():
 
         # Case 2
         nc = np.asarray(c2p.sum(axis=0)).reshape(-1)
-        NV = polymesh.number_of_vertices_of_cells()
+        NV = pmesh.number_of_vertices_of_cells()
         isInterfaceInPoint = isInterfacePoint & (~isInterfaceBdPoint) & (nc == 4)
         isMarkedCell = isMarkedCell | (np.asarray(c2p@(isInterfaceInPoint) > 0))
         isInterfaceInPoint = isInterfacePoint & (~isInterfaceBdPoint) & (nc == 3)
@@ -83,7 +101,7 @@ class AdaptiveMarker():
 
         # Case 3
         if nlink == 0:
-            point = polymesh.point
+            point = pmesh.point
             eps = 1e-8
             nbd = np.sum(isInterfaceBdPoint)
             normal = np.zeros((nbd, 2), dtype=np.float)
@@ -107,8 +125,8 @@ class AdaptiveMarker():
 
 class QuadtreeInterfaceMesh2d():
     def __init__(self, mesh, marker):
-        self.qmesh =  Quadtree(mesh.point, mesh.ds.cell)
-        self.qmesh.uniform_refine() # here one should refine one time 
+        self.treemesh =  Quadtree(mesh.point, mesh.ds.cell)
+        self.treemesh.uniform_refine() # here one should refine one time 
                                     # TODO: there is a bug in Quadtree
         self.marker = marker
         self.adaptive_refine()
@@ -116,22 +134,22 @@ class QuadtreeInterfaceMesh2d():
     def adaptive_refine(self):
         flag = True
         while flag:
-            flag = self.qmesh.refine(marker=self.marker)
+            flag = self.treemesh.refine(marker=self.marker)
 
     def get_interface_mesh(self):
         phi = self.marker.phi
-        polymesh = self.qmesh.to_polygonmesh()
+        pmesh = self.treemesh.to_pmesh()
 
-        N = polymesh.number_of_points()
-        NE = polymesh.number_of_edges()
-        NC = polymesh.number_of_cells()
+        N = pmesh.number_of_points()
+        NE = pmesh.number_of_edges()
+        NC = pmesh.number_of_cells()
 
         # find the interface points 
-        edge = polymesh.ds.edge
-        point = polymesh.point
+        edge = pmesh.ds.edge
+        point = pmesh.point
         phiSign = msign(phi(point))
-        isInterfaceCell = self.marker.interface_cell_flag(polymesh)
-        edge2cell = polymesh.ds.edge2cell
+        isInterfaceCell = self.marker.interface_cell_flag(pmesh)
+        edge2cell = pmesh.ds.edge2cell
 
         isCutEdge0 = (phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0)
         isCutEdge1 = (phiSign[edge[:, 0]] == 0)
@@ -140,13 +158,13 @@ class QuadtreeInterfaceMesh2d():
         cutPoint = find_cut_point(phi, point[cutEdge0[:, 0]], point[cutEdge0[:, 1]])
 
         # find the cut location in each interface cell
-        NV = polymesh.number_of_vertices_of_cells()
+        NV = pmesh.number_of_vertices_of_cells()
         NIC = isInterfaceCell.sum() # the number of interface cell
         cellIdxMap = np.zeros(NC, dtype=np.int)
         cellIdxMap[isInterfaceCell] = range(NIC) # renumbering the interface cell 
 
-        cell = polymesh.ds.cell
-        cellLocation = polymesh.ds.cellLocation
+        cell = pmesh.ds.cell
+        cellLocation = pmesh.ds.cellLocation
 
 
         # find the neighbor cell idx of cut edges
@@ -205,5 +223,20 @@ class QuadtreeInterfaceMesh2d():
                 newCellLocation3[-1] + newCellLocation1[0:-1], 
                 newCellLocation3[-1] + newCellLocation1[-1] + newCellLocation2), axis=0)
         point = np.append(point, cutPoint, axis=0)
-        polymesh1 = PolygonMesh(point, cell, cellLocation)
-        return polymesh1
+        pmesh1 = PolygonMesh(point, cell, cellLocation)
+        return pmesh1
+
+class AdaptiveMarker3d(AdaptiveMarkerBase):
+    def __init__(self, phi, maxh=0.01, maxa=5):
+        super(AdaptiveMarker3d, self).__init__(phi, maxh, maxa)
+    def interface_cell_flag(self):
+        pass
+    def coarsen_mark(self, pmesh):
+        pass
+    def coarsen_mark(self, pmesh):
+        pass
+
+class OctreeInterfaceMesh3d():
+    def __init__(self, mesh, marker):
+        pass
+
