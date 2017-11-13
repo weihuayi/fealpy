@@ -129,7 +129,8 @@ for i in range(maxit):
     if i < maxit - 1:
         mesh.bisect(markedCell)
 
-
+ratio = errorMatrix[4]/errorMatrix[6]
+print(ratio[k:])
 data = {'Ndof':Ndof, 'error':errorMatrix, 'errorType':errorType}
 sio.matlab.savemat(d+'/test'+str(m)+'.mat', data)
 
