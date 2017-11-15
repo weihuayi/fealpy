@@ -8,9 +8,9 @@ import  matplotlib.pyplot as plt
 
 
 phi = Curve1(a=12)
-phi = Curve3()
+#phi = Curve3()
 mesh = rectangledomainmesh(phi.box, nx=10, ny=10, meshtype='quad')
-marker = AdaptiveMarker2d(phi, maxa=2)
+marker = AdaptiveMarker2d(phi, maxh=0.1, maxa=2)
 alg = QuadtreeInterfaceMesh2d(mesh, marker)
 pmesh= alg.get_interface_mesh()
 fig = plt.figure()

@@ -120,6 +120,13 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
             isMarkedCell0 = np.zeros(NC, dtype=np.bool)
             isMarkedCell0[edge2cell[isBigCurvatureEdge, 0:2]] = True
             isMarkedCell = isMarkedCell | (isMarkedCell0 & isInterfaceCell)
+
+        # Case 4
+        a = pmesh.area()
+        maxh = self.maxh
+        isMarkedCell = isMarkedCell | ((a > maxh**2) & isInterfaceCell) 
+
+
         return isMarkedCell
 
 
