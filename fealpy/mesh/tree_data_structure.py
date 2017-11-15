@@ -566,6 +566,7 @@ class Octree(HexahedronMesh):
                 return True
         else:
             return False
+
     def to_pmesh(self):
         '''transform the Octree data structure to Polyhedral data structure
 
@@ -582,8 +583,23 @@ class Octree(HexahedronMesh):
             faceLocation = np.arange(0, NV*(NF+1), NV)
             return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell)
         else:
-            # 0. 
-            pass
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
+
+            face2cell = self.ds.face2cell
+            face = self.ds.face
+
+            isRootCell = sefl.is_root_cell()
+            isLeafCell = self.is_leaf_cell()
+            isLeafFace = isLeafCell[face2cell[:, 0]] & isLeafCell[face2cell[:, 1]]
+
+            pface2cell = face2cell[isLeafFace]
+            pface = face[isLeafFace]
+
+            isLeafBdFace = (pface2cell[:, 0] === pface2cell[:, 1])
+            
+
+            
 
 
             
