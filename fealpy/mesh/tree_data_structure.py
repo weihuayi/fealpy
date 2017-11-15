@@ -596,7 +596,7 @@ class Octree(HexahedronMesh):
             pface2cell = face2cell[isLeafFace]
             pface = face[isLeafFace]
 
-            isLeafBdFace = (pface2cell[:, 0] === pface2cell[:, 1])
+            isLeafBdFace = (pface2cell[:, 0] == pface2cell[:, 1])
             
 
             

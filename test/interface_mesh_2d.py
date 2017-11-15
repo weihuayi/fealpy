@@ -38,6 +38,7 @@ def my_test(n, interface, fname):
 N = [100, 200, 400, 800, 1600]
 
 interface = Curve1(a=6)
+interface = Curve3()
 maxit = len(N)
 T = np.zeros(maxit, dtype=np.float)
 A = np.zeros(maxit, dtype=np.float)

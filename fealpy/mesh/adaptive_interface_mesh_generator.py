@@ -152,10 +152,25 @@ class QuadtreeInterfaceMesh2d():
         edge2cell = pmesh.ds.edge2cell
 
         isCutEdge0 = (phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0)
-        isCutEdge1 = (phiSign[edge[:, 0]] == 0)
-        isCutEdge2 = (phiSign[edge[:, 1]] == 0)
         cutEdge0 = edge[isCutEdge0]
         cutPoint = find_cut_point(phi, point[cutEdge0[:, 0]], point[cutEdge0[:, 1]])
+
+        edge2cutPoint = np.zeros(NE, dtype=np.int)
+        edge2cutPoint[isCutEdge0] = range(N, N+cutEdge0.shape[0])
+
+        isSpecialEdge = (~isCutEdge0) & isInterfaceCell[edge2cell[:, 0]] \
+                & isInterfaceCell[edge2cell[:, 1]]
+
+        if np.any(isSpecialEdge):
+            print(isSpecialEdge.sum())
+            isSpecialEdge0 = isSpecialEdge & (phiSign[edge[:, 0]] == 0)
+            edge2cutPoint[isSpecialEdge0] = edge[isSpecialEdge0, 0]
+            isCutEdge0[isSpecialEdge0] = True
+            isSpecialEdge0 = isSpecialEdge & (phiSign[edge[:, 1]] == 0)
+            edge2cutPoint[isSpecialEdge0] = edge[isSpecialEdge0, 1]
+            isCutEdge0[isSpecialEdge0] = True
+
+        edge2cutPoint = edge2cutPoint[isCutEdge0]
 
         # find the cut location in each interface cell
         NV = pmesh.number_of_vertices_of_cells()
@@ -169,9 +184,10 @@ class QuadtreeInterfaceMesh2d():
 
         # find the neighbor cell idx of cut edges
         cellIdx = edge2cell[isCutEdge0, 0:2].reshape(-1)
+
         idx = np.argsort(cellIdx)
         location = edge2cell[isCutEdge0, 2:4].reshape(-1)[idx].reshape(-1, 2)
-        interfaceCell2cutPoint = np.repeat(range(N, N+cutEdge0.shape[0]), 2)[idx].reshape(-1, 2) 
+        interfaceCell2cutPoint = np.repeat(edge2cutPoint, 2)[idx].reshape(-1, 2) 
         idx = np.argsort(location, axis=1)
         location = location[np.arange(NIC).reshape(-1, 1), idx]
         interfaceCell2cutPoint = interfaceCell2cutPoint[np.arange(NIC).reshape(-1, 1), idx]
