@@ -4,6 +4,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .QuadrangleMesh import QuadrangleMesh 
 from .HexahedronMesh import HexahedronMesh 
 from .PolygonMesh import PolygonMesh
+from .PolyhedronMesh import PolyhedronMesh 
 from ..common import ranges
 
 class Quadtree(QuadrangleMesh):
@@ -567,6 +568,16 @@ class Octree(HexahedronMesh):
         else:
             return False
 
+    def to_pmesh1(self):
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+        point = self.point
+        face = self.ds.face
+        NV = face.shape[1]
+        face2cell = self.ds.face2cell
+        faceLocation = np.arange(0, NV*(NF+1), NV)
+        return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell, NC=NC)
+
     def to_pmesh(self):
         '''transform the Octree data structure to Polyhedral data structure
 
@@ -578,30 +589,160 @@ class Octree(HexahedronMesh):
             NC = self.number_of_cells()
             point = self.point
             face = self.ds.face
-            NV = face.shape[0]
+            NV = face.shape[1]
             face2cell = self.ds.face2cell
             faceLocation = np.arange(0, NV*(NF+1), NV)
-            return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell)
+            return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell, NC=NC)
         else:
-            NF = self.number_of_faces()
-            NC = self.number_of_cells()
-
             face2cell = self.ds.face2cell
+            cell2cell = self.ds.cell_to_cell()
+            cell2face = self.ds.cell_to_face()
             face = self.ds.face
+            parent = self.parent
+            child = self.child
 
-            isRootCell = sefl.is_root_cell()
             isLeafCell = self.is_leaf_cell()
-            isLeafFace = isLeafCell[face2cell[:, 0]] & isLeafCell[face2cell[:, 1]]
+            isLeafFace = (isLeafCell[face2cell[:, 0]] & isLeafCell[face2cell[:, 1]])
 
             pface2cell = face2cell[isLeafFace]
             pface = face[isLeafFace]
 
             isLeafBdFace = (pface2cell[:, 0] == pface2cell[:, 1])
-            
+            pfaceIdx, = np.nonzero(isLeafBdFace)
+            while len(pfaceIdx) > 0:
+                # the right hand side cell of current face 
+                cellIdx = pface2cell[pfaceIdx, 1]  
+                localIdx = pface2cell[pfaceIdx, 3]
 
-            
+                parentCellIdx = parent[cellIdx, 0] 
+                # the parent cell's 'localIdx'-th neighbor
+                neighborCellIdx = cell2cell[parentCellIdx, localIdx]
+                
+                # if this neighbor cell is a leaf cell or a root cell, it is
+                # what we want 
+                isFound = isLeafCell[neighborCellIdx] | isRootCell[neighborCellIdx]
+                pface2cell[pfaceIdx[isFound], 1] = neighborCellIdx[isFound]
+
+                # find the global face idx of this parent cell's  `localIdx`-th face 
+                faceIdx = cell2face[parentCellIdx, localIdx]
+
+                # if the left cell of `faceIdx`-th face is not this parent
+                # cell, we update the local idx of 
+                isCase = (face2cell[faceIdx, 0] == neighborCellIdx) & isFound
+                pface2cell[pfaceIdx[isCase], 3] = face2cell[faceIdx[isCase], 2] 
+
+                # If the left cell of `faceIdx`-th face is this parent cell, we
+                # set the local idx in its right cell of this `pfaceidx`
+                isCase = (face2cell[faceIdx, 1] == neighborCellIdx) & isFound
+                pface2cell[pfaceIdx[isCase], 3] = face2cell[faceIdx[isCase], 3] 
+
+                # If this parent cell is a boundary cell
+                isSpecial = isFound & (parentCellIdx == neighborCellIdx) 
+                pface2cell[pfaceIdx[isSpecial], 1] =  pface2cell[pfaceIdx[isSpecial], 0]
+                pface2cell[pfaceIdx[isSpecial], 3] =  pface2cell[pfaceIdx[isSpecial], 2]
+
+                pfaceIdx = pfaceIdx[~isFound]
+                pface2cell[pfaceIdx, 1] = parentCellIdx[~isFound]
+
+            NC = self.number_of_cells()
+            PNC = isLeafCell.sum()
+            cellIdxMap = np.zeros(NC, dtype=np.int)
+            cellIdxMap[isLeafCell] = np.arange(PNC)
+            pface2cell[:, 0:2] = cellIdxMap[pface2cell[:, 0:2]]
+
+            # pface and pfaceLocation
+            edge = self.ds.edge
+            N = self.number_of_points()
+            NE = self.number_of_edges()
+            face2edge = self.ds.face_to_edge()
+            isLeafEdge = np.zeros(NE, dtype=np.bool)
+            pface2edge = face2edge[isLeafFace]
+            isLeafEdge[pface2edge] = True
+            pedge = edge[isLeafEdge]
+            idxMap = -np.ones(NE, dtype=np.int)
+            idxMap[isLeafEdge] = range(np.sum(isLeafEdge))
+            pface2edge = idxMap[pface2edge]
+
+            PNF = pface.shape[0]
+            NE = pedge.shape[0]
+            I = pedge.flatten()
+            J = np.repeat(range(NE), 2)
+            val = np.ones((NE, 2), dtype=np.int8)
+            val[:, 1] = 2
+            p2e = csr_matrix((val.flatten(), (I, J)), shape=(N, NE), dtype=np.int8)
+
+            NV = np.zeros(PNF, dtype=np.int)
+            point = self.point
+            mp = (point[pedge[:, 0]] + point[pedge[:, 1]])/2
+            l2 = np.sqrt(np.sum((point[pedge[:, 0]] - point[pedge[:, 1]])**2, axis=1))
+            for i in range(4):
+                NV += 1
+                fidx = np.arange(PNF)
+                ei = pface2edge[:, i]
+                p0 = pface[:, i]
+                p1 = pface[:, (i+1)%4]
+                pe = ei 
+                fp = p0
+                while True:
+                    p2e0 = p2e[fp]
+                    I, J = p2e0.nonzero()
+                    l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
+                    l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
+                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
+                    flag1 = (pedge[J, 0] != p1[I]) & (pedge[J, 1] != p1[I])
+                    flag2 = (pedge[J, 0] == fp[I]) | (pedge[J, 1] == fp[I])
+                    flag3 = l2[J] < l2[ei[I]]
+                    isNotOK = flag0 & flag1 & flag2 & flag3
+                    if isNotOK.sum() == 0:
+                        break
+                    lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
+                    p0 = p0[I[isNotOK]]
+                    p1 = p1[I[isNotOK]]
+                    pe = J[isNotOK]
+                    fp = pedge[pe, lidx%2]
+                    fidx = fidx[I[isNotOK]]
+                    ei = pface2edge[fidx, i]
+                    NV[fidx] += 1
+            #idx1 = np.array([ 921,  991, 4544, 4545])
+            #idx2 = np.array([  52,  924,  994, 4550, 6067])
+            #print("To polygon: ")
+            #print(NV[idx1])
+            #print(NV[idx2])
 
 
-            
-
-
+            pfaceLocation = np.zeros(PNF+1, dtype=np.int)
+            pfaceLocation[1:] = np.cumsum(NV)
+            pface0 = np.zeros(pfaceLocation[-1], dtype=np.int)
+            currentLocation = pfaceLocation[:-1].copy()
+            for i in range(4):
+                pface0[currentLocation] = pface[:, i]
+                currentLocation += 1
+                fidx = np.arange(PNF)
+                ei = pface2edge[:, i]
+                p0 = pface[:, i]
+                p1 = pface[:, (i+1)%4]
+                pe = ei 
+                fp = p0
+                while True:
+                    p2e0 = p2e[fp]
+                    I, J = p2e0.nonzero()
+                    l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
+                    l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
+                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])  
+                    flag1 = (pedge[J, 0] != p1[I]) & (pedge[J, 1] != p1[I])
+                    flag2 = (pedge[J, 0] == fp[I]) | (pedge[J, 1] == fp[I])
+                    flag3 = l2[J] < l2[ei[I]]
+                    isNotOK = flag0 & flag1 & flag2 & flag3
+                    if isNotOK.sum() == 0:
+                        break
+                    lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
+                    p0 = p0[I[isNotOK]]
+                    p1 = p1[I[isNotOK]]
+                    pe = J[isNotOK]
+                    fp = pedge[pe, lidx%2]
+                    fidx = fidx[I[isNotOK]]
+                    ei = pface2edge[fidx, i]
+                    pface0[currentLocation[fidx]] = fp
+                    currentLocation[fidx] += 1
+                
+            return PolyhedronMesh(point, pface0, pfaceLocation, pface2cell, NC=PNC)

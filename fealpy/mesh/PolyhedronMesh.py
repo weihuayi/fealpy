@@ -3,26 +3,54 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from scipy.sparse import triu, tril, find, hstack
 from .mesh_tools import unique_row
 
-
+from tvtk.api import tvtk, write_data
 class PolyhedronMesh():
-    def __init__(self, point, face, faceLocation, face2cell, dtype=np.float):
+    def __init__(self, point, face, faceLocation, face2cell, NC=None, dtype=np.float):
         self.point = point
-        self.ds = PolyhedronMeshDataStructure(point.shape[0], face, faceLocation, face2cell)
+        self.ds = PolyhedronMeshDataStructure(point.shape[0], face, faceLocation, face2cell, NC=NC)
         self.meshtype = 'polyhedron'
         self.dtype= dtype 
 
     def to_vtk(self):
         NF = self.number_of_faces()
         face = self.ds.face
+        face2cell = self.ds.face2cell
         faceLocation = self.ds.faceLocation
         NV = self.ds.number_of_vertices_of_faces()
-        faces = np.zeros(len(face) + NF, dtype=np.int)
-        isIdx = np.ones(len(face) + NF, dtype=np.bool)
-        isIdx[0] = False
-        isIdx[np.add.accumulate(NV+1)[:-1]] = False
-        faces[~isIdx] = NV
-        faces[isIdx] = face
-        return NF, faces
+
+
+        isPoly = (face2cell[:, 0]) == 59 |  (face2cell[:, 1] == 59)
+        isBadPoly, V = self.check()
+        idx, = np.nonzero(isBadPoly)
+        print(V[idx])
+        for i in idx:
+            isPoly = (face2cell[:, 0] == i)  |  (face2cell[:, 1] == i) 
+#        isPoly = isBadPoly[face2cell[:, 0]] | isBadPoly[face2cell[:, 1]]
+            NNF = np.sum(isPoly)
+            faces = np.zeros(np.sum(NV[isPoly]) + NNF, dtype=np.int)
+            isIdx = np.ones(len(faces), dtype=np.bool)
+            isIdx[0] = False
+            isIdx[np.add.accumulate(NV[isPoly]+1)[:-1]] = False
+            faces[~isIdx] = NV[isPoly]
+            isPoly = np.repeat(isPoly, NV) 
+            faces[isIdx] = face[isPoly]
+
+            ug = tvtk.UnstructuredGrid(points=self.point)
+            cell_type = tvtk.Polygon().cell_type
+            cell = tvtk.CellArray()
+            cell.set_cells(NNF, faces)
+            ug.set_cells(cell_type, cell) 
+            write_data(ug, str(i)+'.vtk')
+
+        return NNF, faces
+
+#        faces = np.zeros(len(face) + NF, dtype=np.int)
+#        isIdx = np.ones(len(face) + NF, dtype=np.bool)
+#        isIdx[0] = False
+#        isIdx[np.add.accumulate(NV+1)[:-1]] = False
+#        faces[~isIdx] = NV
+#        faces[isIdx] = face
+#        return NF, faces
 
     def check(self):
         N = self.number_of_points()
@@ -39,14 +67,20 @@ class PolyhedronMesh():
 
         np.add.at(E, face2cell[:, 0], NFE)
         np.add.at(E, face2cell[isIntFace, 1], NFE[isIntFace])
+        print("Polygon test:")
+        print(NFE[(face2cell[:, 0] == 36) & (face2cell[:, 1] != 36)])
+        print(NFE[(face2cell[:, 0] != 36) & (face2cell[:, 1] == 36)])
+        print(np.nonzero((face2cell[:, 0] == 36) & (face2cell[:, 1] != 36)))
+        print(np.nonzero((face2cell[:, 0] != 36) & (face2cell[:, 1] == 36)))
         E = E//2
 
         np.add.at(F, face2cell[:, 0], 1)
         np.add.at(F, face2cell[isIntFace, 1], 1)
 
-        isBadPoly = (F - E + V != 2)
-        return isBadPoly.sum() == 0
-
+        val = F - E + V 
+        isBadPoly = (val != 2)
+        print(isBadPoly.sum())
+        return isBadPoly, V 
     def number_of_points(self):
         return self.point.shape[0]
 
@@ -94,10 +128,13 @@ class PolyhedronMesh():
         pass
 
 class PolyhedronMeshDataStructure():
-    def __init__(self, N, face, faceLocation, face2cell):
+    def __init__(self, N, face, faceLocation, face2cell, NC=None):
         self.N = N 
         self.NF = faceLocation.shape[0] - 1
-        self.NC = np.max(face2cell) + 1
+        if NC is None:
+            self.NC = np.max(face2cell) + 1
+        else:
+            self.NC = NC
 
         self.face = face
         self.faceLocation = faceLocation
@@ -105,10 +142,13 @@ class PolyhedronMeshDataStructure():
 
         self.construct()
 
-    def reinit(self, N, face, faceLocation, face2cell):
+    def reinit(self, N, face, faceLocation, face2cell, NC=None):
         self.N = N 
         self.NF = faceLocation.shape[0] - 1
-        self.NC = np.max(face2cell) 
+        if NC is None:
+            self.NC = np.max(face2cell) + 1
+        else:
+            self.NC = NC
 
         self.face = face
         self.faceLocation = faceLocation

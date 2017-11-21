@@ -43,7 +43,6 @@ def write_vtk_mesh(mesh, fileName):
         NF, faces = mesh.to_vtk()
         cell = tvtk.CellArray()
         cell.set_cells(NF, faces)
-        ug.cell_data.scalars = mesh.cellData['flag']
     elif mesh.meshtype is 'polygon':
        cell_type = tvtk.Polygon().cell_type
        NC, cells = mesh.to_vtk()

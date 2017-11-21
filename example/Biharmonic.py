@@ -15,6 +15,7 @@ from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error
 from fealpy.model.BiharmonicModel2d import SinSinData, BiharmonicData2, BiharmonicData3, BiharmonicData4, BiharmonicData5, BiharmonicData6
 from fealpy.tools.show import show_error_table 
 
+from fealpy.tools.show import showmultirate
 
 m = int(sys.argv[1]) 
 meshtype = int(sys.argv[2])
@@ -46,7 +47,7 @@ elif m == 5:
 maxit = 4
 degree = 1
 
-N = np.zeros((maxit,), dtype=np.int)
+Ndof = np.zeros((maxit,), dtype=np.int)
 
 errorType = ['$\| u - u_h\|$',
          '$\|\\nabla u - \\nabla u_h\|$',
@@ -54,6 +55,7 @@ errorType = ['$\| u - u_h\|$',
          '$\|\\nabla u - G(\\nabla u_h)\|$',
          '$\|\Delta u - \\nabla\cdot G(\\nabla u_h)\|$',
          '$\|\Delta u -  G(\\nabla\cdot G(\\nabla u_h))\|$',
+         '$\|G(\\nabla\cdot G(\\nabla u_h)) - \\nabla\cdot G(\\nabla u_h)\|$'
          ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
@@ -86,16 +88,26 @@ for i in range(maxit):
     fem.recover_grad(uh, rgh)
     fem.recover_laplace(rgh, rlh)
 
-    eta = fem.recover_estimate(uh, rgh)
+    eta1 = fem.grad_recover_estimate(uh, rgh)
+    eta2 = fem.laplace_recover_estimate(rgh, rlh, etype=1, order=2)
 
-    N[i] = V.number_of_global_dofs() 
+    Ndof[i] = V.number_of_global_dofs() 
     errorMatrix[0, i] = L2_error(model.solution, uh, order=5)
     errorMatrix[1, i] = H1_semi_error(model.gradient, uh, order=5)
-    errorMatrix[2, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[2, i] = np.sqrt(np.sum(eta1**2))
     errorMatrix[3, i] = L2_error(model.gradient, rgh, order=5)
     errorMatrix[4, i] = div_error(model.laplace, rgh, order=5)
     errorMatrix[5, i] = L2_error(model.laplace, rlh, order=5)
+    errorMatrix[6, i] = np.sqrt(np.sum(eta2**2)) 
 
 #order = np.log(error[0:-1]/error[1:])/np.log(2)
 
-show_error_table(N, errorType, errorMatrix, end='\\\\\\hline\n')
+show_error_table(Ndof, errorType, errorMatrix, end='\\\\\\hline\n')
+
+optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x']
+fig = plt.figure()
+axes = fig.gca()
+showmultirate(axes, 1, Ndof, errorMatrix, optionlist, errorType)
+axes.legend(loc=3)
+axes.axis('tight')
+plt.show()
