@@ -146,11 +146,11 @@ fig2.savefig(d+'/solution.pdf')
 fig3 = plt.figure(figsize=(40, 40), facecolor='w')
 axes = fig3.gca()
 
-#optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
-#showmultirate(axes, k, Ndof, errorMatrix, optionlist, errorType)
+optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
+showmultirate(axes, k, Ndof, errorMatrix, optionlist, errorType)
 
-optionlist = ['k-*', 'r-^']
-showmultirate(axes, k, Ndof, errorMatrix[4:7:2], optionlist, errorType[4:7:2])
+#optionlist = ['k-*', 'r-^']
+#showmultirate(axes, k, Ndof, errorMatrix[4:7:2], optionlist, errorType[4:7:2])
 axes.legend(loc=3, prop={'size': 60})
 axes.tick_params(labelsize=60)
 axes.axis('tight')

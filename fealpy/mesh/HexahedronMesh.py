@@ -38,15 +38,15 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
 
     # The following local data structure should be class properties
     localEdge = np.array([
-        (0, 1), (1, 2), (2, 3), (3, 0),
+        (0, 1), (1, 2), (2, 3), (0, 3),
         (0, 4), (1, 5), (2, 6), (3, 7),
-        (4, 5), (5, 6), (6, 7), (7, 4)])
+        (4, 5), (5, 6), (6, 7), (4, 7)])
     localFace = np.array([
         (0, 3, 2, 1), (4, 5, 6, 7), # bottom and top faces
         (0, 4, 7, 3), (1, 2, 6, 5), # left and right faces  
         (0, 1, 5, 4), (2, 3, 7, 6)])# front and back faces
     localFace2edge = np.array([
-        (0,  1, 2, 3), (8, 9, 10, 11),
+        (3,  2, 1, 0), (8, 9, 10, 11),
         (4, 11, 7, 3), (1, 6,  9,  5),
         (0,  5, 8, 4), (2, 7, 10,  6)])
     V = 8
