@@ -23,8 +23,6 @@ uh = FiniteElementFunction(V)
 Ndof = V.number_of_global_dofs()
 a = SurfaceFEMModel(V,qfindex=1)
 
-
-
 f = pl.figure()
 axes = a3.Axes3D(f)
 mesh.add_plot(axes)

@@ -192,7 +192,8 @@ class LagrangeFiniteElementSpace2d():
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        dim = mesh.geom_dimension()
+        # dim = mesh.geom_dimension()
+        dim = 2
 
         pp = p**p
         ldof = self.number_of_local_dofs() 
@@ -215,7 +216,8 @@ class LagrangeFiniteElementSpace2d():
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        dim = mesh.geom_dimension()
+        #dim = mesh.geom_dimension()
+        dim = 2
 
         pp = p**p
         ldof = self.number_of_local_dofs() 

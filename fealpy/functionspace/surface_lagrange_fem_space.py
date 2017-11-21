@@ -43,9 +43,9 @@ class SurfaceTriangleMesh():
         # outward norm at bc
         mesh = self.scalarspace.mesh
         cell = mesh.ds.cell
-        F0 = np.einsum('ij..., ij->i...',
+        F0 = np.einsum('i...j, ij->i...',
                 J, mesh.point[cell[:, 1], :] - mesh.point[cell[:, 0], :])
-        F1 = np.einsum('ij..., ij->i...',
+        F1 = np.einsum('i...j, ij->i...',
                 J, mesh.point[cell[:, 2], :] - mesh.point[cell[:, 0], :])
         return J, F0, F1, grad
 
@@ -61,7 +61,7 @@ class SurfaceTriangleMesh():
         NC = mesh.number_of_cells()
         a = np.zeros(NC, dtype=self.dtype)
         p = self.scalarspace.p
-        triq = TriangleQuadrature(p)
+        triq = TriangleQuadrature(2*p)
         nQuad = triq.get_number_of_quad_points()
         for i in range(nQuad):
             bc, w = triq.get_gauss_point_and_weight(i)
