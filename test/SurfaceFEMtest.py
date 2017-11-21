@@ -5,30 +5,27 @@ import mpl_toolkits.mplot3d as a3
 import pylab as pl
 
 from fealpy.mesh.level_set_function import Sphere
-from fealpy.functionspace.surface_lagrange_fem_space import SurfaceTriangleMesh,SurfaceLagrangeFiniteElementSpace
-#from fealpy.functionspace.tools import function_space
-#from fealpy.functionspace.function import FiniteElementFunction
+from fealpy.mesh.surface_mesh_generator import iso_surface 
 
+from fealpy.functionspace.tools import function_space
+from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.femmodel.PoissonSurfaceFEMModel import SurfaceFEMModel
 
+qt = int(sys.argv[1]) 
+n = int(sys.argv[2])
+degree = int(sys.argv[3]) 
+
 surface = Sphere()
-smesh = surface.init_mesh()
-smesh.uniform_refine(5, surface)
+mesh = iso_surface(surface, surface.box, nx=n, ny=n, nz=n)
 
-# surface mesh and surfaceTriangleMesh
-stmesh = SurfaceTriangleMesh(surface, smesh, p=1)
-
-## 怎么根据有限元函数找到 自由度组装矩阵，目前下面几行是错的
-V = function_space(stmesh,'Lagrange',1)
+V = function_space(mesh, 'Lagrange', degree)
 uh = FiniteElementFunction(V)
-a = get_stiff_matrix()
-print(a) 
-
-
+Ndof = V.number_of_global_dofs()
+a = SurfaceFEMModel(V,qfindex=1)
 
 
 
 f = pl.figure()
 axes = a3.Axes3D(f)
-smesh.add_plot(axes)
+mesh.add_plot(axes)
 pl.show()
