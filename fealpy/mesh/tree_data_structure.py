@@ -686,29 +686,28 @@ class Octree(HexahedronMesh):
                 while True:
                     p2e0 = p2e[fp]
                     I, J = p2e0.nonzero()
+                    print("I repeat", I.shape, np.unique(I).shape)
+                    lidx = np.asarray(p2e0[I, J]).reshape(-1)
                     l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
                     l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
                     flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
-                    flag1 = (pedge[J, 0] != p1[I]) & (pedge[J, 1] != p1[I])
-                    flag2 = (pedge[J, 0] == fp[I]) | (pedge[J, 1] == fp[I])
-                    flag3 = l2[J] < l2[ei[I]]
-                    isNotOK = flag0 & flag1 & flag2 & flag3
+                    flag1 = (pedge[J, lidx%2] != p1[I])
+                    flag2 = l2[J] < l2[ei[I]]
+                    isNotOK = flag0 & flag1 & flag2 
                     if isNotOK.sum() == 0:
                         break
-                    lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
+                    print("I still repeat?", I[isNotOK].shape, np.unique(I[isNotOK]).shape)
+                    print(np.unique(I[isNotOK]))
                     p0 = p0[I[isNotOK]]
                     p1 = p1[I[isNotOK]]
                     pe = J[isNotOK]
+                    lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
                     fp = pedge[pe, lidx%2]
                     fidx = fidx[I[isNotOK]]
+                    print('fidx:', fidx)
                     ei = pface2edge[fidx, i]
+                    print(ei)
                     NV[fidx] += 1
-            #idx1 = np.array([ 921,  991, 4544, 4545])
-            #idx2 = np.array([  52,  924,  994, 4550, 6067])
-            #print("To polygon: ")
-            #print(NV[idx1])
-            #print(NV[idx2])
-
 
             pfaceLocation = np.zeros(PNF+1, dtype=np.int)
             pfaceLocation[1:] = np.cumsum(NV)
@@ -728,11 +727,10 @@ class Octree(HexahedronMesh):
                     I, J = p2e0.nonzero()
                     l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
                     l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
-                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])  
-                    flag1 = (pedge[J, 0] != p1[I]) & (pedge[J, 1] != p1[I])
-                    flag2 = (pedge[J, 0] == fp[I]) | (pedge[J, 1] == fp[I])
-                    flag3 = l2[J] < l2[ei[I]]
-                    isNotOK = flag0 & flag1 & flag2 & flag3
+                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
+                    flag1 = (pedge[J, lidx%2] != p1[I])
+                    flag2 = l2[J] < l2[ei[I]]
+                    isNotOK = flag0 & flag1 & flag2 
                     if isNotOK.sum() == 0:
                         break
                     lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
