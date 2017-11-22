@@ -72,10 +72,9 @@ marker = AdaptiveMarker(phi)
 for i in range(1):
     octree.uniform_refine()
 
-for i in range(4):
+for i in range(8):
     octree.refine(marker)
 
 pmesh = octree.to_pmesh()
-write_vtk_mesh(octree, 'octree.vtk')
 write_vtk_mesh(pmesh, 'pmesh.vtk')
-pmesh.check()
+print(pmesh.check())

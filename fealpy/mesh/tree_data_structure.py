@@ -676,37 +676,51 @@ class Octree(HexahedronMesh):
             mp = (point[pedge[:, 0]] + point[pedge[:, 1]])/2
             l2 = np.sqrt(np.sum((point[pedge[:, 0]] - point[pedge[:, 1]])**2, axis=1))
             for i in range(4):
+                print('Current:', i)
                 NV += 1
                 fidx = np.arange(PNF)
-                ei = pface2edge[:, i]
                 p0 = pface[:, i]
                 p1 = pface[:, (i+1)%4]
-                pe = ei 
-                fp = p0
+                ei = pface2edge[:, i]
+                pe = -np.ones(PNF) 
+                fp = pface[:, i] 
+                k = 0
                 while True:
-                    p2e0 = p2e[fp]
+                    k += 1
+                    p2e0 = p2e[fp, :]
                     I, J = p2e0.nonzero()
-                    print("I repeat", I.shape, np.unique(I).shape)
                     lidx = np.asarray(p2e0[I, J]).reshape(-1)
+
                     l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
                     l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
-                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
-                    flag1 = (pedge[J, lidx%2] != p1[I])
+                    flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12)    
+                    flag1 = (pedge[J, lidx%2] != p1[I]) 
                     flag2 = l2[J] < l2[ei[I]]
-                    isNotOK = flag0 & flag1 & flag2 
+                    ldot = np.einsum('ij, ij->i', 
+                            point[pedge[J, lidx%2]] - point[pedge[J, lidx-1]],
+                            point[p1[I]] - point[p0[I]])
+                    flag3 = (np.abs(ldot - l2[J]*l2[ei[I]]) < 1e-12)
+                    isNotOK = flag0 & flag1 & flag2 & flag3
                     if isNotOK.sum() == 0:
                         break
-                    print("I still repeat?", I[isNotOK].shape, np.unique(I[isNotOK]).shape)
-                    print(np.unique(I[isNotOK]))
-                    p0 = p0[I[isNotOK]]
-                    p1 = p1[I[isNotOK]]
-                    pe = J[isNotOK]
+
+                    I = I[isNotOK]
+                    J = J[isNotOK]
+
+                    p2e1 = csr_matrix((1/l2[J], (I, J)), shape=(len(fp), NE))
+                    J = np.asarray(p2e1.argmax(axis=1)).reshape(-1)
+                    I = np.arange(len(fp))
+                    isNotOK = np.asarray(p2e1[I, J]).reshape(-1) > 0
+                    if isNotOK.sum() == 0:
+                        break
+
                     lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
-                    fp = pedge[pe, lidx%2]
                     fidx = fidx[I[isNotOK]]
-                    print('fidx:', fidx)
+                    p0 = pface[fidx, i] 
+                    p1 = pface[fidx, (i+1)%4] 
                     ei = pface2edge[fidx, i]
-                    print(ei)
+                    pe = J[isNotOK]
+                    fp = pedge[pe, lidx%2]
                     NV[fidx] += 1
 
             pfaceLocation = np.zeros(PNF+1, dtype=np.int)
@@ -714,33 +728,50 @@ class Octree(HexahedronMesh):
             pface0 = np.zeros(pfaceLocation[-1], dtype=np.int)
             currentLocation = pfaceLocation[:-1].copy()
             for i in range(4):
+                print("Current ", i)
                 pface0[currentLocation] = pface[:, i]
                 currentLocation += 1
                 fidx = np.arange(PNF)
-                ei = pface2edge[:, i]
                 p0 = pface[:, i]
                 p1 = pface[:, (i+1)%4]
-                pe = ei 
+                ei = pface2edge[:, i]
+                pe = -np.ones(PNF) 
                 fp = p0
                 while True:
                     p2e0 = p2e[fp]
                     I, J = p2e0.nonzero()
+                    lidx = np.asarray(p2e0[I, J]).reshape(-1)
                     l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
                     l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
                     flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
-                    flag1 = (pedge[J, lidx%2] != p1[I])
+                    flag1 = (pedge[J, lidx%2] != p1[I]) 
                     flag2 = l2[J] < l2[ei[I]]
-                    isNotOK = flag0 & flag1 & flag2 
+                    ldot = np.einsum('ij, ij->i', 
+                            point[pedge[J, lidx%2]] - point[pedge[J, lidx-1]],
+                            point[p1[I]] - point[p0[I]])
+                    flag3 = (np.abs(ldot - l2[J]*l2[ei[I]]) < 1e-12)
+                    isNotOK = flag0 & flag1 & flag2 & flag3
                     if isNotOK.sum() == 0:
                         break
+
+                    I = I[isNotOK]
+                    J = J[isNotOK]
+                    lidx = lidx[isNotOK]
+                    p2e1 = csr_matrix((1/l2[J], (I, J)), shape=(len(fp), NE))
+                    J = np.asarray(p2e1.argmax(axis=1)).reshape(-1)
+                    I = np.arange(len(fp))
+                    isNotOK = np.asarray(p2e1[I, J]).reshape(-1) > 0
+                    if isNotOK.sum() == 0:
+                        break
+
                     lidx = np.asarray(p2e0[I[isNotOK], J[isNotOK]]).reshape(-1)
-                    p0 = p0[I[isNotOK]]
-                    p1 = p1[I[isNotOK]]
+                    fidx = fidx[I[isNotOK]]
+                    p0 = pface[fidx, i] 
+                    p1 = pface[fidx, (i+1)%4] 
+                    ei = pface2edge[fidx, i]
                     pe = J[isNotOK]
                     fp = pedge[pe, lidx%2]
-                    fidx = fidx[I[isNotOK]]
-                    ei = pface2edge[fidx, i]
                     pface0[currentLocation[fidx]] = fp
                     currentLocation[fidx] += 1
-                
+
             return PolyhedronMesh(point, pface0, pfaceLocation, pface2cell, NC=PNC)
