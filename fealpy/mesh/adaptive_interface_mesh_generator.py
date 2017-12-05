@@ -248,9 +248,11 @@ class QuadtreeInterfaceMesh2d():
         pmesh1 = PolygonMesh(point, cell, cellLocation)
         return pmesh1
 
-class AdaptiveMarker3d(AdaptiveMarkerBase):
+class AdaptiveMarker3d():
     def __init__(self, phi, maxh=0.01, maxa=5):
-        super(AdaptiveMarker3d, self).__init__(phi, maxh, maxa)
+        self.phi = phi
+        self.maxh = maxh
+        self.maxa = 5
 
     def interface_cell_flag(self, pmesh):
         isInterfaceFace = self.interface_face_flag(pmesh)
@@ -276,6 +278,7 @@ class AdaptiveMarker3d(AdaptiveMarkerBase):
 
 
     def refine_mark(self, treemesh):
+        pmesh = treemesh.to_pmesh() 
 
         N = pmesh.number_of_points()
         NF = pmesh.number_of_faces()

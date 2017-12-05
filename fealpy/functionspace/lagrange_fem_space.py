@@ -26,7 +26,8 @@ class LagrangeFiniteElementSpace1d():
     def basis(self, bc):
 
         mesh = self.mesh
-        dim = mesh.geom_dimension()
+        #dim = mesh.geom_dimension()
+        dim = 1 
 
         p = self.p
         pp = p**p
@@ -44,6 +45,7 @@ class LagrangeFiniteElementSpace1d():
         B = P.reshape(-1, 1)*np.multiply.accumulate(A, axis=0)
         phi = pp*np.prod(B[self.cellIdx, [0, 1]], axis=1)
         return phi
+
 
     def grad_basis(self, bc):
         mesh = self.mesh
@@ -211,6 +213,23 @@ class LagrangeFiniteElementSpace2d():
         phi = pp*np.prod(B[self.cellIdx, [0, 1, 2]], axis=1)
         return phi
 
+    def basis_einsum(self, bc):
+
+        nb = len(bc) # the number of barrycenter points
+        p = self.p   # the degree of polynomial basis function
+        dim = 2
+
+        c = np.arange(1, p+1, dtype=np.int)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
+        A = np.ones((nb, p+1, dim+1), dtype=np.float)
+        A[:, 1:, :] = bc.reshape(-1, 1, 3) - t
+        np.cumprod(A[:, 1:, :], axis=1, out=A[:, 1:, :])
+        A[:, 1:, :] = np.einsum('j, ijk->ijk', P, A[:, 1:, :])
+        phi = (p**p)*np.prod(A[:, self.cellIdx, [0, 1, 2]], axis=2)
+        return phi
+
 
     def grad_basis(self, bc):
         p = self.p
@@ -249,6 +268,22 @@ class LagrangeFiniteElementSpace2d():
         R[:,2] = Q[:,0]*Q[:,1]*M[:,2]
         gradphi = np.einsum('ij,kj...->ki...', pp*R, Dlambda)
         return gradphi
+
+    def grad_basis_einsum(self, bc):
+
+        nb = len(bc) # the number of barrycenter points
+        p = self.p   # the degree of polynomial basis function
+        dim = 2
+
+        c = np.arange(1, p+1, dtype=np.int)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
+        A = np.ones((nb, p+1, dim+1), dtype=np.float)
+        A[:, 1:, :] = bc.reshape(-1, 1, 3) - t
+        np.cumprod(A[:, 1:, :], axis=1, out=A[:, 1:, :])
+        A[:, 1:, :] = np.einsum('j, ijk->ijk', P, A[:, 1:, :])
+        pass
 
     def value(self, uh, bc):
         phi = self.basis(bc)

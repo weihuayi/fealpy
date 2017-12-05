@@ -20,6 +20,12 @@ cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int)
 mesh = TriangleMesh(point, cell)
 V = function_space(mesh, 'Lagrange', degree)
 
+bc = np.array([(0.1, 0.2, 0.7), (0.3, 0.4, 0.3)])
+for b in bc:
+    print(V.basis(b))
+
+print(V.basis_einsum(bc))
+
 ipoints = V.interpolation_points()
 cell2dof = V.cell_to_dof()
 fig, axes = plt.subplots(1, 3)
