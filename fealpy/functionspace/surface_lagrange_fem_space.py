@@ -7,24 +7,19 @@ from ..common import ranges
 from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
-    def __init__(self, surface, mesh, p=1, dtype=np.float):
+    def __init__(self, mesh, surface, p=1, dtype=np.float):
         self.scalarspace = LagrangeFiniteElementSpace2d(mesh, p, dtype=dtype)
-        self.point, _= surface.project(self.scalarspace.interpolation_points())
+        self.point, d = surface.project(self.scalarspace.interpolation_points())
+        self.surface = surface
+
         self.dtype=dtype
 
     def number_of_points(self):
         return self.point.shape[0] 
 
-    def number_of_nodes(self):
-        return self.point.shape[0]
-
     def number_of_edges(self):
         mesh = self.scalarspace.mesh
         return mesh.ds.NE
-
-    def number_of_faces(self):
-        mesh = self.scalarspace.mesh
-        return mesh.ds.NC
 
     def number_of_cells(self):
         mesh = self.scalarspace.mesh
@@ -32,6 +27,9 @@ class SurfaceTriangleMesh():
 
     def geom_dimension(self):
         return self.point.shape[1]
+
+    def toplogy_dimension(self):
+        return 2
 
     def jacobi(self, bc):
         cell2dof = self.scalarspace.cell_to_dof()
@@ -61,7 +59,7 @@ class SurfaceTriangleMesh():
         NC = mesh.number_of_cells()
         a = np.zeros(NC, dtype=self.dtype)
         p = self.scalarspace.p
-        triq = TriangleQuadrature(2*p)
+        triq = TriangleQuadrature(p)
         nQuad = triq.get_number_of_quad_points()
         for i in range(nQuad):
             bc, w = triq.get_gauss_point_and_weight(i)
@@ -73,20 +71,51 @@ class SurfaceTriangleMesh():
 
 class SurfaceLagrangeFiniteElementSpace:
     def __init__(self, mesh, surface, p=1, dtype=np.float):
+        """
+        Initial a object of SurfaceLagrangeFiniteElementSpace. 
+
+        Parameters
+        ----------
+        self : 
+            Object 
+        mesh : 
+            This is a mesh object
+        surface : 
+            The continuous surface which was represented as a level set
+            function.
+        p : int
+            The degree of the Lagrangian space 
+
+        Returns
+        -------
+
+        See Also
+        --------
+            
+        Notes
+        -----
+        """ 
         self.p = p
+        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p, dtype=dtype) 
         self.dtype = dtype
-        self.surface = SurfaceTriangleMesh(mesh, surface, p=p, dtype=dtype) 
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
 
     def basis(self, bc):
-        return self.dsurface.scalarspace.basis(bc)
+        """
+        Compute all basis function values at a given barrycenter.
+        """
+        return self.mesh.scalarspace.basis(bc)
 
     def grad_basis(self, bc):
-        J, n, grad = self.dsurface.jacobi(bc)
-        grad = np.einsum('i...k, ijk->ij...',
-                inv(J.transpose(0, 2, 1)), grad)
+        """
+        Compute the gradients of all basis functions at a given barrycenter.
+        """
+        J, F0, F1, grad = self.dsurface.jacobi(bc)
+        n = np.cross(F0, F1, axis=1)
+        n /= np.sqrt(np.sum(n**2, axis=1, keepdims=True))
+        grad = np.einsum('i...k, ijk->ij...', inv(J), grad)
         pgrad = np.einsum('ik, ijk->ij', n, grad)
         grad -= np.einsum('ij, ik->ijk', pgrad, n) 
         return grad
@@ -110,16 +139,16 @@ class SurfaceLagrangeFiniteElementSpace:
         pass
     
     def cell_to_dof(self):
-        pass
+        return self.mesh.scalarspace.cell_to_dof()
 
     def number_of_global_dofs(self):
-        pass
+        return self.mesh.scalarspace.number_of_global_dofs()
 
     def number_of_local_dofs(self):
-        pass
+        return self.mesh.scalarspace.number_of_local_dofs()
 
     def interpolation_points(self):
-        pass
+        return self.mesh.point
 
     def interpolation(self, u, uI):
         pass
