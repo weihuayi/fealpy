@@ -64,4 +64,4 @@ class SurfacePoissonFEMModel(object):
         cell2dof = V.cell_to_dof()
         b = np.zeros((gdof,),dtype=self.dtype)
         np.add.at(b, cell2dof.flatten(), bb.flatten())
-        return b
+        return b - np.mean(b)
