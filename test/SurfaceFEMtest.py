@@ -5,8 +5,7 @@ import mpl_toolkits.mplot3d as a3
 import pylab as pl
 
 from fealpy.mesh.level_set_function import Sphere  
-from fealpy.mesh.surface_mesh_generator import iso_surface 
-from fealpy.model.surface_poisson_model_3d import SphereData 
+from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData 
 
 from fealpy.femmodel.PoissonSurfaceFEMModel import SurfaceFEMModel
 from fealpy.solver import solve
