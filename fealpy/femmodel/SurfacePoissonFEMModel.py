@@ -1,29 +1,38 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
-from ..surface_poisson_model_3d import SurfaceLagrangeFiniteElementSpace
+from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
+from ..solver import solve
+from ..boundarycondition import DirichletBC
 
 class SurfacePoissonFEMModel(object):
-
     def __init__(self, mesh, surface, model, p=1, dtype=np.float):
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, dtype=dtype) 
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p, dtype=dtype) 
         self.surface = surface
         self.model = model
-
+        self.uh = self.V.finite_element_function() 
+        self.uI = self.V.interpolation(model.solution)
+        self.area = self.V.mesh.area()
         self.dtype = dtype
-    
+
+    def reinit(self, mesh):
+        p = self.V.p
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p, dtype=self.dtype) 
+        self.uh = self.V.finite_element_function() 
+        self.uI = self.V.interpolation(self.model.solution)
+        self.area = self.V.mesh.area()
+
     def get_left_matrix(self):
         V = self.V
         mesh = V.mesh
         NC = mesh.number_of_cells() 
-        area = mesh.area()
-        
-        qf = TriangleQuadrature(1)
+        p = V.p 
+        qf = TriangleQuadrature(8)#TODO: automatically choose numerical formula
         nQuad = qf.get_number_of_quad_points()
-
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
         cell2dof = V.cell_to_dof()
+        area = self.area 
         A = coo_matrix((gdof, gdof), dtype=self.dtype)
         for i in range(ldof):
             for j in range(i, ldof):
@@ -39,29 +48,64 @@ class SurfacePoissonFEMModel(object):
 
 
     def get_right_vector(self):
+        """
+        Compute the right hand side.
+        """
         V = self.V
         mesh = V.mesh
         model = self.model
-        
         NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(2)
+        p = V.p 
+        qf = TriangleQuadrature(8)#TODO:
         nQuad = qf.get_number_of_quad_points()
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
         cell2dof = V.cell_to_dof()
         bb = np.zeros((NC,ldof),dtype=self.dtype)
-        area = mesh.area()
+        area = self.area
+        # Compute the integral average of the source `f`
+        fh = np.zeros(NC, dtype=self.dtype)
         for i in range(nQuad):
             lambda_k,w_k = qf.get_gauss_point_and_weight(i)
             p = mesh.bc_to_point(lambda_k)
-            p = self.surface.project(p)
+            p,_= self.surface.project(p)
             fval = model.source(p) 
+            fh += fval*w_k
+        fh *= area
+        fh = np.sum(fh)/np.sum(area)
+
+        for i in range(nQuad):
+            lambda_k,w_k = qf.get_gauss_point_and_weight(i)
+            p = mesh.bc_to_point(lambda_k)
+            p, _ = self.surface.project(p)
+            fval = model.source(p) - fh 
             phi = V.basis(lambda_k)
-            for j in range(ldof):
-                bb[:,j] += rhs*phi[j]*w_k
+            bb += w_k*phi*fval.reshape(-1, 1)
 
         bb *= area.reshape(-1,1)
-        cell2dof = V.cell_to_dof()
         b = np.zeros((gdof,),dtype=self.dtype)
         np.add.at(b, cell2dof.flatten(), bb.flatten())
-        return b - np.mean(b)
+        return b 
+
+    def solve(self):
+        uh = self.uh
+        g0 = lambda p: 0 
+        bc = DirichletBC(self.V, g0, self.is_boundary_dof)
+        solve(self, uh, dirichlet=bc, solver='direct')
+
+    def l2_error(self):
+        uh = self.uh.copy()
+        uI = self.uI 
+        uh += uI[0] 
+        return np.sqrt(np.sum((uh - uI)**2)/len(uI))
+
+    def is_boundary_dof(self, p):
+        isBdDof = np.zeros(p.shape[0], dtype=np.bool)
+        isBdDof[0] = True
+        return isBdDof
+
+    def L2_error(self):
+        pass
+
+    def H1_error(self):
+        pass

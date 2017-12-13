@@ -32,20 +32,16 @@ class SurfaceTriangleMesh():
         return 2
 
     def jacobi(self, bc):
-        cell2dof = self.scalarspace.cell_to_dof()
-        grad = self.scalarspace.grad_basis(bc)
-
-        # Jacobi 
-        J = np.einsum('ij..., ijk->i...k', 
-                self.point[cell2dof, :], grad)
-        # outward norm at bc
         mesh = self.scalarspace.mesh
         cell = mesh.ds.cell
-        F0 = np.einsum('i...j, ij->i...',
-                J, mesh.point[cell[:, 1], :] - mesh.point[cell[:, 0], :])
-        F1 = np.einsum('i...j, ij->i...',
-                J, mesh.point[cell[:, 2], :] - mesh.point[cell[:, 0], :])
-        return J, F0, F1, grad
+        cell2dof = self.scalarspace.cell_to_dof()
+
+        grad = self.scalarspace.grad_basis(bc)
+        # Jacobi 
+        J0 = mesh.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
+        J1 = np.einsum('ij..., ijk->i...k', self.point[cell2dof, :], grad)
+        F = np.einsum('ijk, imk->imj', J1, J0)
+        return F, J0, J1, grad
 
     def bc_to_point(self, bc):
         basis = self.scalarspace.basis(bc)
@@ -59,12 +55,12 @@ class SurfaceTriangleMesh():
         NC = mesh.number_of_cells()
         a = np.zeros(NC, dtype=self.dtype)
         p = self.scalarspace.p
-        triq = TriangleQuadrature(p)
+        triq = TriangleQuadrature(8)
         nQuad = triq.get_number_of_quad_points()
         for i in range(nQuad):
             bc, w = triq.get_gauss_point_and_weight(i)
-            _, F0, F1, _ = self.jacobi(bc)
-            n = np.cross(F0, F1, axis=1)
+            F, _, _, _ = self.jacobi(bc)
+            n = np.cross(F[:, 0, :], F[:, 1, :], axis=1)
             a += np.sqrt(np.sum(n**2, axis=1))*w
         return a/2.0
 
@@ -112,12 +108,16 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
-        J, F0, F1, grad = self.dsurface.jacobi(bc)
-        n = np.cross(F0, F1, axis=1)
-        n /= np.sqrt(np.sum(n**2, axis=1, keepdims=True))
-        grad = np.einsum('i...k, ijk->ij...', inv(J), grad)
-        pgrad = np.einsum('ik, ijk->ij', n, grad)
-        grad -= np.einsum('ij, ik->ijk', pgrad, n) 
+        F, J0, J1, grad = self.mesh.jacobi(bc)
+        G = np.zeros((len(F), 2, 2), dtype=self.dtype)
+        G[:, 0, 0] = np.einsum('ij, ij->i', F[:, 0, :], F[:, 0, :])
+        G[:, 0, 1] = np.einsum('ij, ij->i', F[:, 0, :], F[:, 1, :])
+        G[:, 1, 0] = G[:, 0, 1]
+        G[:, 1, 1] = np.einsum('ij, ij->i', F[:, 1, :], F[:, 1, :])
+        G = np.linalg.inv(G)
+        grad = np.einsum('ijk, imk->imj', J0, grad)
+        grad = np.einsum('ijk, imk->imj', G, grad)
+        grad = np.einsum('ijk, imj->imk', F, grad)
         return grad
 
     def hessian_basis(self, bc):
@@ -150,11 +150,18 @@ class SurfaceLagrangeFiniteElementSpace:
     def interpolation_points(self):
         return self.mesh.point
 
-    def interpolation(self, u, uI):
-        pass
+    def interpolation(self, u):
+        ipoint = self.interpolation_points()
+        uI = FiniteElementFunction(self)
+        uI[:] = u(ipoint)
+        return uI
+
+    def finite_element_function(self):
+        return FiniteElementFunction(self)
 
     def projection(self, u, up):
         pass
 
     def array(self):
-        pass
+        gdof = self.number_of_global_dofs()
+        return np.zeros((gdof,), dtype=self.dtype)

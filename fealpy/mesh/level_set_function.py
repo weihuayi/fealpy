@@ -45,7 +45,7 @@ def dmax(d0, d1):
 
 
 # 3D surface 
-class Sphere:
+class Sphere(object):
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
         self.radius = radius
