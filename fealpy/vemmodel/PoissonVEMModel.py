@@ -1,21 +1,21 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
+
 class PoissonVEMModel:
-    def __init__(self, pde, V, dtype=np.float):
+    def __init__(self, model, V, dtype=np.float):
         self.V = V
-        self.pde = pde  
+        self.model = model  
         self.dtype=dtype
+        self.uh = self.V.finite_element_function() 
+        self.uI = self.V.interpolation(model.solution)
 
     def recover_estimate(self, uh, rtype='simple'):
         V = self.V
         mesh = V.mesh
-        N = mesh.number_of_points()
-        NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
         cell = mesh.ds.cell
-        cellLocation = mesh.ds.cellLocation 
         barycenter = V.smspace.barycenter 
 
         B = self.B 
@@ -23,47 +23,81 @@ class PoissonVEMModel:
         area = V.smspace.area
 
         try:
-            k = self.pde.diffusion_coefficient(barycenter)
+            k = self.model.diffusion_coefficient(barycenter)
         except  AttributeError:
             k = np.ones(NC) 
-
+            
+        # project the vem solution into linear polynomial space
         S = np.zeros((NC, 3), dtype=self.dtype)
-        idx = np.repeat(np.arange(NC), NV)
+        idx = np.repeat(range(NC), NV)
         for i in range(3):
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         S /=h.reshape(-1, 1)
         S *=k.reshape(-1, 1)
-            
 
         p2c = mesh.ds.point_to_cell()
-        if rtype is 'simple':
-            d = p2c.sum(axis=1)
-            ruh = np.asarray((p2c@S[:, 1:3])/d.reshape(-1, 1))
-        elif rtype is 'area':
-            d = p2c@area
-            ruh = np.asarray((p2c@(S[:, 1:3]*area.reshape(-1, 1)))/d.reshape(-1, 1))
-        elif rtype is 'inv_area':
-            d = p2c@(1/area)
-            ruh = np.asarray((p2c@(S[:, 1:3]/area.reshape(-1,1)))/d.reshape(-1, 1))
-        else:
-            raise ValueError("I have note code method: {}!".format(rtype))
+        try: 
+            isSubDomain = self.model.subdomain(barycenter)
+            eta = np.zeros((NC, ), dtype=np.float)
+            for isFlag in isSubDomain:
+                isSubIdx = np.repeat(isFlag, NV)
+                M = p2c[:, isFlag]
+                sa = area[isFlag]
+                if rtype is 'simple':
+                    d = p2c.sum(axis=1)
+                    ruh = np.asarray((M@S[isFlag, 1:3])/d.reshape(-1, 1))
+                elif rtype is 'area':
+                    d = p2c@area
+                    ruh = np.asarray((M@(S[isFlag, 1:3]*sa.reshape(-1, 1)))/d.reshape(-1, 1))
+                elif rtype is 'inv_area':
+                    d = p2c@(1/area)
+                    ruh = np.asarray((M@(S[isFlag, 1:3]/sa.reshape(-1, 1)))/d.reshape(-1, 1))
+                else:
+                    raise ValueError("I have note code method: {}!".format(rtype))
 
-        S1 = np.zeros((NC, 3), dtype=self.dtype)
-        S2 = np.zeros((NC, 3), dtype=self.dtype)
-        for i in range(3):
-            S1[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 0], minlength=NC)
-            S2[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 1], minlength=NC)
+                S1 = np.zeros((NC, 3), dtype=self.dtype)
+                S2 = np.zeros((NC, 3), dtype=self.dtype)
+                for i in range(3):
+                    S1[:, i] = np.bincount(idx[isSubIdx], weights=B[i, isSubIdx]*ruh[cell[isSubIdx], 0], minlength=NC)
+                    S2[:, i] = np.bincount(idx[isSubIdx], weights=B[i, isSubIdx]*ruh[cell[isSubIdx], 1], minlength=NC)
 
-        point = mesh.point
-        NV = mesh.number_of_vertices_of_cells()
-        phi1 = (point[cell, 0] - np.repeat(barycenter[:, 0], NV))/np.repeat(h, NV)
-        phi2 = (point[cell, 1] - np.repeat(barycenter[:, 1], NV))/np.repeat(h, NV)
+                point = mesh.point
+                phi1 = (point[cell[isSubIdx], 0] - np.repeat(barycenter[isFlag, 0], NV[isFlag]))/np.repeat(h[isFlag], NV[isFlag])
+                phi2 = (point[cell[isSubIdx], 1] - np.repeat(barycenter[isFlag, 1], NV[isFlag]))/np.repeat(h[isFlag], NV[isFlag])
 
-        gx = np.repeat(S1[:, 0], NV)+ np.repeat(S1[:, 1], NV)*phi1 + \
-            np.repeat(S1[:, 2], NV)*phi2 - np.repeat(S[:, 1], NV)
-        gy = np.repeat(S2[:,  0], NV)+ np.repeat(S2[:, 1], NV)*phi1 + \
-            np.repeat(S2[:, 2], NV)*phi2 - np.repeat(S[:, 2], NV)
-        eta = np.sqrt(k*np.bincount(np.repeat(range(NC), NV), weights=gx**2+gy**2)/NV*area)
+                gx = np.repeat(S1[isFlag, 0], NV[isFlag])+ np.repeat(S1[isFlag, 1], NV[isFlag])*phi1 + \
+                    np.repeat(S1[isFlag, 2], NV[isFlag])*phi2 - np.repeat(S[isFlag, 1], NV[isFlag])
+                gy = np.repeat(S2[isFlag,  0], NV[isFlag])+ np.repeat(S2[isFlag, 1], NV[isFlag])*phi1 + \
+                    np.repeat(S2[isFlag, 2], NV[isFlag])*phi2 - np.repeat(S[isFlag, 2], NV[isFlag])
+                eta += np.sqrt(k*np.bincount(idx[isSubIdx], weights=gx**2+gy**2, minlength=NC)/NV*area)
+        except  AttributeError:
+            if rtype is 'simple':
+                d = p2c.sum(axis=1)
+                ruh = np.asarray((p2c@S[:, 1:3])/d.reshape(-1, 1))
+            elif rtype is 'area':
+                d = p2c@area
+                ruh = np.asarray((p2c@(S[:, 1:3]*area.reshape(-1, 1)))/d.reshape(-1, 1))
+            elif rtype is 'inv_area':
+                d = p2c@(1/area)
+                ruh = np.asarray((p2c@(S[:, 1:3]/area.reshape(-1,1)))/d.reshape(-1, 1))
+            else:
+                raise ValueError("I have note code method: {}!".format(rtype))
+
+            S1 = np.zeros((NC, 3), dtype=self.dtype)
+            S2 = np.zeros((NC, 3), dtype=self.dtype)
+            for i in range(3):
+                S1[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 0], minlength=NC)
+                S2[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 1], minlength=NC)
+
+            point = mesh.point
+            phi1 = (point[cell, 0] - np.repeat(barycenter[:, 0], NV))/np.repeat(h, NV)
+            phi2 = (point[cell, 1] - np.repeat(barycenter[:, 1], NV))/np.repeat(h, NV)
+
+            gx = np.repeat(S1[:, 0], NV)+ np.repeat(S1[:, 1], NV)*phi1 + \
+                np.repeat(S1[:, 2], NV)*phi2 - np.repeat(S[:, 1], NV)
+            gy = np.repeat(S2[:,  0], NV)+ np.repeat(S2[:, 1], NV)*phi1 + \
+                np.repeat(S2[:, 2], NV)*phi2 - np.repeat(S[:, 2], NV)
+            eta = np.sqrt(k*np.bincount(np.repeat(range(NC), NV), weights=gx**2+gy**2)/NV*area)
         return eta
 
     def get_left_matrix(self):
@@ -108,7 +142,7 @@ class PoissonVEMModel:
 
             try:
                 barycenter = V.smspace.barycenter 
-                k = self.pde.diffusion_coefficient(barycenter)
+                k = self.model.diffusion_coefficient(barycenter)
             except  AttributeError:
                 k = np.ones(NC) 
 
@@ -127,13 +161,13 @@ class PoissonVEMModel:
 
         V = self.V
         mesh = V.mesh
-        pde = self.pde
+        model = self.model
 
         ldof = V.number_of_local_dofs()
         bb = np.zeros(ldof.sum(), dtype=self.dtype)
         point = mesh.point
         NV = mesh.number_of_vertices_of_cells()
-        F = pde.source(point)
+        F = model.source(point)
         area = V.smspace.area
         cell2dof, cell2dofLocation = V.cell_to_dof()
         bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)

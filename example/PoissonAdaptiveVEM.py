@@ -21,7 +21,7 @@ from fealpy.mesh.adaptive_tools import mark
 from fealpy.tools.show import showrate
 
 def vem_solve(model, quadtree):
-    mesh = quadtree.to_polygonmesh() 
+    mesh = quadtree.to_pmesh() 
     V = VirtualElementSpace2d(mesh, 1)
     uh = FiniteElementFunction(V)
     vem = PoissonVEMModel(model, V)
@@ -49,7 +49,7 @@ m = int(sys.argv[1])
 
 if m == 1:
     model = KelloggData()
-    quadtree = model.init_mesh(n=4)
+    quadtree = model.init_mesh(n=3)
 elif m == 2:
     model = LShapeRSinData() 
     quadtree = model.init_mesh(n=4)
@@ -57,8 +57,8 @@ elif m == 3:
     model = CosCosData()
     quadtree = model.init_mesh(n=4)
 
-maxit = 50 
-k = maxit-10 
+maxit = 30 
+k = maxit - 10 
 errorType = ['$\| u - u_h\|$',
              '$\|\\nabla u_I - \\nabla u_h\|$',
              '$\|\\nabla u - \\nabla u_h\|$',

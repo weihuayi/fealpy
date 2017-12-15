@@ -1,4 +1,5 @@
-"""Virtual Element Space
+"""
+Virtual Element Space
 
 """
 import numpy as np
@@ -250,6 +251,8 @@ class VirtualElementSpace2d():
     def interpolation_points(self):
         return self.mesh.point
     
+    def finite_element_function(self):
+        return FiniteElementFunction(self)
 
     def interpolation(self, u):
         ipoint = self.interpolation_points()
