@@ -127,10 +127,20 @@ class SurfaceLagrangeFiniteElementSpace:
         pass
 
     def value(self, uh, bc):
-        pass
+        phi = self.basis(bc)
+        cell2dof = self.cell_to_dof()
+        return uh[cell2dof]@phi 
     
     def grad_value(self, uh, bc):
-        pass
+        mesh = self.mesh
+        dim = mesh.geom_dimension()
+        gradphi = self.grad_basis(bc)
+        cell2dof = self.cell_to_dof()
+        NC = self.mesh.number_of_cells()
+        val = np.zeros((NC, dim), dtype=self.dtype)
+        val = np.einsum('ij, ij...->i...', uh[cell2dof], gradphi)
+        return val 
+
 
     def hessian_value(self, uh, bc):
         pass

@@ -104,8 +104,47 @@ class SurfacePoissonFEMModel(object):
         isBdDof[0] = True
         return isBdDof
 
+    
     def L2_error(self):
-        pass
+        V = self.V
+        mesh = V.mesh
+        model = self.model
+        p = V.p
+        NC = mesh.number_of_cells()    
+        qf = TriangleQuadrature(8)
+        nQuad = qf.get_number_of_quad_points()
+        gdof = V.number_of_global_dofs()
+        ldof = V.number_of_local_dofs()
+        e = np.zeros((NC,),dtype=self.dtype)
+        for i in range(nQuad):
+            lambda_k,w_k = qf.get_gauss_point_and_weight(i)
+            uhval = self.uh.value(lambda_k)
+            p = mesh.bc_to_point(lambda_k)                                      
+            p, _ = self.surface.project(p)
+            uval = model.solution(p)
+            e += w_k*(uhval - uval)*(uhval - uval)
+        e *= mesh.area()
+        return np.sqrt(e.sum())
+
 
     def H1_error(self):
-        pass
+        V = self.V
+        mesh = V.mesh
+        model = self.model
+        p = v.p
+        NC = mesh.number_of_cells()
+        qf = TriangleQuadrature(8)
+        nQuad = qf.get_number_of_quad_points()
+        gdof = V.number_of_global_dofs()
+        ldof = V.number_of_local_dofs()
+        e = np.zeros((NC,), dtype=self.dtype)
+        for i in range(nQuad):
+            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+            gval = self.uh.grad_value(lambda_k)
+            p = mesh.bc_to_point(lambda_k)
+            p, _ = self.surface.project(p)
+            val = model.gradient(p)
+            e += w_k*((gval - val)*(gval - val)).sum(axis=1)
+        e *= mesh.area()
+        return np.sqrt(e.sum())
+
