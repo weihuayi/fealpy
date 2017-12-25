@@ -1,16 +1,34 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
+from ..functionspace.vem_space import VirtualElementSpace2d 
+from ..solver import solve
+from ..boundarycondition import DirichletBC
+from ..quadrature import QuadrangleQuadrature 
 
-class PoissonVEMModel:
-    def __init__(self, model, V, dtype=np.float):
-        self.V = V
+from timeit import default_timer as timer
+
+class PoissonVEMModel():
+    def __init__(self, model, mesh, p=1, dtype=np.float):
+
+        self.V =VirtualElementSpace2d(mesh, p, dtype) 
         self.model = model  
-        self.dtype=dtype
-        self.uh = self.V.finite_element_function() 
+        self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
+        self.area = self.V.smspace.area 
 
-    def recover_estimate(self, uh, rtype='simple'):
+        self.dtype=dtype
+
+    def reinit(self, mesh, p=None):
+        if p is None:
+            p = self.V.p
+        self.V = VirtualElementSpace2d(mesh, p, self.dtype) 
+        self.uh = self.V.function() 
+        self.uI = self.V.interpolation(self.model.solution)
+        self.area = self.V.smspace.area
+
+    def recover_estimate(self, rtype='simple'):
+        uh = self.uh
         V = self.V
         mesh = V.mesh
         NC = mesh.number_of_cells()
@@ -33,7 +51,6 @@ class PoissonVEMModel:
         for i in range(3):
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         S /=h.reshape(-1, 1)
-        S *=k.reshape(-1, 1)
 
         p2c = mesh.ds.point_to_cell()
         try: 
@@ -151,6 +168,7 @@ class PoissonVEMModel:
             J = np.concatenate(list(map(f3, cd)))
             val = np.concatenate(list(map(f4, K)))
             A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=self.dtype)
+            end = timer()
         
         else:
             raise ValueError("I have not code the vem with degree > 1!")
@@ -176,4 +194,62 @@ class PoissonVEMModel:
         return b
 
     def get_neuman_vector(self):
+        pass
+
+    def solve(self):
+        uh = self.uh
+        bc = DirichletBC(self.V, self.model.dirichlet)
+        self.A, b = solve(self, uh, dirichlet=bc, solver='direct')
+
+    def l2_error(self):
+        uh = self.uh
+        uI = self.uI 
+        return np.sqrt(np.sum((uh - uI)**2)/len(uI))
+
+    def interpolation_error(self):
+        A = self.A
+        uh = self.uh
+        uI = self.uI 
+        e = uh - uI
+        return np.sqrt(e@A@e)
+
+    def L2_error(self, order, quadtree):
+        V = self.V
+        mesh = V.mesh
+        model = self.model
+
+        NV = mesh.number_of_vertices_of_cells()
+        NC = mesh.number_of_cells()
+        cell2dof = V.cell_to_dof()
+
+        #Project vem function to polynomial function 
+        uh = self.uh
+        sh = self.V.smspace.function()
+        idx = np.repeat(range(NC), NV)
+        for i in range(3):
+            sh[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell2dof], minlength=NC)
+
+        qf = QuadrangleQuadrature(2)
+        nQuad = qf.get_number_of_quad_points()
+        e = np.zeros((NC,), dtype=self.dtype)
+
+        cell = quadtree.leaf_cell()
+        point = quadtree.point
+        for i in range(nQuad):
+            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
+            p = mesh.bc_to_point(lambda_k)
+            uhval = sh.value(p)
+            uval = self.model.solution(p)
+            e += w_k*(uhval - uval)*(uhval - uval)
+        e *= mesh.area()
+        return np.sqrt(e.sum()) 
+
+
+#        e = (self.uh - self.uI)**2
+#        area = V.smspace.area
+#        e = e[cell]/np.repeat(NV, NV)
+#        e = np.bincount(np.repeat(range(NC), NV), weights=e, minlength=NC)*area
+#        return np.sqrt(np.sum(e)) 
+
+    def H1_error(self):
         pass

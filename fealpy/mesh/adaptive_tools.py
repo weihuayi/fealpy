@@ -14,3 +14,16 @@ def mark(eta, theta, method='L2'):
         raise ValueError("I have not code the method")
     markedCell, = np.nonzero(isMarked)
     return markedCell
+
+class AdaptiveMarker():
+    def __init__(self, eta, theta=0.2):
+        self.eta = eta
+        self.theta = theta
+
+    def refine_marker(self, qtmesh):
+        idx = qtmesh.leaf_cell_index()
+        markedIdx = mark(self.eta, self.theta)
+        return idx[markedIdx]
+
+    def coarsen_marker(self, qtmesh):
+        pass

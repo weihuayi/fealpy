@@ -8,7 +8,6 @@ class KelloggData:
     def __init__(self):
         self.a = 161.4476387975881
         self.b = 1
-        self.subdomain_flag = [1, 2]
 
     def init_mesh(self, n=4, meshtype='quadtree'):
         point = np.array([
@@ -44,15 +43,9 @@ class KelloggData:
 
     def subdomain(self, p):
         """
-        get the index of the subdomain including point p.
+        get the subdomain flag of the subdomain including point p.
         """
-        x = p[:, 0]
-        y = p[:, 1]
-        pi = np.pi
-        theta = np.arctan2(y, x)
-        theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
-        phase = np.floor(2*theta/pi) 
-        is_subdomain = [ (phase == 0) | (phase == 2) , (phase == 1) | (phase == 3)]
+        is_subdomain = [ p[:, 0]*p[:, 1] >0, p[:, 0]*p[:, 1] < 0]
         return is_subdomain 
 
     def solution(self, p):
@@ -95,7 +88,7 @@ class KelloggData:
     
         theta = np.arctan2(y, x) 
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)    
-        t = 1 + (x**2/y**2)
+        t = 1 + (x/y)**2
         r = x**2 + y**2 
         rg = r**gamma 
         ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*p[:, 0]*cos((theta-pi/2+rho)*gamma) \

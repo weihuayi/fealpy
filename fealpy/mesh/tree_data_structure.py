@@ -23,6 +23,14 @@ class Quadtree(QuadrangleMesh):
         idx, = np.nonzero(child[:, 0] == -1)
         return idx
 
+    def leaf_cell(self, celltype='quad'):
+        child = self.child
+        cell = self.ds.cell[child[:, 0] == -1]
+        if celltype is 'quad':
+            return cell
+        elif celltype is 'tri':
+            return np.r_['0', cell[:, [1, 2, 0]], cell[:, [3, 0, 1]]]
+
     def is_leaf_cell(self, idx=None):
         if idx is None:
             return self.child[:, 0] == -1

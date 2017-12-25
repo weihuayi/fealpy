@@ -110,8 +110,12 @@ class ScaledMonomialSpace2d():
         idx1 = cellIdx[:, 1]
         for i in range(1,ldof):
             phi[:, i] = (v[:,0]**idx[i])*(v[:,1]**idx1[i])/(h**idx[i])
-                        
         return phi
+
+    def value(self, uh, point):
+        phi = self.basis(point)
+        return np.einsum('ij, ij->i', uh, phi) 
+
 
     def grad_basis(self, point):
         p = self.p
@@ -133,6 +137,10 @@ class ScaledMonomialSpace2d():
                 gradphi[:,i,1] = idx1[i]*(v[:,0]**idx0[i])*(v[:,1]**(idx1[i]-1))/(h**idx[i])
         return gradphi
 
+    def grad_value(self, uh, point):
+        grad = self.grad_basis(point)
+        return np.einsum('ij, ijm->im', uh, grad)
+
     def laplace_basis(self, point):
         p = self.p
         h = self.h
@@ -147,6 +155,13 @@ class ScaledMonomialSpace2d():
         idx0 = cellIdx[:, 0] 
         idx1 = cellIdx[:, 1]
         
+    def function(self):
+        return FiniteElementFunction(self)
+
+    def array(self):
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        return np.zeros((NC, ldof), dtype=self.dtype)
 
     def number_of_local_dofs(self):
         p = self.p
@@ -251,7 +266,7 @@ class VirtualElementSpace2d():
     def interpolation_points(self):
         return self.mesh.point
     
-    def finite_element_function(self):
+    def function(self):
         return FiniteElementFunction(self)
 
     def interpolation(self, u):
