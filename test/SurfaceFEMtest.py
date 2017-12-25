@@ -29,15 +29,24 @@ mesh.uniform_refine(n=3, surface=surface)
 fem = SurfacePoissonFEMModel(mesh, surface, model, p)
 maxit = 4
 error = np.zeros(maxit)
+L2error = np.zeros(maxit)
+H1error = np.zeros(maxit)
 for i in range(maxit):
     fem.solve()
-    error[i] = fem.l2_error()
-    print(error[i])
+    #error[i] = fem.l2_error()
+    L2error[i] = fem.L2_error()
+    #H1error[i] = fem.H1_error()
+    #print(error[i])
+    print(L2error[i])
+    #print(H1error[i])
     if i < maxit - 1:
         mesh.uniform_refine(1, surface)
         fem.reinit(mesh)
-print(error[:-1]/error[1:])
-#show_solution(fem.V.mesh, fem.uI)
+
+#print(error[:-1]/error[1:])
+print(L2error[:-1]/L2error[1:])
+#print(H1error[:-1]/H1error[1:])
+show_solution(fem.V.mesh, fem.uI)
 
 #f = pl.figure()
 #axes = a3.Axes3D(f)
