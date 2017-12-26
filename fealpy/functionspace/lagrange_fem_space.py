@@ -161,7 +161,6 @@ class LagrangeFiniteElementSpace2d():
         self.mesh = mesh
         self.p = p 
         self.dtype=dtype
-
         self.cell_idx_matrix() 
 
     def __str__(self):
@@ -225,7 +224,7 @@ class LagrangeFiniteElementSpace2d():
         t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
         A = np.ones((nb, p+1, dim+1), dtype=np.float)
         A[:, 1:, :] = bc.reshape(-1, 1, 3) - t
-        np.cumprod(A[:, 1:, :], axis=1, out=A[:, 1:, :])
+        A[:, 1:, :] = np.cumprod(A[:, 1:, :], axis=1)
         A[:, 1:, :] = np.einsum('j, ijk->ijk', P, A[:, 1:, :])
         phi = (p**p)*np.prod(A[:, self.cellIdx, [0, 1, 2]], axis=2)
         return phi
@@ -281,8 +280,9 @@ class LagrangeFiniteElementSpace2d():
         t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
         A = np.ones((nb, p+1, dim+1), dtype=np.float)
         A[:, 1:, :] = bc.reshape(-1, 1, 3) - t
-        np.cumprod(A[:, 1:, :], axis=1, out=A[:, 1:, :])
+        A[:, 1:, :] = np.cumprod(A[:, 1:, :], axis=1)
         A[:, 1:, :] = np.einsum('j, ijk->ijk', P, A[:, 1:, :])
+        F = np.zeros((nb, p+1, dim+1), dtype=self.dtype)
         pass
 
     def value(self, uh, bc):
@@ -422,6 +422,9 @@ class LagrangeFiniteElementSpace2d():
 
     def projection(self, u, up):
         pass
+
+    def function(self):
+        return FiniteElementFunction(self)
 
     def array(self):
         gdof = self.number_of_global_dofs()
