@@ -178,6 +178,49 @@ class VirtualElementSpace2d():
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, dtype)
         self.dtype = dtype
+    
+        self.B = self.V.get_matrix_B()
+        self.D = self.V.get_matrix_D()
+
+    def get_matrix_B(self):
+        p = self.p
+        smldof = self.smspace.number_of_local_dofs()
+        mesh = self.mesh
+        NV = mesh.number_of_vertices_of_cells()
+        h = self.smspace.h 
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        B = np.zeros((smldof, cell2dof.shape[0]), dtype=self.dtype) 
+        if p==1:
+            B[0, :] = 1/np.repeat(NV, NV)
+            B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1,-1)
+        else:
+            raise ValueError("I have not code degree {} vem!".format(p))
+        return B
+
+    def get_matrix_G():
+        p = self.p
+        if p == 1:
+            G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
+        else:
+            raise ValueError("I have not code degree {} vem!".format(p))
+        return G
+
+    def get_matrix_tilde_G():
+        p = self.p 
+        if p == 1:
+            tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+        else:
+            raise ValueError("I have not code degree {} vem!".format(p))
+        return tG
+
+    def get_matrix_D():
+        p = self.p
+        mesh = self.mesh
+        NV = mesh.number_of_vertices_of_cells()
+        bc = np.repeat(self.smspace.barycenter, NV, axis=0)
+        D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
+        D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
+        return D
 
     def basis(self, bc):
         pass
@@ -271,7 +314,7 @@ class VirtualElementSpace2d():
 
     def interpolation(self, u):
         ipoint = self.interpolation_points()
-        uI = FiniteElementFunction(self)
+        uI = self.function() 
         uI[:] = u(ipoint)
         return uI
 

@@ -17,6 +17,7 @@ class PoissonVEMModel():
         self.uI = self.V.interpolation(model.solution)
         self.area = self.V.smspace.area 
 
+
         self.dtype=dtype
 
     def reinit(self, mesh, p=None):
