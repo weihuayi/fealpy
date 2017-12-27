@@ -106,18 +106,16 @@ class ScaledMonomialSpace2d():
         """
         p = self.p
         h = self.h
-        cellIdx = self.cellIdx
-
         ldof = self.number_of_local_dofs() 
         NC = self.mesh.number_of_cells()
         phi = np.ones((NC, ldof), dtype=self.dtype)
-
-        v = point - self.barycenter
-        idx = np.sum(cellIdx, axis=1)
-        idx0 = cellIdx[:, 0] 
-        idx1 = cellIdx[:, 1]
-        for i in range(1,ldof):
-            phi[:, i] = (v[:,0]**idx[i])*(v[:,1]**idx1[i])/(h**idx[i])
+        phi[:, 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+        if p > 1:
+            start = 3
+            for i in range(2, p+1):
+                phi[:, start:start+i] = p[:, start-i:start]*phi[:, [1]]
+                phi[:, start+i] = p[:, start-1]*phi[:, 2]
+                start += i
         return phi
 
     def value(self, uh, point):
