@@ -40,8 +40,8 @@ class SurfaceTriangleMesh():
         # Jacobi 
         J0 = mesh.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
         J1 = np.einsum('ij..., ijk->i...k', self.point[cell2dof, :], grad)
-        F = np.einsum('ijk, imk->imj', J1, J0)
-        return F, J0, J1, grad
+        J = np.einsum('ijk, imk->imj', J1, J0)
+        return J, J0, J1, grad
 
     def bc_to_point(self, bc):
         basis = self.scalarspace.basis(bc)
@@ -59,8 +59,8 @@ class SurfaceTriangleMesh():
         nQuad = triq.get_number_of_quad_points()
         for i in range(nQuad):
             bc, w = triq.get_gauss_point_and_weight(i)
-            F, _, _, _ = self.jacobi(bc)
-            n = np.cross(F[:, 0, :], F[:, 1, :], axis=1)
+            J, _, _, _ = self.jacobi(bc)
+            n = np.cross(J[:, 0, :], J[:, 1, :], axis=1)
             a += np.sqrt(np.sum(n**2, axis=1))*w
         return a/2.0
 
@@ -166,7 +166,10 @@ class SurfaceLagrangeFiniteElementSpace:
         uI[:] = u(ipoint)
         return uI
 
-    def finite_element_function(self):
+    def function(self):
+        """
+        get a function object in this function space 
+        """
         return FiniteElementFunction(self)
 
     def projection(self, u, up):

@@ -1,4 +1,5 @@
 import numpy as np
+
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
@@ -7,18 +8,21 @@ from ..boundarycondition import DirichletBC
 
 class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, surface, model, p=1, dtype=np.float):
+        """
+        """
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p, dtype=dtype) 
         self.surface = surface
         self.model = model
-        self.uh = self.V.finite_element_function() 
+        self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
         self.area = self.V.mesh.area()
         self.dtype = dtype
 
-    def reinit(self, mesh):
-        p = self.V.p
+    def reinit(self, mesh, p=None):
+        if p is None:
+            p = self.V.p
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p, dtype=self.dtype) 
-        self.uh = self.V.finite_element_function() 
+        self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.mesh.area()
 
@@ -26,8 +30,7 @@ class SurfacePoissonFEMModel(object):
         V = self.V
         mesh = V.mesh
         NC = mesh.number_of_cells() 
-        p = V.p 
-        qf = TriangleQuadrature(8)#TODO: automatically choose numerical formula
+        qf = TriangleQuadrature(4)#TODO: automatically choose numerical formula
         nQuad = qf.get_number_of_quad_points()
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
@@ -55,8 +58,7 @@ class SurfacePoissonFEMModel(object):
         mesh = V.mesh
         model = self.model
         NC = mesh.number_of_cells()
-        p = V.p 
-        qf = TriangleQuadrature(8)#TODO:
+        qf = TriangleQuadrature(4)#TODO:
         nQuad = qf.get_number_of_quad_points()
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
@@ -66,23 +68,23 @@ class SurfacePoissonFEMModel(object):
         # Compute the integral average of the source `f`
         fh = np.zeros(NC, dtype=self.dtype)
         for i in range(nQuad):
-            lambda_k,w_k = qf.get_gauss_point_and_weight(i)
-            p = mesh.bc_to_point(lambda_k)
-            p,_= self.surface.project(p)
-            fval = model.source(p) 
-            fh += fval*w_k
+            bc,w = qf.get_gauss_point_and_weight(i)
+            ps = mesh.bc_to_point(bc)
+            ps, _= self.surface.project(ps)
+            fval = model.source(ps) 
+            fh += fval*w
         fh *= area
         fh = np.sum(fh)/np.sum(area)
 
         for i in range(nQuad):
-            lambda_k,w_k = qf.get_gauss_point_and_weight(i)
-            p = mesh.bc_to_point(lambda_k)
-            p, _ = self.surface.project(p)
-            fval = model.source(p) - fh 
-            phi = V.basis(lambda_k)
-            bb += w_k*phi*fval.reshape(-1, 1)
+            bc,w = qf.get_gauss_point_and_weight(i)
+            ps = mesh.bc_to_point(bc)
+            ps, _ = self.surface.project(ps)
+            fval = model.source(ps) - fh 
+            phi = V.basis(bc)
+            bb += w*phi*fval.reshape(-1, 1)
 
-        bb *= area.reshape(-1,1)
+        bb *= area.reshape(-1, 1)
         b = np.zeros((gdof,),dtype=self.dtype)
         np.add.at(b, cell2dof.flatten(), bb.flatten())
         return b 
@@ -93,37 +95,40 @@ class SurfacePoissonFEMModel(object):
         bc = DirichletBC(self.V, g0, self.is_boundary_dof)
         solve(self, uh, dirichlet=bc, solver='direct')
 
-    def l2_error(self):
-        uh = self.uh.copy()
-        uI = self.uI 
-        uh += uI[0] 
-        return np.sqrt(np.sum((uh - uI)**2)/len(uI))
-
     def is_boundary_dof(self, p):
         isBdDof = np.zeros(p.shape[0], dtype=np.bool)
         isBdDof[0] = True
         return isBdDof
 
+    def l2_error(self):
+        uh = self.uh.copy()
+        uI = self.uI 
+        uh += uI[0] 
+        return np.sqrt(np.sum((uh - uI)**2)/len(uI))
     
     def L2_error(self):
         V = self.V
         mesh = V.mesh
         model = self.model
-        p = V.p
         NC = mesh.number_of_cells()    
         qf = TriangleQuadrature(8)
         nQuad = qf.get_number_of_quad_points()
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        e = np.zeros((NC,),dtype=self.dtype)
+        e = np.zeros((NC,), dtype=self.dtype)
+        area = np.zeros((NC,), dtype=self.dtype)
         for i in range(nQuad):
-            lambda_k,w_k = qf.get_gauss_point_and_weight(i)
-            uhval = self.uh.value(lambda_k)
-            p = mesh.bc_to_point(lambda_k)                                      
-            p, _ = self.surface.project(p)
-            uval = model.solution(p)
-            e += w_k*(uhval - uval)*(uhval - uval)
-        e *= mesh.area()
+            bc, w = qf.get_gauss_point_and_weight(i)
+            uhval = self.uh.value(bc)
+            ps = mesh.bc_to_point(bc)                                      
+
+            J0, _, _, _ = mesh.jacobi(bc)
+            J1 = self.surface.jacobi(ps)
+            J = np.einsum('ijk, imk->imj', J1, J0)
+            n = np.cross(J[:, 0, :], J[:, 1, :], axis=1)
+            area += np.sqrt(np.sum(n**2, axis=1))*w
+
+            uval = model.solution(ps)
+            e += w*(uhval - uval)*(uhval - uval)
+        e *= area/2.0
         return np.sqrt(e.sum())
 
 
@@ -139,12 +144,12 @@ class SurfacePoissonFEMModel(object):
         ldof = V.number_of_local_dofs()
         e = np.zeros((NC,), dtype=self.dtype)
         for i in range(nQuad):
-            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-            gval = self.uh.grad_value(lambda_k)
-            p = mesh.bc_to_point(lambda_k)
+            bc, w = qf.get_gauss_point_and_weight(i)
+            gval = self.uh.grad_value(bc)
+            p = mesh.bc_to_point(bc)
             p, _ = self.surface.project(p)
             val = model.gradient(p)
-            e += w_k*((gval - val)*(gval - val)).sum(axis=1)
+            e += w*((gval - val)*(gval - val)).sum(axis=1)
         e *= mesh.area()
         return np.sqrt(e.sum())
 
