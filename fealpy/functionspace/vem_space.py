@@ -59,43 +59,51 @@ class MonomialSpace2d():
                 gradphi[:,i,1] = idx1[i]*(point[:,0]**idx0[i])*(point[:,1]**(idx1[i]-1))
         return gradphi
 
-
 class ScaledMonomialSpace2d():
-    def __init__(self, mesh, p = 1, dtype=np.float):
+    def __init__(self, mesh, p=1, dtype=np.float):
+        """
+        The Scaled Momomial Space in R^2
+        """
+
         self.mesh = mesh
         self.barycenter = mesh.barycenter('cell')
         self.p = p
+        self.area= mesh.area()
+        self.h = np.sqrt(self.area) 
+        self.cellIdx = self.cell_idx_matrix()
 
-        area= mesh.area()
-        self.area = area
-        self.h = np.sqrt(area) 
         self.dtype = dtype
-        self.cell_idx_matrix()
 
     def cell_idx_matrix(self):
+        """
+        Compute the natural correspondence from the one-dimensional index
+        starting from 0. 
+
+        Notes
+        -----
+
+        0<-->(0, 0), 1<-->(1, 0), 2<-->(0, 1), 3<-->(2, 0), 4<-->(1, 1),
+        5<-->(0, 2), .....
+
+        """
         p = self.p
         ldof = self.number_of_local_dofs() 
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        self.cellIdx = np.zeros((ldof, 2), dtype=np.int)
-        self.cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
-        self.cellIdx[:,0] = idx0 - self.cellIdx[:, 1]
-
-    def degree_of_homogeneous(self, i):
-        if i == 0:
-            return self.cellIdx.sum(axis=1)
-        elif i == 1:
-            cellIdx = self.cellIdx
-            ldof = self.number_of_local_dofs()
-            r = cellIdx.sum(axis=1) 
-            r[1:] -= 1
-            r[np.min(cellIdx, axis=1) > 0] *= 2
-            return r 
-        elif i == 3:
-            r = 0 #TODO:
-            return r
+        cellIdx = np.zeros((ldof, 2), dtype=np.int)
+        cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
+        cellIdx[:,0] = idx0 - self.cellIdx[:, 1]
+        return cellIdx
 
     def basis(self, point):
+        """
+        Compute the basis values at point
+
+        Parameters
+        ---------- 
+        point : numpy array, NC x 2 
+            The NC points on each cells
+        """
         p = self.p
         h = self.h
         cellIdx = self.cellIdx
@@ -115,7 +123,6 @@ class ScaledMonomialSpace2d():
     def value(self, uh, point):
         phi = self.basis(point)
         return np.einsum('ij, ij->i', uh, phi) 
-
 
     def grad_basis(self, point):
         p = self.p
@@ -182,6 +189,15 @@ class VirtualElementSpace2d():
         self.B = self.V.get_matrix_B()
         self.D = self.V.get_matrix_D()
 
+    def project_to_smspace(self, uh):
+        S = self.smspace.function()
+        NC = mesh.number_of_cells()
+        NV = mesh.number_of_vertices_of_cells()
+        idx = np.repeat(range(NC), NV)
+        for i in range(3):
+            S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
+        return S
+
     def get_matrix_B(self):
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
@@ -195,9 +211,10 @@ class VirtualElementSpace2d():
             B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1,-1)
         else:
             raise ValueError("I have not code degree {} vem!".format(p))
+
         return B
 
-    def get_matrix_G():
+    def get_matrix_G(self):
         p = self.p
         if p == 1:
             G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
@@ -205,7 +222,7 @@ class VirtualElementSpace2d():
             raise ValueError("I have not code degree {} vem!".format(p))
         return G
 
-    def get_matrix_tilde_G():
+    def get_matrix_tilde_G(self):
         p = self.p 
         if p == 1:
             tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
@@ -213,7 +230,7 @@ class VirtualElementSpace2d():
             raise ValueError("I have not code degree {} vem!".format(p))
         return tG
 
-    def get_matrix_D():
+    def get_matrix_D(self):
         p = self.p
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
@@ -221,6 +238,10 @@ class VirtualElementSpace2d():
         D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
         D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
         return D
+
+    def get_matrix_of_grad_projection(self):
+        pass
+
 
     def basis(self, bc):
         pass
@@ -361,6 +382,9 @@ class VectorLagrangeFiniteElementSpace2d():
 
     def cell_to_dof(self):
         return self.scalarspace.cell_to_dof()
+
+    def function(self):
+        return FiniteElementFunction(self)
 
     def array(self):
         gdof = self.number_of_global_dofs()

@@ -10,14 +10,28 @@ from timeit import default_timer as timer
 
 class PoissonVEMModel():
     def __init__(self, model, mesh, p=1, dtype=np.float):
+        """
+        Initialize a Poisson virtual element model. 
 
+        Parameters
+        ----------
+        self : PoissonVEMModel object
+        model :  PDE Model object
+        mesh : PolygonMesh object
+        p : int
+        dtype : 
+        
+        See Also
+        --------
+
+        Notes
+        -----
+        """
         self.V =VirtualElementSpace2d(mesh, p, dtype) 
         self.model = model  
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
         self.area = self.V.smspace.area 
-
-
         self.dtype=dtype
 
     def reinit(self, mesh, p=None):
@@ -29,6 +43,24 @@ class PoissonVEMModel():
         self.area = self.V.smspace.area
 
     def recover_estimate(self, rtype='simple'):
+        """
+        estimate the recover-type error 
+
+        Parameters
+        ----------
+        self : PoissonVEMModel object
+        rtype : str
+            'simple':
+            'area'
+            'inv_area'
+
+        See Also
+        --------
+
+        Notes
+        ----- 
+
+        """
         uh = self.uh
         V = self.V
         mesh = V.mesh
@@ -37,7 +69,6 @@ class PoissonVEMModel():
         cell = mesh.ds.cell
         barycenter = V.smspace.barycenter 
 
-        B = self.B 
         h = V.smspace.h 
         area = V.smspace.area
 
@@ -47,10 +78,7 @@ class PoissonVEMModel():
             k = np.ones(NC) 
             
         # project the vem solution into linear polynomial space
-        S = np.zeros((NC, 3), dtype=self.dtype)
-        idx = np.repeat(range(NC), NV)
-        for i in range(3):
-            S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
+        S = V.project_to_smspace(self.uh)
         S /=h.reshape(-1, 1)
 
         p2c = mesh.ds.point_to_cell()
@@ -101,11 +129,8 @@ class PoissonVEMModel():
             else:
                 raise ValueError("I have note code method: {}!".format(rtype))
 
-            S1 = np.zeros((NC, 3), dtype=self.dtype)
-            S2 = np.zeros((NC, 3), dtype=self.dtype)
-            for i in range(3):
-                S1[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 0], minlength=NC)
-                S2[:, i] = np.bincount(idx, weights=B[i, :]*ruh[cell, 1], minlength=NC)
+            S1 = V.project_to_smspace(ruh[:, 0])
+            S2 = V.project_to_smspace(ruh[:, 1]) 
 
             point = mesh.point
             phi1 = (point[cell, 0] - np.repeat(barycenter[:, 0], NV))/np.repeat(h, NV)
@@ -139,21 +164,12 @@ class PoissonVEMModel():
 
         if p == 1:
             NV = mesh.number_of_vertices_of_cells()
-            B = np.zeros((smldof, cell2dof.shape[0]), dtype=self.dtype) 
-            B[0, :] = 1/np.repeat(NV, NV)
-            B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1,-1)
-            self.B = B
-            bc = np.repeat(V.smspace.barycenter, NV, axis=0)
-            D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
-            D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
-            G = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
-
-            BB = np.hsplit(B, cell2dofLocation[1:-1])
-            DD = np.vsplit(D, cell2dofLocation[1:-1])
+            BB = np.hsplit(V.B, cell2dofLocation[1:-1])
+            DD = np.vsplit(V.D, cell2dofLocation[1:-1])
             cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-
+            tG = V.get_matrix_tilde_G()
             
-            f1 = lambda x: (x[1].T@G@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
+            f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
             f2 = lambda x: np.repeat(x, x.shape[0]) 
             f3 = lambda x: np.tile(x, x.shape[0])
             f4 = lambda x: x.flatten()
