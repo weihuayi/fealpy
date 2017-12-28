@@ -1,20 +1,13 @@
 import sys
 
 import numpy as np
-import mpl_toolkits.mplot3d as a3
-import pylab as pl
+import matplotlib.pyplot as plt
 
 from fealpy.mesh.level_set_function import Sphere  
 from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData 
 from fealpy.femmodel.SurfacePoissonFEMModel import SurfacePoissonFEMModel
 
-
-def show_solution(mesh, uI):
-    from mayavi import mlab
-    point = mesh.point
-    mlab.figure(1, fgcolor=(0, 0, 0), bgcolor=(1, 1, 1))
-    mlab.points3d(point[:, 0], point[:, 1], point[:, 2], uI)
-    mlab.show()
+from fealpy.tools.show import showmultirate
 
 
 m = int(sys.argv[1])
@@ -28,30 +21,28 @@ mesh = surface.init_mesh()
 mesh.uniform_refine(n=3, surface=surface)
 fem = SurfacePoissonFEMModel(mesh, surface, model, p)
 maxit = 4
-error = np.zeros(maxit)
-L2error = np.zeros(maxit)
-H1error = np.zeros(maxit)
+
+errorType = ['$\| u_I - u_h \|_{l_2}$',
+             '$\| u - u_h\|_{S,0}$',
+             '$\|\\nabla_S u - \\nabla_S u_h\|_{S, 0}$'
+             ]
+Ndof = np.zeros((maxit,), dtype=np.int)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
     fem.solve()
-    #error[i] = fem.l2_error()
-    L2error[i] = fem.L2_error()
-    #H1error[i] = fem.H1_error()
-    #print(error[i])
-    print(L2error[i])
-    #print(H1error[i])
+    errorMatrix[0, i] = fem.l2_error()
+    errorMatrix[1, i] = fem.L2_error()
+    errorMatrix[2, i] = fem.H1_error()
     if i < maxit - 1:
         mesh.uniform_refine(1, surface)
         fem.reinit(mesh)
 
-#print(error[:-1]/error[1:])
-print(L2error[:-1]/L2error[1:])
-#print(H1error[:-1]/H1error[1:])
-show_solution(fem.V.mesh, fem.uI)
+print(errorMatrix)
+fig = plt.figure()
+fig.set_facecolor('white')
+axes = fig.gca()
+optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
+showmultirate(axes, 0, Ndof, errorMatrix[:3, :], optionlist[:3], errorType[:3])
+axes.legend(loc=3, prop={'size': 30})
+plt.show()
 
-#f = pl.figure()
-#axes = a3.Axes3D(f)
-#bc = mesh.barycenter()
-#bc,_= surface.project(bc)
-#color = model.solution(bc)
-#mesh.add_plot(axes, cellcolor=color, showcolorbar=True)
-#pl.show()

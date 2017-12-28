@@ -118,14 +118,9 @@ class SurfacePoissonFEMModel(object):
         for i in range(nQuad):
             bc, w = qf.get_gauss_point_and_weight(i)
             uhval = self.uh.value(bc)
-            ps = mesh.bc_to_point(bc)                                      
-
-            J0, _, _, _ = mesh.jacobi(bc)
-            J1 = self.surface.jacobi(ps)
-            J = np.einsum('ijk, imk->imj', J1, J0)
-            n = np.cross(J[:, 0, :], J[:, 1, :], axis=1)
+            Js, _, _, ps= mesh.surface_jacobi(bc)
+            n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
             area += np.sqrt(np.sum(n**2, axis=1))*w
-
             uval = model.solution(ps)
             e += w*(uhval - uval)*(uhval - uval)
         e *= area/2.0
@@ -136,20 +131,21 @@ class SurfacePoissonFEMModel(object):
         V = self.V
         mesh = V.mesh
         model = self.model
-        p = v.p
         NC = mesh.number_of_cells()
         qf = TriangleQuadrature(8)
         nQuad = qf.get_number_of_quad_points()
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
+        cell2dof = V.cell_to_dof()
         e = np.zeros((NC,), dtype=self.dtype)
+        area = np.zeros((NC,), dtype=self.dtype)
         for i in range(nQuad):
             bc, w = qf.get_gauss_point_and_weight(i)
-            gval = self.uh.grad_value(bc)
-            p = mesh.bc_to_point(bc)
-            p, _ = self.surface.project(p)
-            val = model.gradient(p)
+            gval, Js, ps = V.grad_value_on_surface(self.uh, bc)
+            n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
+            area += np.sqrt(np.sum(n**2, axis=1))*w
+            val = model.gradient(ps)
             e += w*((gval - val)*(gval - val)).sum(axis=1)
-        e *= mesh.area()
+        e *= area 
         return np.sqrt(e.sum())
 

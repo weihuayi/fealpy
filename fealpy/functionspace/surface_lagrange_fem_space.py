@@ -38,10 +38,18 @@ class SurfaceTriangleMesh():
 
         grad = self.scalarspace.grad_basis(bc)
         # Jacobi 
-        J0 = mesh.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
-        J1 = np.einsum('ij..., ijk->i...k', self.point[cell2dof, :], grad)
-        J = np.einsum('ijk, imk->imj', J1, J0)
-        return J, J0, J1, grad
+        Jh = mesh.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
+        Jph = np.einsum('ij..., ijk->i...k', self.point[cell2dof, :], grad)
+        Jp = np.einsum('ijk, imk->imj', Jph, Jh)
+        return Jp, Jh, grad
+
+    def surface_jacobi(self, bc):
+        Jp, Jh, grad = self.jacobi(bc)
+        ps = self.bc_to_point(bc)
+        Jsp = self.surface.jacobi(ps)
+        Js = np.einsum('ijk, imk->imj', Jsp, Jp)
+        return Js, Jh, grad, ps
+
 
     def bc_to_point(self, bc):
         basis = self.scalarspace.basis(bc)
@@ -55,12 +63,12 @@ class SurfaceTriangleMesh():
         NC = mesh.number_of_cells()
         a = np.zeros(NC, dtype=self.dtype)
         p = self.scalarspace.p
-        triq = TriangleQuadrature(8)
-        nQuad = triq.get_number_of_quad_points()
+        qf = TriangleQuadrature(8)
+        nQuad = qf.get_number_of_quad_points()
         for i in range(nQuad):
-            bc, w = triq.get_gauss_point_and_weight(i)
-            J, _, _, _ = self.jacobi(bc)
-            n = np.cross(J[:, 0, :], J[:, 1, :], axis=1)
+            bc, w = qf.get_gauss_point_and_weight(i)
+            Jp, _, _, = self.jacobi(bc)
+            n = np.cross(Jp[:, 0, :], Jp[:, 1, :], axis=1)
             a += np.sqrt(np.sum(n**2, axis=1))*w
         return a/2.0
 
@@ -93,6 +101,7 @@ class SurfaceLagrangeFiniteElementSpace:
         """ 
         self.p = p
         self.mesh = SurfaceTriangleMesh(mesh, surface, p=p, dtype=dtype) 
+        self.cell2dof = self.cell_to_dof()
         self.dtype = dtype
 
     def __str__(self):
@@ -108,17 +117,30 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
-        F, J0, J1, grad = self.mesh.jacobi(bc)
-        G = np.zeros((len(F), 2, 2), dtype=self.dtype)
-        G[:, 0, 0] = np.einsum('ij, ij->i', F[:, 0, :], F[:, 0, :])
-        G[:, 0, 1] = np.einsum('ij, ij->i', F[:, 0, :], F[:, 1, :])
-        G[:, 1, 0] = G[:, 0, 1]
-        G[:, 1, 1] = np.einsum('ij, ij->i', F[:, 1, :], F[:, 1, :])
-        G = np.linalg.inv(G)
-        grad = np.einsum('ijk, imk->imj', J0, grad)
-        grad = np.einsum('ijk, imk->imj', G, grad)
-        grad = np.einsum('ijk, imj->imk', F, grad)
+        Jp, Jh, grad = self.mesh.jacobi(bc)
+        Gp = np.zeros((len(Jp), 2, 2), dtype=self.dtype)
+        Gp[:, 0, 0] = np.einsum('ij, ij->i', Jp[:, 0, :], Jp[:, 0, :])
+        Gp[:, 0, 1] = np.einsum('ij, ij->i', Jp[:, 0, :], Jp[:, 1, :])
+        Gp[:, 1, 0] = Gp[:, 0, 1]
+        Gp[:, 1, 1] = np.einsum('ij, ij->i', Jp[:, 1, :], Jp[:, 1, :])
+        Gp = np.linalg.inv(Gp)
+        grad = np.einsum('ijk, imk->imj', Jh, grad)
+        grad = np.einsum('ijk, imk->imj', Gp, grad)
+        grad = np.einsum('ijk, imj->imk', Jp, grad)
         return grad
+
+    def grad_basis_on_surface(self, bc):
+        Js, Jh, grad, ps = self.mesh.surface_jacobi(bc)
+        Gs = np.zeros((len(Js), 2, 2), dtype=self.dtype)
+        Gs[:, 0, 0] = np.einsum('ij, ij->i', Js[:, 0, :], Js[:, 0, :])
+        Gs[:, 0, 1] = np.einsum('ij, ij->i', Js[:, 0, :], Js[:, 1, :])
+        Gs[:, 1, 0] = Gs[:, 0, 1]
+        Gs[:, 1, 1] = np.einsum('ij, ij->i', Js[:, 1, :], Js[:, 1, :])
+        Gs = np.linalg.inv(Gs)
+        grad = np.einsum('ijk, imk->imj', Jh, grad)
+        grad = np.einsum('ijk, imk->imj', Gs, grad)
+        grad = np.einsum('ijk, imj->imk', Js, grad)
+        return grad, Js, ps
 
     def hessian_basis(self, bc):
         pass
@@ -134,12 +156,20 @@ class SurfaceLagrangeFiniteElementSpace:
     def grad_value(self, uh, bc):
         mesh = self.mesh
         dim = mesh.geom_dimension()
-        gradphi = self.grad_basis(bc)
-        cell2dof = self.cell_to_dof()
-        NC = self.mesh.number_of_cells()
-        val = np.zeros((NC, dim), dtype=self.dtype)
+        grad, ps = self.grad_basis(bc)
+        cell2dof = self.cell2dof
         val = np.einsum('ij, ij...->i...', uh[cell2dof], gradphi)
         return val 
+
+    def grad_value_on_sh(self, uh, bc):
+        pass
+
+    def grad_value_on_surface(self, uh, bc):
+        mesh = self.mesh
+        cell2dof = self.cell2dof
+        grad, Js, ps = self.grad_basis_on_surface(bc)
+        val = np.einsum('ij, ij...->i...', uh[cell2dof], grad)
+        return val, Js, ps
 
 
     def hessian_value(self, uh, bc):
