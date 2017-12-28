@@ -50,7 +50,7 @@ class PolygonMesh(Mesh2d):
 
     @classmethod
     def from_quadtree(cls, quadtree):
-        point, cell, cellLocation = quadtree.to_polygonmesh()
+        point, cell, cellLocation = quadtree.to_pmesh()
         return cls(point, cell, cellLocation)
 
     def barycenter(self, entity='cell', index=None):
@@ -200,17 +200,24 @@ class PolygonMeshDataStructure():
         cell2point = csr_matrix((val, (I, J)), shape=(NC, N), dtype=np.bool)
         return cell2point
 
-    def cell_to_edge(self):
+    def cell_to_edge(self, sparse=True):
         NE = self.NE
         NC = self.NC
 
         edge2cell = self.edge2cell
+        cell = self.cell
 
-        J = np.arange(NE)
-        val = np.ones((NE,), dtype=np.bool)
-        cell2edge = coo_matrix((val, (edge2cell[:,0], J)), shape=(NC, NE), dtype=np.bool)
-        cell2edge += coo_matrix((val, (edge2cell[:,1], J)), shape=(NC, NE), dtype=np.bool)
-        return cell2edge.tocsr()
+        if sparse:
+            J = np.arange(NE)
+            val = np.ones((NE,), dtype=np.bool)
+            cell2edge = coo_matrix((val, (edge2cell[:,0], J)), shape=(NC, NE), dtype=np.bool)
+            cell2edge += coo_matrix((val, (edge2cell[:,1], J)), shape=(NC, NE), dtype=np.bool)
+            return cell2edge.tocsr()
+        else:
+            cell2edge = np.zeros(cell.shape[0], dtype=np.int)
+            cell2edge[cellLocation[:-1]+edge2cell[:, 2]] = range(NE)
+            cell2edge[cellLocation[:-1]+edge2cell[:, 3]] = range(NE)
+            return cell2edge
 
     def cell_to_edge_sign(self):
         NE = self.NE

@@ -1,3 +1,4 @@
+from .GaussLobattoQuadrature import GaussLobattoQuadrature
 from .IntervalQuadrature import IntervalQuadrature
 from .TriangleQuadrature import TriangleQuadrature
 from .TetrahedronQuadrature import TetrahedronQuadrature

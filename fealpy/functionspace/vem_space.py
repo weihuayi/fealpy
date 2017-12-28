@@ -5,59 +5,8 @@ Virtual Element Space
 import numpy as np
 from ..common import ranges
 from .function import FiniteElementFunction
+from ..quadrature import GaussLobattoQuadrature
 
-class MonomialSpace2d():
-    def __init__(self, mesh, p = 0, dtype=np.float):
-        self.mesh = mesh
-        self.p = p
-
-    def cell_idx_matrix(self):
-        p = self.p
-        ldof = self.number_of_local_dofs() 
-        idx = np.arange(0, ldof)
-        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        self.cellIdx = np.zeros((ldof, 2), dtype=np.int)
-        self.cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
-        self.cellIdx[:,0] = idx0 - cellIdx[:, 1]
-
-    def number_of_local_dofs():
-        p = self.p
-        return int((p+1)*(p+2)/2)
-
-    def basis(self, point):
-        p = self.p
-        cellIdx = self.cellIdx
-
-        ldof = self.number_of_local_dofs() 
-        NC = self.mesh.number_of_cells()
-        phi = np.ones((NC, ldof), dtype=self.dtype)
-
-        idx = np.sum(cellIdx, axis=1)
-        idx0 = cellIdx[:, 0] 
-        idx1 = cellIdx[:, 1]
-        for i in range(1,ldof):
-            phi[:, i] = (point[:, 0]**idx[i])*(point[:,1]**idx1[i])
-
-        return phi
-
-    def grad_basis(self, point):
-        p = self.p
-        cellIdx = self.cellIdx
-
-        NC = self.mesh.number_of_cells()
-        ldof = self.number_of_local_dofs() 
-        gradphi = np.zeros((NC, ldof, 2), dtype=self.dtype)
-
-        idx = np.sum(cellIdx, axis=1)
-        idx0 = cellIdx[:, 0] 
-        idx1 = cellIdx[:, 1]
-
-        for i in range(1, ldof):
-            if cellIdx[i, 0] > 0:
-                gradphi[:,i,0] = idx0[i]*point[:,0]**(idx0[i]-1)*point[:,1]**idx1[i]
-            if cellIdx[i, 1] > 0:
-                gradphi[:,i,1] = idx1[i]*(point[:,0]**idx0[i])*(point[:,1]**(idx1[i]-1))
-        return gradphi
 
 class ScaledMonomialSpace2d():
     def __init__(self, mesh, p=1, dtype=np.float):
@@ -70,11 +19,50 @@ class ScaledMonomialSpace2d():
         self.p = p
         self.area= mesh.area()
         self.h = np.sqrt(self.area) 
-        self.cellIdx = self.cell_idx_matrix()
+        self.multiIndex = self.multi_index_matrix()
 
         self.dtype = dtype
 
-    def cell_idx_matrix(self):
+    def get_matrix_H(self):
+        p = self.p
+        mesh = self.mesh
+        point = mesh.point
+        edge = mesh.ds.edge
+        edge2cell = mesh.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        nm = mesh.edge_normal()
+
+        NC = mesh.number_of_cells()
+        NE = mesh.number_of_edges()
+        ldof = self.number_of_local_dofs()
+        H0 = np.zeros((NE, ldof, ldof), dtype=self.dtype)
+        H1 = np.zeros((isInEdge.sum(), ldof, ldof), dtype=self.dtype)
+
+        multiIndex = self.multiIndex
+        qf = GaussLobattoQuadrature(int(np.ceil((2*p+3)/2)))
+        nQuad = qf.get_number_of_quad_points()
+        for i in range(nQuad):
+            bc, w = qf.get_quad_point_and_weight(i)
+            ps = bc[0]*point[edge[:, 0]] + bc[1]*point[edge[:, 1]]
+            phi0 = self.basis(ps, edge2cell[:, 0])
+            phi1 = self.basis(ps[isInEdge], edge2cell[isInEdge, 1])
+            H0 += np.einsum('ij, ik->ijk', w*phi0, phi0)
+            H1 += np.einsum('ij, ik->ijk', w*phi1, phi1)
+
+        b = np.einsum('ij, ij->i', point[edge[:, 0]] - self.barycenter[edge2cell[:, 0]], nm)
+        H0 = np.einsum('i, ijk->ijk', b, H0) 
+        b = np.einsum('ij, ij->i', point[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]], -nm)
+        H1 = np.einsum('i, ijk->ijk', b, H1) 
+        H = np.zeros((NC, ldof, ldof), dtype=self.dtype)
+        np.add.at(H, edge2cell[:, 0], H0)
+        np.add.at(H, edge2cell[isInEdge, 1], H1)
+        return H
+
+    def get_matrix_D(self):
+        pass
+
+
+    def multi_index_matrix(self):
         """
         Compute the natural correspondence from the one-dimensional index
         starting from 0. 
@@ -90,12 +78,12 @@ class ScaledMonomialSpace2d():
         ldof = self.number_of_local_dofs() 
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        cellIdx = np.zeros((ldof, 2), dtype=np.int)
-        cellIdx[:,1] = idx - idx0*(idx0 + 1)/2
-        cellIdx[:,0] = idx0 - self.cellIdx[:, 1]
-        return cellIdx
+        multiIndex = np.zeros((ldof, 2), dtype=np.int)
+        multiIndex[:,1] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:,0] = idx0 - multiIndex[:, 1]
+        return multiIndex 
 
-    def basis(self, point):
+    def basis(self, point, cellIdx=None):
         """
         Compute the basis values at point
 
@@ -107,14 +95,20 @@ class ScaledMonomialSpace2d():
         p = self.p
         h = self.h
         ldof = self.number_of_local_dofs() 
-        NC = self.mesh.number_of_cells()
-        phi = np.ones((NC, ldof), dtype=self.dtype)
-        phi[:, 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+        if cellIdx is None:
+            NC = self.mesh.number_of_cells()
+            assert(len(point) == NC)
+            phi = np.ones((NC, ldof), dtype=self.dtype)
+            phi[:, 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+        else:
+            assert(len(point) == len(cellIdx))
+            phi = np.ones((len(cellIdx), ldof), dtype=self.dtype)
+            phi[:, 1:3] = (point - self.barycenter[cellIdx])/h[cellIdx].reshape(-1, 1)
         if p > 1:
             start = 3
             for i in range(2, p+1):
-                phi[:, start:start+i] = p[:, start-i:start]*phi[:, [1]]
-                phi[:, start+i] = p[:, start-1]*phi[:, 2]
+                phi[:, start:start+i] = phi[:, start-i:start]*phi[:, [1]]
+                phi[:, start+i] = phi[:, start-1]*phi[:, 2]
                 start += i
         return phi
 
@@ -125,22 +119,22 @@ class ScaledMonomialSpace2d():
     def grad_basis(self, point):
         p = self.p
         h = self.h
-        cellIdx = self.cellIdx
-
         NC = self.mesh.number_of_cells()
         ldof = self.number_of_local_dofs() 
         gradphi = np.zeros((NC, ldof, 2), dtype=self.dtype)
 
-        v = point - self.barycenter
-        idx = np.sum(cellIdx, axis=1)
-        idx0 = cellIdx[:, 0] 
-        idx1 = cellIdx[:, 1]
-        for i in range(1, ldof):
-            if cellIdx[i, 0] > 0:
-                gradphi[:,i,0] = idx0[i]*v[:,0]**(idx0[i]-1)*v[:,1]**idx1[i]/(h**idx[i])
-            if cellIdx[i, 1] > 0:
-                gradphi[:,i,1] = idx1[i]*(v[:,0]**idx0[i])*(v[:,1]**(idx1[i]-1))/(h**idx[i])
-        return gradphi
+        phi = self.basis(point)
+        gradphi[:, 0, :] = 0
+        gradphi[:, 1, :] = np.array([[1, 0]])
+        gradphi[:, 2, :] = np.array([[0, 1]])
+        if p > 1:
+            start = 3
+            r = np.arange(1, p+1).reshape(1, -1)
+            for i in range(2, p+1):
+                gradphi[:, start:start+i, 0] = r[:, i-1::-1]*phi[:, start-i:start]
+                gradphi[:, start+1:start+i+1, 1] = r[:, 0:i]*phi[:, start-i:start]
+                start += i
+        return np.einsum('i, ijk->ijk', 1/h, gradphi)
 
     def grad_value(self, uh, point):
         grad = self.grad_basis(point)
@@ -149,16 +143,24 @@ class ScaledMonomialSpace2d():
     def laplace_basis(self, point):
         p = self.p
         h = self.h
-        cellIdx = self.cellIdx
 
-        ldof = self.number_of_local_dofs() 
         NC = self.mesh.number_of_cells()
-        lphi = np.ones((NC, ldof), dtype=self.dtype)
+        ldof = self.number_of_local_dofs() 
 
-        v = point - self.barycenter
-        idx = np.sum(cellIdx, axis=1)
-        idx0 = cellIdx[:, 0] 
-        idx1 = cellIdx[:, 1]
+        lphi = np.zeros((NC, ldof), dtype=self.dtype)
+        phi = self.basis(point)
+        if p > 1:
+            lphi[:, 3:6:2] = 2
+        if p > 2:
+            start = 6
+            r = np.r_[1, np.arange(1, p+1)]
+            r = np.cumprod(r)
+            r = (r[2:]/r[0:-2]).reshape(1, -1)
+            for i in range(3, p+1):
+                lphi[:, start:start+i-1] += r[:, i-2::-1]*phi[:, start-2*i+1:start-i]
+                lphi[:, start+i-1:start+i+1] += r[:, 0:i-1]*phi[:, start-2*i+1:start-i]
+                start += i
+        return np.einsum('i, ij->ij', 1/h**2, lphi)
         
     def function(self):
         return FiniteElementFunction(self)
@@ -236,9 +238,6 @@ class VirtualElementSpace2d():
         D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
         D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
         return D
-
-    def get_matrix_of_grad_projection(self):
-        pass
 
 
     def basis(self, bc):
