@@ -41,9 +41,9 @@ class SurfacePoissonFEMModel(object):
             for j in range(i, ldof):
                 val = np.zeros((NC,), dtype=self.dtype)
                 for q in range(nQuad):
-                    lambda_k, w_k = qf.get_gauss_point_and_weight(q)
-                    gradphi = V.grad_basis(lambda_k)
-                    val += np.sum(gradphi[:,i,:]*gradphi[:,j,:], axis=1)*w_k
+                    bc, w = qf.get_gauss_point_and_weight(q)
+                    gradphi = V.grad_basis(bc)
+                    val += np.sum(gradphi[:,i,:]*gradphi[:,j,:], axis=1)*w
                 A += coo_matrix((val*area, (cell2dof[:,i], cell2dof[:,j])), shape=(gdof, gdof))
                 if j != i:
                     A += coo_matrix((val*area, (cell2dof[:,j], cell2dof[:,i])), shape=(gdof, gdof))
@@ -106,20 +106,19 @@ class SurfacePoissonFEMModel(object):
         uh += uI[0] 
         return np.sqrt(np.sum((uh - uI)**2)/len(uI))
     
-    def L2_error(self):
+    def L2_error(self, order=2):
         V = self.V
         mesh = V.mesh
         model = self.model
         NC = mesh.number_of_cells()    
-        qf = TriangleQuadrature(8)
+        qf = TriangleQuadrature(order)
         nQuad = qf.get_number_of_quad_points()
         e = np.zeros((NC,), dtype=self.dtype)
         area = np.zeros((NC,), dtype=self.dtype)
         for i in range(nQuad):
             bc, w = qf.get_gauss_point_and_weight(i)
             uhval = self.uh.value(bc)
-            Js, _, _, ps= mesh.surface_jacobi(bc)
-            n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
+            n, ps = mesh.normal(bc)
             area += np.sqrt(np.sum(n**2, axis=1))*w
             uval = model.solution(ps)
             e += w*(uhval - uval)*(uhval - uval)
@@ -127,12 +126,12 @@ class SurfacePoissonFEMModel(object):
         return np.sqrt(e.sum())
 
 
-    def H1_error(self):
+    def H1_error(self, order=2):
         V = self.V
         mesh = V.mesh
         model = self.model
         NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(8)
+        qf = TriangleQuadrature(order)
         nQuad = qf.get_number_of_quad_points()
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
@@ -141,8 +140,7 @@ class SurfacePoissonFEMModel(object):
         area = np.zeros((NC,), dtype=self.dtype)
         for i in range(nQuad):
             bc, w = qf.get_gauss_point_and_weight(i)
-            gval, Js, ps = V.grad_value_on_surface(self.uh, bc)
-            n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
+            gval, ps, n= V.grad_value_on_surface(self.uh, bc)
             area += np.sqrt(np.sum(n**2, axis=1))*w
             val = model.gradient(ps)
             e += w*((gval - val)*(gval - val)).sum(axis=1)

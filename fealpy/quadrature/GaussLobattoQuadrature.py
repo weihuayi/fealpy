@@ -2,12 +2,6 @@ import numpy as np
 
 # http://keisan.casio.com/exec/system/1280801905
 class GaussLobattoQuadrature():
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
-
-    def get_quad_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 
-
     def __init__(self, k):
         if k == 2:
             A = np.array([[-1, 1], [1, 1]], dtype=np.float)
@@ -17,7 +11,6 @@ class GaussLobattoQuadrature():
                 [ 0,  1.3333333333333333333333333],
                 [ 1,  0.3333333333333333333333333]], dtype=np.float)
         if k == 4:
-
             A = np.array([
                 [-1,                       0.1666666666666666666667],
                 [-0.447213595499957939282, 0.8333333333333333333333],
@@ -99,10 +92,17 @@ class GaussLobattoQuadrature():
                 [ 0.9340014304080591343323,   0.109612273266994864461],
                 [ 1,                          0.01818181818181818181818]],
                 dtype=np.float)
-
         numpts = A.shape[0]
         self.quadpts = np.zeros((numpts, 2), dtype=np.float)
         self.quadpts[:, 0] = (A[:,0] + 1)/2.0
         self.quadpts[:, 1] = 1 - self.quadpts[:, 0]
         self.weights = A[:, 1]/2
+
+    def get_number_of_quad_points(self):
+        return self.quadpts.shape[0] 
+
+    def get_quad_point_and_weight(self, i):
+        return self.quadpts[i,:], self.weights[i] 
+
+
 

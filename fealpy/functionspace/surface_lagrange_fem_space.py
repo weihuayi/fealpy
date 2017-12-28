@@ -41,14 +41,20 @@ class SurfaceTriangleMesh():
         Jh = mesh.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
         Jph = np.einsum('ij..., ijk->i...k', self.point[cell2dof, :], grad)
         Jp = np.einsum('ijk, imk->imj', Jph, Jh)
-        return Jp, Jh, grad
+        grad = np.einsum('ijk, imk->imj', Jh, grad)
+        return Jp, grad
+
+    def normal(self, bc):
+        Js, _, ps= self.surface_jacobi(bc)
+        n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
+        return n, ps
 
     def surface_jacobi(self, bc):
-        Jp, Jh, grad = self.jacobi(bc)
+        Jp, grad = self.jacobi(bc)
         ps = self.bc_to_point(bc)
         Jsp = self.surface.jacobi(ps)
         Js = np.einsum('ijk, imk->imj', Jsp, Jp)
-        return Js, Jh, grad, ps
+        return Js, grad, ps
 
 
     def bc_to_point(self, bc):
@@ -67,7 +73,7 @@ class SurfaceTriangleMesh():
         nQuad = qf.get_number_of_quad_points()
         for i in range(nQuad):
             bc, w = qf.get_gauss_point_and_weight(i)
-            Jp, _, _, = self.jacobi(bc)
+            Jp, _ = self.jacobi(bc)
             n = np.cross(Jp[:, 0, :], Jp[:, 1, :], axis=1)
             a += np.sqrt(np.sum(n**2, axis=1))*w
         return a/2.0
@@ -117,30 +123,29 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
-        Jp, Jh, grad = self.mesh.jacobi(bc)
+        Jp, grad = self.mesh.jacobi(bc)
         Gp = np.zeros((len(Jp), 2, 2), dtype=self.dtype)
         Gp[:, 0, 0] = np.einsum('ij, ij->i', Jp[:, 0, :], Jp[:, 0, :])
         Gp[:, 0, 1] = np.einsum('ij, ij->i', Jp[:, 0, :], Jp[:, 1, :])
         Gp[:, 1, 0] = Gp[:, 0, 1]
         Gp[:, 1, 1] = np.einsum('ij, ij->i', Jp[:, 1, :], Jp[:, 1, :])
         Gp = np.linalg.inv(Gp)
-        grad = np.einsum('ijk, imk->imj', Jh, grad)
         grad = np.einsum('ijk, imk->imj', Gp, grad)
         grad = np.einsum('ijk, imj->imk', Jp, grad)
         return grad
 
     def grad_basis_on_surface(self, bc):
-        Js, Jh, grad, ps = self.mesh.surface_jacobi(bc)
+        Js, grad, ps = self.mesh.surface_jacobi(bc)
         Gs = np.zeros((len(Js), 2, 2), dtype=self.dtype)
         Gs[:, 0, 0] = np.einsum('ij, ij->i', Js[:, 0, :], Js[:, 0, :])
         Gs[:, 0, 1] = np.einsum('ij, ij->i', Js[:, 0, :], Js[:, 1, :])
         Gs[:, 1, 0] = Gs[:, 0, 1]
         Gs[:, 1, 1] = np.einsum('ij, ij->i', Js[:, 1, :], Js[:, 1, :])
         Gs = np.linalg.inv(Gs)
-        grad = np.einsum('ijk, imk->imj', Jh, grad)
         grad = np.einsum('ijk, imk->imj', Gs, grad)
         grad = np.einsum('ijk, imj->imk', Js, grad)
-        return grad, Js, ps
+        n = np.cross(Js[:, 0, :], Js[:, 1, :], axis=1)
+        return grad, ps, n
 
     def hessian_basis(self, bc):
         pass
@@ -167,9 +172,9 @@ class SurfaceLagrangeFiniteElementSpace:
     def grad_value_on_surface(self, uh, bc):
         mesh = self.mesh
         cell2dof = self.cell2dof
-        grad, Js, ps = self.grad_basis_on_surface(bc)
+        grad, ps, n = self.grad_basis_on_surface(bc)
         val = np.einsum('ij, ij...->i...', uh[cell2dof], grad)
-        return val, Js, ps
+        return val, ps, n
 
 
     def hessian_value(self, uh, bc):
