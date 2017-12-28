@@ -42,7 +42,7 @@ fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca()
 optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
-showmultirate(axes, 0, Ndof, errorMatrix[:3, :], optionlist[:3], errorType[:3])
+showmultirate(axes, 1, Ndof, errorMatrix[:3, :], optionlist[:3], errorType[:3])
 axes.legend(loc=3, prop={'size': 30})
 plt.show()
 
