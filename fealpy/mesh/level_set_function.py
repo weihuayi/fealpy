@@ -284,6 +284,37 @@ class EllipsoidSurface:
         grad[:, 2] = 2*z/c**2 
         return grad
 
+    def hessian(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        H = np.zeros((len(p), 3, 3), dtype=np.float)
+        S = a**4*b**4*z**2+a**4*c**4*y**2+b**4*c**4*x**2
+        T = np.sqrt(S/a**4*b**4*c**4)
+        
+        H[:, 0, 0] = (b**4*z**2+c**4*y**2)*a**2/(S*T)  
+        H[:, 0, 1] = -a**2*c**4*x*y/(S*T)
+        H[:, 1, 0] = -b**2*c**4*x*y/(S*T)
+        H[:, 0, 2] = -a**2*b**4*x*z/(S*T)
+        H[:, 2, 0] = -b**4*c**2*x*z/(S*T)
+        H[:, 1, 1] = b**2*(a**4*z**2+c**4*x**2)/(S*T)
+        H[:, 1, 2] = -a**4*b**2*y*z/(S*T)
+        H[:, 2, 1] = -a**4*c**2*y*z/(S*T)
+        H[:, 2, 2] = c**2*(a**4*y**2+b**4*x**2)/(S*T)
+        return H
+
+    def jacobi(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
+        J[:, 0, 0] += 1
+        J[:, 1, 1] += 1
+        J[:, 2, 2] += 1
+        return J
+
+
     def unit_normal(self, p):
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
@@ -324,6 +355,37 @@ class TorusSurface:
         grad[:, 1] = -(4 - s1)*y/(s1*s2) 
         grad[:, 2] = z/s2 
         return grad
+
+    
+    def hessian(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        H = np.zeros((len(p), 3, 3), dtype=np.float)
+        S = np.sqrt(x**2+y**2)
+
+        H[:, 0, 0] = -(x-4*x/S)**2 + 1+4*x**2/S**3-4/S
+        H[:, 0, 1] = x*y*(1-4/S)**2 + 4*x*y/S**3
+        H[:, 1, 0] = H[:, 0, 1]
+        H[:, 0, 2] = -(x-4*x/S)*z
+        H[:, 2, 0] = H[:, 0, 2]
+        H[:, 1, 1] = -(y-4*y/S)**2 + 1+4*y**2/S**3-4/S
+        H[:, 1, 2] = (y-4*y/S)*z
+        H[:, 2, 1] = H[:, 1, 2]
+        H[:, 2, 2] = -z**2+1
+        return H
+
+    def jacobi(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
+        J[:, 0, 0] += 1
+        J[:, 1, 1] += 1
+        J[:, 2, 2] += 1
+        return J
+
 
     def unit_normal(self, p):
         grad = self.gradient(p)
@@ -368,6 +430,37 @@ class HeartSurface:
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         return grad/l
+    
+    
+    def hessian(self, p):
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        H = np.zeros((len(p), 3, 3), dtype=np.float)
+        S = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
+
+        
+        H[:, 0, 0] = -(-2*z**4+2*x*z**2-y**2-z**2)/S**1.5
+        H[:, 0, 1] = -(-z**2+x)*y/S**1.5
+        H[:, 1, 0] = -y*(-4*z**4+4*x*z**2-3*z**2+x)/S**1.5
+        H[:, 0, 2] = -z*(-4*z**6+12*x*z**4-12*x**2*z**2+4*x**3+4*x**3+4*x*z**2-4*x**2+2*y**2+z**2+x)/S**1.5
+        H[:, 2, 0] = -z*(2*y**2-z**2+x)/S**1.5
+        H[:, 1, 1] = (4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+z**2)/S**1.5
+        H[:, 1, 2] = -y*z*(12*z**4-16*x*z**2+4*x**2+10*z**2-6*x+1)/S**1.5
+        H[:, 2, 1] = z*(-2*z**2+2*x-1)*y/S**1.5
+        H[:, 2, 2] = -(-2*z**6+6*x*z**4-6*x**2*z**2-6*y**2*z**2+z**4+2*x**3+2*x*y**2-x**2-y**2)/S**1.5
+        return H
+
+    def jacobi(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
+        J[:, 0, 0] += 1
+        J[:, 1, 1] += 1
+        J[:, 2, 2] += 1
+        return J
 
     def init_mesh(self):
         pass

@@ -56,25 +56,73 @@ class SphereSinSinSinData(object):
         grad[:, 0] = valx/r
         grad[:, 1] = valy/r
         grad[:, 2] = valz/r
-        return grad
- 
-class SphereData(object):
-    def __init__(self, a = 0.6):
-        self.a = a
+        return grad  
 
-    def solution(self, p):
+
+class HeartSurfacetData(object):
+    def __init__(self):
+        pass
+
+    def solution(self,p):
         """ The exact solution 
         """
-        a = self.a
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        u = x*y
+        return u
+    
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object, N*3 
+        """
         x = p[:, 0]
         y = p[:, 1]
         z = p[:, 2]
         
-        phi = np.arctan2(y,x)
-        phi = (phi >= 0)*phi + (phi < 0)*(phi + 2*pi)
+        val1 = 7*z**8-25*x*z**6+31*x**2*z**4+3*y**2*z**4+8*z**6-15*x**3*z**2-7*x*y**2*z**2-21*x*z**4
+        val2 = 2*x**4+2*x**2*y**2+16*x**2*z**2+2*y**2*z**2+2*z**4-3*x**3-3*x*y**2-3*x*z**2
+        val = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
+        rhs = -2*y*(val1+val2)/val**2
+        return rhs
+
+
+    def gradient(self,p):
+        """The Gradu of the exact solution on surface
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        val = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
+        valx = y*(4*z**6-8*x*z**4+4*x**2*z**2+4*z**4-3*x*z**2-x**2+y**2+z**2)
+        valy = 4*x*z**6-8*x**2*z**4+4*x**3*z**2+5*x*z**4-6*x**2*z**2+y**2*z**2+x**3-x*y**2+x*z**2
+        valz = y*(-z**2+2*x)*z*(-2*z**2+2*x-1)
         
-        theta = np.arccos(z)
-        u = np.sin(theta)**a*np.sin(a*phi)
+        grad = np.zeros(p.shape, dtype=np.float)
+        grad[:, 0] = valx/val
+        grad[:, 1] = valy/val
+        grad[:, 2] = valz/val
+        return grad
+
+
+class ElipsoidSurfaceData(object):
+    def __init__(self):
+        self.a = 9
+        self.b = 3
+        self.c = 1
+
+    def solution(self,p):
+        """ The exact solution 
+        """
+        a = self.a
+        b = self.b
+        c = self.c
+
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        u = np.sin(x)
         return u
 
     def source(self, p):
@@ -83,33 +131,90 @@ class SphereData(object):
             p: array object, N*3 
         """
         a = self.a
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
+        b = self.b
+        c = self.c
+        cos = np.cos
+        sin = np.sin
 
-        pi = np.pi
-        phi = np.arctan2(y,x)
-        phi = (phi >= 0)*phi + (phi < 0)*(phi + 2*pi)
-        
-        theta = np.arccos(z)
-        rhs = a*(a+1)*(np.sin(theta))**a*np.sin(a*phi)
+        t1 = (b**2*z**2+y**2*c**2)*a**4 + (y**2*c**4+z**2*b**4)*a**2 + b**2*c**2*x**2*(b**2+c**2)
+        t2 = a**2*sin(x)*(a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4*(y**2*c**4+z**2*b**4))
+        t3 = (a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4)**2
+
+        rhs = a**2*((c**4*t1*b**4*x*cos(x) + t2))/t3
         return rhs
 
-    def gradient(self, p):
-        """ The Gradu of the exact solution
+    
+    def gradient(self,p):
+        """The Gradu of the exact solution on surface
         """
-        a = self.a
         x = p[:, 0]
         y = p[:, 1]
         z = p[:, 2]
-        pi = np.pi
-
-        grad = np.zeros(p.shape, dtype=np.float)
+        cos = np.cos
+        sin = np.sin
         
-        return grad
-    
-    def dirichlet(self,p):
+        val1 = x**2/a**4 +y**2/b**4 + z**2/c**4
+        valx = cos(x) - (cos(x)*x**2/val1*a**4)
+        valy = -(cos(x)*x*y)/(val1*a**2*b**2)
+        valz = -(cos(x)*x*z)/(val1*a**2*c**2)
+
+        gradus = np.zeros(p.shape, dtype=np.float)
+        gradus[:, 0] = valx
+        gradus[:, 1] = valy
+        gradus[:, 2] = valz        
+        return gradus
+
+
+class ToruSurfacesData(object):
+    def __init__(self):
         pass
+
+    def solution(self,p):
+        """ The exact solution 
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]        
+        u = x*y
+        return u
+    
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object, N*3 
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+
+        t = np.sqrt(x**2+y**2)
+        t1 = -32768-336*y**2*x**2*z**2+61440*t+3*t*x**6+3*t*y**6-11520*y**2*x**2+912*t*x**4+9*t*x**4*z**2+9*t*y**4*z**2+1824*t*x**2*y**2
+        t2 = 912*t*y**4-168*x**4*z**2-168*y**4*z**2-96*x**2*z**4-96*y**2*z**4+18*t*x**2*y**2*z**2-80*y**6-240*x**4*y**2-240*x**2*y**4-8*z**6
+        t3 = 9*t*x**2*z**4+9*t*y**2*z**4+1248*t*x**2*z**2+1248*t*y**2*z**2-5760*y**4+9*t*x**4*y**2+9*t*x**2*y**4+21760*t*x**2+21760*t*y**2
+        t4 = 3*t*z**6+336*t*z**4+8448*t*z**2-5760*x**4-80*x**6-4608*x**2*z**2-4608*y**2*z**2-6144*z**2-49152*x**2-49152*y**2-384*z**4
+        t5 = (-x**2-y**2-z**2+8*t-16)**4*(x**2+y**2)
+        rhs = 2*(t1+t2+t3+t4)*x*(-4+t)*y/t5
+        return rhs
+
+    def gradient(self,p):
+        """The Gradu of the exact solution on surface
+        """
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        t = np.sqrt(x**2+y**2)
+
+        val1 = (-x**2-y**2-z**2+8*t-16)*(x**2+y**2)
+        val2 = t*(-x**2-y**2-z**2+8*t-16)
+        valx = -x**4+x**2*z**2+y**4+y**2*z**2+8*t*x**2-8*t*y**2-16*x**2+16*y**2
+        valy = -x**4-x**2*z**2+y**4-y**2*z**2+8*t*x**2-8*t*y**2-16*x**2+16*y**2
+        valz = 2*z*x(-4+t)*y
+
+        gradus = np.zeros(p.shape, dtype=np.float)
+        grad[:, 0] = -valx/val1
+        grad[:, 1] = valy/val1
+        grad[:, 2] = valz/val2
+        return grad
 
 
 class SquaredSphereData(object):
@@ -178,65 +283,6 @@ class SquaredSphereData(object):
         gradus[:, 0] = valx/(x**14+y**14+z**14)
         gradus[:, 1] = valy/(x**14+y**14+z**14)
         gradus[:, 2] = valz/(x**14+y**14+z**14)
-        return gradus
-
-
-class ElipsoidData(object):
-    def __init__(self):
-        self.a = 9
-        self.b = 3
-        self.c = 1
-
-    def solution(self,p):
-        """ The exact solution 
-        """
-        a = self.a
-        b = self.b
-        c = self.c
-
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        u = np.sin(x)
-        return u
-
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object, N*3 
-        """
-        a = self.a
-        b = self.b
-        c = self.c
-        cos = np.cos
-        sin = np.sin
-
-        t1 = (b**2*z**2+y**2*c**2)*a**4 + (y**2*c**4+z**2*b**4)*a**2 + b**2*c**2*x**2*(b**2+c**2)
-        t2 = a**2*sin(x)*(a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4*(y**2*c**4+z**2*b**4))
-        t3 = (a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4)**2
-
-        rhs = a**2*((c**4*t1*b**4*x*cos(x) + t2))/t3
-        return rhs
-
-    
-    def gradient(self,p):
-        """The Gradu of the exact solution on surface
-        """
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        cos = np.cos
-        sin = np.sin
-        
-        val1 = x**2/a**4 +y**2/b**4 + z**2/c**4
-        valx = cos(x) - (cos(x)*x**2/val1*a**4)
-        valy = -(cos(x)*x*y)/(val1*a**2*b**2)
-        valz = -(cos(x)*x*z)/(val1*a**2*c**2)
-
-        gradus = np.zeros(p.shape, dtype=np.float)
-        gradus[:, 0] = valx
-        gradus[:, 1] = valy
-        gradus[:, 2] = valz        
         return gradus
 
 
@@ -384,64 +430,7 @@ class DoubleTorusData(object):
     def dirichlet(self,p):
         pass
 
-class TorusData(object):
-    def __init__(self):
-        pass
 
-    def solution(self,p):
-        """ The exact solution 
-        """
-        pass
-    
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object, N*3 
-        """
-        pass
-
-
-    def gradu(self,p):
-        """The Gradu of the exact solution
-        """
-        pass
-
-    def gradus(self,p):
-        """The Gradu of the exact solution on surface
-        """
-        pass
-
-    def dirichlet(self,p):
-        pass
-
-class HearsurfacetData(object):
-    def __init__(self):
-        pass
-
-    def solution(self,p):
-        """ The exact solution 
-        """       
-        pass
-    
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object, N*3 
-        """
-        pass
-
-
-    def gradu(self,p):
-        """The Gradu of the exact solution
-        """
-        pass
-    def gradus(self,p):
-        """The Gradu of the exact solution on surface
-        """
-        pass
-
-    def dirichlet(self,p):
-        pass
 
 class Mcmullenk3Data(object):
     def __init__(self):
@@ -473,7 +462,56 @@ class Mcmullenk3Data(object):
     def dirichlet(self,p):
         pass
 
+class SphereData(object):
+    def __init__(self, a = 0.6):
+        self.a = a
 
+    def solution(self, p):
+        """ The exact solution 
+        """
+        a = self.a
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        
+        phi = np.arctan2(y,x)
+        phi = (phi >= 0)*phi + (phi < 0)*(phi + 2*pi)
+        
+        theta = np.arccos(z)
+        u = np.sin(theta)**a*np.sin(a*phi)
+        return u
+
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object, N*3 
+        """
+        a = self.a
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+
+        pi = np.pi
+        phi = np.arctan2(y,x)
+        phi = (phi >= 0)*phi + (phi < 0)*(phi + 2*pi)
+        
+        theta = np.arccos(z)
+        rhs = a*(a+1)*(np.sin(theta))**a*np.sin(a*phi)
+        return rhs
+
+    def gradient(self, p):
+        """ The Gradu of the exact solution
+        """
+        a = self.a
+        x = p[:, 0]
+        y = p[:, 1]
+        z = p[:, 2]
+        pi = np.pi
+
+        grad = np.zeros(p.shape, dtype=np.float)
+        
+        return grad
+    
 
 
 
