@@ -60,7 +60,7 @@ class KelloggData:
         gamma = 0.1
         sigma = -14.9225565104455152
         rho = pi/4
-        r = x**2 + y**2 # r=x^2+y^2
+        r = np.sqrt(x**2 + y**2) # r=x^2+y^2
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
         mu = ((theta >= 0) & (theta < pi/2))*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma) \
@@ -89,7 +89,7 @@ class KelloggData:
         theta = np.arctan2(y, x) 
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)    
         t = 1 + (x/y)**2
-        r = x**2 + y**2 
+        r = np.sqrt(x**2 + y**2)
         rg = r**gamma 
         ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*p[:, 0]*cos((theta-pi/2+rho)*gamma) \
             +rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t))

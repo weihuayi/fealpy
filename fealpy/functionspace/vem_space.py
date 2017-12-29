@@ -89,78 +89,82 @@ class ScaledMonomialSpace2d():
 
         Parameters
         ---------- 
-        point : numpy array, NC x 2 
+        point : numpy array
             The NC points on each cells
         """
         p = self.p
         h = self.h
+
         ldof = self.number_of_local_dofs() 
+        shape = point.shape[:-1]+(ldof,)
+        phi = np.ones(shape, dtype=self.dtype)
         if cellIdx is None:
-            NC = self.mesh.number_of_cells()
-            assert(len(point) == NC)
-            phi = np.ones((NC, ldof), dtype=self.dtype)
-            phi[:, 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+            phi[..., 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
         else:
-            assert(len(point) == len(cellIdx))
-            phi = np.ones((len(cellIdx), ldof), dtype=self.dtype)
-            phi[:, 1:3] = (point - self.barycenter[cellIdx])/h[cellIdx].reshape(-1, 1)
+            phi[..., 1:3] = (point - self.barycenter[cellIdx])/h[cellIdx].reshape(-1, 1)
         if p > 1:
             start = 3
             for i in range(2, p+1):
-                phi[:, start:start+i] = phi[:, start-i:start]*phi[:, [1]]
-                phi[:, start+i] = phi[:, start-1]*phi[:, 2]
-                start += i
+                phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
+                phi[..., start+i] = phi[..., start-1]*phi[..., 2]
+                start += i+1
         return phi
 
     def value(self, uh, point):
         phi = self.basis(point)
         return np.einsum('ij, ij->i', uh, phi) 
 
-    def grad_basis(self, point):
+    def grad_basis(self, point, cellIdx=None):
         p = self.p
         h = self.h
-        NC = self.mesh.number_of_cells()
         ldof = self.number_of_local_dofs() 
-        gradphi = np.zeros((NC, ldof, 2), dtype=self.dtype)
+        shape = point.shape[:-1]+(ldof, 2)
+        gphi = np.zeros(shape, dtype=self.dtype)
 
-        phi = self.basis(point)
-        gradphi[:, 0, :] = 0
-        gradphi[:, 1, :] = np.array([[1, 0]])
-        gradphi[:, 2, :] = np.array([[0, 1]])
+        phi = self.basis(point, cellIdx)
+        gphi[..., 1, 0] = 1 
+        gphi[..., 2, 1] = 1
         if p > 1:
             start = 3
-            r = np.arange(1, p+1).reshape(1, -1)
+            r = np.arange(1, p+1)
             for i in range(2, p+1):
-                gradphi[:, start:start+i, 0] = r[:, i-1::-1]*phi[:, start-i:start]
-                gradphi[:, start+1:start+i+1, 1] = r[:, 0:i]*phi[:, start-i:start]
-                start += i
-        return np.einsum('i, ijk->ijk', 1/h, gradphi)
+                gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
+                gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
+                start += i+1
+        if cellIdx is None:
+            return gphi/h.reshape(-1, 1, 1)
+        else:
+            return gphi/h[cellIdx].reshape(-1, 1, 1)
 
     def grad_value(self, uh, point):
         grad = self.grad_basis(point)
         return np.einsum('ij, ijm->im', uh, grad)
 
-    def laplace_basis(self, point):
+    def laplace_basis(self, point, cellIdx=None):
         p = self.p
         h = self.h
 
-        NC = self.mesh.number_of_cells()
         ldof = self.number_of_local_dofs() 
 
-        lphi = np.zeros((NC, ldof), dtype=self.dtype)
-        phi = self.basis(point)
+        shape = point.shape[:-1]+(ldof,)
+        lphi = np.zeros(shape, dtype=self.dtype)
+        phi = self.basis(point, cellIdx)
         if p > 1:
             lphi[:, 3:6:2] = 2
         if p > 2:
             start = 6
             r = np.r_[1, np.arange(1, p+1)]
             r = np.cumprod(r)
-            r = (r[2:]/r[0:-2]).reshape(1, -1)
+            r = r[2:]/r[0:-2]
             for i in range(3, p+1):
-                lphi[:, start:start+i-1] += r[:, i-2::-1]*phi[:, start-2*i+1:start-i]
-                lphi[:, start+i-1:start+i+1] += r[:, 0:i-1]*phi[:, start-2*i+1:start-i]
-                start += i
-        return np.einsum('i, ij->ij', 1/h**2, lphi)
+                lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
+                lphi[..., start+i-1:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
+                start += i+1
+
+        if cellIdx is None:
+            return lphi/h.reshape(-1, 1)**2
+        else:
+            return lphi/h[cellIdx].reshape(-1, 1)**2
         
     def function(self):
         return FiniteElementFunction(self)
