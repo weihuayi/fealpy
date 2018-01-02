@@ -3,8 +3,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh.level_set_function import Sphere  
-from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData 
+from fealpy.mesh.level_set_function import Sphere,TorusSurface,EllipsoidSurface,HeartSurface
+from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData,ToruSurfacesData,ElipsoidSurfaceData,HeartSurfacetData 
 from fealpy.femmodel.SurfacePoissonFEMModel import SurfacePoissonFEMModel
 
 from fealpy.tools.show import showmultirate
@@ -15,10 +15,25 @@ p = int(sys.argv[2])
 
 if m == 1:
     model = SphereSinSinSinData()
+    surface = Sphere()
+    mesh = surface.init_mesh()
+    mesh.uniform_refine(n=3, surface=surface)
+elif m == 2:
+    model = ToruSurfacesData() 
+    surface = TorusSurface()
+    mesh = surface.init_mesh()
+elif m == 3:
+    model = ElipsoidSurfaceData()
+    surface = EllipsoidSurface()
+    mesh = surface.init_mesh()
+elif m == 4:
+    model = HeartSurfacetData()
+    surface = HeartSurface()
+    mesh = surface.init_mesh()
 
-surface = Sphere()
-mesh = surface.init_mesh()
-mesh.uniform_refine(n=3, surface=surface)
+
+
+
 fem = SurfacePoissonFEMModel(mesh, surface, model, p)
 maxit = 4
 

@@ -318,10 +318,17 @@ class EllipsoidSurface:
     def unit_normal(self, p):
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
-        return grad/l
+        n = grad/l
+        return n
 
     def init_mesh(self):
-        pass
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../meshdata/mpsoid3394.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
 
 class TorusSurface:
     def __init__(self):
@@ -341,8 +348,8 @@ class TorusSurface:
         return np.sqrt(x**2 + y**2 + z**2 + 16 - 8*np.sqrt(x**2 + y**2)) - 1 
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
-        return p0, d
+        p, d = project(self, p, maxit=maxit, tol=tol)
+        return p, d
 
     def gradient(self, p):
         x = p[:, 0]
@@ -390,10 +397,18 @@ class TorusSurface:
     def unit_normal(self, p):
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
-        return grad/l
-
+        n = grad/l
+        return n
+    
     def init_mesh(self):
-        pass
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../meshdata/torus4770.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
+
 
 class HeartSurface:
     def __init__(self):
@@ -464,7 +479,13 @@ class HeartSurface:
         return J
 
     def init_mesh(self):
-        pass
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../meshdata/heart2697.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
 
 class OrthocircleSurface:
     def __init__(self, c=[0.075, 3]):
