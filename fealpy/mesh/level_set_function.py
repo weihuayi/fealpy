@@ -429,7 +429,8 @@ class HeartSurface:
     def unit_normal(self, p):
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
-        return grad/l
+        n = grad/l
+        return n 
     
     
     def hessian(self, p):

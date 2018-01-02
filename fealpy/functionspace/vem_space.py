@@ -29,38 +29,40 @@ class ScaledMonomialSpace2d():
         point = mesh.point
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
+
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        nm = mesh.edge_normal()
 
         NC = mesh.number_of_cells()
         NE = mesh.number_of_edges()
         ldof = self.number_of_local_dofs()
+
         H0 = np.zeros((NE, ldof, ldof), dtype=self.dtype)
         H1 = np.zeros((isInEdge.sum(), ldof, ldof), dtype=self.dtype)
 
-        multiIndex = self.multiIndex
         qf = GaussLobattoQuadrature(int(np.ceil((2*p+3)/2)))
-        nQuad = qf.get_number_of_quad_points()
-        for i in range(nQuad):
-            bc, w = qf.get_quad_point_and_weight(i)
-            ps = bc[0]*point[edge[:, 0]] + bc[1]*point[edge[:, 1]]
-            phi0 = self.basis(ps, edge2cell[:, 0])
-            phi1 = self.basis(ps[isInEdge], edge2cell[isInEdge, 1])
-            H0 += np.einsum('ij, ik->ijk', w*phi0, phi0)
-            H1 += np.einsum('ij, ik->ijk', w*phi1, phi1)
+        bcs, ws = qf.quadpts, qf.weights 
+        ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+        phi0 = self.basis(ps, edge2cell[:, 0])
+        phi1 = self.basis(ps[:, isInEdge, :], edge2cell[isInEdge, 1])
+        H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
+        H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
 
-        b = np.einsum('ij, ij->i', point[edge[:, 0]] - self.barycenter[edge2cell[:, 0]], nm)
-        H0 = np.einsum('i, ijk->ijk', b, H0) 
-        b = np.einsum('ij, ij->i', point[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]], -nm)
-        H1 = np.einsum('i, ijk->ijk', b, H1) 
+
+        nm = mesh.edge_normal()
+        b = point[edge[:, 0]] - self.barycenter[edge2cell[:, 0]]
+        H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
+        b = point[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]]
+        H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
+
         H = np.zeros((NC, ldof, ldof), dtype=self.dtype)
         np.add.at(H, edge2cell[:, 0], H0)
         np.add.at(H, edge2cell[isInEdge, 1], H1)
+
+        multiIndex = self.multiIndex
+        q = np.sum(multiIndex, axis=1)
+        q = 1/(q + q.reshape(-1, 1) + 2)
+        H *= q
         return H
-
-    def get_matrix_D(self):
-        pass
-
 
     def multi_index_matrix(self):
         """
@@ -120,13 +122,12 @@ class ScaledMonomialSpace2d():
         ldof = self.number_of_local_dofs() 
         shape = point.shape[:-1]+(ldof, 2)
         gphi = np.zeros(shape, dtype=self.dtype)
-
-        phi = self.basis(point, cellIdx)
         gphi[..., 1, 0] = 1 
         gphi[..., 2, 1] = 1
         if p > 1:
             start = 3
             r = np.arange(1, p+1)
+            phi = self.basis(point, cellIdx)
             for i in range(2, p+1):
                 gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
                 gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
@@ -148,7 +149,6 @@ class ScaledMonomialSpace2d():
 
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=self.dtype)
-        phi = self.basis(point, cellIdx)
         if p > 1:
             lphi[:, 3:6:2] = 2
         if p > 2:
@@ -156,6 +156,7 @@ class ScaledMonomialSpace2d():
             r = np.r_[1, np.arange(1, p+1)]
             r = np.cumprod(r)
             r = r[2:]/r[0:-2]
+            phi = self.basis(point, cellIdx)
             for i in range(3, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
                 lphi[..., start+i-1:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
@@ -189,6 +190,7 @@ class VirtualElementSpace2d():
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, dtype)
         self.dtype = dtype
+        self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
     
         self.B = self.V.get_matrix_B()
         self.D = self.V.get_matrix_D()
@@ -202,13 +204,25 @@ class VirtualElementSpace2d():
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         return S
 
+    def get_matrix_D(self):
+        p = self.p
+        smldof = self.smspace.number_of_local_dofs()
+        mesh = self.mesh
+        NV = mesh.number_of_vertices_of_cells()
+        h = self.smspace.h 
+        cell2dof, cell2dofLocation = self.cell2dof, self.cell2dofLocation
+        D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
+        D[:, 1] = 
+
+            
+
     def get_matrix_B(self):
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.h 
-        cell2dof, cell2dofLocation = self.cell_to_dof()
+        cell2dof, cell2dofLocation = self.cell2dof, self.cell2dofLocation
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=self.dtype) 
         if p==1:
             B[0, :] = 1/np.repeat(NV, NV)
