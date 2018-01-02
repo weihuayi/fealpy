@@ -5,7 +5,7 @@ Virtual Element Space
 import numpy as np
 from ..common import ranges
 from .function import FiniteElementFunction
-from ..quadrature import GaussLobattoQuadrature
+from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
 
 
 class ScaledMonomialSpace2d():
@@ -23,46 +23,6 @@ class ScaledMonomialSpace2d():
 
         self.dtype = dtype
 
-    def get_matrix_H(self):
-        p = self.p
-        mesh = self.mesh
-        point = mesh.point
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
-
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-        NC = mesh.number_of_cells()
-        NE = mesh.number_of_edges()
-        ldof = self.number_of_local_dofs()
-
-        H0 = np.zeros((NE, ldof, ldof), dtype=self.dtype)
-        H1 = np.zeros((isInEdge.sum(), ldof, ldof), dtype=self.dtype)
-
-        qf = GaussLobattoQuadrature(int(np.ceil((2*p+3)/2)))
-        bcs, ws = qf.quadpts, qf.weights 
-        ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
-        phi0 = self.basis(ps, edge2cell[:, 0])
-        phi1 = self.basis(ps[:, isInEdge, :], edge2cell[isInEdge, 1])
-        H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
-        H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
-
-
-        nm = mesh.edge_normal()
-        b = point[edge[:, 0]] - self.barycenter[edge2cell[:, 0]]
-        H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-        b = point[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]]
-        H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
-
-        H = np.zeros((NC, ldof, ldof), dtype=self.dtype)
-        np.add.at(H, edge2cell[:, 0], H0)
-        np.add.at(H, edge2cell[isInEdge, 1], H1)
-
-        multiIndex = self.multiIndex
-        q = np.sum(multiIndex, axis=1)
-        q = 1/(q + q.reshape(-1, 1) + 2)
-        H *= q
-        return H
 
     def multi_index_matrix(self):
         """
@@ -150,7 +110,7 @@ class ScaledMonomialSpace2d():
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=self.dtype)
         if p > 1:
-            lphi[:, 3:6:2] = 2
+            lphi[..., 3:6:2] = 2
         if p > 2:
             start = 6
             r = np.r_[1, np.arange(1, p+1)]
@@ -204,17 +164,69 @@ class VirtualElementSpace2d():
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         return S
 
+    def get_matrix_H(self):
+        p = self.p
+        mesh = self.mesh
+        point = mesh.point
+        edge = mesh.ds.edge
+        edge2cell = mesh.ds.edge2cell
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        NC = mesh.number_of_cells()
+
+        qf = GaussLegendreQuadrture(p + 1)
+        bcs, ws = qf.quadpts, qf.weights 
+        ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+        phi0 = self.smspace.basis(ps, edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[:, isInEdge, :], edge2cell[isInEdge, 1])
+        H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
+        H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
+
+        nm = mesh.edge_normal()
+        b = point[edge[:, 0]] - self.barycenter[edge2cell[:, 0]]
+        H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
+        b = point[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]]
+        H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
+
+        ldof = self.smspace.number_of_local_dofs()
+        H = np.zeros((NC, ldof, ldof), dtype=self.dtype)
+        np.add.at(H, edge2cell[:, 0], H0)
+        np.add.at(H, edge2cell[isInEdge, 1], H1)
+
+        multiIndex = self.smspace.multiIndex
+        q = np.sum(multiIndex, axis=1)
+        q = 1/(q + q.reshape(-1, 1) + 2)
+        H *= q
+        return H
+
     def get_matrix_D(self):
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.h 
-        cell2dof, cell2dofLocation = self.cell2dof, self.cell2dofLocation
-        D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
-        D[:, 1] = 
 
-            
+        point = mesh.point
+        edge = mesh.ds.edge
+        edge2cell = mesh.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        cell2dof, cell2dofLocation = self.cell2dof, self.cell2dofLocation 
+        D = np.zeros((len(cell2dof), smldof), dtype=self.dtype)
+
+        qf = GaussLobattoQuadrature(p + 1)
+        bcs, ws = qf.quadpts, qf.weights 
+        ps = np.einsum('ij, kjm->ikm', bcs[:-1], point[edge])
+        phi0 = self.smspace.basis(ps, edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[-1::-1, isInEdge, :], edge2cell[isInEdge, 1])
+        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]]*p
+        idx = np.arange(p) + start.reshape(-1, 1) 
+        D[idx, :] = phi0.reshape(-1, smldof)
+        start = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]]*p
+        idx = np.arange(p) + start.reshape(-1, 1) 
+        D[idx, :] = phi1.reshape(-1, smldof)
+        return D
 
     def get_matrix_B(self):
         p = self.p
@@ -247,16 +259,6 @@ class VirtualElementSpace2d():
         else:
             raise ValueError("I have not code degree {} vem!".format(p))
         return tG
-
-    def get_matrix_D(self):
-        p = self.p
-        mesh = self.mesh
-        NV = mesh.number_of_vertices_of_cells()
-        bc = np.repeat(self.smspace.barycenter, NV, axis=0)
-        D = np.ones((cell2dof.shape[0], smldof), dtype=self.dtype)
-        D[:, 1:] = (point[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
-        return D
-
 
     def basis(self, bc):
         pass
