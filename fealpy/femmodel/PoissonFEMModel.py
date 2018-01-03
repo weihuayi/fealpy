@@ -1,12 +1,10 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from .operator import laplace, source
-
 class PoissonFEMModel:
-    def __init__(self, pde, V, lqf, rqf, dtype=np.float):
+    def __init__(self, model, V, dtype=np.float):
         self.V = V
-        self.pde = pde  
+        self.model = model  
         self.lqf = lqf
         self.rqf = rqf
 

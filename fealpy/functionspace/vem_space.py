@@ -103,7 +103,7 @@ class ScaledMonomialSpace2d():
 
     def laplace_basis(self, point, cellIdx=None):
         p = self.p
-        h = self.h
+        area = self.area
 
         ldof = self.number_of_local_dofs() 
 
@@ -123,9 +123,9 @@ class ScaledMonomialSpace2d():
                 start += i+1
 
         if cellIdx is None:
-            return lphi/h.reshape(-1, 1)**2
+            return lphi/area.reshape(-1, 1)
         else:
-            return lphi/h[cellIdx].reshape(-1, 1)**2
+            return lphi/area[cellIdx].reshape(-1, 1)
         
     def function(self):
         return FiniteElementFunction(self)
@@ -164,6 +164,10 @@ class VirtualElementSpace2d():
             S[:, i] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         return S
 
+    def get_matrix(self):
+        H = self.get_matrix_H()
+        D = self.get_matrix_D(H)
+
     def get_matrix_H(self):
         p = self.p
         mesh = self.mesh
@@ -196,11 +200,10 @@ class VirtualElementSpace2d():
 
         multiIndex = self.smspace.multiIndex
         q = np.sum(multiIndex, axis=1)
-        q = 1/(q + q.reshape(-1, 1) + 2)
-        H *= q
+        H /= q + q.reshape(-1, 1) + 2
         return H
 
-    def get_matrix_D(self):
+    def get_matrix_D(self, H):
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
@@ -222,10 +225,15 @@ class VirtualElementSpace2d():
         phi1 = self.smspace.basis(ps[-1::-1, isInEdge, :], edge2cell[isInEdge, 1])
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]]*p
         idx = np.arange(p) + start.reshape(-1, 1) 
-        D[idx, :] = phi0.reshape(-1, smldof)
+        D[idx, :] = phi0.swapaxis(0, 1)
         start = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]]*p
         idx = np.arange(p) + start.reshape(-1, 1) 
-        D[idx, :] = phi1.reshape(-1, smldof)
+        D[idx, :] = phi1.swapaxis(0, 1)
+        if p > 1:
+            area = self.smspace.area
+            np2 = int((p-1)*p/2) # the number of dofs of scale polynomial space with degree p-2
+            idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-np2, 0)
+            D[idx, :] = H[:, :np2, :]/area.reshape(-1, 1, 1)
         return D
 
     def get_matrix_B(self):
@@ -240,6 +248,8 @@ class VirtualElementSpace2d():
             B[0, :] = 1/np.repeat(NV, NV)
             B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1,-1)
         else:
+            idx = cell2dofLocation[0:-1] + NV*p 
+            B[0, idx] = 1
             raise ValueError("I have not code degree {} vem!".format(p))
 
         return B

@@ -245,7 +245,6 @@ def project(surface, p, maxit=200, tol=1e-8):
             break
         else:
             k += 1
-
     d = s*lv
     return p0, d
 
@@ -347,8 +346,9 @@ class TorusSurface:
 
         return np.sqrt(x**2 + y**2 + z**2 + 16 - 8*np.sqrt(x**2 + y**2)) - 1 
 
-    def project(self, p, maxit=200, tol=1e-8):
-        p, d = project(self, p, maxit=maxit, tol=tol)
+    def project(self, p):
+        d = self(p)
+        p = p - d.reshape(-1, 1)*self.gradient(p)
         return p, d
 
     def gradient(self, p):
@@ -404,7 +404,7 @@ class TorusSurface:
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
  
-        data = sio.loadmat('../meshdata/torus4770.mat')
+        data = sio.loadmat('../data/torus4770.mat')
         point = data['node']
         cell = data['elem'] - 1
         return TriangleMesh(point,cell)

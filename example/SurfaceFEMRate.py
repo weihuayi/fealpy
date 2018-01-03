@@ -32,8 +32,6 @@ elif m == 4:
     mesh = surface.init_mesh()
 
 
-
-
 fem = SurfacePoissonFEMModel(mesh, surface, model, p)
 maxit = 4
 
@@ -53,7 +51,8 @@ for i in range(maxit):
         mesh.uniform_refine(1, surface)
         fem.reinit(mesh)
 
-print(errorMatrix)
+print('Ndof:', Ndof)
+print('error:', errorMatrix)
 fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca()
