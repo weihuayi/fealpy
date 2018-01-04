@@ -2,25 +2,24 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from fealpy.functionspace.function import FiniteElementFunction
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace2d  
+from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace  
 from ..quadrature  import TriangleQuadrature
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
 class PoissonFEMModel(object):
-    def __init__(self, mesh,  model, p=1, dtype=np.float):
-        self.V = LagrangeFiniteElementSpace2d(mesh, p, dtype=dtype) 
+    def __init__(self, mesh,  model, p=1):
+        self.V = LagrangeFiniteElementSpace(mesh, p) 
         self.mesh = mesh 
         self.model = model
         self.uh = self.V.function()
         self.uI = self.V.interpolation(model.solution)
         self.area = self.mesh.area()
-        self.dtype = dtype
 
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
-        self.V = LagrangeFiniteElementSpace2d(mesh, p, dtype=self.dtype) 
+        self.V = LagrangeFiniteElementSpace(mesh, p) 
         self.uh = self.V.function()
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.mesh.area()
@@ -31,7 +30,7 @@ class PoissonFEMModel(object):
         mesh = self.mesh
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
-        cell2dof = V.cell2dof
+        cell2dof = V.dof.cell2dof
         area = self.area
 
         qf = TriangleQuadrature(6)
@@ -60,7 +59,7 @@ class PoissonFEMModel(object):
 
         bb *= self.area.reshape(-1, 1)
         gdof = V.number_of_global_dofs()
-        b = np.bincount(V.cell2dof.flat, weights=bb.flat, minlength=gdof)
+        b = np.bincount(V.dof.cell2dof.flat, weights=bb.flat, minlength=gdof)
         return b
 
 

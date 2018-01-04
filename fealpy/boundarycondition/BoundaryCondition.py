@@ -13,7 +13,7 @@ class DirichletBC:
         gdof = V.number_of_global_dofs()
         if is_boundary_dof == None:
             isBdDof = np.zeros(gdof, dtype=np.bool)
-            edge2dof = V.edge_to_dof()
+            edge2dof = V.dof.edge_to_dof()
             isBdEdge = V.mesh.ds.boundary_edge_flag()
             isBdDof[edge2dof[isBdEdge]] = True
         else:

@@ -18,7 +18,7 @@ class TriangleMesh(Mesh2d):
         N = point.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
 
-        self.meshtype = 'tri'
+        self.meshType = 'tri'
         self.dtype = dtype
         self.cellData = {}
         self.pointData = {}

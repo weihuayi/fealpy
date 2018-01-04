@@ -3,121 +3,48 @@ import numpy as np
 from .function import FiniteElementFunction
 from ..common import ranges
 
-class LagrangeFiniteElementSpace1d():
-    def __init__(self, mesh, p=1, dtype=np.float):
+class CPLFEMDof1d():
+    def __init__(self, mesh, p):
         self.mesh = mesh
-        self.p = p
-        self.dtype= dtype
+        self.p = p 
+        self.multiIndex = self.multi_index_matrix() 
+        self.cell2dof = self.cell_to_dof()
 
-        self.cell_idx_matrix()
-
-    def __str__(self):
-        return "Lagrange finite element space on interval mesh!"
-
-    def cell_idx_matrix(self):
+    def multi_index_matrix(self):
         p = self.p
         ldof = self.number_of_local_dofs()
-        dim = self.mesh.geom_dimension()
-        cellIdx = np.zeros((ldof, dim+1), dtype=np.int)
-        cellIdx[:, 0] = np.arange(p, -1, -1)
-        cellIdx[:, 1] = p - cellIdx[:, 0]
-        self.cellIdx = cellIdx
-
-    def basis(self, bc):
-
-        mesh = self.mesh
-        #dim = mesh.geom_dimension()
-        dim = 1 
-
-        p = self.p
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-        phi = np.zeros((ldof, ), dtype=self.dtype)
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim+1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape((-1,1))
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-        B = P.reshape(-1, 1)*np.multiply.accumulate(A, axis=0)
-        phi = pp*np.prod(B[self.cellIdx, [0, 1]], axis=1)
-        return phi
-
-
-    def grad_basis(self, bc):
-        mesh = self.mesh
-        dim = mesh.geom_dimension()
-
-        p = self.p
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim+1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape((-1,1))
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-
-        B = P.reshape(-1,1)*np.multiply.accumulate(A, axis=0)
-
-        F = np.zeros((p+1, dim+1), dtype=self.dtype)
-        for i in range(dim+1):
-            Fi = A[1:, [i]] - np.diag(A[1:,i]) + np.eye(p)
-            F[1:, i] = np.tril(np.multiply.accumulate(Fi, axis=0)).sum(axis=1)
-        F *= P.reshape(-1,1)
-
-        Dlambda, *_ = mesh.grad_lambda() 
-        R = np.zeros((ldof, 2), dtype=np.float)
-
-        Q = B[self.cellIdx,[0,1]]
-        M = F[self.cellIdx,[0,1]]
-        R[:,0] = M[:,0]*Q[:,1]
-        R[:,1] = Q[:,0]*M[:,1]
-
-        gradphi = np.einsum('ij,kj...->ki...', pp*R, Dlambda)
-        return gradphi
+        multiIndex = np.zeros((ldof, 2), dtype=np.int)
+        multiIndex[:, 0] = np.arange(p, -1, -1)
+        multiIndex[:, 1] = p - multiIndex[:, 0]
+        return multiIndex 
 
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
-        NC = mesh.number_of_cells()
-
-        ldof = self.number_of_local_dofs()
-        cell2dof = np.zeros((NC, ldof), dtype=np.int)
-        cell2dof[:, [0, -1]] = cell
-
-        if p > 1:
-            idof = p - 1
-            cell2dof[:, 1:-1] = base + np.arange(NC*idof).reshape(NC, idof)
-            
-        return cell2dof
-
-    def number_of_global_dofs(self):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
-
-        p = self.p
-
-        gdof = N
-        if p > 1:
-            gdof += (p-1)*NC
-
-        return gdof
-
+        if p == 1:
+            return cell
+        else:
+            N = mesh.number_of_points()
+            NC = mesh.number_of_cells()
+            ldof = self.number_of_local_dofs()
+            cell2dof = np.zeros((NC, ldof), dtype=np.int)
+            cell2dof[:, [0, -1]] = cell
+            cell2dof[:, 1:-1] = N + np.arange(NC*(p-1)).reshape(NC, p-1)
+            return cell2dof
 
     def number_of_local_dofs(self):
+        return self.p + 1
+
+    def number_of_global_dofs(self):
         p = self.p
-        return p+1
+        mesh = self.mesh
+        gdof = mesh.number_of_points()
+        if p > 1:
+            NC = mesh.number_of_cells()
+            gdof += NC*(p-1)
+        return gdof
 
     def interpolation_points(self):
         p = self.p
@@ -125,47 +52,26 @@ class LagrangeFiniteElementSpace1d():
         cell = mesh.ds.cell
         point = mesh.point
 
-        NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
-
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-
-        ipoint = np.zeros((gdof, ), dtype=np.float)
-        ipoint[:N] = point
-        if p > 1:
-            NE = mesh.number_of_edges()
+        if p == 1:
+            return point
+        else:
+            N = point.shape[0]
+            gdof = self.number_of_global_dofs()
+            ipoint = np.zeros(gdof, dtype=np.float)
+            ipoint[:N] = point
+            NC = mesh.number_of_cells()
             edge = mesh.ds.edge
-            w = np.zeros((p-1, 2), dtype=np.float)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
             ipoint[N:N+(p-1)*NC] = np.einsum('ij, kj->ki', w, point[cell]).reshape(-1)
-        return ipoint  
+            return ipoint
 
-
-    def interpolation(self, u, uI):
-        ipoint = self.interpolation_points()
-        uI = FiniteElementFunction(self)
-        uI[:] = u(ipoint)
-        return uI
-
-    def projection(self, u, up):
-        pass
-
-    def array(self):
-        pass
-
-class LagrangeFiniteElementSpace2d():
-
-    def __init__(self, mesh, p=1, dtype=np.float):
+class CPLFEMDof2d():
+    def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p 
-        self.dtype=dtype
         self.multiIndex = self.multi_index_matrix() 
         self.cell2dof = self.cell_to_dof()
-
-    def __str__(self):
-        return "Lagrange finite element space on triangle mesh!"
 
     def multi_index_matrix(self):
         p = self.p
@@ -185,115 +91,6 @@ class LagrangeFiniteElementSpace2d():
 
     def is_on_edge_local_dof(self):
         return self.multiIndex == 0 
-
-    def basis(self, bc):
-        """
-        compute the basis function values at barycentric point bc 
-
-        Parameters
-        ----------
-        bc : numpy.array
-            the shape of `bc` can be `(3,)` or `(nb, 3)`         
-
-        Returns
-        -------
-        phi : numpy.array
-
-        See also
-        --------
-
-        Notes
-        -----
-
-        """
-        p = self.p   # the degree of polynomial basis function
-        dim = 2
-        multiIndex = self.multiIndex 
-
-        c = np.arange(1, p+1, dtype=np.int)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.linspace(0, 1, p, endpoint=False)
-        shape = bc.shape[:-1]+(p+1, dim+1)
-        A = np.ones(shape, dtype=np.float)
-        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        phi = (p**p)*np.prod(A[..., multiIndex, [0, 1, 2]], axis=-1)
-        return phi
-
-    def grad_basis(self, bc):
-        """
-        compute the basis function values at barycentric point bc 
-
-        Parameters
-        ----------
-        bc : numpy.array
-            the shape of `bc` can be `(3,)` or `(nb, 3)`         
-
-        Returns
-        -------
-        phi : numpy.array
-
-        See also
-        --------
-
-        Notes
-        -----
-
-        """
-        p = self.p   # the degree of polynomial basis function
-
-        dim = 2
-        multiIndex = self.multiIndex 
-
-        c = np.arange(1, p+1, dtype=np.int)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.linspace(0, 1, p, endpoint=False)
-        shape = bc.shape[:-1]+(p+1, dim+1)
-        A = np.ones(shape, dtype=self.dtype)
-        F = np.zeros(shape, dtype=self.dtype)
-        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = 1
-        np.cumprod(FF, axis=-2, out=FF)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-        B = np.cumprod(A, axis=-2)
-        B[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = B[..., multiIndex, [0,1,2]]
-        M = F[..., multiIndex, [0,1,2]]
-        ldof = self.number_of_local_dofs()
-        shape = bc.shape[:-1]+(ldof, dim+1)
-        R = np.zeros(shape, dtype=np.float)
-        R[..., 0] = M[..., 0]*Q[..., 1]*Q[..., 2]
-        R[..., 1] = Q[..., 0]*M[..., 1]*Q[..., 2]
-        R[..., 2] = Q[..., 0]*Q[..., 1]*M[..., 2]
-
-        pp = p**p
-        Dlambda, _ = self.mesh.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda)
-        return gphi 
-
-    def value(self, uh, bc):
-        phi = self.basis(bc)
-        cell2dof = self.cell2dof
-        val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
-        return val 
-
-    def grad_value(self, uh, bc):
-        gphi = self.grad_basis(bc)
-        cell2dof = self.cell2dof
-        val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
-        return val
-
-    def hessian_value(self, uh, bc):
-        pass
-
-    def div_value(self, uh, bc):
-        pass
 
     def edge_to_dof(self):
         p = self.p
@@ -353,150 +150,63 @@ class LagrangeFiniteElementSpace2d():
             
         return cell2dof
 
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.ds.cell
+        point = mesh.point
+
+        if p == 1:
+            return point
+        if p > 1:
+            N = point.shape[0]
+            dim = point.shape[-1]
+            gdof = self.number_of_global_dofs()
+            ipoint = np.zeros((gdof, dim), dtype=np.float)
+            ipoint[:N, :] = point
+            NE = mesh.number_of_edges()
+            edge = mesh.ds.edge
+            w = np.zeros((p-1,2), dtype=np.float)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    point[edge,:]).reshape(-1, dim)
+        if p > 2:
+            isEdgeDof = self.is_on_edge_local_dof()
+            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            w = self.multiIndex[isInCellDof, :]/p
+            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    point[cell,:]).reshape(-1, dim)
+
+        return ipoint  
+
     def number_of_global_dofs(self):
         p = self.p
         N = self.mesh.number_of_points()
-        ldof = self.number_of_local_dofs()
         gdof = N
-
         if p > 1:
             NE = self.mesh.number_of_edges()
             gdof += (p-1)*NE
 
         if p > 2:
+            ldof = self.number_of_local_dofs()
             NC = self.mesh.number_of_cells() 
             gdof += (ldof - 3*p)*NC 
-
         return gdof
 
     def number_of_local_dofs(self):
         p = self.p
         return int((p+1)*(p+2)/2)
 
-    def interpolation_points(self):
-        p = self.p
-        mesh = self.mesh
-        cell = mesh.ds.cell
-        point = mesh.point
-        dim = mesh.geom_dimension()
-
-        N = point.shape[0]
-        dim = point.shape[1]
-        NC = cell.shape[0]
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-        ipoint = np.zeros((gdof, dim), dtype=np.float)
-        ipoint[:N, :] = point
-        if p > 1:
-            NE = mesh.number_of_edges()
-            edge = mesh.ds.edge
-            w = np.zeros((p-1,2), dtype=np.float)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, point[edge,:]).reshape(-1, dim)
-            
-        if p > 2:
-            isEdgeDof = self.is_on_edge_local_dof()
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            w = self.multiIndex[isInCellDof, :]/p
-            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w, point[cell,:]).reshape(-1, dim)
-
-        return ipoint  
-
-    def interpolation(self, u):
-        ipoint = self.interpolation_points()
-        uI = FiniteElementFunction(self)
-        uI[:] = u(ipoint)
-        return uI
-
-    def projection(self, u, up):
-        pass
-
-    def function(self):
-        return FiniteElementFunction(self)
-
-    def array(self):
-        gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,), dtype=self.dtype)
-
-class VectorLagrangeFiniteElementSpace2d():
-    def __init__(self, mesh, p=1, dtype=np.float):
-        self.scalarspace = LagrangeFiniteElementSpace2d(mesh, p, dtype=dtype)
+class CPLFEMDof3d():
+    def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p 
-        self.dtype=dtype
+        self.multiIndex = self.multi_index_matrix() 
+        self.faceMultiIndex = self.face_multi_index_matrix()
+        self.cell2dof = self.cell_to_dof()
 
-    def basis(self, bc):
-        return self.scalarspace.basis(bc)
-
-    def grad_basis(self, bc):
-        return self.scalarspace.grad_basis(bc)
-
-    def dual_basis(self, u):
-        pass
-
-    def value(self, uh, bc):
-        mesh = self.scalarspace.mesh
-        NC = mesh.number_of_cells()
-        phi = self.basis(bc)
-        cell2dof = self.cell_to_dof()
-        val = np.zeros((NC,2), dtype=self.dtype)
-        val[:,0] = (uh[cell2dof,0]@phi.reshape(-1, 1)).reshape(-1)
-        val[:,1] = (uh[cell2dof,1]@phi.reshape(-1, 1)).reshape(-1)
-        return val 
-
-    def grad_value(self, uh, bc):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        gradphi = self.grad_basis(bc)
-        cell2dof = self.cell_to_dof()
-        val = np.zeros((NC, 2, 2), dtype=self.dtype)
-        val[:, 0, 0] = (uh[cell2dof, 0]*gradphi[:, :, 0]).sum(axis=1)
-        val[:, 0, 1] = (uh[cell2dof, 0]*gradphi[:, :, 1]).sum(axis=1)
-        val[:, 1, 0] = (uh[cell2dof, 1]*gradphi[:, :, 0]).sum(axis=1)
-        val[:, 1, 1] = (uh[cell2dof, 1]*gradphi[:, :, 1]).sum(axis=1)
-        return val
-
-    def hessian_value(self, uh, bc):
-        pass
-
-    def div_value(self, uh, bc):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        gradphi = self.grad_basis(bc)
-        cell2dof = self.cell_to_dof()
-        val = np.zeros((NC,), dtype=self.dtype)
-        val += (uh[cell2dof, 0]*gradphi[:, :, 0]).sum(axis=1)
-        val += (uh[cell2dof, 1]*gradphi[:, :, 1]).sum(axis=1)
-        return val
-
-    def number_of_global_dofs(self):
-        return self.scalarspace.number_of_global_dofs()
-        
-    def number_of_local_dofs(self):
-        return self.scalarspace.number_of_local_dofs()
-
-    def cell_to_dof(self):
-        return self.scalarspace.cell_to_dof()
-
-    def array(self):
-        gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,2),dtype=self.dtype)
-
-class LagrangeFiniteElementSpace3d():
-
-    def __init__(self, mesh, p=1, dtype=np.float):
-        self.mesh = mesh
-        self.p = p 
-        self.dtype=dtype
-
-        self.cell_idx_matrix()
-        self.face_idx_matrix()
-
-    def __str__(self):
-        return "Lagrange finite element space on tet mesh!"
-
-    def cell_idx_matrix(self):
+    def multi_index_matrix(self):
         p = self.p
         ldof = self.number_of_local_dofs()
         idx = np.arange(1, ldof)
@@ -504,136 +214,44 @@ class LagrangeFiniteElementSpace3d():
         idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
         idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
         idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
-        cellIdx = np.zeros((ldof, 4), dtype=np.int)
-        cellIdx[1:, 3] = idx1 - idx2*(idx2 + 1)/2
-        cellIdx[1:, 2] = idx2 - cellIdx[1:, 3]
-        cellIdx[1:, 1] = idx0 - idx2
-        cellIdx[:, 0] = p - np.sum(cellIdx[:, 1:], axis=1)
-        self.cellIdx = cellIdx
-        print(cellIdx)
+        multiIndex = np.zeros((ldof, 4), dtype=np.int)
+        multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+        multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+        multiIndex[1:, 1] = idx0 - idx2
+        multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+        return multiIndex
 
-    def face_idx_matrix(self):
+    def face_multi_index_matrix(self):
         p = self.p
         fdof = int((p+1)*(p+2)/2)
         idx = np.arange(0, fdof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        faceIdx = np.zeros((fdof, 3), dtype=np.int)
-        faceIdx[:,2] = idx - idx0*(idx0 + 1)/2
-        faceIdx[:,1] = idx0 - faceIdx[:,2]
-        faceIdx[:,0] = p - faceIdx[:, 1] - faceIdx[:, 2] 
-        self.faceIdx = faceIdx
-        print(faceIdx)
+        faceMultiIndex = np.zeros((fdof, 3), dtype=np.int)
+        faceMultiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+        faceMultiIndex[:,1] = idx0 - faceMultiIndex[:,2]
+        faceMultiIndex[:,0] = p - faceMultiIndex[:, 1] - faceMultiIndex[:, 2] 
+        return faceMultiIndex
 
     def is_on_node_local_dof(self):
         p = self.p
-        cellIdx = self.cellIdx
-        isNodeDof = (cellIdx == p)
+        isNodeDof = (self.multiIndex == p)
         return isNodeDof
 
     def is_on_edge_local_dof(self):
         p =self.p
-        cellIdx = self.cellIdx
         ldof = self.number_of_local_dofs()
         localEdge = self.mesh.ds.localEdge
         isEdgeDof = np.zeros((ldof, 6), dtype=np.bool)
         for i in range(6):
-            isEdgeDof[i,:] = (cellIdx[localEdge[-(i+1), 0],:] == 0)  & (cellIdx[localEdge[-(i+1), 1],:] == 0 )
-
-        print('isEdgeDof', isEdgeDof)
+            isEdgeDof[i,:] = (self.multiIndex[localEdge[-(i+1), 0],:] == 0) & (self.multiIndex[localEdge[-(i+1), 1],:] == 0 )
         return isEdgeDof
 
     def is_on_face_local_dof(self):
         p = self.p
-        cellIdx = self.cellIdx
         ldof = self.number_of_local_dofs()
-        isFaceDof = (cellIdx == 0)
+        isFaceDof = (self.multiIndex == 0)
         return isFaceDof
 
-    def basis(self, bc):
-        p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        dim = mesh.geom_dimension()
-
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-        phi = np.zeros((ldof, ), dtype=self.dtype)
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim + 1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-        B = P.reshape(-1, 1)*np.multiply.accumulate(A, axis=0)
-        phi = pp*np.prod(B[self.cellIdx, [0, 1, 2, 3]], axis=1)
-        return phi
-
-    def grad_basis(self, bc):
-        p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        dim = mesh.geom_dimension()
-
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim+1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape((-1,1))
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-
-        B = P.reshape(-1,1)*np.multiply.accumulate(A, axis=0)
-
-        F = np.zeros((p+1, dim+1), dtype=self.dtype)
-        for i in range(dim+1):
-            Fi = A[1:, [i]] - np.diag(A[1:,i]) + np.eye(p)
-            F[1:, i] = np.tril(np.multiply.accumulate(Fi, axis=0)).sum(axis=1)
-        F *= P.reshape(-1,1)
-
-        Dlambda, *_ = mesh.grad_lambda() 
-
-        Q = B[self.cellIdx,[0, 1, 2, 3]]
-        M = F[self.cellIdx,[0, 1, 2, 3]]
-        R = np.zeros((ldof, dim+1), dtype=np.float)
-        R[:,0] = M[:,0]*Q[:,1]*Q[:,2]*Q[:,3]
-        R[:,1] = Q[:,0]*M[:,1]*Q[:,2]*Q[:,3]
-        R[:,2] = Q[:,0]*Q[:,1]*M[:,2]*Q[:,3]
-        R[:,3] = Q[:,0]*Q[:,1]*Q[:,2]*M[:,3]
-
-        gradphi = np.einsum('ij,kj...->ki...', pp*R, Dlambda)
-        return gradphi
-
-    def hessian_basis(self, bc):
-        pass
-
-    def value(self, uh, bc):
-        phi = self.basis(bc)
-        cell2dof = self.cell_to_dof()
-        return uh[cell2dof]@phi
-    
-    def grad_value(self, uh, bc):
-        mesh = self.mesh
-        dim = mesh.geom_dimension()
-        gradphi = self.grad_basis(bc)
-        cell2dof = self.cell_to_dof()
-        NC = self.mesh.number_of_cells()
-        val = np.zeros((NC, dim), dtype=self.dtype)
-        val = np.einsum('ij, ij...->i...', uh[cell2dof], gradphi)
-        return val
-
-    def hessian_value(self, uh, bc):
-        pass
-
-    def div_value(self, uh, bc):
-        pass
-    
     def edge_to_dof(self):
         p = self.p
         mesh = self.mesh
@@ -648,7 +266,6 @@ class LagrangeFiniteElementSpace3d():
         if p > 1:
             edge2dof[:,1:-1] = base + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
-
 
     def face_to_dof(self):
         p = self.p
@@ -671,8 +288,7 @@ class LagrangeFiniteElementSpace3d():
         edge2dof = self.edge_to_dof()
 
         face2dof = np.zeros((NF, fdof), dtype=np.int)
-        faceIdx = self.faceIdx
-
+        faceIdx = self.faceMultiIndex
         isEdgeDof = (faceIdx == 0) 
 
         fe = np.array([1, 0, 0])
@@ -713,7 +329,7 @@ class LagrangeFiniteElementSpace3d():
 
         face2dof = self.face_to_dof()
         isFaceDof = self.is_on_face_local_dof()
-        faceIdx = self.faceIdx.T
+        faceIdx = self.faceMultiIndex.T
 
         for i in range(4):
             fi = face[cell2face[:, i]]
@@ -774,6 +390,9 @@ class LagrangeFiniteElementSpace3d():
         cell = mesh.ds.cell
         point = mesh.point
 
+        if p == 1:
+            return point
+
         N = point.shape[0]
         dim = point.shape[1]
         NC = mesh.number_of_cells() 
@@ -781,7 +400,6 @@ class LagrangeFiniteElementSpace3d():
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, dim), dtype=np.float)
-
         ipoint[:N, :] = point
         if p > 1:
             NE = mesh.number_of_edges()
@@ -797,19 +415,179 @@ class LagrangeFiniteElementSpace3d():
             face = mesh.ds.face
             isEdgeDof = (self.faceIdx == 0)
             isInFaceDof = ~(isEdgeDof[:, 0] | isEdgeDof[:, 1] | isEdgeDof[:, 2])
-            w = self.faceIdx[isInFaceDof, :]/p
+            w = self.faceMultiIndex[isInFaceDof, :]/p
             ipoint[N+(p-1)*NE:N+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, point[face,:]).reshape(-1, dim)
 
         if p > 3:
             isFaceDof = self.is_on_face_local_dof()
             isInCellDof = ~(isFaceDof[:,0] | isFaceDof[:,1] | isFaceDof[:,2] | isFaceDof[:, 3])
-            w = self.cellIdx[isInCellDof, :]/p
+            w = self.multiIndex[isInCellDof, :]/p
             ipoint[N+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w, point[cell,:]).reshape(-1, dim)
-
         return ipoint  
 
-    def interpolation(self, u, uI):
-        ipoint = self.interpolation_points()
+
+class DPLFEMDof1d():
+    def __init__(self, mesh, p):
+        pass
+
+class DPLFEMDof2d():
+    def __init__(self, mesh, p):
+        pass
+
+class DPLFEMDof3d():
+    def __init__(self, mesh, p):
+        pass
+
+
+class LagrangeFiniteElementSpace():
+    def __init__(self, mesh, p=1, spacetype='C'):
+        self.mesh = mesh
+        self.p = p 
+        if spacetype is 'C':
+            if mesh.meshType is 'interval':
+                self.dof = CPLFEMDof1d(mesh, p)
+                self.dim = 1
+            if mesh.meshType is 'tri':
+                self.dof = CPLFEMDof2d(mesh, p) 
+                self.dim = 2
+            elif mesh.meshType is 'tet':
+                self.dof = CPLFEMDof3d(mesh, p)
+                self.dim = 3
+        elif spacetype is 'D':
+            if mesh.meshType is 'interval':
+                self.dof = DPLFEMDof1d(mesh, p)
+                self.dim = 1
+            if mesh.meshType is 'tri':
+                self.dof = DPLFEMDof2d(mesh, p) 
+                self.dim = 2
+            elif mesh.meshType is 'tet':
+                self.dof = DPLFEMDof3d(mesh, p)
+                self.dim = 3
+
+    def __str__(self):
+        return "Lagrange finite element space!"
+
+    def number_of_global_dofs(self):
+        return self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self):
+        return self.dof.number_of_local_dofs()
+
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
+    def basis(self, bc):
+        """
+        compute the basis function values at barycentric point bc 
+
+        Parameters
+        ----------
+        bc : numpy.array
+            the shape of `bc` can be `(dim+1,)` or `(nb, dim+1)`         
+
+        Returns
+        -------
+        phi : numpy.array
+
+        See also
+        --------
+
+        Notes
+        -----
+
+        """
+        p = self.p   # the degree of polynomial basis function
+        dim = self.dim 
+        multiIndex = self.dof.multiIndex 
+
+        c = np.arange(1, p+1, dtype=np.int)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.linspace(0, 1, p, endpoint=False)
+        shape = bc.shape[:-1]+(p+1, dim+1)
+        A = np.ones(shape, dtype=np.float)
+        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        phi = (p**p)*np.prod(A[..., multiIndex, [0, 1, 2]], axis=-1)
+        return phi
+
+    def grad_basis(self, bc):
+        """
+        compute the basis function values at barycentric point bc 
+
+        Parameters
+        ----------
+        bc : numpy.array
+            the shape of `bc` can be `(dim+1,)` or `(nb, dim+1)`         
+
+        Returns
+        -------
+        phi : numpy.array
+
+        See also
+        --------
+
+        Notes
+        -----
+
+        """
+        p = self.p   # the degree of polynomial basis function
+        dim = self.dim 
+        multiIndex = self.dof.multiIndex 
+
+        c = np.arange(1, p+1, dtype=np.int)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.linspace(0, 1, p, endpoint=False)
+        shape = bc.shape[:-1]+(p+1, dim+1)
+        A = np.ones(shape, dtype=np.float)
+        F = np.zeros(shape, dtype=np.float)
+        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = 1
+        np.cumprod(FF, axis=-2, out=FF)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+        B = np.cumprod(A, axis=-2)
+        B[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = B[..., multiIndex, [0,1,2]]
+        M = F[..., multiIndex, [0,1,2]]
+        ldof = self.number_of_local_dofs()
+        shape = bc.shape[:-1]+(ldof, dim+1)
+        R = np.zeros(shape, dtype=np.float)
+
+        for i in range(dim+1):
+            idx = list(range(dim+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        pp = p**p
+        Dlambda, _ = self.mesh.grad_lambda()
+        gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda)
+        return gphi 
+
+    def value(self, uh, bc):
+        phi = self.basis(bc)
+        cell2dof = self.dof.cell2dof
+        val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
+        return val 
+
+    def grad_value(self, uh, bc):
+        gphi = self.grad_basis(bc)
+        cell2dof = self.dof.cell2dof
+        val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+        return val
+
+    def hessian_value(self, uh, bc):
+        pass
+
+    def div_value(self, uh, bc):
+        pass
+
+
+    def interpolation(self, u):
+        ipoint = self.dof.interpolation_points()
         uI = FiniteElementFunction(self)
         uI[:] = u(ipoint)
         return uI
@@ -817,5 +595,53 @@ class LagrangeFiniteElementSpace3d():
     def projection(self, u, up):
         pass
 
+    def function(self):
+        return FiniteElementFunction(self)
+
     def array(self):
+        gdof = self.number_of_global_dofs()
+        return np.zeros((gdof,), dtype=np.float)
+
+class VectorLagrangeFiniteElementSpace():
+    def __init__(self, mesh, p=1):
+        self.scalarspace = LagrangeFiniteElementSpace(mesh, p)
+
+    def basis(self, bc):
+        return self.scalarspace.basis(bc)
+
+    def grad_basis(self, bc):
+        return self.scalarspace.grad_basis(bc)
+
+    def dual_basis(self, u):
         pass
+
+    def value(self, uh, bc):
+        mesh = self.scalarspace.mesh
+        NC = mesh.number_of_cells()
+        phi = self.basis(bc)
+        cell2dof = self.cell_to_dof()
+        val = np.einsum('...j, ijm->...im', phi, uh[cell2dof])
+        return val 
+
+    def grad_value(self, uh, bc):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        gradphi = self.grad_basis(bc)
+        cell2dof = self.scalarspace.dof.cell2dof()
+        val = np.einsum('...ijm, ijk->...ikm', gradphi, uh[cell2dof])
+        return val
+
+    def div_value(self, uh, bc):
+        val = self.grad_value(uh, bc)
+        return np.diagonal(val, axis1=-2, axis2=-1) 
+
+    def number_of_global_dofs(self):
+        return self.scalarspace.number_of_global_dofs()
+        
+    def number_of_local_dofs(self):
+        return self.scalarspace.number_of_local_dofs()
+
+    def array(self):
+        gdof = self.number_of_global_dofs()
+        return np.zeros((gdof, self.scalarspace.dim), dtype=np.float)
+
