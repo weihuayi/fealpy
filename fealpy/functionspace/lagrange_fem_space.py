@@ -167,53 +167,26 @@ class LagrangeFiniteElementSpace2d():
     def __str__(self):
         return "Lagrange finite element space on triangle mesh!"
 
-    def cell_idx_matrix(self):
+    def multi_index_matrix(self):
         p = self.p
         ldof = self.number_of_local_dofs() 
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 3), dtype=np.int)
         multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:,1] = idx0 - [:,2]
+        multiIndex[:,1] = idx0 - multiIndex[:,2]
         multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2] 
         return multiIndex
 
     def is_on_node_local_dof(self):
-        p = self.p
-        isIdx = (self.cellIdx == p)
+        isIdx = (self.multiIndex == self.p)
         isNodeDof = (isIdx[:, 0] | isIdx[:, 1] | isIdx[:, 2] | isIdx[:, 3]) 
         return isNodeDof
 
     def is_on_edge_local_dof(self):
-        p =self.p
-        cellIdx = self.cellIdx
-        ldof = self.number_of_local_dofs()
-        return cellIdx == 0 
+        return self.multiIndex == 0 
 
     def basis(self, bc):
-        p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        # dim = mesh.geom_dimension()
-        dim = 2
-
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-        phi = np.zeros((ldof, ), dtype=self.dtype)
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim+1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape(-1, 1)
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-        B = P.reshape(-1, 1)*np.multiply.accumulate(A, axis=0)
-        phi = pp*np.prod(B[self.multiIndex, [0, 1, 2]], axis=1)
-        return phi
-
-    def basis_einsum(self, bc):
         """
         compute the basis function values at barycentric point bc 
 
@@ -249,46 +222,7 @@ class LagrangeFiniteElementSpace2d():
         phi = (p**p)*np.prod(A[..., multiIndex, [0, 1, 2]], axis=-1)
         return phi
 
-
     def grad_basis(self, bc):
-        p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        #dim = mesh.geom_dimension()
-        dim = 2
-
-        pp = p**p
-        ldof = self.number_of_local_dofs() 
-
-        P = np.ones((p+1,), dtype=np.float)
-        A = np.ones((p+1, dim+1), dtype=np.float)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        t = np.linspace(0, 1, p, endpoint=False).reshape((-1,1))
-
-        P[1:] = 1.0/np.multiply.accumulate(c)
-        A[1:,:] = bc - t
-
-        B = P.reshape(-1,1)*np.multiply.accumulate(A, axis=0)
-
-        F = np.zeros((p+1, dim+1), dtype=self.dtype)
-        for i in range(dim+1):
-            Fi = A[1:, [i]] - np.diag(A[1:,i]) + np.eye(p)
-            F[1:, i] = np.tril(np.multiply.accumulate(Fi, axis=0)).sum(axis=1)
-        F *= P.reshape(-1,1)
-
-        Dlambda, *_ = mesh.grad_lambda() 
-
-        Q = B[self.multiIndex,[0,1,2]]
-        M = F[self.multiIndex,[0,1,2]]
-        R = np.zeros((ldof,3), dtype=np.float)
-        R[:,0] = M[:,0]*Q[:,1]*Q[:,2]
-        R[:,1] = Q[:,0]*M[:,1]*Q[:,2]
-        R[:,2] = Q[:,0]*Q[:,1]*M[:,2]
-        gradphi = np.einsum('ij,kj...->ki...', pp*R, Dlambda)
-        return gradphi
-
-    def grad_basis_einsum(self, bc):
         """
         compute the basis function values at barycentric point bc 
 
@@ -309,6 +243,7 @@ class LagrangeFiniteElementSpace2d():
 
         """
         p = self.p   # the degree of polynomial basis function
+
         dim = 2
         multiIndex = self.multiIndex 
 
@@ -322,13 +257,15 @@ class LagrangeFiniteElementSpace2d():
         A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = 1
-        F[..., 1:, :] = np.sum(np.tril(np.cumprod(FF, axis=-2))).swapaxes(-1, -2)
+        np.cumprod(FF, axis=-2, out=FF)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
         F[..., 1:, :] *= P.reshape(-1, 1)
         B = np.cumprod(A, axis=-2)
         B[..., 1:, :] *= P.reshape(-1, 1)
 
         Q = B[..., multiIndex, [0,1,2]]
         M = F[..., multiIndex, [0,1,2]]
+        ldof = self.number_of_local_dofs()
         shape = bc.shape[:-1]+(ldof, dim+1)
         R = np.zeros(shape, dtype=np.float)
         R[..., 0] = M[..., 0]*Q[..., 1]*Q[..., 2]
@@ -336,23 +273,20 @@ class LagrangeFiniteElementSpace2d():
         R[..., 2] = Q[..., 0]*Q[..., 1]*M[..., 2]
 
         pp = p**p
-        Dlambda, _ = mesh.grad_lambda() 
+        Dlambda, _ = self.mesh.grad_lambda()
         gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda)
         return gphi 
 
     def value(self, uh, bc):
         phi = self.basis(bc)
         cell2dof = self.cell2dof
-        return uh[cell2dof]@phi
+        val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
+        return val 
 
     def grad_value(self, uh, bc):
-        mesh = self.mesh
-        dim = mesh.geom_dimension()
         gphi = self.grad_basis(bc)
         cell2dof = self.cell2dof
-        NC = self.mesh.number_of_cells()
-        val = np.zeros((NC, dim), dtype=self.dtype)
-        val = np.einsum('ij, ...ijm->...im', uh[cell2dof], gphi)
+        val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
         return val
 
     def hessian_value(self, uh, bc):

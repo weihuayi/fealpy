@@ -16,14 +16,13 @@ n = int(sys.argv[3])
 if m == 1:
     model = CosCosData()
 
-box = [0, 1, 0, 1]
-mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='tri')
+mesh = model.init_mesh(n=n)
 fem = PoissonFEMModel(mesh, model, p)
 maxit = 4
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
-             '$|| u - u_h||_{S,0}$',
-             '$||\\nabla_S u - \\nabla_S u_h||_{S, 0}$'
+             '$|| u - u_h||_{0}$',
+             '$||\\nabla u - \\nabla u_h||_{0}$'
              ]
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)

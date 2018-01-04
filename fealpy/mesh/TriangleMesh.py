@@ -287,13 +287,10 @@ class TriangleMesh(Mesh2d):
         return a
 
     def bc_to_point(self, bc):
-        #TODO:try to use tensordot
         point = self.point
         cell = self.ds.cell
-        p0 = point[cell[:, 0], :] 
-        p1 = point[cell[:, 1], :] 
-        p2 = point[cell[:, 2], :] 
-        return bc[0]*p0+ bc[1]*p1 + bc[2]*p2
+        p = np.einsum('...j, ijk->...ik', bc, point[cell])
+        return p 
 
 
 

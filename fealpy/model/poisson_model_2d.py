@@ -198,11 +198,30 @@ class CosCosData:
     def __init__(self):
         pass
 
+    def init_mesh(self, n=4, meshtype='tri'):
+        point = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        if meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         u = np.cos(pi*x)*np.cos(pi*y)
         return u
@@ -212,8 +231,8 @@ class CosCosData:
         INPUT:
             p: array object, N*2 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         rhs = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)
         return rhs
@@ -227,17 +246,17 @@ class CosCosData:
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         uprime = np.zeros(p.shape, dtype=np.float)
-        uprime[:, 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
-        uprime[:, 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        uprime[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        uprime[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return uprime
 
     def is_boundary(self, p):
         eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        return (p[..., 0] < eps) | (p[..., 1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 class PolynomialData:
     def __init__(self):
