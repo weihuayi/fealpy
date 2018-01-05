@@ -41,10 +41,10 @@ for i in range(maxit):
     Ndof[i] = vem.V.number_of_global_dofs()
     errorMatrix[0, i] = vem.l2_error()
     errorMatrix[1, i] = vem.interpolation_error()
-    errorMatrix[2, i] = vem.L2_error()
+    errorMatrix[2, i] = vem.L2_error(3, quadtree)
     errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
-        quadtree.refine(marker=AdaptiveMarker(eta, theta=0.3))
+        quadtree.refine(marker=AdaptiveMarker(eta, theta=0.2))
         vem.reinit(quadtree.to_pmesh())
 
 mesh = vem.V.mesh

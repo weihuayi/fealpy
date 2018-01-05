@@ -62,4 +62,8 @@ class QuadrangleMesh(Mesh2d):
         jacobi = self.jacobi_at_corner()
         return jacobi.sum(axis=1)/4
 
-
+    def bc_to_point(self, bc):
+        point = self.point
+        cell = self.ds.cell
+        p = np.einsum('...j, ijk->...ik', bc, point[cell])
+        return p 

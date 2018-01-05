@@ -332,6 +332,13 @@ class Quadtree(QuadrangleMesh):
 
             return PolygonMesh(self.point,  pcell, pcellLocation)
 
+    def bc_to_point(self, bc):
+        point = self.point
+        cell = self.ds.cell
+        isLeafCell = self.is_leaf_cell()
+        p = np.einsum('...j, ijk->...ik', bc, point[cell[isLeafCell]])
+        return p 
+
 
 class Octree(HexahedronMesh):
     localFace2childCell = np.array([
