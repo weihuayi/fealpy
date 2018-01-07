@@ -81,9 +81,9 @@ class PoissonFEMModel(object):
         bcs, ws = qf.quadpts, qf.weights 
         pp = mesh.bc_to_point(bcs)
 
-        uhval = self.uh.value(bcs)
-        uval = model.solution(pp)
-        e = np.einsum('i, ij->j', ws, (uhval - uval)**2)
+        val0 = self.uh.value(bcs)
+        val1 = model.solution(pp)
+        e = np.einsum('i, ij->j', ws, (val1 - val0)**2)
         e *=self.area
         return np.sqrt(e.sum()) 
 
@@ -97,9 +97,9 @@ class PoissonFEMModel(object):
         bcs, ws = qf.quadpts, qf.weights 
         pp = mesh.bc_to_point(bcs)
 
-        guh = self.uh.grad_value(bcs)
-        gu = model.gradient(pp)
-        e = np.sum((guh - gu)**2, axis=-1)
+        val0 = self.uh.grad_value(bcs)
+        val1 = model.gradient(pp)
+        e = np.sum((val1 - val0)**2, axis=-1)
         e = np.einsum('i, ij->j', ws, e)
         e *=self.area
         return np.sqrt(e.sum()) 

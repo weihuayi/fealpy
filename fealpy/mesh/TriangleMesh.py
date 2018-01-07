@@ -252,10 +252,12 @@ class TriangleMesh(Mesh2d):
         J : numpy.array
             The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
         """
+        point = self.point
+        cell = self.ds.cell
         if cellidx is None:
-            J = self.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
+            J = point[cell[:, [1, 2]]] - point[cell[:, [0]]]
         else:
-            J = self.point[cell[cellidx, [1, 2]]] - mesh.point[cell[cellidx, [0]]]
+            J = point[cell[cellidx, [1, 2]]] - point[cell[cellidx, [0]]]
         return J
 
     def rot_lambda(self):

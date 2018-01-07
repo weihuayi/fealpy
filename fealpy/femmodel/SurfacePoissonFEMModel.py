@@ -7,48 +7,49 @@ from ..solver import solve
 from ..boundarycondition import DirichletBC
 
 class SurfacePoissonFEMModel(object):
-    def __init__(self, mesh, surface, model, p=1, dtype=np.float):
+    def __init__(self, mesh, surface, model, integrator=None, p=1, p0=None):
         """
         """
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p, spacetype='C') 
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
+        self.mesh = self.V.mesh
         self.surface = surface
         self.model = model
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
-        self.area = self.V.mesh.area()
-        self.dtype = dtype
+        if integrator is None:
+            self.integrator = TriangleQuadrature(p+1)
+        if type(integrator) is int:
+            self.integrator = TriangleQuadrature(integrator)
+        else:
+            self.integrator = integrator 
+        self.area = self.V.mesh.area(integrator)
 
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p, dtype=self.dtype) 
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p) 
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
-        self.area = self.V.mesh.area()
+        self.area = self.V.mesh.area(self.integrator)
 
     def get_left_matrix(self):
         V = self.V
-        mesh = V.mesh
-        NC = mesh.number_of_cells() 
-        qf = TriangleQuadrature(4)#TODO: automatically choose numerical formula
-        nQuad = qf.get_number_of_quad_points()
+        mesh = self.mesh
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
-        cell2dof = V.cell_to_dof()
-        area = self.area 
-        A = coo_matrix((gdof, gdof), dtype=self.dtype)
-        for i in range(ldof):
-            for j in range(i, ldof):
-                val = np.zeros((NC,), dtype=self.dtype)
-                for q in range(nQuad):
-                    bc, w = qf.get_gauss_point_and_weight(q)
-                    gradphi = V.grad_basis(bc)
-                    val += np.sum(gradphi[:,i,:]*gradphi[:,j,:], axis=1)*w
-                A += coo_matrix((val*area, (cell2dof[:,i], cell2dof[:,j])), shape=(gdof, gdof))
-                if j != i:
-                    A += coo_matrix((val*area, (cell2dof[:,j], cell2dof[:,i])), shape=(gdof, gdof))
-        return A.tocsr()
+        cell2dof = V.dof.cell2dof
+        area = self.area
 
+        qf = self.integrator  
+        bcs, ws = qf.quadpts, qf.weights
+        gphi = V.grad_basis(bcs)
+        A = np.einsum('i, ijkm, ijpm->jkp', ws, gphi, gphi)
+        A *= area.reshape(-1, 1, 1)
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        return A
 
     def get_right_vector(self):
         """
@@ -57,37 +58,18 @@ class SurfacePoissonFEMModel(object):
         V = self.V
         mesh = V.mesh
         model = self.model
-        NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(4)#TODO:
-        nQuad = qf.get_number_of_quad_points()
+        
+        qf = self.integrator 
+        bcs, ws = qf.quadpts, qf.weights
+        pp = mesh.bc_to_point(bcs)
+        fval = model.source(pp)
+        phi = V.basis(bcs)
+        bb = np.einsum('i, ij, ik->kj', ws, phi, fval)
+        bb *= self.area.reshape(-1, 1)
         gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        cell2dof = V.cell_to_dof()
-        bb = np.zeros((NC,ldof),dtype=self.dtype)
-        area = self.area
-        # Compute the integral average of the source `f`
-        fh = np.zeros(NC, dtype=self.dtype)
-        for i in range(nQuad):
-            bc,w = qf.get_gauss_point_and_weight(i)
-            ps = mesh.bc_to_point(bc)
-            ps, _= self.surface.project(ps)
-            fval = model.source(ps) 
-            fh += fval*w
-        fh *= area
-        fh = np.sum(fh)/np.sum(area)
-
-        for i in range(nQuad):
-            bc,w = qf.get_gauss_point_and_weight(i)
-            ps = mesh.bc_to_point(bc)
-            ps, _ = self.surface.project(ps)
-            fval = model.source(ps) - fh 
-            phi = V.basis(bc)
-            bb += w*phi*fval.reshape(-1, 1)
-
-        bb *= area.reshape(-1, 1)
-        b = np.zeros((gdof,),dtype=self.dtype)
-        np.add.at(b, cell2dof.flatten(), bb.flatten())
-        return b 
+        b = np.bincount(V.dof.cell2dof.flat, weights=bb.flat, minlength=gdof)
+        b -= np.mean(b)
+        return b
 
     def solve(self):
         uh = self.uh
@@ -105,45 +87,40 @@ class SurfacePoissonFEMModel(object):
         uI = self.uI 
         uh += uI[0] 
         return np.sqrt(np.sum((uh - uI)**2)/len(uI))
-    
-    def L2_error(self, order=2):
+
+    def L2_error(self):
         V = self.V
         mesh = V.mesh
         model = self.model
-        NC = mesh.number_of_cells()    
-        qf = TriangleQuadrature(order)
-        nQuad = qf.get_number_of_quad_points()
-        e = np.zeros((NC,), dtype=self.dtype)
-        area = np.zeros((NC,), dtype=self.dtype)
-        for i in range(nQuad):
-            bc, w = qf.get_gauss_point_and_weight(i)
-            uhval = self.uh.value(bc)
-            n, ps = mesh.normal(bc)
-            area += np.sqrt(np.sum(n**2, axis=1))*w
-            uval = model.solution(ps)
-            e += w*(uhval - uval)*(uhval - uval)
-        e *= area/2.0
-        return np.sqrt(e.sum())
+        
+        qf = self.integrator 
+        bcs, ws = qf.quadpts, qf.weights 
+        pp = mesh.bc_to_point(bcs)
+        n, ps = mesh.normal(bcs)
+        l = np.sqrt(np.sum(n**2, axis=-1))
+        area = np.einsum('i, ij->j', ws, l)/2.0
+
+        val0 = self.uh.value(bcs)
+        val1 = model.solution(ps)
+        e = np.einsum('i, ij->j', ws, (val1 - val0)**2)
+        e *= area
+        return np.sqrt(e.sum()) 
 
 
-    def H1_error(self, order=2):
+    def H1_error(self):
         V = self.V
         mesh = V.mesh
         model = self.model
-        NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(order)
-        nQuad = qf.get_number_of_quad_points()
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        cell2dof = V.cell_to_dof()
-        e = np.zeros((NC,), dtype=self.dtype)
-        area = np.zeros((NC,), dtype=self.dtype)
-        for i in range(nQuad):
-            bc, w = qf.get_gauss_point_and_weight(i)
-            gval, ps, n= V.grad_value_on_surface(self.uh, bc)
-            area += np.sqrt(np.sum(n**2, axis=1))*w
-            val = model.gradient(ps)
-            e += w*((gval - val)*(gval - val)).sum(axis=1)
-        e *= area 
-        return np.sqrt(e.sum())
+        
+        qf = self.integrator
+        bcs, ws = qf.quadpts, qf.weights 
+        pp = mesh.bc_to_point(bcs)
 
+        val0, ps, n= V.grad_value_on_surface(self.uh, bcs)
+        val1 = model.gradient(ps)
+        l = np.sqrt(np.sum(n**2, axis=-1))
+        area = np.einsum('i, ij->j', ws, l)/2.0
+        e = np.sum((val1 - val0)**2, axis=-1)
+        e = np.einsum('i, ij->j', ws, e)
+        e *=self.area
+        return np.sqrt(e.sum()) 

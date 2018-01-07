@@ -6,18 +6,20 @@ import matplotlib.pyplot as plt
 from fealpy.mesh.level_set_function import Sphere,TorusSurface,EllipsoidSurface,HeartSurface
 from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData,ToruSurfacesData,ElipsoidSurfaceData,HeartSurfacetData 
 from fealpy.femmodel.SurfacePoissonFEMModel import SurfacePoissonFEMModel
+from fealpy.quadrature import TriangleQuadrature 
 
 from fealpy.tools.show import showmultirate
 
 
 m = int(sys.argv[1])
 p = int(sys.argv[2]) 
+q = int(sys.argv[3])
 
 if m == 1:
     model = SphereSinSinSinData()
     surface = Sphere()
     mesh = surface.init_mesh()
-    mesh.uniform_refine(n=3, surface=surface)
+    mesh.uniform_refine(n=2, surface=surface)
 elif m == 2:
     model = ToruSurfacesData() 
     surface = TorusSurface()
@@ -32,7 +34,8 @@ elif m == 4:
     mesh = surface.init_mesh()
 
 
-fem = SurfacePoissonFEMModel(mesh, surface, model, p)
+integrator = TriangleQuadrature(q)
+fem = SurfacePoissonFEMModel(mesh, surface, model, p=p, integrator=integrator)
 maxit = 4
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',

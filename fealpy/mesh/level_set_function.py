@@ -67,8 +67,8 @@ class Sphere(object):
         return np.sqrt((x - cx)**2 + (y - cy)**2 + (z - cz)**2) - r 
 
     def gradient(self, p):
-        l = np.sqrt(np.sum((p - self.center)**2, axis=1))
-        n = (p - self.center)/l.reshape(-1, 1)
+        l = np.sqrt(np.sum((p - self.center)**2, axis=-1))
+        n = (p - self.center)/l[..., np.newaxis]
         return n
 
     def unit_normal(self, p):
@@ -93,7 +93,7 @@ class Sphere(object):
         H[..., 2, 2] = 1/L - z**2/L3
         return H
 
-    def jacobi(self, p):
+    def jacobi_matrix(self, p):
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
