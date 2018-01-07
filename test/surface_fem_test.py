@@ -14,7 +14,7 @@ smesh = surface.init_mesh()
 smesh.uniform_refine(r, surface)
 
 stmesh = SurfaceTriangleMesh(smesh, surface, p)
-a = stmesh.area()
+a = stmesh.einsum_area()
 print(smesh.area().sum())
 print('{:2.16f}'.format(a.sum()))
 print(4*np.pi)

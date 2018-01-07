@@ -2,13 +2,13 @@ import numpy as np
 from numpy.linalg import inv
 
 from .function import FiniteElementFunction
-from .lagrange_fem_space import LagrangeFiniteElementSpace2d
+from .lagrange_fem_space import LagrangeFiniteElementSpace
 from ..common import ranges
 from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1, dtype=np.float):
-        self.scalarspace = LagrangeFiniteElementSpace2d(mesh, p, dtype=dtype)
+        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype='C')
         self.point, d = surface.project(self.scalarspace.interpolation_points())
         self.surface = surface
 
@@ -34,7 +34,7 @@ class SurfaceTriangleMesh():
     def jacobi(self, bc):
         mesh = self.scalarspace.mesh
         cell = mesh.ds.cell
-        cell2dof = self.scalarspace.cell_to_dof()
+        cell2dof = self.scalarspace.dof.cell2dof
 
         grad = self.scalarspace.grad_basis(bc)
         # Jacobi 
@@ -77,6 +77,17 @@ class SurfaceTriangleMesh():
             n = np.cross(Jp[:, 0, :], Jp[:, 1, :], axis=1)
             a += np.sqrt(np.sum(n**2, axis=1))*w
         return a/2.0
+
+    def einsum_area(self):
+        mesh = self.scalarspace.mesh
+        p = self.scalarspace.p
+        qf = TriangleQuadrature(8)
+        bcs, ws = qf.quadpts, qf.weights
+        Jp, _ = self.jacobi(bcs) 
+        n = np.cross(Jp[:, 0, :],Jp[:, 1, :], axis=1)
+        a = np.einsum('i, ij->j',ws,n)# 还是没检查对
+        return a/2.0
+        
 
 
 class SurfaceLagrangeFiniteElementSpace:

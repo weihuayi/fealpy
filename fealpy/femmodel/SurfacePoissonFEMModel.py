@@ -10,7 +10,7 @@ class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, surface, model, p=1, dtype=np.float):
         """
         """
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p, dtype=dtype) 
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p, spacetype='C') 
         self.surface = surface
         self.model = model
         self.uh = self.V.function() 
