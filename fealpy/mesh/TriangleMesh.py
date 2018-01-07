@@ -17,7 +17,6 @@ class TriangleMesh(Mesh2d):
         self.point = point
         N = point.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
-
         self.meshType = 'tri'
         self.dtype = dtype
         self.cellData = {}
@@ -238,15 +237,26 @@ class TriangleMesh(Mesh2d):
             Dlambda[:,0,:] = v0@W/length.reshape((-1, 1))
             Dlambda[:,1,:] = v1@W/length.reshape((-1, 1))
             Dlambda[:,2,:] = v2@W/length.reshape((-1, 1))
-            area = length/2.0
         elif dim == 3:
             length = np.sqrt(np.square(nv).sum(axis=1))
             n = nv/length.reshape((-1, 1))
             Dlambda[:,0,:] = np.cross(n, v0)/length.reshape((-1,1))
             Dlambda[:,1,:] = np.cross(n, v1)/length.reshape((-1,1))
             Dlambda[:,2,:] = np.cross(n, v2)/length.reshape((-1,1))
-            area = length/2.0
-        return Dlambda, area
+        return Dlambda
+
+    def jacobi_matrix(self, cellidx=None):
+        """
+        Return
+        ------
+        J : numpy.array
+            The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
+        """
+        if cellidx is None:
+            J = self.point[cell[:, [1, 2]]] - mesh.point[cell[:, [0]]]
+        else:
+            J = self.point[cell[cellidx, [1, 2]]] - mesh.point[cell[cellidx, [0]]]
+        return J
 
     def rot_lambda(self):
         point = self.point
@@ -263,14 +273,12 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,0,:] = v0/length.reshape((-1, 1))
             Rlambda[:,1,:] = v1/length.reshape((-1, 1))
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-            area = length/2.0
         elif dim == 3:
             length = np.sqrt(np.square(nv).sum(axis=1))
             Rlambda[:,0,:] = v0/length.reshape((-1, 1))
             Rlambda[:,1,:] = v1/length.reshape((-1, 1))
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-            area = length/2.0
-        return Rlambda, area
+        return Rlambda
 
     def area(self):
         point = self.point

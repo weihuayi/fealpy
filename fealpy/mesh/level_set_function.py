@@ -54,9 +54,9 @@ class Sphere(object):
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -75,21 +75,22 @@ class Sphere(object):
         return self.gradient(p)
 
     def hessian(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        H = np.zeros((len(p), 3, 3), dtype=np.float)
-        L = np.sqrt(np.sum(p*p, axis=1))
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        L = np.sqrt(np.sum(p*p, axis=-1))
         L3=L**3
-        H[:, 0, 0] = 1/L-x**2/L3
-        H[:, 0, 1] = -x*y/L3
-        H[:, 1, 0] = H[:, 0, 1]
-        H[:, 0, 2] = - x*z/L3
-        H[:, 2, 0] = H[:, 0, 2]
-        H[:, 1, 1] = 1/L - y**2/L3
-        H[:, 1, 2] = -y*z/L3
-        H[:, 2, 1] = H[:, 1, 2]
-        H[:, 2, 2] = 1/L - z**2/L3
+        H[..., 0, 0] = 1/L-x**2/L3
+        H[..., 0, 1] = -x*y/L3
+        H[..., 1, 0] = H[..., 0, 1]
+        H[..., 0, 2] = - x*z/L3
+        H[..., 2, 0] = H[..., 0, 2]
+        H[..., 1, 1] = 1/L - y**2/L3
+        H[..., 1, 2] = -y*z/L3
+        H[..., 2, 1] = H[..., 1, 2]
+        H[..., 2, 2] = 1/L - z**2/L3
         return H
 
     def jacobi(self, p):
@@ -97,18 +98,16 @@ class Sphere(object):
         n = self.unit_normal(p)
         p[:], d = self.project(p)
 
-        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[:, 0, 0] += 1
-        J[:, 1, 1] += 1
-        J[:, 2, 2] += 1
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
         return J
 
     def tangent_operator(self, p):
         pass
 
     def project(self, p):
-        d= self(p)
-        p = p - d.reshape(-1, 1)*self.unit_normal(p)
+        d = self(p)
+        p = p - d[..., np.newaxis]*self.unit_normal(p)
         return p, d
 
     def init_mesh(self):
