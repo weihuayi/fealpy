@@ -7,20 +7,11 @@ from ..common import ranges
 from .function import FiniteElementFunction
 from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
 
-
-class ScaledMonomialSpace2d():
-    def __init__(self, mesh, p=1):
-        """
-        The Scaled Momomial Space in R^2
-        """
-
+class SMDof2d():
+    def __init__(self, mesh, p):
         self.mesh = mesh
-        self.barycenter = mesh.barycenter('cell')
         self.p = p
-        self.area= mesh.area()
-        self.h = np.sqrt(self.area) 
         self.multiIndex = self.multi_index_matrix()
-
 
     def multi_index_matrix(self):
         """
@@ -42,6 +33,32 @@ class ScaledMonomialSpace2d():
         multiIndex[:,1] = idx - idx0*(idx0 + 1)/2
         multiIndex[:,0] = idx0 - multiIndex[:, 1]
         return multiIndex 
+
+    def cell_to_dof():
+        pass
+
+    def number_of_local_dofs(self):
+        p = self.p
+        return int((p+1)*(p+2)/2)
+
+    def number_of_global_dofs(self):
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        return NC*ldof
+
+
+class ScaledMonomialSpace2d():
+    def __init__(self, mesh, p=1):
+        """
+        The Scaled Momomial Space in R^2
+        """
+
+        self.mesh = mesh
+        self.barycenter = mesh.barycenter('cell')
+        self.p = p
+        self.area= mesh.area()
+        self.h = np.sqrt(self.area) 
+        self.dof = SMDof2d(mesh, p)
 
     def basis(self, point, cellIdx=None):
         """
@@ -70,9 +87,12 @@ class ScaledMonomialSpace2d():
                 start += i+1
         return phi
 
-    def value(self, uh, point):
-        phi = self.basis(point)
-        return np.einsum('ij, ij->i', uh, phi) 
+    def value(self, uh, point, cellIdx=None):
+        phi = self.basis(point, cellIdx=cellIdx)
+        if cellIdx is None:
+            return np.einsum('ij, ij->i', uh, phi) 
+        else:
+            return np.einsum('ij, ij->i', uh[cellIdx], phi)
 
     def grad_basis(self, point, cellIdx=None):
         p = self.p
@@ -95,9 +115,12 @@ class ScaledMonomialSpace2d():
         else:
             return gphi/h[cellIdx].reshape(-1, 1, 1)
 
-    def grad_value(self, uh, point):
-        grad = self.grad_basis(point)
-        return np.einsum('ij, ijm->im', uh, grad)
+    def grad_value(self, uh, point, cellIdx=None):
+        gphi = self.grad_basis(point, cellIdx=cellIdx)
+        if cellIdx is None:
+            return np.einsum('ij, ijm->im', uh, gphi)
+        else:
+            return np.einsum('ij, ijm->im', uh[cellIdx], gphi)
 
     def laplace_basis(self, point, cellIdx=None):
         p = self.p
@@ -123,22 +146,26 @@ class ScaledMonomialSpace2d():
         else:
             return lphi/area[cellIdx].reshape(-1, 1)
         
+    def laplace_value(self, uh, point, cellIdx=None):
+        lphi = self.laplace_basis(point, cellIdx=cellIdx)
+        if cellIdx is None:
+            return np.einsum('ij, ij->i', uh, lphi)
+        else:
+            return np.einsum('ij, ij->i', uh[cellIdx], lphi)
+
     def function(self):
         return FiniteElementFunction(self)
 
     def array(self):
         ldof = self.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
-        return np.zeros((NC, ldof), dtype=np.float)
+        return np.zeros(NC*ldof, dtype=np.float)
 
     def number_of_local_dofs(self):
-        p = self.p
-        return int((p+1)*(p+2)/2)
+        return self.dof.number_of_local_dofs()
 
     def number_of_global_dofs(self):
-        ldof = self.number_of_local_dofs()
-        NC = self.mesh.number_of_cells()
-        return NC*ldof
+        return self.dof.number_of_global_dofs()
 
 class VESDof2d():
     def __init__(self, mesh, p):
@@ -278,7 +305,6 @@ class VirtualElementSpace2d():
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.h 
-
         point = mesh.point
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
@@ -286,6 +312,11 @@ class VirtualElementSpace2d():
 
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation 
         D = np.zeros((len(cell2dof), smldof), dtype=np.float)
+
+        if p == 1:
+            bc = np.repeat(self.smspace.barycenter, NV, axis=0) 
+            D[:, 1:] = (point[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
+
 
         qf = GaussLobattoQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights 

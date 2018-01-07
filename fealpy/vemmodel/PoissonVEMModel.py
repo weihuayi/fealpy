@@ -132,13 +132,9 @@ class PoissonVEMModel():
             S2 = V.project_to_smspace(ruh[:, 1]) 
 
             point = mesh.point
-            phi1 = (point[cell, 0] - np.repeat(barycenter[:, 0], NV))/np.repeat(h, NV)
-            phi2 = (point[cell, 1] - np.repeat(barycenter[:, 1], NV))/np.repeat(h, NV)
-
-            gx = np.repeat(S1[:, 0], NV)+ np.repeat(S1[:, 1], NV)*phi1 + \
-                np.repeat(S1[:, 2], NV)*phi2 - np.repeat(S[:, 1], NV)
-            gy = np.repeat(S2[:,  0], NV)+ np.repeat(S2[:, 1], NV)*phi1 + \
-                np.repeat(S2[:, 2], NV)*phi2 - np.repeat(S[:, 2], NV)
+            cellIdx = np.repeat(range(NC), NV)
+            gx = S1.value(point[cell], cellIdx) - np.repeat(S[:, 1], NV)
+            gy = S2.value(point[cell], cellIdx) - np.repeat(S[:, 2], NV)
             eta = np.sqrt(k*np.bincount(np.repeat(range(NC), NV), weights=gx**2+gy**2)/NV*area)
         return eta
 

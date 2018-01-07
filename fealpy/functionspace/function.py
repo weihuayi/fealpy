@@ -6,18 +6,18 @@ class FiniteElementFunction(np.ndarray):
         self.V = V
         return self
 
-    def value(self, bc):
+    def value(self, bc, cellIdx=None):
         V = self.V
-        return V.value(self, bc)
+        return V.value(self, bc, cellIdx=cellIdx)
 
-    def grad_value(self, bc):
+    def grad_value(self, bc, cellIdx=None):
         V = self.V
-        return V.grad_value(self,bc)
+        return V.grad_value(self, bc, cellIdx=cellIdx)
         
-    def div_value(self, bc):
+    def div_value(self, bc, cellIdx=None):
         V = self.V
-        return V.div_value(self, bc)
+        return V.div_value(self, bc, cellIdx=cellIdx)
 
-    def hessian_value(self, bc):
+    def hessian_value(self, bc, cellIdx=None):
         V = self.V
-        return V.hessian_value(self, bc)
+        return V.hessian_value(self, bc, cellIdx=cellIdx)

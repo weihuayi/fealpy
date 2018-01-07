@@ -476,7 +476,7 @@ class LagrangeFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def basis(self, bc):
+    def basis(self, bc, cellIdx=None):
         """
         compute the basis function values at barycentric point bc 
 
@@ -511,7 +511,7 @@ class LagrangeFiniteElementSpace():
         phi = (p**p)*np.prod(A[..., multiIndex, [0, 1, 2]], axis=-1)
         return phi
 
-    def grad_basis(self, bc):
+    def grad_basis(self, bc, cellIdx=None):
         """
         compute the basis function values at barycentric point bc 
 
@@ -567,22 +567,28 @@ class LagrangeFiniteElementSpace():
         gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda)
         return gphi 
 
-    def value(self, uh, bc):
-        phi = self.basis(bc)
+    def value(self, uh, bc, cellIdx=None):
+        phi = self.basis(bc, cellIdx=cellIdx)
         cell2dof = self.dof.cell2dof
-        val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
+        if cellIdx is None:
+            val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
+        else:
+            val = np.einsum('...j, ij->...i', phi, uh[cell2dof[cellIdx]]) 
         return val 
 
-    def grad_value(self, uh, bc):
-        gphi = self.grad_basis(bc)
+    def grad_value(self, uh, bc, cellIdx=None):
+        gphi = self.grad_basis(bc, cellIdx=cellIdx)
         cell2dof = self.dof.cell2dof
-        val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+        if cellIdx is None:
+            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+        else:
+            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[cellIdx]])
         return val
 
-    def hessian_value(self, uh, bc):
+    def hessian_value(self, uh, bc, cellIdx=None):
         pass
 
-    def div_value(self, uh, bc):
+    def div_value(self, uh, bc, cellIdx=None):
         pass
 
 
@@ -606,33 +612,39 @@ class VectorLagrangeFiniteElementSpace():
     def __init__(self, mesh, p=1):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p)
 
-    def basis(self, bc):
-        return self.scalarspace.basis(bc)
+    def basis(self, bc, cellIdx=None):
+        return self.scalarspace.basis(bc, cellIdx=cellIdx)
 
-    def grad_basis(self, bc):
-        return self.scalarspace.grad_basis(bc)
+    def grad_basis(self, bc, cellIdx=None):
+        return self.scalarspace.grad_basis(bc, cellIdx=cellIdx)
 
     def dual_basis(self, u):
         pass
 
-    def value(self, uh, bc):
+    def value(self, uh, bc, cellIdx=None):
         mesh = self.scalarspace.mesh
         NC = mesh.number_of_cells()
-        phi = self.basis(bc)
-        cell2dof = self.cell_to_dof()
-        val = np.einsum('...j, ijm->...im', phi, uh[cell2dof])
+        phi = self.basis(bc, cellIdx=cellIdx)
+        cell2dof = self.scalarspace.dof.cell2dof
+        if cellIdx is None:
+            val = np.einsum('...j, ijm->...im', phi, uh[cell2dof])
+        else:
+            val = np.einsum('...j, ijm->...im', phi, uh[cell2dof[cellIdx]])
         return val 
 
-    def grad_value(self, uh, bc):
+    def grad_value(self, uh, bc, cellIdx=None):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        gradphi = self.grad_basis(bc)
-        cell2dof = self.scalarspace.dof.cell2dof()
-        val = np.einsum('...ijm, ijk->...ikm', gradphi, uh[cell2dof])
+        gradphi = self.grad_basis(bc, cellIdx=cellIdx)
+        cell2dof = self.scalarspace.dof.cell2dof
+        if cellIdx is None:
+            val = np.einsum('...ijm, ijk->...ikm', gradphi, uh[cell2dof])
+        else:
+            val = np.einsum('...ijm, ijk->...ikm', gradphi, uh[cell2dof[cellIdx]])
         return val
 
-    def div_value(self, uh, bc):
-        val = self.grad_value(uh, bc)
+    def div_value(self, uh, bc, cellIdx=None):
+        val = self.grad_value(uh, bc, cellIdx=cellIdx)
         return np.diagonal(val, axis1=-2, axis2=-1) 
 
     def number_of_global_dofs(self):
@@ -640,6 +652,9 @@ class VectorLagrangeFiniteElementSpace():
         
     def number_of_local_dofs(self):
         return self.scalarspace.number_of_local_dofs()
+
+    def function(self):
+        return FiniteElementFunction(self)
 
     def array(self):
         gdof = self.number_of_global_dofs()

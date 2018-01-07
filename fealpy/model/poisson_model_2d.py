@@ -1,6 +1,5 @@
 import numpy as np
 
-
 from ..mesh.TriangleMesh import TriangleMesh  
 from ..mesh.tree_data_structure import Quadtree 
 
@@ -265,8 +264,8 @@ class PolynomialData:
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         u = (x-x**2)*(y-y**2)
         return u
 
@@ -275,8 +274,8 @@ class PolynomialData:
         INPUT:
             p: array object, N*2 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         rhs = 2*(y-y**2)+2*(x-x**2)
         return rhs
 
@@ -289,17 +288,17 @@ class PolynomialData:
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         uprime = np.zeros(p.shape, dtype=np.float)
-        uprime[:, 0] = (1-2*x)*(y-y**2)
-        uprime[:, 1] = (1-2*y)*(x-x**2)
+        uprime[..., 0] = (1-2*x)*(y-y**2)
+        uprime[..., 1] = (1-2*y)*(x-x**2)
         return uprime
 
     def is_boundary(self, p):
         eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        return (p[...,0] < eps) | (p[..., 1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 
 class ExpData:
