@@ -5,7 +5,7 @@ class PrioriError():
     def __init__(self):
         pass
 
-    def L2_error(u, uh, order=4):
+    def L2_error(self, u, uh, order=4):
         mesh = uh.V.mesh
 
         NC = mesh.number_of_cells()
@@ -18,12 +18,12 @@ class PrioriError():
         e *=mesh.area()
         return np.sqrt(e.sum()) 
 
-    def l2_error(u, uh):
+    def l2_error(self, u, uh):
         uI = V.interpolation(u)
         gdof = V.number_of_global_dofs()
         return np.sqrt(np.sum((uI - uh)**2)/gdof)
 
-    def H1_semi_error(gu, uh, order=3, gradfunction=False):
+    def H1_semi_error(self, gu, uh, order=3, gradfunction=False):
         mesh = uh.V.mesh
 
         qf = TriangleQuadrature(order)
@@ -39,12 +39,12 @@ class PrioriError():
         e *=mesh.area()
         return np.sqrt(e.sum()) 
 
-    def H1_error(u, gu, uh, order=3):
+    def H1_error(self, u, gu, uh, order=3):
         e0 = self.L2_error(u, uh, order=order)
         e1 = self.H1_semi_error(gu, uh, order=order)
         return np.sqrt(e0**2 + e1**2)
 
-    def div_error(du, rguh, order=4, dtype=np.float):
+    def div_error(self, du, rguh, order=4, dtype=np.float):
         mesh = uh.V.mesh
         qf = TriangleQuadrature(order)
         bcs, ws = qf.quadpts, qf.weights

@@ -17,9 +17,7 @@ class FEMFunctionRecoveryAlg():
 
         VV = VectorLagrangeFiniteElementSpace(mesh, V.p)
         rguh = VV.function()
-        print(rguh.V)
-        rguh[:, :] = np.asarray(p2c@guh)/valence.reshape(-1, 1)
-        print(rguh.V)
+        rguh[:] = np.asarray(p2c@guh)/valence.reshape(-1, 1)
         return rguh
 
     def area_average(self, uh):

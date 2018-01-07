@@ -611,6 +611,7 @@ class LagrangeFiniteElementSpace():
 class VectorLagrangeFiniteElementSpace():
     def __init__(self, mesh, p=1):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p)
+        self.mesh = mesh
 
     def basis(self, bc, cellIdx=None):
         return self.scalarspace.basis(bc, cellIdx=cellIdx)

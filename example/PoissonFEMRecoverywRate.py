@@ -22,7 +22,7 @@ maxit = 4
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h||_{0}$',
-             '$||\\nabla u - \\nabla u_h||_{0}$'
+             '$||\\nabla u - \\nabla u_h||_{0}$', 
              '$||\\nabla u - G_0(\\nabla u_h)||_{0}$'
              ]
 Ndof = np.zeros((maxit,), dtype=np.int)
@@ -46,6 +46,6 @@ fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca()
 optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
-showmultirate(axes, 0, Ndof, errorMatrix[:3, :], optionlist[:3], errorType[:3])
+showmultirate(axes, 0, Ndof, errorMatrix[:4], optionlist[:4], errorType[:4])
 axes.legend(loc=3, prop={'size': 30})
 plt.show()
