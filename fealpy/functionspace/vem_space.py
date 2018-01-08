@@ -12,6 +12,7 @@ class SMDof2d():
         self.mesh = mesh
         self.p = p
         self.multiIndex = self.multi_index_matrix()
+        self.cell2dof = self.cell_to_dof()
 
     def multi_index_matrix(self):
         """
@@ -35,7 +36,13 @@ class SMDof2d():
         return multiIndex 
 
     def cell_to_dof():
-        pass
+        p = self.p
+        mesh = self.mesh
+
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
+        return cell2dof
 
     def number_of_local_dofs(self):
         p = self.p
@@ -60,25 +67,26 @@ class ScaledMonomialSpace2d():
         self.h = np.sqrt(self.area) 
         self.dof = SMDof2d(mesh, p)
 
-    def basis(self, point, cellIdx=None):
+    def basis(self, point, cellidx=None):
         """
         Compute the basis values at point
 
         Parameters
         ---------- 
         point : numpy array
-            The NC points on each cells
+            The shape of point is (..., M, 2) 
         """
         p = self.p
         h = self.h
 
         ldof = self.number_of_local_dofs() 
         shape = point.shape[:-1]+(ldof,)
-        phi = np.ones(shape, dtype=np.float)
-        if cellIdx is None:
+        phi = np.ones(shape, dtype=np.float) # (..., M, ldof)
+        if cellidx is None:
             phi[..., 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
         else:
-            phi[..., 1:3] = (point - self.barycenter[cellIdx])/h[cellIdx].reshape(-1, 1)
+            assert(point.shape[-2] == len(cellidx))
+            phi[..., 1:3] = (point - self.barycenter[cellidx])/h[cellidx].reshape(-1, 1)
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -87,14 +95,16 @@ class ScaledMonomialSpace2d():
                 start += i+1
         return phi
 
-    def value(self, uh, point, cellIdx=None):
-        phi = self.basis(point, cellIdx=cellIdx)
-        if cellIdx is None:
-            return np.einsum('ij, ij->i', uh, phi) 
+    def value(self, uh, point, cellidx=None):
+        phi = self.basis(point, cellidx=cellidx)
+        cell2dof = self.dof.cell2dof
+        if cellidx is None:
+            return np.einsum('ij, ...ij->...i', uh[cell2dof], phi) 
         else:
-            return np.einsum('ij, ij->i', uh[cellIdx], phi)
+            assert(point.shape[-2] == len(cellidx))
+            return np.einsum('ij, ...ij->...i', uh[cell2dof[cellidx]], phi)
 
-    def grad_basis(self, point, cellIdx=None):
+    def grad_basis(self, point, cellidx=None):
         p = self.p
         h = self.h
         ldof = self.number_of_local_dofs() 
@@ -105,24 +115,27 @@ class ScaledMonomialSpace2d():
         if p > 1:
             start = 3
             r = np.arange(1, p+1)
-            phi = self.basis(point, cellIdx)
+            phi = self.basis(point, cellidx=cellidx)
             for i in range(2, p+1):
                 gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
                 gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
                 start += i+1
-        if cellIdx is None:
+        if cellidx is None:
             return gphi/h.reshape(-1, 1, 1)
         else:
-            return gphi/h[cellIdx].reshape(-1, 1, 1)
+            assert(point.shape[-2] == len(cellidx))
+            return gphi/h[cellidx].reshape(-1, 1, 1)
 
-    def grad_value(self, uh, point, cellIdx=None):
-        gphi = self.grad_basis(point, cellIdx=cellIdx)
-        if cellIdx is None:
-            return np.einsum('ij, ijm->im', uh, gphi)
+    def grad_value(self, uh, point, cellidx=None):
+        gphi = self.grad_basis(point, cellidx=cellidx)
+        cell2dof = self.dof.cell2dof
+        if cellidx is None:
+            return np.einsum('ij, ijm->im', uh[cell2dof], gphi)
         else:
-            return np.einsum('ij, ijm->im', uh[cellIdx], gphi)
+            assert(point.shape[-2] == len(cellidx))
+            return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
 
-    def laplace_basis(self, point, cellIdx=None):
+    def laplace_basis(self, point, cellidx=None):
         p = self.p
         area = self.area
 
@@ -135,23 +148,26 @@ class ScaledMonomialSpace2d():
             r = np.r_[1, np.arange(1, p+1)]
             r = np.cumprod(r)
             r = r[2:]/r[0:-2]
-            phi = self.basis(point, cellIdx)
+            phi = self.basis(point, cellidx=cellidx)
             for i in range(2, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
                 lphi[..., start+2:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 start += i+1
 
-        if cellIdx is None:
+        if cellidx is None:
             return lphi/area.reshape(-1, 1)
         else:
-            return lphi/area[cellIdx].reshape(-1, 1)
+            assert(point.shape[-2] == len(cellidx))
+            return lphi/area[cellidx].reshape(-1, 1)
         
-    def laplace_value(self, uh, point, cellIdx=None):
-        lphi = self.laplace_basis(point, cellIdx=cellIdx)
+    def laplace_value(self, uh, point, cellidx=None):
+        lphi = self.laplace_basis(point, cellidx=cellidx)
+        cell2dof = self.dof.cell2dof
         if cellIdx is None:
-            return np.einsum('ij, ij->i', uh, lphi)
+            return np.einsum('ij, ...ij->...i', uh[cell2dof], lphi)
         else:
-            return np.einsum('ij, ij->i', uh[cellIdx], lphi)
+            assert(point.shape[-2] == len(cellidx))
+            return np.einsum('ij, ...ij->...i', uh[cell2dof[cellIdx]], lphi)
 
     def function(self):
         return FiniteElementFunction(self)
@@ -167,10 +183,10 @@ class ScaledMonomialSpace2d():
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
-class VESDof2d():
+class VEMDof2d():
     def __init__(self, mesh, p):
-        self.mesh = mesh
         self.p = p
+        self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
     def edge_to_dof(self):
@@ -196,20 +212,29 @@ class VESDof2d():
         if p == 1:
             return cell, cellLocation
         else:
-            ldof = self.number_of_local_dofs()
             NC = mesh.number_of_cells()
-            NV = mesh.number_of_vertices_of_cells()
 
+            ldof = self.number_of_local_dofs()
             cell2dofLocation = np.zeros(NC+1, dtype=np.int)
             cell2dofLocation[1:] = np.add.accumulate(ldof)
             cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
-            cell2dof[ranges(NV) + np.repeat(cell2dofLocation[:-1], NV)] = cell
             
             edge2dof = self.edge_to_dof()
-            cell2edgeSign = mesh.ds.cell_to_edge_sign()
-            cell2edge = mesh.ds.cell_to_edge()
+            edge2cell = mesh.ds.edge2cell
+            idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+            cell2dof[idx] = edge2dof[:, 0:-1]
+            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        return         
+            idx = cell2dofLocation[edge2cell[isInEdge, [1]]] + edge2cell[isInEdge, [3]]*p + np.arange(p)
+            cell2dof[idx] = edge2dof[isInEdge, -1:0:-1]
+
+            NV = mesh.number_of_vertices_of_cells()
+            NE = mesh.number_of_edges()
+            idof = int((p-1)*p/2)
+            idx = (cell2dofLocation[:-1] + NV*p).reshape(-1, 1) + np.arange(int((p-1)*p/2))
+            cell2dof[idx] = N + NE*(p-1) + np.arange(NC*idof).reshape(NC, idof)
+            return cell2dof, cell2dofLocation
+
 
     def number_of_global_dofs(self):
         mesh = self.mesh
@@ -234,8 +259,25 @@ class VESDof2d():
         return ldofs
 
     def interpolation_points(self):
-        return self.mesh.point
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.ds.cell
+        point = mesh.point
 
+        if p == 1:
+            return point
+        if p > 1:
+            N = point.shape[0]
+            dim = point.shape[-1]
+            NE = mesh.number_of_edges()
+            edof = N + NE*(p-1)
+            ipoint = np.zeros((edof, dim), dtype=np.float)
+            ipoint[:N, :] = point
+            edge = mesh.ds.edge
+            qf = GaussLobattoQuadrature(p + 1)
+            bcs = qf.quadpts[1:-1, :]
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, point[edge,:]).reshape(-1, dim)
+            return ipoint
 
 class VirtualElementSpace2d():
     def __init__(self, mesh, p = 1):
@@ -243,18 +285,21 @@ class VirtualElementSpace2d():
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.dof = VESDof2d(mesh, p)
+
         self.H = self.get_matrix_H()
         self.D = self.get_matrix_D(self.H)
         self.B = self.get_matrix_B()
 
     def project_to_smspace(self, uh):
+        #TODO: for general p  G^{-1}B
         S = self.smspace.function()
         NC = self.mesh.number_of_cells()
         NV = self.mesh.number_of_vertices_of_cells()
         idx = np.repeat(range(NC), NV)
         cell = self.mesh.ds.cell
-        for i in range(3):
-            S[:, i] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
+        ldof = self.smspace.number_of_local_dofs()
+        for i in range(ldof):
+            S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
         return S
 
     def get_matrix(self):
@@ -268,6 +313,7 @@ class VirtualElementSpace2d():
         p = self.p
         mesh = self.mesh
         point = mesh.point
+
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
 
@@ -278,8 +324,8 @@ class VirtualElementSpace2d():
         qf = GaussLegendreQuadrture(p + 1)
         bcs, ws = qf.quadpts, qf.weights 
         ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
-        phi0 = self.smspace.basis(ps, edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[:, isInEdge, :], edge2cell[isInEdge, 1])
+        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
         H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
 
@@ -321,19 +367,17 @@ class VirtualElementSpace2d():
         qf = GaussLobattoQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights 
         ps = np.einsum('ij, kjm->ikm', bcs[:-1], point[edge])
-        phi0 = self.smspace.basis(ps, edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[-1::-1, isInEdge, :], edge2cell[isInEdge, 1])
-        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-        idx = np.arange(p) + start.reshape(-1, 1) 
-        D[idx, :] = phi0.swapaxes(0, 1)
-        start = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p
-        idx = np.arange(p) + start.reshape(-1, 1) 
-        D[idx, :] = phi1.swapaxes(0, 1)
+        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
+        D[idx, :] = phi0
+        idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
+        D[idx, :] = phi1
         if p > 1:
             area = self.smspace.area
-            np2 = int((p-1)*p/2) # the number of dofs of scale polynomial space with degree p-2
-            idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-np2, 0)
-            D[idx, :] = H[:, :np2, :]/area.reshape(-1, 1, 1)
+            idof = int((p-1)*p/2) # the number of dofs of scale polynomial space with degree p-2
+            idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
+            D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
         return D
 
     def get_matrix_B(self):
@@ -359,10 +403,29 @@ class VirtualElementSpace2d():
                 idx0 = np.arange(start, start+i-1)
                 idx1 = np.arange(start-2*i+1, start-i)
                 idx1 = idx.reshape(-1, 1) + idx1.reshape(1, -1)
-                B[idx0, idx1] += r[i-2::-1]
-                B[idx0+2, idx1] += r[0:i-1]
+                B[idx0, idx1] -= r[i-2::-1]
+                B[idx0+2, idx1] -= r[0:i-1]
                 start += i+1
-            raise ValueError("I have not code degree {} vem!".format(p))
+
+            point = mesh.point
+            edge = mesh.ds.edge
+            edge2cell = mesh.ds.edge2cell
+            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+            qf = GaussLobattoQuadrature(p + 1)
+            bcs, ws = qf.quadpts, qf.weights 
+            ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+            gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
+            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+            nm = mesh.edge_normal()
+
+            val = np.einsum('jk, ijmk->ijm', nm, gphi0)
+            val = np.einsum('i, ijm->ijm', ws, val)
+
+            idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
+            idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
+
+            
 
         return B
 
