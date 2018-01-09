@@ -15,7 +15,7 @@ class FunctionNorm():
         else:
             val = u(bcs)
         if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, val)))
+            e = np.einsum('i, ij->j', ws, val)
         elif funtype is 'vector':
             l = np.sum(val**2, axis=-1)
             e = np.einsum('i, ij->j', ws, l)
@@ -33,11 +33,13 @@ class FunctionNorm():
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
         val0 = uh.value(bcs)
+        print(bcs.shape)
+        print(ws)
 
         pp = mesh.bc_to_point(bcs)
         val1 = u(pp)
         if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, (val1-val0)**2)))
+            e = np.einsum('i, ij->j', ws, (val1-val0)**2)
         elif funtype is 'vector':
             l = np.sum((val1 - val0)**2, axis=-1)
             e = np.einsum('i, ij->j', ws, l)
@@ -90,7 +92,7 @@ class FunctionNorm():
         val1 = divu(pp)
 
         if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, (val1-val0)**2)))
+            e = np.einsum('i, ij->j', ws, (val1-val0)**2)
         elif funtype is 'vector':
             l = np.sum((val1 - val0)**2, axis=-1)
             e = np.einsum('i, ij->j', ws, l)

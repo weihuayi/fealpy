@@ -6,6 +6,8 @@ from ..quadrature import IntervalQuadrature
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace 
 from ..functionspace.function_norm import FunctionNorm 
+from ..boundarycondition import DirichletBC
+from ..solver import solve
 
 class BiharmonicRecoveryFEMModel:
     def __init__(self, mesh, model, integrator=None, rtype='simple'):
@@ -26,17 +28,17 @@ class BiharmonicRecoveryFEMModel:
             self.integrator = integrator 
         self.rtype = rtype 
 
-        self.gradphi = V.mesh.grad_lambda()
+        self.gradphi = self.V.mesh.grad_lambda()
         self.area = mesh.area()
         self.A, self.B = self.get_revcover_matrix()
 
-        self.funnorm = FunctionNorm(integrator, area)
+        self.funNorm = FunctionNorm(integrator, self.area)
 
     def grad_recover_estimate(self):
         qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
         val0 = self.uh.grad_value(bcs)
-        val1 = self.ruh.value(bcs)
+        val1 = self.rgh.value(bcs)
         e = np.sum((val1 - val0)**2, axis=-1)
         e = np.einsum('i, ij->j', ws, e)
         e *= self.area
@@ -113,7 +115,7 @@ class BiharmonicRecoveryFEMModel:
             D = spdiags(1.0/np.bincount(cell.flat), 0, N, N)
             A = D@A.tocsc()
             B = D@B.tocsc()
-        elif self.rtype is 'inv_area':
+        elif self.rtype is 'harmonic':
             for i in range(3):
                 for j in range(3):  
                     A += coo_matrix((gradphi[:,j,0]/area, (cell[:,i], cell[:,j])), shape=(N,N))
@@ -199,8 +201,6 @@ class BiharmonicRecoveryFEMModel:
 
         gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
-        cell2dof = V.cell_to_dof()
-        
         bb = np.zeros((NC, ldof), dtype=np.float)
         area = mesh.area()
         for i in range(nQuad):
@@ -212,7 +212,7 @@ class BiharmonicRecoveryFEMModel:
                 bb[:, j] += fval*phi[j]*w_k
 
         bb *= area.reshape(-1, 1)
-        cell2dof = V.cell_to_dof()
+        cell2dof = V.dof.cell2dof        
         b = np.zeros((gdof,), dtype=np.float)
         np.add.at(b, cell2dof, bb)
         return b + self.get_neuman_vector()

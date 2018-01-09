@@ -8,7 +8,6 @@ import scipy.io as sio
 
 
 from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEMModel
-from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error, L2_norm
 from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, BiharmonicData6, BiharmonicData7, BiharmonicData8
 
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
@@ -77,31 +76,31 @@ errorType = ['$\| u - u_h\|$',
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
+integrator = TriangleQuadrature(3)
 
 for i in range(maxit):
     print(i, 'step:')
 
-    fem = BiharmonicRecoveryFEMModel(V, model, sigma=sigma, rtype='inv_area')
-    bc = DirichletBC(V, model.dirichlet)
-    solve(fem, uh, dirichlet=bc, solver='direct')
-    fem.recover_grad(uh, rgh)
-    fem.recover_laplace(rgh, rlh)
+    fem = BiharmonicRecoveryFEMModel(mesh, model, integrator, rtype='harmonic')
+    fem.solve()
+    fem.recover_grad()
+    fem.recover_laplace()
 
-    eta1 = fem.grad_recover_estimate(uh, rgh, order=4)
+    eta1 = fem.grad_recover_estimate()
 
-    eta2 = fem.laplace_recover_estimate(rgh, rlh, etype=1, order=2)
-    eta3 = fem.laplace_recover_estimate(rgh, rlh, etype=2, order=2)
-    eta4 = fem.laplace_recover_estimate(rgh, rlh, etype=3, order=2)
+    eta2 = fem.laplace_recover_estimate(etype=1)
+    eta3 = fem.laplace_recover_estimate(etype=2)
+    eta4 = fem.laplace_recover_estimate(etype=3)
 
-    Ndof[i] = V.number_of_global_dofs() 
-    errorMatrix[0, i] = L2_error(model.solution, uh, order=8)
-    errorMatrix[1, i] = H1_semi_error(model.gradient, uh, order=8)
+    Ndof[i] = len(fem.uh) 
+    errorMatrix[0, i] = fem.funNorm.L2_error(model.solution, fem.uh)
+    errorMatrix[1, i] = fem.H1_semi_error(model.gradient, fem.uh)
     errorMatrix[2, i] = np.sqrt(np.sum(eta1**2))
-    errorMatrix[3, i] = L2_error(model.gradient, rgh, order=8)
-    errorMatrix[4, i] = div_error(model.laplace, rgh, order=8)
-    errorMatrix[5, i] = L2_error(model.laplace, rlh, order=8)
+    errorMatrix[3, i] = fem.funNorm.L2_error(model.gradient, fem.rgh)
+    errorMatrix[4, i] = fem.funNorm.div_error(model.laplace, fem.rgh)
+    errorMatrix[5, i] = fem.funNorm.L2_error(model.laplace, fem.rlh)
     errorMatrix[6, i] = np.sqrt(np.sum(eta2**2))
-    errorMatrix[7, i] = L2_norm(model.laplace, V, order=8)
+    errorMatrix[7, i] = fem.funNorm.L2_norm(model.laplace, fem.V)
     errorMatrix[8, i] = np.sqrt(np.sum(eta3**2))
     errorMatrix[9, i] = np.sqrt(np.sum(eta4**2))
 
@@ -116,11 +115,6 @@ for i in range(maxit):
     markedCell = mark(eta2, theta)
     if i < maxit - 1:
         mesh.bisect(markedCell)
-
-ratio = errorMatrix[4]/errorMatrix[6]
-print(ratio[k:])
-data = {'Ndof':Ndof, 'error':errorMatrix, 'errorType':errorType}
-sio.matlab.savemat(d+'/test'+str(m)+'.mat', data)
 
 fig2 = plt.figure()
 fig2.set_facecolor('white')
