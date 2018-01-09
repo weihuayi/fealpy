@@ -5,6 +5,7 @@ from ..quadrature  import TriangleQuadrature
 from ..quadrature import IntervalQuadrature
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace 
+from ..functionspace.function_norm import FunctionNorm 
 
 class BiharmonicRecoveryFEMModel:
     def __init__(self, mesh, model, integrator=None, rtype='simple'):
@@ -28,6 +29,8 @@ class BiharmonicRecoveryFEMModel:
         self.gradphi = V.mesh.grad_lambda()
         self.area = mesh.area()
         self.A, self.B = self.get_revcover_matrix()
+
+        self.funnorm = FunctionNorm(integrator, area)
 
     def grad_recover_estimate(self):
         qf = self.integrator
