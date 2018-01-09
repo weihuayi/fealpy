@@ -419,13 +419,14 @@ class VirtualElementSpace2d():
             gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
             nm = mesh.edge_normal()
 
-            val = np.einsum('jk, ijmk->ijm', nm, gphi0)
+            val = np.eisum('ijmk, jk->jim', gphi0, nm)
+            val = np.einsum('i, jim->jim', ws, val)
+            idx = (cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p).reshape(-1, 1) + np.arange(p+1)  
+            np.add.at(B, , val) 
+            val = np.eisum('ijmk, jk->ijm', gphi1, -nm[isInEdge])
             val = np.einsum('i, ijm->ijm', ws, val)
-
-            idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
             idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
-
-            
+            np.add.at(B[, idx], , val)
 
         return B
 

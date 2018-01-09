@@ -3,109 +3,88 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 import numpy as np
 from ..quadrature  import TriangleQuadrature
 from ..quadrature import IntervalQuadrature
-from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace2d 
+from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace 
+from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace 
 
 class BiharmonicRecoveryFEMModel:
-    def __init__(self, V, model, sigma=1, rtype='simple', dtype=np.float):
-        self.V = V
+    def __init__(self, mesh, model, integrator=None, rtype='simple'):
+        self.V = LagrangeFiniteElementSpace(mesh, p=1) 
+        self.VV = VectorLagrangeFiniteElementSpace(mesh, p=1)
+
+        self.uh = self.V.function()
+        self.uI = self.V.interpolation(model.solution) 
+        self.rgh = self.VV.function()
+        self.rlh = self.V.function()
+
         self.model = model
-        self.sigma = sigma 
-        self.dtype = dtype
+        if integrator is None:
+            self.integrator = TriangleQuadrature(p+1)
+        if type(integrator) is int:
+            self.integrator = TriangleQuadrature(integrator)
+        else:
+            self.integrator = integrator 
         self.rtype = rtype 
-        self.gradphi, self.area = V.mesh.grad_lambda()
+
+        self.gradphi = V.mesh.grad_lambda()
+        self.area = mesh.area()
         self.A, self.B = self.get_revcover_matrix()
 
-    def grad_recover_estimate(self, uh, ruh, order=3, dtype=np.float):
-        V = uh.V
-        mesh = V.mesh
-
-        NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(order)
-        nQuad = qf.get_number_of_quad_points()
-
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        
-        e = np.zeros((NC,), dtype=dtype)
-        for i in range(nQuad):
-            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-            uhval = uh.grad_value(lambda_k)
-            ruhval = ruh.value(lambda_k)
-            e += w_k*((uhval - ruhval)*(uhval - ruhval)).sum(axis=1)
-        e *= mesh.area()
-        e = np.sqrt(e)
+    def grad_recover_estimate(self):
+        qf = self.integrator
+        bcs, ws = qf.quadpts, qf.weights
+        val0 = self.uh.grad_value(bcs)
+        val1 = self.ruh.value(bcs)
+        e = np.sum((val1 - val0)**2, axis=-1)
+        e = np.einsum('i, ij->j', ws, e)
+        e *= self.area
         return e 
 
-    def laplace_recover_estimate(self, rgh, rlh, etype=1, order=2):
-        V = self.V
-        mesh = V.mesh
-        NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(order)
-        nQuad = qf.get_number_of_quad_points()
-
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        
-        e = np.zeros((NC,), dtype=self.dtype)
-
+    def laplace_recover_estimate(self, etype=1):
+        qf = self.integrator
+        bcs, ws = qf.quadpts, qf.weights
         if etype == 1:
-            for i in range(nQuad):
-                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-                rghval = rgh.div_value(lambda_k)
-                rlhval = rlh.value(lambda_k)
-                e += w_k*(rghval - rlhval)*(rghval - rlhval)
+            val0 = self.rgh.div_value(bcs)
+            val1 = self.rlh.value(bcs)
+            e = np.einsum('i, ij->j', ws, (val1 - val0)**2)
         elif etype == 2:
-            for i in range(nQuad):
-                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-                rghval = rgh.div_value(lambda_k)
-                e += w_k*rghval**2
+            val0 = self.rgh.div_value(bcs)
+            e = np.einsum('i, ij->j', ws, val0**2)
         elif etype == 3:
-            for i in range(nQuad):
-                lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-                rlhval = rlh.value(lambda_k)
-                e += w_k*rlhval**2
+            val1 = self.rlh.value(bcs)
+            e = np.einsum('i, ij->j', ws, val1**2)
         else:
             raise ValueError("1 <= etype <=3! Your input is {}".format(etype)) 
-
-        e *= mesh.area()
+        e *= self.area
         e = np.sqrt(e)
         return e 
 
-    def recover_grad(self, uh, rgh):
-        rgh[:, 0] = self.A@uh
-        rgh[:, 1] = self.B@uh
+    def recover_grad(self):
+        uh = self.uh
+        self.rgh[:, 0] = self.A@uh
+        self.rgh[:, 1] = self.B@uh
         mesh = self.V.mesh
         point = mesh.point
         isBdPoints = mesh.ds.boundary_point_flag()
         val = self.model.gradient(point[isBdPoints])
         isNotNan = np.isnan(val)
-        rgh[isBdPoints][isNotNan] = val[isNotNan] 
+        self.rgh[isBdPoints][isNotNan] = val[isNotNan] 
 
-    def recover_laplace(self, rgh, rlh):
+    def recover_laplace(self):
         b = np.array([1/3, 1/3, 1/3])
-        val = rgh.div_value(b)
         mesh = self.V.mesh
-        cell = mesh.ds.cell
         N = mesh.number_of_points()
+        cell = mesh.ds.cell
+        val = self.rgh.div_value(b)
         if self.rtype is 'simple':
-            l = np.bincount(cell[:, 0], weights=val, minlength=N)
-            l += np.bincount(cell[:, 1], weights=val, minlength=N)
-            l += np.bincount(cell[:, 2], weights=val, minlength=N)
-            l /= np.bincount(cell.flatten())
-            rlh[:] = l
-        elif self.rtype is 'inv_area':
-            area = self.area
-            val /= area
-            l = np.bincount(cell[:, 0], weights=val, minlength=N)
-            l += np.bincount(cell[:, 1], weights=val, minlength=N)
-            l += np.bincount(cell[:, 2], weights=val, minlength=N)
-            
-            val = 1/area
-            s = np.bincount(cell[:, 0], weights=val, minlength=N)
-            s += np.bincount(cell[:, 1], weights=val, minlength=N)
-            s += np.bincount(cell[:, 2], weights=val, minlength=N)
-            l /=s
-            rlh[:] = l
+            np.add.at(self.rlh, cell, val.reshape(-1, 1))
+            self.rlh /= np.bincount(cell.flat, minlength=N)
+        elif self.rtype is 'harmonic':
+            inva = 1/self.area
+            s = np.zeros(N, dtype=np.float)
+            np.add.at(s, cell, inva.reshape(-1, 1))
+            val *= inva 
+            np.add.at(self.rlh, cell, val.reshape(-1, 1))
+            self.rlh /= s
         else:
             raise ValueError("I have not coded the method {}".format(self.rtype))
 
@@ -128,7 +107,7 @@ class BiharmonicRecoveryFEMModel:
                 for j in range(3):  
                     A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
                     B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
-            D = spdiags(1.0/np.bincount(cell.flatten()), 0, N, N)
+            D = spdiags(1.0/np.bincount(cell.flat), 0, N, N)
             A = D@A.tocsc()
             B = D@B.tocsc()
         elif self.rtype is 'inv_area':
@@ -196,9 +175,9 @@ class BiharmonicRecoveryFEMModel:
                     val = 1/3
                 else:
                     val = 1/6
-                P += coo_matrix((self.sigma*val*n[:, 0]*n[:, 0]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
-                Q += coo_matrix((self.sigma*val*n[:, 0]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
-                S += coo_matrix((self.sigma*val*n[:, 1]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+                P += coo_matrix((val*n[:, 0]*n[:, 0]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+                Q += coo_matrix((val*n[:, 0]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
+                S += coo_matrix((val*n[:, 1]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
           
         P = P.tocsc()
         Q = Q.tocsc()
@@ -219,7 +198,7 @@ class BiharmonicRecoveryFEMModel:
         ldof = V.number_of_local_dofs()
         cell2dof = V.cell_to_dof()
         
-        bb = np.zeros((NC, ldof), dtype=self.dtype)
+        bb = np.zeros((NC, ldof), dtype=np.float)
         area = mesh.area()
         for i in range(nQuad):
             lambda_k, w_k = qf.get_gauss_point_and_weight(i)
@@ -231,9 +210,8 @@ class BiharmonicRecoveryFEMModel:
 
         bb *= area.reshape(-1, 1)
         cell2dof = V.cell_to_dof()
-        b = np.zeros((gdof,), dtype=self.dtype)
-        np.add.at(b, cell2dof.flatten(), bb.flatten())
-        #b = np.bincount(cell2dof.flatten(), weights=bb.flatten(), minlength=gdof)
+        b = np.zeros((gdof,), dtype=np.float)
+        np.add.at(b, cell2dof, bb)
         return b + self.get_neuman_vector()
 
     def get_neuman_vector(self):
@@ -255,8 +233,8 @@ class BiharmonicRecoveryFEMModel:
         n /= h.reshape((-1,1))
 
 
-        b0 = np.zeros(N, dtype=self.dtype)
-        b1 = np.zeros(N, dtype=self.dtype)
+        b0 = np.zeros(N, dtype=np.float)
+        b1 = np.zeros(N, dtype=np.float)
 
         qf = IntervalQuadrature(5)
         nQuad = qf.get_number_of_quad_points()
@@ -270,5 +248,8 @@ class BiharmonicRecoveryFEMModel:
             b1[bdEdge[:, 0]] += w_k*n[:, 1]*val*lambda_k[0]/h
             b1[bdEdge[:, 1]] += w_k*n[:, 1]*val*lambda_k[1]/h
 
-        return self.sigma*(self.A.transpose()@b0 + self.B.transpose()@b1)
+        return self.A.transpose()@b0 + self.B.transpose()@b1
 
+    def solve(self):
+        bc = DirichletBC(self.V, self.model.dirichlet)
+        solve(self, self.uh, dirichlet=bc, solver='direct')

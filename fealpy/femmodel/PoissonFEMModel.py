@@ -43,8 +43,6 @@ class PoissonFEMModel(object):
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
-
-
     def get_right_vector(self):
         V = self.V
         mesh = V.mesh

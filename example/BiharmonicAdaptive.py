@@ -6,15 +6,8 @@ import sys
 import os
 import scipy.io as sio
 
-from fealpy.mesh.meshio import load_mat_mesh
-from fealpy.mesh.simple_mesh_generator import rectangledomainmesh  
-from fealpy.mesh.simple_mesh_generator import triangle, unitsquaredomainmesh
 
-from fealpy.functionspace.tools import function_space 
 from fealpy.femmodel.BiharmonicFEMModel import BiharmonicRecoveryFEMModel
-from fealpy.boundarycondition.BoundaryCondition import DirichletBC
-from fealpy.solver import solve
-from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.erroranalysis.PrioriError import L2_error, div_error, H1_semi_error, L2_norm
 from fealpy.model.BiharmonicModel2d import BiharmonicData4, BiharmonicData5, BiharmonicData6, BiharmonicData7, BiharmonicData8
 
@@ -87,11 +80,6 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     print(i, 'step:')
-    V = function_space(mesh, 'Lagrange', degree)
-    V2 = function_space(mesh, 'Lagrange_2', degree)
-    uh = FiniteElementFunction(V)
-    rgh = FiniteElementFunction(V2)
-    rlh = FiniteElementFunction(V)
 
     fem = BiharmonicRecoveryFEMModel(V, model, sigma=sigma, rtype='inv_area')
     bc = DirichletBC(V, model.dirichlet)

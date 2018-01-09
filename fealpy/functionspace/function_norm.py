@@ -102,11 +102,3 @@ class FunctionNorm():
         else:
             e *= self.area
         return np.sqrt(e.sum()) 
-
-        
-
-
-
-
-
-

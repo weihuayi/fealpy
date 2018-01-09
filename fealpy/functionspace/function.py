@@ -6,6 +6,10 @@ class FiniteElementFunction(np.ndarray):
         self.V = V
         return self
 
+    def __call__(self, bc, cellidx=None):
+        V = self.V
+        return V.value(self, bc, cellidx=cellidx)
+
     def value(self, bc, cellidx=None):
         V = self.V
         return V.value(self, bc, cellidx=cellidx)
