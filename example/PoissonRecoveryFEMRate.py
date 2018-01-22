@@ -1,25 +1,24 @@
+
 import sys
 
 import numpy as np  
 import matplotlib.pyplot as plt
 from fealpy.model.poisson_model_2d import CosCosData
-from fealpy.femmodel.PoissonFEMModel import PoissonFEMModel
-
+from fealpy.femmodel.PoissonRecoveryFEMModel import PoissonRecoveryFEMModel
 from fealpy.tools.show import showmultirate
 
 from fealpy.functionspace import FunctionNorm
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
 
 m = int(sys.argv[1])
-p = int(sys.argv[2])
-n = int(sys.argv[3])
+n = int(sys.argv[2])
 
 if m == 1:
     model = CosCosData()
 
 mesh = model.init_mesh(n=n)
 integrator = TriangleQuadrature(3)
-fem = PoissonFEMModel(mesh, model, p=p, integrator=integrator)
+fem = PoissonRecoveryFEMModel(mesh, model, integrator, rtype='harmonic')
 funNorm = FunctionNorm(integrator, fem.area)
 maxit = 4
 
@@ -39,7 +38,6 @@ for i in range(maxit):
         mesh.uniform_refine()
         fem.reinit(mesh)
         funNorm.area = fem.area
-        
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)

@@ -5,18 +5,19 @@ from ..quadrature  import TriangleQuadrature
 from ..quadrature import IntervalQuadrature
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace 
-from ..functionspace.function_norm import FunctionNorm 
+from ..functionspace.lagrange_fem_space import TensorLagrangeFiniteElementSpace 
 from ..boundarycondition import DirichletBC
 from ..solver import solve
 
 class BiharmonicRecoveryFEMModel:
     def __init__(self, mesh, model, integrator=None, rtype='simple'):
         self.V = LagrangeFiniteElementSpace(mesh, p=1) 
-        self.VV = VectorLagrangeFiniteElementSpace(mesh, p=1)
+        self.V2 = VectorLagrangeFiniteElementSpace(mesh, p=1, vectordim=2)
+        self.V3 = TensorLagrangeFiniteElementSpace(mesh, 1, tensorshape=(2,2)) 
 
         self.uh = self.V.function()
         self.uI = self.V.interpolation(model.solution) 
-        self.rgh = self.VV.function()
+        self.rgh = self.V2.function()
         self.rlh = self.V.function()
 
         self.model = model
@@ -32,7 +33,17 @@ class BiharmonicRecoveryFEMModel:
         self.area = mesh.area()
         self.A, self.B = self.get_revcover_matrix()
 
-        self.funNorm = FunctionNorm(integrator, self.area)
+
+    def reinit(self, mesh):
+        self.V = LagrangeFiniteElementSpace(mesh, p=1) 
+        self.V2 = VectorLagrangeFiniteElementSpace(mesh, p=1)
+        self.uh = self.V.function()
+        self.uI = self.V.interpolation(self.model.solution)
+        self.rgh = self.V2.function()
+        self.rlh = self.V.function()
+        self.area = self.V.mesh.area()
+        self.gradphi = self.V.mesh.grad_lambda()
+        self.A, self.B = self.get_revcover_matrix()
 
     def grad_recover_estimate(self):
         qf = self.integrator
@@ -105,28 +116,25 @@ class BiharmonicRecoveryFEMModel:
         N = mesh.number_of_points() 
         cell = mesh.ds.cell
 
-        A = coo_matrix((N, N), dtype=np.float)
-        B = coo_matrix((N, N), dtype=np.float)
         if self.rtype is 'simple':
-            for i in range(3):
-                for j in range(3):  
-                    A += coo_matrix((gradphi[:,j,0], (cell[:,i], cell[:,j])), shape=(N,N))
-                    B += coo_matrix((gradphi[:,j,1], (cell[:,i], cell[:,j])), shape=(N,N))
             D = spdiags(1.0/np.bincount(cell.flat), 0, N, N)
-            A = D@A.tocsc()
-            B = D@B.tocsc()
+            I = np.einsum('k, ij->ijk', np.ones(3), cell)
+            J = I.swapaxes(-1, -2)
+            val = np.einsum('k, ij->ikj', np.ones(3), gradphi[:, :, 0])
+            A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+            val = np.einsum('k, ij->ikj', np.ones(3), gradphi[:, :, 1])
+            B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
         elif self.rtype is 'harmonic':
-            for i in range(3):
-                for j in range(3):  
-                    A += coo_matrix((gradphi[:,j,0]/area, (cell[:,i], cell[:,j])), shape=(N,N))
-                    B += coo_matrix((gradphi[:,j,1]/area, (cell[:,i], cell[:,j])), shape=(N,N))
-            d = np.bincount(cell[:, 0], weights=1/area, minlength=N)
-            d += np.bincount(cell[:, 1], weights=1/area, minlength=N)
-            d += np.bincount(cell[:, 2], weights=1/area, minlength=N)
-
+            gphi = gradphi/area.reshape(-1, 1, 1)
+            d = np.zeros(N, dtype=np.float)
+            np.add.at(d, cell, 1/area.reshape(-1, 1))
             D = spdiags(1/d, 0, N, N)
-            A = D@A.tocsc()
-            B = D@B.tocsc()
+            I = np.einsum('k, ij->ijk', np.ones(3), cell)
+            J = I.swapaxes(-1, -2)
+            val = np.einsum('ij, k->ikj',  gphi[:, :, 0], np.ones(3))
+            A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+            val = np.einsum('ij, k->ikj',  gphi[:, :, 1], np.ones(3))
+            B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
         else:
             raise ValueError("I have not coded the method {}".format(self.rtype))
 
@@ -151,42 +159,34 @@ class BiharmonicRecoveryFEMModel:
         h = np.sqrt(np.sum(n**2, axis=1)) 
         n /= h.reshape(-1, 1)
 
-        P = coo_matrix((N, N), dtype=np.float)
-        Q = coo_matrix((N, N), dtype=np.float)
-        S = coo_matrix((N, N), dtype=np.float)
         gradphi, area = self.gradphi, self.area
-        for i in range(3):
-            for j in range(3):  
-                val00 = gradphi[:,i,0]*gradphi[:,j,0]*area 
-                val01 = gradphi[:,i,0]*gradphi[:,j,1]*area
-                val11 = gradphi[:,i,1]*gradphi[:,j,1]*area
-                P += coo_matrix((val00, (cell[:,i], cell[:,j])), shape=(N, N))
-                Q += coo_matrix((val01, (cell[:,i], cell[:,j])), shape=(N, N))
-                S += coo_matrix((val11, (cell[:,i], cell[:,j])), shape=(N, N))
-        P = P.tocsc()
-        Q = Q.tocsc()
-        S = S.tocsc()
+
+
+        I = np.einsum('ij, k->ijk',  cell, np.ones(3))
+        J = I.swapaxes(-1, -2)
+        val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 0], gradphi[:, :, 0])
+        P = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 0], gradphi[:, :, 1])
+        Q = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 1], gradphi[:, :, 1])
+        S = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+
+        
 
         A, B = self.A, self.B
 
         M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
 
-        P = coo_matrix((N, N), dtype=np.float)
-        Q = coo_matrix((N, N), dtype=np.float)
-        S = coo_matrix((N, N), dtype=np.float)
-        for i in range(2):
-            for j in range(2):
-                if i == j:
-                    val = 1/3
-                else:
-                    val = 1/6
-                P += coo_matrix((val*n[:, 0]*n[:, 0]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
-                Q += coo_matrix((val*n[:, 0]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
-                S += coo_matrix((val*n[:, 1]*n[:, 1]/h, (bdEdge[:, i], bdEdge[:, j])), shape=(N, N))
-          
-        P = P.tocsc()
-        Q = Q.tocsc()
-        S = S.tocsc()
+        I = np.einsum('ij, k->ijk', bdEdge, np.ones(2))
+        J = I.swapaxes(-1, -2)
+        val = np.array([(1/3, 1/6), (1/6, 1/3)])
+        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 0]/h, val)
+        P = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(N, N))
+        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 1]/h, val)
+        Q = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(N, N))
+        val0 = np.einsum('i, jk->ijk', n[:, 1]*n[:, 1]/h, val)
+        S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(N, N))
+
 
         M += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
         return M
@@ -194,24 +194,17 @@ class BiharmonicRecoveryFEMModel:
     def get_right_vector(self):
         V = self.V
         mesh = V.mesh
+        model = self.model
+        
+        qf = self.integrator 
+        bcs, ws = qf.quadpts, qf.weights
+        pp = mesh.bc_to_point(bcs)
+        fval = model.source(pp)
+        phi = V.basis(bcs)
+        bb = np.einsum('i, ij, ik->kj', ws, phi,fval)
 
-        NC = mesh.number_of_cells()
-        qf = TriangleQuadrature(5)
-        nQuad = qf.get_number_of_quad_points()
-
+        bb *= self.area.reshape(-1, 1)
         gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        bb = np.zeros((NC, ldof), dtype=np.float)
-        area = mesh.area()
-        for i in range(nQuad):
-            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-            p = mesh.bc_to_point(lambda_k)
-            fval = self.model.source(p)
-            phi = V.basis(lambda_k)
-            for j in range(ldof):
-                bb[:, j] += fval*phi[j]*w_k
-
-        bb *= area.reshape(-1, 1)
         cell2dof = V.dof.cell2dof        
         b = np.zeros((gdof,), dtype=np.float)
         np.add.at(b, cell2dof, bb)
@@ -240,16 +233,13 @@ class BiharmonicRecoveryFEMModel:
         b1 = np.zeros(N, dtype=np.float)
 
         qf = IntervalQuadrature(5)
-        nQuad = qf.get_number_of_quad_points()
-        for i in range(nQuad):
-            lambda_k, w_k = qf.get_gauss_point_and_weight(i)
-            p = point[bdEdge[:, 0], :]*lambda_k[0] \
-                    + point[bdEdge[:, 1], :]*lambda_k[1] 
-            val = self.model.neuman(p, n)
-            b0[bdEdge[:, 0]] += w_k*n[:, 0]*val*lambda_k[0]/h
-            b0[bdEdge[:, 1]] += w_k*n[:, 0]*val*lambda_k[1]/h
-            b1[bdEdge[:, 0]] += w_k*n[:, 1]*val*lambda_k[0]/h
-            b1[bdEdge[:, 1]] += w_k*n[:, 1]*val*lambda_k[1]/h
+        bcs, ws = qf.quadpts, qf.weights
+        pp = np.einsum('...j, ijk->...ik', bcs, point[bdEdge])
+        val = self.model.neuman(pp, n)
+        val0 = np.einsum('m, mj, i, mi->ij', ws, bcs, n[:, 0]/h, val)
+        np.add.at(b0, bdEdge, val0)
+        val0 = np.einsum('m, mj, i, mi->ij', ws, bcs, n[:, 1]/h, val)
+        np.add.at(b0, bdEdge, val0)
 
         return self.A.transpose()@b0 + self.B.transpose()@b1
 

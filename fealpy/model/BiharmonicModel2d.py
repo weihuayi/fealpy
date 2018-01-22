@@ -6,25 +6,25 @@ class SinSinData:
         pass
 
     def solution(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*y)
         return r
 
     def gradient(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
-        val = np.zeros((len(x),2), dtype=p.dtype)
-        val[:,0] = 2*pi*np.sin(pi*x)*np.cos(pi*x)*np.sin(pi*y)*np.sin(pi*y)
-        val[:,1] = 2*pi*np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.cos(pi*y)
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[...,0] = 2*pi*np.sin(pi*x)*np.cos(pi*x)*np.sin(pi*y)*np.sin(pi*y)
+        val[...,1] = 2*pi*np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.cos(pi*y)
         return val
 
 
     def laplace(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = 2*pi**2*np.cos(pi*y)**2*np.sin(pi*x)**2
         r += 2*pi**2*np.cos(pi*x)**2*np.sin(pi*y)**2 
@@ -40,11 +40,11 @@ class SinSinData:
         """ Neuman boundary condition
         """
         val = self.gradient(p)
-        return np.sum(val*n, axis=1)
+        return np.sum(val*n, axis=-1)
 
     def source(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         pi4 = pi**4
         r1 = np.sin(pi*x)**2
@@ -56,7 +56,7 @@ class SinSinData:
 
     def is_boundary_dof(self, p):
         eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 class BiharmonicData2:
     def __init__(self,a,b):
@@ -68,24 +68,24 @@ class BiharmonicData2:
         """
         a = self.a
         b = self.b
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         r = 2350*(x**4)*(x-a)*(x-a)*(y**4)*(y-b)*(y-b)
         return r
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         b = self.b
-        val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:,0] = 2350*2*(x**3)*(x-a)*(3*x-2*a)*(y**4)*(y-b)*(y-b)
-        val[:,1] = 2350*(x**4)*(x-a)*(x-a)*2*(y**3)*(y-b)*(3*y-2*b)
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[...,0] = 2350*2*(x**3)*(x-a)*(3*x-2*a)*(y**4)*(y-b)*(y-b)
+        val[...,1] = 2350*(x**4)*(x-a)*(x-a)*2*(y**3)*(y-b)*(3*y-2*b)
         return val
 
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         b = self.b
         r = 2350*(y**6-2*b*y**5+b**2*y**4)*(30*x**4-40*a*x**3+12*a**2*x**2)
@@ -101,11 +101,11 @@ class BiharmonicData2:
     def neuman(self, p, n):
         """ Neuman boundary condition
         """
-        return np.zeros((p.shape[0],), dtype=np.float)
+        return np.zeros(p.shape[0:-1], dtype=np.float)
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         b = self.b
         r1 = 56400*(a**2-10*a*x+15*x**2)*(b-y)*(b-y)*y**4
@@ -116,7 +116,7 @@ class BiharmonicData2:
 
     def is_boundary_dof(self, p):
         eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 class BiharmonicData3:
     def __init__(self):
@@ -125,24 +125,24 @@ class BiharmonicData3:
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = np.cos(2*pi*x)*np.cos(2*pi*y)
         return r
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:,0] = -2*pi*np.sin(2*pi*x)*np.cos(2*pi*y) 
-        val[:,1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        val[...,0] = -2*pi*np.sin(2*pi*x)*np.cos(2*pi*y) 
+        val[...,1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
         return val
 
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = -8*pi**2*self.solution(p)
         return r
@@ -159,15 +159,15 @@ class BiharmonicData3:
         return np.zeros(p.shape[0], dtype=p.dtype) 
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = 64*pi**4*np.cos(2*pi*x)*np.cos(2*pi*y)
         return r
 
     def is_boundary_dof(self, p):
         eps = 1e-14 
-        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        return (p[...,0] < eps) | (p[...,1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 class BiharmonicData4:
     def __init__(self):
@@ -176,25 +176,25 @@ class BiharmonicData4:
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = np.sin(2*pi*x)*np.sin(2*pi*y)
         return r
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
-        val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:,0] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y) 
-        val[:,1] = 2*pi*np.cos(2*pi*y)*np.sin(2*pi*x)
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[...,0] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y) 
+        val[...,1] = 2*pi*np.cos(2*pi*y)*np.sin(2*pi*x)
         return val
 
 
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = -8*pi**2*self.solution(p)
         return r
@@ -203,17 +203,17 @@ class BiharmonicData4:
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
-        return np.zeros((p.shape[0],), dtype=np.float)
+        return np.zeros(p.shape[0:-1], dtype=np.float)
 
     def neuman(self, p, n):
         """ Neuman boundary condition
         """
         val = self.gradient(p)
-        return np.sum(val*n, axis=1)
+        return np.sum(val*n, axis=-1)
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         r = 64*pi**4*np.sin(2*pi*x)*np.sin(2*pi*y)
         return r
@@ -252,26 +252,26 @@ class BiharmonicData5:
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         r1 = (x - 0.5)**2 + (y - 0.5)**2 + a 
         r2 = (x + 0.5)**2 + (y + 0.5)**2 + a 
         return 1.0/r1 - 1.0/r2 
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
-        val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:, 0] = -(-2*x - 1.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**2 + (-2*x + 1.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**2
-        val[:, 1] = -(-2*y - 1.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**2 + (-2*y + 1.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**2
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = -(-2*x - 1.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**2 + (-2*x + 1.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**2
+        val[..., 1] = -(-2*y - 1.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**2 + (-2*y + 1.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**2
         return val
 
 
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         r =(2*x - 1.0)*(4*x - 2.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**3 - (2*x + 1.0)*(4*x + 2.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**3 + (2*y - 1.0)*(4*y - 2.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**3 - (2*y + 1.0)*(4*y + 2.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**3 + 4/(a + (x + 0.5)**2 + (y + 0.5)**2)**2 - 4/(a + (x - 0.5)**2 + (y - 0.5)**2)**2 
         return r
@@ -286,11 +286,11 @@ class BiharmonicData5:
         """ Neuman boundary condition
         """
         val = self.gradient(p)
-        return np.sum(val*n, axis=1)
+        return np.sum(val*n, axis=-1)
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         a = self.a
         r = (2*x - 1.0)*(4*x - 2.0)*(6*x - 3.0)*(8*x - 4.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**5 + 2*(2*x - 1.0)*(4*x - 2.0)*(6*y - 3.0)*(8*y - 4.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**5 - 18*(2*x - 1.0)*(4*x - 2.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 - 8*(2*x - 1.0)*(6*x - 3.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 - (2*x + 1.0)*(4*x + 2.0)*(6*x + 3.0)*(8*x + 4.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**5 - 2*(2*x + 1.0)*(4*x + 2.0)*(6*y + 3.0)*(8*y + 4.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**5 + 18*(2*x + 1.0)*(4*x + 2.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 + 8*(2*x + 1.0)*(6*x + 3.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 - 6*(4*x - 2.0)*(6*x - 3.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 + 6*(4*x + 2.0)*(6*x + 3.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 + (2*y - 1.0)*(4*y - 2.0)*(6*y - 3.0)*(8*y - 4.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**5 - 6*(2*y - 1.0)*(4*y - 2.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 - 8*(2*y - 1.0)*(6*y - 3.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 - (2*y + 1.0)*(4*y + 2.0)*(6*y + 3.0)*(8*y + 4.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**5 + 6*(2*y + 1.0)*(4*y + 2.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 + 8*(2*y + 1.0)*(6*y + 3.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 - 10*(4*y - 2.0)*(6*y - 3.0)/(a + (x - 0.5)**2 + (y - 0.5)**2)**4 + 10*(4*y + 2.0)*(6*y + 3.0)/(a + (x + 0.5)**2 + (y + 0.5)**2)**4 - 64/(a + (x + 0.5)**2 + (y + 0.5)**2)**3 + 64/(a + (x - 0.5)**2 + (y - 0.5)**2)**3
         return r
@@ -341,8 +341,8 @@ class BiharmonicData6:
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         sin = np.sin
         theta = np.arctan2(y, x)
@@ -352,8 +352,8 @@ class BiharmonicData6:
         return z
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         sin = np.sin
         cos = np.cos
         pi = np.pi
@@ -361,12 +361,12 @@ class BiharmonicData6:
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         r = x*x + y*y
         val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:, 0] = 5*x*sin(5*theta/3)/(3*r**(1/6)) - 5*y*cos(5*theta/3)/(3*r**(1/6))
-        val[:, 1] = 5*x*cos(5*theta/3)/(3*r**(1/6)) + 5*y*sin(5*theta/3)/(3*r**(1/6))
+        val[..., 0] = 5*x*sin(5*theta/3)/(3*r**(1/6)) - 5*y*cos(5*theta/3)/(3*r**(1/6))
+        val[..., 1] = 5*x*cos(5*theta/3)/(3*r**(1/6)) + 5*y*sin(5*theta/3)/(3*r**(1/6))
         return val
 
     def laplace(self,p):
-        z = np.zeros((p.shape[0],), dtype=np.float)
+        z = np.zeros(p.shape[0:-1], dtype=np.float)
         return z
 
 
@@ -379,10 +379,10 @@ class BiharmonicData6:
         """ Neuman boundary condition
         """
         val = self.gradient(p)
-        return np.sum(val*n, axis=1)
+        return np.sum(val*n, axis=-1)
 
     def source(self,p):
-        z = np.zeros((p.shape[0],), dtype=np.float)
+        z = np.zeros(p.shape[0:-1], dtype=np.float)
         return z
 
 class BiharmonicData7:
@@ -430,8 +430,8 @@ class BiharmonicData7:
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -444,8 +444,8 @@ class BiharmonicData7:
         return val
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -456,14 +456,23 @@ class BiharmonicData7:
         d = r**3*np.sqrt(1 - z**2)
         m1 = 4*z*(r**z)*(x**2 - 1)*(y**2 - 1)**2 
         m2 = -4*z*(r**z)*(x**2 - 1)**2*(y**2 - 1) 
-        val = np.zeros((len(x), 2), dtype=p.dtype)
-        val[:, 0] = m1*(c*r*y**2*z*(x**2 - 1) - x**5*z - x**3*z*(r**2*z + r*s*y + y**2 - 1) + x*(-4*r**4*z - 4*r**3*s*y + r**2*z**2 + r*s*y*z + y**2*z))/d
-        val[:, 1] = m2*(c*r*x*y*z*(y**2 - 1) + r**2*y*z*(4*r**2 - z) + r*s*y**2*(5*r**2 - z) - r*s*(r**2 - y**4*z) + x**2*y*z*(y**2 - 1) + y**5*z + y**3*z*(r**2*z - 1))/d 
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = m1*(c*r*y**2*z*(x**2 - 1) - x**5*z - x**3*z*(r**2*z + r*s*y + y**2 - 1) + x*(-4*r**4*z - 4*r**3*s*y + r**2*z**2 + r*s*y*z + y**2*z))/d
+        val[..., 1] = m2*(c*r*x*y*z*(y**2 - 1) + r**2*y*z*(4*r**2 - z) + r*s*y**2*(5*r**2 - z) - r*s*(r**2 - y**4*z) + x**2*y*z*(y**2 - 1) + y**5*z + y**3*z*(r**2*z - 1))/d 
         return val
 
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        val = np.zeros(p.shape[:-1]+(2,2), dtype=p.dtype)
+
+
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -490,11 +499,11 @@ class BiharmonicData7:
         """ Neuman boundary condition
         """
         val = self.gradient(p)
-        return np.sum(val*n, axis=1)
+        return np.sum(val*n, axis=-1)
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -559,8 +568,8 @@ class BiharmonicData8:
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -577,8 +586,8 @@ class BiharmonicData8:
         return val
 
     def gradient(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -591,19 +600,19 @@ class BiharmonicData8:
         zw1 = (z*np.sqrt(-zw**2 + 1) + zw)
         s2 = np.sqrt(2)
         xy2 = (x**2 - 1)*(y**2 - 1)**2
-        val = np.zeros((len(x), 2), dtype=p.dtype)
+        val = np.zeros(p.shape, dtype=p.dtype)
         x3 = r*s2*z*zw + r*s2*zw + 2*s*y*z
         x1 = -4*r**3*s2*zw - 8*r**2*s*y + r*s2*z*zw + r*s2*zw + 2*s*y*z
-        val[:, 0] = -r**(z - 2)*s2*zw1*xy2*(c*s2**2*y**2*z*(x**2 - 1) - x**3*x3 + x*x1)/((z - 1)*(z + 1))
+        val[..., 0] = -r**(z - 2)*s2*zw1*xy2*(c*s2**2*y**2*z*(x**2 - 1) - x**3*x3 + x*x1)/((z - 1)*(z + 1))
         xy2 = (x**2 - 1)**2*(y**2 - 1)
         y2 = r**2*s2**2 + 8*r**2 - 2*z
         k = r*s2*y**3*zw*(z + 1) - r*s2*y*zw*(-4*r**2 + z + 1) + 2*s*y**4*z + s*y**2*y2
-        val[:, 1] =r**(z - 2)*s2*zw1*xy2*(c*s2**2*x*y*z*(y**2 - 1) - r**2*s*s2**2 + k )/((z - 1)*(z + 1))
+        val[..., 1] =r**(z - 2)*s2*zw1*xy2*(c*s2**2*x*y*z*(y**2 - 1) - r**2*s*s2**2 + k )/((z - 1)*(z + 1))
         return val
 
     def laplace(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -637,8 +646,8 @@ class BiharmonicData8:
         return np.sum(val*n, axis=1)
 
     def source(self,p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)

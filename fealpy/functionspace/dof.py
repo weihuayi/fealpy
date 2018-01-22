@@ -1,4 +1,6 @@
 import numpy as np
+import operator as op
+from functools import reduce
 
 class CPLFEMDof1d():
     def __init__(self, mesh, p):
@@ -422,16 +424,106 @@ class CPLFEMDof3d():
             ipoint[N+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w, point[cell,:]).reshape(-1, dim)
         return ipoint  
 
-
-class DPLFEMDof1d():
+class DPLFEMDof():
     def __init__(self, mesh, p):
-        pass
+        self.mesh = mesh
+        self.p = p 
+        self.multiIndex = self.multi_index_matrix() 
+        self.cell2dof = self.cell_to_dof()
+
+    def multi_index_matrix(self):
+        return None
+
+    def cell_to_dof(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.ds.cell
+
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
+        return cell2dof 
+
+    def number_of_global_dofs(self):
+        NC = self.mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        gdof = ldof*NC 
+        return gdof
+
+    def number_of_local_dofs(self):
+        p = self.p 
+        d = self.dim
+        numer = reduce(op.mul, range(p+d, p+d-2, -1))
+        denom = reduce(op.mul, range(1, d+1))
+        return numer//denom
+
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.ds.cell
+        point = mesh.point
+
+        if p == 1:
+            return point
+
+        N = point.shape[0]
+        dim = point.shape[1]
+        NC = mesh.number_of_cells() 
+
+        ldof = self.number_of_local_dofs()
+        gdof = self.number_of_global_dofs()
+        w = self.multiIndex/p
+        ipoint = np.einsum('ij, kj...->ki...', w, point[cell]).reshape(-1, point.shape[-1])
+        return ipoint
+
+class DPLFEMDof1d(DPLFEMDof):
+    def __init__(self, mesh, p):
+        super(DPLFEMDof, self).__init__(mesh, p) 
+        self.dim = 1
+        
+
+    def multi_index_matrix(self):
+        p = self.p
+        ldof = self.number_of_local_dofs()
+        multiIndex = np.zeros((ldof, 2), dtype=np.int)
+        multiIndex[:, 0] = np.arange(p, -1, -1)
+        multiIndex[:, 1] = p - multiIndex[:, 0]
+        return multiIndex 
+
 
 class DPLFEMDof2d():
     def __init__(self, mesh, p):
-        pass
+        super(DPLFEMDof, self).__init__(mesh, p) 
+        self.dim = 2
+
+    def multi_index_matrix(self):
+        p = self.p
+        ldof = self.number_of_local_dofs() 
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        multiIndex = np.zeros((ldof, 3), dtype=np.int)
+        multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:,1] = idx0 - multiIndex[:,2]
+        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2] 
+        return multiIndex
+
 
 class DPLFEMDof3d():
     def __init__(self, mesh, p):
-        pass
+        super(DPLFEMDof, self).__init__(mesh, p) 
+        self.dim = 3
 
+    def multi_index_matrix(self):
+        p = self.p
+        ldof = self.number_of_local_dofs()
+        idx = np.arange(1, ldof)
+        idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3) 
+        idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+        idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+        idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+        multiIndex = np.zeros((ldof, 4), dtype=np.int)
+        multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+        multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+        multiIndex[1:, 1] = idx0 - idx2
+        multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+        return multiIndex

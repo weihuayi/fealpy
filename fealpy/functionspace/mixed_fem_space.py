@@ -1,10 +1,9 @@
 import numpy as np
 
-class RaviartThomasFiniteElementSpace2d:
-    def __init__(self, mesh, p=0, dtype=np.float):
+class RTFiniteElementSpace2d:
+    def __init__(self, mesh, p=0):
         self.mesh = mesh
         self.p = p
-        self.dtype= dtype
 
     def cell_to_edge_sign(self):
         mesh = self.mesh
@@ -16,36 +15,35 @@ class RaviartThomasFiniteElementSpace2d:
 
     def basis(self, bc):
         mesh = self.mesh
-        dim = mesh.geom_dimension()
-
-        ldof = self.number_of_local_dofs()
-
-        NC = mesh.number_of_cells()
         p = self.p
-        phi = np.zeros((NC, ldof, dim), dtype=self.dtype)
-        Rlambda, _ = mesh.rot_lambda()
+        ldof = self.number_of_local_dofs()
+        NC = mesh.number_of_cells()
+        Rlambda = mesh.rot_lambda()
         cell2edgeSign = self.cell_to_edge_sign()
+        shape = bc.shape[:-1] + (NC, ldof, 2)
+        phi = np.zeros(shape, dtype=np.float)
         if p == 0:
-            phi[:, 0, :] = bc[1]*Rlambda[:, 2, :] - bc[2]*Rlambda[:, 1, :]
-            phi[:, 1, :] = bc[2]*Rlambda[:, 0, :] - bc[0]*Rlambda[:, 2, :]
-            phi[:, 2, :] = bc[0]*Rlambda[:, 1, :] - bc[1]*Rlambda[:, 0, :]
+            phi[..., 0, :] = bc[..., 1, np.newaxis, np.newaxis]*Rlambda[:, 2, :] - bc[..., 2, np.newaxis, np.newaxis]*Rlambda[:, 1, :]
+            phi[..., 1, :] = bc[..., 2, np.newaxis, np.newaxis]*Rlambda[:, 0, :] - bc[..., 0, np.newaxis, np.newaxis]*Rlambda[:, 2, :]
+            phi[..., 2, :] = bc[..., 0, np.newaxis, np.newaxis]*Rlambda[:, 1, :] - bc[..., 1, np.newaxis, np.newaxis]*Rlambda[:, 0, :]
             phi *= cell2edgeSign.reshape(-1, 3, 1)
         else:
-            #TODO:raise a error
-            print("error")
+            raise ValueError('p')
 
         return phi
 
     def grad_basis(self, bc):
         mesh = self.mesh
-        dim = mesh.geom_dimension()
         p = self.p
 
-        gradPhi = np.zeros((NC, ldof, dim, dim), dtype=self.dtype)
+        ldof = self.number_of_local_dofs()
+        NC = mesh.number_of_cells()
+        shape = (NC, ldof, 2, 2)
+        gradPhi = np.zeros(shape, dtype=np.float)
 
         cell2edgeSign = self.cell_to_edge_sign()
-        W = np.array([[0, 1], [-1, 0]], dtype=self.dtype)
-        Rlambda, _ = mesh.rot_lambda()
+        W = np.array([[0, 1], [-1, 0]], dtype=np.float)
+        Rlambda= mesh.rot_lambda()
         Dlambda = Rlambda@W
         if p == 0:
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
@@ -71,17 +69,18 @@ class RaviartThomasFiniteElementSpace2d:
         mesh = self.mesh
         p = self.p
 
-        divPhi = np.zeors((NC, ldof), dtype=self.dtype)
+        ldof = self.number_of_local_dofs()
+        NC = mesh.number_of_cells()
+        divPhi = np.zeors((NC, ldof), dtype=np.float)
         cell2edgeSign = self.cell_to_edge_sign()
-        W = np.array([[0, 1], [-1, 0]], dtype=self.dtype)
+        W = np.array([[0, 1], [-1, 0]], dtype=np.float)
 
-        Rlambda, _ = mesh.rot_lambda()
+        Rlambda = mesh.rot_lambda()
         Dlambda = Rlambda@W
         if p == 1:
             divPhi[:, 0] = np.sum(Dlambda[:, 1, :]*Rlambda[:, 2, :], axis=1) - np.sum(Dlambda[:, 2, :]*Rlambda[:, 1, :], axis=1)
             divPhi[:, 1] = np.sum(Dlambda[:, 2, :]*Rlambda[:, 0, :], axis=1) - np.sum(Dlambda[:, 0, :]*Rlambda[:, 2, :], axis=1)
             divPhi[:, 2] = np.sum(Dlambda[:, 0, :]*Rlambda[:, 1, :], axis=1) - np.sum(Dlambda[:, 1, :]*Rlambda[:, 0, :], axis=1)
-
             divPhi *= cell2edgeSign
         else:
             #TODO:raise a error

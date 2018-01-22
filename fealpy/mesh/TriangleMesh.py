@@ -119,7 +119,6 @@ class TriangleMesh(Mesh2d):
             edge2newPoint = np.arange(N, N+NE)
             newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
             if surface is not None:
-                #TODO: just project the boundary point
                 newPoint, _ = surface.project(newPoint)
             self.point = np.concatenate((point, newPoint), axis=0)
             p = np.concatenate((cell, edge2newPoint[cell2edge]), axis=1)

@@ -137,15 +137,22 @@ class LShapeRSinData:
             (-1, 1),
             (0, 1),
             (1, 1)], dtype=np.float)
-        cell = np.array([
-            (0, 1, 3, 2),
-            (2, 3, 6, 5),
-            (3, 4, 7, 6)], dtype=np.int)
         if meshtype is 'quadtree':
+            cell = np.array([
+                (0, 1, 3, 2),
+                (2, 3, 6, 5),
+                (3, 4, 7, 6)], dtype=np.int)
             mesh = Quadtree(point, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
+            cell = np.array([
+                (1, 3, 0),
+                (2, 0, 3),
+                (3, 6, 2),
+                (5, 2, 6),
+                (4, 7, 3),
+                (6, 3, 7)], dtype=np.int)
             mesh = TriangleMesh(point, cell)
             mesh.uniform_refine(n)
             return mesh
@@ -156,8 +163,8 @@ class LShapeRSinData:
         pass
 
     def solution(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
@@ -169,7 +176,7 @@ class LShapeRSinData:
         INPUT:
             p: array object, N*2
         """
-        rhs = np.zeros(p.shape[0]) 
+        rhs = np.zeros(p.shape[0:-1]) 
         return rhs
 
     def gradient(self, p):
@@ -177,14 +184,15 @@ class LShapeRSinData:
         """
         sin = np.sin
         cos = np.cos
-        x = p[:, 0]
-        y = p[:, 1]
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         r = x**2 + y**2
-        val = np.zeros((len(x),2),dtype=p.dtype)
-        val[:, 0] = 2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
-        val[:, 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3)) 
+        val = np.zeros(p.shape,dtype=p.dtype)
+        val[..., 0] = 2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
+        val[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3)) 
         return val
 
     def dirichlet(self, p):

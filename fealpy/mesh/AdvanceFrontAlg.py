@@ -34,8 +34,6 @@ class PolygonDomain():
 
         N = self.number_of_vertices()
 
-
-
         
         
 

@@ -6,7 +6,7 @@ class FunctionNorm():
         self.integrator = integrator
         self.area = area
 
-    def L2_norm(u, mesh, funtype='scalar'):
+    def L2_norm(self, u, mesh, funtype='scalar'):
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
         if isinstance(u, types.FunctionType) or isinstance(u, types.MethodType):
@@ -28,13 +28,28 @@ class FunctionNorm():
             e *= self.area
         return np.sqrt(e.sum()) 
 
+    def H1_semi_norm(self, uh, mesh, elemtype=False):
+        qf = self.integrator  
+        bcs, ws = qf.quadpts, qf.weights
+        val = u.grad_value(bcs)
+        l = np.sum(val**2, axis=-1)
+        e = np.einsum('i, ij->j', ws, l)
+
+        if self.area is None:
+            e *= mesh.area()
+        else:
+            e *= self.area
+
+        if elemtype is True:
+            return np.sqrt(e)
+        else:
+            return np.sqrt(e.sum()) 
+
     def L2_error(self, u, uh, funtype='scalar'):
         mesh = uh.V.mesh
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
         val0 = uh.value(bcs)
-        print(bcs.shape)
-        print(ws)
 
         pp = mesh.bc_to_point(bcs)
         val1 = u(pp)
@@ -57,20 +72,25 @@ class FunctionNorm():
         gdof = uh.V.number_of_global_dofs()
         return np.sqrt(np.sum((uI - uh)**2)/gdof)
 
+    def infty_error(self, u, uh):
+        uI = uh.V.interpolation(u)
+        gdof = uh.V.number_of_global_dofs()
+        return np.max(np.abs(uI - uh))
+
     def H1_semi_error(self, gu, uh, funtype='scalar'):
         mesh = uh.V.mesh
         qf = self.integrator 
         bcs, ws = qf.quadpts, qf.weights
         if funtype is 'scalar':
-            guh = uh.value(bcs)
+            val0 = uh.grad_value(bcs)
         elif funtype is 'vector':
-            guh = uh.grad_value(bcs)
+            val0 = uh.value(bcs)
         else:
             raise ValueError('funtype "{}"'.format(funtype))
 
         pp = mesh.bc_to_point(bcs)
-        gu = gu(pp)
-        e = np.sum((guh - gu)**2, axis=-1)
+        val1 = gu(pp)
+        e = np.sum((val1 - val0)**2, axis=-1)
         e = np.einsum('i, ij->j', ws, e)
         if self.area is None:
             e *= mesh.area()
@@ -84,7 +104,7 @@ class FunctionNorm():
         return np.sqrt(e0**2 + e1**2)
 
     def div_error(self, divu, guh, funtype='scalar'):
-        mesh = uh.V.mesh
+        mesh = guh.V.mesh
         qf = self.integrator 
         bcs, ws = qf.quadpts, qf.weights
         val0 = guh.div_value(bcs)

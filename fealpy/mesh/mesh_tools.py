@@ -144,7 +144,7 @@ def show_mesh_2d(axes, mesh,
     cell = mesh.ds.cell
 
 
-    if mesh.meshtype is not 'polygon':
+    if mesh.meshType is not 'polygon':
         if mesh.geom_dimension() == 2:
             poly = PolyCollection(point[cell, :])
         else:

@@ -177,10 +177,14 @@ class LagrangeFiniteElementSpace():
         return np.zeros((gdof,), dtype=np.float)
 
 class VectorLagrangeFiniteElementSpace():
-    def __init__(self, mesh, p=1, spacetype='C'):
+    def __init__(self, mesh, p=1, vectordim=None, spacetype='C'):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
         self.mesh = mesh
         self.dof = self.scalarspace.dof 
+        if vectordim is None:
+            self.vectordim = mesh.geom_dimension()
+        else:
+            self.vectordim = vectordim 
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
@@ -227,6 +231,67 @@ class VectorLagrangeFiniteElementSpace():
 
     def array(self):
         gdof = self.number_of_global_dofs()
-        dim = self.mesh.geom_dimension()
-        return np.zeros((gdof, dim), dtype=np.float)
+        return np.zeros((gdof, self.vectordim), dtype=np.float)
 
+class TensorLagrangeFiniteElementSpace():
+    def __init__(self, mesh, p, tensorshape, spacetype='C'):
+        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
+        self.mesh = mesh
+        self.dof = self.scalarspace.dof 
+        if type(tensorshape) is int:
+            self.tensorshape = (tensorshape, )
+        elif isinstance(tensorshape, tuple):
+            self.tensorshape = tensorshape
+        else:
+            raise ValueError("the type of `tensorshape` must be `int` or `tuple`!")
+
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
+    def basis(self, bc):
+        return self.scalarspace.basis(bc)
+
+    def grad_basis(self, bc, cellidx=None):
+        return self.scalarspace.grad_basis(bc, cellidx=cellidx)
+
+    def value(self, uh, bc, cellidx=None):
+        phi = self.basis(bc)
+        cell2dof = self.dof.cell2dof
+        s0 = 'abcdefg'
+        s1 = '...j, ij{}->...i{}'.format(s0[:len(self.tensorshape)], s0[:len(self.tensorshape)])
+        if cellidx is None:
+            val = np.einsum(s1, phi, uh[cell2dof])
+        else:
+            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+        return val 
+
+    def grad_value(self, uh, bc, cellidx=None):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        gphi = self.grad_basis(bc, cellidx=cellidx)
+        cell2dof = self.dof.cell2dof
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:len(self.tensorshape)], s0[:len(self.tensorshape)])
+        if cellidx is None:
+            val = np.einsum(s1, gphi, uh[cell2dof])
+        else:
+            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+        return val
+
+
+    def div_value(self, uh, bc, cellidx=None):
+        val = self.grad_value(uh, bc, cellidx=cellidx)
+        return np.sum(np.diagonal(val, axis1=-2, axis2=-1), axis=-1) 
+
+    def number_of_global_dofs(self):
+        return self.scalarspace.number_of_global_dofs()
+        
+    def number_of_local_dofs(self):
+        return self.scalarspace.number_of_local_dofs()
+
+    def function(self):
+        return FiniteElementFunction(self)
+
+    def array(self):
+        gdof = self.number_of_global_dofs()
+        return np.zeros((gdof,)+self.tensorshape, dtype=np.float)

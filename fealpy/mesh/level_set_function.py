@@ -223,29 +223,133 @@ class TwelveSpheres:
         pass
 
 
-
-def project(surface, p, maxit=200, tol=1e-8):
+def project(surface, p0, maxit=200, tol=1e-8):
     eps = np.finfo(float).eps
-    p0 = p
+    p = p0
+    value = surface(p)
+    s = np.sign(value)
+    grad = surface.gradient(p)
+    lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+
+    pp = p - value[..., np.newaxis]*grad/lg**2
+    v = s[..., np.newaxis]*(pp - p0)
+    lv = np.sqrt(np.sum(v**2, axis=-1))
+    d = s*lv
+
+    g = surface.gradient(pp)
+    l = np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+    p = p0 - d[..., np.newaxis]*g/l
+    del pp, v, lv, d, g, l
+    
     k = 0
-    while k < maxit:
-        value = surface(p0)
-        s = np.sign(value)
-        grad = surface.gradient(p0)
-        lg = np.sum(grad**2, axis=1)
-        n = grad/np.sqrt(lg).reshape(-1, 1)
-        p0 = p0 - value.reshape(-1, 1)*n
-        v = s.reshape(-1, 1)*(p - p0)
-        lv = np.sqrt(np.sum(v**2, axis=1))
-        isNotOK = (lv > np.sqrt(eps))
-        ev = n[isNotOK] - v[isNotOK]/(lv.reshape(-1, 1)[isNotOK])
-        e = np.max(np.sqrt(value[isNotOK]**2/(lg.reshape(-1, 1)[isNotOK]) + np.sum(ev**2, axis=1)))
-        if e > tol:
+    while True:
+        value = surface(p)
+        grad = surface.gradient(p)
+        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+
+        v = s[..., np.newaxis]*(p0 - p)
+        lv = np.sqrt(np.sum(v**2, axis=-1))
+        d = s*lv
+
+        ev = grad/lg - v/lv[..., np.newaxis]
+        e = np.max(np.sqrt((value/lg)**2 + np.sum(ev**2, axis=-1)))
+        print(e)
+        if e < tol:
             break
         else:
             k += 1
-    d = s*lv
-    return p0, d
+            if k > maxit:
+                break
+            pp = p - value[..., np.newaxis]*grad/lg**2
+            v = s[..., np.newaxis]*(pp - p0)
+            lv = np.sqrt(np.sum(v**2, axis=-1))
+            d = s*lv
+
+            g = surface.gradient(pp)
+            l = np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+            p = p0 - d[..., np.newaxis]*g/l
+            del pp, v, lv, d, g, l
+
+    return p, d
+        
+    
+
+class HeartSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return (x - z**2)**2 + y**2 + z**2 - 1.0 
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 2*(x - z**2)
+        grad[..., 1] = 2*y
+        grad[..., 2] = -4*(x - z**2)*z + 2*z
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n 
+    
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        S = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
+
+        
+        H[..., 0, 0] = -(-2*z**4+2*x*z**2-y**2-z**2)/S**1.5
+        H[..., 0, 1] = -(-z**2+x)*y/S**1.5
+        H[..., 1, 0] = -y*(-4*z**4+4*x*z**2-3*z**2+x)/S**1.5
+        H[..., 0, 2] = -z*(-4*z**6+12*x*z**4-12*x**2*z**2+4*x**3+4*x**3+4*x*z**2-4*x**2+2*y**2+z**2+x)/S**1.5
+        H[..., 2, 0] = -z*(2*y**2-z**2+x)/S**1.5
+        H[..., 1, 1] = (4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+z**2)/S**1.5
+        H[..., 1, 2] = -y*z*(12*z**4-16*x*z**2+4*x**2+10*z**2-6*x+1)/S**1.5
+        H[..., 2, 1] = z*(-2*z**2+2*x-1)*y/S**1.5
+        H[..., 2, 2] = -(-2*z**6+6*x*z**4-6*x**2*z**2-6*y**2*z**2+z**4+2*x**3+2*x*y**2-x**2-y**2)/S**1.5
+        return H
+
+    def jacobi(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
+        J[..., 0, 0] += 1
+        J[..., 1, 1] += 1
+        J[..., 2, 2] += 1
+        return J
+
+    def init_mesh(self):
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../data/heart2697.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
 
 class EllipsoidSurface:
     def __init__(self, c=[5, 4, 3]):
@@ -409,82 +513,6 @@ class TorusSurface:
         return TriangleMesh(point,cell)
 
 
-class HeartSurface:
-    def __init__(self):
-        self.box = [-2, 2, -2, 2, -2, 2]
-
-    def __call__(self, *args):
-        if len(args) == 1:
-            p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
-        elif len(args) == 3:
-            x, y, z = args
-        else:
-            raise ValueError("the args must be a N*3 array or x, y, z")
-
-        return (x - z**2)**2 + y**2 + z**2 - 1.0 
-
-    def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
-        return p0, d
-
-    def gradient(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[:, 0] = 2*(x - z**2)
-        grad[:, 1] = 2*y
-        grad[:, 2] = -4*(x - z**2)*z + 2*z
-        return grad
-
-    def unit_normal(self, p):
-        grad = self.gradient(p)
-        l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
-        n = grad/l
-        return n 
-    
-    
-    def hessian(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        H = np.zeros((len(p), 3, 3), dtype=np.float)
-        S = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
-
-        
-        H[:, 0, 0] = -(-2*z**4+2*x*z**2-y**2-z**2)/S**1.5
-        H[:, 0, 1] = -(-z**2+x)*y/S**1.5
-        H[:, 1, 0] = -y*(-4*z**4+4*x*z**2-3*z**2+x)/S**1.5
-        H[:, 0, 2] = -z*(-4*z**6+12*x*z**4-12*x**2*z**2+4*x**3+4*x**3+4*x*z**2-4*x**2+2*y**2+z**2+x)/S**1.5
-        H[:, 2, 0] = -z*(2*y**2-z**2+x)/S**1.5
-        H[:, 1, 1] = (4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+z**2)/S**1.5
-        H[:, 1, 2] = -y*z*(12*z**4-16*x*z**2+4*x**2+10*z**2-6*x+1)/S**1.5
-        H[:, 2, 1] = z*(-2*z**2+2*x-1)*y/S**1.5
-        H[:, 2, 2] = -(-2*z**6+6*x*z**4-6*x**2*z**2-6*y**2*z**2+z**4+2*x**3+2*x*y**2-x**2-y**2)/S**1.5
-        return H
-
-    def jacobi(self, p):
-        H = self.hessian(p)
-        n = self.unit_normal(p)
-        p[:], d = self.project(p)
-
-        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[:, 0, 0] += 1
-        J[:, 1, 1] += 1
-        J[:, 2, 2] += 1
-        return J
-
-    def init_mesh(self):
-        import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
- 
-        data = sio.loadmat('../meshdata/heart2697.mat')
-        point = data['node']
-        cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
 
 class OrthocircleSurface:
     def __init__(self, c=[0.075, 3]):
