@@ -9,8 +9,8 @@ p=3
 surface = HeartSurface()
 mesh = surface.init_mesh()
 mesh.uniform_refine(2, surface=surface)
-V = LagrangeFiniteElementSpace(mesh, p)
-ipoint = V.interpolation_points()
+#V = LagrangeFiniteElementSpace(mesh, p)
+#ipoint = V.interpolation_points()
 #point, d = surface.project(ipoint)
 
 fig = plt.figure()

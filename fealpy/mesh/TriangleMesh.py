@@ -121,13 +121,8 @@ class TriangleMesh(Mesh2d):
             if surface is not None:
                 newPoint, _ = surface.project(newPoint)
             self.point = np.concatenate((point, newPoint), axis=0)
-            p = np.concatenate((cell, edge2newPoint[cell2edge]), axis=1)
-            cell = np.concatenate((
-                p[:, [0, 5, 4]], 
-                p[:, [5, 1, 3]],
-                p[:, [4, 3, 2]],
-                p[:, [3, 4, 5]]))
-
+            p = np.r_['-1', cell, edge2newPoint[cell2edge]] 
+            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
             N = self.number_of_points()
             self.ds.reinit(N, cell)
 

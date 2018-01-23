@@ -28,7 +28,6 @@ class Mesh2d():
 
     def barycenter(self, entity='cell'):
         point = self.point
-        dim = point.shape[1] 
         if entity == 'cell':
             cell = self.ds.cell
             bc = np.sum(point[cell, :], axis=1)/cell.shape[1]
@@ -38,8 +37,7 @@ class Mesh2d():
         elif entity == 'point':
             bc = point
         else:
-            pass
-            #TODO: rasie a error
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
     def area(self):

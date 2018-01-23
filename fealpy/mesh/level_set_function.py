@@ -222,7 +222,6 @@ class TwelveSpheres:
     def init_mesh(self):
         pass
 
-
 def project(surface, p0, maxit=200, tol=1e-8):
     eps = np.finfo(float).eps
     p = p0
@@ -230,45 +229,50 @@ def project(surface, p0, maxit=200, tol=1e-8):
     s = np.sign(value)
     grad = surface.gradient(p)
     lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
-
-    pp = p - value[..., np.newaxis]*grad/lg**2
+    grad /= lg
+    grad /= lg
+    grad *= value[..., np.newaxis]
+    pp = p - grad 
     v = s[..., np.newaxis]*(pp - p0)
-    lv = np.sqrt(np.sum(v**2, axis=-1))
-    d = s*lv
+    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+    d *= s[..., np.newaxis]
 
     g = surface.gradient(pp)
-    l = np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-    p = p0 - d[..., np.newaxis]*g/l
-    del pp, v, lv, d, g, l
+    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+    g *= d 
+    p = p0 - g 
     
     k = 0
     while True:
         value = surface(p)
         grad = surface.gradient(p)
         lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+        grad /= lg
 
         v = s[..., np.newaxis]*(p0 - p)
-        lv = np.sqrt(np.sum(v**2, axis=-1))
-        d = s*lv
+        d = np.sqrt(np.sum(v**2, axis=-1))
+        v /= d[..., np.newaxis]
+        d *= s
 
-        ev = grad/lg - v/lv[..., np.newaxis]
-        e = np.max(np.sqrt((value/lg)**2 + np.sum(ev**2, axis=-1)))
-        print(e)
+        ev = grad - v 
+        e = np.max(np.sqrt((value/lg.reshape(-1))**2 + np.sum(ev**2, axis=-1)))
         if e < tol:
             break
         else:
             k += 1
             if k > maxit:
                 break
-            pp = p - value[..., np.newaxis]*grad/lg**2
+            grad /= lg
+            grad *= value[..., np.newaxis]
+            pp = p - grad
             v = s[..., np.newaxis]*(pp - p0)
-            lv = np.sqrt(np.sum(v**2, axis=-1))
-            d = s*lv
+            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+            d *= s[..., np.newaxis]
 
             g = surface.gradient(pp)
-            l = np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-            p = p0 - d[..., np.newaxis]*g/l
-            del pp, v, lv, d, g, l
+            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+            g *= d
+            p = p0 - g 
 
     return p, d
         
@@ -360,9 +364,9 @@ class EllipsoidSurface:
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -376,33 +380,34 @@ class EllipsoidSurface:
         return p0, d
 
     def gradient(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
         a, b, c = self.c
         grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[:, 0] = 2*x/a**2 
-        grad[:, 1] = 2*y/b**2 
-        grad[:, 2] = 2*z/c**2 
+        grad[..., 0] = 2*x/a**2 
+        grad[..., 1] = 2*y/b**2 
+        grad[..., 2] = 2*z/c**2 
         return grad
 
     def hessian(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
-        H = np.zeros((len(p), 3, 3), dtype=np.float)
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
         S = a**4*b**4*z**2+a**4*c**4*y**2+b**4*c**4*x**2
         T = np.sqrt(S/a**4*b**4*c**4)
         
-        H[:, 0, 0] = (b**4*z**2+c**4*y**2)*a**2/(S*T)  
-        H[:, 0, 1] = -a**2*c**4*x*y/(S*T)
-        H[:, 1, 0] = -b**2*c**4*x*y/(S*T)
-        H[:, 0, 2] = -a**2*b**4*x*z/(S*T)
-        H[:, 2, 0] = -b**4*c**2*x*z/(S*T)
-        H[:, 1, 1] = b**2*(a**4*z**2+c**4*x**2)/(S*T)
-        H[:, 1, 2] = -a**4*b**2*y*z/(S*T)
-        H[:, 2, 1] = -a**4*c**2*y*z/(S*T)
-        H[:, 2, 2] = c**2*(a**4*y**2+b**4*x**2)/(S*T)
+        H[..., 0, 0] = (b**4*z**2+c**4*y**2)*a**2/(S*T)  
+        H[..., 0, 1] = -a**2*c**4*x*y/(S*T)
+        H[..., 1, 0] = -b**2*c**4*x*y/(S*T)
+        H[..., 0, 2] = -a**2*b**4*x*z/(S*T)
+        H[..., 2, 0] = -b**4*c**2*x*z/(S*T)
+        H[..., 1, 1] = b**2*(a**4*z**2+c**4*x**2)/(S*T)
+        H[..., 1, 2] = -a**4*b**2*y*z/(S*T)
+        H[..., 2, 1] = -a**4*c**2*y*z/(S*T)
+        H[..., 2, 2] = c**2*(a**4*y**2+b**4*x**2)/(S*T)
         return H
 
     def jacobi(self, p):
@@ -411,9 +416,9 @@ class EllipsoidSurface:
         p[:], d = self.project(p)
 
         J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[:, 0, 0] += 1
-        J[:, 1, 1] += 1
-        J[:, 2, 2] += 1
+        J[..., 0, 0] += 1
+        J[..., 1, 1] += 1
+        J[..., 2, 2] += 1
         return J
 
 
@@ -426,7 +431,6 @@ class EllipsoidSurface:
     def init_mesh(self):
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
- 
         data = sio.loadmat('../meshdata/mpsoid3394.mat')
         point = data['node']
         cell = data['elem'] - 1
