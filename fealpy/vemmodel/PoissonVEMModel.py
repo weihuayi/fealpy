@@ -5,6 +5,7 @@ from ..functionspace.vem_space import VirtualElementSpace2d
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..quadrature import QuadrangleQuadrature 
+from ..vemmodel import form 
 
 from timeit import default_timer as timer
 
@@ -76,8 +77,7 @@ class PoissonVEMModel():
             k = np.ones(NC) 
             
         # project the vem solution into linear polynomial space
-        S = V.project_to_smspace(self.uh)
-        S /=h.reshape(-1, 1)
+        S = V.project_to_smspace(self.uh, self.B)
 
         p2c = mesh.ds.point_to_cell()
         try: 
@@ -139,70 +139,10 @@ class PoissonVEMModel():
         return eta
 
     def get_left_matrix(self):
-        V = self.V
-        mesh = V.mesh
-        NC = mesh.number_of_cells()
-
-        p = V.p
-        area = V.smspace.area
-        h = V.smspace.h
-
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        smldof = V.smspace.number_of_local_dofs()
-
-        cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
-        cell = mesh.ds.cell
-        point = mesh.point
-
-        if p == 1:
-            NV = mesh.number_of_vertices_of_cells()
-            cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-            BB, DD, tG = V.get_matrix()
-            
-            f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
-            f2 = lambda x: np.repeat(x, x.shape[0]) 
-            f3 = lambda x: np.tile(x, x.shape[0])
-            f4 = lambda x: x.flatten()
-
-            try:
-                barycenter = V.smspace.barycenter 
-                k = self.model.diffusion_coefficient(barycenter)
-            except  AttributeError:
-                k = np.ones(NC) 
-
-            K = list(map(f1, zip(DD, BB, k)))
-            I = np.concatenate(list(map(f2, cd)))
-            J = np.concatenate(list(map(f3, cd)))
-            val = np.concatenate(list(map(f4, K)))
-            A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-            end = timer()
-        
-        else:
-            raise ValueError("I have not code the vem with degree > 1!")
-
-        return A
+        return form.stiff_matrix(self)
 
     def get_right_vector(self):
-
-        V = self.V
-        mesh = V.mesh
-        model = self.model
-
-        ldof = V.number_of_local_dofs()
-        bb = np.zeros(ldof.sum(), dtype=np.float)
-        point = mesh.point
-        NV = mesh.number_of_vertices_of_cells()
-        F = model.source(point)
-        area = V.smspace.area
-        cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
-        bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
-        gdof = V.number_of_global_dofs()
-        b = np.bincount(cell2dof, weights=bb, minlength=gdof)
-        return b
-
-    def get_neuman_vector(self):
-        pass
+        return form.source_vector(self)
 
     def solve(self):
         uh = self.uh
