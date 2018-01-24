@@ -334,29 +334,28 @@ class HeartSurface:
         H[..., 2, 1] = z*(-2*z**2+2*x-1)*y/S**1.5
         H[..., 2, 2] = -(-2*z**6+6*x*z**4-6*x**2*z**2-6*y**2*z**2+z**4+2*x**3+2*x*y**2-x**2-y**2)/S**1.5
         return H
-
-    def jacobi(self, p):
+    
+    def jacobi_matrix(self, p):
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
 
-        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[..., 0, 0] += 1
-        J[..., 1, 1] += 1
-        J[..., 2, 2] += 1
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
         return J
+
 
     def init_mesh(self):
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
  
-        data = sio.loadmat('../data/heart2697.mat')
+        data = sio.loadmat('../data/heartsurfaceopt.mat')
         point = data['node']
         cell = data['elem'] - 1
         return TriangleMesh(point,cell)
 
 class EllipsoidSurface:
-    def __init__(self, c=[5, 4, 3]):
+    def __init__(self, c=[9, 3, 1]):
         m = np.max(c)
         self.box = [-m, m, -m, m, -m, m]
         self.c = c
@@ -374,10 +373,12 @@ class EllipsoidSurface:
 
         a, b, c = self.c
         return x**2/a**2 + y**2/b**2 + z**2/c**2 - 1 
-
+ 
+   
     def project(self, p, maxit=200, tol=1e-8):
         p0, d = project(self, p, maxit=maxit, tol=tol)
         return p0, d
+
 
     def gradient(self, p):
         x = p[..., 0]
@@ -409,16 +410,15 @@ class EllipsoidSurface:
         H[..., 2, 1] = -a**4*c**2*y*z/(S*T)
         H[..., 2, 2] = c**2*(a**4*y**2+b**4*x**2)/(S*T)
         return H
+    
 
-    def jacobi(self, p):
+    def jacobi_matrix(self, p):
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
 
-        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[..., 0, 0] += 1
-        J[..., 1, 1] += 1
-        J[..., 2, 2] += 1
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
         return J
 
 
@@ -431,7 +431,7 @@ class EllipsoidSurface:
     def init_mesh(self):
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
-        data = sio.loadmat('../meshdata/mpsoid3394.mat')
+        data = sio.loadmat('../data/ellipsoidsurface.mat')
         point = data['node']
         cell = data['elem'] - 1
         return TriangleMesh(point,cell)
@@ -443,63 +443,60 @@ class TorusSurface:
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
+            x = p[..., :, 0]
+            y = p[..., :, 1]
+            z = p[..., :, 2]
         elif len(args) == 3:
             x, y, z = args
         else:
             raise ValueError("the args must be a N*3 array or x, y, z")
 
         return np.sqrt(x**2 + y**2 + z**2 + 16 - 8*np.sqrt(x**2 + y**2)) - 1 
-
-    def project(self, p):
-        d = self(p)
-        p = p - d.reshape(-1, 1)*self.gradient(p)
-        return p, d
+    
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol)
+        return p0, d
 
     def gradient(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         s1 = np.sqrt(x**2 + y**2)
         s2 = np.sqrt(s1**2 + z**2 + 16 - 8*s1)
         grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[:, 0] = -(4 - s1)*x/(s1*s2) 
-        grad[:, 1] = -(4 - s1)*y/(s1*s2) 
-        grad[:, 2] = z/s2 
+        grad[..., :, 0] = -(4 - s1)*x/(s1*s2) 
+        grad[..., :, 1] = -(4 - s1)*y/(s1*s2) 
+        grad[..., :, 2] = z/s2 
         return grad
 
     
     def hessian(self, p):
-        x = p[:, 0]
-        y = p[:, 1]
-        z = p[:, 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         H = np.zeros((len(p), 3, 3), dtype=np.float)
         S = np.sqrt(x**2+y**2)
 
-        H[:, 0, 0] = -(x-4*x/S)**2 + 1+4*x**2/S**3-4/S
-        H[:, 0, 1] = x*y*(1-4/S)**2 + 4*x*y/S**3
-        H[:, 1, 0] = H[:, 0, 1]
-        H[:, 0, 2] = -(x-4*x/S)*z
-        H[:, 2, 0] = H[:, 0, 2]
-        H[:, 1, 1] = -(y-4*y/S)**2 + 1+4*y**2/S**3-4/S
-        H[:, 1, 2] = (y-4*y/S)*z
-        H[:, 2, 1] = H[:, 1, 2]
-        H[:, 2, 2] = -z**2+1
+        H[..., :, 0, 0] = -(x-4*x/S)**2 + 1+4*x**2/S**3-4/S
+        H[..., :, 0, 1] = x*y*(1-4/S)**2 + 4*x*y/S**3
+        H[..., :, 1, 0] = H[..., :, 0, 1]
+        H[..., :, 0, 2] = -(x-4*x/S)*z
+        H[..., :, 2, 0] = H[..., :, 0, 2]
+        H[..., :, 1, 1] = -(y-4*y/S)**2 + 1+4*y**2/S**3-4/S
+        H[..., :, 1, 2] = (y-4*y/S)*z
+        H[..., :, 2, 1] = H[..., :, 1, 2]
+        H[..., :, 2, 2] = -z**2+1
         return H
+    
 
-    def jacobi(self, p):
+    def jacobi_matrix(self, p):
         H = self.hessian(p)
         n = self.unit_normal(p)
         p[:], d = self.project(p)
 
-        J = -(d.reshape(-1, 1, 1)*H + np.einsum('ij, ik->ijk', n, n))
-        J[:, 0, 0] += 1
-        J[:, 1, 1] += 1
-        J[:, 2, 2] += 1
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
         return J
-
 
     def unit_normal(self, p):
         grad = self.gradient(p)
@@ -526,9 +523,9 @@ class OrthocircleSurface:
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
+            x = p[..., :, 0]
+            y = p[..., :, 1]
+            z = p[..., :, 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -551,7 +548,7 @@ class OrthocircleSurface:
 
     def gradient(self, p):
         c = self.c
-        x, y, z = p[:, 0], p[:, 1], p[:, 2]
+        x, y, z = p[..., :, 0], p[..., :, 1], p[..., :, 2]
         x2, y2, z2 = x**2, y**2, z**2
         d1 = (x2 + y2 - 1)**2 + z2
         d2 = (y2 + z2 - 1)**2 + x2
@@ -560,11 +557,11 @@ class OrthocircleSurface:
         d22 = d2**2 + x2
         d33 = d3**2 + y2
         grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[:, 0] = 4*d1*x*d22*d33 + 2*d11*x*d33 + 4*d11*d22*d3*x \
+        grad[..., :, 0] = 4*d1*x*d22*d33 + 2*d11*x*d33 + 4*d11*d22*d3*x \
                 - 2*c[0]**2*c[1]*x 
-        grad[:, 1] = 4*d1*y*d22*d33 + 4*d11*d2*y*d33 + 2*d11*d22*y \
+        grad[..., :, 1] = 4*d1*y*d22*d33 + 4*d11*d2*y*d33 + 2*d11*d22*y \
                 -2 * c[0]**2 * c[1] * y
-        grad[:, 2] = 2*z*d22*d33 + 4*d11*d2*z*d33 + 4*d11*d22*d3*z \
+        grad[..., :, 2] = 2*z*d22*d33 + 4*d11*d2*z*d33 + 4*d11*d22*d3*z \
                 - 2* c[0]**2 * c[1] * z
         return grad
 
@@ -574,7 +571,14 @@ class OrthocircleSurface:
         return grad/l
 
     def init_mesh(self):
-        pass
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../data/orthocircle5482.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
+
 
 class QuarticsSurface:
     def __init__(self, r=1.05):
@@ -584,9 +588,9 @@ class QuarticsSurface:
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-            z = p[:, 2]
+            x = p[..., :, 0]
+            y = p[..., :, 1]
+            z = p[..., :, 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -602,12 +606,12 @@ class QuarticsSurface:
         return p0, d
 
     def gradient(self, p):
-        x, y, z = p[:, 0], p[:, 1], p[:, 2]
+        x, y, z = p[..., :, 0], p[..., :, 1], p[..., :, 2]
         x2, y2, z2 = x**2, y**2, z**2
         grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[:, 0] = 4*(x2 - 1)*x  
-        grad[:, 1] = 4*(y2 - 1)*x 
-        grad[:, 2] = 4*(z2 - 1)*x 
+        grad[..., :, 0] = 4*(x2 - 1)*x  
+        grad[..., :, 1] = 4*(y2 - 1)*x 
+        grad[..., :, 2] = 4*(z2 - 1)*x 
         return grad
 
     def unit_normal(self, p):
@@ -616,7 +620,14 @@ class QuarticsSurface:
         return grad/l
 
     def init_mesh(self):
-        pass
+        import scipy.io as sio
+        from .TriangleMesh import TriangleMesh
+ 
+        data = sio.loadmat('../data/quarticssurfaceopt.mat')
+        point = data['node']
+        cell = data['elem'] - 1
+        return TriangleMesh(point,cell)
+
 
 class ImplicitSurface:
     def __init__(self, expression):

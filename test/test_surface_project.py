@@ -1,12 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh.level_set_function import Sphere,TorusSurface,EllipsoidSurface,HeartSurface
+from fealpy.mesh.level_set_function import Sphere, TorusSurface, EllipsoidSurface,HeartSurface, OrthocircleSurface, QuarticsSurface
 from fealpy.functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace 
 
 p=3
-surface = HeartSurface()
+#surface = OrthocircleSurface()
+surface = QuarticsSurface()
 mesh = surface.init_mesh()
 mesh.uniform_refine(2, surface=surface)
 #V = LagrangeFiniteElementSpace(mesh, p)
