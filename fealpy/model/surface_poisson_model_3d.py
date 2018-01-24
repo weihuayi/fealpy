@@ -2,7 +2,8 @@ import numpy as np
 
 class SphereSinSinSinData(object):
     def __init__(self):
-        pass
+        from ..mesh.level_set_function import Sphere
+        self.surface = Sphere()
 
     def solution(self,p):
         """ The exact solution 

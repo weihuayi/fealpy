@@ -10,22 +10,25 @@ def stiff_matrix(fem):
     fem.B = matrix_B(V)
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+    NC = len(cell2dofLocation) - 1
     cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
     BB = np.hsplit(fem.B, cell2dofLocation[1:-1])
     DD = np.vsplit(fem.D, cell2dofLocation[1:-1])
+
+    if p == 1:
+        tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+
+    try:
+        barycenter = V.smspace.barycenter 
+        k = fem.model.diffusion_coefficient(barycenter)
+    except  AttributeError:
+        k = np.ones(NC) 
             
     f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
     f2 = lambda x: np.repeat(x, x.shape[0]) 
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
-    if p == 1:
-        tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
-    try:
-        barycenter = V.smspace.barycenter 
-        k = fem.model.diffusion_coefficient(barycenter)
-    except  AttributeError:
-        k = np.ones(NC) 
 
     K = list(map(f1, zip(DD, BB, k)))
     I = np.concatenate(list(map(f2, cd)))
@@ -100,12 +103,12 @@ def matrix_D(V, H):
     isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation 
-    D = np.zeros((len(cell2dof), smldof), dtype=np.float)
+    D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
     if p == 1:
         bc = np.repeat(V.smspace.barycenter, NV, axis=0) 
         D[:, 1:] = (point[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
-
+        return D
 
     qf = GaussLobattoQuadrature(p + 1)
     bcs, ws = qf.quadpts, qf.weights 
@@ -118,7 +121,7 @@ def matrix_D(V, H):
     D[idx, :] = phi1
     if p > 1:
         area = V.smspace.area
-        idof = int((p-1)*p/2) # the number of dofs of scale polynomial space with degree p-2
+        idof = (p-1)*p//2 # the number of dofs of scale polynomial space with degree p-2
         idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
         D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
     return D
@@ -131,9 +134,10 @@ def matrix_B(V):
     h = V.smspace.h 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float) 
-    if p==1:
+    if p == 1:
         B[0, :] = 1/np.repeat(NV, NV)
         B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1, -1)
+        return B
     else:
         idx = cell2dofLocation[0:-1] + NV*p 
         B[0, idx] = 1
@@ -182,6 +186,6 @@ def matrix_B(V):
                 idx1 = cell2dofLocation[idx0] + edge2cell[i, 3]*p + np.arange(p+1)
                 B[:, idx1] += val[j]
                 j += 1
-    return B
+        return B
 
 

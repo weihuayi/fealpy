@@ -11,3 +11,4 @@ test/*.pdf
 test/*.png
 result
 meshdata
+opengl

@@ -35,8 +35,8 @@ class KelloggData:
         return mesh
 
     def diffusion_coefficient(self, p):
-        idx = p[:, 0]*p[:, 1] >0
-        k = np.ones((p.shape[0], ), dtype=np.float)
+        idx = p[..., 0]*p[..., 1] >0
+        k = np.ones(p.shape[:-1], dtype=np.float)
         k[idx] = self.a  
         return k
 
@@ -44,13 +44,13 @@ class KelloggData:
         """
         get the subdomain flag of the subdomain including point p.
         """
-        is_subdomain = [ p[:, 0]*p[:, 1] >0, p[:, 0]*p[:, 1] < 0]
+        is_subdomain = [ p[..., 0]*p[..., 1] >0, p[..., 0]*p[..., 1] < 0]
         return is_subdomain 
 
     def solution(self, p):
     
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
     
         pi = np.pi
         cos = np.cos
@@ -72,10 +72,10 @@ class KelloggData:
     def gradient(self, p):
         """The gradient of the exact solution
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
 
-        val = np.zeros((len(x), 2), dtype=p.dtype)                      
+        val = np.zeros(p.shape, dtype=p.dtype)                      
         
         pi = np.pi
         cos = np.cos
@@ -90,24 +90,24 @@ class KelloggData:
         t = 1 + (x/y)**2
         r = np.sqrt(x**2 + y**2)
         rg = r**gamma 
-        ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*p[:, 0]*cos((theta-pi/2+rho)*gamma) \
-            +rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t))
-        uy1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma)/r*p[:, 1] \
-            -rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma/(p[:, 0]*t))
-        ux2 = ((x <= 0.0) & (y >= 0.0))*(r**(-1.9)*p[:, 0]*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
-            +rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t));
-        uy2 = ((x <= 0.0) & (y >= 0.0))*( r**(-1.9)*p[:, 1]*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
-            -rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma/(p[:, 0]*t))
-        ux3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*p[:, 0]*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
-            +rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t));
-        uy3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*p[:, 1]*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
-            -rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma/(p[:, 0]*t))
-        ux4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*p[:, 0]*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma) \
-            +rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma*p[:, 1]/((p[:, 0]**2)*t))
-        uy4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*p[:, 1]*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma)\
-            -rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma/(p[:, 0]*t)) 
-        val[:,0] =  ux1+ux2+ux3+ux4
-        val[:,1] =  uy1+uy2+uy3+uy4
+        ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*x*cos((theta-pi/2+rho)*gamma) \
+            +rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma*y/((x**2)*t))
+        uy1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma)/r*y \
+            -rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma/(x*t))
+        ux2 = ((x <= 0.0) & (y >= 0.0))*(r**(-1.9)*x*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
+            +rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma*y/((x**2)*t));
+        uy2 = ((x <= 0.0) & (y >= 0.0))*( r**(-1.9)*y*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
+            -rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma/(x*t))
+        ux3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*x*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
+            +rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma*y/((x**2)*t));
+        uy3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*y*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
+            -rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma/(x*t))
+        ux4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*x*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma) \
+            +rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma*y/((x**2)*t))
+        uy4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*y*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma)\
+            -rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma/(x*t)) 
+        val[...,0] =  ux1+ux2+ux3+ux4
+        val[...,1] =  uy1+uy2+uy3+uy4
         return val
     
     def source(self, p):
@@ -115,7 +115,7 @@ class KelloggData:
         INPUT:
             p:array object, N*2
         """
-        rhs = np.zeros(p.shape[0])
+        rhs = np.zeros(p.shape[0:-1]) 
         return rhs
 
     def dirichlet(self, p):
@@ -205,7 +205,7 @@ class CosCosData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='tri'):
+    def init_mesh(self, n=4, meshtype='quadtree'):
         point = np.array([
             (0, 0),
             (1, 0),
@@ -260,10 +260,6 @@ class CosCosData:
         uprime[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
         uprime[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return uprime
-
-    def is_boundary(self, p):
-        eps = 1e-14 
-        return (p[..., 0] < eps) | (p[..., 1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
 
 class PolynomialData:
     def __init__(self):

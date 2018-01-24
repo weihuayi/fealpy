@@ -8,7 +8,10 @@ def write_obj_mesh(trimesh, f):
     point = trimesh.point
     cell  = trimesh.ds.cell
     mesh = TriMesh()
-    vh = [mesh.add_vertex(mesh.Point(x, y, 0.0)) for x, y in point]
+    if trimesh.geom_dimension() == 2:
+        vh = [mesh.add_vertex(mesh.Point(x, y, 0.0)) for x, y in point]
+    else:
+        vh = [mesh.add_vertex(mesh.Point(x, y, z)) for x, y, z in point]
     fh = [mesh.add_face(vh[i], vh[j], vh[k]) for i, j, k in cell]
     write_mesh(mesh, f)
 

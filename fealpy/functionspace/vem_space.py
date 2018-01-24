@@ -129,7 +129,7 @@ class ScaledMonomialSpace2d():
         gphi = self.grad_basis(point, cellidx=cellidx)
         cell2dof = self.dof.cell2dof
         if cellidx is None:
-            return np.einsum('ij, ijm->im', uh[cell2dof], gphi)
+            return np.einsum('ij, ...ijm->...im', uh[cell2dof], gphi)
         else:
             assert(point.shape[-2] == len(cellidx))
             return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
@@ -169,7 +169,8 @@ class ScaledMonomialSpace2d():
             return np.einsum('ij, ...ij->...i', uh[cell2dof[cellIdx]], lphi)
 
     def function(self):
-        return FiniteElementFunction(self)
+        f = FiniteElementFunction(self)
+        return f 
 
     def array(self):
         ldof = self.number_of_local_dofs()
@@ -284,19 +285,6 @@ class VirtualElementSpace2d():
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.dof = VEMDof2d(mesh, p)
-
-    def project_to_smspace(self, uh, B):
-        #TODO: for general p  G^{-1}B
-        S = self.smspace.function()
-        NC = self.mesh.number_of_cells()
-        NV = self.mesh.number_of_vertices_of_cells()
-        idx = np.repeat(range(NC), NV)
-        cell = self.mesh.ds.cell
-        ldof = self.smspace.number_of_local_dofs()
-        for i in range(ldof):
-            S[i::ldof] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
-        return S
-
 
     def basis(self, bc):
         pass

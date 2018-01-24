@@ -170,7 +170,8 @@ class LagrangeFiniteElementSpace():
         pass
 
     def function(self):
-        return FiniteElementFunction(self)
+        f = FiniteElementFunction(self)
+        return f
 
     def array(self):
         gdof = self.number_of_global_dofs()
@@ -227,7 +228,8 @@ class VectorLagrangeFiniteElementSpace():
         return self.scalarspace.number_of_local_dofs()
 
     def function(self):
-        return FiniteElementFunction(self)
+        f = FiniteElementFunction(self)
+        return f
 
     def array(self):
         gdof = self.number_of_global_dofs()
@@ -290,7 +292,8 @@ class TensorLagrangeFiniteElementSpace():
         return self.scalarspace.number_of_local_dofs()
 
     def function(self):
-        return FiniteElementFunction(self)
+        f = FiniteElementFunction(self)
+        return f
 
     def array(self):
         gdof = self.number_of_global_dofs()

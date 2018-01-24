@@ -2,69 +2,47 @@ import numpy as np
 import types
 
 class FunctionNorm():
-    def __init__(self, integrator, area=None):
+    def __init__(self, integrator, area):
         self.integrator = integrator
         self.area = area
 
-    def L2_norm(self, u, mesh, funtype='scalar'):
+    def L2_norm(self, u, mesh, barycenter=False, elemtype=False):
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
-        if isinstance(u, types.FunctionType) or isinstance(u, types.MethodType):
+        if barycenter is False:
             pp = mesh.bc_to_point(bcs)
             val = u(pp)
         else:
             val = u(bcs)
-        if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, val)
-        elif funtype is 'vector':
-            l = np.sum(val**2, axis=-1)
-            e = np.einsum('i, ij->j', ws, l)
-        else:
-            raise ValueError('funtype "{}"'.format(funtype))
 
-        if self.area is None:
-            e *= mesh.area()
-        else:
-            e *= self.area
-        return np.sqrt(e.sum()) 
-
-    def H1_semi_norm(self, uh, mesh, elemtype=False):
-        qf = self.integrator  
-        bcs, ws = qf.quadpts, qf.weights
-        val = u.grad_value(bcs)
-        l = np.sum(val**2, axis=-1)
-        e = np.einsum('i, ij->j', ws, l)
-
-        if self.area is None:
-            e *= mesh.area()
-        else:
-            e *= self.area
-
+        e = val**2
+        if len(e.shape) == 2:
+            e = np.sum(e, axis=1)
+        e *= self.area 
         if elemtype is True:
             return np.sqrt(e)
         else:
             return np.sqrt(e.sum()) 
 
-    def L2_error(self, u, uh, funtype='scalar'):
-        mesh = uh.V.mesh
+    def L2_error(self, u, uh, mesh=None, barycenter=True):
+        if mesh is None:
+            mesh = uh.V.mesh
+
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
-        val0 = uh.value(bcs)
-
         pp = mesh.bc_to_point(bcs)
-        val1 = u(pp)
-        if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, (val1-val0)**2)
-        elif funtype is 'vector':
-            l = np.sum((val1 - val0)**2, axis=-1)
-            e = np.einsum('i, ij->j', ws, l)
-        else:
-            raise ValueError('funtype "{}"'.format(funtype))
 
-        if self.area is None:
-            e *= mesh.area()
+        if barycenter is True:
+            val0 = uh(bcs)
         else:
-            e *= self.area
+            val0 = uh(pp)
+        val1 = u(pp)
+        
+        e = (val1 - val0)**2
+        axis = tuple(range(2, len(e.shape)))
+        e = np.sum(e, axis=axis)
+        e = np.einsum('i, ij->j', ws, e)
+        e *= self.area 
         return np.sqrt(e.sum()) 
 
     def l2_error(self, u, uh):
@@ -77,50 +55,3 @@ class FunctionNorm():
         gdof = uh.V.number_of_global_dofs()
         return np.max(np.abs(uI - uh))
 
-    def H1_semi_error(self, gu, uh, funtype='scalar'):
-        mesh = uh.V.mesh
-        qf = self.integrator 
-        bcs, ws = qf.quadpts, qf.weights
-        if funtype is 'scalar':
-            val0 = uh.grad_value(bcs)
-        elif funtype is 'vector':
-            val0 = uh.value(bcs)
-        else:
-            raise ValueError('funtype "{}"'.format(funtype))
-
-        pp = mesh.bc_to_point(bcs)
-        val1 = gu(pp)
-        e = np.sum((val1 - val0)**2, axis=-1)
-        e = np.einsum('i, ij->j', ws, e)
-        if self.area is None:
-            e *= mesh.area()
-        else:
-            e *= self.area
-        return np.sqrt(e.sum()) 
-
-    def H1_error(self, u, gu, uh, funtype='scalar'):
-        e0 = self.L2_error(u, uh, funtype=funtype)
-        e1 = self.H1_semi_error(gu, uh, funtype=funtype)
-        return np.sqrt(e0**2 + e1**2)
-
-    def div_error(self, divu, guh, funtype='scalar'):
-        mesh = guh.V.mesh
-        qf = self.integrator 
-        bcs, ws = qf.quadpts, qf.weights
-        val0 = guh.div_value(bcs)
-        pp = mesh.bc_to_point(bcs)
-        val1 = divu(pp)
-
-        if funtype is 'scalar':
-            e = np.einsum('i, ij->j', ws, (val1-val0)**2)
-        elif funtype is 'vector':
-            l = np.sum((val1 - val0)**2, axis=-1)
-            e = np.einsum('i, ij->j', ws, l)
-        else:
-            raise ValueError('funtype "{}"'.format(funtype))
-        e = np.einsum('i, ij->j', ws, (val1 - val0)**2)
-        if self.area is None:
-            e *= mesh.area()
-        else:
-            e *= self.area
-        return np.sqrt(e.sum()) 

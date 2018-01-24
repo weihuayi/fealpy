@@ -3,6 +3,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
@@ -31,6 +32,34 @@ class SurfacePoissonFEMModel(object):
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.mesh.area(self.integrator)
+
+    def recover_estimate(self):
+        if self.V.p > 1:
+            raise ValueError('This method only work for p=1!')
+
+        V = self.V
+        mesh = V.mesh.mesh
+
+        p2c = mesh.ds.point_to_cell()
+        inva = 1/mesh.area()
+        asum = p2c@inva
+
+        bc = np.array([1/3]*3, dtype=np.float)
+        guh = self.uh.grad_value(bc)
+
+        VV = VectorLagrangeFiniteElementSpace(mesh, p=1)
+        rguh = VV.function()
+        rguh[:] = np.asarray(p2c@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
+
+        qf = self.integrator  
+        bcs, ws = qf.quadpts, qf.weights
+
+        val0 = rguh.value(bcs)
+        val1 = self.uh.grad_value(bcs)
+        l = np.sum((val1 - val0)**2, axis=-1)
+        e = np.einsum('i, ij->j', ws, l)
+        e *= self.area
+        return np.sqrt(e)
 
     def get_left_matrix(self):
         V = self.V

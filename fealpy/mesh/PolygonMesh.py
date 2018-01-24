@@ -20,7 +20,7 @@ class PolygonMesh(Mesh2d):
                 raise(ValueError("Miss `cellLocation` array!"))
 
         self.ds = PolygonMeshDataStructure(point.shape[0], cell, cellLocation)
-        self.meshtype = 'polygon'
+        self.meshType = 'polygon'
         self.dtype = dtype
 
     def number_of_vertices_of_cells(self):

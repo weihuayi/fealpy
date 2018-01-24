@@ -59,7 +59,6 @@ def solve(fem, uh, dirichlet=None, solver='cg'):
     if dirichlet is not None:
         AD, b = dirichlet.apply(A, b)
 
-#    print("The condtion number is: ", np.linalg.cond(AD.todense()))
     if solver is 'cg':
         start = timer()
         D = AD.diagonal()
@@ -67,18 +66,18 @@ def solve(fem, uh, dirichlet=None, solver='cg'):
         uh[:], info = cg(AD, b, tol=1e-14, M=M)
         end = timer()
         print(info)
-#    elif solver is 'amg':
-#        start = timer()
-#        ml = pyamg.ruge_stuben_solver(AD)  
-#        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
-#        end = timer()
-#        print(ml)
+    elif solver is 'amg':
+        start = timer()
+        ml = pyamg.ruge_stuben_solver(AD)  
+        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+        end = timer()
+        print(ml)
     elif solver is 'direct':
         start = timer()
         uh[:] = spsolve(AD, b)
         end = timer()
     else:
-        print("We don't support solver: " + solver)
+        raise ValueError("We don't support solver `{}`! ".format(solver))
 
     print("Solve time:", end-start)
 
