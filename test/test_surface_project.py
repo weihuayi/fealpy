@@ -7,7 +7,7 @@ from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 
 p=3
 #surface = OrthocircleSurface()
-surface = QuarticsSurface()
+surface = HeartSurface()
 mesh = surface.init_mesh()
 mesh.uniform_refine(2, surface=surface)
 #V = LagrangeFiniteElementSpace(mesh, p)

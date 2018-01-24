@@ -133,6 +133,11 @@ class ElipsoidSurfaceData(object):
         a = self.a
         b = self.b
         c = self.c
+        
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
+
         cos = np.cos
         sin = np.sin
 

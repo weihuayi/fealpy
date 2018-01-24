@@ -274,7 +274,9 @@ def project(surface, p0, maxit=200, tol=1e-8):
             g *= d
             p = p0 - g 
 
+
     return p, d
+
         
     
 
@@ -392,6 +394,8 @@ class EllipsoidSurface:
         return grad
 
     def hessian(self, p):
+
+        a, b, c = self.c
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
