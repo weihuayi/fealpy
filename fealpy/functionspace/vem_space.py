@@ -5,7 +5,6 @@ Virtual Element Space
 import numpy as np
 from ..common import ranges
 from .function import FiniteElementFunction
-from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
 
 class SMDof2d():
     def __init__(self, mesh, p):
@@ -35,7 +34,7 @@ class SMDof2d():
         multiIndex[:,0] = idx0 - multiIndex[:, 1]
         return multiIndex 
 
-    def cell_to_dof():
+    def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
 
@@ -244,7 +243,7 @@ class VEMDof2d():
         gdof = N 
         p = self.p
         if p > 1:
-            gdof += NE*(p-1) + NC*int((p-1)*p/2)
+            gdof += NE*(p-1) + NC*(p-1)*p//2
         return gdof
 
     def number_of_local_dofs(self):
@@ -255,7 +254,7 @@ class VEMDof2d():
         ldofs = NV
         p = self.p
         if p > 1:
-            ldofs += NV*(p-1) + int((p-1)*p/2)
+            ldofs += NV*(p-1) + (p-1)*p//2
         return ldofs
 
     def interpolation_points(self):
@@ -284,13 +283,9 @@ class VirtualElementSpace2d():
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
-        self.dof = VESDof2d(mesh, p)
+        self.dof = VEMDof2d(mesh, p)
 
-        self.H = self.get_matrix_H()
-        self.D = self.get_matrix_D(self.H)
-        self.B = self.get_matrix_B()
-
-    def project_to_smspace(self, uh):
+    def project_to_smspace(self, uh, B):
         #TODO: for general p  G^{-1}B
         S = self.smspace.function()
         NC = self.mesh.number_of_cells()
@@ -299,152 +294,9 @@ class VirtualElementSpace2d():
         cell = self.mesh.ds.cell
         ldof = self.smspace.number_of_local_dofs()
         for i in range(ldof):
-            S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
+            S[i::ldof] = np.bincount(idx, weights=B[i, :]*uh[cell], minlength=NC)
         return S
 
-    def get_matrix(self):
-        BB = np.hsplit(self.B, self.dof.cell2dofLocation[1:-1])
-        DD = np.vsplit(self.D, self.dof.cell2dofLocation[1:-1])
-        tG = self.get_matrix_tilde_G()
-        return BB, DD, tG
-
-
-    def get_matrix_H(self):
-        p = self.p
-        mesh = self.mesh
-        point = mesh.point
-
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
-
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-        NC = mesh.number_of_cells()
-
-        qf = GaussLegendreQuadrture(p + 1)
-        bcs, ws = qf.quadpts, qf.weights 
-        ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
-        H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
-        H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
-
-        nm = mesh.edge_normal()
-        b = point[edge[:, 0]] - self.smspace.barycenter[edge2cell[:, 0]]
-        H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-        b = point[edge[isInEdge, 0]] - self.smspace.barycenter[edge2cell[isInEdge, 1]]
-        H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
-
-        ldof = self.smspace.number_of_local_dofs()
-        H = np.zeros((NC, ldof, ldof), dtype=np.float)
-        np.add.at(H, edge2cell[:, 0], H0)
-        np.add.at(H, edge2cell[isInEdge, 1], H1)
-
-        multiIndex = self.smspace.multiIndex
-        q = np.sum(multiIndex, axis=1)
-        H /= q + q.reshape(-1, 1) + 2
-        return H
-
-    def get_matrix_D(self, H):
-        p = self.p
-        smldof = self.smspace.number_of_local_dofs()
-        mesh = self.mesh
-        NV = mesh.number_of_vertices_of_cells()
-        h = self.smspace.h 
-        point = mesh.point
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation 
-        D = np.zeros((len(cell2dof), smldof), dtype=np.float)
-
-        if p == 1:
-            bc = np.repeat(self.smspace.barycenter, NV, axis=0) 
-            D[:, 1:] = (point[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
-
-
-        qf = GaussLobattoQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights 
-        ps = np.einsum('ij, kjm->ikm', bcs[:-1], point[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
-        idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
-        D[idx, :] = phi0
-        idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
-        D[idx, :] = phi1
-        if p > 1:
-            area = self.smspace.area
-            idof = int((p-1)*p/2) # the number of dofs of scale polynomial space with degree p-2
-            idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
-            D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
-        return D
-
-    def get_matrix_B(self):
-        p = self.p
-        smldof = self.smspace.number_of_local_dofs()
-        mesh = self.mesh
-        NV = mesh.number_of_vertices_of_cells()
-        h = self.smspace.h 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
-        B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float) 
-        if p==1:
-            B[0, :] = 1/np.repeat(NV, NV)
-            B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1,-1)
-        else:
-            idx = cell2dofLocation[0:-1] + NV*p 
-            B[0, idx] = 1
-            idof = int((p-1)*p/2)
-            start = 3
-            r = np.r_[1, np.arange(1, p+1)]
-            r = np.cumprod(r)
-            r = r[2:]/r[0:-2]
-            for i in range(2, p+1):
-                idx0 = np.arange(start, start+i-1)
-                idx1 = np.arange(start-2*i+1, start-i)
-                idx1 = idx.reshape(-1, 1) + idx1.reshape(1, -1)
-                B[idx0, idx1] -= r[i-2::-1]
-                B[idx0+2, idx1] -= r[0:i-1]
-                start += i+1
-
-            point = mesh.point
-            edge = mesh.ds.edge
-            edge2cell = mesh.ds.edge2cell
-            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-            qf = GaussLobattoQuadrature(p + 1)
-            bcs, ws = qf.quadpts, qf.weights 
-            ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
-            gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
-            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
-            nm = mesh.edge_normal()
-
-            val = np.eisum('ijmk, jk->jim', gphi0, nm)
-            val = np.einsum('i, jim->jim', ws, val)
-            idx = (cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p).reshape(-1, 1) + np.arange(p+1)  
-            np.add.at(B, , val) 
-            val = np.eisum('ijmk, jk->ijm', gphi1, -nm[isInEdge])
-            val = np.einsum('i, ijm->ijm', ws, val)
-            idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
-            np.add.at(B[, idx], , val)
-
-        return B
-
-    def get_matrix_G(self):
-        p = self.p
-        if p == 1:
-            G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
-        else:
-            raise ValueError("I have not code degree {} vem!".format(p))
-        return G
-
-    def get_matrix_tilde_G(self):
-        p = self.p 
-        if p == 1:
-            tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
-        else:
-            raise ValueError("I have not code degree {} vem!".format(p))
-        return tG
 
     def basis(self, bc):
         pass
