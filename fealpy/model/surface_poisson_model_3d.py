@@ -9,9 +9,9 @@ class SphereSinSinSinData(object):
         """ The exact solution 
         """
   
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
         u = np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*z)
         return u
@@ -21,9 +21,9 @@ class SphereSinSinSinData(object):
         INPUT:
             p: array object, N*3 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
         cos = np.cos
         sin = np.sin
@@ -38,9 +38,9 @@ class SphereSinSinSinData(object):
     def gradient(self, p):
         """ The Gradu of the exact solution
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
         cos = np.cos
         sin = np.sin
@@ -54,9 +54,9 @@ class SphereSinSinSinData(object):
         valz = pi*(t1*x**2 + t1*y**2 -t2*y*z - t3*x*z)
         grad = np.zeros(p.shape, dtype=np.float)
         r = x**2 + y**2 + z**2
-        grad[..., 0] = valx/r
-        grad[..., 1] = valy/r
-        grad[..., 2] = valz/r
+        grad[..., :, 0] = valx/r
+        grad[..., :, 1] = valy/r
+        grad[..., :, 2] = valz/r
         return grad  
 
 
@@ -67,9 +67,9 @@ class HeartSurfacetData(object):
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         u = x*y
         return u
     
@@ -78,9 +78,9 @@ class HeartSurfacetData(object):
         INPUT:
             p: array object, N*3 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         
         val1 = 7*z**8-25*x*z**6+31*x**2*z**4+3*y**2*z**4+8*z**6-15*x**3*z**2-7*x*y**2*z**2-21*x*z**4
         val2 = 2*x**4+2*x**2*y**2+16*x**2*z**2+2*y**2*z**2+2*z**4-3*x**3-3*x*y**2-3*x*z**2
@@ -92,18 +92,18 @@ class HeartSurfacetData(object):
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         val = 4*z**6-8*x*z**4+4*x**2*z**2+5*z**4-6*x*z**2+x**2+y**2+z**2
         valx = y*(4*z**6-8*x*z**4+4*x**2*z**2+4*z**4-3*x*z**2-x**2+y**2+z**2)
         valy = 4*x*z**6-8*x**2*z**4+4*x**3*z**2+5*x*z**4-6*x**2*z**2+y**2*z**2+x**3-x*y**2+x*z**2
         valz = y*(-z**2+2*x)*z*(-2*z**2+2*x-1)
         
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., 0] = valx/val
-        grad[..., 1] = valy/val
-        grad[..., 2] = valz/val
+        grad[..., :, 0] = valx/val
+        grad[..., :, 1] = valy/val
+        grad[..., :, 2] = valz/val
         return grad
 
 
@@ -120,9 +120,9 @@ class ElipsoidSurfaceData(object):
         b = self.b
         c = self.c
 
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         u = np.sin(x)
         return u
 
@@ -134,12 +134,13 @@ class ElipsoidSurfaceData(object):
         a = self.a
         b = self.b
         c = self.c
+        
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
+
         cos = np.cos
         sin = np.sin
-
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
 
         t1 = (b**2*z**2+y**2*c**2)*a**4 + (y**2*c**4+z**2*b**4)*a**2 + b**2*c**2*x**2*(b**2+c**2)
         t2 = a**2*sin(x)*(a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4*(y**2*c**4+z**2*b**4))
@@ -152,9 +153,9 @@ class ElipsoidSurfaceData(object):
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         cos = np.cos
         sin = np.sin
         
@@ -164,9 +165,9 @@ class ElipsoidSurfaceData(object):
         valz = -(cos(x)*x*z)/(val1*a**2*c**2)
 
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., 0] = valx
-        grad[..., 1] = valy
-        grad[..., 2] = valz        
+        grad[..., :, 0] = valx
+        grad[..., :, 1] = valy
+        grad[..., :, 2] = valz        
         return grad
 
 
@@ -177,9 +178,9 @@ class ToruSurfacesData(object):
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]        
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]        
         u = x*y
         return u
     
@@ -188,37 +189,38 @@ class ToruSurfacesData(object):
         INPUT:
             p: array object, N*3 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         t = np.sqrt(x**2+y**2)
-        t1 = -32768-336*y**2*x**2*z**2+61440*t+3*t*x**6+3*t*y**6-11520*y**2*x**2+912*t*x**4+9*t*x**4*z**2+9*t*y**4*z**2+1824*t*x**2*y**2
-        t2 = 912*t*y**4-168*x**4*z**2-168*y**4*z**2-96*x**2*z**4-96*y**2*z**4+18*t*x**2*y**2*z**2-80*y**6-240*x**4*y**2-240*x**2*y**4-8*z**6
-        t3 = 9*t*x**2*z**4+9*t*y**2*z**4+1248*t*x**2*z**2+1248*t*y**2*z**2-5760*y**4+9*t*x**4*y**2+9*t*x**2*y**4+21760*t*x**2+21760*t*y**2
-        t4 = 3*t*z**6+336*t*z**4+8448*t*z**2-5760*x**4-80*x**6-4608*x**2*z**2-4608*y**2*z**2-6144*z**2-49152*x**2-49152*y**2-384*z**4
-        t5 = (-x**2-y**2-z**2+8*t-16)**4*(x**2+y**2)
-        rhs = 2*(t1+t2+t3+t4)*x*(-4+t)*y/t5
+        t1 = (-x**2-y**2-z**2+8*t-16)**4*t**2
+
+        t2 = -32768+9*t*x**2*z**4+9*t*y**2*z**4+1248*t*x**2*z**2+1248*t*y**2*z**2+61440*t-384*z**4-8*z**6
+        t3 = 9*t*x**4*y**2+9*t*x**2*y**4+336*t*z**4+8448*t*z**2+3*t*z**6-96*x**2*z**4-96*y**2*z**4+3*t*x**6+3*t*y**6
+        t4 = 9*t*x**4*z**2+912*t*x**4+912*t*y**4+9*t*y**4*z**2+1824*t*x**2*y**2+18*t*x**2*z**2*y**2-168*y**4*z**2-80*y**6-240*x**4*y**2-240*x**2*y**4-11520*x**2*y**2
+        t5 = -168*x**4*z**2-336*x**2*y**2*z**2-5760*y**4+21760*t*x**2+21760*t*y**2-4608*x**2*z**2-4608*y**2*z**2-5760*x**4-80*x**6-6144*z**2-49152*x**2-49152*y**2
+        rhs = 2*(t2+t3+t4+t5)*x*(-4+t)*y/t1
         return rhs
 
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         t = np.sqrt(x**2+y**2)
 
-        val1 = (-x**2-y**2-z**2+8*t-16)*(x**2+y**2)
+        val1 = (-x**2-y**2-z**2+8*t-16)*t**2
         val2 = t*(-x**2-y**2-z**2+8*t-16)
         valx = -x**4+x**2*z**2+y**4+y**2*z**2+8*t*x**2-8*t*y**2-16*x**2+16*y**2
         valy = -x**4-x**2*z**2+y**4-y**2*z**2+8*t*x**2-8*t*y**2-16*x**2+16*y**2
         valz = 2*z*x*(-4+t)*y
 
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., 0] = -valx/val1
-        grad[..., 1] = valy/val1
-        grad[..., 2] = valz/val2
+        grad[..., :, 0] = -valx*y/val1
+        grad[..., :, 1] = valy*x/val1
+        grad[..., :, 2] = valz/val2
         return grad
 
 
@@ -229,9 +231,9 @@ class SquaredSphereData(object):
     def solution(self,p):
         """ The exact solution
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
         u = np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*z)
         return u
@@ -242,9 +244,9 @@ class SquaredSphereData(object):
             INPUT:
             p: array object, N*3
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
         cos = np.cos
         sin = np.sin
@@ -264,9 +266,9 @@ class SquaredSphereData(object):
     def gradient(self,p):
         """ The exace solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np. pi
         cos = np.cos
         sin = np.sin
@@ -285,9 +287,9 @@ class SquaredSphereData(object):
         valz = (valz1 - valz2)*pi
         
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., 0] = valx/(x**14+y**14+z**14)
-        grad[..., 1] = valy/(x**14+y**14+z**14)
-        grad[..., 2] = valz/(x**14+y**14+z**14)
+        grad[..., :, 0] = valx/(x**14+y**14+z**14)
+        grad[..., :, 1] = valy/(x**14+y**14+z**14)
+        grad[..., :, 2] = valz/(x**14+y**14+z**14)
         return grad
 
 
@@ -298,9 +300,9 @@ class OrthocircleData(object):
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         u = np.exp(x+y+z)
         return u
@@ -310,9 +312,9 @@ class OrthocircleData(object):
         INPUT:
             p: array object, N*3 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         
         s1 = x**6-2*x**4+x**2+y**6-2*y**4+y**2+z**6-2*z**4+z**2
         s2 = x**6-2*x**4+(-y**3+y-z**3+z)*x**3+x**2+(y**3-y+z**3-z)*x+y**6-2*y**4+(-z**3+z)*y**3+y**2+(z**3-z)*y+z**2+z**6-2*z**4
@@ -324,9 +326,9 @@ class OrthocircleData(object):
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         val = x**6-2*x**4+x**2+y**6-2*y**4+y**2+z**6-2*z**4+z**2
         t1 = (y**3-y+z**3-z)*x**3+(-y**3+y-z**3+z)*x-y**6+2*y**4-y**2-z**6+2*z**4-z**2
@@ -334,9 +336,9 @@ class OrthocircleData(object):
         t3 = (-x**3+x-y**3+y)*z**3+(x**3-x+y**3-y)*z-2*x**4+x**2+y**6+y**2-2*y**4
         grad = np.zeros(p.shape, dtype=np.float)
 
-        grad[..., 0] = -t1*np.exp(x+y+z)/val
-        grad[..., 1] = t2*np.exp(x+y+z)/val
-        grad[..., 2] = t3*np.exp(x+y+z)/val
+        grad[..., :, 0] = -t1*np.exp(x+y+z)/val
+        grad[..., :, 1] = t2*np.exp(x+y+z)/val
+        grad[..., :, 2] = t3*np.exp(x+y+z)/val
         return grad
 
 
@@ -347,9 +349,9 @@ class QuarticsData(object):
     def solution(self,p):
         """ The exact solution 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         u = np.exp(x+y+z)
         return u
@@ -359,9 +361,9 @@ class QuarticsData(object):
         INPUT:
             p: array object, N*3 
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         
         s1 = x**6-2*x**4+x**2+y**6-2*y**4+y**2+z**6-2*z**4+z**2
         s2 = x**6-2*x**4+(-y**3+y-z**3+z)*x**3+x**2+(y**3-y+z**3-z)*x+y**6-2*y**4+(-z**3+z)*y**3+y**2+(z**3-z)*y+z**2+z**6-2*z**4
@@ -374,9 +376,9 @@ class QuarticsData(object):
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         val = x**6-2*x**4+x**2+y**6-2*y**4+y**2+z**6-2*z**4+z**2
         t1 = (y**3-y+z**3-z)*x**3+(-y**3+y-z**3+z)*x-y**6+2*y**4-y**2-z**6+2*z**4-z**2
@@ -384,9 +386,9 @@ class QuarticsData(object):
         t3 = (-x**3+x-y**3+y)*z**3+(x**3-x+y**3-y)*z-2*x**4+x**2+y**6+y**2-2*y**4
         grad = np.zeros(p.shape, dtype=np.float)
 
-        grad[..., 0] = -t1*np.exp(x+y+z)/val
-        grad[..., 1] = t2*np.exp(x+y+z)/val
-        grad[..., 2] = t3*np.exp(x+y+z)/val
+        grad[..., :, 0] = -t1*np.exp(x+y+z)/val
+        grad[..., :, 1] = t2*np.exp(x+y+z)/val
+        grad[..., :, 2] = t3*np.exp(x+y+z)/val
         return grad
 
 
@@ -442,9 +444,9 @@ class SphereData(object):
         """ The exact solution 
         """
         a = self.a
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         
         phi = np.arctan2(y,x)
         phi = (phi >= 0)*phi + (phi < 0)*(phi + 2*pi)
@@ -459,9 +461,9 @@ class SphereData(object):
             p: array object, N*3 
         """
         a = self.a
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
 
         pi = np.pi
         phi = np.arctan2(y,x)
@@ -475,9 +477,9 @@ class SphereData(object):
         """ The Gradu of the exact solution
         """
         a = self.a
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        x = p[..., :, 0]
+        y = p[..., :, 1]
+        z = p[..., :, 2]
         pi = np.pi
 
         grad = np.zeros(p.shape, dtype=np.float)
