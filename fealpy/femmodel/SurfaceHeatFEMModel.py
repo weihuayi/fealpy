@@ -7,14 +7,13 @@ from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElem
 
 from fealpy.timeintegratoralg.TimeIntegratorAlgorithm import TimeIntegratorAlgorithm
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
 class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
-    def __init__(self, mesh, surface, model, initTime, stopTime, N,
-            method='FM', integrator=None, p=1,p0=None):
+    def __init__(self, mesh, surface, model, initTime, stopTime, N, method='FM', integrator=None, p=1,p0=None):
         super(SurfaceHeatFEMModel, self).__init__(initTime, stopTime)
-
         """
         surface parabolic equation
         """
@@ -30,8 +29,9 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
 
         self.solution = [self.uh]
         self.maxError = 0.0
-       # self.stiffMatrix = get_left_matrix()
-       # self.massMatrix = get_mass_matrix()
+        
+        #self.stiffMatrix = get_left_matrix()
+        #self.massMatrix = get_mass_matrix()
 
         if integrator is None:
             self.integrator = TriangleQuadrature(p+1)
@@ -54,8 +54,8 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
         """
         V = self.V
         mesh = self.mesh
-        gdof = V.number_of_global_dof()
-        lodf = V.number_of_local_dofs()
+        gdof = V.number_of_global_dofs()
+        ldof = V.number_of_local_dofs()
         cell2dof = V.dof.cell2dof
         area = self.area
 
@@ -75,15 +75,14 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
         """
         V = self.V
         mesh = self.mesh
-        gdof = V.number_of_global_dof()
+        gdof = V.number_of_global_dofs()
         ldof = V.number_of_local_dofs()
         cell2dof = V.dof.cell2dof
         area = self.area
         qf = self.integrator 
         bcs, ws = qf.quadpts, qf.weights
         phi = V.basis(bcs)
-        M = np.einsum('i, ijkm, ijpm->jkp', ws, phi, phi)
-        M *= area.reshape(-1, 1, 1)
+        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2) 
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
@@ -91,13 +90,13 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
 
     def get_right_vector(self):
         V = self.V
-        mseh = self.mesh
-        model = self.model
+        mesh = self.mesh
+        model = self.model  # add time right 
         model = lambda p: model.source(p, t)
         qf = self.integrator 
         bcs, ws = qf.quadpts, qf.weights
         pp = mesh.bc_to_point(bcs)
-        fval = model.source(pp)
+        fval = model.source(pp,t)
         phi = V.basis(bcs)
         bb = np.einsum('i, ij, ik->kj', ws, phi, fval)
         bb *= self.area.reshape(-1, 1)
@@ -106,7 +105,7 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
         b -= np.mean(b)
         return b
     
-    def get_setp_length(self):
+    def get_step_length(self):
         return self.dt
 
     def get_current_linear_system(self):
@@ -114,15 +113,15 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
         model = self.model
         t = self.currentTime
 
-        self.stiffMatrix = get_left_matrix()
-        self.massMatrix = get_mass_matrix()
+       # self.stiffMatrix = get_left_matrix()
+       # self.massMatrix = get_mass_matrix()
         
-        S = self.stiffMatrix
-        M = self.massMatrix
+        S = self.get_left_matrix()
+        M = self.get_mass_matrix()
         K = model.diffusion_coefficient()
         g0 = lambda p: 0 
         bc = DirichletBC(self.V, g0, self.is_boundary_dof)
-        F = get_right_vector() 
+        F = self.get_right_vector() 
         dt = self.dt
         if self.method is 'FM':
             b = dt*(F - K*S@self.solution[-1]) + M@self.solution[-1]
@@ -151,7 +150,7 @@ class SurfaceHeatFEMModel(TimeIntegratorAlgorithm):
     def solve(self, A, b):
         self.uh = self.V.functionspace()
         self.uh[:] = spsolve(A, b)
-        return uh
+        return self.uh
 
     def is_boundary_dof(self,p):
         isBdDof = np.zeros(p.shape[0],dtype=np.bool)
