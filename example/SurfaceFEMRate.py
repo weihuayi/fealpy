@@ -3,7 +3,6 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh.level_set_function import Sphere,TorusSurface,EllipsoidSurface,HeartSurface
 from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData,ToruSurfacesData,ElipsoidSurfaceData,HeartSurfacetData 
 from fealpy.femmodel.SurfacePoissonFEMModel import SurfacePoissonFEMModel
 from fealpy.quadrature import TriangleQuadrature 
@@ -17,20 +16,20 @@ q = int(sys.argv[3])
 
 if m == 1:
     model = SphereSinSinSinData()
-    surface = Sphere()
+    surface = model.surface 
     mesh = surface.init_mesh()
     mesh.uniform_refine(n=2, surface=surface)
 elif m == 2:
     model = ToruSurfacesData() 
-    surface = TorusSurface()
+    surface = model.surface 
     mesh = surface.init_mesh()
 elif m == 3:
     model = ElipsoidSurfaceData()
-    surface = EllipsoidSurface()
+    surface = model.surface 
     mesh = surface.init_mesh()
 elif m == 4:
     model = HeartSurfacetData()
-    surface = HeartSurface()
+    surface = model.surface 
     mesh = surface.init_mesh()
 
 

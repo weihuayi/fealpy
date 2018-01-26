@@ -6,6 +6,7 @@ from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElem
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..solver import solve
 from ..boundarycondition import DirichletBC
+from ..femmodel import doperator 
 
 class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, surface, model, integrator=None, p=1, p0=None):
@@ -62,43 +63,12 @@ class SurfacePoissonFEMModel(object):
         return np.sqrt(e)
 
     def get_left_matrix(self):
-        V = self.V
-        mesh = self.mesh
-        gdof = V.number_of_global_dofs()
-        ldof = V.number_of_local_dofs()
-        cell2dof = V.dof.cell2dof
-        area = self.area
-
-        qf = self.integrator  
-        bcs, ws = qf.quadpts, qf.weights
-        gphi = V.grad_basis(bcs)
-        A = np.einsum('i, ijkm, ijpm->jkp', ws, gphi, gphi)
-        A *= area.reshape(-1, 1, 1)
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-
-        return A
+        return doperator.stiff_matrix(self)
 
     def get_right_vector(self):
-        """
-        Compute the right hand side.
-        """
-        V = self.V
-        mesh = V.mesh
-        model = self.model
-        
-        qf = self.integrator 
-        bcs, ws = qf.quadpts, qf.weights
-        pp = mesh.bc_to_point(bcs)
-        fval = model.source(pp)
-        phi = V.basis(bcs)
-        bb = np.einsum('i, ij, ik->kj', ws, phi, fval)
-        bb *= self.area.reshape(-1, 1)
-        gdof = V.number_of_global_dofs()
-        b = np.bincount(V.dof.cell2dof.flat, weights=bb.flat, minlength=gdof)
+        b = doperator.source_vector(self)
         b -= np.mean(b)
-        return b
+        return b 
 
     def solve(self):
         uh = self.uh
@@ -110,12 +80,6 @@ class SurfacePoissonFEMModel(object):
         isBdDof = np.zeros(p.shape[0], dtype=np.bool)
         isBdDof[0] = True
         return isBdDof
-
-    def l2_error(self):
-        uh = self.uh.copy()
-        uI = self.uI 
-        uh += uI[0] 
-        return np.sqrt(np.sum((uh - uI)**2)/len(uI))
 
     def L2_error(self):
         V = self.V

@@ -228,8 +228,7 @@ def project(surface, p0, maxit=200, tol=1e-8):
     value = surface(p)
     s = np.sign(value)
     grad = surface.gradient(p)
-    lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
-    grad /= lg
+    lg = np.sum(grad**2, axis=-1, keepdims=True)  
     grad /= lg
     grad *= value[..., np.newaxis]
     pp = p - grad 
@@ -251,11 +250,13 @@ def project(surface, p0, maxit=200, tol=1e-8):
 
         v = s[..., np.newaxis]*(p0 - p)
         d = np.sqrt(np.sum(v**2, axis=-1))
-        v /= d[..., np.newaxis]
+        isOK = d < eps
+        v[isOK] = grad[isOK]
+        v[~isOK] /= d[~isOK][..., np.newaxis]
         d *= s
 
         ev = grad - v 
-        e = np.max(np.sqrt((value/lg.reshape(-1))**2 + np.sum(ev**2, axis=-1)))
+        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
         if e < tol:
             break
         else:
