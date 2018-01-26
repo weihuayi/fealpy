@@ -106,22 +106,23 @@ class LagrangeFiniteElementSpace():
         t = np.linspace(0, 1, p, endpoint=False)
         shape = bc.shape[:-1]+(p+1, dim+1)
         A = np.ones(shape, dtype=np.float)
-        F = np.zeros(shape, dtype=np.float)
         A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = 1
         np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=np.float)
         F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
         F[..., 1:, :] *= P.reshape(-1, 1)
-        B = np.cumprod(A, axis=-2)
-        B[..., 1:, :] *= P.reshape(-1, 1)
 
-        Q = B[..., multiIndex, [0,1,2]]
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, [0,1,2]]
         M = F[..., multiIndex, [0,1,2]]
         ldof = self.number_of_local_dofs()
         shape = bc.shape[:-1]+(ldof, dim+1)
         R = np.zeros(shape, dtype=np.float)
-
         for i in range(dim+1):
             idx = list(range(dim+1))
             idx.remove(i)
