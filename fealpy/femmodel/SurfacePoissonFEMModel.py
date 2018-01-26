@@ -7,6 +7,7 @@ from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..femmodel import doperator 
+from ..functionspace import FunctionNorm
 
 class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, surface, model, integrator=None, p=1, p0=None):
@@ -25,14 +26,17 @@ class SurfacePoissonFEMModel(object):
         else:
             self.integrator = integrator 
         self.area = self.V.mesh.area(integrator)
+        self.error = FunctionNorm(integrator, self.area)
 
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p) 
+        self.mesh = self.V.mesh
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.mesh.area(self.integrator)
+        self.error = FunctionNorm(self.integrator, self.area)
 
     def recover_estimate(self):
         if self.V.p > 1:
@@ -81,39 +85,21 @@ class SurfacePoissonFEMModel(object):
         isBdDof[0] = True
         return isBdDof
 
+    def l2_error(self):
+        u = self.model.solution
+        uh = self.uh
+        return self.error.l2_error(u, uh)
+
     def L2_error(self):
-        V = self.V
-        mesh = V.mesh
-        model = self.model
-        
-        qf = self.integrator 
-        bcs, ws = qf.quadpts, qf.weights 
-        pp = mesh.bc_to_point(bcs)
-        n, ps = mesh.normal(bcs)
-        l = np.sqrt(np.sum(n**2, axis=-1))
-        area = np.einsum('i, ij->j', ws, l)/2.0
+        u = self.model.solution
+        uh = self.uh.value
+        mesh = self.mesh
+        return self.error.L2_error(u, uh, mesh)
 
-        val0 = self.uh.value(bcs)
-        val1 = model.solution(ps)
-        e = np.einsum('i, ij->j', ws, (val1 - val0)**2)
-        e *= area
-        return np.sqrt(e.sum()) 
+    def H1_semi_error(self):
+        gu = self.model.gradient
+        guh = self.uh.grad_value
+        mesh = self.mesh
+        surface = self.surface
+        return self.error.L2_error(gu, guh, mesh, surface=surface)
 
-
-    def H1_error(self):
-        V = self.V
-        mesh = V.mesh
-        model = self.model
-        
-        qf = self.integrator
-        bcs, ws = qf.quadpts, qf.weights 
-        pp = mesh.bc_to_point(bcs)
-
-        val0, ps, n= V.grad_value_on_surface(self.uh, bcs)
-        val1 = model.gradient(ps)
-        l = np.sqrt(np.sum(n**2, axis=-1))
-        area = np.einsum('i, ij->j', ws, l)/2.0
-        e = np.sum((val1 - val0)**2, axis=-1)
-        e = np.einsum('i, ij->j', ws, e)
-        e *=self.area
-        return np.sqrt(e.sum()) 

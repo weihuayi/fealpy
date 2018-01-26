@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 from fealpy.model.surface_poisson_model_3d import SphereSinSinSinData,ToruSurfacesData,ElipsoidSurfaceData,HeartSurfacetData 
 from fealpy.femmodel.SurfacePoissonFEMModel import SurfacePoissonFEMModel
 from fealpy.quadrature import TriangleQuadrature 
-
 from fealpy.tools.show import showmultirate
 
 
@@ -48,7 +47,7 @@ for i in range(maxit):
     Ndof[i] = len(fem.uh)
     errorMatrix[0, i] = fem.l2_error()
     errorMatrix[1, i] = fem.L2_error()
-    errorMatrix[2, i] = fem.H1_error()
+    errorMatrix[2, i] = fem.H1_semi_error()
     if i < maxit - 1:
         mesh.uniform_refine(1, surface)
         fem.reinit(mesh)

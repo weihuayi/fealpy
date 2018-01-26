@@ -34,11 +34,16 @@ class SurfaceTriangleMesh():
         cell2dof = self.V.dof.cell2dof
 
         grad = self.V.grad_basis(bc, cellidx=cellidx)
-        Jh = mesh.jacobi_matrix(cellidx=cellidx)
+        # the tranpose of the jacobi matrix between S_h and K 
+        Jh = mesh.jacobi_matrix(cellidx=cellidx) 
+
+        # the tranpose of the jacobi matrix between S_p and S_h 
         if cellidx is None:
             Jph = np.einsum('ijm, ...ijk->...imk', self.point[cell2dof, :], grad)
         else:
             Jph = np.einsum('ijm, ...ijk->...imk', self.point[cell2dof[cellidx], :], grad)
+
+        # the transpose of the jacobi matrix between S_p and K
         Jp = np.einsum('...ijk, imk->...imj', Jph, Jh)
         grad = np.einsum('ijk, ...imk->...imj', Jh, grad)
         return Jp, grad

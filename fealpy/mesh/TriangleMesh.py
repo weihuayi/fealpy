@@ -244,6 +244,7 @@ class TriangleMesh(Mesh2d):
         Return
         ------
         J : numpy.array
+            `J` is the transpose o  jacobi matrix of each cell. 
             The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
         """
         point = self.point
