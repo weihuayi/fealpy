@@ -28,6 +28,15 @@ class KelloggData:
             mesh = Quadtree(point, cell)
             mesh.uniform_refine(n)
         elif meshtype is 'tri':
+            cell = np.array([
+                (1, 4, 0),
+                (3, 0, 4),
+                (4, 1, 5),
+                (2, 5, 1), 
+                (4, 7, 3),
+                (6, 3, 7),
+                (7, 4, 8),
+                (5, 8, 4)], dtype=np.int)
             mesh = TriangleMesh(point, cell)
             mesh.uniform_refine(n)
         else:
@@ -62,10 +71,12 @@ class KelloggData:
         r = np.sqrt(x**2 + y**2) # r=x^2+y^2
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
+
         mu = ((theta >= 0) & (theta < pi/2))*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma) \
             + ((theta >= pi/2) & (theta < pi))*cos(rho*gamma)*cos((theta-pi+sigma)*gamma) \
             + ((theta >= pi) & (theta < 1.5*pi))*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
             + ((theta >= 1.5*pi) & (theta < 2*pi))*cos((pi/2-rho)*gamma)*cos((theta-1.5*pi-sigma)*gamma)
+
         u = r**gamma*mu
         return u
 
@@ -90,22 +101,23 @@ class KelloggData:
         t = 1 + (y/x)**2
         r = np.sqrt(x**2 + y**2)
         rg = r**gamma 
-        ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*x*cos((theta-pi/2+rho)*gamma) \
-            +rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma*y/((x**2)*t))
-        uy1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)*cos((theta-pi/2+rho)*gamma)/r*y \
-            -rg*cos((pi/2-sigma)*gamma)*sin((theta-pi/2+rho)*gamma)*gamma/(x*t))
-        ux2 = ((x <= 0.0) & (y >= 0.0))*(r**(-1.9)*x*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
-            +rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma*y/((x**2)*t));
-        uy2 = ((x <= 0.0) & (y >= 0.0))*( r**(-1.9)*y*gamma*cos(rho*gamma)*cos((theta-pi+sigma)*gamma)\
-            -rg*cos(rho*gamma)*sin((theta-pi+sigma)*gamma)*gamma/(x*t))
-        ux3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*x*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
-            +rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma*y/((x**2)*t));
-        uy3 = ((x <= 0.0) & (y <= 0.0))*(r**(-1.9)*y*gamma*cos(sigma*gamma)*cos((theta-pi-rho)*gamma) \
-            -rg*cos(sigma*gamma)*sin((theta-pi-rho)*gamma)*gamma/(x*t))
-        ux4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*x*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma) \
-            +rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma*y/((x**2)*t))
-        uy4 = ((x >= 0.0) & (y <= 0.0))*(r**(-1.9)*y*gamma*cos((pi/2-rho)*gamma)*cos((theta-3*pi/2-sigma)*gamma)\
-            -rg*cos((pi/2-rho)*gamma)*sin((theta-3*pi/2-sigma)*gamma)*gamma/(x*t)) 
+
+        ux1= ((x >= 0.0) & (y >= 0.0))*(gamma*rg*cos((pi/2-sigma)*gamma)*(x*cos((theta-pi/2+rho)*gamma)/(r*r) + y*sin((theta-pi/2+rho)*gamma)/(x*x*t)))
+
+        uy1 = ((x >= 0.0) & (y >= 0.0))*(gamma*rg*cos((pi/2-sigma)*gamma)*(y*cos((theta-pi/2+rho)*gamma)/(r*r) - sin((theta-pi/2+rho)*gamma)/(x*t)))
+
+        ux2 = ((x <= 0.0) & (y >= 0.0))*(gamma*rg*cos(rho*gamma)*(x*cos((theta-pi+sigma)*gamma)/(r*r) + y*sin((theta-pi+sigma)*gamma)/(x*x*t)))
+
+        uy2 = ((x <= 0.0) & (y >= 0.0))*(gamma*rg*cos(rho*gamma)*(y*cos((theta-pi+sigma)*gamma)/(r*r) - sin((theta-pi+sigma)*gamma)/(x*t)))
+
+        ux3 = ((x <= 0.0) & (y <= 0.0))*(gamma*rg*cos(sigma*gamma)*(x*cos((theta-pi-rho)*gamma)/(r*r)+y*sin((theta-pi-rho)*gamma)/(x*x*t)))
+
+        uy3 = ((x <= 0.0) & (y <= 0.0))*(gamma*rg*cos(sigma*gamma)*(y*cos((theta-pi-rho)*gamma)/(r*r) - sin((theta-pi-rho)*gamma)/(x*t)))
+
+        ux4 = ((x >= 0.0) & (y <= 0.0))*(gamma*rg*cos((pi/2-rho)*gamma)*(x*cos((theta-3*pi/2-sigma)*gamma)/(r*r)+y*sin((theta-3*pi/2-sigma)*gamma)/(x*x*t)))
+
+        uy4 = ((x >= 0.0) & (y <= 0.0))*(gamma*rg*cos((pi/2-rho)*gamma)*(y*cos((theta-3*pi/2-sigma)*gamma)/(r*r)-sin((theta-3*pi/2-sigma)*gamma)/(x*t)))
+
         val[...,0] =  ux1+ux2+ux3+ux4
         val[...,1] =  uy1+uy2+uy3+uy4
         return val
@@ -205,30 +217,29 @@ class CrackData:
         pass
 
     def init_mesh(self, n=4, meshtype='quadtree'):
-        r = 1-2**(1/2)/2
-        a = 1/2 - 2**(1/2)/2 
-        rr = 1/2
-
-        point = np.array([
-            (0, -1),
-            (-rr, -rr),
-            (rr, -rr),
-            (-r, -r),
-            (0, -r), 
-            (r, -r),
-            (-1, 0),
-            (-r, 0),
-            (0, 0),
-            (r, 0),
-            (1, 0), 
-            (r, 0),
-            (-r, r),
-            (0, r),
-            (r, r),
-            (-rr,rr),
-            (rr,rr),
-            (0,1)],dtype=np.float)
         if meshtype is 'quadtree':
+            r = 1-2**(1/2)/2
+            a = 1/2 - 2**(1/2)/2 
+            rr = 1/2
+            point = np.array([
+                (0, -1),
+                (-rr, -rr),
+                (rr, -rr),
+                (-r, -r),
+                (0, -r), 
+                (r, -r),
+                (-1, 0),
+                (-r, 0),
+                (0, 0),
+                (r, 0),
+                (1, 0), 
+                (r, 0),
+                (-r, r),
+                (0, r),
+                (r, r),
+                (-rr,rr),
+                (rr,rr),
+                (0,1)],dtype=np.float)
             cell = np.array([
                 (0, 4, 3, 1),
                 (2, 5, 4, 0),
@@ -246,6 +257,19 @@ class CrackData:
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
+            point = np.array([
+                (0, -1),
+                (-1, 0),
+                (0, 0),
+                (1, 0),
+                (1, 0),
+                (0, 1)], dtype=np.float)
+
+            cell = np.array([
+                (2, 1, 0),
+                (2, 0, 3),
+                (2, 5, 1),
+                (2, 4, 5)], dtype=np.int)
             mesh = TriangleMesh(point, cell)
             mesh.uniform_refine(n)
             return mesh
@@ -263,7 +287,7 @@ class CrackData:
         return u
 
     def source(self, p):
-        rhs = np.zeros(p.shape[0:-1])
+        rhs = np.ones(p.shape[0:-1])
         return rhs
 
     def gradient(self, p):
@@ -274,12 +298,14 @@ class CrackData:
 
         r = np.sqrt(x**2 + y**2)
         val = np.zeros(p.shape, dtype=p.dtype)
-        val[..., 0] = 0.5*x*(x**2 + y**2)**(-0.5) - 0.5*x - 0.5
-        val[..., 1] = 0.5*y*(x**2 + y**2)**(-0.5) - 0.5*y
+        val[..., 0] = -0.5*x + (-0.5*x + 0.5*r)**(-0.5)*(0.25*x/r - 0.25)
+        val[..., 1] = 0.25*y*(-0.5*x + 0.5*r)**(-0.5)/r - 0.5*y
+
         return val
 
     def dirichlet(self, p):
         return self.solution(p)
+
 
 class CosCosData:
     def __init__(self):
