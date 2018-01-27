@@ -26,7 +26,7 @@ class SurfacePoissonFEMModel(object):
         else:
             self.integrator = integrator 
         self.area = self.V.mesh.area(integrator)
-        self.error = FunctionNorm(integrator, self.area)
+        self.error = FunctionNorm(self.integrator, self.area)
 
     def reinit(self, mesh, p=None):
         if p is None:
@@ -36,7 +36,7 @@ class SurfacePoissonFEMModel(object):
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.mesh.area(self.integrator)
-        self.error = FunctionNorm(self.integrator, self.area)
+        self.error.area = self.area 
 
     def recover_estimate(self):
         if self.V.p > 1:
@@ -67,10 +67,10 @@ class SurfacePoissonFEMModel(object):
         return np.sqrt(e)
 
     def get_left_matrix(self):
-        return doperator.stiff_matrix(self)
+        return doperator.stiff_matrix(self.V, self.integrator, self.area)
 
     def get_right_vector(self):
-        b = doperator.source_vector(self)
+        b = doperator.source_vector(self.model.source, self.V, self.integrator, self.area)
         b -= np.mean(b)
         return b 
 

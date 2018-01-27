@@ -1,15 +1,26 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-def stiff_matrix(fem):
-    V = fem.V
+
+def cross_matrix(w, V, qf, area):
+    gdof = V.number_of_global_dofs()
+    ldof = V.number_of_local_dofs()
+    cell2dof = V.dof.cell2dof
+    bcs, ws = qf.quadpts, qf.weights
+    phi = V.basis(bcs)
+    val = w.value(bcs)
+    A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, area)
+    I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+    J = I.swapaxes(-1, -2)
+    A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+    return 
+
+def stiff_matrix(V, qf, area):
     mesh = V.mesh
     gdof = V.number_of_global_dofs()
     ldof = V.number_of_local_dofs()
     cell2dof = V.dof.cell2dof
-    area = fem.area
 
-    qf = fem.integrator 
     bcs, ws = qf.quadpts, qf.weights
     gphi = V.grad_basis(bcs)
     A = np.einsum('i, ijkm, ijpm->jkp', ws, gphi, gphi)
@@ -19,15 +30,12 @@ def stiff_matrix(fem):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def mass_matrix(fem):
-    V = fem.V
+def mass_matrix(V, qf, area):
     mesh = V.mesh
     gdof = V.number_of_global_dofs()
     ldof = V.number_of_local_dofs()
     cell2dof = V.dof.cell2dof
-    area = fem.area
 
-    qf = fem.integrator 
     bcs, ws = qf.quadpts, qf.weights
     phi = V.basis(bcs)
     A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
@@ -36,19 +44,16 @@ def mass_matrix(fem):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def source_vector(fem):
-    V = fem.V
+def source_vector(f, V, qf, area):
     mesh = V.mesh
-    model = fem.model
     
-    qf = fem.integrator 
     bcs, ws = qf.quadpts, qf.weights
     pp = mesh.bc_to_point(bcs)
-    fval = model.source(pp)
+    fval = f(pp)
     phi = V.basis(bcs)
     bb = np.einsum('i, ij, ik->kj', ws, phi,fval)
 
-    bb *= fem.area.reshape(-1, 1)
+    bb *= area.reshape(-1, 1)
     gdof = V.number_of_global_dofs()
     b = np.bincount(V.dof.cell2dof.flat, weights=bb.flat, minlength=gdof)
     return b

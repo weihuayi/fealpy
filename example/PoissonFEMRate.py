@@ -7,7 +7,6 @@ from fealpy.femmodel.PoissonFEMModel import PoissonFEMModel
 
 from fealpy.tools.show import showmultirate
 
-from fealpy.functionspace import FunctionNorm
 from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
 
 m = int(sys.argv[1])
@@ -17,10 +16,9 @@ n = int(sys.argv[3])
 if m == 1:
     model = CosCosData()
 
-mesh = model.init_mesh(n=n)
+mesh = model.init_mesh(n=n, meshtype='tri')
 integrator = TriangleQuadrature(3)
 fem = PoissonFEMModel(mesh, model, p=p, integrator=integrator)
-funNorm = FunctionNorm(integrator, fem.area)
 maxit = 4
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
@@ -32,13 +30,12 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
     fem.solve()
     Ndof[i] = len(fem.uh)
-    errorMatrix[0, i] = funNorm.l2_error(model.solution, fem.uh)
-    errorMatrix[1, i] = funNorm.L2_error(model.solution, fem.uh)
-    errorMatrix[2, i] = funNorm.H1_semi_error(model.gradient, fem.uh)
+    errorMatrix[0, i] = fem.l2_error()
+    errorMatrix[1, i] = fem.L2_error()
+    errorMatrix[2, i] = fem.H1_semi_error()
     if i < maxit - 1:
         mesh.uniform_refine()
         fem.reinit(mesh)
-        funNorm.area = fem.area
         
 
 print('Ndof:', Ndof)

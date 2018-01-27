@@ -7,11 +7,13 @@ from fealpy.functionspace.lagrange_fem_space import VectorLagrangeFiniteElementS
 from ..quadrature  import TriangleQuadrature
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..femmodel import form 
+from ..femmodel import doperator 
+from ..functionspace import FunctionNorm
 
 class PoissonFEMModel(object):
     def __init__(self, mesh,  model, integrator=None, p=1):
         self.V = LagrangeFiniteElementSpace(mesh, p) 
+        self.mesh = self.V.mesh
         self.model = model
         self.uh = self.V.function()
         self.uI = self.V.interpolation(model.solution)
@@ -24,6 +26,8 @@ class PoissonFEMModel(object):
         else:
             self.integrator = integrator 
 
+        self.error = FunctionNorm(self.integrator, self.area)
+
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
@@ -31,6 +35,7 @@ class PoissonFEMModel(object):
         self.uh = self.V.function()
         self.uI = self.V.interpolation(self.model.solution)
         self.area = mesh.area()
+        self.error.area = self.area 
 
     def recover_estimate(self):
         if self.V.p > 1:
@@ -62,13 +67,28 @@ class PoissonFEMModel(object):
 
     
     def get_left_matrix(self):
-        return form.stiff_matrix(self)
+        return doperator.stiff_matrix(self.V, self.integrator, self.area)
 
     def get_right_vector(self):
-        return form.source_vector(self)
+        return doperator.source_vector(self.model.source, self.V, self.integrator, self.area)
 
     def solve(self):
         bc = DirichletBC(self.V, self.model.dirichlet)
         solve(self, self.uh, dirichlet=bc, solver='direct')
 
+    def l2_error(self):
+        u = self.model.solution
+        uh = self.uh
+        return self.error.l2_error(u, uh)
 
+    def L2_error(self):
+        u = self.model.solution
+        uh = self.uh.value
+        mesh = self.mesh
+        return self.error.L2_error(u, uh, mesh)
+
+    def H1_semi_error(self):
+        gu = self.model.gradient
+        guh = self.uh.grad_value
+        mesh = self.mesh
+        return self.error.L2_error(gu, guh, mesh)
