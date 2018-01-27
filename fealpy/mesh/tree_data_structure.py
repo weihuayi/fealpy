@@ -112,7 +112,7 @@ class Quadtree(QuadrangleMesh):
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
 
             edgeCenter = 0.5*np.sum(point[edge[isNeedCutEdge]], axis=1) 
-            cellCenter = 0.5*np.sum(point[cell[isNeedCutCell][:, [0, 2]].reshape(-1, 2)], axis=1)
+            cellCenter = self.barycenter(entity='cell', entityidx=isNeedCutCell)
 
             NEC = len(edgeCenter)
             NCC = len(cellCenter)

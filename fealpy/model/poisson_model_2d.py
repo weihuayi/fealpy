@@ -87,7 +87,7 @@ class KelloggData:
     
         theta = np.arctan2(y, x) 
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)    
-        t = 1 + (x/y)**2
+        t = 1 + (y/x)**2
         r = np.sqrt(x**2 + y**2)
         rg = r**gamma 
         ux1 = ((x >= 0.0) & (y >= 0.0))*(rg*gamma/r*cos((pi/2-sigma)*gamma)/r*x*cos((theta-pi/2+rho)*gamma) \
@@ -200,6 +200,86 @@ class LShapeRSinData:
         """
         return self.solution(p)
 
+class CrackData:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=4, meshtype='quadtree'):
+        r = 1-2**(1/2)/2
+        a = 1/2 - 2**(1/2)/2 
+        rr = 1/2
+
+        point = np.array([
+            (0, -1),
+            (-rr, -rr),
+            (rr, -rr),
+            (-r, -r),
+            (0, -r), 
+            (r, -r),
+            (-1, 0),
+            (-r, 0),
+            (0, 0),
+            (r, 0),
+            (1, 0), 
+            (r, 0),
+            (-r, r),
+            (0, r),
+            (r, r),
+            (-rr,rr),
+            (rr,rr),
+            (0,1)],dtype=np.float)
+        if meshtype is 'quadtree':
+            cell = np.array([
+                (0, 4, 3, 1),
+                (2, 5, 4, 0),
+                (1, 3, 7, 6),
+                (3, 4, 8, 7),
+                (4, 5, 9, 8),
+                (5, 2, 10, 9),
+                (6, 7, 12, 15),
+                (7, 8, 13, 12),
+                (8, 11, 14, 13),
+                (11, 10, 16, 14),
+                (12, 13, 17, 15),    
+                (13, 14, 16, 17)], dtype=np.int)
+            mesh = Quadtree(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            mesh = TriangleMesh(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+    def domain(self, n):
+        pass 
+
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        r = np.sqrt(x**2 + y**2)
+        u = np.sqrt(1/2*(r - x)) - 1/4*r**2
+        return u
+
+    def source(self, p):
+        rhs = np.zeros(p.shape[0:-1])
+        return rhs
+
+    def gradient(self, p):
+        """the gradient of the exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+
+        r = np.sqrt(x**2 + y**2)
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = 0.5*x*(x**2 + y**2)**(-0.5) - 0.5*x - 0.5
+        val[..., 1] = 0.5*y*(x**2 + y**2)**(-0.5) - 0.5*y
+        return val
+
+    def dirichlet(self, p):
+        return self.solution(p)
 
 class CosCosData:
     def __init__(self):

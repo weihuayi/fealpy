@@ -1,4 +1,3 @@
-
 import numpy as np
 
 def msign(x):
@@ -6,29 +5,85 @@ def msign(x):
     flag[np.abs(x) < 1e-8] = 0
     return flag
 
-class CircleCurve():
+def project(curve, p0, maxit=200, tol=1e-8):
+    eps = np.finfo(float).eps
+    p = p0
+    value = curve(p)
+    s = np.sign(value)
+    grad = curve.gradient(p)
+    lg = np.sum(grad**2, axis=-1, keepdims=True)  
+    grad /= lg
+    grad *= value[..., np.newaxis]
+    pp = p - grad 
+    v = s[..., np.newaxis]*(pp - p0)
+    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+    d *= s[..., np.newaxis]
 
-    def __init__(self, cx, cy, r):
-        self.cx = cx
-        self.cy = cy
-        self.r = r
-        self.box = [cx - r - 0.1, cx + r + 0.1, cy - r - 0.1, cy + r + 0.1]
+    g = curve.gradient(pp)
+    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+    g *= d 
+    p = p0 - g 
+    
+    k = 0
+    while True:
+        value = curve(p)
+        grad = curve.gradient(p)
+        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+        grad /= lg
 
+        v = s[..., np.newaxis]*(p0 - p)
+        d = np.sqrt(np.sum(v**2, axis=-1))
+        isOK = d < eps
+        d[isOK] = 0
+        v[isOK] = grad[isOK]
+        v[~isOK] /= d[~isOK][..., np.newaxis]
+        d *= s
 
-    def __call__(self, *args):
-        if len(args) == 1:
-            p, = args
-            x = p[:, 0]
-            y = p[:, 1]
-        elif len(args) == 2:
-            x, y = args
+        ev = grad - v 
+        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
+        if e < tol:
+            break
         else:
-            raise ValueError("the args must be a N*2 or (X, Y)")
+            k += 1
+            if k > maxit:
+                break
+            grad /= lg
+            grad *= value[..., np.newaxis]
+            pp = p - grad
+            v = s[..., np.newaxis]*(pp - p0)
+            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+            d *= s[..., np.newaxis]
 
+            g = curve.gradient(pp)
+            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+            g *= d
+            p = p0 - g 
+    return p, d, grad
 
-        return (x - self.cx)**2 + (y - self.cy)**2 - self.r**2 
+class Circle():
+    def __init__(self, center=np.array([0.0, 0.0]), radius=1.0):
+        self.center = center
+        self.radius = radius
+        self.box = [-1.5, 1.5, -1.5, 1.5]
 
+    def __call__(self, p):
+        return np.sqrt(np.sum((p - self.center)**2, axis=-1))-self.radius
 
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        l = np.sqrt(np.sum((p - self.center)**2, axis=-1))
+        n = (p - self.center)/l[..., np.newaxis]
+        return n
+
+    def distvalue(self, p):
+        p[:], d, n= project(self, p)
+        return d, n
+
+    def project(self, p):
+        p[:], d, n= project(self, p)
+        return d, n
 
 class Curve1():
     def __init__(self, a=6):

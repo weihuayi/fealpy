@@ -5,11 +5,12 @@ from ..functionspace.vem_space import VirtualElementSpace2d
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..vemmodel import form 
+from ..functionspace import FunctionNorm
 
 from timeit import default_timer as timer
 
 class PoissonVEMModel():
-    def __init__(self, model, mesh, p=1):
+    def __init__(self, model, mesh, integrator=None, p=1):
         """
         Initialize a Poisson virtual element model. 
 
@@ -31,6 +32,7 @@ class PoissonVEMModel():
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
         self.area = self.V.smspace.area 
+        self.error = FunctionNorm(integrator, self.area)
 
     def reinit(self, mesh, p=None):
         if p is None:
@@ -39,6 +41,7 @@ class PoissonVEMModel():
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.smspace.area
+        self.error.area = self.area 
 
     def project_to_smspace(self, uh=None):
         V = self.V
@@ -89,7 +92,7 @@ class PoissonVEMModel():
             
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
-        S = self.project_to_smspace(self.uh) 
+        S = self.S 
         grad = S.grad_value(barycenter)
 
         S0 = V.smspace.function() 
@@ -155,4 +158,24 @@ class PoissonVEMModel():
         uh = self.uh
         bc = DirichletBC(self.V, self.model.dirichlet)
         self.A, b = solve(self, uh, dirichlet=bc, solver='direct')
+        self.S = self.project_to_smspace(uh)
+    
+    def l2_error(self):
+        u = self.model.solution
+        uh = self.uh
+        return self.error.l2_error(u, uh)
+
+    def uIuh_error(self):
+        e = self.uh - self.uI
+        return np.sqrt(e@self.A@e)
+
+    def L2_error(self, quadtree):
+        u = self.model.solution
+        uh = self.S.value
+        return self.error.L2_error(u, uh, quadtree, barycenter=False)
+
+    def H1_semi_error(self, quadtree):
+        gu = self.model.gradient
+        guh = self.S.grad_value
+        return self.error.L2_error(gu, guh, quadtree, barycenter=False)
 

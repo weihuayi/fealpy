@@ -26,14 +26,20 @@ class Mesh2d():
     def geom_dimension(self):
         return self.point.shape[1]
 
-    def barycenter(self, entity='cell'):
+    def barycenter(self, entity='cell', entityidx=None):
         point = self.point
         if entity == 'cell':
             cell = self.ds.cell
-            bc = np.sum(point[cell, :], axis=1)/cell.shape[1]
+            if entityidx is None:
+                bc = np.sum(point[cell, :], axis=1)/cell.shape[1]
+            else:
+                bc = np.sum(point[cell[entityidx], :], axis=1)/cell.shape[1]
         elif entity == 'edge':
             edge = self.ds.edge
-            bc = np.sum(point[edge, :], axis=1)/edge.shape[1]
+            if entityidx is None:
+                bc = np.sum(point[edge, :], axis=1)/edge.shape[1]
+            else:
+                bc = np.sum(point[edge[entityidx], :], axis=1)/edge.shape[1]
         elif entity == 'point':
             bc = point
         else:

@@ -1,11 +1,10 @@
 import numpy as np
 import sys
 
-from fealpy.model.poisson_model_2d import LShapeRSinData, CosCosData, KelloggData
+from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData
 from fealpy.vemmodel import PoissonVEMModel 
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 from fealpy.tools.show import showmultirate
-from fealpy.functionspace import FunctionNorm
 from fealpy.quadrature import QuadrangleQuadrature 
 
 import matplotlib.pyplot as plt
@@ -22,6 +21,9 @@ elif m == 2:
     model = LShapeRSinData() 
     quadtree = model.init_mesh(n=4)
 elif m == 3:
+    model = CrackData()
+    quadtree = model.init_mesh(n=4)
+elif m == 4:
     model = CosCosData()
     quadtree = model.init_mesh(n=4)
 
@@ -37,27 +39,22 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 mesh = quadtree.to_pmesh()
 
 integrator = QuadrangleQuadrature(3)
-vem = PoissonVEMModel(model, mesh, p=1)
-funNorm = FunctionNorm(integrator, vem.area)
+vem = PoissonVEMModel(model, mesh, p=1, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
     eta = vem.recover_estimate()
     Ndof[i] = vem.V.number_of_global_dofs()
-    errorMatrix[0, i] = funNorm.l2_error(model.solution, vem.uh)
-    e = vem.uh - vem.uI
-    S = vem.project_to_smspace()
-    errorMatrix[1, i] = np.sqrt(e@vem.A@e)
-    errorMatrix[2, i] = funNorm.L2_error(model.solution, S.value, mesh=quadtree, barycenter=False)
-    errorMatrix[3, i] = funNorm.L2_error(model.gradient, S.grad_value, mesh=quadtree, barycenter=False)
+    errorMatrix[0, i] = vem.l2_error()
+    errorMatrix[1, i] = vem.uIuh_error() 
+    errorMatrix[2, i] = vem.L2_error(quadtree)
+    errorMatrix[3, i] = vem.H1_semi_error(quadtree)
     errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
         quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
         vem.reinit(quadtree.to_pmesh())
-        funNorm.area = vem.area
 
 mesh = vem.V.mesh
-
 fig1 = plt.figure()
 fig1.set_facecolor('white')
 axes = fig1.gca() 

@@ -1,52 +1,59 @@
 import numpy as np
 
-class DistDomain2d():
-    def __init__(self, fd, fh, bbox, pfix=None, *args):
-        self.params = fd, fh, bbox, pfix, args
+def project(surface, p0, maxit=200, tol=1e-8):
+    eps = np.finfo(float).eps
+    p = p0
+    value = surface(p)
+    s = np.sign(value)
+    grad = surface.gradient(p)
+    lg = np.sum(grad**2, axis=-1, keepdims=True)  
+    grad /= lg
+    grad *= value[..., np.newaxis]
+    pp = p - grad 
+    v = s[..., np.newaxis]*(pp - p0)
+    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+    d *= s[..., np.newaxis]
 
-class DistDomain3d():
-    def __init__(self, fd, fh, bbox, pfix=None, *args):
-        self.params = fd, fh, bbox, pfix, args
+    g = surface.gradient(pp)
+    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+    g *= d 
+    p = p0 - g 
+    
+    k = 0
+    while True:
+        value = surface(p)
+        grad = surface.gradient(p)
+        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+        grad /= lg
 
-def dcircle(p, cxy, r):
-    x = p[:, 0]
-    y = p[:, 1]
-    return np.sqrt((x - cxy[0])**2 + (y - cxy[1])**2) - r
+        v = s[..., np.newaxis]*(p0 - p)
+        d = np.sqrt(np.sum(v**2, axis=-1))
+        isOK = d < eps
+        v[isOK] = grad[isOK]
+        v[~isOK] /= d[~isOK][..., np.newaxis]
+        d *= s
 
-def dsine(p,cxy,r):
-    x = p[:,0]
-    y = p[:,1]
-    return (y - cxy[1]) - r*np.sin(x-cxy[0])
+        ev = grad - v 
+        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
+        if e < tol:
+            break
+        else:
+            k += 1
+            if k > maxit:
+                break
+            grad /= lg
+            grad *= value[..., np.newaxis]
+            pp = p - grad
+            v = s[..., np.newaxis]*(pp - p0)
+            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+            d *= s[..., np.newaxis]
 
-def dparabolic(p,cxy,r):
-    x = p[:,0]
-    y = p[:,1]
-    return (y - cxy[1])**2 - 2*r*x
+            g = surface.gradient(pp)
+            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
+            g *= d
+            p = p0 - g 
+    return p, d
 
-def drectangle(p, box):
-    return -dmin(
-            dmin(dmin(p[:,1] - box[2], box[3]-p[:,1]), p[:,0] - box[0]),
-            box[1] - p[:,0])  
-        
-
-def dpoly(p, poly):
-    pass
-
-def ddiff(d0, d1):
-    return dmax(d0, -d1)
-
-def dmin(d0, d1):
-    dd = np.concatenate((d0.reshape((-1,1)), d1.reshape((-1,1))), axis=1)
-    return dd.min(axis=1)
-
-def dmax(d0, d1):
-    dd = np.concatenate((d0.reshape((-1,1)), d1.reshape((-1,1))), axis=1)
-    return dd.max(axis=1)
-
-# 2d Case 
-
-
-# 3D surface 
 class Sphere(object):
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
@@ -224,61 +231,6 @@ class TwelveSpheres:
     def init_mesh(self):
         pass
 
-def project(surface, p0, maxit=200, tol=1e-8):
-    eps = np.finfo(float).eps
-    p = p0
-    value = surface(p)
-    s = np.sign(value)
-    grad = surface.gradient(p)
-    lg = np.sum(grad**2, axis=-1, keepdims=True)  
-    grad /= lg
-    grad *= value[..., np.newaxis]
-    pp = p - grad 
-    v = s[..., np.newaxis]*(pp - p0)
-    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-    d *= s[..., np.newaxis]
-
-    g = surface.gradient(pp)
-    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-    g *= d 
-    p = p0 - g 
-    
-    k = 0
-    while True:
-        value = surface(p)
-        grad = surface.gradient(p)
-        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
-        grad /= lg
-
-        v = s[..., np.newaxis]*(p0 - p)
-        d = np.sqrt(np.sum(v**2, axis=-1))
-        isOK = d < eps
-        v[isOK] = grad[isOK]
-        v[~isOK] /= d[~isOK][..., np.newaxis]
-        d *= s
-
-        ev = grad - v 
-        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
-        if e < tol:
-            break
-        else:
-            k += 1
-            if k > maxit:
-                break
-            grad /= lg
-            grad *= value[..., np.newaxis]
-            pp = p - grad
-            v = s[..., np.newaxis]*(pp - p0)
-            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-            d *= s[..., np.newaxis]
-
-            g = surface.gradient(pp)
-            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-            g *= d
-            p = p0 - g 
-
-
-    return p, d
 
         
     
