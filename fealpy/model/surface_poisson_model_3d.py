@@ -110,6 +110,8 @@ class HeartSurfacetData(object):
 
 class ElipsoidSurfaceData(object):
     def __init__(self):
+        from ..mesh.level_set_function import EllipsoidSurface
+        self.surface = EllipsoidSurface()
         self.a = 9
         self.b = 3
         self.c = 1
@@ -121,9 +123,9 @@ class ElipsoidSurfaceData(object):
         b = self.b
         c = self.c
 
-        x = p[..., :, 0]
-        y = p[..., :, 1]
-        z = p[..., :, 2]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
         u = np.sin(x)
         return u
 
@@ -136,39 +138,44 @@ class ElipsoidSurfaceData(object):
         b = self.b
         c = self.c
         
-        x = p[..., :, 0]
-        y = p[..., :, 1]
-        z = p[..., :, 2]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
 
         cos = np.cos
         sin = np.sin
+        
+        t = a**4*b**4*z**2 + a**4*c**4*y**2 + b**4*c**4*x**2
+        t1 = a**6*b**8*sin(x)*z**4 + 2*a**6*sin(x)*y**2*z**2*b**4*c**4+a**6*c**8*sin(x)*y**4+b**8*sin(x)*x**2*z**2*a**2*c**4
+        t2 = c**8*sin(x)*x**2*y**2*a**2*b**4+cos(x)*x*z**2*a**4*b**6*c**4+cos(x)*x*y**2*a**4*b**4*c**6+b**8*cos(x)*x*z**2*a**2*c**4
+        t3 = c**8*cos(x)*x*y**2*a**2*b**4+b**8*cos(x)*x**3*c**6+c**8*cos(x)*x**3*b**6
 
-        t1 = (b**2*z**2+y**2*c**2)*a**4 + (y**2*c**4+z**2*b**4)*a**2 + b**2*c**2*x**2*(b**2+c**2)
-        t2 = a**2*sin(x)*(a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4*(y**2*c**4+z**2*b**4))
-        t3 = (a**4*(y**2*c**4+z**2*b**4)+x**2*b**4*c**4)**2
-
-        rhs = a**2*((c**4*t1*b**4*x*cos(x) + t2))/t3
+        rhs = (a**2*(t1+t2+t3))/t**2
         return rhs
 
     
     def gradient(self,p):
         """The Gradu of the exact solution on surface
         """
-        x = p[..., :, 0]
-        y = p[..., :, 1]
-        z = p[..., :, 2]
+        a = self.a
+        b = self.b
+        c = self.c
+
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
         cos = np.cos
         sin = np.sin
-        
-        val1 = x**2/a**4 +y**2/b**4 + z**2/c**4
-        valx = cos(x) - (cos(x)*x**2/val1*a**4)
-        valy = -(cos(x)*x*y)/(val1*a**2*b**2)
-        valz = -(cos(x)*x*z)/(val1*a**2*c**2)
+       
+        val = a**4*b**4*z**2 + a**4*c**4*y**2 + b**4*c**4*x**2
+        valx = cos(x)*a**4*(b**4*z**2+c**4*y**2)
+        valy = cos(x)*x*y*a**2*b**2*c**4
+        valz = cos(x)*x*z*a**2*b**4*c**2
 
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., :, 0] = valx
-        grad[..., :, 1] = valy
-        grad[..., :, 2] = valz        
+        grad[..., 0] = valx/val
+        grad[..., 1] = -valy/val
+        grad[..., 2] = -valz/val       
         return grad
 
 
