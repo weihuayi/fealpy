@@ -76,8 +76,8 @@ class SurfacePoissonFEMModel(object):
 
     def solve(self):
         uh = self.uh
-        g0 = lambda p: 0 
-        bc = DirichletBC(self.V, g0, self.is_boundary_dof)
+        u = self.model.solution
+        bc = DirichletBC(self.V, u, self.is_boundary_dof)
         solve(self, uh, dirichlet=bc, solver='direct')
 
     def is_boundary_dof(self, p):

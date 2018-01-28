@@ -2,20 +2,8 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 
-def cross_matrix(w, V, qf, area):
-    gdof = V.number_of_global_dofs()
-    ldof = V.number_of_local_dofs()
-    cell2dof = V.dof.cell2dof
-    bcs, ws = qf.quadpts, qf.weights
-    phi = V.basis(bcs)
-    val = w.value(bcs)
-    A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, area)
-    I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-    J = I.swapaxes(-1, -2)
-    A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-    return 
 
-def stiff_matrix(V, qf, area):
+def stiff_matrix(V, qf, area, cfun=None, barycenter=True):
     mesh = V.mesh
     gdof = V.number_of_global_dofs()
     ldof = V.number_of_local_dofs()
@@ -30,7 +18,7 @@ def stiff_matrix(V, qf, area):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def mass_matrix(V, qf, area):
+def mass_matrix(V, qf, area, cfun=None, barycenter=True):
     mesh = V.mesh
     gdof = V.number_of_global_dofs()
     ldof = V.number_of_local_dofs()
@@ -38,7 +26,16 @@ def mass_matrix(V, qf, area):
 
     bcs, ws = qf.quadpts, qf.weights
     phi = V.basis(bcs)
-    A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
+    if coefficient is None:
+        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
+    else:
+        if barycenter is True:
+            val = cfun(bcs)
+        else:
+            pp = mesh.bc_to_point(bcs)
+            val = cfun(pp)
+        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, area)
+
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))

@@ -11,11 +11,13 @@ from fealpy.quadrature import TriangleQuadrature
 from fealpy.mesh import meshio 
 from fealpy.tools.show import showmultirate
 
+
 def node_sizing(mesh, e, eta=0.8, smooth=8):
     area = mesh.area()
     h = np.sqrt(4*area/np.sqrt(3))
     N = mesh.number_of_cells()
     ep = eta*np.min(e)
+    print(np.mean(h))
     ch = np.mean(h)*(ep/e)**2
     p2c = mesh.ds.point_to_cell()
     valence = np.asarray(p2c.sum(axis=1)).reshape(-1)
@@ -24,7 +26,7 @@ def node_sizing(mesh, e, eta=0.8, smooth=8):
         ph = np.asarray(p2c@ch).reshape(-1)/valence 
         ch = np.sum(ph[cell], axis=1)/3
 
-    return ph
+    return ph, ch
 
 m = int(sys.argv[1])
 p = int(sys.argv[2]) 
@@ -53,9 +55,11 @@ for i in range(maxit):
     Ndof[i] = len(fem.uh)
     errorMatrix[0, i] = fem.l2_error()
     errorMatrix[1, i] = fem.L2_error()
-    errorMatrix[2, i] = fem.H1_error()
+    errorMatrix[2, i] = fem.H1_semi_error()
     e = fem.recover_estimate()
-    h = node_sizing(mesh, e, eta=1, smooth=6)
+    bc = mesh.barycenter()
+    e = 1/np.exp(bc[:, 2]**2)**2
+    h , ch= node_sizing(mesh, e, eta=1, smooth=6)
     errorMatrix[3, i] = np.sqrt(np.sum(e**2))
     if i < maxit - 1:
         mesh.uniform_refine(1, surface)
@@ -70,7 +74,8 @@ axes = fig.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
 z = mesh.point[:, 2] 
-axes.plot_trisurf(x, y, z, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
+mesh.add_plot(axes, cellcolor=ch, showcolorbar=True)
+#axes.plot_trisurf(x, y, z, triangles=mesh.ds.cell, cmap=plt.cm.jet, lw=0.0)
 
 fig = plt.figure()
 fig.set_facecolor('white')

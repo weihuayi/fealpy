@@ -47,7 +47,7 @@ for i in range(maxit):
     Ndof[i] = len(fem.uh)
     errorMatrix[0, i] = fem.l2_error()
     errorMatrix[1, i] = fem.L2_error()
-    errorMatrix[2, i] = fem.H1_semi_error()
+    #errorMatrix[2, i] = fem.H1_semi_error()
     if i < maxit - 1:
         mesh.uniform_refine(1, surface)
         fem.reinit(mesh)
@@ -58,7 +58,7 @@ fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca()
 optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
-showmultirate(axes, 0, Ndof, errorMatrix[:3, :], optionlist[:3], errorType[:3])
+showmultirate(axes, 0, Ndof, errorMatrix[:2, :], optionlist[:2], errorType[:2])
 axes.legend(loc=3, prop={'size': 30})
 plt.show()
 

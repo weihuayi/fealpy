@@ -139,19 +139,25 @@ class LagrangeFiniteElementSpace():
     def value(self, uh, bc, cellidx=None):
         phi = self.basis(bc)
         cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...j, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            val = np.einsum('...j, ij->...i', phi, uh[cell2dof]) 
+            val = np.einsum(s1, phi, uh[cell2dof]) 
         else:
-            val = np.einsum('...j, ij->...i', phi, uh[cell2dof[cellidx]]) 
+            val = np.einsum(s1, phi, uh[cell2dof[cellidx]]) 
         return val 
 
     def grad_value(self, uh, bc, cellidx=None):
         gphi = self.grad_basis(bc, cellidx=cellidx)
         cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+            val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
         return val
 
     def hessian_value(self, uh, bc, cellidx=None):
@@ -160,142 +166,26 @@ class LagrangeFiniteElementSpace():
     def div_value(self, uh, bc, cellidx=None):
         pass
 
-
-    def interpolation(self, u):
+    def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
-        uI = FiniteElementFunction(self)
+        uI = FiniteElementFunction(self, dim=dim)
         uI[:] = u(ipoint)
         return uI
 
     def projection(self, u, up):
         pass
 
-    def function(self):
-        f = FiniteElementFunction(self)
+    def function(self, dim=None):
+        f = FiniteElementFunction(self, dim=dim)
         return f
 
-    def array(self):
+    def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,), dtype=np.float)
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
 
-class VectorLagrangeFiniteElementSpace():
-    def __init__(self, mesh, p=1, vectordim=None, spacetype='C'):
-        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
-        self.mesh = mesh
-        self.dof = self.scalarspace.dof 
-        if vectordim is None:
-            self.vectordim = mesh.geom_dimension()
-        else:
-            self.vectordim = vectordim 
-
-    def interpolation_points(self):
-        return self.dof.interpolation_points()
-
-    def basis(self, bc):
-        return self.scalarspace.basis(bc)
-
-    def grad_basis(self, bc, cellidx=None):
-        return self.scalarspace.grad_basis(bc, cellidx=cellidx)
-
-    def value(self, uh, bc, cellidx=None):
-        phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
-        if cellidx is None:
-            val = np.einsum('...j, ijm->...im', phi, uh[cell2dof])
-        else:
-            val = np.einsum('...j, ijm->...im', phi, uh[cell2dof[cellidx]])
-        return val 
-
-    def grad_value(self, uh, bc, cellidx=None):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        gphi = self.grad_basis(bc, cellidx=cellidx)
-        cell2dof = self.dof.cell2dof
-        if cellidx is None:
-            val = np.einsum('...ijm, ijk->...ikm', gphi, uh[cell2dof])
-        else:
-            val = np.einsum('...ijm, ijk->...ikm', gphi, uh[cell2dof[cellidx]])
-        return val
-
-
-    def div_value(self, uh, bc, cellidx=None):
-        val = self.grad_value(uh, bc, cellidx=cellidx)
-        return np.sum(np.diagonal(val, axis1=-2, axis2=-1), axis=-1) 
-
-    def number_of_global_dofs(self):
-        return self.scalarspace.number_of_global_dofs()
-        
-    def number_of_local_dofs(self):
-        return self.scalarspace.number_of_local_dofs()
-
-    def function(self):
-        f = FiniteElementFunction(self)
-        return f
-
-    def array(self):
-        gdof = self.number_of_global_dofs()
-        return np.zeros((gdof, self.vectordim), dtype=np.float)
-
-class TensorLagrangeFiniteElementSpace():
-    def __init__(self, mesh, p, tensorshape, spacetype='C'):
-        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
-        self.mesh = mesh
-        self.dof = self.scalarspace.dof 
-        if type(tensorshape) is int:
-            self.tensorshape = (tensorshape, )
-        elif isinstance(tensorshape, tuple):
-            self.tensorshape = tensorshape
-        else:
-            raise ValueError("the type of `tensorshape` must be `int` or `tuple`!")
-
-    def interpolation_points(self):
-        return self.dof.interpolation_points()
-
-    def basis(self, bc):
-        return self.scalarspace.basis(bc)
-
-    def grad_basis(self, bc, cellidx=None):
-        return self.scalarspace.grad_basis(bc, cellidx=cellidx)
-
-    def value(self, uh, bc, cellidx=None):
-        phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
-        s0 = 'abcdefg'
-        s1 = '...j, ij{}->...i{}'.format(s0[:len(self.tensorshape)], s0[:len(self.tensorshape)])
-        if cellidx is None:
-            val = np.einsum(s1, phi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
-        return val 
-
-    def grad_value(self, uh, bc, cellidx=None):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        gphi = self.grad_basis(bc, cellidx=cellidx)
-        cell2dof = self.dof.cell2dof
-        s0 = 'abcdefg'
-        s1 = '...ijm, ij{}->...i{}m'.format(s0[:len(self.tensorshape)], s0[:len(self.tensorshape)])
-        if cellidx is None:
-            val = np.einsum(s1, gphi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
-        return val
-
-
-    def div_value(self, uh, bc, cellidx=None):
-        val = self.grad_value(uh, bc, cellidx=cellidx)
-        return np.sum(np.diagonal(val, axis1=-2, axis2=-1), axis=-1) 
-
-    def number_of_global_dofs(self):
-        return self.scalarspace.number_of_global_dofs()
-        
-    def number_of_local_dofs(self):
-        return self.scalarspace.number_of_local_dofs()
-
-    def function(self):
-        f = FiniteElementFunction(self)
-        return f
-
-    def array(self):
-        gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,)+self.tensorshape, dtype=np.float)

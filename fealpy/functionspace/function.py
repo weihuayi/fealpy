@@ -1,8 +1,8 @@
 import numpy as np
 
 class FiniteElementFunction(np.ndarray):
-    def __new__(cls, V):
-        self = V.array().view(cls)
+    def __new__(cls, V, dim=None):
+        self = V.array(dim=dim).view(cls)
         self.V = V
         return self
 
