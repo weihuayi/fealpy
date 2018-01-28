@@ -40,9 +40,8 @@ class SurfaceHeatFEMModel():
         self.V = V
         self.mesh = self.V.mesh
 
-        NT = tmodel.get_number_of_time_steps()
         self.uh = self.V.function(dim=NT) 
-        self.uh[:, 0] = tmodel.q0
+        self.solution = [self.uh]
         self.integrator = integrator 
         self.area = self.V.mesh.area(integrator)
 
@@ -53,13 +52,23 @@ class SurfaceHeatFEMModel():
 
 
     def get_current_linear_system(self):
-
+        
+        M = self.M
+        S = self.A
+        F = self.F
         dt = self.tmodel.get_time_step_length()
+        # there have diffconDiffusion coefficient and Radius of gyration
         if self.method is 'FM':
+            b = -dt*(S + F)@self.solution[-1] + M@self.solution[-1]
+            A = M                                                         
             return A, b
         if self.method is 'BM':
+            b = M@self.solution[-1]
+            A = M + dt*(S + F)
             return A, b
         if self.method is 'CN':
+            b = -0.5*dt(S + F)@self.solution[-1] + M@self.solution[-1]
+            A = M + 0.5*dt(S + F)
             return A, b
 
     def run(self):
