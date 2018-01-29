@@ -60,47 +60,66 @@ class CircleInterfaceData:
         sdflag = [self.interface(p) > 0, self.interface(p) < 0]
         return sdflag 
 
-    def solution(self, p):
+    def solution_plus(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
+        return np.sin(pi*x)*np.sin(pi*y) - 1
+
+    def solution_minus(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        return np.cos(pi*x)*np.cos(pi*y) - 1
+
+    def solution(self, p):
         flag = self.subdomain(p)
         val = np.zeros(p.shape[0:-1], dtype=np.float)
-        x = p[..., flag[0], 0]
-        y = p[..., flag[0], 1]
-        val[flag[0]] = np.sin(pi*x)*np.sin(pi*y)-1
+        val[flag[0]] = self.solution_plus(p[flag[0], :]) 
+        val[flag[1]] = self.solution_minus(p[flag[1], :]) 
+        return val
 
-        x = p[..., flag[1], 0]
-        y = p[..., flag[1], 1]
-        val[flag[1]] = np.cos(pi*x)*np.cos(pi*y)-1
+    def gradient_plus(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype = np.float)
+        val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)
+        val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y) 
+        return val 
+
+    def gradient_minus(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype = np.float)
+        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return val
     
     def gradient(self,p):
         pi = np.pi
         flag = self.subdomain(p)
         val = np.zeros(p.shape, dtype = np.float)
-        x = p[..., flag[0], 0]
-        y = p[..., flag[0], 1]
-        val[..., flag[0], 0] = pi*np.cos(pi*x)*np.sin(pi*y)
-        val[..., flag[0], 1] = pi*np.sin(pi*x)*np.cos(pi*y) 
-
-        x = p[..., flag[1], 0]
-        y = p[..., flag[1], 1]
-        val[..., flag[1], 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
-        val[..., flag[1], 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        val[..., flag[0], :] = self.gradient_plus(p[flag[0], :]) 
+        val[..., flag[1], :] = self.gradient_minus(p[flag[1], :])
         return val 
 
-    def source(self, p):
+    def source_plus(self, p):
         pi = np.pi
         b1 = self.b1
+        return 2*pi**2*b1*self.solution_plus(p)
+
+    def source_minus(self, p):
+        pi = np.pi
         b2 = self.b2
+        return 2*pi**2*b2*self.solution_minus(p)
+
+    def source(self, p):
         flag = self.subdomain(p)
         val = np.zeros(p.shape[0:-1], dtype=np.float)
-        x = p[..., flag[0], 0]
-        y = p[..., flag[0], 1]
-        val[flag[0]] = 2*pi**2*b1*np.sin(pi*x)*np.sin(pi*y) 
-
-        x = p[..., flag[1], 0]
-        y = p[..., flag[1], 1]
-        val[flag[1]] = 2*pi**2*b2*np.cos(pi*x)*np.cos(pi*y) 
+        val[flag[0]] = self.source_plus(p[flag[0], :]) 
+        val[flag[1]] = self.source_minus(p[flag[1], :]) 
         return val
 
     def dirichlet(self, p):

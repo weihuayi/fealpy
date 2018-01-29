@@ -1,11 +1,15 @@
 import numpy as np 
 import sys
-from .curve import msign
 from .PolygonMesh import PolygonMesh 
 from .tree_data_structure import Quadtree
 from .tree_data_structure import Octree
 from .simple_mesh_generator import rectangledomainmesh
 from .interface_mesh_generator import find_cut_point 
+
+def msign(x):
+    flag = np.sign(x)
+    flag[np.abs(x) < 1e-8] = 0
+    return flag
 
 class AdaptiveMarkerBase():
     def __init__(self, phi, maxh, maxa):
@@ -132,7 +136,11 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
 
 class QuadtreeInterfaceMesh2d():
     def __init__(self, mesh, marker):
-        self.treemesh =  Quadtree(mesh.point, mesh.ds.cell)
+        if mesh.meshType is 'quad':
+            self.treemesh =  Quadtree(mesh.point, mesh.ds.cell)
+        elif mesh.meshType is 'quadtree':
+            self.treemesh = mesh
+
         self.treemesh.uniform_refine() # here one should refine one time 
                                     # TODO: there is a bug in Quadtree
         self.marker = marker

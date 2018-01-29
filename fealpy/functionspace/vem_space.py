@@ -172,7 +172,7 @@ class ScaledMonomialSpace2d():
         f = FiniteElementFunction(self)
         return f 
 
-    def array(self):
+    def array(self, dim=None):
         ldof = self.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         return np.zeros(NC*ldof, dtype=np.float)
@@ -332,49 +332,7 @@ class VirtualElementSpace2d():
     def projection(self, u, up):
         pass
 
-    def array(self):
+    def array(self, dim=None):
         gdof = self.number_of_global_dofs()
         return np.zeros((gdof,), dtype=np.float)
 
-class VectorLagrangeFiniteElementSpace2d():
-    def __init__(self, mesh, p=1):
-        self.scalarspace = VirtualElementSpace2d(mesh, p)
-        self.mesh = mesh
-        self.p = p 
-
-    def basis(self, bc):
-        pass
-
-    def grad_basis(self, bc):
-        pass
-
-    def dual_basis(self, u):
-        pass
-
-    def value(self, uh, bc):
-        pass
-
-    def grad_value(self, uh, bc):
-        pass
-
-    def hessian_value(self, uh, bc):
-        pass
-
-    def div_value(self, uh, bc):
-        pass
-
-    def number_of_global_dofs(self):
-        return self.scalarspace.number_of_global_dofs()
-        
-    def number_of_local_dofs(self):
-        return self.scalarspace.number_of_local_dofs()
-
-    def cell_to_dof(self):
-        return self.scalarspace.cell_to_dof()
-
-    def function(self):
-        return FiniteElementFunction(self)
-
-    def array(self):
-        gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,2), dtype=np.float)

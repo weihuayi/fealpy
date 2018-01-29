@@ -7,12 +7,11 @@ def f(x):
     G[0, :] = 0
     return G
 
-def stiff_matrix(V, cfun=None, fem=None):
-
+def stiff_matrix(V, area, cfun=None, fem=None):
     p = V.p
     if fem is None:
         H = matrix_H(V)
-        D = matrix_D(V, fem.H)
+        D = matrix_D(V, H)
         B = matrix_B(V)
     else:
         B = fem.B
@@ -26,24 +25,30 @@ def stiff_matrix(V, cfun=None, fem=None):
 
     if p == 1:
         tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+        if cfun is None:
+            f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+            K = list(map(f1, zip(DD, BB)))
+        else:
+            barycenter = V.smspace.barycenter 
+            k = cfun(barycenter)
+            f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
+            K = list(map(f1, zip(DD, BB, k)))
     else:
         tG = list(map(f, zip(BB, DD)))
-
-
-    if cfun is None:
-        f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-    try:
-        barycenter = V.smspace.barycenter 
-        k = fem.model.diffusion_coefficient(barycenter)
-    except  AttributeError:
-        k = np.ones(NC) 
+        if cfun is None:
+            f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+            K = list(map(f1, zip(DD, BB, tG)))
+        else:
+            barycenter = V.smspace.barycenter 
+            k = cfun(barycenter)
+            f1 = lambda x: (x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[3]
+            K = list(map(f1, zip(DD, BB, tG, k)))
             
     f2 = lambda x: np.repeat(x, x.shape[0]) 
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
 
-    K = list(map(f1, zip(DD, BB, k)))
     I = np.concatenate(list(map(f2, cd)))
     J = np.concatenate(list(map(f3, cd)))
     val = np.concatenate(list(map(f4, K)))
@@ -51,17 +56,13 @@ def stiff_matrix(V, cfun=None, fem=None):
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
     return A
 
-def source_vector(fem):
-    V = fem.V
+def source_vector(f, V, area, fem=None):
     mesh = V.mesh
-    model = fem.model
-
     ldof = V.number_of_local_dofs()
     bb = np.zeros(ldof.sum(), dtype=np.float)
     point = mesh.point
     NV = mesh.number_of_vertices_of_cells()
-    F = model.source(point)
-    area = V.smspace.area
+    F = f(point)
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
     gdof = V.number_of_global_dofs()

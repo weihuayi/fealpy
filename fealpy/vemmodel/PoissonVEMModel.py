@@ -7,7 +7,6 @@ from ..boundarycondition import DirichletBC
 from ..vemmodel import doperator 
 from ..functionspace import FunctionNorm
 
-from timeit import default_timer as timer
 
 class PoissonVEMModel():
     def __init__(self, model, mesh, integrator=None, p=1):
@@ -34,6 +33,10 @@ class PoissonVEMModel():
         self.area = self.V.smspace.area 
         self.error = FunctionNorm(integrator, self.area)
 
+        self.H = doperator.matrix_H(self.V)
+        self.D = doperator.matrix_D(self.V, self.H)
+        self.B = doperator.matrix_B(self.V)
+
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
@@ -42,6 +45,10 @@ class PoissonVEMModel():
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.smspace.area
         self.error.area = self.area 
+
+        self.H = doperator.matrix_H(self.V)
+        self.D = doperator.matrix_D(self.V, self.H)
+        self.B = doperator.matrix_B(self.V)
 
     def project_to_smspace(self, uh=None):
         V = self.V
@@ -149,10 +156,19 @@ class PoissonVEMModel():
         return eta
 
     def get_left_matrix(self):
-        return form.stiff_matrix(self)
+        V = self.V
+        area = self.area
+        try:
+            f = self.model.diffusion_coefficient
+            return doperator.stiff_matrix(V, area, cfun=f, fem=self)
+        except AttributeError:
+            return doperator.stiff_matrix(V, area, fem=self)
 
     def get_right_vector(self):
-        return form.source_vector(self)
+        V = self.V
+        area = self.area
+        f = self.model.source
+        return doperator.source_vector(f, V, area)
 
     def solve(self):
         uh = self.uh

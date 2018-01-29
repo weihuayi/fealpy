@@ -1,6 +1,6 @@
 import numpy as np 
 import sys
-from fealpy.mesh.curve import Curve1, Curve3
+from fealpy.mesh.implicit_curve import Circle, Curve1
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.mesh.adaptive_interface_mesh_generator import AdaptiveMarker2d, QuadtreeInterfaceMesh2d 
 

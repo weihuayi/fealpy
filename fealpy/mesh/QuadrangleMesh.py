@@ -15,7 +15,7 @@ class QuadrangleMesh(Mesh2d):
         N = point.shape[0]
         self.ds = QuadrangleMeshDataStructure(N, cell)
 
-        self.meshtype = 'quad'
+        self.meshType = 'quad'
         self.dtype = dtype
 
     def area(self):

@@ -1,9 +1,5 @@
 import numpy as np
 
-def msign(x):
-    flag = np.sign(x)
-    flag[np.abs(x) < 1e-8] = 0
-    return flag
 
 def project(curve, p0, maxit=200, tol=1e-8):
     eps = np.finfo(float).eps
