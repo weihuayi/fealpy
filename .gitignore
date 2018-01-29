@@ -8,6 +8,11 @@
 *.swp
 .ipynb_checkpoints
 
+*.mat
+meshdata
+result
+build
+__pycache__
 results
 refineresults
 data
