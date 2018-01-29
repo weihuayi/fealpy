@@ -2,29 +2,42 @@ import numpy as np
 from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-def stiff_matrix(fem):
-    V = fem.V
+def f(x):
+    G = x[0]@x[1]
+    G[0, :] = 0
+    return G
+
+def stiff_matrix(V, cfun=None, fem=None):
+
     p = V.p
-    fem.H = matrix_H(V)
-    fem.D = matrix_D(V, fem.H)
-    fem.B = matrix_B(V)
+    if fem is None:
+        H = matrix_H(V)
+        D = matrix_D(V, fem.H)
+        B = matrix_B(V)
+    else:
+        B = fem.B
+        D = fem.D
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     NC = len(cell2dofLocation) - 1
     cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-    BB = np.hsplit(fem.B, cell2dofLocation[1:-1])
-    DD = np.vsplit(fem.D, cell2dofLocation[1:-1])
+    BB = np.hsplit(B, cell2dofLocation[1:-1])
+    DD = np.vsplit(D, cell2dofLocation[1:-1])
 
     if p == 1:
         tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+    else:
+        tG = list(map(f, zip(BB, DD)))
 
+
+    if cfun is None:
+        f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
     try:
         barycenter = V.smspace.barycenter 
         k = fem.model.diffusion_coefficient(barycenter)
     except  AttributeError:
         k = np.ones(NC) 
             
-    f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
     f2 = lambda x: np.repeat(x, x.shape[0]) 
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()

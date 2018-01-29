@@ -4,7 +4,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..vemmodel import form 
+from ..vemmodel import doperator 
 from ..functionspace import FunctionNorm
 
 from timeit import default_timer as timer
