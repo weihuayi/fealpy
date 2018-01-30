@@ -235,12 +235,16 @@ class CircleInterfaceData:
     def source_plus(self, p):
         pi = np.pi
         b1 = self.b1
-        return 2*pi**2*b1*self.solution_plus(p)
+        x = p[..., 0]
+        y = p[..., 1]
+        return 2*pi**2*b1*np.sin(pi*x)*np.sin(pi*y)
 
     def source_minus(self, p):
         pi = np.pi
         b2 = self.b2
-        return 2*pi**2*b2*self.solution_minus(p)
+        x = p[..., 0]
+        y = p[..., 1]
+        return 2*pi**2*b2*np.cos(pi*x)*np.cos(pi*y)
 
     def source(self, p):
         flag = self.subdomain(p)

@@ -104,12 +104,15 @@ class Mesh2d():
             v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
         return v 
 
-    def add_plot(self, axes,
+    def add_plot(self, plt,
             pointcolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
             linewidths=1, markersize=2,  
             showaxis=False, showcolorbar=False, cmap='rainbow'):
 
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
         return show_mesh_2d(axes, self,
                 pointcolor=pointcolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,

@@ -44,10 +44,16 @@ def show_error_table(N, errorType, errorMatrix, pre=5, sep=' & ', out=sys.stdout
     if flag:
         out.close()
 
-def showmultirate(axes, k, N, errorMatrix, optionlist, labellist, lw=4, ms=15):
+def showmultirate(plt, k, N, errorMatrix, labellist, lw=4, ms=15):
+    fig = plt.figure()
+    fig.set_facecolor('white')
+    axes = fig.gca()
+    optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
     m, n = errorMatrix.shape
     for i in range(m):
         showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
+    axes.legend(loc=3, prop={'size': 30})
+    return axes
 
 def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
     axes.set_xlim(xmin=N[0]/2, xmax=N[-1]*2)

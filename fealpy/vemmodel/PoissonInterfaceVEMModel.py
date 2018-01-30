@@ -109,8 +109,8 @@ class PoissonInterfaceVEMModel():
 
 
     def get_left_matrix(self):
-        #return self.get_stiff_matrix() 
-        return doperator.stiff_matrix(self.V, self.area, vem=self)
+        return self.get_stiff_matrix() 
+        #return doperator.stiff_matrix(self.V, self.area, vem=self)
 
     def get_right_vector(self):
         area = self.area
@@ -118,7 +118,7 @@ class PoissonInterfaceVEMModel():
         f = self.model.source 
         b0 =  doperator.source_vector(f, V, area)
         b1 = self.get_flux_jump_vector()
-        #return b0 - b1 + self.AI@self.wh 
+        return b0 - b1 + self.AI@self.wh 
         return b0 
 
     def get_flux_jump_vector(self):
@@ -188,7 +188,6 @@ class PoissonInterfaceVEMModel():
         wh = self.wh
         eI =  uII[self.isIntPoint] - (uh[self.isIntPoint] - wh[self.isIntPoint])
         eE =  uIE[self.isExtPoint] - uh[self.isExtPoint]
-        print(uh)
         return np.sqrt((np.mean(eI**2) + np.mean(eE**2))/2)
 
     def uIuh_error(self):
