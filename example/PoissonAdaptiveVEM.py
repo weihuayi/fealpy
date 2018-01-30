@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData
+from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData, SinSinData
 from fealpy.vemmodel import PoissonVEMModel 
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 from fealpy.tools.show import showmultirate
@@ -26,8 +26,11 @@ elif m == 3:
 elif m == 4:
     model = CosCosData()
     quadtree = model.init_mesh(n=4)
+elif m == 5:
+    model = SinSinData()
+    quadtree = model.init_mesh(n=3)
 
-k = maxit - 10
+k = 0
 errorType = ['$\| u_I - u_h \|_{l_2}$',
              '$\|\\nabla u_I - \\nabla u_h\|_A$',
              '$\| u - \Pi^\Delta u_h\|_0$',
@@ -43,6 +46,7 @@ vem = PoissonVEMModel(model, mesh, p=1, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
+    print(vem.uh)
     eta = vem.recover_estimate()
     Ndof[i] = vem.V.number_of_global_dofs()
     errorMatrix[0, i] = vem.l2_error()
@@ -51,7 +55,8 @@ for i in range(maxit):
     errorMatrix[3, i] = vem.H1_semi_error(quadtree)
     errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
-        quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
+        quadtree.uniform_refine()
+        #quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
         vem.reinit(quadtree.to_pmesh())
 
 mesh = vem.V.mesh

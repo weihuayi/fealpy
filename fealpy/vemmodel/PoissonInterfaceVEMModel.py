@@ -7,6 +7,7 @@ from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..vemmodel import doperator 
 from ..functionspace import FunctionNorm
+from ..quadrature import GaussLegendreQuadrture
 
 from timeit import default_timer as timer
 
@@ -22,49 +23,69 @@ class PoissonInterfaceVEMModel():
         Notes
         -----
         """
-        self.V =VirtualElementSpace2d(mesh, p) 
-
-        barycenter = self.V.smspace.barycenter
-        isIntCell = model.interface(barycenter) < 0
-        point = mesh.point
-        N = mesh.number_of_points()
-        NV = mesh.number_of_vertices_of_cells()
-        cell = mesh.ds.cell
-        edge = mesh.ds.edge 
-        edge2cell = mesh.ds.edge_to_cell()
-        isInterfaceEdge = (isIntCell[edge2cell[:, 0]] != isIntCell[edge2cell[:, 1]])
-        isInterfacePoint = np.zeros(N, dtype=np.bool)
-        isInterfacePoint[edge[isInterfaceEdge]] = True
-        self.interfaceEdge = edge[isInterfaceEdge]
-
-        self.wh = self.V.function()
-        self.wh[isInterfacePoint] = self.model.func_jump(point[isInterfacePoint])
-
-        isExtPoint = np.zeros(N, dtype=np.bool)
-        isExtPoint[cell[np.repeat(~isIntCell, NV)]] = True
-        self.uI0 = self.V.function() 
-        self.uI0[isExtPoint] = model.solution_plus(point[isExtPoint])
-        isIntPoint = np.zeros(N, dtype=np.bool)
-        isIntPoint[cell[np.repeat(isIntCell, NV)]] = True
-        self.uI1 = self.V.function()
-        self.uI1[isIntPoint] = model.solution_minus(point[isIntPoint])
-
-        self.isIntCell = isIntCell
         self.model = model  
+        self.V = VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.V.mesh
         self.uh = self.V.function() 
+        self.aux_data()
+
+        point = mesh.point
+        self.wh = self.V.function()
+        self.wh[self.isInterfacePoint] = self.model.func_jump(point[self.isInterfacePoint])
+
+        self.uIE = self.V.function() 
+        self.uIE[self.isExtPoint] = model.solution_plus(point[self.isExtPoint])
+        self.uII = self.V.function()
+        self.uII[self.isIntPoint] = model.solution_minus(point[self.isIntPoint])
+
         self.area = self.V.smspace.area 
 
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
 
+    def aux_data(self):
+        barycenter = self.V.smspace.barycenter
+        # TODO: Notice that here we assume barycenter is inside each cell
+        self.isIntCell = self.model.interface(barycenter) < 0
+
+        mesh = self.mesh
+
+        N = mesh.number_of_points()
+        NV = mesh.number_of_vertices_of_cells()
+        cell = mesh.ds.cell
+        edge = mesh.ds.edge 
+        edge2cell = mesh.ds.edge_to_cell()
+
+        self.isInterfaceEdge = (self.isIntCell[edge2cell[:, 0]] != self.isIntCell[edge2cell[:, 1]])
+        self.isInterfacePoint = np.zeros(N, dtype=np.bool)
+        self.isInterfacePoint[edge[self.isInterfaceEdge]] = True
+        self.interfaceEdge = edge[self.isInterfaceEdge]
+
+        self.isExtPoint = np.zeros(N, dtype=np.bool)
+        self.isExtPoint[cell[np.repeat(~self.isIntCell, NV)]] = True
+
+        self.isIntPoint = np.zeros(N, dtype=np.bool)
+        self.isIntPoint[cell[np.repeat(self.isIntCell, NV)]] = True
+
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
-        self.V = VirtualElementSpace2d(mesh, p) 
+        self.V =VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.V.mesh
         self.uh = self.V.function() 
-        self.uI = self.V.interpolation(self.model.solution)
-        self.area = self.V.smspace.area
+        self.aux_data()
+
+        point = mesh.point
+        self.wh = self.V.function()
+        self.wh[self.isInterfacePoint] = self.model.func_jump(point[self.isInterfacePoint])
+
+        self.uIE = self.V.function() 
+        self.uIE[self.isExtPoint] = self.model.solution_plus(point[self.isExtPoint])
+        self.uII = self.V.function()
+        self.uII[self.isIntPoint] = self.model.solution_minus(point[self.isIntPoint])
+
+        self.area = self.V.smspace.area 
 
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
@@ -88,7 +109,8 @@ class PoissonInterfaceVEMModel():
 
 
     def get_left_matrix(self):
-        return self.get_stiff_matrix() 
+        #return self.get_stiff_matrix() 
+        return doperator.stiff_matrix(self.V, self.area, vem=self)
 
     def get_right_vector(self):
         area = self.area
@@ -96,9 +118,11 @@ class PoissonInterfaceVEMModel():
         f = self.model.source 
         b0 =  doperator.source_vector(f, V, area)
         b1 = self.get_flux_jump_vector()
-        return b0 - b1 + self.AI@self.wh 
+        #return b0 - b1 + self.AI@self.wh 
+        return b0 
 
     def get_flux_jump_vector(self):
+
         qf = GaussLegendreQuadrture(3)
         bcs, ws = qf.quadpts, qf.weights 
         point = self.mesh.point
@@ -115,17 +139,20 @@ class PoissonInterfaceVEMModel():
         return b
 
     def get_stiff_matrix(self):
+        V = self.V
         B = self.B
         D = self.D
 
         cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
         NC = len(cell2dofLocation) - 1
+        
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         BB = np.hsplit(B, cell2dofLocation[1:-1])
         DD = np.vsplit(D, cell2dofLocation[1:-1])
         tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
 
         barycenter = self.V.smspace.barycenter 
+        #TODO: Notice that here we assume barycenter is inside each cell
         k = self.model.diffusion_coefficient(barycenter)
         f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
         K = list(map(f1, zip(DD, BB, k)))
@@ -135,18 +162,18 @@ class PoissonInterfaceVEMModel():
         f4 = lambda x: x.flatten()
 
 
-        I = np.concatenate(list(map(f2, cd)))
-        J = np.concatenate(list(map(f3, cd)))
-        val = np.concatenate(list(map(f4, K)))
         gdof = V.number_of_global_dofs()
-        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-
         I = np.concatenate(list(map(f2, compress(cd, self.isIntCell))))
         J = np.concatenate(list(map(f3, compress(cd, self.isIntCell))))
         val = np.concatenate(list(map(f4, compress(K, self.isIntCell))))
-        AI = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-        self.AI = AI
-        return A
+        self.AI = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+
+        I = np.concatenate(list(map(f2, compress(cd, ~self.isIntCell))))
+        J = np.concatenate(list(map(f3, compress(cd, ~self.isIntCell))))
+        val = np.concatenate(list(map(f4, compress(K, ~self.isIntCell))))
+        self.AE = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+
+        return  self.AI + self.AE 
 
     def solve(self):
         uh = self.uh
@@ -155,13 +182,26 @@ class PoissonInterfaceVEMModel():
         self.S = self.project_to_smspace(uh)
     
     def l2_error(self):
-        u = self.model.solution
+        uII = self.uII
+        uIE = self.uIE
         uh = self.uh
-        return self.error.l2_error(u, uh)
+        wh = self.wh
+        eI =  uII[self.isIntPoint] - (uh[self.isIntPoint] - wh[self.isIntPoint])
+        eE =  uIE[self.isExtPoint] - uh[self.isExtPoint]
+        print(uh)
+        return np.sqrt((np.mean(eI**2) + np.mean(eE**2))/2)
 
     def uIuh_error(self):
-        e = self.uh - self.uI
-        return np.sqrt(e@self.A@e)
+        uII = self.uII
+        uIE = self.uIE
+        uh = self.uh
+        wh = self.wh
+        eI =  uII - (uh - wh)
+        eE =  uIE - uh
+
+        eI[~self.isIntPoint] = 0 
+        eE[~self.isExtPoint] = 0
+        return np.sqrt(eI@self.AI@eI + eE@self.AE@eE)
 
     def L2_error(self, quadtree):
         u = self.model.solution

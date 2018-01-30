@@ -160,9 +160,9 @@ class PoissonVEMModel():
         area = self.area
         try:
             f = self.model.diffusion_coefficient
-            return doperator.stiff_matrix(V, area, cfun=f, fem=self)
+            return doperator.stiff_matrix(V, area, cfun=f, vem=self)
         except AttributeError:
-            return doperator.stiff_matrix(V, area, fem=self)
+            return doperator.stiff_matrix(V, area, vem=self)
 
     def get_right_vector(self):
         V = self.V

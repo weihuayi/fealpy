@@ -1,1 +1,2 @@
 from .PoissonVEMModel import PoissonVEMModel 
+from .PoissonInterfaceVEMModel import PoissonInterfaceVEMModel

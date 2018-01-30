@@ -7,15 +7,15 @@ def f(x):
     G[0, :] = 0
     return G
 
-def stiff_matrix(V, area, cfun=None, fem=None):
+def stiff_matrix(V, area, cfun=None, vem=None):
     p = V.p
-    if fem is None:
+    if vem is None:
         H = matrix_H(V)
         D = matrix_D(V, H)
         B = matrix_B(V)
     else:
-        B = fem.B
-        D = fem.D
+        B = vem.B
+        D = vem.D
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     NC = len(cell2dofLocation) - 1
