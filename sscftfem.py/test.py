@@ -1,8 +1,8 @@
 
 import numpy as np
 import sys
-from initData import Cmp_mesh_data
-from initData import Cmp_pmt_data
+from SSCFTbase import Cmp_mesh_data
+from SSCFTbase import Cmp_pmt_data
 
 ################
 Nspecies=2
