@@ -58,8 +58,7 @@ for i in range(maxit):
         vem.reinit(pmesh)
 
 pmesh.add_plot(plt, cellcolor='w')
-k = 0
-l = 2
+k,l = 0, 2
 showmultirate(plt, k, Ndof, errorMatrix[:l, :], errorType[:l])
 plt.show()
 
