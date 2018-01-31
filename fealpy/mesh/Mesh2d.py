@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from .mesh_tools import unique_row, find_point, find_entity, show_mesh_2d
 from ..common import ranges
+from types import ModuleType
 
 class Mesh2d():
     """ The base class of TriangleMesh and QuadrangleMesh
@@ -104,15 +105,18 @@ class Mesh2d():
             v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
         return v 
 
-    def add_plot(self, plt,
+    def add_plot(self, plot,
             pointcolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
             linewidths=1, markersize=2,  
             showaxis=False, showcolorbar=False, cmap='rainbow'):
 
-        fig = plt.figure()
-        fig.set_facecolor('white')
-        axes = fig.gca() 
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca() 
+        else:
+            axes = plot
         return show_mesh_2d(axes, self,
                 pointcolor=pointcolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,

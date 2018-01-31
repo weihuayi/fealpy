@@ -9,7 +9,7 @@ from ..functionspace import FunctionNorm
 
 
 class PoissonVEMModel():
-    def __init__(self, model, mesh, integrator=None, p=1):
+    def __init__(self, model, mesh, p=1, integrator=None, quadtree=None):
         """
         Initialize a Poisson virtual element model. 
 
@@ -27,20 +27,30 @@ class PoissonVEMModel():
         -----
         """
         self.V =VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.V.mesh
+        self.quadtree = quadtree
         self.model = model  
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(model.solution)
         self.area = self.V.smspace.area 
+
         self.error = FunctionNorm(integrator, self.area)
 
         self.H = doperator.matrix_H(self.V)
+
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
+        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
+        self.G = doperator.matrix_G(self.V, self.B, self.D)
+
+        self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
+        self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
 
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
         self.V = VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.V.mesh
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.smspace.area
@@ -49,21 +59,33 @@ class PoissonVEMModel():
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
+        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
+
+        self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
+        self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
 
     def project_to_smspace(self, uh=None):
-        V = self.V
-        mesh = V.mesh
-        NC = mesh.number_of_cells()
-        NV = mesh.number_of_vertices_of_cells()
-        cell = mesh.ds.cell
-        ldof = V.smspace.number_of_local_dofs()
-
+        p = self.V.p
+#        if p == 1:
+#            V = self.V
+#            mesh = V.mesh
+#            NC = mesh.number_of_cells()
+#            NV = mesh.number_of_vertices_of_cells()
+#            cell = mesh.ds.cell
+#            ldof = V.smspace.number_of_local_dofs()
+#
+#            S = self.V.smspace.function()
+#            if uh is None:
+#                uh = self.uh
+#            idx = np.repeat(range(NC), NV)
+#            for i in range(3):
+#                S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
+#        else:
+        cell2dof, cell2dofLocation = self.V.dof.cell2dof, self.V.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@self.uh[x[1]]
         S = self.V.smspace.function()
-        if uh is None:
-            uh = self.uh
-        idx = np.repeat(range(NC), NV)
-        for i in range(3):
-            S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
+        S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
     def recover_estimate(self, rtype='simple'):
@@ -168,7 +190,7 @@ class PoissonVEMModel():
         V = self.V
         area = self.area
         f = self.model.source
-        return doperator.source_vector(f, V, area)
+        return doperator.source_vector(f, V, area, vem=self)
 
     def solve(self):
         uh = self.uh
@@ -185,13 +207,13 @@ class PoissonVEMModel():
         e = self.uh - self.uI
         return np.sqrt(e@self.A@e)
 
-    def L2_error(self, quadtree):
+    def L2_error(self):
         u = self.model.solution
         uh = self.S.value
-        return self.error.L2_error(u, uh, quadtree, barycenter=False)
+        return self.error.L2_error(u, uh, self.quadtree, barycenter=False)
 
-    def H1_semi_error(self, quadtree):
+    def H1_semi_error(self):
         gu = self.model.gradient
         guh = self.S.grad_value
-        return self.error.L2_error(gu, guh, quadtree, barycenter=False)
+        return self.error.L2_error(gu, guh, self.quadtree, barycenter=False)
 

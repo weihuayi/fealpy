@@ -10,8 +10,8 @@ class DirichletBC:
         self.V = V
         self.g0 = g0
 
-        gdof = V.number_of_global_dofs()
         if is_boundary_dof == None:
+            gdof = V.number_of_global_dofs()
             isBdDof = np.zeros(gdof, dtype=np.bool)
             edge2dof = V.dof.edge_to_dof()
             isBdEdge = V.mesh.ds.boundary_edge_flag()

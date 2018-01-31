@@ -5,6 +5,7 @@ Virtual Element Space
 import numpy as np
 from ..common import ranges
 from .function import FiniteElementFunction
+from ..quadrature import GaussLobattoQuadrature
 
 class SMDof2d():
     def __init__(self, mesh, p):
@@ -198,7 +199,7 @@ class VEMDof2d():
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int) 
-        edge2dof[:, [0, -1]] = edge 
+        edge2dof[:, [0, p]] = edge 
         if p > 1:
             edge2dof[:, 1:-1] = N + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
@@ -222,16 +223,17 @@ class VEMDof2d():
             edge2dof = self.edge_to_dof()
             edge2cell = mesh.ds.edge2cell
             idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-            cell2dof[idx] = edge2dof[:, 0:-1]
+            cell2dof[idx] = edge2dof[:, 0:p]
+            
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+            idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
+            cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
 
-            idx = cell2dofLocation[edge2cell[isInEdge, [1]]] + edge2cell[isInEdge, [3]]*p + np.arange(p)
-            cell2dof[idx] = edge2dof[isInEdge, -1:0:-1]
-
+            N = mesh.number_of_points()
             NV = mesh.number_of_vertices_of_cells()
             NE = mesh.number_of_edges()
-            idof = int((p-1)*p/2)
-            idx = (cell2dofLocation[:-1] + NV*p).reshape(-1, 1) + np.arange(int((p-1)*p/2))
+            idof = (p-1)*p//2
+            idx = (cell2dofLocation[:-1] + NV*p).reshape(-1, 1) + np.arange(idof)
             cell2dof[idx] = N + NE*(p-1) + np.arange(NC*idof).reshape(NC, idof)
             return cell2dof, cell2dofLocation
 
@@ -270,14 +272,15 @@ class VEMDof2d():
             N = point.shape[0]
             dim = point.shape[-1]
             NE = mesh.number_of_edges()
-            edof = N + NE*(p-1)
-            ipoint = np.zeros((edof, dim), dtype=np.float)
+            gdof = self.number_of_global_dofs()
+            ipoint = np.zeros((gdof, dim), dtype=np.float)
             ipoint[:N, :] = point
             edge = mesh.ds.edge
             qf = GaussLobattoQuadrature(p + 1)
             bcs = qf.quadpts[1:-1, :]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, point[edge,:]).reshape(-1, dim)
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, point[edge, :]).reshape(-1, dim)
             return ipoint
+
 
 class VirtualElementSpace2d():
     def __init__(self, mesh, p = 1):
@@ -310,14 +313,17 @@ class VirtualElementSpace2d():
     def div_value(self, uh, bc):
         pass
 
-    
     def function(self):
         return FiniteElementFunction(self)
 
     def interpolation(self, u):
+        mesh = self.mesh
+        N = mesh.number_of_points()
+        NE = mesh.number_of_edges()
+        p = self.p
         ipoint = self.interpolation_points()
         uI = self.function() 
-        uI[:] = u(ipoint)
+        uI[:N+(p-1)*NE] = u(ipoint[:N+(p-1)*NE])
         return uI
 
     def number_of_global_dofs(self):
@@ -327,7 +333,7 @@ class VirtualElementSpace2d():
         return self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
-        return self.mesh.point
+        return self.dof.interpolation_points()
 
     def projection(self, u, up):
         pass

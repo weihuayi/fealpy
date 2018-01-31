@@ -1,48 +1,47 @@
 import numpy as np
 from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
-
-def f(x):
-    G = x[0]@x[1]
-    G[0, :] = 0
-    return G
+from numpy.linalg import inv
 
 def stiff_matrix(V, area, cfun=None, vem=None):
+
+    def f(x):
+        x[0, :] = 0
+        return x 
+
     p = V.p
     if vem is None:
-        H = matrix_H(V)
-        D = matrix_D(V, H)
-        B = matrix_B(V)
+        pass
     else:
-        B = vem.B
+        G = vem.G
+        PI1 = vem.PI1
         D = vem.D
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     NC = len(cell2dofLocation) - 1
     cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-    BB = np.hsplit(B, cell2dofLocation[1:-1])
     DD = np.vsplit(D, cell2dofLocation[1:-1])
 
     if p == 1:
         tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
         if cfun is None:
             f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-            K = list(map(f1, zip(DD, BB)))
+            K = list(map(f1, zip(DD, PI1)))
         else:
             barycenter = V.smspace.barycenter 
             k = cfun(barycenter)
             f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
-            K = list(map(f1, zip(DD, BB, k)))
+            K = list(map(f1, zip(DD, PI1, k)))
     else:
-        tG = list(map(f, zip(BB, DD)))
+        tG = list(map(f, G))
         if cfun is None:
             f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
-            K = list(map(f1, zip(DD, BB, tG)))
+            K = list(map(f1, zip(DD, PI1, tG)))
         else:
             barycenter = V.smspace.barycenter 
             k = cfun(barycenter)
             f1 = lambda x: (x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[3]
-            K = list(map(f1, zip(DD, BB, tG, k)))
+            K = list(map(f1, zip(DD, PI1, tG, k)))
             
     f2 = lambda x: np.repeat(x, x.shape[0]) 
     f3 = lambda x: np.tile(x, x.shape[0])
@@ -56,15 +55,29 @@ def stiff_matrix(V, area, cfun=None, vem=None):
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
     return A
 
-def source_vector(f, V, area, fem=None):
-    mesh = V.mesh
-    ldof = V.number_of_local_dofs()
-    bb = np.zeros(ldof.sum(), dtype=np.float)
-    point = mesh.point
-    NV = mesh.number_of_vertices_of_cells()
-    F = f(point)
+def source_vector(f, V, area, vem=None):
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
-    bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
+    if V.p == 1:
+        mesh = V.mesh
+        ldof = V.number_of_local_dofs()
+        bb = np.zeros(ldof.sum(), dtype=np.float)
+        point = mesh.point
+        NV = mesh.number_of_vertices_of_cells()
+        F = f(point)
+        bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
+    else:
+        if vem is not None:
+            qf = vem.error.integrator  
+            bcs, ws = qf.quadpts, qf.weights
+            pp = vem.quadtree.bc_to_point(bcs)
+            val = f(pp)
+            phi = vem.V.smspace.basis(pp)
+            bb = np.einsum('i, ij, ijm->jm', ws, val, phi)
+            g = lambda x: x[0].T@x[1]
+            bb = np.concatenate(list(map(g, zip(vem.PI0, bb))))
+        else:
+            raise ValueError('We need vem!')
+            
     gdof = V.number_of_global_dofs()
     b = np.bincount(cell2dof, weights=bb, minlength=gdof)
     return b
@@ -105,6 +118,15 @@ def matrix_H(V):
     H /= q + q.reshape(-1, 1) + 2
     return H
 
+def matrix_H_test(V, vem=None):
+    qf = vem.error.integrator  
+    bcs, ws = qf.quadpts, qf.weights
+    pp = vem.quadtree.bc_to_point(bcs)
+    phi = vem.V.smspace.basis(pp)
+    H = np.einsum('i, ijk, ijm->jkm', ws, phi, phi)
+    H *= vem.area[:, np.newaxis, np.newaxis]
+    return H
+
 def matrix_D(V, H):
     p = V.p
     smldof = V.smspace.number_of_local_dofs()
@@ -126,9 +148,9 @@ def matrix_D(V, H):
 
     qf = GaussLobattoQuadrature(p + 1)
     bcs, ws = qf.quadpts, qf.weights 
-    ps = np.einsum('ij, kjm->ikm', bcs[:-1], point[edge])
-    phi0 = V.smspace.basis(ps, cellidx=edge2cell[:, 0])
-    phi1 = V.smspace.basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+    ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+    phi0 = V.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
+    phi1 = V.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
     idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
     D[idx, :] = phi0
     idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
@@ -162,8 +184,8 @@ def matrix_B(V):
         r = r[2:]/r[0:-2]
         for i in range(2, p+1):
             idx0 = np.arange(start, start+i-1)
-            idx1 = np.arange(start-2*i+1, start-i)
-            idx1 = idx.reshape(-1, 1) + idx1.reshape(1, -1)
+            idx1 =  np.arange(start-2*i+1, start-i)
+            idx1 = idx.reshape(-1, 1) + idx1
             B[idx0, idx1] -= r[i-2::-1]
             B[idx0+2, idx1] -= r[0:i-1]
             start += i+1
@@ -180,16 +202,17 @@ def matrix_B(V):
         gphi1 = V.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
         nm = mesh.edge_normal()
 
-        val = np.eisum('ijmk, jk->jmi', gphi0, nm)
+        val = np.einsum('ijmk, jk->jmi', gphi0, nm)
         val = np.einsum('i, jmi->jmi', ws, val)
 
         #TODO: vectorize
+        NE = mesh.number_of_edges()
         for i in range(NE):
             idx0 = edge2cell[i, 0] 
             idx1 = cell2dofLocation[idx0] + edge2cell[i, 2]*p + np.arange(p+1)
             B[:, idx1] += val[i]
     
-        val = np.eisum('ijmk, jk->jmi', gphi1, -nm[isInEdge])
+        val = np.einsum('ijmk, jk->jmi', gphi1, -nm[isInEdge])
         val = np.einsum('i, jmi->jmi', ws, val)
 
         #TODO: vectorize
@@ -201,5 +224,57 @@ def matrix_B(V):
                 B[:, idx1] += val[j]
                 j += 1
         return B
+
+def matrix_G(V, B, D):
+    p = V.p
+    if p == 1:
+        G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
+    else:
+        cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+        BB = np.hsplit(B, cell2dofLocation[1:-1])
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@x[1]
+        G = list(map(g, zip(BB, DD)))
+    return G
+
+def matrix_C(V, B, D, H, area):
+    p = V.p
+
+    smldof = V.smspace.number_of_local_dofs()
+    idof = (p-1)*p//2
+
+    mesh = V.mesh
+    NV = mesh.number_of_vertices_of_cells()
+    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+    BB = np.hsplit(B, cell2dofLocation[1:-1])
+    DD = np.vsplit(D, cell2dofLocation[1:-1])
+    g = lambda x: x[0]@x[1]
+    G = list(map(g, zip(BB, DD)))
+    d = lambda x: x[0]@inv(x[1])@x[2]
+    C = list(map(d, zip(H, G, BB)))
+    if p == 1:
+        return C
+    else:
+        l = lambda x: np.r_[
+                '0', 
+                np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
+                x[2][idof:, :]]
+        return list(map(l, zip(NV, area, C)))
+
+def matrix_PI_0(V, H, C):
+    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+    pi0 = lambda x: inv(x[0])@x[1]
+    return list(map(pi0, zip(H, C)))
+        
+def matrix_PI_1(V, G, B):
+    p = V.p
+    if p == 1:
+        cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+        return np.hsplit(B, cell2dofLocation[1:-1])
+    else:
+        cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+        BB = np.hsplit(B, cell2dofLocation[1:-1])
+        g = lambda x: inv(x[0])@x[1]
+        return list(map(g, zip(G, BB)))
 
 

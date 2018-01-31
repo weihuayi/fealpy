@@ -30,7 +30,7 @@ class Quadtree(QuadrangleMesh):
         if celltype is 'quad':
             return cell
         elif celltype is 'tri':
-            return np.r_['0', cell[:, [1, 2, 0]], cell[:, [3, 0, 1]]]
+            return np.r_['0', cell[:, [1, 2, 0]], cell[:, [3, 0, 2]]]
 
     def is_leaf_cell(self, idx=None):
         if idx is None:
