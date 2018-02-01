@@ -25,7 +25,7 @@ elif m == 3:
     quadtree = model.init_mesh(n=4)
 elif m == 4:
     model = CosCosData()
-    quadtree = model.init_mesh(n=4)
+    quadtree = model.init_mesh(n=2)
 elif m == 5:
     model = SinSinData()
     quadtree = model.init_mesh(n=3)

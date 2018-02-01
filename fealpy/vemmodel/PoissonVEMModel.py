@@ -40,8 +40,8 @@ class PoissonVEMModel():
 
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
-        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
         self.G = doperator.matrix_G(self.V, self.B, self.D)
+        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
 
         self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
         self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
@@ -61,26 +61,13 @@ class PoissonVEMModel():
         self.B = doperator.matrix_B(self.V)
         self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
 
+        self.G = doperator.matrix_G(self.V, self.B, self.D)
+
         self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
         self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
 
     def project_to_smspace(self, uh=None):
         p = self.V.p
-#        if p == 1:
-#            V = self.V
-#            mesh = V.mesh
-#            NC = mesh.number_of_cells()
-#            NV = mesh.number_of_vertices_of_cells()
-#            cell = mesh.ds.cell
-#            ldof = V.smspace.number_of_local_dofs()
-#
-#            S = self.V.smspace.function()
-#            if uh is None:
-#                uh = self.uh
-#            idx = np.repeat(range(NC), NV)
-#            for i in range(3):
-#                S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
-#        else:
         cell2dof, cell2dofLocation = self.V.dof.cell2dof, self.V.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@self.uh[x[1]]

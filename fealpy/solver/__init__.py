@@ -1,2 +1,2 @@
 
-from .solve import solve, solve1
+from .solve import solve, active_set_solver 

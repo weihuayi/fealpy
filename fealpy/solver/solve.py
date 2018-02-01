@@ -47,11 +47,11 @@ def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
 
     return A 
 
-def solve(fem, uh, dirichlet=None, solver='cg'):
-    V = fem.V
+def solve(dmodel, uh, dirichlet=None, solver='cg'):
+    V = dmodel.V
     start = timer()
-    A = fem.get_left_matrix()
-    b = fem.get_right_vector()
+    A = dmodel.get_left_matrix()
+    b = dmodel.get_right_vector()
     end = timer()
 
     print("Construct linear system time:", end - start)
@@ -82,3 +82,52 @@ def solve(fem, uh, dirichlet=None, solver='cg'):
     print("Solve time:", end-start)
 
     return A, b 
+
+
+def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
+        solver='direct'):
+    V = dmodel.V
+    start = timer()
+    A = dmodel.get_left_matrix()
+    b = dmodel.get_right_vector()
+    end = timer()
+    print("Construct linear system time:", end - start)
+
+    if dirichlet is not None:
+        AD, b = dirichlet.apply(A, b)
+
+    
+    
+    AD = AD.tolil()
+    start = timer()
+    lam = V.function()
+
+    gdof = V.number_of_global_dofs()
+    I = np.ones(gdof, dtype=np.bool)
+    I0 = np.ones(gdof, dtype=np.bool)
+
+    k = 0
+    while k < maxit:
+        k += 1
+        I0[:] = I
+
+        I = (lam + gh - uh > 0)
+        if (k > 1) & np.all(I == I0):
+            break
+
+        M = AD.copy()
+        F = b.copy()
+
+        idx, = np.nonzero(I)
+        M[idx, :] = 0
+        M[idx, idx] = 1
+        F[idx] = gh[idx]
+        uh[:] = spsolve(M.tocsr(), F)
+        lam[:] = AD@uh - b
+    print('k', k)
+    end = timer()
+    print("Solve time:", end-start)
+    return 
+
+
+        

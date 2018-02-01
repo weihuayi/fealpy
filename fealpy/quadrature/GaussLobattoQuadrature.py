@@ -94,8 +94,8 @@ class GaussLobattoQuadrature():
                 dtype=np.float)
         numpts = A.shape[0]
         self.quadpts = np.zeros((numpts, 2), dtype=np.float)
-        self.quadpts[:, 0] = (A[:,0] + 1)/2.0
-        self.quadpts[:, 1] = 1 - self.quadpts[:, 0]
+        self.quadpts[:, 1] = (A[:,0] + 1)/2.0
+        self.quadpts[:, 0] = 1 - self.quadpts[:, 1]
         self.weights = A[:, 1]/2
 
     def get_number_of_quad_points(self):

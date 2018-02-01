@@ -15,7 +15,8 @@ class PolygonMesh(Mesh2d):
             if len(cell.shape)  == 2:
                 NC = cell.shape[0]
                 NV = cell.shape[1]
-                cellLocation = np.arange(0, NC*NV, NV)
+                cell = cell.reshape(-1)
+                cellLocation = np.arange(0, (NC+1)*NV, NV)
             else:
                 raise(ValueError("Miss `cellLocation` array!"))
 
@@ -206,6 +207,7 @@ class PolygonMeshDataStructure():
 
         edge2cell = self.edge2cell
         cell = self.cell
+        cellLocation = self.cellLocation
 
         if sparse:
             J = np.arange(NE)

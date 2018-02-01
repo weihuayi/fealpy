@@ -145,9 +145,8 @@ class ScaledMonomialSpace2d():
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
             start = 3
-            r = np.r_[1, np.arange(1, p+1)]
-            r = np.cumprod(r)
-            r = r[2:]/r[0:-2]
+            r = np.arange(1, p+1)
+            r = r[0:-1]*r[1:] 
             phi = self.basis(point, cellidx=cellidx)
             for i in range(2, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])

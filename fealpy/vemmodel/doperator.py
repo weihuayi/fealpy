@@ -73,6 +73,7 @@ def source_vector(f, V, area, vem=None):
             val = f(pp)
             phi = vem.V.smspace.basis(pp)
             bb = np.einsum('i, ij, ijm->jm', ws, val, phi)
+            bb *= vem.area[:, np.newaxis]
             g = lambda x: x[0].T@x[1]
             bb = np.concatenate(list(map(g, zip(vem.PI0, bb))))
         else:
@@ -146,7 +147,7 @@ def matrix_D(V, H):
         D[:, 1:] = (point[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
         return D
 
-    qf = GaussLobattoQuadrature(p + 1)
+    qf = GaussLobattoQuadrature(p+1)
     bcs, ws = qf.quadpts, qf.weights 
     ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
     phi0 = V.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
@@ -179,9 +180,8 @@ def matrix_B(V):
         B[0, idx] = 1
         idof = (p-1)*p//2
         start = 3
-        r = np.r_[1, np.arange(1, p+1)]
-        r = np.cumprod(r)
-        r = r[2:]/r[0:-2]
+        r = np.arange(1, p+1)
+        r = r[0:-1]*r[1:] 
         for i in range(2, p+1):
             idx0 = np.arange(start, start+i-1)
             idx1 =  np.arange(start-2*i+1, start-i)
@@ -189,7 +189,6 @@ def matrix_B(V):
             B[idx0, idx1] -= r[i-2::-1]
             B[idx0+2, idx1] -= r[0:i-1]
             start += i+1
-
         point = mesh.point
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
@@ -209,9 +208,9 @@ def matrix_B(V):
         NE = mesh.number_of_edges()
         for i in range(NE):
             idx0 = edge2cell[i, 0] 
-            idx1 = cell2dofLocation[idx0] + edge2cell[i, 2]*p + np.arange(p+1)
+            idx1 = cell2dofLocation[idx0] + (edge2cell[i, 2]*p + np.arange(p+1))%(NV[idx0]*p)
             B[:, idx1] += val[i]
-    
+
         val = np.einsum('ijmk, jk->jmi', gphi1, -nm[isInEdge])
         val = np.einsum('i, jmi->jmi', ws, val)
 
@@ -220,10 +219,13 @@ def matrix_B(V):
         for i in range(NE):
             if isInEdge[i]:
                 idx0 = edge2cell[i, 1]
-                idx1 = cell2dofLocation[idx0] + edge2cell[i, 3]*p + np.arange(p+1)
+                idx1 = cell2dofLocation[idx0] + (edge2cell[i, 3]*p + np.arange(p+1))%(NV[idx0]*p)
                 B[:, idx1] += val[j]
                 j += 1
         return B
+
+def matrix_B_test(V):
+    pass
 
 def matrix_G(V, B, D):
     p = V.p
@@ -236,6 +238,17 @@ def matrix_G(V, B, D):
         g = lambda x: x[0]@x[1]
         G = list(map(g, zip(BB, DD)))
     return G
+
+def matrix_G_test(V, vem=None):
+    qf = vem.error.integrator  
+    bcs, ws = qf.quadpts, qf.weights
+    pp = vem.quadtree.bc_to_point(bcs)
+    gphi = vem.V.smspace.grad_basis(pp)
+    G = np.einsum('i, ijkl, ijml->jkm', ws, gphi, gphi)
+    G *= vem.area[:, np.newaxis, np.newaxis]
+    G[:, 0, :] = vem.H[:, 0, :]/vem.area[:, np.newaxis]
+    return G
+
 
 def matrix_C(V, B, D, H, area):
     p = V.p

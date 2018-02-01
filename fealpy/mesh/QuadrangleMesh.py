@@ -32,6 +32,34 @@ class QuadrangleMesh(Mesh2d):
         a /=2
         return a
 
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            N = self.number_of_points()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            # Find the cutted edge  
+            cell2edge = self.ds.cell_to_edge()
+            edgeCenter = self.barycenter(entity='edge')
+            cellCenter = self.barycenter(entity='cell')
+
+            edge2center = np.arange(N, N+NE) 
+
+            cell = self.ds.cell
+            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
+            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
+            cc = np.arange(N + NE, N + NE + NC).reshape(-1, 1)
+            
+            cell = np.zeros((4*NC, 4), dtype=np.int)
+            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
+            cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
+            cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
+            cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
+
+            self.point = np.r_['0', self.point, edgeCenter, cellCenter]
+            self.ds.reinit(N + NE + NC, cell)
+        return 
+
     def angle(self):
         NC = self.number_of_cells()
         cell = self.ds.cell
