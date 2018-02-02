@@ -79,7 +79,7 @@ class ObstacleData2:
         x = p[..., 0]
         y = p[..., 1]
         r0 = self.r0
-        r = np.sqrt((x*x+y*y))
+        r = np.sqrt(x*x+y*y)
         val = np.zeros(p.shape[0:-1], dtype=np.float)
         flag = (r <= r0)
         val[flag] = np.sqrt(1 - r[flag]**2)
@@ -92,7 +92,7 @@ class ObstacleData2:
         r0 = self.r0
         r = np.sqrt((x*x+y*y))
         val = np.zeros(p.shape, dtype=np.float)
-        flag = (r <= self.r0)
+        flag = (r <= r0)
         val[flag,  0] = -x[flag]/np.sqrt(-r[flag]**2 + 1)
         val[flag,  1] = -y[flag]/np.sqrt(-r[flag]**2 + 1)
         val[~flag, 0] = -r0**2*x[~flag]/np.sqrt(-r0**2 + 1)/r[~flag]
@@ -105,10 +105,9 @@ class ObstacleData2:
         return val
 
     def obstacle(self, p):
-
         x = p[..., 0]
         y = p[..., 1]
-        r = np.sqrt((x*x+y*y))
+        r = np.sqrt(x*x+y*y)
         val = np.zeros(p.shape[0:-1], dtype=np.float)
         flag = (r <= 1)
         val[flag] = r[flag]
