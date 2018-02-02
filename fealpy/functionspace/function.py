@@ -1,10 +1,33 @@
 import numpy as np
 
 class FiniteElementFunction(np.ndarray):
-    def __new__(cls, V, dim=None):
-        self = V.array(dim=dim).view(cls)
+    def __new__(cls, V, dim=None, array=None):
+        if array is None:
+            self = V.array(dim=dim).view(cls)
+        else:
+            self = array.view(cls)
+            print(array)
         self.V = V
         return self
+
+    def index(self, i):
+        return FiniteElementFunction(self.V, array=self[:, i])
+
+    def __add__(self, y):
+        a = self.view(np.ndarray)
+        return FiniteElementFunction(self.V, array=a+y)
+
+    def __sub__(self, y):
+        a = self.view(np.ndarray)
+        return FiniteElementFunction(self.V, array=a-y)
+
+    def __mul__(self, y):
+        a = self.view(np.ndarray)
+        return FiniteElementFunction(self.V, array=a*y)
+
+    def __div__(self, y):
+        a = self.view(np.ndarray)
+        return FiniteElementFunction(self.V, array=a/y)
 
     def __call__(self, bc, cellidx=None):
         V = self.V
