@@ -31,6 +31,12 @@ class ObstacleData1:
         else:
             raise ValueError("".format)
 
+    def solution(self, p):
+        return np.zeros(p.shape[0:-1]) 
+
+    def gradient(self, p):
+        return np.zeros(p.shape) 
+
     def source(self, p):
         """The right hand side
         """
@@ -76,42 +82,36 @@ class ObstacleData2:
             raise ValueError("".format)
 
     def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
         r0 = self.r0
-        r = np.sqrt(x*x+y*y)
+        r = np.sqrt(np.sum(p**2, axis=-1))
         val = np.zeros(p.shape[0:-1], dtype=np.float)
         flag = (r <= r0)
-        val[flag] = np.sqrt(1 - r[flag]**2)
+        val[flag] =  np.sqrt(1 - r[flag]**2)
         val[~flag] = -r0**2*np.log(r[~flag]/2)/np.sqrt(1-r0**2)
         return val
  
     def gradient(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
         r0 = self.r0
-        r = np.sqrt((x*x+y*y))
+        r = np.sqrt(np.sum(p**2, axis=-1))
         val = np.zeros(p.shape, dtype=np.float)
         flag = (r <= r0)
+        x = p[..., 0]
+        y = p[..., 1]
         val[flag,  0] = -x[flag]/np.sqrt(-r[flag]**2 + 1)
         val[flag,  1] = -y[flag]/np.sqrt(-r[flag]**2 + 1)
         val[~flag, 0] = -r0**2*x[~flag]/np.sqrt(-r0**2 + 1)/r[~flag]
         val[~flag, 1] = -r0**2*y[~flag]/np.sqrt(-r0**2 + 1)/r[~flag]
-
         return val
 
     def source(self, p):
-        val = np.zeros(p.shape[0:-1])
-        return val
+        return np.zeros(p.shape[0:-1], dtype=np.float) 
 
     def obstacle(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        r = np.sqrt(x*x+y*y)
+        r = np.sqrt(np.sum(p**2, axis=-1))
         val = np.zeros(p.shape[0:-1], dtype=np.float)
         flag = (r <= 1)
-        val[flag] = r[flag]
-        val[~flag] = -1
+        val[flag] = r[flag] 
+        val[~flag] = -1  
         return val
 
     def dirichlet(self, p):

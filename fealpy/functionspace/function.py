@@ -6,7 +6,6 @@ class FiniteElementFunction(np.ndarray):
             self = V.array(dim=dim).view(cls)
         else:
             self = array.view(cls)
-            print(array)
         self.V = V
         return self
 

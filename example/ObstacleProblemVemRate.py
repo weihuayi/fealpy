@@ -49,6 +49,15 @@ axes = fig2.gca(projection='3d')
 x = mesh.point[:, 0]
 y = mesh.point[:, 1]
 tri = quadtree.leaf_cell(celltype='tri')
-axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
+s = axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
+fig2.colorbar(s)
+
+
+fig3 = plt.figure()
+fig3.set_facecolor('white')
+axes = fig3.gca(projection='3d')
+s = axes.plot_trisurf(x, y, tri, vem.uI-vem.gI, cmap=plt.cm.jet, lw=0.0)
+fig3.colorbar(s)
+
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()

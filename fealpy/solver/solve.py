@@ -96,23 +96,20 @@ def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
     if dirichlet is not None:
         AD, b = dirichlet.apply(A, b)
 
-    
-    
     AD = AD.tolil()
     start = timer()
     lam = V.function()
 
     gdof = V.number_of_global_dofs()
     I = np.ones(gdof, dtype=np.bool)
-    I0 = np.ones(gdof, dtype=np.bool)
 
     k = 0
     while k < maxit:
         k += 1
-        I0[:] = I
-
-        I = (lam + gh - uh > 0)
-        if (k > 1) & np.all(I == I0):
+        print(k)
+        I0 = I.copy()
+        I[:] = (lam + gh - uh > 0)
+        if np.all(I == I0) & (k > 1):
             break
 
         M = AD.copy()
@@ -124,7 +121,6 @@ def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
         F[idx] = gh[idx]
         uh[:] = spsolve(M.tocsr(), F)
         lam[:] = AD@uh - b
-    print('k', k)
     end = timer()
     print("Solve time:", end-start)
     return 

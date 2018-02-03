@@ -6,6 +6,24 @@ class FunctionNorm():
         self.integrator = integrator
         self.area = area
 
+    def integral(self, u, mesh,  barycenter=False, elemtype=False):
+        qf = self.integrator  
+        bcs, ws = qf.quadpts, qf.weights
+        if barycenter is False:
+            pp = mesh.bc_to_point(bcs)
+            val = u(pp)
+        else:
+            val = u(bcs)
+        e = val
+        if len(e.shape) == 2:
+            e = np.sum(e, axis=1)
+        e *= self.area 
+        if elemtype is True:
+            return np.sqrt(e)
+        else:
+            return np.sqrt(e.sum()) 
+
+
     def L2_norm(self, u, mesh, barycenter=False, elemtype=False):
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights

@@ -32,6 +32,7 @@ class ObstacleVEMModel2d():
         self.model = model  
         self.uh = self.V.function() 
         self.gI = self.V.interpolation(model.obstacle)
+        self.uI = self.V.interpolation(model.solution)
         self.area = self.V.smspace.area 
 
         self.error = FunctionNorm(integrator, self.area)
@@ -53,6 +54,7 @@ class ObstacleVEMModel2d():
         self.mesh = self.V.mesh
         self.uh = self.V.function() 
         self.gI = self.V.interpolation(self.model.obstacle)
+        self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.smspace.area
         self.error.area = self.area 
 
@@ -92,7 +94,7 @@ class ObstacleVEMModel2d():
         bc = DirichletBC(self.V, self.model.dirichlet)
         active_set_solver(self, uh, gI, dirichlet=bc, solver='direct')
         self.S = self.project_to_smspace(uh)
-    
+
     def l2_error(self):
         u = self.model.solution
         uh = self.uh

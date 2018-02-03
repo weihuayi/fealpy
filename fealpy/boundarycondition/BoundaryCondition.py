@@ -6,7 +6,7 @@ from ..functionspace.barycentric_coordinates import bc_to_point, grad_lambda
 
 
 class DirichletBC:
-    def __init__(self, V, g0, is_boundary_dof=None, dtype=np.float):
+    def __init__(self, V, g0, is_boundary_dof=None):
         self.V = V
         self.g0 = g0
 
@@ -21,7 +21,6 @@ class DirichletBC:
             isBdDof = is_boundary_dof(ipoints)
 
         self.isBdDof = isBdDof
-        self.dtype = dtype
 
     def apply(self, A, b):
         """ Modify matrix A and b
@@ -32,7 +31,7 @@ class DirichletBC:
 
         gdof = V.number_of_global_dofs()
 
-        x = np.zeros((gdof,), dtype=self.dtype)
+        x = np.zeros((gdof,), dtype=np.float)
 
         ipoints = V.interpolation_points()
         x[isBdDof] = g0(ipoints[isBdDof,:])
