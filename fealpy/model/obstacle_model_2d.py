@@ -92,13 +92,13 @@ class ObstacleData2:
  
     def gradient(self, p):
         r0 = self.r0
-        r = np.sqrt(np.sum(p**2, axis=-1))
+        r = np.sum(p**2, axis=-1)
         val = np.zeros(p.shape, dtype=np.float)
-        flag = (r <= r0)
+        flag = (r <= r0**2)
         x = p[..., 0]
         y = p[..., 1]
-        val[flag,  0] = -x[flag]/np.sqrt(-r[flag]**2 + 1)
-        val[flag,  1] = -y[flag]/np.sqrt(-r[flag]**2 + 1)
+        val[flag,  0] = -x[flag]/np.sqrt(-r[flag] + 1)
+        val[flag,  1] = -y[flag]/np.sqrt(-r[flag] + 1)
         val[~flag, 0] = -r0**2*x[~flag]/np.sqrt(-r0**2 + 1)/r[~flag]
         val[~flag, 1] = -r0**2*y[~flag]/np.sqrt(-r0**2 + 1)/r[~flag]
         return val
@@ -107,10 +107,10 @@ class ObstacleData2:
         return np.zeros(p.shape[0:-1], dtype=np.float) 
 
     def obstacle(self, p):
-        r = np.sqrt(np.sum(p**2, axis=-1))
+        r = np.sum(p**2, axis=-1)
         val = np.zeros(p.shape[0:-1], dtype=np.float)
         flag = (r <= 1)
-        val[flag] = r[flag] 
+        val[flag] = np.sqrt(1 - r[flag])
         val[~flag] = -1  
         return val
 

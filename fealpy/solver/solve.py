@@ -106,7 +106,6 @@ def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
     k = 0
     while k < maxit:
         k += 1
-        print(k)
         I0 = I.copy()
         I[:] = (lam + gh - uh > 0)
         if np.all(I == I0) & (k > 1):

@@ -15,7 +15,7 @@ p = int(sys.argv[3])
 
 if m == 1:
     model = ObstacleData1()
-    quadtree= model.init_mesh(n=4, meshtype='quadtree')
+    quadtree= model.init_mesh(n=3, meshtype='quadtree')
 elif m == 2:
     model = ObstacleData2() 
     quadtree = model.init_mesh(n=4, meshtype='quadtree')

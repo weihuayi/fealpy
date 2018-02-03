@@ -30,12 +30,19 @@ class ObstacleVEMModel2d():
         self.mesh = self.V.mesh
         self.quadtree = quadtree
         self.model = model  
+
+        self.area = self.V.smspace.area 
+        self.error = FunctionNorm(integrator, self.area)
+
         self.uh = self.V.function() 
         self.gI = self.V.interpolation(model.obstacle)
         self.uI = self.V.interpolation(model.solution)
-        self.area = self.V.smspace.area 
+        if p == 2:
+            NC = self.mesh.number_of_cells()
+            self.gI[-NC:] = self.error.integral(model.obstacle, self.quadtree, elemtype=True)/self.area
+            self.uI[-NC:] = self.error.integral(model.solution, self.quadtree, elemtype=True)/self.area
 
-        self.error = FunctionNorm(integrator, self.area)
+            
 
         self.H = doperator.matrix_H(self.V)
 
@@ -57,6 +64,11 @@ class ObstacleVEMModel2d():
         self.uI = self.V.interpolation(self.model.solution)
         self.area = self.V.smspace.area
         self.error.area = self.area 
+
+        if p == 2:
+            NC = self.mesh.number_of_cells()
+            self.gI[-NC:] = self.error.integral(self.model.obstacle, self.quadtree, elemtype=True)/self.area
+            self.uI[-NC:] = self.error.integral(self.model.solution, self.quadtree, elemtype=True)/self.area
 
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
