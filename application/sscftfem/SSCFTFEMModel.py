@@ -162,9 +162,18 @@ class SSCFTFEMModel():
         f = f + np.sum(q, axis=1)
         f = dt*f
         return f
-
+    
     def integral_space(self, q):
-        pass
+        mesh = self.V.mesh
+        qf = self.operator
+        bcs, ws = qf.quadpts, qf.weights
+        qq = q[mesh.ds.elem]
+        NT = mesh.ds.elem.shape[0]
+        b = np.zeros((NT, 1))
+        b = np.einsum('i,ij, ij->j', ws, qq, bcs)
+        b *= self.area
+        Q = np.sum(b)
+        return Q
 
     def update_density(self, q):
         n0 = self.timeline0.get_number_of_time_steps()
