@@ -3,7 +3,7 @@ import numpy as np
 from fealpy.quadrature  import TriangleQuadrature
 from fealpy.functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from fealpy.femmodel import doperator 
-from fealpy.solver import solve
+from scipy.sparse.linalg import spsolve
 
 class SSCFTParameter():
     def __init__(self):
@@ -52,15 +52,15 @@ class TimeLine():
         self.current = 0
         
 class PDESolver():
-    def __init__(self, V, integrator, area,  method='FM'):
+    def __init__(self, femspace, integrator, area,  method='FM'):
 
         self.method = method
-        self.V = V
+        self.femspace = femspace 
         self.integrator = integrator 
         self.area = area
 
-        self.M = doperator.mass_matrix(self.V, self.integrator, self.area)
-        self.A = doperator.stiff_matrix(self.V, self.integrator, self.area)
+        self.M = doperator.mass_matrix(self.femspace, self.integrator, self.area)
+        self.A = doperator.stiff_matrix(self.femspace, self.integrator, self.area)
 
     def get_current_linear_system(self, u0, dt):
         M = self.M
@@ -92,8 +92,8 @@ class PDESolver():
 
 class SSCFTFEMModel():
     def __init__(self, surface, mesh, option, p=1, p0=1):
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
-        self.mesh = self.V.mesh
+        self.femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
+        self.mesh = self.femspace.mesh
         self.area = mesh.area(option.integrator)
         self.totalArea = np.sum(self.area)
         self.surface = surface
@@ -103,16 +103,16 @@ class SSCFTFEMModel():
         self.timeline1 = TimeLine([option.fA, 1], option.dtMax)
 
         N = self.timeline0.Nt + self.timeline1.Nt + 1
-        self.q0 = self.V.function(dim=N) 
-        self.q1 = self.V.function(dim=N) 
+        self.q0 = self.femspace.function(dim=N) 
+        self.q1 = self.femspace.function(dim=N) 
 
-        self.rho   = [self.V.function() for i in range(option.Nspecies)] 
-        self.w   = [self.V.function() for i in range(option.Nspecies)] 
-        self.mu   = [self.V.function() for i in range(option.Nspecies)] 
-        self.grad   = [self.V.function() for i in range(option.Nspecies)] 
+        self.rho   = [self.femspace.function() for i in range(option.Nspecies)] 
+        self.w   = [self.femspace.function() for i in range(option.Nspecies)] 
+        self.mu   = [self.femspace.function() for i in range(option.Nspecies)] 
+        self.grad = self.femspace.function(dim=option.Nspecies)
         self.sQ    = np.zeros((self.Nspecies-1, self.Nblend))
 
-        self.solver = PDESolver(self.V, option.integrator, self.area, option.pdemethod)
+        self.solver = PDESolver(self.femspace, option.integrator, self.area, option.pdemethod)
 
         self.initialize()
 
@@ -125,7 +125,7 @@ class SSCFTFEMModel():
             self.mu[1][:]   = fields[:, 1]
             self.w[0][:] = fields[:, 0] - fields[:, 1]
             self.w[1][:] = fields[:, 0] + fields[:, 1]
-        if fieldtype is 'fieldw':
+        if option.fieldtype is 'fieldw':
             self.w[0][:]   = fields[:, 0]
             self.w[1][:]   = fields[:, 1]
             self.mu[0][:] = 0.5*(fields[:, 0] + fields[:, 1])
@@ -139,12 +139,12 @@ class SSCFTFEMModel():
         n1 = self.timeline1.get_number_of_time_steps()
 
         F0 = doperator.mass_matrix(
-                self.V, 
+                self.femspace, 
                 self.integrator, 
                 self.area, 
                 cfun=self.w[0].value)
         F1 = doperator.mass_matrix(
-                self.V, 
+                self.femspace, 
                 self.integrator, 
                 self.area, 
                 cfun=self.w[1].value)
@@ -164,13 +164,21 @@ class SSCFTFEMModel():
         return f
     
     def integral_space(self, q):
-        mesh = self.V.mesh
-        qf = self.operator
+        mesh = self.femspace.mesh
+        qf = self.option.integrator 
         bcs, ws = qf.quadpts, qf.weights
-        qq = q[mesh.ds.elem]
-        NT = mesh.ds.elem.shape[0]
-        b = np.zeros((NT, 1))
-        b = np.einsum('i,ij, ij->j', ws, qq, bcs)
+        qq = q.value(bcs)
+        b = np.einsum('i, ij->j', ws, qq)
+        b *= self.area
+        Q = np.sum(b)
+        return Q
+
+    def integral_space2(self, q):
+        mesh = self.femspace.mesh
+        qf = self.option.integrator 
+        bcs, ws = qf.quadpts, qf.weights
+        qq = q.value(bcs)**2
+        b = np.einsum('i, ij->j', ws, qq)
         b *= self.area
         Q = np.sum(b)
         return Q
@@ -181,34 +189,42 @@ class SSCFTFEMModel():
         self.rho[1][:] = integral_time(q[:, n0-1:], self.timeline1.dt)
         return 
 
-    def get_grad_F(self, radius)
- 
-        self.update_propagator()
 
-        qq = self.q0 * self.q1[:, -1::-1] 
-        self.sQ[0,0] = self.updateQ(self, qq)
-        gradF = -np.sum(sQ.reshape(-1))
-
-        return partialF
-
-    def updateQ(self, integrand):
-
-        f = integral_space(self, integrand)
-
+    def update_singleQ(self, integrand):
+        f = self.integral_space(integrand)/self.totalArea 
         return f
 
     def update_hamilton(self)
 
         chiN = self.chiAB * self.Ndeg
 
-        mu1_int = integral_space(self.mesh, self.mu[0])
-        mu2_int = integral_nonlinear_term(self.mesh, self.mu[1])
-        
+        mu1_int = self.integral_space(self.mu[0])
+        mu2_int = self.integral_space2(self.mu[1])
         H = -mu1_int + mu2_int/chiN
 
         return H
 
-    def evlSaddle(self):
+    def updateField(self):
+
+        option = self.option
+        chiN = option.chiAB * option.Ndeg
+        
+        lambd = np.array([2,2])
+
+        self.grad[:, 0] = self.rho[0]  + self.rho[1] - 1.0
+        self.grad[:, 1] = 2.0*self.mu[1]/chiN - self.rho[0] + self.rho[1]
+
+        err = np.max(np.abs(self.grad), axis=0)
+
+        self.mu[0] += lambd[0]*self.grad[:, 0]
+        self.mu[1] -= lambd[1]*self.grad[:, 1]
+
+
+        self.w[0] = self.mu[0] - self.mu[1] 
+        self.w[1] = self.mu[1] + self.mu[1]
+
+        return err 
+    def find_saddle_point(self):
         
         res = np.inf
         Hold = np.inf
@@ -224,7 +240,7 @@ class SSCFTFEMModel():
 
             qq = self.q0*self.q1[:, -1::-1] 
 
-            self.sQ[0,0] = self.updateQ(self, qq)
+            self.sQ[0,0] = self.update_singleQ(self, self.q0.index(-1))
 
             self.update_density(qq)
 
@@ -239,3 +255,12 @@ class SSCFTFEMModel():
             ediff = H - Hold
             Hold = H
 
+    def get_partial_F(self, radius)
+ 
+        self.update_propagator()
+
+        qq = self.q0 * self.q1[:, -1::-1] 
+        self.sQ[0,0] = self.updateQ(self, qq)
+        gradF = -np.sum(sQ.reshape(-1))
+
+        return partialF
