@@ -143,6 +143,7 @@ class SSCFTFEMModel():
                 self.integrator, 
                 self.area, 
                 cfun=self.w[0].value)
+
         F1 = doperator.mass_matrix(
                 self.femspace, 
                 self.integrator, 
@@ -187,8 +188,6 @@ class SSCFTFEMModel():
         n0 = self.timeline0.get_number_of_time_steps()
         self.rho[0][:] = integral_time(q[:, 0:n0], self.timeline0.dt)
         self.rho[1][:] = integral_time(q[:, n0-1:], self.timeline1.dt)
-        return 
-
 
     def update_singleQ(self, integrand):
         f = self.integral_space(integrand)/self.totalArea 
@@ -224,6 +223,7 @@ class SSCFTFEMModel():
         self.w[1] = self.mu[1] + self.mu[1]
 
         return err 
+
     def find_saddle_point(self):
         
         res = np.inf

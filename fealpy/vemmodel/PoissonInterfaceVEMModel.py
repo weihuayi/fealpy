@@ -34,12 +34,12 @@ class PoissonInterfaceVEMModel():
         self.wh[self.isInterfacePoint] = self.model.func_jump(point[self.isInterfacePoint])
 
         self.uIE = self.V.function() 
-        self.uIE[self.isExtPoint] = model.solution_plus(point[self.isExtPoint])
+        self.uIE[self.isExtPoint] = model.solution_plus(point[self.isExtPoint])       
         self.uII = self.V.function()
         self.uII[self.isIntPoint] = model.solution_minus(point[self.isIntPoint])
 
         self.area = self.V.smspace.area 
-
+        print("self.area", self.area.shape)
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
@@ -51,7 +51,7 @@ class PoissonInterfaceVEMModel():
 
         mesh = self.mesh
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_points()        
         NV = mesh.number_of_vertices_of_cells()
         cell = mesh.ds.cell
         edge = mesh.ds.edge 
@@ -60,6 +60,7 @@ class PoissonInterfaceVEMModel():
         self.isInterfaceEdge = (self.isIntCell[edge2cell[:, 0]] != self.isIntCell[edge2cell[:, 1]])
         self.isInterfacePoint = np.zeros(N, dtype=np.bool)
         self.isInterfacePoint[edge[self.isInterfaceEdge]] = True
+
         self.interfaceEdge = edge[self.isInterfaceEdge]
 
         self.isExtPoint = np.zeros(N, dtype=np.bool)
@@ -67,7 +68,7 @@ class PoissonInterfaceVEMModel():
 
         self.isIntPoint = np.zeros(N, dtype=np.bool)
         self.isIntPoint[cell[np.repeat(self.isIntCell, NV)]] = True
-
+        
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.V.p
@@ -86,7 +87,7 @@ class PoissonInterfaceVEMModel():
         self.uII[self.isIntPoint] = self.model.solution_minus(point[self.isIntPoint])
 
         self.area = self.V.smspace.area 
-
+        
         self.H = doperator.matrix_H(self.V)
         self.D = doperator.matrix_D(self.V, self.H)
         self.B = doperator.matrix_B(self.V)
@@ -127,12 +128,13 @@ class PoissonInterfaceVEMModel():
         bcs, ws = qf.quadpts, qf.weights 
         point = self.mesh.point
         iedge = self.interfaceEdge
+        
         ps = np.einsum('ij, kjm->ikm', bcs, point[iedge])
         val = self.model.flux_jump(ps)
         bb = np.einsum('i, ij, ik->kj', ws, bcs, val)
-
+       
         l = np.sqrt(np.sum((point[iedge[:, 0], :] - point[iedge[:, 1], :])**2, axis=1))
-
+        
         bb *= l.reshape(-1, 1)
         gdof = self.V.number_of_global_dofs()
         b = np.bincount(iedge.flat, weights=bb.flat, minlength=gdof)
@@ -187,6 +189,7 @@ class PoissonInterfaceVEMModel():
         uh = self.uh
         wh = self.wh
         eI =  uII[self.isIntPoint] - (uh[self.isIntPoint] - wh[self.isIntPoint])
+       
         eE =  uIE[self.isExtPoint] - uh[self.isExtPoint]
         return np.sqrt((np.mean(eI**2) + np.mean(eE**2))/2)
 
@@ -197,17 +200,43 @@ class PoissonInterfaceVEMModel():
         wh = self.wh
         eI =  uII - (uh - wh)
         eE =  uIE - uh
-
+        
         eI[~self.isIntPoint] = 0 
         eE[~self.isExtPoint] = 0
         return np.sqrt(eI@self.AI@eI + eE@self.AE@eE)
 
-    def L2_error(self, quadtree):
-        u = self.model.solution
-        uh = self.S.value
-        return self.error.L2_error(u, uh, quadtree, barycenter=False)
+    def L2_error(self):   
+    
+        qf = GaussLegendreQuadrture(2)
+        bcs, ws = qf.quadpts, qf.weights
+        point = self.mesh.point
+        edge = self.mesh.ds.edge
+        cell = self.mesh.ds.cell
+        cell2dof, cell2dofLocation = self.V.dof.cell2dof, self.V.dof.cell2dofLocation
+        NV = self.mesh.number_of_vertices_of_cells()
+        NC = self.mesh.number_of_cells()
+        
+        uII = self.uII        
+        uIE = self.uIE
+        uh = self.uh
+        wh = self.wh
+        
+        eI =  (uII - (uh - wh))**2
+        eE =  (uIE - uh)**2
+        
+        eI[~self.isIntPoint] = 0 
+        eE[~self.isExtPoint] = 0
 
-    def H1_semi_error(self, quadtree):
+        eI = eI[cell2dof[np.repeat(self.isIntCell, NV)]]
+        eE = eE[cell2dof[np.repeat(~self.isIntCell, NV)]]
+        print("eI", cell.shape)
+
+        eI = eI/NV*self.area
+        eE = eE/NV*self.area
+       
+        return np.sqrt(eI.sum()) + np.sqrt(eE.sum())
+        
+    def H1_semi_error(self):
         gu = self.model.gradient
         guh = self.S.grad_value
         return self.error.L2_error(gu, guh, quadtree, barycenter=False)
