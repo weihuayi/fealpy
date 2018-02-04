@@ -19,15 +19,18 @@ class SSCFTParameter():
         self.tolR = 1.0e-3
         self.maxit = 5000
         self.showstep = 200
-        self.pdemethod = 'FM'
+        self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
+        self.fieldType = 'fieldmu'
+
 
 class TimeLine():
     def __init__(self, interval, dt):
         self.T0 = interval[0]
         self.T1 = interval[1]
-        self.Nt = int(np.ceil((selt.T1 - self.T0)/dt))
+        self.Nt = int(np.ceil((self.T1 - self.T0)/dt))
         self.dt = (self.T1 - self.T0)/self.Nt
+        print(self.dt)
         self.current = 0
 
     def get_index_interval(self):
@@ -40,7 +43,7 @@ class TimeLine():
         return self.current
 
     def get_time_step_length(self):
-        return self.dt 
+        return self.dt
 
     def stop(self):
         return self.current >= self.Nt 
@@ -64,11 +67,16 @@ class PDESolver():
 
     def get_current_linear_system(self, u0, dt):
         M = self.M
+        print(M,M.shape)
         S = self.A
+        print(S,S.shape)
         F = self.F
+        print(F,F.shape)
         if self.method is 'FM':
             b = -dt*(S + F)@u0 + M@u0
-            A = M                                                         
+            print(b)
+            A = M   
+            print(A)
             return A, b
         if self.method is 'BM':
             b = M@u0
@@ -91,13 +99,14 @@ class PDESolver():
     
 
 class SSCFTFEMModel():
-    def __init__(self, surface, mesh, option, p=1, p0=1):
+    def __init__(self, surface, mesh, option,fields, p=1, p0=1):
         self.femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
         self.mesh = self.femspace.mesh
-        self.area = mesh.area(option.integrator)
+        self.area = mesh.area()
         self.totalArea = np.sum(self.area)
         self.surface = surface
         self.option = option
+        self.fields = fields
 
         self.timeline0 = TimeLine([0, option.fA], option.dtMax)
         self.timeline1 = TimeLine([option.fA, 1], option.dtMax)
@@ -110,7 +119,7 @@ class SSCFTFEMModel():
         self.w   = [self.femspace.function() for i in range(option.Nspecies)] 
         self.mu   = [self.femspace.function() for i in range(option.Nspecies)] 
         self.grad = self.femspace.function(dim=option.Nspecies)
-        self.sQ    = np.zeros((self.Nspecies-1, self.Nblend))
+        self.sQ    = np.zeros((option.Nspecies-1, option.Nblend))
 
         self.solver = PDESolver(self.femspace, option.integrator, self.area, option.pdemethod)
 
@@ -118,14 +127,17 @@ class SSCFTFEMModel():
 
     def initialize(self):
         option = self.option
+        fields = self.fields
         chiN = option.chiAB * option.Ndeg
-        field = option.fields
+         
         if option.fieldType is 'fieldmu':
             self.mu[0][:]   = fields[:, 0]
+           # print('mu0', fields[:, 0])
             self.mu[1][:]   = fields[:, 1]
+           # print('mu1',fields[:, 1])
             self.w[0][:] = fields[:, 0] - fields[:, 1]
             self.w[1][:] = fields[:, 0] + fields[:, 1]
-        if option.fieldtype is 'fieldw':
+        if option.fieldType is 'fieldw':
             self.w[0][:]   = fields[:, 0]
             self.w[1][:]   = fields[:, 1]
             self.mu[0][:] = 0.5*(fields[:, 0] + fields[:, 1])
@@ -133,25 +145,28 @@ class SSCFTFEMModel():
 
         self.rho[0][:] = 0.5 + self.mu[1]/chiN
         self.rho[1][:] = 1.0 - self.rho[0]
+        print(self.rho)
 
     def update_propagator(self):
+        option = self.option
         n0 = self.timeline0.get_number_of_time_steps()
+        print(n0)
         n1 = self.timeline1.get_number_of_time_steps()
 
         F0 = doperator.mass_matrix(
                 self.femspace, 
-                self.integrator, 
+                option.integrator, 
                 self.area, 
                 cfun=self.w[0].value)
 
         F1 = doperator.mass_matrix(
                 self.femspace, 
-                self.integrator, 
+                option.integrator, 
                 self.area, 
                 cfun=self.w[1].value)
 
         self.q0[:, 0] = 1.0
-        self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
+        print( self.solver.run(self.timeline0, self.q0[:, 0:n0], F0))
         self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
@@ -193,14 +208,11 @@ class SSCFTFEMModel():
         f = self.integral_space(integrand)/self.totalArea 
         return f
 
-    def update_hamilton(self)
-
+    def update_hamilton(self):
         chiN = self.chiAB * self.Ndeg
-
         mu1_int = self.integral_space(self.mu[0])
         mu2_int = self.integral_space2(self.mu[1])
         H = -mu1_int + mu2_int/chiN
-
         return H
 
     def updateField(self):
@@ -255,7 +267,7 @@ class SSCFTFEMModel():
             ediff = H - Hold
             Hold = H
 
-    def get_partial_F(self, radius)
+    def get_partial_F(self, radius):
  
         self.update_propagator()
 
