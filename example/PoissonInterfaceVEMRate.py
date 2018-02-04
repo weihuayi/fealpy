@@ -8,6 +8,8 @@ from fealpy.tools.show import showmultirate
 
 from fealpy.mesh.implicit_curve import Circle
 from fealpy.mesh.adaptive_interface_mesh_generator import AdaptiveMarker2d, QuadtreeInterfaceMesh2d 
+from fealpy.quadrature import TriangleQuadrature 
+
 
 import matplotlib.pyplot as plt 
 from mpl_toolkits.mplot3d import Axes3D
@@ -40,17 +42,17 @@ alg = QuadtreeInterfaceMesh2d(quadtree, marker)
 pmesh= alg.get_interface_mesh()
 
 pmesh.add_plot(plt, cellcolor='w')
-
-vem = PoissonInterfaceVEMModel(model, pmesh, p=1)
+integrator = TriangleQuadrature(3)
+vem = PoissonInterfaceVEMModel(model, pmesh, p=1, integrator=integrator)
 
 for i in range(maxit):
     print('step:', i)
     vem.solve()
-    Ndof[i] = vem.V.number_of_global_dofs()
+    Ndof[i] = vem.vemspace.number_of_global_dofs()
     errorMatrix[0, i] = vem.l2_error()
     errorMatrix[1, i] = vem.uIuh_error() 
-#    errorMatrix[2, i] = vem.L2_error(quadtree)
-#    errorMatrix[3, i] = vem.H1_semi_error(quadtree)
+    errorMatrix[2, i] = vem.L2_error()
+    errorMatrix[3, i] = vem.H1_semi_error()
 #    errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
         quadtree.uniform_refine()
@@ -58,7 +60,7 @@ for i in range(maxit):
         vem.reinit(pmesh)
 
 pmesh.add_plot(plt, cellcolor='w')
-k,l = 0, 2
+k,l = 0, 4
 showmultirate(plt, k, Ndof, errorMatrix[:l, :], errorType[:l])
 plt.show()
 

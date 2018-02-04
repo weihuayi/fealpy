@@ -196,7 +196,6 @@ class PoissonVEMModel():
         uh = self.uh
         bc = DirichletBC(self.vemspace, self.model.dirichlet)
         self.A, b = solve(self, uh, dirichlet=bc, solver='direct')
-        self.S = self.project_to_smspace(uh)
 
     def l2_error(self):
         e = self.uh - self.uI
@@ -208,10 +207,12 @@ class PoissonVEMModel():
 
     def L2_error(self):
         u = self.model.solution
-        uh = self.S.value
+        S = self.project_to_smspace(uh)
+        uh = S.value
         return self.integralalg.L2_error(u, uh)
 
     def H1_semi_error(self):
         gu = self.model.gradient
-        guh = self.S.grad_value
+        S = self.project_to_smspace(uh)
+        guh = S.grad_value
         return self.integralalg.L2_error(gu, guh)
