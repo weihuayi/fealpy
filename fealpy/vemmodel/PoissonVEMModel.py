@@ -4,12 +4,12 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..vemmodel import doperator 
-from ..functionspace import FunctionNorm
+from ..vemmodel import doperator
+from .integral_alg import PolygonMeshIntegralAlg
 
 
 class PoissonVEMModel():
-    def __init__(self, model, mesh, p=1, integrator=None, quadtree=None):
+    def __init__(self, model, mesh, p=1, integrator=None):
         """
         Initialize a Poisson virtual element model. 
 
@@ -26,52 +26,62 @@ class PoissonVEMModel():
         Notes
         -----
         """
-        self.V =VirtualElementSpace2d(mesh, p) 
-        self.mesh = self.V.mesh
-        self.quadtree = quadtree
+        self.vemspace =VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.vemspace.mesh
         self.model = model  
-        self.uh = self.V.function() 
-        self.uI = self.V.interpolation(model.solution)
-        self.area = self.V.smspace.area 
+        self.uh = self.vemspace.function() 
+        self.area = self.vemspace.smspace.area 
+        self.integrator = integrator
 
-        self.error = FunctionNorm(integrator, self.area)
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.integrator, 
+                self.mesh, 
+                area=self.area, 
+                barycenter=self.vemspace.smspace.barycenter)
 
-        self.H = doperator.matrix_H(self.V)
+        self.uI = self.vemspace.interpolation(model.solution, self.integralalg.integral)
 
-        self.D = doperator.matrix_D(self.V, self.H)
-        self.B = doperator.matrix_B(self.V)
-        self.G = doperator.matrix_G(self.V, self.B, self.D)
-        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
+        self.H = doperator.matrix_H(self.vemspace)
 
-        self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
+        self.D = doperator.matrix_D(self.vemspace, self.H)
+        self.B = doperator.matrix_B(self.vemspace)
+        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
+        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
+
+        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
+        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
 
     def reinit(self, mesh, p=None):
         if p is None:
-            p = self.V.p
-        self.V = VirtualElementSpace2d(mesh, p) 
-        self.mesh = self.V.mesh
-        self.uh = self.V.function() 
-        self.uI = self.V.interpolation(self.model.solution)
-        self.area = self.V.smspace.area
-        self.error.area = self.area 
+            p = self.vemspace.p
+        self.vemspace = VirtualElementSpace2d(mesh, p) 
+        self.mesh = self.vemspace.mesh
+        self.uh = self.vemspace.function() 
+        self.area = self.vemspace.smspace.area
 
-        self.H = doperator.matrix_H(self.V)
-        self.D = doperator.matrix_D(self.V, self.H)
-        self.B = doperator.matrix_B(self.V)
-        self.C = doperator.matrix_C(self.V, self.B, self.D, self.H, self.area)
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.integrator, 
+                self.mesh, 
+                area=self.area, 
+                barycenter=self.vemspace.smspace.barycenter)
+        self.uI = self.vemspace.interpolation(self.model.solution, self.integralalg.integral)
 
-        self.G = doperator.matrix_G(self.V, self.B, self.D)
+        self.H = doperator.matrix_H(self.vemspace)
+        self.D = doperator.matrix_D(self.vemspace, self.H)
+        self.B = doperator.matrix_B(self.vemspace)
+        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
 
-        self.PI0 = doperator.matrix_PI_0(self.V, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.V, self.G, self.B)
+        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
+
+        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
+        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
 
     def project_to_smspace(self, uh=None):
-        p = self.V.p
-        cell2dof, cell2dofLocation = self.V.dof.cell2dof, self.V.dof.cell2dofLocation
+        p = self.vemspace.p
+        cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@self.uh[x[1]]
-        S = self.V.smspace.function()
+        S = self.vemspace.smspace.function()
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
@@ -95,24 +105,24 @@ class PoissonVEMModel():
 
         """
         uh = self.uh
-        V = self.V
-        mesh = V.mesh
+        vemspace = self.vemspace
+        mesh = vemspace.mesh
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
         cell = mesh.ds.cell
-        barycenter = V.smspace.barycenter 
+        barycenter = vemspace.smspace.barycenter 
 
-        h = V.smspace.h 
-        area = V.smspace.area
-        ldof = V.smspace.number_of_local_dofs()
+        h = vemspace.smspace.h 
+        area = vemspace.smspace.area
+        ldof = vemspace.smspace.number_of_local_dofs()
             
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
         S = self.S 
         grad = S.grad_value(barycenter)
 
-        S0 = V.smspace.function() 
-        S1 = V.smspace.function()
+        S0 = vemspace.smspace.function() 
+        S1 = vemspace.smspace.function()
         p2c = mesh.ds.point_to_cell()
         try: 
             isSubDomain = self.model.subdomain(barycenter)
@@ -165,30 +175,32 @@ class PoissonVEMModel():
         return eta
 
     def get_left_matrix(self):
-        V = self.V
+        vemspace = self.vemspace
         area = self.area
         try:
             f = self.model.diffusion_coefficient
-            return doperator.stiff_matrix(V, area, cfun=f, vem=self)
+            return doperator.stiff_matrix(vemspace, area, cfun=f, vem=self)
         except AttributeError:
-            return doperator.stiff_matrix(V, area, vem=self)
+            return doperator.stiff_matrix(vemspace, area, vem=self)
 
     def get_right_vector(self):
-        V = self.V
-        area = self.area
         f = self.model.source
-        return doperator.source_vector(f, V, area, vem=self)
+        integral = self.integralalg.integral 
+        return doperator.source_vector(
+                integral,
+                f, 
+                self.vemspace,
+                self.PI0)
 
     def solve(self):
         uh = self.uh
-        bc = DirichletBC(self.V, self.model.dirichlet)
+        bc = DirichletBC(self.vemspace, self.model.dirichlet)
         self.A, b = solve(self, uh, dirichlet=bc, solver='direct')
         self.S = self.project_to_smspace(uh)
-    
+
     def l2_error(self):
-        u = self.model.solution
-        uh = self.uh
-        return self.error.l2_error(u, uh)
+        e = self.uh - self.uI
+        return np.sqrt(np.mean(e**2))
 
     def uIuh_error(self):
         e = self.uh - self.uI
@@ -197,10 +209,9 @@ class PoissonVEMModel():
     def L2_error(self):
         u = self.model.solution
         uh = self.S.value
-        return self.error.L2_error(u, uh, self.quadtree, barycenter=False)
+        return self.integralalg.L2_error(u, uh)
 
     def H1_semi_error(self):
         gu = self.model.gradient
         guh = self.S.grad_value
-        return self.error.L2_error(gu, guh, self.quadtree, barycenter=False)
-
+        return self.integralalg.L2_error(gu, guh)

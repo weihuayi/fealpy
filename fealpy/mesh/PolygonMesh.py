@@ -105,8 +105,6 @@ class PolygonMesh(Mesh2d):
         d = point[idx1] - point[idx2] 
         return 0.5*d@w 
 
-
-
     def print(self):
         print("Point:\n", self.point)
         print("Cell:\n", self.ds.cell)

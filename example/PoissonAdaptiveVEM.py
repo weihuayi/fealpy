@@ -5,7 +5,7 @@ from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData,
 from fealpy.vemmodel import PoissonVEMModel 
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 from fealpy.tools.show import showmultirate
-from fealpy.quadrature import QuadrangleQuadrature 
+from fealpy.quadrature import TriangleQuadrature 
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -30,7 +30,7 @@ elif m == 5:
     model = SinSinData()
     quadtree = model.init_mesh(n=3)
 
-k = 0
+k = 0 
 errorType = ['$\| u_I - u_h \|_{l_2}$',
              '$\|\\nabla u_I - \\nabla u_h\|_A$',
              '$\| u - \Pi^\Delta u_h\|_0$',
@@ -41,13 +41,13 @@ Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 mesh = quadtree.to_pmesh()
 
-integrator = QuadrangleQuadrature(6)
-vem = PoissonVEMModel(model, mesh, p=p, integrator=integrator, quadtree=quadtree)
+integrator = TriangleQuadrature(6)
+vem = PoissonVEMModel(model, mesh, p=p, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
     #eta = vem.recover_estimate()
-    Ndof[i] = vem.V.number_of_global_dofs()
+    Ndof[i] = vem.vemspace.number_of_global_dofs()
     errorMatrix[0, i] = vem.l2_error()
     errorMatrix[1, i] = vem.uIuh_error() 
     errorMatrix[2, i] = vem.L2_error()

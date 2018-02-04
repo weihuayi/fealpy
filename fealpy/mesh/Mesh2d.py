@@ -27,20 +27,20 @@ class Mesh2d():
     def geom_dimension(self):
         return self.point.shape[1]
 
-    def barycenter(self, entity='cell', entityidx=None):
+    def barycenter(self, entity='cell', index=None):
         point = self.point
         if entity == 'cell':
             cell = self.ds.cell
-            if entityidx is None:
+            if index is None:
                 bc = np.sum(point[cell, :], axis=1)/cell.shape[1]
             else:
-                bc = np.sum(point[cell[entityidx], :], axis=1)/cell.shape[1]
+                bc = np.sum(point[cell[index], :], axis=1)/cell.shape[1]
         elif entity == 'edge':
             edge = self.ds.edge
-            if entityidx is None:
+            if index is None:
                 bc = np.sum(point[edge, :], axis=1)/edge.shape[1]
             else:
-                bc = np.sum(point[edge[entityidx], :], axis=1)/edge.shape[1]
+                bc = np.sum(point[edge[index], :], axis=1)/edge.shape[1]
         elif entity == 'point':
             bc = point
         else:
@@ -62,47 +62,68 @@ class Mesh2d():
         a /=2
         return a
 
-    def edge_length(self, edgeflag=None):
-        if edgeflag is None:
+    def cell_area(self):
+        #TODO: 3D Case
+        NC = self.number_of_cells()
+        point = self.point
+        edge = self.ds.edge
+        edge2cell = self.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        v= (point[edge[:, 1], :] - point[edge[:, 0], :])@w
+        val = np.sum(v*point[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+
+    def entity_measure(self, dim=2):
+        if dim == 2:
+            return self.cell_area()
+        elif dim == 1:
+            return self.edge_length()
+
+    def edge_length(self, index=None):
+        if index is None:
             v = point[edge[:,1],:] - point[edge[:,0],:]
         else:
-            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+            v = point[edge[index,1],:] - point[edge[index,0],:]
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
 
-    def edge_unit_normal(self, edgeflag=None):
+    def edge_unit_normal(self, index=None):
         #TODO: 3D Case
-        v = self.edge_unit_tagent(edgeflag=edgeflag)
+        v = self.edge_unit_tagent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_unit_tagent(self, edgeflag=None):
+    def edge_unit_tagent(self, index=None):
         edge = self.ds.edge
         point = self.point
         NE = self.number_of_edges()
-        if edgeflag is None:
+        if index is None:
             v = point[edge[:,1],:] - point[edge[:,0],:]
             length = np.sqrt(np.sum(v**2,axis=1))
             v /= length.reshape(-1, 1)
         else:
-            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+            v = point[edge[index,1],:] - point[edge[index,0],:]
             length = np.sqrt(np.sum(v**2, axis=1))
             v /= length.reshape(-1, 1)
         return v
 
-    def edge_normal(self, edgeflag=None):
-        v = self.edge_tagent(edgeflag=edgeflag)
+    def edge_normal(self, index=None):
+        v = self.edge_tagent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_tagent(self, edgeflag=None):
+    def edge_tagent(self, index=None):
         point = self.point
         edge = self.ds.edge
-        if edgeflag is None:
+        if index is None:
             v = point[edge[:,1],:] - point[edge[:,0],:]
         else:
-            v = point[edge[edgeflag,1],:] - point[edge[edgeflag,0],:]
+            v = point[edge[index,1],:] - point[edge[index,0],:]
         return v 
 
     def add_plot(self, plot,

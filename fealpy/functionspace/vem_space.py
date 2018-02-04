@@ -44,9 +44,10 @@ class SMDof2d():
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
-    def number_of_local_dofs(self):
-        p = self.p
-        return int((p+1)*(p+2)/2)
+    def number_of_local_dofs(self, p=None):
+        if p is None:
+            p = self.p
+        return (p+1)*(p+2)//2
 
     def number_of_global_dofs(self):
         ldof = self.number_of_local_dofs()
@@ -67,7 +68,7 @@ class ScaledMonomialSpace2d():
         self.h = np.sqrt(self.area) 
         self.dof = SMDof2d(mesh, p)
 
-    def basis(self, point, cellidx=None):
+    def basis(self, point, cellidx=None, p=None):
         """
         Compute the basis values at point
 
@@ -76,10 +77,14 @@ class ScaledMonomialSpace2d():
         point : numpy array
             The shape of point is (..., M, 2) 
         """
-        p = self.p
+        if p is None:
+            p = self.p
         h = self.h
 
-        ldof = self.number_of_local_dofs() 
+        ldof = self.number_of_local_dofs(p=p) 
+        if p == 0: 
+            return np.ones(point.shape[:-1], dtype=np.float) 
+    
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float) # (..., M, ldof)
         if cellidx is None:
@@ -104,10 +109,11 @@ class ScaledMonomialSpace2d():
             assert(point.shape[-2] == len(cellidx))
             return np.einsum('ij, ...ij->...i', uh[cell2dof[cellidx]], phi)
 
-    def grad_basis(self, point, cellidx=None):
-        p = self.p
+    def grad_basis(self, point, cellidx=None, p=None):
+        if p is None:
+            p = self.p
         h = self.h
-        ldof = self.number_of_local_dofs() 
+        ldof = self.number_of_local_dofs(p=p) 
         shape = point.shape[:-1]+(ldof, 2)
         gphi = np.zeros(shape, dtype=np.float)
         gphi[..., 1, 0] = 1 
@@ -135,8 +141,9 @@ class ScaledMonomialSpace2d():
             assert(point.shape[-2] == len(cellidx))
             return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
 
-    def laplace_basis(self, point, cellidx=None):
-        p = self.p
+    def laplace_basis(self, point, cellidx=None, p=None):
+        if p is None:
+            p = self.p
         area = self.area
 
         ldof = self.number_of_local_dofs() 
@@ -177,8 +184,8 @@ class ScaledMonomialSpace2d():
         NC = self.mesh.number_of_cells()
         return np.zeros(NC*ldof, dtype=np.float)
 
-    def number_of_local_dofs(self):
-        return self.dof.number_of_local_dofs()
+    def number_of_local_dofs(self, p=None):
+        return self.dof.number_of_local_dofs(p=p)
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -315,7 +322,8 @@ class VirtualElementSpace2d():
     def function(self):
         return FiniteElementFunction(self)
 
-    def interpolation(self, u):
+    def interpolation(self, u, integral=None):
+        p = self.p
         mesh = self.mesh
         N = mesh.number_of_points()
         NE = mesh.number_of_edges()
@@ -323,6 +331,18 @@ class VirtualElementSpace2d():
         ipoint = self.interpolation_points()
         uI = self.function() 
         uI[:N+(p-1)*NE] = u(ipoint[:N+(p-1)*NE])
+
+        if p > 1:
+            phi = self.smspace.basis
+
+            def f(x, cellidx):
+                return np.einsum('ij, ij...->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
+            
+            if p == 2:
+                bb = integral(f, celltype=True)/self.smspace.area
+            else:
+                bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+            uI[N+(p-1)*NE:] = bb.reshape(-1)
         return uI
 
     def number_of_global_dofs(self):

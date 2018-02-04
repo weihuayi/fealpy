@@ -5,7 +5,7 @@ import sys
 from fealpy.model.obstacle_model_2d import ObstacleData1, ObstacleData2 
 from fealpy.vemmodel.ObstacleVEMModel2d import ObstacleVEMModel2d
 from fealpy.tools.show import showmultirate
-from fealpy.quadrature import QuadrangleQuadrature 
+from fealpy.quadrature import TriangleQuadrature 
 
 import matplotlib.pyplot as plt
 
@@ -18,14 +18,15 @@ if m == 1:
     quadtree= model.init_mesh(n=3, meshtype='quadtree')
 elif m == 2:
     model = ObstacleData2() 
-    quadtree = model.init_mesh(n=4, meshtype='quadtree')
+    quadtree = model.init_mesh(n=3, meshtype='quadtree')
 
 errorType = ['$\| u - \Pi^\Delta u_h\|_0$',
              '$\|\\nabla u - \\nabla \Pi^\Delta u_h\|$'
              ]
+
 mesh = quadtree.to_pmesh()
-integrator = QuadrangleQuadrature(6)
-vem = ObstacleVEMModel2d(model, mesh, p=p, integrator=integrator, quadtree=quadtree)
+integrator = TriangleQuadrature(3)
+vem = ObstacleVEMModel2d(model, mesh, p=p, integrator=integrator)
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
@@ -33,7 +34,7 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
-    Ndof[i] = vem.V.number_of_global_dofs()
+    Ndof[i] = vem.vemspace.number_of_global_dofs()
     errorMatrix[0, i] = vem.L2_error()
     errorMatrix[1, i] = vem.H1_semi_error()
     if i < maxit - 1:

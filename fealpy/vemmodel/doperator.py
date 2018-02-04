@@ -55,33 +55,44 @@ def stiff_matrix(V, area, cfun=None, vem=None):
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
     return A
 
-def source_vector(f, V, area, vem=None):
-    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
-    if V.p == 1:
-        mesh = V.mesh
-        ldof = V.number_of_local_dofs()
-        bb = np.zeros(ldof.sum(), dtype=np.float)
-        point = mesh.point
-        NV = mesh.number_of_vertices_of_cells()
-        F = f(point)
-        bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
-    else:
-        if vem is not None:
-            qf = vem.error.integrator  
-            bcs, ws = qf.quadpts, qf.weights
-            pp = vem.quadtree.bc_to_point(bcs)
-            val = f(pp)
-            phi = vem.V.smspace.basis(pp)
-            bb = np.einsum('i, ij, ijm->jm', ws, val, phi)
-            bb *= vem.area[:, np.newaxis]
-            g = lambda x: x[0].T@x[1]
-            bb = np.concatenate(list(map(g, zip(vem.PI0, bb))))
-        else:
-            raise ValueError('We need vem!')
-            
-    gdof = V.number_of_global_dofs()
-    b = np.bincount(cell2dof, weights=bb, minlength=gdof)
+def source_vector(integral, f, vemspace, PI0):
+    phi = vemspace.smspace.basis
+    def u(x, cellidx):
+        return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+    bb = integral(u, celltype=True)
+    g = lambda x: x[0].T@x[1]
+    bb = np.concatenate(list(map(g, zip(PI0, bb))))
+    gdof = vemspace.number_of_global_dofs()
+    b = np.bincount(vemspace.dof.cell2dof, weights=bb, minlength=gdof)
     return b
+
+#def source_vector(f, V, area, vem=None):
+#    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+#    if V.p == 1:
+#        mesh = V.mesh
+#        ldof = V.number_of_local_dofs()
+#        bb = np.zeros(ldof.sum(), dtype=np.float)
+#        point = mesh.point
+#        NV = mesh.number_of_vertices_of_cells()
+#        F = f(point)
+#        bb = F[cell2dof]/np.repeat(NV, NV)*np.repeat(area, NV)
+#    else:
+#        if vem is not None:
+#            qf = vem.error.integrator  
+#            bcs, ws = qf.quadpts, qf.weights
+#            pp = vem.quadtree.bc_to_point(bcs)
+#            val = f(pp)
+#            phi = vem.V.smspace.basis(pp)
+#            bb = np.einsum('i, ij, ijm->jm', ws, val, phi)
+#            bb *= vem.area[:, np.newaxis]
+#            g = lambda x: x[0].T@x[1]
+#            bb = np.concatenate(list(map(g, zip(vem.PI0, bb))))
+#        else:
+#            raise ValueError('We need vem!')
+#            
+#    gdof = V.number_of_global_dofs()
+#    b = np.bincount(cell2dof, weights=bb, minlength=gdof)
+#    return b
 
 def matrix_H(V):
     p = V.p
