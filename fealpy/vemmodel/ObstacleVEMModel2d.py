@@ -88,6 +88,95 @@ class ObstacleVEMModel2d():
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
+    def recover_estimate(self, rtype='simple'):
+        """
+        estimate the recover-type error 
+
+        Parameters
+        ----------
+        self : PoissonVEMModel object
+        rtype : str
+            'simple':
+            'area'
+            'inv_area'
+
+        See Also
+        --------
+
+        Notes
+        ----- 
+
+        """
+        uh = self.uh
+        vemspace = self.vemspace
+        mesh = vemspace.mesh
+        NC = mesh.number_of_cells()
+        NV = mesh.number_of_vertices_of_cells()
+        cell = mesh.ds.cell
+        barycenter = vemspace.smspace.barycenter 
+
+        h = vemspace.smspace.h 
+        area = vemspace.smspace.area
+        ldof = vemspace.smspace.number_of_local_dofs()
+            
+        # project the vem solution into linear polynomial space
+        idx = np.repeat(range(NC), NV)
+        S = self.S 
+        grad = S.grad_value(barycenter)
+
+        S0 = vemspace.smspace.function() 
+        S1 = vemspace.smspace.function()
+        p2c = mesh.ds.point_to_cell()
+        try: 
+            isSubDomain = self.model.subdomain(barycenter)
+            for isFlag in isSubDomain:
+                isSubIdx = np.repeat(isFlag, NV)
+                M = p2c[:, isFlag]
+                sa = area[isFlag]
+                if rtype is 'simple':
+                    d = p2c.sum(axis=1)
+                    ruh = np.asarray((M@grad[isFlag])/d.reshape(-1, 1))
+                elif rtype is 'area':
+                    d = p2c@area
+                    ruh = np.asarray((M@(grad[isFlag]*sa.reshape(-1, 1)))/d.reshape(-1, 1))
+                elif rtype is 'inv_area':
+                    d = p2c@(1/area)
+                    ruh = np.asarray((M@(grad[isFlag]/sa.reshape(-1, 1)))/d.reshape(-1, 1))
+                else:
+                    raise ValueError("I have note code method: {}!".format(rtype))
+
+                for i in range(3):
+                    S0[i::ldof] += np.bincount(idx[isSubIdx], weights=self.B[i, isSubIdx]*ruh[cell[isSubIdx], 0], minlength=NC)
+                    S1[i::ldof] += np.bincount(idx[isSubIdx], weights=self.B[i, isSubIdx]*ruh[cell[isSubIdx], 1], minlength=NC)
+
+        except  AttributeError:
+            if rtype is 'simple':
+                d = p2c.sum(axis=1)
+                ruh = np.asarray((p2c@grad)/d.reshape(-1, 1))
+            elif rtype is 'area':
+                d = p2c@area
+                ruh = np.asarray((p2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
+            elif rtype is 'inv_area':
+                d = p2c@(1/area)
+                ruh = np.asarray((p2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
+            else:
+                raise ValueError("I have note code method: {}!".format(rtype))
+
+            for i in range(ldof):
+                S0[i::ldof] = np.bincount(idx, weights=self.B[i, :]*ruh[cell, 0], minlength=NC)
+                S1[i::ldof] = np.bincount(idx, weights=self.B[i, :]*ruh[cell, 1], minlength=NC)
+
+        try:
+            k = self.model.diffusion_coefficient(barycenter)
+        except  AttributeError:
+            k = np.ones(NC) 
+
+        point = mesh.point
+        gx = S0.value(point[cell], idx) - np.repeat(grad[:, 0], NV)
+        gy = S1.value(point[cell], idx) - np.repeat(grad[:, 1], NV)
+        eta = np.sqrt(k*np.bincount(idx, weights=gx**2+gy**2)/NV*area)
+        return eta 
+
     def get_left_matrix(self):
         vemspace = self.vemspace
         area = self.area
@@ -106,7 +195,7 @@ class ObstacleVEMModel2d():
         uh = self.uh
         gI = self.gI
         bc = DirichletBC(self.vemspace, self.model.dirichlet)
-        active_set_solver(self, uh, gI, dirichlet=bc, solver='direct')
+        self.A, b = active_set_solver(self, uh, gI, dirichlet=bc, solver='direct')
         self.S = self.project_to_smspace(uh)
 
     def l2_error(self):
