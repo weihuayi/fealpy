@@ -9,7 +9,7 @@ class PolygonMesh(Mesh2d):
 
     """ 2d Polygon Mesh data structure from vtk data structure
     """
-    def __init__(self, point, cell, cellLocation=None, dtype=np.float):
+    def __init__(self, point, cell, cellLocation=None):
         self.point = point
         if cellLocation is None: 
             if len(cell.shape)  == 2:
@@ -22,7 +22,6 @@ class PolygonMesh(Mesh2d):
 
         self.ds = PolygonMeshDataStructure(point.shape[0], cell, cellLocation)
         self.meshType = 'polygon'
-        self.dtype = dtype
 
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()

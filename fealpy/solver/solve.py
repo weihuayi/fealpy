@@ -84,7 +84,7 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
     return A, b 
 
 
-def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
+def active_set_solver(dmodel, uh, gh, maxit =5000, dirichlet=None,
         solver='direct'):
     V = uh.V
     start = timer()
@@ -105,6 +105,7 @@ def active_set_solver(dmodel, uh, gh, maxit =1000, dirichlet=None,
 
     k = 0
     while k < maxit:
+        print(k)
         k += 1
         I0 = I.copy()
         I[:] = (lam + gh - uh > 0)
