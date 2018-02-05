@@ -20,7 +20,7 @@ class SSCFTParameter():
         self.dtMax = 0.005
         self.tol = 1.0e-6
         self.tolR = 1.0e-3
-        self.maxit = 2 
+        self.maxit = 5000 
         self.showstep = 200
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
@@ -170,11 +170,9 @@ class SSCFTFEMModel():
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
 
     def integral_time(self, q, dt):
-        q = q.view(np.ndarray)
-        f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) + 1/24*(q[:,
-            2] + q[:, -3])
+        f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
         f += np.sum(q, axis=1)
-        f = dt*f
+        f *= dt
         return f
     
     def integral_space(self, u):
@@ -224,10 +222,9 @@ class SSCFTFEMModel():
         self.mu[0] += lambd[0]*self.grad[:, 0]
         self.mu[1] -= lambd[1]*self.grad[:, 1]
 
-
         self.w[0][:] = self.mu[0] - self.mu[1] 
-        self.w[1][:] = self.mu[1] + self.mu[1]
-
+        self.w[1][:] = self.mu[0] + self.mu[1]
+        
         return err 
 
     def find_saddle_point(self):
@@ -245,7 +242,7 @@ class SSCFTFEMModel():
             iteration += 1
             print('res:', self.res, 'ediff:', self.ediff, 'H:', self.H)
 
-            if iteration%50 == 0:
+            if iteration%200 == 0:
                 mesh = self.mesh.mesh
                 cell = mesh.ds.cell
                 point = mesh.point
@@ -258,23 +255,12 @@ class SSCFTFEMModel():
                         simplices=cell, 
                         color_func=c)
                 py.plot(fig, filename='test')
-
-#                fig = plt.figure()
-#                fig.set_facecolor('white')
-#                axes = fig.gca(projection='3d')
-#                s = axes.plot_trisurf(point[:, 0], point[:, 1], point[:, 2],
-#                        triangles=cell)
-#                fig.colorbar(s)
-#                fig.savefig('/home/why/test/rhoA{}.pdf'.format(iteration))
         
     def one_step(self):
         self.update_propagator() 
-
         qq = self.q0*self.q1[:, -1::-1] 
-
         self.sQ[0,0] = self.update_singleQ(self.q0.index(-1))
         print('sQ:', self.sQ)
-
         self.update_density(qq)
 
         error = self.update_field()
