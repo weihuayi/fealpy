@@ -63,11 +63,8 @@ def triangle(box, h):
     cell = np.array(mesh.elements, dtype=np.int)
     return TriangleMesh(point, cell)
 
-def unitsquaredomainmesh(h0, meshtype='tri', dtype=np.float):
-    fd = lambda p: drectangle(p, [0, 1, 0, 1])
+def distmesh2d(fd, h0, bbox, pfix, meshtype='tri', dtype=np.float):
     fh = huniform
-    bbox = [-0.2, 1.2, -0.2, 1.2]
-    pfix = np.array([[0,0],[1,0],[1,1],[0,1]], dtype=dtype) 
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)
     distmesh2d.run()

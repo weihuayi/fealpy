@@ -1,6 +1,5 @@
 import numpy as np
 
-
 def project(curve, p0, maxit=200, tol=1e-8):
     eps = np.finfo(float).eps
     p = p0

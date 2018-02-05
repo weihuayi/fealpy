@@ -3,8 +3,8 @@ import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
-#import pyamg
-import pylab
+import pyamg
+#import pylab
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     V = a.V
@@ -69,7 +69,7 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
     elif solver is 'amg':
         start = timer()
         ml = pyamg.ruge_stuben_solver(AD)  
-        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+        uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape(-1)
         end = timer()
         print(ml)
     elif solver is 'direct':
@@ -84,7 +84,7 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
     return A, b 
 
 
-def active_set_solver(dmodel, uh, gh, maxit =5000, dirichlet=None,
+def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,
         solver='direct'):
     V = uh.V
     start = timer()
@@ -102,7 +102,7 @@ def active_set_solver(dmodel, uh, gh, maxit =5000, dirichlet=None,
 
     gdof = V.number_of_global_dofs()
     I = np.ones(gdof, dtype=np.bool)
-
+    
     k = 0
     while k < maxit:
         print(k)
@@ -119,11 +119,16 @@ def active_set_solver(dmodel, uh, gh, maxit =5000, dirichlet=None,
         M[idx, :] = 0
         M[idx, idx] = 1
         F[idx] = gh[idx]
-        uh[:] = spsolve(M.tocsr(), F)
+
+        if solver is 'direct':
+            uh[:] = spsolve(M.tocsr(), F)
+        elif solver is 'amg':
+            ml = pyamg.ruge_stuben_solver(M.tocsr())  
+            uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
         lam[:] = AD@uh - b
     end = timer()
     print("Solve time:", end-start)
-    return 
+    return A, b
 
 
         

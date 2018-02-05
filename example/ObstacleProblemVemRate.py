@@ -7,6 +7,7 @@ from fealpy.vemmodel.ObstacleVEMModel2d import ObstacleVEMModel2d
 from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.quadrature import TriangleQuadrature 
 from fealpy.mesh import PolygonMesh
+from fealpy.mesh.simple_mesh_generator import distmesh2d, drectangle
 
 import matplotlib.pyplot as plt
 import scipy.io as sio
@@ -16,9 +17,13 @@ def load_mesh(f):
     point = data['point']
     cell = np.array(data['cell'].reshape(-1), dtype=np.int)
     cellLocation = np.array(data['cellLocation'].reshape(-1), dtype=np.int)
-    print(cellLocation.dtype)
     mesh = PolygonMesh(point, cell, cellLocation)
     return mesh
+
+
+fd = lambda p: drectangle(p, [-2, 2, -2, 2])
+bbox = [-2.2, 2.2, -2.2, 2.2]
+pfix = np.array([[-2, -2],[2, -2], [2, 2],[-2, 2]], dtype=np.float) 
 
 m = int(sys.argv[1])
 maxit = int(sys.argv[2])
@@ -29,7 +34,9 @@ if m == 1:
     quadtree= model.init_mesh(n=3, meshtype='quadtree')
 elif m == 2:
     model = ObstacleData2() 
-    mesh = load_mesh('nonconvexpmesh1.mat')
+    #mesh = load_mesh('nonconvexpmesh1.mat')
+    h0 = 0.2
+    mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
 
 errorType = ['$\| u - \Pi^\Delta u_h\|_0$',
              '$\|\\nabla u - \\nabla \Pi^\Delta u_h\|$'
@@ -44,14 +51,20 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 data = {}
 for i in range(maxit):
     print('step:', i)
-    vem.solve()
+    vem.solve(solver='direct')
     Ndof[i] = vem.vemspace.number_of_global_dofs()
     errorMatrix[0, i] = vem.L2_error()
     errorMatrix[1, i] = vem.H1_semi_error()
+
     data['uh{}'.format(i+1)] = vem.uh
+    data['elem{}'.format(i+1)] = mesh.ds.cell
+    data['elemLocation{}'.format(i+1)] = mesh.ds.cellLocation
+    data['node{}'.format(i+1)] = mesh.point
     if i < maxit - 1:
-        fi = 'nonconvexpmesh{}.mat'
-        mesh = load_mesh(fi.format(i+2))
+        #fi = 'nonconvexpmesh{}.mat'
+        #mesh = load_mesh(fi.format(i+2))
+        h0 /= 2
+        mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
         vem.reinit(mesh)
 
 data['errorMatrix'] = errorMatrix

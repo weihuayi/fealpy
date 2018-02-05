@@ -191,11 +191,21 @@ class ObstacleVEMModel2d():
                 self.vemspace,
                 self.PI0)
 
-    def solve(self):
+    def get_non_active_flag(self):
+        p = self.vemspace.p
+        gdof = self.vemspace.number_of_global_dofs()
+        flag = np.ones(gdof, dtype=np.bool)
+        NC = self.mesh.number_of_cells()
+        if p > 1:
+            flag[:-NC] = False
+        return flag
+        
+
+    def solve(self, solver='amg'):
         uh = self.uh
         gI = self.gI
         bc = DirichletBC(self.vemspace, self.model.dirichlet)
-        self.A, b = active_set_solver(self, uh, gI, dirichlet=bc, solver='direct')
+        self.A, b = active_set_solver(self, uh, gI, dirichlet=bc, solver=solver)
         self.S = self.project_to_smspace(uh)
 
     def l2_error(self):

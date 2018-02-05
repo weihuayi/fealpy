@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-def show_error_table(N, errorType, errorMatrix, pre=5, sep=' & ', out=sys.stdout, end='\n'):
+def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys.stdout, end='\n'):
 
     flag = False
     if type(out) == type(''):
@@ -20,11 +20,13 @@ def show_error_table(N, errorType, errorMatrix, pre=5, sep=' & ', out=sys.stdout
     print(s, file=out, end=end)
 
     n = len(errorType)
+    ff = '%.'+str(pre)+f
     for i in range(n):
         first = errorType[i]
         line = errorMatrix[i]
         s = first + sep + np.array2string(line, separator=sep,
-                precision=pre)
+                precision=pre, formatter=dict( float = lambda x: ff % x ))
+        
         s = s.replace('\n', '')
         s = s.replace('[', '')
         s = s.replace(']', '')
