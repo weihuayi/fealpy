@@ -8,7 +8,6 @@ def stiff_matrix(V, qf, area, cfun=None, barycenter=True):
     gdof = V.number_of_global_dofs()
     ldof = V.number_of_local_dofs()
     cell2dof = V.dof.cell2dof
-
     bcs, ws = qf.quadpts, qf.weights
     gphi = V.grad_basis(bcs)
     A = np.einsum('i, ijkm, ijpm->jkp', ws, gphi, gphi)
@@ -27,7 +26,8 @@ def mass_matrix(V, qf, area, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     phi = V.basis(bcs)
     if cfun is None:
-        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
+        val = np.einsum('m, mj, mk->jk', ws, phi, phi)
+        A = np.einsum('i, jk->ijk', area, val)
     else:
         if barycenter is True:
             val = cfun(bcs)

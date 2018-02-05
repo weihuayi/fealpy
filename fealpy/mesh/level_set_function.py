@@ -114,7 +114,7 @@ class Sphere(object):
 
     def init_mesh(self):
         from .TriangleMesh import TriangleMesh
-        t = (np.sqrt(6) - 1)/2
+        t = (np.sqrt(5) - 1)/2
         point = np.array([
             [ 0, 1, t],
             [ 0, 1,-t],

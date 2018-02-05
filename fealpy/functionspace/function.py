@@ -12,22 +12,6 @@ class FiniteElementFunction(np.ndarray):
     def index(self, i):
         return FiniteElementFunction(self.V, array=self[:, i])
 
-    def __add__(self, y):
-        a = self.view(np.ndarray)
-        return FiniteElementFunction(self.V, array=a+y)
-
-    def __sub__(self, y):
-        a = self.view(np.ndarray)
-        return FiniteElementFunction(self.V, array=a-y)
-
-    def __mul__(self, y):
-        a = self.view(np.ndarray)
-        return FiniteElementFunction(self.V, array=a*y)
-
-    def __div__(self, y):
-        a = self.view(np.ndarray)
-        return FiniteElementFunction(self.V, array=a/y)
-
     def __call__(self, bc, cellidx=None):
         V = self.V
         return V.value(self, bc, cellidx=cellidx)

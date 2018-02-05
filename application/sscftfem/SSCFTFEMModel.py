@@ -5,19 +5,22 @@ from fealpy.functionspace.surface_lagrange_fem_space import SurfaceLagrangeFinit
 from fealpy.femmodel import doperator 
 from scipy.sparse.linalg import spsolve
 
+import plotly.offline as py
+import plotly.figure_factory as FF
+
 class SSCFTParameter():
     def __init__(self):
         self.Nspecies = 2 
         self.Nblend   = 1
         self.Nblock   = 2 
         self.Ndeg     = 100  
-        self.fA       = 0.8 
-        self.chiAB    = 0.3 
+        self.fA       = 0.5 
+        self.chiAB    = 0.15 
         self.dim = 2
-        self.dtMax = 0.1
+        self.dtMax = 0.005
         self.tol = 1.0e-6
         self.tolR = 1.0e-3
-        self.maxit = 5000
+        self.maxit = 2 
         self.showstep = 200
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
@@ -30,7 +33,6 @@ class TimeLine():
         self.T1 = interval[1]
         self.Nt = int(np.ceil((self.T1 - self.T0)/dt))
         self.dt = (self.T1 - self.T0)/self.Nt
-        print(self.dt)
         self.current = 0
 
     def get_index_interval(self):
@@ -46,7 +48,7 @@ class TimeLine():
         return self.dt
 
     def stop(self):
-        return self.current >= self.Nt 
+        return self.current >= self.Nt - 1 
 
     def step(self):
         self.current += 1
@@ -67,16 +69,11 @@ class PDESolver():
 
     def get_current_linear_system(self, u0, dt):
         M = self.M
-        print(M,M.shape)
         S = self.A
-        print(S,S.shape)
         F = self.F
-        print(F,F.shape)
         if self.method is 'FM':
             b = -dt*(S + F)@u0 + M@u0
-            print(b)
             A = M   
-            print(A)
             return A, b
         if self.method is 'BM':
             b = M@u0
@@ -89,24 +86,23 @@ class PDESolver():
 
     def run(self, timeline, uh, F):
         self.F = F
-        while ~timeline.stop(): 
-            current = timeline.get_current_time_step()
+        while timeline.current < timeline.Nt: 
+            current = timeline.current
             dt = timeline.get_time_step_length()
-            A, b = self.get_current_linear_system(uh[current], dt)
-            self.uh[:, current] = spsolve(A, b)
-            timeline.step()
+            A, b = self.get_current_linear_system(uh[:, current], dt)
+            uh[:, current+1] = spsolve(A, b)
+            timeline.current += 1
         timeline.reset()
     
 
 class SSCFTFEMModel():
-    def __init__(self, surface, mesh, option,fields, p=1, p0=1):
+    def __init__(self, surface, mesh, option, p=1, p0=1):
         self.femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
         self.mesh = self.femspace.mesh
         self.area = mesh.area()
         self.totalArea = np.sum(self.area)
         self.surface = surface
         self.option = option
-        self.fields = fields
 
         self.timeline0 = TimeLine([0, option.fA], option.dtMax)
         self.timeline1 = TimeLine([option.fA, 1], option.dtMax)
@@ -114,6 +110,8 @@ class SSCFTFEMModel():
         N = self.timeline0.Nt + self.timeline1.Nt + 1
         self.q0 = self.femspace.function(dim=N) 
         self.q1 = self.femspace.function(dim=N) 
+
+        self.Ndof = self.femspace.number_of_global_dofs()
 
         self.rho   = [self.femspace.function() for i in range(option.Nspecies)] 
         self.w   = [self.femspace.function() for i in range(option.Nspecies)] 
@@ -123,34 +121,33 @@ class SSCFTFEMModel():
 
         self.solver = PDESolver(self.femspace, option.integrator, self.area, option.pdemethod)
 
-        self.initialize()
-
     def initialize(self):
         option = self.option
-        fields = self.fields
+        fields = option.fields 
         chiN = option.chiAB * option.Ndeg
-         
-        if option.fieldType is 'fieldmu':
-            self.mu[0][:]   = fields[:, 0]
-           # print('mu0', fields[:, 0])
-            self.mu[1][:]   = fields[:, 1]
-           # print('mu1',fields[:, 1])
-            self.w[0][:] = fields[:, 0] - fields[:, 1]
-            self.w[1][:] = fields[:, 0] + fields[:, 1]
-        if option.fieldType is 'fieldw':
-            self.w[0][:]   = fields[:, 0]
-            self.w[1][:]   = fields[:, 1]
-            self.mu[0][:] = 0.5*(fields[:, 0] + fields[:, 1])
-            self.mu[1][:] = 0.5*(fields[:, 1] - fields[:, 0])
 
+        self.w[0][:] = fields[:, 0] - fields[:, 1]
+        self.w[1][:] = fields[:, 0] + fields[:, 1]
+         
+#        if option.fieldType is 'fieldmu':
+#            self.mu[0][:]   = fields[:, 0]
+#            self.mu[1][:]   = fields[:, 1]
+#            self.w[0][:] = fields[:, 0] - fields[:, 1]
+#            self.w[1][:] = fields[:, 0] + fields[:, 1]
+#        if option.fieldType is 'fieldw':
+#            self.w[0][:]   = fields[:, 0]
+#            self.w[1][:]   = fields[:, 1]
+#            self.mu[0][:] = 0.5*(fields[:, 0] + fields[:, 1])
+#            self.mu[1][:] = 0.5*(fields[:, 1] - fields[:, 0])
+
+        self.mu[0][:]   = 0.5*(self.w[0] + self.w[1]) 
+        self.mu[1][:]   = 0.5*(self.w[1] - self.w[0]) 
         self.rho[0][:] = 0.5 + self.mu[1]/chiN
         self.rho[1][:] = 1.0 - self.rho[0]
-        print(self.rho)
 
     def update_propagator(self):
         option = self.option
         n0 = self.timeline0.get_number_of_time_steps()
-        print(n0)
         n1 = self.timeline1.get_number_of_time_steps()
 
         F0 = doperator.mass_matrix(
@@ -166,56 +163,53 @@ class SSCFTFEMModel():
                 cfun=self.w[1].value)
 
         self.q0[:, 0] = 1.0
-        print( self.solver.run(self.timeline0, self.q0[:, 0:n0], F0))
+        self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
         self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
 
     def integral_time(self, q, dt):
+        q = q.view(np.ndarray)
         f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) + 1/24*(q[:,
             2] + q[:, -3])
-        f = f + np.sum(q, axis=1)
+        f += np.sum(q, axis=1)
         f = dt*f
         return f
     
-    def integral_space(self, q):
+    def integral_space(self, u):
         mesh = self.femspace.mesh
         qf = self.option.integrator 
         bcs, ws = qf.quadpts, qf.weights
-        qq = q.value(bcs)
-        b = np.einsum('i, ij->j', ws, qq)
-        b *= self.area
-        Q = np.sum(b)
+        val = u(bcs)
+        Q = np.einsum('i, ij, j', ws, val, self.area)
         return Q
 
-    def integral_space2(self, q):
-        mesh = self.femspace.mesh
-        qf = self.option.integrator 
-        bcs, ws = qf.quadpts, qf.weights
-        qq = q.value(bcs)**2
-        b = np.einsum('i, ij->j', ws, qq)
-        b *= self.area
-        Q = np.sum(b)
-        return Q
 
     def update_density(self, q):
         n0 = self.timeline0.get_number_of_time_steps()
-        self.rho[0][:] = integral_time(q[:, 0:n0], self.timeline0.dt)
-        self.rho[1][:] = integral_time(q[:, n0-1:], self.timeline1.dt)
+        self.rho[0][:] = self.integral_time(q[:, 0:n0],
+                self.timeline0.dt)/self.sQ[0, 0]
+        self.rho[1][:] = self.integral_time(q[:, n0-1:],
+                self.timeline1.dt)/self.sQ[0, 0]
 
     def update_singleQ(self, integrand):
-        f = self.integral_space(integrand)/self.totalArea 
+        u = integrand.value
+        f = self.integral_space(integrand.value)/self.totalArea 
         return f
 
     def update_hamilton(self):
-        chiN = self.chiAB * self.Ndeg
-        mu1_int = self.integral_space(self.mu[0])
-        mu2_int = self.integral_space2(self.mu[1])
+        u = self.mu[0].value
+        mu1_int = self.integral_space(u)
+
+        u = lambda x : self.mu[1].value(x)**2
+        mu2_int = self.integral_space(u)
+
+        chiN = self.option.chiAB * self.option.Ndeg
         H = -mu1_int + mu2_int/chiN
         return H
 
-    def updateField(self):
+    def update_field(self):
 
         option = self.option
         chiN = option.chiAB * option.Ndeg
@@ -231,41 +225,65 @@ class SSCFTFEMModel():
         self.mu[1] -= lambd[1]*self.grad[:, 1]
 
 
-        self.w[0] = self.mu[0] - self.mu[1] 
-        self.w[1] = self.mu[1] + self.mu[1]
+        self.w[0][:] = self.mu[0] - self.mu[1] 
+        self.w[1][:] = self.mu[1] + self.mu[1]
 
         return err 
 
     def find_saddle_point(self):
         
-        res = np.inf
-        Hold = np.inf
-        ediff = np.inf
+        self.res = np.inf
+        self.Hold = np.inf
+        self.ediff = np.inf
         iteration = 0
-
-        error = np.arange(self.grad.shape[0])
         option = self.option
 
-        while (res > option.tol) and (iteration < option.maxit):
-            
-            self.update_propagator() 
+        while (self.res > option.tol) and (iteration < option.maxit):
+            self.H, self.res = self.one_step()
+            self.ediff = self.H - self.Hold
+            self.Hold = self.H
+            iteration += 1
+            print('res:', self.res, 'ediff:', self.ediff, 'H:', self.H)
 
-            qq = self.q0*self.q1[:, -1::-1] 
+            if iteration%50 == 0:
+                mesh = self.mesh.mesh
+                cell = mesh.ds.cell
+                point = mesh.point
+                c = np.sum(self.rho[0][cell], axis=1)/3
+                fig = FF.create_trisurf(
+                        x = point[:, 0], 
+                        y = point[:, 1],
+                        z = point[:, 2],
+                        show_colorbar = True,
+                        simplices=cell, 
+                        color_func=c)
+                py.plot(fig, filename='test')
 
-            self.sQ[0,0] = self.update_singleQ(self, self.q0.index(-1))
-
-            self.update_density(qq)
-
-            error = self.update_field()
+#                fig = plt.figure()
+#                fig.set_facecolor('white')
+#                axes = fig.gca(projection='3d')
+#                s = axes.plot_trisurf(point[:, 0], point[:, 1], point[:, 2],
+#                        triangles=cell)
+#                fig.colorbar(s)
+#                fig.savefig('/home/why/test/rhoA{}.pdf'.format(iteration))
         
-            H = self.update_hamilton()
+    def one_step(self):
+        self.update_propagator() 
 
-            H = H/self.totalArea - np.log(self.sQ(0,0))
+        qq = self.q0*self.q1[:, -1::-1] 
 
-            res = error.max()                      
+        self.sQ[0,0] = self.update_singleQ(self.q0.index(-1))
+        print('sQ:', self.sQ)
 
-            ediff = H - Hold
-            Hold = H
+        self.update_density(qq)
+
+        error = self.update_field()
+    
+        H = self.update_hamilton()
+
+        H = H/self.totalArea - np.log(self.sQ[0,0])
+        return H, error.max()
+
 
     def get_partial_F(self, radius):
  
