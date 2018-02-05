@@ -26,7 +26,7 @@ def mass_matrix(V, qf, area, cfun=None, barycenter=True):
 
     bcs, ws = qf.quadpts, qf.weights
     phi = V.basis(bcs)
-    if coefficient is None:
+    if cfun is None:
         A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, area)
     else:
         if barycenter is True:
