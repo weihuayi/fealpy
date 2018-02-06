@@ -7,6 +7,11 @@ from scipy.sparse.linalg import spsolve
 
 import plotly.offline as py
 import plotly.figure_factory as FF
+import fealpy.tools.colors as cs
+import scipy.io as sio
+
+
+
 
 class SSCFTParameter():
     def __init__(self):
@@ -20,7 +25,7 @@ class SSCFTParameter():
         self.dtMax = 0.005
         self.tol = 1.0e-6
         self.tolR = 1.0e-3
-        self.maxit = 5000 
+        self.maxit = 5000
         self.showstep = 200
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
@@ -145,6 +150,16 @@ class SSCFTFEMModel():
         self.rho[0][:] = 0.5 + self.mu[1]/chiN
         self.rho[1][:] = 1.0 - self.rho[0]
 
+        self.data ={
+                'node':self.mesh.mesh.point, 
+                'elem':self.mesh.mesh.ds.cell+1, 
+                'rhoA':[self.rho[0]],
+                'rhoB':[self.rho[1]],
+                'sQ':[],
+                'ediff':[],
+                'H':[]
+                }
+
     def update_propagator(self):
         option = self.option
         n0 = self.timeline0.get_number_of_time_steps()
@@ -227,7 +242,7 @@ class SSCFTFEMModel():
         
         return err 
 
-    def find_saddle_point(self):
+    def find_saddle_point(self, n=100, datafile='data', showsolution=True):
         
         self.res = np.inf
         self.Hold = np.inf
@@ -242,24 +257,22 @@ class SSCFTFEMModel():
             iteration += 1
             print('res:', self.res, 'ediff:', self.ediff, 'H:', self.H)
 
-            if iteration%200 == 0:
-                mesh = self.mesh.mesh
-                cell = mesh.ds.cell
-                point = mesh.point
-                c = np.sum(self.rho[0][cell], axis=1)/3
-                fig = FF.create_trisurf(
-                        x = point[:, 0], 
-                        y = point[:, 1],
-                        z = point[:, 2],
-                        show_colorbar = True,
-                        simplices=cell, 
-                        color_func=c)
-                py.plot(fig, filename='test')
+            self.data['rhoA'].append(self.rho[0])
+            self.data['rhoB'].append(self.rho[1])
+            self.data['H'].append(self.H)
+            self.data['ediff'].append(self.ediff)
+
+            if (iteration%n == 0) and showsolution:
+                self.show_solution(iteration)
+        sio.matlab.savemat(datafile+'.mat', self.data)
         
     def one_step(self):
         self.update_propagator() 
         qq = self.q0*self.q1[:, -1::-1] 
         self.sQ[0,0] = self.update_singleQ(self.q0.index(-1))
+
+        self.data['sQ'].append(self.sQ[0, 0])
+
         print('sQ:', self.sQ)
         self.update_density(qq)
 
@@ -280,3 +293,20 @@ class SSCFTFEMModel():
         gradF = -np.sum(sQ.reshape(-1))
 
         return partialF
+
+    def show_solution(self, i):
+        mesh = self.mesh.mesh
+        cell = mesh.ds.cell
+        point = mesh.point
+        c = self.rho[0].view(np.ndarray)
+        c = np.sum(c[cell], axis=1)/3
+        c = cs.val_to_color(c)
+        fig = FF.create_trisurf(
+                x = point[:, 0], 
+                y = point[:, 1],
+                z = point[:, 2],
+                show_colorbar = False,
+                plot_edges=False,
+                simplices=cell)
+        fig['data'][0]['facecolor'] = c
+        py.plot(fig, filename='test{}'.format(i))

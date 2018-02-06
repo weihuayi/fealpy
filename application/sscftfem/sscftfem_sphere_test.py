@@ -19,6 +19,7 @@ if m == 1:
 
 
 option = SSCFTParameter()
+option.maxit = 100
 scft = SSCFTFEMModel(surface, mesh, option, p=1, p0=1)
 
 
@@ -34,21 +35,7 @@ pi = np.pi
 theta = np.arctan2(ipoint[:,1], ipoint[:,0])
 theta = (theta >= 0)*theta + (theta <0)*(theta + 2*pi)             
 fields[:, 1] = chiN*np.sin(5*theta)
-
 option.fields = fields
 scft.initialize()
-
-mesh = scft.mesh.mesh
-cell = mesh.ds.cell
-point = mesh.point
-c = np.sum(scft.rho[0][cell], axis=1)/3
-fig = FF.create_trisurf(
-        x = point[:, 0], 
-        y = point[:, 1],
-        z = point[:, 2],
-        show_colorbar = True,
-        simplices=cell, 
-        color_func=c)
-py.plot(fig, filename='test')
-scft.find_saddle_point()
+scft.find_saddle_point(n=10, datafile='spheredata')
 

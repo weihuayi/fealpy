@@ -23,6 +23,7 @@ fig = FF.create_trisurf(
         y = point[:, 1],
         z = point[:, 2],
         show_colorbar = True,
+        plot_edges=False,
         simplices=cell)
 
 fig['data'][0]['facecolor'] = c 

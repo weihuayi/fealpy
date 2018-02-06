@@ -8,6 +8,7 @@ from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.quadrature import TriangleQuadrature 
 from fealpy.mesh import PolygonMesh
 from fealpy.mesh.simple_mesh_generator import distmesh2d, drectangle
+from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 
 import matplotlib.pyplot as plt
 import scipy.io as sio
@@ -35,11 +36,13 @@ if m == 1:
 elif m == 2:
     model = ObstacleData2() 
     #mesh = load_mesh('nonconvexpmesh1.mat')
-    h0 = 0.2
-    mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
+    #h0 = 0.2
+    #mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
+    n = 20
+    mesh = rectangledomainmesh([-2, 2, -2, 2], nx=n, ny=n, meshtype='polygon')
 
-errorType = ['$\| u - \Pi^\Delta u_h\|_0$',
-             '$\|\\nabla u - \\nabla \Pi^\Delta u_h\|$'
+errorType = ['$\| u - \Pi^\\nabla u_h\|_0$',
+             '$\|\\nabla u - \\nabla \Pi^\\nabla u_h\|$'
              ]
 
 integrator = TriangleQuadrature(3)
@@ -63,8 +66,10 @@ for i in range(maxit):
     if i < maxit - 1:
         #fi = 'nonconvexpmesh{}.mat'
         #mesh = load_mesh(fi.format(i+2))
-        h0 /= 2
-        mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
+        #h0 /= 2
+        #mesh = distmesh2d(fd, h0, bbox, pfix, meshtype='polygon')
+        n *= 2
+        mesh = rectangledomainmesh([-2, 2, -2, 2], nx=n, ny=n, meshtype='polygon')
         vem.reinit(mesh)
 
 data['errorMatrix'] = errorMatrix
