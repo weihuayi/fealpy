@@ -15,12 +15,12 @@ m = int(sys.argv[1])
 if m == 1:
     surface = Sphere()
     mesh =  surface.init_mesh()
-    mesh.uniform_refine(n=3, surface=surface)
+    mesh.uniform_refine(n=2, surface=surface)
 
 
 option = SSCFTParameter()
 option.maxit = 100
-scft = SSCFTFEMModel(surface, mesh, option, p=1, p0=1)
+scft = SSCFTFEMModel(surface, mesh, option, p=2, p0=2)
 
 
 femspace = scft.femspace

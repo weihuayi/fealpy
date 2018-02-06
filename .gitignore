@@ -8,6 +8,8 @@
 *.swp
 .ipynb_checkpoints
 
+*.html
+
 *.mat
 meshdata
 result
