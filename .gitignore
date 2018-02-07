@@ -7,7 +7,7 @@
 *.bbl
 *.swp
 .ipynb_checkpoints
-
+doc/project
 *.html
 
 *.mat
