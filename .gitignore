@@ -10,6 +10,9 @@
 doc/project
 *.html
 
+meviewer
+mego
+
 *.mat
 meshdata
 result
