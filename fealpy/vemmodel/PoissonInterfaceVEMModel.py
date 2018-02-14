@@ -49,14 +49,7 @@ class PoissonInterfaceVEMModel():
                 area=self.area, 
                 barycenter=self.vemspace.smspace.barycenter)
 
-        self.H = doperator.matrix_H(self.vemspace)
-        self.D = doperator.matrix_D(self.vemspace, self.H)
-        self.B = doperator.matrix_B(self.vemspace)
-        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
-        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
-
-        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
+        self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
     def aux_data(self):
         barycenter = self.vemspace.smspace.barycenter
@@ -109,14 +102,7 @@ class PoissonInterfaceVEMModel():
                 barycenter=self.vemspace.smspace.barycenter)
         self.uI = self.vemspace.interpolation(self.model.solution, self.integralalg.integral)
 
-        self.H = doperator.matrix_H(self.vemspace)
-        self.D = doperator.matrix_D(self.vemspace, self.H)
-        self.B = doperator.matrix_B(self.vemspace)
-        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
-        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
-
-        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
+        self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
 
     def project_to_smspace(self, uh=None):
@@ -144,7 +130,7 @@ class PoissonInterfaceVEMModel():
 
         f = self.model.source
         integral = self.integralalg.integral 
-        b0 = doperator.source_vector(integral, f, self.vemspace, self.PI0)
+        b0 = doperator.source_vector(integral, f, self.vemspace, self.mat.PI0)
         
         b1 = self.get_flux_jump_vector()
         return b0 - b1 + self.AI@self.wh 
@@ -172,8 +158,8 @@ class PoissonInterfaceVEMModel():
 
     def get_stiff_matrix(self):
         vemspace = self.vemspace
-        B = self.B
-        D = self.D
+        B = self.mat.B
+        D = self.mat.D
 
         cell2dof, cell2dofLocation = vemspace.dof.cell2dof, vemspace.dof.cell2dofLocation
         NC = len(cell2dofLocation) - 1
