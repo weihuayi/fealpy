@@ -3,19 +3,35 @@ from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from numpy.linalg import inv
 
-def stiff_matrix(V, area, cfun=None, vem=None):
+
+class BasicMatrix():
+    def __init__(self, V, area):
+        self.area = area
+        self.H = matrix_H(V)
+        self.D = matrix_D(V, self.H)
+        self.B = matrix_B(V)
+        self.C = matrix_C(V, self.B, self.D, self.H, self.area)
+        self.G = matrix_G(V, self.B, self.D)
+
+        self.PI0 = matrix_PI_0(V, self.H, self.C)
+        self.PI1 = matrix_PI_1(V, self.G, self.B)
+
+def basic_matrix(V, area):
+    return BasicMatrix(V, area)
+
+def stiff_matrix(V, area, cfun=None, mat=None):
 
     def f(x):
         x[0, :] = 0
         return x 
 
     p = V.p
-    if vem is None:
+    if mat is None:
         pass
     else:
-        G = vem.G
-        PI1 = vem.PI1
-        D = vem.D
+        G = mat.G
+        PI1 = mat.PI1
+        D = mat.D
 
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     NC = len(cell2dofLocation) - 1
@@ -54,6 +70,38 @@ def stiff_matrix(V, area, cfun=None, vem=None):
     gdof = V.number_of_global_dofs()
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
     return A
+
+def mass_matrix(V, area, cfun=None, mat=None):
+    p = V.p
+    if mat is None:
+        pass
+    else:
+        PI0 = mat.PI0
+        D = mat.D
+        H = mat.H
+        C = mat.C
+
+    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
+    NC = len(cell2dofLocation) - 1
+    cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+    DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+    f1 = lambda x: x[0]@x[1]
+    PIS = list(map(f1, zip(DD, PI0)))
+
+    f1 = lambda x: x[0].T@x[1]@x[0] + x[3]*(np.eye(x[2].shape[1]) - x[2]).T@(np.eye(x[2].shape[1]) - x[2])
+    K = list(map(f1, zip(PI0, H, PIS, area)))
+
+    f2 = lambda x: np.repeat(x, x.shape[0]) 
+    f3 = lambda x: np.tile(x, x.shape[0])
+    f4 = lambda x: x.flatten()
+
+    I = np.concatenate(list(map(f2, cd)))
+    J = np.concatenate(list(map(f3, cd)))
+    val = np.concatenate(list(map(f4, K)))
+    gdof = V.number_of_global_dofs()
+    M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+    return M 
 
 def source_vector(integral, f, vemspace, PI0):
     phi = vemspace.smspace.basis
@@ -234,9 +282,6 @@ def matrix_B(V):
                 B[:, idx1] += val[j]
                 j += 1
         return B
-
-def matrix_B_test(V):
-    pass
 
 def matrix_G(V, B, D):
     p = V.p

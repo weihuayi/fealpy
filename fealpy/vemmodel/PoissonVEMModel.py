@@ -41,15 +41,7 @@ class PoissonVEMModel():
 
         self.uI = self.vemspace.interpolation(model.solution, self.integralalg.integral)
 
-        self.H = doperator.matrix_H(self.vemspace)
-
-        self.D = doperator.matrix_D(self.vemspace, self.H)
-        self.B = doperator.matrix_B(self.vemspace)
-        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
-        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
-
-        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
+        self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
     def reinit(self, mesh, p=None):
         if p is None:
@@ -66,15 +58,7 @@ class PoissonVEMModel():
                 barycenter=self.vemspace.smspace.barycenter)
         self.uI = self.vemspace.interpolation(self.model.solution, self.integralalg.integral)
 
-        self.H = doperator.matrix_H(self.vemspace)
-        self.D = doperator.matrix_D(self.vemspace, self.H)
-        self.B = doperator.matrix_B(self.vemspace)
-        self.C = doperator.matrix_C(self.vemspace, self.B, self.D, self.H, self.area)
-
-        self.G = doperator.matrix_G(self.vemspace, self.B, self.D)
-
-        self.PI0 = doperator.matrix_PI_0(self.vemspace, self.H, self.C)
-        self.PI1 = doperator.matrix_PI_1(self.vemspace, self.G, self.B)
+        self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
     def project_to_smspace(self, uh=None):
         p = self.vemspace.p
@@ -82,7 +66,7 @@ class PoissonVEMModel():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@self.uh[x[1]]
         S = self.vemspace.smspace.function()
-        S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+        S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
         return S
 
     def recover_estimate(self, rtype='simple'):
@@ -179,9 +163,9 @@ class PoissonVEMModel():
         area = self.area
         try:
             f = self.model.diffusion_coefficient
-            return doperator.stiff_matrix(vemspace, area, cfun=f, vem=self)
+            return doperator.stiff_matrix(vemspace, area, cfun=f, mat=self.mat)
         except AttributeError:
-            return doperator.stiff_matrix(vemspace, area, vem=self)
+            return doperator.stiff_matrix(vemspace, area, mat=self.mat)
 
     def get_right_vector(self):
         f = self.model.source
@@ -190,7 +174,7 @@ class PoissonVEMModel():
                 integral,
                 f, 
                 self.vemspace,
-                self.PI0)
+                self.mat.PI0)
 
     def solve(self):
         uh = self.uh
@@ -207,12 +191,12 @@ class PoissonVEMModel():
 
     def L2_error(self):
         u = self.model.solution
-        S = self.project_to_smspace(uh)
+        S = self.project_to_smspace(self.uh)
         uh = S.value
         return self.integralalg.L2_error(u, uh)
 
     def H1_semi_error(self):
         gu = self.model.gradient
-        S = self.project_to_smspace(uh)
+        S = self.project_to_smspace(self.uh)
         guh = S.grad_value
         return self.integralalg.L2_error(gu, guh)

@@ -116,3 +116,52 @@ class ObstacleData2:
 
     def dirichlet(self, p):
         return self.solution(p)
+
+class ObstacleData1:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=4, meshtype='quadtree'):
+        point = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        if meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quad':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = QuadrangleMesh(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(point, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+
+    def solution(self, p):
+        return np.zeros(p.shape[0:-1]) 
+
+    def gradient(self, p):
+        return np.zeros(p.shape) 
+
+    def source(self, p):
+        """The right hand side
+        """
+        val = -8*np.ones(p.shape[0:-1])
+        return val
+
+    def obstacle(self, p):
+        """The obstacle function
+        """
+        val = -0.3*np.ones(p.shape[0:-1])
+        return val 
+
+    def dirichlet(self, p):
+        return np.zeros(p.shape[0:-1]) 

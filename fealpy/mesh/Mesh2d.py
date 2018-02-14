@@ -42,7 +42,10 @@ class Mesh2d():
             else:
                 bc = np.sum(point[edge[index], :], axis=1)/edge.shape[1]
         elif entity == 'point':
-            bc = point
+            if index is None:
+                bc = point
+            else:
+                bc = point[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc

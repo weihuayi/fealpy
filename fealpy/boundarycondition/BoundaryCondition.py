@@ -6,11 +6,11 @@ from ..functionspace.barycentric_coordinates import bc_to_point, grad_lambda
 
 
 class DirichletBC:
-    def __init__(self, V, g0, is_boundary_dof=None):
+    def __init__(self, V, g0, is_dirichlet_dof=None):
         self.V = V
         self.g0 = g0
 
-        if is_boundary_dof == None:
+        if is_dirichlet_dof == None:
             gdof = V.number_of_global_dofs()
             isBdDof = np.zeros(gdof, dtype=np.bool)
             edge2dof = V.dof.edge_to_dof()
@@ -18,7 +18,7 @@ class DirichletBC:
             isBdDof[edge2dof[isBdEdge]] = True
         else:
             ipoints = V.interpolation_points()
-            isBdDof = is_boundary_dof(ipoints)
+            isBdDof = is_dirichlet_dof(ipoints)
 
         self.isBdDof = isBdDof
 
