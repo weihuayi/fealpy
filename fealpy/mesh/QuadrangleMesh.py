@@ -18,6 +18,10 @@ class QuadrangleMesh(Mesh2d):
         self.meshType = 'quad'
         self.dtype = dtype
 
+        self.cellData = {}
+        self.pointData = {}
+        self.edgeData = {}
+
     def area(self):
         NC = self.number_of_cells()
         point = self.point
@@ -58,6 +62,7 @@ class QuadrangleMesh(Mesh2d):
 
             self.point = np.r_['0', self.point, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
+
         return 
 
     def angle(self):

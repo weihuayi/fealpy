@@ -177,10 +177,10 @@ def show_mesh_2d(axes, mesh,
     return axes.add_collection(poly)
 
 def show_mesh_3d(axes, mesh,
-        pointcolor='k', edgecolor='k',
+        pointcolor='k', edgecolor='k', facecolor='w',
         aspect='equal',
         linewidths=1, markersize=20,  
-        showaxis=False):
+        showaxis=False, alpha=0.8):
 
     axes.set_aspect('equal')
     if showaxis == False:
@@ -199,12 +199,10 @@ def show_mesh_3d(axes, mesh,
     axes.scatter(point[:, 0], point[:, 1], point[:, 2],
             color=pointcolor, s=markersize)
 
-    edge = mesh.ds.edge
-    vts = point[edge, :]
-    line = a3.art3d.Line3DCollection(vts)
-    line.set_linewidth(linewidths)
-    line.set_color(edgecolor)
-    return axes.add_collection3d(line)
+    face = mesh.ds.face
+    vts = point[face, :]
+    faces = a3.art3d.Poly3DCollection(vts, facecolor=facecolor, linewidths=linewidths, edgecolor=edgecolor, alpha = alpha)
+    return axes.add_collection3d(faces)
     
 
 

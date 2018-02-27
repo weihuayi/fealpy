@@ -9,7 +9,7 @@ class TetrahedronMesh(Mesh3d):
         N = point.shape[0]
         self.ds = TetrahedronMeshDataStructure(N, cell)
 
-        self.meshtype = 'tet'
+        self.meshType = 'tet'
         self.dtype= dtype
 
         self.cellData = {}

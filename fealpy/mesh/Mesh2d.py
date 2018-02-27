@@ -445,6 +445,10 @@ class Mesh2dDataStructure():
         edge2cell = self.edge2cell
         return edge2cell[:, 0] == edge2cell[:, 1]
 
+    def boundary_edge(self):
+        edge = self.edge
+        return edge[self.boundary_edge_index()]
+
     def boundary_cell_flag(self):
         NC = self.NC
         edge2cell = self.edge2cell

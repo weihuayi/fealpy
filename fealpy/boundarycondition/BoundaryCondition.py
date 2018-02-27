@@ -11,11 +11,7 @@ class DirichletBC:
         self.g0 = g0
 
         if is_dirichlet_dof == None:
-            gdof = V.number_of_global_dofs()
-            isBdDof = np.zeros(gdof, dtype=np.bool)
-            edge2dof = V.dof.edge_to_dof()
-            isBdEdge = V.mesh.ds.boundary_edge_flag()
-            isBdDof[edge2dof[isBdEdge]] = True
+            isBdDof = V.dof.boundary_dof()
         else:
             ipoints = V.interpolation_points()
             isBdDof = is_dirichlet_dof(ipoints)
@@ -67,8 +63,9 @@ class DirichletBC:
         isBdDof = self.isBdDof
 
         gdof = V.number_of_global_dofs()
-        x = np.zeros((gdof,), dtype=self.dtype)
+        x = np.zeros((gdof,), dtype=np.float)
 
+        ipoints = V.interpolation_points()
         x[isBdDof] = g0(ipoints[isBdDof,:])
         b -= A@x
 

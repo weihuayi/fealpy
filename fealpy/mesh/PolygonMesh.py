@@ -46,7 +46,7 @@ class PolygonMesh(Mesh2d):
         NC = mesh.number_of_cells()
         NV = cell.shape[1]
         cellLocation = np.arange(0, (NC+1)*NV, NV)
-        return cls(point, cell.reshape(-1), cellLocation, dtype=mesh.dtype)
+        return cls(point, cell.reshape(-1), cellLocation)
 
     @classmethod
     def from_quadtree(cls, quadtree):
@@ -316,6 +316,10 @@ class PolygonMeshDataStructure():
         NE = self.NE
         edge2cell = self.edge2cell
         return edge2cell[:,0] == edge2cell[:,1]
+
+    def boundary_edge(self):
+        edge = self.edge
+        return edge[self.boundary_edge_index()]
 
     def boundary_cell_flag(self):
         NC = self.NC

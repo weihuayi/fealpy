@@ -69,13 +69,13 @@ class Mesh3d():
             pointcolor='k', edgecolor='k',
              aspect='equal',
             linewidths=2, markersize=20,  
-            showaxis=False):
+            showaxis=False, alpha=0.8):
 
         return show_mesh_3d(axes, self,
                 pointcolor=pointcolor, edgecolor=edgecolor,
                 aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
-                 showaxis=showaxis)
+                 showaxis=showaxis, alpha=alpha)
 
     def find_point(self, axes, point=None,
             index=None, showindex=False,

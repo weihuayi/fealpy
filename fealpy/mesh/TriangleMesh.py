@@ -19,9 +19,10 @@ class TriangleMesh(Mesh2d):
         self.ds = TriangleMeshDataStructure(N, cell)
         self.meshType = 'tri'
         self.dtype = dtype
+
         self.cellData = {}
         self.pointData = {}
-
+        self.edgeData = {}
     def circumcenter(self):
         point = self.point
         cell = self.ds.cell

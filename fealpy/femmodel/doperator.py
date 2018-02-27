@@ -1,58 +1,54 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-
-
-def stiff_matrix(V, qf, area, cfun=None, barycenter=True):
-    mesh = V.mesh
-    gdof = V.number_of_global_dofs()
-    ldof = V.number_of_local_dofs()
-    cell2dof = V.dof.cell2dof
+def stiff_matrix(space, qf, vol, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
-    gphi = V.grad_basis(bcs)
-    A = np.einsum('i, ijkm, ijpm->jkp', ws, gphi, gphi)
-    A *= area.reshape(-1, 1, 1)
+    gphi = space.grad_basis(bcs)
+    A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, vol)
+    
+    cell2dof = space.dof.cell2dof
+    ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
+
+    gdof = space.number_of_global_dofs()
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def mass_matrix(V, qf, area, cfun=None, barycenter=True):
-    mesh = V.mesh
-    gdof = V.number_of_global_dofs()
-    ldof = V.number_of_local_dofs()
-    cell2dof = V.dof.cell2dof
+def mass_matrix(space, qf, vol, cfun=None, barycenter=True):
 
     bcs, ws = qf.quadpts, qf.weights
-    phi = V.basis(bcs)
+    phi = space.basis(bcs)
     if cfun is None:
-        val = np.einsum('m, mj, mk->jk', ws, phi, phi)
-        A = np.einsum('i, jk->ijk', area, val)
+        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, vol)
     else:
         if barycenter is True:
             val = cfun(bcs)
         else:
-            pp = mesh.bc_to_point(bcs)
+            pp = space.mesh.bc_to_point(bcs)
             val = cfun(pp)
-        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, area)
+        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, vol)
 
+    cell2dof = space.dof.cell2dof
+    ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
+
+    gdof = space.number_of_global_dofs()
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def source_vector(f, V, qf, area):
-    mesh = V.mesh
+def source_vector(f, space, qf, vol):
     
     bcs, ws = qf.quadpts, qf.weights
-    pp = mesh.bc_to_point(bcs)
+    pp = space.mesh.bc_to_point(bcs)
     fval = f(pp)
-    phi = V.basis(bcs)
-    bb = np.einsum('i, ij, ik->kj', ws, phi,fval)
+    phi = space.basis(bcs)
+    bb = np.einsum('i, ik, ij, k->kj', ws, fval, phi, vol)
 
-    bb *= area.reshape(-1, 1)
-    gdof = V.number_of_global_dofs()
-    b = np.bincount(V.dof.cell2dof.flat, weights=bb.flat, minlength=gdof)
+    cell2dof = space.dof.cell2dof
+    gdof = space.number_of_global_dofs()
+    b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
     return b
 
 def grad_recovery_matrix(fem):

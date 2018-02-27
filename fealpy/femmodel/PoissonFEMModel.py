@@ -3,9 +3,9 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from fealpy.functionspace.function import FiniteElementFunction
 from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from fealpy.functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..quadrature  import TriangleQuadrature
 from ..solver import solve
+from ..solver.petsc_solver import linear_solver
 from ..boundarycondition import DirichletBC
 from ..femmodel import doperator 
 from ..functionspace import FunctionNorm
@@ -51,8 +51,7 @@ class PoissonFEMModel(object):
         bc = np.array([1/3]*3, dtype=np.float)
         guh = self.uh.grad_value(bc)
 
-        VV = VectorLagrangeFiniteElementSpace(mesh, p=1)
-        rguh = VV.function()
+        rguh = self.V.function(dim=2)
         rguh[:] = np.asarray(p2c@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
 
         qf = self.integrator  
@@ -74,7 +73,9 @@ class PoissonFEMModel(object):
 
     def solve(self):
         bc = DirichletBC(self.V, self.model.dirichlet)
-        solve(self, self.uh, dirichlet=bc, solver='direct')
+        #solve(self, self.uh, dirichlet=bc, solver='direct')
+        linear_solver(self, self.uh, dirichlet=bc)
+
 
     def l2_error(self):
         u = self.model.solution

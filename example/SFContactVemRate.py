@@ -2,58 +2,85 @@
 import numpy as np
 import sys
 
-from fealpy.model.simplified_frictional_contact_problem import SFContactProblemData 
+from fealpy.model.simplified_frictional_contact_problem import SFContactProblemData, SFContactProblemData1
 from fealpy.vemmodel.SFContactVEMModel2d import SFContactVEMModel2d 
 from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.quadrature import TriangleQuadrature 
+from fealpy.mesh import PolygonMesh
 
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-maxit = int(sys.argv[1])
+maxit = 6 
 
 model = SFContactProblemData()
-quadtree= model.init_mesh(n=3, meshtype='quadtree')
+qmesh= model.init_mesh(n=2, meshtype='quad')
 
 integrator = TriangleQuadrature(4)
 
-pmesh = quadtree.to_pmesh()
-vem1 = SFContactVEMModel2d(model, pmesh, p=1, integrator=integrator)
-vem2 = SFContactVEMModel2d(model, pmesh, p=2, integrator=integrator)
+pmesh = PolygonMesh.from_mesh(qmesh) 
+vem = SFContactVEMModel2d(model, pmesh, p=1, integrator=integrator)
 
 Ndof = np.zeros((maxit,), dtype=np.int)
+data = []
+solution = {}
+for i in range(maxit):
+    print('step:', i)
+    vem.solve(rho=0.1, maxit=40000)
+    Ndof[i] = vem.vemspace.number_of_global_dofs()
+
+    NC = qmesh.number_of_cells()
+    cell = np.zeros(NC, dtype=np.object)
+    cell[:] = list(qmesh.ds.cell+1)
+
+
+    solution['mesh{}'.format(2+i)] = {
+            'vertices':qmesh.point,
+            'elements':cell.reshape(-1, 1),
+            'boundary':qmesh.ds.boundary_edge()+1,
+            'solution':vem.uh.reshape(-1, 1)}
+    if i < maxit - 1:
+        data.append(vem.uh.copy())
+        edge = qmesh.ds.edge
+        cell = qmesh.ds.cell
+        bc = qmesh.barycenter()
+        for j, d in enumerate(data):
+            S = vem.project_to_smspace(d)
+            pdata = d.copy()
+            edata = np.sum(d[edge], axis=1)/2.0
+            cdata = S.value(bc)
+            data[j] = np.r_[pdata, edata, cdata]
+        qmesh.uniform_refine()
+        pmesh = PolygonMesh.from_mesh(qmesh) 
+        vem.reinit(pmesh)
+
+# error analysis
 errorType = ['$\| u - \Pi^\\nabla u_h\|_0$',
              '$\|\\nabla u - \\nabla \Pi^\\nabla u_h\|$'
              ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+for i in range(maxit-1):
+    S = vem.project_to_smspace(data[i])
+    errorMatrix[0, i] = vem.L2_error(S.value)
+    errorMatrix[1, i] = vem.H1_semi_error(S.grad_value)
 
-for i in range(maxit):
-    print('step:', i)
-    vem1.solve(rho=10)
-    Ndof[i] = vem1.vemspace.number_of_global_dofs()
-    vem2.solve(rho=10)
-    errorMatrix[0, i] = vem2.L2_error(u=vem1.S.value)
-    errorMatrix[1, i] = vem2.H1_semi_error(gu=vem1.S.grad_value)
-    if i < maxit - 1:
-        quadtree.uniform_refine()
-        pmesh = quadtree.to_pmesh()
-        vem1.reinit(pmesh)
-        vem2.reinit(pmesh)
+solution['errorMatrix'] = errorMatrix
+solution['Ndof'] = Ndof
+f = 'solution.mat'
+sio.matlab.savemat(f, solution)
 
-show_error_table(Ndof, errorType, errorMatrix)
+print(Ndof)
+print(errorMatrix)
+
+show_error_table(Ndof[:-1], errorType, errorMatrix[:, :-1])
 
 fig2 = plt.figure()
 fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
-x = pmesh.point[:, 0]
-y = pmesh.point[:, 1]
-tri = quadtree.leaf_cell(celltype='tri')
-s = axes.plot_trisurf(x, y, tri, vem2.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
+x = qmesh.point[:, 0]
+y = qmesh.point[:, 1]
+cell = qmesh.ds.cell
+tri = np.r_['0', cell[:, [1, 2, 0]], cell[:, [3, 0, 2]]]
+s = axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
 fig2.colorbar(s)
 plt.show()
-
-#    p = quadtree.point.copy()
-#    cell = quadtree.ds.cell
-#    isLeafCell = quadtree.is_leaf_cell()
-#    cell = cell[isLeafCell].copy()
-#    solution.append([vem.uh.copy(), p, cell])

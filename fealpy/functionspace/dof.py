@@ -91,6 +91,14 @@ class CPLFEMDof2d():
     def is_on_edge_local_dof(self):
         return self.multiIndex == 0 
 
+    def boundary_dof(self):
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdDof[edge2dof[isBdEdge]] = True
+        return isBdDof
+
     def edge_to_dof(self):
         p = self.p
         mesh = self.mesh
@@ -412,7 +420,7 @@ class CPLFEMDof3d():
             NF = mesh.number_of_faces()
             fidof = int((p+1)*(p+2)/2) - 3*p
             face = mesh.ds.face
-            isEdgeDof = (self.faceIdx == 0)
+            isEdgeDof = (self.faceMultiIndex == 0)
             isInFaceDof = ~(isEdgeDof[:, 0] | isEdgeDof[:, 1] | isEdgeDof[:, 2])
             w = self.faceMultiIndex[isInFaceDof, :]/p
             ipoint[N+(p-1)*NE:N+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, point[face,:]).reshape(-1, dim)

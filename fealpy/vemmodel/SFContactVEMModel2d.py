@@ -2,6 +2,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+import pyamg
 
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..boundarycondition import DirichletBC
@@ -62,10 +63,12 @@ class SFContactVEMModel2d():
         self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
     def project_to_smspace(self, uh=None):
+        if uh is None:
+            uh = self.uh
         p = self.vemspace.p
         cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        g = lambda x: x[0]@self.uh[x[1]]
+        g = lambda x: x[0]@uh[x[1]]
         S = self.vemspace.smspace.function()
         S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
         return S
@@ -75,7 +78,7 @@ class SFContactVEMModel2d():
         area = self.area
         A = doperator.stiff_matrix(vemspace, area, mat=self.mat)
         M = doperator.mass_matrix(vemspace, area, mat=self.mat)
-        return A+M 
+        return A+M
 
     def get_right_vector(self):
         f = self.model.source
@@ -86,21 +89,21 @@ class SFContactVEMModel2d():
                 self.vemspace,
                 self.mat.PI0)
 
-    def get_lagrangian_multiplier_vector(self, edge, edge2dof):
+    def get_lagrangian_multiplier_vector(self, cedge, cedge2dof):
         p = self.vemspace.p
         point = self.mesh.point
-        v = point[edge[:, 1]] - point[edge[:, 0]] 
+        v = point[cedge[:, 1]] - point[cedge[:, 0]] 
         l = np.sqrt(np.sum(v**2, axis=1))
         qf = GaussLobattoQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights 
         lh = self.lh
-        bb = np.einsum('i, ji, j->ji', ws, lh[edge2dof], l)
+        bb = np.einsum('i, ji, j->ji', ws, lh[cedge2dof], l)
         
         gdof = self.vemspace.number_of_global_dofs()
-        b = np.bincount(edge2dof.flat, weights=bb.flat, minlength=gdof)
+        b = np.bincount(cedge2dof.flat, weights=bb.flat, minlength=gdof)
         return b
 
-    def solve(self, rho=0.1, maxit=10000, tol=1e-8):
+    def solve(self, rho=1, maxit=10000, tol=1e-8):
         uh = self.uh
         lh = self.lh
 
@@ -127,17 +130,22 @@ class SFContactVEMModel2d():
 
         k = 0
         eta = self.model.eta
+
+        AD = bc.apply_on_matrix(A)
+        ml = pyamg.ruge_stuben_solver(AD)  
         while k < maxit:
             b1 = self.get_lagrangian_multiplier_vector(edge, edge2dof)
-            Ad, bd = bc.apply(A, b - eta*b1)
+            bd = bc.apply_on_vector(b - eta*b1, A)
             uh0 = uh.copy()
-            uh[:] = spsolve(Ad, bd)
-            e = np.sqrt(np.sum((uh - uh0)**2))
-            print('k:', k, 'error:', e)
-            #print('lh:', self.lh[isContactDof])
-            if e < tol:
-                break
+            lh0 = lh.copy()
+            #uh[:] = spsolve(Ad, bd)
+            uh[:] = ml.solve(bd, tol=1e-12, accel='cg').reshape(-1)
             lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1) 
+            e0 = np.sqrt(np.sum((uh - uh0)**2))
+            e1 = np.sqrt(np.sum((lh - lh0)**2))
+            print('k:', k, 'error:', e0, e1)
+            if e0 < tol:
+                break
             k += 1
 
         self.S = self.project_to_smspace(uh)

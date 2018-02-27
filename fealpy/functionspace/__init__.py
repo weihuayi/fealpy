@@ -1,1 +1,2 @@
 from .function_norm import FunctionNorm
+from .lagrange_fem_space import LagrangeFiniteElementSpace

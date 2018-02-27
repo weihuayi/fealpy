@@ -63,7 +63,6 @@ def stiff_matrix(V, area, cfun=None, mat=None):
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
-
     I = np.concatenate(list(map(f2, cd)))
     J = np.concatenate(list(map(f3, cd)))
     val = np.concatenate(list(map(f4, K)))

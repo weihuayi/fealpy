@@ -53,7 +53,7 @@ def rectangledomainmesh(box, nx=10, ny=10, meshtype='tri', dtype=np.float):
         cell[:,3] = idx[0:-1, 1:].flatten()
         return PolygonMesh(point, cell)
 
-def triangle(box, h):
+def triangle(box, h, meshtype='tri'):
     from meshpy.triangle import MeshInfo, build
     mesh_info = MeshInfo()
     mesh_info.set_points([(box[0], box[2]), (box[1], box[2]), (box[1], box[3]), (box[0], box[3])])
@@ -61,7 +61,12 @@ def triangle(box, h):
     mesh = build(mesh_info, max_volume=h**2)
     point = np.array(mesh.points, dtype=np.float)
     cell = np.array(mesh.elements, dtype=np.int)
-    return TriangleMesh(point, cell)
+    if meshtype is 'tri':
+        return TriangleMesh(point, cell)
+    elif meshtype is 'polygon':
+        mesh = TriangleMeshWithInfinityPoint(TriangleMesh(point, cell))
+        ppoint, pcell, pcellLocation = mesh.to_polygonmesh()
+        return PolygonMesh(ppoint, pcell, pcellLocation) 
 
 def distmesh2d(fd, h0, bbox, pfix, meshtype='tri', dtype=np.float):
     fh = huniform
