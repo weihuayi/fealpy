@@ -80,6 +80,23 @@ class Mesh2d():
         a /=2
         return a
 
+    def edge_length(self):
+        edge = self.ds.edge
+        point = self.point
+        v = point[edge[:, 1]] - point[edge[:, 0]]
+        length = np.sqrt(np.sum(v**2, axis=-1))
+        return length
+
+    def entity(self, dim=2):
+        if dim == 2:
+            return self.ds.cell
+        elif dim == 1:
+            return self.ds.edge
+        elif dim == 0:
+            return self.point
+        else:
+            raise ValueError('dim must be in [0, 1, 2]!')
+
     def entity_measure(self, dim=2):
         if dim == 2:
             return self.cell_area()
@@ -94,6 +111,11 @@ class Mesh2d():
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
+    def edge_frame(self, index=None):
+        t = self.edge_unit_tagent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        n = v@w
+        return n, t
 
     def edge_unit_normal(self, index=None):
         #TODO: 3D Case

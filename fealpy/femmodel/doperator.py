@@ -1,12 +1,12 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-def stiff_matrix(space, qf, vol, cfun=None, barycenter=True):
+def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     gphi = space.grad_basis(bcs)
-    A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, vol)
+    A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure)
     
-    cell2dof = space.dof.cell2dof
+    cell2dof = space.cell_to_dof()
     ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
@@ -15,19 +15,19 @@ def stiff_matrix(space, qf, vol, cfun=None, barycenter=True):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def mass_matrix(space, qf, vol, cfun=None, barycenter=True):
+def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
 
     bcs, ws = qf.quadpts, qf.weights
     phi = space.basis(bcs)
     if cfun is None:
-        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, vol)
+        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, measure)
     else:
         if barycenter is True:
             val = cfun(bcs)
         else:
             pp = space.mesh.bc_to_point(bcs)
             val = cfun(pp)
-        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, vol)
+        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
 
     cell2dof = space.dof.cell2dof
     ldof = space.number_of_local_dofs()
@@ -38,13 +38,13 @@ def mass_matrix(space, qf, vol, cfun=None, barycenter=True):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def source_vector(f, space, qf, vol):
+def source_vector(f, space, qf, measure):
     
     bcs, ws = qf.quadpts, qf.weights
     pp = space.mesh.bc_to_point(bcs)
     fval = f(pp)
     phi = space.basis(bcs)
-    bb = np.einsum('i, ik, ij, k->kj', ws, fval, phi, vol)
+    bb = np.einsum('i, ik, ij, k->kj', ws, fval, phi, measure)
 
     cell2dof = space.dof.cell2dof
     gdof = space.number_of_global_dofs()

@@ -1,19 +1,19 @@
 import numpy as np
 
 class IntegralAlg():
-    def __init__(self, integrator, mesh, area=None):
+    def __init__(self, integrator, mesh, measure=None):
         self.mesh = mesh
         self.integrator = integrator
-        if area is None:
-            self.area = mesh.entity_measure()
+        if measure is None:
+            self.measure = mesh.entity_measure()
         else:
-            self.area = area
+            self.measure = measure 
 
     def integral(self, u, celltype=False):
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
         val = u(bcs)
-        e = np.einsum('i, ij..., j->j...', ws, val, self.area)
+        e = np.einsum('i, ij..., j->j...', ws, val, self.measure)
         if celltype is True:
             return e
         else:

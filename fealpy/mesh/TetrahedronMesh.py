@@ -3,6 +3,32 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 
+class TetrahedronMeshDataStructure(Mesh3dDataStructure):
+    localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
+    localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
+    localFace2edge = np.array([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
+    index = np.array([
+       (0, 1, 2, 3), (0, 2, 3, 1), (0, 3, 1, 2),
+       (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
+       (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
+       (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)]);
+    V = 4
+    E = 6
+    F = 4
+
+    def __init__(self, N, cell):
+        super(TetrahedronMeshDataStructure, self).__init__(N, cell)
+
+    def face_to_edge_sign(self):
+        face2edge = self.face_to_edge()
+        edge = self.edge
+        face2edgeSign = np.zeros((NF, FE), dtype=np.bool)
+        n = [1, 2, 0]
+        for i in range(3):
+            face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
+        return face2edgeSign
+
+
 class TetrahedronMesh(Mesh3d):
     def __init__(self, point, cell, dtype=np.float):
         self.point = point
@@ -41,6 +67,15 @@ class TetrahedronMesh(Mesh3d):
         volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
         return volume
 
+    def cell_volume(self):
+        cell = self.ds.cell
+        point = self.point
+        v01 = point[cell[:,1]] - point[cell[:,0]]
+        v02 = point[cell[:,2]] - point[cell[:,0]]
+        v03 = point[cell[:,3]] - point[cell[:,0]]
+        volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
+        return volume
+
     def face_area(self):
         face = self.ds.face
         point = self.point
@@ -50,6 +85,14 @@ class TetrahedronMesh(Mesh3d):
         nv = np.cross(v01, v02)
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return area 
+
+    def edge_length(self):
+        edge = self.ds.edge
+        point = self.point
+        v = point[edge[:, 1]] - point[edge[:, 0]]
+        length = np.sqrt(np.sum(v**2, axis=-1))
+        return length
+
 
     def dihedral_angle(self):
         NC = self.number_of_cells()
@@ -88,7 +131,7 @@ class TetrahedronMesh(Mesh3d):
         ss = np.sum(s[cell2face], axis=1)
         d = self.direction(0)
         ld = np.sqrt(np.sum(d**2, axis=1))
-        vol = self.volume()
+        vol = self.cell_volume()
         R = ld/vol/12.0
         r = 3.0*vol/ss
         return R/r/3.0
@@ -230,29 +273,4 @@ class TetrahedronMesh(Mesh3d):
         print("Face2cell:\n", self.ds.face2cell)
         print("Cell2face:\n", self.ds.cell_to_face())
 
-
-class TetrahedronMeshDataStructure(Mesh3dDataStructure):
-    localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
-    localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
-    localFace2edge = np.array([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
-    index = np.array([
-       (0, 1, 2, 3), (0, 2, 3, 1), (0, 3, 1, 2),
-       (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
-       (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
-       (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)]);
-    V = 4
-    E = 6
-    F = 4
-
-    def __init__(self, N, cell):
-        super(TetrahedronMeshDataStructure, self).__init__(N, cell)
-
-    def face_to_edge_sign(self):
-        face2edge = self.face_to_edge()
-        edge = self.edge
-        face2edgeSign = np.zeros((NF, FE), dtype=np.bool)
-        n = [1, 2, 0]
-        for i in range(3):
-            face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
-        return face2edgeSign
 

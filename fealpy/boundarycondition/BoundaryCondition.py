@@ -11,7 +11,7 @@ class DirichletBC:
         self.g0 = g0
 
         if is_dirichlet_dof == None:
-            isBdDof = V.dof.boundary_dof()
+            isBdDof = V.boundary_dof()
         else:
             ipoints = V.interpolation_points()
             isBdDof = is_dirichlet_dof(ipoints)

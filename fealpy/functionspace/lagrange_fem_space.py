@@ -1,7 +1,6 @@
 import numpy as np
 
 from .function import FiniteElementFunction
-from ..common import ranges
 from .dof import *
 
 class LagrangeFiniteElementSpace():
@@ -40,6 +39,15 @@ class LagrangeFiniteElementSpace():
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof
+
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
+
+    def geom_dim(self):
+        return self.dim
 
     def basis(self, bc):
         """
@@ -189,3 +197,168 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
 
+class VectorLagrangeFiniteElementSpace():
+    def __init__(self, mesh, p, spacetype='C'):
+        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
+        self.mesh = mesh
+        self.p = p
+        self.dof = self.scalarspace.dof
+        self.dim = self.scalarspace.dim
+
+    def __str__(self):
+        return "Vector Lagrange finite element space!"
+
+    def geom_dim(self):
+        return self.dim
+
+    def vector_dim(self):
+        return self.dim
+
+    def cell_to_dof(self):
+        dim = self.dim
+        cell2dof = self.dof.cell2dof[..., np.newaxis]
+        cell2dof = dim*cell2dof + np.arange(dim)
+        NC = cell2dof.shape[0]
+        return cell2dof.reshape(NC, -1)
+
+    def boundary_dof(self):
+        dim = self.dim
+        isBdDof = self.dof.boundary_dof()
+        return np.repeat(isBdDof, dim)
+
+    def number_of_global_dofs(self):
+        return self.dim*self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self):
+        return self.dim*self.dof.number_of_local_dofs()
+
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
+    def basis(self, bcs, cellidx=None):
+        phi = self.scalarspace.basis(bcs, cellidx=cellidx)
+        V = np.eye(self.dim)
+        phi = np.einsum('...j, mn->...jmn', phi0, V)
+        shape = list(phi.shape)
+        phi = phi.reshape(phi.shape[0], -1, phi.shape[-1])
+        return phi
+
+    def div_basis(self, bcs, cellidx=None):
+        gphi = self.scalarspace.grad_basis(bcs, cellidx=cellidx)
+        shape = list(gphi.shape[:-1])
+        shape[-1] = -1
+        return gphi.reshape(shape)
+
+    def value(self, uh, bc, cellidx=None):
+        phi = self.basis(bc)
+        cell2dof = self.dof.cell2dof
+        uh0 = uh.reshape(-1, self.dim)
+        if cellidx is None:
+            uh0 = uh0[cell2dof].reshape(-1)
+        else:
+            uh0 = uh0[cell2dof[cellidx]].reshape(-1)
+        val = np.einsum('...jm, ij->...im',  phi, uh0) 
+        return val 
+
+    def function(self, dim=None):
+        f = FiniteElementFunction(self)
+        return f
+
+    def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        return np.zeros(gdof, dtype=np.float)
+
+    def interpolation(self, u):
+        ipoint = self.dof.interpolation_points()
+        uI = FiniteElementFunction(self)
+        uI[:] = u(ipoint).flat[:]
+        return uI
+
+class TensorLagrangeFiniteElementSpace():
+    def __init__(self, mesh, p, spacetype='C'):
+        self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
+        self.mesh = mesh
+        self.p = p
+        self.dof = self.scalarspace.dof
+        self.dim = self.scalarspace.dim
+
+        if self.dim == 2:
+            self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
+        elif self.dim == 3:
+            self.T = np.array([
+                [(1, 0, 0), (0, 0, 0), (0, 0, 0)], 
+                [(0, 1, 0), (1, 0, 0), (0, 0, 0)],
+                [(0, 0, 1), (0, 0, 0), (1, 0, 0)],
+                [(0, 0, 0), (0, 1, 0), (0, 0, 0)],
+                [(0, 0, 0), (0, 0, 1), (0, 1, 0)],
+                [(0, 0, 0), (0, 0, 0), (0, 0, 1)]])
+
+    def __str__(self):
+        return "Vector Lagrange finite element space!"
+
+    def geom_dim(self):
+        return self.dim
+
+    def tensor_dim(self):
+        dim = self.dim
+        return dim*(dim - 2)//2 + dim
+
+    def cell_to_dof(self):
+        tdim = self.tensor_dim()
+        cell2dof = self.dof.cell2dof[..., np.newaxis]
+        cell2dof = tdim*cell2dof + np.arange(tdim)
+        NC = cell2dof.shape[0]
+        return cell2dof.reshape(NC, -1)
+
+    def boundary_dof(self):
+        tdim = self.tensor_dim()
+        isBdDof = self.dof.boundary_dof()
+        return np.repeat(isBdDof, dim)
+
+    def number_of_global_dofs(self):
+        tdim = self.tensor_dim()
+        return tdim*self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self):
+        tdim self.tensor_dim()
+        return tdim*self.dof.number_of_local_dofs()
+
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
+    def basis(self, bcs, cellidx=None):
+        phi = self.scalarspace.basis(bcs, cellidx=cellidx)
+        phi = np.einsum('...j, mno->...jmno', phi0, self.T)
+        phi = phi.reshape(phi.shape[0], -1, phi.shape[-1])
+        return phi
+
+    def div_basis(self, bcs, cellidx=None):
+        gphi = self.scalarspace.grad_basis(bcs, cellidx=cellidx)
+        shape = list(gphi.shape[:-1])
+        shape[-1] = -1
+        return gphi.reshape(shape)
+
+    def value(self, uh, bc, cellidx=None):
+        phi = self.basis(bc)
+        cell2dof = self.dof.cell2dof
+        uh0 = uh.reshape(-1, self.dim)
+        if cellidx is None:
+            uh0 = uh0[cell2dof].reshape(-1)
+        else:
+            uh0 = uh0[cell2dof[cellidx]].reshape(-1)
+        val = np.einsum('...jm, ij->...im',  phi, uh0) 
+        return val 
+
+    def function(self, dim=None):
+        f = FiniteElementFunction(self)
+        return f
+
+    def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        return np.zeros(gdof, dtype=np.float)
+
+    def interpolation(self, u):
+        ipoint = self.dof.interpolation_points()
+        uI = FiniteElementFunction(self)
+        uI[:] = u(ipoint).flat[:]
+        return uI

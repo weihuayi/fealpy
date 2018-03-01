@@ -24,11 +24,25 @@ class Mesh3d():
         assert(self.point.shape[1] == 3)
         return 3 
 
-    def volume(self):
-        pass
+    def entity(self, dim=3):
+        if dim == 3:
+            return self.ds.cell
+        elif dim == 2:
+            return self.ds.face
+        elif dim == 1:
+            return self.ds.edge
+        elif dim == 0:
+            return self.point
+        else:
+            raise ValueError('dim must be in [0, 1, 2, 3]!')
 
-    def face_area(self):
-        pass
+    def entity_measure(self, dim=3):
+        if dim == 3:
+            return self.cell_volume()
+        elif dim == 2:
+            return self.face_area()
+        elif dim == 1:
+            return self.edge_length()
 
     def barycenter(self, entity='cell'):
         point = self.point
