@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
+from ..quadrature import TetrahedronQuadrature
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -40,6 +41,9 @@ class TetrahedronMesh(Mesh3d):
 
         self.cellData = {}
         self.pointData = {}
+
+    def integrator(self, k):
+        return TetrahedronQuadrature(k)
 
     def direction(self, i):
         """ Compute the direction on every vertex of 
@@ -111,7 +115,8 @@ class TetrahedronMesh(Mesh3d):
     def bc_to_point(self, bc):
         point = self.point
         cell = self.ds.cell
-        return np.tensordot(bc, point[cell,:], axes=(0,1))
+        p = np.einsum('...j, ijk->...ik', bc, point[cell])
+        return p 
 
     def circumcenter(self):
         point = self.point
@@ -188,7 +193,7 @@ class TetrahedronMesh(Mesh3d):
     def grad_lambda(self):
         localFace = self.ds.localFace
         point = self.point
-        cell = self.cell
+        cell = self.ds.cell
         NC = self.number_of_cells()
         Dlambda = np.zeros((NC, 4, 3), dtype=self.dtype)
         volume = self.volume()
@@ -197,7 +202,7 @@ class TetrahedronMesh(Mesh3d):
             vjk = point[cell[:,k],:] - point[cell[:,j],:]
             vjm = point[cell[:,m],:] - point[cell[:,j],:]
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
-        return Dlambda, volume
+        return Dlambda
 
     def uniform_refine(self, n=1):
         for i in range(n):

@@ -81,7 +81,8 @@ class LagrangeFiniteElementSpace():
         A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
-        phi = (p**p)*np.prod(A[..., multiIndex, [0, 1, 2]], axis=-1)
+        idx = np.arange(dim+1)
+        phi = (p**p)*np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
     def grad_basis(self, bc, cellidx=None):
@@ -126,8 +127,9 @@ class LagrangeFiniteElementSpace():
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
-        Q = A[..., multiIndex, [0,1,2]]
-        M = F[..., multiIndex, [0,1,2]]
+        idx = np.arange(dim+1)
+        Q = A[..., multiIndex, idx]
+        M = F[..., multiIndex, idx]
         ldof = self.number_of_local_dofs()
         shape = bc.shape[:-1]+(ldof, dim+1)
         R = np.zeros(shape, dtype=np.float)
@@ -235,29 +237,29 @@ class VectorLagrangeFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def basis(self, bcs, cellidx=None):
-        phi = self.scalarspace.basis(bcs, cellidx=cellidx)
-        V = np.eye(self.dim)
-        phi = np.einsum('...j, mn->...jmn', phi0, V)
-        shape = list(phi.shape)
-        phi = phi.reshape(phi.shape[0], -1, phi.shape[-1])
+    def basis(self, bcs):
+        dim = self.dim
+        phi = self.scalarspace.basis(bcs)
+        shape = list(phi.shape[:-1])
+        phi = np.einsum('...j, mn->...jmn', phi, np.eye(self.dim))
+        shape += [-1, dim] 
+        phi = phi.reshape(shape)
         return phi
 
     def div_basis(self, bcs, cellidx=None):
         gphi = self.scalarspace.grad_basis(bcs, cellidx=cellidx)
-        shape = list(gphi.shape[:-1])
-        shape[-1] = -1
+        shape = list(gphi.shape[:-2])
+        shape += [-1]
         return gphi.reshape(shape)
 
-    def value(self, uh, bc, cellidx=None):
-        phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
-        uh0 = uh.reshape(-1, self.dim)
+    def value(self, uh, bcs, cellidx=None):
+        phi = self.basis(bcs)
+        cell2dof = self.cell_to_dof()
         if cellidx is None:
-            uh0 = uh0[cell2dof].reshape(-1)
+            uh = uh[cell2dof]
         else:
-            uh0 = uh0[cell2dof[cellidx]].reshape(-1)
-        val = np.einsum('...jm, ij->...im',  phi, uh0) 
+            uh = uh[cell2dof[cellidx]]
+        val = np.einsum('...jm, ij->...im',  phi, uh) 
         return val 
 
     def function(self, dim=None):
@@ -274,7 +276,7 @@ class VectorLagrangeFiniteElementSpace():
         uI[:] = u(ipoint).flat[:]
         return uI
 
-class TensorLagrangeFiniteElementSpace():
+class SymmetricTensorLagrangeFiniteElementSpace():
     def __init__(self, mesh, p, spacetype='C'):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
         self.mesh = mesh
@@ -294,14 +296,14 @@ class TensorLagrangeFiniteElementSpace():
                 [(0, 0, 0), (0, 0, 0), (0, 0, 1)]])
 
     def __str__(self):
-        return "Vector Lagrange finite element space!"
+        return " Symmetric Tensor Lagrange finite element space!"
 
     def geom_dim(self):
         return self.dim
 
     def tensor_dim(self):
         dim = self.dim
-        return dim*(dim - 2)//2 + dim
+        return dim*(dim - 1)//2 + dim
 
     def cell_to_dof(self):
         tdim = self.tensor_dim()
@@ -313,29 +315,32 @@ class TensorLagrangeFiniteElementSpace():
     def boundary_dof(self):
         tdim = self.tensor_dim()
         isBdDof = self.dof.boundary_dof()
-        return np.repeat(isBdDof, dim)
+        return np.repeat(isBdDof, tdim)
 
     def number_of_global_dofs(self):
         tdim = self.tensor_dim()
         return tdim*self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self):
-        tdim self.tensor_dim()
+        tdim = self.tensor_dim()
         return tdim*self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def basis(self, bcs, cellidx=None):
-        phi = self.scalarspace.basis(bcs, cellidx=cellidx)
+    def basis(self, bcs):
+        dim = self.dim
+        phi = self.scalarspace.basis(bcs)
+        shape = list(phi.shape[:-1])
         phi = np.einsum('...j, mno->...jmno', phi0, self.T)
-        phi = phi.reshape(phi.shape[0], -1, phi.shape[-1])
-        return phi
+        shape += [-1, dim, dim]
+        return phi.reshape(shape)
 
     def div_basis(self, bcs, cellidx=None):
+        dim = self.dim
         gphi = self.scalarspace.grad_basis(bcs, cellidx=cellidx)
-        shape = list(gphi.shape[:-1])
-        shape[-1] = -1
+        shape = list(gphi.shape[:-2])
+        shape += [-1, dim]
         return gphi.reshape(shape)
 
     def value(self, uh, bc, cellidx=None):

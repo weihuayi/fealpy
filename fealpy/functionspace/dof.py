@@ -90,7 +90,7 @@ class CPLFEMDof2d():
 
     def is_on_point_local_dof(self):
         p = self.p
-        isPointDof = np.sum(self.multiIndex == 0, axis=-1) == 3 
+        isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
         return isPointDof
 
     def is_on_edge_local_dof(self):
@@ -251,7 +251,7 @@ class CPLFEMDof3d():
 
     def is_on_point_local_dof(self):
         p = self.p
-        isPointDof = np.sum(self.multiIndex == 0, axis=-1) == 3 
+        isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
         return isPointDof
 
     def is_on_edge_local_dof(self):
@@ -260,7 +260,7 @@ class CPLFEMDof3d():
         localEdge = self.mesh.ds.localEdge
         isEdgeDof = np.zeros((ldof, 6), dtype=np.bool)
         for i in range(6):
-            isEdgeDof[i,:] = (self.multiIndex[localEdge[-(i+1), 0],:] == 0) & (self.multiIndex[localEdge[-(i+1), 1],:] == 0 )
+            isEdgeDof[:, i] = (self.multiIndex[:, localEdge[-(i+1), 0]] == 0) & (self.multiIndex[:, localEdge[-(i+1), 1]] == 0 )
         return isEdgeDof
 
     def is_on_face_local_dof(self):
@@ -451,8 +451,9 @@ class CPLFEMDof3d():
         return ipoint  
 
 class DPLFEMDof():
-    def __init__(self, mesh, p):
+    def __init__(self, mesh, p, dim):
         self.mesh = mesh
+        self.dim = dim
         self.p = p 
         self.multiIndex = self.multi_index_matrix() 
         self.cell2dof = self.cell_to_dof()
@@ -501,8 +502,10 @@ class DPLFEMDof():
 
 class DPLFEMDof1d(DPLFEMDof):
     def __init__(self, mesh, p):
-        super(DPLFEMDof, self).__init__(mesh, p) 
-        self.dim = 1
+        super(DPLFEMDof1d, self).__init__(mesh, p, 1) 
+
+    def number_of_local_dofs(self):
+        return self.p+1 
 
     def multi_index_matrix(self):
         p = self.p
@@ -515,8 +518,11 @@ class DPLFEMDof1d(DPLFEMDof):
 
 class DPLFEMDof2d(DPLFEMDof):
     def __init__(self, mesh, p):
-        super(DPLFEMDof, self).__init__(mesh, p) 
-        self.dim = 2
+        super(DPLFEMDof2d, self).__init__(mesh, p, 2) 
+
+    def number_of_local_dofs(self):
+        p = self.p
+        return (p+1)*(p+2)//2
 
     def multi_index_matrix(self):
         p = self.p
@@ -545,7 +551,6 @@ class DPLFEMDof2d(DPLFEMDof):
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
 
-        cell2edge = self.mesh.ds.cell_to_edge()
         edge2cell = self.mesh.ds.edge_to_cell()
         isBdEdge = self.mesh.ds.boundary_edge_flag()
 
@@ -554,14 +559,20 @@ class DPLFEMDof2d(DPLFEMDof):
 
         cell2dof = self.cell2dof
         isEdgeDof = self.is_on_edge_local_dof()
-        isBdDof[cell2dof[cellIdx.reshape(-1, 1), isEdgeDof.T[localIdx]] = True
+        _, idx = np.nonzero(isEdgeDof.T[localIdx])
+        n = p+1
+        isBdDof[cell2dof[cellIdx.reshape(-1, 1), idx.reshape(-1, n)]] = True
         return isBdDof
 
 
 class DPLFEMDof3d(DPLFEMDof):
     def __init__(self, mesh, p):
-        super(DPLFEMDof, self).__init__(mesh, p) 
-        self.dim = 3
+        super(DPLFEMDof3d, self).__init__(mesh, p, 3) 
+
+    def number_of_local_dofs(self):
+        p = self.p
+        ldof = (p+1)*(p+2)*(p+3)//6
+        return ldof
 
     def is_on_point_local_dof(self):
         p = self.p
@@ -599,6 +610,8 @@ class DPLFEMDof3d(DPLFEMDof):
         return multiIndex
 
     def boundary_dof(self):
+        p = self.p
+
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
 
@@ -610,5 +623,7 @@ class DPLFEMDof3d(DPLFEMDof):
 
         cell2dof = self.cell2dof
         isFaceDof = self.is_on_face_local_dof()
-        isBdDof[cell2dof[cellIdx.reshape(-1, 1), isFaceDof.T[localIdx]] = True
+        _, idx = np.nonzero(isFaceDof.T[localIdx])
+        n = (p+1)*(p+2)//2
+        isBdDof[cell2dof[cellIdx.reshape(-1, 1), idx.reshape(-1, n)]] = True
         return isBdDof

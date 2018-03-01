@@ -76,7 +76,7 @@ class Mesh3d():
         edge = self.ds.edge
         point = self.point
         v = point[edge[:,1], :] - point[edge[:,0],:]
-        length = np.sqrt(np.square(nv).sum(axis=1))
+        length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1,1)
 
     def add_plot(self, axes,
