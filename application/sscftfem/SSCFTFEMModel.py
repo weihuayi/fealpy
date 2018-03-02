@@ -19,8 +19,8 @@ class SSCFTParameter():
         self.Nblend   = 1
         self.Nblock   = 2 
         self.Ndeg     = 100  
-        self.fA       = 0.5 
-        self.chiAB    = 0.15 
+        self.fA       = 0.2 
+        self.chiAB    = 0.25 
         self.dim = 2
         self.dtMax = 0.005
         self.tol = 1.0e-6
@@ -62,7 +62,7 @@ class TimeLine():
         self.current = 0
         
 class PDESolver():
-    def __init__(self, femspace, integrator, area,  method='FM'):
+    def __init__(self, femspace, integrator, area,  method='CN'):
 
         self.method = method
         self.femspace = femspace 
@@ -91,6 +91,7 @@ class PDESolver():
 
     def run(self, timeline, uh, F):
         self.F = F
+
         while timeline.current < timeline.Nt: 
             current = timeline.current
             dt = timeline.get_time_step_length()
@@ -106,6 +107,7 @@ class SSCFTFEMModel():
         self.mesh = self.femspace.mesh
         self.area = mesh.area()
         self.totalArea = np.sum(self.area)
+        print(self.totalArea)
         self.surface = surface
         self.option = option
 
@@ -113,7 +115,7 @@ class SSCFTFEMModel():
         self.timeline1 = TimeLine([option.fA, 1], option.dtMax)
 
         N = self.timeline0.Nt + self.timeline1.Nt + 1
-        self.q0 = self.femspace.function(dim=N) 
+        self.q0 = self.femspace.function(dim=N)
         self.q1 = self.femspace.function(dim=N) 
 
         self.Ndof = self.femspace.number_of_global_dofs()
@@ -125,6 +127,7 @@ class SSCFTFEMModel():
         self.sQ    = np.zeros((option.Nspecies-1, option.Nblend))
 
         self.solver = PDESolver(self.femspace, option.integrator, self.area, option.pdemethod)
+
 
     def initialize(self):
         option = self.option
@@ -242,29 +245,40 @@ class SSCFTFEMModel():
         
         return err 
 
-    def find_saddle_point(self, n=100, datafile='data', showsolution=True):
+    def find_saddle_point(self, datafile='data', showsolution=True, file_path=None):
         
         self.res = np.inf
         self.Hold = np.inf
         self.ediff = np.inf
         iteration = 0
         option = self.option
-
+        
+        if file_path is not None:
+            file = open(file_path + '/log.txt', 'w')
         while (self.res > option.tol) and (iteration < option.maxit):
             self.H, self.res = self.one_step()
             self.ediff = self.H - self.Hold
             self.Hold = self.H
             iteration += 1
-            print('res:', self.res, 'ediff:', self.ediff, 'H:', self.H)
+
+
+            if file_path is not None:
+                string = 'Iter: %d ======> \n sQ: %f res: %f ediff: %f H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
+                file.write(string)
+
+            print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
+            print('\n')
 
             self.data['rhoA'].append(self.rho[0])
             self.data['rhoB'].append(self.rho[1])
             self.data['H'].append(self.H)
             self.data['ediff'].append(self.ediff)
 
-            if (iteration%n == 0) and showsolution:
+            if (iteration%option.showstep == 0) and showsolution:
                 self.show_solution(iteration)
         sio.matlab.savemat(datafile+'.mat', self.data)
+        
+        file.close()
         
     def one_step(self):
         self.update_propagator() 
@@ -305,7 +319,7 @@ class SSCFTFEMModel():
                 x = point[:, 0], 
                 y = point[:, 1],
                 z = point[:, 2],
-                show_colorbar = False,
+                show_colorbar = True,
                 plot_edges=False,
                 simplices=cell)
         fig['data'][0]['facecolor'] = c
