@@ -85,7 +85,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def value(self, uh, bc, cellidx=None):
         phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell_to_dof()
         if cellidx is None:
             val = np.einsum('...j, ij->...i', phi, uh[cell2dof])
         else:
@@ -94,7 +94,7 @@ class SurfaceLagrangeFiniteElementSpace:
     
     def grad_value(self, uh, bc, cellidx=None):
         gphi = self.grad_basis(bc, cellidx=cellidx)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell_to_dof()
         if cellidx is None:
             val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
         else:
@@ -106,7 +106,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def grad_value_on_surface(self, uh, bc, cellidx=None):
         gphi, ps, n = self.grad_basis_on_surface(bc, cellidx=cellidx)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell_to_dof()
         if cellidx is None:
             val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
         else:
@@ -127,6 +127,9 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
+    
+    def cell_to_dof(self):
+        return self.dof.cell2dof
 
     def interpolation(self, u, dim=None):
         ipoint = self.interpolation_points()
