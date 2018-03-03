@@ -1,10 +1,12 @@
 import numpy as np
 import sys
 
-from fealpy.model.linear_elasticity_model import PolyModel
+from fealpy.model.linear_elasticity_model import PolyModel3d, Model2d
 from fealpy.femmodel.LinearElasticityFEMModel import LinearElasticityFEMModel 
 from fealpy.tools.show import showmultirate
 
+import numpy as np  
+import matplotlib.pyplot as plt
 
 
 m = int(sys.argv[1])
@@ -12,14 +14,16 @@ p = int(sys.argv[2])
 n = int(sys.argv[3])
 
 if m == 1:
-    model = PolyModel()
+    model = PolyModel3d()
+if m == 2:
+    model = Model2d()
 
 mesh = model.init_mesh(n)
-integrator = mesh.integrator(7)
+integrator = mesh.integrator(10)
 
 fem = LinearElasticityFEMModel(mesh, model, p, integrator)
 
-maxit = 3 
+maxit = 4 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',

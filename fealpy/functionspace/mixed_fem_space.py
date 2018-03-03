@@ -3,22 +3,31 @@ from .function import FiniteElementFunction
 from .lagrange_fem_space import LagrangeFiniteElementSpace
 
 class HuZhangFiniteElementSpace():
+    """
+    Hu-Zhang Mixed Finite Element Space.
+    """
     def __init__(self, mesh, p):
         self.space = LagrangeFiniteElementSpace(mesh, p)
         self.mesh = mesh
         self.p = p
         self.dof = self.space.dof
         self.dim = self.space.dim
-        self.orth_matrices()
+        self.init_orth_matrices()
+        self.init_cell_to_dof()
 
-    def orth_matrices(self):
+    def init_orth_matrices(self):
+        """
+        Initialize the othogonal symetric matrix basis.
+        """
         mesh = self.mesh
 
         if self.dim == 2:
             idx = np.array([(0, 0), (0, 1), (1, 1)])
+            idx1 = 1
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
         elif self.dim == 3:
             idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
+            idx1 = [1, 2, 4]
             self.T = np.array([
                 [(1, 0, 0), (0, 0, 0), (0, 0, 0)], 
                 [(0, 1, 0), (1, 0, 0), (0, 0, 0)],
@@ -27,10 +36,18 @@ class HuZhangFiniteElementSpace():
                 [(0, 0, 0), (0, 0, 1), (0, 1, 0)],
                 [(0, 0, 0), (0, 0, 0), (0, 0, 1)]])
 
-        t = self.mesh.edge_unit_tagent()
-        t = np.prod(t[:, idx], axis=-1, keepdims=True).swapaxes(-1, -2)
-        _, _, self.TE = np.linalg.svd(t)
-        self.TE[:, 0, :] = t.reshape(-1, t.shape[-1])
+#        t = mesh.edge_unit_tagent()
+#        t = np.prod(t[:, idx0], axis=-1)
+#        _, _, self.TE = np.linalg.svd(t[:, np.newaxis, :])
+#        self.TE[:, 0, :] = t
+        
+        t = mesh.edge_unit_tagent()
+        n = mesh.edge_unit_normal()
+        self.TE = np.zeros((len(t), 3, 3), dtype=np.float)
+        self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
+        self.TE[:, 1, :] = (t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
+        self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
+
         if self.dim == 3:
             face2edge = mesh.ds.face_to_edge()
             _, _, self.TF = np.linalg.svd(self.TE[face2edge, 0, :])
@@ -40,19 +57,106 @@ class HuZhangFiniteElementSpace():
         return "Hu-Zhang mixed finite element space!"
 
     def number_of_global_dofs(self):
+        p = self.p
+        dim = self.dim
         tdim = self.tensor_dim() 
-        return tdim*self.dof.number_of_global_dofs()
+
+        NC = self.mesh.number_of_cells()
+        N = self.mesh.number_of_points()
+        gdof = tdim*N
+        if p > 1:
+            edof = p - 1
+            NE = self.mesh.number_of_edges()
+            gdof += (tdim-1)*edof*NE 
+            if dim == 2:
+                gdof += 3*edof*NC
+            elif dim == 3:
+                gdof += 6*edof*NC
+
+        if p > 2:
+            fdof = (p+1)*(p+2)//2 - 3*p
+            if dim == 2:
+                gdof += tdim*fdof*NC
+            elif dim == 3:
+                NF = self.mesh.number_of_faces()
+                gdof += (tdim - 3)*fdof*NF + 12*fdof*NC
+
+        if (p > 3) and (dim == 3):
+            ldof = self.dof.number_of_local_dofs()
+            cdof = ldof - 6*edof - 4*fdof - 4
+            gdof += tdim*cdof*NC
+        return gdof 
 
     def number_of_local_dofs(self):
         tdim = self.tensor_dim() 
         return tdim*self.dof.number_of_local_dofs()
 
     def cell_to_dof(self):
+        return self.cell2dof
+
+    def init_cell_to_dof(self):
+        """
+        Construct the dofs matrix on each cell.
+        """
+        mesh = self.mesh
+        N = mesh.number_of_points()
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        dim = self.dim
         tdim = self.tensor_dim()
-        cell2dof = self.dof.cell2dof[..., np.newaxis]
-        cell2dof = tdim*cell2dof + np.arange(tdim)
-        NC = cell2dof.shape[0]
-        return cell2dof.reshape(NC, -1)
+        p = self.p
+       
+        c2d = self.dof.cell2dof[..., np.newaxis]
+        ldof = self.dof.number_of_local_dofs() 
+        cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int)
+
+        dofFlags = self.dof_flags_1()
+        idx, = np.nonzero(dofFlags[0])
+        cell2dof[:, idx, :] = tdim*c2d[:, idx] + np.arange(tdim)
+
+        base0 = 0
+        base1 = 0
+        idx, = np.nonzero(dofFlags[1])
+        if len(idx) > 0:
+            base0 += N
+            base1 += tdim*N
+            cell2dof[:, idx, 1:] = base1 + (tdim-1)*(c2d[:, idx] - base0) + np.arange(tdim - 1)
+
+        idx, = np.nonzero(dofFlags[2])
+        if len(idx) > 0:
+            edof = p - 1
+            base0 += edof*NE
+            base1 += (tdim-1)*edof*NE
+            if dim == 2:
+                cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
+            elif dim == 3:
+                cell2dof[:, idx, 3:]= base1 + (tdim-3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
+
+        fdof = (p+1)*(p+2)//2 - 3*p
+        if dim == 3:
+            idx, = np.nonzero(dofFlags[3])
+            if lend(idx) > 0:
+                NF = mesh.number_of_faces()
+                base0 += fdof*NF 
+                base1 += (tdim - 3)*fdof*NF
+                cell2dof[:, idx, :] = base1 + tdim*(cell2dof[:, idx] - base0) + np.arange(tdim)
+                cdof = ldof - 4*fdof - 6*edof - 4
+        else:
+            cdof = fdof
+
+        idx, = np.nonzero(dofFlags[1])
+        if len(idx) > 0:
+            base1 += tdim*cdof*NC 
+            cell2dof[:, idx, 0] = base1 + np.arange(NC*len(idx)).reshape(NC, len(idx)) 
+
+        if dim == 3:
+            base1 += NC*len(idx)
+            idx, = np.nonzero(dofFlags[2])
+            if len(idx) > 0:
+                cell2dof[:, idx, 0:3] = base1 + np.arange(NC*len(idx)*3).reshape(NC, len(idx), 3)
+
+        self.cell2dof = cell2dof.reshape(NC, -1)
 
     def geom_dim(self):
         return self.dim
@@ -64,20 +168,52 @@ class HuZhangFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def basis(self, bc, cellidx=None):
-        dim = self.dim
+    def dof_flags(self):
+        dim = self.dim # the geometry space dimension
         dof = self.dof 
-        isPointDof = dof.is_on_node_local_dof()
+        
+        isPointDof = dof.is_on_point_local_dof()
         isEdgeDof = dof.is_on_edge_local_dof()
         isEdgeDof[isPointDof] = False
+        
         isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
         isOtherDof = (~isEdgeDof0)
-        if dim == 3:
+        if dim == 2:
+            return isOtherDof, isEdgeDof
+        elif dim == 3:
             isFaceDof = dof.is_on_face_local_dof()
             isFaceDof[isPointDof, :] = False
             isFaceDof[isEdgeDof0, :] = False
+
             isFaceDof0 = np.sum(isFaceDof, axis=-1) > 0
             isOtherDof = isOtherDof & (~isFaceDof0)
+
+            return isOtherDof, isEdgeDof, isFaceDof
+        else:
+            raise ValueError('`dim` should be 2 or 3!')
+
+    def dof_flags_1(self):
+        dim = self.dim # the geometry space dimension
+        dof = self.dof 
+        isPointDof = dof.is_on_point_local_dof()
+        isEdgeDof = dof.is_on_edge_local_dof()
+        isEdgeDof[isPointDof] = False
+        isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
+        if dim == 2:
+            return isPointDof, isEdgeDof0, ~(isPointDof | isEdgeDof0)
+        elif dim == 3:
+            isFaceDof = dof.is_on_face_local_dof()
+            isFaceDof[isPointDof, :] = False
+            isFaceDof[isEdgeDof0, :] = False
+
+            isFaceDof0 = np.sum(isFaceDof, axis=-1) > 0
+            return isPointDof, isEdgeDof0, isFaceDof0, ~(isPointDof | isEdgeDof0 | isFaceDof0)
+        else:
+            raise ValueError('`dim` should be 2 or 3!')
+
+    def basis(self, bc, cellidx=None):
+        dim = self.dim # the geometry space dimension
+        tdim = self.tensor_dim() # the tensor dimension
 
         if cellidx is None:
             NC = self.mesh.number_of_cells()
@@ -85,18 +221,29 @@ class HuZhangFiniteElementSpace():
             NC = len(cellidx)
 
         phi0 = self.space.basis(bc)
-        tdim = self.tensor_dim() 
         shape = list(phi0.shape)
         shape.insert(-1, NC)
         shape += [tdim, tdim]
-        phi = np.zeros(shape, dtype=np.float)
-        A =  np.einsum('...j, mn->...jmn', phi0[..., np.newaxis, isOtherDof], np.eye(tdim))
-        phi[..., isOtherDof, :, :] = np.einsum('...j, mn->...jmn', phi0[..., np.newaxis, isOtherDof], np.eye(tdim))
+        # The shape of `phi` is (NB, NC, ldof, tdim, tdim), where
+        #   NB : the 
+        #   NC : the number of cells
+        #   ldof : the number of dofs in each cell
+        #   tdim : the dimension of symmetric tensor matrix
+        phi = np.zeros(shape, dtype=np.float) 
+
+        dofFlag = self.dof_flags()
+        # the dof on the vertex and the interior of the cell
+        isOtherDof = dofFlag[0]
+        idx, = np.nonzero(isOtherDof)
+        if len(idx) > 0:
+            phi[..., idx[..., np.newaxis], range(tdim), range(tdim)] = phi0[..., np.newaxis, idx, np.newaxis]
   
         if cellidx is None:
             cell2edge = self.mesh.ds.cell_to_edge()
         else:
             cell2edge = self.mesh.ds.cell_to_edge()[cellidx]
+
+        isEdgeDof = dofFlag[1]
         for i, isDof in enumerate(isEdgeDof.T):
             phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TE[cell2edge[:, i]]) 
 
@@ -105,28 +252,18 @@ class HuZhangFiniteElementSpace():
                 cell2face = self.mesh.ds.cell_to_face()
             else:
                 cell2face = self.mesh.ds.cell_to_face()[cellidx]
+            isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):
                 phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TF[cell2face[:, i]])
 
+        # The new shape of `phi` is `(NB, NC, ldof*tdim, dim, dim)`, where
+        #   dim : the geometry space dimension
         phi = np.einsum('...jk, kmn->...jmn', phi, self.T)
         shape = phi.shape[:-4] + (-1, dim, dim)
         return phi.reshape(shape) 
 
     def div_basis(self, bc, cellidx=None):
         dim = self.dim
-        dof = self.dof 
-        isPointDof = dof.is_on_node_local_dof()
-        isEdgeDof = dof.is_on_edge_local_dof()
-        isEdgeDof[isPointDof, :] = False
-        isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
-        isOtherDof = (~isEdgeDof0)
-        if dim == 3:
-            isFaceDof = dof.is_on_face_local_dof()
-            isFaceDof[isPointDof, :] = False
-            isFaceDof[isEdgeDof0, :] = False
-            isFaceDof0 = np.sum(isFaceDof, axis=-1) > 0
-            isOtherDof = isOtherDof & (~isFaceDof0)
-
         gphi = self.space.grad_basis(bc, cellidx=cellidx)
 
         tdim = self.tensor_dim() 
@@ -134,12 +271,16 @@ class HuZhangFiniteElementSpace():
         shape.insert(-1, tdim)
         dphi = np.zeros(shape, dtype=np.float)
 
+        dofFlag = self.dof_flags()
+        # the dof on the vertex and the interior of the cell
+        isOtherDof = dofFlag[0]
         dphi[..., isOtherDof, :, :] = np.einsum('...ijm, kmn->...ijkn', gphi[..., isOtherDof, :], self.T)
 
         if cellidx is None:
             cell2edge = self.mesh.ds.cell_to_edge()
         else:
             cell2edge = self.mesh.ds.cell_to_edge()[cellidx]
+        isEdgeDof = dofFlag[1]
         for i, isDof in enumerate(isEdgeDof.T):
             VAL = np.einsum('ijk, kmn->ijmn', self.TE[cell2edge[:, i]], self.T)
             dphi[..., isDof, :, :] = np.einsum('...ikm, ijmn->...ikjn', gphi[..., isDof, :], VAL) 
@@ -149,9 +290,11 @@ class HuZhangFiniteElementSpace():
                 cell2face = self.mesh.ds.cell_to_face()
             else:
                 cell2face = self.mesh.ds.cell_to_face()[cellidx]
+            isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):
                 VAL = np.einsum('ijk, kmn->ijmn', self.TF[cell2face[:, i]], self.T)
                 dphi[..., isDof, :, :] = np.einsum('...ikm, ijmn->...ikjn', gphi[..., isDof, :], VAL) 
+
         shape = dphi.shape[:-3] + (-1, dim)
         return dphi.reshape(shape)
 

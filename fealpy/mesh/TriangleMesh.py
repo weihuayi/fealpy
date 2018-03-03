@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
+from ..quadrature import TriangleQuadrature
 
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
@@ -23,6 +24,10 @@ class TriangleMesh(Mesh2d):
         self.cellData = {}
         self.pointData = {}
         self.edgeData = {}
+
+    def integrator(self, k):
+        return TriangleQuadrature(k)
+
     def circumcenter(self):
         point = self.point
         cell = self.ds.cell
@@ -279,6 +284,20 @@ class TriangleMesh(Mesh2d):
         return Rlambda
 
     def area(self):
+        point = self.point
+        cell = self.ds.cell
+        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
+        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
+        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
+        dim = self.point.shape[1] 
+        nv = np.cross(v2, -v1)
+        if dim == 2:
+            a = nv/2.0
+        elif dim == 3:
+            a = np.sqrt(np.square(nv).sum(axis=1))/2.0
+        return a
+
+    def cell_area(self):
         point = self.point
         cell = self.ds.cell
         v0 = point[cell[:, 2], :] - point[cell[:, 1], :]

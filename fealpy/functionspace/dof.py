@@ -286,7 +286,7 @@ class CPLFEMDof3d():
 
     def face_to_dof(self):
         p = self.p
-        fdof = int((p+1)*(p+2)/2)
+        fdof = (p+1)*(p+2)//2
 
         edgeIdx = np.zeros((2, p+1), dtype=np.int)
         edgeIdx[0, :] = range(p+1)
@@ -560,7 +560,7 @@ class DPLFEMDof2d(DPLFEMDof):
         cell2dof = self.cell2dof
         isEdgeDof = self.is_on_edge_local_dof()
         _, idx = np.nonzero(isEdgeDof.T[localIdx])
-        n = p+1
+        n = self.p + 1
         isBdDof[cell2dof[cellIdx.reshape(-1, 1), idx.reshape(-1, n)]] = True
         return isBdDof
 
@@ -610,7 +610,6 @@ class DPLFEMDof3d(DPLFEMDof):
         return multiIndex
 
     def boundary_dof(self):
-        p = self.p
 
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
@@ -624,6 +623,7 @@ class DPLFEMDof3d(DPLFEMDof):
         cell2dof = self.cell2dof
         isFaceDof = self.is_on_face_local_dof()
         _, idx = np.nonzero(isFaceDof.T[localIdx])
+        p = self.p
         n = (p+1)*(p+2)//2
         isBdDof[cell2dof[cellIdx.reshape(-1, 1), idx.reshape(-1, n)]] = True
         return isBdDof
