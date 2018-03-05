@@ -178,12 +178,16 @@ class SSCFTFEMModel():
                 self.area, 
                 cfun=self.w[1].value)
 
+
         self.q0[:, 0] = 1.0
         self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
         self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
+
+        print(self.q0[:, -1])
+        print(self.q1[:, -1])
 
     def integral_time(self, q, dt):
         f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])

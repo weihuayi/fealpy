@@ -15,11 +15,11 @@ m = int(sys.argv[1])
 if m == 1:
     surface = Sphere()
     mesh =  surface.init_mesh()
-    mesh.uniform_refine(n=4, surface=surface)
+    mesh.uniform_refine(n=0, surface=surface)
 
 
 option = SSCFTParameter()
-option.maxit = 5000
+option.maxit = 5 
 scft = SSCFTFEMModel(surface, mesh, option, p=1, p0=1)
 
 
