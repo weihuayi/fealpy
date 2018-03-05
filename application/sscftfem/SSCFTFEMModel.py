@@ -254,7 +254,7 @@ class SSCFTFEMModel():
         option = self.option
         
         if file_path is not None:
-            file = open(file_path + '/log.txt', 'w')
+            f = open(file_path + '/log.txt', 'w')
         while (self.res > option.tol) and (iteration < option.maxit):
             self.H, self.res = self.one_step()
             self.ediff = self.H - self.Hold
@@ -264,7 +264,7 @@ class SSCFTFEMModel():
 
             if file_path is not None:
                 string = 'Iter: %d ======> \n sQ: %f res: %f ediff: %f H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
-                file.write(string)
+                f.write(string)
 
             print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
             print('\n')
@@ -278,7 +278,8 @@ class SSCFTFEMModel():
                 self.show_solution(iteration)
         sio.matlab.savemat(datafile+'.mat', self.data)
         
-        file.close()
+        if file_path is not None:
+            f.close()
         
     def one_step(self):
         self.update_propagator() 

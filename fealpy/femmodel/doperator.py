@@ -29,7 +29,7 @@ def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
             val = cfun(pp)
         A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
 
-    cell2dof = space.dof.cell2dof
+    cell2dof = space.cell_to_dof()
     ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
