@@ -20,9 +20,11 @@ class Mesh3d():
     def number_of_cells(self):
         return self.ds.NC
 
-    def geom_dimension(self):
-        assert(self.point.shape[1] == 3)
-        return 3 
+    def geo_dimension(self):
+        return self.point.shape[1] 
+
+    def top_dimension(self):
+        return 3
 
     def entity(self, dim=3):
         if dim == 3:

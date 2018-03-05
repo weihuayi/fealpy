@@ -22,12 +22,18 @@ class HuZhangFiniteElementSpace():
         mesh = self.mesh
 
         if self.dim == 2:
+            NE = mesh.number_of_edges()
             idx = np.array([(0, 0), (0, 1), (1, 1)])
-            idx1 = 1
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
+            self.TE = np.zeros((NE, 3, 3), dtype=np.float)
+
+#            t = mesh.edge_unit_tagent()
+#            n = mesh.edge_unit_normal()
+#            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
+#            self.TE[:, 1, :] = (t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
+#            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
         elif self.dim == 3:
             idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
-            idx1 = [1, 2, 4]
             self.T = np.array([
                 [(1, 0, 0), (0, 0, 0), (0, 0, 0)], 
                 [(0, 1, 0), (1, 0, 0), (0, 0, 0)],
@@ -36,22 +42,25 @@ class HuZhangFiniteElementSpace():
                 [(0, 0, 0), (0, 0, 1), (0, 1, 0)],
                 [(0, 0, 0), (0, 0, 0), (0, 0, 1)]])
 
-#        t = mesh.edge_unit_tagent()
-#        t = np.prod(t[:, idx0], axis=-1)
-#        _, _, self.TE = np.linalg.svd(t[:, np.newaxis, :])
-#        self.TE[:, 0, :] = t
-        
+            self.TE = np.zeros((NE, 6, 6), dtype=np.float)
+
         t = mesh.edge_unit_tagent()
-        n = mesh.edge_unit_normal()
-        self.TE = np.zeros((len(t), 3, 3), dtype=np.float)
-        self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
-        self.TE[:, 1, :] = (t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
-        self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
+        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
+        frame[:, 0] = t
+        for i, (j, k) in enumerate(idx):
+            self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
+
+        self.TE[:, 1] *= np.sqrt(2)
 
         if self.dim == 3:
+            NF = mesh.number_of_faces()
+            n = mesh.face_unit_normal()
+
             face2edge = mesh.ds.face_to_edge()
-            _, _, self.TF = np.linalg.svd(self.TE[face2edge, 0, :])
+            ft = t[face2edge]
+            self.TF = np.zeros((NF, 6, 6), dtype=np.float)
             self.TF[:, 0:3, :] = self.TE[face2edge, 0, :]
+            self.TF[:, 3:, :] = np.sqrt(2)*(n[:, np.newaxis, idx[:, 0]]*ft[:, :, idx[:, 1]] + n[:, np.newaxis, idx[:, 1]]*ft[:, :, idx[:, 0]])/2
 
     def __str__(self):
         return "Hu-Zhang mixed finite element space!"
@@ -59,27 +68,27 @@ class HuZhangFiniteElementSpace():
     def number_of_global_dofs(self):
         p = self.p
         dim = self.dim
-        tdim = self.tensor_dim() 
+        tdim = self.tensor_dimension() 
 
-        NC = self.mesh.number_of_cells()
-        N = self.mesh.number_of_points()
+        mesh = self.mesh
+
+        NC = mesh.number_of_cells()
+        N = mesh.number_of_points()
         gdof = tdim*N
         if p > 1:
             edof = p - 1
-            NE = self.mesh.number_of_edges()
+            NE = mesh.number_of_edges()
             gdof += (tdim-1)*edof*NE 
-            if dim == 2:
-                gdof += 3*edof*NC
-            elif dim == 3:
-                gdof += 6*edof*NC
+            E = mesh.number_of_edges_of_cells()
+            gdof += NC*E*edof
 
         if p > 2:
             fdof = (p+1)*(p+2)//2 - 3*p
             if dim == 2:
                 gdof += tdim*fdof*NC
             elif dim == 3:
-                NF = self.mesh.number_of_faces()
-                gdof += (tdim - 3)*fdof*NF + 12*fdof*NC
+                NF = mesh.number_of_faces()
+                gdof += 3*fdof*NF + 3*4*fdof*NC
 
         if (p > 3) and (dim == 3):
             ldof = self.dof.number_of_local_dofs()
@@ -88,7 +97,7 @@ class HuZhangFiniteElementSpace():
         return gdof 
 
     def number_of_local_dofs(self):
-        tdim = self.tensor_dim() 
+        tdim = self.tensor_dimension() 
         return tdim*self.dof.number_of_local_dofs()
 
     def cell_to_dof(self):
@@ -103,12 +112,14 @@ class HuZhangFiniteElementSpace():
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        dim = self.dim
-        tdim = self.tensor_dim()
+        dim = self.geo_dimension()
+        tdim = self.tensor_dimension()
         p = self.p
+
+        dof = self.dof
        
-        c2d = self.dof.cell2dof[..., np.newaxis]
-        ldof = self.dof.number_of_local_dofs() 
+        c2d = dof.cell2dof[..., np.newaxis]
+        ldof = dof.number_of_local_dofs() 
         cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int)
 
         dofFlags = self.dof_flags_1()
@@ -131,12 +142,12 @@ class HuZhangFiniteElementSpace():
             if dim == 2:
                 cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
             elif dim == 3:
-                cell2dof[:, idx, 3:]= base1 + (tdim-3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
+                cell2dof[:, idx, 3:]= base1 + (tdim - 3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
 
         fdof = (p+1)*(p+2)//2 - 3*p
         if dim == 3:
             idx, = np.nonzero(dofFlags[3])
-            if lend(idx) > 0:
+            if len(idx) > 0:
                 NF = mesh.number_of_faces()
                 base0 += fdof*NF 
                 base1 += (tdim - 3)*fdof*NF
@@ -158,10 +169,10 @@ class HuZhangFiniteElementSpace():
 
         self.cell2dof = cell2dof.reshape(NC, -1)
 
-    def geom_dim(self):
+    def geo_dimension(self):
         return self.dim
 
-    def tensor_dim(self):
+    def tensor_dimension(self):
         dim = self.dim
         return dim*(dim - 1)//2 + dim
 
@@ -169,7 +180,7 @@ class HuZhangFiniteElementSpace():
         return self.dof.interpolation_points()
 
     def dof_flags(self):
-        dim = self.dim # the geometry space dimension
+        dim = self.geo_dimension()
         dof = self.dof 
         
         isPointDof = dof.is_on_point_local_dof()
@@ -212,20 +223,24 @@ class HuZhangFiniteElementSpace():
             raise ValueError('`dim` should be 2 or 3!')
 
     def basis(self, bc, cellidx=None):
-        dim = self.dim # the geometry space dimension
-        tdim = self.tensor_dim() # the tensor dimension
+        dim = self.geo_dimension() 
+        tdim = self.tensor_dimension()
+
+        mesh = self.mesh
 
         if cellidx is None:
-            NC = self.mesh.number_of_cells()
+            NC = mesh.number_of_cells()
+            cell2edge = mesh.ds.cell_to_edge()
         else:
             NC = len(cellidx)
+            cell2edge = mesh.ds.cell_to_edge()[cellidx]
 
-        phi0 = self.space.basis(bc)
+        phi0 = self.space.basis(bc) # the shape of phi0 is (NQ, ldof)
         shape = list(phi0.shape)
         shape.insert(-1, NC)
         shape += [tdim, tdim]
-        # The shape of `phi` is (NB, NC, ldof, tdim, tdim), where
-        #   NB : the 
+        # The shape of `phi` is (NQ, NC, ldof, tdim, tdim), where
+        #   NQ : the number of quadrature points 
         #   NC : the number of cells
         #   ldof : the number of dofs in each cell
         #   tdim : the dimension of symmetric tensor matrix
@@ -238,25 +253,20 @@ class HuZhangFiniteElementSpace():
         if len(idx) > 0:
             phi[..., idx[..., np.newaxis], range(tdim), range(tdim)] = phi0[..., np.newaxis, idx, np.newaxis]
   
-        if cellidx is None:
-            cell2edge = self.mesh.ds.cell_to_edge()
-        else:
-            cell2edge = self.mesh.ds.cell_to_edge()[cellidx]
-
         isEdgeDof = dofFlag[1]
         for i, isDof in enumerate(isEdgeDof.T):
             phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TE[cell2edge[:, i]]) 
 
         if dim == 3:
             if cellidx is None:
-                cell2face = self.mesh.ds.cell_to_face()
+                cell2face = mesh.ds.cell_to_face()
             else:
-                cell2face = self.mesh.ds.cell_to_face()[cellidx]
+                cell2face = mesh.ds.cell_to_face()[cellidx]
             isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):
                 phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TF[cell2face[:, i]])
 
-        # The new shape of `phi` is `(NB, NC, ldof*tdim, dim, dim)`, where
+        # The new shape of `phi` is `(NQ, NC, ldof*tdim, dim, dim)`, where
         #   dim : the geometry space dimension
         phi = np.einsum('...jk, kmn->...jmn', phi, self.T)
         shape = phi.shape[:-4] + (-1, dim, dim)
@@ -264,11 +274,14 @@ class HuZhangFiniteElementSpace():
 
     def div_basis(self, bc, cellidx=None):
         dim = self.dim
-        gphi = self.space.grad_basis(bc, cellidx=cellidx)
+        tdim = self.tensor_dimension() 
+        mesh = self.mesh
 
-        tdim = self.tensor_dim() 
+        # the shape of `gphi` is (NQ, NC, ldof, dim)
+        gphi = self.space.grad_basis(bc, cellidx=cellidx) 
         shape = list(gphi.shape)
         shape.insert(-1, tdim)
+        # the shape of `dphi` is (NQ, NC, ldof, tdim, dim)
         dphi = np.zeros(shape, dtype=np.float)
 
         dofFlag = self.dof_flags()
@@ -277,9 +290,9 @@ class HuZhangFiniteElementSpace():
         dphi[..., isOtherDof, :, :] = np.einsum('...ijm, kmn->...ijkn', gphi[..., isOtherDof, :], self.T)
 
         if cellidx is None:
-            cell2edge = self.mesh.ds.cell_to_edge()
+            cell2edge = mesh.ds.cell_to_edge()
         else:
-            cell2edge = self.mesh.ds.cell_to_edge()[cellidx]
+            cell2edge = mesh.ds.cell_to_edge()[cellidx]
         isEdgeDof = dofFlag[1]
         for i, isDof in enumerate(isEdgeDof.T):
             VAL = np.einsum('ijk, kmn->ijmn', self.TE[cell2edge[:, i]], self.T)
@@ -287,21 +300,23 @@ class HuZhangFiniteElementSpace():
 
         if dim == 3:
             if cellidx is None:
-                cell2face = self.mesh.ds.cell_to_face()
+                cell2face = mesh.ds.cell_to_face()
             else:
-                cell2face = self.mesh.ds.cell_to_face()[cellidx]
+                cell2face = mesh.ds.cell_to_face()[cellidx]
             isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):
                 VAL = np.einsum('ijk, kmn->ijmn', self.TF[cell2face[:, i]], self.T)
                 dphi[..., isDof, :, :] = np.einsum('...ikm, ijmn->...ikjn', gphi[..., isDof, :], VAL) 
 
+
+        # The new shape of `dphi` is `(NQ, NC, ldof*tdim, dim)`, where
         shape = dphi.shape[:-3] + (-1, dim)
         return dphi.reshape(shape)
 
     def value(self, uh, bc, cellidx=None):
         phi = self.basis(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
-        tdim = self.tensor_dim()
+        tdim = self.tensor_dimension()
         if cellidx is None:
             uh = uh[cell2dof]
         else:
@@ -312,13 +327,50 @@ class HuZhangFiniteElementSpace():
     def div_value(self, uh, bc, cellidx=None):
         dphi = self.div_basis(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
-        tdim = self.tensor_dim()
+        tdim = self.tensor_dimension()
         if cellidx is None:
             uh = uh[cell2dof]
         else:
             uh = uh[cell2dof[cellidx]]
         val = np.einsum('...ijm, ij->...im', dphi, uh)
         return val
+
+    def interpolation(self, u):
+
+        dim = self.geo_dimension()
+        tdim = self.tensor_dimension()
+
+        if dim == 2:
+            idx = np.array([(0, 0), (0, 1), (1, 1)])
+        elif dim == 3:
+            idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
+
+        ipoint = self.dof.interpolation_points()
+        c2d = self.dof.cell2dof
+        val = u(ipoint)[c2d]
+
+        ldof = self.dof.number_of_local_dofs()
+        cell2dof = self.cell_to_dof().reshape(-1, ldof, tdim)
+
+        uI = FiniteElementFunction(self)
+        dofFlag = self.dof_flags()
+        isOtherDof = dofFlag[0]
+        idx0, = np.nonzero(isOtherDof)
+        uI[cell2dof[:, idx0, :]] = val[:, idx0][..., idx[:, 0], idx[:, 1]]
+
+        isEdgeDof = dofFlag[1]
+        cell2edge = self.mesh.ds.cell_to_edge()
+        for i, isDof in enumerate(isEdgeDof.T):
+            TE = np.einsum('ijk, kmn->ijmn', self.TE[cell2edge[:, i]], self.T)
+            uI[cell2dof[:, isDof, :]] = np.einsum('ikmn, ijmn->ikj', val[:, isDof, :, :], TE)
+
+        if dim == 3:
+            cell2face = mesh.ds.cell_to_face()
+            isFaceDof = dofFlag[2]
+            for i, isDof in enumerate(isFaceDof.T):
+                TF = np.einsum('ijk, kmn->ijmn', self.TF[cell2face[:, i]], self.T)
+                uI[cell2dof[:, isDof, :]] = np.einsum('ikmn, ijmn->ikj', val[..., isDof, :, :], TF) 
+        return uI
 
     def function(self, dim=None):
         f = FiniteElementFunction(self)

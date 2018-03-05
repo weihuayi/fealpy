@@ -139,6 +139,7 @@ class TriangleMesh(Mesh2d):
             NE = self.number_of_edges()
             point = self.point
             edge = self.ds.edge
+            cell = self.ds.cell
             cell2edge = self.ds.cell_to_edge()
 
             cell2edge0 = np.zeros((2*NC,),dtype=np.int)

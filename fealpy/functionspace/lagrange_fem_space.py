@@ -271,9 +271,13 @@ class VectorLagrangeFiniteElementSpace():
         return np.zeros(gdof, dtype=np.float)
 
     def interpolation(self, u):
-        ipoint = self.dof.interpolation_points()
+        dim = self.dim
+        c2d = self.dof.cell2dof
+        ldof = self.dof.number_of_local_dofs()
+        cell2dof = self.cell_to_dof().reshape(-1, ldof, dim)
+        p = self.dof.interpolation_points()[c2d]
         uI = FiniteElementFunction(self)
-        uI[:] = u(ipoint).flat[:]
+        uI[cell2dof] = u(p)
         return uI
 
 class SymmetricTensorLagrangeFiniteElementSpace():

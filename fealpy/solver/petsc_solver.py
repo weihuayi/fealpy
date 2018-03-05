@@ -28,3 +28,21 @@ def linear_solver(dmodel, uh, dirichlet=None):
     ksp.solve(Pb, x)
     end = timer()
     print("Solve time:", end-start)
+
+def minres(A, b, uh):
+
+    PA = PETSc.Mat().createAIJ(
+            size=A.shape, 
+            csr=(A.indptr, A.indices,  A.data)
+            ) 
+    Pb = PETSc.Vec().createWithArray(b)
+    x = PETSc.Vec().createWithArray(uh)
+
+    ksp = PETSc.KSP().create()
+    #ksp.setType('minres')
+    pc = ksp.getPC()
+    pc.setType('none')
+    ksp.setOperators(PA)
+    ksp.setFromOptions()
+    ksp.solve(Pb, x)
+

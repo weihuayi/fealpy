@@ -155,8 +155,7 @@ class Model2d():
         mu = self.mu
         du = self.grad_displacement(p)
         val = mu*(du + du.swapaxes(-1, -2))
-        idx = np.arange(2)
-        val[..., idx, idx] += lam*du.trace(axis1=-2, axis2=-1)[..., np.newaxis]
+        val[..., range(2), range(2)] += lam*du.trace(axis1=-2, axis2=-1)[..., np.newaxis]
         return val
         
 
