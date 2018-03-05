@@ -44,6 +44,14 @@ class SMDof2d():
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
+    def boundary_dof(self):
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdDof[edge2dof[isBdEdge]] = True
+        return isBdDof
+
     def number_of_local_dofs(self, p=None):
         if p is None:
             p = self.p
@@ -67,6 +75,10 @@ class ScaledMonomialSpace2d():
         self.area= mesh.area()
         self.h = np.sqrt(self.area) 
         self.dof = SMDof2d(mesh, p)
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof
+
 
     def basis(self, point, cellidx=None, p=None):
         """
@@ -196,6 +208,15 @@ class VEMDof2d():
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
+
+    def boundary_dof(self):
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdDof[edge2dof[isBdEdge]] = True
+        return isBdDof
+
     def edge_to_dof(self):
         p = self.p
         mesh = self.mesh
@@ -294,6 +315,12 @@ class VirtualElementSpace2d():
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.dof = VEMDof2d(mesh, p)
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof, self.dof.cell2dofLocation
+
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
 
     def basis(self, bc):
         pass

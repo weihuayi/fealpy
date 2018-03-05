@@ -94,10 +94,29 @@ The general member function of a mesh
 * bc_to_points(self, bc) : transform quadrature points in barycentric coordinates to points in pysical cells
 
 ## Function Space
+
+### degrees of freedom management 
+
 * ldof: the number of local dof on each cell
 * gdof: the number of global dof on the whole mesh
 * dim: the space dimension 
 
 (NQ, NC, ldof, m, n, ...)
 
+The member function in a `FunctionSpace`:
 
+* cell_to_dof(self)
+* boundary_dof(self)
+* basis(self, ...)
+* function(self)
+* number_of_global_dofs(self)
+* number_of_local_dofs(self)
+* function(self)
+* interpolation(self, u):
+* projection(self, u): 
+* array(self, dim=None)
+* value(self, u, bc, cellidx=None)
+* grad_value(self, u, bc, cellidx=None)
+* div_value(self, u, bc, cellidx=None)
+* geo_dimension(self)
+* top_dimension(self)

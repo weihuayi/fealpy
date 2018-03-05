@@ -11,8 +11,6 @@ import fealpy.tools.colors as cs
 import scipy.io as sio
 
 
-
-
 class SSCFTParameter():
     def __init__(self):
         self.Nspecies = 2 

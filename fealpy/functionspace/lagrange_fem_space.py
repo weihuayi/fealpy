@@ -127,9 +127,8 @@ class LagrangeFiniteElementSpace():
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
-        idx = np.arange(dim+1)
-        Q = A[..., multiIndex, idx]
-        M = F[..., multiIndex, idx]
+        Q = A[..., multiIndex, range(dim+1)]
+        M = F[..., multiIndex, range(dim+1)]
         ldof = self.number_of_local_dofs()
         shape = bc.shape[:-1]+(ldof, dim+1)
         R = np.zeros(shape, dtype=np.float)
