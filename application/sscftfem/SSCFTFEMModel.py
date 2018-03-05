@@ -62,15 +62,15 @@ class TimeLine():
         self.current = 0
         
 class PDESolver():
-    def __init__(self, femspace, integrator, area,  method='CN'):
+    def __init__(self, femspace, integrator, measure,  method='CN'):
 
         self.method = method
         self.femspace = femspace 
         self.integrator = integrator 
-        self.area = area
+        self.measure = measure
 
-        self.M = doperator.mass_matrix(self.femspace, self.integrator, self.area)
-        self.A = doperator.stiff_matrix(self.femspace, self.integrator, self.area)
+        self.M = doperator.mass_matrix(self.femspace, self.integrator, self.measure)
+        self.A = doperator.stiff_matrix(self.femspace, self.integrator, self.measure)
 
     def get_current_linear_system(self, u0, dt):
         M = self.M
