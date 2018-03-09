@@ -9,7 +9,7 @@ from .integral_alg import PolygonMeshIntegralAlg
 
 
 class PoissonVEMModel():
-    def __init__(self, model, mesh, p=1, integrator=None):
+    def __init__(self, model, mesh, p, integrator):
         """
         Initialize a Poisson virtual element model. 
 

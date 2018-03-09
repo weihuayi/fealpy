@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from ..common import ranges
 from .mesh_tools import unique_row, find_entity, show_mesh_2d
-
+from ..quadrature import TriangleQuadrature
 from .Mesh2d import Mesh2d
 
 class PolygonMesh(Mesh2d):
@@ -22,6 +22,9 @@ class PolygonMesh(Mesh2d):
 
         self.ds = PolygonMeshDataStructure(point.shape[0], cell, cellLocation)
         self.meshType = 'polygon'
+
+    def integrator(self, k):
+        return TriangleQuadrature(k)
 
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()

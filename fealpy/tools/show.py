@@ -46,11 +46,12 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
     if flag:
         out.close()
 
-def showmultirate(plt, k, N, errorMatrix, labellist, lw=4, ms=15):
+def showmultirate(plt, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=15):
     fig = plt.figure()
     fig.set_facecolor('white')
     axes = fig.gca()
-    optionlist = ['k-*', 'b-o', 'r--^', 'g->', 'm-8', 'c-D','y-x', 'y-+', 'y-h', 'y-p']
+    if optionlist is None:
+        optionlist = ['k-*', 'r-o', 'b-D', 'g-->', 'b--8', 'm--x','b-.x', 'b-.+', 'b-.h', 'm:s', 'm:p', 'm:h']
     m, n = errorMatrix.shape
     for i in range(m):
         showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
@@ -63,4 +64,4 @@ def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
     c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
     s = 0.75*error[k]/N[k]**c[0] 
     line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
-            lw=lw, color=line0.get_color())
+            lw=lw, ls=line0.get_linestyle(), color=line0.get_color())

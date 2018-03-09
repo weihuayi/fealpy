@@ -44,14 +44,6 @@ class SMDof2d():
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
-    def boundary_dof(self):
-        gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
-        edge2dof = self.edge_to_dof()
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True
-        return isBdDof
-
     def number_of_local_dofs(self, p=None):
         if p is None:
             p = self.p
@@ -207,7 +199,6 @@ class VEMDof2d():
         self.p = p
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
-
 
     def boundary_dof(self):
         gdof = self.number_of_global_dofs()
