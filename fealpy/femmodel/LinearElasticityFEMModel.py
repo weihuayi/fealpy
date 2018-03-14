@@ -129,8 +129,21 @@ class LinearElasticityFEMModel:
 
         start = timer()
         M, B = self.get_left_matrix()
+
+        c2d = self.tensorspace.cell_to_dof()
+        print(c2d.reshape(1, 10, 3))
+        MM = M.todense()
+
+        f = open('M.txt', 'ab')
+        np.savetxt(f, MM, fmt='%.16f')
+        f.close()
+
+        f = open('B.txt', 'ab')
+        np.savetxt(f, B.todense(), fmt='%.16f')
+        f.close()
+
         b = self.get_right_vector()
-        self.write_system(M, B, b, sparse=False)
+        #self.write_system(M, B, b, sparse=False)
         A = bmat([[M, B.transpose()], [B, None]]).tocsr()
         bb = np.r_[np.zeros(tgdof), b]
         end = timer()

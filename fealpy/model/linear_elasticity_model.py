@@ -114,12 +114,19 @@ class Model2d():
 
     def init_mesh(self, n=4):
         from ..mesh import TriangleMesh
+#        point = np.array([
+#            (0, 0),
+#            (1, 0),
+#            (1, 1),
+#            (0, 1)], dtype=np.float)
+#        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+
         point = np.array([
             (0, 0),
             (1, 0),
-            (1, 1),
             (0, 1)], dtype=np.float)
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+        cell = np.array([(0, 1, 2)], dtype=np.int)
+
         mesh = TriangleMesh(point, cell)
         mesh.uniform_refine(n)
         return mesh 

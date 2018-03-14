@@ -19,13 +19,13 @@ if m == 2:
     model = Model2d()
 
 mesh = model.init_mesh(n)
-h = 1/n
+h = 1
 integrator = mesh.integrator(10)
 
 fem = LinearElasticityFEMModel(mesh, model, p, integrator)
 gdof = fem.vectorspace.number_of_global_dofs()
 
-maxit = 5 
+maxit = 1 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',
@@ -34,12 +34,12 @@ errorType = ['$||\sigma - \sigma_h ||_{0}$',
 Ndof = np.zeros((maxit,))
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
-s = 'solutions/sigmah{}.dat'
-u = 'solutions/uh{}.dat'
+#s = 'solutions/sigmah{}.dat'
+#u = 'solutions/uh{}.dat'
 for i in range(maxit):
-    #fem.solve()
-    fem.sh[:] = np.loadtxt(s.format(i))
-    fem.uh[:] = np.loadtxt(u.format(i))
+    fem.solve()
+    #fem.sh[:] = np.loadtxt(s.format(i))
+    #fem.uh[:] = np.loadtxt(u.format(i))
 
     Ndof[i] = 1/h**2 
     e0, e1, e2 = fem.error()
