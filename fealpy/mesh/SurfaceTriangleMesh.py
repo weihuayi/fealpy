@@ -6,11 +6,11 @@ class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1):
         self.mesh = mesh
         self.V = LagrangeFiniteElementSpace(mesh, p)
-        self.point, d = surface.project(self.V.interpolation_points())
+        self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
 
-    def number_of_points(self):
-        return self.point.shape[0] 
+    def number_of_nodes(self):
+        return self.node.shape[0] 
 
     def number_of_edges(self):
         return self.mesh.ds.NE
@@ -19,7 +19,7 @@ class SurfaceTriangleMesh():
         return self.mesh.ds.NC
 
     def geom_dimension(self):
-        return self.point.shape[1]
+        return self.node.shape[1]
 
     def top_dimension(self):
         return 2
@@ -35,9 +35,9 @@ class SurfaceTriangleMesh():
 
         # the tranpose of the jacobi matrix between S_p and S_h 
         if cellidx is None:
-            Jph = np.einsum('ijm, ...ijk->...imk', self.point[cell2dof, :], grad)
+            Jph = np.einsum('ijm, ...ijk->...imk', self.node[cell2dof, :], grad)
         else:
-            Jph = np.einsum('ijm, ...ijk->...imk', self.point[cell2dof[cellidx], :], grad)
+            Jph = np.einsum('ijm, ...ijk->...imk', self.node[cell2dof[cellidx], :], grad)
 
         # the transpose of the jacobi matrix between S_p and K
         Jp = np.einsum('...ijk, imk->...imj', Jph, Jh)
@@ -61,9 +61,9 @@ class SurfaceTriangleMesh():
         basis = self.V.basis(bc)
         cell2dof = self.V.dof.cell2dof
         if cellidx is None:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.point[cell2dof, :])
+            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof, :])
         else:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.point[cell2dof[cellidx], :])
+            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
         return bcp
 
     def area(self, integrator):

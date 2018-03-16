@@ -8,23 +8,23 @@ class LagrangeFiniteElementSpace():
         self.mesh = mesh
         self.p = p 
         if spacetype is 'C':
-            if mesh.meshType is 'interval':
+            if mesh.meshtype is 'interval':
                 self.dof = CPLFEMDof1d(mesh, p)
                 self.dim = 1
-            elif mesh.meshType is 'tri':
+            elif mesh.meshtype is 'tri':
                 self.dof = CPLFEMDof2d(mesh, p) 
                 self.dim = 2
-            elif mesh.meshType is 'tet':
+            elif mesh.meshtype is 'tet':
                 self.dof = CPLFEMDof3d(mesh, p)
                 self.dim = 3
         elif spacetype is 'D':
-            if mesh.meshType is 'interval':
+            if mesh.meshtype is 'interval':
                 self.dof = DPLFEMDof1d(mesh, p)
                 self.dim = 1
-            elif mesh.meshType is 'tri':
+            elif mesh.meshtype is 'tri':
                 self.dof = DPLFEMDof2d(mesh, p) 
                 self.dim = 2
-            elif mesh.meshType is 'tet':
+            elif mesh.meshtype is 'tet':
                 self.dof = DPLFEMDof3d(mesh, p)
                 self.dim = 3
 

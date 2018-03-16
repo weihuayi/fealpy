@@ -14,10 +14,10 @@ def iso_surface(surface, box, nx=10, ny=10, nz=10):
     obj = mlab.pipeline.iso_surface(src, contours=[0])
     actor = obj.actor.actors[0]
     polyDataObj = actor.mapper.input
-    point = np.array(polyDataObj.points)
-    point, _ = surface.project(point)
+    node = np.array(polyDataObj.points)
+    node, _ = surface.project(node)
     cell = polyDataObj.polys.data.to_array().reshape(-1, 4)
     cell = cell[:, [1, 3, 2]]
 
-    return TriangleMesh(point, cell)
+    return TriangleMesh(node, cell)
 

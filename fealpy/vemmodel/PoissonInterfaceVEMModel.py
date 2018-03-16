@@ -30,14 +30,15 @@ class PoissonInterfaceVEMModel():
         self.uh = self.vemspace.function() 
         self.aux_data()
 
-        point = mesh.point
+        node = mesh.node
         self.wh = self.vemspace.function()
-        self.wh[self.isInterfacePoint] = self.model.func_jump(point[self.isInterfacePoint])
+        self.wh[self.isInterfaceNode] =
+        self.model.func_jump(node[self.isInterfaceNode])
 
         self.uIE = self.vemspace.function() 
-        self.uIE[self.isExtPoint] = model.solution_plus(point[self.isExtPoint])       
+        self.uIE[self.isExtNode] = model.solution_plus(node[self.isExtNode])       
         self.uII = self.vemspace.function()
-        self.uII[self.isIntPoint] = model.solution_minus(point[self.isIntPoint])
+        self.uII[self.isIntNode] = model.solution_minus(node[self.isIntNode])
 
         self.area = self.vemspace.smspace.area 
 
@@ -58,23 +59,23 @@ class PoissonInterfaceVEMModel():
 
         mesh = self.mesh
 
-        N = mesh.number_of_points()        
+        N = mesh.number_of_nodes()        
         NV = mesh.number_of_vertices_of_cells()
         cell = mesh.ds.cell
         edge = mesh.ds.edge 
         edge2cell = mesh.ds.edge_to_cell()
 
         self.isInterfaceEdge = (self.isIntCell[edge2cell[:, 0]] != self.isIntCell[edge2cell[:, 1]])
-        self.isInterfacePoint = np.zeros(N, dtype=np.bool)
-        self.isInterfacePoint[edge[self.isInterfaceEdge]] = True
+        self.isInterfaceNode = np.zeros(N, dtype=np.bool)
+        self.isInterfaceNode[edge[self.isInterfaceEdge]] = True
 
         self.interfaceEdge = edge[self.isInterfaceEdge]
 
-        self.isExtPoint = np.zeros(N, dtype=np.bool)
-        self.isExtPoint[cell[np.repeat(~self.isIntCell, NV)]] = True
+        self.isExtNode = np.zeros(N, dtype=np.bool)
+        self.isExtNode[cell[np.repeat(~self.isIntCell, NV)]] = True
 
-        self.isIntPoint = np.zeros(N, dtype=np.bool)
-        self.isIntPoint[cell[np.repeat(self.isIntCell, NV)]] = True
+        self.isIntNode = np.zeros(N, dtype=np.bool)
+        self.isIntNode[cell[np.repeat(self.isIntCell, NV)]] = True
         
     def reinit(self, mesh, p=None):
         if p is None:
@@ -84,14 +85,16 @@ class PoissonInterfaceVEMModel():
         self.uh = self.vemspace.function() 
         self.aux_data()
 
-        point = mesh.point
+        node = mesh.node
         self.wh = self.vemspace.function()
-        self.wh[self.isInterfacePoint] = self.model.func_jump(point[self.isInterfacePoint])
+        self.wh[self.isInterfaceNode] =
+        self.model.func_jump(node[self.isInterfaceNode])
 
         self.uIE = self.vemspace.function() 
-        self.uIE[self.isExtPoint] = self.model.solution_plus(point[self.isExtPoint])
+        self.uIE[self.isExtNode] = self.model.solution_plus(node[self.isExtNode])
         self.uII = self.vemspace.function()
-        self.uII[self.isIntPoint] = self.model.solution_minus(point[self.isIntPoint])
+        self.uII[self.isIntNode] =
+        self.model.solution_minus(node[self.isIntNode])
 
         self.area = self.vemspace.smspace.area 
 
@@ -142,14 +145,14 @@ class PoissonInterfaceVEMModel():
 
         qf = GaussLegendreQuadrture(3)
         bcs, ws = qf.quadpts, qf.weights 
-        point = self.mesh.point
+        node = self.mesh.node
         iedge = self.interfaceEdge
         
-        ps = np.einsum('ij, kjm->ikm', bcs, point[iedge])
+        ps = np.einsum('ij, kjm->ikm', bcs, node[iedge])
         val = self.model.flux_jump(ps)
         bb = np.einsum('i, ij, ik->kj', ws, bcs, val)
        
-        l = np.sqrt(np.sum((point[iedge[:, 0], :] - point[iedge[:, 1], :])**2, axis=1))
+        l = np.sqrt(np.sum((node[iedge[:, 0], :] - node[iedge[:, 1], :])**2, axis=1))
         
         bb *= l.reshape(-1, 1)
         gdof = self.vemspace.number_of_global_dofs()
@@ -208,8 +211,8 @@ class PoissonInterfaceVEMModel():
         eI[:] =  uII - (uh - wh)
         eE[:] =  uIE - uh
         
-        eI = eI[self.isIntPoint] 
-        eE = eE[self.isExtPoint]
+        eI = eI[self.isIntNode] 
+        eE = eE[self.isExtNode]
         return np.sqrt((np.mean(eI**2) + np.mean(eE**2))/2)
 
     def uIuh_error(self):
@@ -222,8 +225,8 @@ class PoissonInterfaceVEMModel():
         eI[:] =  uII - (uh - wh)
         eE[:] =  uIE - uh
         
-        eI[~self.isIntPoint] = 0
-        eE[~self.isExtPoint] = 0
+        eI[~self.isIntNode] = 0
+        eE[~self.isExtNode] = 0
         return np.sqrt(eI@self.AI@eI + eE@self.AE@eE)
 
         

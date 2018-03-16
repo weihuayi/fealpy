@@ -73,7 +73,7 @@ class HuZhangFiniteElementSpace():
         mesh = self.mesh
 
         NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         gdof = tdim*N
         if p > 1:
             edof = p - 1

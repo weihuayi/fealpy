@@ -8,8 +8,8 @@ class Mesh3d():
     def __init__(self):
         pass
 
-    def number_of_points(self):
-        return self.point.shape[0]
+    def number_of_nodes(self):
+        return self.node.shape[0]
 
     def number_of_edges(self):
         return self.ds.NE
@@ -21,7 +21,7 @@ class Mesh3d():
         return self.ds.NC
 
     def geo_dimension(self):
-        return self.point.shape[1] 
+        return self.node.shape[1] 
 
     def top_dimension(self):
         return 3
@@ -34,7 +34,7 @@ class Mesh3d():
         elif dim == 1:
             return self.ds.edge
         elif dim == 0:
-            return self.point
+            return self.node
         else:
             raise ValueError('dim must be in [0, 1, 2, 3]!')
 
@@ -47,18 +47,18 @@ class Mesh3d():
             return self.edge_length()
 
     def barycenter(self, entity='cell'):
-        point = self.point
+        node = self.node
         if entity == 'cell':
             cell = self.ds.cell
-            bc = np.sum(point[cell, :], axis=1).reshape(-1, 3)/cell.shape[1]
+            bc = np.sum(node[cell, :], axis=1).reshape(-1, 3)/cell.shape[1]
         elif entity == 'face':
             face = self.ds.face
-            bc = np.sum(point[face, :], axis=1).reshape(-1, 3)/face.shape[1]
+            bc = np.sum(node[face, :], axis=1).reshape(-1, 3)/face.shape[1]
         elif entity == 'edge':
             edge = self.ds.edge
-            bc = np.sum(point[edge, :], axis=1).reshape(-1, 3)/edge.shape[1]
-        elif entity == 'point':
-            bc = point
+            bc = np.sum(node[edge, :], axis=1).reshape(-1, 3)/edge.shape[1]
+        elif entity == 'node':
+            bc = node
         else:
             pass
             #TODO: raise a error
@@ -66,41 +66,41 @@ class Mesh3d():
 
     def face_unit_normal(self):
         face = self.ds.face
-        point = self.point
-        v01 = point[face[:, 1], :] - point[face[:, 0], :]
-        v02 = point[face[:, 2], :] - point[face[:, 0], :]
-        dim = self.point.shape[1] 
+        node = self.node
+        v01 = node[face[:, 1], :] - node[face[:, 0], :]
+        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+        dim = self.node.shape[1] 
         nv = np.cross(v01, v02)
         length = np.sqrt(np.square(nv).sum(axis=1))
         return nv/length.reshape(-1,1) 
 
     def edge_unit_tagent(self):
         edge = self.ds.edge
-        point = self.point
-        v = point[edge[:,1], :] - point[edge[:,0],:]
+        node = self.node
+        v = node[edge[:,1], :] - node[edge[:,0],:]
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1,1)
 
     def add_plot(self, axes,
-            pointcolor='k', edgecolor='k',
+            nodecolor='k', edgecolor='k',
              aspect='equal',
             linewidths=2, markersize=20,  
             showaxis=False, alpha=0.8):
 
         return show_mesh_3d(axes, self,
-                pointcolor=pointcolor, edgecolor=edgecolor,
+                nodecolor=nodecolor, edgecolor=edgecolor,
                 aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
                  showaxis=showaxis, alpha=alpha)
 
-    def find_point(self, axes, point=None,
+    def find_node(self, axes, node=None,
             index=None, showindex=False,
             color='r', markersize=40, 
             fontsize=24, fontcolor='k'):
 
-        if point is None:
-            point = self.point
-        find_point(axes, point, 
+        if node is None:
+            node = self.node
+        find_node(axes, node, 
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
@@ -200,7 +200,7 @@ class Mesh3dDataStructure():
         self.cell2edge = np.reshape(j, (NC, E))
         self.NE = self.edge.shape[0]
 
-    def cell_to_point(self):
+    def cell_to_node(self):
         """ 
         """
         N = self.N
@@ -211,8 +211,8 @@ class Mesh3dDataStructure():
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2point = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
-        return cell2point
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        return cell2node
 
     def cell_to_edge(self, sparse=False):
         """ The neighbor information of cell to edge
@@ -300,7 +300,7 @@ class Mesh3dDataStructure():
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    def face_to_point(self, return_sparse=False):
+    def face_to_node(self, return_sparse=False):
 
         face = self.face
         FE = self.localFace.shape[1] 
@@ -311,8 +311,8 @@ class Mesh3dDataStructure():
             NF = self.NF
             I = np.repeat(range(NF), FE)
             val = np.ones(FE*NF, dtype=np.bool)
-            face2point = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
-            return face2point
+            face2node = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
+            return face2node
 
     def face_to_edge(self, return_sparse=False):
         cell2edge = self.cell2edge
@@ -347,7 +347,7 @@ class Mesh3dDataStructure():
             face2cell = csr_matrix((val, (I, J)), shape=(NF, NC), dtype=np.bool)
             return face2cell 
 
-    def edge_to_point(self, return_sparse=False):
+    def edge_to_node(self, return_sparse=False):
         N = self.N
         NE = self.NE
         edge = self.edge
@@ -358,12 +358,12 @@ class Mesh3dDataStructure():
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
             val = np.ones(2*NE, dtype=np.bool)
-            edge2point = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
-            return edge2point
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            return edge2node
 
     def edge_to_edge(self):
-        edge2point = self.edge_to_point()
-        return edge2point*edge2point.transpose()
+        edge2node = self.edge_to_node()
+        return edge2node*edge2node.transpose()
 
     def edge_to_face(self):
         NF = self.NF
@@ -387,8 +387,8 @@ class Mesh3dDataStructure():
         edge2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
         return edge2cell
 
-    def point_to_point(self):
-        """ The neighbor information of points
+    def node_to_node(self):
+        """ The neighbor information of nodes
         """
         N = self.N
         NE = self.NE
@@ -396,10 +396,10 @@ class Mesh3dDataStructure():
         I = edge.flatten()
         J = edge[:,[1,0]].flatten()
         val = np.ones((2*NE,), dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
-        return point2point
+        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        return node2node
 
-    def point_to_edge(self):
+    def node_to_edge(self):
         N = self.N
         NE = self.NE
         
@@ -407,10 +407,10 @@ class Mesh3dDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        point2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
-        return point2edge
+        node2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+        return node2edge
 
-    def point_to_face(self):
+    def node_to_face(self):
         N = self.N
         NF = self.NF
 
@@ -420,10 +420,10 @@ class Mesh3dDataStructure():
         I = face.flatten()
         J = np.repeat(range(NF), FV)
         val = np.ones(FV*NF, dtype=np.bool)
-        point2face = csr_matrix((val, (I, J)), shape=(NF, N), dtype=np.bool)
-        return point2face
+        node2face = csr_matrix((val, (I, J)), shape=(NF, N), dtype=np.bool)
+        return node2face
 
-    def point_to_cell(self, return_local_index=False):
+    def node_to_cell(self, return_local_index=False):
         """
         """
         N = self.N
@@ -437,13 +437,13 @@ class Mesh3dDataStructure():
 
         if return_local_index == True:
             val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
-        return point2cell
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+        return node2cell
 
-    def boundary_point_flag(self):
+    def boundary_node_flag(self):
         N = self.N
         face = self.face
         isBdFace = self.boundary_face_flag()
@@ -472,8 +472,8 @@ class Mesh3dDataStructure():
         isBdCell[face2cell[isBdFace, 0]] = True
         return isBdCell 
 
-    def boundary_point_index(self):
-        isBdPoint = self.boundary_point_flag()
+    def boundary_node_index(self):
+        isBdPoint = self.boundary_node_flag()
         idx, = np.nonzero(isBdPoint)
         return idx
 

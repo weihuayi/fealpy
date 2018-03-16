@@ -9,8 +9,8 @@ class Mesh2d():
         
         The class is just a abstract class, and you can not use it directly.
     """
-    def number_of_points(self):
-        return self.point.shape[0]
+    def number_of_nodes(self):
+        return self.node.shape[0]
 
     def number_of_edges(self):
         return self.ds.NE
@@ -25,27 +25,27 @@ class Mesh2d():
         return self.ds.number_of_vertices_of_cells()
 
     def geom_dimension(self):
-        return self.point.shape[1]
+        return self.node.shape[1]
 
     def barycenter(self, entity='cell', index=None):
-        point = self.point
+        node = self.node
         if entity == 'cell':
             cell = self.ds.cell
             if index is None:
-                bc = np.sum(point[cell, :], axis=1)/cell.shape[1]
+                bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
             else:
-                bc = np.sum(point[cell[index], :], axis=1)/cell.shape[1]
+                bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
         elif entity == 'edge':
             edge = self.ds.edge
             if index is None:
-                bc = np.sum(point[edge, :], axis=1)/edge.shape[1]
+                bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
             else:
-                bc = np.sum(point[edge[index], :], axis=1)/edge.shape[1]
-        elif entity == 'point':
+                bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
+        elif entity == 'node':
             if index is None:
-                bc = point
+                bc = node
             else:
-                bc = point[index]
+                bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
@@ -53,13 +53,13 @@ class Mesh2d():
     def area(self):
         #TODO: 3D Case
         NC = self.number_of_cells()
-        point = self.point
+        node = self.node
         edge = self.ds.edge
         edge2cell = self.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v= (point[edge[:, 1], :] - point[edge[:, 0], :])@w
-        val = np.sum(v*point[edge[:, 0], :], axis=1)
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
         a /=2
@@ -68,13 +68,13 @@ class Mesh2d():
     def cell_area(self):
         #TODO: 3D Case
         NC = self.number_of_cells()
-        point = self.point
+        node = self.node
         edge = self.ds.edge
         edge2cell = self.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v= (point[edge[:, 1], :] - point[edge[:, 0], :])@w
-        val = np.sum(v*point[edge[:, 0], :], axis=1)
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
         a /=2
@@ -82,8 +82,8 @@ class Mesh2d():
 
     def edge_length(self):
         edge = self.ds.edge
-        point = self.point
-        v = point[edge[:, 1]] - point[edge[:, 0]]
+        node = self.node
+        v = node[edge[:, 1]] - node[edge[:, 0]]
         length = np.sqrt(np.sum(v**2, axis=-1))
         return length
 
@@ -93,7 +93,7 @@ class Mesh2d():
         elif dim == 1:
             return self.ds.edge
         elif dim == 0:
-            return self.point
+            return self.node
         else:
             raise ValueError('dim must be in [0, 1, 2]!')
 
@@ -105,9 +105,9 @@ class Mesh2d():
 
     def edge_length(self, index=None):
         if index is None:
-            v = point[edge[:,1],:] - point[edge[:,0],:]
+            v = node[edge[:,1],:] - node[edge[:,0],:]
         else:
-            v = point[edge[index,1],:] - point[edge[index,0],:]
+            v = node[edge[index,1],:] - node[edge[index,0],:]
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
@@ -125,14 +125,14 @@ class Mesh2d():
 
     def edge_unit_tagent(self, index=None):
         edge = self.ds.edge
-        point = self.point
+        node = self.node
         NE = self.number_of_edges()
         if index is None:
-            v = point[edge[:,1],:] - point[edge[:,0],:]
+            v = node[edge[:,1],:] - node[edge[:,0],:]
             length = np.sqrt(np.sum(v**2,axis=1))
             v /= length.reshape(-1, 1)
         else:
-            v = point[edge[index,1],:] - point[edge[index,0],:]
+            v = node[edge[index,1],:] - node[edge[index,0],:]
             length = np.sqrt(np.sum(v**2, axis=1))
             v /= length.reshape(-1, 1)
         return v
@@ -143,16 +143,16 @@ class Mesh2d():
         return v@w
 
     def edge_tagent(self, index=None):
-        point = self.point
+        node = self.node
         edge = self.ds.edge
         if index is None:
-            v = point[edge[:,1],:] - point[edge[:,0],:]
+            v = node[edge[:,1],:] - node[edge[:,0],:]
         else:
-            v = point[edge[index,1],:] - point[edge[index,0],:]
+            v = node[edge[index,1],:] - node[edge[index,0],:]
         return v 
 
     def add_plot(self, plot,
-            pointcolor='w', edgecolor='k',
+            nodecolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
             linewidths=1, markersize=2,  
             showaxis=False, showcolorbar=False, cmap='rainbow'):
@@ -164,19 +164,19 @@ class Mesh2d():
         else:
             axes = plot
         return show_mesh_2d(axes, self,
-                pointcolor=pointcolor, edgecolor=edgecolor,
+                nodecolor=nodecolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
                 showaxis=showaxis, showcolorbar=showcolorbar, cmap=cmap)
 
-    def find_point(self, axes, point=None,
+    def find_node(self, axes, node=None,
             index=None, showindex=False,
             color='r', markersize=200, 
             fontsize=24, fontcolor='k'):
 
-        if point is None:
-            point = self.point
-        find_point(axes, point, 
+        if node is None:
+            node = self.node
+        find_node(axes, node, 
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
@@ -203,7 +203,7 @@ class Mesh2d():
                 fontsize=fontsize, fontcolor=fontcolor)
 
     def print(self):
-        print("Point:\n", self.point)
+        print("Point:\n", self.node)
         print("Cell:\n", self.ds.cell)
         print("Edge and Edge2cell:\n", np.concatenate((self.ds.edge, self.ds.edge2cell), axis=1))
         print("Cell2edge:\n", self.ds.cell_to_edge())
@@ -270,7 +270,7 @@ class Mesh2dDataStructure():
         edge2cell = self.edge2cell
         self.edge = cell[edge2cell[:, [0]], localEdge[edge2cell[:, 2]]]
 
-    def cell_to_point(self):
+    def cell_to_node(self):
         """ 
         """
         N = self.N
@@ -281,8 +281,8 @@ class Mesh2dDataStructure():
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2point = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
-        return cell2point
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        return cell2node
 
     def cell_to_edge(self, sparse=False):
         """ The neighbor information of cell to edge
@@ -366,7 +366,7 @@ class Mesh2dDataStructure():
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    def edge_to_point(self, sparse=False):
+    def edge_to_node(self, sparse=False):
         N = self.N
         NE = self.NE
 
@@ -378,12 +378,12 @@ class Mesh2dDataStructure():
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
             val = np.ones(2*NE, dtype=np.bool)
-            edge2point = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
-            return edge2point
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            return edge2node
 
     def edge_to_edge(self, sparse=False):
-        edge2point = self.edge_to_point()
-        return edge2point*edge2point.tranpose()
+        edge2node = self.edge_to_node()
+        return edge2node*edge2node.tranpose()
 
     def edge_to_cell(self, sparse=False):
         if sparse==False:
@@ -397,8 +397,8 @@ class Mesh2dDataStructure():
             face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
             return face2cell 
 
-    def point_to_point(self, return_array=False):
-        """ The neighbor information of points
+    def node_to_node(self, return_array=False):
+        """ The neighbor information of nodes
         """
         N = self.N
         NE = self.NE
@@ -406,24 +406,24 @@ class Mesh2dDataStructure():
         I = edge.flatten()
         J = edge[:,[1,0]].flatten()
         val = np.ones((2*NE,), dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
         if return_array == False:
-            return point2point 
+            return node2node 
         else:
-            nn = point2point.sum(axis=1).reshape(-1)
-            _, adj = point2point.nonzero()
+            nn = node2node.sum(axis=1).reshape(-1)
+            _, adj = node2node.nonzero()
             adjLocation = np.zeros(N+1, dtype=np.int32)
             adjLocation[1:] = np.cumsum(nn)
             return adj.astype(np.int32), adjLocation
 
-    def point_to_point_in_edge(self, N, edge):
+    def node_to_node_in_edge(self, N, edge):
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
         val = np.ones(2*edge.shape[0], dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
-        return point2point
+        node2node = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        return node2node
 
-    def point_to_edge(self):
+    def node_to_edge(self):
         N = self.N
         NE = self.NE
         
@@ -431,10 +431,10 @@ class Mesh2dDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        point2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
-        return point2edge
+        node2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
+        return node2edge
 
-    def point_to_cell(self, localidx=False):
+    def node_to_cell(self, localidx=False):
         """
         """
         N = self.N
@@ -448,14 +448,14 @@ class Mesh2dDataStructure():
 
         if localidx == True:
             val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
-        return point2cell
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+        return node2cell
 
 
-    def boundary_point_flag(self):
+    def boundary_node_flag(self):
         N = self.N
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
@@ -479,8 +479,8 @@ class Mesh2dDataStructure():
         isBdCell[edge2cell[isBdEdge,0]] = True
         return isBdCell 
 
-    def boundary_point_index(self):
-        isBdPoint = self.boundary_point_flag()
+    def boundary_node_index(self):
+        isBdPoint = self.boundary_node_flag()
         idx, = np.nonzero(isBdPoint)
         return idx 
 

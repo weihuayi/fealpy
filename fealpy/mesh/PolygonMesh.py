@@ -9,8 +9,8 @@ class PolygonMesh(Mesh2d):
 
     """ 2d Polygon Mesh data structure from vtk data structure
     """
-    def __init__(self, point, cell, cellLocation=None):
-        self.point = point
+    def __init__(self, node, cell, cellLocation=None):
+        self.node = node
         if cellLocation is None: 
             if len(cell.shape)  == 2:
                 NC = cell.shape[0]
@@ -20,7 +20,7 @@ class PolygonMesh(Mesh2d):
             else:
                 raise(ValueError("Miss `cellLocation` array!"))
 
-        self.ds = PolygonMeshDataStructure(point.shape[0], cell, cellLocation)
+        self.ds = PolygonMeshDataStructure(node.shape[0], cell, cellLocation)
         self.meshType = 'polygon'
 
     def integrator(self, k):
@@ -44,35 +44,35 @@ class PolygonMesh(Mesh2d):
 
     @classmethod
     def from_mesh(cls, mesh):
-        point = mesh.point
+        node = mesh.node
         cell = mesh.ds.cell
         NC = mesh.number_of_cells()
         NV = cell.shape[1]
         cellLocation = np.arange(0, (NC+1)*NV, NV)
-        return cls(point, cell.reshape(-1), cellLocation)
+        return cls(node, cell.reshape(-1), cellLocation)
 
     @classmethod
     def from_quadtree(cls, quadtree):
-        point, cell, cellLocation = quadtree.to_pmesh()
-        return cls(point, cell, cellLocation)
+        node, cell, cellLocation = quadtree.to_pmesh()
+        return cls(node, cell, cellLocation)
 
     def barycenter(self, entity='cell', index=None):
-        point = self.point
+        node = self.node
         dim = self.geom_dimension()
 
         if entity is 'cell':
-            cell2point = self.ds.cell_to_point()
+            cell2node = self.ds.cell_to_node()
             NV = self.number_of_vertices_of_cells().reshape(-1,1)
-            bc = cell2point*point/NV 
+            bc = cell2node*node/NV 
         elif entity is 'edge':
             edge = self.ds.edge
-            bc = np.sum(point[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
-        elif entity is 'point':
-            bc = point
+            bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
+        elif entity is 'node':
+            bc = node
         return bc
 
     def angle(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         cellLocation = self.ds.cellLocation
 
@@ -83,15 +83,15 @@ class PolygonMesh(Mesh2d):
         idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
         idx2[1:] = cell[0:-1]
         idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
-        a = point[idx1] - point[cell]
-        b = point[idx2] - point[cell]
+        a = node[idx1] - node[cell]
+        b = node[idx2] - node[cell]
         la = np.sum(a**2, axis=1)
         lb = np.sum(b**2, axis=1)
         x = np.arccos(np.sum(a*b, axis=1)/np.sqrt(la*lb))
         return np.degrees(x)
 
     def node_normal(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         cellLocation = self.ds.cellLocation
 
@@ -104,11 +104,11 @@ class PolygonMesh(Mesh2d):
         idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
 
         w = np.array([(0,-1),(1,0)])
-        d = point[idx1] - point[idx2] 
+        d = node[idx1] - node[idx2] 
         return 0.5*d@w 
 
     def print(self):
-        print("Point:\n", self.point)
+        print("Node:\n", self.node)
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Edge2cell:\n", self.ds.edge2cell)
@@ -186,7 +186,7 @@ class PolygonMeshDataStructure():
         self.edge2cell[:, 2] = localIdx[i0] 
         self.edge2cell[:, 3] = localIdx[i1] 
 
-    def cell_to_point(self):
+    def cell_to_node(self):
         N = self.N
         NC = self.NC
         NE = self.NE
@@ -198,8 +198,8 @@ class PolygonMeshDataStructure():
         J = cell
 
         val = np.ones(len(cell), dtype=np.bool)
-        cell2point = csr_matrix((val, (I, J)), shape=(NC, N), dtype=np.bool)
-        return cell2point
+        cell2node = csr_matrix((val, (I, J)), shape=(NC, N), dtype=np.bool)
+        return cell2node
 
     def cell_to_edge(self, sparse=True):
         NE = self.NE
@@ -242,7 +242,7 @@ class PolygonMeshDataStructure():
                 shape=(NC,NC), dtype=np.bool)
         return cell2cell.tocsr()
 
-    def edge_to_point(self, sparse=False):
+    def edge_to_node(self, sparse=False):
         N = self.N
         NE = self.NE
 
@@ -251,13 +251,13 @@ class PolygonMeshDataStructure():
             return edge
         else:
             val = np.ones((NE,), dtype=np.bool)
-            edge2point = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, N), dtype=np.bool)
-            edge2point+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, N), dtype=np.bool)
-            return edge2point.tocsr()
+            edge2node = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, N), dtype=np.bool)
+            edge2node+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, N), dtype=np.bool)
+            return edge2node.tocsr()
 
     def edge_to_edge(self):
-        edge2point = self.edge_to_point()
-        return edge2point*edge2point.tranpose()
+        edge2node = self.edge_to_node()
+        return edge2node*edge2node.tranpose()
 
     def edge_to_cell(self, sparse=False):
         NE = self.NE
@@ -271,30 +271,30 @@ class PolygonMeshDataStructure():
             edge2cell+= coo_matrix((val, (range(NE), edge2cell[:,1])), shape=(NE, NC), dtype=np.bool)
             return edge2cell.tocsr()
 
-    def point_to_point(self):
+    def node_to_node(self):
         N = self.N
         edge = self.edge
-        return point_to_point_in_edge(N, edge)
+        return node_to_node_in_edge(N, edge)
 
-    def point_to_point_in_edge(self, N, edge):
+    def node_to_node_in_edge(self, N, edge):
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
         val = np.ones(2*edge.shape[0], dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
-        return point2point
+        node2node = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        return node2node
 
-    def point_to_edge(self):
+    def node_to_edge(self):
         N = self.N
         NE = self.NE
 
         edge = self.edge
 
         val = np.ones((NE,), dtype=np.bool)
-        point2edge = coo_matrix((val, (edge[:,0], range(NE))), shape=(NE, N), dtype=np.bool)
-        point2edge+= coo_matrix((val, (edge[:,1], range(NE))), shape=(NE, N), dtype=np.bool)
-        return point2edge.tocsr()
+        node2edge = coo_matrix((val, (edge[:,0], range(NE))), shape=(NE, N), dtype=np.bool)
+        node2edge+= coo_matrix((val, (edge[:,1], range(NE))), shape=(NE, N), dtype=np.bool)
+        return node2edge.tocsr()
 
-    def point_to_cell(self):
+    def node_to_cell(self):
         N = self.N
         NC = self.NC
         NE = self.NE
@@ -304,16 +304,16 @@ class PolygonMeshDataStructure():
         I = cell
         J = np.repeat(range(NC), NV)
         val = np.ones(cell.shape[0], dtype=np.bool)
-        point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
-        return point2cell
+        node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+        return node2cell
 
-    def boundary_point_flag(self):
+    def boundary_node_flag(self):
         N = self.N
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros(N, dtype=np.bool)
-        isBdPoint[edge[isBdEdge,:]] = True
-        return isBdPoint
+        isBdNode = np.zeros(N, dtype=np.bool)
+        isBdNode[edge[isBdEdge,:]] = True
+        return isBdNode
 
     def boundary_edge_flag(self):
         NE = self.NE
@@ -333,9 +333,9 @@ class PolygonMeshDataStructure():
         isBdCell[edge2cell[isBdEdge,0]] = True
         return isBdCell 
 
-    def boundary_point_index(self):
-        isBdPoint = self.boundary_point_flag()
-        idx, = np.nonzero(isBdPoint)
+    def boundary_node_index(self):
+        isBdNode = self.boundary_node_flag()
+        idx, = np.nonzero(isBdNode)
         return idx 
 
     def boundary_edge_index(self):

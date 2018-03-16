@@ -13,34 +13,34 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
         super(TriangleMeshDataStructure, self).__init__(N, cell) 
 
 class TriangleMesh(Mesh2d):
-    def __init__(self, point, cell, dtype=np.float):
+    def __init__(self, node, cell, dtype=np.float):
 
-        self.point = point
-        N = point.shape[0]
+        self.node = node
+        N = node.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
-        self.meshType = 'tri'
+        self.meshtype = 'tri'
         self.dtype = dtype
 
-        self.cellData = {}
-        self.pointData = {}
-        self.edgeData = {}
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
 
     def integrator(self, k):
         return TriangleQuadrature(k)
 
     def circumcenter(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         dim = self.geom_dimension()
 
-        v0 = point[cell[:,2],:] - point[cell[:,1],:]
-        v1 = point[cell[:,0],:] - point[cell[:,2],:]
-        v2 = point[cell[:,1],:] - point[cell[:,0],:]
+        v0 = node[cell[:,2],:] - node[cell[:,1],:]
+        v1 = node[cell[:,0],:] - node[cell[:,2],:]
+        v2 = node[cell[:,1],:] - node[cell[:,0],:]
         nv = np.cross(v2, -v1)
         length = np.sqrt(np.square(nv).sum(axis=1))
         area = length/2.0 
         if dim == 2:
-            x2 = np.sum(point**2, axis=1, keepdims=True)
+            x2 = np.sum(node**2, axis=1, keepdims=True)
             w0 = x2[cell[:,2]] + x2[cell[:,1]]
             w1 = x2[cell[:,0]] + x2[cell[:,2]]
             w2 = x2[cell[:,1]] + x2[cell[:,0]]
@@ -49,25 +49,25 @@ class TriangleMesh(Mesh2d):
             fe1 = w1*v1@w 
             fe1 = w2*v2@w 
             c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
-            R = np.sqrt(np.sum((c-point[cell[:,0], :])**2,axis=1))
+            R = np.sqrt(np.sum((c-node[cell[:,0], :])**2,axis=1))
         elif dim == 3:
             n = nv/length.reshape((-1, 1))
             l02 = np.sum(v1**2, axis=1, keepdims=True)
             l01 = np.sum(v2**2, axis=1, keepdims=True)
             d = 0.5*(l02*np.cross(n, v2) + l01*np.cross(-v1, n))/length.reshape(-1, 1)
-            c = point[cell[:, 0]] + d
+            c = node[cell[:, 0]] + d
             R = np.sqrt(np.sum(d**2, axis=1))
         return c, R
 
     def angle(self):
         NC = self.number_of_cells()
         cell = self.ds.cell
-        point = self.point
+        node = self.node
         localEdge = self.ds.local_edge()
         angle = np.zeros((NC, 3), dtype=np.float)
         for i,(j,k) in zip(range(3),localEdge):
-            v0 = point[cell[:,j],:] - point[cell[:,i],:]
-            v1 = point[cell[:,k],:] - point[cell[:,i],:]
+            v0 = node[cell[:,j],:] - node[cell[:,i],:]
+            v1 = node[cell[:,k],:] - node[cell[:,i],:]
             angle[:,i] = np.arccos(np.sum(v0*v1,axis=1)
                     /np.sqrt(np.sum(v0**2,axis=1) * np.sum(v1**2,axis=1)))
         return angle
@@ -110,34 +110,34 @@ class TriangleMesh(Mesh2d):
                 cell[edge2cell[isNonDelaunayEdge, 1], 1] = p0
                 cell[edge2cell[isNonDelaunayEdge, 1], 2] = p2
 
-                N = self.number_of_points()
+                N = self.number_of_nodes()
                 self.ds.reinit(N, cell)
 
     def uniform_refine(self, n=1, surface=None):
         for i in range(n):
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NC = self.number_of_cells()
             NE = self.number_of_edges()
-            point = self.point
+            node = self.node
             edge = self.ds.edge
             cell = self.ds.cell
             cell2edge = self.ds.cell_to_edge()
-            edge2newPoint = np.arange(N, N+NE)
-            newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
+            edge2newNode = np.arange(N, N+NE)
+            newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
             if surface is not None:
-                newPoint, _ = surface.project(newPoint)
-            self.point = np.concatenate((point, newPoint), axis=0)
-            p = np.r_['-1', cell, edge2newPoint[cell2edge]] 
+                newNode, _ = surface.project(newNode)
+            self.node = np.concatenate((node, newNode), axis=0)
+            p = np.r_['-1', cell, edge2newNode[cell2edge]] 
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             self.ds.reinit(N, cell)
 
     def uniform_bisect(self, n=1):
         for i in range(n):
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NC = self.number_of_cells()
             NE = self.number_of_edges()
-            point = self.point
+            node = self.node
             edge = self.ds.edge
             cell = self.ds.cell
             cell2edge = self.ds.cell_to_edge()
@@ -145,14 +145,14 @@ class TriangleMesh(Mesh2d):
             cell2edge0 = np.zeros((2*NC,),dtype=np.int)
             cell2edge0[0:NC] = cell2edge[:,0]
 
-            edge2newPoint = np.arange(N, N+NE)
-            newPoint = (point[edge[:,0],:]+point[edge[:,1],:])/2.0
-            self.point = np.concatenate((point, newPoint), axis=0)
+            edge2newNode = np.arange(N, N+NE)
+            newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
+            self.node = np.concatenate((node, newNode), axis=0)
             for k in range(2):
                 p0 = cell[0:NC,0]
                 p1 = cell[0:NC,1]
                 p2 = cell[0:NC,2]
-                p3 = edge2newPoint[cell2edge0[0:NC]]
+                p3 = edge2newNode[cell2edge0[0:NC]]
                 cell = np.zeros((2*NC,3),dtype=np.int)
                 cell[0:NC,0] = p3 
                 cell[0:NC,1] = p0 
@@ -165,12 +165,12 @@ class TriangleMesh(Mesh2d):
                     cell2edge0[NC:] = cell2edge[:,1]
                 NC = 2*NC
 
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             self.ds.reinit(N, cell)
 
     def bisect(self, markedCell):
 
-        N = self.number_of_points()
+        N = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
@@ -185,16 +185,16 @@ class TriangleMesh(Mesh2d):
             refineNeighbor = cell2cell[markedCell, 0]
             markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
 
-        edge2newPoint = np.zeros((NE,),dtype=np.int)
-        edge2newPoint[isCutEdge] = np.arange(N, N+isCutEdge.sum())
+        edge2newNode = np.zeros((NE,),dtype=np.int)
+        edge2newNode[isCutEdge] = np.arange(N, N+isCutEdge.sum())
 
-        point = self.point
-        newPoint =0.5*(point[edge[isCutEdge,0],:] + point[edge[isCutEdge,1],:]) 
-        self.point = np.concatenate((point, newPoint), axis=0)
+        node = self.node
+        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
+        self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
         for k in range(2):
-            idx, = np.nonzero(edge2newPoint[cell2edge0]>0)
+            idx, = np.nonzero(edge2newNode[cell2edge0]>0)
             nc = len(idx)
             if nc == 0:
                 break
@@ -203,7 +203,7 @@ class TriangleMesh(Mesh2d):
             p0 = cell[idx,0]
             p1 = cell[idx,1]
             p2 = cell[idx,2]
-            p3 = edge2newPoint[cell2edge0[idx]]
+            p3 = edge2newNode[cell2edge0[idx]]
             cell = np.concatenate((cell, np.zeros((nc,3),dtype=np.int)), axis=0)
             cell[L,0] = p3 
             cell[L,1] = p0 
@@ -219,16 +219,16 @@ class TriangleMesh(Mesh2d):
             NC = NC+nc
 
         # reconstruct the  data structure
-        N = self.number_of_points()
+        N = self.number_of_nodes()
         self.ds.reinit(N, cell)
 
     def grad_lambda(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()
-        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
-        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
-        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
         dim = self.geom_dimension()
         nv = np.cross(v2, -v1)
         Dlambda = np.zeros((NC, 3, dim), dtype=self.dtype)
@@ -254,21 +254,21 @@ class TriangleMesh(Mesh2d):
             `J` is the transpose o  jacobi matrix of each cell. 
             The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
         """
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         if cellidx is None:
-            J = point[cell[:, [1, 2]]] - point[cell[:, [0]]]
+            J = node[cell[:, [1, 2]]] - node[cell[:, [0]]]
         else:
-            J = point[cell[cellidx, [1, 2]]] - point[cell[cellidx, [0]]]
+            J = node[cell[cellidx, [1, 2]]] - node[cell[cellidx, [0]]]
         return J
 
     def rot_lambda(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()
-        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
-        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
-        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
         dim = self.geom_dimension()
         nv = np.cross(v2, -v1)
         Rlambda = np.zeros((NC, 3, dim), dtype=self.dtype)
@@ -285,12 +285,12 @@ class TriangleMesh(Mesh2d):
         return Rlambda
 
     def area(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
-        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
-        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
-        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
-        dim = self.point.shape[1] 
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        dim = self.node.shape[1] 
         nv = np.cross(v2, -v1)
         if dim == 2:
             a = nv/2.0
@@ -299,12 +299,12 @@ class TriangleMesh(Mesh2d):
         return a
 
     def cell_area(self):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
-        v0 = point[cell[:, 2], :] - point[cell[:, 1], :]
-        v1 = point[cell[:, 0], :] - point[cell[:, 2], :]
-        v2 = point[cell[:, 1], :] - point[cell[:, 0], :]
-        dim = self.point.shape[1] 
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        dim = self.node.shape[1] 
         nv = np.cross(v2, -v1)
         if dim == 2:
             a = nv/2.0
@@ -313,39 +313,39 @@ class TriangleMesh(Mesh2d):
         return a
 
     def bc_to_point(self, bc):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
-        p = np.einsum('...j, ijk->...ik', bc, point[cell])
+        p = np.einsum('...j, ijk->...ik', bc, node[cell])
         return p 
 
 
 
-class TriangleMeshWithInfinityPoint:
+class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):
         edge = mesh.ds.edge
         bdEdgeIdx = mesh.ds.boundary_edge_index()
         NBE = len(bdEdgeIdx)
         NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
 
         newCell = np.zeros((NC + NBE, 3), dtype=np.int)
         newCell[:NC, :] = mesh.ds.cell
         newCell[NC:, 0] = N 
         newCell[NC:, 1:3] = edge[bdEdgeIdx, 1::-1]
 
-        point = mesh.point
-        self.point = np.append(point, [[np.nan, np.nan]], axis=0)
+        node = mesh.node
+        self.node = np.append(node, [[np.nan, np.nan]], axis=0)
         self.ds = TriangleMeshDataStructure(N+1, newCell)
         self.center = np.append(mesh.barycenter(),
-                0.5*(point[edge[bdEdgeIdx, 0], :] + point[edge[bdEdgeIdx, 1], :]), axis=0)
+                0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         self.meshtype = 'tri'
         self.dtype = mesh.dtype
 
-    def number_of_points(self):
-        return self.point.shape[0] 
+    def number_of_nodes(self):
+        return self.node.shape[0] 
 
     def number_of_nodes(self):
-        return self.point.shape[0]
+        return self.node.shape[0]
 
     def number_of_edges(self):
         return self.ds.NE
@@ -357,10 +357,10 @@ class TriangleMeshWithInfinityPoint:
         return self.ds.NC
 
     def geom_dimension(self):
-        return self.point.shape[1]
+        return self.node.shape[1]
 
     def is_infinity_cell(self):
-        N = self.number_of_points()
+        N = self.number_of_nodes()
         cell = self.ds.cell
         return cell[:, 0] == N-1
 
@@ -372,27 +372,27 @@ class TriangleMeshWithInfinityPoint:
         isBdEdge[cell2edge[isInfCell, 0]] = True
         return isBdEdge
 
-    def is_boundary_point(self):
-        N = self.number_of_points()
+    def is_boundary_node(self):
+        N = self.number_of_nodes()
         edge = self.ds.edge
         isBdEdge = self.is_boundary_edge()
-        isBdPoint = np.zeros(N, dtype=np.bool)
-        isBdPoint[edge[isBdEdge, :]] = True
-        return isBdPoint
+        isBdNode = np.zeros(N, dtype=np.bool)
+        isBdNode[edge[isBdEdge, :]] = True
+        return isBdNode
 
     def to_polygonmesh(self):
-        isBdPoint = self.is_boundary_point()
-        NBP = isBdPoint.sum()
+        isBdNode = self.is_boundary_node()
+        NB = isBdNode.sum()
 
-        pointIdxMap = np.zeros(isBdPoint.shape, dtype=np.int)
-        pointIdxMap[isBdPoint] = self.center.shape[0] + np.arange(NBP)
+        nodeIdxMap = np.zeros(isBdNode.shape, dtype=np.int)
+        nodeIdxMap[isBdNode] = self.center.shape[0] + np.arange(NBP)
 
-        ppoint = np.concatenate((self.center, self.point[isBdPoint]), axis=0)
-        PN = ppoint.shape[0]
+        pnode = np.concatenate((self.center, self.node[isBdNode]), axis=0)
+        PN = pnode.shape[0]
 
-        point2cell = self.ds.point_to_cell(localidx=True)
-        NV = np.asarray((point2cell > 0).sum(axis=1)).reshape(-1)
-        NV[isBdPoint] += 1
+        node2cell = self.ds.node_to_cell(localidx=True)
+        NV = np.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
+        NV[isBdNode] += 1
         NV = NV[:-1]
         
         PNC = len(NV)
@@ -411,8 +411,8 @@ class TriangleMeshWithInfinityPoint:
         pcell[pcellLocation[:-1]] = currentCellIdx 
 
         currentIdx = pcellLocation[:-1]
-        N = self.number_of_points() - 1
-        currentPointIdx = np.arange(N)
+        N = self.number_of_nodes() - 1
+        currentNodeIdx = np.arange(N)
         endIdx = pcellLocation[1:]
         cell2cell = self.ds.cell_to_cell()
         isInfCell = self.is_infinity_cell()
@@ -420,21 +420,21 @@ class TriangleMeshWithInfinityPoint:
         while True:
             isNotOK = (currentIdx + 1) < endIdx
             currentIdx = currentIdx[isNotOK]
-            currentPointIdx = currentPointIdx[isNotOK]
+            currentNodeIdx = currentNodeIdx[isNotOK]
             currentCellIdx = pcell[currentIdx]
             endIdx = endIdx[isNotOK]
             if len(currentIdx) == 0:
                 break
-            localIdx = np.asarray(point2cell[currentPointIdx, currentCellIdx]) - 1
+            localIdx = np.asarray(node2cell[currentNodeIdx, currentCellIdx]) - 1
             cellIdx = np.asarray(cell2cell[currentCellIdx, pnext[localIdx]]).reshape(-1)
             isBdCase = isInfCell[currentCellIdx] & isInfCell[cellIdx]
             if np.any(isBdCase):
-                pcell[currentIdx[isBdCase] + 1] = pointIdxMap[currentPointIdx[isBdCase]]
+                pcell[currentIdx[isBdCase] + 1] = nodeIdxMap[currentNodeIdx[isBdCase]]
                 currentIdx[isBdCase] += 1
             pcell[currentIdx + 1] = cellIdx
             currentIdx += 1
 
-        return ppoint, pcell, pcellLocation
+        return pnode, pcell, pcellLocation
 
     
 

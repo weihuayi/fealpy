@@ -44,7 +44,7 @@ class PoissonFEMModel(object):
         V = self.V
         mesh = V.mesh
 
-        p2c = mesh.ds.point_to_cell()
+        p2c = mesh.ds.node_to_cell()
         inva = 1/mesh.area()
         asum = p2c@inva
 
@@ -73,8 +73,8 @@ class PoissonFEMModel(object):
 
     def solve(self):
         bc = DirichletBC(self.V, self.model.dirichlet)
-        #solve(self, self.uh, dirichlet=bc, solver='direct')
-        linear_solver(self, self.uh, dirichlet=bc)
+        solve(self, self.uh, dirichlet=bc, solver='direct')
+        #linear_solver(self, self.uh, dirichlet=bc)
 
 
     def l2_error(self):

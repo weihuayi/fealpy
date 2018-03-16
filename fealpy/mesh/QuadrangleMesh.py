@@ -10,27 +10,27 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
         super(QuadrangleMeshDataStructure, self).__init__(N, cell)
 
 class QuadrangleMesh(Mesh2d):
-    def __init__(self, point, cell, dtype=np.float):
-        self.point = point
-        N = point.shape[0]
+    def __init__(self, node, cell, dtype=np.float):
+        self.node = node
+        N = node.shape[0]
         self.ds = QuadrangleMeshDataStructure(N, cell)
 
-        self.meshType = 'quad'
+        self.meshtype = 'quad'
         self.dtype = dtype
 
-        self.cellData = {}
-        self.pointData = {}
-        self.edgeData = {}
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
 
     def area(self):
         NC = self.number_of_cells()
-        point = self.point
+        node = self.node
         edge = self.ds.edge
         edge2cell = self.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         w = np.array([[0,-1],[1, 0]], dtype=np.int)
-        v= (point[edge[:,1], :] - point[edge[:,0], :])@w
-        val = np.sum(v*point[edge[:,0], :], axis=1)
+        v= (node[edge[:,1], :] - node[edge[:,0], :])@w
+        val = np.sum(v*node[edge[:,0], :], axis=1)
         a = np.bincount(edge2cell[:,0], weights=val, minlength=NC)
         a+= np.bincount(edge2cell[isInEdge,1], weights=-val[isInEdge], minlength=NC)
         a /=2
@@ -38,7 +38,7 @@ class QuadrangleMesh(Mesh2d):
 
     def uniform_refine(self, n=1):
         for i in range(n):
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
@@ -60,7 +60,7 @@ class QuadrangleMesh(Mesh2d):
             cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
             cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
 
-            self.point = np.r_['0', self.point, edgeCenter, cellCenter]
+            self.node = np.r_['0', self.node, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
 
         return 
@@ -73,8 +73,8 @@ class QuadrangleMesh(Mesh2d):
         iprev = [3, 0, 1, 2]
         for i,j in localEdge:
             k = iprev[i] 
-            v0 = point[cell[:,j],:] - point[cell[:,i],:]
-            v1 = point[cell[:,k],:] - point[cell[:,i],:]
+            v0 = node[cell[:,j],:] - node[cell[:,i],:]
+            v1 = node[cell[:,k],:] - node[cell[:,i],:]
             angle[:,i] = np.arccos(np.sum(v0*v1,axis=1)/np.sqrt(np.sum(v0**2,axis=1)*np.sum(v1**2,axis=1)))
         return angle
 
@@ -86,8 +86,8 @@ class QuadrangleMesh(Mesh2d):
         iprev = [3, 0, 1, 2]
         for i,j in localEdge:
             k = iprev[i]
-            v0 = point[cell[:,j],:] - point[cell[:,i],:]
-            v1 = point[cell[:,k],:] - point[cell[:,i],:]
+            v0 = node[cell[:,j],:] - node[cell[:,i],:]
+            v1 = node[cell[:,k],:] - node[cell[:,i],:]
             jacobi[:,i] = v0[:,0]*v1[:,1] - v0[:,1]*v1[:,0]
         return jacobi
 
@@ -96,7 +96,7 @@ class QuadrangleMesh(Mesh2d):
         return jacobi.sum(axis=1)/4
 
     def bc_to_point(self, bc):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
-        p = np.einsum('...j, ijk->...ik', bc, point[cell])
+        p = np.einsum('...j, ijk->...ik', bc, node[cell])
         return p 

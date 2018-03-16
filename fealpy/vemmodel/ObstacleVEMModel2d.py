@@ -126,7 +126,7 @@ class ObstacleVEMModel2d():
 
         S0 = vemspace.smspace.function() 
         S1 = vemspace.smspace.function()
-        p2c = mesh.ds.point_to_cell()
+        p2c = mesh.ds.node_to_cell()
         try: 
             isSubDomain = self.model.subdomain(barycenter)
             for isFlag in isSubDomain:
@@ -171,9 +171,9 @@ class ObstacleVEMModel2d():
         except  AttributeError:
             k = np.ones(NC) 
 
-        point = mesh.point
-        gx = S0.value(point[cell], idx) - np.repeat(grad[:, 0], NV)
-        gy = S1.value(point[cell], idx) - np.repeat(grad[:, 1], NV)
+        node = mesh.node
+        gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
+        gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
         eta = np.sqrt(k*np.bincount(idx, weights=gx**2+gy**2)/NV*area)
         return eta 
 

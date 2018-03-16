@@ -6,9 +6,9 @@ from .Mesh3d import Mesh3d, Mesh3dDataStructure
 
 class HexahedronMesh(Mesh3d):
 
-    def __init__(self, point, cell, dtype=np.float):
-        self.point = point
-        N = point.shape[0]
+    def __init__(self, node, cell, dtype=np.float):
+        self.node = node
+        N = node.shape[0]
         self.ds = HexahedronMeshDataStructure(N, cell)
 
         self.meshtype = 'hex'
@@ -27,7 +27,7 @@ class HexahedronMesh(Mesh3d):
         pass
 
     def print(self):
-        print("Point:\n", self.point)
+        print("Point:\n", self.node)
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Face:\n", self.ds.face)

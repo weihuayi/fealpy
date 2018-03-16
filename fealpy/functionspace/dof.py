@@ -25,7 +25,7 @@ class CPLFEMDof1d():
         if p == 1:
             return cell
         else:
-            N = mesh.number_of_points()
+            N = mesh.number_of_nodes()
             NC = mesh.number_of_cells()
             ldof = self.number_of_local_dofs()
             cell2dof = np.zeros((NC, ldof), dtype=np.int)
@@ -39,7 +39,7 @@ class CPLFEMDof1d():
     def number_of_global_dofs(self):
         p = self.p
         mesh = self.mesh
-        gdof = mesh.number_of_points()
+        gdof = mesh.number_of_nodes()
         if p > 1:
             NC = mesh.number_of_cells()
             gdof += NC*(p-1)
@@ -49,20 +49,20 @@ class CPLFEMDof1d():
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         if p == 1:
-            return point
+            return node
         else:
-            N = point.shape[0]
+            N = node.shape[0]
             gdof = self.number_of_global_dofs()
             ipoint = np.zeros(gdof, dtype=np.float)
-            ipoint[:N] = point
+            ipoint[:N] = node
             NC = mesh.number_of_cells()
             edge = mesh.ds.edge
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NC] = np.einsum('ij, kj->ki', w, point[cell]).reshape(-1)
+            ipoint[N:N+(p-1)*NC] = np.einsum('ij, kj->ki', w, node[cell]).reshape(-1)
             return ipoint
 
 class CPLFEMDof2d():
@@ -88,11 +88,6 @@ class CPLFEMDof2d():
         isNodeDof = np.sum(self.multiIndex == p, axis=-1) > 0
         return isNodeDof
 
-    def is_on_point_local_dof(self):
-        p = self.p
-        isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
-        return isPointDof
-
     def is_on_edge_local_dof(self):
         return self.multiIndex == 0 
 
@@ -109,7 +104,7 @@ class CPLFEMDof2d():
         mesh = self.mesh
 
         NE= mesh.number_of_edges()
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int) 
@@ -123,7 +118,7 @@ class CPLFEMDof2d():
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
@@ -166,35 +161,35 @@ class CPLFEMDof2d():
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         if p == 1:
-            return point
+            return node
         if p > 1:
-            N = point.shape[0]
-            dim = point.shape[-1]
+            N = node.shape[0]
+            dim = node.shape[-1]
             gdof = self.number_of_global_dofs()
             ipoint = np.zeros((gdof, dim), dtype=np.float)
-            ipoint[:N, :] = point
+            ipoint[:N, :] = node
             NE = mesh.number_of_edges()
             edge = mesh.ds.edge
             w = np.zeros((p-1,2), dtype=np.float)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
             ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    point[edge,:]).reshape(-1, dim)
+                    node[edge,:]).reshape(-1, dim)
         if p > 2:
             isEdgeDof = self.is_on_edge_local_dof()
             isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
             w = self.multiIndex[isInCellDof, :]/p
             ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    point[cell,:]).reshape(-1, dim)
+                    node[cell,:]).reshape(-1, dim)
 
         return ipoint  
 
     def number_of_global_dofs(self):
         p = self.p
-        N = self.mesh.number_of_points()
+        N = self.mesh.number_of_nodes()
         gdof = N
         if p > 1:
             NE = self.mesh.number_of_edges()
@@ -246,13 +241,8 @@ class CPLFEMDof3d():
 
     def is_on_node_local_dof(self):
         p = self.p
-        isNodeDof = np.sum(self.multiIndex == p, axis=-1) > 0
+        isNodeDof = np.sum(self.multiIndex == p, axis=-1) == 1
         return isNodeDof
-
-    def is_on_point_local_dof(self):
-        p = self.p
-        isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
-        return isPointDof
 
     def is_on_edge_local_dof(self):
         p =self.p
@@ -273,7 +263,7 @@ class CPLFEMDof3d():
         p = self.p
         mesh = self.mesh
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
 
         base = N
@@ -294,7 +284,7 @@ class CPLFEMDof3d():
 
         mesh = self.mesh
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NF = mesh.number_of_faces()
 
@@ -340,7 +330,7 @@ class CPLFEMDof3d():
 
         mesh = self.mesh
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NF = mesh.number_of_faces()
         NC = mesh.number_of_cells()
@@ -382,7 +372,7 @@ class CPLFEMDof3d():
     def number_of_global_dofs(self):
         p = self.p
         mesh = self.mesh
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         gdof = N
 
         if p > 1:
@@ -413,26 +403,26 @@ class CPLFEMDof3d():
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         if p == 1:
-            return point
+            return node
 
-        N = point.shape[0]
-        dim = point.shape[1]
+        N = node.shape[0]
+        dim = node.shape[1]
         NC = mesh.number_of_cells() 
 
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, dim), dtype=np.float)
-        ipoint[:N, :] = point
+        ipoint[:N, :] = node
         if p > 1:
             NE = mesh.number_of_edges()
             edge = mesh.ds.edge
             w = np.zeros((p-1,2), dtype=np.float)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, point[edge,:]).reshape(-1, dim)
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, dim)
             
         if p > 2:
             NF = mesh.number_of_faces()
@@ -441,13 +431,14 @@ class CPLFEMDof3d():
             isEdgeDof = (self.faceMultiIndex == 0)
             isInFaceDof = ~(isEdgeDof[:, 0] | isEdgeDof[:, 1] | isEdgeDof[:, 2])
             w = self.faceMultiIndex[isInFaceDof, :]/p
-            ipoint[N+(p-1)*NE:N+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, point[face,:]).reshape(-1, dim)
+            ipoint[N+(p-1)*NE:N+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, node[face,:]).reshape(-1, dim)
 
         if p > 3:
             isFaceDof = self.is_on_face_local_dof()
             isInCellDof = ~(isFaceDof[:,0] | isFaceDof[:,1] | isFaceDof[:,2] | isFaceDof[:, 3])
             w = self.multiIndex[isInCellDof, :]/p
-            ipoint[N+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w, point[cell,:]).reshape(-1, dim)
+            ipoint[N+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell,:]).reshape(-1, dim)
         return ipoint  
 
 class DPLFEMDof():
@@ -485,19 +476,19 @@ class DPLFEMDof():
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         if p == 1:
-            return point
+            return node
 
-        N = point.shape[0]
-        dim = point.shape[1]
+        N = node.shape[0]
+        dim = node.shape[1]
         NC = mesh.number_of_cells() 
 
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
         w = self.multiIndex/p
-        ipoint = np.einsum('ij, kj...->ki...', w, point[cell]).reshape(-1, point.shape[-1])
+        ipoint = np.einsum('ij, kj...->ki...', w, node[cell]).reshape(-1, node.shape[-1])
         return ipoint
 
 class DPLFEMDof1d(DPLFEMDof):
@@ -535,10 +526,10 @@ class DPLFEMDof2d(DPLFEMDof):
         multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2] 
         return multiIndex
 
-    def is_on_point_local_dof(self):
+    def is_on_node_local_dof(self):
         p = self.p
-        isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
-        return isPointDof
+        isNodeDof = np.sum(self.multiIndex == p, axis=-1) == 1 
+        return isNodeDof
 
     def is_on_edge_local_dof(self):
         p =self.p
@@ -574,7 +565,7 @@ class DPLFEMDof3d(DPLFEMDof):
         ldof = (p+1)*(p+2)*(p+3)//6
         return ldof
 
-    def is_on_point_local_dof(self):
+    def is_on_node_local_dof(self):
         p = self.p
         isPointDof = np.sum(self.multiIndex == p, axis=-1) == 1 
         return isPointDof

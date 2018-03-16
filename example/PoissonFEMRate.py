@@ -17,7 +17,7 @@ if m == 1:
     model = CosCosData()
 
 mesh = model.init_mesh(n=n, meshtype='tri')
-integrator = TriangleQuadrature(5)
+integrator = TriangleQuadrature(7)
 fem = PoissonFEMModel(mesh, model, p=p, integrator=integrator)
 maxit = 4
 

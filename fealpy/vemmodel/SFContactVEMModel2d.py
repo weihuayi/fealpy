@@ -91,8 +91,8 @@ class SFContactVEMModel2d():
 
     def get_lagrangian_multiplier_vector(self, cedge, cedge2dof):
         p = self.vemspace.p
-        point = self.mesh.point
-        v = point[cedge[:, 1]] - point[cedge[:, 0]] 
+        node = self.mesh.node
+        v = node[cedge[:, 1]] - node[cedge[:, 0]] 
         l = np.sqrt(np.sum(v**2, axis=1))
         qf = GaussLobattoQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights 

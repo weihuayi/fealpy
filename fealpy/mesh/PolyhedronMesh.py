@@ -5,9 +5,9 @@ from .mesh_tools import unique_row
 
 from tvtk.api import tvtk, write_data
 class PolyhedronMesh():
-    def __init__(self, point, face, faceLocation, face2cell, NC=None, dtype=np.float):
-        self.point = point
-        self.ds = PolyhedronMeshDataStructure(point.shape[0], face, faceLocation, face2cell, NC=NC)
+    def __init__(self, node, face, faceLocation, face2cell, NC=None, dtype=np.float):
+        self.node = node
+        self.ds = PolyhedronMeshDataStructure(node.shape[0], face, faceLocation, face2cell, NC=NC)
         self.meshtype = 'polyhedron'
         self.dtype= dtype 
 
@@ -27,15 +27,15 @@ class PolyhedronMesh():
         return NF, faces
 
     def check(self):
-        N = self.number_of_points()
+        N = self.number_of_nodes()
         NC = self.number_of_cells()
         NFE = self.ds.number_of_edges_of_faces()
         
         face2cell = self.ds.face2cell
         isIntFace = (face2cell[:, 0] != face2cell[:, 1])
 
-        cell2point = self.ds.cell_to_point()
-        V = cell2point@np.ones(N, dtype=np.int)
+        cell2node = self.ds.cell_to_node()
+        V = cell2node@np.ones(N, dtype=np.int)
         E = np.zeros(NC, dtype=np.int)
         F = np.zeros(NC, dtype=np.int)
 
@@ -50,8 +50,8 @@ class PolyhedronMesh():
         isBadPoly = (val != 2)
         return np.any(isBadPoly)
 
-    def number_of_points(self):
-        return self.point.shape[0]
+    def number_of_nodes(self):
+        return self.node.shape[0]
 
     def number_of_edges(self):
         return self.ds.NE
@@ -62,11 +62,11 @@ class PolyhedronMesh():
     def number_of_cells(self):
         return self.ds.NC
 
-    def geom_dimension(self):
-        return self.point.shape[1]
+    def geo_dimension(self):
+        return self.node.shape[1]
 
     def face_angle(self):
-        point = self.point
+        node = self.node
         face = self.ds.face
         faceLocation = self.ds.faceLocation
 
@@ -77,8 +77,8 @@ class PolyhedronMesh():
         idx1[faceLocation[1:]-1] = face[faceLocation[:-1]]
         idx2[1:] = face[0:-1]
         idx2[faceLocation[:-1]] = face[faceLocation[1:]-1]
-        a = point[idx1] - point[face]
-        b = point[idx2] - point[face]
+        a = node[idx1] - node[face]
+        b = node[idx2] - node[face]
         la = np.sum(a**2, axis=1)
         lb = np.sum(b**2, axis=1)
         x = np.arccos(np.sum(a*b, axis=1)/np.sqrt(la*lb))
@@ -159,7 +159,7 @@ class PolyhedronMeshDataStructure():
 
         return 
 
-    def cell_to_point(self):
+    def cell_to_node(self):
         N = self.N
         NF = self.NF
         NC = self.NC
@@ -171,12 +171,12 @@ class PolyhedronMeshDataStructure():
 
         I = np.repeat(face2cell[:, 0], NFV)
         val = np.ones(len(face), dtype=np.bool)
-        cell2point = coo_matrix((val, (I, face)), shape=(NC, N), dtype=np.bool)
+        cell2node = coo_matrix((val, (I, face)), shape=(NC, N), dtype=np.bool)
 
         I = np.repeat(face2cell[:, 1], NFV)
-        cell2point+= coo_matrix((val, (I, face)), shape=(NC, N), dtype=np.bool)
+        cell2node+= coo_matrix((val, (I, face)), shape=(NC, N), dtype=np.bool)
 
-        return cell2point.tocsr()
+        return cell2node.tocsr()
 
     def cell_to_edge(self):
         NC = self.NC
@@ -225,7 +225,7 @@ class PolyhedronMeshDataStructure():
         cell2cell += coo_matrix((val, (face2cell[isInface, 1], face2cell[isInFace, 0])), shape=(NC, NC), dtype=np.bool)
         return cell2cell.tocsr()
 
-    def face_to_point(self):
+    def face_to_node(self):
         N = self.N
         NF = self.NF
 
@@ -234,8 +234,8 @@ class PolyhedronMeshDataStructure():
 
         I = np.repeat(range(NF), NFV)
         val = np.ones(len(face), dtype=np.bool)
-        face2point = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
-        return face2point
+        face2node = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
+        return face2node
 
     def face_to_edge(self, sparse=False):
         NF = self.NF
@@ -268,7 +268,7 @@ class PolyhedronMeshDataStructure():
             face2cell+= coo_matrix((val, (range(NF), face2cell[:, 1])), shape=(NF, NC), dtype=np.bool)
             return face2cell.tocsr()
 
-    def edge_to_point(self, sparse=False):
+    def edge_to_node(self, sparse=False):
         N = self.N
         NE = self.NE
         edge = self.edge
@@ -276,13 +276,13 @@ class PolyhedronMeshDataStructure():
             return edge
         else:
             val = np.ones(NE, dtype=np.bool)
-            edge2point = coo_matrix((val, (range(NE), edge[:,0])), shape=(NE, N), dtype=np.bool)
-            edge2point+= coo_matrix((val, (range(NE), edge[:,1])), shape=(NE, N), dtype=np.bool)
-            return edge2point.tocsr()
+            edge2node = coo_matrix((val, (range(NE), edge[:,0])), shape=(NE, N), dtype=np.bool)
+            edge2node+= coo_matrix((val, (range(NE), edge[:,1])), shape=(NE, N), dtype=np.bool)
+            return edge2node.tocsr()
 
     def edge_to_edge(self):
-        edge2point = self.edge_to_point()
-        return edge2point*edge2point.transpose()
+        edge2node = self.edge_to_node()
+        return edge2node*edge2node.transpose()
 
     def edge_to_face(self):
         NE = self.NE
@@ -317,17 +317,17 @@ class PolyhedronMeshDataStructure():
 
         return edge2cell.tocsr()
     
-    def point_to_point(self):
+    def node_to_node(self):
         N = self.N
         NE = self.NE
         edge = self.edge
         I = edge.flatten()
         J = edge[:,[1,0]].flatten()
         val = np.ones((2*NE,), dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
-        return point2point
+        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        return node2node
 
-    def point_to_edge(self):
+    def node_to_edge(self):
         N = self.N
         NE = self.NE
         
@@ -335,10 +335,10 @@ class PolyhedronMeshDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(NE, dtype=np.bool)
-        point2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
-        return point2edge
+        node2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
+        return node2edge
 
-    def point_to_face(self):
+    def node_to_face(self):
         N = self.N
         NF = self.NF
 
@@ -347,11 +347,11 @@ class PolyhedronMeshDataStructure():
 
         J = np.repeat(range(NF), NFV)
         val = np.ones(len(face), dtype=np.bool)
-        point2face = csr_matrix((val, (face, J)), shape=(N, NF), dtype=np.bool)
-        return point2face
+        node2face = csr_matrix((val, (face, J)), shape=(N, NF), dtype=np.bool)
+        return node2face
 
 
-    def point_to_cell(self, cell):
+    def node_to_cell(self, cell):
         N = self.N
         NF = self.NF
         NC = self.NC
@@ -362,14 +362,14 @@ class PolyhedronMeshDataStructure():
 
         J = np.repeat(face2cell[:, 0], NFV)
         val = np.ones(len(face), dtype=np.bool)
-        point2cell = coo_matrix((val, (face, J)), shape=(N, NC), dtype=np.bool)
+        node2cell = coo_matrix((val, (face, J)), shape=(N, NC), dtype=np.bool)
 
         J = np.repeat(face2cell[:, 1], NFV)
-        point2cell+= coo_matrix((val, (face, J)), shape=(N, NC), dtype=np.bool)
+        node2cell+= coo_matrix((val, (face, J)), shape=(N, NC), dtype=np.bool)
 
-        return point2cell.tocsr()
+        return node2cell.tocsr()
 
-    def boundary_point_flag(self):
+    def boundary_node_flag(self):
         N = self.N
 
         face = self.face
@@ -380,9 +380,9 @@ class PolyhedronMeshDataStructure():
 
         isFaceBdPoint = np.repeat(isBdFace, NFV)
 
-        isBdPoint = np.zeros(N, dtype=np.bool)
-        isBdpoint[face[isFaceBdPoint]] = True
-        return isBdPoint
+        isBdNode = np.zeros(N, dtype=np.bool)
+        isBdnode[face[isFaceBdNode]] = True
+        return isBdNode
 
     def boundary_edge_flag(self):
         NE = self.NE
@@ -411,9 +411,9 @@ class PolyhedronMeshDataStructure():
         isBdCell[face2cell[isBdFace, 0]] = True
         return isBdCell
 
-    def boundary_point_index(self):
-        isBdPoint = self.boundary_point_flag()
-        idx, = np.nonzero(isBdPoint)
+    def boundary_node_index(self):
+        isBdNode = self.boundary_node_flag()
+        idx, = np.nonzero(isBdNode)
         return idx
 
     def boundary_edge_index(self):

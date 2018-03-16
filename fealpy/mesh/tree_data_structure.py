@@ -11,8 +11,8 @@ class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
 
-    def __init__(self, point, cell, dtype=np.float):
-        super(Quadtree, self).__init__(point, cell, dtype=dtype)
+    def __init__(self, node, cell, dtype=np.float):
+        super(Quadtree, self).__init__(node, cell, dtype=dtype)
         self.dtype = dtype
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=np.int) 
@@ -62,11 +62,11 @@ class Quadtree(QuadrangleMesh):
 
         if len(idx) > 0:
             # Prepare data
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
-            point = self.point
+            node = self.node
             edge = self.ds.edge
             cell = self.ds.cell
 
@@ -112,7 +112,7 @@ class Quadtree(QuadrangleMesh):
             edge2center = np.zeros(NE, dtype=np.int)
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
 
-            edgeCenter = 0.5*np.sum(point[edge[isNeedCutEdge]], axis=1) 
+            edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1) 
             cellCenter = self.barycenter(entity='cell', index=isNeedCutCell)
 
             NEC = len(edgeCenter)
@@ -136,7 +136,7 @@ class Quadtree(QuadrangleMesh):
             child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
 
             cell = np.concatenate((cell, newCell), axis=0)
-            self.point = np.concatenate((point, edgeCenter, cellCenter), axis=0)
+            self.node = np.concatenate((node, edgeCenter, cellCenter), axis=0)
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
@@ -152,10 +152,10 @@ class Quadtree(QuadrangleMesh):
             return False
 
         if len(idx) > 0:
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NC = self.number_of_cells()
 
-            point = self.point
+            node = self.node
             cell = self.ds.cell
 
             parent = self.parent
@@ -175,8 +175,8 @@ class Quadtree(QuadrangleMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainPoint = np.zeros(N, dtype=np.bool)
-            isRemainPoint[cell[isRemainCell, :]] = True
+            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
             child = child[isRemainCell]
@@ -195,11 +195,11 @@ class Quadtree(QuadrangleMesh):
             self.child = child
             self.parent = parent
 
-            pointIdxMap = np.zeros(N, dtype=np.int)
-            NN = isRemainPoint.sum()
-            pointIdxMap[isRemainPoint] = np.arange(NN)
-            cell = pointIdxMap[cell]
-            self.point = point[isRemainPoint]
+            nodeIdxMap = np.zeros(N, dtype=np.int)
+            NN = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(NN)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
             self.ds.reinit(NN, cell)
 
             if cell.shape[0] == NC:
@@ -218,16 +218,16 @@ class Quadtree(QuadrangleMesh):
         if np.all(isRootCell):
             NC = self.number_of_cells()
 
-            point = self.point
+            node = self.node
             cell = self.ds.cell
             NV = cell.shape[1]
 
             pcell = cell.reshape(-1) 
             pcellLocation = np.arange(0, NV*(NC+1), NV)
 
-            return PolygonMesh(point, pcell, pcellLocation, dtype=self.dtype) 
+            return PolygonMesh(node, pcell, pcellLocation, dtype=self.dtype) 
         else:
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
@@ -323,21 +323,21 @@ class Quadtree(QuadrangleMesh):
                     cellIdx = cellIdx[isNotOK]
                     if len(currentIdx) == 0:
                         break
-                    pointIdx = pcell[currentIdx] 
-                    _, J = p2pe[pointIdx].nonzero()
-                    isEdge = (pedge2cell[J, 1] == np.repeat(cellIdx, NES[pointIdx])) \
+                    nodeIdx = pcell[currentIdx] 
+                    _, J = p2pe[nodeIdx].nonzero()
+                    isEdge = (pedge2cell[J, 1] == np.repeat(cellIdx, NES[nodeIdx])) \
                             & (pedge2cell[J, 3] == i) & (~isPast[J])
                     isPast[J[isEdge]] = True
                     pcell[currentIdx + 1] = pedge[J[isEdge], 0]
                     currentIdx += 1
 
-            return PolygonMesh(self.point,  pcell, pcellLocation)
+            return PolygonMesh(self.node,  pcell, pcellLocation)
 
     def bc_to_point(self, bc):
-        point = self.point
+        node = self.node
         cell = self.ds.cell
         isLeafCell = self.is_leaf_cell()
-        p = np.einsum('...j, ijk->...ik', bc, point[cell[isLeafCell]])
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[isLeafCell]])
         return p 
 
 
@@ -351,8 +351,8 @@ class Octree(HexahedronMesh):
         (4, 0), (5, 1), (6, 2), (7, 3),
         (4, 5), (5, 6), (6, 7), (7, 4)], dtype=np.int)
 
-    def __init__(self, point, cell, dtype=np.float):
-        super(Octree, self).__init__(point, cell, dtype=dtype)
+    def __init__(self, node, cell, dtype=np.float):
+        super(Octree, self).__init__(node, cell, dtype=dtype)
         self.dtype = dtype
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=np.int) 
@@ -388,12 +388,12 @@ class Octree(HexahedronMesh):
             return False
 
         if len(idx) > 0:
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NE = self.number_of_edges()
             NF = self.number_of_faces()
             NC = self.number_of_cells()
 
-            point = self.point
+            node = self.node
             edge = self.ds.edge
             face = self.ds.face
             cell = self.ds.cell
@@ -436,7 +436,7 @@ class Octree(HexahedronMesh):
             localIdx = self.localEdge2childCell[localIdx, 1]
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
 
-            edgeCenter = 0.5*np.sum(point[edge[isNeedCutEdge]], axis=1)
+            edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
             NEC = len(edgeCenter)
             edge2center[isNeedCutEdge] = np.arange(N, N + NEC)
 
@@ -468,13 +468,13 @@ class Octree(HexahedronMesh):
             localIdx = self.localFace2childCell[localIdx, 1]
             face2center[isCuttedFace] = cell[cellIdx, localIdx]
 
-            faceCenter = 0.5*np.sum(point[face[isNeedCutFace][:, [0, 2]]], axis=1)
+            faceCenter = 0.5*np.sum(node[face[isNeedCutFace][:, [0, 2]]], axis=1)
             NFC = len(faceCenter)
 
             face2center[isNeedCutFace] = np.arange(N + NEC, N + NEC + NFC)
 
 
-            cellCenter = 0.5*np.sum(point[cell[isNeedCutCell][:, [0, 6]]], axis=1)
+            cellCenter = 0.5*np.sum(node[cell[isNeedCutCell][:, [0, 6]]], axis=1)
             NCC = len(cellCenter) 
 
             cp = [cell[isNeedCutCell, i].reshape(-1, 1) for i in range(8)]
@@ -510,7 +510,7 @@ class Octree(HexahedronMesh):
 
             
             cell = np.concatenate((cell, newCell), axis=0)
-            self.point = np.concatenate((point, edgeCenter, faceCenter, cellCenter), axis=0)
+            self.node = np.concatenate((node, edgeCenter, faceCenter, cellCenter), axis=0)
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.child[newParent[:, 0], newParent[:, 1]] = np.arange(NC, NC + 8*NCC) 
@@ -528,10 +528,10 @@ class Octree(HexahedronMesh):
             return False
 
         if len(idx) > 0:
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NC = self.number_of_cells()
 
-            point = self.point
+            node = self.node
             cell = self.ds.cell
             parent = self.parent
             child = self.child
@@ -552,8 +552,8 @@ class Octree(HexahedronMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainPoint = np.zeros(N, dtype=np.bool)
-            isRemainPoint[cell[isRemainCell, :]] = True
+            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
             child = child[isRemainCell]
@@ -570,11 +570,11 @@ class Octree(HexahedronMesh):
             self.child = child
             self.parent = parent
 
-            pointIdxMap = np.zeros(N, dtype=np.int)
-            NN = isRemainPoint.sum()
-            pointIdxMap[isRemainPoint] = np.arange(NN)
-            cell = pointIdxMap[cell]
-            self.point = point[isRemainPoint]
+            nodeIdxMap = np.zeros(N, dtype=np.int)
+            NN = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(NN)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
             self.ds.reinit(NN, cell)
 
             if cell.shape[0] == NC:
@@ -587,28 +587,28 @@ class Octree(HexahedronMesh):
     def to_pmesh1(self):
         NF = self.number_of_faces()
         NC = self.number_of_cells()
-        point = self.point
+        node = self.node
         face = self.ds.face
         NV = face.shape[1]
         face2cell = self.ds.face2cell
         faceLocation = np.arange(0, NV*(NF+1), NV)
-        return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell, NC=NC)
+        return PolyhedronMesh(node, face.reshape(-1), faceLocation, face2cell, NC=NC)
 
     def to_pmesh(self):
         '''transform the Octree data structure to Polyhedral data structure
 
-            * point, pface, pfaceLocation, pface2cell 
+            * node, pface, pfaceLocation, pface2cell 
         '''
         isRootCell = self.is_root_cell()
         if np.all(isRootCell):
             NF = self.number_of_faces()
             NC = self.number_of_cells()
-            point = self.point
+            node = self.node
             face = self.ds.face
             NV = face.shape[1]
             face2cell = self.ds.face2cell
             faceLocation = np.arange(0, NV*(NF+1), NV)
-            return PolyhedronMesh(point, face.reshape(-1), faceLocation, face2cell, NC=NC)
+            return PolyhedronMesh(node, face.reshape(-1), faceLocation, face2cell, NC=NC)
         else:
             face2cell = self.ds.face2cell
             cell2cell = self.ds.cell_to_cell()
@@ -668,7 +668,7 @@ class Octree(HexahedronMesh):
 
             # pface and pfaceLocation
             edge = self.ds.edge
-            N = self.number_of_points()
+            N = self.number_of_nodes()
             NE = self.number_of_edges()
             face2edge = self.ds.face_to_edge()
             isLeafEdge = np.zeros(NE, dtype=np.bool)
@@ -688,9 +688,9 @@ class Octree(HexahedronMesh):
             p2e = csr_matrix((val.flatten(), (I, J)), shape=(N, NE), dtype=np.int8)
 
             NV = np.zeros(PNF, dtype=np.int)
-            point = self.point
-            mp = (point[pedge[:, 0]] + point[pedge[:, 1]])/2
-            l2 = np.sqrt(np.sum((point[pedge[:, 0]] - point[pedge[:, 1]])**2, axis=1))
+            node = self.node
+            mp = (node[pedge[:, 0]] + node[pedge[:, 1]])/2
+            l2 = np.sqrt(np.sum((node[pedge[:, 0]] - node[pedge[:, 1]])**2, axis=1))
             for i in range(4):
                 print('Current:', i)
                 NV += 1
@@ -707,14 +707,14 @@ class Octree(HexahedronMesh):
                     I, J = p2e0.nonzero()
                     lidx = np.asarray(p2e0[I, J]).reshape(-1)
 
-                    l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
-                    l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
+                    l20 = np.sqrt(np.sum((mp[J] - node[p0[I]])**2, axis=1))
+                    l21 = np.sqrt(np.sum((mp[J] - node[p1[I]])**2, axis=1))
                     flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12)    
                     flag1 = (pedge[J, lidx%2] != p1[I]) 
                     flag2 = l2[J] < l2[ei[I]]
                     ldot = np.einsum('ij, ij->i', 
-                            point[pedge[J, lidx%2]] - point[pedge[J, lidx-1]],
-                            point[p1[I]] - point[p0[I]])
+                            node[pedge[J, lidx%2]] - node[pedge[J, lidx-1]],
+                            node[p1[I]] - node[p0[I]])
                     flag3 = (np.abs(ldot - l2[J]*l2[ei[I]]) < 1e-12)
                     isNotOK = flag0 & flag1 & flag2 & flag3
                     if isNotOK.sum() == 0:
@@ -757,14 +757,14 @@ class Octree(HexahedronMesh):
                     p2e0 = p2e[fp]
                     I, J = p2e0.nonzero()
                     lidx = np.asarray(p2e0[I, J]).reshape(-1)
-                    l20 = np.sqrt(np.sum((mp[J] - point[p0[I]])**2, axis=1))
-                    l21 = np.sqrt(np.sum((mp[J] - point[p1[I]])**2, axis=1))
+                    l20 = np.sqrt(np.sum((mp[J] - node[p0[I]])**2, axis=1))
+                    l21 = np.sqrt(np.sum((mp[J] - node[p1[I]])**2, axis=1))
                     flag0 = (np.abs(l20 + l21 - l2[ei[I]]) < 1e-12) & (J != pe[I])   
                     flag1 = (pedge[J, lidx%2] != p1[I]) 
                     flag2 = l2[J] < l2[ei[I]]
                     ldot = np.einsum('ij, ij->i', 
-                            point[pedge[J, lidx%2]] - point[pedge[J, lidx-1]],
-                            point[p1[I]] - point[p0[I]])
+                            node[pedge[J, lidx%2]] - node[pedge[J, lidx-1]],
+                            node[p1[I]] - node[p0[I]])
                     flag3 = (np.abs(ldot - l2[J]*l2[ei[I]]) < 1e-12)
                     isNotOK = flag0 & flag1 & flag2 & flag3
                     if isNotOK.sum() == 0:
@@ -790,4 +790,4 @@ class Octree(HexahedronMesh):
                     pface0[currentLocation[fidx]] = fp
                     currentLocation[fidx] += 1
 
-            return PolyhedronMesh(point, pface0, pfaceLocation, pface2cell, NC=PNC)
+            return PolyhedronMesh(node, pface0, pfaceLocation, pface2cell, NC=PNC)

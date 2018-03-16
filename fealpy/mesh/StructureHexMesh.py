@@ -10,25 +10,25 @@ class StructureHexMesh(Mesh3d):
         self.ds = StructureHexMeshDataStructure(nx, ny, nz)
     
     @property
-    def point(self):
+    def node(self):
         N = self.ds.N
         box = self.box
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        point = np.zeros((N, 3), dtype=np.float)
+        node = np.zeros((N, 3), dtype=np.float)
         X, Y, Z = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1),
                 box[4]:box[5]:complex(0, nz+1)
                 ]
-        point[:, 0] = X.flatten()
-        point[:, 1] = Y.flatten()
-        point[:, 2] = Z.flatten()
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
 
-        return point
+        return node
 
-    def number_of_points(self):
+    def number_of_nodes(self):
         return self.ds.N 
 
 
@@ -238,7 +238,7 @@ class StructureHexMeshDataStructure():
         totalEdge = cell[:, localEdge].reshape(-1, localEdge.shape[1])
         return np.sort(totalEdge, axis=1)
 
-    def cell_to_point(self):
+    def cell_to_node(self):
         """ 
         """
         N = self.N
@@ -249,8 +249,8 @@ class StructureHexMeshDataStructure():
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2point = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
-        return cell2point
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        return cell2node
 
     def cell_to_edge(self, sparse=False):
         """ The neighbor information of cell to edge
@@ -338,7 +338,7 @@ class StructureHexMeshDataStructure():
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    def face_to_point(self, return_sparse=False):
+    def face_to_node(self, return_sparse=False):
 
         face = self.face
         FE = self.localFace.shape[1] 
@@ -349,8 +349,8 @@ class StructureHexMeshDataStructure():
             NF = self.NF
             I = np.repeat(range(NF), FE)
             val = np.ones(FE*NF, dtype=np.bool)
-            face2point = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
-            return face2point
+            face2node = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
+            return face2node
 
     def face_to_edge(self, return_sparse=False):
         cell2edge = self.cell2edge
@@ -385,7 +385,7 @@ class StructureHexMeshDataStructure():
             face2cell = csr_matrix((val, (I, J)), shape=(NF, NC), dtype=np.bool)
             return face2cell 
 
-    def edge_to_point(self, return_sparse=False):
+    def edge_to_node(self, return_sparse=False):
         N = self.N
         NE = self.NE
         edge = self.edge
@@ -396,12 +396,12 @@ class StructureHexMeshDataStructure():
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
             val = np.ones(2*NE, dtype=np.bool)
-            edge2point = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
-            return edge2point
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            return edge2node
 
     def edge_to_edge(self):
-        edge2point = self.edge_to_point()
-        return edge2point*edge2point.transpose()
+        edge2node = self.edge_to_node()
+        return edge2node*edge2node.transpose()
 
     def edge_to_face(self):
         NF = self.NF
@@ -425,8 +425,8 @@ class StructureHexMeshDataStructure():
         edge2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
         return edge2cell
 
-    def point_to_point(self):
-        """ The neighbor information of points
+    def node_to_node(self):
+        """ The neighbor information of nodes
         """
         N = self.N
         NE = self.NE
@@ -434,10 +434,10 @@ class StructureHexMeshDataStructure():
         I = edge.flatten()
         J = edge[:,[1,0]].flatten()
         val = np.ones((2*NE,), dtype=np.bool)
-        point2point = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
-        return point2point
+        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        return node2node
 
-    def point_to_edge(self):
+    def node_to_edge(self):
         N = self.N
         NE = self.NE
         
@@ -445,10 +445,10 @@ class StructureHexMeshDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        point2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
-        return point2edge
+        node2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+        return node2edge
 
-    def point_to_face(self):
+    def node_to_face(self):
         N = self.N
         NF = self.NF
 
@@ -458,10 +458,10 @@ class StructureHexMeshDataStructure():
         I = face.flatten()
         J = np.repeat(range(NF), FV)
         val = np.ones(FV*NF, dtype=np.bool)
-        point2face = csr_matrix((val, (I, J)), shape=(NF, N), dtype=np.bool)
-        return point2face
+        node2face = csr_matrix((val, (I, J)), shape=(NF, N), dtype=np.bool)
+        return node2face
 
-    def point_to_cell(self, return_local_index=False):
+    def node_to_cell(self, return_local_index=False):
         """
         """
         N = self.N
@@ -475,13 +475,13 @@ class StructureHexMeshDataStructure():
 
         if return_local_index == True:
             val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            point2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
-        return point2cell
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+        return node2cell
 
-    def boundary_point_flag(self):
+    def boundary_node_flag(self):
         N = self.N
         face = self.face
         isBdFace = self.boundary_face_flag()
@@ -510,8 +510,8 @@ class StructureHexMeshDataStructure():
         isBdCell[face2cell[isBdFace, 0]] = True
         return isBdCell 
 
-    def boundary_point_index(self):
-        isBdPoint = self.boundary_point_flag()
+    def boundary_node_index(self):
+        isBdPoint = self.boundary_node_flag()
         idx, = np.nonzero(isBdPoint)
         return idx
 
