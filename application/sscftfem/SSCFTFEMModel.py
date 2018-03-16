@@ -152,7 +152,7 @@ class SSCFTFEMModel():
         self.rho[1][:] = 1.0 - self.rho[0]
 
         self.data ={
-                'node':self.mesh.mesh.point, 
+                'node':self.mesh.mesh.node, 
                 'elem':self.mesh.mesh.ds.cell+1, 
                 'rhoA':[self.rho[0]],
                 'rhoB':[self.rho[1]],
@@ -314,14 +314,14 @@ class SSCFTFEMModel():
     def show_solution(self, i):
         mesh = self.mesh.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
         c = self.rho[0].view(np.ndarray)
         c = np.sum(c[cell], axis=1)/3
         c = cs.val_to_color(c)
         fig = FF.create_trisurf(
-                x = point[:, 0], 
-                y = point[:, 1],
-                z = point[:, 2],
+                x = node[:, 0], 
+                y = node[:, 1],
+                z = node[:, 2],
                 show_colorbar = True,
                 plot_edges=False,
                 simplices=cell)

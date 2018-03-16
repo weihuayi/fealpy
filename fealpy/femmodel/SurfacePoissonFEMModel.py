@@ -45,7 +45,7 @@ class SurfacePoissonFEMModel(object):
         V = self.V
         mesh = V.mesh.mesh
 
-        p2c = mesh.ds.point_to_cell()
+        p2c = mesh.ds.node_to_cell()
         inva = 1/mesh.area()
         asum = p2c@inva
 

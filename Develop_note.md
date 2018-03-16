@@ -7,7 +7,7 @@
 * memberdata
 * function_name
 * member_function_name
-* thisFunctionVarable
+* thisIsFunctionVarable
 
 
 * ClassName.py

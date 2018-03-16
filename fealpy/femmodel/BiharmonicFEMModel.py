@@ -79,16 +79,16 @@ class BiharmonicRecoveryFEMModel:
         self.rgh[:, 0] = self.A@uh
         self.rgh[:, 1] = self.B@uh
         mesh = self.V.mesh
-        point = mesh.point
-        isBdPoints = mesh.ds.boundary_point_flag()
-        val = self.model.gradient(point[isBdPoints])
+        node = mesh.node
+        isBdNodes = mesh.ds.boundary_node_flag()
+        val = self.model.gradient(node[isBdNodes])
         isNotNan = np.isnan(val)
-        self.rgh[isBdPoints][isNotNan] = val[isNotNan] 
+        self.rgh[isBdNodes][isNotNan] = val[isNotNan] 
 
     def recover_laplace(self):
         b = np.array([1/3, 1/3, 1/3])
         mesh = self.V.mesh
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         cell = mesh.ds.cell
         val = self.rgh.div_value(b)
         if self.rtype is 'simple':
@@ -113,7 +113,7 @@ class BiharmonicRecoveryFEMModel:
         mesh = V.mesh
 
         NC = mesh.number_of_cells() 
-        N = mesh.number_of_points() 
+        N = mesh.number_of_nodes() 
         cell = mesh.ds.cell
 
         if self.rtype is 'simple':
@@ -145,9 +145,9 @@ class BiharmonicRecoveryFEMModel:
 
         mesh = V.mesh
         NC = mesh.number_of_cells() 
-        N = mesh.number_of_points() 
+        N = mesh.number_of_nodes() 
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         edge2cell = mesh.ds.edge_to_cell()
         edge = mesh.ds.edge
@@ -155,7 +155,7 @@ class BiharmonicRecoveryFEMModel:
         bdEdge = edge[isBdEdge]
         
         W = np.array([[0, -1], [1, 0]], dtype=np.int)
-        n = (point[bdEdge[:,1],] - point[bdEdge[:,0],:])@W
+        n = (node[bdEdge[:,1],] - node[bdEdge[:,0],:])@W
         h = np.sqrt(np.sum(n**2, axis=1)) 
         n /= h.reshape(-1, 1)
 
@@ -214,9 +214,9 @@ class BiharmonicRecoveryFEMModel:
         V = self.V
         mesh = V.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
 
         edge = mesh.ds.edge
         isBdEdge = mesh.ds.boundary_edge_flag()
@@ -224,7 +224,7 @@ class BiharmonicRecoveryFEMModel:
 
         # the unit outward normal on boundary edge
         W = np.array([[0, -1], [1, 0]], dtype=np.int)
-        n = (point[bdEdge[:,1],] - point[bdEdge[:,0],:])@W
+        n = (node[bdEdge[:,1],] - node[bdEdge[:,0],:])@W
         h = np.sqrt(np.sum(n**2, axis=1)) 
         n /= h.reshape((-1,1))
 
@@ -234,7 +234,7 @@ class BiharmonicRecoveryFEMModel:
 
         qf = IntervalQuadrature(5)
         bcs, ws = qf.quadpts, qf.weights
-        pp = np.einsum('...j, ijk->...ik', bcs, point[bdEdge])
+        pp = np.einsum('...j, ijk->...ik', bcs, node[bdEdge])
         val = self.model.neuman(pp, n)
         val0 = np.einsum('m, mj, i, mi->ij', ws, bcs, n[:, 0]/h, val)
         np.add.at(b0, bdEdge, val0)
