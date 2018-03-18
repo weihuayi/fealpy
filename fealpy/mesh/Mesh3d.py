@@ -2,7 +2,7 @@ import numpy as np
 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 import mpl_toolkits.mplot3d as a3
-from .mesh_tools import unique_row, find_entity, show_mesh_3d, find_point
+from .mesh_tools import unique_row, find_entity, show_mesh_3d, find_node
 
 class Mesh3d():
     def __init__(self):

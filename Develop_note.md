@@ -36,8 +36,6 @@ The kinds of mesh :
 * TritreeMesh
 * BitreeMesh
 
-* MeshNameDataStructure
-
 The basic entity array in a mesh:
 *  node 
 *  cell
@@ -72,7 +70,7 @@ other data:
 
 The number of entity:
 
-* N: the number of nodes 
+* N or NN: the number of nodes 
 * NC: the number of cells 
 * NE: the number of edges 
 * NF: the number of faces

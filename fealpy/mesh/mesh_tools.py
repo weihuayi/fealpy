@@ -12,7 +12,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.patches import Polygon
 
 
-def find_point(axes, point, index=None, 
+def find_node(axes, point, index=None, 
         showindex=False, color='r', 
         markersize=20, fontsize=24, fontcolor='k'):
 

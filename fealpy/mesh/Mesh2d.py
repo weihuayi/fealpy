@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from .mesh_tools import unique_row, find_point, find_entity, show_mesh_2d
+from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 from ..common import ranges
 from types import ModuleType
 
