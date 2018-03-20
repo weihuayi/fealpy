@@ -45,13 +45,13 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
 
     def interface_cell_flag(self, pmesh):
         phi = self.phi
-        c2p = pmesh.ds.cell_to_point()
-        phiValue = phi(pmesh.point)
+        cell2node = pmesh.ds.cell_to_node()
+        phiValue = phi(pmesh.node)
         phiSign = msign(phiValue)
         NV = pmesh.number_of_vertices_of_cells()
 
-        eta1 = np.abs(c2p*phiSign)
-        eta2 = c2p*np.abs(phiSign)
+        eta1 = np.abs(cell2node*phiSign)
+        eta2 = cell2node*np.abs(phiSign)
 
         isInterfaceCell = (eta1 < eta2) | ((eta1 == eta2) & ((NV - eta2) > 2))
 
@@ -59,21 +59,21 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
 
     def refine_mark(self, pmesh, treemesh=None):
         phi = self.phi
-        c2p = pmesh.ds.cell_to_point()
+        cell2node = pmesh.ds.cell_to_node()
 
-        phiValue = phi(pmesh.point)
+        phiValue = phi(pmesh.node)
         phiSign = msign(phiValue)
         NV = pmesh.number_of_vertices_of_cells()
 
-        eta1 = np.abs(c2p*phiSign)
-        eta2 = c2p*np.abs(phiSign)
+        eta1 = np.abs(cell2node*phiSign)
+        eta2 = cell2node*np.abs(phiSign)
 
         isInterfaceCell = (eta1 < eta2) | ((eta1 == eta2) & ((NV - eta2) > 2))
 
         idx0, = np.nonzero(isInterfaceCell)
 
-        N = pmesh.number_of_points()
-        isInterfacePoint= np.asarray(isInterfaceCell@c2p).reshape(-1)
+        N = pmesh.number_of_nodes()
+        isInterfaceNode= np.asarray(isInterfaceCell@cell2node).reshape(-1)
 
 
         NC = pmesh.number_of_cells()
@@ -86,35 +86,37 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
         isInterfaceBdEdge = isInterfaceCell[edge2cell[:, 0]] & (~isInterfaceCell[edge2cell[:, 1]]) 
         isInterfaceBdEdge = isInterfaceBdEdge | ((~isInterfaceCell[edge2cell[:, 0]]) & isInterfaceCell[edge2cell[:, 1]])
         edge0 = edge[isInterfaceBdEdge]
-        isInterfaceBdPoint = np.zeros(N, dtype=np.int) 
-        isInterfaceBdPoint[edge0] = 1
-        p2p = pmesh.ds.point_to_point_in_edge(N, edge0)
-        isInterfaceLinkPoint = np.asarray(p2p@isInterfaceBdPoint) > 2 
-        nlink = np.sum(isInterfaceLinkPoint) 
+        isInterfaceBdNode = np.zeros(N, dtype=np.int) 
+        isInterfaceBdNode[edge0] = 1
+        node2node = pmesh.ds.node_to_node_in_edge(N, edge0)
+        isInterfaceLinkNode = np.asarray(node2node@isInterfaceBdNode) > 2 
+        nlink = np.sum(isInterfaceLinkNode) 
 
         if nlink > 0:
-            isMarkedCell = isMarkedCell | (np.asarray(c2p@(isInterfaceLinkPoint) > 0))
+            isMarkedCell = isMarkedCell | (np.asarray(cell2node@(isInterfaceLinkNode) > 0))
 
         # Case 2
-        nc = np.asarray(c2p.sum(axis=0)).reshape(-1)
+        nc = np.asarray(cell2node.sum(axis=0)).reshape(-1)
         NV = pmesh.number_of_vertices_of_cells()
-        isInterfaceInPoint = isInterfacePoint & (~isInterfaceBdPoint) & (nc == 4)
-        isMarkedCell = isMarkedCell | (np.asarray(c2p@(isInterfaceInPoint) > 0))
-        isInterfaceInPoint = isInterfacePoint & (~isInterfaceBdPoint) & (nc == 3)
-        isMarkedCell = isMarkedCell | (np.asarray(c2p@(isInterfaceInPoint) > 0) & (NV > 4))
+        isInterfaceInNode = isInterfaceNode & (~isInterfaceBdNode) & (nc == 4)
+        isMarkedCell = isMarkedCell | (np.asarray(cell2node@(isInterfaceInNode) > 0))
+        isInterfaceInNode = isInterfaceNode & (~isInterfaceBdNode) & (nc == 3)
+        isMarkedCell = isMarkedCell | (np.asarray(cell2node@(isInterfaceInNode) > 0) & (NV > 4))
 
         # Case 3
         if nlink == 0:
-            point = pmesh.point
+            node = pmesh.node
             eps = 1e-8
-            nbd = np.sum(isInterfaceBdPoint)
+            nbd = np.sum(isInterfaceBdNode)
             normal = np.zeros((nbd, 2), dtype=np.float)
             xeps = np.array([(eps, 0)])
             yeps = np.array([(0, eps)])
-            normal[:, 0] = (phi(point[isInterfaceBdPoint==1]+xeps) - phi(point[isInterfaceBdPoint==1] - xeps))/(2*eps)
-            normal[:, 1] = (phi(point[isInterfaceBdPoint==1]+yeps) - phi(point[isInterfaceBdPoint==1] - yeps))/(2*eps)
+            normal[:, 0] = (phi(node[isInterfaceBdNode==1]+xeps) -
+                    phi(node[isInterfaceBdNode==1] - xeps))/(2*eps)
+            normal[:, 1] = (phi(node[isInterfaceBdNode==1]+yeps) -
+                    phi(node[isInterfaceBdNode==1] - yeps))/(2*eps)
             idxMap = np.zeros(N, dtype=np.int)
-            idxMap[isInterfaceBdPoint==1] = np.arange(nbd)
+            idxMap[isInterfaceBdNode==1] = np.arange(nbd)
             edge00 = idxMap[edge0]
             l = np.sqrt(np.sum(normal**2, axis=1))
             cosa = np.sum(normal[edge00[:, 0]]*normal[edge00[:, 1]], axis=1)/(l[edge00[:, 0]]*l[edge00[:, 1]])
@@ -137,7 +139,7 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
 class QuadtreeInterfaceMesh2d():
     def __init__(self, mesh, marker):
         if mesh.meshType is 'quad':
-            self.treemesh =  Quadtree(mesh.point, mesh.ds.cell)
+            self.treemesh =  Quadtree(mesh.node, mesh.ds.cell)
         elif mesh.meshType is 'quadtree':
             self.treemesh = mesh
 
@@ -155,23 +157,23 @@ class QuadtreeInterfaceMesh2d():
         phi = self.marker.phi
         pmesh = self.treemesh.to_pmesh()
 
-        N = pmesh.number_of_points()
+        N = pmesh.number_of_nodes()
         NE = pmesh.number_of_edges()
         NC = pmesh.number_of_cells()
 
-        # find the interface points 
+        # find the interface nodes 
         edge = pmesh.ds.edge
-        point = pmesh.point
-        phiSign = msign(phi(point))
+        node = pmesh.node
+        phiSign = msign(phi(node))
         isInterfaceCell = self.marker.interface_cell_flag(pmesh)
         edge2cell = pmesh.ds.edge2cell
 
         isCutEdge0 = (phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0)
         cutEdge0 = edge[isCutEdge0]
-        cutPoint = find_cut_point(phi, point[cutEdge0[:, 0]], point[cutEdge0[:, 1]])
+        cutNode = find_cut_point(phi, node[cutEdge0[:, 0]], node[cutEdge0[:, 1]])
 
-        edge2cutPoint = np.zeros(NE, dtype=np.int)
-        edge2cutPoint[isCutEdge0] = range(N, N+cutEdge0.shape[0])
+        edge2cutNode = np.zeros(NE, dtype=np.int)
+        edge2cutNode[isCutEdge0] = range(N, N+cutEdge0.shape[0])
 
         isSpecialEdge = (~isCutEdge0) & isInterfaceCell[edge2cell[:, 0]] \
                 & isInterfaceCell[edge2cell[:, 1]]
@@ -179,13 +181,13 @@ class QuadtreeInterfaceMesh2d():
         if np.any(isSpecialEdge):
             print(isSpecialEdge.sum())
             isSpecialEdge0 = isSpecialEdge & (phiSign[edge[:, 0]] == 0)
-            edge2cutPoint[isSpecialEdge0] = edge[isSpecialEdge0, 0]
+            edge2cutNode[isSpecialEdge0] = edge[isSpecialEdge0, 0]
             isCutEdge0[isSpecialEdge0] = True
             isSpecialEdge0 = isSpecialEdge & (phiSign[edge[:, 1]] == 0)
-            edge2cutPoint[isSpecialEdge0] = edge[isSpecialEdge0, 1]
+            edge2cutNode[isSpecialEdge0] = edge[isSpecialEdge0, 1]
             isCutEdge0[isSpecialEdge0] = True
 
-        edge2cutPoint = edge2cutPoint[isCutEdge0]
+        edge2cutNode = edge2cutNode[isCutEdge0]
 
         # find the cut location in each interface cell
         NV = pmesh.number_of_vertices_of_cells()
@@ -202,10 +204,10 @@ class QuadtreeInterfaceMesh2d():
 
         idx = np.argsort(cellIdx)
         location = edge2cell[isCutEdge0, 2:4].reshape(-1)[idx].reshape(-1, 2)
-        interfaceCell2cutPoint = np.repeat(edge2cutPoint, 2)[idx].reshape(-1, 2) 
+        interfaceCell2cutNode = np.repeat(edge2cutNode, 2)[idx].reshape(-1, 2) 
         idx = np.argsort(location, axis=1)
         location = location[np.arange(NIC).reshape(-1, 1), idx]
-        interfaceCell2cutPoint = interfaceCell2cutPoint[np.arange(NIC).reshape(-1, 1), idx]
+        interfaceCell2cutNode = interfaceCell2cutNode[np.arange(NIC).reshape(-1, 1), idx]
 
 
         NV0 = NV[isInterfaceCell]
@@ -219,8 +221,8 @@ class QuadtreeInterfaceMesh2d():
         newCell1 = np.zeros(np.sum(NV1), dtype=np.int)
         newCellLocation1 = np.zeros(NNC+1, dtype=np.int)
         newCellLocation1[1:] = np.cumsum(NV1)
-        newCell1[newCellLocation1[:-1]] = interfaceCell2cutPoint[:, 0]
-        newCell1[newCellLocation1[:-1]+NV1-1] = interfaceCell2cutPoint[:, 1]
+        newCell1[newCellLocation1[:-1]] = interfaceCell2cutNode[:, 0]
+        newCell1[newCellLocation1[:-1]+NV1-1] = interfaceCell2cutNode[:, 1]
         for i in range(NNC):
             idx0 =np.arange(newCellLocation1[i]+1, newCellLocation1[i]+NV1[i]-1) 
             idx1 = np.arange(initLocation[i]+location[i, 0]+1, 
@@ -231,9 +233,9 @@ class QuadtreeInterfaceMesh2d():
         newCell2 = np.zeros(np.sum(NV2), dtype=np.int)
         newCellLocation2 = np.zeros(NNC+1, dtype=np.int)
         newCellLocation2[1:] = np.cumsum(NV2)
-        newCell2[newCellLocation2[:-1]+ location[:, 0] + 1] = interfaceCell2cutPoint[:, 0]
-        newCell2[newCellLocation2[:-1] + location[:, 0] + 2] = interfaceCell2cutPoint[:, 1]
-        for i in range(NNC):
+        newCell2[newCellLocation2[:-1]+ location[:, 0] + 1] = interfaceCell2cutNode[:, 0]
+        newCell2[newCellLocation2[:-1] + location[:, 0] + 2] = interfaceCell2cutNode[:, 1] 
+        for i in range(NNC): 
             idx0 = np.arange(newCellLocation2[i], newCellLocation2[i] + location[i, 0] +1)
             idx1 = np.arange(initLocation[i], initLocation[i] + location[i, 0] + 1)
             newCell2[idx0] = cell[idx1]
@@ -252,8 +254,8 @@ class QuadtreeInterfaceMesh2d():
                 (newCellLocation3[0:-1],
                 newCellLocation3[-1] + newCellLocation1[0:-1], 
                 newCellLocation3[-1] + newCellLocation1[-1] + newCellLocation2), axis=0)
-        point = np.append(point, cutPoint, axis=0)
-        pmesh1 = PolygonMesh(point, cell, cellLocation)
+        node = np.append(node, cutNode, axis=0)
+        pmesh1 = PolygonMesh(node, cell, cellLocation)
         return pmesh1
 
 class AdaptiveMarker3d():
@@ -272,13 +274,13 @@ class AdaptiveMarker3d():
 
     def interface_face_flag(self, pmesh):
         phi = self.phi
-        f2p = pmesh.ds.face_to_point()
-        phiValue = phi(pmesh.point)
+        face2node = pmesh.ds.face_to_node()
+        phiValue = phi(pmesh.node)
         phiSign = msign(phiValue)
         NFV = pmesh.ds.number_of_vertices_of_faces()
 
-        eta1 = np.abs(f2p*phiSign)
-        eta2 = f2p*np.abs(phiSign)
+        eta1 = np.abs(face2node*phiSign)
+        eta2 = face2node*np.abs(phiSign)
 
         isInterfaceFace = (eta1 < eta2) | ((eta1 == eta2) & ((NV - eta2) > 2))
 
@@ -288,22 +290,22 @@ class AdaptiveMarker3d():
     def refine_mark(self, treemesh):
         pmesh = treemesh.to_pmesh() 
 
-        N = pmesh.number_of_points()
+        N  = pmesh.number_of_nodes()
         NF = pmesh.number_of_faces()
         NC = pmesh.number_of_cells()
 
         isInterfaceCell = self.interface_cell_flag(self, pmesh)
-        c2p = pmesh.ds.cell_to_point()
-        isInterfacePoint= np.asarray(isInterfaceCell@c2p).reshape(-1)
+        cell2node = pmesh.ds.cell_to_node()
+        isInterfaceNode= np.asarray(isInterfaceCell@cell2node).reshape(-1)
 
         isMarkedCell = np.zeros(NC, dtype=np.bool)
 
         # Case 1
         isLeafCell = treemesh.is_leaf_cell()
-        point = treemesh.point
+        node = treemesh.node
         cell = treemesh.ds.cell
 
-        h = np.sqrt(np.sum((point[cell[isLeafCell, 0]] - point[cell[isLeafCell, 6]])**2, axis=1))
+        h = np.sqrt(np.sum((node[cell[isLeafCell, 0]] - node[cell[isLeafCell, 6]])**2, axis=1))
         maxh = self.maxh
         isMarkedCell = isMarkedCell | ((h > maxh) & isInterfaceCell) 
 

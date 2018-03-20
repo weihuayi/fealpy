@@ -87,7 +87,7 @@ class TetrahedronMesh(Mesh3d):
         node = self.node
         v01 = node[face[:, 1], :] - node[face[:, 0], :]
         v02 = node[face[:, 2], :] - node[face[:, 0], :]
-        dim = self.geom_dimension() 
+        dim = self.geo_dimension() 
         nv = np.cross(v01, v02)
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return area 

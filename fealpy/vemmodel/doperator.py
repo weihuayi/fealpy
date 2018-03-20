@@ -144,7 +144,7 @@ def source_vector(integral, f, vemspace, PI0):
 def matrix_H(V):
     p = V.p
     mesh = V.mesh
-    point = mesh.point
+    node = mesh.node
 
     edge = mesh.ds.edge
     edge2cell = mesh.ds.edge2cell
@@ -155,16 +155,16 @@ def matrix_H(V):
 
     qf = GaussLegendreQuadrture(p + 1)
     bcs, ws = qf.quadpts, qf.weights 
-    ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+    ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
     phi0 = V.smspace.basis(ps, cellidx=edge2cell[:, 0])
     phi1 = V.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
     H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
     H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
 
     nm = mesh.edge_normal()
-    b = point[edge[:, 0]] - V.smspace.barycenter[edge2cell[:, 0]]
+    b = node[edge[:, 0]] - V.smspace.barycenter[edge2cell[:, 0]]
     H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-    b = point[edge[isInEdge, 0]] - V.smspace.barycenter[edge2cell[isInEdge, 1]]
+    b = node[edge[isInEdge, 0]] - V.smspace.barycenter[edge2cell[isInEdge, 1]]
     H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
     ldof = V.smspace.number_of_local_dofs()
@@ -192,7 +192,7 @@ def matrix_D(V, H):
     mesh = V.mesh
     NV = mesh.number_of_vertices_of_cells()
     h = V.smspace.h 
-    point = mesh.point
+    node = mesh.node
     edge = mesh.ds.edge
     edge2cell = mesh.ds.edge2cell
     isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -202,12 +202,12 @@ def matrix_D(V, H):
 
     if p == 1:
         bc = np.repeat(V.smspace.barycenter, NV, axis=0) 
-        D[:, 1:] = (point[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
+        D[:, 1:] = (node[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
         return D
 
     qf = GaussLobattoQuadrature(p+1)
     bcs, ws = qf.quadpts, qf.weights 
-    ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+    ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
     phi0 = V.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
     phi1 = V.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
     idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
@@ -247,14 +247,14 @@ def matrix_B(V):
             B[idx0, idx1] -= r[i-2::-1]
             B[idx0+2, idx1] -= r[0:i-1]
             start += i+1
-        point = mesh.point
+        node = mesh.node
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         qf = GaussLobattoQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights 
-        ps = np.einsum('ij, kjm->ikm', bcs, point[edge])
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         gphi0 = V.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
         gphi1 = V.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
         nm = mesh.edge_normal()

@@ -22,7 +22,7 @@ The kinds of mesh :
 
 * IntervalMesh
 * TriangleMesh
-* QuadrangleMesh
+* QuadrilateralMesh
 * TetrahedronMesh
 * HexahedronMesh
 * PolygonMesh
@@ -36,60 +36,88 @@ The kinds of mesh :
 * TritreeMesh
 * BitreeMesh
 
-The basic entity array in a mesh:
-*  node 
-*  cell
+The name of basic mesh entity:
+* node
+* cell
 
-The addition entity array in a mesh
-*  edge: appear in 2d and 3d mesh
-*  face: appear in 3d mesh
+* edge
+* face
 
-The toplogy relationship array or sparse matrix in mesh:
-*  cell2node
-*  cell2edge
-*  cell2face
-*  cell2cell
-*  face2node
-*  face2edge
-*  face2face
-*  face2cell
-*  edge2node
-*  edge2edge
-*  edge2face
-*  edge2cell
-*  node2node
-*  node2edge
-*  node2face
-*  node2cell
+The name rules of the number of entity:
 
-other data:
+* NN: the Number of Nodes 
+* NE: the Number of Edges 
+* NF: the Number of Faces
+* NC: the Number of Cells 
+* NQ: the Number of Quadrature points
+* GD: the Geometry Dimension
+* NFV: the Number of Face Vertices 
+* NCV: the Number of Cell Vertices 
+
+
+The basic member data in a mesh:
+* node: a numpy array with shape `(NN, GD)`
+* ds : the toplogy data structure, which have the following data member
+    + NN: the number of nodes 
+    + NC: the number of cells
+    + edge: a numpy array with shape `(NE, 2)`
+    + face: a numpy array with shape `(NF, NFV)`
+    + cell: a numpy array iwth shape `(NC, NCV)`
+
+other member datas:
 * nodedata = {}
 * celldata = {}
+
 * edgedata = {}
 * facedata = {}
 
-The number of entity:
-
-* N or NN: the number of nodes 
-* NC: the number of cells 
-* NE: the number of edges 
-* NF: the number of faces
-* NQ: the number of quadrature points
 
 The general member function of a mesh
 
-* geo_dimension(self)
-* top_dimension(self)
-* number_of_nodes(self)
-* number_of_cells(self)
-* number_of_edges(self)
-* number_of_faces(self)
-* number_of_entities(self, dim)
-* entity(self, dim)
-* entity_measure(self, dim)
-* entity_barycenter(self, dim) : 
-* integrator(self, index) : get the quadrature formula on this kind of mesh
-* bc_to_points(self, bc) : transform quadrature points in barycentric coordinates to points in pysical cells
+* geo_dimension()
+* top_dimension()
+
+* number_of_nodes()
+* number_of_cells()
+* number_of_edges()
+* number_of_faces()
+* number_of_entities_by_dim(dim)
+* number_of_entities_by_name(name)
+
+* entity_by_dim(dim)
+* entity_by_name(name)
+
+* entity_measure_by_dim(dim)
+* entity_measure_by_name(name)
+
+* entity_barycenter_by_dim(dim) 
+* entity_barycenter_by_name(name) 
+
+* integrator(index) : get the quadrature formula on this kind of mesh
+* bc_to_points(bc) : transform quadrature points in barycentric coordinates to points in pysical cells
+
+## the toplogy data structure class
+
+For every mesh, there is toplogy data member `ds`, which contain the toplogy
+data of mesh. 
+
+The toplogy relationship function in `ds`:
+*  cell_to_node(...): return `cell2node` 
+*  cell_to_edge(...): return `cell2edge` 
+*  cell_to_face(...): return `cell2face` 
+*  cell_to_cell(...): return `cell2cell` 
+*  face_to_node(...): return `face2node` 
+*  face_to_edge(...): return `face2edge`
+*  face_to_face(...): return `face2face`
+*  face_to_cell(...): return `face2cell`
+*  edge_to_node(...): return `edge2node`
+*  edge_to_edge(...): return `edge2edge`
+*  edge_to_face(...): return `edge2face`
+*  edge_to_cell(...): return `edge2cell`
+*  node_to_node(...): return `node2node`
+*  node_to_edge(...): return `node2edge`
+*  node_to_face(...): return `node2face`
+*  node_to_cell(...): return `node2cell`
 
 ## Function Space
 
@@ -97,24 +125,25 @@ The general member function of a mesh
 
 * ldof: the number of local dof on each cell
 * gdof: the number of global dof on the whole mesh
-* dim: the space dimension 
+* gdim: the geometry dimension 
+* tdim: the toplogy diemension
 
 (NQ, NC, ldof, m, n, ...)
 
 The member function in a `FunctionSpace`:
 
-* cell_to_dof(self)
-* boundary_dof(self)
-* basis(self, ...)
-* function(self)
-* number_of_global_dofs(self)
-* number_of_local_dofs(self)
-* function(self)
-* interpolation(self, u):
-* projection(self, u): 
-* array(self, dim=None)
-* value(self, u, bc, cellidx=None)
-* grad_value(self, u, bc, cellidx=None)
-* div_value(self, u, bc, cellidx=None)
-* geo_dimension(self)
-* top_dimension(self)
+* number_of_global_dofs()
+* number_of_local_dofs()
+* cell_to_dof()
+* boundary_dof()
+* basis(bc)
+* gradbasis(bc)
+* function()
+
+* interpolation(u):
+* projection(u): 
+
+* array(dim=None)
+* value(u, bc, cellidx=None)
+* grad_value(u, bc, cellidx=None)
+* div_value(u, bc, cellidx=None)

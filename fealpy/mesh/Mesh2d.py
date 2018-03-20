@@ -24,8 +24,11 @@ class Mesh2d():
     def number_of_edges_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
-    def geom_dimension(self):
+    def geo_dimension(self):
         return self.node.shape[1]
+
+    def top_dimension(self):
+        return 2
 
     def barycenter(self, entity='cell', index=None):
         node = self.node

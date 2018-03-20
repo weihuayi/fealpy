@@ -23,7 +23,9 @@
 ## Recovery operator
 
 1. simple average
-1. ZZ
+1. area average
+1. harmonic average
+1. ZZ-SPR
 1. PPR
 1. SCR
 

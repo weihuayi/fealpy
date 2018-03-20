@@ -2,6 +2,7 @@ import numpy as np
 import sys
 
 from fealpy.model.poisson_interface_model_2d import CircleInterfaceData, SquareInterfaceData
+from fealpy.model.poisson_interface_model_2d import FoldCurveInterfaceData
 from fealpy.vemmodel import PoissonInterfaceVEMModel
 from fealpy.mesh.adaptive_tools import AdaptiveMarker
 from fealpy.tools.show import showmultirate
@@ -25,6 +26,9 @@ if m == 2:
     quadtree = model.init_mesh(n=4, meshtype='quadtree')
 if m == 3:
     model = SquareInterfaceData([0,0],2,2,1)
+    quadtree = model.init_mesh(n=4, meshtype='quadtree')
+if m == 4:
+    model = FoldCurveInterfaceData(6, 1, 1)
     quadtree = model.init_mesh(n=4, meshtype='quadtree')
 
 errorType = ['$\| u_I - u_h \|_{l_2}$',
@@ -59,7 +63,6 @@ for i in range(maxit):
         pmesh = alg.get_interface_mesh()
         vem.reinit(pmesh)
 
-pmesh.add_plot(plt, cellcolor='w')
 k,l = 0, 4
 showmultirate(plt, k, Ndof, errorMatrix[:l, :], errorType[:l])
 plt.show()

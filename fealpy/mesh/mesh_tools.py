@@ -2,22 +2,24 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 import mpl_toolkits.mplot3d as a3
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
 import matplotlib.colors as colors
 from matplotlib.tri import Triangulation
 
-from matplotlib.collections import PolyCollection
+from matplotlib.collections import PolyCollection, LineCollection, PatchCollection
 import matplotlib.cm as cm 
-
-from matplotlib.collections import PatchCollection
 from matplotlib.patches import Polygon
 
 
-def find_node(axes, point, index=None, 
+def find_node(axes, node, index=None, 
         showindex=False, color='r', 
         markersize=20, fontsize=24, fontcolor='k'):
 
+    if len(node.shape) == 1:
+        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
+
     if (index is None) or ( index is 'all'):
-        index = range(point.shape[0])
+        index = range(node.shape[0])
     elif (type(index) is np.ndarray) & (index.dtype == np.bool):
         index, = np.nonzero(index)
     elif (type(index) is list) & (type(index[0]) is np.bool):
@@ -33,8 +35,8 @@ def find_node(axes, point, index=None,
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
 
-    bc = point[index]
-    dim = point.shape[1]
+    bc = node[index]
+    dim = node.shape[1]
     if dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
@@ -53,8 +55,8 @@ def find_entity(axes, mesh, entity=None,
         color='r', markersize=20, 
         fontsize=24, fontcolor='k'):
 
-    if (entity is None) or (entity is 'point'): 
-        bc = mesh.barycenter(entity='point') 
+    if (entity is None) or (entity is 'node'): 
+        bc = mesh.barycenter(entity='node') 
     elif entity is 'edge': 
         bc = mesh.barycenter(entity='edge')
     elif entity is 'face':
@@ -66,8 +68,8 @@ def find_entity(axes, mesh, entity=None,
         #TODO: raise a error
 
     if (index is None) or ( index is 'all') :
-        if (entity is None) or (entity is 'point'): 
-            N = mesh.number_of_points()
+        if (entity is None) or (entity is 'node'): 
+            N = mesh.number_of_nodes()
             index = range(N)
         elif entity is 'edge': 
             NE = mesh.number_of_edges()
@@ -96,7 +98,7 @@ def find_entity(axes, mesh, entity=None,
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
 
-    dim = mesh.geom_dimension() 
+    dim = mesh.geo_dimension() 
     bc = bc[index]
     if dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
@@ -110,9 +112,35 @@ def find_entity(axes, mesh, entity=None,
             for i in range(len(index)):
                 axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]), 
                         multialignment='center', fontsize=fontsize, color=fontcolor) 
+def show_mesh_1d(axes, mesh, 
+        nodecolor='k', cellcolor='k',
+        aspect='equal', 
+        linewidths=1, markersize=20,
+        showaxis=False):
+    axes.set_aspect(aspect)
+    if showaxis == False :
+        axes.set_axis_off()
+    else:
+        axes.set_axis_on()
+
+    node = mesh.node
+    cell = mesh.ds.cell
+
+    dim = mesh.geo_dimension() 
+    if dim == 1:
+        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
+
+    vts = node[cell, :]
+
+    if dim < 3:
+        lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor, markersize=markersize)
+        return axes.add_collection(lines)
+    else:
+        lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor, markersize=markersize)
+        return axes.add_collection3d(vts)
 
 def show_mesh_2d(axes, mesh,  
-        pointcolor='k', edgecolor='k',
+        nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
         showaxis=False, showcolorbar=False, cmap='rainbow'):
@@ -123,12 +151,12 @@ def show_mesh_2d(axes, mesh,
     else:
         axes.set_axis_on()
 
-    if (type(pointcolor) is np.ndarray) & np.isreal(pointcolor[0]):
-        cmax = pointcolor.max()
-        cmin = pointcolor.min()
+    if (type(nodecolor) is np.ndarray) & np.isreal(nodecolor[0]):
+        cmax = nodecolor.max()
+        cmin = nodecolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
         mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
-        pointcolor = mapper.to_rgba(pointcolor)
+        nodecolor = mapper.to_rgba(nodecolor)
 
     if (type(cellcolor) is np.ndarray) & np.isreal(cellcolor[0]):
         cmax = cellcolor.max()
@@ -140,19 +168,19 @@ def show_mesh_2d(axes, mesh,
         if showcolorbar:
             f = axes.get_figure()
             cbar = f.colorbar(mapper, shrink=0.5, ax=axes)
-    point = mesh.point
+    node = mesh.node
     cell = mesh.ds.cell
 
 
-    if mesh.meshType is not 'polygon':
-        if mesh.geom_dimension() == 2:
-            poly = PolyCollection(point[cell, :])
+    if mesh.meshtype is not 'polygon':
+        if mesh.geo_dimension() == 2:
+            poly = PolyCollection(node[cell, :])
         else:
-            poly = a3.art3d.Poly3DCollection(point[cell,:])
+            poly = a3.art3d.Poly3DCollection(node[cell,:])
     else:
         cellLocation = mesh.ds.cellLocation
         NC = mesh.number_of_cells()
-        patches = [Polygon(point[cell[cellLocation[i]:cellLocation[i+1]], :], True) for i in range(NC)]
+        patches = [Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True) for i in range(NC)]
         poly = PatchCollection(patches)
 
 
@@ -160,24 +188,24 @@ def show_mesh_2d(axes, mesh,
     poly.set_linewidth(linewidths)
     poly.set_facecolors(cellcolor)
 
-    if mesh.geom_dimension() == 2:
+    if mesh.geo_dimension() == 2:
         box = np.zeros(4, dtype=np.float)
     else:
         box = np.zeros(6, dtype=np.float)
 
-    box[0::2] = np.min(point, axis=0)
-    box[1::2] = np.max(point, axis=0)
+    box[0::2] = np.min(node, axis=0)
+    box[1::2] = np.max(node, axis=0)
 
     axes.set_xlim(box[0:2])
     axes.set_ylim(box[2:4])
 
-    if mesh.geom_dimension() == 3:
+    if mesh.geo_dimension() == 3:
         axes.set_zlim(box[4:6])
 
     return axes.add_collection(poly)
 
 def show_mesh_3d(axes, mesh,
-        pointcolor='k', edgecolor='k', facecolor='w',
+        nodecolor='k', edgecolor='k', facecolor='w',
         aspect='equal',
         linewidths=1, markersize=20,  
         showaxis=False, alpha=0.8):
@@ -188,19 +216,19 @@ def show_mesh_3d(axes, mesh,
     else:
         axes.set_axis_on()
 
-    if (type(pointcolor) is np.ndarray) & np.isreal(pointcolor[0]):
-        cmax = pointcolor.max()
-        cmin = pointcolor.min()
+    if (type(nodecolor) is np.ndarray) & np.isreal(nodecolor[0]):
+        cmax = nodecolor.max()
+        cmin = nodecolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
-        pointcolor = mapper.to_rgba(pointcolor)
+        nodecolor = mapper.to_rgba(nodecolor)
 
-    point = mesh.point
-    axes.scatter(point[:, 0], point[:, 1], point[:, 2],
-            color=pointcolor, s=markersize)
+    node = mesh.node
+    axes.scatter(node[:, 0], node[:, 1], node[:, 2],
+            color=nodecolor, s=markersize)
 
     face = mesh.ds.face
-    vts = point[face, :]
+    vts = node[face, :]
     faces = a3.art3d.Poly3DCollection(vts, facecolor=facecolor, linewidths=linewidths, edgecolor=edgecolor, alpha = alpha)
     return axes.add_collection3d(faces)
     

@@ -32,8 +32,7 @@ class PoissonInterfaceVEMModel():
 
         node = mesh.node
         self.wh = self.vemspace.function()
-        self.wh[self.isInterfaceNode] =
-        self.model.func_jump(node[self.isInterfaceNode])
+        self.wh[self.isInterfaceNode] = self.model.func_jump(node[self.isInterfaceNode])
 
         self.uIE = self.vemspace.function() 
         self.uIE[self.isExtNode] = model.solution_plus(node[self.isExtNode])       
@@ -87,14 +86,12 @@ class PoissonInterfaceVEMModel():
 
         node = mesh.node
         self.wh = self.vemspace.function()
-        self.wh[self.isInterfaceNode] =
-        self.model.func_jump(node[self.isInterfaceNode])
+        self.wh[self.isInterfaceNode] = self.model.func_jump(node[self.isInterfaceNode])
 
         self.uIE = self.vemspace.function() 
         self.uIE[self.isExtNode] = self.model.solution_plus(node[self.isExtNode])
         self.uII = self.vemspace.function()
-        self.uII[self.isIntNode] =
-        self.model.solution_minus(node[self.isIntNode])
+        self.uII[self.isIntNode] = self.model.solution_minus(node[self.isIntNode])
 
         self.area = self.vemspace.smspace.area 
 
@@ -121,7 +118,7 @@ class PoissonInterfaceVEMModel():
             uh = self.uh
         idx = np.repeat(range(NC), NV)
         for i in range(3):
-            S[i::ldof] = np.bincount(idx, weights=self.B[i, :]*uh[cell], minlength=NC)
+            S[i::ldof] = np.bincount(idx, weights=self.mat.B[i, :]*uh[cell], minlength=NC)
         return S
 
 

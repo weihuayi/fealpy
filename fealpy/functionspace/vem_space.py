@@ -212,7 +212,7 @@ class VEMDof2d():
         p = self.p
         mesh = self.mesh
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE= mesh.number_of_edges()
 
         edge = mesh.ds.edge
@@ -247,7 +247,7 @@ class VEMDof2d():
             idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
 
-            N = mesh.number_of_points()
+            N = mesh.number_of_nodes()
             NV = mesh.number_of_vertices_of_cells()
             NE = mesh.number_of_edges()
             idof = (p-1)*p//2
@@ -260,8 +260,8 @@ class VEMDof2d():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        N = mesh.number_of_points()
-        gdof = N 
+        NN = mesh.number_of_nodes()
+        gdof = NN
         p = self.p
         if p > 1:
             gdof += NE*(p-1) + NC*(p-1)*p//2
@@ -282,21 +282,21 @@ class VEMDof2d():
         p = self.p
         mesh = self.mesh
         cell = mesh.ds.cell
-        point = mesh.point
+        node = mesh.node
 
         if p == 1:
-            return point
+            return node 
         if p > 1:
-            N = point.shape[0]
-            dim = point.shape[-1]
+            N =  node.shape[0]
+            dim = node.shape[-1]
             NE = mesh.number_of_edges()
             gdof = self.number_of_global_dofs()
             ipoint = np.zeros((gdof, dim), dtype=np.float)
-            ipoint[:N, :] = point
+            ipoint[:N, :] = node 
             edge = mesh.ds.edge
             qf = GaussLobattoQuadrature(p + 1)
             bcs = qf.quadpts[1:-1, :]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, point[edge, :]).reshape(-1, dim)
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs,  node[edge, :]).reshape(-1, dim)
             return ipoint
 
 
@@ -343,7 +343,7 @@ class VirtualElementSpace2d():
     def interpolation(self, u, integral=None):
         p = self.p
         mesh = self.mesh
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         p = self.p
         ipoint = self.interpolation_points()

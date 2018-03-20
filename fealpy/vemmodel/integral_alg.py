@@ -23,7 +23,7 @@ class PolygonMeshIntegralAlg():
 
     def integral(self, u, celltype=False):
         pmesh = self.pmesh
-        point = pmesh.point
+        node = pmesh.node
         bc = self.barycenter
 
         edge = pmesh.ds.edge
@@ -35,7 +35,7 @@ class PolygonMeshIntegralAlg():
         bcs, ws = qf.quadpts, qf.weights
 
 
-        tri = [bc[edge2cell[:, 0]], point[edge[:, 0]], point[edge[:, 1]]]
+        tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
         a = self.triangle_area(tri)
         pp = np.einsum('ij, jkm->ikm', bcs, tri)
         val = u(pp, edge2cell[:, 0])
@@ -49,7 +49,7 @@ class PolygonMeshIntegralAlg():
         np.add.at(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        tri = [bc[edge2cell[isInEdge, 1]], point[edge[isInEdge, 1]], point[edge[isInEdge, 0]]]
+        tri = [bc[edge2cell[isInEdge, 1]], node[edge[isInEdge, 1]], node[edge[isInEdge, 0]]]
         a = self.triangle_area(tri)
         pp = np.einsum('ij, jkm->ikm', bcs, tri)
         val = u(pp, edge2cell[isInEdge, 1])

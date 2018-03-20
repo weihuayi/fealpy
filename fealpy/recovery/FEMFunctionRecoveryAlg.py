@@ -9,24 +9,24 @@ class FEMFunctionRecoveryAlg():
         V = uh.V
         mesh = V.mesh
 
-        p2c = mesh.ds.point_to_cell()
-        valence = p2c.sum(axis=1)
+        node2cell = mesh.ds.node_to_cell()
+        valence = node2cell.sum(axis=1)
 
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
 
         VV = VectorLagrangeFiniteElementSpace(mesh, V.p)
         rguh = VV.function()
-        rguh[:] = np.asarray(p2c@guh)/valence.reshape(-1, 1)
+        rguh[:] = np.asarray(node2cell@guh)/valence.reshape(-1, 1)
         return rguh
 
     def area_average(self, uh):
         V = uh.V
         mesh = V.mesh
 
-        p2c = mesh.ds.point_to_cell()
+        node2cell = mesh.ds.node_to_cell()
         area = mesh.area()
-        asum = p2c@area
+        asum = node2cell@area
 
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
@@ -40,9 +40,9 @@ class FEMFunctionRecoveryAlg():
         V = uh.V
         mesh = V.mesh
 
-        p2c = mesh.ds.point_to_cell()
+        node2cell = mesh.ds.node_to_cell()
         inva = 1/mesh.area()
-        asum = p2c@inva
+        asum = node2cell@inva
 
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)

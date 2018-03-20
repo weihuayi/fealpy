@@ -21,7 +21,7 @@ class PolygonMesh(Mesh2d):
                 raise(ValueError("Miss `cellLocation` array!"))
 
         self.ds = PolygonMeshDataStructure(node.shape[0], cell, cellLocation)
-        self.meshType = 'polygon'
+        self.meshtype = 'polygon'
 
     def integrator(self, k):
         return TriangleQuadrature(k)
@@ -58,7 +58,7 @@ class PolygonMesh(Mesh2d):
 
     def barycenter(self, entity='cell', index=None):
         node = self.node
-        dim = self.geom_dimension()
+        dim = self.geo_dimension()
 
         if entity is 'cell':
             cell2node = self.ds.cell_to_node()

@@ -80,7 +80,7 @@ class Circle():
         p[:], d, n= project(self, p)
         return d, n
 
-class Curve1():
+class FoldCurve():
     def __init__(self, a=6):
         self.a = a
         self.box = [-1, 1, -1, 1]
@@ -88,18 +88,52 @@ class Curve1():
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[:, 0]
-            y = p[:, 1]
+            x = p[..., 0]
+            y = p[..., 1]
         elif len(args) == 2:
             x, y = args
         else:
             raise ValueError("the args must be a N*2 or (X, Y)")
 
         a = self.a
-        anu = 0.02*np.sqrt(5)
-        theta = np.arctan2(y- anu, x - anu)
+        c = 0.02*np.sqrt(5)
+        pi = np.pi
+        theta = np.arctan2(y- c, x - c)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
 
-        return (x - anu)**2 + (y - anu)**2 - (0.5 + 0.2 * np.sin(a*theta))**2 
+        return (x - c)**2 + (y - c)**2 - (0.5 + 0.2 * np.sin(a*theta))**2 
+
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        c = 0.02*np.sqrt(5)
+        a = self.a
+        x = p[..., 0]
+        y = p[..., 1]
+        b0 = 0.5
+        b1 = 0.2
+        cos = np.cos
+        sin = np.sin
+        pi = np.pi
+
+        theta = np.arctan2(y- c, x - c)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
+        r2 = (-c + x)**2 + (-c + y)**2
+
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = -2*a*b1*(b0 + b1*sin(a*theta))*(c - y)*cos(a*theta)/r2 - 2*c + 2*x
+
+        grad[..., 1] = -2*a*b1*(b0 + b1*sin(a*theta))*(-c + x)*cos(a*theta)/r2 - 2*c + 2*y
+        return grad
+
+    def distvalue(self, p):
+        p[:], d, n= project(self, p)
+        return d, n
+
+    def project(self, p):
+        p[:], d, n= project(self, p)
+        return d, n
 
 
 class Curve2():
