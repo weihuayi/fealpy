@@ -102,22 +102,22 @@ def interfacemesh2d(box, phi, n):
 
     mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad') 
 
-    N = mesh.number_of_points()
+    N = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
     NE = mesh.number_of_edges()
 
-    point = mesh.point
+    node = mesh.node
     cell = mesh.ds.cell
 
-    phiValue = phi(point)
+    phiValue = phi(node)
     #phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
     phiSign = np.sign(phiValue)
 
-    # Step 1: find the points near interface
+    # Step 1: find the nodes near interface
     edge = mesh.ds.edge
     isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0 
-    e0 = point[edge[isCutEdge, 0]]
-    e1 = point[edge[isCutEdge, 1]]
+    e0 = node[edge[isCutEdge, 0]]
+    e1 = node[edge[isCutEdge, 1]]
     cutPoint = find_cut_point(phi, e0, e1)
     ncut = cutPoint.shape[0]
 
@@ -458,7 +458,7 @@ class InterfaceMesh3d():
         tcell = tcell[~isBadCell]
         cellIdx = cellIdx[~isBadCell]
 
-        T = TetrahedronMesh(self.point, idxMap[tcell])
+        T = TetrahedronMesh(self.node, idxMap[tcell])
         T.cellIdx = cellIdx
 
         return T
@@ -565,7 +565,7 @@ class InterfaceMesh3d():
         cutPolyIdx[isCutPoly] = range(NP)
 
         pface2cell = cutPolyIdx[pface2cell]
-        pmesh = PolyhedronMesh(self.point, pface, pfaceLocation, pface2cell)
+        pmesh = PolyhedronMesh(self.node, pface, pfaceLocation, pface2cell)
 
         pmesh.cellData = {'flag':flag, }
 
@@ -581,7 +581,7 @@ class InterfaceMesh3d():
 
         self.find_aux_point()
 
-        interfacePoint, idxMap = self.find_interface_point()
+        interfacePoint, idxMap = self.find_interface_node()
 
         T = self.delaunay(interfacePoint, idxMap)
 

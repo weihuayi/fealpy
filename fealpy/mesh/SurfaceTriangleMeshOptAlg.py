@@ -8,11 +8,13 @@ class SurfaceTriangleMeshOptAlg:
         self.theta = theta
 
     def run(self, maxit=10):
-        for i in range(3):
+        mesh = self.mesh
+        print('Laplace smooting:')
+        for i in range(10):
             mesh.node = self.laplace_smoothing()
-            mesh.edge_swap()
 
-        for i in range(maxit):
+        print('CVT smoothing:')
+        for i in range(0):
             mesh.node = self.cvt_smoothing()
             mesh.edge_swap()
 
@@ -25,10 +27,10 @@ class SurfaceTriangleMeshOptAlg:
         cell = mesh.entity('cell')
 
         node2node= mesh.ds.node_to_node()
-        NV = node2node.sum(axis=1)
-        newNode = node2node@node/NV.reshape(-1, 1)
+        NV = np.asarray(node2node.sum(axis=1))
+        newNode = np.asarray(node2node@node)/NV.reshape(-1, 1)
 
-        normal = sruface.unit_normal(node)
+        normal = surface.unit_normal(node)
         mv = newNode - node
         mv -= np.sum(mv*normal, axis=-1).reshape(-1, 1)*normal
         return node + theta*mv
