@@ -22,19 +22,51 @@ class QuadrangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
 
-    def area(self):
-        NC = self.number_of_cells()
+    def area(self, index=None):
         node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0,-1],[1, 0]], dtype=np.int)
-        v= (node[edge[:,1], :] - node[edge[:,0], :])@w
-        val = np.sum(v*node[edge[:,0], :], axis=1)
-        a = np.bincount(edge2cell[:,0], weights=val, minlength=NC)
-        a+= np.bincount(edge2cell[isInEdge,1], weights=-val[isInEdge], minlength=NC)
-        a /=2
-        return a
+        cell = self.ds.cell
+        dim = self.node.shape[1] 
+        if index is None:
+            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
+            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
+        else:
+            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
+        nv = np.cross(v1, v2)
+        a0 = nv/2.0
+
+        if index is None:
+            v1 = node[cell[:, 3], :] - node[cell[:, 2], :]
+            v2 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        else:
+            v1 = node[cell[index, 3], :] - node[cell[index, 2], :]
+            v2 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        nv = np.cross(v1, v2)
+        a1 = nv/2.0
+        return a0 + a1
+
+    def cell_area(self, index=None):
+        node = self.node
+        cell = self.ds.cell
+        dim = self.node.shape[1] 
+        if index is None:
+            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
+            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
+        else:
+            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
+        nv = np.cross(v1, v2)
+        a0 = nv/2.0
+
+        if index is None:
+            v1 = node[cell[:, 3], :] - node[cell[:, 2], :]
+            v2 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        else:
+            v1 = node[cell[index, 3], :] - node[cell[index, 2], :]
+            v2 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        nv = np.cross(v1, v2)
+        a1 = nv/2.0
+        return a0 + a1
 
     def uniform_refine(self, n=1):
         for i in range(n):

@@ -231,10 +231,6 @@ class TwelveSpheres:
     def init_mesh(self):
         pass
 
-
-        
-    
-
 class HeartSurface:
     def __init__(self):
         self.box = [-2, 2, -2, 2, -2, 2]

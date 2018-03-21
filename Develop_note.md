@@ -81,17 +81,11 @@ The general member function of a mesh
 * number_of_cells()
 * number_of_edges()
 * number_of_faces()
-* number_of_entities_by_dim(dim)
-* number_of_entities_by_name(name)
+* number_of_entities(etype)
 
-* entity_by_dim(dim)
-* entity_by_name(name)
-
-* entity_measure_by_dim(dim)
-* entity_measure_by_name(name)
-
-* entity_barycenter_by_dim(dim) 
-* entity_barycenter_by_name(name) 
+* entity(etype)
+* entity_measure(etype)
+* entity_barycenter(etype) 
 
 * integrator(index) : get the quadrature formula on this kind of mesh
 * bc_to_points(bc) : transform quadrature points in barycentric coordinates to points in pysical cells

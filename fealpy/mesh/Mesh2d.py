@@ -53,58 +53,50 @@ class Mesh2d():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-    def area(self):
-        #TODO: 3D Case
-        NC = self.number_of_cells()
-        node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
-        val = np.sum(v*node[edge[:, 0], :], axis=1)
-        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
-        a /=2
-        return a
 
-    def cell_area(self):
-        #TODO: 3D Case
-        NC = self.number_of_cells()
-        node = self.node
-        edge = self.ds.edge
-        edge2cell = self.ds.edge2cell
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
-        val = np.sum(v*node[edge[:, 0], :], axis=1)
-        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
-        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
-        a /=2
-        return a
-
-    def edge_length(self):
-        edge = self.ds.edge
-        node = self.node
-        v = node[edge[:, 1]] - node[edge[:, 0]]
-        length = np.sqrt(np.sum(v**2, axis=-1))
-        return length
-
-    def entity(self, dim=2):
-        if dim == 2:
+    def entity(self, etype=2):
+        if etype in ['cell', 2]:
             return self.ds.cell
-        elif dim == 1:
+        elif etype in ['edge', 1]:
             return self.ds.edge
-        elif dim == 0:
+        elif etype in ['node', 0]:
             return self.node
         else:
-            raise ValueError('dim must be in [0, 1, 2]!')
+            raise ValueError("`entitytype` is wrong!")
 
-    def entity_measure(self, dim=2):
-        if dim == 2:
-            return self.cell_area()
-        elif dim == 1:
-            return self.edge_length()
+    def entity_measure(self, etype=2, index=None):
+        if etype in ['cell', 2]:
+            return self.cell_area(index)
+        elif etype in ['edge', 1]:
+            return self.edge_length(index)
+        elif etype in ['node', 0]:
+            return 0
+        else:
+            raise ValueError("`entitytype` is wrong!")
+
+    def entity_barycenter(self, etype=2, index=None):
+        node = self.node
+        if etype in ['cell', 2]:
+            cell = self.ds.cell
+            if index is None:
+                bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+            else:
+                bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
+        elif etype in ['edge', 1]:
+            edge = self.ds.edge
+            if index is None:
+                bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
+            else:
+                bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
+        elif etype in ['node', 0]:
+            if index is None:
+                bc = node
+            else:
+                bc = node[index]
+        else:
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+        return bc
+
 
     def edge_length(self, index=None):
         if index is None:
@@ -246,6 +238,9 @@ class Mesh2dDataStructure():
 
         totalEdge = cell[:, localEdge].reshape(-1, 2)
         return np.sort(totalEdge, axis=1)
+
+    def local_edge(self):
+        return self.localEdge
 
     def construct(self):  
         """ Construct edge and edge2cell from cell

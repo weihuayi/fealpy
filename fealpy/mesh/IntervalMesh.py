@@ -19,21 +19,13 @@ class IntervalMesh():
     def number_of_cells(self):
         return self.ds.NC
 
-    def number_of_entities_by_dim(self, dim):
-        if dim == 1:
+    def number_of_entities(self, etype):
+        if etype in ['cell', 1]:
             return self.ds.NC
-        elif dim == 0:
+        elif etype in ['node', 0]:
             return self.ds.NN
         else:
             raise ValueError("`dim` must be 0 or 1!")
-
-    def number_of_entities_by_name(self, entityname):
-        if name is 'cell':
-            return self.ds.NC
-        elif name is 'node':
-            return self.ds.NN
-        else:
-            raise ValueError("`name` must be `cell` or `node`!")
 
     def geo_dimension(self):
         node = self.node
@@ -45,6 +37,25 @@ class IntervalMesh():
     def top_dimension(self):
         return 1
 
+
+    def entity_measure(self, etype=1, index=None):
+        if etype in ['cell', 1]:
+            return self.cell_length(cellidx=index)
+        elif etype in ['node', 0]:
+            return 0
+        else:
+            raise ValueError("`etype` is wrong!")
+
+    def entity_barycenter(self, etype=1):
+        node = self.node
+        cell = self.ds.cell
+        if etype in ['cell', 1]:
+            return np.sum(node[cell], axis=-1)/2
+        elif etype in ['node', 0]:
+            return node
+        else:
+            raise ValueError("`etype` is wrong!")
+
     def cell_length(self, cellidx=None):
         node = self.node
         cell = self.ds.cell
@@ -52,40 +63,6 @@ class IntervalMesh():
             return node[cell[:, 1]] - node[cell[:, 0]]
         else:
             return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
-
-    def entity_measure_by_dim(self, dim, index=None):
-        if dim == 1:
-            return self.cell_length(cellidx=index)
-        elif dim == 0:
-            return 0
-        else:
-            raise ValueError("`dim` must be 0 or 1!")
-
-    def entity_measure_by_name(self, name, index=None):
-        if name is 'cell':
-            return self.cell_length(cellidx=index)
-        elif name is 'node':
-            return 0
-        else:
-            raise ValueError("`name` must be `cell` or `node`!")
-
-    def entity_barycenter_by_dim(self, dim):
-        node = self.node
-        cell = self.ds.cell
-        if dim == 1:
-            return np.sum(node[cell], axis=-1)/2
-        elif dim == 0:
-            return node
-
-    def entity_barycenter_by_name(self, name):
-        node = self.node
-        cell = self.ds.cell
-        if name is 'cell': 
-            return np.sum(node[cell], axis=-1)/2
-        elif name is 'node':
-            return node
-        else:
-            raise ValueError("`name` must be `cell` or `node`!")
 
     def bc_to_points(self, bc)
         node = self.node

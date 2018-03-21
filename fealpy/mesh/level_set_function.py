@@ -280,9 +280,6 @@ def project(surface, p0, maxit=200, tol=1e-8):
 
     return p, d
 
-        
-    
-
 class HeartSurface:
     def __init__(self):
         self.box = [-2, 2, -2, 2, -2, 2]

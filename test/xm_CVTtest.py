@@ -181,7 +181,7 @@ def MassCenter(point,cell,normal,gamma=1):
 
     massCenter = massCenter - l *normal
 
-    return massCenter
+    return massCenteruu
 
 massCenter = MassCenter(point,cell,normal,gamma=1)
 print(massCenter)

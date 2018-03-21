@@ -107,6 +107,36 @@ class PolygonMesh(Mesh2d):
         d = node[idx1] - node[idx2] 
         return 0.5*d@w 
 
+    def area(self, index=None):
+        #TODO: 3D Case
+        NC = self.number_of_cells()
+        node = self.node
+        edge = self.ds.edge
+        edge2cell = self.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+
+    def cell_area(self, index=None):
+        #TODO: 3D Case
+        NC = self.number_of_cells()
+        node = self.node
+        edge = self.ds.edge
+        edge2cell = self.ds.edge2cell
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+
     def print(self):
         print("Node:\n", self.node)
         print("Cell:\n", self.ds.cell)

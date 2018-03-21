@@ -13,13 +13,12 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
         super(TriangleMeshDataStructure, self).__init__(N, cell) 
 
 class TriangleMesh(Mesh2d):
-    def __init__(self, node, cell, dtype=np.float):
+    def __init__(self, node, cell):
 
         self.node = node
         N = node.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
         self.meshtype = 'tri'
-        self.dtype = dtype
 
         self.celldata = {}
         self.nodedata = {}
@@ -31,7 +30,7 @@ class TriangleMesh(Mesh2d):
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
-        dim = self.geom_dimension()
+        dim = self.geo_dimension()
 
         v0 = node[cell[:,2],:] - node[cell[:,1],:]
         v1 = node[cell[:,0],:] - node[cell[:,2],:]
@@ -81,9 +80,9 @@ class TriangleMesh(Mesh2d):
             # Find non-Delaunay edges
             angle = self.angle()
             asum = np.sum(angle[edge2cell[:, 0:2], edge2cell[:, 2:4]], axis=1)
-            isNonDelaunayEdge = (asum > np.pi) \
-                    & (edge2cell[:,0] != edge2cell[:,1])
-            if np.any(isNonDelaunayEdge) is not True:
+            isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:,0] != edge2cell[:,1])
+            
+            if np.sum(isNonDelaunayEdge) == 0:
                 break
             # Find dependent set of swap edges
             isCheckCell = np.sum(isNonDelaunayEdge[cell2edge], axis=1) > 1
@@ -229,12 +228,12 @@ class TriangleMesh(Mesh2d):
         v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
         v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
         v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
-        dim = self.geom_dimension()
+        dim = self.geo_dimension()
         nv = np.cross(v2, -v1)
-        Dlambda = np.zeros((NC, 3, dim), dtype=self.dtype)
+        Dlambda = np.zeros((NC, 3, dim), dtype=np.float)
         if dim == 2:
             length = nv
-            W = np.array([[0, 1], [-1, 0]], dtype=self.dtype)
+            W = np.array([[0, 1], [-1, 0]])
             Dlambda[:,0,:] = v0@W/length.reshape((-1, 1))
             Dlambda[:,1,:] = v1@W/length.reshape((-1, 1))
             Dlambda[:,2,:] = v2@W/length.reshape((-1, 1))
@@ -269,9 +268,9 @@ class TriangleMesh(Mesh2d):
         v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
         v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
         v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
-        dim = self.geom_dimension()
+        dim = self.geo_dimension()
         nv = np.cross(v2, -v1)
-        Rlambda = np.zeros((NC, 3, dim), dtype=self.dtype)
+        Rlambda = np.zeros((NC, 3, dim), dtype=np.float)
         if dim == 2:
             length = nv
             Rlambda[:,0,:] = v0/length.reshape((-1, 1))
@@ -284,13 +283,16 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def area(self):
+    def area(self, index=None):
         node = self.node
         cell = self.ds.cell
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
         dim = self.node.shape[1] 
+        if index is None:
+            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
+            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
+        else:
+            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
         if dim == 2:
             a = nv/2.0
@@ -298,13 +300,16 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
-    def cell_area(self):
+    def cell_area(self, index=None):
         node = self.node
         cell = self.ds.cell
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
         dim = self.node.shape[1] 
+        if index is None:
+            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
+            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
+        else:
+            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
         if dim == 2:
             a = nv/2.0
@@ -339,7 +344,6 @@ class TriangleMeshWithInfinityNode:
         self.center = np.append(mesh.barycenter(),
                 0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         self.meshtype = 'tri'
-        self.dtype = mesh.dtype
 
     def number_of_nodes(self):
         return self.node.shape[0] 
@@ -355,9 +359,6 @@ class TriangleMeshWithInfinityNode:
 
     def number_of_cells(self):
         return self.ds.NC
-
-    def geom_dimension(self):
-        return self.node.shape[1]
 
     def is_infinity_cell(self):
         N = self.number_of_nodes()
