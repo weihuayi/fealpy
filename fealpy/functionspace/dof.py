@@ -25,12 +25,12 @@ class CPLFEMDof1d():
         if p == 1:
             return cell
         else:
-            N = mesh.number_of_nodes()
+            NN = mesh.number_of_nodes()
             NC = mesh.number_of_cells()
             ldof = self.number_of_local_dofs()
             cell2dof = np.zeros((NC, ldof), dtype=np.int)
             cell2dof[:, [0, -1]] = cell
-            cell2dof[:, 1:-1] = N + np.arange(NC*(p-1)).reshape(NC, p-1)
+            cell2dof[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
             return cell2dof
 
     def number_of_local_dofs(self):
@@ -54,15 +54,24 @@ class CPLFEMDof1d():
         if p == 1:
             return node
         else:
-            N = node.shape[0]
+            NN = mesh.number_of_nodes() 
             gdof = self.number_of_global_dofs()
-            ipoint = np.zeros(gdof, dtype=np.float)
-            ipoint[:N] = node
+            shape = (gdof,) + node.shape[1:]
+            ipoint = np.zeros(shape, dtype=np.float)
+            ipoint[:NN] = node
             NC = mesh.number_of_cells()
-            edge = mesh.ds.edge
+            cell = mesh.ds.cell
+            w = np.zeros((p-1,2), dtype=np.float)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NC] = np.einsum('ij, kj->ki', w, node[cell]).reshape(-1)
+            GD = mesh.geo_dimension()
+            if GD == 1:
+                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                        node[cell]).reshape(-1)
+            else:
+                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                        node[cell]).reshape(-1, GD)
+
             return ipoint
 
 class CPLFEMDof2d():

@@ -9,8 +9,6 @@ from ..quadrature  import TriangleQuadrature
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
-from .form import Form 
-
 class PoissonRecoveryFEMModel:
     def __init__(self, mesh, model, integrator=None, rtype='simple'):
         self.V = LagrangeFiniteElementSpace(mesh, p=1) 

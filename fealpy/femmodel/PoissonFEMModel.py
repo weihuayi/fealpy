@@ -93,3 +93,9 @@ class PoissonFEMModel(object):
         guh = self.uh.grad_value
         mesh = self.mesh
         return self.error.L2_error(gu, guh, mesh)
+
+    def recover_error(self, rgh):
+        gu = self.model.gradient
+        guh = rgh.value
+        mesh = self.mesh
+        return self.error.L2_error(gu, guh, mesh)

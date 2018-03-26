@@ -13,6 +13,7 @@ from .StructureHexMesh import StructureHexMesh
 from .StructureQuadMesh import StructureQuadMesh 
 from .TetrahedronMesh import TetrahedronMesh
 from .PolyhedronMesh import PolyhedronMesh 
+from .TriangleMesh import TriangleMesh
 
 
 def msign(x):
@@ -118,44 +119,44 @@ def interfacemesh2d(box, phi, n):
     isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0 
     e0 = node[edge[isCutEdge, 0]]
     e1 = node[edge[isCutEdge, 1]]
-    cutPoint = find_cut_point(phi, e0, e1)
-    ncut = cutPoint.shape[0]
+    cutNode = find_cut_point(phi, e0, e1)
+    ncut = cutNode.shape[0]
 
     # find interface cell and point
     isInterfaceCell = np.zeros(NC, dtype=np.bool)
     edge2cell =  mesh.ds.edge_to_cell()
     isInterfaceCell[edge2cell[isCutEdge, 0:2]] = True
     isInterfaceCell[np.sum(np.abs(phiSign[cell]), axis=1) < 3] = True
-    isInterfacePoint = np.zeros(N, dtype=np.bool)
-    isInterfacePoint[cell[isInterfaceCell,:]] = True
+    isInterfaceNode = np.zeros(N, dtype=np.bool)
+    isInterfaceNode[cell[isInterfaceCell,:]] = True
 
     # Find specical cells
     isSpecialCell = (np.sum(np.abs(phiSign[cell]), axis=1) == 2) \
             & (np.sum(phiSign[cell], axis=1) == 0)
     scell = cell[isSpecialCell, :]
-    auxPoint = (point[scell[:, 0], :] + point[scell[:, 2], :])/2
-    naux = auxPoint.shape[0]
+    auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :])/2
+    naux = auxNode.shape[0]
 
-    interfacePoint = np.concatenate(
-            (point[isInterfacePoint, :], cutPoint, auxPoint), 
+    interfaceNode = np.concatenate(
+            (node[isInterfaceNode, :], cutNode, auxNode), 
             axis=0)
-    dt = Delaunay(interfacePoint)
+    dt = Delaunay(interfaceNode)
     tri = dt.simplices 
-    NI = np.sum(isInterfacePoint)
+    NI = np.sum(isInterfaceNode)
     isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
     tri = tri[~isUnnecessaryCell, :]
 
-    interfacePointIdx = np.zeros(interfacePoint.shape[0], dtype=np.int)
-    interfacePointIdx[:NI], = np.nonzero(isInterfacePoint) 
-    interfacePointIdx[NI:NI+ncut] = N + np.arange(ncut)
-    interfacePointIdx[NI+ncut:] = N + ncut + np.arange(naux)
-    tri = interfacePointIdx[tri]
+    interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
+    interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode) 
+    interfaceNodeIdx[NI:NI+ncut] = N + np.arange(ncut)
+    interfaceNodeIdx[NI+ncut:] = N + ncut + np.arange(naux)
+    tri = interfaceNodeIdx[tri]
 
     # Get the final mesh in PolygonMesh 
 
     NS = np.sum(~isInterfaceCell)
     NT = tri.shape[0]
-    ppoint = np.concatenate((point, cutPoint, auxPoint), axis=0)
+    pnode = np.concatenate((node, cutNode, auxNode), axis=0)
     pcell = np.zeros(NS*4 + NT*3, dtype=np.int) 
     pcellLocation = np.zeros(NS + NT + 1, dtype=np.int) 
 
@@ -167,10 +168,10 @@ def interfacemesh2d(box, phi, n):
     pcellLocation[:NS] = range(0, 4*NS, 4)
     pcellLocation[NS:-1] = range(4*NS, 4*NS+3*NT, 3)
     pcellLocation[-1] = 4*NS+3*NT
-    pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
+    pmesh = PolygonMesh(pnode, pcell, pcellLocation)
 
-    pmesh.pointMarker = np.zeros(pmesh.number_of_points(), dtype=np.int)
-    pmesh.pointMarker[:N] = phiSign
+    pmesh.nodeMarker = np.zeros(pmesh.number_of_nodes(), dtype=np.int)
+    pmesh.nodeMarker[:N] = phiSign
 
     pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
     pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
@@ -185,14 +186,14 @@ class InterfaceMesh2d():
 
         self.interface = interface 
         self.mesh = StructureQuadMesh(box, nx=n, ny=n)
-        self.point = self.mesh.point
-        self.phi = interface(self.point)
+        self.node = self.mesh.node
+        self.phi = interface(self.node)
         self.phi[np.abs(self.phi) < 0.1*self.h**2] = 0.0
         self.phiSign = msign(self.phi) 
 
         self.box = box
         self.n = n
-        self.N0 = self.point.shape[0]
+        self.N0 = self.node.shape[0]
 
     def find_cut_cell(self):
         mesh = self.mesh
@@ -223,24 +224,24 @@ class InterfaceMesh2d():
 
     def find_cut_point(self):
         mesh = self.mesh
-        point = self.point
+        node = self.node
         edge = mesh.ds.edge
         phiSign = self.phiSign 
         isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
         
-        A = point[edge[isCutEdge, 0]]
-        B = point[edge[isCutEdge, 1]]
+        A = node[edge[isCutEdge, 0]]
+        B = node[edge[isCutEdge, 1]]
 
         self.N1 = self.N0 + A.shape[0]
 
-        cutPoint = find_cut_point(self.interface, A, B)
-        self.point = np.append(point, cutPoint, axis=0)
+        cutNode = find_cut_point(self.interface, A, B)
+        self.node = np.append(node, cutNode, axis=0)
         self.phi = np.append(self.phi, np.zeros(A.shape[0]))
         self.phiSign = np.append(self.phiSign, np.zeros(A.shape[0]))
 
     def find_aux_point(self):
         mesh = self.mesh
-        point = self.point
+        node = self.node
         cell = mesh.ds.cell
         phiSign = self.phiSign 
 
@@ -248,30 +249,30 @@ class InterfaceMesh2d():
                 & (np.sum(phiSign[cell], axis=1) == 0)
         scell = cell[isSpecialCell, :]
 
-        auxPoint = (point[scell[:, 0], :] + point[scell[:, 2], :])/2
+        auxNode = (node[scell[:, 0], :] + node[scell[:, 2], :])/2
 
-        self.N2 = self.N1 + auxPoint.shape[0]
-        self.point = np.append(point, auxPoint, axis=0)
+        self.N2 = self.N1 + auxNode.shape[0]
+        self.node = np.append(node, auxNode, axis=0)
 
         self.phi = np.append(self.phi, np.zeros(self.N2 - self.N1))
         self.phiSign = np.append(self.phiSign, np.zeros(self.N2 - self.N1))
 
-    def find_interface_point(self):
+    def find_interface_node(self):
         N = self.N2 
         cell = self.mesh.ds.cell
-        point = self.point
-        isInterfacePoint = np.zeros(N, dtype=np.bool)
+        node = self.node
+        isInterfaceNode = np.zeros(N, dtype=np.bool)
         isCutCell = self.is_cut_cell()
-        isInterfacePoint[cell[isCutCell]] = True
-        isInterfacePoint[self.N0:] = True
+        isInterfaceNode[cell[isCutCell]] = True
+        isInterfaceNode[self.N0:] = True
 
-        return point[isInterfacePoint], np.nonzero(isInterfacePoint)[0]
+        return node[isInterfaceNode], np.nonzero(isInterfaceNode)[0]
 
-    def delaunay(self, interfacePoint, idxMap):
+    def delaunay(self, interfaceNode, idxMap):
 
-        t = Delaunay(interfacePoint)
+        t = Delaunay(interfaceNode)
         tcell = t.simplices
-        NI = interfacePoint.shape[0] - (self.N2 - self.N0)
+        NI = interfaceNode.shape[0] - (self.N2 - self.N0)
 
         isUnnecessaryCell = (np.sum(tcell < NI, axis=1) == 3)
         tcell = idxMap[tcell[~isUnnecessaryCell, :]]
@@ -279,7 +280,7 @@ class InterfaceMesh2d():
         isCutCell = self.is_cut_cell()
         NS = np.sum(~isCutCell)
         NT = tcell.shape[0]
-        ppoint = self.point 
+        pnode = self.node 
         pcell = np.zeros(NS*4 + NT*3, dtype=np.int) 
         pcellLocation = np.zeros(NS + NT + 1, dtype=np.int) 
 
@@ -293,25 +294,24 @@ class InterfaceMesh2d():
         pcellLocation[NS:-1] = range(4*NS, 4*NS+3*NT, 3)
         pcellLocation[-1] = 4*NS+3*NT
 
-        return ppoint, pcell, pcellLocation 
+        return pnode, pcell, pcellLocation 
 
     def run(self):
 
         self.find_cut_cell()
 
-        self.find_cut_point()
+        self.find_cut_node()
 
-        self.find_aux_point()
+        self.find_aux_node()
 
-        interfacePoint, idxMap = self.find_interface_point()
+        interfaceNode, idxMap = self.find_interface_node()
 
-        ppoint, pcell, pcellLocation = self.delaunay(interfacePoint, idxMap)
+        pnode, pcell, pcellLocation = self.delaunay(interfaceNode, idxMap)
 
-        return ppoint, pcell, pcellLocation 
+        return pnode, pcell, pcellLocation 
 
-    def point_marker(self):
+    def node_marker(self):
         return self.phiSign == 0 
-
 
 
 class InterfaceMesh3d():
@@ -319,8 +319,8 @@ class InterfaceMesh3d():
     def __init__(self, interface, box, n):
         self.interface = interface
         self.mesh = StructureHexMesh(box, nx=n, ny=n, nz=n)
-        self.point = self.mesh.point
-        self.phi = interface(self.point)
+        self.node = self.mesh.node
+        self.phi = interface(self.node)
         self.phiSign = msign(self.phi)
 
         self.box = box
@@ -328,7 +328,7 @@ class InterfaceMesh3d():
 
         self.h = (box[1] - box[0])/n
 
-        self.N0 = self.mesh.number_of_points()
+        self.N0 = self.mesh.number_of_nodes()
 
     def get_cell_idx(self, p):
         box = self.box
@@ -365,69 +365,64 @@ class InterfaceMesh3d():
         self.cellFlag[(~isCutCell) & (np.max(phiSign[cell], axis=1) == 1)] = 1
         self.cellFlag[(~isCutCell) & (np.min(phiSign[cell], axis=1) == -1)] = -1
 
-    def find_cut_point(self):
+    def find_cut_node(self):
         mesh = self.mesh
-        point = self.point
+        node = self.node
         edge = mesh.ds.edge
         phiSign = self.phiSign 
         isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
         
-        A = point[edge[isCutEdge, 0]]
-        B = point[edge[isCutEdge, 1]]
+        A = node[edge[isCutEdge, 0]]
+        B = node[edge[isCutEdge, 1]]
 
         self.N1 = self.N0 + A.shape[0]
 
-        cutPoint = find_cut_point(self.interface, A, B)
-        self.point = np.append(point, cutPoint, axis=0)
+        cutNode = find_cut_point(self.interface, A, B)
+        self.node = np.append(node, cutNode, axis=0)
         self.phi = np.append(self.phi, np.zeros(A.shape[0]))
         self.phiSign = np.append(self.phiSign, np.zeros(A.shape[0]))
 
-    def find_aux_point(self):
+    def find_aux_node(self):
         mesh = self.mesh
-        point = self.point
+        node = self.node
         face = mesh.ds.face
         face2cell = mesh.ds.face_to_cell()
         phiSign = self.phiSign 
         isAuxFace = (phiSign[face[:, 0]] == 0) & (phiSign[face[:, 2]] ==0)
         isAuxFace = isAuxFace | ((phiSign[face[:, 1]] == 0) & (phiSign[face[:, 3]] ==0))
-        auxPoint = (point[face[isAuxFace, 0]] + point[face[isAuxFace, 2]])/2
+        auxNode = (node[face[isAuxFace, 0]] + node[face[isAuxFace, 2]])/2
 
-        self.N2 = self.N1 + auxPoint.shape[0]
-        self.point = np.append(point, auxPoint, axis=0)
+        self.N2 = self.N1 + auxNode.shape[0]
+        self.node = np.r_['0', node, auxNode]
 
-        self.phi = np.append(self.phi, np.zeros(self.N2 - self.N1))
-        self.phiSign = np.append(self.phiSign, np.zeros(self.N2 - self.N1))
+        self.phi = np.r_[self.phi, np.zeros(self.N2 - self.N1)]
+        self.phiSign = np.r_[self.phiSign, np.zeros(self.N2 - self.N1)]
 
     def is_cut_cell(self):
         cellFlag = self.cellFlag
         isCutCell = (cellFlag == 0)
         return isCutCell
 
-    def find_interface_point(self):
+    def find_interface_node(self):
         N = self.N2 
         cell = self.mesh.ds.cell
-        point = self.point
-        isInterfacePoint = np.zeros(N, dtype=np.bool)
+        node = self.node
+        isInterfaceNode = np.zeros(N, dtype=np.bool)
         isCutCell = self.is_cut_cell()
-        isInterfacePoint[cell[isCutCell]] = True
-        isInterfacePoint[self.N0:] = True
+        isInterfaceNode[cell[isCutCell]] = True
+        isInterfaceNode[self.N0:] = True
 
-        return point[isInterfacePoint], np.nonzero(isInterfacePoint)[0]
+        return node[isInterfaceNode], np.nonzero(isInterfaceNode)[0]
 
 
-    def delaunay(self, interfacePoint, idxMap):
+    def delaunay(self, interfaceNode, idxMap):
 
-        t = Delaunay(interfacePoint)
+        t = Delaunay(interfaceNode)
         tcell = t.simplices
 
-        bc = np.sum(interfacePoint[tcell], axis=1).reshape(-1, 3)/4
+        bc = np.sum(interfaceNode[tcell], axis=1).reshape(-1, 3)/4
 
         cellIdx = self.get_cell_idx(bc) 
-
-#        NI = interfacePoint.shape[0] - (self.N2 - self.N0)
-#
-#        isUnnecessaryCell = (np.sum(tcell < NI, axis=1) == 4)
-#        tcell = tcell[~isUnnecessaryCell, :]
 
         # Get rid of tets on the cube boundary
         eps = 1e-12
@@ -448,9 +443,9 @@ class InterfaceMesh3d():
 
 
         h = self.h
-        X = interfacePoint[tcell, 0]
-        Y = interfacePoint[tcell, 1]
-        Z = interfacePoint[tcell, 2]
+        X = interfaceNode[tcell, 0]
+        Y = interfaceNode[tcell, 1]
+        Z = interfaceNode[tcell, 2]
         isBadCell = (np.max(X, axis=1) - np.min(X, axis=1)) > 2*h - eps
         isBadCell = isBadCell | ((np.max(Y, axis=1) - np.min(Y, axis=1)) > 2*h - eps)
         isBadCell = isBadCell | ((np.max(Z, axis=1) - np.min(Z, axis=1)) > 2*h - eps)
@@ -462,6 +457,7 @@ class InterfaceMesh3d():
         T.cellIdx = cellIdx
 
         return T
+
 
     def tet_to_poly(self, T):
         # Get the interface and triangles between cubes 
@@ -571,21 +567,49 @@ class InterfaceMesh3d():
 
         return pmesh
 
+    def interface_mesh(self, T):
+        cellIdx = T.cellIdx
+
+        tcell = T.ds.cell
+        face = T.ds.face
+        face2cell = T.ds.face_to_cell()
+
+        phiSign = self.phiSign
+        isInteriorTet = np.min(phiSign[tcell], axis=1) == -1 
+
+        isInterfaceFace0 = (face2cell[:, 0] != face2cell[:, 1]) & isInteriorTet[face2cell[:, 0]] & (~isInteriorTet[face2cell[:, 1]])   
+        isInterfaceFace1 = (face2cell[:, 0] != face2cell[:, 1]) & (~isInteriorTet[face2cell[:, 0]]) & isInteriorTet[face2cell[:, 1]]
+
+        tface0 = face[isInterfaceFace0]
+        tface0 = np.append(tface0, face[isInterfaceFace1][:, [0, 2, 1]], axis=0)
+
+        node = T.node
+        N = T.number_of_nodes()
+        isInterfaceNode = np.zeros(N, dtype=np.bool)
+        isInterfaceNode[tface0] = True
+        NN = np.sum(isInterfaceNode)
+        idxMap = np.zeros(N, dtype=np.int)
+        idxMap[isInterfaceNode] = range(NN)
+        triangles = idxMap[tface0]
+
+        return TriangleMesh(node[isInterfaceNode], triangles)
 
 
-    def run(self):
+    def run(self, meshtype='polyhedron'):
 
         self.find_cut_cell()
 
-        self.find_cut_point()
+        self.find_cut_node()
 
-        self.find_aux_point()
+        self.find_aux_node()
 
-        interfacePoint, idxMap = self.find_interface_node()
+        interfaceNode, idxMap = self.find_interface_node()
 
-        T = self.delaunay(interfacePoint, idxMap)
+        T = self.delaunay(interfaceNode, idxMap)
 
-        pmesh = self.tet_to_poly(T)
-
-        return pmesh
+        if meshtype is 'polyhedron':
+            mesh = self.tet_to_poly(T)
+        elif meshtype is 'interfacemesh':
+            mesh = self.interface_mesh(T)
+        return mesh
 

@@ -1,5 +1,5 @@
 import numpy as np
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
+from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
@@ -64,15 +64,15 @@ class IntervalMesh():
         else:
             return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
 
-    def bc_to_points(self, bc)
+    def bc_to_points(self, bc):
         node = self.node
         cell = self.ds.cell
         p = np.einsum('...j, ij->...i', bc, node[cell])
         return p 
 
     def add_plot(self, plot,
-            nodecolor='w', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=2,  
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=200,  
             showaxis=False):
 
         if isinstance(plot, ModuleType):
@@ -81,11 +81,10 @@ class IntervalMesh():
             axes = fig.gca() 
         else:
             axes = plot
-        return show_mesh_2d(axes, self,
-                nodecolor=nodecolor, edgecolor=edgecolor,
-                cellcolor=cellcolor, aspect=aspect,
+        return show_mesh_1d(axes, self,
+                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
-                showaxis=showaxis, showcolorbar=showcolorbar, cmap=cmap)
+                showaxis=showaxis)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
@@ -122,26 +121,27 @@ class IntervalMesh():
 
 
 class IntervalMeshDataStructure():
-    def __init__(self, N, cell):
-        self.N = N
+    def __init__(self, NN, cell):
+        self.NN = NN
         self.NC = len(cell)
         self.cell = cell
         self.construct()
 
     def reinit(self, N, cell):
-        self.N = N
+        self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
         self.construct()
 
     def construct(self):
-        N = self.N
+        NN = self.NN
         NC = self.NC
+        cell = self.cell
 
         _, i0, j = np.unique(cell.reshape(-1), return_index=True, return_inverse=True)
-        self.node2cell = np.zeros((N, 2), dtype=np.int)
+        self.node2cell = np.zeros((NN, 4), dtype=np.int)
 
-        i1 = np.zeros(N, dtype=np.int) 
+        i1 = np.zeros(NN, dtype=np.int) 
         i1[j] = np.arange(2*NC)
 
         self.node2cell[:, 0] = i0//2 
@@ -164,13 +164,13 @@ class IntervalMeshDataStructure():
         return self.node2cell
 
     def node_to_node(self):
-        N = self.N
+        NN = self.NN
         NC = self.NC
         cell = self.cell
         I = cell.flatten()
         J = cell[:,[1,0]].flatten()
         val = np.ones((2*NC,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN),dtype=np.bool)
         return node2node
 
     def boundary_node_flag(self):

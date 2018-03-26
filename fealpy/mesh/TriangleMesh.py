@@ -65,10 +65,10 @@ class TriangleMesh(Mesh2d):
         localEdge = self.ds.local_edge()
         angle = np.zeros((NC, 3), dtype=np.float)
         for i,(j,k) in zip(range(3),localEdge):
-            v0 = node[cell[:,j],:] - node[cell[:,i],:]
-            v1 = node[cell[:,k],:] - node[cell[:,i],:]
-            angle[:,i] = np.arccos(np.sum(v0*v1,axis=1)
-                    /np.sqrt(np.sum(v0**2,axis=1) * np.sum(v1**2,axis=1)))
+            v0 = node[cell[:,j]] - node[cell[:,i]]
+            v1 = node[cell[:,k]] - node[cell[:,i]]
+            angle[:,i] = np.arccos(np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1) * np.sum(v1**2, axis=1)))
+        print(np.isnan(angle).sum())
         return angle
 
     def edge_swap(self):
@@ -81,6 +81,8 @@ class TriangleMesh(Mesh2d):
             angle = self.angle()
             asum = np.sum(angle[edge2cell[:, 0:2], edge2cell[:, 2:4]], axis=1)
             isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:,0] != edge2cell[:,1])
+
+            return isNonDelaunayEdge
             
             if np.sum(isNonDelaunayEdge) == 0:
                 break

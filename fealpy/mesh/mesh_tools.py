@@ -55,18 +55,7 @@ def find_entity(axes, mesh, entity=None,
         color='r', markersize=20, 
         fontsize=24, fontcolor='k'):
 
-    if (entity is None) or (entity is 'node'): 
-        bc = mesh.barycenter(entity='node') 
-    elif entity is 'edge': 
-        bc = mesh.barycenter(entity='edge')
-    elif entity is 'face':
-        bc = mesh.barycenter(entity='face')
-    elif entity is 'cell':
-        bc = mesh.barycenter(entity='cell')
-    else:
-        pass
-        #TODO: raise a error
-
+    bc = mesh.entity_barycenter(entity)
     if (index is None) or ( index is 'all') :
         if (entity is None) or (entity is 'node'): 
             N = mesh.number_of_nodes()
@@ -130,13 +119,14 @@ def show_mesh_1d(axes, mesh,
     if dim == 1:
         node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
 
+    axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
     vts = node[cell, :]
 
     if dim < 3:
-        lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor, markersize=markersize)
+        lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor)
         return axes.add_collection(lines)
     else:
-        lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor, markersize=markersize)
+        lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor)
         return axes.add_collection3d(vts)
 
 def show_mesh_2d(axes, mesh,  

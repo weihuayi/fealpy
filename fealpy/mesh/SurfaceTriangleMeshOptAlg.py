@@ -10,13 +10,17 @@ class SurfaceTriangleMeshOptAlg:
     def run(self, maxit=10):
         mesh = self.mesh
         print('Laplace smooting:')
-        for i in range(10):
+        for i in range(0):
             mesh.node = self.laplace_smoothing()
+            mesh.edge_swap()
 
         print('CVT smoothing:')
-        for i in range(0):
+        for i in range(1):
+            print(i)
             mesh.node = self.cvt_smoothing()
-            mesh.edge_swap()
+            print('test')
+            isNonDelaunayEdge = mesh.edge_swap()
+            return isNonDelaunayEdge
 
     def laplace_smoothing(self):
         mesh = self.mesh
