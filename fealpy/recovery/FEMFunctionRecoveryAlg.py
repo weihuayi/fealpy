@@ -31,7 +31,7 @@ class FEMFunctionRecoveryAlg():
         guh = uh.grad_value(bc)
 
         rguh = V.function(dim=GD)
-        rguh[:] = np.asarray(p2c@(guh*area.reshape(-1, 1)))/asum.reshape(-1, 1)
+        rguh[:] = np.asarray(node2cell@(guh*area.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
 
     def harmonic_average(self, uh):
@@ -47,5 +47,5 @@ class FEMFunctionRecoveryAlg():
         guh = uh.grad_value(bc)
 
         rguh = V.function(dim=GD)
-        rguh[:] = np.asarray(p2c@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
+        rguh[:] = np.asarray(node2cell@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
