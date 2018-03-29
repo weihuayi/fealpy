@@ -748,8 +748,8 @@ def part_mesh(mesh, entity='cell', nparts=2,
     """
     if entity == 'cell':
         adj, adjLocation = mesh.ds.cell_to_cell(return_array=True)
-    elif entity == 'point':
-        adj, adjLocation = mesh.ds.point_to_point(return_array=True)
+    elif entity == 'node':
+        adj, adjLocation = mesh.ds.node_to_node(return_array=True)
 
     graph = array_to_metis(adj, adjLocation)
 
