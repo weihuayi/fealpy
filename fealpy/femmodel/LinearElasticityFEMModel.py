@@ -44,8 +44,8 @@ class LinearElasticityFEMModel:
 
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
-        aphi = self.model.compliance_tensor(phi)
-        M = np.einsum('i, ijkmn, ijomn, j->jko', ws, phi, aphi, self.measure)
+        #aphi = self.model.compliance_tensor(phi)
+        M = np.einsum('i, ijkmn, ijomn, j->jko', ws, phi, phi, self.measure)
 
         tldof = tspace.number_of_local_dofs()
         I = np.einsum('ij, k->ijk', tspace.cell_to_dof(), np.ones(tldof))
@@ -129,27 +129,34 @@ class LinearElasticityFEMModel:
 
         start = timer()
         M, B = self.get_left_matrix()
-
-        c2d = self.tensorspace.cell_to_dof()
-        print(c2d.reshape(1, 10, 3))
-        MM = M.todense()
-
-        f = open('M.txt', 'ab')
-        np.savetxt(f, MM, fmt='%.16f')
-        f.close()
-
-        f = open('B.txt', 'ab')
-        np.savetxt(f, B.todense(), fmt='%.16f')
-        f.close()
-
         b = self.get_right_vector()
-        #self.write_system(M, B, b, sparse=False)
         A = bmat([[M, B.transpose()], [B, None]]).tocsr()
         bb = np.r_[np.zeros(tgdof), b]
         end = timer()
         print("Construct linear system time:", end - start)
 
         start = timer()
+        x = spsolve(A, bb)
+        end = timer()
+        print("Solve time:", end-start)
+        self.sh[:] = x[0:tgdof]
+        self.uh[:] = x[tgdof:]
+
+#        c2d = self.tensorspace.cell_to_dof()
+#        print(c2d.reshape(1, 10, 3))
+#        MM = M.todense()
+#
+#        f = open('M.txt', 'ab')
+#        np.savetxt(f, MM, fmt='%.16f')
+#        f.close()
+#
+#        f = open('B.txt', 'ab')
+#        np.savetxt(f, B.todense(), fmt='%.16f')
+#        f.close()
+
+        #self.write_system(M, B, b, sparse=False)
+
+
         #isBdDof = np.zeros(gdof, dtype=np.bool)
         #isBdDof[0:3] = True
         #isBdDof[tgdof:] = self.vectorspace.boundary_dof()
@@ -163,7 +170,6 @@ class LinearElasticityFEMModel:
         #b[isBdDof] = x[isBdDof] 
         #x[:] = spsolve(A, b)
 
-        x = spsolve(A, bb)
 
         #x, info =  minres(A, b, tol=1e-8, maxiter=1000, show=True)
         #print('info:', info)
@@ -173,12 +179,6 @@ class LinearElasticityFEMModel:
 
         #x, istop = lsmr(A, b)[:2]
         #print(istop)
-
-        end = timer()
-        print("Solve time:", end-start)
-
-        self.sh[:] = x[0:tgdof]
-        self.uh[:] = x[tgdof:]
 
     def error(self):
 

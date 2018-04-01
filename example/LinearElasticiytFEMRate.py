@@ -34,12 +34,8 @@ errorType = ['$||\sigma - \sigma_h ||_{0}$',
 Ndof = np.zeros((maxit,))
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
-#s = 'solutions/sigmah{}.dat'
-#u = 'solutions/uh{}.dat'
 for i in range(maxit):
     fem.solve()
-    #fem.sh[:] = np.loadtxt(s.format(i))
-    #fem.uh[:] = np.loadtxt(u.format(i))
 
     Ndof[i] = 1/h**2 
     e0, e1, e2 = fem.error()
