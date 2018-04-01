@@ -21,6 +21,12 @@ sudo -H pipe install plotly
 ```
 
 ```
+sudo apt-get install petsc-dev
+sudo -H pip3 install petsc4py 
+```
+
+
+```
 sudo apt-get install python3-skimage
 ```
 
