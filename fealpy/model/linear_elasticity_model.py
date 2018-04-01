@@ -161,8 +161,9 @@ class Model2d():
         lam = self.lam
         mu = self.mu
         du = self.grad_displacement(p)
-        val = mu*(du + du.swapaxes(-1, -2))
-        val[..., range(2), range(2)] += lam*du.trace(axis1=-2, axis2=-1)[..., np.newaxis]
+        Au = (du + du.swapaxes(-1, -2))/2
+        val = 2*mu*Au
+        val[..., range(2), range(2)] += lam*Au.trace(axis1=-2, axis2=-1)[..., np.newaxis]
         return val
         
 
@@ -170,7 +171,7 @@ class Model2d():
         lam = self.lam
         mu = self.mu
         aphi = phi.copy()
-        aphi[..., range(2), range(2)] -= (lam/(2*mu+2*lam)*aphi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
+        aphi[..., range(2), range(2)] -= (lam/(2*mu+2*lam)*phi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
         aphi /= 2*mu
         return aphi
 
@@ -194,14 +195,13 @@ class Model2d():
         t0 = (-x + 1)*(-y + 1)
 
         val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] -=  lam*(pi**2*cc + e*t0*x*y + 2*e*t0*y - 2*e*x*y*(-y + 1) - 2*e*y*(-y + 1)) 
-        val[..., 0] -=  mu*(2*e*t0*x*y + 4*e*t0*y - 4*e*x*y*(-y + 1) - 4*e*y*(-y + 1)) 
-        val[..., 0] -=  mu*(pi**2*cc + e*t0*x*y - 2*e*t0*x + 2*e*x*y*(-x + 1) - 2*e*x*(-x + 1))
+        val[..., 0] -= lam*(pi**2*cc + e*t0*x*y + 2*e*t0*y - 2*e*x*y*(-y + 1) - 2*e*y*(-y + 1)) 
+        val[..., 0] -= 2*mu*(e*t0*x*y + 2*e*t0*y - 2*e*x*y*(-y + 1) - 2*e*y*(-y + 1)) 
+        val[..., 0] -= 2*mu*(pi**2*cc/2 + e*t0*x*y/2 - e*t0*x + e*x*y*(-x + 1) - e*x*(-x + 1))
 
         val[..., 1] -= lam*(-e*t0*x*y + e*t0*x - e*t0*y + e*t0 - e*x*y*(-x + 1) + e*x*y*(-y + 1) + e*x*y - e*x*(-y + 1) - e*y*(-x + 1) - pi**2*ss)
         val[..., 1] += 2*pi**2*mu*ss 
-        val[..., 1] -= mu*(-e*t0*x*y + e*t0*x - e*t0*y + e*t0 - e*x*y*(-x + 1) + e*x*y*(-y + 1) + e*x*y - e*x*(-y + 1) - e*y*(-x + 1) - pi**2*ss)
-
+        val[..., 1] -= 2*mu*(-e*t0*x*y/2 + e*t0*x/2 - e*t0*y/2 + e*t0/2 - e*x*y*(-x + 1)/2 + e*x*y*(-y + 1)/2 + e*x*y/2 - e*x*(-y + 1)/2 - e*y*(-x + 1)/2 - pi**2*ss/2)
         return val
 
 class SimplifyModel2d():
@@ -252,13 +252,10 @@ class SimplifyModel2d():
         val = du + du.swapaxes(-1, -2)
         return val
 
-
     def div_stress(self, p):
         return -self.source(p)
 
     def source(self, p):
-        lam = self.lam
-        mu = self.mu
         x = p[..., 0]
         y = p[..., 1]
 

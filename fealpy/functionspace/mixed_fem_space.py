@@ -27,11 +27,11 @@ class HuZhangFiniteElementSpace():
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
 
-#            t = mesh.edge_unit_tagent()
-#            n = mesh.edge_unit_normal()
-#            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
-#            self.TE[:, 1, :] = (t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
-#            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
+            t = mesh.edge_unit_tagent()
+            n = mesh.edge_unit_normal()
+            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
+            self.TE[:, 1, :] = np.sqrt(2)*(t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
+            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
         elif self.dim == 3:
             idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
             self.T = np.array([
@@ -44,13 +44,13 @@ class HuZhangFiniteElementSpace():
 
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
 
-        t = mesh.edge_unit_tagent()
-        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
-        frame[:, 0] = t
-        for i, (j, k) in enumerate(idx):
-            self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
-
-        self.TE[:, 1] *= np.sqrt(2)
+#        t = mesh.edge_unit_tagent()
+#        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
+#        frame[:, 0] = t
+#        for i, (j, k) in enumerate(idx):
+#            self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
+#
+#        self.TE[:, 1] *= np.sqrt(2)
 
         if self.dim == 3:
             NF = mesh.number_of_faces()
@@ -108,7 +108,7 @@ class HuZhangFiniteElementSpace():
         Construct the dofs matrix on each cell.
         """
         mesh = self.mesh
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
@@ -117,8 +117,6 @@ class HuZhangFiniteElementSpace():
         p = self.p
 
         dof = self.dof
-        print(dof.cell2dof)
-        print(dof.interpolation_points()[dof.cell2dof])
        
         c2d = dof.cell2dof[..., np.newaxis]
         ldof = dof.number_of_local_dofs() 
@@ -185,7 +183,7 @@ class HuZhangFiniteElementSpace():
         dim = self.geo_dimension()
         dof = self.dof 
         
-        isPointDof = dof.is_on_point_local_dof()
+        isPointDof = dof.is_on_node_local_dof()
         isEdgeDof = dof.is_on_edge_local_dof()
         isEdgeDof[isPointDof] = False
         
@@ -208,7 +206,7 @@ class HuZhangFiniteElementSpace():
     def dof_flags_1(self):
         dim = self.dim # the geometry space dimension
         dof = self.dof 
-        isPointDof = dof.is_on_point_local_dof()
+        isPointDof = dof.is_on_node_local_dof()
         isEdgeDof = dof.is_on_edge_local_dof()
         isEdgeDof[isPointDof] = False
         isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
@@ -476,7 +474,7 @@ class RTFiniteElementSpace2d:
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
@@ -543,10 +541,7 @@ class BDMFiniteElementSpace2d:
             phi[:, 4, :] = bc[0]*Rlambda[:, 1, :] - bc[1]*Rlambda[:, 0, :]
             phi[:, 5, :] = bc[0]*Rlambda[:, 1, :] + bc[1]*Rlambda[:, 0, :]
 
-            print(cell2edgeSign)
-            print(phi[-2:])
             phi[:, 0:6:2, :] *=cell2edgeSign.reshape(-1, 3, 1)
-            print(phi[-2:])
         else:
             #TODO:raise a error
             print("error")
@@ -630,7 +625,7 @@ class BDMFiniteElementSpace2d:
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
@@ -711,7 +706,7 @@ class RaviartThomasFiniteElementSpace3d:
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
@@ -862,7 +857,7 @@ class FirstNedelecFiniteElement2d():
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
@@ -1019,7 +1014,7 @@ class SecondNedelecFiniteElementTwo2d():
         mesh = self.mesh
         cell = mesh.ds.cell
 
-        N = mesh.number_of_points()
+        N = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()

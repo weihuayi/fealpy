@@ -44,8 +44,8 @@ class LinearElasticityFEMModel:
 
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
-        #aphi = self.model.compliance_tensor(phi)
-        M = np.einsum('i, ijkmn, ijomn, j->jko', ws, phi, phi, self.measure)
+        aphi = self.model.compliance_tensor(phi)
+        M = np.einsum('i, ijkmn, ijomn, j->jko', ws, aphi, phi, self.measure)
 
         tldof = tspace.number_of_local_dofs()
         I = np.einsum('ij, k->ijk', tspace.cell_to_dof(), np.ones(tldof))
@@ -156,8 +156,6 @@ class LinearElasticityFEMModel:
 
         #self.write_system(M, B, b, sparse=False)
 
-
-        #isBdDof = np.zeros(gdof, dtype=np.bool)
         #isBdDof[0:3] = True
         #isBdDof[tgdof:] = self.vectorspace.boundary_dof()
         #x = np.zeros(gdof, dtype=np.float)
@@ -197,5 +195,11 @@ class LinearElasticityFEMModel:
         uh = self.uh.value
         e2 = self.integralalg.L2_error(u, uh)
 
+        sI = self.sI.value 
+        e3 = self.integralalg.L2_error(s, sI)
 
-        return e0, e1, e2
+        dsI = self.sI.div_value
+        e4 = self.integralalg.L2_error(ds, dsI)
+
+
+        return e0, e1, e2, e3, e4

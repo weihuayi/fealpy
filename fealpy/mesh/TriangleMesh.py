@@ -36,9 +36,8 @@ class TriangleMesh(Mesh2d):
         v1 = node[cell[:,0],:] - node[cell[:,2],:]
         v2 = node[cell[:,1],:] - node[cell[:,0],:]
         nv = np.cross(v2, -v1)
-        length = np.sqrt(np.square(nv).sum(axis=0))
-        area = length/2.0 
         if dim == 2:
+            area = nv/2.0 
             x2 = np.sum(node**2, axis=1, keepdims=True)
             w0 = x2[cell[:,2]] + x2[cell[:,1]]
             w1 = x2[cell[:,0]] + x2[cell[:,2]]
@@ -50,6 +49,7 @@ class TriangleMesh(Mesh2d):
             c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
             R = np.sqrt(np.sum((c-node[cell[:,0], :])**2,axis=1))
         elif dim == 3:
+            length = np.sqrt(np.sum(nv**2, axis=1))
             n = nv/length.reshape((-1, 1))
             l02 = np.sum(v1**2, axis=1, keepdims=True)
             l01 = np.sum(v2**2, axis=1, keepdims=True)
