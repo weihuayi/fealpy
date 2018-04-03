@@ -102,6 +102,34 @@ def mass_matrix(V, area, cfun=None, mat=None):
     M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
     return M 
 
+def cross_mass_matrix(vemspace, area, wh, PI0):
+    p = vemspace.p
+    phi = vemspace.smspace.basis
+    def u(x, cellidx):
+        val = phi(x, cellidx=cellidx)
+        cval = cfun(x, cellidx=cellidx)
+        return np.einsum('ij, ijm, ijn->ijmn', cval, val, val)
+    H = integral(u, celltype=True)
+
+    cell2dof, cell2dofLocation = vemspace.dof.cell2dof, vemspace.dof.cell2dofLocation
+    NC = len(cell2dofLocation) - 1
+    cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+    DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+    f1 = lambda x: x[0].T@x[1]@x[0] 
+    K = list(map(f1, zip(PI0, H)))
+
+    f2 = lambda x: np.repeat(x, x.shape[0]) 
+    f3 = lambda x: np.tile(x, x.shape[0])
+    f4 = lambda x: x.flatten()
+
+    I = np.concatenate(list(map(f2, cd)))
+    J = np.concatenate(list(map(f3, cd)))
+    val = np.concatenate(list(map(f4, K)))
+    gdof = vemspace.number_of_global_dofs()
+    M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+    return M 
+
 def source_vector(integral, f, vemspace, PI0):
     phi = vemspace.smspace.basis
     def u(x, cellidx):

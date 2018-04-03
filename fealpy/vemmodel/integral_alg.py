@@ -40,10 +40,8 @@ class PolygonMeshIntegralAlg():
         pp = np.einsum('ij, jkm->ikm', bcs, tri)
         val = u(pp, edge2cell[:, 0])
 
-        if len(val.shape) == 2:
-            e = np.zeros(NC, dtype=np.float)
-        else:
-            e = np.zeros((NC, val.shape[-1]), dtype=np.float)
+        shape = (NC, ) + val.shape[2:]
+        e = np.zeros(shape, dtype=np.float)
 
         ee = np.einsum('i, ij..., j->j...', ws, val, a)
         np.add.at(e, edge2cell[:, 0], ee)
