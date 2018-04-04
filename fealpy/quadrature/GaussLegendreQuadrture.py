@@ -1,5 +1,6 @@
 import numpy as np
 
+#http://keisan.casio.com/exec/system/1280624821
 class GaussLegendreQuadrture():
     def __init__(self, k):
         if k == 1:

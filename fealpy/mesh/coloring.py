@@ -1,7 +1,7 @@
 
 import numpy as np 
 
-def coloring(mesh, method='random', entity='point'):
+def coloring(mesh, method='random', etype='node'):
     if method is 'random':
         c = randomcoloring(mesh)
     if method is 'random1':
@@ -19,23 +19,22 @@ def is_valid_coloring(mesh, c):
 
 def opt_coloring(mesh, c):
     mc = np.max(c)
-    N = mesh.number_of_points()
+    NN = mesh.number_of_nodes()
 
     edge = mesh.ds.edge
 
-    nc = np.zeros((N, mc), dtype=np.bool)
+    nc = np.zeros((NN, mc), dtype=np.bool)
     np.add.at(nc, (edge[:, 0], c[edge[:, 1]]-1), True)
     np.add.at(nc, (edge[:, 1], c[edge[:, 0]]-1), True)
-    print(nc.sum(axis=1)[c==mc])
 
 
 def randomcoloring(mesh):
-    N = mesh.number_of_points()
+    NN = mesh.number_of_nodes()
     NE = mesh.number_of_edges()
 
     edge = mesh.ds.edge
 
-    c = np.zeros(N, dtype=np.int)
+    c = np.zeros(NN, dtype=np.int)
 
     isUnColor = (c == 0) 
     color = 0
@@ -43,33 +42,33 @@ def randomcoloring(mesh):
     while np.any(isRemainEdge):
         color += 1
         edge0 = edge[isRemainEdge]
-        r = np.random.random(N)
+        r = np.random.random(NN)
         isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
-        flag = np.bincount(edge0[~isLess, 0], minlength=N)
-        flag += np.bincount(edge0[isLess, 1], minlength=N)
+        flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+        flag += np.bincount(edge0[isLess, 1], minlength=NN)
         c[(flag == 0) & isUnColor] = color
         isUnColor = (c == 0) 
 
         isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
         isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-        flag = np.bincount(edge[isEdge0, 0], minlength=N)
-        flag += np.bincount(edge[isEdge1, 1], minlength=N)
+        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
         isInteriorUnColor = (flag == 0) & isUnColor
         while np.any(isInteriorUnColor):
             isRemainEdge = isInteriorUnColor[edge[:,0]] & isInteriorUnColor[edge[:,1]]
             edge0 = edge[isRemainEdge]
 
-            r = np.random.random(N)
+            r = np.random.random(NN)
             isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
-            flag = np.bincount(edge0[~isLess, 0], minlength=N)
-            flag += np.bincount(edge0[isLess, 1], minlength=N)
+            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+            flag += np.bincount(edge0[isLess, 1], minlength=NN)
             c[(flag == 0) & isInteriorUnColor] = color
 
             isUnColor = (c==0)
             isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
             isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-            flag = np.bincount(edge[isEdge0, 0], minlength=N)
-            flag += np.bincount(edge[isEdge1, 1], minlength=N)
+            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
             isInteriorUnColor = (flag == 0) & isUnColor
 
         isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]]
@@ -81,30 +80,29 @@ def randomcoloring(mesh):
     for i in range(1, color+1):
         print('There are %d points with color %d'%((c==i).sum(), i))
 
-    opt_coloring(mesh, c)
     return c
 
 def randomcoloring1(mesh):
-    N = mesh.number_of_points()
+    NN = mesh.number_of_nodes()
     edge = mesh.ds.edge
 
-    c = np.zeros(N, dtype=np.int)
+    c = np.zeros(NN, dtype=np.int)
 
     isUnColor = (c == 0) 
 
     color = 1 # current color
     while np.any(isUnColor):
-        r = np.random.random(N)
+        r = np.random.random(NN)
 
         isEdge0 = isUnColor[edge[:, 0]]
         edge0 = edge[isEdge0, :]
         isLess = (~isUnColor[edge0[:, 1]]) | (r[edge0[:, 0]] < r[edge0[:, 1]])
-        flag = np.bincount(edge0[~isLess, 0], minlength=N)
+        flag = np.bincount(edge0[~isLess, 0], minlength=NN)
         
         isEdge1 = isUnColor[edge[:, 1]]
         edge1 = edge[isEdge1, :]
         isLess =  (~isUnColor[edge1[:, 0]]) | (r[edge1[:, 1]] < r[edge1[:, 0]])
-        flag += np.bincount(edge1[~isLess, 1], minlength=N)
+        flag += np.bincount(edge1[~isLess, 1], minlength=NN)
         isNewColor = isUnColor & (flag == 0)
         c[isNewColor] = color
         color += 1

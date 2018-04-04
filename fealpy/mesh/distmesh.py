@@ -68,9 +68,9 @@ class DistMesh2d():
         h, dptol, ttol, Fscale = self.params
 
         dxdt = self.dx_dt(self.time_elapsed)
-        self.mesh.point = self.mesh.point + dt*dxdt
+        self.mesh.node = self.mesh.node + dt*dxdt
 
-        p = self.mesh.point
+        p = self.mesh.node
         d = fd(p, *args)
         idx = d > 0
         depsx = np.array([self.deps,0])
@@ -83,8 +83,8 @@ class DistMesh2d():
         self.time_elapsed += dt
 
         if self.maxmove > ttol:
-            t = self.delaunay(self.mesh.point)
-            self.mesh = TriangleMesh(self.mesh.point, t)
+            t = self.delaunay(self.mesh.node)
+            self.mesh = TriangleMesh(self.mesh.node, t)
 
 
         if self.maxmove < dptol:
@@ -95,7 +95,7 @@ class DistMesh2d():
         fd, fh, bbox, pfix, args = self.domain.params
         h, dptol, ttol, Fscale = self.params
 
-        p = self.mesh.point
+        p = self.mesh.node
         N = p.shape[0]
         edge = self.mesh.ds.edge
         vec = p[edge[:, 0], :] - p[edge[:, 1], :]
@@ -193,9 +193,9 @@ class DistMesh3d:
         h, dptol, ttol, Fscale = self.params
 
         dxdt = self.dx_dt(self.time_elapsed)
-        self.mesh.point = self.mesh.point + dt*dxdt
+        self.mesh.node = self.mesh.node + dt*dxdt
 
-        p = self.mesh.point
+        p = self.mesh.node
         d = fd(p, *args)
         idx = d > 0
         depsx = np.array([self.deps, 0, 0])
@@ -210,8 +210,8 @@ class DistMesh3d:
         self.maxmove = np.max(np.sqrt(np.sum(dt*dxdt[d < -self.geps,:]**2, axis=1)))
         self.time_elapsed += dt
         if self.maxmove > ttol*h:
-            t = self.delaunay(self.mesh.point)
-            self.mesh = TetrahedronMesh(self.mesh.point, t)
+            t = self.delaunay(self.mesh.node)
+            self.mesh = TetrahedronMesh(self.mesh.node, t)
 
         if self.maxmove < dptol*h:
             raise StopIteration
@@ -221,7 +221,7 @@ class DistMesh3d:
         fd, fh, bbox, pfix, args = self.domain.params
         h, dptol, ttol, Fscale = self.params
 
-        p = self.mesh.point
+        p = self.mesh.node
         N = p.shape[0]
         edge = self.mesh.ds.edge
         vec = p[edge[:, 0], :] - p[edge[:, 1], :]
