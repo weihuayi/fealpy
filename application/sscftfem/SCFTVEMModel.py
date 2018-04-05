@@ -1,33 +1,44 @@
 import numpy as np
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from fealpy.quadrature  import TriangleQuadrature
-from fealpy.functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
-from fealpy.femmodel import doperator 
+from fealpy.functionspace.vem_space import VirtualElementSpace2d 
+from fealpy.vemmodel import doperator
 from scipy.sparse.linalg import spsolve
 
-import plotly.offline as py
-import plotly.figure_factory as FF
-import fealpy.tools.colors as cs
-import scipy.io as sio
+from fealpy.mesh.tree_data_structure import Quadtree 
+from fealpy.quadrature import TriangleQuadrature 
+#from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 
+from fealpy.vemmodel.integral_alg import PolygonMeshIntegralAlg
 
 class SSCFTParameter():
     def __init__(self):
-        self.Nspecies = 2 
+        self.Nspecies = 2
         self.Nblend   = 1
-        self.Nblock   = 2 
-        self.Ndeg     = 100  
-        self.fA       = 0.2 
-        self.chiAB    = 0.25 
-        self.dim = 2
-        self.dtMax = 0.005
-        self.tol = 1.0e-6
-        self.tolR = 1.0e-3
-        self.maxit = 5000
+        self.Nblock   = 2
+        self.Ndeg     = 100
+        self.fA       = 0.2
+        self.chiAB    = 0.25
+        self.dim      = 2
+        self.dtMax    = 0.005
+        self.tol      = 1.0e-6
+        self.maxit    = 5000
         self.showstep = 200
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
-        self.fieldType = 'fieldmu'
+                
+    #def init_mesh(self):
+    #   node = np.array([
+    #       (0, 0),
+    #       (1, 0),
+    #       (1, 1),
+    #       (0, 1)], dtype=np.float)
+    #   
+    #   cell = np.array([0,1,2,3])
+    #   mesh = Quadtree(node,cell)
+    #   return mesh
+
+       
 
 
 class TimeLine():
@@ -58,25 +69,27 @@ class TimeLine():
 
     def reset(self):
         self.current = 0
-        
+
 class PDESolver():
-    def __init__(self, femspace, integrator, measure,  method='CN'):
+    def __init__(self, vemspace, measure, method ='CN'):
 
         self.method = method
-        self.femspace = femspace 
-        self.integrator = integrator 
+        self.vemspace = vemspace
         self.measure = measure
-
-        self.M = doperator.mass_matrix(self.femspace, self.integrator, self.measure)
-        self.A = doperator.stiff_matrix(self.femspace, self.integrator, self.measure)
-
-    def get_current_linear_system(self, u0, dt):
+        
+        self.mat = doperator.basic_matrix(self.vemspace, self.measure)
+        self.A = doperator.stiff_matrix(self.vemspace,self.measure,mat=self.mat)
+        print(self.A)
+        self.M = doperator.mass_matrix(self.vemspace,self.measure,mat=self.mat)
+        print(self.M) 
+    def get_current_linear_system(self,u0,dt):
         M = self.M
         S = self.A
         F = self.F
+        
         if self.method is 'FM':
             b = -dt*(S + F)@u0 + M@u0
-            A = M   
+            A = M
             return A, b
         if self.method is 'BM':
             b = M@u0
@@ -87,73 +100,70 @@ class PDESolver():
             A = M + 0.5*dt*(S + F)
             return A, b
 
-    def run(self, timeline, uh, F):
+    def run(self,timeline, uh, F):
         self.F = F
-
-        while timeline.current < timeline.Nt: 
+        
+        while timeline.current < timeline.Nt:
             current = timeline.current
             dt = timeline.get_time_step_length()
             A, b = self.get_current_linear_system(uh[:, current], dt)
             uh[:, current+1] = spsolve(A, b)
-            timeline.current += 1
+            timeline.current +=1
         timeline.reset()
-    
 
-class SSCFTFEMModel():
-    def __init__(self, surface, mesh, option, p=1, p0=1):
-        self.femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
-        self.mesh = self.femspace.mesh
-        self.area = mesh.area()
+
+class SCFTVEMModel():
+    def __init__(self,mesh,option,p=1):
+        self.vemspace =VirtualElementSpace2d(mesh, p)
+        self.mesh  = self.vemspace.mesh
+        
+        self.uh = self.vemspace.function()
+        self.area = self.vemspace.smspace.area
         self.totalArea = np.sum(self.area)
-        print(self.totalArea)
-        self.surface = surface
         self.option = option
-
+        #TODO
+        self.integralalg = PolygonMeshIntegralAlg(option.integrator,
+                self.mesh,
+                self.area,
+                barycenter=self.vemspace.smspace.barycenter)
+        
         self.timeline0 = TimeLine([0, option.fA], option.dtMax)
         self.timeline1 = TimeLine([option.fA, 1], option.dtMax)
 
-        N = self.timeline0.Nt + self.timeline1.Nt + 1
-        self.q0 = self.femspace.function(dim=N)
-        self.q1 = self.femspace.function(dim=N) 
+        N = self.timeline0.Nt + self.timeline1.Nt+1
+       
+        self.q0 = self.vemspace.function(dim=N)
+        self.q1 = self.vemspace.function(dim=N)
+        self.Ndof = self.vemspace.number_of_global_dofs()
 
-        self.Ndof = self.femspace.number_of_global_dofs()
+        self.rho = [self.vemspace.function() for i in range(option.Nspecies)]
+        self.w = [self.vemspace.function() for i in range(option.Nspecies)]
+        self.mu = [self.vemspace.function() for i in range(option.Nspecies)]
 
-        self.rho   = [self.femspace.function() for i in range(option.Nspecies)] 
-        self.w   = [self.femspace.function() for i in range(option.Nspecies)] 
-        self.mu   = [self.femspace.function() for i in range(option.Nspecies)] 
-        self.grad = self.femspace.function(dim=option.Nspecies)
-        self.sQ    = np.zeros((option.Nspecies-1, option.Nblend))
+        self.grad = self.vemspace.function(dim=option.Nspecies)
+        self.sQ = np.zeros((option.Nspecies -1, option.Nblend))
 
-        self.solver = PDESolver(self.femspace, option.integrator, self.area, option.pdemethod)
+        self.solver = PDESolver(self.vemspace,self.area, option.pdemethod)
 
 
     def initialize(self):
         option = self.option
-        fields = option.fields 
+        fields = option.fields
         chiN = option.chiAB * option.Ndeg
 
         self.w[0][:] = fields[:, 0] - fields[:, 1]
-        self.w[1][:] = fields[:, 0] + fields[:, 1]
-         
-#        if option.fieldType is 'fieldmu':
-#            self.mu[0][:]   = fields[:, 0]
-#            self.mu[1][:]   = fields[:, 1]
-#            self.w[0][:] = fields[:, 0] - fields[:, 1]
-#            self.w[1][:] = fields[:, 0] + fields[:, 1]
-#        if option.fieldType is 'fieldw':
-#            self.w[0][:]   = fields[:, 0]
-#            self.w[1][:]   = fields[:, 1]
-#            self.mu[0][:] = 0.5*(fields[:, 0] + fields[:, 1])
-#            self.mu[1][:] = 0.5*(fields[:, 1] - fields[:, 0])
+        self.w[1][:] = fields[:, 1] + fields[:, 1]
 
-        self.mu[0][:]   = 0.5*(self.w[0] + self.w[1]) 
-        self.mu[1][:]   = 0.5*(self.w[1] - self.w[0]) 
+
+        self.mu[0][:] = 0.5*(self.w[0] + self.w[1])
+        self.mu[1][:] = 0.5*(self.w[0] - self.w[1])
+
         self.rho[0][:] = 0.5 + self.mu[1]/chiN
         self.rho[1][:] = 1.0 - self.rho[0]
-
-        self.data ={
-                'node':self.mesh.mesh.node, 
-                'elem':self.mesh.mesh.ds.cell+1, 
+        
+        self.data = {
+                'node':self.mesh.node,
+                'elem':self.mesh.ds.cell+1,
                 'rhoA':[self.rho[0]],
                 'rhoB':[self.rho[1]],
                 'sQ':[],
@@ -165,38 +175,40 @@ class SSCFTFEMModel():
         option = self.option
         n0 = self.timeline0.get_number_of_time_steps()
         n1 = self.timeline1.get_number_of_time_steps()
-
-        F0 = doperator.mass_matrix(
-                self.femspace, 
-                option.integrator, 
-                self.area, 
-                cfun=self.w[0].value)
-
-        F1 = doperator.mass_matrix(
-                self.femspace, 
-                option.integrator, 
-                self.area, 
-                cfun=self.w[1].value)
+        
+        self.PI0 = doperator.basic_matrix(self.vemspace, self.area)
 
 
+        #TODO self.PI0
+        integral = self.integralalg.integral
+        
+        F0 = doperator.cross_mass_matrix(
+                integral,
+                self.vemspace,
+                self.area,
+                self.w[0],
+                self.PI0)
+
+        F1 = doperator.cross_mass_matrix(
+                integral,
+                self.vemspace,
+                self.area,
+                self.w[1],
+                self.PI0)
+        
         self.q0[:, 0] = 1.0
-        self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
-        self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
+        self.solver.run(self.timeline0,self.q0[:, 0:n0], F0)
+        self.solver.run(self.timeline1, self.q1[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
 
-       # print(self.q0[:, -1])
-       # print(self.q1[:, -1])
+        print(self.q0[:, -1])
+        print(self.q1[:, -1])
 
-    def integral_time(self, q, dt):
-        f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
-        f += np.sum(q, axis=1)
-        f *= dt
-        return f
-    
+    #TODO 
     def integral_space(self, u):
-        mesh = self.femspace.mesh
+        mesh = self.vemspace.mesh
         qf = self.option.integrator 
         bcs, ws = qf.quadpts, qf.weights
         val = u(bcs)
@@ -257,10 +269,6 @@ class SSCFTFEMModel():
         
         if file_path is not None:
             f = open(file_path + '/log.txt', 'w')
-        
-        import time
-        start = time.clock()
-
         while (self.res > option.tol) and (iteration < option.maxit):
             self.H, self.res = self.one_step()
             self.ediff = self.H - self.Hold
@@ -269,16 +277,11 @@ class SSCFTFEMModel():
 
 
             if file_path is not None:
-                string = 'Iter: %d ======> \n sQ: %f res:%f ediff: %f H:%f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
+                string = 'Iter: %d ======> \n sQ: %f res: %f ediff: %f H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
                 f.write(string)
 
-            print('Iter:',iteration,'======>','res:',
-                    self.res,'ediff:',self.ediff, 'H:', self.H)
-            end = time.clock()
-            Timecost = "Time cost is %.6f seconds\n" % (end - start)
-            print(Timecost)
+            print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
             print('\n')
-            start = end
 
             self.data['rhoA'].append(self.rho[0])
             self.data['rhoB'].append(self.rho[1])
@@ -320,19 +323,31 @@ class SSCFTFEMModel():
 
         return partialF
 
-    def show_solution(self, i):
-        mesh = self.mesh.mesh
-        cell = mesh.ds.cell
-        node = mesh.node
-        c = self.rho[0].view(np.ndarray)
-        c = np.sum(c[cell], axis=1)/3
-        c = cs.val_to_color(c)
-        fig = FF.create_trisurf(
-                x = node[:, 0], 
-                y = node[:, 1],
-                z = node[:, 2],
-                show_colorbar = True,
-                plot_edges=False,
-                simplices=cell)
-        fig['data'][0]['facecolor'] = c
-        py.plot(fig, filename='test{}'.format(i))
+    #def show_solution(self, i):
+    #    mesh = self.mesh.mesh
+    #    cell = mesh.ds.cell
+    #    node = mesh.node
+    #    c = self.rho[0].view(np.ndarray)
+    #    c = np.sum(c[cell], axis=1)/3
+    #    c = cs.val_to_color(c)
+    #    fig = FF.create_trisurf(
+    #            x = node[:, 0], 
+    #            y = node[:, 1],
+    #            z = node[:, 2],
+    #            show_colorbar = True,
+    #            plot_edges=False,
+    #            simplices=cell)
+    #    fig['data'][0]['facecolor'] = c
+    #    py.plot(fig, filename='test{}'.format(i))
+
+
+
+
+
+
+
+
+
+
+
+
