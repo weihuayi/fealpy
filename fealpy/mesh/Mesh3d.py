@@ -135,15 +135,15 @@ class Mesh3d():
 
 
 class Mesh3dDataStructure():
-    def __init__(self, N, cell):
+    def __init__(self, NN, cell):
 
-        self.N = N
+        self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
         self.construct()
 
-    def reinit(self, N, cell):
-        self.N = N
+    def reinit(self, NN, cell):
+        self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
         self.construct()
@@ -203,7 +203,7 @@ class Mesh3dDataStructure():
     def cell_to_node(self):
         """ 
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
@@ -211,7 +211,7 @@ class Mesh3dDataStructure():
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
     def cell_to_edge(self, sparse=False):
@@ -348,7 +348,7 @@ class Mesh3dDataStructure():
             return face2cell 
 
     def edge_to_node(self, return_sparse=False):
-        N = self.N
+        NN = self.NN
         NE = self.NE
         edge = self.edge
         if return_sparse == False:
@@ -358,7 +358,7 @@ class Mesh3dDataStructure():
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
             val = np.ones(2*NE, dtype=np.bool)
-            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
             return edge2node
 
     def edge_to_edge(self):
@@ -390,28 +390,28 @@ class Mesh3dDataStructure():
     def node_to_node(self):
         """ The neighbor information of nodes
         """
-        N = self.N
+        NN = self.NN
         NE = self.NE
         edge = self.edge
         I = edge.flatten()
         J = edge[:,[1,0]].flatten()
         val = np.ones((2*NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN),dtype=np.bool)
         return node2node
 
     def node_to_edge(self):
-        N = self.N
+        NN = self.NN
         NE = self.NE
         
         edge = self.edge
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+        node2edge = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
         return node2edge
 
     def node_to_face(self):
-        N = self.N
+        NN = self.NN
         NF = self.NF
 
         face = self.face
@@ -420,13 +420,13 @@ class Mesh3dDataStructure():
         I = face.flatten()
         J = np.repeat(range(NF), FV)
         val = np.ones(FV*NF, dtype=np.bool)
-        node2face = csr_matrix((val, (I, J)), shape=(NF, N), dtype=np.bool)
+        node2face = csr_matrix((val, (I, J)), shape=(NF, NN), dtype=np.bool)
         return node2face
 
     def node_to_cell(self, return_local_index=False):
         """
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
@@ -437,17 +437,17 @@ class Mesh3dDataStructure():
 
         if return_local_index == True:
             val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
     def boundary_node_flag(self):
-        N = self.N
+        NN = self.NN
         face = self.face
         isBdFace = self.boundary_face_flag()
-        isBdPoint = np.zeros((N,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool)
         isBdPoint[face[isBdFace,:]] = True 
         return isBdPoint 
 
