@@ -337,8 +337,8 @@ class VirtualElementSpace2d():
     def div_value(self, uh, bc):
         pass
 
-    def function(self):
-        return FiniteElementFunction(self)
+    def function(self,dim=None):
+        return FiniteElementFunction(self,dim=dim)
 
     def interpolation(self, u, integral=None):
         p = self.p
