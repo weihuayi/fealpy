@@ -4,14 +4,19 @@ classdef Mesh3d
         ds
     end
     methods
+        function obj = Mesh3d(node, ds)
+            obj.node = node;
+            obj.ds = ds;
+        end
+        
         function NN = number_of_nodes(obj)
             NN = obj.ds.NN;
         end
         function NE = number_of_edges(obj)
-            NE = length(obj.ds.edge);
+            NE = obj.ds.NE;
         end
         function NF = number_of_faces(obj)
-            NF = length(obj.ds.face);
+            NF = obj.ds.NF;
         end
         function NC = number_of_cells(obj)
             NC = obj.ds.NC;
@@ -54,11 +59,18 @@ classdef Mesh3d
         end
         
         function l = edge_length(obj)
-            v = obj.node(obj.ds.edge(:, 1), :) - obj.node(obj.ds.edge(:, 2), :);
-            l = sqrt(sum(v.^2, 2));
+            v = obj.node(:, obj.ds.edge(1, :)) - obj.node(:, obj.ds.edge(2, :));
+            l = sqrt(sum(v.^2, 1));
+        end 
+
+        function find_node(obj)
         end
-            
-            
+        function find_edge(obj)
+        end
+        function find_face(obj)
+        end
+        function find_cell(obj)
+        end
     end  
 end
 
