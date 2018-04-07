@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-from SSCFTVEMModel import SCFTVEMModel,SSCFTParameter
+from SCFTVEMModel import SCFTVEMModel, SCFTParameter
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh 
 
 
@@ -12,8 +12,9 @@ box = [-1, 1, -1, 1]
 mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='polygon')
 
 # get_sys_parameter
-option = SSCFTParameter()
-scftvem = SCFTVEMModel(mesh, option, p=1) 
+option = SCFTParameter()
+scft = SCFTVEMModel(mesh, option, p=1) 
+chiN = option.Ndeg*option.chiAB
 
 
 vemspace = scft.vemspace
@@ -34,7 +35,7 @@ elif fieldsType == 6:
    
 option.fields = fields
 
-scftvem.update_propagator()
-scftvem.initialize()
-scftvem.find_saddle_point(datafile='vemflat', file_path='./')
+scft.update_propagator()
+scft.initialize()
+scft.find_saddle_point(datafile='vemflat', file_path='./')
 

@@ -337,7 +337,7 @@ class VirtualElementSpace2d():
     def div_value(self, uh, bc):
         pass
 
-    def function(self,dim=None):
+    def function(self, dim=None):
         return FiniteElementFunction(self,dim=dim)
 
     def interpolation(self, u, integral=None):
@@ -377,5 +377,11 @@ class VirtualElementSpace2d():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        return np.zeros((gdof,), dtype=np.float)
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
 

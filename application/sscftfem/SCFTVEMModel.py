@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+import scipy.io as sio
 
 from fealpy.functionspace.vem_space import VirtualElementSpace2d 
 from fealpy.vemmodel import doperator
@@ -11,7 +12,7 @@ from fealpy.quadrature import TriangleQuadrature
 
 from fealpy.vemmodel.integral_alg import PolygonMeshIntegralAlg
 
-class SSCFTParameter():
+class SCFTParameter():
     def __init__(self):
         self.Nspecies = 2
         self.Nblend   = 1
@@ -78,11 +79,10 @@ class PDESolver():
         self.measure = measure
         
         self.mat = doperator.basic_matrix(self.vemspace, self.measure)
-        self.A = doperator.stiff_matrix(self.vemspace,self.measure,mat=self.mat)
-        print(self.A)
-        self.M = doperator.mass_matrix(self.vemspace,self.measure,mat=self.mat)
-        print(self.M) 
-    def get_current_linear_system(self,u0,dt):
+        self.A = doperator.stiff_matrix(self.vemspace, self.measure, mat=self.mat)
+        self.M = doperator.mass_matrix(self.vemspace, self.measure, mat=self.mat)
+
+    def get_current_linear_system(self, u0, dt):
         M = self.M
         S = self.A
         F = self.F
@@ -108,6 +108,7 @@ class PDESolver():
             dt = timeline.get_time_step_length()
             A, b = self.get_current_linear_system(uh[:, current], dt)
             uh[:, current+1] = spsolve(A, b)
+            print(uh[:, current+1])
             timeline.current +=1
         timeline.reset()
 
@@ -171,48 +172,61 @@ class SCFTVEMModel():
                 'H':[]
                 }
 
+    def project_to_smspace(self, uh):
+        p = self.vemspace.p
+        cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@self.uh[x[1]]
+        S = self.vemspace.smspace.function()
+        S[:] = np.concatenate(list(map(g, zip(self.solver.mat.PI1, cd))))
+        return S
+
     def update_propagator(self):
         option = self.option
         n0 = self.timeline0.get_number_of_time_steps()
         n1 = self.timeline1.get_number_of_time_steps()
         
-        self.PI0 = doperator.basic_matrix(self.vemspace, self.area)
-
 
         #TODO self.PI0
         integral = self.integralalg.integral
         
+        S = self.project_to_smspace(self.w[0])
         F0 = doperator.cross_mass_matrix(
                 integral,
+                S.value,
                 self.vemspace,
                 self.area,
-                self.w[0],
-                self.PI0)
+                self.solver.mat.PI0)
 
+        S = self.project_to_smspace(self.w[1])
         F1 = doperator.cross_mass_matrix(
                 integral,
+                S.value,
                 self.vemspace,
                 self.area,
-                self.w[1],
-                self.PI0)
+                self.solver.mat.PI0)
         
         self.q0[:, 0] = 1.0
+        print("q0 first step")
         self.solver.run(self.timeline0,self.q0[:, 0:n0], F0)
+        print("q0 second step")
         self.solver.run(self.timeline1, self.q1[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
+        print("q1 first step")
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
+        print("q1 second step")
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
 
-        print(self.q0[:, -1])
-        print(self.q1[:, -1])
 
-    #TODO 
-    def integral_space(self, u):
-        mesh = self.vemspace.mesh
-        qf = self.option.integrator 
-        bcs, ws = qf.quadpts, qf.weights
-        val = u(bcs)
-        Q = np.einsum('i, ij, j', ws, val, self.area)
+    def integral_time(self, q, dt):
+        f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
+        f += np.sum(q, axis=1)
+        f *= dt
+        return f
+
+    def integral_space(self, uh):
+        S = self.project_to_smspace(uh)
+        Q = self.integralalg.integral(S.value)
         return Q
 
 
@@ -224,15 +238,18 @@ class SCFTVEMModel():
                 self.timeline1.dt)/self.sQ[0, 0]
 
     def update_singleQ(self, integrand):
-        u = integrand.value
-        f = self.integral_space(integrand.value)/self.totalArea 
+        f = self.integral_space(integrand)/self.totalArea 
         return f
 
     def update_hamilton(self):
-        u = self.mu[0].value
+        u = self.mu[0]
         mu1_int = self.integral_space(u)
 
-        u = lambda x : self.mu[1].value(x)**2
+        S = self.project_to_smspace(self.mu[1])
+        def u(x, cellidx):
+            val = S.value(x, cellidx=cellidx)**2
+            return val 
+
         mu2_int = self.integral_space(u)
 
         chiN = self.option.chiAB * self.option.Ndeg
@@ -277,7 +294,7 @@ class SCFTVEMModel():
 
 
             if file_path is not None:
-                string = 'Iter: %d ======> \n sQ: %f res: %f ediff: %f H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
+                string = 'Iter: %d ======> \n sQ: %.15e res: %.15e ediff: %.15e H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
                 f.write(string)
 
             print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
@@ -298,11 +315,11 @@ class SCFTVEMModel():
     def one_step(self):
         self.update_propagator() 
         qq = self.q0*self.q1[:, -1::-1] 
+        print(self.sQ)
         self.sQ[0,0] = self.update_singleQ(self.q0.index(-1))
-
+        print('sQ:', self.sQ)
         self.data['sQ'].append(self.sQ[0, 0])
 
-        print('sQ:', self.sQ)
         self.update_density(qq)
 
         error = self.update_field()
