@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 
+from fealpy.functionspace.vem_space import VirtualElementSpace2d 
 from SCFTVEMModel import SCFTVEMModel, SCFTParameter
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh 
 
@@ -11,16 +12,16 @@ fieldsType = int(sys.argv[2]) # define fields type
 box = [-1, 1, -1, 1]
 mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='polygon')
 
+p = 1
+vemspace =VirtualElementSpace2d(mesh, p)
+
 # get_sys_parameter
 option = SCFTParameter()
-scft = SCFTVEMModel(mesh, option, p=1) 
+option.maxit = 1
 chiN = option.Ndeg*option.chiAB
 
-
-vemspace = scft.vemspace
-Ndof = vemspace.number_of_global_dofs()
-
 # define fields
+Ndof = vemspace.number_of_global_dofs()
 fields = np.zeros((Ndof, 2))
 
 if fieldsType == 1:
@@ -35,7 +36,10 @@ elif fieldsType == 6:
    
 option.fields = fields
 
-scft.update_propagator()
+scft = SCFTVEMModel(vemspace, option) 
+
+
 scft.initialize()
-scft.find_saddle_point(datafile='vemflat', file_path='./')
+scft.update_propagator()
+#scft.find_saddle_point(datafile='vemflat', file_path='./')
 

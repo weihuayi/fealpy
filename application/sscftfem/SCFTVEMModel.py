@@ -2,7 +2,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 import scipy.io as sio
 
-from fealpy.functionspace.vem_space import VirtualElementSpace2d 
 from fealpy.vemmodel import doperator
 from scipy.sparse.linalg import spsolve
 
@@ -108,14 +107,13 @@ class PDESolver():
             dt = timeline.get_time_step_length()
             A, b = self.get_current_linear_system(uh[:, current], dt)
             uh[:, current+1] = spsolve(A, b)
-            print(uh[:, current+1])
             timeline.current +=1
         timeline.reset()
 
 
 class SCFTVEMModel():
-    def __init__(self,mesh,option,p=1):
-        self.vemspace =VirtualElementSpace2d(mesh, p)
+    def __init__(self, vemspace, option):
+        self.vemspace = vemspace
         self.mesh  = self.vemspace.mesh
         
         self.uh = self.vemspace.function()
@@ -173,7 +171,6 @@ class SCFTVEMModel():
                 }
 
     def project_to_smspace(self, uh):
-        p = self.vemspace.p
         cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@self.uh[x[1]]
@@ -190,7 +187,9 @@ class SCFTVEMModel():
         #TODO self.PI0
         integral = self.integralalg.integral
         
+        print('w0:', self.w[0])
         S = self.project_to_smspace(self.w[0])
+        print('S:', S)
         F0 = doperator.cross_mass_matrix(
                 integral,
                 S.value,
@@ -198,7 +197,9 @@ class SCFTVEMModel():
                 self.area,
                 self.solver.mat.PI0)
 
+        print('w1:', self.w[1])
         S = self.project_to_smspace(self.w[1])
+        print('S:', S)
         F1 = doperator.cross_mass_matrix(
                 integral,
                 S.value,
@@ -315,7 +316,6 @@ class SCFTVEMModel():
     def one_step(self):
         self.update_propagator() 
         qq = self.q0*self.q1[:, -1::-1] 
-        print(self.sQ)
         self.sQ[0,0] = self.update_singleQ(self.q0.index(-1))
         print('sQ:', self.sQ)
         self.data['sQ'].append(self.sQ[0, 0])
