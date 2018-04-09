@@ -59,11 +59,36 @@ classdef Mesh3d
         end
         
         function l = edge_length(obj)
-            v = obj.node(:, obj.ds.edge(1, :)) - obj.node(:, obj.ds.edge(2, :));
+            v = obj.node(obj.ds.edge(1, :), :) - obj.node(obj.ds.edge(2, :), :);
             l = sqrt(sum(v.^2, 1));
         end 
 
-        function find_node(obj)
+        function find_node(obj, range, varargin)
+            hold on
+            if (nargin==1)
+                NN = obj.number_of_nodes();
+                range = (1:NN)';
+            end
+            if islogical(range)
+                range = find(range);
+            end
+            if size(range,2)>size(range,1)
+                range = range';
+            end
+            h = plot3(obj.node(range, 1),obj.node(range, 2), obj.node(range, 3),'k.','MarkerSize', 20);
+            if nargin>2
+                if strcmp(varargin{1},'noindex') || strcmp(varargin{1},'index')
+                    startidx = 2;
+                else
+                    startidx = 1;
+                end
+                set(h,varargin{startidx:end});
+            end
+            if (nargin<3) || ~(strcmp(varargin{1},'noindex'))
+                text(obj.node(range,1)+0.015,obj.node(range,2)+0.015,obj.node(range,3)+0.015,int2str(range), ...
+                    'FontSize',16,'FontWeight','bold');
+            end
+            hold off;
         end
         function find_edge(obj)
         end
@@ -71,6 +96,6 @@ classdef Mesh3d
         end
         function find_cell(obj)
         end
-    end  
+    end
 end
 

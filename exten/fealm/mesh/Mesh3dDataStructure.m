@@ -23,7 +23,7 @@ classdef Mesh3dDataStructure
             obj.NF = length(i1);
             i2 = zeros(obj.NF, 1);
             i2(j) = 1:obj.F*obj.NC;
-            obj.face2cell = zeros(4, obj.NF);
+            obj.face2cell = zeros(4, obj.NF, 'int32');
             obj.face2cell(1, :) = ceil(i1/obj.F);
             obj.face2cell(2, :) = ceil(i2/obj.F);
             obj.face2cell(3, :) = rem(i1-1, obj.F)+1;
@@ -34,7 +34,7 @@ classdef Mesh3dDataStructure
             obj.edge = totalEdge(:, i1);
             obj.NE = length(i1);
             
-            obj.cell2edge = reshape(j, obj.E, []);
+            obj.cell2edge = int32(reshape(j, obj.E, []));
         end
         function te = total_edge(obj)
             te = reshape(obj.cell(obj.localEdge, :), 2, []);
