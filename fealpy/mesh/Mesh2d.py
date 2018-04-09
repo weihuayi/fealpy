@@ -30,21 +30,21 @@ class Mesh2d():
     def top_dimension(self):
         return 2
 
-    def barycenter(self, entity='cell', index=None):
+    def barycenter(self, etype='cell', index=None):
         node = self.node
-        if entity == 'cell':
+        if etype in ['cell', 2]:
             cell = self.ds.cell
             if index is None:
                 bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
             else:
                 bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
-        elif entity == 'edge':
+        elif etype in ['edge', 1]:
             edge = self.ds.edge
             if index is None:
                 bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
             else:
                 bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
-        elif entity == 'node':
+        elif etype in ['node', 0]:
             if index is None:
                 bc = node
             else:

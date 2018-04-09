@@ -16,87 +16,80 @@ from meshpy.triangle import MeshInfo, build
 
 
 class Meshtype():
-    def __init__(self):
-        pass
-
     #Fishbone
-    def fishbone(self, n=4, meshtype="uniform_bisect"):
-        node = np.array([
-            (0, 0),
-            (1/2, 0),
-            (1, 0),
-            (0, 1/2),
-            (1/2, 1/2),
-            (1, 1/2),
-            (0, 1),
-            (1/2, 1),
-            (1, 1)], dtype=np.float)
-        cell=np.array([
-            (3, 0, 4), 
-            (1, 4, 0), 
-            (1, 2, 4),
-            (5, 4, 2),
-            (6, 3, 7),
-            (4, 7, 3),
-            (4, 5, 7),
-            (8, 7, 5)], dtype=np.int)
-        mesh = TriangleMesh(node, cell)        
-        mesh.uniform_bisect(n)       
-        return mesh
+
+    def regular(self, box, n=10):
+        return rectangledomainmesh(box, nx=n, ny=n, meshtype='tri')
+
+    def fishbone(self, box, n=10):
+        qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NC = qmesh.number_of_cells()
+        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell[0::2, :] = True
+        isLeftCell = isLeftCell.reshape(-1)
+        lcell = cell[isLeftCell]
+        rcell = cell[~isLeftCell]
+        newCell = np.r_['0', 
+                lcell[:, [1, 2, 0]], 
+                lcell[:, [3, 0, 2]],
+                rcell[:, [0, 1, 3]],
+                rcell[:, [2, 3, 1]]]
+        return TriangleMesh(node, newCell)
 
     #cross mesh
-    def cross_mesh(self, n=4, meshtype="uniform_bisect"):
-        node=np.array([
-            (0, 0),
-            (1, 0),
-            (1/2, 1/2),
-            (0, 1),
-            (1, 1)], detype=np.float)
-        cell=np.array([
-            (2, 0, 1),
-            (2, 3, 0),
-            (2, 1, 0),
-            (2, 4, 3)], dtype=np.int)
-        mesh = TriangleMesh(node, cell)        
-        mesh.uniform_bisect(n)      
-        return mesh
+    def cross_mesh(self, box, n=10):
+        qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NN = qmesh.number_of_nodes()
+        NC = qmesh.number_of_cells()
+        bc = qmesh.barycenter('cell') 
+        newNode = np.r_['0', node, bc]
 
-    def rice_mesh(self, n=4, meshtype="uniform_bisect"):
-        node = np.array([
-            (0, 0),
-            (1/2, 0),
-            (1, 0),
-            (0, 1/2),
-            (1/2, 1/2),
-            (1, 1/2),
-            (0, 1),
-            (1/2, 1),
-            (1, 1)], dtype=np.float)
+        newCell = np.zeros((4*NC, 3), dtype=np.int) 
+        newCell[0:NC, 0] = range(NN, NN+NC)
+        newCell[0:NC, 1:3] = cell[:, 0:2]
+        
+        newCell[NC:2*NC, 0] = range(NN, NN+NC)
+        newCell[NC:2*NC, 1:3] = cell[:, 1:3]
 
-        cell = np.array([
-            (1, 4, 0),
-            (3, 0, 4),
-            (1, 2, 4),
-            (5, 4, 2),
-            (3, 4, 6),
-            (7, 6, 4),
-            (5, 8, 4),            
-            (7, 4, 8)], dtype=np.int)
-        mesh = TriangleMesh(node, cell)        
-        mesh.uniform_bisect(n)       
-        return mesh
+        newCell[2*NC:3*NC, 0] = range(NN, NN+NC)
+        newCell[2*NC:3*NC, 1:3] = cell[:, 2:4]
 
-    def random_mesh(self, h=0.5):
+        newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
+        newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
+        return TriangleMesh(node, newCell)
 
-        mesh_info = MeshInfo()
-        mesh_info.set_points([(0,0), (1,0), (1,1), (0,1)])
-        mesh_info.set_facets([[0,1], [1,2], [2,3], [3,0]]) 
+    def rice_mesh(self, box, n=10):
+        qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NC = qmesh.number_of_cells()
 
-        mesh = build(mesh_info, max_volume=(h)**2)
-        point = np.array(mesh.points, dtype=np.float)
-        cell = np.array(mesh.elements, dtype=np.int)
-        mesh = TriangleMesh(point, cell)      
-        return mesh
+        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell[0, 0::2] = True
+        isLeftCell[1, 1::2] = True
+        if n > 2:
+            isLeftCell[2::2, :] = isLeftCell[0, :]
+        if n > 3:
+            isLeftCell[3::2, :] = isLeftCell[1, :]
+        isLeftCell = isLeftCell.reshape(-1)
+
+        lcell = cell[isLeftCell]
+        rcell = cell[~isLeftCell]
+        newCell = np.r_['0', 
+                lcell[:, [1, 2, 0]], 
+                lcell[:, [3, 0, 2]],
+                rcell[:, [0, 1, 3]],
+                rcell[:, [2, 3, 1]]]
+        return TriangleMesh(node, newCell)
+
+    def random_mesh(self, box, n=10):
+        h = (box[1] - box[0])/n
+        return triangle(box, h, meshtype='tri')
+
         
 m = int(sys.argv[1])
 n = int(sys.argv[2])
@@ -162,10 +155,6 @@ for i in range(maxit):
     errorMatrix[4, i] = fem.recover_error(rguh1)
     rguh2 = ralg.harmonic_average(uh)
     errorMatrix[5, i] = fem.recover_error(rguh2)
-
-    if i < maxit - 1:
-        mesh.uniform_refine()
-        fem.reinit(mesh)
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)

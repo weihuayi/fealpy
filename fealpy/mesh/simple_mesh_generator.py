@@ -20,7 +20,7 @@ def squaremesh(x0, x1, y0, y1, r=3, dtype=np.float):
     mesh.uniform_refine(r)
     return mesh 
 
-def rectangledomainmesh(box, nx=10, ny=10, meshtype='tri', dtype=np.float):
+def rectangledomainmesh(box, nx=10, ny=10, meshtype='tri'):
     N = (nx+1)*(ny+1)
     NC = nx*ny
     node = np.zeros((N,2))
