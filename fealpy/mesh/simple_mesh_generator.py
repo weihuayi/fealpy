@@ -123,3 +123,5 @@ def cubehexmesh(cube, nx=10, ny=10, nz=10):
     cell[:, 7] = cell[:, 4] + nz + 1
 
     return HexahedronMesh(node, cell)
+
+
