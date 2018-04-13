@@ -401,10 +401,10 @@ class Mesh2dDataStructure():
         N = self.N
         NE = self.NE
         edge = self.edge
-        I = edge.flatten()
-        J = edge[:,[1,0]].flatten()
+        I = edge
+        J = edge[:, [1, 0]] 
         val = np.ones((2*NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(N, N),dtype=np.bool)
         if return_array == False:
             return node2node 
         else:
