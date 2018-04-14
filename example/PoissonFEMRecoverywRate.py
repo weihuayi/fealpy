@@ -157,7 +157,7 @@ class Meshtype():
 m = int(sys.argv[1])
 meshtype = int(sys.argv[2])
 n = int(sys.argv[3])
-maxit = 4
+maxit = 5
 box=[0,1,0,1]
 if m == 1:
     model = CosCosData()
@@ -212,7 +212,7 @@ for i in range(maxit):
     errorMatrix[3, i] = fem.recover_error(rguh)
     rguh1 = ralg.area_average(uh)
     errorMatrix[4, i] = fem.recover_error(rguh1)
-    rguh2 = ralg.harmonic_average(uh)
+    rguh2 = ralg.zzspr(uh)
     errorMatrix[5, i] = fem.recover_error(rguh2)
     if i < maxit - 1:
         mesh.uniform_refine()
