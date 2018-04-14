@@ -10,6 +10,51 @@ import matplotlib.pyplot as plt
 from mpi4py import MPI
 
 
+class MeshOverlapDataStructure():
+    def __init__(self, lmesh, comm):
+        self.send = {}
+        self.recv = {}
+
+        rank = comm.Get_rank()
+        NN = lmesh.number_of_nodes()
+
+        edge = lmesh.entity('edge')
+        parts = lmesh.nodedata['partition'] 
+        gid = lmesh.nodedata['global_id']
+        isLocalNode = (parts == rank)
+        for prank in lmesh.neighbor:
+            isRecvNode = (parts == prank)
+            isEdge = (np.sum(isRecvNode[edge], axis=1) == 1) & (np.sum(isLocalNode[edge], axis=1) == 1)
+            isSentNode = np.zeros(NN, dtype=np.bool)
+            isSentNode[edge[isEdge]] = True
+            isSentNode[isRecvNode] = False
+            NS = np.sum(isSentNode)
+            self.send[prank], = np.nonzero(isSentNode) 
+            comm.Isend(gid[isSentNode], dest=prank, tag=rank)
+
+        for prank in lmesh.neighbor:
+            isRecvNode = (parts == prank)
+            NR = np.sum(isRecvNode)
+            rd = np.zeros(NR, dtype=np.int)
+            req = comm.Irecv(rd, source=prank, tag=prank)
+            req.Wait()
+            self.recv[prank] = lmesh.global2local[rd]
+
+def set_gost_node(data, pds, lmesh, comm):
+    rank = comm.Get_rank()
+    for prank in lmesh.neighbor:
+        sd = data[pds.send[prank]]
+        comm.Isend(sd, dest=prank, tag=rank)
+
+    for prank in lmesh.neighbor:
+        NR = len(pds.recv[prank])
+        rd = np.zeros(NR, dtype=np.int)
+        req = comm.Irecv(rd, source=prank, tag=prank)
+        req.Wait()
+        data[pds.recv[prank]] = rd
+
+
+
 def par_mesh(h, n):
     mesh_info = MeshInfo()
 
@@ -71,7 +116,7 @@ def local_mesh(tmesh, rank):
     return lmesh
 
 
-def coloring(lmesh, rank, comm):
+def coloring(lmesh, comm):
     NN = lmesh.number_of_nodes()
     c = np.zeros(NN, dtype=np.int)
 
@@ -79,33 +124,38 @@ def coloring(lmesh, rank, comm):
     isUnColor = (c == 0) 
     color = 0
 
-    r = np.random.randint(0, 100000000, NN)
-    edge = lmesh.entity('edge')
-    parts = lmesh.nodedata['partition'] 
-    gid = lmesh.nodedata['global_id']
-    isLocalNode = (parts == rank)
-    for prank in lmesh.neighbor:
-        isRecvNode = (parts == prank)
-        isEdge = (np.sum(isRecvNode[edge], axis=1) == 1) & (np.sum(isLocalNode[edge], axis=1) == 1)
-        isSentNode = np.zeros(NN, dtype=np.bool)
-        isSentNode[edge[isEdge]] = True
-        isSentNode[isRecvNode] = False
-        NS = np.sum(isSentNode)
-        sd = np.zeros((NS, 2), dtype=np.int)  
-        sd[:, 0] = gid[isSentNode]
-        sd[:, 1] = r[isSentNode]
-        comm.Isend(sd, dest=prank, tag=rank)
-        print("Process ", rank, " sent data ", sd.shape, " to process ", prank)
+    pds = MeshOverlapDataStructure(lmesh, comm)
 
-    for prank in lmesh.neighbor:
-        isRecvNode = (parts == prank)
-        NR = np.sum(isRecvNode)
-        rd = np.zeros((NR, 2), dtype=np.int)
-        req = comm.Irecv(rd, source=prank, tag=prank)
-        print("Process ", rank, " receive data ", rd.shape, " from process ", prank)
-        req.Wait()
-        idx = lmesh.global2local[rd[:, 0]]
-        r[idx] = rd[:, 1]
+    r = np.random.randint(0, 100, NN)
+
+    set_gost_node(r, pds, lmesh, comm) 
+
+#    edge = lmesh.entity('edge')
+#    parts = lmesh.nodedata['partition'] 
+#    gid = lmesh.nodedata['global_id']
+#    isLocalNode = (parts == rank)
+#    for prank in lmesh.neighbor:
+#        isRecvNode = (parts == prank)
+#        isEdge = (np.sum(isRecvNode[edge], axis=1) == 1) & (np.sum(isLocalNode[edge], axis=1) == 1)
+#        isSentNode = np.zeros(NN, dtype=np.bool)
+#        isSentNode[edge[isEdge]] = True
+#        isSentNode[isRecvNode] = False
+#        NS = np.sum(isSentNode)
+#        sd = np.zeros((NS, 2), dtype=np.int)  
+#        sd[:, 0] = gid[isSentNode]
+#        sd[:, 1] = r[isSentNode]
+#        comm.Isend(sd, dest=prank, tag=rank)
+#        print("Process ", rank, " sent data ", sd.shape, " to process ", prank)
+#
+#    for prank in lmesh.neighbor:
+#        isRecvNode = (parts == prank)
+#        NR = np.sum(isRecvNode)
+#        rd = np.zeros((NR, 2), dtype=np.int)
+#        req = comm.Irecv(rd, source=prank, tag=prank)
+#        print("Process ", rank, " receive data ", rd.shape, " from process ", prank)
+#        req.Wait()
+#        idx = lmesh.global2local[rd[:, 0]]
+#        r[idx] = rd[:, 1]
 
     return r
 #    edge = mesh.ds.edge
@@ -133,7 +183,7 @@ if __name__ == "__main__":
 
     tmesh = par_mesh(0.05, size) 
     lmesh = local_mesh(tmesh, rank)
-    r = coloring(lmesh, rank, comm)
+    r = coloring(lmesh, comm)
 
     fig = plt.figure()
     axes = fig.gca()
