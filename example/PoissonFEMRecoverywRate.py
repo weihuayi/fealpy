@@ -16,12 +16,13 @@ from meshpy.triangle import MeshInfo, build
 
 
 class Meshtype():
+    def __init__(self, box, n=10):
+        pass
     #Fishbone
-
-    def regular(self, box, n=10):
+    def regular(self):
         return rectangledomainmesh(box, nx=n, ny=n, meshtype='tri')
 
-    def fishbone(self, box, n=10):
+    def fishbone(self):
         qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')
@@ -38,8 +39,8 @@ class Meshtype():
                 rcell[:, [2, 3, 1]]]
         return TriangleMesh(node, newCell)
 
-    #cross mesh
-    def cross_mesh(self, box, n=10):
+        #cross mesh
+    def cross_mesh(self):
         qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')
@@ -60,9 +61,9 @@ class Meshtype():
 
         newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
         newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
-        return TriangleMesh(node, newCell)
+        return TriangleMesh(newNode, newCell)
 
-    def rice_mesh(self, box, n=10):
+    def rice_mesh(self):
         qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')
@@ -86,16 +87,78 @@ class Meshtype():
                 rcell[:, [2, 3, 1]]]
         return TriangleMesh(node, newCell)
 
-    def random_mesh(self, box, n=10):
+    def random_mesh(self):
         h = (box[1] - box[0])/n
         return triangle(box, h, meshtype='tri')
 
+    def nonuniform_mesh(self):
+        nx = 4*n
+        ny = 4*n
+        n1 = 2*n+1
+
+        N = n1**2
+        NC = 4*n*n
+        node = np.zeros((N,2))
+        
+        x = np.zeros(n1, dtype=np.float)
+        x[0::2] = range(0,nx+1,4)
+        x[1::2] = range(3, nx+1, 4)
+
+        y = np.zeros(n1, dtype=np.float)
+        y[0::2] = range(0,nx+1,4)
+        y[1::2] = range(1, nx+1,4)
+
+        node[:,0] = x.repeat(n1)/nx
+        node[:,1] = np.tile(y, n1)/ny
+
+
+        idx = np.arange(N).reshape(n1, n1)
+        
+        cell = np.zeros((2*NC, 3), dtype=np.int)
+        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+        return TriangleMesh(node, cell)
+        
+    def uncross_mesh(self,r="1"):
+        qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
+        node = qmesh.entity('node')
+        cell = qmesh.entity('cell')
+        NN = qmesh.number_of_nodes()
+        NC = qmesh.number_of_cells()   
+        bc = qmesh.barycenter('cell') 
+
+        if r=="1":
+            bc1 = np.sqrt(np.sum((bc-node[cell[:,0], :])**2, axis=1))[0]
+            newNode = np.r_['0', node, bc-bc1*0.3]
+        elif r=="2":
+            ll = node[cell[:, 0]] - node[cell[:, 2]]
+            bc = qmesh.barycenter('cell') + ll/4
+            newNode = np.r_['0',node, bc]
+
+        newCell = np.zeros((4*NC, 3), dtype=np.int) 
+        newCell[0:NC, 0] = range(NN, NN+NC)
+        newCell[0:NC, 1:3] = cell[:, 0:2]
+            
+        newCell[NC:2*NC, 0] = range(NN, NN+NC)
+        newCell[NC:2*NC, 1:3] = cell[:, 1:3]
+
+        newCell[2*NC:3*NC, 0] = range(NN, NN+NC)
+        newCell[2*NC:3*NC, 1:3] = cell[:, 2:4]
+
+        newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
+        newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
+        return TriangleMesh(newNode, newCell)
+
         
 m = int(sys.argv[1])
-n = int(sys.argv[2])
-meshtype = int(sys.argv[3])
+meshtype = int(sys.argv[2])
+n = int(sys.argv[3])
 maxit = 4
-
+box=[0,1,0,1]
 if m == 1:
     model = CosCosData()
 elif m == 2:
@@ -105,19 +168,26 @@ elif m == 3:
 elif m == 4:
     model = PolynomialData
 
-if meshtype == 0:
-    mesh = model.init_mesh(n=n, meshtype='tri')
-elif meshtype == 1:
-    mesh = Meshtype.fishbone(n, meshtype="uniform")
-elif meshtype == 1:
-    mesh = Meshtype.cross_mesh(n)
-elif meshtype == 2:
-    mesh = Meshtype.rice_mesh(n)
+Mesh = Meshtype(box, 4)
 
-h0 = 0.5
+if meshtype == 1:
+    mesh = Mesh.regular()
+elif meshtype == 2:
+    mesh = Mesh.cross_mesh()
+elif meshtype == 3:
+    mesh = Mesh.uncross_mesh(r='1')
+elif meshtype == 4:
+    mesh = Mesh.fishbone()
+elif meshtype == 5:
+    mesh = Mesh.rice_mesh()
+elif meshtype == 6:
+    mesh = Mesh.random_mesh()
+elif meshtype == 7:
+    mesh = Mesh.nonuniform_mesh()
+elif meshtype == 8:
+    mesh = Mesh.uncross_mesh(r='1')
 
 ralg = FEMFunctionRecoveryAlg()
-
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h||_{0}$',
@@ -130,17 +200,6 @@ Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
-    if meshtype == 3:
-        mesh = Meshtype.random_mesh(h0/2**i)
-    elif meshtype == 4:
-        mesh = load_mat_mesh('../data/ll/chevronmesh'+str(i+1)+'.mat')
-    elif meshtype == 5:
-        mesh = load_mat_mesh('../data/ll/crisscrossmesh'+str(i+1)+'.mat')       
-    elif meshtype == 6:
-        mesh = load_mat_mesh('../data/ll/gtrimesh'+str(i+1)+'.mat')
-    elif meshtype == 7:
-        mesh = load_mat_mesh('../data/ll/unionjackmesh'+str(i+1)+'.mat')
-
     mesh.add_plot(plt)
     fem = PoissonFEMModel(mesh, model, 1)
     fem.solve()
@@ -155,6 +214,10 @@ for i in range(maxit):
     errorMatrix[4, i] = fem.recover_error(rguh1)
     rguh2 = ralg.harmonic_average(uh)
     errorMatrix[5, i] = fem.recover_error(rguh2)
+    if i < maxit - 1:
+        mesh.uniform_refine()
+        #mesh.uniform_bisect()
+        fem.reinit(mesh)
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
