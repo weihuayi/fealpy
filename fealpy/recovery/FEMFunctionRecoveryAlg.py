@@ -74,7 +74,6 @@ class FEMFunctionRecoveryAlg():
           
         cell = mesh.ds.cell
         node = mesh.node
-        print(node)
         
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
@@ -104,7 +103,7 @@ class FEMFunctionRecoveryAlg():
             rguh[i,1] = coefficient[2]/h
         return rguh
 
-    def zzspr(self, uh):
+    def ZZ(self, uh):
         V = uh.V 
         mesh = V.mesh
         GD = mesh.geo_dimension()
@@ -130,8 +129,6 @@ class FEMFunctionRecoveryAlg():
 
         for i in range(NN):
             ne, = np.nonzero(t2p[:, i])            
-            print("ne",ne,'nc',NC)
-            print(xnode.shape)
             temp0 =xnode[ne, :]
             tempx,center,h = scaleCoor(temp0)
             bc = np.array([1/3]*3, dtype=np.float)
@@ -157,9 +154,7 @@ class FEMFunctionRecoveryAlg():
                         X = np.ones((tempn, 3))
                         X[:, 1:3] = tempx
 
-                        coefficient1 = np.linalg.solve(X.T@X,X.T@tempp[:,0])
-                        print("c",coefficient1)
-                        print("n_c",node[i,:]@coefficient1[1:3],"node",node[i,:])
+                        coefficient1 = np.linalg.solve(X.T@X,X.T@tempp[:,0])                        
                         rguh[i,0] = rguh[i,0] + node[i,:]@coefficient1[1:3]/h + coefficient1[0] - center@coefficient1[1:3]/h
                         coefficient2 = np.linalg.solve(X.T@X,X.T@tempp[:,1])
                         rguh[i,1] = rguh[i,1] + node[i,:]@coefficient2[1:3]/h + coefficient2[0] - center@coefficient2[1:3]/h
@@ -171,7 +166,6 @@ class FEMFunctionRecoveryAlg():
                 rguh[i,0] = node[i,:]@coefficient3[1:3]/h + coefficient3[0] - center@coefficient3[1:3]/h
                 coefficient4 =  np.linalg.solve(X.T@X,X.T@tempp[:,1])
                 rguh[i,1] = node[i,:]@coefficient4[1:3]/h + coefficient4[0] - center@coefficient4[1:3]/h
-                print("h",h)
                 return rguh
 
 
@@ -255,7 +249,6 @@ class FEMFunctionRecoveryAlg():
             coefficient[i,3] = cc[3]/h/h
             coefficient[i,4] = cc[4]/h/h
             coefficient[i,5] = cc[5]/h/h    
-            print(coefficient)
         return rguh
 
 

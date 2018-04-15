@@ -171,12 +171,15 @@ Mesh = Meshtype()
 
 ralg = FEMFunctionRecoveryAlg()
 
-errorType = ['$|| u_I - u_h ||_{l_2}$',
-             '$|| u - u_h||_{0}$',
-             '$||\\nabla u - \\nabla u_h||_{0}$', 
+errorType = [#'$|| u_I - u_h ||_{l_2}$',
+             #'$|| u - u_h||_{0}$',
+             #'$||\\nabla u - \\nabla u_h||_{0}$', 
              '$||\\nabla u - G(\\nabla u_h)||_{0}simple$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}area$',
-             '$||\\nabla u - G(\\nabla u_h)||_{0}har$'
+             '$||\\nabla u - G(\\nabla u_h)||_{0}har$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}scr$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}ZZ$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}ppr$'
              ]
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
@@ -203,15 +206,21 @@ for i in range(maxit):
     fem.solve()
     uh = fem.uh
     Ndof[i] = fem.mesh.number_of_cells() 
-    errorMatrix[0, i] = fem.l2_error()
-    errorMatrix[1, i] = fem.L2_error()
-    errorMatrix[2, i] = fem.H1_semi_error()
+    #errorMatrix[0, i] = fem.l2_error()
+    #errorMatrix[1, i] = fem.L2_error()
+    #errorMatrix[2, i] = fem.H1_semi_error()
     rguh = ralg.simple_average(uh)
-    errorMatrix[3, i] = fem.recover_error(rguh)
+    errorMatrix[0, i] = fem.recover_error(rguh)
     rguh1 = ralg.area_average(uh)
-    errorMatrix[4, i] = fem.recover_error(rguh1)
-    rguh2 = ralg.SCR(uh)
-    errorMatrix[5, i] = fem.recover_error(rguh2)
+    errorMatrix[1, i] = fem.recover_error(rguh1)
+    rguh2 = ralg.harmonic_average(uh)
+    errorMatrix[2, i] = fem.recover_error(rguh2)
+    rguh3 = ralg.SCR(uh)
+    errorMatrix[3, i] = fem.recover_error(rguh3)
+    rguh4 = ralg.ZZ(uh)
+    errorMatrix[4, i] = fem.recover_error(rguh4)
+    rguh5 = ralg.PPR(uh)
+    errorMatrix[5, i] = fem.recover_error(rguh5)
     if i < maxit - 1:
         n *= 2
 
