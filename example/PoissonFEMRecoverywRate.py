@@ -218,15 +218,11 @@ for i in range(maxit):
     rguh4 = ralg.ZZ(uh)
     errorMatrix[4, i] = fem.recover_error(rguh4)
     rguh5 = ralg.PPR(uh)
-    #print(rguh5)
     errorMatrix[5, i] = fem.recover_error(rguh5)
-    #plt.savefig('./ll/mesh'+ str(i) + '.png')
     if i < maxit - 1:
         n *= 2
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
-plt.savefig('./ll/errorRate'+ str(i) + '.png')
-showmultirate(plt, 0, Ndof, errorMatrix, errorType)
-plt.savefig('./ll/errorRate'+ str(i) + '.pdf')
+showmultirate(plt, 2, Ndof, errorMatrix, errorType)
 plt.show()
