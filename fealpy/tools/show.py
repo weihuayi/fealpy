@@ -55,7 +55,7 @@ def showmultirate(plt, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=1
     m, n = errorMatrix.shape
     for i in range(m):
         showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
-    axes.legend(loc=3, prop={'size': 30})
+    axes.legend(loc=3, prop={'size': 17})
     return axes
 
 def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):

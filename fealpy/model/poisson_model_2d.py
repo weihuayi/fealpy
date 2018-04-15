@@ -478,8 +478,8 @@ class ExpData:
     def solution(self, p):
         """ The exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         u = np.exp(x**2+y**2)
         return u
 
@@ -488,8 +488,8 @@ class ExpData:
         INPUT:
             p: array object, N*2 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         rhs = -(4*x**2+4*y**2+4)*(np.exp(x**2+y**2))
         return rhs
 
@@ -502,12 +502,12 @@ class ExpData:
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         uprime = np.zeros(p.shape, dtype=np.float)
-        uprime[:, 0] = 2*x*(np.exp(x**2+y**2))
-        uprime[:, 1] = 2*y*(np.exp(x**2+y**2))
+        uprime[..., 0] = 2*x*(np.exp(x**2+y**2))
+        uprime[..., 1] = 2*y*(np.exp(x**2+y**2))
         return uprime
 
     def is_boundary(self, p):

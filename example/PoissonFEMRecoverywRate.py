@@ -162,9 +162,9 @@ if m == 1:
 elif m == 2:
     model = ExpData()
 elif m == 3:
-    model = SinSinData()
+    model = PolynomialData()
 elif m == 4:
-    model = PolynomialData
+    model = SinSinData()
 
 Mesh = Meshtype()
 
@@ -174,11 +174,11 @@ ralg = FEMFunctionRecoveryAlg()
 errorType = [#'$|| u_I - u_h ||_{l_2}$',
              #'$|| u - u_h||_{0}$',
              #'$||\\nabla u - \\nabla u_h||_{0}$', 
-             '$||\\nabla u - G(\\nabla u_h)||_{0}simple$',
-             '$||\\nabla u - G(\\nabla u_h)||_{0}area$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}sim$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}are$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}har$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}scr$',
-             '$||\\nabla u - G(\\nabla u_h)||_{0}ZZ$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}zz$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}ppr$'
              ]
 Ndof = np.zeros((maxit,), dtype=np.int)
@@ -199,9 +199,7 @@ for i in range(maxit):
         mesh = Mesh.random_mesh(box, n=n)
     elif meshtype == 7:
         mesh = Mesh.nonuniform_mesh(box, n=n)
-    elif meshtype == 8:
-        mesh = Mesh.uncross_mesh(box, n=n, r='1')
-    mesh.add_plot(plt)
+    #mesh.add_plot(plt,cellcolor='w')
     fem = PoissonFEMModel(mesh, model, 1)
     fem.solve()
     uh = fem.uh
@@ -222,10 +220,13 @@ for i in range(maxit):
     rguh5 = ralg.PPR(uh)
     #print(rguh5)
     errorMatrix[5, i] = fem.recover_error(rguh5)
+    #plt.savefig('./ll/mesh'+ str(i) + '.png')
     if i < maxit - 1:
         n *= 2
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
+plt.savefig('./ll/errorRate'+ str(i) + '.png')
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+plt.savefig('./ll/errorRate'+ str(i) + '.pdf')
 plt.show()
