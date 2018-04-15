@@ -201,7 +201,7 @@ for i in range(maxit):
         mesh = Mesh.nonuniform_mesh(box, n=n)
     elif meshtype == 8:
         mesh = Mesh.uncross_mesh(box, n=n, r='1')
-    #mesh.add_plot(plt)
+    mesh.add_plot(plt)
     fem = PoissonFEMModel(mesh, model, 1)
     fem.solve()
     uh = fem.uh
@@ -220,6 +220,7 @@ for i in range(maxit):
     rguh4 = ralg.ZZ(uh)
     errorMatrix[4, i] = fem.recover_error(rguh4)
     rguh5 = ralg.PPR(uh)
+    #print(rguh5)
     errorMatrix[5, i] = fem.recover_error(rguh5)
     if i < maxit - 1:
         n *= 2
