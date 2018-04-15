@@ -6,8 +6,7 @@ def scaleCoor(realp):
 
     pn = realp.shape[0]
 
-    diff = realp - center*np.ones((pn,2))
-
+    diff = realp - center
     h = 0.1*np.max(np.sqrt(np.sum(diff**2,axis=1)))
     
     refp = diff/h
