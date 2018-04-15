@@ -189,7 +189,7 @@ class FEMFunctionRecoveryAlg():
         coefficient = np.zeros((NN,6))
         
         isBdNodes = mesh.ds.boundary_node_flag()
-        neighbor =
+        neighbor = mesh.ds.cell_to_cell()
         
         row = np.arange(NC).repeat(3)
         col = cell.flatten()
@@ -199,55 +199,63 @@ class FEMFunctionRecoveryAlg():
         p2p = p2t@t2p
         
         for i in range(NN):
-            np1 = [j for (j,val) in enumerate(p2p[i,:]) if val>0]
+            #np1 = [j for (j,val) in enumerate(p2p[i,:]) if val>0]
+            np1, = np.nonzero(p2p[i,:])
+
             npn = np1.shape[0]
             if isBdNodes[i]:
                 ip = np1[~isBdNodes[np1]]
-                ipn = ip.shape[1]
+                ipn = ip.shape[0]
                 if ipn == 0:
                     for k in range(npn):
-                        cp = [j for (j,val) in enumerate(p2p[np1[k],:]) if val>0]
+                        #cp = [j for (j,val) in enumerate(p2p[np1[k],:]) if val>0]
+                        cp, = np.nonzero(p2p[np1[k], :])
                         np1 = np.hstack((np1,cp))
-                np1 = np.unique(np1)
+                    np1 = np.unique(np1)
                 else:
-                    cp = [j for (j,val) in enumerate(p2p[ip[0],:]) if val>0]
+                    #cp = [j for (j,val) in enumerate(p2p[ip[0],:]) if val>0]
+                    cp, = np.nonzero(p2p[ip[0],:])
                     p = np.hstack((np1,cp))
                     np2 = np.unique(p)
-                    if np1.shape[1] < 6:
+                    if np1.shape[0] < 6:
                         for k in range(npn):
-                            cp = [j for (j,val) in enumerate(p2p[np1[k],:]) if val>0]
+                           # cp = [j for (j,val) in enumerate(p2p[np1[k],:]) if val>0]
+                            cp, = np.nonzero(p2p[np1[k],:])
                             np1 = np.hstack((np1,cp))
                         np2 = np.unique(np1)
                     np1 = np2
             else:
                 if npn < 6:
-                    ne = [j for (j,val) in enumerate(p2t[i,:]) if val>0]
+                    ne, =np.nonzero(p2t[i,:]) 
+         #           ne = [j for (j,val) in enumerate(p2t[i,:]) if val>0]
                     n1 = neighbor[ne,0]
                     n2 = neighbor[ne,1]
-                    n2 = neighbor[ne,2]
-                    e = np.hstack((ne,n1.T,n2.T,n3.T))
+                    n3 = neighbor[ne,2]
+                    e = np.hstack((ne,n1,n2,n3))
                     e = np.unique(e)
-                    p = cell[e.T,:]
-                    p = p[:]
-                    np1 = np.unique(p.T)
-            temp0 = node [np1,:]
+                    p = cell[e, :]
+                   # p = p[:]
+                    np1 = np.unique(p)
+            temp0 = node[np1,:]
             tempp = uh[np1]
             tempx,center,h = scaleCoor(temp0)
             tempn = tempx.shape[0]
             X = np.ones((tempn,6))
             X[:,1:3] = tempx
-            X[:,3] = tempx[:,0]@tempx[:,1]
-            X[:,4:6] = tempx@tempx
-            cc = np.linalg.solve(X.T@X,X.T@tempp)  
-            c1 = center[0,0]
-            c2 = center[0,1]
+            X[:,3] = tempx[:,0]*tempx[:,1]
+            X[:,4:6] = tempx**2
+            cc = np.linalg.solve(X.T@X,X.T@tempp) 
+            c1 = center[0]
+            c2 = center[1]
             
-            coefficient[i,0] = cc[0] - cc[1]@c1/h - cc[2]@c2/h +cc[3]@c1@c2/h/h + cc[4]@c1@c1/h/h + cc[5]@c2@c2/h/h
-            coefficient[i,1] = cc[1]/h - cc[3]@c2/h/h - 2*cc[4]@c1/h/h
-            coefficient[i,2] = cc[2]/h - cc[3]@c1/h/h - 2*cc[5]@c2/h/h
+            coefficient[i,0] = cc[0] - cc[1]*c1/h - cc[2]*c2/h +cc[3]*c1*c2/h/h
+            + cc[4]*c1*c1/h/h + cc[5]*c2*c2/h/h
+            coefficient[i,1] = cc[1]/h - cc[3]*c2/h/h - 2*cc[4]*c1/h/h 
+            coefficient[i,2] = cc[2]/h - cc[3]*c1/h/h - 2*cc[5]*c2/h/h
             coefficient[i,3] = cc[3]/h/h
             coefficient[i,4] = cc[4]/h/h
-            coefficient[i,5] = cc[5]/h/h     
+            coefficient[i,5] = cc[5]/h/h    
+            print(coefficient)
         return rguh
 
 

@@ -200,7 +200,7 @@ Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
-    mesh.add_plot(plt)
+    #mesh.add_plot(plt)
     fem = PoissonFEMModel(mesh, model, 1)
     fem.solve()
     uh = fem.uh
@@ -212,7 +212,7 @@ for i in range(maxit):
     errorMatrix[3, i] = fem.recover_error(rguh)
     rguh1 = ralg.area_average(uh)
     errorMatrix[4, i] = fem.recover_error(rguh1)
-    rguh2 = ralg.zzspr(uh)
+    rguh2 = ralg.SCR(uh)
     errorMatrix[5, i] = fem.recover_error(rguh2)
     if i < maxit - 1:
         mesh.uniform_refine()
