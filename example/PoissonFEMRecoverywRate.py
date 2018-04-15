@@ -155,7 +155,7 @@ class Meshtype():
 m = int(sys.argv[1])
 meshtype = int(sys.argv[2])
 n = int(sys.argv[3])
-maxit = 5
+maxit = 4
 box=[0,1,0,1]
 if m == 1:
     model = CosCosData()

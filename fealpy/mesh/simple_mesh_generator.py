@@ -56,10 +56,10 @@ def rectangledomainmesh(box, nx=10, ny=10, meshtype='tri'):
 def triangle(box, h, meshtype='tri'):
     from meshpy.triangle import MeshInfo, build
     mesh_info = MeshInfo()
-    mesh_info.set_nodes([(box[0], box[2]), (box[1], box[2]), (box[1], box[3]), (box[0], box[3])])
+    mesh_info.set_points([(box[0], box[2]), (box[1], box[2]), (box[1], box[3]), (box[0], box[3])])
     mesh_info.set_facets([[0,1], [1,2], [2,3], [3,0]])  
     mesh = build(mesh_info, max_volume=h**2)
-    node = np.array(mesh.nodes, dtype=np.float)
+    node = np.array(mesh.points, dtype=np.float)
     cell = np.array(mesh.elements, dtype=np.int)
     if meshtype is 'tri':
         return TriangleMesh(node, cell)
