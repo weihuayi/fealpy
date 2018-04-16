@@ -106,6 +106,95 @@ class PolyModel3d():
         val[..., 2] -= mu*(b*t0*x - b*t2*x*y - b*t3*x*z + b*x*y*z*(-x + 1) - 2*c*t2*x*z)
         return val
 
+class HuangModel2d():
+    def __init__(self, lam=10, mu=1):
+        self.lam = lam
+        self.mu = mu
+
+    def init_mesh(self, n=4):
+        from ..mesh import TriangleMesh
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh 
+
+    def displacement(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = pi/2*np.sin(pi*x)**2*np.sin(2*pi*y) 
+        val[..., 1] = -pi/2*np.sin(pi*y)**2*np.sin(2*pi*x) 
+        return val
+
+    def grad_displacement(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+
+        shape = p.shape + (2, )
+        val = np.zeros(shape, dtype=np.float)
+        val[..., 0, 0] = pi**2*sin(pi*x)*sin(2*pi*y)*cos(pi*x)
+        val[..., 0, 1] = pi**2*sin(pi*x)**2*cos(2*pi*y)
+        val[..., 1, 0] = -pi**2*sin(pi*y)**2*cos(2*pi*x)
+        val[..., 1, 1] = -pi**2*sin(2*pi*x)*sin(pi*y)*cos(pi*y)
+        return val
+
+    def stress(self, p):
+        lam = self.lam
+        mu = self.mu
+        du = self.grad_displacement(p)
+        Au = (du + du.swapaxes(-1, -2))/2
+        val = 2*mu*Au
+        val[..., range(2), range(2)] += lam*Au.trace(axis1=-2, axis2=-1)[..., np.newaxis]
+        return val
+        
+
+    def compliance_tensor(self, phi):
+        lam = self.lam
+        mu = self.mu
+        aphi = phi.copy()
+        aphi[..., range(2), range(2)] -= (lam/(2*mu+2*lam)*phi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
+        aphi /= 2*mu
+        return aphi
+
+    def div_stress(self, p):
+        return -self.source(p)
+
+    def source(self, p):
+        lam = self.lam
+        mu = self.mu
+        x = p[..., 0]
+        y = p[..., 1]
+
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+
+
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] -= lam*(-pi**3*sin(pi*x)**2*sin(2*pi*y) - 2*pi**3*sin(pi*y)*cos(2*pi*x)*cos(pi*y) + pi**3*sin(2*pi*y)*cos(pi*x)**2)
+        val[..., 0] -= 2*mu*(-pi**3*sin(pi*x)**2*sin(2*pi*y) - pi**3*sin(pi*y)*cos(2*pi*x)*cos(pi*y))
+        val[..., 0] += 2*pi**3*mu*sin(pi*x)**2*sin(2*pi*y) - 2*pi**3*mu*sin(2*pi*y)*cos(pi*x)**2
+
+        val[..., 1] -= lam*(2*pi**3*sin(pi*x)*cos(pi*x)*cos(2*pi*y) + pi**3*sin(2*pi*x)*sin(pi*y)**2 - pi**3*sin(2*pi*x)*cos(pi*y)**2)
+        val[..., 1] -= 2*mu*(pi**3*sin(pi*x)*cos(pi*x)*cos(2*pi*y) + pi**3*sin(2*pi*x)*sin(pi*y)**2)
+        val[..., 1] -= 2*pi**3*mu*sin(2*pi*x)*sin(pi*y)**2 
+        val[..., 1] += 2*pi**3*mu*sin(2*pi*x)*cos(pi*y)**2
+
+#        val[..., 0] = -pi**3*sin(2*pi*y)*(2*cos(2*pi*x) - 1)
+#        val[..., 1] = pi**3*sin(2*pi*x)*(2*cos(2*pi*y) - 1)
+
+        return val
 
 class Model2d():
     def __init__(self, lam=1.0, mu=0.5):

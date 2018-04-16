@@ -21,7 +21,6 @@ class LinearElasticityFEMModel:
         self.sI = self.tensorspace.interpolation(self.model.stress)
         self.integrator = integrator
         self.measure = mesh.entity_measure()
-        print(np.max(self.measure))
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
         self.count = 0
 
@@ -37,7 +36,6 @@ class LinearElasticityFEMModel:
         self.sI = self.tensorspace.interpolation(self.model.stress)
         self.uh = self.vectorspace.function()
         self.measure = mesh.entity_measure()
-        print(np.max(self.measure))
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
 
     def get_left_matrix(self):

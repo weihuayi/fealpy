@@ -27,11 +27,11 @@ class HuZhangFiniteElementSpace():
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
 
-            t = mesh.edge_unit_tagent()
-            n = mesh.edge_unit_normal()
-            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
-            self.TE[:, 1, :] = np.sqrt(2)*(t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
-            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
+#            t = mesh.edge_unit_tagent()
+#            n = mesh.edge_unit_normal()
+#            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
+#            self.TE[:, 1, :] = np.sqrt(2)*(t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
+#            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
         elif self.dim == 3:
             idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
             self.T = np.array([
@@ -44,13 +44,13 @@ class HuZhangFiniteElementSpace():
 
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
 
-#        t = mesh.edge_unit_tagent()
-#        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
-#        frame[:, 0] = t
-#        for i, (j, k) in enumerate(idx):
-#            self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
-#
-#        self.TE[:, 1] *= np.sqrt(2)
+        t = mesh.edge_unit_tagent()
+        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
+        frame[:, 0] = t
+        for i, (j, k) in enumerate(idx):
+            self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
+
+        self.TE[:, 1] *= np.sqrt(2)
 
         if self.dim == 3:
             NF = mesh.number_of_faces()

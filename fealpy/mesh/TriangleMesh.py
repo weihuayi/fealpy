@@ -116,14 +116,14 @@ class TriangleMesh(Mesh2d):
 
     def uniform_refine(self, n=1, surface=None):
         for i in range(n):
-            N = self.number_of_nodes()
+            NN = self.number_of_nodes()
             NC = self.number_of_cells()
             NE = self.number_of_edges()
-            node = self.node
-            edge = self.ds.edge
-            cell = self.ds.cell
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
             cell2edge = self.ds.cell_to_edge()
-            edge2newNode = np.arange(N, N+NE)
+            edge2newNode = np.arange(NN, NN+NE)
             newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
             if surface is not None:
                 newNode, _ = surface.project(newNode)
@@ -131,7 +131,7 @@ class TriangleMesh(Mesh2d):
             p = np.r_['-1', cell, edge2newNode[cell2edge]] 
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
             N = self.number_of_nodes()
-            self.ds.reinit(N, cell)
+            self.ds.reinit(NN, cell)
 
     def uniform_bisect(self, n=1):
         for i in range(n):
@@ -388,7 +388,7 @@ class TriangleMeshWithInfinityNode:
         NB = isBdNode.sum()
 
         nodeIdxMap = np.zeros(isBdNode.shape, dtype=np.int)
-        nodeIdxMap[isBdNode] = self.center.shape[0] + np.arange(NBP)
+        nodeIdxMap[isBdNode] = self.center.shape[0] + np.arange(NB)
 
         pnode = np.concatenate((self.center, self.node[isBdNode]), axis=0)
         PN = pnode.shape[0]

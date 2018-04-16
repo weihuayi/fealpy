@@ -1,7 +1,8 @@
 import numpy as np
 import sys
 
-from fealpy.model.linear_elasticity_model import PolyModel3d, Model2d, SimplifyModel2d
+from fealpy.model.linear_elasticity_model import PolyModel3d, Model2d, SimplifyModel2d, HuangModel2d
+from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.femmodel.LinearElasticityFEMModel import LinearElasticityFEMModel 
 from fealpy.tools.show import showmultirate
 
@@ -19,13 +20,15 @@ if m == 2:
     model = Model2d()
 if m == 3:
     model = SimplifyModel2d()
+if m == 4:
+    model = HuangModel2d()
+
+#box = [0, 1, 0, 1]
+#mesh = rectangledomainmesh(box, nx=n, ny=n)
 
 mesh = model.init_mesh(n)
-h = 1
 integrator = mesh.integrator(7)
 
-fem = LinearElasticityFEMModel(mesh, model, p, integrator)
-gdof = fem.vectorspace.number_of_global_dofs()
 
 maxit = 4 
 
@@ -39,14 +42,23 @@ Ndof = np.zeros((maxit,))
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
+    fem = LinearElasticityFEMModel(mesh, model, p, integrator)
     fem.solve()
+    
+#    fig = plt.figure()
+#    axes = fig.gca()
+#    mesh.print()
+#    mesh.add_plot(axes)
+#    mesh.find_node(axes, showindex=True)
+#    mesh.find_edge(axes, showindex=True)
+#    mesh.find_cell(axes, showindex=True)
 
     Ndof[i] = fem.mesh.number_of_cells() 
     errorMatrix[:, i] = fem.error()
     if i < maxit - 1:
-        h /=2
+        #n *= 2
+        #mesh = rectangledomainmesh(box, nx=n, ny=n)
         mesh.uniform_refine()
-        fem.reinit(mesh)
         
 
 print('Ndof:', Ndof)

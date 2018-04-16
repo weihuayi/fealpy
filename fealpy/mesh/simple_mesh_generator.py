@@ -14,9 +14,9 @@ from .distmesh import DistMesh2d
 
 
 def squaremesh(x0, x1, y0, y1, r=3, dtype=np.float):
-    nodes = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=dtype)
-    cells = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int)
-    mesh = TriangleMesh(nodes, cells, dtype=dtype)
+    node = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=dtype)
+    cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int)
+    mesh = TriangleMesh(node, cell)
     mesh.uniform_refine(r)
     return mesh 
 
