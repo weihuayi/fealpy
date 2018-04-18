@@ -56,7 +56,7 @@ class PolygonMesh(Mesh2d):
         node, cell, cellLocation = quadtree.to_pmesh()
         return cls(node, cell, cellLocation)
 
-    def barycenter(self, entity='cell', index=None):
+    def entity_barycenter(self, entity='cell', index=None):
         node = self.node
         dim = self.geo_dimension()
 

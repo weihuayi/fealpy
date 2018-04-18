@@ -1,11 +1,14 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve, lsmr
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import spdiags, eye, bmat, tril, triu
+from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator
+import pyamg
 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..functionspace.mixed_fem_space import HuZhangFiniteElementSpace
-from ..solver.petsc_solver import minres
 from .integral_alg import IntegralAlg
+from .doperator import stiff_matrix
 from timeit import default_timer as timer
 
 
@@ -14,6 +17,7 @@ class LinearElasticityFEMModel:
         self.mesh = mesh
         self.tensorspace = HuZhangFiniteElementSpace(mesh, p)
         self.vectorspace = VectorLagrangeFiniteElementSpace(mesh, p-1, spacetype='D') 
+        self.cspace = LagrangeFiniteElementSpace(mesh, 1)
         self.dim = self.tensorspace.dim
         self.sh = self.tensorspace.function()
         self.uh = self.vectorspace.function()
@@ -45,14 +49,42 @@ class LinearElasticityFEMModel:
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
         aphi = self.model.compliance_tensor(phi)
+        
+        tcell2dof = tspace.cell_to_dof()
         M = np.einsum('i, ijkmn, ijomn, j->jko', ws, aphi, phi, self.measure)
-
         tldof = tspace.number_of_local_dofs()
-        I = np.einsum('ij, k->ijk', tspace.cell_to_dof(), np.ones(tldof))
+        I = np.einsum('ij, k->ijk', tcell2dof, np.ones(tldof))
         J = I.swapaxes(-1, -2)
-
         tgdof = tspace.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
+
+        # construct diag matrix D
+        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)
+        self.D = np.bincount(tcell2dof.flat, weights=D.flat, minlength=tgdof)
+
+        # construct amg solver 
+        A = stiff_matrix(self.cspace, self.integrator, self.measure)
+        isBdDof = self.cspace.boundary_dof()
+        bdIdx = np.zeros((A.shape[0], ), np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        A = T@A@T + Tbd
+        self.ml = pyamg.ruge_stuben_solver(A)  
+
+        # Get interpolation matrix 
+        NC = self.mesh.number_of_cells()
+        bc = self.vectorspace.dof.multiIndex/self.vectorspace.p
+        val = np.tile(bc, (NC, 1))
+        c2d0 = self.vectorspace.dof.cell2dof
+        c2d1 = self.cspace.cell_to_dof()
+
+        I = np.einsum('ij, k->ijk', c2d0, np.ones(3))
+        J = np.einsum('ik, j->ijk', c2d1, np.ones(len(bc)))
+        cgdof = self.cspace.number_of_global_dofs()
+        fgdof = self.vectorspace.number_of_global_dofs()/self.mesh.geo_dimension()
+        self.PI = csr_matrix((val.flat, (I.flat, J.flat)), shape=(fgdof, cgdof))
+
 
         dphi = tspace.div_basis(bcs)
         uphi = vspace.basis(bcs)
@@ -81,47 +113,6 @@ class LinearElasticityFEMModel:
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=vgdof)
         return  -b
 
-    def average_trace(self):
-        dim = self.dim
-        sh = self.sh
-        bcs, ws = self.integrator.quadpts, self.integrator.weights
-        f = lambda x: sh.value(x).trace(axis1=-2, axis2=-1)
-        val = self.integralalg.integral(f)/(dim*np.sum(self.measure))
-        return val
-
-        
-    def write_system(self, M, B, b, sparse=True):
-        fM = open('M{}.dat'.format(self.count), 'ab')
-        fB = open('B{}.dat'.format(self.count), 'ab')
-        fb = open('b{}.dat'.format(self.count), 'ab')
-
-        np.savetxt(fM, np.array([M.shape]), fmt='%d')
-        if sparse is True:
-            np.savetxt(fM, M.indptr, fmt='%d')
-            np.savetxt(fM, np.array([M.indices, M.data]).T, fmt=['%d', '%.18e'])
-        else:
-            nnz = M.nnz
-            np.savetxt(fM, [nnz], fmt='%d')
-            T = M.tocoo()
-            np.savetxt(fM, np.array([T.row, T.col, T.data]).T, fmt=['%d', '%d', '%.18e'])
-        fM.close()
-
-        np.savetxt(fB, np.array([B.shape]), fmt='%d')
-        if sparse is True:
-            np.savetxt(fB, B.indptr, fmt='%d')
-            np.savetxt(fB, np.array([B.indices, B.data]).T, fmt=['%d', '%.18e'])
-        else:
-            nnz = B.nnz
-            np.savetxt(fB, [nnz], fmt='%d')
-            T = B.tocoo()
-            np.savetxt(fB, np.array([T.row, T.col, T.data]).T, fmt=['%d', '%d', '%.18e'])
-        fB.close()
-
-        np.savetxt(fb, [len(b)], fmt='%d')
-        np.savetxt(fb, b)
-        fb.close()
-
-
     def solve(self):
         tgdof = self.tensorspace.number_of_global_dofs()
         vgdof = self.vectorspace.number_of_global_dofs()
@@ -142,41 +133,48 @@ class LinearElasticityFEMModel:
         self.sh[:] = x[0:tgdof]
         self.uh[:] = x[tgdof:]
 
-#        c2d = self.tensorspace.cell_to_dof()
-#        print(c2d.reshape(1, 10, 3))
-#        MM = M.todense()
-#
-#        f = open('M.txt', 'ab')
-#        np.savetxt(f, MM, fmt='%.16f')
-#        f.close()
-#
-#        f = open('B.txt', 'ab')
-#        np.savetxt(f, B.todense(), fmt='%.16f')
-#        f.close()
+    def fast_solve(self):
+        tgdof = self.tensorspace.number_of_global_dofs()
+        vgdof = self.vectorspace.number_of_global_dofs()
+        gdof = tgdof + vgdof
 
-        #self.write_system(M, B, b, sparse=False)
+        self.M, self.B = self.get_left_matrix()
+        S = self.B@spdiags(1/self.D)@self.B.tranpose()
+        self.SL = tril(S)
+        self.SU = triu(S, k=1)
 
-        #isBdDof[0:3] = True
-        #isBdDof[tgdof:] = self.vectorspace.boundary_dof()
-        #x = np.zeros(gdof, dtype=np.float)
-        #b -= A@x
-        #bdIdx = np.zeros(gdof, dtype=np.int)
-        #bdIdx[isBdDof] = 1
-        #Tbd = spdiags(bdIdx, 0, gdof, gdof)
-        #T = spdiags(1-bdIdx, 0, gdof, gdof)
-        #A = T@A@T + Tbd
-        #b[isBdDof] = x[isBdDof] 
-        #x[:] = spsolve(A, b)
+        b = self.get_right_vector()
+
+        AA = bmat([[self.M, self.B.transpose()], [self.B, None]]).tocsr()
+        bb = np.r_[np.zeros(tgdof), b]
+
+        start = timer()
+        x, exitCode = gmres(AA, bb)
+        print(exitCode)
+        end = timer()
+
+        print("Solve time:", end-start)
+        self.sh[:] = x[0:tgdof]
+        self.uh[:] = x[tgdof:]
+
+    def linear_operator(self, r):
+        tgdof = self.tensorspace.number_of_global_dofs()
+        vgdof = self.vectorspace.number_of_global_dofs()
+        gdof = tgdof + vgdof
+
+        r0 = r[0:tgdof]
+        r1 = r[tgdof:]
+
+        u0 = r0/self.D
+        u1 = np.zeros(vgdof, dtype=np.float)
+        r2 = r1 - self.B@u0
+
+        for i in range(6):
+            u1[:] = spsolve(self.SL, r2 - self.SU@u1) 
 
 
-        #x, info =  minres(A, b, tol=1e-8, maxiter=1000, show=True)
-        #print('info:', info)
-
-        #x = np.r_[self.sh, self.uh]
-        #minres(A, b, x)
-
-        #x, istop = lsmr(A, b)[:2]
-        #print(istop)
+        for i in range(6):
+            u1[:] = spsolve(self.SL.transpose(), r2 - self.SU.transpose()@u1)
 
     def error(self):
 

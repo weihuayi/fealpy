@@ -61,7 +61,13 @@ def showmultirate(plt, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=1
 def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
     axes.set_xlim(xmin=N[0]/2, xmax=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
-    c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
-    s = 0.75*error[k]/N[k]**c[0] 
-    line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
-            lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+    if isinstance(k, int):
+        c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
+        s = 0.75*error[k]/N[k]**c[0] 
+        line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
+                lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+    else:
+        c = np.polyfit(np.log(N[k]), np.log(error[k]), 1)
+        s = 0.75*error[k[0]]/N[k[0]]**c[0] 
+        line1, = axes.loglog(N[k], s*N[k]**c[0], label='C$N^{%0.4f}$'%(c[0]),
+                lw=lw, ls=line0.get_linestyle(), color=line0.get_color())

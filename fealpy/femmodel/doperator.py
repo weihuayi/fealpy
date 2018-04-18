@@ -39,7 +39,6 @@ def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
     return A
 
 def source_vector(f, space, qf, measure):
-    
     bcs, ws = qf.quadpts, qf.weights
     pp = space.mesh.bc_to_point(bcs)
     fval = f(pp)

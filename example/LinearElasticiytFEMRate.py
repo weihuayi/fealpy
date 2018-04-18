@@ -44,20 +44,9 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
     fem = LinearElasticityFEMModel(mesh, model, p, integrator)
     fem.solve()
-    
-#    fig = plt.figure()
-#    axes = fig.gca()
-#    mesh.print()
-#    mesh.add_plot(axes)
-#    mesh.find_node(axes, showindex=True)
-#    mesh.find_edge(axes, showindex=True)
-#    mesh.find_cell(axes, showindex=True)
-
     Ndof[i] = fem.mesh.number_of_cells() 
     errorMatrix[:, i] = fem.error()
     if i < maxit - 1:
-        #n *= 2
-        #mesh = rectangledomainmesh(box, nx=n, ny=n)
         mesh.uniform_refine()
         
 

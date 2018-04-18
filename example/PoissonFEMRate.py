@@ -4,39 +4,27 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.model.poisson_model_2d import CosCosData
 from fealpy.femmodel.PoissonFEMModel import PoissonFEMModel
-
 from fealpy.tools.show import showmultirate
 
-from fealpy.quadrature.TriangleQuadrature import TriangleQuadrature 
-
-m = int(sys.argv[1])
-p = int(sys.argv[2])
+p = int(sys.argv[1])
+q = int(sys.argv[2])
 n = int(sys.argv[3])
 
-if m == 1:
-    model = CosCosData()
-
-mesh = model.init_mesh(n=n, meshtype='tri')
-integrator = TriangleQuadrature(7)
-fem = PoissonFEMModel(mesh, model, p=p, integrator=integrator)
+pde = CosCosData()
+mesh = pde.init_mesh(n=n, meshtype='tri')
+integrator = mesh.integrator(q)
 maxit = 4
 
-errorType = ['$|| u_I - u_h ||_{l_2}$',
-             '$|| u - u_h||_{0}$',
-             '$||\\nabla u - \\nabla u_h||_{0}$'
-             ]
+errorType = ['$|| u - u_h||_{0}$', '$||\\nabla u - \\nabla u_h||_{0}$']
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
-    fem.solve()
-    Ndof[i] = len(fem.uh)
-    errorMatrix[0, i] = fem.l2_error()
-    errorMatrix[1, i] = fem.L2_error()
-    errorMatrix[2, i] = fem.H1_semi_error()
+    femModel = PoissonFEMModel(pde, mesh, p, integrator)
+    femModel.solve()
+    Ndof[i] = femModel.femspace.number_of_global_dofs()
+    errorMatrix[:, i] = femModel.error()
     if i < maxit - 1:
         mesh.uniform_refine()
-        fem.reinit(mesh)
-        
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
