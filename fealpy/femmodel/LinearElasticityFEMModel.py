@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator
+from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator, spsolve_triangular
 import pyamg
 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
@@ -10,7 +10,7 @@ from ..functionspace.mixed_fem_space import HuZhangFiniteElementSpace
 from .integral_alg import IntegralAlg
 from .doperator import stiff_matrix
 from timeit import default_timer as timer
-
+import cProfile
 
 class LinearElasticityFEMModel:
     def __init__(self, mesh,  model, p, integrator):
@@ -139,9 +139,9 @@ class LinearElasticityFEMModel:
         gdof = tgdof + vgdof
 
         self.M, self.B = self.get_left_matrix()
-        S = self.B@spdiags(1/self.D)@self.B.tranpose()
-        self.SL = tril(S)
-        self.SU = triu(S, k=1)
+        S = self.B@spdiags(1/self.D, 0, tgdof, tgdof)@self.B.transpose()
+        self.SL = tril(S).tocsr()
+        self.SU = triu(S, k=1).tocsr()
 
         b = self.get_right_vector()
 
@@ -149,7 +149,8 @@ class LinearElasticityFEMModel:
         bb = np.r_[np.zeros(tgdof), b]
 
         start = timer()
-        x, exitCode = gmres(AA, bb)
+        P = LinearOperator((gdof, gdof), matvec=self.linear_operator)
+        x, exitCode = gmres(AA, bb, M=P, tol=1e-8)
         print(exitCode)
         end = timer()
 
@@ -169,12 +170,19 @@ class LinearElasticityFEMModel:
         u1 = np.zeros(vgdof, dtype=np.float)
         r2 = r1 - self.B@u0
 
-        for i in range(6):
-            u1[:] = spsolve(self.SL, r2 - self.SU@u1) 
+        for i in range(3):
+            u1[:] = spsolve(self.SL, r2 - self.SU@u1, permc_spec="NATURAL") 
 
+        r3 = r2 - (self.SL@u1 + self.SU@u1)
+        u30 = self.ml.solve(self.PI.transpose()@r3[0::2], tol=1e-6, accel='cg')
+        u31 = self.ml.solve(self.PI.transpose()@r3[1::2], tol=1e-6, accel='cg')
+        u1[0::2] += self.PI@u30
+        u1[1::2] += self.PI@u31
 
-        for i in range(6):
-            u1[:] = spsolve(self.SL.transpose(), r2 - self.SU.transpose()@u1)
+        for i in range(3):
+            u1[:] = spsolve(self.SL.transpose(), r2 - self.SU.transpose()@u1, permc_spec="NATURAL")
+
+        return np.r_[u0 + self.B.transpose()@u1, -u1]
 
     def error(self):
 

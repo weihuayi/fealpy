@@ -48,7 +48,7 @@ def set_gost_node(data, pds, lmesh, comm):
 
     for prank in lmesh.neighbor:
         NR = len(pds.recv[prank])
-        rd = np.zeros(NR, dtype=np.int)
+        rd = np.zeros(NR, dtype=data.dtype)
         req = comm.Irecv(rd, source=prank, tag=prank)
         req.Wait()
         data[pds.recv[prank]] = rd
@@ -117,59 +117,92 @@ def local_mesh(tmesh, rank):
 
 
 def coloring(lmesh, comm):
-    NN = lmesh.number_of_nodes()
-    c = np.zeros(NN, dtype=np.int)
 
+    rank = comm.Get_rank()
     parts = lmesh.nodedata['partition'] 
+    NN = lmesh.number_of_nodes()
+
+    c = np.zeros(NN, dtype=np.int)
     isUnColor = (c == 0) 
     color = 0
 
     pds = MeshOverlapDataStructure(lmesh, comm)
 
-    r = np.random.randint(0, 100, NN)
-
+    r = np.random.rand(NN)
     set_gost_node(r, pds, lmesh, comm) 
 
-#    edge = lmesh.entity('edge')
-#    parts = lmesh.nodedata['partition'] 
-#    gid = lmesh.nodedata['global_id']
-#    isLocalNode = (parts == rank)
-#    for prank in lmesh.neighbor:
-#        isRecvNode = (parts == prank)
-#        isEdge = (np.sum(isRecvNode[edge], axis=1) == 1) & (np.sum(isLocalNode[edge], axis=1) == 1)
-#        isSentNode = np.zeros(NN, dtype=np.bool)
-#        isSentNode[edge[isEdge]] = True
-#        isSentNode[isRecvNode] = False
-#        NS = np.sum(isSentNode)
-#        sd = np.zeros((NS, 2), dtype=np.int)  
-#        sd[:, 0] = gid[isSentNode]
-#        sd[:, 1] = r[isSentNode]
-#        comm.Isend(sd, dest=prank, tag=rank)
-#        print("Process ", rank, " sent data ", sd.shape, " to process ", prank)
+    edge = lmesh.entity('edge')
+    isLocalNode = (parts == rank)
+    while True:
+        color += 1
+        isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]]
+        if isRemainEdge.sum() == 0:
+            break
+
+        edge0 = edge[isRemainEdge]
+
+        r = np.random.rand(NN)
+        set_gost_node(r, pds, lmesh, comm) 
+
+
+        isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
+        flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+        flag += np.bincount(edge0[isLess, 1], minlength=NN)
+        flag = (flag == 0) & isUnColor & isLocalNode
+        c[flag] = color
+
+        set_gost_node(c, pds, lmesh, comm) 
+        isUnColor = (c == 0) 
+
+#        isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+#        isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+#        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+#        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+#        flag = (flag == 0) & isLocalNode
 #
-#    for prank in lmesh.neighbor:
-#        isRecvNode = (parts == prank)
-#        NR = np.sum(isRecvNode)
-#        rd = np.zeros((NR, 2), dtype=np.int)
-#        req = comm.Irecv(rd, source=prank, tag=prank)
-#        print("Process ", rank, " receive data ", rd.shape, " from process ", prank)
-#        req.Wait()
-#        idx = lmesh.global2local[rd[:, 0]]
-#        r[idx] = rd[:, 1]
+#        while np.any(flag):
+#            isRemainEdge = flag[edge[:,0]] & flag[edge[:,1]]
+#            edge0 = edge[isRemainEdge]
+#
+#            r = np.random.randint(0, maxInt, NN)
+#            set_gost_node(r, pds, lmesh, comm) 
+#
+#            isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
+#            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+#            flag += np.bincount(edge0[isLess, 1], minlength=NN)
+#            flag = (flag == 0) & isLocalNode
+#            c[flag] = color
+#            set_gost_node(c, pds, lmesh, comm) 
+#
+#            isUnColor = (c == 0) 
+#
+#            isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+#            isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+#            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+#            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+#            flag = (flag == 0) & isLocalNode
 
-    return r
-#    edge = mesh.ds.edge
-#    isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]] 
-#    while np.any(isRemainEdge):
-#        color += 1
-#        edge0 = edge[isRemainEdge]
-#        isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
-#        flag = np.bincount(edge0[~isLess, 0], minlength=NN)
-#        flag += np.bincount(edge0[isLess, 1], minlength=NN)
-#        c[(flag == 0) & isUnColor] = color
-#        isUnColor = (c == 0) 
+
+    if np.any(isUnColor):
+        color += 1
+        c[isUnColor] = color
+
+    for i in range(1, color+1):
+        print('There are {} points with color {} in rank {}.'.format((c==i).sum(), i, rank))
+
+    return c
 
 
+def show_mesh(lmesh, data):
+    fig = plt.figure()
+    axes = fig.gca()
+    lmesh.add_plot(axes, cellcolor='w')
+    lmesh.find_node(axes, color=lmesh.nodedata['partition'], markersize=20)
+    NN = lmesh.number_of_nodes()
+    node = lmesh.entity('node')
+    for i in range(NN):
+        axes.text(node[i, 0], node[i, 1], str(data[i]), multialignment='center') 
+    axes.set_title("rank {}".format(rank))
 
 if __name__ == "__main__":
     comm = MPI.COMM_WORLD
@@ -183,16 +216,8 @@ if __name__ == "__main__":
 
     tmesh = par_mesh(0.05, size) 
     lmesh = local_mesh(tmesh, rank)
-    r = coloring(lmesh, comm)
+    c = coloring(lmesh, comm)
 
-    fig = plt.figure()
-    axes = fig.gca()
-    lmesh.add_plot(axes, cellcolor='w')
-    lmesh.find_node(axes, color=lmesh.nodedata['partition'], markersize=20)
-    NN = lmesh.number_of_nodes()
-    node = lmesh.entity('node')
-    for i in range(NN):
-        axes.text(node[i, 0], node[i, 1], str(r[i]), multialignment='center') 
-
-    axes.set_title("rank {}".format(rank))
+    show_mesh(lmesh, c)
+    #show_mesh(lmesh, r)
     plt.show()

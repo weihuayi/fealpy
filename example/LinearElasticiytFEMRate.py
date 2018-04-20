@@ -30,7 +30,7 @@ mesh = model.init_mesh(n)
 integrator = mesh.integrator(7)
 
 
-maxit = 4 
+maxit = 6 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',
@@ -43,8 +43,12 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     fem = LinearElasticityFEMModel(mesh, model, p, integrator)
-    fem.solve()
-    Ndof[i] = fem.mesh.number_of_cells() 
+    #fem.solve()
+    fem.fast_solve()
+    tgdof = fem.tensorspace.number_of_global_dofs()
+    vgdof = fem.vectorspace.number_of_global_dofs()
+    gdof = tgdof + vgdof
+    Ndof[i] = gdof 
     errorMatrix[:, i] = fem.error()
     if i < maxit - 1:
         mesh.uniform_refine()
