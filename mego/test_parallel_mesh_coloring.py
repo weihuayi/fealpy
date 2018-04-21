@@ -150,37 +150,36 @@ def coloring(lmesh, comm):
         flag += np.bincount(edge0[isLess, 1], minlength=NN)
         flag = (flag == 0) & isUnColor & isLocalNode
         c[flag] = color
-
         set_gost_node(c, pds, lmesh, comm) 
         isUnColor = (c == 0) 
 
-#        isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
-#        isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-#        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
-#        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
-#        flag = (flag == 0) & isLocalNode
-#
-#        while np.any(flag):
-#            isRemainEdge = flag[edge[:,0]] & flag[edge[:,1]]
-#            edge0 = edge[isRemainEdge]
-#
-#            r = np.random.randint(0, maxInt, NN)
-#            set_gost_node(r, pds, lmesh, comm) 
-#
-#            isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
-#            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
-#            flag += np.bincount(edge0[isLess, 1], minlength=NN)
-#            flag = (flag == 0) & isLocalNode
-#            c[flag] = color
-#            set_gost_node(c, pds, lmesh, comm) 
-#
-#            isUnColor = (c == 0) 
-#
-#            isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
-#            isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-#            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
-#            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
-#            flag = (flag == 0) & isLocalNode
+        isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+        isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+        flag = (flag == 0) & isUnColor & isLocalNode
+
+        while np.any(flag):
+            isRemainEdge = flag[edge[:,0]] & flag[edge[:,1]]
+            edge0 = edge[isRemainEdge]
+
+            r = np.random.rand(NN)
+            set_gost_node(r, pds, lmesh, comm) 
+
+            isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
+            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+            flag += np.bincount(edge0[isLess, 1], minlength=NN)
+            flag = (flag == 0) & isUnColor & isLocalNode
+            c[flag] = color
+            set_gost_node(c, pds, lmesh, comm) 
+
+            isUnColor = (c == 0) 
+
+            isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+            isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+            flag = (flag == 0) & isUnColor & isLocalNode
 
 
     if np.any(isUnColor):
