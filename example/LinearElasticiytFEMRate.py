@@ -30,7 +30,7 @@ mesh = model.init_mesh(n)
 integrator = mesh.integrator(7)
 
 
-maxit = 6 
+maxit = 4 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',

@@ -140,8 +140,11 @@ class LinearElasticityFEMModel:
 
         self.M, self.B = self.get_left_matrix()
         S = self.B@spdiags(1/self.D, 0, tgdof, tgdof)@self.B.transpose()
-        self.SL = tril(S).tocsr()
+        self.SL = tril(S).tocsc()
         self.SU = triu(S, k=1).tocsr()
+
+        self.SUT = self.SL.transpose().tocsr()
+        self.SLT = self.SU.transpose().tocsr()
 
         b = self.get_right_vector()
 
@@ -174,13 +177,13 @@ class LinearElasticityFEMModel:
             u1[:] = spsolve(self.SL, r2 - self.SU@u1, permc_spec="NATURAL") 
 
         r3 = r2 - (self.SL@u1 + self.SU@u1)
-        u30 = self.ml.solve(self.PI.transpose()@r3[0::2], tol=1e-6, accel='cg')
-        u31 = self.ml.solve(self.PI.transpose()@r3[1::2], tol=1e-6, accel='cg')
+        u30 = self.ml.solve(self.PI.transpose()@r3[0::2], tol=1e-8, accel='cg')
+        u31 = self.ml.solve(self.PI.transpose()@r3[1::2], tol=1e-8, accel='cg')
         u1[0::2] += self.PI@u30
         u1[1::2] += self.PI@u31
 
         for i in range(3):
-            u1[:] = spsolve(self.SL.transpose(), r2 - self.SU.transpose()@u1, permc_spec="NATURAL")
+            u1[:] = spsolve(self.SUT, r2 - self.SLT@u1, permc_spec="NATURAL")
 
         return np.r_[u0 + self.B.transpose()@u1, -u1]
 
