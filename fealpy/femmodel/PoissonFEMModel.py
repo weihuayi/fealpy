@@ -6,6 +6,7 @@ from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..quadrature  import TriangleQuadrature
 from ..solver import solve
 from ..solver.petsc_solver import linear_solver
+from ..solver.hofsolver import HOFEMFastSovler
 from ..boundarycondition import DirichletBC
 from ..femmodel import doperator 
 from .integral_alg import IntegralAlg
@@ -58,6 +59,15 @@ class PoissonFEMModel(object):
     def solve(self):
         bc = DirichletBC(self.femspace, self.pde.dirichlet)
         self.A, b= solve(self, self.uh, dirichlet=bc, solver='direct')
+
+    def fast_solve(self):
+        bc = DirichletBC(self.femspace, self.pde.dirichlet)
+        A = self.get_left_matrix()
+        b = self.get_right_vector()
+        AD, b = bc.apply(A, b)
+        solver = HOFEMFastSovler(AD, self.femspace, self.integrator,
+                self.cellmeasure)
+        self.uh[:] = solver.solve(b, tol=1e-13)
 
 
     def error(self):
