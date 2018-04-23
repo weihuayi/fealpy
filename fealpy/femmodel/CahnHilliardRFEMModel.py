@@ -21,6 +21,7 @@ class CahnHilliardRFEMModel():
         self.integrator = integrator 
         self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
 
+        self.gradphi = self.mesh.grad_lambda() 
         self.A, self.B = grad_recovery_matrix(self.femspace)
         self.M =  mass_matrix(self.femspace, self.integrator, self.area)
 

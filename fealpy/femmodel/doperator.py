@@ -50,40 +50,41 @@ def source_vector(f, space, qf, measure):
     b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
     return b
 
-def grad_recovery_matrix(space):
+def grad_recovery_matrix(space, rtype='simple'):
     mesh = space.mesh
-    gradphi = mesh.grad_lambda() 
-
     NC = mesh.number_of_cells() 
-    N = mesh.number_of_points() 
-    cell = mesh.ds.cell
+    NN = mesh.number_of_nodes() 
+    cell = mesh.entity('cell')
 
-    if fem.rtype is 'simple':
-        D = spdiags(1.0/np.bincount(cell.flat), 0, N, N)
+    area = mesh.entity_measure('cell')
+    gradphi = mesh.grad_lambda()
+
+    if rtype is 'simple':
+        D = spdiags(1.0/np.bincount(cell.flat), 0, NN, NN)
         I = np.einsum('k, ij->ijk', np.ones(3), cell)
         J = I.swapaxes(-1, -2)
         val = np.einsum('k, ij->ikj', np.ones(3), gradphi[:, :, 0])
-        A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
         val = np.einsum('k, ij->ikj', np.ones(3), gradphi[:, :, 1])
-        B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
     elif fem.rtype is 'harmonic':
-        area = fem.area
         gphi = gradphi/area.reshape(-1, 1, 1)
-        d = np.zeros(N, dtype=np.float)
+        d = np.zeros(NN, dtype=np.float)
         np.add.at(d, cell, 1/area.reshape(-1, 1))
         D = spdiags(1/d, 0, N, N)
         I = np.einsum('k, ij->ijk', np.ones(3), cell)
         J = I.swapaxes(-1, -2)
         val = np.einsum('ij, k->ikj',  gphi[:, :, 0], np.ones(3))
-        A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        A = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
         val = np.einsum('ij, k->ikj',  gphi[:, :, 1], np.ones(3))
-        B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
     else:
-        raise ValueError("I have not coded the method {}".format(fem.rtype))
+        raise ValueError("I have not coded the method {}".format(rtype))
     return A, B
 
-def biharmonic_matirx(space, gradphi, area, A, B, epsilon):
+def recovery_biharmonic_matirx(space, area, A, B, epsilon):
     mesh = space.mesh
+    gradphi = mesh.grad_lambda() 
     NC = mesh.number_of_cells() 
     NN = mesh.number_of_nodes() 
 
@@ -124,4 +125,26 @@ def biharmonic_matirx(space, gradphi, area, A, B, epsilon):
     S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
 
     M += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
-    return M
+
+    localEdge = mesh.ds.local_edge()
+    cellIdx = edge2cell[isBdEdge, [0]]
+    localIdx = edge2cell[isBdEdge, 2]
+    val0 = 0.5*h*n[:, 0]*gradphi[cellIdx, localEdge[localIdx], 0]  
+    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
+    P0 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+    val0 = 0.5*h*n[:, 0]*gradphi[cellIdx, localEdge[localIdx], 1]  
+    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
+    Q0 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+    val0 = 0.5*h*n[:, 1]*gradphi[cellIdx, localEdge[localIdx], 0]  
+    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
+    P1 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+    val0 = 0.5*h*n[:, 1]*gradphi[cellIdx, localEdge[localIdx], 1]  
+    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
+    Q1 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+    M0 = A.transpose()@P0@A + A.transpose()@Q0@B + B.transpose()@P1@A + B.transpose()@Q1@B
+
+    return  M -= (M0 + M0.transpose())
