@@ -10,15 +10,16 @@ import matplotlib.pyplot as plt
 n = int(sys.argv[1])  # n is mesh refine
 fieldsType = int(sys.argv[2]) # define fields type
 
-box = [-1, 1, -1, 1]
+box = [0, 4, 0, 4]
 mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='polygon')
 
+node = mesh.node
 p = 1
 vemspace =VirtualElementSpace2d(mesh, p)
 
 # get_sys_parameter
 option = SCFTParameter()
-option.maxit = 1
+option.maxit = 100
 chiN = option.Ndeg*option.chiAB
 
 # define fields
@@ -29,24 +30,16 @@ if fieldsType == 1:
     fields[:, 0] = chiN*(-1 + 2*np.random.rand(1, Ndof))
     fields[:, 1] = chiN*(-1 + 2*np.random.rand(1, Ndof))
 elif fieldsType == 2:
-    pi = np.pi
-    fields[:, 1] = chiN*(np.sin(pi*node[:,0]))
-elif fieldsType == 6:
-    pi = np.pi
-    fields[:, 1] = chiN*(np.sin(pi*node[:,0]))
+    fields[:, 1] = chiN*(np.sin(5*node[:,0]))
+elif fieldsType == 3:
+    fields[:, 1] = chiN*(np.sin(5*node[:,1]))
    
 option.fields = fields
-
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
 
 scft = SCFTVEMModel(vemspace, option) 
 
 scft.initialize()
 scft.update_propagator()
-#scft.find_saddle_point(datafile='vemflat', file_path='./')
+scft.find_saddle_point()
 plt.show()
 

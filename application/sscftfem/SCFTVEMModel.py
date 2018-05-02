@@ -27,18 +27,7 @@ class SCFTParameter():
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
                 
-    #def init_mesh(self):
-    #   node = np.array([
-    #       (0, 0),
-    #       (1, 0),
-    #       (1, 1),
-    #       (0, 1)], dtype=np.float)
-    #   
-    #   cell = np.array([0,1,2,3])
-    #   mesh = Quadtree(node,cell)
-    #   return mesh
-
-       
+           
 
 
 class TimeLine():
@@ -80,7 +69,8 @@ class PDESolver():
         self.mat = doperator.basic_matrix(self.vemspace, self.measure)
         self.A = doperator.stiff_matrix(self.vemspace, self.measure, mat=self.mat)
         self.M = doperator.mass_matrix(self.vemspace, self.measure, mat=self.mat)
-
+    
+    
     def get_current_linear_system(self, u0, dt):
         M = self.M
         S = self.A
@@ -119,6 +109,7 @@ class SCFTVEMModel():
         self.area = self.vemspace.smspace.area
         self.totalArea = np.sum(self.area)
         self.option = option
+        
         #TODO
         self.integralalg = PolygonMeshIntegralAlg(option.integrator,
                 self.mesh,
@@ -150,7 +141,7 @@ class SCFTVEMModel():
         chiN = option.chiAB * option.Ndeg
 
         self.w[0][:] = fields[:, 0] - fields[:, 1]
-        self.w[1][:] = fields[:, 1] + fields[:, 1]
+        self.w[1][:] = fields[:, 0] + fields[:, 1]
 
 
         self.mu[0][:] = 0.5*(self.w[0] + self.w[1])
@@ -183,12 +174,9 @@ class SCFTVEMModel():
         n1 = self.timeline1.get_number_of_time_steps()
         
 
-        #TODO self.PI0
         integral = self.integralalg.integral
         
-        print('w0:', self.w[0])
         S = self.project_to_smspace(self.w[0])
-        print('S:', S)
         F0 = doperator.cross_mass_matrix(
                 integral,
                 S.value,
@@ -196,9 +184,8 @@ class SCFTVEMModel():
                 self.area,
                 self.solver.mat.PI0)
 
-        print('w1:', self.w[1])
+        print(F0)
         S = self.project_to_smspace(self.w[1])
-        print('S:', S)
         F1 = doperator.cross_mass_matrix(
                 integral,
                 S.value,
@@ -207,16 +194,13 @@ class SCFTVEMModel():
                 self.solver.mat.PI0)
         
         self.q0[:, 0] = 1.0
-        print("q0 first step")
         self.solver.run(self.timeline0,self.q0[:, 0:n0], F0)
-        print("q0 second step")
         self.solver.run(self.timeline1, self.q1[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
-        print("q1 first step")
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
-        print("q1 second step")
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
-
+        print(self.q0[:, -1])
+        print(self.q0[:, -1])
 
     def integral_time(self, q, dt):
         f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
@@ -224,8 +208,8 @@ class SCFTVEMModel():
         f *= dt
         return f
 
-    def integral_space(self, uh):
-        S = self.project_to_smspace(uh)
+    def integral_space(self, u):
+        S = self.project_to_smspace(u)
         Q = self.integralalg.integral(S.value)
         return Q
 
@@ -238,7 +222,7 @@ class SCFTVEMModel():
                 self.timeline1.dt)/self.sQ[0, 0]
 
     def update_singleQ(self, integrand):
-        f = self.integral_space(integrand)/self.totalArea 
+        f = self.integral_space(integrand)/self.totalArea
         return f
 
     def update_hamilton(self):
@@ -276,7 +260,7 @@ class SCFTVEMModel():
         
         return err 
 
-    def find_saddle_point(self, datafile='data', showsolution=True, file_path=None):
+    def find_saddle_point(self):
         
         self.res = np.inf
         self.Hold = np.inf
@@ -284,8 +268,6 @@ class SCFTVEMModel():
         iteration = 0
         option = self.option
         
-        if file_path is not None:
-            f = open(file_path + '/log.txt', 'w')
         while (self.res > option.tol) and (iteration < option.maxit):
             self.H, self.res = self.one_step()
             self.ediff = self.H - self.Hold
@@ -293,9 +275,6 @@ class SCFTVEMModel():
             iteration += 1
 
 
-            if file_path is not None:
-                string = 'Iter: %d ======> \n sQ: %.15e res: %.15e ediff: %.15e H: %f \n' % (iteration, self.sQ, self.res, self.ediff, self.H)
-                f.write(string)
 
             print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
             print('\n')
@@ -305,12 +284,8 @@ class SCFTVEMModel():
             self.data['H'].append(self.H)
             self.data['ediff'].append(self.ediff)
 
-            if (iteration%option.showstep == 0) and showsolution:
-                self.show_solution(iteration)
         sio.matlab.savemat(datafile+'.mat', self.data)
         
-        if file_path is not None:
-            f.close()
         
     def one_step(self):
         self.update_propagator() 
@@ -339,23 +314,7 @@ class SCFTVEMModel():
 
         return partialF
 
-    #def show_solution(self, i):
-    #    mesh = self.mesh.mesh
-    #    cell = mesh.ds.cell
-    #    node = mesh.node
-    #    c = self.rho[0].view(np.ndarray)
-    #    c = np.sum(c[cell], axis=1)/3
-    #    c = cs.val_to_color(c)
-    #    fig = FF.create_trisurf(
-    #            x = node[:, 0], 
-    #            y = node[:, 1],
-    #            z = node[:, 2],
-    #            show_colorbar = True,
-    #            plot_edges=False,
-    #            simplices=cell)
-    #    fig['data'][0]['facecolor'] = c
-    #    py.plot(fig, filename='test{}'.format(i))
-
+    
 
 
 
