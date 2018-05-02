@@ -64,6 +64,46 @@ class FEMFunctionRecoveryAlg():
         rguh[:] = np.asarray(node2cell@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
     
+    def distance_harmonic_average(self, uh):
+        V = uh.V
+        mesh = V.mesh
+        GD = mesh.geo_dimension()
+        NN = mesh.number_of_nodes()
+
+        bc = np.array([1/3]*3, dtype=np.float)
+        guh = uh.grad_value(bc)
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        bp = mesh.entity_barycenter('cell')
+        v = bp[:, np.newaxis, :] - node[cell, :]
+        d = 1/np.sqrt(np.sum(v**2, axis=-1))
+        dsum = np.bincount(cell.flat, weights=d.flat, minlength=NN)
+        rguh = V.function(dim=GD)
+        for i in range(GD):
+            val = guh[:, [i]]*d
+            rguh[:, i] = np.bincount(cell.flat, weights=val.flat,
+                    minlength=NN)/dsum
+        return rguh
+
+    def angle_average(self, uh):
+        V = uh.V
+        mesh = V.mesh
+        GD = mesh.geo_dimension()
+        NN = mesh.number_of_nodes()
+
+        bc = np.array([1/3]*3, dtype=np.float)
+        guh = uh.grad_value(bc)
+
+
+        cell = mesh.entity('cell')
+        angle = mesh.angle()
+        asum = np.bincount(cell.flat, weights=angle.flat, minlength=NN)
+        rguh = V.function(dim=GD)
+        for i in range(GD):
+            val = guh[:, [i]]*angle
+            rguh[:, i] = np.bincount(cell.flat, weights=val.flat, minlength=NN)/asum
+        return rguh
 
 
     def SCR(self,uh):

@@ -84,4 +84,4 @@ class PoissonFEMModel(object):
         gu = self.pde.gradient
         guh = rgh.value
         mesh = self.mesh
-        return self.error.L2_error(gu, guh, mesh)
+        return self.integralalg.L2_error(gu, guh, mesh)

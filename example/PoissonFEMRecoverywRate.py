@@ -158,13 +158,13 @@ n = int(sys.argv[3])
 maxit = 4
 box=[0,1,0,1]
 if m == 1:
-    model = CosCosData()
+    pde = CosCosData()
 elif m == 2:
-    model = ExpData()
+    pde = ExpData()
 elif m == 3:
-    model = PolynomialData()
+    pde = PolynomialData()
 elif m == 4:
-    model = SinSinData()
+    pde = SinSinData()
 
 Mesh = Meshtype()
 
@@ -184,6 +184,7 @@ errorType = [#'$|| u_I - u_h ||_{l_2}$',
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
+
 for i in range(maxit):
     if meshtype == 1:
         mesh = Mesh.regular(box, n=n)
@@ -199,8 +200,10 @@ for i in range(maxit):
         mesh = Mesh.random_mesh(box, n=n)
     elif meshtype == 7:
         mesh = Mesh.nonuniform_mesh(box, n=n)
-    #mesh.add_plot(plt,cellcolor='w')
-    fem = PoissonFEMModel(mesh, model, 1)
+
+    integrator = mesh.integrator(3)
+    mesh.add_plot(plt,cellcolor='w')
+    fem = PoissonFEMModel(pde, mesh, 1, integrator)
     fem.solve()
     uh = fem.uh
     Ndof[i] = fem.mesh.number_of_cells() 
@@ -211,7 +214,7 @@ for i in range(maxit):
     errorMatrix[0, i] = fem.recover_error(rguh)
     rguh1 = ralg.area_average(uh)
     errorMatrix[1, i] = fem.recover_error(rguh1)
-    rguh2 = ralg.harmonic_average(uh)
+    rguh2 = ralg.distance_harmonic_average(uh)
     errorMatrix[2, i] = fem.recover_error(rguh2)
     rguh3 = ralg.SCR(uh)
     errorMatrix[3, i] = fem.recover_error(rguh3)

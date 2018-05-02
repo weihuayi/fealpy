@@ -68,7 +68,6 @@ class TriangleMesh(Mesh2d):
             v0 = node[cell[:,j]] - node[cell[:,i]]
             v1 = node[cell[:,k]] - node[cell[:,i]]
             angle[:,i] = np.arccos(np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1) * np.sum(v1**2, axis=1)))
-        print(np.isnan(angle).sum())
         return angle
 
     def edge_swap(self):
