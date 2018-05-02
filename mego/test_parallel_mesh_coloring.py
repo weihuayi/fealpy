@@ -204,6 +204,7 @@ def coloring(lmesh, comm):
 
             r[:] = 0
             N = np.sum(isUnColor & isLocalNode)
+
             r[isUnColor & isLocalNode]  = np.random.rand(N)
             set_ghost_random(r, isUnColor, isLocalNode, ods, lmesh, comm) 
 
@@ -240,7 +241,8 @@ def show_mesh(lmesh, data):
     NN = lmesh.number_of_nodes()
     node = lmesh.entity('node')
     for i in range(NN):
-        axes.text(node[i, 0], node[i, 1], str(data[i]), multialignment='center') 
+        axes.text(node[i, 0], node[i, 1], str(data[i]),
+                multialignment='center', fontsize=20) 
     axes.set_title("rank {}".format(rank))
 
 if __name__ == "__main__":

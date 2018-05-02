@@ -4,6 +4,7 @@ import numpy as np
 from fealpy.functionspace.vem_space import VirtualElementSpace2d 
 from SCFTVEMModel import SCFTVEMModel, SCFTParameter
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh 
+import matplotlib.pyplot as plt
 
 
 n = int(sys.argv[1])  # n is mesh refine
@@ -36,10 +37,16 @@ elif fieldsType == 6:
    
 option.fields = fields
 
-scft = SCFTVEMModel(vemspace, option) 
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
 
+scft = SCFTVEMModel(vemspace, option) 
 
 scft.initialize()
 scft.update_propagator()
 #scft.find_saddle_point(datafile='vemflat', file_path='./')
+plt.show()
 

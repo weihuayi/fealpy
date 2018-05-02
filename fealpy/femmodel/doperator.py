@@ -147,4 +147,5 @@ def recovery_biharmonic_matirx(space, area, A, B, epsilon):
 
     M0 = A.transpose()@P0@A + A.transpose()@Q0@B + B.transpose()@P1@A + B.transpose()@Q1@B
 
-    return  M -= (M0 + M0.transpose())
+    M -= (M0 + M0.transpose())
+    return  M 
