@@ -85,7 +85,7 @@ class Meshtype():
                 rcell[:, [2, 3, 1]]]
         return TriangleMesh(node, newCell)
 
-    def random_mesh(self, box, n=10):
+    def delaunay_mesh(self, box, n=10):
         h = (box[1] - box[0])/n
         return triangle(box, h, meshtype='tri')
 
@@ -177,6 +177,8 @@ errorType = [#'$|| u_I - u_h ||_{l_2}$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}sim$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}are$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}har$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}angle$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}dhar$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}scr$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}zz$',
              '$||\\nabla u - G(\\nabla u_h)||_{0}ppr$'
@@ -190,13 +192,13 @@ for i in range(maxit):
     elif meshtype == 2:
         mesh = Mesh.cross_mesh(box, n=n)
     elif meshtype == 3:
-        mesh = Mesh.uncross_mesh(box, n=n, r='1')
+        mesh = Mesh.rice_mesh(box, n=n)
     elif meshtype == 4:
         mesh = Mesh.fishbone(box, n=n)
     elif meshtype == 5:
-        mesh = Mesh.rice_mesh(box, n=n)
+        mesh = Mesh.delaunay_mesh(box, n=n)
     elif meshtype == 6:
-        mesh = Mesh.random_mesh(box, n=n)
+        mesh = Mesh.uncross_mesh(box, n=n, r='1')
     elif meshtype == 7:
         mesh = Mesh.nonuniform_mesh(box, n=n)
     #mesh.add_plot(plt,cellcolor='w')
@@ -213,12 +215,16 @@ for i in range(maxit):
     errorMatrix[1, i] = fem.recover_error(rguh1)
     rguh2 = ralg.harmonic_average(uh)
     errorMatrix[2, i] = fem.recover_error(rguh2)
-    rguh3 = ralg.SCR(uh)
+    rguh3 = ralg.angle_average(uh)
     errorMatrix[3, i] = fem.recover_error(rguh3)
-    rguh4 = ralg.ZZ(uh)
+    rguh4 = ralg.distance_harmonic_average(uh)
     errorMatrix[4, i] = fem.recover_error(rguh4)
-    rguh5 = ralg.PPR(uh)
+    rguh5 = ralg.SCR(uh)
     errorMatrix[5, i] = fem.recover_error(rguh5)
+    rguh6 = ralg.ZZ(uh)
+    errorMatrix[6, i] = fem.recover_error(rguh6)
+    rguh7 = ralg.PPR(uh)
+    errorMatrix[7, i] = fem.recover_error(rguh7)
     if i < maxit - 1:
         n *= 2
 
