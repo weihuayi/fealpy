@@ -62,7 +62,7 @@ class ScaledMonomialSpace2d():
         """
 
         self.mesh = mesh
-        self.barycenter = mesh.barycenter('cell')
+        self.barycenter = mesh.entity_barycenter('cell')
         self.p = p
         self.area= mesh.area()
         self.h = np.sqrt(self.area) 

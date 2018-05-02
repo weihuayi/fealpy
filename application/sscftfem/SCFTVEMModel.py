@@ -116,7 +116,6 @@ class SCFTVEMModel():
         self.vemspace = vemspace
         self.mesh  = self.vemspace.mesh
         
-        self.uh = self.vemspace.function()
         self.area = self.vemspace.smspace.area
         self.totalArea = np.sum(self.area)
         self.option = option
@@ -173,7 +172,7 @@ class SCFTVEMModel():
     def project_to_smspace(self, uh):
         cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        g = lambda x: x[0]@self.uh[x[1]]
+        g = lambda x: x[0]@uh[x[1]]
         S = self.vemspace.smspace.function()
         S[:] = np.concatenate(list(map(g, zip(self.solver.mat.PI1, cd))))
         return S
