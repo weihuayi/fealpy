@@ -91,7 +91,6 @@ class PDESolver():
 
     def run(self,timeline, uh, F):
         self.F = F
-        
         while timeline.current < timeline.Nt:
             current = timeline.current
             dt = timeline.get_time_step_length()
@@ -184,7 +183,6 @@ class SCFTVEMModel():
                 self.area,
                 self.solver.mat.PI0)
 
-        print(F0)
         S = self.project_to_smspace(self.w[1])
         F1 = doperator.cross_mass_matrix(
                 integral,
@@ -195,12 +193,10 @@ class SCFTVEMModel():
         
         self.q0[:, 0] = 1.0
         self.solver.run(self.timeline0,self.q0[:, 0:n0], F0)
-        self.solver.run(self.timeline1, self.q1[:, n0-1:], F1)
+        self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
         self.q1[:, 0] = 1.0
         self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
         self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
-        print(self.q0[:, -1])
-        print(self.q0[:, -1])
 
     def integral_time(self, q, dt):
         f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
@@ -233,9 +229,8 @@ class SCFTVEMModel():
         def u(x, cellidx):
             val = S.value(x, cellidx=cellidx)**2
             return val 
-
-        mu2_int = self.integral_space(u)
-
+        mu2_int = self.integralalg.integral(u)
+        
         chiN = self.option.chiAB * self.option.Ndeg
         H = -mu1_int + mu2_int/chiN
         return H

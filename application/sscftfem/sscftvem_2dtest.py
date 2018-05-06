@@ -39,7 +39,7 @@ option.fields = fields
 scft = SCFTVEMModel(vemspace, option) 
 
 scft.initialize()
-scft.update_propagator()
+#scft.update_propagator()
 scft.find_saddle_point()
 plt.show()
 
