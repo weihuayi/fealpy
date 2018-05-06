@@ -17,7 +17,7 @@
 
 
 mio = MeshIO();
-meshes = mio.read_inp('data1.inp');
+meshes = mio.read_inp('data2.inp');
 cmap = hsv(double(meshes.Count));
 i = 1;
 fig = figure();

@@ -46,7 +46,7 @@ classdef Mesh3d
         
         function a = entity_measure(obj, etype)
             if etype == 3
-                a = obj.cell_volumn();
+                a = obj.cell_volume();
             elseif etype == 2
                 a = obj.face_area();
             elseif etype == 1

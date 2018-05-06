@@ -40,7 +40,7 @@ classdef MeshIO
                 data = textscan(fid, '%d %d %d %d %d', 'Delimiter', ',');
                 cellid = data{1};
                 cell = cell2mat({data{2:end}})' - start;
-                c(name) = TetrahedronMesh(node, cell);  
+                c(name) = TetrahedronMesh(node, cell');  
                 
                 line = fgetl(fid);
                 while ~strcmp(line(1), ',')

@@ -9,6 +9,7 @@
 .ipynb_checkpoints
 doc/project
 *.html
+*.inp
 
 meviewer
 
