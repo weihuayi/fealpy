@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.mesh.level_set_function import Sphere
+from fealpy.functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from SSCFTFEMModel import SSCFTFEMModel,SSCFTParameter
 
 import plotly.offline as py
@@ -18,7 +19,7 @@ fieldsType = int(sys.argv[3])
 if m == 1:
     surface = Sphere()
     mesh =  surface.init_mesh()
-    mesh.uniform_refine(n=5, surface=surface)
+    mesh.uniform_refine(n=4, surface=surface)
 
 option = SSCFTParameter()
 
@@ -33,12 +34,10 @@ elif model_pmt ==2:
 option.pdemethod = 'CN'
 option.maxit = 5000
 option.showstep = 50
-  
 
-scft = SSCFTFEMModel(surface, mesh, option, p=1, p0=1)
+# define surface finite element space
+femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface,p=1, p0=1)
 
-
-femspace = scft.femspace
 Ndof = femspace.number_of_global_dofs()
 ipoint = femspace.interpolation_points()
 cell = mesh.ds.cell
@@ -87,6 +86,8 @@ elif fieldsType == 6:
    
 option.fields = fields
 
+
+scft = SSCFTFEMModel(femspace,surface, mesh, option)
 scft.initialize()
 scft.find_saddle_point(datafile='spheredata', file_path='./')
 

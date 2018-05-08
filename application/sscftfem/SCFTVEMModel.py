@@ -5,9 +5,7 @@ import scipy.io as sio
 from fealpy.vemmodel import doperator
 from scipy.sparse.linalg import spsolve
 
-from fealpy.mesh.tree_data_structure import Quadtree 
 from fealpy.quadrature import TriangleQuadrature 
-#from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 
 from fealpy.vemmodel.integral_alg import PolygonMeshIntegralAlg
 
@@ -279,7 +277,7 @@ class SCFTVEMModel():
             self.data['H'].append(self.H)
             self.data['ediff'].append(self.ediff)
 
-        sio.matlab.savemat(datafile+'.mat', self.data)
+        sio.matlab.savemat('datafile'+'.mat', self.data)
         
         
     def one_step(self):
