@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 import scipy.io as sio
-
+import matplotlib.pyplot as plt
 from fealpy.vemmodel import doperator
 from scipy.sparse.linalg import spsolve
 
@@ -21,7 +21,9 @@ class SCFTParameter():
         self.dtMax    = 0.005
         self.tol      = 1.0e-6
         self.maxit    = 5000
-        self.showstep = 200
+        self.showstep = 10
+        self.Nh = 100
+        self.t = np.pi/5
         self.pdemethod = 'CN'
         self.integrator = TriangleQuadrature(3)
                 
@@ -97,7 +99,6 @@ class PDESolver():
             timeline.current +=1
         timeline.reset()
 
-
 class SCFTVEMModel():
     def __init__(self, vemspace, option):
         self.vemspace = vemspace
@@ -156,7 +157,7 @@ class SCFTVEMModel():
                 'ediff':[],
                 'H':[]
                 }
-
+        
     def project_to_smspace(self, uh):
         cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
@@ -180,7 +181,6 @@ class SCFTVEMModel():
                 self.vemspace,
                 self.area,
                 self.solver.mat.PI0)
-
         S = self.project_to_smspace(self.w[1])
         F1 = doperator.cross_mass_matrix(
                 integral,
@@ -253,7 +253,7 @@ class SCFTVEMModel():
         
         return err 
 
-    def find_saddle_point(self):
+    def find_saddle_point(self, datafile='data', showsolution=True, file_path=None):
         
         self.res = np.inf
         self.Hold = np.inf
@@ -261,25 +261,46 @@ class SCFTVEMModel():
         iteration = 0
         option = self.option
         
-        while (self.res > option.tol) and (iteration < option.maxit):
+        if file_path is not None:
+            f = open(file_path + '/log.txt', 'w')
+        import time
+        start = time.clock()
+
+        while (self.res > option.tol):
             self.H, self.res = self.one_step()
             self.ediff = self.H - self.Hold
             self.Hold = self.H
             iteration += 1
 
+            if file_path is not None:
+                string = 'Iter: %d ======> \n sQ: %.15e res: %.15e  ediff %.15e H: %.15e \n' %(iteration, self.sQ, self.res, self.ediff, self.H)
+                
+                f.write(string)
 
+            scftinfo = 'Iter: %d======> \n sQ: %.15e res: % .15e ediff %.15e H: %.15e \n' %(iteration, self.sQ, self.res, self.ediff, self.H)
+            print(scftinfo) 
 
-            print('Iter:',iteration,'======>','res:', self.res, 'ediff:',self.ediff, 'H:', self.H)
+            end = time.clock()
+            Timecost = 'Time cost is %.6f seconds\n' % (end-start)
+            print(Timecost)
             print('\n')
+
+            start = end
 
             self.data['rhoA'].append(self.rho[0])
             self.data['rhoB'].append(self.rho[1])
             self.data['H'].append(self.H)
             self.data['ediff'].append(self.ediff)
 
+            if (iteration%option.showstep == 0) and showsolution:
+                self.show_soultion(iteration)
+
         sio.matlab.savemat('datafile'+'.mat', self.data)
         
-        
+        if file_path is not None:
+            f.close()
+
+
     def one_step(self):
         self.update_propagator() 
         qq = self.q0*self.q1[:, -1::-1] 
@@ -309,6 +330,26 @@ class SCFTVEMModel():
 
     
 
+
+    def show_soultion(self, i):
+        option = self.option 
+
+        mesh = self.mesh
+        node = mesh.node
+
+        x,y = np.mgrid[slice(0, option.t + option.t/option.Nh, option.t/option.Nh),
+                        slice(0, option.t + option.t/option.Nh, option.t/option.Nh)]
+        N = x.shape[1]
+        rhoA = self.rho[0].reshape(option.Nh+1, option.Nh+1)
+        rhoA = rhoA[:, -1::-1]
+
+        cmap = plt.get_cmap('jet')
+        fig = plt.figure()
+        axes = fig.gca()
+
+        im = axes.pcolormesh(x,y,rhoA,cmap=cmap)
+        plt.savefig('./results/scftfigure'+ str(i)+'.png')
+        plt.savefig('./results/scftfigure'+ str(i)+'.pdf')
 
 
 
