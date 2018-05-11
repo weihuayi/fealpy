@@ -48,7 +48,7 @@ classdef Mesh3dDataStructure
         
         function obj = reinit(obj, NN, cell)
             obj.NN = NN;
-            obj.NC = size(cell, 2);
+            obj.NC = size(cell, 1);
             obj.cell = cell;
             obj.construct();
         end

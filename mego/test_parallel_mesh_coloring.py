@@ -167,9 +167,9 @@ def coloring(lmesh, comm):
     r = np.zeros(NN, dtype=np.float)
 
     edge = lmesh.entity('edge')
-    isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]]
     while True:
         color += 1
+
         isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]]
         if isRemainEdge.sum() == 0:
             break
@@ -181,14 +181,16 @@ def coloring(lmesh, comm):
         r[isUnColor & isLocalNode]  = np.random.rand(N)
         set_ghost_random(r, isUnColor, isLocalNode, ods, lmesh, comm) 
 
-
         isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
         flag = np.bincount(edge0[~isLess, 0], minlength=NN)
         flag += np.bincount(edge0[isLess, 1], minlength=NN)
         flag = (flag == 0) & isUnColor & isLocalNode
         c[flag] = color
+
         set_ghost_color(c, isLocalNode, ods, lmesh, comm) 
+
         isUnColor = (c == 0)
+
 
         isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
         isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
@@ -207,12 +209,13 @@ def coloring(lmesh, comm):
 
             r[isUnColor & isLocalNode]  = np.random.rand(N)
             set_ghost_random(r, isUnColor, isLocalNode, ods, lmesh, comm) 
+            if color == 1:
+                c1 = c.copy()
 
             isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
             flag = np.bincount(edge0[~isLess, 0], minlength=NN)
             flag += np.bincount(edge0[isLess, 1], minlength=NN)
             c[(flag == 0) & isInteriorUnColor & isLocalNode] = color
-
             set_ghost_color(c, isLocalNode, ods, lmesh, comm) 
             isUnColor = (c == 0)
 
@@ -223,14 +226,18 @@ def coloring(lmesh, comm):
             isInteriorUnColor = (flag==0) & isUnColor 
 
 
-
     if np.any(isUnColor):
         c[isUnColor] = color
 
     for i in range(1, color+1):
         print('There are {} points with color {} in rank {}.'.format((c==i).sum(), i, rank))
 
-    return c
+    return c, c1
+
+def check_color(lmesh, c):
+    edge = lmesh.entity('edge')
+    flag = (c[edge[:, 0]] == c[edge[:, 1]])
+    return flag 
 
 
 def show_mesh(lmesh, data):
@@ -244,6 +251,7 @@ def show_mesh(lmesh, data):
         axes.text(node[i, 0], node[i, 1], str(data[i]),
                 multialignment='center', fontsize=20) 
     axes.set_title("rank {}".format(rank))
+    return axes
 
 if __name__ == "__main__":
     comm = MPI.COMM_WORLD
@@ -257,8 +265,12 @@ if __name__ == "__main__":
 
     tmesh = par_mesh(0.05, size) 
     lmesh = local_mesh(tmesh, rank)
-    c = coloring(lmesh, comm)
+    c, r1 = coloring(lmesh, comm)
 
-    show_mesh(lmesh, c)
-    #show_mesh(lmesh, r)
+    #flag = check_color(lmesh, c)
+    #print('Process ', rank, " with same coloring ",  np.sum(flag))
+
+    axes = show_mesh(lmesh, r1)
+    #lmesh.find_edge(axes, index=flag) 
+    #show_mesh(lmesh, r1)
     plt.show()
