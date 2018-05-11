@@ -100,12 +100,11 @@ class PDESolver():
     
 
 class SSCFTFEMModel():
-    def __init__(self, surface, mesh, option, p=1, p0=1):
-        self.femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
+    def __init__(self,femspace,surface, mesh, option, p=1, p0=1):
+        self.femspace = femspace
         self.mesh = self.femspace.mesh
         self.area = mesh.area()
         self.totalArea = np.sum(self.area)
-        print(self.totalArea)
         self.surface = surface
         self.option = option
 
