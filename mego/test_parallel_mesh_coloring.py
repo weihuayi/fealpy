@@ -174,22 +174,21 @@ def coloring(lmesh, comm):
 
     color = 0
     ods = get_ods(lmesh, comm) 
-    np.random.seed(rank)
+    #np.random.seed(rank)
 
     r = np.zeros(NN, dtype=np.float)
 
     edge = lmesh.entity('edge')
+    nc = np.zeros(1, dtype=np.int)
+    totalnc = np.zeros(1, dtype=np.int) 
     while True:
-        color += 1
-
-        nc = np.zeros(1, dtype=np.int)
         nc[0] = np.sum(isUnColor & isLocalNode)
-        totalnc = np.zeros(1, dtype=np.int) 
+        totalnc[0] = 0
         comm.Allreduce(nc, totalnc, op=MPI.SUM)
 
-        if totalnc == 0:
+        if totalnc[0] == 0:
             break
-
+        color += 1
         isRemainEdge = isUnColor[edge[:, 0]] & isUnColor[edge[:, 1]]
         edge0 = edge[isRemainEdge]
 
@@ -208,38 +207,41 @@ def coloring(lmesh, comm):
         isUnColor = (c == 0)
 
 
-#        isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
-#        isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-#        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
-#        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
-#        isInteriorUnColor = (flag == 0)  & isUnColor 
-#        while True:
-#            if np.sum(isInteriorUnColor & isLocalNode) == 0:
-#                break
-#
-#            isRemainEdge = isInteriorUnColor[edge[:,0]] & isInteriorUnColor[edge[:,1]]
-#            edge0 = edge[isRemainEdge]
-#
-#            r[:] = 0
-#            N = np.sum(isUnColor & isLocalNode)
-#
-#            r[isUnColor & isLocalNode]  = np.random.rand(N)
-#            set_ghost_random(r, isUnColor, isLocalNode, ods, lmesh, comm) 
-#
-#            isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
-#            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
-#            flag += np.bincount(edge0[isLess, 1], minlength=NN)
-#            c[(flag == 0) & isInteriorUnColor & isLocalNode] = color
-#            set_ghost_color(c, isLocalNode, ods, lmesh, comm) 
-#            isUnColor = (c == 0)
-#
-#
-#            isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
-#            isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
-#            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
-#            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
-#            isInteriorUnColor = (flag==0) & isUnColor 
+        isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+        isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+        flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+        flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+        isInteriorUnColor = (flag == 0)  & isUnColor 
+        while True:
+            nc[0] = np.sum(isInteriorUnColor & isLocalNode)
+            totalnc[0] = 0
+            comm.Allreduce(nc, totalnc, op=MPI.SUM)
 
+            if totalnc[0] == 0:
+                break
+
+            isRemainEdge = isInteriorUnColor[edge[:,0]] & isInteriorUnColor[edge[:,1]]
+            edge0 = edge[isRemainEdge]
+
+            r[:] = 0
+            N = np.sum(isUnColor & isLocalNode)
+
+            r[isUnColor & isLocalNode]  = np.random.rand(N)
+            set_ghost_random(r, isUnColor, isLocalNode, ods, lmesh, comm) 
+
+            isLess =  r[edge0[:, 0]] < r[edge0[:, 1]]
+            flag = np.bincount(edge0[~isLess, 0], minlength=NN)
+            flag += np.bincount(edge0[isLess, 1], minlength=NN)
+            c[(flag == 0) & isInteriorUnColor & isLocalNode] = color
+            set_ghost_color(c, isLocalNode, ods, lmesh, comm) 
+            isUnColor = (c == 0)
+
+
+            isEdge0 = isUnColor[edge[:, 0]] & (c[edge[:, 1]] == color)
+            isEdge1 = isUnColor[edge[:, 1]] & (c[edge[:, 0]] == color)
+            flag = np.bincount(edge[isEdge0, 0], minlength=NN)
+            flag += np.bincount(edge[isEdge1, 1], minlength=NN)
+            isInteriorUnColor = (flag==0) & isUnColor 
 
     for i in range(1, color+1):
         print('There are {} points with color {} in rank {}.'.format((c==i).sum(), i, rank))
@@ -286,7 +288,7 @@ if __name__ == "__main__":
     print('Rank:', rank)
     print('Name:', name)
 
-    tmesh = par_mesh(0.05, size) 
+    tmesh = par_mesh(0.005, size) 
     lmesh = local_mesh(tmesh, rank)
 
     c = coloring(lmesh, comm)

@@ -169,8 +169,8 @@ class CPLFEMDof2d():
     def interpolation_points(self):
         p = self.p
         mesh = self.mesh
-        cell = mesh.ds.cell
-        node = mesh.node
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
 
         if p == 1:
             return node
@@ -526,6 +526,8 @@ class DPLFEMDof2d(DPLFEMDof):
 
     def multi_index_matrix(self):
         p = self.p
+        if p == 0:
+            return np.array([[0, 0, 0]], dtype=np.int)
         ldof = self.number_of_local_dofs() 
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)

@@ -39,6 +39,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
         self.p = p
         self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0) 
+        self.surface = surface
         
         if p0 == p:
             self.dof = self.mesh.V.dof
@@ -101,9 +102,6 @@ class SurfaceLagrangeFiniteElementSpace:
             val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[cellidx]])
         return val
 
-    def grad_value_on_sh(self, uh, bc, cellidx=None):
-        pass
-
     def grad_value_on_surface(self, uh, bc, cellidx=None):
         gphi, ps, n = self.grad_basis_on_surface(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
@@ -120,20 +118,20 @@ class SurfaceLagrangeFiniteElementSpace:
         pass
     
     def number_of_global_dofs(self):
-        return self.mesh.V.number_of_global_dofs()
+        return self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self):
-        return self.mesh.V.number_of_local_dofs()
+        return self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
-        return self.dof.interpolation_points()
+        ipoint, _ = self.surface.project(self.dof.interpolation_points())
+        return ipoint
     
     def cell_to_dof(self):
         return self.dof.cell2dof
 
     def interpolation(self, u, dim=None):
         ipoint = self.interpolation_points()
-        ipoint, _ = self.mesh.surface.project(ipoint)
         uI = FiniteElementFunction(self, dim=dim)
         uI[:] = u(ipoint)
         return uI

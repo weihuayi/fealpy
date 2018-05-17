@@ -56,11 +56,12 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(dim+1,)` or `(nb, dim+1)`         
+            the shape of `bc` can be `(dim+1,)` or `(NQ, dim+1)`         
 
         Returns
         -------
         phi : numpy.array
+            the shape of 'phi' can be `(1, )` or `(NQ, 1)`
 
         See also
         --------
@@ -70,6 +71,13 @@ class LagrangeFiniteElementSpace():
 
         """
         p = self.p   # the degree of polynomial basis function
+
+        if p == 0:
+            if len(bc.shape) == 1:
+                return np.ones(1)
+            else:
+                return np.ones(bc.shape[0])
+
         dim = self.dim 
         multiIndex = self.dof.multiIndex 
 
@@ -107,6 +115,12 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p   # the degree of polynomial basis function
         dim = self.dim 
+        if p == 0:#TODO: make it correct 
+            if len(bc.shape) == 1:
+                return np.zeros((1, dim))
+            else:
+                return np.zeros((bc.shape[0], dim))
+
         multiIndex = self.dof.multiIndex 
 
         c = np.arange(1, p+1, dtype=np.int)

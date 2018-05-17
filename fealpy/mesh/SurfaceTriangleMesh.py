@@ -9,6 +9,16 @@ class SurfaceTriangleMesh():
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
 
+    def entity(self, etype=2):
+        if etype in ['cell', 2]:
+            return self.ds.cell
+        elif etype in ['edge', 1]:
+            return self.ds.edge
+        elif etype in ['node', 0]:
+            return self.mesh.node
+        else:
+            raise ValueError("`entitytype` is wrong!")
+
     def number_of_nodes(self):
         return self.node.shape[0] 
 

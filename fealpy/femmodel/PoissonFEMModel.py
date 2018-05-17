@@ -12,7 +12,7 @@ from ..femmodel import doperator
 from .integral_alg import IntegralAlg
 
 class PoissonFEMModel(object):
-    def __init__(self, pde, mesh,  p, integrator):
+    def __init__(self, pde, mesh, p, integrator):
         self.femspace = LagrangeFiniteElementSpace(mesh, p) 
         self.mesh = self.femspace.mesh
         self.pde = pde 
