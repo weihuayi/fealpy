@@ -102,7 +102,7 @@ class PoissonVEMModel():
             
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
-        S = self.S 
+        S = self.project_to_smspace(self.uh)
         grad = S.grad_value(barycenter)
 
         S0 = vemspace.smspace.function() 
@@ -144,8 +144,8 @@ class PoissonVEMModel():
                 raise ValueError("I have note code method: {}!".format(rtype))
 
             for i in range(ldof):
-                S0[i::ldof] = np.bincount(idx, weights=self.B[i, :]*ruh[cell, 0], minlength=NC)
-                S1[i::ldof] = np.bincount(idx, weights=self.B[i, :]*ruh[cell, 1], minlength=NC)
+                S0[i::ldof] = np.bincount(idx, weights=self.mat.B[i, :]*ruh[cell, 0], minlength=NC)
+                S1[i::ldof] = np.bincount(idx, weights=self.mat.B[i, :]*ruh[cell, 1], minlength=NC)
 
         try:
             k = self.model.diffusion_coefficient(barycenter)

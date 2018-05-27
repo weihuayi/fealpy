@@ -30,6 +30,8 @@ elif m == 5:
     model = SinSinData()
     quadtree = model.init_mesh(n=3)
 
+theta = 0.2
+
 k = 0 
 errorType = ['$\| u_I - u_h \|_{l_2}$',
              '$\|\\nabla u_I - \\nabla u_h\|_A$',
@@ -46,16 +48,16 @@ vem = PoissonVEMModel(model, mesh, p=p, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
-    #eta = vem.recover_estimate()
+    eta = vem.recover_estimate()
     Ndof[i] = vem.vemspace.number_of_global_dofs()
     errorMatrix[0, i] = vem.l2_error()
     errorMatrix[1, i] = vem.uIuh_error() 
     errorMatrix[2, i] = vem.L2_error()
     errorMatrix[3, i] = vem.H1_semi_error()
-    #errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
-        quadtree.uniform_refine()
-        #quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
+        #quadtree.uniform_refine()
+        quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
         mesh = quadtree.to_pmesh()
         vem.reinit(mesh)
 
@@ -64,8 +66,8 @@ mesh.add_plot(plt, cellcolor='w')
 fig2 = plt.figure()
 fig2.set_facecolor('white')
 axes = fig2.gca(projection='3d')
-x = mesh.point[:, 0]
-y = mesh.point[:, 1]
+x = mesh.node[:, 0]
+y = mesh.node[:, 1]
 tri = quadtree.leaf_cell(celltype='tri')
 axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
 

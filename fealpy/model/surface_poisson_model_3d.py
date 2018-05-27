@@ -5,6 +5,11 @@ class SphereSinSinSinData(object):
         from ..mesh.level_set_function import Sphere
         self.surface = Sphere()
 
+    def init_mesh(self, n):
+        mesh = self.surface.init_mesh()
+        mesh.uniform_refine(n, self.surface)
+        return mesh
+
     def solution(self,p):
         """ The exact solution 
         """

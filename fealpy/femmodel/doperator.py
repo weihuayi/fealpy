@@ -38,9 +38,11 @@ def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 
-def source_vector(f, space, qf, measure):
+def source_vector(f, space, qf, measure, surface=None):
     bcs, ws = qf.quadpts, qf.weights
     pp = space.mesh.bc_to_point(bcs)
+    if surface is not None:
+        pp, _ = surface.project(pp)
     fval = f(pp)
     phi = space.basis(bcs)
     bb = np.einsum('i, ik, ij, k->kj', ws, fval, phi, measure)

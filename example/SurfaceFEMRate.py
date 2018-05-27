@@ -14,10 +14,8 @@ p = int(sys.argv[2])
 q = int(sys.argv[3])
 
 if m == 1:
-    model = SphereSinSinSinData()
-    surface = model.surface 
-    mesh = surface.init_mesh()
-    mesh.uniform_refine(n=2, surface=surface)
+    pde = SphereSinSinSinData()
+    mesh = pde.init_mesh(2)
 elif m == 2:
     model = ToruSurfacesData() 
     surface = model.surface 
@@ -31,9 +29,7 @@ elif m == 4:
     surface = model.surface 
     mesh = surface.init_mesh()
 
-
-integrator = TriangleQuadrature(q)
-fem = SurfacePoissonFEMModel(mesh, surface, model, p=p, p0=p, integrator=integrator)
+fem = SurfacePoissonFEMModel(mesh, pde, p, q)
 maxit = 4
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
@@ -49,12 +45,11 @@ for i in range(maxit):
     errorMatrix[1, i] = fem.L2_error()
     errorMatrix[2, i] = fem.H1_semi_error()
     if i < maxit - 1:
-        mesh.uniform_refine(1, surface)
+        mesh.uniform_refine(1, pde.surface)
         fem.reinit(mesh)
 
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
 showmultirate(plt, 0, Ndof, errorMatrix,  errorType)
-plt.show()
 plt.show()
 

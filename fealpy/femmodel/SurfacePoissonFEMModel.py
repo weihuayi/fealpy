@@ -7,26 +7,21 @@ from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..femmodel import doperator 
-from ..functionspace import FunctionNorm
+from .SurfaceIntegralAlg import SurfaceIntegralAlg
 
 class SurfacePoissonFEMModel(object):
-    def __init__(self, mesh, surface, model, integrator=None, p=1, p0=None):
+    def __init__(self, mesh, pde, p, k, p0=None):
         """
         """
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=p, p0=p0) 
+        self.V = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p, p0=p0) 
         self.mesh = self.V.mesh
-        self.surface = surface
-        self.model = model
+        self.surface = pde.surface
+        self.pde = pde
         self.uh = self.V.function() 
-        self.uI = self.V.interpolation(model.solution)
-        if integrator is None:
-            self.integrator = TriangleQuadrature(p+1)
-        if type(integrator) is int:
-            self.integrator = TriangleQuadrature(integrator)
-        else:
-            self.integrator = integrator 
-        self.area = self.V.mesh.area(integrator)
-        self.error = FunctionNorm(self.integrator, self.area)
+        self.uI = self.V.interpolation(pde.solution)
+        self.integrator = self.mesh.integrator(k)
+        self.area = self.V.mesh.area(self.integrator)
+        self.error = SurfaceIntegralAlg(self.integrator, self.mesh, self.area)
 
     def reinit(self, mesh, p=None):
         if p is None:
@@ -34,9 +29,10 @@ class SurfacePoissonFEMModel(object):
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p) 
         self.mesh = self.V.mesh
         self.uh = self.V.function() 
-        self.uI = self.V.interpolation(self.model.solution)
+        self.uI = self.V.interpolation(self.pde.solution)
         self.area = self.V.mesh.area(self.integrator)
         self.error.area = self.area 
+        self.error.mesh = self.mesh
 
     def recover_estimate(self):
         if self.V.p > 1:
@@ -70,13 +66,14 @@ class SurfacePoissonFEMModel(object):
         return doperator.stiff_matrix(self.V, self.integrator, self.area)
 
     def get_right_vector(self):
-        b = doperator.source_vector(self.model.source, self.V, self.integrator, self.area)
+        b = doperator.source_vector(self.pde.source, self.V, self.integrator,
+                self.area, self.surface)
         b -= np.mean(b)
         return b 
 
     def solve(self):
         uh = self.uh
-        u = self.model.solution
+        u = self.pde.solution
         bc = DirichletBC(self.V, u, self.is_boundary_dof)
         solve(self, uh, dirichlet=bc, solver='direct')
 
@@ -86,20 +83,17 @@ class SurfacePoissonFEMModel(object):
         return isBdDof
 
     def l2_error(self):
-        u = self.model.solution
+        u = self.pde.solution
         uh = self.uh
         return self.error.l2_error(u, uh)
 
     def L2_error(self):
-        u = self.model.solution
+        u = self.pde.solution
         uh = self.uh.value
-        mesh = self.mesh
-        return self.error.L2_error(u, uh, mesh)
+        return self.error.L2_error(u, uh)
 
     def H1_semi_error(self):
-        gu = self.model.gradient
+        gu = self.pde.gradient
         guh = self.uh.grad_value
-        mesh = self.mesh
-        surface = self.surface
-        return self.error.L2_error(gu, guh, mesh, surface=surface)
+        return self.error.H1_semi_error(gu, guh)
 

@@ -1,6 +1,7 @@
 
 import numpy as np
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1):
@@ -8,6 +9,9 @@ class SurfaceTriangleMesh():
         self.V = LagrangeFiniteElementSpace(mesh, p)
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
+
+    def integrator(self, k):
+        return TriangleQuadrature(k) 
 
     def entity(self, etype=2):
         if etype in ['cell', 2]:
@@ -28,7 +32,7 @@ class SurfaceTriangleMesh():
     def number_of_cells(self):
         return self.mesh.ds.NC
 
-    def geom_dimension(self):
+    def geo_dimension(self):
         return self.node.shape[1]
 
     def top_dimension(self):

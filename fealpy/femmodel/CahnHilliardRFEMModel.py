@@ -23,7 +23,7 @@ class CahnHilliardRFEMModel():
 
         self.gradphi = self.mesh.grad_lambda() 
         self.A, self.B = grad_recovery_matrix(self.femspace)
-        self.M =  mass_matrix(self.femspace, self.integrator, self.area)
+        self.M = mass_matrix(self.femspace, self.integrator, self.area)
 
     def get_left_matrix(self):
         pass

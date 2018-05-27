@@ -46,7 +46,10 @@ class LagrangeFiniteElementSpace():
     def boundary_dof(self):
         return self.dof.boundary_dof()
 
-    def geom_dim(self):
+    def geo_dimension(self):
+        return self.dim
+
+    def top_dimension(self):
         return self.dim
 
     def basis(self, bc):
@@ -56,12 +59,12 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(dim+1,)` or `(NQ, dim+1)`         
+            the shape of `bc` can be `(tdim+1,)` or `(NQ, tdim+1)`         
 
         Returns
         -------
         phi : numpy.array
-            the shape of 'phi' can be `(1, )` or `(NQ, 1)`
+            the shape of 'phi' can be `(ldof, )` or `(NQ, ldof)`
 
         See also
         --------
@@ -100,11 +103,12 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(dim+1,)` or `(nb, dim+1)`         
+            the shape of `bc` can be `(tdim+1,)` or `(NQ, tdim+1)`         
 
         Returns
         -------
-        phi : numpy.array
+        gphi : numpy.array
+            the shape of `gphi` can b `(NC, ldof, gdim)' or `(NQ, NC, ldof, gdim)'
 
         See also
         --------
@@ -223,7 +227,7 @@ class VectorLagrangeFiniteElementSpace():
     def __str__(self):
         return "Vector Lagrange finite element space!"
 
-    def geom_dim(self):
+    def geo_dimension(self):
         return self.dim
 
     def vector_dim(self):
