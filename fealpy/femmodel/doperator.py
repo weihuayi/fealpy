@@ -127,27 +127,4 @@ def recovery_biharmonic_matirx(space, area, A, B, epsilon):
     S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
 
     M += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
-
-    localEdge = mesh.ds.local_edge()
-    cellIdx = edge2cell[isBdEdge, [0]]
-    localIdx = edge2cell[isBdEdge, 2]
-    val0 = 0.5*h*n[:, 0]*gradphi[cellIdx, localEdge[localIdx], 0]  
-    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
-    P0 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-    val0 = 0.5*h*n[:, 0]*gradphi[cellIdx, localEdge[localIdx], 1]  
-    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
-    Q0 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-    val0 = 0.5*h*n[:, 1]*gradphi[cellIdx, localEdge[localIdx], 0]  
-    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
-    P1 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-    val0 = 0.5*h*n[:, 1]*gradphi[cellIdx, localEdge[localIdx], 1]  
-    val0 = np.repeat(val0, 2, axis=0).reshape(-1, 2, 2)
-    Q1 = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-    M0 = A.transpose()@P0@A + A.transpose()@Q0@B + B.transpose()@P1@A + B.transpose()@Q1@B
-
-    M -= (M0 + M0.transpose())
     return  M 

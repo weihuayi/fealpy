@@ -7,6 +7,7 @@ from .PolygonMesh import PolygonMesh
 from .PolyhedronMesh import PolyhedronMesh 
 from ..common import ranges
 
+
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
