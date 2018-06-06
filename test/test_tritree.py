@@ -55,30 +55,57 @@ class Tritree(TriangleMesh):
 
         if len(idx) > 0:
             # Prepare data
+
+
+
+            NC = self.number_of_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[idx] = True
+
+            isTwoChildCell = (self.child[:, 1] > -1 & self.child[:, 2] == -1)
+            idx0, = np.nonzero(isTwoChildCell)
+            flag0 = np.ones(NC, dtype=np.bool)
+            flag0[child[idx0, [0, 1]]] = True
+
+            # expand the marked cell
+            isExpand = np.zeros(NC, dtype=np.bool)
+            cell2cell = self.ds.cell_to_cell()
+            flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
+            flag = flag1 | flag2
+            while np.any(flag):
+                isMarkedCell[flag] = True
+                flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+                flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
+                flag = flag1 | flag2
+
+            if len(idx0) > 0:
+                # delete the children of the cells with two children
+                flag = isMarkedCell[child[idx0, 0]] | isMarkedCell[child[idx0, 1]]
+                isMarkCell[idx0[flag]] = True
+
+                flag = np.ones(NC, dtype=np.bool)
+                flag[child[idx0, [0, 1]]] = False
+                NN = self.number_of_nodes()
+                self.ds.reinit(NN, cell[flag])
+                self.parent = self.parent[flag]
+                self.child = self.child[flag]
+                isMarkedCell = isMarkedCell[flag]
+
+            
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
-
             node = self.entity('node')
             edge = self.entity('edge')
             cell = self.entity('cell')
-
-            parent = self.parent
-            child = self.child
-            isLeafCell = self.is_leaf_cell()
-
-            # Construct 
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
-            isNeedCutCell[idx] = True
-            isNeedCutCell = isNeedCutCell & isLeafCell
-
 
 
             # Find the cutted edge  
             cell2edge = self.ds.cell_to_edge()
 
             isCutEdge = np.zeros(NE, dtype=np.bool)
-            isCutEdge[cell2edge[isNeedCutCell, :]] = True
+            isCutEdge[cell2edge[isMarkedCell, :]] = True
 
             isCuttedEdge = np.zeros(NE, dtype=np.bool)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
