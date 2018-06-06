@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse.linalg import spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..femmodel import doperator 
 from .integral_alg import IntegralAlg
@@ -6,7 +7,7 @@ from .doperator import grad_recovery_matrix,
 
 
 class CahnHilliardRFEMModel():
-    def __init__(self, pde, n, tau, integrator):
+    def __init__(self, pde, n, tau, q):
         self.pde = pde 
 
         self.mesh = pde.space_mesh(n) 
@@ -18,19 +19,20 @@ class CahnHilliardRFEMModel():
 
         self.area = mesh.entity_measure('cell')
 
-        self.integrator = integrator 
-        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        self.integrator = self.mesh.integrator(q)
+        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.area)
 
-        self.gradphi = self.mesh.grad_lambda() 
-        self.A, self.B = grad_recovery_matrix(self.femspace)
+        self.A, self.B, self.gradphi = grad_recovery_matrix(self.femspace)
         self.M = mass_matrix(self.femspace, self.integrator, self.area)
         self.K = self.get_stiff_matrix()  
         self.D = self.M + self.tau*self.K
 
+        self.current = 0
+
     def get_stiff_matrix(self):
         mesh = self.mesh
         area = self.area
-        gradphi = mesh.grad_lambda() 
+        gradphi = self.gradphi 
         NC = mesh.number_of_cells() 
         NN = mesh.number_of_nodes() 
 
@@ -126,5 +128,15 @@ class CahnHilliardRFEMModel():
             t = timemesh[i]
             b = self.get_right_vector(i)
             self.uh[:, i+1] =  spsolve(D, b)
+
+    def step(self):
+        D = self.D
+        b = self.get_right_vector(self.current)
+        self.uh[:, self.current + 1] = spsolve(D, b)
+        self.current += 1
+
+
+
+
 
 

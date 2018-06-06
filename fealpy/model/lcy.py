@@ -21,7 +21,7 @@ class CahnHilliardData1:
         tau = (self.t1 - self.t0)/n
         return np.linspace(self.t0, self.t1, num=n+1), tau
 
-    def initdata(self,p):
+    def initdata(self, p):
         x = p[..., 0]
         y = p[..., 1]
         epsilon = self.epsilon

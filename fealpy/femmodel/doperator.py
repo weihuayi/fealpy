@@ -82,7 +82,7 @@ def grad_recovery_matrix(space, rtype='simple'):
         B = D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
     else:
         raise ValueError("I have not coded the method {}".format(rtype))
-    return A, B
+    return A, B, gradphi
 
 def recovery_biharmonic_matirx(space, area, A, B, epsilon):
     mesh = space.mesh
