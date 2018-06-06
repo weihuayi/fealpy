@@ -1,4 +1,5 @@
 import numpy as np
+from ..mesh.TriangleMesh import TriangleMesh  
 
 class CahnHilliardData1:
     def __init__(self, t0, t1, alpha=0.125):
@@ -11,13 +12,17 @@ class CahnHilliardData1:
             (0, 0),
             (1, 0),
             (1, 1),
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            (0, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 2, 0),
+            (3, 0, 2)], dtype=np.int)
+
         mesh = TriangleMesh(point, cell)
         mesh.uniform_refine(n)
         return mesh
 
     def time_mesh(self, tau):
-        n = int(np.ceil(self.t1 - self.t0)/tau))
+        n = int(np.ceil(self.t1 - self.t0)/tau)
         tau = (self.t1 - self.t0)/n
         return np.linspace(self.t0, self.t1, num=n+1), tau
 

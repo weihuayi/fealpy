@@ -139,8 +139,9 @@ class Tritree(TriangleMesh):
 
 
 mesh_info = MeshInfo()
-mesh_info.set_points([ (-1, -1), (0, -1), (0, 0), (1, 0), (1, 1), (-1, 1)]
-mesh_info.set_facets([(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)])  
+mesh_info.set_points([(-1,-1),(0,-1),(0,0),(1,0),(1,1),(0,1),(1,1),(-1,0)])
+mesh_info.set_facets([[0,1],[1,2],[2,3],[3,4],[4, 5],[5,6],[6,7],[7,0]]) 
+
 h = 0.05
 mesh = build(mesh_info, max_volume=h**2)
 node = np.array(mesh.points, dtype=np.float)

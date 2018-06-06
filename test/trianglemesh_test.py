@@ -15,6 +15,7 @@ point = np.array([
 cell = np.array([
     (1, 2, 0), 
     (3, 0, 2)], dtype=np.int)
+
 tmesh = TriangleMesh(point, cell)
 fig = plt.figure()
 axes = fig.gca()
