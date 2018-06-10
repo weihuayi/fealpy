@@ -10,7 +10,7 @@ class Mesh2d():
         The class is just a abstract class, and you can not use it directly.
     """
     def number_of_nodes(self):
-        return self.node.shape[0]
+        return self.ds.N
 
     def number_of_edges(self):
         return self.ds.NE

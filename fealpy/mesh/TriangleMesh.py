@@ -129,12 +129,12 @@ class TriangleMesh(Mesh2d):
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]] 
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            N = self.number_of_nodes()
+            NN = self.node.shape[0]
             self.ds.reinit(NN, cell)
 
     def uniform_bisect(self, n=1):
         for i in range(n):
-            N = self.number_of_nodes()
+            NN = self.number_of_nodes()
             NC = self.number_of_cells()
             NE = self.number_of_edges()
             node = self.node
@@ -145,7 +145,7 @@ class TriangleMesh(Mesh2d):
             cell2edge0 = np.zeros((2*NC,),dtype=np.int)
             cell2edge0[0:NC] = cell2edge[:,0]
 
-            edge2newNode = np.arange(N, N+NE)
+            edge2newNode = np.arange(NN, NN+NE)
             newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
             self.node = np.concatenate((node, newNode), axis=0)
             for k in range(2):
@@ -165,12 +165,12 @@ class TriangleMesh(Mesh2d):
                     cell2edge0[NC:] = cell2edge[:,1]
                 NC = 2*NC
 
-            N = self.number_of_nodes()
-            self.ds.reinit(N, cell)
+            NN = self.node.shape[0] 
+            self.ds.reinit(NN, cell)
 
     def bisect(self, markedCell):
 
-        N = self.number_of_nodes()
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
@@ -186,7 +186,7 @@ class TriangleMesh(Mesh2d):
             markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
 
         edge2newNode = np.zeros((NE,),dtype=np.int)
-        edge2newNode[isCutEdge] = np.arange(N, N+isCutEdge.sum())
+        edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
 
         node = self.node
         newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
@@ -219,8 +219,8 @@ class TriangleMesh(Mesh2d):
             NC = NC+nc
 
         # reconstruct the  data structure
-        N = self.number_of_nodes()
-        self.ds.reinit(N, cell)
+        NN = self.node.shape[0]
+        self.ds.reinit(NN, cell)
 
     def grad_lambda(self):
         node = self.node
