@@ -1,24 +1,20 @@
 import numpy as np
-<<<<<<< HEAD
-from scipy.sparse.linalg import spsolve
-=======
 
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
->>>>>>> d76f273d8055b6715a2f57f3d89e6b8ee8bdad21
+from scipy.sparse import csc_matrix, csr_matrix, spdiags, eye
+from scipy.sparse.linalg import spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..femmodel import doperator 
 from .integral_alg import IntegralAlg
-from .doperator import grad_recovery_matrix
+from .doperator  import mass_matrix, grad_recovery_matrix
 
 
 class CahnHilliardRFEMModel():
     def __init__(self, pde, n, tau, q):
         self.pde = pde 
-
         self.mesh = pde.space_mesh(n) 
         self.timemesh, self.tau = self.pde.time_mesh(tau)
-
         self.femspace = LagrangeFiniteElementSpace(self.mesh, 1) 
+
         self.uh = self.femspace.function(dim=len(self.timemesh))
         self.uh[:, 0] = self.femspace.interpolation(pde.initdata)
 
@@ -28,9 +24,9 @@ class CahnHilliardRFEMModel():
         self.integralalg = IntegralAlg(self.integrator, self.mesh, self.area)
 
         self.A, self.B, self.gradphi = grad_recovery_matrix(self.femspace)
-        self.M = mass_matrix(self.femspace, self.integrator, self.area)
+        self.M = doperator.mass_matrix(self.femspace, self.integrator, self.area)
         self.K = self.get_stiff_matrix()  
-        self.D = self.M + self.tau*self.K
+        self.D = self.M + self.pde.epsilon**2 * self.tau * self.K
 
         self.current = 0
 
@@ -69,7 +65,6 @@ class CahnHilliardRFEMModel():
         S = csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
 
         K = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
-        K *= self.pde.epsilon**2
 
         I = np.einsum('ij, k->ijk', bdEdge, np.ones(2))
         J = I.swapaxes(-1, -2)
@@ -103,7 +98,7 @@ class CahnHilliardRFEMModel():
 
         M = A.transpose()@P0@A + A.transpose()@Q0@B + B.transpose()@P1@A + B.transpose()@Q1@B
 
-        K -= M + M.transpose()
+        K -= (M + M.transpose())
         return K 
 
     def get_right_vector(self, i):
@@ -115,23 +110,18 @@ class CahnHilliardRFEMModel():
     def get_non_linear_vector(self, uh):
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         gradphi = self.femspace.grad_basis(bcs)
-        print(gradphi)
 
         uval = uh.value(bcs)
         guval = uh.grad_value(bcs)
-        fval = (3*uval[..., np.newaxis]**2 - 1)*guval
-        print(ws.shape)
-        print(fval.shape)
         print(gradphi.shape)
-
-        bb = np.einsum('i, ikjm, jm, k->kj', ws, fval, gradphi, self.area)
-        cell2dof = space.cell_to_dof()
-        gdof = space.number_of_global_dofs()
+        fval = (3*uval[..., np.newaxis]**2 - 1)*guval
+        bb = np.einsum('i, ikm, ikjm, k->kj', ws, fval, gradphi, self.area)
+        cell2dof = self.femspace.cell_to_dof()
+        gdof = self.femspace.number_of_global_dofs()
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
         return b
 
     def solve(self):
-
         timemesh = self.timemesh 
         tau = self.tau
         N = len(timemesh)
@@ -140,7 +130,7 @@ class CahnHilliardRFEMModel():
             t = timemesh[i]
             b = self.get_right_vector(i)
             self.uh[:, i+1] =  spsolve(D, b)
-            print(self[:, i+1])
+            print(self.uh[:, i+1])
 
     def step(self):
         D = self.D
