@@ -18,8 +18,8 @@ class CahnHilliardRFEMModel():
         self.timemesh, self.tau = self.pde.time_mesh(tau)
         self.femspace = LagrangeFiniteElementSpace(self.mesh, 1) 
 
-        self.uh = self.femspace.function(dim=len(self.timemesh))
-        self.uh[:, 0] = self.femspace.interpolation(pde.initdata)
+        self.uh0 = self.femspace.interpolation(pde.initdata)
+        self.uh1 = self.femspace.function()
 
         self.area = self.mesh.entity_measure('cell')
 
@@ -112,19 +112,19 @@ class CahnHilliardRFEMModel():
         K -= (M + M.transpose())
         return K 
 
-    def get_right_vector(self, i):
-        uh = self.uh.index(i)
-        b =  self.get_non_linear_vector(uh)
+    def get_right_vector(self):
+        uh = self.uh0
+        b =  self.get_non_linear_vector()
         return self.M@uh  - self.tau*b
 
 
-    def get_non_linear_vector(self, uh):
+    def get_non_linear_vector(self):
+        uh = self.uh0
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         gradphi = self.femspace.grad_basis(bcs)
 
         uval = uh.value(bcs)
         guval = uh.grad_value(bcs)
-        #print(gradphi.shape)
         fval = (3*uval[..., np.newaxis]**2 - 1)*guval
         bb = np.einsum('i, ikm, ikjm, k->kj', ws, fval, gradphi, self.area)
         cell2dof = self.femspace.cell_to_dof()
@@ -134,15 +134,16 @@ class CahnHilliardRFEMModel():
 
     def solve(self):
         timemesh = self.timemesh 
-        tau = self.tau
         N = len(timemesh)
         D = self.D
-        for i in range(N-1):
+        for i in range(N):
             t = timemesh[i]
-            b = self.get_right_vector(i)
-            self.uh[:, i+1] =  spsolve(D, b)
-            print(self.uh[:, i+1])
-            self.show_soultion()
+            b = self.get_right_vector()
+            self.uh1[:] =  spsolve(D, b)
+            self.current = i
+            if self.current%10 == 0:
+                self.show_soultion()
+            self.uh0[:] = self.uh1[:]
             
 
     def step(self):
@@ -156,15 +157,11 @@ class CahnHilliardRFEMModel():
         mesh = self.mesh
         timemesh = self.timemesh 
         cell = mesh.entity('cell')
-        N = len(timemesh)
-        print(N)
-        x = mesh.node[:, 0]
-        y = mesh.node[:, 1]
-        for i in range(0,N-1,1):
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca(projection='3d')
-            axes.plot_trisurf(x, y, cell, self.uh[:,i], cmap=plt.cm.jet, lw=0.0)
-            plt.savefig('./results/cahnHilliard'+ str(i)+'.png')
+        node = mesh.entity('node')
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca(projection='3d')
+        axes.plot_trisurf(node[:, 0], node[:, 1], cell, self.uh0, cmap=plt.cm.jet, lw=0.0)
+        plt.savefig('./results/cahnHilliard'+ str(self.current)+'.png')
     
     

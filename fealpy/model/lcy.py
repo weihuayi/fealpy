@@ -11,7 +11,7 @@ class CahnHilliardData1:
         point = np.array([
             (0, 0),
             (2, 0),
-            (4, 1),
+            (4, 0),
             (0, 2),
             (2, 2),
             (4, 2)], dtype=np.float)
