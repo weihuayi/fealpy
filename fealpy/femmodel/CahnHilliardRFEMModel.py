@@ -1,5 +1,8 @@
 import numpy as np
 
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 from scipy.sparse import csc_matrix, csr_matrix, spdiags, eye
 from scipy.sparse.linalg import spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
@@ -55,29 +58,37 @@ class CahnHilliardRFEMModel():
         h = np.sqrt(np.sum(n**2, axis=1)) 
         n /= h.reshape(-1, 1)
 
+        # 计算梯度的恢复矩阵
         I = np.einsum('ij, k->ijk',  cell, np.ones(3))
         J = I.swapaxes(-1, -2)
+        
         val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 0], gradphi[:, :, 0])
         P = csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
+        
         val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 0], gradphi[:, :, 1])
         Q = csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
+        
         val = np.einsum('i, ij, ik->ijk', area, gradphi[:, :, 1], gradphi[:, :, 1])
         S = csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN))
-
+        
         K = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
 
+        # 边界上两个方向导数相乘的积分
         I = np.einsum('ij, k->ijk', bdEdge, np.ones(2))
         J = I.swapaxes(-1, -2)
         val = np.array([(1/3, 1/6), (1/6, 1/3)])
-        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 0]/h, val)
+        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 0]/h, val)        
         P = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
         val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 1]/h, val)
         Q = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+
         val0 = np.einsum('i, jk->ijk', n[:, 1]*n[:, 1]/h, val)
         S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
+        
         K += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
 
+        # 中间的边界上的两项
         I = np.einsum('ij, k->ijk', bdEdge, np.ones(3))
         J = np.einsum('ij, k->ikj', cell[cellIdx], np.ones(2)) 
         val0 = 0.5*h.reshape(-1, 1)*n[:, [0]]*gradphi[cellIdx, :, 0]  
@@ -113,7 +124,7 @@ class CahnHilliardRFEMModel():
 
         uval = uh.value(bcs)
         guval = uh.grad_value(bcs)
-        print(gradphi.shape)
+        #print(gradphi.shape)
         fval = (3*uval[..., np.newaxis]**2 - 1)*guval
         bb = np.einsum('i, ikm, ikjm, k->kj', ws, fval, gradphi, self.area)
         cell2dof = self.femspace.cell_to_dof()
@@ -131,15 +142,29 @@ class CahnHilliardRFEMModel():
             b = self.get_right_vector(i)
             self.uh[:, i+1] =  spsolve(D, b)
             print(self.uh[:, i+1])
+            self.show_soultion()
+            
 
     def step(self):
         D = self.D
         b = self.get_right_vector(self.current)
         self.uh[:, self.current + 1] = spsolve(D, b)
         self.current += 1
+       
 
-
-
-
-
-
+    def show_soultion(self):
+        mesh = self.mesh
+        timemesh = self.timemesh 
+        cell = mesh.entity('cell')
+        N = len(timemesh)
+        print(N)
+        x = mesh.node[:, 0]
+        y = mesh.node[:, 1]
+        for i in range(0,N-1,1):
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca(projection='3d')
+            axes.plot_trisurf(x, y, cell, self.uh[:,i], cmap=plt.cm.jet, lw=0.0)
+            plt.savefig('./results/cahnHilliard'+ str(i)+'.png')
+    
+    

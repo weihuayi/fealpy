@@ -10,12 +10,16 @@ class CahnHilliardData1:
     def space_mesh(self, n=4):
         point = np.array([
             (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float)
+            (2, 0),
+            (4, 1),
+            (0, 2),
+            (2, 2),
+            (4, 2)], dtype=np.float)
         cell = np.array([
-            (1, 2, 0),
-            (3, 0, 2)], dtype=np.int)
+            (3, 0, 4),
+            (1, 4, 0),
+            (2, 5, 1),
+            (4, 1, 5)], dtype=np.int)
 
         mesh = TriangleMesh(point, cell)
         mesh.uniform_refine(n)
@@ -54,19 +58,37 @@ class CahnHilliardData1:
         return rhs
     
 class CahnHilliardData2:
-    def __init__(self,h,m):
-        self.h = 1/256
-        self.m = 4
+    def __init__(self, t0, t1, alpha=0.0625):
+       self.t0 = t0
+       self.t1 = t1
+       self.epsilon = alpha/(2*np.sqrt(2)*np.arctanh(0.9945))
+
+    def space_mesh(self, n=8):
+        point = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 2, 0),
+            (3, 0, 2)], dtype=np.int)
+
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n)
+        return mesh
+    
+    def time_mesh(self, tau):
+        n = int(np.ceil(self.t1 - self.t0)/tau)
+        tau = (self.t1 - self.t0)/n
+        return np.linspace(self.t0, self.t1, num=n+1), tau
+
         
     def initdata(self,p):
-        h = self.h
-        m = self.m
-        
         x = p[..., 0]
         y = p[..., 1]
-        
-        epsilon = (h*m)/(2*np.sqrt(2)*np.arctanh(0.9945))
-        u0 = np.tanh((0.1-np.sqrt((x-0.5)**2+(y-0.5)**2))/(np.sqrt(2)*epsilon))
+        epsilon = self.epsilon
+ 
+        u0 = np.tanh(0.1-np.sqrt((x-0.5)**2+(y-0.5**2))/(np.sqrt(2)*epsilon)) 
         return u0
     
     def solution(self,p):
@@ -94,7 +116,34 @@ class CahnHilliardData3:
     def __init__(self,h,m):
         self.h = 1/128
         self.m = 4
-        
+    
+    def space_mesh(self, n=7):
+        point = np.array([
+            (0, 0),
+            (1, 0),
+            (2, 0),
+            (3, 0),
+            (0, 1),
+            (1, 1),
+            (2, 1),
+            (3, 1)], dtype=np.float)
+        cell = np.array([
+            (0, 6, 7),
+            (0, 1, 6),
+            (1, 5, 6),
+            (1, 2, 5),
+            (2, 4, 5),
+            (2, 3, 4)], dtype=np.int)
+
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n)
+        return mesh  
+    
+    def time_mesh(self, tau):
+        n = int(np.ceil(self.t1 - self.t0)/tau)
+        tau = (self.t1 - self.t0)/n
+        return np.linspace(self.t0, self.t1, num=n+1), tau
+    
     def initdata(self,p):
         
         h = self.h
@@ -135,6 +184,25 @@ class CahnHilliardData4:
     def __init__(self,epsilon):
         self.epsilon = 0.08
         
+    def space_mesh(self, n=8):
+        point = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 2, 0),
+            (3, 0, 2)], dtype=np.int)
+
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n)
+        return mesh
+    
+    def time_mesh(self, tau):
+        n = int(np.ceil(self.t1 - self.t0)/tau)
+        tau = (self.t1 - self.t0)/n
+        return np.linspace(self.t0, self.t1, num=n+1), tau
+   
     def initdata(self,p):
         
         epsilon = self.epsilon

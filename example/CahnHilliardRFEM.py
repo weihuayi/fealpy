@@ -13,8 +13,11 @@ def init():
 def animate(i):
     global fem
     fem.step()
+   
 
-
-pde = CahnHilliardData1(0, 10, )
-fem = CahnHilliardRFEMModel(pde, 4, 0.001, 3)
+pde = CahnHilliardData1(0, 1)
+fem = CahnHilliardRFEMModel(pde, 4, 0.00001, 3)
 fem.solve()
+
+
+
