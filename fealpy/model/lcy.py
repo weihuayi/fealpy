@@ -2,10 +2,10 @@ import numpy as np
 from ..mesh.TriangleMesh import TriangleMesh  
 
 class CahnHilliardData1:
-    def __init__(self, t0, t1, alpha=0.125):
+    def __init__(self, t0, t1):
         self.t0 = t0
         self.t1 = t1
-        self.epsilon = alpha/(2*np.sqrt(2)*np.arctanh(0.9945))
+        self.epsilon = 1/16/(2*np.sqrt(2)*np.arctanh(0.9945))
 
     def space_mesh(self, n=4):
         point = np.array([

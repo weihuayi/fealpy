@@ -16,7 +16,7 @@ def animate(i):
    
 
 pde = CahnHilliardData1(0, 1)
-fem = CahnHilliardRFEMModel(pde, 7, 0.000001, 3)
+fem = CahnHilliardRFEMModel(pde, 8, 0.000001, 3)
 fem.solve()
 
 

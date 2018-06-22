@@ -9,7 +9,7 @@ from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..femmodel import doperator 
 from .integral_alg import IntegralAlg
 from .doperator  import mass_matrix, grad_recovery_matrix
-
+import pyamg
 
 class CahnHilliardRFEMModel():
     def __init__(self, pde, n, tau, q):
@@ -29,8 +29,9 @@ class CahnHilliardRFEMModel():
         self.A, self.B, self.gradphi = grad_recovery_matrix(self.femspace)
         self.M = doperator.mass_matrix(self.femspace, self.integrator, self.area)
         self.K = self.get_stiff_matrix()  
-        self.D = self.M + self.pde.epsilon**2 * self.tau * self.K
-
+        self.D = self.M + self.tau * self.K
+        self.ml = pyamg.ruge_stuben_solver(self.D)  
+        print(self.ml)
         self.current = 0
 
     def get_stiff_matrix(self):
@@ -73,20 +74,6 @@ class CahnHilliardRFEMModel():
         
         K = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
 
-        # 边界上两个方向导数相乘的积分
-        I = np.einsum('ij, k->ijk', bdEdge, np.ones(2))
-        J = I.swapaxes(-1, -2)
-        val = np.array([(1/3, 1/6), (1/6, 1/3)])
-        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 0]/h, val)        
-        P = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 1]/h, val)
-        Q = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-        val0 = np.einsum('i, jk->ijk', n[:, 1]*n[:, 1]/h, val)
-        S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
-        
-        K += A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B
 
         # 中间的边界上的两项
         I = np.einsum('ij, k->ijk', bdEdge, np.ones(3))
@@ -110,6 +97,20 @@ class CahnHilliardRFEMModel():
         M = A.transpose()@P0@A + A.transpose()@Q0@B + B.transpose()@P1@A + B.transpose()@Q1@B
 
         K -= (M + M.transpose())
+        K *= self.pde.epsilon**2
+
+        # 边界上两个方向导数相乘的积分
+        I = np.einsum('ij, k->ijk', bdEdge, np.ones(2))
+        J = I.swapaxes(-1, -2)
+        val = np.array([(1/3, 1/6), (1/6, 1/3)])
+        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 0]/h, val)        
+        P = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+        val0 = np.einsum('i, jk->ijk', n[:, 0]*n[:, 1]/h, val)
+        Q = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+        val0 = np.einsum('i, jk->ijk', n[:, 1]*n[:, 1]/h, val)
+        S = csc_matrix((val0.flat, (I.flat, J.flat)), shape=(NN, NN))
+        
+        K +=self.pde.epsilon**2*(A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q@A + B.transpose()@S@B)
         return K 
 
     def get_right_vector(self):
@@ -139,9 +140,10 @@ class CahnHilliardRFEMModel():
         for i in range(N):
             t = timemesh[i]
             b = self.get_right_vector()
-            self.uh1[:] =  spsolve(D, b)
+            #self.uh1[:] =  spsolve(D, b)
+            self.uh1[:] = self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
             self.current = i
-            if self.current%10 == 0:
+            if self.current%2 == 0:
                 self.show_soultion()
             self.uh0[:] = self.uh1[:]
             
