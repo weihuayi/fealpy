@@ -9,14 +9,14 @@ from .integral_alg import PolygonMeshIntegralAlg
 
 
 class PoissonVEMModel():
-    def __init__(self, model, mesh, p, integrator):
+    def __init__(self, pde, mesh, p, integrator):
         """
         Initialize a Poisson virtual element model. 
 
         Parameters
         ----------
         self : PoissonVEMModel object
-        model :  PDE Model object
+        pde :  PDE Model object
         mesh : PolygonMesh object
         p : int
         
@@ -28,7 +28,7 @@ class PoissonVEMModel():
         """
         self.vemspace =VirtualElementSpace2d(mesh, p) 
         self.mesh = self.vemspace.mesh
-        self.model = model  
+        self.pde = pde  
         self.uh = self.vemspace.function() 
         self.area = self.vemspace.smspace.area 
         self.integrator = integrator
@@ -39,7 +39,7 @@ class PoissonVEMModel():
                 area=self.area, 
                 barycenter=self.vemspace.smspace.barycenter)
 
-        self.uI = self.vemspace.interpolation(model.solution, self.integralalg.integral)
+        self.uI = self.vemspace.interpolation(pde.solution, self.integralalg.integral)
 
         self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
@@ -56,7 +56,7 @@ class PoissonVEMModel():
                 self.mesh, 
                 area=self.area, 
                 barycenter=self.vemspace.smspace.barycenter)
-        self.uI = self.vemspace.interpolation(self.model.solution, self.integralalg.integral)
+        self.uI = self.vemspace.interpolation(self.pde.solution, self.integralalg.integral)
 
         self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
@@ -69,7 +69,7 @@ class PoissonVEMModel():
         S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
         return S
 
-    def recover_estimate(self, rtype='simple'):
+    def recover_estimate(self, rtype='simple', residual=True):
         """
         estimate the recover-type error 
 
@@ -109,7 +109,7 @@ class PoissonVEMModel():
         S1 = vemspace.smspace.function()
         p2c = mesh.ds.node_to_cell()
         try: 
-            isSubDomain = self.model.subdomain(barycenter)
+            isSubDomain = self.pde.subdomain(barycenter)
             for isFlag in isSubDomain:
                 isSubIdx = np.repeat(isFlag, NV)
                 M = p2c[:, isFlag]
@@ -148,27 +148,33 @@ class PoissonVEMModel():
                 S1[i::ldof] = np.bincount(idx, weights=self.mat.B[i, :]*ruh[cell, 1], minlength=NC)
 
         try:
-            k = self.model.diffusion_coefficient(barycenter)
+            k = self.pde.diffusion_coefficient(barycenter)
         except  AttributeError:
             k = np.ones(NC) 
 
         node = mesh.node
         gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
         gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
-        eta = np.sqrt(k*np.bincount(idx, weights=gx**2+gy**2)/NV*area)
-        return eta
+        eta = k*np.bincount(idx, weights=gx**2+gy**2)/NV*area
+
+        if residual:
+            fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
+            g0 = S0.grad_value(barycenter)
+            g1 = S1.grad_value(barycenter)
+            eta += k*(fh + k*(g0[:, 0] + g1[:, 1]))**2*area**2
+        return np.sqrt(eta)
 
     def get_left_matrix(self):
         vemspace = self.vemspace
         area = self.area
         try:
-            f = self.model.diffusion_coefficient
+            f = self.pde.diffusion_coefficient
             return doperator.stiff_matrix(vemspace, area, cfun=f, mat=self.mat)
         except AttributeError:
             return doperator.stiff_matrix(vemspace, area, mat=self.mat)
 
     def get_right_vector(self):
-        f = self.model.source
+        f = self.pde.source
         integral = self.integralalg.integral 
         return doperator.source_vector(
                 integral,
@@ -178,7 +184,7 @@ class PoissonVEMModel():
 
     def solve(self):
         uh = self.uh
-        bc = DirichletBC(self.vemspace, self.model.dirichlet)
+        bc = DirichletBC(self.vemspace, self.pde.dirichlet)
         self.A, b = solve(self, uh, dirichlet=bc, solver='direct')
 
     def l2_error(self):
@@ -190,13 +196,13 @@ class PoissonVEMModel():
         return np.sqrt(e@self.A@e)
 
     def L2_error(self):
-        u = self.model.solution
+        u = self.pde.solution
         S = self.project_to_smspace(self.uh)
         uh = S.value
         return self.integralalg.L2_error(u, uh)
 
     def H1_semi_error(self):
-        gu = self.model.gradient
+        gu = self.pde.gradient
         S = self.project_to_smspace(self.uh)
         guh = S.grad_value
         return self.integralalg.L2_error(gu, guh)

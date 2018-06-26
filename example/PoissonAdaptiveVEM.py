@@ -15,24 +15,24 @@ maxit = int(sys.argv[2])
 p = int(sys.argv[3])
 
 if m == 1:
-    model = KelloggData()
-    quadtree = model.init_mesh(n=4)
+    pde = KelloggData()
+    quadtree = pde.init_mesh(n=4)
 elif m == 2:
-    model = LShapeRSinData() 
-    quadtree = model.init_mesh(n=4)
+    pde = LShapeRSinData() 
+    quadtree = pde.init_mesh(n=4)
 elif m == 3:
-    model = CrackData()
-    quadtree = model.init_mesh(n=4)
+    pde = CrackData()
+    quadtree = pde.init_mesh(n=4)
 elif m == 4:
-    model = CosCosData()
-    quadtree = model.init_mesh(n=2)
+    pde = CosCosData()
+    quadtree = pde.init_mesh(n=2)
 elif m == 5:
-    model = SinSinData()
-    quadtree = model.init_mesh(n=3)
+    pde = SinSinData()
+    quadtree = pde.init_mesh(n=3)
 
-theta = 0.2
+theta = 0.3
 
-k = 0 
+k = 15
 errorType = ['$\| u_I - u_h \|_{l_2}$',
              '$\|\\nabla u_I - \\nabla u_h\|_A$',
              '$\| u - \Pi^\Delta u_h\|_0$',
@@ -44,7 +44,7 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 mesh = quadtree.to_pmesh()
 
 integrator = TriangleQuadrature(6)
-vem = PoissonVEMModel(model, mesh, p=p, integrator=integrator)
+vem = PoissonVEMModel(pde, mesh, p=p, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()

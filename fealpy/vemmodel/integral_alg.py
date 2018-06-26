@@ -59,36 +59,30 @@ class PolygonMeshIntegralAlg():
         else:
             return e.sum(axis=0) 
 
+    def fun_integral(self, f, celltype=False):
+        def u(x, cellidx):
+            return f(x)
+        return self.integral(u, celltype)
+
     def L1_error(self, u, uh, celltype=False):
         def f(x, cellidx):
             return np.abs(u(x) - uh(x, cellidx))
         e = self.integral(f, celltype=celltype)
-        if elemtype is False:
-            return e.sum()
-        else:
-            return e
-        return 
+        return e
 
     def L2_error(self, u, uh, celltype=False):
         def f(x, cellidx):
             return (u(x) - uh(x, cellidx))**2
-
         e = self.integral(f, celltype=celltype)
-        if celltype is False:
-            return np.sqrt(e.sum())
-        else:
-            return np.sqrt(e)
-        return 
+        if isinstance(e, np.ndarray):
+            e = e.sum()
+        return np.sqrt(e)
 
     def Lp_error(self, u, uh, p, celltype=False):
         def f(x, cellidx):
             return np.abs(u(x) - uh(x, cellidx))**p
         e = self.integral(f, celltype=celltype)
-        if celltype is False:
-            return e.sum()**(1/p)
-        else:
-            return e**(1/p)
-        return 
+        return e**(1/p)
 
         
 
