@@ -17,7 +17,7 @@ sudo apt-get install python3 python3-pip ipython3
 sudo apt-get install python3-numpy
 sudo apt-get install python3-scipy
 sudo -H pip3 install matplotlib
-sudo -H pipe install plotly
+sudo -H pip3 install plotly
 ```
 
 ```
@@ -34,7 +34,10 @@ sudo apt-get install python3-skimage
 
 Install mesh generation package `meshpy`:
 
+ububtu 18.04 install meshpy
+
 ```
+sudo apt-get install libboost-python-dev
 sudo -H pip3 install meshpy
 ```
 
