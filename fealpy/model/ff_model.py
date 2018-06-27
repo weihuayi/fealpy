@@ -47,7 +47,8 @@ class ffData:
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
-        pass
+        val = np.zeros(p.shape[0:-1])
+        return val
 
   
 
