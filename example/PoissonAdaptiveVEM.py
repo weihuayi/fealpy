@@ -36,9 +36,9 @@ elif m == 6:
 
 
 
-theta = 0.3
+theta = 0.2
 
-k = 15
+k = maxit - 15 
 errorType = [#'$\| u_I - u_h \|_{l_2}$',
              #'$\|\\nabla u_I - \\nabla u_h\|_A$',
              #'$\| u - \Pi^\Delta u_h\|_0$',
@@ -55,7 +55,7 @@ for i in range(maxit):
     print('step:', i)
     vem.solve()
     #print(vem.uh)
-    eta = vem.recover_estimate(residual=False)
+    eta = vem.recover_estimate(residual=True)
     Ndof[i] = vem.vemspace.number_of_global_dofs()
     #errorMatrix[0, i] = vem.l2_error()
     #errorMatrix[1, i] = vem.uIuh_error() 

@@ -7,7 +7,7 @@ class ffData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=2, meshtype='quadtree'):
+    def init_mesh(self, n=1, meshtype='quadtree'):
         node = np.array([
             (0, 0),
             (1, 0),
@@ -42,16 +42,11 @@ class ffData:
         x = p[..., 0]
         y = p[..., 1]
 
-        x = np.floor(4*x)
-        y = np.floor(4*y)
-        f = x+y
-        for i in range(f.shape[0]):
-            for j in range(f.shape[1]):
-                if np.mod(f[i, j], 2) == 1:
-                    f[i, j] = 1
-                else:
-                    f[i, j] = -1
-        return f
+        val = np.ones(x.shape, dtype=np.float)
+        I = np.floor(4*x) + np.floor(4*y)
+        isMinus = (I%2 == 0)
+        val[isMinus] = - 1
+        return val 
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
