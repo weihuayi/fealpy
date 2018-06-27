@@ -3,6 +3,62 @@ import numpy as np
 from ..mesh.TriangleMesh import TriangleMesh  
 from ..mesh.tree_data_structure import Quadtree 
 
+class ffData:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=2, meshtype='quadtree'):
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        if meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.zeros(p.shape[0:-1])
+    
+    def gradient(self, p):
+        """ The gradient of the exact solution
+        """
+        val = np.zeros(p.shape,dtype=p.dtype)     
+        return val
+
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        x = np.floor(4*x)
+        y = np.floor(4*y)
+        f = x+y
+        for i in range(f.shape[0]):
+            for j in range(f.shape[1]):
+                if np.mod(f[i, j], 2) == 1:
+                    f[i, j] = 1
+                else:
+                    f[i, j] = -1
+        return f
+
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        val = np.zeros(p.shape[0:-1])
+        return val
+
 class KelloggData:
     def __init__(self):
         self.a = 161.4476387975881

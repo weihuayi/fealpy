@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData, SinSinData
+from fealpy.model.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData, SinSinData, ffData
 from fealpy.vemmodel import PoissonVEMModel 
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 from fealpy.tools.show import showmultirate
@@ -29,14 +29,20 @@ elif m == 4:
 elif m == 5:
     pde = SinSinData()
     quadtree = pde.init_mesh(n=3)
+elif m == 6:
+    pde = ffData()
+    quadtree = pde.init_mesh(n=2)
+
+
+
 
 theta = 0.3
 
 k = 15
-errorType = ['$\| u_I - u_h \|_{l_2}$',
-             '$\|\\nabla u_I - \\nabla u_h\|_A$',
-             '$\| u - \Pi^\Delta u_h\|_0$',
-             '$\|\\nabla u - \\nabla \Pi^\Delta u_h\|$',
+errorType = [#'$\| u_I - u_h \|_{l_2}$',
+             #'$\|\\nabla u_I - \\nabla u_h\|_A$',
+             #'$\| u - \Pi^\Delta u_h\|_0$',
+             #'$\|\\nabla u - \\nabla \Pi^\Delta u_h\|$',
              '$\|\\nabla \Pi^\Delta u_h - \Pi^\Delta G(\\nabla \Pi^\Delta u_h) \|$'
              ]
 Ndof = np.zeros((maxit,), dtype=np.int)
@@ -48,13 +54,14 @@ vem = PoissonVEMModel(pde, mesh, p=p, integrator=integrator)
 for i in range(maxit):
     print('step:', i)
     vem.solve()
-    eta = vem.recover_estimate()
+    #print(vem.uh)
+    eta = vem.recover_estimate(residual=False)
     Ndof[i] = vem.vemspace.number_of_global_dofs()
-    errorMatrix[0, i] = vem.l2_error()
-    errorMatrix[1, i] = vem.uIuh_error() 
-    errorMatrix[2, i] = vem.L2_error()
-    errorMatrix[3, i] = vem.H1_semi_error()
-    errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
+    #errorMatrix[0, i] = vem.l2_error()
+    #errorMatrix[1, i] = vem.uIuh_error() 
+    #errorMatrix[2, i] = vem.L2_error()
+    #errorMatrix[3, i] = vem.H1_semi_error()
+    errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
         #quadtree.uniform_refine()
         quadtree.refine(marker=AdaptiveMarker(eta, theta=theta))
@@ -71,6 +78,6 @@ y = mesh.node[:, 1]
 tri = quadtree.leaf_cell(celltype='tri')
 axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
 
-showmultirate(plt, k, Ndof, errorMatrix[:4, :], errorType[:4])
+showmultirate(plt, k, Ndof, errorMatrix, errorType)
 plt.show()
 
