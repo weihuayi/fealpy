@@ -102,12 +102,14 @@ class ScaledMonomialSpace2d():
                 phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
                 phi[..., start+i] = phi[..., start-1]*phi[..., 2]
                 start += i+1
+
         return phi
 
     def value(self, uh, point, cellidx=None):
         phi = self.basis(point, cellidx=cellidx)
         cell2dof = self.dof.cell2dof
         if cellidx is None:
+            
             return np.einsum('ij, ...ij->...i', uh[cell2dof], phi) 
         else:
             assert(point.shape[-2] == len(cellidx))

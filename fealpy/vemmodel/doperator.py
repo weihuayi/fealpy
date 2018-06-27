@@ -68,6 +68,7 @@ def stiff_matrix(V, area, cfun=None, mat=None):
     val = np.concatenate(list(map(f4, K)))
     gdof = V.number_of_global_dofs()
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+    #print(A)
     return A
 
 def mass_matrix(V, area, cfun=None, mat=None):
@@ -138,6 +139,7 @@ def source_vector(integral, f, vemspace, PI0):
     bb = np.concatenate(list(map(g, zip(PI0, bb))))
     gdof = vemspace.number_of_global_dofs()
     b = np.bincount(vemspace.dof.cell2dof, weights=bb, minlength=gdof)
+    #print(b)
     return b
 
 #def source_vector(f, V, area, vem=None):
