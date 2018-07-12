@@ -10,39 +10,19 @@ from ..boundarycondition import DirichletBC
 from ..solver import solve
 
 class BiharmonicRecoveryFEMModel:
-    def __init__(self, mesh, model, integrator=None, rtype='simple'):
-        self.V = LagrangeFiniteElementSpace(mesh, p=1) 
-        self.V2 = VectorLagrangeFiniteElementSpace(mesh, p=1, vectordim=2)
-        self.V3 = TensorLagrangeFiniteElementSpace(mesh, 1, tensorshape=(2,2)) 
+    def __init__(self, mesh, model, p, q, rtype='simple'):
+        self.V = LagrangeFiniteElementSpace(mesh, p=p) 
 
         self.uh = self.V.function()
         self.uI = self.V.interpolation(model.solution) 
-        self.rgh = self.V2.function()
-        self.rlh = self.V.function()
+        self.rgh = self.
 
         self.model = model
-        if integrator is None:
-            self.integrator = TriangleQuadrature(p+1)
-        if type(integrator) is int:
-            self.integrator = TriangleQuadrature(integrator)
-        else:
-            self.integrator = integrator 
+        self.integrator = mesh.integrator(q)
         self.rtype = rtype 
 
         self.gradphi = self.V.mesh.grad_lambda()
         self.area = mesh.area()
-        self.A, self.B = self.get_revcover_matrix()
-
-
-    def reinit(self, mesh):
-        self.V = LagrangeFiniteElementSpace(mesh, p=1) 
-        self.V2 = VectorLagrangeFiniteElementSpace(mesh, p=1)
-        self.uh = self.V.function()
-        self.uI = self.V.interpolation(self.model.solution)
-        self.rgh = self.V2.function()
-        self.rlh = self.V.function()
-        self.area = self.V.mesh.area()
-        self.gradphi = self.V.mesh.grad_lambda()
         self.A, self.B = self.get_revcover_matrix()
 
     def grad_recover_estimate(self):
