@@ -409,7 +409,6 @@ class CosCosData:
         return val
 
 
-
     def gradient(self, p):
         """ The gradient of the exact solution 
         """

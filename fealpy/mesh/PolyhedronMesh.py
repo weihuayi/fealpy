@@ -3,7 +3,6 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from scipy.sparse import triu, tril, find, hstack
 from .mesh_tools import unique_row
 
-from tvtk.api import tvtk, write_data
 
 class PolyhedronMesh():
     def __init__(self, node, face, faceLocation, face2cell, NC=None, dtype=np.float):
