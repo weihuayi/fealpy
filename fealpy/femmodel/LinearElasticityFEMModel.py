@@ -31,11 +31,11 @@ class LinearElasticityFEMModel:
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.tensorspace.p
-
         self.count += 1
         self.mesh = mesh
         self.tensorspace = HuZhangFiniteElementSpace(mesh, p)
         self.vectorspace = VectorLagrangeFiniteElementSpace(mesh, p-1) 
+        self.cspace = LagrangeFiniteElementSpace(mesh, 1)
         self.sh = self.tensorspace.function()
         self.sI = self.tensorspace.interpolation(self.model.stress)
         self.uh = self.vectorspace.function()
@@ -70,6 +70,7 @@ class LinearElasticityFEMModel:
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         A = T@A@T + Tbd
+        print(A)
         self.ml = pyamg.ruge_stuben_solver(A)  
 
         # Get interpolation matrix 

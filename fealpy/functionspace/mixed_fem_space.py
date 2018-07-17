@@ -7,7 +7,7 @@ class HuZhangFiniteElementSpace():
     Hu-Zhang Mixed Finite Element Space.
     """
     def __init__(self, mesh, p):
-        self.space = LagrangeFiniteElementSpace(mesh, p)
+        self.space = LagrangeFiniteElementSpace(mesh, p) # the scalar space
         self.mesh = mesh
         self.p = p
         self.dof = self.space.dof
@@ -21,17 +21,11 @@ class HuZhangFiniteElementSpace():
         """
         mesh = self.mesh
 
+        NE = mesh.number_of_edges()
         if self.dim == 2:
-            NE = mesh.number_of_edges()
             idx = np.array([(0, 0), (0, 1), (1, 1)])
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
-
-#            t = mesh.edge_unit_tagent()
-#            n = mesh.edge_unit_normal()
-#            self.TE[:, 0, :] = np.prod(t[:, idx], axis=-1)
-#            self.TE[:, 1, :] = np.sqrt(2)*(t[:, idx[:, 0]]*n[:, idx[:, 1]] + t[:, idx[:, 1]]*n[:, idx[:, 0]])/2
-#            self.TE[:, 2, :] = np.prod(n[:, idx], axis=-1)
         elif self.dim == 3:
             idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
             self.T = np.array([
@@ -44,22 +38,21 @@ class HuZhangFiniteElementSpace():
 
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
 
-        t = mesh.edge_unit_tagent()
-        _, _, frame = np.linalg.svd(t[:, np.newaxis, :])
+        t = mesh.edge_unit_tagent() 
+        _, _, frame = np.linalg.svd(t[:, np.newaxis, :]) # get the axis frame on the edge by svd
         frame[:, 0] = t
         for i, (j, k) in enumerate(idx):
             self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
 
-        self.TE[:, 1] *= np.sqrt(2)
+        self.TE[:, 1] *= np.sqrt(2) # normalize
 
         if self.dim == 3:
             NF = mesh.number_of_faces()
             n = mesh.face_unit_normal()
-
             face2edge = mesh.ds.face_to_edge()
             ft = t[face2edge]
             self.TF = np.zeros((NF, 6, 6), dtype=np.float)
-            self.TF[:, 0:3, :] = self.TE[face2edge, 0, :]
+            self.TF[:, 0:3, :] = self.TE[face2edge, 0, :] # 
             self.TF[:, 3:, :] = np.sqrt(2)*(n[:, np.newaxis, idx[:, 0]]*ft[:, :, idx[:, 1]] + n[:, np.newaxis, idx[:, 1]]*ft[:, :, idx[:, 0]])/2
 
     def __str__(self):
@@ -105,7 +98,14 @@ class HuZhangFiniteElementSpace():
 
     def init_cell_to_dof(self):
         """
-        Construct the dofs matrix on each cell.
+        构建局部自由度到全局自由度的映射矩阵
+
+        Returns
+        -------
+        cell2dof : ndarray with shape (NC, ldof*tdim)
+            NC: 单元个数
+            ldof: p 次标量空间局部自由度的个数
+            tdim: 对称张量的维数
         """
         mesh = self.mesh
         N = mesh.number_of_nodes()
@@ -115,23 +115,25 @@ class HuZhangFiniteElementSpace():
         dim = self.geo_dimension()
         tdim = self.tensor_dimension()
         p = self.p
-
-        dof = self.dof
+        dof = self.dof # 标量空间自由度对象 
        
         c2d = dof.cell2dof[..., np.newaxis]
         ldof = dof.number_of_local_dofs() 
+        # ldof : 标量空间单元上自由度个数
+        # tdim : 张量维数
         cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int)
 
-        dofFlags = self.dof_flags_1()
-        idx, = np.nonzero(dofFlags[0])
+        dofFlags = self.dof_flags_1() # 把不同类型的自由度区分开来
+        idx, = np.nonzero(dofFlags[0]) # 局部顶点自由度的编号
         cell2dof[:, idx, :] = tdim*c2d[:, idx] + np.arange(tdim)
 
         base0 = 0
         base1 = 0
-        idx, = np.nonzero(dofFlags[1])
+        idx, = np.nonzero(dofFlags[1]) # 边内部自由度的编号
         if len(idx) > 0:
-            base0 += N
-            base1 += tdim*N
+            base0 += N # 这是标量编号的新起点
+            base1 += tdim*N # 这是张量自由度编号的新起点
+            #  0号局部自由度对应的是切向不连续的自由度, 留到后面重新编号
             cell2dof[:, idx, 1:] = base1 + (tdim-1)*(c2d[:, idx] - base0) + np.arange(tdim - 1)
 
         idx, = np.nonzero(dofFlags[2])
@@ -142,6 +144,7 @@ class HuZhangFiniteElementSpace():
             if dim == 2:
                 cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
             elif dim == 3:
+                # 0, 1, 2号局部自由度对应切向不连续的张量自由度, 留到后面重新编号
                 cell2dof[:, idx, 3:]= base1 + (tdim - 3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
 
         fdof = (p+1)*(p+2)//2 - 3*p
@@ -151,8 +154,8 @@ class HuZhangFiniteElementSpace():
                 NF = mesh.number_of_faces()
                 base0 += fdof*NF 
                 base1 += (tdim - 3)*fdof*NF
-                cell2dof[:, idx, :] = base1 + tdim*(cell2dof[:, idx] - base0) + np.arange(tdim)
-                cdof = ldof - 4*fdof - 6*edof - 4
+                cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
+            cdof = ldof - 4*fdof - 6*edof - 4
         else:
             cdof = fdof
 
@@ -180,6 +183,20 @@ class HuZhangFiniteElementSpace():
         return self.dof.interpolation_points()
 
     def dof_flags(self):
+        """ 对标量空间中的自由度进行分类, 分为边内部自由度, 面内部自由度(如果是三维空间的话)及其它自由度 
+
+        Returns
+        -------
+
+        isOtherDof : ndarray, (ldof,)
+            除了边内部和面内部自由度的其它自由度
+        isEdgeDof : ndarray, (ldof, 3) or (ldof, 6) 
+            每个边内部的自由度
+        isFaceDof : ndarray, (ldof, 4)
+            每个面内部的自由度
+        -------
+
+        """
         dim = self.geo_dimension()
         dof = self.dof 
         
@@ -187,8 +204,10 @@ class HuZhangFiniteElementSpace():
         isEdgeDof = dof.is_on_edge_local_dof()
         isEdgeDof[isPointDof] = False
         
-        isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
-        isOtherDof = (~isEdgeDof0)
+        isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0 # 
+        isOtherDof = (~isEdgeDof0) # 除了边内部自由度之外的其它自由度
+                                   # dim = 2: 包括点和面内部自由度
+                                   # dim = 3: 包括点, 面内部和体内部自由度
         if dim == 2:
             return isOtherDof, isEdgeDof
         elif dim == 3:
@@ -197,13 +216,32 @@ class HuZhangFiniteElementSpace():
             isFaceDof[isEdgeDof0, :] = False
 
             isFaceDof0 = np.sum(isFaceDof, axis=-1) > 0
-            isOtherDof = isOtherDof & (~isFaceDof0)
+            isOtherDof = isOtherDof & (~isFaceDof0) # 三维情形下, 从其它自由度中除去面内部自由度
 
             return isOtherDof, isEdgeDof, isFaceDof
         else:
             raise ValueError('`dim` should be 2 or 3!')
 
     def dof_flags_1(self):
+        """ 
+        对标量空间中的自由度进行分类, 分为:
+            点上的自由由度
+            边内部的自由度
+            面内部的自由度
+            体内部的自由度
+
+        Returns
+        -------
+
+        isOtherDof : ndarray, (ldof,)
+            除了边内部和面内部自由度的其它自由度
+        isEdgeDof : ndarray, (ldof, 3) or (ldof, 6) 
+            每个边内部的自由度
+        isFaceDof : ndarray, (ldof, 4)
+            每个面内部的自由度
+        -------
+
+        """
         dim = self.dim # the geometry space dimension
         dof = self.dof 
         isPointDof = dof.is_on_node_local_dof()
@@ -223,6 +261,24 @@ class HuZhangFiniteElementSpace():
             raise ValueError('`dim` should be 2 or 3!')
 
     def basis(self, bc, cellidx=None):
+        """
+
+        Parameters
+        ----------
+        bc : ndarray with shape (NQ, dim+1)
+            bc[i, :] is i-th quad point
+        cellidx : ndarray
+            有时我我们只需要计算部分单元上的基函数
+        Returns
+        -------
+        phi : ndarray with shape (NQ, NC, ldof*tdim, 3 or 6)
+            NQ: 积分点个数
+            NC: 单元个数
+            ldof: 标量空间的单元自由度个数
+            tdim: 对称张量的维数
+
+            (NQ, NC, ldof*tdim, dim, dim) 这样的存储有点浪费空间?
+        """
         dim = self.geo_dimension() 
         tdim = self.tensor_dimension()
 
@@ -337,6 +393,7 @@ class HuZhangFiniteElementSpace():
 
     def interpolation(self, u):
 
+        mesh = self.mesh;
         dim = self.geo_dimension()
         tdim = self.tensor_dimension()
 
