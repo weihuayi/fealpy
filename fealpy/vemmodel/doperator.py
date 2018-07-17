@@ -68,7 +68,6 @@ def stiff_matrix(V, area, cfun=None, mat=None):
     val = np.concatenate(list(map(f4, K)))
     gdof = V.number_of_global_dofs()
     A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-    #print(A)
     return A
 
 def mass_matrix(V, area, cfun=None, mat=None):

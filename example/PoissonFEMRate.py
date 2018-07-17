@@ -2,6 +2,7 @@ import sys
 
 import numpy as np  
 import matplotlib.pyplot as plt
+
 from fealpy.model.poisson_model_2d import CosCosData
 from fealpy.femmodel.PoissonFEMModel import PoissonFEMModel
 from fealpy.tools.show import showmultirate
@@ -20,8 +21,8 @@ Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
     femModel = PoissonFEMModel(pde, mesh, p, integrator)
-    #femModel.solve()
-    femModel.fast_solve()
+    femModel.solve()
+    #femModel.fast_solve()
     Ndof[i] = femModel.femspace.number_of_global_dofs()
     errorMatrix[:, i] = femModel.error()
     if i < maxit - 1:
