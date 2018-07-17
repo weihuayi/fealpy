@@ -62,6 +62,14 @@ sudo -H pip3 install nipy
 sudo -H pip3 install pygmsh
 ```
 
+
+## Anaconda 
+
+```
+conda install pyamg
+conda install petsc4py
+```
+
 ## Install Boost with python3 
 
 
