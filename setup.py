@@ -9,6 +9,6 @@ setup(name='fealpy',
       license='GNU',
       packages=['fealpy'],
       install_requires=[
-          'pyamg', 'meshpy'
+          'numpy', 'scipy', 'matplotlib', 'pyamg', 'meshpy'
       ],
       zip_safe=False)
