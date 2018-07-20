@@ -12,7 +12,7 @@ setup(name='fealpy',
           'numpy',  
           'scipy', 
           'matplotlib', 
-	  'mespack',
+	  'msgpack',
           'pytools',
           'meshpy',
           'pyamg' 
