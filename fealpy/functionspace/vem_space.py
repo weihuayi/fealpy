@@ -8,6 +8,9 @@ from .function import FiniteElementFunction
 from ..quadrature import GaussLobattoQuadrature
 
 class SMDof2d():
+    """
+    单项式空间自由度管理类
+    """
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p

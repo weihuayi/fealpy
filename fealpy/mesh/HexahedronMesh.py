@@ -4,36 +4,6 @@ from scipy.sparse import triu, tril, find, hstack
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure 
 
-class HexahedronMesh(Mesh3d):
-
-    def __init__(self, node, cell, dtype=np.float):
-        self.node = node
-        N = node.shape[0]
-        self.ds = HexahedronMeshDataStructure(N, cell)
-
-        self.meshtype = 'hex'
-        self.dtype= np.float
-
-    def volume(self):
-        pass
-
-    def face_area(self):
-        pass
-
-    def jacobi_at_corner(self):
-        pass
-
-    def cell_quality(self):
-        pass
-
-    def print(self):
-        print("Point:\n", self.node)
-        print("Cell:\n", self.ds.cell)
-        print("Edge:\n", self.ds.edge)
-        print("Face:\n", self.ds.face)
-        print("Face2cell:\n", self.ds.face2cell)
-
-
 class HexahedronMeshDataStructure(Mesh3dDataStructure):
 
     # The following local data structure should be class properties
@@ -64,3 +34,34 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
         for i in range(4):
             face2edgeSign[:, i] = (face[:, i] == edge[face2edge[:, i], 0])
         return face2edgeSign
+
+class HexahedronMesh(Mesh3d):
+
+    def __init__(self, node, cell, dtype=np.float):
+        self.node = node
+        N = node.shape[0]
+        self.ds = HexahedronMeshDataStructure(N, cell)
+
+        self.meshtype = 'hex'
+        self.dtype= np.float
+
+    def volume(self):
+        pass
+
+    def face_area(self):
+        pass
+
+    def jacobi_at_corner(self):
+        pass
+
+    def cell_quality(self):
+        pass
+
+    def print(self):
+        print("Point:\n", self.node)
+        print("Cell:\n", self.ds.cell)
+        print("Edge:\n", self.ds.edge)
+        print("Face:\n", self.ds.face)
+        print("Face2cell:\n", self.ds.face2cell)
+
+

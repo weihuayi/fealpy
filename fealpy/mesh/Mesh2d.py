@@ -22,7 +22,7 @@ class Mesh2d():
         return self.ds.number_of_vertices_of_cells()
 
     def number_of_edges_of_cells(self):
-        return self.ds.number_of_vertices_of_cells()
+        return self.ds.number_of_edges_of_cells()
 
     def geo_dimension(self):
         return self.node.shape[1]

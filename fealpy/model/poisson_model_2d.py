@@ -359,6 +359,10 @@ class CrackData:
 
 
 class CosCosData:
+    """
+    -\Delta u = f
+    u = cos(pi*x)*cos(pi*y)
+    """
     def __init__(self):
         pass
 
@@ -405,7 +409,6 @@ class CosCosData:
         return val
 
 
-
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -416,6 +419,9 @@ class CosCosData:
         val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
         val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return val
+
+    def dirichlet(self, p):
+        return self.solution(p)
 
     def neuman(self, p):
         """ Neuman  boundary condition

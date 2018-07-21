@@ -1,4 +1,3 @@
-
 import numpy as np
 import sys
 
@@ -27,9 +26,10 @@ def show_solution(axes, mesh, uh):
 m = int(sys.argv[1])
 maxit = int(sys.argv[2])
 
-model = CosCosData()
+pde = CosCosData()
 h = 0.2
-mesh = triangle([0, 1, 0, 1], h, meshtype='polygon')
+box = [0, 1, 0, 1] # [0, 1]^2 domain
+mesh = triangle(box, h, meshtype='polygon')
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u - \Pi^\\nabla u_h||_0$ with p=1',
@@ -44,18 +44,17 @@ ps = [1, 2, 5]
 
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 integrator = mesh.integrator(7)
-vem = PoissonVEMModel(model, mesh, 1, integrator)
 for i in range(maxit):
     for j, p in enumerate(ps):
-        vem.reinit(mesh, p)
+        vem = PoissonVEMModel(pde, mesh, p, integrator)
         vem.solve()
         Ndof[i] = mesh.number_of_cells() 
         errorMatrix[j, i] = vem.L2_error()
         errorMatrix[j+3, i] = vem.H1_semi_error()
     if i < maxit - 1:
         h /= 2
-        mesh = triangle([0, 1, 0, 1], h, meshtype='polygon')
-        vem.reinit(mesh)
+        mesh = triangle(box, h, meshtype='polygon')
+
 print(errorMatrix)
 mesh.add_plot(plt, cellcolor='w')
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)

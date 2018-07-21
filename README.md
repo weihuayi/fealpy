@@ -10,6 +10,24 @@ package to support our teach and research work.
 We still have lot work to do. 
 
 
+## Install by pip 
+
+In `fealpy/`, run the following command 
+```
+sudo pip install .
+```
+whill copy the fealpy into `/usr/local/lib/python3.x/dist-packages/`
+
+
+
+In the `fealpy/`, run the following command:
+
+```
+sudo pip install -e .
+```
+which will create a link in `/usr/local/lib/python3.x/dist-packages/`.  
+
+
 ## Dependency
 
 ```
@@ -60,6 +78,23 @@ sudo -H pip3 install pymetis
 sudo -H pip3 install PySPH
 sudo -H pip3 install nipy
 sudo -H pip3 install pygmsh
+```
+
+
+## Anaconda 
+
+```
+conda install pyamg
+conda install -c conda-forge pytools
+```
+
+from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy, dowload 
+
+'MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl'
+
+```
+pip install msgpack
+pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
 ```
 
 ## Install Boost with python3 

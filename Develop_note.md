@@ -20,19 +20,22 @@
 
 The kinds of mesh :
 
-* IntervalMesh
-* TriangleMesh
-* QuadrilateralMesh
-* TetrahedronMesh
-* HexahedronMesh
-* PolygonMesh
-* PolyhedronMesh
-* StructureQuadMesh
-* StructureHexMesh
-* BlockStructureQuadMesh
+* IntervalMesh: 区间网格
+* TriangleMesh: 三角形网格
+* QuadrilateralMesh: 四边形网格
+* TetrahedronMesh: 四面体网格
+* HexahedronMesh: 六面体网格
+* PolygonMesh: 多边形网格
+* PolyhedronMesh: 多面体网格
+* StructureQuadMesh: 结构四边形网格
+* StructureHexMesh: 结构六面体体网格
+
+* BlockStructureQuadMesh: 
 * BlockStructureHexMesh
+
 * QuadtreeMesh
 * OctreeMesh
+
 * TritreeMesh
 * BitreeMesh
 
