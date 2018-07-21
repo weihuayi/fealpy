@@ -52,7 +52,7 @@ class Quadtree(QuadrangleMesh):
     def sizing_adaptive(self, eta):
         pass 
 
-    def refine(self, marker=None):
+    def refine(self, marker=None, u=None):
         if marker == None:
             idx = self.leaf_cell_index()
         else:
@@ -115,6 +115,14 @@ class Quadtree(QuadrangleMesh):
 
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1) 
             cellCenter = self.entity_barycenter('cell', isNeedCutCell)
+            if u is not None:
+                isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
+                eu = 0.5*np.sum(u[edge[isNeedCutEdge]], axis=1)
+                
+                cu = np.sum(u[cell[isNeedCutCell], :], axis=1)/4
+                Iu = np.concatenate((u, eu, cu), axis=0)
+            
+                
 
             NEC = len(edgeCenter)
             NCC = len(cellCenter)
@@ -141,9 +149,14 @@ class Quadtree(QuadrangleMesh):
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
-            return True
+            if u is None:
+                return True
+            else:
+                return (Iu,True)
         else:
             return False
+        
+
 
     def coarsen(self, marker):
         """ marker will marke the leaf cells which will be coarsen
@@ -183,7 +196,8 @@ class Quadtree(QuadrangleMesh):
             child = child[isRemainCell]
             parent = parent[isRemainCell]
 
-            # 子单元不需要保留的单元， 是新的叶子单元 
+            # 子单元不需要保留的单元， 是新的叶子单元
+
             childIdx, = np.nonzero(child[:, 0] > -1)
             isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0 
             child[childIdx[isNewLeafCell], :] = -1
