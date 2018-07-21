@@ -4,6 +4,8 @@ def mark(eta, theta, method='L2'):
     isMarked = np.zeros(len(eta), dtype=np.bool)
     if method is 'MAX':
         isMarked[eta > theta*np.max(eta)] = True
+    elif method is 'COARSEN':
+        isMarked[eta < theta*np.max(eta)] = True
     elif method is 'L2':
         eta = eta**2
         idx = np.argsort(eta)[-1::-1]
@@ -16,9 +18,10 @@ def mark(eta, theta, method='L2'):
     return markedCell
 
 class AdaptiveMarker():
-    def __init__(self, eta, theta=0.2):
+    def __init__(self, eta, theta=0.2, ctheta=0.1):
         self.eta = eta
         self.theta = theta
+        self.ctheta = ctheta
 
     def refine_marker(self, qtmesh):
         idx = qtmesh.leaf_cell_index()
@@ -26,4 +29,6 @@ class AdaptiveMarker():
         return idx[markedIdx]
 
     def coarsen_marker(self, qtmesh):
-        pass
+        idx = qtmesh.leaf_cell_index()
+        markedIdx = mark(self.eta, self.ctheta, method='COARSEN')
+        return idx[markedIdx]
