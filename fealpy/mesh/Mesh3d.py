@@ -32,42 +32,47 @@ class Mesh3d():
     def top_dimension(self):
         return 3
 
-    def entity(self, dim=3):
-        if dim == 3:
+    def entity(self, etype='cell'):
+        if etype in ['cell', 3]:
             return self.ds.cell
-        elif dim == 2:
+        elif etype in ['face', 2]:
             return self.ds.face
-        elif dim == 1:
+        elif etype in ['edge', 1]:
             return self.ds.edge
-        elif dim == 0:
+        elif etype in ['node', 0]:
             return self.node
         else:
-            raise ValueError('dim must be in [0, 1, 2, 3]!')
+            raise ValueError("`entitytype` is wrong!")
 
     def entity_measure(self, dim=3):
-        if dim == 3:
+        if etype in ['cell', 3]:
             return self.cell_volume()
-        elif dim == 2:
+        elif etype in ['face', 2]:
             return self.face_area()
-        elif dim == 1:
+        elif etype in ['edge', 1]:
             return self.edge_length()
+        elif etype in ['node', 0]:
+            NN = self.number_of_nodes()
+            return np.zeros(NN, dtype=np.float)
+        else:
+            raise ValueError("`entitytype` is wrong!")
 
-    def barycenter(self, entity='cell'):
+    def entity_barycenter(self, etype='cell'):
         node = self.node
-        if entity == 'cell':
+        if etype in ['cell', 3]:
             cell = self.ds.cell
             bc = np.sum(node[cell, :], axis=1).reshape(-1, 3)/cell.shape[1]
-        elif entity == 'face':
+        elif etype in ['face', 2]:
             face = self.ds.face
             bc = np.sum(node[face, :], axis=1).reshape(-1, 3)/face.shape[1]
-        elif entity == 'edge':
+        elif etype in ['edge', 1]:
             edge = self.ds.edge
             bc = np.sum(node[edge, :], axis=1).reshape(-1, 3)/edge.shape[1]
-        elif entity == 'node':
+        elif etype in  ['node', 0]:
             bc = node
         else:
-            pass
-            #TODO: raise a error
+            raise ValueError("`etype` is wrong!")
+
         return bc
 
     def face_unit_normal(self):

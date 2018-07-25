@@ -17,7 +17,7 @@ class LinearElasticityFEMModel:
         self.mesh = mesh
         self.tensorspace = HuZhangFiniteElementSpace(mesh, p)
         self.vectorspace = VectorLagrangeFiniteElementSpace(mesh, p-1, spacetype='D') 
-        self.cspace = LagrangeFiniteElementSpace(mesh, 1)
+        self.cspace = LagrangeFiniteElementSpace(mesh, 1) # linear space 
         self.dim = self.tensorspace.dim
         self.sh = self.tensorspace.function()
         self.uh = self.vectorspace.function()
@@ -59,7 +59,7 @@ class LinearElasticityFEMModel:
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
 
         # construct diag matrix D
-        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)
+        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)#TODO: aphi*phi? test it
         self.D = np.bincount(tcell2dof.flat, weights=D.flat, minlength=tgdof)
 
         # construct amg solver 
