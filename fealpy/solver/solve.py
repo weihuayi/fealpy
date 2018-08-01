@@ -7,7 +7,7 @@ import pyamg
 #import pylab
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
-    V = a.V
+    space = a.space
 
     start = timer()
     A = a.get_matrix()
@@ -48,7 +48,7 @@ def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     return A 
 
 def solve(dmodel, uh, dirichlet=None, solver='cg'):
-    V = uh.V
+    space = uh.space
     start = timer()
     A = dmodel.get_left_matrix()
     b = dmodel.get_right_vector()
@@ -86,7 +86,7 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
 
 def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,
         solver='direct'):
-    V = uh.V
+    space = uh.space
     start = timer()
     A = dmodel.get_left_matrix()
     b = dmodel.get_right_vector()
@@ -98,9 +98,9 @@ def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,
 
     AD = AD.tolil()
     start = timer()
-    lam = V.function()
+    lam = space.function()
 
-    gdof = V.number_of_global_dofs()
+    gdof = space.number_of_global_dofs()
     I = np.ones(gdof, dtype=np.bool)
     
     k = 0

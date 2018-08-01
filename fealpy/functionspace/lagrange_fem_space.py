@@ -75,12 +75,6 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p   # the degree of polynomial basis function
 
-        if p == 0:
-            if len(bc.shape) == 1:
-                return np.ones(1)
-            else:
-                return np.ones(bc.shape[0])
-
         dim = self.dim 
         multiIndex = self.dof.multiIndex 
 
@@ -119,11 +113,6 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p   # the degree of polynomial basis function
         dim = self.dim 
-        if p == 0:#TODO: make it correct 
-            if len(bc.shape) == 1:
-                return np.zeros((1, dim))
-            else:
-                return np.zeros((bc.shape[0], dim))
 
         multiIndex = self.dof.multiIndex 
 
