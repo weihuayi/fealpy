@@ -166,6 +166,7 @@ class LinearElasticityFEMModel:
         tgdof = self.tensorspace.number_of_global_dofs()
         vgdof = self.vectorspace.number_of_global_dofs()
         gdof = tgdof + vgdof
+        gdim = self.tensorspace.geo_dimension()
 
         r0 = r[0:tgdof]
         r1 = r[tgdof:]
@@ -178,10 +179,9 @@ class LinearElasticityFEMModel:
             u1[:] = spsolve(self.SL, r2 - self.SU@u1, permc_spec="NATURAL") 
 
         r3 = r2 - (self.SL@u1 + self.SU@u1)
-        u30 = self.ml.solve(self.PI.transpose()@r3[0::2], tol=1e-8, accel='cg')
-        u31 = self.ml.solve(self.PI.transpose()@r3[1::2], tol=1e-8, accel='cg')
-        u1[0::2] += self.PI@u30
-        u1[1::2] += self.PI@u31
+
+        for i in range(gdim):
+            u1[i::gdim] = self.PI@self.ml.solve(self.PI.transpose()@r3[i::gdim], tol=1e-8, accel='cg')
 
         for i in range(3):
             u1[:] = spsolve(self.SUT, r2 - self.SLT@u1, permc_spec="NATURAL")
