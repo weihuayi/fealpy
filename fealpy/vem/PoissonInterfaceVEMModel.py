@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..vemmodel import doperator
+from ..vem import doperator
 from .integral_alg import PolygonMeshIntegralAlg
 
 from ..quadrature import GaussLegendreQuadrture

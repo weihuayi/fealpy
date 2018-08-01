@@ -1,9 +1,9 @@
 import numpy as np
 import sys
 
-from fealpy.model.poisson_interface_model_2d import CircleInterfaceData, SquareInterfaceData
-from fealpy.model.poisson_interface_model_2d import FoldCurveInterfaceData
-from fealpy.vemmodel import PoissonInterfaceVEMModel
+from fealpy.pde.poisson_interface_model_2d import CircleInterfaceData, SquareInterfaceData
+from fealpy.pde.poisson_interface_model_2d import FoldCurveInterfaceData
+from fealpy.vem import PoissonInterfaceVEMModel
 from fealpy.mesh.adaptive_tools import AdaptiveMarker
 from fealpy.tools.show import showmultirate
 
@@ -57,7 +57,7 @@ for i in range(maxit):
     errorMatrix[1, i] = vem.uIuh_error() 
     errorMatrix[2, i] = vem.L2_error()
     errorMatrix[3, i] = vem.H1_semi_error()
-#    errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
         quadtree.uniform_refine()
         pmesh = alg.get_interface_mesh()
