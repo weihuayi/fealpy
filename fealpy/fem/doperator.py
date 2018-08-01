@@ -45,7 +45,7 @@ def source_vector(f, space, qf, measure, surface=None):
         pp, _ = surface.project(pp)
     fval = f(pp)
     phi = space.basis(bcs)
-    bb = np.einsum('i, ik, ij, k->kj', ws, fval, phi, measure)
+    bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, measure)
 
     cell2dof = space.dof.cell2dof
     gdof = space.number_of_global_dofs()

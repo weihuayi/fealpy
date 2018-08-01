@@ -1,9 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from ..quadrature import IntervalQuadrature
-from ..functionspace.barycentric_coordinates import bc_to_point, grad_lambda
-
 
 class DirichletBC:
     def __init__(self, V, g0, is_dirichlet_dof=None):
@@ -30,7 +27,7 @@ class DirichletBC:
         x = np.zeros((gdof,), dtype=np.float)
 
         ipoints = V.interpolation_points()
-        x[isBdDof] = g0(ipoints[isBdDof,:])
+        x[isBdDof] = g0(ipoints[isBdDof])
         b -= A@x
 
         bdIdx = np.zeros(gdof, dtype=np.int)

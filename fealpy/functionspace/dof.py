@@ -17,6 +17,13 @@ class CPLFEMDof1d():
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex 
 
+    def boundary_dof(self):
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        idx = self.mesh.ds.boundary_node_index()
+        isBdDof[idx] = True
+        return isBdDof
+
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh

@@ -3,6 +3,8 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
+from ..quadrature import IntervalQuadrature
+
 class IntervalMesh():
     def __init__(self, node, cell):
         self.node = node
@@ -12,6 +14,10 @@ class IntervalMesh():
 
         self.nodedata = {}
         self.celldata = {}
+
+
+    def integrator(self, k):
+        return IntervalQuadrature(k)
 
     def number_of_nodes(self):
         return self.ds.NN
@@ -26,6 +32,31 @@ class IntervalMesh():
             return self.ds.NN
         else:
             raise ValueError("`dim` must be 0 or 1!")
+
+    def entity(self, etype=1):
+        if etype in ['cell', 1]:
+            return self.ds.cell
+        elif etype in ['node', 0]:
+            return self.node
+        else:
+            raise ValueError("`entitytype` is wrong!")
+
+    def grad_lambda(self):
+        node = self.node
+        cell = self.ds.cell
+        NC = self.number_of_cells()
+        v = node[cell[:, 1]] - node[cell[:, 0]]
+        dim = self.geo_dimension()
+        Dlambda = np.zeros((NC, 2, dim), dtype=np.float)
+        if dim == 1:
+            Dlambda[:, 0, 0] = -1/v
+            Dlambda[:, 1, 0] = 1/v
+        else:
+            h2 = np.sum(v**2, axis=-1)
+            v /=h2.reshape(-1, 1)
+            Dlambda[:, 0, :] = -v
+            Dlambda[:, 1, :] = v
+        return Dlambda
 
     def geo_dimension(self):
         node = self.node
@@ -64,11 +95,29 @@ class IntervalMesh():
         else:
             return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
 
-    def bc_to_points(self, bc):
+    def bc_to_point(self, bc):
         node = self.node
         cell = self.ds.cell
         p = np.einsum('...j, ij->...i', bc, node[cell])
-        return p 
+        return p
+
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            cell = self.entity('cell')
+            cell2newNode = np.arange(NN, NN+NC)
+            newNode = (node[cell[:,0]] + node[cell[:,1]])/2
+            #self.node = np.concatenate((node, newNode))
+            self.node = np.r_['-1', node, newNode] 
+            p = np.r_['-1', cell, cell2newNode.reshape(-1,1)] 
+            cell = np.r_['0', p[:, [0, 2]], p[:, [2, 1]]] 
+            NN = self.node.shape[0]
+            self.ds.reinit(NN, cell)
+
+
+
 
     def add_plot(self, plot,
             nodecolor='k', cellcolor='k',
@@ -119,7 +168,6 @@ class IntervalMesh():
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
-
 class IntervalMeshDataStructure():
     def __init__(self, NN, cell):
         self.NN = NN
@@ -127,7 +175,7 @@ class IntervalMeshDataStructure():
         self.cell = cell
         self.construct()
 
-    def reinit(self, N, cell):
+    def reinit(self, NN, cell):
         self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
@@ -184,3 +232,13 @@ class IntervalMeshDataStructure():
         isBdNode = self.boundary_node_flag()
         isBdCell[node2cell[isBdNode, 0]] = True
         return isBdCell 
+
+    def boundary_node_index(self):
+        isBdPoint = self.boundary_node_flag()
+        idx, = np.nonzero(isBdPoint)
+        return idx 
+
+    def boundary_cell_index(self):
+        isBdCell = self.boundary_cell_flag()
+        idx, = np.nonzero(isBdCell)
+        return idx 

@@ -44,7 +44,7 @@ class Mesh3d():
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def entity_measure(self, etype='cell'):
+    def entity_measure(self, etype=3):
         if etype in ['cell', 3]:
             return self.cell_volume()
         elif etype in ['face', 2]:

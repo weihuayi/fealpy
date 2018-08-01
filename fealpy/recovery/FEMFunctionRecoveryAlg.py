@@ -19,8 +19,8 @@ class FEMFunctionRecoveryAlg():
         pass
 
     def simple_average(self, uh):
-        V = uh.V
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
@@ -28,13 +28,13 @@ class FEMFunctionRecoveryAlg():
 
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         rguh[:] = np.asarray(node2cell@guh)/valence.reshape(-1, 1)
         return rguh
 
     def area_average(self, uh):
-        V = uh.V
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
@@ -44,13 +44,13 @@ class FEMFunctionRecoveryAlg():
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
 
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         rguh[:] = np.asarray(node2cell@(guh*area.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
 
     def harmonic_average(self, uh):
-        V = uh.V
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
@@ -60,13 +60,13 @@ class FEMFunctionRecoveryAlg():
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
 
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         rguh[:] = np.asarray(node2cell@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
     
     def distance_harmonic_average(self, uh):
-        V = uh.V
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
         NN = mesh.number_of_nodes()
 
@@ -79,7 +79,7 @@ class FEMFunctionRecoveryAlg():
         v = bp[:, np.newaxis, :] - node[cell, :]
         d = 1/np.sqrt(np.sum(v**2, axis=-1))
         dsum = np.bincount(cell.flat, weights=d.flat, minlength=NN)
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         for i in range(GD):
             val = guh[:, [i]]*d
             rguh[:, i] = np.bincount(cell.flat, weights=val.flat,
@@ -87,8 +87,8 @@ class FEMFunctionRecoveryAlg():
         return rguh
 
     def angle_average(self, uh):
-        V = uh.V
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
         NN = mesh.number_of_nodes()
 
@@ -99,7 +99,7 @@ class FEMFunctionRecoveryAlg():
         cell = mesh.entity('cell')
         angle = mesh.angle()
         asum = np.bincount(cell.flat, weights=angle.flat, minlength=NN)
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         for i in range(GD):
             val = guh[:, [i]]*angle
             rguh[:, i] = np.bincount(cell.flat, weights=val.flat, minlength=NN)/asum
@@ -107,10 +107,10 @@ class FEMFunctionRecoveryAlg():
 
 
     def SCR(self,uh):
-        V = uh.V 
-        mesh = V.mesh
+        space = uh.space 
+        mesh = space.mesh
         GD = mesh.geo_dimension()
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
           
         cell = mesh.ds.cell
         node = mesh.node
@@ -144,10 +144,10 @@ class FEMFunctionRecoveryAlg():
         return rguh
 
     def ZZ(self, uh):
-        V = uh.V 
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
        
           
 
@@ -210,10 +210,10 @@ class FEMFunctionRecoveryAlg():
 
 
     def PPR(self,uh):
-        V = uh.V 
-        mesh = V.mesh
+        space = uh.space
+        mesh = space.mesh
         GD = mesh.geo_dimension()
-        rguh = V.function(dim=GD)
+        rguh = space.function(dim=GD)
         
         cell = mesh.ds.cell
         node = mesh.node
