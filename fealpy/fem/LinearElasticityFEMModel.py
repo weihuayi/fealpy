@@ -28,20 +28,6 @@ class LinearElasticityFEMModel:
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
         self.count = 0
 
-    def reinit(self, mesh, p=None):
-        if p is None:
-            p = self.tensorspace.p
-        self.count += 1
-        self.mesh = mesh
-        self.tensorspace = HuZhangFiniteElementSpace(mesh, p)
-        self.vectorspace = VectorLagrangeFiniteElementSpace(mesh, p-1) 
-        self.cspace = LagrangeFiniteElementSpace(mesh, 1)
-        self.sh = self.tensorspace.function()
-        self.sI = self.tensorspace.interpolation(self.model.stress)
-        self.uh = self.vectorspace.function()
-        self.measure = mesh.entity_measure()
-        self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
-
     def get_left_matrix(self):
         tspace = self.tensorspace
         vspace = self.vectorspace
@@ -70,7 +56,6 @@ class LinearElasticityFEMModel:
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         A = T@A@T + Tbd
-        print(A)
         self.ml = pyamg.ruge_stuben_solver(A)  
 
         # Get interpolation matrix 
@@ -80,7 +65,8 @@ class LinearElasticityFEMModel:
         c2d0 = self.vectorspace.dof.cell2dof
         c2d1 = self.cspace.cell_to_dof()
 
-        I = np.einsum('ij, k->ijk', c2d0, np.ones(3))
+        gdim = self.tensorspace.geo_dimension()
+        I = np.einsum('ij, k->ijk', c2d0, np.ones(gdim+1))
         J = np.einsum('ik, j->ijk', c2d1, np.ones(len(bc)))
         cgdof = self.cspace.number_of_global_dofs()
         fgdof = self.vectorspace.number_of_global_dofs()/self.mesh.geo_dimension()
@@ -139,6 +125,8 @@ class LinearElasticityFEMModel:
         vgdof = self.vectorspace.number_of_global_dofs()
         gdof = tgdof + vgdof
 
+        start = timer()
+        print("Construting linear system ......!")
         self.M, self.B = self.get_left_matrix()
         S = self.B@spdiags(1/self.D, 0, tgdof, tgdof)@self.B.transpose()
         self.SL = tril(S).tocsc()
@@ -151,6 +139,10 @@ class LinearElasticityFEMModel:
 
         AA = bmat([[self.M, self.B.transpose()], [self.B, None]]).tocsr()
         bb = np.r_[np.zeros(tgdof), b]
+        end = timer()
+        print("Construct linear system time:", end - start)
+
+
 
         start = timer()
         P = LinearOperator((gdof, gdof), matvec=self.linear_operator)
@@ -163,6 +155,8 @@ class LinearElasticityFEMModel:
         self.uh[:] = x[tgdof:]
 
     def linear_operator(self, r):
+        self.count += 1
+        print('Step :', self.count)
         tgdof = self.tensorspace.number_of_global_dofs()
         vgdof = self.vectorspace.number_of_global_dofs()
         gdof = tgdof + vgdof
@@ -179,7 +173,6 @@ class LinearElasticityFEMModel:
             u1[:] = spsolve(self.SL, r2 - self.SU@u1, permc_spec="NATURAL") 
 
         r3 = r2 - (self.SL@u1 + self.SU@u1)
-
         for i in range(gdim):
             u1[i::gdim] = self.PI@self.ml.solve(self.PI.transpose()@r3[i::gdim], tol=1e-8, accel='cg')
 

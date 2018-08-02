@@ -10,7 +10,6 @@ def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
-
     gdof = space.number_of_global_dofs()
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A

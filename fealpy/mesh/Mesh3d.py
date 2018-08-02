@@ -92,11 +92,18 @@ class Mesh3d():
         length = np.sqrt(np.square(v).sum(axis=1))
         return v/length.reshape(-1,1)
 
-    def add_plot(self, axes,
+    def add_plot(self, plot,
             nodecolor='k', edgecolor='k',
              aspect='equal',
             linewidths=2, markersize=20,  
             showaxis=False, alpha=0.8):
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca() 
+        else:
+            axes = plot
 
         return show_mesh_3d(axes, self,
                 nodecolor=nodecolor, edgecolor=edgecolor,
