@@ -3,10 +3,9 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
-from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..femmodel import doperator 
+from ..fem import doperator 
 from .SurfaceIntegralAlg import SurfaceIntegralAlg
 
 class SurfacePoissonFEMModel(object):
@@ -22,17 +21,6 @@ class SurfacePoissonFEMModel(object):
         self.integrator = self.mesh.integrator(k)
         self.area = self.V.mesh.area(self.integrator)
         self.error = SurfaceIntegralAlg(self.integrator, self.mesh, self.area)
-
-    def reinit(self, mesh, p=None):
-        if p is None:
-            p = self.V.p
-        self.V = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p) 
-        self.mesh = self.V.mesh
-        self.uh = self.V.function() 
-        self.uI = self.V.interpolation(self.pde.solution)
-        self.area = self.V.mesh.area(self.integrator)
-        self.error.area = self.area 
-        self.error.mesh = self.mesh
 
     def recover_estimate(self):
         if self.V.p > 1:
@@ -82,17 +70,17 @@ class SurfacePoissonFEMModel(object):
         isBdDof[0] = True
         return isBdDof
 
-    def l2_error(self):
+    def get_l2_error(self):
         u = self.pde.solution
         uh = self.uh
         return self.error.l2_error(u, uh)
 
-    def L2_error(self):
+    def get_L2_error(self):
         u = self.pde.solution
         uh = self.uh.value
         return self.error.L2_error(u, uh)
 
-    def H1_semi_error(self):
+    def get_H1_semi_error(self):
         gu = self.pde.gradient
         guh = self.uh.grad_value
         return self.error.H1_semi_error(gu, guh)

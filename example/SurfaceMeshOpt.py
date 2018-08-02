@@ -12,14 +12,14 @@ from fealpy.mesh.TriangleMesh import TriangleMesh
 
 surface = Sphere()
 mesh = surface.init_mesh()
-mesh.uniform_refine(1, surface)
+mesh.uniform_refine(3, surface)
 
 c, R = mesh.circumcenter()
 
 f = pl.figure()
 axes = a3.Axes3D(f)
 mesh.add_plot(axes, showaxis=True)
-mesh.find_point(axes, point=c, markersize=300)
+mesh.find_node(axes, node=c, markersize=300)
 pl.show()
 
 
