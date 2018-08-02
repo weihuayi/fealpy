@@ -43,23 +43,6 @@ class PoissonVEMModel():
 
         self.mat = doperator.basic_matrix(self.vemspace, self.area)
 
-    def reinit(self, mesh, p=None):
-        if p is None:
-            p = self.vemspace.p
-        self.vemspace = VirtualElementSpace2d(mesh, p) 
-        self.mesh = self.vemspace.mesh
-        self.uh = self.vemspace.function() 
-        self.area = self.vemspace.smspace.area
-
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator, 
-                self.mesh, 
-                area=self.area, 
-                barycenter=self.vemspace.smspace.barycenter)
-        self.uI = self.vemspace.interpolation(self.pde.solution, self.integralalg.integral)
-
-        self.mat = doperator.basic_matrix(self.vemspace, self.area)
-
     def project_to_smspace(self, uh=None):
         p = self.vemspace.p
         cell2dof, cell2dofLocation = self.vemspace.dof.cell2dof, self.vemspace.dof.cell2dofLocation

@@ -71,11 +71,11 @@ class SurfaceIntegralAlg():
 #        return np.sqrt(e.sum()) 
 
     def l2_error(self, u, uh):
-        uI = uh.V.interpolation(u)
-        gdof = uh.V.number_of_global_dofs()
+        uI = uh.space.interpolation(u)
+        gdof = uh.space.number_of_global_dofs()
         return np.sqrt(np.sum((uI - uh)**2)/gdof)
 
     def infty_error(self, u, uh):
-        uI = uh.V.interpolation(u)
-        gdof = uh.V.number_of_global_dofs()
+        uI = uh.space.interpolation(u)
+        gdof = uh.space.number_of_global_dofs()
         return np.max(np.abs(uI - uh))
