@@ -28,6 +28,29 @@ class LinearElasticityFEMModel:
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
         self.count = 0
 
+    def precondieitoner(self):
+        tspace = self.tensorspace
+        vspace = self.vectorspace
+
+        bcs, ws = self.integrator.quadpts, self.integrator.weights
+        phi = tspace.basis(bcs)
+
+        # construct diag matrix D
+        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)#TODO: aphi*phi? test it
+
+        tcell2dof = tspace.cell_to_dof()
+        self.D = np.bincount(tcell2dof.flat, weights=D.flat, minlength=tgdof)
+
+        # construct amg solver 
+        A = stiff_matrix(self.cspace, self.integrator, self.measure)
+        isBdDof = self.cspace.boundary_dof()
+        bdIdx = np.zeros((A.shape[0], ), np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        A = T@A@T + Tbd
+        self.ml = pyamg.ruge_stuben_solver(A)  
+
     def get_left_matrix(self):
         tspace = self.tensorspace
         vspace = self.vectorspace
@@ -43,20 +66,6 @@ class LinearElasticityFEMModel:
         J = I.swapaxes(-1, -2)
         tgdof = tspace.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
-
-        # construct diag matrix D
-        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)#TODO: aphi*phi? test it
-        self.D = np.bincount(tcell2dof.flat, weights=D.flat, minlength=tgdof)
-
-        # construct amg solver 
-        A = stiff_matrix(self.cspace, self.integrator, self.measure)
-        isBdDof = self.cspace.boundary_dof()
-        bdIdx = np.zeros((A.shape[0], ), np.int)
-        bdIdx[isBdDof] = 1
-        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        A = T@A@T + Tbd
-        self.ml = pyamg.ruge_stuben_solver(A)  
 
         # Get interpolation matrix 
         NC = self.mesh.number_of_cells()
@@ -121,6 +130,9 @@ class LinearElasticityFEMModel:
         self.uh[:] = x[tgdof:]
 
     def fast_solve(self):
+
+        self.precondieitoner()
+
         tgdof = self.tensorspace.number_of_global_dofs()
         vgdof = self.vectorspace.number_of_global_dofs()
         gdof = tgdof + vgdof
@@ -155,8 +167,6 @@ class LinearElasticityFEMModel:
         self.uh[:] = x[tgdof:]
 
     def linear_operator(self, r):
-        self.count += 1
-        print('Step :', self.count)
         tgdof = self.tensorspace.number_of_global_dofs()
         vgdof = self.vectorspace.number_of_global_dofs()
         gdof = tgdof + vgdof

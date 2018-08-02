@@ -36,14 +36,15 @@ errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',
              '$||u - u_h||_{0}$',
              '$||\sigma - \sigma_I ||_{0}$',
-             '$||div(\sigma - \sigma_I)||_{0}$'
+             '$||div(\sigma - \sigma_I)||_{0}$',
              ]
 Ndof = np.zeros((maxit,))
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     fem = LinearElasticityFEMModel(mesh, pde, p, integrator)
-    fem.fast_solve()
+    fem.solve()
+    #fem.fast_solve()
     tgdof = fem.tensorspace.number_of_global_dofs()
     vgdof = fem.vectorspace.number_of_global_dofs()
     gdof = tgdof + vgdof
@@ -54,5 +55,5 @@ for i in range(maxit):
         
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
-showmultirate(plt, 1, Ndof, errorMatrix, errorType)
+showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()
