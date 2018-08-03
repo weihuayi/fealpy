@@ -81,7 +81,7 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
 
     print("Solve time:", end-start)
 
-    return A, b 
+    return AD, b 
 
 
 def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,

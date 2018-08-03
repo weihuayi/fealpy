@@ -4,6 +4,8 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     gphi = space.grad_basis(bcs)
+
+    # Compute the element sitffness matrix
     A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure)
     
     cell2dof = space.cell_to_dof()
@@ -11,6 +13,8 @@ def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
     J = I.swapaxes(-1, -2)
     gdof = space.number_of_global_dofs()
+
+    # Construct the stiffness matrix
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
 

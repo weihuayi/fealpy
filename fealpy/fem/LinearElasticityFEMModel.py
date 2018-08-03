@@ -51,6 +51,20 @@ class LinearElasticityFEMModel:
         A = T@A@T + Tbd
         self.ml = pyamg.ruge_stuben_solver(A)  
 
+        # Get interpolation matrix 
+        NC = self.mesh.number_of_cells()
+        bc = self.vectorspace.dof.multiIndex/self.vectorspace.p
+        val = np.tile(bc, (NC, 1))
+        c2d0 = self.vectorspace.dof.cell2dof
+        c2d1 = self.cspace.cell_to_dof()
+
+        gdim = self.tensorspace.geo_dimension()
+        I = np.einsum('ij, k->ijk', c2d0, np.ones(gdim+1))
+        J = np.einsum('ik, j->ijk', c2d1, np.ones(len(bc)))
+        cgdof = self.cspace.number_of_global_dofs()
+        fgdof = self.vectorspace.number_of_global_dofs()/self.mesh.geo_dimension()
+        self.PI = csr_matrix((val.flat, (I.flat, J.flat)), shape=(fgdof, cgdof))
+
     def get_left_matrix(self):
         tspace = self.tensorspace
         vspace = self.vectorspace
@@ -67,20 +81,6 @@ class LinearElasticityFEMModel:
         tgdof = tspace.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
 
-        # Get interpolation matrix 
-        NC = self.mesh.number_of_cells()
-        bc = self.vectorspace.dof.multiIndex/self.vectorspace.p
-        val = np.tile(bc, (NC, 1))
-        c2d0 = self.vectorspace.dof.cell2dof
-        c2d1 = self.cspace.cell_to_dof()
-
-        gdim = self.tensorspace.geo_dimension()
-        I = np.einsum('ij, k->ijk', c2d0, np.ones(gdim+1))
-        J = np.einsum('ik, j->ijk', c2d1, np.ones(len(bc)))
-        cgdof = self.cspace.number_of_global_dofs()
-        fgdof = self.vectorspace.number_of_global_dofs()/self.mesh.geo_dimension()
-        self.PI = csr_matrix((val.flat, (I.flat, J.flat)), shape=(fgdof, cgdof))
-
 
         dphi = tspace.div_basis(bcs)
         uphi = vspace.basis(bcs)
@@ -91,7 +91,6 @@ class LinearElasticityFEMModel:
         I = np.einsum('ij, k->ijk', vspace.cell_to_dof(), np.ones(tldof))
         J = np.einsum('ij, k->ikj', tspace.cell_to_dof(), np.ones(vldof))
         B = csr_matrix((B.flat, (I.flat, J.flat)), shape=(vgdof, tgdof))
-
         return  M, B
 
     def get_right_vector(self):
@@ -155,7 +154,6 @@ class LinearElasticityFEMModel:
         print("Construct linear system time:", end - start)
 
 
-
         start = timer()
         P = LinearOperator((gdof, gdof), matvec=self.linear_operator)
         x, exitCode = gmres(AA, bb, M=P, tol=1e-8)
@@ -213,6 +211,5 @@ class LinearElasticityFEMModel:
 
         dsI = self.sI.div_value
         e4 = self.integralalg.L2_error(ds, dsI)
-
 
         return e0, e1, e2, e3, e4

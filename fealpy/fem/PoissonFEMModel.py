@@ -46,7 +46,8 @@ class PoissonFEMModel(object):
 
     def solve(self):
         bc = DirichletBC(self.femspace, self.pde.dirichlet)
-        self.A, b= solve(self, self.uh, dirichlet=bc, solver='direct')
+        AD, b= solve(self, self.uh, dirichlet=bc, solver='direct')
+        return AD, b
 
     
     def get_l2_error(self):

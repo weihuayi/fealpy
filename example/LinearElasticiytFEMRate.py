@@ -27,8 +27,7 @@ if m == 4:
 #mesh = rectangledomainmesh(box, nx=n, ny=n)
 
 mesh = pde.init_mesh(n)
-integrator = mesh.integrator(7)
-
+integrator = mesh.integrator(8)
 
 maxit = 4 
 
@@ -55,5 +54,5 @@ for i in range(maxit):
         
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
-showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+showmultirate(plt, 1, Ndof, errorMatrix, errorType)
 plt.show()
