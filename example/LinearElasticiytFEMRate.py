@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from fealpy.pde.linear_elasticity_model import PolyModel3d, Model2d, SimplifyModel2d, HuangModel2d
+from fealpy.pde.linear_elasticity_model import PolyModel3d, Model2d, HuangModel2d
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.fem.LinearElasticityFEMModel import LinearElasticityFEMModel 
 from fealpy.tools.show import showmultirate
@@ -27,7 +27,7 @@ if m == 4:
 #mesh = rectangledomainmesh(box, nx=n, ny=n)
 
 mesh = pde.init_mesh(n)
-integrator = mesh.integrator(8)
+integrator = mesh.integrator(7)
 
 maxit = 4 
 
@@ -42,8 +42,8 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     fem = LinearElasticityFEMModel(mesh, pde, p, integrator)
-    fem.solve()
-    #fem.fast_solve()
+    #fem.solve()
+    fem.fast_solve()
     tgdof = fem.tensorspace.number_of_global_dofs()
     vgdof = fem.vectorspace.number_of_global_dofs()
     gdof = tgdof + vgdof

@@ -6,7 +6,7 @@ class PolyModel3d():
         self.mu = mu
     def init_mesh(self, n=2):
         from ..mesh import TetrahedronMesh
-        point = np.array([
+        node = np.array([
             [0, 0, 0],
             [1, 0, 0], 
             [1, 1, 0],
@@ -23,7 +23,7 @@ class PolyModel3d():
             [0,7,4,6],
             [0,3,7,6],
             [0,2,3,6]], dtype=np.int)
-        mesh = TetrahedronMesh(point, cell)
+        mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
 
@@ -70,8 +70,8 @@ class PolyModel3d():
         lam = self.lam
         mu = self.mu
         aphi = phi.copy()
-        idx = np.arange(3)
-        aphi[..., idx, idx] -= (lam/(2*mu+3*lam)*aphi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
+        t = np.sum(aphi[..., 0:3], axis=-1)
+        aphi[..., 0:3] -= lam/(2*mu+3*lam)*t[..., np.newaxis]
         aphi /= 2*mu
         return aphi
 
@@ -163,7 +163,8 @@ class HuangModel2d():
         lam = self.lam
         mu = self.mu
         aphi = phi.copy()
-        aphi[..., range(2), range(2)] -= (lam/(2*mu+2*lam)*phi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
+        t = np.sum(aphi[..., 0:2], axis=-1)
+        aphi[..., 0:2] -= lam/(2*mu+2*lam)*t[..., np.newaxis]
         aphi /= 2*mu
         return aphi
 
@@ -203,20 +204,14 @@ class Model2d():
 
     def init_mesh(self, n=4):
         from ..mesh import TriangleMesh
-        point = np.array([
+        node = np.array([
             (0, 0),
             (1, 0),
             (1, 1),
             (0, 1)], dtype=np.float)
         cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
 
-#        point = np.array([
-#            (0, 0),
-#            (1, 0),
-#            (0, 1)], dtype=np.float)
-#        cell = np.array([(0, 1, 2)], dtype=np.int)
-
-        mesh = TriangleMesh(point, cell)
+        mesh = TriangleMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh 
 
@@ -260,7 +255,8 @@ class Model2d():
         lam = self.lam
         mu = self.mu
         aphi = phi.copy()
-        aphi[..., range(2), range(2)] -= (lam/(2*mu+2*lam)*phi.trace(axis1=-2, axis2=-1))[..., np.newaxis]
+        t = np.sum(aphi[..., 0:2], axis=-1)
+        aphi[..., 0:2] -= lam/(2*mu+2*lam)*t[..., np.newaxis]
         aphi /= 2*mu
         return aphi
 
@@ -293,73 +289,3 @@ class Model2d():
         val[..., 1] -= 2*mu*(-e*t0*x*y/2 + e*t0*x/2 - e*t0*y/2 + e*t0/2 - e*x*y*(-x + 1)/2 + e*x*y*(-y + 1)/2 + e*x*y/2 - e*x*(-y + 1)/2 - e*y*(-x + 1)/2 - pi**2*ss/2)
         return val
 
-class SimplifyModel2d():
-    def __init__(self):
-        pass
-
-    def init_mesh(self, n=4):
-        from ..mesh import TriangleMesh
-        point = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float)
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-
-        mesh = TriangleMesh(point, cell)
-        mesh.uniform_refine(n)
-        return mesh 
-
-    def displacement(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = np.exp(x - y)*x*(1 - x)*y*(1 - y)
-        val[..., 1] = np.sin(pi*x)*np.sin(pi*y)
-        return val
-
-    def grad_displacement(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-
-        sin = np.sin
-        cos = np.cos
-        pi = np.pi
-        e = np.exp(x - y)
-
-        shape = p.shape + (2, )
-        val = np.zeros(shape, dtype=np.float)
-        val[..., 0, 0] = e*(x*y*(-x + 1)*(-y + 1) - x*y*(-y + 1) + y*(-x + 1)*(-y + 1))
-        val[..., 0, 1] = e*(-x*y*(-x + 1)*(-y + 1) - x*y*(-x + 1) + x*(-x + 1)*(-y + 1))
-        val[..., 1, 0] = pi*sin(pi*y)*cos(pi*x)
-        val[..., 1, 1] = pi*sin(pi*x)*cos(pi*y)
-        return val
-
-    def stress(self, p):
-        du = self.grad_displacement(p)
-        val = du + du.swapaxes(-1, -2)
-        return val
-
-    def div_stress(self, p):
-        return -self.source(p)
-
-    def source(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-
-        sin = np.sin
-        cos = np.cos
-        pi = np.pi
-
-
-        ss = sin(pi*x)*sin(pi*y)
-        cc = cos(pi*x)*cos(pi*y)
-        e = np.exp(x - y)
-        t0 = (-x + 1)*(-y + 1)
-
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = -pi**2*cc - 3*e*t0*x*y + 2*e*t0*x - 4*e*t0*y - 2*e*x*y*(-x + 1) + 4*e*x*y*(-y + 1) + 2*e*x*(-x + 1) + 4*e*y*(-y + 1)
-        val[..., 1] = e*t0*x*y - e*t0*x + e*t0*y - e*t0 + e*x*y*(-x + 1) - e*x*y*(-y + 1) - e*x*y + e*x*(-y + 1) + e*y*(-x + 1) + 3*pi**2*ss 
-
-        return val

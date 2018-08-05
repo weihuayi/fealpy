@@ -26,9 +26,17 @@ class HuZhangFiniteElementSpace():
         if gdim == 2:
             idx = np.array([(0, 0), (1, 1), (0, 1)])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
+            self.T = np.array([[(1, 0), (0, 0)], [(0, 0), (0, 1)], [(0, 1), (1, 0)]])
         elif gdim == 3:
             idx = np.array([(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)])
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
+            self.T = np.array([
+                [(1, 0, 0), (0, 0, 0), (0, 0, 0)], 
+                [(0, 0, 0), (0, 1, 0), (0, 0, 0)],
+                [(0, 0, 0), (0, 0, 0), (0, 0, 1)],
+                [(0, 0, 0), (0, 0, 1), (0, 1, 0)],
+                [(0, 0, 1), (0, 0, 0), (1, 0, 0)],
+                [(0, 1, 0), (1, 0, 0), (0, 0, 0)]])
 
         t = mesh.edge_unit_tagent() 
         _, _, frame = np.linalg.svd(t[:, np.newaxis, :]) # get the axis frame on the edge by svd
@@ -81,7 +89,7 @@ class HuZhangFiniteElementSpace():
 
         if (p > 3) and (gdim == 3):
             ldof = self.dof.number_of_local_dofs()
-            V = mesh.nubmer_of_nodes_of_cells() # 单元顶点的个数
+            V = mesh.number_of_nodes_of_cells() # 单元顶点的个数
             cdof = ldof - E*edof - F*fdof - V 
             gdof += tdim*cdof*NC
         return gdof 
@@ -127,8 +135,8 @@ class HuZhangFiniteElementSpace():
         base1 = 0
         idx, = np.nonzero(dofFlags[1]) # 边内部自由度的编号
         if len(idx) > 0:
-            base0 += N # 这是标量编号的新起点
-            base1 += tdim*N # 这是张量自由度编号的新起点
+            base0 += NN # 这是标量编号的新起点
+            base1 += tdim*NN # 这是张量自由度编号的新起点
             #  0号局部自由度对应的是切向不连续的自由度, 留到后面重新编号
             cell2dof[:, idx, 1:] = base1 + (tdim-1)*(c2d[:, idx] - base0) + np.arange(tdim - 1)
 
@@ -308,7 +316,7 @@ class HuZhangFiniteElementSpace():
             for i, isDof in enumerate(isFaceDof.T):
                 phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TF[cell2face[:, i]])
         # The shape of `phi` should be (NQ, NC, ldof*tdim, tdim)?
-        shape = dphi.shape[:-3] + (-1, tdim)
+        shape = phi.shape[:-3] + (-1, tdim)
         return phi.reshape(shape)
 
     def div_basis(self, bc, cellidx=None):
@@ -338,7 +346,7 @@ class HuZhangFiniteElementSpace():
             VAL = np.einsum('ijk, kmn->ijmn', self.TE[cell2edge[:, i]], self.T)
             dphi[..., isDof, :, :] = np.einsum('...ikm, ijmn->...ikjn', gphi[..., isDof, :], VAL) 
 
-        if dim == 3:
+        if gdim == 3:
             if cellidx is None:
                 cell2face = mesh.ds.cell_to_face()
             else:
@@ -360,6 +368,7 @@ class HuZhangFiniteElementSpace():
             uh = uh[cell2dof]
         else:
             uh = uh[cell2dof[cellidx]]
+        phi = np.einsum('...jk, kmn->...jmn', phi, self.T)
         val = np.einsum('...ijmn, ij->...imn', phi, uh) 
         return val 
 
@@ -377,13 +386,13 @@ class HuZhangFiniteElementSpace():
     def interpolation(self, u):
 
         mesh = self.mesh;
-        dim = self.geo_dimension()
+        gdim = self.geo_dimension()
         tdim = self.tensor_dimension()
 
-        if dim == 2:
-            idx = np.array([(0, 0), (0, 1), (1, 1)])
-        elif dim == 3:
-            idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
+        if gdim == 2:
+            idx = np.array([(0, 0), (1, 1), (0, 1)])
+        elif gdim == 3:
+            idx = np.array([(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)])
 
         ipoint = self.dof.interpolation_points()
         c2d = self.dof.cell2dof
@@ -404,7 +413,7 @@ class HuZhangFiniteElementSpace():
             TE = np.einsum('ijk, kmn->ijmn', self.TE[cell2edge[:, i]], self.T)
             uI[cell2dof[:, isDof, :]] = np.einsum('ikmn, ijmn->ikj', val[:, isDof, :, :], TE)
 
-        if dim == 3:
+        if gdim == 3:
             cell2face = mesh.ds.cell_to_face()
             isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):

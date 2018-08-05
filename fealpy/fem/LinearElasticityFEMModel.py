@@ -29,14 +29,22 @@ class LinearElasticityFEMModel:
         self.count = 0
 
     def precondieitoner(self):
+
         tspace = self.tensorspace
         vspace = self.vectorspace
+        tgdof = tspace.number_of_global_dofs()
+
+        gdim = tspace.geo_dimension()
 
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
 
         # construct diag matrix D
-        D = np.einsum('i, ijkmn, j->jk', ws, phi**2, self.measure)#TODO: aphi*phi? test it
+        if gdim == 2:
+            d = np.array([1, 1, 2])
+        elif gdim == 3:
+            d = np.array([1, 1, 1, 2, 2, 2])
+        D = np.einsum('i, ijkm, m, ijkm, j->jk', ws, phi, d, phi, self.measure) 
 
         tcell2dof = tspace.cell_to_dof()
         self.D = np.bincount(tcell2dof.flat, weights=D.flat, minlength=tgdof)
@@ -49,7 +57,7 @@ class LinearElasticityFEMModel:
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         A = T@A@T + Tbd
-        self.ml = pyamg.ruge_stuben_solver(A)  
+        self.ml = pyamg.ruge_stuben_solver(A) # 这里要求必须有网格内部节点 
 
         # Get interpolation matrix 
         NC = self.mesh.number_of_cells()
@@ -69,18 +77,25 @@ class LinearElasticityFEMModel:
         tspace = self.tensorspace
         vspace = self.vectorspace
 
+        gdim = tspace.geo_dimension()
+
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
         aphi = self.model.compliance_tensor(phi)
         
+        if gdim == 2:
+            d = np.array([1, 1, 2])
+        elif gdim == 3:
+            d = np.array([1, 1, 1, 2, 2, 2])
+
+        M = np.einsum('i, ijkm, m, ijom, j->jko', ws, aphi, d, phi, self.measure)
+
         tcell2dof = tspace.cell_to_dof()
-        M = np.einsum('i, ijkmn, ijomn, j->jko', ws, aphi, phi, self.measure)
         tldof = tspace.number_of_local_dofs()
         I = np.einsum('ij, k->ijk', tcell2dof, np.ones(tldof))
         J = I.swapaxes(-1, -2)
         tgdof = tspace.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
-
 
         dphi = tspace.div_basis(bcs)
         uphi = vspace.basis(bcs)
