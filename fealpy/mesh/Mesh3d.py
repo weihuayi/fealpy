@@ -20,11 +20,14 @@ class Mesh3d():
     def number_of_cells(self):
         return self.ds.NC
 
-    def number_of_vertices_of_cells(self):
-        return self.ds.number_of_vertices_of_cells()
+    def number_of_nodes_of_cells(self):
+        return self.ds.number_of_nodes_of_cells()
 
     def number_of_edges_of_cells(self):
         return self.ds.number_of_edges_of_cells()
+
+    def number_of_faces_of_cells(self):
+        return self.ds.number_of_faces_of_cells()
 
     def geo_dimension(self):
         return self.node.shape[1] 
@@ -172,11 +175,14 @@ class Mesh3dDataStructure():
         self.edge = None
         self.cell2edge = None
 
-    def number_of_vertices_of_cells(self):
+    def number_of_nodes_of_cells(self):
         return self.V
 
     def number_of_edges_of_cells(self):
         return self.E
+
+    def number_of_faces_of_cells(self):
+        return self.F
 
 
     def total_edge(self):

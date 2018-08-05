@@ -20,22 +20,14 @@ class HuZhangFiniteElementSpace():
         Initialize the othogonal symetric matrix basis.
         """
         mesh = self.mesh
+        gdim = self.geo_dimension()
 
         NE = mesh.number_of_edges()
-        if self.dim == 2:
-            idx = np.array([(0, 0), (0, 1), (1, 1)])
-            self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
+        if gdim == 2:
+            idx = np.array([(0, 0), (1, 1), (0, 1)])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
-        elif self.dim == 3:
-            idx = np.array([(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)])
-            self.T = np.array([
-                [(1, 0, 0), (0, 0, 0), (0, 0, 0)], 
-                [(0, 1, 0), (1, 0, 0), (0, 0, 0)],
-                [(0, 0, 1), (0, 0, 0), (1, 0, 0)],
-                [(0, 0, 0), (0, 1, 0), (0, 0, 0)],
-                [(0, 0, 0), (0, 0, 1), (0, 1, 0)],
-                [(0, 0, 0), (0, 0, 0), (0, 0, 1)]])
-
+        elif gdim == 3:
+            idx = np.array([(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)])
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
 
         t = mesh.edge_unit_tagent() 
@@ -44,9 +36,8 @@ class HuZhangFiniteElementSpace():
         for i, (j, k) in enumerate(idx):
             self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
 
-        self.TE[:, 1] *= np.sqrt(2) # normalize
-
-        if self.dim == 3:
+        self.TE[:, gdim:] *=np.sqrt(2) 
+        if gdim == 3:
             NF = mesh.number_of_faces()
             n = mesh.face_unit_normal()
             face2edge = mesh.ds.face_to_edge()
@@ -59,39 +50,46 @@ class HuZhangFiniteElementSpace():
         return "Hu-Zhang mixed finite element space!"
 
     def number_of_global_dofs(self):
+        """
+        """
         p = self.p
-        dim = self.dim
+        gdim = self.geo_dimension()
         tdim = self.tensor_dimension() 
 
         mesh = self.mesh
 
         NC = mesh.number_of_cells()
-        N = mesh.number_of_nodes()
-        gdof = tdim*N
+        NN = mesh.number_of_nodes()
+        gdof = tdim*NN
+
         if p > 1:
             edof = p - 1
             NE = mesh.number_of_edges()
-            gdof += (tdim-1)*edof*NE 
-            E = mesh.number_of_edges_of_cells()
-            gdof += NC*E*edof
+            gdof += (tdim-1)*edof*NE # 边内部连续自由度的个数 
+            E = mesh.number_of_edges_of_cells() # 单元边的个数
+            gdof += NC*E*edof # 边内部不连续自由度的个数 
 
         if p > 2:
-            fdof = (p+1)*(p+2)//2 - 3*p
-            if dim == 2:
+            fdof = (p+1)*(p+2)//2 - 3*p # 面内部自由度的个数
+            if gdim == 2:
                 gdof += tdim*fdof*NC
-            elif dim == 3:
+            elif gdim == 3:
                 NF = mesh.number_of_faces()
-                gdof += 3*fdof*NF + 3*4*fdof*NC
+                gdof += 3*fdof*NF # 面内部连续自由度的个数
+                F = mesh.number_of_faces_of_cells() # 每个单元面的个数
+                gdof += 3*F*fdof*NC # 面内部不连续自由度的个数
 
-        if (p > 3) and (dim == 3):
+        if (p > 3) and (gdim == 3):
             ldof = self.dof.number_of_local_dofs()
-            cdof = ldof - 6*edof - 4*fdof - 4
+            V = mesh.nubmer_of_nodes_of_cells() # 单元顶点的个数
+            cdof = ldof - E*edof - F*fdof - V 
             gdof += tdim*cdof*NC
         return gdof 
 
     def number_of_local_dofs(self):
         tdim = self.tensor_dimension() 
-        return tdim*self.dof.number_of_local_dofs()
+        ldof = self.dof.number_of_local_dofs()
+        return tdim*ldof
 
     def cell_to_dof(self):
         return self.cell2dof
@@ -108,20 +106,18 @@ class HuZhangFiniteElementSpace():
             tdim: 对称张量的维数
         """
         mesh = self.mesh
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        dim = self.geo_dimension()
-        tdim = self.tensor_dimension()
+        gdim = self.geo_dimension()
+        tdim = self.tensor_dimension() # 张量维数
         p = self.p
-        dof = self.dof # 标量空间自由度对象 
+        dof = self.dof # 标量空间自由度管理对象 
        
         c2d = dof.cell2dof[..., np.newaxis]
-        ldof = dof.number_of_local_dofs() 
-        # ldof : 标量空间单元上自由度个数
-        # tdim : 张量维数
-        cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int)
+        ldof = dof.number_of_local_dofs() # ldof : 标量空间单元上自由度个数
+        cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int) # 每个标量自由度变成 tdim 个自由度
 
         dofFlags = self.dof_flags_1() # 把不同类型的自由度区分开来
         idx, = np.nonzero(dofFlags[0]) # 局部顶点自由度的编号
@@ -141,21 +137,21 @@ class HuZhangFiniteElementSpace():
             edof = p - 1
             base0 += edof*NE
             base1 += (tdim-1)*edof*NE
-            if dim == 2:
+            if gdim == 2:
                 cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
-            elif dim == 3:
+            elif gdim == 3:
                 # 0, 1, 2号局部自由度对应切向不连续的张量自由度, 留到后面重新编号
                 cell2dof[:, idx, 3:]= base1 + (tdim - 3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
 
-        fdof = (p+1)*(p+2)//2 - 3*p
-        if dim == 3:
+        fdof = (p+1)*(p+2)//2 - 3*p # 边内部自由度
+        if gdim == 3:
             idx, = np.nonzero(dofFlags[3])
             if len(idx) > 0:
                 NF = mesh.number_of_faces()
                 base0 += fdof*NF 
                 base1 += (tdim - 3)*fdof*NF
                 cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
-            cdof = ldof - 4*fdof - 6*edof - 4
+            cdof = ldof - 4*fdof - 6*edof - 4 # 单元内部自由度
         else:
             cdof = fdof
 
@@ -164,7 +160,7 @@ class HuZhangFiniteElementSpace():
             base1 += tdim*cdof*NC 
             cell2dof[:, idx, 0] = base1 + np.arange(NC*len(idx)).reshape(NC, len(idx)) 
 
-        if dim == 3:
+        if gdim == 3:
             base1 += NC*len(idx)
             idx, = np.nonzero(dofFlags[2])
             if len(idx) > 0:
@@ -233,24 +229,16 @@ class HuZhangFiniteElementSpace():
         Returns
         -------
 
-        isOtherDof : ndarray, (ldof,)
-            除了边内部和面内部自由度的其它自由度
-        isEdgeDof : ndarray, (ldof, 3) or (ldof, 6) 
-            每个边内部的自由度
-        isFaceDof : ndarray, (ldof, 4)
-            每个面内部的自由度
-        -------
-
         """
-        dim = self.dim # the geometry space dimension
+        gdim = self.geo_dimension() # the geometry space dimension
         dof = self.dof 
         isPointDof = dof.is_on_node_local_dof()
         isEdgeDof = dof.is_on_edge_local_dof()
         isEdgeDof[isPointDof] = False
         isEdgeDof0 = np.sum(isEdgeDof, axis=-1) > 0
-        if dim == 2:
+        if gdim == 2:
             return isPointDof, isEdgeDof0, ~(isPointDof | isEdgeDof0)
-        elif dim == 3:
+        elif gdim == 3:
             isFaceDof = dof.is_on_face_local_dof()
             isFaceDof[isPointDof, :] = False
             isFaceDof[isEdgeDof0, :] = False
@@ -276,13 +264,11 @@ class HuZhangFiniteElementSpace():
             NC: 单元个数
             ldof: 标量空间的单元自由度个数
             tdim: 对称张量的维数
-
-            (NQ, NC, ldof*tdim, dim, dim) 这样的存储有点浪费空间?
         """
-        dim = self.geo_dimension() 
-        tdim = self.tensor_dimension()
-
         mesh = self.mesh
+
+        gdim = self.geo_dimension() 
+        tdim = self.tensor_dimension()
 
         if cellidx is None:
             NC = mesh.number_of_cells()
@@ -313,7 +299,7 @@ class HuZhangFiniteElementSpace():
         for i, isDof in enumerate(isEdgeDof.T):
             phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TE[cell2edge[:, i]]) 
 
-        if dim == 3:
+        if gdim == 3:
             if cellidx is None:
                 cell2face = mesh.ds.cell_to_face()
             else:
@@ -321,23 +307,21 @@ class HuZhangFiniteElementSpace():
             isFaceDof = dofFlag[2]
             for i, isDof in enumerate(isFaceDof.T):
                 phi[..., isDof, :, :] = np.einsum('...j, imn->...ijmn', phi0[..., isDof], self.TF[cell2face[:, i]])
-
-        # The new shape of `phi` is `(NQ, NC, ldof*tdim, dim, dim)`, where
-        #   dim : the geometry space dimension
-        phi = np.einsum('...jk, kmn->...jmn', phi, self.T)
-        shape = phi.shape[:-4] + (-1, dim, dim)
-        return phi.reshape(shape) 
+        # The shape of `phi` should be (NQ, NC, ldof*tdim, tdim)?
+        shape = dphi.shape[:-3] + (-1, tdim)
+        return phi.reshape(shape)
 
     def div_basis(self, bc, cellidx=None):
-        dim = self.dim
-        tdim = self.tensor_dimension() 
         mesh = self.mesh
 
-        # the shape of `gphi` is (NQ, NC, ldof, dim)
+        gdim = self.geo_dimension()
+        tdim = self.tensor_dimension() 
+
+        # the shape of `gphi` is (NQ, NC, ldof, gdim)
         gphi = self.space.grad_basis(bc, cellidx=cellidx) 
         shape = list(gphi.shape)
         shape.insert(-1, tdim)
-        # the shape of `dphi` is (NQ, NC, ldof, tdim, dim)
+        # the shape of `dphi` is (NQ, NC, ldof, tdim, gdim)
         dphi = np.zeros(shape, dtype=np.float)
 
         dofFlag = self.dof_flags()
@@ -364,9 +348,8 @@ class HuZhangFiniteElementSpace():
                 VAL = np.einsum('ijk, kmn->ijmn', self.TF[cell2face[:, i]], self.T)
                 dphi[..., isDof, :, :] = np.einsum('...ikm, ijmn->...ikjn', gphi[..., isDof, :], VAL) 
 
-
-        # The new shape of `dphi` is `(NQ, NC, ldof*tdim, dim)`, where
-        shape = dphi.shape[:-3] + (-1, dim)
+        # The new shape of `dphi` is `(NQ, NC, ldof*tdim, gdim)`, where
+        shape = dphi.shape[:-3] + (-1, gdim)
         return dphi.reshape(shape)
 
     def value(self, uh, bc, cellidx=None):
