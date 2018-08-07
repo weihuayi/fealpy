@@ -40,7 +40,7 @@ class HuZhangFiniteElementSpace():
 
         t = mesh.edge_unit_tagent() 
         _, _, frame = np.linalg.svd(t[:, np.newaxis, :]) # get the axis frame on the edge by svd
-        frame[:, 0] = t
+        frame[:, 0, :] = t
         for i, (j, k) in enumerate(idx):
             self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
 
@@ -53,6 +53,7 @@ class HuZhangFiniteElementSpace():
             self.TF = np.zeros((NF, 6, 6), dtype=np.float)
             self.TF[:, 0:3, :] = self.TE[face2edge, 0, :] # 
             self.TF[:, 3:, :] = np.sqrt(2)*(n[:, np.newaxis, idx[:, 0]]*ft[:, :, idx[:, 1]] + n[:, np.newaxis, idx[:, 1]]*ft[:, :, idx[:, 0]])/2
+            print('TF shape is:', self.TF.shape)
 
     def __str__(self):
         return "Hu-Zhang mixed finite element space!"
