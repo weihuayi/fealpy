@@ -137,11 +137,11 @@ class LinearElasticityFEMModel:
         print("Construct linear system time:", end - start)
 
         start = timer()
-        #x = spsolve(A, bb)
+        x = spsolve(A, bb)
         end = timer()
         print("Solve time:", end-start)
-        #self.sh[:] = x[0:tgdof]
-        #self.uh[:] = x[tgdof:]
+        self.sh[:] = x[0:tgdof]
+        self.uh[:] = x[tgdof:]
 
     def fast_solve(self):
 
@@ -209,37 +209,22 @@ class LinearElasticityFEMModel:
         dim = self.dim
         mesh = self.mesh
 
-        start = timer()
         s = self.model.stress
         sh = self.sh.value 
         e0 = self.integralalg.L2_error(s, sh)
-        end = timer()
-        print('time s - sh:', end-start)
 
-        start = timer()
         ds = self.model.div_stress
         dsh = self.sh.div_value
         e1 = self.integralalg.L2_error(ds, dsh)
-        end = timer()
-        print('time ds - dsh:', end-start)
 
-        start = timer()
         u = self.model.displacement
         uh = self.uh.value
         e2 = self.integralalg.L2_error(u, uh)
-        end = timer()
-        print('time u - uh:', end-start)
 
-        start = timer()
         sI = self.sI.value 
         e3 = self.integralalg.L2_error(s, sI)
-        end = timer()
-        print('time s - sI:', end-start)
 
-        start = timer()
         dsI = self.sI.div_value
         e4 = self.integralalg.L2_error(ds, dsI)
-        end = timer()
-        print('time ds - dsI:', end-start)
 
         return e0, e1, e2, e3, e4
