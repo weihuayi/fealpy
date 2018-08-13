@@ -212,6 +212,7 @@ class Mesh2dDataStructure():
         self.N = N
         self.NC = cell.shape[0]
         self.cell = cell
+        self.itype = cell.dtype
         self.construct()
 
     def reinit(self, N, cell):
@@ -253,10 +254,10 @@ class Mesh2dDataStructure():
         NE = i0.shape[0]
         self.NE = NE
 
-        self.edge2cell = np.zeros((NE, 4), dtype=np.int)
+        self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
-        i1 = np.zeros(NE, dtype=np.int) 
-        i1[j] = np.arange(E*NC)
+        i1 = np.zeros(NE, dtype=self.itype) 
+        i1[j] = np.arange(E*NC, dtype=self.itype)
 
         self.edge2cell[:, 0] = i0//E 
         self.edge2cell[:, 1] = i1//E
@@ -292,7 +293,7 @@ class Mesh2dDataStructure():
         edge2cell = self.edge2cell
 
         if sparse == False:
-            cell2edge = np.zeros((NC, E), dtype=np.int)
+            cell2edge = np.zeros((NC, E), dtype=self.itype)
             cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
             cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
             return cell2edge
@@ -332,7 +333,7 @@ class Mesh2dDataStructure():
         edge2cell = self.edge2cell
         if (return_sparse == False) & (return_array == False):
             E = self.E
-            cell2cell = np.zeros((NC, E), dtype=np.int)
+            cell2cell = np.zeros((NC, E), dtype=self.itype)
             cell2cell[edge2cell[:, 0], edge2cell[:, 2]] = edge2cell[:, 1]
             cell2cell[edge2cell[:, 1], edge2cell[:, 3]] = edge2cell[:, 0]
             return cell2cell
@@ -445,8 +446,8 @@ class Mesh2dDataStructure():
         J = np.repeat(range(NC), V)
 
         if localidx == True:
-            val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            val = ranges(V*np.ones(NC, dtype=self.itype), start=1) 
+            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=self.itype)
         else:
             val = np.ones(V*NC, dtype=np.bool)
             node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
