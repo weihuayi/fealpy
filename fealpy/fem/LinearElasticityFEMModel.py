@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator, spsolve_triangular
 import pyamg

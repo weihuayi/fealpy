@@ -176,11 +176,15 @@ class LagrangeFiniteElementSpace():
             val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
         return val
 
-    def hessian_value(self, uh, bc, cellidx=None):
-        pass
-
     def div_value(self, uh, bc, cellidx=None):
-        pass
+        dim = len(uh.shape)
+        gdim = self.geo_dimension()
+        if (dim == 2) & (uh.shape[1] == gdim):
+            val = self.grad_value(uh, bc, cellidx=cellidx)
+            return val.trace(axis1=-2, axis2=-1)
+        else:
+            raise ValueError("The shape of uh should be (gdof, gdim)!")
+
 
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()

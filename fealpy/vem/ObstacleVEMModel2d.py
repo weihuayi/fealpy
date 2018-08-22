@@ -25,7 +25,7 @@ class ObstacleVEMModel2d():
         Notes
         -----
         """
-        self.vemspace =VirtualElementSpace2d(mesh, p) 
+        self.vemspace = VirtualElementSpace2d(mesh, p) 
         self.mesh = self.vemspace.mesh
         self.model = model  
 

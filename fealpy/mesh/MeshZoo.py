@@ -1,6 +1,7 @@
 import numpy as np
 from .simple_mesh_generator import rectangledomainmesh  
-from .simple_mesh_generator import triangle, unitsquaredomainmesh
+from .simple_mesh_generator import triangle
+from .TriangleMesh import TriangleMesh
 
 class MeshZoo():
     #Fishbone

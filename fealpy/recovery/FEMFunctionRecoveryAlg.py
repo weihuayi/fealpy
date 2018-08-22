@@ -38,8 +38,8 @@ class FEMFunctionRecoveryAlg():
         GD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
-        area = mesh.area()
-        asum = node2cell@area
+        measure = mesh.entity_measure('cell')
+        asum = node2cell@measure
 
         bc = np.array([1/3]*3, dtype=np.float)
         guh = uh.grad_value(bc)
@@ -54,7 +54,7 @@ class FEMFunctionRecoveryAlg():
         GD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
-        inva = 1/mesh.area()
+        inva = 1/mesh.entity_measure('cell')
         asum = node2cell@inva
 
         bc = np.array([1/3]*3, dtype=np.float)
@@ -82,8 +82,7 @@ class FEMFunctionRecoveryAlg():
         rguh = space.function(dim=GD)
         for i in range(GD):
             val = guh[:, [i]]*d
-            rguh[:, i] = np.bincount(cell.flat, weights=val.flat,
-                    minlength=NN)/dsum
+            rguh[:, i] = np.bincount(cell.flat, weights=val.flat, minlength=NN)/dsum
         return rguh
 
     def angle_average(self, uh):

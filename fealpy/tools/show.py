@@ -1,5 +1,6 @@
 import sys
 import numpy as np
+from types import ModuleType
 
 def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys.stdout, end='\n'):
 
@@ -46,10 +47,13 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
     if flag:
         out.close()
 
-def showmultirate(plt, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=15):
-    fig = plt.figure()
-    fig.set_facecolor('white')
-    axes = fig.gca()
+def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=15):
+    if isinstance(plot, ModuleType):
+        fig = plot.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+    else:
+        axes = plot
     if optionlist is None:
         optionlist = ['k-*', 'r-o', 'b-D', 'g-->', 'b--8', 'm--x','b-.x', 'b-.+', 'b-.h', 'm:s', 'm:p', 'm:h']
     m, n = errorMatrix.shape

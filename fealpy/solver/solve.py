@@ -21,6 +21,8 @@ def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
 
     if dirichlet is not None:
         AD, b = dirichlet.apply(A, b)
+    else:
+        AD = A
 
 #    print("The condtion number is: ", np.linalg.cond(AD.todense()))
     if solver is 'cg':
@@ -58,6 +60,8 @@ def solve(dmodel, uh, dirichlet=None, solver='cg'):
 
     if dirichlet is not None:
         AD, b = dirichlet.apply(A, b)
+    else:
+        AD = A
 
     if solver is 'cg':
         start = timer()

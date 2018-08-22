@@ -12,6 +12,7 @@ from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh  
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
+from .MeshZoo import MeshZoo
 
 from .simple_mesh_generator import *
 
