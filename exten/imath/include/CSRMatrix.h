@@ -1,5 +1,5 @@
-#ifndef CSCMatrix_h
-#define CSCMatrix_h
+#ifndef CSRMatrix_h
+#define CSRMatrix_h
 
 #include <new>
 #include "type.h"
@@ -9,18 +9,18 @@ namespace iMath {
 
 namespace LinearAlgebra {
 
-template<class I, class F>
+template<class I, class T>
 class CSRMatrix
 {
 public:
     typedef I Int;
-    typedef F Float;
+    typedef T Float;
 public:
     I nnz;
     I ndim;
     I shape[2];
 
-    F * data;
+    T * data;
     I * indices;
     I * indptr;
 
@@ -32,7 +32,7 @@ public:
 
 public:
     CSRMatrix(
-            F * _data, 
+            T * _data, 
             I * _indices, 
             I * _indptr, 
             I _nnz, 
@@ -72,7 +72,7 @@ public:
         mat_type = _mat_type;
         sparse_type = CSR;
 
-        data = new F[nnz];
+        data = new T[nnz];
         indices = new I[nnz];
         indptr = new I[shape[0]+1];
     }
@@ -216,14 +216,14 @@ public:
             }
         }
     }
-    void symmetric_strength_of_connection(CSRMatrix<I, F> & S, F theta)
+    void symmetric_strength_of_connection(CSRMatrix<I, T> & S, T theta)
     {
-        std::vector<F> diags(shape[0]);
+        std::vector<T> diags(shape[0]);
 
         //compute norm of diagonal values
         for(I i = 0; i < shape[0]; i++)
         {
-            F diag = 0.0;
+            T diag = 0.0;
             for(I j = indptr[i]; j < indptr[i+1]; j++)
             {
                 if(indices[j] == i)
@@ -239,7 +239,7 @@ public:
 
         for(I i = 0; i < shape[0]; i++)
         {
-            F eps_Aii = theta*theta*diags[i];
+            T eps_Aii = theta*theta*diags[i];
 
             for(I jj = indptr[i]; jj < indptr[i+1]; jj++)
             {
@@ -378,8 +378,8 @@ public:
         {
             I start = indptr[i];
             I end   = indptr[i+1];
-            F rsum = 0;
-            F diag = 0;
+            T rsum = 0;
+            T diag = 0;
 
             for(I jj = start; jj < end; jj++)
             {
@@ -390,7 +390,7 @@ public:
                     rsum += data[jj]*x[j];
             }
 
-            if (diag != (F) 0.0){
+            if (diag != (T) 0.0){
                 x[i] = (b[i] - rsum)/diag;
             }
         }

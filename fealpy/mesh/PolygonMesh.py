@@ -147,8 +147,8 @@ class PolygonMesh(Mesh2d):
 
 
 class PolygonMeshDataStructure():
-    def __init__(self, N, cell, cellLocation):
-        self.N = N
+    def __init__(self, NN, cell, cellLocation):
+        self.NN = NN
         self.NC = cellLocation.shape[0] - 1
 
         self.cell = cell
@@ -179,7 +179,7 @@ class PolygonMeshDataStructure():
         cell = self.cell
         cellLocation = self.cellLocation
 
-        N = self.N
+        NN = self.NN
         NC = self.NC
         NV = self.number_of_vertices_of_cells() 
 
@@ -208,7 +208,8 @@ class PolygonMeshDataStructure():
 
         self.edge = totalEdge[i0]
 
-        cellIdx= np.repeat(range(NC), NV)
+        cellIdx = np.repeat(range(NC), NV)
+        
         localIdx = ranges(NV)
 
         self.edge2cell[:, 0] = cellIdx[i0] 
@@ -217,7 +218,7 @@ class PolygonMeshDataStructure():
         self.edge2cell[:, 3] = localIdx[i1] 
 
     def cell_to_node(self):
-        N = self.N
+        NN = self.NN
         NC = self.NC
         NE = self.NE
 
@@ -228,7 +229,7 @@ class PolygonMeshDataStructure():
         J = cell
 
         val = np.ones(len(cell), dtype=np.bool)
-        cell2node = csr_matrix((val, (I, J)), shape=(NC, N), dtype=np.bool)
+        cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
     def cell_to_edge(self, sparse=True):
@@ -273,7 +274,7 @@ class PolygonMeshDataStructure():
         return cell2cell.tocsr()
 
     def edge_to_node(self, sparse=False):
-        N = self.N
+        NN = self.NN
         NE = self.NE
 
         edge = self.edge
@@ -281,8 +282,8 @@ class PolygonMeshDataStructure():
             return edge
         else:
             val = np.ones((NE,), dtype=np.bool)
-            edge2node = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, N), dtype=np.bool)
-            edge2node+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, N), dtype=np.bool)
+            edge2node = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, NN), dtype=np.bool)
+            edge2node+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, NN), dtype=np.bool)
             return edge2node.tocsr()
 
     def edge_to_edge(self):
@@ -302,30 +303,30 @@ class PolygonMeshDataStructure():
             return edge2cell.tocsr()
 
     def node_to_node(self):
-        N = self.N
+        NN = self.NN
         edge = self.edge
-        return node_to_node_in_edge(N, edge)
+        return node_to_node_in_edge(NN, edge)
 
-    def node_to_node_in_edge(self, N, edge):
+    def node_to_node_in_edge(self, NN, edge):
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
         val = np.ones(2*edge.shape[0], dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
         return node2node
 
     def node_to_edge(self):
-        N = self.N
+        NN = self.NN
         NE = self.NE
 
         edge = self.edge
 
         val = np.ones((NE,), dtype=np.bool)
-        node2edge = coo_matrix((val, (edge[:,0], range(NE))), shape=(NE, N), dtype=np.bool)
-        node2edge+= coo_matrix((val, (edge[:,1], range(NE))), shape=(NE, N), dtype=np.bool)
+        node2edge = coo_matrix((val, (edge[:,0], range(NE))), shape=(NE, NN), dtype=np.bool)
+        node2edge+= coo_matrix((val, (edge[:,1], range(NE))), shape=(NE, NN), dtype=np.bool)
         return node2edge.tocsr()
 
     def node_to_cell(self):
-        N = self.N
+        NN = self.NN
         NC = self.NC
         NE = self.NE
 
@@ -334,14 +335,14 @@ class PolygonMeshDataStructure():
         I = cell
         J = np.repeat(range(NC), NV)
         val = np.ones(cell.shape[0], dtype=np.bool)
-        node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+        node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
     def boundary_node_flag(self):
-        N = self.N
+        NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdNode = np.zeros(N, dtype=np.bool)
+        isBdNode = np.zeros(NN, dtype=np.bool)
         isBdNode[edge[isBdEdge,:]] = True
         return isBdNode
 

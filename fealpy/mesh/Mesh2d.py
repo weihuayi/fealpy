@@ -10,7 +10,7 @@ class Mesh2d():
         The class is just a abstract class, and you can not use it directly.
     """
     def number_of_nodes(self):
-        return self.ds.N
+        return self.ds.NN
 
     def number_of_edges(self):
         return self.ds.NE
@@ -208,15 +208,15 @@ class Mesh2dDataStructure():
         This is just a abstract class, and you can not use it directly. 
     """
 
-    def __init__(self, N, cell):
-        self.N = N
+    def __init__(self, NN, cell):
+        self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
         self.itype = cell.dtype
         self.construct()
 
-    def reinit(self, N, cell):
-        self.N = N
+    def reinit(self, NN, cell):
+        self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
         self.construct()
@@ -272,7 +272,7 @@ class Mesh2dDataStructure():
     def cell_to_node(self):
         """ 
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
@@ -280,7 +280,7 @@ class Mesh2dDataStructure():
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
     def cell_to_edge(self, sparse=False):
@@ -366,7 +366,7 @@ class Mesh2dDataStructure():
                 return adj.astype(np.int32), adjLocation
 
     def edge_to_node(self, sparse=False):
-        N = self.N
+        NN = self.NN
         NE = self.NE
 
         edge = self.edge
@@ -377,7 +377,7 @@ class Mesh2dDataStructure():
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
             val = np.ones(2*NE, dtype=np.bool)
-            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
             return edge2node
 
     def edge_to_edge(self, sparse=False):
@@ -399,44 +399,44 @@ class Mesh2dDataStructure():
     def node_to_node(self, return_array=False):
         """ The neighbor information of nodes
         """
-        N = self.N
+        NN = self.NN
         NE = self.NE
         edge = self.edge
         I = edge
         J = edge[:, [1, 0]] 
         val = np.ones((2*NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NN),dtype=np.bool)
         if return_array == False:
             return node2node 
         else:
             nn = node2node.sum(axis=1).reshape(-1)
             _, adj = node2node.nonzero()
-            adjLocation = np.zeros(N+1, dtype=np.int32)
+            adjLocation = np.zeros(NN+1, dtype=np.int32)
             adjLocation[1:] = np.cumsum(nn)
             return adj.astype(np.int32), adjLocation
 
-    def node_to_node_in_edge(self, N, edge):
+    def node_to_node_in_edge(self, NN, edge):
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
         val = np.ones(2*edge.shape[0], dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N), dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
         return node2node
 
     def node_to_edge(self):
-        N = self.N
+        NN = self.NN
         NE = self.NE
         
         edge = self.edge
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(N, NE), dtype=np.bool)
+        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE), dtype=np.bool)
         return node2edge
 
     def node_to_cell(self, localidx=False):
         """
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
@@ -447,18 +447,18 @@ class Mesh2dDataStructure():
 
         if localidx == True:
             val = ranges(V*np.ones(NC, dtype=self.itype), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=self.itype)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
 
     def boundary_node_flag(self):
-        N = self.N
+        NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros((N,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool)
         isBdPoint[edge[isBdEdge,:]] = True
         return isBdPoint
 
