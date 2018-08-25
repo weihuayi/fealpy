@@ -18,7 +18,7 @@ class StructureQuadMesh(Mesh2d):
 
     @property 
     def node(self):
-        N = self.ds.N
+        NN = self.ds.NN
         nx = self.ds.nx
         ny = self.ds.ny
         box = self.box
@@ -26,14 +26,13 @@ class StructureQuadMesh(Mesh2d):
         X, Y = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1)]
-        node = np.zeros((N, 2), dtype=np.float)
-        node[:, 0] = X.flatten()
-        node[:, 1] = Y.flatten()
+        node = np.zeros((NN, 2), dtype=np.float)
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
         return node
 
-
     def number_of_nodes(self):
-        return self.ds.N
+        return self.ds.NN
 
     def number_of_edges(self):
         return self.ds.NE
@@ -52,7 +51,7 @@ class StructureQuadMeshDataStructure:
     def __init__(self, nx, ny):
         self.nx = nx
         self.ny = ny
-        self.N = (nx+1)*(ny+1)
+        self.NN = (nx+1)*(ny+1)
         self.NE = ny*(nx+1) + nx*(ny+1)
         self.NC = nx*ny
 
@@ -63,12 +62,12 @@ class StructureQuadMeshDataStructure:
         nx = self.nx
         ny = self.ny
 
-        N = self.N
+        NN = self.NN
         NC = self.NC
         cell = np.zeros((NC, 4), dtype=np.int)
-        idx = np.arange(N).reshape(nx+1, ny+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1)
         c = idx[:-1, :-1]
-        cell[:, 0] = c.flatten()
+        cell[:, 0] = c.flat
         cell[:, 1] = cell[:, 0] + ny + 1
         cell[:, 2] = cell[:, 1] + 1
         cell[:, 3] = cell[:, 0] + 1
@@ -79,16 +78,16 @@ class StructureQuadMeshDataStructure:
         nx = self.nx
         ny = self.ny
 
-        N = self.N
+        NN = self.NN
         NE = self.NE
 
-        idx = np.arange(N).reshape(nx+1, ny+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1)
         edge = np.zeros((NE, 2), dtype=np.int)
 
         NE0 = 0
         NE1 = ny*(nx+1)
-        edge[NE0:NE1, 0] = idx[:, :-1].flatten()
-        edge[NE0:NE1, 1] = idx[:, 1:].flatten()
+        edge[NE0:NE1, 0] = idx[:, :-1].flat
+        edge[NE0:NE1, 1] = idx[:, 1:].flat
         edge[NE0:NE0+ny, :] = edge[NE0:NE0+ny, -1::-1]
 
         NE0 = NE1
@@ -120,9 +119,9 @@ class StructureQuadMeshDataStructure:
 
         NE0 = NE1
         NE1 += nx*ny
-        edge2cell[NE0:NE1, 0] = idx.flatten()
+        edge2cell[NE0:NE1, 0] = idx.flat
         edge2cell[NE0:NE1, 2] = 1
-        edge2cell[NE0:NE1-ny, 1] = idx[1:].flatten()
+        edge2cell[NE0:NE1-ny, 1] = idx[1:].flat
         edge2cell[NE0:NE1-ny, 3] = 3 
         edge2cell[NE1-ny:NE1, 1] = idx[-1]
         edge2cell[NE1-ny:NE1, 3] = 1
@@ -148,7 +147,7 @@ class StructureQuadMeshDataStructure:
     def cell_to_node(self):
         """ 
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
@@ -156,7 +155,7 @@ class StructureQuadMeshDataStructure:
 
         I = np.repeat(range(NC), V)
         val = np.ones(self.V*NC, dtype=np.bool)
-        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, N), dtype=np.bool)
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
     def cell_to_edge(self, sparse=False):
@@ -242,7 +241,7 @@ class StructureQuadMeshDataStructure:
                 return adj.astype(np.int32), adjLocation
 
     def edge_to_node(self, sparse=False):
-        N = self.N
+        NN = self.NN
         NE = self.NE
 
         edge = self.edge
@@ -251,9 +250,9 @@ class StructureQuadMeshDataStructure:
         else:
             edge = self.edge
             I = np.repeat(range(NE), 2)
-            J = edge.flatten()
+            J = edge.flat
             val = np.ones(2*NE, dtype=np.bool)
-            edge2node = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
             return edge2node
 
     def edge_to_edge(self, sparse=False):
@@ -275,49 +274,49 @@ class StructureQuadMeshDataStructure:
     def node_to_node(self):
         """ The neighbor information of nodes
         """
-        N = self.N
+        NN = self.NN
         NE = self.NE
         edge = self.edge
-        I = edge.flatten()
-        J = edge[:,[1,0]].flatten()
+        I = edge.flat
+        J = edge[:,[1,0]].flat
         val = np.ones((2*NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(N, N),dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN),dtype=np.bool)
         return node2node
 
     def node_to_edge(self):
-        N = self.N
+        NN = self.NN
         NE = self.NE
         
         edge = self.edge
-        I = edge.flatten()
+        I = edge.flat
         J = np.repeat(range(NE), 2)
         val = np.ones(2*NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(NE, N), dtype=np.bool)
+        node2edge = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
         return node2edge
 
     def node_to_cell(self, localidx=False):
         """
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
         cell = self.cell
 
-        I = cell.flatten() 
+        I = cell.flat 
         J = np.repeat(range(NC), V)
 
         if localidx == True:
             val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.int)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int)
         else:
             val = np.ones(V*NC, dtype=np.bool)
-            node2cell = csr_matrix((val, (I, J)), shape=(N, NC), dtype=np.bool)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
 
     def boundary_node_flag(self):
-        N = self.N
+        NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
         isBdPoint = np.zeros((N,), dtype=np.bool)

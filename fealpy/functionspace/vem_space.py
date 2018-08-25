@@ -34,8 +34,8 @@ class SMDof2d():
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 2), dtype=np.int)
-        multiIndex[:,1] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:,0] = idx0 - multiIndex[:, 1]
+        multiIndex[:, 1] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:, 0] = idx0 - multiIndex[:, 1]
         return multiIndex 
 
     def cell_to_dof(self):
@@ -59,7 +59,7 @@ class SMDof2d():
 
 
 class ScaledMonomialSpace2d():
-    def __init__(self, mesh, p=1):
+    def __init__(self, mesh, p):
         """
         The Scaled Momomial Space in R^2
         """
@@ -67,7 +67,7 @@ class ScaledMonomialSpace2d():
         self.mesh = mesh
         self.barycenter = mesh.entity_barycenter('cell')
         self.p = p
-        self.area= mesh.area()
+        self.area = mesh.cell_area()
         self.h = np.sqrt(self.area) 
         self.dof = SMDof2d(mesh, p)
 
@@ -87,6 +87,7 @@ class ScaledMonomialSpace2d():
         if p is None:
             p = self.p
         h = self.h
+        NC = self.mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs(p=p) 
         if p == 0: 
@@ -95,6 +96,7 @@ class ScaledMonomialSpace2d():
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float) # (..., M, ldof)
         if cellidx is None:
+            assert(point.shape[-2] == NC)
             phi[..., 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
         else:
             assert(point.shape[-2] == len(cellidx))
@@ -112,7 +114,6 @@ class ScaledMonomialSpace2d():
         phi = self.basis(point, cellidx=cellidx)
         cell2dof = self.dof.cell2dof
         if cellidx is None:
-            
             return np.einsum('ij, ...ij->...i', uh[cell2dof], phi) 
         else:
             assert(point.shape[-2] == len(cellidx))
@@ -217,14 +218,14 @@ class VEMDof2d():
         p = self.p
         mesh = self.mesh
 
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
         NE= mesh.number_of_edges()
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int) 
         edge2dof[:, [0, p]] = edge 
         if p > 1:
-            edge2dof[:, 1:-1] = N + np.arange(NE*(p-1)).reshape(NE, p-1)
+            edge2dof[:, 1:-1] = np.arange(NN, NN + NE*(p-1)).reshape(NE, p-1)
         return edge2dof
     
     def cell_to_dof(self):
@@ -244,7 +245,8 @@ class VEMDof2d():
             cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
             
             edge2dof = self.edge_to_dof()
-            edge2cell = mesh.ds.edge2cell
+            edge2cell = mesh.ds.edge_to_cell()
+
             idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
             cell2dof[idx] = edge2dof[:, 0:p]
             
@@ -252,7 +254,7 @@ class VEMDof2d():
             idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
 
-            N = mesh.number_of_nodes()
+            NN = mesh.number_of_nodes()
             NV = mesh.number_of_vertices_of_cells()
             NE = mesh.number_of_edges()
             idof = (p-1)*p//2
@@ -286,22 +288,25 @@ class VEMDof2d():
     def interpolation_points(self):
         p = self.p
         mesh = self.mesh
-        cell = mesh.ds.cell
-        node = mesh.node
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
 
         if p == 1:
             return node 
         if p > 1:
-            N =  node.shape[0]
-            dim = node.shape[-1]
+            NN = mesh.number_of_nodes()
+            GD = mesh.geo_dimension() 
             NE = mesh.number_of_edges()
+
             gdof = self.number_of_global_dofs()
-            ipoint = np.zeros((gdof, dim), dtype=np.float)
-            ipoint[:N, :] = node 
-            edge = mesh.ds.edge
+            ipoint = np.zeros((gdof, GD), dtype=np.float)
+            ipoint[:NN, :] = node 
+            edge = mesh.entity('edge')
+
             qf = GaussLobattoQuadrature(p + 1)
+
             bcs = qf.quadpts[1:-1, :]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs,  node[edge, :]).reshape(-1, dim)
+            ipoint[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', bcs, node[edge, :]).reshape(-1, GD)
             return ipoint
 
 
@@ -343,18 +348,17 @@ class VirtualElementSpace2d():
         pass
 
     def function(self, dim=None):
-        return FiniteElementFunction(self,dim=dim)
+        return FiniteElementFunction(self, dim=dim)
 
     def interpolation(self, u, integral=None):
-        p = self.p
+
         mesh = self.mesh
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         p = self.p
         ipoint = self.interpolation_points()
         uI = self.function() 
-        uI[:N+(p-1)*NE] = u(ipoint[:N+(p-1)*NE])
-
+        uI[:NN+(p-1)*NE] = u(ipoint[:NN+(p-1)*NE])
         if p > 1:
             phi = self.smspace.basis
 
@@ -365,7 +369,7 @@ class VirtualElementSpace2d():
                 bb = integral(f, celltype=True)/self.smspace.area
             else:
                 bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
-            uI[N+(p-1)*NE:] = bb.reshape(-1)
+            uI[NN+(p-1)*NE:] = bb.reshape(-1)
         return uI
 
     def number_of_global_dofs(self):

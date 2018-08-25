@@ -9,10 +9,20 @@ n = 2
 qmesh = StructureQuadMesh(box, n, n)
 qmesh.print()
 
+
+NN = qmesh.number_of_nodes()
+NE = qmesh.number_of_edges()
+NC = qmesh.number_of_cells()
+
+X = np.zeros(NE + NC, dtype=np.float)
+
+I = np.arange(NC, dtype=np.int)
+J = I
+
 fig = plt.figure()
 axes = fig.gca()
 qmesh.add_plot(axes)
-qmesh.find_point(axes, showindex=True)
+qmesh.find_node(axes, showindex=True)
 qmesh.find_edge(axes, showindex=True)
 qmesh.find_cell(axes, showindex=True)
 plt.show()

@@ -172,10 +172,10 @@ def source_vector(integral, f, vemspace, PI0):
 def matrix_H(V):
     p = V.p
     mesh = V.mesh
-    node = mesh.node
+    node = mesh.entity('node')
 
-    edge = mesh.ds.edge
-    edge2cell = mesh.ds.edge2cell
+    edge = mesh.entity('edge')
+    edge2cell = mesh.ds.edge_to_cell()
 
     isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 

@@ -54,6 +54,7 @@ The name rules of the number of entity:
 * NC: the Number of Cells 
 * NQ: the Number of Quadrature points
 * GD: the Geometry Dimension
+* TD: the Toplogy Dimension 
 * NFV: the Number of Face Vertices 
 * NCV: the Number of Cell Vertices 
 
@@ -122,8 +123,6 @@ The toplogy relationship function in `ds`:
 
 * ldof: the number of local dof on each cell
 * gdof: the number of global dof on the whole mesh
-* gdim: the geometry dimension 
-* tdim: the toplogy diemension
 
 (NQ, NC, ldof, m, n, ...)
 
