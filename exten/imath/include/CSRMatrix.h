@@ -13,9 +13,6 @@ template<class I, class T>
 class CSRMatrix
 {
 public:
-    typedef I Int;
-    typedef T Float;
-public:
     I nnz;
     I ndim;
     I shape[2];
@@ -51,7 +48,9 @@ public:
         shape[0] = _n_rows;
         shape[1] = _n_cols;
         has_sorted_indices = _has_sorted_indices;
+
         from_other = true;  
+
         mat_type = _mat_type;
         sparse_type = CSR;
     }
@@ -77,13 +76,75 @@ public:
         indptr = new I[shape[0]+1];
     }
 
+    template<class Index>
+    CSRMatrix(
+            Index * Ai,
+            Index * Aj,
+            T * Ax,
+            I _nnz,
+            I _n_rows,
+            I _n_cols,
+            MatType _mat_type=G, 
+            bool _has_sorted_indices=true
+            )
+    {
+        from_other = false;
+        nnz = _nnz;
+        shape[0] = _n_rows;
+        shape[1] = _n_cols;
+        mat_type = _mat_type;
+        sparse_type = CSR;
+        has_sorted_indices = _has_sorted_indices;
+
+        data = new T[nnz];
+        indices = new I[nnz];
+        indptr = new I[shape[0]+1];
+
+        //计算三元组每一行非零元的个数 
+        std::fill(indptr, indptr + shape[0], 0);
+
+        for (I n = 0; n < nnz; n++){            
+            I i = Ai[n];
+            indptr[i]++;
+        }
+
+        // 累加构造行指针数组
+        for(I i = 0, cumsum = 0; i < shape[0]; i++)
+        {     
+            I temp = indptr[i];
+            indptr[i] = cumsum;
+            cumsum += temp;
+        }
+
+        indptr[shape[0]] = nnz; 
+
+        // 把列指标 Aj, Ax 复制进 indices, data
+        for(I n = 0; n < nnz; n++){
+            I row  = Ai[n];
+            I dest = indptr[row];
+
+            indices[dest] = Aj[n];
+            data[dest] = Ax[n];
+
+            indptr[row]++;
+        }
+
+        for(I i = 0, last = 0; i <= shape[0]; i++){
+            I temp = indptr[i];
+            indptr[i]  = last;
+            last  = temp;
+        }
+
+        // 可能有重复
+    }
+
+
     ~CSRMatrix()
     {
         if( from_other == false )
         {
             if( data != NULL )
                 delete[] data;
-
             if( indices != NULL )
                 delete[] indices;
 

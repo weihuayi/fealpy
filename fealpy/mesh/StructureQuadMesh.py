@@ -92,9 +92,9 @@ class StructureQuadMeshDataStructure:
 
         NE0 = NE1
         NE1 += nx*(ny+1)
-        edge[NE0:NE1, 0] = idx[:-1, :].flatten('F')
-        edge[NE0:NE1, 1] = idx[1:, :].flatten('F')
-        edge[NE1-nx:NE1, :] = edge[NE1-nx:NE1, -1::-1]
+        edge[NE0:NE1, 0] = idx[:-1, :].flat
+        edge[NE0:NE1, 1] = idx[1:, :].flat
+        edge[NE1:NE0:-nx-1, :] = edge[NE1:NE0:-nx-1, -1::-1]
         return edge
 
     @property
@@ -110,37 +110,23 @@ class StructureQuadMeshDataStructure:
 
         idx = np.arange(NC).reshape(nx, ny)
 
-        # y direcion
-        NE0 = 0 
-        NE1 = ny
-        edge2cell[NE0:NE1, 0] = idx[0]
-        edge2cell[NE0:NE1, 1] = idx[0]
-        edge2cell[NE0:NE1, 2:4] = 3
+        # y direction
+        idx0 = np.arange(NE/2).reshape(ny, nx+1)
+        edge2cell[idx0[1:], 0] = idx
+        edge2cell[idx0[1:], 2] = 1
+        edge2cell[idx0[0], 0] = idx[0]
+        edge2cell[idx0[0], 2] = 3
 
-        NE0 = NE1
-        NE1 += nx*ny
-        edge2cell[NE0:NE1, 0] = idx.flat
-        edge2cell[NE0:NE1, 2] = 1
-        edge2cell[NE0:NE1-ny, 1] = idx[1:].flat
-        edge2cell[NE0:NE1-ny, 3] = 3 
-        edge2cell[NE1-ny:NE1, 1] = idx[-1]
-        edge2cell[NE1-ny:NE1, 3] = 1
+        edge2cell[idx0[:-1], 0] = idx
+        edge2cell[idx0[:-1], 2] = 3
+        edge2cell[idx0[-1], 1] = idx[-1]
+        edge2cell[idx0[-1], 3] = 1
 
         # x direction 
-        NE0 = NE1
-        NE1 += nx
-        edge2cell[NE0:NE1, 0] = idx[:, 0]
-        edge2cell[NE0:NE1, 1] = idx[:, 0]
-        edge2cell[NE0:NE1, 2:4] = 0
+        idx1 = np.arange(NE/2).reshape(ny+1, nx)
 
-        NE0 = NE1
-        NE1 += nx*ny
-        edge2cell[NE0:NE1, 0] = idx.flatten('F')
-        edge2cell[NE0:NE1, 2] = 3
-        edge2cell[NE0:NE1-nx, 1] = idx[:, 1:].flatten('F')
-        edge2cell[NE0:NE1-nx, 3] = 0 
-        edge2cell[NE1-nx:NE1, 1] = idx[:, -1]
-        edge2cell[NE1-nx:NE1, 3] = 3
+        edge2cell[idx1[:, :-1], 0] = idx
+        edge2cell[idx1[:, :-1], 2] = 0
 
         return edge2cell
 
