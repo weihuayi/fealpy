@@ -108,25 +108,37 @@ class StructureQuadMeshDataStructure:
 
         edge2cell = np.zeros((NE, 4), dtype=np.int)
 
-        idx = np.arange(NC).reshape(nx, ny)
+        idx = np.arange(NC).reshape(nx, ny).T
 
         # y direction
-        idx0 = np.arange(NE/2).reshape(ny, nx+1)
-        edge2cell[idx0[1:], 0] = idx
-        edge2cell[idx0[1:], 2] = 1
-        edge2cell[idx0[0], 0] = idx[0]
-        edge2cell[idx0[0], 2] = 3
+        idx0 = np.arange((NE/2),dtype=np.int).reshape(nx+1, ny).T
+        #left element
+        edge2cell[idx0[:,1:], 0] = idx
+        edge2cell[idx0[:,1:], 2] = 1
+        edge2cell[idx0[:,0], 0] = idx[:,0]
+        edge2cell[idx0[:,0], 2] = 3
+        
 
-        edge2cell[idx0[:-1], 0] = idx
-        edge2cell[idx0[:-1], 2] = 3
-        edge2cell[idx0[-1], 1] = idx[-1]
-        edge2cell[idx0[-1], 3] = 1
+        #right element
+        edge2cell[idx0[:,:-1], 1] = idx
+        edge2cell[idx0[:,:-1], 3] = 3
+        edge2cell[idx0[:,-1], 1] = idx[:,-1]
+        edge2cell[idx0[:,-1], 3] = 1
 
         # x direction 
-        idx1 = np.arange(NE/2).reshape(ny+1, nx)
+        idx1 = np.arange((NE/2),dtype=np.int).reshape(nx, ny+1).T
+        NE0 = ny*(nx+1)
+        #left element
+        edge2cell[NE0+idx1[:-1], 0] = idx
+        edge2cell[NE0+idx1[:-1], 2] = 0
+        edge2cell[NE0+idx1[-1], 0] = idx[-1]
+        edge2cell[NE0+idx1[-1], 2] = 2
 
-        edge2cell[idx1[:, :-1], 0] = idx
-        edge2cell[idx1[:, :-1], 2] = 0
+        #right element
+        edge2cell[NE0+idx1[1:], 1] = idx
+        edge2cell[NE0+idx1[1:], 3] = 2
+        edge2cell[NE0+idx1[0],1] = idx[0]
+        edge2cell[NE0+idx1[0], 3] = 0
 
         return edge2cell
 
