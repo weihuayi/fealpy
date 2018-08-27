@@ -40,7 +40,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     }
 
     CSRMatrix  A(I, J, data, nnz, n_rows, n_cols);
-
     A.print();
+
     return;
 }

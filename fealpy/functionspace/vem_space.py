@@ -175,6 +175,33 @@ class ScaledMonomialSpace2d():
         else:
             assert(point.shape[-2] == len(cellidx))
             return lphi/area[cellidx].reshape(-1, 1)
+
+    def hessian_basis(self, point, cellidx=None, p=None):
+        if p is None:
+            p = self.p
+        area = self.area
+
+        ldof = self.number_of_local_dofs() 
+
+        shape = point.shape[:-1]+(ldof, 3)
+        hphi = np.zeros(shape, dtype=np.float)
+        if p > 1:
+            start = 3
+            r = np.arange(1, p+1)
+            r = r[0:-1]*r[1:] 
+            phi = self.basis(point, cellidx=cellidx)
+            for i in range(2, p+1):
+                hphi[..., start:start+i-1, 0] = np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
+                hphi[..., start+2:start+i+1, 1] = np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
+                r0 = np.arange(1, i)
+                r0 = r0*r0[-1::-1]
+                hphi[..., start+1:start+i, 2] = np.eisum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i]
+                start += i+1
+        if cellidx is None:
+            return hphi/area.reshape(-1, 1, 1)
+        else:
+            assert(point.shape[-2] == len(cellidx))
+            return hphi/area[cellidx].reshape(-1, 1, 1)
         
     def laplace_value(self, uh, point, cellidx=None):
         lphi = self.laplace_basis(point, cellidx=cellidx)

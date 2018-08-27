@@ -126,7 +126,7 @@ public:
             indices[dest] = Aj[n];
             data[dest] = Ax[n];
 
-            indptr[row]++;
+            indptr[row]++;//TODO: WHY
         }
 
         for(I i = 0, last = 0; i <= shape[0]; i++){
@@ -162,6 +162,7 @@ public:
             {
                 for(I j = indptr[i]; j < indptr[i+1]; j++)
                 {
+                    std::cout<< j << std::endl;
                     std::cout<<"("<< i <<","<< indices[j] <<") " << data[j] << std::endl;
                 }
             }
