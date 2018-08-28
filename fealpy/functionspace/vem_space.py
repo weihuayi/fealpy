@@ -209,10 +209,10 @@ class ScaledMonomialSpace2d():
             phi = self.basis(point, cellidx=cellidx)
             for i in range(2, p+1):
                 hphi[..., start:start+i-1, 0] = np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
-                hphi[..., start+2:start+i+1, 1] = np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
+                hphi[..., start+2:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 r0 = np.arange(1, i)
                 r0 = r0*r0[-1::-1]
-                hphi[..., start+1:start+i, 2] = np.eisum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
+                hphi[..., start+1:start+i, 2] = np.einsum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
                 start += i+1
 
         if cellidx is None:
