@@ -44,54 +44,43 @@ class PolyData:
         return mesh
 
 
-    def source(self, p):
-        beta = self.beta
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape)
-        t = 1 + beta*np.sqrt(2*(x**2 + y**2))
-        val[..., 0] = t*(x + y) + 3*x**2
-        val[..., 1] = t*(x - y) + 3*y**2
-        return val
-
-    def velocity(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape)
-        val[..., 0] = x + y
-        val[..., 1] = x - y
-        return val
-
-    def pressure(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = x**3 + y**3 
-        return val
-
-    def grad_pressure(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape)
-        val[..., 0] = 3*x**2
-        val[..., 1] = 3*y**2 
-        return val
-
-    def grad_velocity(self, p):
-        pass
-
-    def neumann(self, p):
-        eps = 1e-12
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[0:-1])
-        flag = abs(x+1) < eps
-        val[flag] = 1 - y[flag]
-        flag = abs(x - 1) < eps
-        val[flag] = 1 + y[flag]
-        flag = abs(y + 1) < eps
-        val[flag] = -x[flag] - 1
-        flag = abs(y - 1) < eps
-        val[flag] = x[flag] - 1
-        return val
+        def source(self, p):
+            """ The right hand side of DarcyForchheimer equation
+            """
+            x = p[..., 0]
+            y = p[..., 1]
+            pi = np.pi
+            rhs = 2*pi*np.cos(pi*x)*np.sin(pi*y)
+            return rhs
 
 
+        def velocity_u(self, p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.sin(pi*x)*np.cos(pi*y)
+            return val
+
+        def velocity_v(self, p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.cos(pi*x)*np.sin(pi*y)
+            return val
+
+        def pressure(self, p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = x*(1-x)*y*(1-y)
+            return val
+
+        def grad_pressure(self, p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.zeros(p.shape)
+            val[..., 0] = (1-x)*y*(1-y) - x*y*(1-y)
+            val[..., 1] = x*(1-x)*(1-y) - x*(1-x)*y
+            return val
+
+        def dirichlet(self, p):
+            """ Dirichlet boundary condition
+            """
+            return self.pressure(p)
