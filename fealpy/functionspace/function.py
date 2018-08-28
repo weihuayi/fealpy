@@ -1,6 +1,6 @@
 import numpy as np
 
-class FiniteElementFunction(np.ndarray):
+class Function(np.ndarray):
     def __new__(cls, space, dim=None, array=None):
         if array is None:
             self = space.array(dim=dim).view(cls)

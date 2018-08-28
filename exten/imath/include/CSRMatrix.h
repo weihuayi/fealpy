@@ -28,6 +28,22 @@ public:
     SparseType sparse_type;
 
 public:
+    CSRMatrix()
+    {
+        ndim = 2;
+        nnz = 0;
+        data = NULL;
+        indices = NULL;
+        indptr = NULL;
+        shape[0] = 0;
+        shape[1] = 0;
+        mat_type = G;
+        sparse_type = CSR;
+        has_sorted_indices = true;
+        from_other = false;
+    }
+
+
     CSRMatrix(
             T * _data, 
             I * _indices, 
@@ -136,6 +152,38 @@ public:
         }
 
         // 可能有重复
+    }
+
+
+    void reinit(I _nnz, I _n_rows, I _n_cols)
+    {
+        shape[0] = _n_rows;
+        shape[1] = _n_cols;
+
+        from_other = false;
+        data = new T[nnz];
+        indices = new T[nnz];
+        indptr = new T[shape[0]];
+    }
+
+
+    I count_blocks(const I R, const I C)
+    {
+        std::vector<I> mask(shape[1]/C + 1, -1);
+        I n_blocks = 0;
+
+        for(I i = 0; i < shape[0]; i++)
+        {
+            I bi = i/R;
+            for(I jj = indptr[i]; jj < indptr[i+1]; jj++){
+                I bj = indices[jj]/C;
+                if(mask[bj] != bi){
+                    mask[bj] = bi;
+                    n_blocks++;
+                }
+            }
+        }
+        return n_blocks;
     }
 
 

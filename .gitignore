@@ -10,6 +10,7 @@
 doc/project
 *.html
 *.inp
+*.mexa64
 
 meviewer
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from .function import FiniteElementFunction
+from .function import Function
 from .dof import *
 
 class LagrangeFiniteElementSpace():
@@ -188,7 +188,7 @@ class LagrangeFiniteElementSpace():
 
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
-        uI = FiniteElementFunction(self, dim=dim)
+        uI = Function(self, dim=dim)
         uI[:] = u(ipoint)
         return uI
 
@@ -196,7 +196,7 @@ class LagrangeFiniteElementSpace():
         pass
 
     def function(self, dim=None):
-        f = FiniteElementFunction(self, dim=dim)
+        f = Function(self, dim=dim)
         return f
 
     def array(self, dim=None):
@@ -369,7 +369,7 @@ class SymmetricTensorLagrangeFiniteElementSpace():
         return val 
 
     def function(self, dim=None):
-        f = FiniteElementFunction(self)
+        f = Function(self)
         return f
 
     def array(self, dim=None):
@@ -378,6 +378,6 @@ class SymmetricTensorLagrangeFiniteElementSpace():
 
     def interpolation(self, u):
         ipoint = self.dof.interpolation_points()
-        uI = FiniteElementFunction(self)
+        uI = Function(self)
         uI[:] = u(ipoint).flat[:]
         return uI

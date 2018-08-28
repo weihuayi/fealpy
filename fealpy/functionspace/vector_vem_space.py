@@ -1,6 +1,7 @@
 
 import numpy as np
 from .vem_space import ScaledMonomialSpace2d
+from .function import Function
 
 class VectorScaledMonomialSpace2d():
     def __init__(self, mesh, p):
@@ -8,7 +9,7 @@ class VectorScaledMonomialSpace2d():
         self.mesh = mesh
         self.p = p
         self.dof = self.scalarspace.dof
-        self.GD = self.scalarspace.dim # geometry dimension
+        self.GD = self.scalarspace.GD # geometry dimension
 
     def geo_dimension(self):
         return self.GD
@@ -20,11 +21,15 @@ class VectorScaledMonomialSpace2d():
         Parameters
         ---------- 
         point : numpy array
-            The shape of point is (..., M, 2) 
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        phi : numpy array
+            the shape of `phi` is (..., NC, ldof, GD, GD)
         """
         phi = self.scalarspace.basis(point, cellidx=cellidx, p=p)
-        GD = self.GD
-        phi = np.einsum('...j, mn->...jmn', phi, np.eye(GD))
+        phi = np.einsum('...j, mn->...jmn', phi, np.eye(self.GD))
 
         # TODO: better way?
         #shape = phi.shape[:-1] + (-1, GD)
@@ -32,6 +37,19 @@ class VectorScaledMonomialSpace2d():
         return phi
 
     def grad_basis(self, point, cellidx=None, p=None):
+        """
+        Compute the value of the gradients of basis at a set of point
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        gphi : numpy array
+            the shape of gphi is (..., NC, ldof, GD, GD, GD)
+        """
         GD = self.GD
         gphi0 = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
         shape = gphi0.shape + (GD, GD)
@@ -41,12 +59,39 @@ class VectorScaledMonomialSpace2d():
         return gphi
 
     def div_basis(self, point, cellidx=None, p=None):
-        gphi = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
-        return gphi
+        """
+        Compute the value of the divergence of the basis at a set of 'point'
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        dphi : numpy array
+            the shape of gphi is (..., NC, ldof, GD)
+        """
+        dphi = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
+        return dphi
 
     def grad_div_basis(self, point, cellidx=None, p=None):
+        """
+        Compute the value of the gradient of the divergence of the basis at a set of 'point'
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        gdphi : numpy array
+            the shape of gdphi is (..., NC, ldof, GD, GD)
+        """
         hphi = self.scalarspace.hessian_basis(point, cellidx=cellidx, p=p)
-        shape = hphi.shape[:-1] + (2, 2)
+        GD = self.GD
+        shape = hphi.shape[:-1] + (GD, GD)
         gdphi = np.zeros(shape, dtype=np.float) 
         gdphi[..., 0, 0] = hphi[..., 0]
         gdphi[..., 0, 1] = hphi[..., 2]
@@ -55,7 +100,20 @@ class VectorScaledMonomialSpace2d():
         return gdphi
 
     def strain_basis(self, point, cellidx=None, p=None):
-        sphi = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
+        """
+        Compute the value of  the strain of the basis at a set of 'point'
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        sdphi : numpy array
+            the shape of sphi is (..., NC, ldof, GD, GD, GD)
+        """
+        sphi = self.grad_basis(point, cellidx=cellidx, p=p)
         sphi[..., 0, 0, 1] /= 2
         sphi[..., 0, 1, 0] = sphi[..., 0, 0, 1]
 
@@ -64,6 +122,19 @@ class VectorScaledMonomialSpace2d():
         return sphi
 
     def div_strain_basis(self, point, cellidx=None, p=None):
+        """
+        Compute the value of  the divergence of the strain of the basis at a set of 'point'
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        sdphi : numpy array
+            the shape of sphi is (..., NC, ldof, GD, GD)
+        """
         hphi = self.scalarspace.hessian_basis(point, cellidx=cellidx, p=p)
 
         shape = hphi.shape[:-1] + (2, 2)
@@ -76,29 +147,107 @@ class VectorScaledMonomialSpace2d():
         return dsphi
 
     def value(self, uh, point, cellidx=None):
+        """
+        Compute the value of the scaled monomial function
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC, GD)
+        """
         phi = self.scalarspace(point, cellidx=cellidx)
         val = np.einsum('ijk, ...ij->...ik', uh, phi)
         return val
 
     def grad_value(self, uh, point, cellidx=None):
+        """
+        Compute the gradient value of the scaled monomial function
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC, GD, GD)
+        """
         gphi = self.scalarspace.grad_basis(point, cellidx=cellidx)
-        val = np.einsum('ijk, ...ijm->ikm', uh, gphi)
+        val = np.einsum('ijk, ...ijm->...ikm', uh, gphi)
         return val
 
     def div_value(self, uh, point, cellidx=None):
+        """
+        Compute the divergence value of the scaled monomial function
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC)
+        """
         gphi = self.scalarspace.grad_basis(point, cellidx=cellidx)
-        val = np.einsum('ijk, ...ijk->i', uh, gphi)
+        val = np.einsum('ijk, ...ijk->...i', uh, gphi)
         return val
 
     def grad_div_value(self, uh, point, cellidx=None):
+        """
+        Compute the gradient value of the divergence of the scaled monomial
+        function `uh`.
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC, GD)
+        """
         hphi = self.scalarspace.hessian_basis(point, cellidx=cellidx)
-        shape = hphi.shape[:-2] + (2, )
+        shape = hphi.shape[:-2] + (self.GD, )
         val = np.zeros(shape, dtype=np.float)
-        np.einsum('ijk, ...ijk->i', uh, hphi[..., [0, 2]], out=val[..., 0])
-        np.einsum('ijk, ...ijk->i', uh, hphi[..., [2, 1]], out=val[..., 1])
+        np.einsum('ijk, ...ijk->...i', uh, hphi[..., [0, 2]], out=val[..., 0])
+        np.einsum('ijk, ...ijk->...i', uh, hphi[..., [2, 1]], out=val[..., 1])
         return val
 
     def strain_value(self, uh, point, cellidx=None):
+        """
+        Compute the strain value of the scaled monomial
+        function `uh`.
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC, 3)
+        """
+
         gphi = self.scalarspace.grad_basis(point, cellidx=cellidx)
         shape = gphi.shape[:-2] + (3, )
         val = np.zeros(shape, dtype=np.float)
@@ -108,12 +257,28 @@ class VectorScaledMonomialSpace2d():
         return val
 
     def div_strain_value(self, uh, point, cellidx=None):
+        """
+        Compute the divergence value of  the scaled monomial
+        function `uh`.
+
+        Parameters
+        ---------- 
+        uh : numpy array
+            The shape of uh is (NC, ldof, GD)
+        point : numpy array
+            The shape of point is (..., NC, GD) 
+
+        Returns
+        -------
+        val : numpy array
+            the shape of val is (..., NC, GD)
+        """
         dsphi = self.div_strain_value(point, cellidx=cellidx)
         val = np.einsum('ijk, ...ijkm->...im', uh, dsphi)
         return val
 
     def function(self):
-        f = FiniteElementFunction(self)
+        f = Function(self)
         return f 
 
     def array(self, dim=None):

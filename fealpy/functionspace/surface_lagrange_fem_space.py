@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 
-from .function import FiniteElementFunction
+from .function import Function
 from ..common import ranges
 from .dof import CPLFEMDof2d, DPLFEMDof2d 
 from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh 
@@ -132,12 +132,12 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def interpolation(self, u, dim=None):
         ipoint = self.interpolation_points()
-        uI = FiniteElementFunction(self, dim=dim)
+        uI = Function(self, dim=dim)
         uI[:] = u(ipoint)
         return uI
 
     def function(self, dim=None):
-        f = FiniteElementFunction(self, dim=dim)
+        f = Function(self, dim=dim)
         return f
 
     def projection(self, u, up):
@@ -152,5 +152,4 @@ class SurfaceLagrangeFiniteElementSpace:
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
-        return np.zeros((gdof,), dtype=np.float)
 

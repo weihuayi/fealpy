@@ -4,7 +4,7 @@ Virtual Element Space
 """
 import numpy as np
 from ..common import ranges
-from .function import FiniteElementFunction
+from .function import Function
 from ..quadrature import GaussLobattoQuadrature
 
 class SMDof2d():
@@ -70,6 +70,10 @@ class ScaledMonomialSpace2d():
         self.area = mesh.cell_area()
         self.h = np.sqrt(self.area) 
         self.dof = SMDof2d(mesh, p)
+        self.GD = 2
+
+    def geo_dimension(self):
+        return self.GD
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -177,10 +181,23 @@ class ScaledMonomialSpace2d():
             return lphi/area[cellidx].reshape(-1, 1)
 
     def hessian_basis(self, point, cellidx=None, p=None):
+        """
+        Compute the value of the hessian of the basis at a set of 'point'
+
+        Parameters
+        ---------- 
+        point : numpy array
+            The shape of point is (..., NC, 2) 
+
+        Returns
+        -------
+        hphi : numpy array
+            the shape of hphi is (..., NC, ldof, 3)
+        """
         if p is None:
             p = self.p
-        area = self.area
 
+        area = self.area
         ldof = self.number_of_local_dofs() 
 
         shape = point.shape[:-1]+(ldof, 3)
@@ -195,8 +212,9 @@ class ScaledMonomialSpace2d():
                 hphi[..., start+2:start+i+1, 1] = np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 r0 = np.arange(1, i)
                 r0 = r0*r0[-1::-1]
-                hphi[..., start+1:start+i, 2] = np.eisum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i]
+                hphi[..., start+1:start+i, 2] = np.eisum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
                 start += i+1
+
         if cellidx is None:
             return hphi/area.reshape(-1, 1, 1)
         else:

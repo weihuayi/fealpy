@@ -3,9 +3,11 @@
 
 #include <iostream>
 #include "CSRMatrix.h"
+#include "BSRMatrix.h"
 #include "Vector.h"
 
 typedef iMath::LinearAlgebra::CSRMatrix<int, double>  CSRMatrix;
+typedef iMath::LinearAlgebra::BSRMatrix<int, double>  BSRMatrix;
 typedef iMath::LinearAlgebra::Vector<int, double>  Vector;
 void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
 {
@@ -42,5 +44,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[])
     CSRMatrix  A(I, J, data, nnz, n_rows, n_cols);
     A.print();
 
+    BSRMatrix B(A, 2, 2);
+    B.print();
     return;
 }
