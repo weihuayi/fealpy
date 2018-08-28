@@ -159,6 +159,8 @@ public:
                 shape[0]/blocksize[0],
                 shape[1]/blocksize[1]);
 
+        C.reinit(A.nnz, A.shape[0], A.shape[1]);
+
         A.symmetric_strength_of_connection(C, theta);
     }
 };

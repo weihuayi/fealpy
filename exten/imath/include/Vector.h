@@ -8,11 +8,11 @@ namespace iMath {
 
 namespace LinearAlgebra {
 
-template<class I, class F>
+template<class I, class T>
 class Vector
 {
 public:
-    F * data;
+    T * data;
     I size;
 
     bool from_other;
@@ -24,7 +24,7 @@ public:
         from_other = false;
     }
 
-    Vector(F * _data, I _size)
+    Vector(T * _data, I _size)
     {
         size = _size;
         data = _data;
@@ -35,7 +35,7 @@ public:
     Vector(V & v)
     {
         size = v.size;
-        data = new F[size];
+        data = new T[size];
         for(int i = 0; i < size; i++)
         {
             data[i] = v[i];
@@ -46,9 +46,21 @@ public:
     Vector(I _size)
     {
         size = _size;
-        data = new F[size];
+        data = new T[size];
         from_other = false;
     }
+
+    void reinit(I _size)
+    {
+        if( (from_other == false) & (data != NULL) )
+        {
+            delete[] data;
+        }
+        size = _size;
+        data = new T[size];
+        from_other = false;
+    }
+
 
     ~Vector()
     {
@@ -58,7 +70,7 @@ public:
         }
     }
 
-    F & operator [] (int i)
+    T & operator [] (int i)
     {
         return data[i];
     }
@@ -73,9 +85,9 @@ public:
         }
     }
 
-    F norm()
+    T norm()
     {
-        F r = 0.0;
+        T r = 0.0;
         for(I i = 0; i < size; i++)
         {
             r += data[i]*data[i];
@@ -84,23 +96,23 @@ public:
     }
 
     template<class V> 
-    F dot(V & v)
+    T dot(V & v)
     {
-        F sum = 0.0;
+        T sum = 0.0;
         for(I i=0; i < size; i++)
             sum += data[i]*v[i];
         return sum;
     }
 
     template<class V>
-    void wplus(F alpha, V & v)
+    void wplus(T alpha, V & v)
     {
         for(I i=0; i < size; i++)
             data[i] += alpha*v[i];
     }
 
     template<class V>
-    void wminus(F alpha, V & v)
+    void wminus(T alpha, V & v)
     {
         for(I i=0; i < size; i++)
             data[i] += alpha*v[i];
