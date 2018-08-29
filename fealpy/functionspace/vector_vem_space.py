@@ -28,15 +28,14 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         phi : numpy array
-            the shape of `phi` is (..., NC, ldof, GD, GD)
+            the shape of `phi` is (..., NC, ldof*GD, GD)
         """
         phi = self.scalarspace.basis(point, cellidx=cellidx, p=p)
         phi = np.einsum('...j, mn->...jmn', phi, np.eye(self.GD))
 
         # TODO: better way?
-        #shape = phi.shape[:-1] + (-1, GD)
-        #phi = phi.reshape(shape)
-        return phi
+        shape = phi.shape[:-3] + (-1, self.GD)
+        return phi.reshape(shape)
 
     def grad_basis(self, point, cellidx=None, p=None):
         """
@@ -50,7 +49,7 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         gphi : numpy array
-            the shape of gphi is (..., NC, ldof, GD, GD, GD)
+            the shape of gphi is (..., NC, ldof*GD, GD, GD)
         """
         GD = self.GD
         gphi0 = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
@@ -58,7 +57,9 @@ class VectorScaledMonomialSpace2d():
         gphi = np.zeros(shape, dtype=np.float)
         gphi[..., 0, 0, :] = gphi0
         gphi[..., 1, 1, :] = gphi0
-        return gphi
+
+        shape = gphi.shape[:-4] + (-1, GD, GD)
+        return  gphi.reshape(shape)
 
     def div_basis(self, point, cellidx=None, p=None):
         """
@@ -72,10 +73,12 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         dphi : numpy array
-            the shape of gphi is (..., NC, ldof, GD)
+            the shape of gphi is (..., NC, ldof*GD)
         """
         dphi = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
-        return dphi
+
+        shape = dphi.shape[:-2] + (-1, )
+        return dphi.reshape(shape)
 
     def grad_div_basis(self, point, cellidx=None, p=None):
         """
@@ -89,7 +92,7 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         gdphi : numpy array
-            the shape of gdphi is (..., NC, ldof, GD, GD)
+            the shape of gdphi is (..., NC, ldof*GD, GD)
         """
         hphi = self.scalarspace.hessian_basis(point, cellidx=cellidx, p=p)
         GD = self.GD
@@ -99,7 +102,8 @@ class VectorScaledMonomialSpace2d():
         gdphi[..., 0, 1] = hphi[..., 2]
         gdphi[..., 1, 0] = hphi[..., 2] 
         gdphi[..., 1, 1] = hphi[..., 1]
-        return gdphi
+        shape = gdphi.shape[:-3] + (-1, GD)
+        return gdphi.reshape(shape)
 
     def strain_basis(self, point, cellidx=None, p=None):
         """
@@ -113,15 +117,23 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         sdphi : numpy array
-            the shape of sphi is (..., NC, ldof, GD, GD, GD)
+            the shape of sphi is (..., NC, ldof*GD, GD, GD)
         """
-        sphi = self.grad_basis(point, cellidx=cellidx, p=p)
-        sphi[..., 0, 0, 1] /= 2
+        GD = self.GD
+        gphi = self.scalarspace.grad_basis(point, cellidx=cellidx, p=p)
+        shape = gphi.shape + (GD, GD)
+        sphi = np.zeros(shape, dtype=np.float)
+        
+        sphi[..., 0, 0, 0] = gphi[..., 0]
+        sphi[..., 0, 0, 1] = gphi[..., 1]/2
         sphi[..., 0, 1, 0] = sphi[..., 0, 0, 1]
 
-        sphi[..., 1, 1, 0] /= 2
+        sphi[..., 1, 1, 1] = gphi[..., 1]
+        sphi[..., 1, 1, 0] = gphi[..., 0]/2
         sphi[..., 1, 0, 1] = sphi[..., 1, 1, 0]
-        return sphi
+
+        shape = sphi.shape[:-4] + (-1, GD, GD)
+        return sphi.reshape(shape)
 
     def div_strain_basis(self, point, cellidx=None, p=None):
         """
@@ -135,7 +147,7 @@ class VectorScaledMonomialSpace2d():
         Returns
         -------
         sdphi : numpy array
-            the shape of sphi is (..., NC, ldof, GD, GD)
+            the shape of sphi is (..., NC, ldof*GD, GD)
         """
         hphi = self.scalarspace.hessian_basis(point, cellidx=cellidx, p=p)
 
@@ -146,7 +158,8 @@ class VectorScaledMonomialSpace2d():
 
         dsphi[..., 1, 0] = hphi[..., 2]/2
         dsphi[..., 1, 1] = hphi[..., 0]/2 + hphi[..., 1]
-        return dsphi
+        shape = dsphi.shape[:-3] + (-1, self.GD)
+        return dsphi.reshape(shape)
 
     def value(self, uh, point, cellidx=None):
         """
@@ -276,7 +289,8 @@ class VectorScaledMonomialSpace2d():
             the shape of val is (..., NC, GD)
         """
         dsphi = self.div_strain_value(point, cellidx=cellidx)
-        val = np.einsum('ijk, ...ijkm->...im', uh, dsphi)
+        shape = uh.shape[:-2] + (-1, )
+        val = np.einsum('ij, ...ijm->...im', uh.reshape(shape), dsphi)
         return val
 
     def function(self):
@@ -342,3 +356,8 @@ class VectorVirtualElementSpace2d():
         gdof = self.dof.number_of_global_dofs() # 获得对应标量空间的全局自由度
         shape = (gdof, dim)
         return np.zeros(shape, dtype=np.float)
+
+
+        
+
+
