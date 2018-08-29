@@ -6,12 +6,12 @@ class PolygonMeshIntegralAlg():
         self.pmesh = pmesh
         self.integrator = integrator
         if area is None:
-            self.area = pmesh.entity_measure(dim=2)
+            self.area = pmesh.entity_measure('cell')
         else:
             self.area = area
 
         if barycenter is None:
-            self.barycenter = pmesh.barycenter()
+            self.barycenter = pmesh.entity_barycenter('cell')
         else:
             self.barycenter = barycenter
 

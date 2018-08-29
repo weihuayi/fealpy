@@ -56,18 +56,18 @@ class PolygonMesh(Mesh2d):
         node, cell, cellLocation = quadtree.to_pmesh()
         return cls(node, cell, cellLocation)
 
-    def entity_barycenter(self, entity='cell', index=None):
+    def entity_barycenter(self, etype='cell', index=None):
         node = self.node
         dim = self.geo_dimension()
 
-        if entity is 'cell':
+        if etype in ['cell', 2]:
             cell2node = self.ds.cell_to_node()
             NV = self.number_of_vertices_of_cells().reshape(-1,1)
             bc = cell2node*node/NV 
-        elif entity is 'edge':
+        elif etype in ['edge', 1]:
             edge = self.ds.edge
             bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
-        elif entity is 'node':
+        elif etype in ['node', 1]:
             bc = node
         return bc
 

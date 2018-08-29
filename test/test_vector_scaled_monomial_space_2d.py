@@ -4,6 +4,8 @@ import matplotlib.pyplot as plt
 from fealpy.functionspace.vector_vem_space import VectorScaledMonomialSpace2d
 from fealpy.mesh import PolygonMesh
 
+from fealpy.vem.integral_alg import PolygonMeshIntegralAlg
+
 p = 1
 point = np.array([(0.5, 0.5)], dtype=np.float)
 point = np.array([(1, 1)], dtype=np.float)

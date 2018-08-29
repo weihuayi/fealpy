@@ -1,6 +1,6 @@
 
 import numpy as np
-from .vem_space import ScaledMonomialSpace2d
+from .vem_space import ScaledMonomialSpace2d, VEMDof2d
 from .function import Function
 
 class VectorScaledMonomialSpace2d():
@@ -10,6 +10,8 @@ class VectorScaledMonomialSpace2d():
         self.p = p
         self.dof = self.scalarspace.dof
         self.GD = self.scalarspace.GD # geometry dimension
+        self.area = self.scalarspace.area
+        self.barycenter = self.scalarspace.barycenter
 
     def geo_dimension(self):
         return self.GD
@@ -294,3 +296,49 @@ class VectorScaledMonomialSpace2d():
     def number_of_global_dofs(self):
         GD = self.GD
         return GD*self.dof.number_of_global_dofs()
+
+class VectorVirtualElementSpace2d():
+    def __init__(self, mesh, p = 1):
+        self.mesh = mesh
+        self.p = p
+        self.vsmspace = VectorScaledMonomialSpace2d(mesh, p)
+        self.dof = VEMDof2d(mesh, p) # 标量空间自由度管理对象
+        self.GD = 2
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof, self.dof.cell2dofLocation
+
+    def number_of_global_dofs(self):
+        return self.GD*self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self):
+        return self.GD*self.dof.number_of_local_dofs()
+
+    def interpolation_points(self):
+        return self.dof.interpolation_points()
+
+    def interpolation(self, u, integral=None):
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        p = self.p
+        ipoint = self.dof.interpolation_points()
+        uI = self.function() 
+        uI[:NN+(p-1)*NE, :] = u(ipoint)
+        if p > 1:
+            phi = self.vsmspace.basis
+
+            def f(x, cellidx):
+                return np.einsum('ijk, ij...k->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
+            
+            bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis, np.newaxis]
+            uI[NN+(p-1)*NE:, :] = bb.reshape(-1, 2)
+        return uI
+
+    def function(self):
+        return Function(self, self.GD)
+
+    def array(self, dim):
+        gdof = self.dof.number_of_global_dofs() # 获得对应标量空间的全局自由度
+        shape = (gdof, dim)
+        return np.zeros(shape, dtype=np.float)

@@ -95,7 +95,8 @@ class ScaledMonomialSpace2d():
 
         ldof = self.number_of_local_dofs(p=p) 
         if p == 0: 
-            return np.ones(point.shape[:-1], dtype=np.float) 
+            shape = point.shape[:-1] + (1, )
+            return np.ones(shape, dtype=np.float) 
     
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float) # (..., M, ldof)
@@ -343,8 +344,7 @@ class VEMDof2d():
             GD = mesh.geo_dimension() 
             NE = mesh.number_of_edges()
 
-            gdof = self.number_of_global_dofs()
-            ipoint = np.zeros((gdof, GD), dtype=np.float)
+            ipoint = np.zeros((NN+(p-1)*NE, GD), dtype=np.float)
             ipoint[:NN, :] = node 
             edge = mesh.entity('edge')
 
@@ -393,27 +393,23 @@ class VirtualElementSpace2d():
         pass
 
     def function(self, dim=None):
-        return FiniteElementFunction(self, dim=dim)
+        return Function(self, dim=dim)
 
     def interpolation(self, u, integral=None):
-
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         p = self.p
-        ipoint = self.interpolation_points()
+        ipoint = self.dof.interpolation_points()
         uI = self.function() 
-        uI[:NN+(p-1)*NE] = u(ipoint[:NN+(p-1)*NE])
+        uI[:NN+(p-1)*NE] = u(ipoint)
         if p > 1:
             phi = self.smspace.basis
 
             def f(x, cellidx):
                 return np.einsum('ij, ij...->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
-            
-            if p == 2:
-                bb = integral(f, celltype=True)/self.smspace.area
-            else:
-                bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+
+            bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
             uI[NN+(p-1)*NE:] = bb.reshape(-1)
         return uI
 
