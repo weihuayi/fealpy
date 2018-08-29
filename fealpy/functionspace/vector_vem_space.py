@@ -331,7 +331,7 @@ class VectorVirtualElementSpace2d():
             def f(x, cellidx):
                 return np.einsum('ijk, ij...k->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
             
-            bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis, np.newaxis]
+            bb = integral(f, celltype=True)/self.vsmspace.area[..., np.newaxis, np.newaxis]
             uI[NN+(p-1)*NE:, :] = bb.reshape(-1, 2)
         return uI
 

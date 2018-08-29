@@ -305,7 +305,7 @@ class VEMDof2d():
             NE = mesh.number_of_edges()
             idof = (p-1)*p//2
             idx = (cell2dofLocation[:-1] + NV*p).reshape(-1, 1) + np.arange(idof)
-            cell2dof[idx] = N + NE*(p-1) + np.arange(NC*idof).reshape(NC, idof)
+            cell2dof[idx] = NN + NE*(p-1) + np.arange(NC*idof).reshape(NC, idof)
             return cell2dof, cell2dofLocation
 
 

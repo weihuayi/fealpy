@@ -21,7 +21,7 @@ cellLocation = np.array([0, 4], dtype=np.int)
 
 mesh = PolygonMesh(node, cell, cellLocation)
 
-p = 2
+p = 4
 q = 3
 vem = VectorVirtualElementSpace2d(mesh, p)
 
