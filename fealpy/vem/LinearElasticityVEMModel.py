@@ -32,5 +32,14 @@ class LinearElasticityVEMModel():
             G += np.einsum('ijk, ijp->ijkp', dphi, dphi)
             return G 
 
-        G = self.integralalg.integral(f, celltype=True);
+        G = self.integralalg.integral(f, celltype=True)
+
+        if self.space.p == 1:
+            G[..., 0, 0] = 1
+            G[..., 1, 1] = 1
+        else:
+            phi = self.space.vsmspace.scalarspace.basis
+            G0 = self.integralalg.integral(phi, celltype=True)
+            G[..., 0, 0::2] = G0
+            G[..., 1, 1::2] = G0
         return G

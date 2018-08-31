@@ -47,12 +47,13 @@ class PolygonMeshIntegralAlg():
         np.add.at(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        tri = [bc[edge2cell[isInEdge, 1]], node[edge[isInEdge, 1]], node[edge[isInEdge, 0]]]
-        a = self.triangle_area(tri)
-        pp = np.einsum('ij, jkm->ikm', bcs, tri)
-        val = u(pp, edge2cell[isInEdge, 1])
-        ee = np.einsum('i, ij..., j->j...', ws, val, a)
-        np.add.at(e, edge2cell[isInEdge, 1], ee)
+        if np.sum(isInEdge) > 0:
+            tri = [bc[edge2cell[isInEdge, 1]], node[edge[isInEdge, 1]], node[edge[isInEdge, 0]]]
+            a = self.triangle_area(tri)
+            pp = np.einsum('ij, jkm->ikm', bcs, tri)
+            val = u(pp, edge2cell[isInEdge, 1])
+            ee = np.einsum('i, ij..., j->j...', ws, val, a)
+            np.add.at(e, edge2cell[isInEdge, 1], ee)
 
         if celltype is True:
             return e

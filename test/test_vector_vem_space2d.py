@@ -26,7 +26,7 @@ mesh = PolygonMesh(node, cell, cellLocation)
 
 
 pde = LinearElasticityModel(1, 1)
-p = 1
+p = 2
 q = 5
 vem = LinearElasticityVEMModel(pde, mesh, p, q)
 
