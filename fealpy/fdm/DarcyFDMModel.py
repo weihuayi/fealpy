@@ -2,18 +2,26 @@ import numpy as np
 from scipy.sparse import csr_matrix,hstack,vstack
 
 
-class DarcyForchheimerFDMModel():
-    def __init__(self):
-    	self.fdmspace = 
-        pass
+class DarcyFDMModel():
+    def __init__(self, pde, mesh):
+        self.pde = pde
+        self.mesh = mesh
 
-    def get_left_matrix(self,nx,ny,NC,NE):
-    	row1 = [val for val in np.arange(NC) for i in range(2)]
-        N1 = np.arange(NE/2-ny)
-        N2 = np.arange(ny,NE/2)
-        col1 = [rv for r in zip(N1,N2) for rv in r]
-        data1 = np.array([-1,1 ]*NC)
-        A11 = csr_matrix((data1, (row1, col1)),shape = (NC, NE/2))
+    def get_left_matrix(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+
+        idx = np.arange(NE)
+        edge2cell = mesh.ds.edge_to_cell()
+        isIntEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        idx = idx[isIntEdge]
+
+
+        A11 = csr_matrix((data1, (idx, idx)),shape = (NE, NE))
+
+
+
         N3 = np.arange((NE/2),dtype = np.int).reshape(4,5)[:,:-1].flatten()
         N4 = np.arange((NE/2+1),dtype = np.int)[1:].reshape(4,5)[:,:-1].flatten()
         col2 = [rv for r in zip(N3,N4) for rv in r]
