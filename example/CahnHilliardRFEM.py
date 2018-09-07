@@ -3,8 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-from fealpy.model.lcy  import CahnHilliardData1
-from fealpy.femmodel.CahnHilliardRFEMModel import CahnHilliardRFEMModel 
+from fealpy.pde.lcy  import CahnHilliardData5
+from fealpy.fem.CahnHilliardRFEMModel import CahnHilliardRFEMModel 
 
 
 def init():
@@ -15,9 +15,10 @@ def animate(i):
     fem.step()
    
 
-pde = CahnHilliardData1(0, 1)
-fem = CahnHilliardRFEMModel(pde, 8, 0.000001, 3)
+pde = CahnHilliardData5(0, 0.0001)
+fem = CahnHilliardRFEMModel(pde, 8, 0.00001, 3)
 fem.solve()
+
 
 
 

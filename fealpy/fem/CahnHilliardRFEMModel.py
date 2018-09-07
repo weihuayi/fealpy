@@ -6,9 +6,9 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.sparse import csc_matrix, csr_matrix, spdiags, eye
 from scipy.sparse.linalg import spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from ..femmodel import doperator 
+from ..fem import doperator 
 from .integral_alg import IntegralAlg
-from .doperator  import mass_matrix, grad_recovery_matrix
+from .doperator import mass_matrix, grad_recovery_matrix
 import pyamg
 
 class CahnHilliardRFEMModel():
@@ -142,10 +142,12 @@ class CahnHilliardRFEMModel():
             b = self.get_right_vector()
             #self.uh1[:] =  spsolve(D, b)
             self.uh1[:] = self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+            error = self.get_L2_error(t)
             self.current = i
             if self.current%2 == 0:
                 self.show_soultion()
             self.uh0[:] = self.uh1[:]
+            
             
 
     def step(self):
@@ -165,5 +167,16 @@ class CahnHilliardRFEMModel():
         axes = fig.gca(projection='3d')
         axes.plot_trisurf(node[:, 0], node[:, 1], cell, self.uh0, cmap=plt.cm.jet, lw=0.0)
         plt.savefig('./results/cahnHilliard'+ str(self.current)+'.png')
-    
+
+
+    def get_L2_error(self, t):
+        def solution(x):
+            return self.pde.solution(x, t)
+        u = solution
+        uh = self.uh1.value
+        L2 = self.integralalg.L2_error(u, uh)
+        print(L2)
+        return L2
+
+
     

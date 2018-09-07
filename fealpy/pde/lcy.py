@@ -230,3 +230,67 @@ class CahnHilliardData4:
         rhs = np.zeros(p.shape[0:-1]) 
         return rhs
 
+
+class CahnHilliardData5:
+    def __init__(self, t0, t1):
+        self.t0 = t0
+        self.t1 = t1
+        self.epsilon = 0.01
+
+    def space_mesh(self, n=4):
+        point = np.array([
+            (0, 0),
+            (2, 0),
+            (4, 0),
+            (0, 2),
+            (2, 2),
+            (4, 2)], dtype=np.float)
+        cell = np.array([
+            (3, 0, 4),
+            (1, 4, 0),
+            (2, 5, 1),
+            (4, 1, 5)], dtype=np.int)
+
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
+    def time_mesh(self, tau):
+        n = int(np.ceil(self.t1 - self.t0)/tau)
+        tau = (self.t1 - self.t0)/n
+        return np.linspace(self.t0, self.t1, num=n+1), tau
+
+    def initdata(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        u0 = np.sin(np.pi*x)**2*np.sin(np.pi*y)**2   
+        return u0
+     
+    def solution(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        u = np.exp(-2*t)*np.sin(np.pi*x)**2*np.sin(np.pi*y)**2   
+        return u
+    
+    def gradient(self, p, t):
+        pass
+    
+    def laplace(self, p, t):
+        pass
+    
+    def neumann(self, p):
+        """
+        Neumann boundary condition
+        """
+        return 0 
+    
+    def source(self, p, t):
+        epsilon = self.epsilon
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = (-2)*np.exp(-2*t)*np.sin(np.pi*x)**2*np.sin(np.pi*y)**2\
+                + epsilon*2*np.pi**2*np.exp(-2*t)*(4*np.pi**2*np.cos(2*np.pi*x)*np.cos(2*np.pi*y)\
+                -4*np.pi**2*np.cos(2*np.pi*y)*np.sin(np.pi*x)**2-4*np.pi**2*np.cos(2*np.pi*x)*np.sin(np.pi*y)**2)
+        return rhs
+    
+
