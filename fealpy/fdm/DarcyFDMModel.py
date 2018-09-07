@@ -10,6 +10,7 @@ class DarcyFDMModel():
     def get_left_matrix(self):
         mesh = self.mesh
         NE = mesh.number_of_edges()
+        print(NE)
 
         idx = np.arange(NE)
         edge2cell = mesh.ds.edge_to_cell()
@@ -59,4 +60,7 @@ class DarcyFDMModel():
         pass
 
     def solve(self):
+        pass
+
+    def get_L2_error(self):
         pass
