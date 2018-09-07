@@ -10,9 +10,9 @@ from fealpy.fem.CahnHilliardRFEMModel import CahnHilliardRFEMModel
 def init():
     return lines, points
 
-def animate(i):
-    global fem
-    fem.step()
+#def animate(i):
+#    global fem
+#    fem.step()
    
 
 pde = CahnHilliardData5(0, 0.0001)
