@@ -4,31 +4,16 @@ from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.Mesh2d import Mesh2d
 
 class CoscosData:
-    def __init__(self,box,nx,ny):
+    def __init__(self, box):
         self.box = box
-        self.nx = nx
-        self.ny = ny
-        pass
-    def init_mesh(self, n=2, meshtype ='quad'):
-        nx = self.nx
-        ny = self.ny
+        self.mu = 1
+        slef.k = 1
+
+    def init_mesh(self, nx, ny):
         box = self.box
-        node = np.array([
-            (0,0),
-            (0, 0.5),
-            (0,1),
-            (0.5, 0),
-            (0.5, 0.5),
-            (0.5, 1),
-            (1, 0),
-            (1, 0.5),
-            (1, 1)], dtype = np.float)
-        cell = np.array([(0, 3, 1, 4),
-            (1, 4, 5, 2),
-            (3, 6, 7, 4),
-            (4, 7, 5, 8)],dtype = np.int)
-        mesh = StructureQuadMesh(box,nx,ny)
+        mesh = StructureQuadMesh(box, nx, ny)
         return mesh
+
     def solution1(self,p):
         x = p[..., 0]
         y = p[..., 1]

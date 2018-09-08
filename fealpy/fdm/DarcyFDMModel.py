@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import csr_matrix,hstack,vstack
+from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat
 
 
 class DarcyFDMModel():
@@ -8,56 +8,62 @@ class DarcyFDMModel():
         self.mesh = mesh
 
     def get_left_matrix(self):
+
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        print(NE)
+        NC = mesh.number_of_cells()
+        itype = mesh.itype
+        ftype = mesh.ftype
 
         idx = np.arange(NE)
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+
+        mu = self.pde.mu
+        k = self.pde.k
+        A11 = mu/k*eye(NE, NE, dtype=ftype) 
+
+
         edge2cell = mesh.ds.edge_to_cell()
-        isIntEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        data = np.ones(len(I), dtype=ftype)/mesh.dx
 
-        idx = idx[isIntEdge]
+        A12 = coo_matrix((data, (I, R)), shape=(NE, NC))
+        A12 += coo_matrix((-data, (I, L)), shape=(NE, NC))
+
+        I, = np.nonzero(~isBDEdge & isXDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        data = np.ones(len(I), dtype=ftype)/mesh.dy
+        A12 += coo_matrix((-data, (I, R)), shape=(NE, NC))
+        A12 += coo_matrix((data, (I, L)), shape=(NE, NC))
+        A12 = A12.tocsr()
+
+        
+        cell2edge = mesh.ds.cell_to_cedge()
+        I = np.arange(NC, dtype=itype)
+        data = np.ones(NC, dtype=ftype)
 
 
-        A11 = csr_matrix((data1, (idx, idx)),shape = (NE, NE))
+        A21 = coo_matrix((data/mesh.dx, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-data/mesh.dx, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((data/mesh.dy, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-data/mesh.dy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
+        A21 = A21.tocsr()
 
-
-
-        N3 = np.arange((NE/2),dtype = np.int).reshape(4,5)[:,:-1].flatten()
-        N4 = np.arange((NE/2+1),dtype = np.int)[1:].reshape(4,5)[:,:-1].flatten()
-        col2 = [rv for r in zip(N3,N4) for rv in r]
-        A12 = csr_matrix((data1, (row1, col2)),shape = (NC, NE/2))
-        A13 = csr_matrix((NC, NC),dtype = np.int)
-        A1 = hstack((A11, A12, A13))
-
-        row2 = np.arange(4,NE/2)
-        data2 = mu*nx/k*np.array([1]*(int(NE/2-ny)))
-        A21 = csr_matrix((data2,(row2,row2)),shape = (NE/2, NE/2))
-        A22 = csr_matrix((NE/2, NE/2),dtype = np.int)
-        row3 = [val for val in np.arange(ny,NE/2-ny) for i in range(2)]
-        N5 = np.arange(NE/2-2*ny)
-        N6 = np.arange(ny,NE/2-ny)
-        col3 = [rv for r in zip(N5,N6) for rv in r]
-        data3 = np.array([-1,1 ]*(int(NE/2-2*ny)))
-        A23 = csr_matrix((data3,(row3,col3)),shape = (NE/2, NC))
-        A2 = hstack((A21, A22, A23))
-        A31 = csr_matrix((NE/2, NE/2),dtype = np.int)
-        row4 = np.arange((NE/2),dtype = np.int).reshape(4,5)[:,1:].flatten()
-        A32 = csr_matrix((data2,(row4,row4)),shape = (NE/2, NE/2))
-        N7 = np.arange((NE/2),dtype = np.int).reshape(4,5)[:,1:-1].flatten()
-        row5 = [val for val in N7 for i in range(2)]
-        N8 = np.arange((NC),dtype = np.int).reshape(4,4)[:,:-1].flatten()
-        N9 = np.arange((NC+1),dtype = np.int)[1:].reshape(4,4)[:,:-1].flatten()
-        col4 = [rv for r in zip(N8,N9) for rv in r]
-        data4 = np.array([-1,1 ]*int(NC-nx))
-        A33 = csr_matrix((data4,(row5,col4)),shape = (NE/2, NC))
-        A3 = hstack((A31, A32, A33))
-        A = vstack((A1,A2,A3)).toarray()
+        A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
 
         return A
 
     def get_right_vector(self):
-        pass
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        itype = mesh.itype
+        ftype = mesh.ftype
 
     def solve(self):
         pass
