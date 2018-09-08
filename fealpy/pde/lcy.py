@@ -256,7 +256,7 @@ class CahnHilliardData5:
         return mesh
 
     def time_mesh(self, tau):
-        n = int(np.ceil(self.t1 - self.t0)/tau)
+        n = int(np.ceil((self.t1 - self.t0)/tau))
         tau = (self.t1 - self.t0)/n
         return np.linspace(self.t0, self.t1, num=n+1), tau
 

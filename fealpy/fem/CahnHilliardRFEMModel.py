@@ -147,6 +147,7 @@ class CahnHilliardRFEMModel():
         timemesh = self.timemesh 
         tau = self.tau
         N = len(timemesh)
+        print(N)
         D = self.D
         for i in range(N):
             t = timemesh[i]
