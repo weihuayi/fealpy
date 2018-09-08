@@ -14,20 +14,14 @@ class CoscosData:
         mesh = StructureQuadMesh(box, nx, ny)
         return mesh
 
-    def solution1(self,p):
+    def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
-        val = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
-        return val
 
-    def solution2(self,p):
-        x = p[..., 0]
-        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
-        sin = np.sin
-        cos = np.cos
-        val = 2*pi*cos(2*pi*x)*sin(2*pi*y)
+        val[..., 0] = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
+        val[..., 1] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
         return val
 
     def pressure(self,p):

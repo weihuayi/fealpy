@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat
 
-
 class DarcyFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
@@ -12,6 +11,7 @@ class DarcyFDMModel():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
+
         itype = mesh.itype
         ftype = mesh.ftype
 
@@ -29,7 +29,7 @@ class DarcyFDMModel():
         I, = np.nonzero(~isBDEdge & isYDEdge)
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
-        data = np.ones(len(I), dtype=ftype)/mesh.dx
+        data = np.ones(len(I), dtype=ftype)/mesh.hx
 
         A12 = coo_matrix((data, (I, R)), shape=(NE, NC))
         A12 += coo_matrix((-data, (I, L)), shape=(NE, NC))
@@ -37,7 +37,7 @@ class DarcyFDMModel():
         I, = np.nonzero(~isBDEdge & isXDEdge)
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
-        data = np.ones(len(I), dtype=ftype)/mesh.dy
+        data = np.ones(len(I), dtype=ftype)/mesh.hy
         A12 += coo_matrix((-data, (I, R)), shape=(NE, NC))
         A12 += coo_matrix((data, (I, L)), shape=(NE, NC))
         A12 = A12.tocsr()
@@ -46,12 +46,10 @@ class DarcyFDMModel():
         cell2edge = mesh.ds.cell_to_cedge()
         I = np.arange(NC, dtype=itype)
         data = np.ones(NC, dtype=ftype)
-
-
-        A21 = coo_matrix((data/mesh.dx, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-data/mesh.dx, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((data/mesh.dy, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-data/mesh.dy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
+        A21 = coo_matrix((data/mesh.hx, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-data/mesh.hx, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((data/mesh.hy, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-data/mesh.hy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
         A21 = A21.tocsr()
 
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
@@ -60,10 +58,21 @@ class DarcyFDMModel():
 
     def get_right_vector(self):
         mesh = self.mesh
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
         itype = mesh.itype
         ftype = mesh.ftype
+
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        b = np.zeros(NE+NC, dtype=ftype)
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+
+        idx, = np.nonzero(isBDEdge & isYDEdge)
+        b[idx] =  
+
+
 
     def solve(self):
         pass
