@@ -10,7 +10,7 @@ class Function(np.ndarray):
         return self
 
     def index(self, i):
-        return FiniteElementFunction(self.space, array=self[:, i])
+        return Function(self.space, array=self[:, i])
 
     def __call__(self, bc, cellidx=None):
         space = self.space

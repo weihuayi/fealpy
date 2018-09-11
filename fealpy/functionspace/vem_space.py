@@ -232,7 +232,7 @@ class ScaledMonomialSpace2d():
             return np.einsum('ij, ...ij->...i', uh[cell2dof[cellIdx]], lphi)
 
     def function(self):
-        f = FiniteElementFunction(self)
+        f = Function(self)
         return f 
 
     def array(self, dim=None):
