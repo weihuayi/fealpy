@@ -7,7 +7,7 @@ class CoscosData:
     def __init__(self, box):
         self.box = box
         self.mu = 1
-        slef.k = 1
+        self.k = 1
 
     def init_mesh(self, nx, ny):
         box = self.box
@@ -49,12 +49,4 @@ class CoscosData:
         val[..., 1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
         return val
 
-    def dirichlet(self, p):
-        """ The dirichlet boundary condition
-        """
-        return self.pressure(p)
 
-    def neumann(self, p):
-        """ The neumann boundary condition
-        """
-        pass

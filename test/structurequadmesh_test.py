@@ -5,7 +5,7 @@ import sys
 
 from fealpy.mesh.StructureQuadMesh import StructureQuadMesh 
 box = [0, 1, 0, 1]
-n = 2
+n = 4
 qmesh = StructureQuadMesh(box, n, n)
 qmesh.print()
 
