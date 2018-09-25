@@ -24,6 +24,24 @@ class CoscosData:
         val[..., 1] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
         return val
 
+    def velocity_x(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = np.zeros(p.shape, dtype=p.dtype)
+        pi = np.pi
+        val = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
+        return val
+
+    def velocity_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = np.zeros(p.shape, dtype=p.dtype)
+        pi = np.pi
+        val = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        return val
+
     def pressure(self,p):
         x = p[..., 0]
         y = p[..., 1]

@@ -1,11 +1,28 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat
+from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 class DarcyFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh
+
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        self.uh = np.zeros(NE, dtype=mesh.ftype)
+        self.ph = np.zeros(NC, dtype=mesh.ftype)
+        self.uI = np.zeros(NE, dtype=mesh.ftype) 
+        
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        bc = mesh.entity_barycenter('edge')
+        self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
+        self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
+        pc = mesh.entity_barycenter('cell')
+        self.pI = pde.pressure(pc)
+
+        self.ph[0] = self.pI[0]
+         
 
     def get_left_matrix(self):
 
@@ -24,7 +41,6 @@ class DarcyFDMModel():
         mu = self.pde.mu
         k = self.pde.k
         A11 = mu/k*eye(NE, NE, dtype=ftype)
-        print('A11',A11)
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -43,7 +59,6 @@ class DarcyFDMModel():
         A12 += coo_matrix((-data, (I, R)), shape=(NE, NC))
         A12 += coo_matrix((data, (I, L)), shape=(NE, NC))
         A12 = A12.tocsr()
-        print("A12",A12)
 
         
         cell2edge = mesh.ds.cell_to_cedge()
@@ -60,6 +75,7 @@ class DarcyFDMModel():
         return A
 
     def get_right_vector(self,nx,ny):
+        pde = self.pde
         mesh = self.mesh
         node = mesh.node
         itype = mesh.itype
@@ -68,90 +84,57 @@ class DarcyFDMModel():
         NN = mesh.number_of_nodes()  
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        dn = mesh.ds.edge_to_node()
-        
+        edge = mesh.entity('edge')
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        mu = self.pde.mu
+        k = self.pde.k
 
         b = np.zeros(NE+NC, dtype=ftype)
-        
-        
-        dn1 = dn[:int(NE/2),:]
-        nodex = (node[dn1[:,1],:] + node[dn1[:,0],:])/2
 
-        dn2 = dn[int(NE/2):,:]
-        nodey = (node[dn2[:,1],:] + node[dn2[:,0],:])/2
-        
-       
-        nodep = np.zeros((NC,2), dtype=ftype)
-        d = int(NE/2/(ny+1))
-        for i in range(d):
-            nodep[i*ny:(i+1)*ny,0] = nodey[i*(ny+1)+1:(i+1)*(ny+1)]
-        nodep[:,1] = nodex[ny:,1]
-        b[NE:] = self.pde.source(nodep)
+        idx, = np.nonzero(isYDEdge & isBDEdge)
+        val = pde.velocity(bc[idx, :])
+        b[idx] = mu/k*val[:, 0];
+
+        idx, = np.nonzero(isXDEdge & isBDEdge)
+        val = pde.velocity(bc[idx, :])
+        b[idx] = mu/k*val[:, 1]
+
+        b[NE:] = pde.source(pc)
         return b
 
 
-    def solve(self,A,b,nx,ny):
+    def solve(self):
         mesh = self.mesh
-        x = np.zeros((NE+NC,), dtype=np.ftype)
+        itype = mesh.itype
+        ftype = mesh.ftype
 
+        A = self.get_left_matrix()
+        b = self.get_right_vector()
 
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        isYDEdge = mesh.ds.y_direction_edge_flag()
-        isXDEdge = mesh.ds.x_direction_edge_flag() 
-        
-
-        # Modify the right hand
-        dn1 = dn[:int(NE/2),:]
-        nodex = (node[dn1[:,1],:] + node[dn1[:,0],:])/2
-        idx1, = np.nonzero(isBDEdge & isYDEdge)
-        x[idx1] = self.pde.velocity(nodex[idx1,:])[:,0]
-
-        dn2 = dn[int(NE/2):,:]
-        nodey = (node[dn2[:,1],:] + node[dn2[:,0],:])/2
-        idx2, = np.nonzero(isBDEdge & isXDEdge)
-        x[idx2] = self.pde.velocity(nodey[idx2,:])[:,1]
-
-
-        nodep = np.zeros((NC,2), dtype=ftype)
-        d = int(NE/2/(ny+1))
-        for i in range(d):
-            nodep[i*ny:(i+1)*ny,0] = nodey[i*(ny+1):(i+1)*(ny+1)]
-        nodep[:,1] = nodex[ny:,1]
-
-        x[NE] = self.pde.pressure(nodeyy[0,:])
+        x = np.r_[self.uh, self.ph]
         b = b - A@x
 
         # Modify matrix
-        bdIdx = np.zeros((A.shape[0],),dtype = itype)
-        bdIdx[~isBDEdge] = 1
-        bdIdx[NE] = 0
+        bdIdx = np.zeros((A.shape[0],), dtype = itype)
+        bdIdx[NE] = 1
 
-        Tbd = spdiags(bdIdx, 0, A.shape[0],A.shape[0])
-        T = spdiags(1-bdIdx, 0, A.shape[0],A.shape[0])
+        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
+        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
         AD = T@A@T + Tbd
 
+        b[NE] = self.ph[0]
+
         # solve
-        isBDNode1 = np.vstack((idx1,idx2)).flatten()
-        isBDNode = np.hstack((isBDNode1,NE))
-        freeNode = [i for i in range(NE+NC) if i not in isBDNode]
-        x[freeNode] = spsolve(AD[isBDNode],b[isBDNode])
-        
+        x[:] = spsolve(AD, b)
+        self.uh[:] = x[:NE]
+        self.ph[:] = x[NE:]
 
-        return x
-
-    def get_L2_error(self, x, nx, ny):
-        mesh = self.mesh
-
-        NE = mesh.number_of_edges() 
-        NC = mesh.number_of_cells()
-
-
-        U = self.pde.velocity
-        P = self.pde.pressure
-
-        u = x[:NE]
-        p = x[NE:]
-        erruL2 = np.sqrt(sum(hx*hy*(U[:] - u)**2))
-        errpL2 = np.sqrt(sum(hx*hy*(P - p)**2))
-
-        return erruL2, errpL2
+    def get_max_error(self):
+        ue = np.max(np.abs(self.uh - self.uI))
+        pe = np.max(np.abs(self.ph - self.pI))
+        return ue, pe 
