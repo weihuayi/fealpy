@@ -16,6 +16,7 @@ class DarcyFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         bc = mesh.entity_barycenter('edge')
+
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         pc = mesh.entity_barycenter('cell')
@@ -29,6 +30,7 @@ class DarcyFDMModel():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
+        print(NC)
 
         itype = mesh.itype
         ftype = mesh.ftype
@@ -61,7 +63,7 @@ class DarcyFDMModel():
         A12 = A12.tocsr()
 
         
-        cell2edge = mesh.ds.cell_to_cedge()
+        cell2edge = mesh.ds.cell_to_edge()
         I = np.arange(NC, dtype=itype)
         data = np.ones(NC, dtype=ftype)
         A21 = coo_matrix((data/mesh.hx, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
@@ -104,19 +106,21 @@ class DarcyFDMModel():
         val = pde.velocity(bc[idx, :])
         b[idx] = mu/k*val[:, 1]
 
+
         b[NE:] = pde.source(pc)
         return b
 
 
-    def solve(self):
+    def solve(self,nx,ny):
         mesh = self.mesh
+        NE = mesh.number_of_edges()
         itype = mesh.itype
         ftype = mesh.ftype
 
         A = self.get_left_matrix()
-        b = self.get_right_vector()
+        b = self.get_right_vector(nx,ny)
 
-        x = np.r_[self.uh, self.ph]
+        x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
         b = b - A@x
 
         # Modify matrix
@@ -133,8 +137,17 @@ class DarcyFDMModel():
         x[:] = spsolve(AD, b)
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
-
+        return x
+    
     def get_max_error(self):
         ue = np.max(np.abs(self.uh - self.uI))
         pe = np.max(np.abs(self.ph - self.pI))
-        return ue, pe 
+        return ue, pe
+
+    def get_L2_error(self,nx,ny):
+        hx = 1/nx
+        hy = 1/ny
+        ueL2 = np.sqrt(np.sum(hx*hy*(self.uh - self.uI)**2))
+        peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
+        return ueL2,peL2
+

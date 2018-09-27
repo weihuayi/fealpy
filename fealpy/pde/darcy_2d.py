@@ -53,7 +53,7 @@ class CoscosData:
         """
         x = p[..., 0]
         y = p[..., 1]
-        val = 8*(np.pi)**2*np.cos(2*np.pi*x)*np.sin(2*np.pi*y)
+        val = 8*(np.pi)**2*np.cos(2*np.pi*x)*np.cos(2*np.pi*y)
         return val
 
     def gradient(self, p):
@@ -65,6 +65,10 @@ class CoscosData:
         val = np.zeros(p.shape, dtype=np.float)
         val[..., 0] = -2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
         val[..., 1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        return val
+
+    def g_D(self,p):
+        val = np.zeros(p.shape[0],1)
         return val
 
 
