@@ -273,7 +273,7 @@ class VectorLagrangeFiniteElementSpace():
         return val 
 
     def function(self, dim=None):
-        f = FiniteElementFunction(self)
+        f = Function(self)
         return f
 
     def array(self, dim=None):
@@ -286,7 +286,7 @@ class VectorLagrangeFiniteElementSpace():
         ldof = self.dof.number_of_local_dofs()
         cell2dof = self.cell_to_dof().reshape(-1, ldof, dim)
         p = self.dof.interpolation_points()[c2d]
-        uI = FiniteElementFunction(self)
+        uI = Function(self)
         uI[cell2dof] = u(p)
         return uI
 

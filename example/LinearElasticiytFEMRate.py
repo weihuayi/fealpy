@@ -42,8 +42,8 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     fem = LinearElasticityFEMModel(mesh, pde, p, integrator)
-    fem.solve()
-    #fem.fast_solve()
+    #fem.solve()
+    fem.fast_solve()
     tgdof = fem.tensorspace.number_of_global_dofs()
     vgdof = fem.vectorspace.number_of_global_dofs()
     gdof = tgdof + vgdof

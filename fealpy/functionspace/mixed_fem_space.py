@@ -1,5 +1,5 @@
 import numpy as np
-from .function import FiniteElementFunction
+from .function import Function
 from .lagrange_fem_space import LagrangeFiniteElementSpace
 
 class HuZhangFiniteElementSpace():
@@ -402,7 +402,7 @@ class HuZhangFiniteElementSpace():
         ldof = self.dof.number_of_local_dofs()
         cell2dof = self.cell_to_dof().reshape(-1, ldof, tdim)
 
-        uI = FiniteElementFunction(self)
+        uI = Function(self)
         dofFlag = self.dof_flags()
         isOtherDof = dofFlag[0]
         idx0, = np.nonzero(isOtherDof)
@@ -423,7 +423,7 @@ class HuZhangFiniteElementSpace():
         return uI
 
     def function(self, dim=None):
-        f = FiniteElementFunction(self)
+        f = Function(self)
         return f
 
     def array(self, dim=None):
