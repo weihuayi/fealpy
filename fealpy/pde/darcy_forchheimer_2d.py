@@ -13,7 +13,7 @@ class PolyData:
             (0, 0),
             (0.5, 0),
             (1, 0),
-            (0, 0),
+            (0, 0.5),
             (0.5, 0.5),
             (1, 0.5),
             (0, 1),
@@ -57,12 +57,14 @@ class PolyData:
         def velocity_u(self, p):
             x = p[..., 0]
             y = p[..., 1]
+            pi = np.pi
             val = np.sin(pi*x)*np.cos(pi*y)
             return val
 
         def velocity_v(self, p):
             x = p[..., 0]
             y = p[..., 1]
+            pi = np.pi
             val = np.cos(pi*x)*np.sin(pi*y)
             return val
 
@@ -83,4 +85,5 @@ class PolyData:
         def dirichlet(self, p):
             """ Dirichlet boundary condition
             """
-            return self.pressure(p)
+            val = np.zeros(p.shape[0],1)
+            return val

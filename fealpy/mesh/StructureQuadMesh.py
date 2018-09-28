@@ -8,13 +8,16 @@ from matplotlib.collections import LineCollection
 from .Mesh2d import Mesh2d
 
 class StructureQuadMesh(Mesh2d):
-    def __init__(self, box, nx, ny):
+    def __init__(self, box, nx, ny, itype=np.int32, ftype=np.float):
         self.box = box
-        self.ds = StructureQuadMeshDataStructure(nx, ny)
+        self.ds = StructureQuadMeshDataStructure(nx, ny, itype)
         self.meshtype="quad"
-        self.dx = (box[1] - box[0])/nx
-        self.dy = (box[3] - box[2])/ny
+        self.hx = (box[1] - box[0])/nx
+        self.hy = (box[3] - box[2])/ny
         self.data = {}
+
+        self.itype = itype 
+        self.ftype = ftype 
 
     @property 
     def node(self):
@@ -26,7 +29,7 @@ class StructureQuadMesh(Mesh2d):
         X, Y = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1)]
-        node = np.zeros((NN, 2), dtype=np.float)
+        node = np.zeros((NN, 2), dtype=self.ftype)
         node[:, 0] = X.flat
         node[:, 1] = Y.flat
         return node
@@ -48,12 +51,13 @@ class StructureQuadMeshDataStructure:
     V = 4
     E = 4
     F = 1
-    def __init__(self, nx, ny):
+    def __init__(self, nx, ny, itype):
         self.nx = nx
         self.ny = ny
         self.NN = (nx+1)*(ny+1)
         self.NE = ny*(nx+1) + nx*(ny+1)
         self.NC = nx*ny
+        self.itype = itype
 
     
     @property
@@ -64,7 +68,7 @@ class StructureQuadMeshDataStructure:
 
         NN = self.NN
         NC = self.NC
-        cell = np.zeros((NC, 4), dtype=np.int)
+        cell = np.zeros((NC, 4), dtype=self.itype)
         idx = np.arange(NN).reshape(nx+1, ny+1)
         c = idx[:-1, :-1]
         cell[:, 0] = c.flat
@@ -81,8 +85,8 @@ class StructureQuadMeshDataStructure:
         NN = self.NN
         NE = self.NE
 
-        idx = np.arange(NN).reshape(nx+1, ny+1)
-        edge = np.zeros((NE, 2), dtype=np.int)
+        idx = np.arange(NN, dtype=self.itype).reshape(nx+1, ny+1)
+        edge = np.zeros((NE, 2), dtype=self.itype)
 
         NE0 = 0
         NE1 = ny*(nx+1)
@@ -106,12 +110,12 @@ class StructureQuadMeshDataStructure:
         NC = self.NC
         NE = self.NE
 
-        edge2cell = np.zeros((NE, 4), dtype=np.int)
+        edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
         idx = np.arange(NC).reshape(nx, ny).T
 
         # y direction
-        idx0 = np.arange((NE/2),dtype=np.int).reshape(nx+1, ny).T
+        idx0 = np.arange((nx+1)*ny, dtype=self.itype).reshape(nx+1, ny).T
         #left element
         edge2cell[idx0[:,1:], 0] = idx
         edge2cell[idx0[:,1:], 2] = 1
@@ -126,7 +130,7 @@ class StructureQuadMeshDataStructure:
         edge2cell[idx0[:,-1], 3] = 1
 
         # x direction 
-        idx1 = np.arange((NE/2),dtype=np.int).reshape(nx, ny+1).T
+        idx1 = np.arange(nx*(ny+1),dtype=self.itype).reshape(nx, ny+1).T
         NE0 = ny*(nx+1)
         #left element
         edge2cell[NE0+idx1[:-1], 0] = idx
@@ -166,9 +170,11 @@ class StructureQuadMeshDataStructure:
         edge2cell = self.edge2cell
 
         if sparse == False:
-            cell2edge = np.zeros((NC, E), dtype=np.int)
-            cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
-            cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
+            cell2edge = np.zeros((NC, E), dtype=self.itype)
+            cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE,
+                    dtype=self.itype)
+            cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE,
+                    dtype=self.itype)
             return cell2edge
         else:
             val = np.ones(2*NE, dtype=np.bool)
@@ -348,3 +354,29 @@ class StructureQuadMeshDataStructure:
         idx, = np.nonzero(isBdCell)
         return idx 
 
+    def y_direction_edge_index(self):
+        nx = self.nx
+        ny = self.ny
+        return np.arange(ny*(nx+1))
+
+    def x_direction_edge_index(self):
+        nx = self.nx
+        ny = self.ny
+        NE = self.NE
+        return np.arange(ny*(nx+1), NE)
+
+    def y_direction_edge_flag(self):
+        nx = self.nx
+        ny = self.ny
+        NE = self.NE
+        isYDEdge = np.zeros(NE, dtype=np.bool)
+        isYDEdge[:ny*(nx+1)] = True
+        return isYDEdge 
+
+    def x_direction_edge_flag(self):
+        nx = self.nx
+        ny = self.ny
+        NE = self.NE
+        isXDEdge = np.zeros(NE, dtype=np.bool)
+        isXDEdge[ny*(nx+1):] = True
+        return isXDEdge 

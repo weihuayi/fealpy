@@ -3,7 +3,7 @@ import sys
 import numpy as np  
 import matplotlib.pyplot as plt
 
-from fealpy.pde.poisson_model_1d import CosData
+from fealpy.pde.poisson_1d import CosData
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 from fealpy.tools.show import showmultirate
 

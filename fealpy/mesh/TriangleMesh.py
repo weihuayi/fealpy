@@ -355,9 +355,6 @@ class TriangleMeshWithInfinityNode:
     def number_of_nodes(self):
         return self.node.shape[0] 
 
-    def number_of_nodes(self):
-        return self.node.shape[0]
-
     def number_of_edges(self):
         return self.ds.NE
 
