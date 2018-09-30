@@ -6,7 +6,7 @@ from ..mesh.Mesh2d import Mesh2d
 class CoscosData:
     def __init__(self, box):
         self.box = box
-        self.mu = 1
+        self.mu = 2
         self.k = 1
 
     def init_mesh(self, nx, ny):
@@ -45,7 +45,7 @@ class CoscosData:
     def pressure(self,p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.cos(2*np.pi*x)*np.cos(2*np.pi*y)
+        val = self.mu*self.k*np.cos(2*np.pi*x)*np.cos(2*np.pi*y)
         return val
 
     def source(self, p):
