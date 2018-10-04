@@ -20,8 +20,8 @@ class CoscosData:
 
         val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
-        val[..., 0] = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
-        val[..., 1] = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        val[..., 0] = np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = np.cos(pi*x)*np.sin(pi*y)
         return val
 
     def velocity_x(self, p):
@@ -30,7 +30,7 @@ class CoscosData:
 
         val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
-        val = 2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
+        val = np.sin(pi*x)*np.cos(pi*y)
         return val
 
     def velocity_y(self, p):
@@ -39,13 +39,13 @@ class CoscosData:
 
         val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
-        val = 2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        val = np.cos(pi*x)*np.sin(pi*y)
         return val
 
     def pressure(self,p):
         x = p[..., 0]
         y = p[..., 1]
-        val = self.mu/self.k*np.cos(2*np.pi*x)*np.cos(2*np.pi*y)
+        val = x*(1-x)*y*(1-y)
         return val
 
     def source1(self, p):
@@ -53,26 +53,21 @@ class CoscosData:
         """
         x = p[..., 0]
         y = p[..., 1]
-        val = 8*(np.pi)**2*np.cos(2*np.pi*x)*np.cos(2*np.pi*y)
+        val = 2*np.pi*np.cos(np.pi*x)*np.cos(np.pi*y)
         return val
 
     def source2(self,p):
-        val = np.zeros(p.shape[0])
+        x = p[..., 0]
+        y = p[..., 1]
+        val = self.mu/self.k*np.sin(np.pi*x)*np.cos(np.pi*y) \
+                + (1-2*x)*y*(1-y)
         return val
 
     def source3(self,p):
-        val = np.zeros(p.shape[0])
-        return val
-
-    def gradient(self, p):
-        """ The gradient of the exact pressure
-        """
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = -2*pi*np.sin(2*pi*x)*np.cos(2*pi*y)
-        val[..., 1] = -2*pi*np.cos(2*pi*x)*np.sin(2*pi*y)
+        val = self.mu/self.k*np.cos(np.pi*x)*np.sin(np.pi*y) \
+                + x*(1-x)*(1-2*y)
         return val
 
     def g_D(self,p):
