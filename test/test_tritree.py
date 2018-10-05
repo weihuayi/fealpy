@@ -55,9 +55,6 @@ class Tritree(TriangleMesh):
 
         if len(idx) > 0:
             # Prepare data
-
-
-
             NC = self.number_of_cells()
             isMarkedCell = np.zeros(NC, dtype=np.bool)
             isMarkedCell[idx] = True
@@ -83,6 +80,7 @@ class Tritree(TriangleMesh):
                 # delete the children of the cells with two children
                 flag = isMarkedCell[child[idx0, 0]] | isMarkedCell[child[idx0, 1]]
                 isMarkCell[idx0[flag]] = True
+                self.child[idx0, 0:1] = -1
 
                 flag = np.ones(NC, dtype=np.bool)
                 flag[child[idx0, [0, 1]]] = False
@@ -107,59 +105,15 @@ class Tritree(TriangleMesh):
             isCutEdge = np.zeros(NE, dtype=np.bool)
             isCutEdge[cell2edge[isMarkedCell, :]] = True
 
+            isLeafCell = self.is_leaf_cell()
             isCuttedEdge = np.zeros(NE, dtype=np.bool)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
-            isCuttedEdge = isCuttedEdge & isCutEdge
 
+            isCuttedEdge = isCuttedEdge & isCutEdge
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
 
             # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
-            I, J = np.nonzero(isCuttedEdge[cell2edge])
-            cellIdx = np.zeros(NE, dtype=np.int)
-            localIdx = np.zeros(NE, dtype=np.int)
-            I1 = I[~isLeafCell[I]]
-            J1 = J[~isLeafCell[I]]
-            cellIdx[cell2edge[I1, J1]] = I1 # the cell idx 
-            localIdx[cell2edge[I1, J1]] = J1 #
-            del I, J, I1, J1
 
-            # 找到该单元相应孩子单元编号， 及对应的中点编号
-            cellIdx = cellIdx[isCuttedEdge]
-            localIdx = localIdx[isCuttedEdge]
-            cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
-            localIdx = self.localEdge2childCell[localIdx, 1]
-
-            edge2center = np.zeros(NE, dtype=np.int)
-            edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
-
-            edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1) 
-            cellCenter = self.entity_barycenter('cell', isNeedCutCell)
-
-            NEC = len(edgeCenter)
-            NCC = len(cellCenter)
-
-            edge2center[isNeedCutEdge] = np.arange(N, N+NEC) 
-
-            cp = [cell[isNeedCutCell, i].reshape(-1, 1) for i in range(4)]
-            ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(4)]
-            cc = np.arange(N + NEC, N + NEC + NCC).reshape(-1, 1)
-            
-            newCell = np.zeros((4*NCC, 4), dtype=np.int)
-            newChild = -np.ones((4*NCC, 4), dtype=np.int)
-            newParent = -np.ones((4*NCC, 2), dtype=np.int)
-            newCell[0::4, :] = np.concatenate((cp[0], ep[0], cc, ep[3]), axis=1) 
-            newCell[1::4, :] = np.concatenate((ep[0], cp[1], ep[1], cc), axis=1)
-            newCell[2::4, :] = np.concatenate((cc, ep[1], cp[2], ep[2]), axis=1)
-            newCell[3::4, :] = np.concatenate((ep[3], cc, ep[2], cp[3]), axis=1)
-            newParent[:, 0] = np.repeat(idx, 4)
-            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int)) 
-            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
-
-            cell = np.concatenate((cell, newCell), axis=0)
-            self.node = np.concatenate((node, edgeCenter, cellCenter), axis=0)
-            self.parent = np.concatenate((parent, newParent), axis=0)
-            self.child = np.concatenate((child, newChild), axis=0)
-            self.ds.reinit(N + NEC + NCC, cell)
             return True
         else:
             return False
