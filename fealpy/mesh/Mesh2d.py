@@ -381,8 +381,8 @@ class Mesh2dDataStructure():
             return edge2node
 
     def edge_to_edge(self, sparse=False):
-        edge2node = self.edge_to_node()
-        return edge2node*edge2node.transpose()
+        edge2node = self.edge_to_node(sparse=True)
+        return edge2node*edge2node.transpose(0, 1)
 
     def edge_to_cell(self, sparse=False):
         if sparse==False:

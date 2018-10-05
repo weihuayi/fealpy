@@ -76,7 +76,7 @@ class DarcyFDMModel():
 
         return A
 
-    def get_right_vector(self,nx,ny):
+    def get_right_vector(self):
         pde = self.pde
         mesh = self.mesh
         node = mesh.node
@@ -111,14 +111,14 @@ class DarcyFDMModel():
         return b
 
 
-    def solve(self,nx,ny):
+    def solve(self):
         mesh = self.mesh
         NE = mesh.number_of_edges()
         itype = mesh.itype
         ftype = mesh.ftype
 
         A = self.get_left_matrix()
-        b = self.get_right_vector(nx,ny)
+        b = self.get_right_vector()
 
         x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
         b = b - A@x
@@ -144,9 +144,10 @@ class DarcyFDMModel():
         pe = np.max(np.abs(self.ph - self.pI))
         return ue, pe
 
-    def get_L2_error(self,nx,ny):
-        hx = 1/nx
-        hy = 1/ny
+    def get_L2_error(self):
+        mesh = self.mesh
+        hx = mesh.hx
+        hy = mesh.hy
         ueL2 = np.sqrt(np.sum(hx*hy*(self.uh - self.uI)**2))
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2

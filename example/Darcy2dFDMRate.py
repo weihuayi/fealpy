@@ -24,12 +24,12 @@ for i in range(maxit):
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
-    fdm.solve(nx,ny)
+    fdm.solve()
 
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
     err[1,i] = pe
-    ueL2,peL2 = fdm.get_L2_error(nx,ny)
+    ueL2,peL2 = fdm.get_L2_error()
     error[0,i] = ueL2
     error[1,i] = peL2
     if i < maxit - 1:

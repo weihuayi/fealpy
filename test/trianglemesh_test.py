@@ -17,12 +17,15 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(n=5)
-print(tmesh.circumcenter())
+tmesh.uniform_refine(0)
+a = tmesh.ds.edge_to_edge()
+print(a)
+
+
 fig = plt.figure()
 axes = fig.gca()
 tmesh.add_plot(axes)
-#tmesh.find_node(axes, showindex=True)
-#tmesh.find_edge(axes, showindex=True)
-#tmesh.find_cell(axes, showindex=True)
+tmesh.find_node(axes, showindex=True)
+tmesh.find_edge(axes, showindex=True)
+tmesh.find_cell(axes, showindex=True)
 plt.show()

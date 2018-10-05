@@ -4,10 +4,10 @@ from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.Mesh2d import Mesh2d
 
 class CoscosData:
-    def __init__(self, box):
+    def __init__(self, box,mu=1,k=1):
         self.box = box
-        self.mu = 1
-        self.k = 1
+        self.mu = mu
+        self.k = k
 
     def init_mesh(self, nx, ny):
         box = self.box
