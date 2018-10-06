@@ -55,7 +55,7 @@ class CoscosData1:
         y = p[..., 1]
         val = x*(1-x)*y*(1-y)
         return val
-    def source2(self, p, Qu1):
+    def source2(self, p):
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
@@ -63,18 +63,28 @@ class CoscosData1:
         k = self.k
         rho = self.rho
         beta = self.beta
-        val = (mu/k+beta*rho*Qu1)*np.sin(pi*x)*np.cos(pi*y)+(1-2*x)*y*(1-y)
+        t0 = np.sin(pi*x)
+        t1 = np.cos(pi*x)
+        t2 = np.sin(pi*y)
+        t3 = np.cos(pi*y)
+        m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
+        val = m*t0*t3 + (1-2*x)*y*(1-y)
         return val
-    def source3(self, p, Qv1):
+
+    def source3(self, p):
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
         mu = self.mu
         k = self.k
         rho = self.rho
-        beta = self.beta 
-        val = (mu/k+beta*rho*Qv1)*np.cos(pi*x)*np.sin(pi*y) \
-                + x*(1-x)*(1-2*y)
+        beta = self.beta
+        t0 = np.sin(pi*x)
+        t1 = np.cos(pi*x)
+        t2 = np.sin(pi*y)
+        t3 = np.cos(pi*y)
+        m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
+        val = m*t1*t2 +  x*(1-x)*(1-2*y)
         return val
     def grad_pressure(self, p):
         x = p[..., 0]
