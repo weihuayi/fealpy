@@ -343,12 +343,12 @@ class DarcyForchheimerFDMModel():
             Qu1 = self.get_Qu1()
             Qv1 = self.get_Qv1()
             count = count + 1
-            self.uh = u1
-            self.ph = p1
             print('ru',ru)
             print('rp',rp)
 
-            return count
+        self.uh = u1
+        self.ph = p1
+        return count
 
     
     def get_max_error(self):
