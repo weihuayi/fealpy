@@ -2,9 +2,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 #from fealpy.pde.darcy_2d import CoscosData
-#from fealpy.pde.darcy_2d_1 import CoscosData
-from fealpy.pde.darcy_2d_2 import CoscosData
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+from fealpy.pde.darcy_2d_1 import CoscosData
+#from fealpy.pde.darcy_2d_2 import CoscosData
+#from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+from fealpy.fdm.DarcyFDMModel_1 import DarcyFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
