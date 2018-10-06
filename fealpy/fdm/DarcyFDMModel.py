@@ -98,6 +98,10 @@ class DarcyFDMModel():
 
         b = np.zeros(NE+NC, dtype=ftype)
 
+        b[:NE//2] = pde.source2(bc[0:NE//2,:])
+        b[NE//2:NE] = pde.source3(bc[NE//2:,:])
+
+
         idx, = np.nonzero(isYDEdge & isBDEdge)
         val = pde.velocity(bc[idx, :])
         b[idx] = mu/k*val[:, 0];
@@ -107,7 +111,7 @@ class DarcyFDMModel():
         b[idx] = mu/k*val[:, 1]
 
 
-        b[NE:] = pde.source(pc)
+        b[NE:] = pde.source1(pc)
         return b
 
 
