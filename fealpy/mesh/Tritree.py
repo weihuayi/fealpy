@@ -108,13 +108,66 @@ class Tritree(TriangleMesh):
             isLeafCell = self.is_leaf_cell()
             isCuttedEdge = np.zeros(NE, dtype=np.bool)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
-
             isCuttedEdge = isCuttedEdge & isCutEdge
+            
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
 
             # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
+            I, J = np.nonzero(isCuttedEdge[cell2edge])
+            cellIdx = np.zeros(NE, dtype=np.int)
+            localIdx = np.zeros()
+            I1 = I[~isLeafCell[I]]
+            J1 = J[~isLeafCell[I]]
+            cellIdx[cell2edge[I1, J1]] = I1
+            localIdx[cell2edge[I1, J1]] = J1
+            del I, J, I1, J1
+
+            #找到该单元相应孩子单元编号， 及对应的中点编号
+            cellIdx = cellIdx[isCuttedEdge]
+            localIdx = localIdx[isCuttedEdge]
+            cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
+            localIdx = self.localEdge2childCell[localIdx, 1]
             
-            
+            edge2center = np.zeros(NE, dtype=np.int)
+            edge2center[isCuttedEdge] = cell[cellIdx, localIdx]
+
+            edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
+
+
+            NEC = len(edgeCenter)
+            edge2center[isaNeedCutEdge] = np.arange(NN, NN + NEC)
+
+            cp = [cell[isNeedCutcell, i].reshape(-1, 1) for i in range(3)]
+            ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(3)]
+
+            newCell = np.zeros((4*NCC, 3), dtype=np.int)
+            newChild = -np.ones((4*NCC, 4), dtype=np.int)
+            newParent = -np.ones((4*NCC, 2), dtype=np.int)
+            newCell[0::4, :] = np.concatenate((cp[0], ep[0], ep[3]), axis=1)
+            newCell[1::4, :] = np.concatenate((ep[0], cp[1], ep[1]), axis=1)
+            newCell[2::4, :] = np.concatenate((ep[1], cp[2], ep[2]), axis=1)
+            newCell[3::4, :] = np.concatenate((ep[3], ep[2], cp[3]), axis=1)
+            newParent[:, 0] = np.repeat(idx, 4)
+            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int))
+            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
+
+            cell = np.concatenate((cell, newCell), axis=0)
+            self.node = np.concatenate((node, edgeCenter), axis=0)
+            self.parent = np.concatenate((parent, newParent), axis=0)
+            self.child = np.concatenate((child, newChild), axis=0)
+            self.ds.reinit(NN + NEC, cell)
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

@@ -14,7 +14,8 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 tmesh = Tritree(node, cell)
-print(tmesh.to_mesh())
+tmesh.refine(marker=None)
+print(tmesh.ds.cell)
 
 
 
