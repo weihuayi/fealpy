@@ -9,7 +9,7 @@ class CoscosData1:
         self.mu = 2
         self.k = 1
         self.rho = 1
-        self.beta = 1
+        self.beta = 10
 
 
     def init_mesh(self, nx, ny):
@@ -24,7 +24,7 @@ class CoscosData1:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        rhs = 2*pi*np.cos(pi*x)*np.sin(pi*y)
+        rhs = 2*pi*np.cos(pi*x)*np.cos(pi*y)
         return rhs
 
 

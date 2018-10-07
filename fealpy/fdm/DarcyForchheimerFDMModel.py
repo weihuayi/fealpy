@@ -6,9 +6,8 @@ from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
-    def __init__(self, pde1, pde, mesh):
+    def __init__(self, pde, mesh):
         self.pde = pde
-        self.pde1 = pde1
         self.mesh = mesh
 
         NE = mesh.number_of_edges()
@@ -17,20 +16,27 @@ class DarcyForchheimerFDMModel():
         self.ph = np.zeros(NC, dtype=mesh.ftype)
         self.uI = np.zeros(NE, dtype=mesh.ftype) 
         self.uh0 = np.zeros(NE, dtype=mesh.ftype)
+        self.ph0 = np.zeros(NC, dtype=mesh.ftype)
         
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
 
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
+        self.pI = pde.pressure(pc)
+        umax = np.max(self.uI)
+        pmax = np.max(np.abs(self.pI))
+#        print('uI:',self.uI)
+#        print('pI:',self.pI)
         pc = mesh.entity_barycenter('cell')
         self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
         pass
 
-    def get_nonlinear_coef(slef):
+    def get_nonlinear_coef(self):
         mesh = self.mesh
         uh0 = self.uh0
 
@@ -48,9 +54,9 @@ class DarcyForchheimerFDMModel():
 
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
-        isXDedge = mesh.ds.x_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        C = np.zeros(NE, dtype=mesh.ftype)
+        C = np.ones(NE, dtype=mesh.ftype)
         edge2cell = mesh.ds.edge_to_cell()
         cell2edge = mesh.ds.cell_to_edge()
 
@@ -77,7 +83,7 @@ class DarcyForchheimerFDMModel():
 
         C = mu/k + rho*beta*C
 
-        return C
+        return C # no problem
 
 
     def get_left_matrix(self):
@@ -95,7 +101,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
-        A11 = np.diag(C)
+        A11 = np.diag(C)# correct
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -151,6 +157,9 @@ class DarcyForchheimerFDMModel():
         rho = self.pde.rho
         beta = self.pde.beta
 
+        ## Modify
+        C = self.get_nonlinear_coef()#add
+
         b0 = np.zeros(NE, dtype=ftype)
         flag = ~isBDEdge & isYDEdge
         b0[flag] = pde.source2(bc[flag])
@@ -159,11 +168,11 @@ class DarcyForchheimerFDMModel():
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
         val = pde.velocity_x(bc[idx])
-        b0[idx] = (mu/k)*val
+        b0[idx] = (mu/k+beta*rho*C[idx])*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
         val = pde.velocity_y(bc[idx])
-        b0[idx] = mu/k*val
+        b0[idx] = (mu/k+beta*rho*C[idx])*val
 
         b1 = pde.source1(pc)
         
@@ -171,84 +180,78 @@ class DarcyForchheimerFDMModel():
 
     def solve(self):
         mesh = self.mesh
+
+        hx = mesh.hx
+        hy = mesh.hy
         NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
         itype = mesh.itype
         ftype = mesh.ftype
 
-        A = self.get_left_matrix()
         b = self.get_right_vector()
-
-        x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
-        b = b - A@x
-
-        # Modify matrix
-        bdIdx = np.zeros((A.shape[0],), dtype = itype)
-        bdIdx[NE] = 1
-
-        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
-        AD = T@A@T + Tbd
-
-        b[NE] = self.ph[0]
-
-        # solve
-        x[:] = spsolve(AD, b)
-        return x
-
-    def cycling(self):
-        mesh = self.mesh
-        hx = mesh.hx
-        hy = mesh.hy
-
-        NE = mesh.number_of_edges()
-        uu = self.uu
-        u2 = uu[:NE]
-        p2 = uu[NE:]
+        A = self.get_left_matrix()
 
         tol = 1e-6
         ru = 1
         rp = 1
         count = 0
-        iterMax = 2000
+        iterMax = 500
         while ru+rp > tol and count < iterMax:
-            u  = self.solve()
-            u1 = u[:NE]
-            p1 = u[NE:]
 
-            A = self.get_left_matrix()
-            b = self.get_right_vector()
-            A11 = A[:NE,:NE]
-            A12 = A[:NE,NE:]
-            A21 = A[NE:,:NE]
+            bnew = b
+
+            x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
+            bnew = bnew - A@x
+
+            # Modify matrix
+            bdIdx = np.zeros((A.shape[0],), dtype = itype)
+            bdIdx[NE] = 1
+
+            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
+            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
+            AD = T@A@T + Tbd
+
+            bnew[NE] = self.ph[0]
+
+            # solve
+            x[:] = spsolve(AD, bnew)
+            u1 = x[:NE]
+            p1 = x[NE:]
+
             f = b[:NE]
             g = b[NE:]
 
-            ru = np.sqrt(np.sum(hx*hy*(u1-u2)**2))
-            rp = np.sqrt(np.sum(hx*hy*(p1-p2)**2))
-#            if LA.norm(f) == 0:
-#                ru = LA.norm(f - A11*u1 - A12*p1)
-#            else:
-#                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
-#            if LA.norm(g) == 0:
-#                rp = LA.norm(g - A21*u1)
-#            else:
-#                rp = LA.norm(g - A21*u1)/LA.norm(g)
-#
-            uu[:NE] = u1
-            uu[NE:] = p1
-            Qu = self.get_Qu()
-            Qv = self.get_Qv()
-            Qu1 = self.get_Qu1()
-            Qv1 = self.get_Qv1()
+            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
+            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
+#            print('uh -u0:',ue)
+#            print('ph - p0:',pe)
+
+            self.uh0 = u1
+            self.ph0 = p1
+            A = self.get_left_matrix()
+            A11 = A[:NE,:NE]
+            A12 = A[:NE,NE:NE+NC]
+            A21 = A[NE:NE+NC,:NE]
+
+            if LA.norm(f) == 0:
+                ru = LA.norm(f - A11*u1 - A12*p1)
+            else:
+                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
+            if LA.norm(g) == 0:
+                rp = LA.norm(g - A21*u1)
+            else:
+                rp = LA.norm(g - A21*u1)/LA.norm(g)
+
             count = count + 1
-            print('ru',ru)
-            print('rp',rp)
+ #           print('ru:',ru)
+ #           print('rp:',rp)
 
         self.uh = u1
         self.ph = p1
+#        print('uh:',self.uh)
         return count
 
-    
+
     def get_max_error(self):
         ue = np.max(np.abs(self.uh - self.uI))
         pe = np.max(np.abs(self.ph - self.pI))
@@ -262,4 +265,11 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
+#    def get_L2_perror(self):
+#        uh = self.uh
+#        ph = self.ph
+#        uI = self.uI
+#        pI = self.pI
+#        err = self.integralalg.L2_error(ph, pI)
+#        return err
  
