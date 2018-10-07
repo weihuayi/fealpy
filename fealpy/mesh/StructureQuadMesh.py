@@ -379,4 +379,4 @@ class StructureQuadMeshDataStructure:
         NE = self.NE
         isXDEdge = np.zeros(NE, dtype=np.bool)
         isXDEdge[ny*(nx+1):] = True
-        return isXDEdge 
+        return isXDEdge  
