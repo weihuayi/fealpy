@@ -1,7 +1,7 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-
+from fealpy.mesh.TriangleMesh import TriangleMesh
 from fealpy.mesh.Tritree import Tritree
 
 node = np.array([
@@ -12,10 +12,12 @@ node = np.array([
 cell = np.array([
     (1, 2, 0), 
     (3, 0, 2)], dtype=np.int)
+tmesh = TriangleMesh(node, cell)
+tmesh.uniform_refine(1)
 
-tmesh = Tritree(node, cell)
-tmesh.refine(marker=None)
-print(tmesh.ds.cell)
+
+tmesh = Tritree(tmesh.node, tmesh.ds.cell)
+print(tmesh.refine(marker=None))
 
 
 

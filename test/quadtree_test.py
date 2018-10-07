@@ -20,15 +20,15 @@ class AdaptiveMarker():
         phi = self.phi
 
         idx = qtmesh.leaf_cell_index()
-        pmesh = qtmesh.to_polygonmesh()
-        cell2point = pmesh.ds.cell_to_point()
+        pmesh = qtmesh.to_pmesh()
+        cell2node = pmesh.ds.cell_to_node()
 
-        point = qtmesh.point
-        value = phi(point)
+        node = qtmesh.node
+        value = phi(node)
         valueSign = np.sign(value)
         valueSign[np.abs(value) < 1e-8] = 0
         NV = pmesh.number_of_vertices_of_cells()
-        isNeedCutCell = np.abs(cell2point*valueSign).reshape(-1) != NV
+        isNeedCutCell = np.abs(cell2node*valueSign).reshape(-1) != NV
 
         return idx[isNeedCutCell]
 
@@ -44,7 +44,7 @@ class AdaptiveMarker():
             return None
         else:
             point = qtmesh.point
-            value = phi(point)
+            value = phi(node)
             valueSign = np.sign(value)
             valueSign[np.abs(value) < 1e-12] = 0
 
@@ -68,7 +68,7 @@ circle = Circle(cxy, r, edgecolor='g', fill=False, linewidth=2)
 n = 1
 mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
 
-qtree = Quadtree(mesh.point, mesh.ds.cell)
+qtree = Quadtree(mesh.node, mesh.ds.cell)
 
 marker = AdaptiveMarker(phi) 
 
@@ -83,7 +83,7 @@ f0 = plt.figure()
 axes0 = f0.gca()
 qtree.add_plot(axes0)
 
-pmesh = qtree.to_polygonmesh()
+pmesh = qtree.to_pmesh()
 f1 = plt.figure()
 axes1 = f1.gca()
 pmesh.add_plot(axes1)
