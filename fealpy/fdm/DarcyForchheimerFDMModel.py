@@ -6,41 +6,46 @@ from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
-    def __init__(self, pde1, pde, mesh):
+    def __init__(self, pde, mesh):
         self.pde = pde
-        self.pde1 = pde1
         self.mesh = mesh
-        fdm = DarcyFDMModel(pde1, mesh)
-        uu = fdm.solve()
-        self.uu = uu
 
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         self.uh = np.zeros(NE, dtype=mesh.ftype)
         self.ph = np.zeros(NC, dtype=mesh.ftype)
         self.uI = np.zeros(NE, dtype=mesh.ftype) 
+        self.uh0 = np.zeros(NE, dtype=mesh.ftype)
+        self.ph0 = np.zeros(NC, dtype=mesh.ftype)
         
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
 
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
+        self.pI = pde.pressure(pc)
+        umax = np.max(self.uI)
+        pmax = np.max(np.abs(self.pI))
+#        print('uI:',self.uI)
+#        print('pI:',self.pI)
         pc = mesh.entity_barycenter('cell')
         self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
         pass
 
-    def get_Qu(self):
+    def get_nonlinear_coef(self):
         mesh = self.mesh
-        uu = self.uu
+        uh0 = self.uh0
 
         itype = mesh.itype
         ftype = mesh.ftype
 
         mu = self.pde.mu
         k = self.pde.k
+
         rho = self.pde.rho
         beta = self.pde.beta
 
@@ -49,127 +54,36 @@ class DarcyForchheimerFDMModel():
 
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        I, = np.nonzero(~isBDEdge & isYDEdge)
+        C = np.ones(NE, dtype=mesh.ftype)
         edge2cell = mesh.ds.edge_to_cell()
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
         cell2edge = mesh.ds.cell_to_edge()
+
+        flag = ~isBDEdge & isYDEdge
+        L = edge2cell[flag, 0]
+        R = edge2cell[flag, 1]
         P1 = cell2edge[L, 0]# the 0 edge of the left cell
         D1 = cell2edge[L, 2]# the 2 edge of the left cell
         P2 = cell2edge[R, 0]# the 0 edge of the right cell
         D2 = cell2edge[R, 2]# the 2 edge of the right cell
 
-        Qu = np.zeros(NE//2,dtype=ftype)
-        Qu[I] = 1/4*(np.sqrt(uu[I]**2+uu[P1]**2)+np.sqrt(uu[I]**2+uu[D1]**2)\
-                +np.sqrt(uu[I]**2+uu[P2]**2)+np.sqrt(uu[I]**2+uu[D2]**2))
-        idx = np.nonzero(isBDEdge & isYDEdge)
-        Qu[idx] = 1
-                
-        Qu = mu/k + rho*beta*Qu
+        C[flag] = 1/4*(np.sqrt(uh0[flag]**2+uh0[P1]**2)+np.sqrt(uh0[flag]**2+uh0[D1]**2)\
+                +np.sqrt(uh0[flag]**2+uh0[P2]**2)+np.sqrt(uh0[flag]**2+uh0[D2]**2))
 
-        return Qu
-    def get_Qv(self):
-        mesh = self.mesh
-        uu = self.uu
-
-        itype = mesh.itype
-        ftype = mesh.ftype
-
-        mu = self.pde.mu
-        k = self.pde.k
-        rho = self.pde.rho
-        beta = self.pde.beta
-
-        pde = self.pde
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
-
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        isXDEdge = mesh.ds.x_direction_edge_flag()
-        I, = np.nonzero(~isBDEdge & isXDEdge)
-        edge2cell = mesh.ds.edge_to_cell()
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-        cell2edge = mesh.ds.cell_to_edge()
+        flag = ~isBDEdge & isXDEdge
+        L = edge2cell[flag, 0]
+        R = edge2cell[flag, 1]
         P1 = cell2edge[L, 3]
         D1 = cell2edge[L, 1]
         P2 = cell2edge[R, 3]
         D2 = cell2edge[R, 1]
+        C[flag] = 1/4*(np.sqrt(uh0[flag]**2+uh0[P1]**2)+np.sqrt(uh0[flag]**2+uh0[D1]**2)\
+                +np.sqrt(uh0[flag]**2+uh0[P2]**2)+np.sqrt(uh0[flag]**2+uh0[D2]**2))
 
-        Qv = np.zeros(NE,dtype=ftype)
+        C = mu/k + rho*beta*C
 
-        Qv[I] = 1/4*(np.sqrt(uu[P1]**2+uu[I]**2)+np.sqrt(uu[D1]**2+uu[I]**2)+np.sqrt(uu[P2]**2+uu[I]**2)+np.sqrt(uu[D2]**2+uu[I]**2))
-        idx = np.nonzero(isBDEdge & isXDEdge)
-        Qv[idx] = 1
-
-        Qv = mu/k + rho*beta*Qv
-        
-        return Qv
-
-    def get_Qu1(self):
-        mesh = self.mesh
-
-        itype = mesh.itype
-        ftype = mesh.ftype
-        NE = mesh.number_of_edges()
-
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        isYDEdge = mesh.ds.y_direction_edge_flag()
-        I, = np.nonzero(~isBDEdge & isYDEdge)
-
-        edge2cell = mesh.ds.edge_to_cell()
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-
-        cell2edge = mesh.ds.cell_to_edge()
-        P1 = cell2edge[L, 0]# the 0 edge of the left cell
-        D1 = cell2edge[L, 2]# the 2 edge of the left cell
-        P2 = cell2edge[R, 0]# the 0 edge of the right cell
-        D2 = cell2edge[R, 2]# the 2 edge of the right cell
-        
-        Qu1 = np.zeros(NE//2,dtype = ftype)
-        bc = mesh.entity_barycenter('edge')
-        pi = np.pi
-        Qu1[I] = 1/4*(np.sqrt((np.sin(pi*bc[I,0])*np.cos(pi*bc[I,1]))**2+(np.cos(pi*bc[P1,0])*np.sin(pi*bc[P1,1]))**2) \
-                +np.sqrt((np.sin(pi*bc[I,0])*np.cos(pi*bc[I,1]))**2+(np.cos(pi*bc[D1,0])*np.sin(pi*bc[D1,1]))**2) \
-            +np.sqrt((np.sin(pi*bc[I,0])*np.cos(pi*bc[I,1]))**2+(np.cos(pi*bc[P2,0])*np.sin(pi*bc[P2,1]))**2)\
-            +np.sqrt((np.sin(pi*bc[I,0])*np.cos(pi*bc[I,1]))**2+(np.cos(pi*bc[D2,0])*np.sin(pi*bc[D2,1]))**2))
-        
-        return Qu1
-
-    def get_Qv1(self):
-
-        mesh = self.mesh
-
-        itype = mesh.itype
-        ftype = mesh.ftype
-        NE = mesh.number_of_edges()
-
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        isXDEdge = mesh.ds.x_direction_edge_flag()
-        I, = np.nonzero(~isBDEdge & isXDEdge)
-
-        edge2cell = mesh.ds.edge_to_cell()
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-
-        cell2edge = mesh.ds.cell_to_edge()
-        P1 = cell2edge[L, 3]# the 3 edge of the left cell
-        D1 = cell2edge[L, 1]# the 1 edge of the left cell
-        P2 = cell2edge[R, 3]# the 3 edge of the right cell
-        D2 = cell2edge[R, 1]# the 1 edge of the right cell
-        
-        Qv1 = np.zeros(NE, dtype = ftype)
-        bc = mesh.entity_barycenter('edge')
-        pi = np.pi
-        Qv1[I] =1/4*(np.sqrt((np.sin(pi*bc[P1,0])*np.cos(pi*bc[P1,1]))**2+(np.cos(pi*bc[I,0])*np.sin(pi*bc[I,1]))**2) \
-                +np.sqrt((np.sin(pi*bc[D1,0])*np.cos(pi*bc[D1,1]))**2+(np.cos(pi*bc[I,0])*np.sin(pi*bc[I,1]))**2) \
-            +np.sqrt((np.sin(pi*bc[P2,0])*np.cos(pi*bc[P2,1]))**2+(np.cos(pi*bc[I,0])*np.sin(pi*bc[I,1]))**2)\
-            +np.sqrt((np.sin(pi*bc[D2,0])*np.cos(pi*bc[D2,1]))**2+(np.cos(pi*bc[I,0])*np.sin(pi*bc[I,1]))**2))
-        Qv1 = Qv1[NE//2:NE]
-
-        return Qv1
+        return C # no problem
 
 
     def get_left_matrix(self):
@@ -186,11 +100,8 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        Qu = self.get_Qu()
-        Qv = self.get_Qv()
-        Qv = Qv[NE//2:NE]
-        Quv = np.hstack((Qu, Qv))
-        A11 = np.diag(Quv)
+        C = self.get_nonlinear_coef()
+        A11 = np.diag(C)# correct
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -241,116 +152,106 @@ class DarcyForchheimerFDMModel():
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
 
-        Qu = self.get_Qu()
-        Qv = self.get_Qv()
-        Qu1 = self.get_Qu1()
-        Qv1 = self.get_Qv1()
-
         mu = self.pde.mu
         k = self.pde.k
         rho = self.pde.rho
         beta = self.pde.beta
 
-        b = np.zeros(NE+NC, dtype=ftype)
+        ## Modify
+        C = self.get_nonlinear_coef()#add
 
-        b[:NE//2] = pde.source2(bc[0:NE//2,:], Qu1)
-        b[NE//2:NE] = pde.source3(bc[NE//2:,:], Qv1)
-
+        b0 = np.zeros(NE, dtype=ftype)
+        flag = ~isBDEdge & isYDEdge
+        b0[flag] = pde.source2(bc[flag])
+        flag = ~isBDEdge & isXDEdge
+        b0[flag] = pde.source3(bc[flag])
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
-        val = pde.velocity_x(bc[idx, :])
-        
-        b[idx] = (mu/k+rho*beta*Qu[idx])*val
+        val = pde.velocity_x(bc[idx])
+        b0[idx] = (mu/k+beta*rho*C[idx])*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
-        val = pde.velocity_y(bc[idx, :])
-        b[idx] = (mu/k+rho*beta*Qv[idx])*val
+        val = pde.velocity_y(bc[idx])
+        b0[idx] = (mu/k+beta*rho*C[idx])*val
 
-
-        b[NE:] = pde.source1(pc)
+        b1 = pde.source1(pc)
         
-        return b
+        return np.r_[b0, b1] 
 
     def solve(self):
         mesh = self.mesh
+
+        hx = mesh.hx
+        hy = mesh.hy
         NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
         itype = mesh.itype
         ftype = mesh.ftype
 
-        A = self.get_left_matrix()
         b = self.get_right_vector()
-
-        x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
-        b = b - A@x
-
-        # Modify matrix
-        bdIdx = np.zeros((A.shape[0],), dtype = itype)
-        bdIdx[NE] = 1
-
-        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
-        AD = T@A@T + Tbd
-
-        b[NE] = self.ph[0]
-
-        # solve
-        x[:] = spsolve(AD, b)
-        return x
-
-    def cycling(self):
-        mesh = self.mesh
-        hx = mesh.hx
-        hy = mesh.hy
-
-        NE = mesh.number_of_edges()
-        uu = self.uu
-        u2 = uu[:NE]
-        p2 = uu[NE:]
+        A = self.get_left_matrix()
 
         tol = 1e-6
         ru = 1
         rp = 1
         count = 0
-        iterMax = 2000
+        iterMax = 500
         while ru+rp > tol and count < iterMax:
-            u  = self.solve()
-            u1 = u[:NE]
-            p1 = u[NE:]
 
-            A = self.get_left_matrix()
-            b = self.get_right_vector()
-            A11 = A[:NE,:NE]
-            A12 = A[:NE,NE:]
-            A21 = A[NE:,:NE]
+            bnew = b
+
+            x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
+            bnew = bnew - A@x
+
+            # Modify matrix
+            bdIdx = np.zeros((A.shape[0],), dtype = itype)
+            bdIdx[NE] = 1
+
+            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
+            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
+            AD = T@A@T + Tbd
+
+            bnew[NE] = self.ph[0]
+
+            # solve
+            x[:] = spsolve(AD, bnew)
+            u1 = x[:NE]
+            p1 = x[NE:]
+
             f = b[:NE]
             g = b[NE:]
 
-            ru = np.sqrt(np.sum(hx*hy*(u1-u2)**2))
-            rp = np.sqrt(np.sum(hx*hy*(p1-p2)**2))
-#            if LA.norm(f) == 0:
-#                ru = LA.norm(f - A11*u1 - A12*p1)
-#            else:
-#                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
-#            if LA.norm(g) == 0:
-#                rp = LA.norm(g - A21*u1)
-#            else:
-#                rp = LA.norm(g - A21*u1)/LA.norm(g)
-#
-            uu[:NE] = u1
-            uu[NE:] = p1
-            Qu = self.get_Qu()
-            Qv = self.get_Qv()
-            Qu1 = self.get_Qu1()
-            Qv1 = self.get_Qv1()
+            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
+            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
+#            print('uh -u0:',ue)
+#            print('ph - p0:',pe)
+
+            self.uh0 = u1
+            self.ph0 = p1
+            A = self.get_left_matrix()
+            A11 = A[:NE,:NE]
+            A12 = A[:NE,NE:NE+NC]
+            A21 = A[NE:NE+NC,:NE]
+
+            if LA.norm(f) == 0:
+                ru = LA.norm(f - A11*u1 - A12*p1)
+            else:
+                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
+            if LA.norm(g) == 0:
+                rp = LA.norm(g - A21*u1)
+            else:
+                rp = LA.norm(g - A21*u1)/LA.norm(g)
+
             count = count + 1
-            self.uh = u1
-            self.ph = p1
-            print('ru',ru)
-            print('rp',rp)
+ #           print('ru:',ru)
+ #           print('rp:',rp)
 
-            return count
+        self.uh = u1
+        self.ph = p1
+#        print('uh:',self.uh)
+        return count
 
-    
+
     def get_max_error(self):
         ue = np.max(np.abs(self.uh - self.uI))
         pe = np.max(np.abs(self.ph - self.pI))
@@ -364,4 +265,11 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
+#    def get_L2_perror(self):
+#        uh = self.uh
+#        ph = self.ph
+#        uI = self.uI
+#        pI = self.pI
+#        err = self.integralalg.L2_error(ph, pI)
+#        return err
  
