@@ -10,7 +10,7 @@ from fealpy.tools.show import showmultirate
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 
 class Tritree(TriangleMesh):
-    localEdge2childCell = np.array([[0, 1], [1, 2], [2, 0]])
+    localEdge2childCell = np.array([[0, 1], [1, 2], [2, 0]], dtype=np.int)
     def __init__(self, node, cell):
         super(Tritree, self).__init__(node, cell)
         NC = self.number_of_cells()
@@ -44,54 +44,53 @@ class Tritree(TriangleMesh):
         isLeafCell = self.is_leaf_cell()
         return TriangleMesh(self.node, self.ds.cell[isLeafCell])
 
-    def refine(self, marker=None):
-        if marker == None:
-            idx = self.leaf_cell_index()
-        else:
-            # 需要加密的叶子单元编号
-            idx = marker.refine_marker(self)
-
+    def refine(self):
+        idx = self.leaf_cell_index()
+        
+        # 需要加密的叶子单元编号
+        idx_0 = [idx[0]]
         if idx is None:
-            return False
+             return False
+
 
         if len(idx) > 0:
-            # Prepare data
+             # Prepare data
             NC = self.number_of_cells()
             isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[idx] = True
+            isMarkedCell[idx_0] = True
+        
+#            isTwoChildCell = (self.child[:, 1] > -1 & self.child[:, 2] == -1)
+#            idx0, = np.nonzero(isTwoChildCell)
+#            flag0 = np.ones(NC, dtype=np.bool)
+#            flag0[child[idx0, [0, 1]]] = True
 
-            isTwoChildCell = (self.child[:, 1] > -1 & self.child[:, 2] == -1)
-            idx0, = np.nonzero(isTwoChildCell)
-            flag0 = np.ones(NC, dtype=np.bool)
-            flag0[child[idx0, [0, 1]]] = True
-
-            # expand the marked cell
-            isExpand = np.zeros(NC, dtype=np.bool)
-            cell2cell = self.ds.cell_to_cell()
-            flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
-            flag = flag1 | flag2
-            while np.any(flag):
-                isMarkedCell[flag] = True
-                flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-                flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
-                flag = flag1 | flag2
-
-            if len(idx0) > 0:
-                # delete the children of the cells with two children
-                flag = isMarkedCell[child[idx0, 0]] | isMarkedCell[child[idx0, 1]]
-                isMarkCell[idx0[flag]] = True
-                self.child[idx0, 0:1] = -1
-
-                flag = np.ones(NC, dtype=np.bool)
-                flag[child[idx0, [0, 1]]] = False
-                NN = self.number_of_nodes()
-                self.ds.reinit(NN, cell[flag])
-                self.parent = self.parent[flag]
-                self.child = self.child[flag]
-                isMarkedCell = isMarkedCell[flag]
-
-            
+#            # expand the marked cell
+#            isExpand = np.zeros(NC, dtype=np.bool)
+#            cell2cell = self.ds.cell_to_cell()
+#            flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+#            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
+#            flag = flag1 | flag2
+#            while np.any(flag):
+#                isMarkedCell[flag] = True
+#                flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+#                flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
+#                flag = flag1 | flag2
+#
+#            if len(idx0) > 0:
+#                # delete the children of the cells with two children
+#                flag = isMarkedCell[child[idx0, 0]] | isMarkedCell[child[idx0, 1]]
+#                isMarkCell[idx0[flag]] = True
+#                self.child[idx0, 0:1] = -1
+#
+#                flag = np.ones(NC, dtype=np.bool)
+#                flag[child[idx0, [0, 1]]] = False
+#                NN = self.number_of_nodes()
+#                self.ds.reinit(NN, cell[flag])
+#                self.parent = self.parent[flag]
+#                self.child = self.child[flag]
+#                isMarkedCell = isMarkedCell[flag]
+#
+#            
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
@@ -100,9 +99,9 @@ class Tritree(TriangleMesh):
             cell = self.entity('cell')
 
 
-            # Find the cutted edge  
+#            # Find the cutted edge  
             cell2edge = self.ds.cell_to_edge()
-
+        
             isCutEdge = np.zeros(NE, dtype=np.bool)
             isCutEdge[cell2edge[isMarkedCell, :]] = True
 
@@ -112,7 +111,7 @@ class Tritree(TriangleMesh):
             isCuttedEdge = isCuttedEdge & isCutEdge
             
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
-
+        
             # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
             I, J = np.nonzero(isCuttedEdge[cell2edge])
             cellIdx = np.zeros(NE, dtype=np.int)
@@ -122,54 +121,54 @@ class Tritree(TriangleMesh):
             cellIdx[cell2edge[I1, J1]] = I1
             localIdx[cell2edge[I1, J1]] = J1
             del I, J, I1, J1
-
-            #找到该单元相应孩子单元编号， 及对应的中点编号
+#
+#            #找到该单元相应孩子单元编号， 及对应的中点编号
             cellIdx = cellIdx[isCuttedEdge]
             localIdx = localIdx[isCuttedEdge]
-            cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
+            cellIdx = self.child[cellIdx, self.localEdge2childCell[localIdx, 0]]
             localIdx = self.localEdge2childCell[localIdx, 1]
-            
+    
             edge2center = np.zeros(NE, dtype=np.int)
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]
 
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
             cellCenter = self.entity_barycenter('cell', isNeedCutCell)
+                
+           # NEC = len(edgeCenter)
+           # NCC = len(cellCenter)
+           # edge2center[isaNeedCutEdge] = np.arange(NN, NN + NEC)
 
-            NEC = len(edgeCenter)
-            NCC = len(cellCenter)
-            edge2center[isaNeedCutEdge] = np.arange(NN, NN + NEC)
+           # cp = [cell[isNeedCutcell, i].reshape(-1, 1) for i in range(3)]
+           # ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(3)]
 
-            cp = [cell[isNeedCutcell, i].reshape(-1, 1) for i in range(3)]
-            ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(3)]
-
-            newCell = np.zeros((4*NCC, 3), dtype=np.int)
-            newChild = -np.ones((4*NCC, 4), dtype=np.int)
-            newParent = -np.ones((4*NCC, 2), dtype=np.int)
-            newCell[0::4, :] = np.concatenate((cp[0], ep[0], ep[3]), axis=1)
-            newCell[1::4, :] = np.concatenate((ep[0], cp[1], ep[1]), axis=1)
-            newCell[2::4, :] = np.concatenate((ep[1], cp[2], ep[2]), axis=1)
-            newCell[3::4, :] = np.concatenate((ep[3], ep[2], cp[3]), axis=1)
-            newParent[:, 0] = np.repeat(idx, 4)
-            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int))
-            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
-
-            cell = np.concatenate((cell, newCell), axis=0)
-            self.node = np.concatenate((node, edgeCenter), axis=0)
-            self.parent = np.concatenate((parent, newParent), axis=0)
-            self.child = np.concatenate((child, newChild), axis=0)
-            self.ds.reinit(NN + NEC + NCC, cell)
-
-
-
-
-
-
-
-
-
-
-
-
+#            newCell = np.zeros((4*NCC, 3), dtype=np.int)
+#            newChild = -np.ones((4*NCC, 4), dtype=np.int)
+#            newParent = -np.ones((4*NCC, 2), dtype=np.int)
+#            newCell[0::4, :] = np.concatenate((cp[0], ep[0], ep[3]), axis=1)
+#            newCell[1::4, :] = np.concatenate((ep[0], cp[1], ep[1]), axis=1)
+#            newCell[2::4, :] = np.concatenate((ep[1], cp[2], ep[2]), axis=1)
+#            newCell[3::4, :] = np.concatenate((ep[3], ep[2], cp[3]), axis=1)
+#            newParent[:, 0] = np.repeat(idx, 4)
+#            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int))
+#            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4) 
+#
+#            cell = np.concatenate((cell, newCell), axis=0)
+#            self.node = np.concatenate((node, edgeCenter), axis=0)
+#            self.parent = np.concatenate((parent, newParent), axis=0)
+#            self.child = np.concatenate((child, newChild), axis=0)
+#            self.ds.reinit(NN + NEC + NCC, cell)
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
+#
 
 
 
