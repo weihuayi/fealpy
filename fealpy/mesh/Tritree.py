@@ -10,6 +10,7 @@ from fealpy.tools.show import showmultirate
 from fealpy.mesh.adaptive_tools import AdaptiveMarker 
 
 class Tritree(TriangleMesh):
+    localEdge2childCell = np.array([[0, 1], [1, 2], [2, 0]])
     def __init__(self, node, cell):
         super(Tritree, self).__init__(node, cell)
         NC = self.number_of_cells()
@@ -115,7 +116,7 @@ class Tritree(TriangleMesh):
             # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
             I, J = np.nonzero(isCuttedEdge[cell2edge])
             cellIdx = np.zeros(NE, dtype=np.int)
-            localIdx = np.zeros()
+            localIdx = np.zeros(NE, dtype = np.int)
             I1 = I[~isLeafCell[I]]
             J1 = J[~isLeafCell[I]]
             cellIdx[cell2edge[I1, J1]] = I1
@@ -132,9 +133,10 @@ class Tritree(TriangleMesh):
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]
 
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
-
+            cellCenter = self.entity_barycenter('cell', isNeedCutCell)
 
             NEC = len(edgeCenter)
+            NCC = len(cellCenter)
             edge2center[isaNeedCutEdge] = np.arange(NN, NN + NEC)
 
             cp = [cell[isNeedCutcell, i].reshape(-1, 1) for i in range(3)]
@@ -155,7 +157,7 @@ class Tritree(TriangleMesh):
             self.node = np.concatenate((node, edgeCenter), axis=0)
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
-            self.ds.reinit(NN + NEC, cell)
+            self.ds.reinit(NN + NEC + NCC, cell)
 
 
 

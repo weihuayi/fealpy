@@ -72,10 +72,10 @@ qtree = Quadtree(mesh.node, mesh.ds.cell)
 
 marker = AdaptiveMarker(phi) 
 
-for i in range(5):
+for i in range(3):
     qtree.uniform_refine()
 
-for i in range(4):
+for i in range(2):
     qtree.refine(marker)
 
 
