@@ -16,7 +16,7 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
-tmesh.bisect(cell)
+tmesh.uniform_refine(1)
 fig = plt.figure()
 axes = fig.gca()
 tmesh.add_plot(axes)

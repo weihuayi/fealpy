@@ -17,15 +17,16 @@ tmesh.uniform_refine()
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
-tree = Tritree(node, cell)
+tritree = Tritree(node, cell)
 idx = np.arange(2, 7); 
-ef = tree.refine(idx);
-
+ef =tritree.refine(idx);
+print(ef)
 fig = plt.figure()
 axes = fig.gca()
-tree.add_plot(axes)
-tree.find_node(axes, node=ec, showindex=True)
-#tree.find_cell(axes, showindex=True)
+tritree.add_plot(axes)
+tritree.find_node(axes, showindex=True)
+tritree.find_cell(axes, showindex=True)
+tritree.find_edge(axes, showindex=True) 
 plt.show()
 
 
