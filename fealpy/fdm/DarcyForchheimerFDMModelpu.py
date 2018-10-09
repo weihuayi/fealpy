@@ -123,10 +123,10 @@ class DarcyForchheimerFDMModel():
         idx, = np.nonzero(isBDCell)
         print('idx',idx)
         cell = np.arange(NC)
-        vy1 = cell2edge[cell, 0]
-        ux2 = cell2edge[cell, 1]
-        vy2 = cell2edge[cell, 2]
-        ux1 = cell2edge[cell, 3]#correct
+        vy1 = cell2edge[cell, 0] # e_{i,0}
+        ux2 = cell2edge[cell, 1] # e_{i,1}
+        vy2 = cell2edge[cell, 2] # e_{i,2}
+        ux1 = cell2edge[cell, 3] # e_{i,3}#correct
 
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
@@ -235,7 +235,7 @@ class DarcyForchheimerFDMModel():
         self.uh = uh1
         self.ph = ph1
 #        print('uh:',self.uh)
-        return count,self.uh,self.ph
+        return count
 
 
     def get_max_error(self):
