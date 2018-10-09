@@ -29,12 +29,6 @@ class DarcyForchheimerFDMModel():
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         self.pI = pde.pressure(pc)
-        umax = np.max(self.uI)
-        pmax = np.max(np.abs(self.pI))
-#        print('uI:',self.uI)
-#        print('pI:',self.pI)
-        pc = mesh.entity_barycenter('cell')
-        self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
         pass
@@ -91,15 +85,13 @@ class DarcyForchheimerFDMModel():
     def solve(self):
         mesh = self.mesh
         pde = self.pde
-
-        hx = mesh.hx
-        hy = mesh.hy
-        Nx = int(1/hx)
-        Ny = int(1/hy)
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
         itype = mesh.itype
         ftype = mesh.ftype
+
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
 
         # find edge
         isBDEdge = mesh.ds.boundary_edge_flag()
