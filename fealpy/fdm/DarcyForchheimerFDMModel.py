@@ -175,7 +175,7 @@ class DarcyForchheimerFDMModel():
         b0[idx] = (mu/k+beta*rho*C[idx])*val
 
         b1 = pde.source1(pc)
-        
+        print('maxf',np.max(b0))
         return np.r_[b0, b1] 
 
     def solve(self):
@@ -191,7 +191,7 @@ class DarcyForchheimerFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-        tol = 1e-6
+        tol = 1e-9
         ru = 1
         rp = 1
         count = 0
@@ -199,7 +199,7 @@ class DarcyForchheimerFDMModel():
         while ru+rp > tol and count < iterMax:
 
             bnew = b
-
+            
             x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
             bnew = bnew - A@x
 
@@ -227,12 +227,11 @@ class DarcyForchheimerFDMModel():
 #            print('ph - p0:',pe)
 
             self.uh0 = u1
-            self.ph0 = p1
             A = self.get_left_matrix()
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-
+            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
             else:
@@ -243,7 +242,7 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
 
             count = count + 1
- #           print('ru:',ru)
+            print('ru0:',ru0)
  #           print('rp:',rp)
 
         self.uh = u1

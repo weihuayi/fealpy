@@ -7,9 +7,9 @@ class CoscosData1:
     def __init__(self, box):
         self.box = box
         self.mu = 2
-        self.k = 1
+        self.k = 4
         self.rho = 1
-        self.beta = 10
+        self.beta = 20
 
 
     def init_mesh(self, nx, ny):
