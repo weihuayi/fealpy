@@ -95,36 +95,59 @@ class Tritree(TriangleMesh):
            
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
        
-#           # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
-#           edge2center = np.zeros(NE, dtype=np.int)
-#           ec = self.entity_barycenter('edge', isNeedCutEdge)
-#           edge2center[isNeedCutEdge] = range(NN, NN+isNeedCutEdge.sum())
-#       
-            I, J = np.nonzero(isCuttedEdge[cell2edge])
-            cellIdx = np.zeros(NE, dtype=self.itype)
-            localIdx = np.zeros(NE, dtype=self.itype)
-            I1 = I[~isLeafCell[I]]
-            J1 = J[~isLeafCell[I]]
-            cellIdx[cell2edge[I1, J1]] = I1
-            localIdx[cell2edge[I1, J1]] = J1
-            del I, J, I1, J1
-
-            #找到该单元相应孩子单元编号， 及对应的中点编号
-            cellIdx = cellIdx[isCuttedEdge]
-            localIdx = localIdx[isCuttedEdge]
-            cellIdx = self.child[cellIdx, self.localEdge2childCell[localIdx, 0]]
-            localIdx = self.localEdge2childCell[localIdx, 1] 
             edge2center = np.zeros(NE, dtype=np.int) 
-            edge2center[isCuttedEdge] = cell[cellIdx, localIdx]
+
+            edge2cell = self.ds.edge_to_cell()
+            flag = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]]) 
+            I = self.child[edge2cell[flag, 1], 3]
+            J = edge2cell[flag, 3]
+            edge2center[flag] = cell[I, J]
+
+            flag = (~isLeafCell[edge2cell[:, 0]]) & isLeafCell[edge2cell[:, 1]]
+            I = self.child[edge2cell[flag, 0], 3]
+            J = edge2cell[flag, 2]
+            edge2center[flag] = cell[I, J]
+
             ec = self.entity_barycenter('edge', isNeedCutEdge) 
             NEC = len(ec)
-            NCC = np.sum(isMarkedCell) 
             edge2center[isNeedCutEdge] = np.arange(NN, NN+NEC)
                 
-            cp = [cell[isMarkedCell, i].reshape(-1, 1) for i in range(3)]      
-            ep = [edge2center[cell2edge[isMarkedCell, i]].reshape(-1, 1) for i in range(3)]
-                  
                                                                               
+            # 一分为四的单元
+            cellIdx, = np.find(isMarkedCell)
+            NCC = sum(isMarkedCell)
+            cell4 = np.zeroos((4*NCC, 3), dtype=self.itype)
+            child4 = -np.ones((4*NCC, 4), dtype=self.itype)
+            parent4 = -np.ones((4*NCC,2), dtype=self.itype) 
+            cell4[:NCC, 0] = cell[isMarkedCell, 0] 
+            cell4[:NCC, 1] = edge2center[cell2edge[isMarkedCell, 2]] 
+            cell4[:NCC, 2] = edge2center[cell2edge[isMarkedCell, 1]] 
+            parent4[:NCC, 0] = cellIdx
+            parent4[:NCC, 1] = 0
+
+            cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1] 
+            cell4[NCC:2*NCC, 1] = edge2center[cell2edge[isMarkedCell, 0]] 
+            cell4[NCC:2*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]] 
+            parent4[NCC:2*NCC, 0] = cellIdx
+            parent4[NCC:2*NCC, 1] = 1
+
+            cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2] 
+            cell4[2*NCC:3*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
+            cell4[2*NCC:3*NCC, 2] = edge2center[cell2edge[isMarkedCell, 0]] 
+            parent4[2*NCC:3*NCC, 0] = cellIdx
+            parent4[2*NCC:3*NCC, 1] = 2
+
+            cell4[3*NCC:4*NCC, 0] = edge2center[cell2edge[isMarkedCell, 0]] 
+            cell4[3*NCC:4*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
+            cell4[3*NCC:4*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]]
+            parent4[3*NCC:4*NCC, 0] = cellIdx
+            parent4[3*NCC:4*NCC, 1] = 3
+
+            # 一分为二的单元
+            cell2
+            child2
+            parent2
+
             newCell = np.zeros((4*NCC+2*(NC-NCC), 3), dtype=np.int)
 
             newChild = -np.ones((4*NCC, 4), dtype=np.int)                       
