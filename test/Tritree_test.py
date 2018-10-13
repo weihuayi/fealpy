@@ -24,9 +24,9 @@ print(ef)
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
-tritree.find_node(axes, showindex=True)
-tritree.find_cell(axes, showindex=True)
-tritree.find_edge(axes, showindex=True) 
+#tritree.find_node(axes, showindex=True)
+#tritree.find_cell(axes, showindex=True)
+#tritree.find_edge(axes, showindex=True) 
 plt.show()
 
 
