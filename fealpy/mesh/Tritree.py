@@ -2,7 +2,6 @@ import numpy as np
 from fealpy.mesh import TriangleMesh 
 
 class Tritree(TriangleMesh):
-    localEdge2childCell = np.array([[0, 1], [1, 2], [2, 0]], dtype=np.int)
     def __init__(self, node, cell):
         super(Tritree, self).__init__(node, cell)
         NC = self.number_of_cells()
@@ -114,58 +113,62 @@ class Tritree(TriangleMesh):
                 
                                                                               
             # 一分为四的单元
-            cellIdx, = np.find(isMarkedCell)
-            NCC = sum(isMarkedCell)
-            cell4 = np.zeroos((4*NCC, 3), dtype=self.itype)
+            cell4Idx, = np.where(isMarkedCell)
+            NCC = np.sum(isMarkedCell)
+            cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
             child4 = -np.ones((4*NCC, 4), dtype=self.itype)
             parent4 = -np.ones((4*NCC,2), dtype=self.itype) 
             cell4[:NCC, 0] = cell[isMarkedCell, 0] 
             cell4[:NCC, 1] = edge2center[cell2edge[isMarkedCell, 2]] 
             cell4[:NCC, 2] = edge2center[cell2edge[isMarkedCell, 1]] 
-            parent4[:NCC, 0] = cellIdx
+            parent4[:NCC, 0] = cell4Idx
             parent4[:NCC, 1] = 0
 
             cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1] 
             cell4[NCC:2*NCC, 1] = edge2center[cell2edge[isMarkedCell, 0]] 
             cell4[NCC:2*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]] 
-            parent4[NCC:2*NCC, 0] = cellIdx
+            parent4[NCC:2*NCC, 0] = cell4Idx
             parent4[NCC:2*NCC, 1] = 1
 
             cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2] 
             cell4[2*NCC:3*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
             cell4[2*NCC:3*NCC, 2] = edge2center[cell2edge[isMarkedCell, 0]] 
-            parent4[2*NCC:3*NCC, 0] = cellIdx
+            parent4[2*NCC:3*NCC, 0] = cell4Idx
             parent4[2*NCC:3*NCC, 1] = 2
 
             cell4[3*NCC:4*NCC, 0] = edge2center[cell2edge[isMarkedCell, 0]] 
             cell4[3*NCC:4*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
             cell4[3*NCC:4*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]]
-            parent4[3*NCC:4*NCC, 0] = cellIdx
+            parent4[3*NCC:4*NCC, 0] = cell4Idx
             parent4[3*NCC:4*NCC, 1] = 3
 
             # 一分为二的单元
-            cell2
-            child2
-            parent2
+            cell2Idx = np.where(isTwoChildCell)
+            N2CC = np.sum(isTwoChildCell)
+            cell2 = np.zeros((2*N2CC, 3), dtype=self.itype)
+            child4 = -np.ones((2*N2CC, 4), dtype=self.itype)
+            parent2 = -np.ones((2*N2CC, 4), dtype=self.itype)
+            cell2[0:N2CC, 0] = cell[isTwoChildCell, 0]
+            cell2[0:N2CC, 1] = cell[isTwoChildCell, 1]
+            cell2[0:N2CC, 2] = edge2center[cell2edge[cell[I, J], 1]]
+            parent2[0:N2CC, 0] = cell2Idx
+            parent2[0:N2CC, 1] = 0
 
-            newCell = np.zeros((4*NCC+2*(NC-NCC), 3), dtype=np.int)
-
-            newChild = -np.ones((4*NCC, 4), dtype=np.int)                       
-            newParent = -np.ones((4*NCC, 2), dtype=np.int)                      
-            newCell[0::3, :] = np.concatenate((cp[0], ep[0], ep[2]), axis=1)
-            newCell[1::3, :] = np.concatenate((ep[0], cp[1], ep[1]), axis=1)
-            newCell[2::3, :] = np.concatenate((ep[1], cp[2], ep[2]), axis=1)
-            newParent[:, 0] = np.repeat(idx, 4)                                 
-            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int))              
-            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)           
-                                                                                             
-            cell = np.concatenate((cell, newCell), axis=0)                      
+            cell2[N2CC:2*N2CC, 0] = cell[isTwoChildCell, 1]                           
+            cell2[N2CC:2*N2CC, 1] = cell[isTwoChildCell, 2]                           
+            cell2[N2CC:2*N2CC, 2] = edge2center[cell2edge[isTwoChildCell, 1]]          
+            parent2[N2CC:2*N2CC, 0] = cell2Idx                                        
+            parent2[N2CC:2*N2CC, 1] = 1
+            
+#            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)           
+#                                                                                             
+            cell = np.concatenate((cell, cell4, cell2), axis=0)                      
             self.node = np.concatenate((node, ec), axis=0)  
-            self.parent = np.concatenate((parent, newParent), axis=0)           
-            self.child = np.concatenate((child, newChild), axis=0)              
-            self.ds.reinit(NN + NEC + NCC, cell) 
-                
-           
+#            self.parent = np.concatenate((parent, parent4, parent2), axis=0)           
+#            self.child = np.concatenate((child, child4, child2), axis=0)              
+            self.ds.reinit(NN + NEC + NCC + N2CC, cell) 
+               
+          
 
 
 
