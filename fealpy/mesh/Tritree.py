@@ -113,7 +113,7 @@ class Tritree(TriangleMesh):
                 
                                                                               
             # 一分为四的单元
-            cell4Idx, = np.where(isMarkedCell)
+            cell4Idx, = np.where(isMarkedCell)                                 
             NCC = np.sum(isMarkedCell)
             cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
             child4 = -np.ones((4*NCC, 4), dtype=self.itype)
@@ -162,8 +162,8 @@ class Tritree(TriangleMesh):
             
             cell = np.concatenate((cell, cell4, cell2), axis=0)                      
             self.node = np.concatenate((node, ec), axis=0)  
-##            self.parent = np.concatenate((parent4, parent2), axis=0)           
-##            self.child = np.concatenate((child4, child2), axis=0)              
+#            self.parent = np.concatenate((parent4, parent2), axis=0)           
+#            self.child = np.concatenate((child4, child2), axis=0)              
             self.ds.reinit(NN + NEC + NCC + N2CC, cell) 
                
           
