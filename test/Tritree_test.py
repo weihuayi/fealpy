@@ -4,6 +4,13 @@ import matplotlib.pyplot as plt
 from fealpy.mesh.TriangleMesh import TriangleMesh
 from fealpy.mesh.Tritree import Tritree
 
+def get_idx(tritree):
+    cell = tritree.entity('cell')
+    isLeafCell = tritree.is_leaf_cell()
+    flag = (np.sum(cell==5, axis=1) == 1) & isLeafCell
+    idx, = np.where(flag)
+    return idx
+
 node = np.array([
     (0, 0), 
     (1, 0), 
@@ -18,8 +25,10 @@ tmesh.uniform_refine()
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
-idx = np.arange(2, 7); 
-ef =tritree.refine(idx);
+
+for i in range(5):
+    idx = get_idx(tritree); 
+    tritree.refine(idx);
 
 fig = plt.figure()
 axes = fig.gca()
