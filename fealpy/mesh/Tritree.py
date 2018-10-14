@@ -143,29 +143,27 @@ class Tritree(TriangleMesh):
             parent4[3*NCC:4*NCC, 1] = 3
 
             # 一分为二的单元
-            cell2Idx = np.where(isTwoChildCell)
-            N2CC = np.sum(isTwoChildCell)
+            cell2Idx, = np.where(~isMarkedCell)
+            N2CC = np.sum(~isMarkedCell)
             cell2 = np.zeros((2*N2CC, 3), dtype=self.itype)
             child4 = -np.ones((2*N2CC, 4), dtype=self.itype)
             parent2 = -np.ones((2*N2CC, 4), dtype=self.itype)
-            cell2[0:N2CC, 0] = cell[isTwoChildCell, 0]
-            cell2[0:N2CC, 1] = cell[isTwoChildCell, 1]
-            cell2[0:N2CC, 2] = edge2center[cell2edge[cell[I, J], 1]]
+            cell2[0:N2CC, 0] = cell[~isMarkedCell, 0]
+            cell2[0:N2CC, 1] = cell[~isMarkedCell, 1]
+            cell2[0:N2CC, 2] = edge2center[cell2edge[~isMarkedCell, 0]]
             parent2[0:N2CC, 0] = cell2Idx
             parent2[0:N2CC, 1] = 0
 
-            cell2[N2CC:2*N2CC, 0] = cell[isTwoChildCell, 1]                           
-            cell2[N2CC:2*N2CC, 1] = cell[isTwoChildCell, 2]                           
-            cell2[N2CC:2*N2CC, 2] = edge2center[cell2edge[isTwoChildCell, 1]]          
+            cell2[N2CC:2*N2CC, 0] = cell[~isMarkedCell, 1]                           
+            cell2[N2CC:2*N2CC, 1] = cell[~isMarkedCell, 2]                           
+            cell2[N2CC:2*N2CC, 2] = edge2center[cell2edge[~isMarkedCell, 0]]          
             parent2[N2CC:2*N2CC, 0] = cell2Idx                                        
             parent2[N2CC:2*N2CC, 1] = 1
             
-#            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)           
-#                                                                                             
             cell = np.concatenate((cell, cell4, cell2), axis=0)                      
             self.node = np.concatenate((node, ec), axis=0)  
-#            self.parent = np.concatenate((parent, parent4, parent2), axis=0)           
-#            self.child = np.concatenate((child, child4, child2), axis=0)              
+##            self.parent = np.concatenate((parent4, parent2), axis=0)           
+##            self.child = np.concatenate((child4, child2), axis=0)              
             self.ds.reinit(NN + NEC + NCC + N2CC, cell) 
                
           
