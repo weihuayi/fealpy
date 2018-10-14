@@ -101,7 +101,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
-        A11 = np.diag(C)# correct
+        A11 = spdiags(C,0,NE,NE).toarray()# correct
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -175,7 +175,7 @@ class DarcyForchheimerFDMModel():
         b0[idx] = (mu/k+beta*rho*C[idx])*val
 
         b1 = pde.source1(pc)
-        print('maxf',np.max(b0))
+#        print('maxf',np.max(b0))
         return np.r_[b0, b1] 
 
     def solve(self):
@@ -191,11 +191,11 @@ class DarcyForchheimerFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-        tol = 1e-9
+        tol = 1e-4
         ru = 1
         rp = 1
         count = 0
-        iterMax = 500
+        iterMax = 2000
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -226,12 +226,11 @@ class DarcyForchheimerFDMModel():
 #            print('uh -u0:',ue)
 #            print('ph - p0:',pe)
 
-            self.uh0 = u1
+            self.uh0[:] = u1
             A = self.get_left_matrix()
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
             else:
@@ -242,13 +241,25 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
 
             count = count + 1
-            print('ru0:',ru0)
+ #           print('ru:',ru)
  #           print('rp:',rp)
 
-        self.uh = u1
-        self.ph = p1
+        self.uh[:] = u1
+        self.ph[:] = p1
 #        print('uh:',self.uh)
         return count
+
+    def grad_pressure(self):
+        mesh = self.mesh
+        ftype = mesh.ftype
+
+        NC = mesh.number_of_cells()
+
+        ph = self.ph
+        hx = mesh.hx
+        hy = mesh.hy
+
+        val = np.zeros((NC,2),dtype=ftype)
 
 
     def get_max_error(self):
@@ -264,11 +275,48 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
-#    def get_L2_perror(self):
-#        uh = self.uh
-#        ph = self.ph
-#        uI = self.uI
-#        pI = self.pI
-#        err = self.integralalg.L2_error(ph, pI)
-#        return err
- 
+    def get_H1_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+        ueL2,peL2 = self.get_L2_error()
+        ep = self.ph - self.pI
+        psemi = np.sqrt(np.sum((ep[1:]-ep[:NC-1])**2))
+        peH1 = peL2+psemi
+        return ep,psemi
+
+    def get_DpL2_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+        Nx = int(1/hx)
+        Ny = int(1/hy)
+        ftype = mesh.ftype
+
+        Dph = np.zeros((NC,2),dtype=ftype)
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+        DpI = self.pde.grad_pressure(pc)
+
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        I, = np.nonzero(isBDEdge & isYDEdge)
+        Dph[NC-Ny:NC,0] = self.pde.source2(bc[I[Ny:],:])
+        J, = np.nonzero(isBDEdge & isXDEdge)
+        Dph[Ny-1:NC:Ny,1] = self.pde.source3(bc[J[1::2],:])
+
+        Dph[:NC-Ny,0] = (self.ph[Ny:] - self.ph[:NC-Ny])/hx
+        
+        m = np.arange(NC)
+        m = m.reshape(Ny,Nx)
+        n1 = m[:,1:].flatten()
+        n2 = m[:,:Ny-1].flatten()
+        Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
+
+        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        return DpeL2
+
