@@ -20,7 +20,7 @@ cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
 idx = np.arange(2, 7); 
 ef =tritree.refine(idx);
-print(ef)
+
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
