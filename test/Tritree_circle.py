@@ -1,14 +1,20 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import Circle
+
 from fealpy.mesh.TriangleMesh import TriangleMesh
+from fealpy.mesh.level_set_function import dcircle
 from fealpy.mesh.Tritree import Tritree
 
-def get_idx(tritree):
+def get_idx(tritree, phi):
+    node = tritree.entity('node')
     cell = tritree.entity('cell')
     isLeafCell = tritree.is_leaf_cell()
-    flag = (np.sum(cell==5, axis=1) == 1) & isLeafCell
-    idx, = np.where(flag)
+    cell2node = tritree.ds.cell_to_node()
+    value = phi(node)
+    valueSign = np.sign(value)
+    valueSign[np.abs(value)<1e-8] = 0
     return idx
 
 node = np.array([
@@ -19,15 +25,21 @@ node = np.array([
 cell = np.array([
     (1, 2, 0), 
     (3, 0, 2)], dtype=np.int)
+
+cxy = (0.5, 0.5)
+r = 0.5
+phi = lambda p: dcircle(p, cxy, r)
+circle = Circle(cxy, r, edgecolor='g', fill=False, linewidth=2)
+
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(3)
+tmesh.uniform_refine()
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
 
 for i in range(5):
-    idx = get_idx(tritree); 
+    idx = get_idx(tritree, phi);
     tritree.refine(idx);
 
 fig = plt.figure()
