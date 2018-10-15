@@ -10,11 +10,12 @@ from fealpy.mesh.Tritree import Tritree
 def get_idx(tritree, phi):
     node = tritree.entity('node')
     cell = tritree.entity('cell')
-    isLeafCell = tritree.is_leaf_cell()
-    cell2node = tritree.ds.cell_to_node()
+    idx = tritree.leaf_cell_index()
     value = phi(node)
     valueSign = np.sign(value)
-    valueSign[np.abs(value)<1e-8] = 0
+    valueSign[np.abs(value)<1e-12] = 0
+    flag = (np.abs(np.sum(valueSign[cell[idx, :]], axis=1)) < 3)
+    idx = idx[flag]
     return idx
 
 node = np.array([
@@ -27,7 +28,7 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 cxy = (0.5, 0.5)
-r = 0.5
+r = 0.3
 phi = lambda p: dcircle(p, cxy, r)
 circle = Circle(cxy, r, edgecolor='g', fill=False, linewidth=2)
 
@@ -39,12 +40,14 @@ cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
 
 for i in range(5):
-    idx = get_idx(tritree, phi);
-    tritree.refine(idx);
+    idx = get_idx(tritree, phi)
+    tritree.refine(idx)
 
+idx = tritree.leaf_cell_index()
+mesh = TriangleMesh(tritree.node, tritree.ds.cell[idx, :])
 fig = plt.figure()
 axes = fig.gca()
-tritree.add_plot(axes)
+mesh.add_plot(axes)
 #tritree.find_node(axes, showindex=True)
 #tritree.find_cell(axes, showindex=True)
 #tritree.find_edge(axes, showindex=True) 
