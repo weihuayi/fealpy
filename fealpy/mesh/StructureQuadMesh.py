@@ -331,12 +331,23 @@ class StructureQuadMeshDataStructure:
         edge2cell = self.edge2cell
         return edge2cell[:, 0] == edge2cell[:, 1]
 
-    def boundary_cell_flag(self):
+    def boundary_cell_flag(self, bctype=None):
+        """
+        Parameters
+        ----------
+        bctype : None or 0, 1, 2 ,3
+        """
         NC = self.NC
-        edge2cell = self.edge2cell
-        isBdCell = np.zeros((NC,), dtype=np.bool)
-        isBdEdge = self.boundary_edge_flag()
-        isBdCell[edge2cell[isBdEdge,0]] = True
+
+        if bctype is None:
+            edge2cell = self.edge2cell
+            isBdCell = np.zeros((NC,), dtype=np.bool)
+            isBdEdge = self.boundary_edge_flag()
+            isBdCell[edge2cell[isBdEdge,0]] = True
+
+        else:
+            cell2cell = self.cell_to_cell()
+            isBdCell = cell2cell[:, bctype] == np.arange(NC)
         return isBdCell 
 
     def boundary_node_index(self):
@@ -349,8 +360,8 @@ class StructureQuadMeshDataStructure:
         idx, = np.nonzero(isBdEdge)
         return idx 
 
-    def boundary_cell_index(self):
-        isBdCell = self.boundary_cell_flag()
+    def boundary_cell_index(self, bctype=None):
+        isBdCell = self.boundary_cell_flag(bctype)
         idx, = np.nonzero(isBdCell)
         return idx 
 
