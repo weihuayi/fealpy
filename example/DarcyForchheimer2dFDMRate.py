@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import time
 
 from fealpy.pde.darcy_forchheimer_2d import CoscosData1
 from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
@@ -8,10 +9,10 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 32
-ny = 32
+nx = 128
+ny = 128
 pde = CoscosData1(box)
-maxit = 4
+maxit = 1
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$','$||Dp_I - Dp_h||_0$']
 erruL2 = np.zeros((maxit,), dtype=np.float)
@@ -20,6 +21,7 @@ err = np.zeros((2,maxit),dtype=np.float)
 error = np.zeros((3,maxit),dtype=np.float)
 count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
+    t = time.time()
     mesh = pde.init_mesh(nx,ny)
     fdm = DarcyForchheimerFDMModel(pde,mesh)
     NE = mesh.number_of_edges()
@@ -39,6 +41,7 @@ for i in range(maxit):
     if i < maxit - 1:
         nx = 2*nx
         ny = 2*ny
+    elapsed = time.time() -t
 print('err',err)
 print('error',error)
 print('iter',count)

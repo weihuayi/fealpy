@@ -90,6 +90,7 @@ class DarcyForchheimerFDMModel():
 
         mesh = self.mesh
         NE = mesh.number_of_edges()
+        print('NE',NE)
         NC = mesh.number_of_cells()
 
         itype = mesh.itype
@@ -131,6 +132,7 @@ class DarcyForchheimerFDMModel():
         A21 += coo_matrix((-data/mesh.hy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
         A21 = A21.tocsr()
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
+        print('A',A.shape)
 
         return A
 
@@ -196,6 +198,8 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -214,7 +218,14 @@ class DarcyForchheimerFDMModel():
             bnew[NE] = self.ph[0]
 
             # solve
-            x[:] = spsolve(AD, bnew)
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = b.copy()
+                ctx.set_rhs(x) #Modified in place
+            ctx.run(job=6)
+            x = ctx.destory()
+
             u1 = x[:NE]
             p1 = x[NE:]
 
@@ -291,8 +302,8 @@ class DarcyForchheimerFDMModel():
         NC = mesh.number_of_cells()
         hx = mesh.hx
         hy = mesh.hy
-        Nx = int(1/hx)
-        Ny = int(1/hy)
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
         ftype = mesh.ftype
 
         Dph = np.zeros((NC,2),dtype=ftype)
