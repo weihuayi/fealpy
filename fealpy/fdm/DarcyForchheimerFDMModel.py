@@ -102,7 +102,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
-        A11 = spdiags(C,0,NE,NE).toarray()# correct
+        A11 = spdiags(C,0,NE,NE)# correct
 
 
         edge2cell = mesh.ds.edge_to_cell()
