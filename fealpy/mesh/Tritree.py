@@ -2,7 +2,6 @@ import numpy as np
 from fealpy.mesh import TriangleMesh 
 
 class Tritree(TriangleMesh):
-    localEdge2childCell = np.array([[0, 1], [1, 2], [2, 0]], dtype=np.int)
     def __init__(self, node, cell):
         super(Tritree, self).__init__(node, cell)
         NC = self.number_of_cells()
@@ -47,7 +46,7 @@ class Tritree(TriangleMesh):
             flag0 = np.zeros(NC, dtype=np.bool)
             idx0, = np.nonzero(isTwoChildCell)
             if len(idx0) > 0:
-                flag0[self.child[idx0, [0, 1]]] = True
+                flag0[self.child[idx0, 0:2]] = True
         
             # expand the marked cell
             isExpand = np.zeros(NC, dtype=np.bool)
@@ -63,14 +62,16 @@ class Tritree(TriangleMesh):
 
             if len(idx0) > 0:
                 # delete the children of the cells with two children
-                flag = isMarkedCell[child[idx0, 0]] | isMarkedCell[child[idx0, 1]]
-                isMarkCell[idx0[flag]] = True
-                self.child[idx0, 0:1] = -1
+                flag = isMarkedCell[self.child[idx0, 0]] | isMarkedCell[self.child[idx0, 1]]
+                isMarkedCell[idx0[flag]] = True
 
                 flag = np.ones(NC, dtype=np.bool)
-                flag[child[idx0, [0, 1]]] = False
+                flag[self.child[idx0, 0:2]] = False
                 NN = self.number_of_nodes()
+                cell = self.entity('cell')
                 self.ds.reinit(NN, cell[flag])
+
+                self.child[idx0, 0:1] = -1
                 self.parent = self.parent[flag]
                 self.child = self.child[flag]
                 isMarkedCell = isMarkedCell[flag]
@@ -98,15 +99,16 @@ class Tritree(TriangleMesh):
             edge2center = np.zeros(NE, dtype=np.int) 
 
             edge2cell = self.ds.edge_to_cell()
-            flag = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]]) 
-            I = self.child[edge2cell[flag, 1], 3]
-            J = edge2cell[flag, 3]
-            edge2center[flag] = cell[I, J]
+            flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]]) 
+            I = self.child[edge2cell[flag0, 1], 3]
+            J = edge2cell[flag0, 3]
+            edge2center[flag0] = cell[I, J]
 
-            flag = (~isLeafCell[edge2cell[:, 0]]) & isLeafCell[edge2cell[:, 1]]
-            I = self.child[edge2cell[flag, 0], 3]
-            J = edge2cell[flag, 2]
-            edge2center[flag] = cell[I, J]
+            flag1 = (~isLeafCell[edge2cell[:, 0]]) & isLeafCell[edge2cell[:, 1]]
+            I = self.child[edge2cell[flag1, 0], 3]
+            J = edge2cell[flag1, 2]
+            edge2center[flag1] = cell[I, J]
+
 
             ec = self.entity_barycenter('edge', isNeedCutEdge) 
             NEC = len(ec)
@@ -114,58 +116,94 @@ class Tritree(TriangleMesh):
                 
                                                                               
             # 一分为四的单元
-            cellIdx, = np.find(isMarkedCell)
-            NCC = sum(isMarkedCell)
-            cell4 = np.zeroos((4*NCC, 3), dtype=self.itype)
+            cell4Idx, = np.where(isMarkedCell)                                 
+            NCC = np.sum(isMarkedCell)
+            cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
             child4 = -np.ones((4*NCC, 4), dtype=self.itype)
-            parent4 = -np.ones((4*NCC,2), dtype=self.itype) 
+            parent4 = -np.ones((4*NCC, 2), dtype=self.itype) 
             cell4[:NCC, 0] = cell[isMarkedCell, 0] 
             cell4[:NCC, 1] = edge2center[cell2edge[isMarkedCell, 2]] 
             cell4[:NCC, 2] = edge2center[cell2edge[isMarkedCell, 1]] 
-            parent4[:NCC, 0] = cellIdx
+            parent4[:NCC, 0] = cell4Idx
             parent4[:NCC, 1] = 0
+            self.child[cell4Idx, 0] = NC + np.arange(0, NCC)
 
             cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1] 
             cell4[NCC:2*NCC, 1] = edge2center[cell2edge[isMarkedCell, 0]] 
             cell4[NCC:2*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]] 
-            parent4[NCC:2*NCC, 0] = cellIdx
+            parent4[NCC:2*NCC, 0] = cell4Idx
             parent4[NCC:2*NCC, 1] = 1
+            self.child[cell4Idx, 1] = NC + np.arange(NCC, 2*NCC)
 
             cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2] 
             cell4[2*NCC:3*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
             cell4[2*NCC:3*NCC, 2] = edge2center[cell2edge[isMarkedCell, 0]] 
-            parent4[2*NCC:3*NCC, 0] = cellIdx
+            parent4[2*NCC:3*NCC, 0] = cell4Idx
             parent4[2*NCC:3*NCC, 1] = 2
+            self.child[cell4Idx, 2] = NC + np.arange(2*NCC, 3*NCC)
 
             cell4[3*NCC:4*NCC, 0] = edge2center[cell2edge[isMarkedCell, 0]] 
             cell4[3*NCC:4*NCC, 1] = edge2center[cell2edge[isMarkedCell, 1]] 
             cell4[3*NCC:4*NCC, 2] = edge2center[cell2edge[isMarkedCell, 2]]
-            parent4[3*NCC:4*NCC, 0] = cellIdx
+            parent4[3*NCC:4*NCC, 0] = cell4Idx
             parent4[3*NCC:4*NCC, 1] = 3
+            self.child[cell4Idx, 3] = NC + np.arange(3*NCC, 4*NCC)
 
             # 一分为二的单元
-            cell2
-            child2
-            parent2
+            flag0 = isLeafCell[edge2cell[:, 0]] & \
+                    (~isMarkedCell[edge2cell[:, 0]]) &\
+                    (isMarkedCell[edge2cell[:, 1]] | (~isLeafCell[edge2cell[:, 1]]))
+            flag1 = isLeafCell[edge2cell[:, 1]] & \
+                    (~isMarkedCell[edge2cell[:, 1]]) & \
+                    (isMarkedCell[edge2cell[:, 0]] | (~isLeafCell[edge2cell[:, 0]]))
+            cidx0 = edge2cell[flag0, 0]
+            N0 = len(cidx0)
+            cell20 = np.zeros((2*N0, 3), dtype=self.itype)
+            child20 = -np.ones((2*N0, 4), dtype=self.itype)
+            parent20 = -np.ones((2*N0, 2), dtype=self.itype)
 
-            newCell = np.zeros((4*NCC+2*(NC-NCC), 3), dtype=np.int)
+            cell20[0:N0, 0] = edge[flag0, 0] 
+            cell20[0:N0, 1] = edge2center[flag0] 
+            cell20[0:N0, 2] = cell[cidx0, edge2cell[flag0, 2]] 
+            parent20[0:N0, 0] = cidx0 
+            parent20[0:N0, 1] = 0
+            self.child[cidx0, 0] = NC + 4*NCC + np.arange(0, N0)
 
-            newChild = -np.ones((4*NCC, 4), dtype=np.int)                       
-            newParent = -np.ones((4*NCC, 2), dtype=np.int)                      
-            newCell[0::3, :] = np.concatenate((cp[0], ep[0], ep[2]), axis=1)
-            newCell[1::3, :] = np.concatenate((ep[0], cp[1], ep[1]), axis=1)
-            newCell[2::3, :] = np.concatenate((ep[1], cp[2], ep[2]), axis=1)
-            newParent[:, 0] = np.repeat(idx, 4)                                 
-            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int))              
-            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)           
-                                                                                             
-            cell = np.concatenate((cell, newCell), axis=0)                      
-            self.node = np.concatenate((node, ec), axis=0)  
-            self.parent = np.concatenate((parent, newParent), axis=0)           
-            self.child = np.concatenate((child, newChild), axis=0)              
-            self.ds.reinit(NN + NEC + NCC, cell) 
-                
-           
+            cell20[N0:2*N0, 0] = edge[flag0, 1]                           
+            cell20[N0:2*N0, 1] = cell20[0:N0, 2]                           
+            cell20[N0:2*N0, 2] = cell20[0:N0, 1]          
+            parent20[N0:2*N0, 0] = cidx0                                       
+            parent20[N0:2*N0, 1] = 1
+            self.child[cidx0, 1] = NC + 4*NCC + np.arange(N0, 2*N0)
+
+            cidx1 = edge2cell[flag1, 1]
+            N1 = len(cidx1)
+            cell21 = np.zeros((2*N1, 3), dtype=self.itype)
+            child21 = -np.ones((2*N1, 4), dtype=self.itype)
+            parent21 = -np.ones((2*N1, 2), dtype=self.itype)
+
+            cell21[0:N1, 0] = edge[flag1, 1] 
+            cell21[0:N1, 1] = edge2center[flag1] 
+            cell21[0:N1, 2] = cell[cidx1, edge2cell[flag1, 3]] 
+            parent21[0:N1, 0] = cidx1 
+            parent21[0:N1, 1] = 0
+            self.child[cidx1, 0] = NC + 4*NCC + 2*N0 + np.arange(0, N1)
+
+            cell21[N1:2*N1, 0] = edge[flag1, 0]                           
+            cell21[N1:2*N1, 1] = cell21[0:N1, 2]                           
+            cell21[N1:2*N1, 2] = cell21[0:N1, 1]          
+            parent21[N1:2*N1, 0] = cidx1                                       
+            parent21[N1:2*N1, 1] = 1
+            self.child[cidx1, 1] = NC + 4*NCC + 2*N0 + np.arange(N1, 2*N1)
+
+            cell = np.r_['0', cell, cell4, cell20, cell21]                      
+            self.node = np.r_['0', node, ec] 
+            self.parent = np.r_['0', self.parent, parent4, parent20, parent21]           
+            self.child = np.r_['0', self.child, child4, child20, child21]              
+            self.ds.reinit(NN + NEC, cell) 
+
+               
+          
 
 
 

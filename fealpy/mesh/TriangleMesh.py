@@ -171,7 +171,7 @@ class TriangleMesh(Mesh2d):
             NN = self.node.shape[0] 
             self.ds.reinit(NN, cell)
 
-    def bisect(self, markedCell):
+    def bisect(self, markedCell, u=None):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
@@ -222,6 +222,13 @@ class TriangleMesh(Mesh2d):
             NC = NC+nc
 
         # reconstruct the  data structure
+        if u is not None:                                                       
+            eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)                         
+            Iu = np.concatenate((u, eu), axis=0)                                
+        if u is None:                                                           
+            return True                                                         
+        else:                                                                   
+            return(Iu, True) 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
 

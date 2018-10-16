@@ -99,6 +99,8 @@ class Mesh2d():
 
 
     def edge_length(self, index=None):
+        node = self.entity('node')
+        edge = self.entity('edge')
         if index is None:
             v = node[edge[:,1],:] - node[edge[:,0],:]
         else:
