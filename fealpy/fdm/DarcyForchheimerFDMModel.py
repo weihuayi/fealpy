@@ -221,10 +221,11 @@ class DarcyForchheimerFDMModel():
             #x[:] = spsolve(AD, bnew)
             if ctx.myid == 0:
                 ctx.set_centralized_sparse(AD)
-                x = b.copy()
+                x = bnew.copy()
                 ctx.set_rhs(x) #Modified in place
+                
             ctx.run(job=6)
-            x = ctx.destory()
+            ctx.destroy()
 
             u1 = x[:NE]
             p1 = x[NE:]
