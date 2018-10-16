@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
+from scipy.sparse.linalg import inv
 from fealpy.fem.integral_alg import IntegralAlg
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
@@ -188,14 +189,16 @@ class DarcyForchheimerFDMModel():
         itype = mesh.itype
         ftype = mesh.ftype
 
+        pc = mesh.entity_barycenter('cell')
+
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-        tol = 1e-9
+        tol = 1e-6
         ru = 1
         rp = 1
         count = 0
-        iterMax = 500
+        iterMax = 2000
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -212,11 +215,18 @@ class DarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
 
             bnew[NE] = self.ph[0]
+            A11 = AD[:NE,:NE]
+            A11inv = inv(A11)
+            A12 = AD[:NE,NE:NE+NC]
+            A21 = AD[NE:NE+NC,:NE]
+            Anew = A21*A11inv*A12
+            b1 = A21*A11inv*b[:NE] - b[NE:NE+NC]
 
             # solve
-            x[:] = spsolve(AD, bnew)
-            u1 = x[:NE]
-            p1 = x[NE:]
+            p1 = np.zeros((NC,),dtype=ftype)
+            p1[1:NC] = spsolve(Anew[1:NC,1:NC],bnew[1:NC])
+            p1[0] = self.pde.pressure(pc[0])
+            u1 = A11inv*(b[:NE] - A12*p1)
 
             f = b[:NE]
             g = b[NE:]
@@ -231,6 +241,8 @@ class DarcyForchheimerFDMModel():
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
+            p1 = np.zeros((NC,),dtype=ftype)
+            Anew = A21*A11
             ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
@@ -242,13 +254,25 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
 
             count = count + 1
-            print('ru0:',ru0)
+ #           print('ru:',ru)
  #           print('rp:',rp)
 
         self.uh = u1
         self.ph = p1
 #        print('uh:',self.uh)
         return count
+
+    def grad_pressure(self):
+        mesh = self.mesh
+        ftype = mesh.ftype
+
+        NC = mesh.number_of_cells()
+
+        ph = self.ph
+        hx = mesh.hx
+        hy = mesh.hy
+
+        val = np.zeros((NC,2),dtype=ftype)
 
 
     def get_max_error(self):
@@ -264,11 +288,14 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
-#    def get_L2_perror(self):
-#        uh = self.uh
-#        ph = self.ph
-#        uI = self.uI
-#        pI = self.pI
-#        err = self.integralalg.L2_error(ph, pI)
-#        return err
- 
+    def get_H1_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+
+        ueL2,peL2 = self.get_L2_error()
+        ep = self.ph - self.pI
+        psemi = np.sqrt(np.sum((ep[1:] - ep[:NC-1])**2)/hx/hy)
+        peH1 = peL2 + psemi
+        return peH1

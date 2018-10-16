@@ -53,9 +53,17 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        C = np.ones(NE, dtype=mesh.ftype)
+        C = np.zeros(NE, dtype=mesh.ftype)
         edge2cell = mesh.ds.edge_to_cell()
         cell2edge = mesh.ds.cell_to_edge()
+
+        bc = mesh.entity_barycenter('edge')
+
+        flag = isBDEdge & isYDEdge
+        C[flag] = self.pde.velocity_x(bc[flag])
+
+        flag = isBDEdge & isXDEdge
+        C[flag] = self.pde.velocity_y(bc[flag])
 
         flag = ~isBDEdge & isYDEdge
         L = edge2cell[flag, 0]
@@ -88,6 +96,9 @@ class DarcyForchheimerFDMModel():
         itype = mesh.itype
         ftype = mesh.ftype
 
+        hx = mesh.hx
+        hy = mesh.hy
+
         nx = mesh.ds.nx
         ny = mesh.ds.ny
         NE = mesh.number_of_edges()
@@ -113,12 +124,13 @@ class DarcyForchheimerFDMModel():
 
         isBDCell = mesh.ds.boundary_cell_flag()
         idx, = np.nonzero(isBDCell)
-        print('idx',idx)
         cell = np.arange(NC)
         vy1 = cell2edge[cell, 0] # e_{i,0}
         ux2 = cell2edge[cell, 1] # e_{i,1}
         vy2 = cell2edge[cell, 2] # e_{i,2}
         ux1 = cell2edge[cell, 3] # e_{i,3}#correct
+
+        cell2cell = mesh.ds.cell_to_cell()
 
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
@@ -128,12 +140,11 @@ class DarcyForchheimerFDMModel():
         ph1 = np.zeros(NC, dtype=ftype)
         ph1[0] = pde.pressure(pc[0])
 
-
         tol = 1e-6
         ru = 1
         rp = 1
         count = 0
-        iterMax = 500
+        iterMax = 2000
         while ru+rp > tol and count < iterMax:
             C = self.get_nonlinear_coef()
             fx = pde.source2(bc[:sum(isYDEdge)])
@@ -141,56 +152,54 @@ class DarcyForchheimerFDMModel():
             f = np.r_[fx,fy]
             g = pde.source1(pc)
 
-            #boundary cell of the vertex angle
-            ph1[Ny-1] = (g[Ny-1] - (hx*f[ux2[Ny-1]]-self.ph0[2*Ny-1])/C[ux2[Ny-1]]/hx**2\
-                    + (hy*f[vy1[Ny-1]]+self.ph0[Ny-1])/C[vy1[Ny-1]]/hy**2)\
-                    / (1/C[ux2[Ny-1]]/hx**2 + 1/C[vy1[Ny-1]]/hy**2)
-            ph1[Ny*(Nx-1)] = (g[Ny*(Nx-1)]+(hx*f[ux1[Ny*(Nx-1)]]+self.ph0[Ny*(Nx-2)])/C[ux1[Ny*(Nx-1)]]/hx**2\
-                    -(hy*f[vy2[Ny*(Nx-1)]]-self.ph0[Ny*(Nx-1)+1])/C[vy2[Ny*(Nx-1)]]/hy**2)\
-                    /(1/C[ux1[Ny*(Nx-1)]]/hx**2+1/C[vy2[Ny*(Nx-1)]]/hy**2)
-            ph1[Ny*Nx-1]=(g[Ny*Nx-1]+(hx*f[ux1[Ny*Nx-1]]+self.ph0[Ny*(Nx-1)-1])/C[ux1[Ny*Nx-1]]/hx**2\
-                    +(hy*f[vy1[Ny*Nx-1]]+self.ph0[Ny*Nx-2])/C[vy1[Ny*Nx-1]]/hy**2)\
-                    /(1/C[ux1[Ny*Nx-1]]/hx**2+1/C[vy1[Ny*Nx-1]]/hy**2) 
-            print('ph0:',self.ph0)
+            p = np.zeros((NC,4),dtype=ftype)
+            idx1 = cell2cell[:NC:ny, 0]
+            a = np.arange(NC).reshape(ny,nx)
+            idx2 = a[:, 1:].flatten()
+            idx3 = a[:,:nx-1].flatten()
+            p[idx1, 0] = hy*C[vy1[idx1]]*pde.velocity_y(bc[cell2edge[idx1, 0]]) - hy*f[vy1[idx1]] + self.ph0[idx1]
+            p[idx2, 0] = self.ph0[idx3]
 
-            #left boundary cell
-            idx1 = idx[1:Ny-1]
-            ph1[idx1] =(g[idx1]-(hx*f[ux2[idx1]]-self.ph0[idx1+Ny])/C[ux2[idx1]]/hx**2\
-                    - (hy*f[vy2[idx1]]-self.ph0[idx1+1])/C[vy2[idx1]]/hy**2 \
-                    + (hy*f[vy1[idx1]] + self.ph0[idx1-1])/C[vy1[idx1]]/hy**2)\
-                    /(1/C[ux2[idx1]]/hx**2+(1/C[vy2[idx1]]+1/C[vy1[idx1]])/hy**2)
+            idx1 = cell2cell[NC-ny:NC, 1]
+            idx2 = a[:ny-1, :].flatten()
+            idx3 = a[1:, :].flatten()
+            p[idx1, 1] = hx*f[ux2[idx1]] - hx*C[ux2[idx1]]*pde.velocity_x(bc[cell2edge[idx1, 1]]) + self.ph0[idx1]
+            p[idx2, 1] = self.ph0[idx3]
 
-            print('ph0:',self.ph0)#????
-            #right boundary cell
-            idx1 = idx[len(idx)-Ny+1:len(idx)-1]
+            idx1 = cell2cell[ny-1:NC:ny, 2]
+            idx2 = a[:, :nx-1].flatten()
+            idx3 = a[:, 1:].flatten()
+            p[idx1, 2] = hy*f[vy2[idx1]] - hy*C[vy2[idx1]]*pde.velocity_y(bc[cell2edge[idx1, 2]]) + self.ph0[idx1]
+            p[idx2, 2] = self.ph0[idx3]
+#            print('idx1',idx1)
+#            print('idx2',idx2)
+#            print('idx3',idx3)
+#            print('vy1[idx1]',vy2[idx1])
+#            print('cell2edge[idx1,2]',cell2edge[idx1,2])
+#            print('f',f[vy2[idx1]])
+#            print('ff',hx*f[vy2[idx1]])
+#            print('C',C[vy2[idx1]])
+#            print('pde',pde.velocity_y(bc[cell2edge[idx1,2]]))
+#            print('CC',hx*C[vy2[idx1]]*pde.velocity_y(bc[cell2edge[idx1, 2]]))
+#            print('ph0',self.ph0)
+#            print('p[idx2]',p[idx2,0])
+#            print('p[idx1]',p[idx1,3])
 
-            ph1[idx1] =(g[idx1]+(hx*f[ux1[idx1]]+self.ph0[idx1-Ny])/C[ux1[idx1]]/hx**2\
-                    - (hy*f[vy2[idx1]]-self.ph0[idx1+1])/C[vy2[idx1]]/hy**2 \
-                    + (hy*f[vy1[idx1]] + self.ph0[idx1-1])/C[vy1[idx1]]/hy**2)\
-                    /(1/C[ux1[idx1]]/hx**2+(1/C[vy2[idx1]]+1/C[vy1[idx1]])/hy**2)
+            idx1 = cell2cell[:ny, 3]
+            idx2 = a[1:, :].flatten()
+            idx3 = a[:ny-1,:].flatten()
+            p[idx1, 3] = hx*C[ux1[idx1]]*pde.velocity_x(bc[cell2edge[idx1, 3]]) - hx*f[ux1[idx1]] + self.ph0[idx1]
+            p[idx2, 3] = self.ph0[idx3]
+            print('p',p)
 
-            #upper boundary cell
-            idx1 = idx[Ny:len(idx)-Ny:2]
-            ph1[idx1]=(g[idx1]-(hx*f[ux2[idx1]]-self.ph0[idx1+Ny])/C[ux2[idx1]]/hx**2\
-                    +(hx*f[ux1[idx1]] + self.ph0[idx1-Ny])/C[ux1[idx1]]/hx**2 \
-                    - (hy*f[vy2[idx1]] - self.ph0[idx1+1])/C[vy2[idx1]]/hy**2)\
-                    /((1/C[ux1[idx1]]+1/C[ux2[idx1]])/hx**2+1/C[vy2[idx1]]/hy**2)
 
-            #under boundary cell
-            idx1 = idx[Ny+1:len(idx)-Ny:2]
+            ph1[1:] = (g[1:] - f[ux2[1:]]/hx/C[ux2[1:]] + f[ux1[1:]]/hx/C[ux1[1:]]- f[vy2[1:]]/hy/C[vy2[1:]] + f[vy1[1:]]/hy/C[vy1[1:]]\
+                            + p[1:, 1]/hx**2/C[ux2[1:]]\
+                            + p[1:, 3]/hx**2/C[ux1[1:]]\
+                            + p[1:, 0]/hy**2/C[vy1[1:]]\
+                            + p[1:, 2]/hy**2/C[vy2[1:]])\
+                            /(1/C[ux1[1:]]/hx**2 + 1/C[vy1[1:]]/hy**2 + 1/C[ux2[1:]]/hx**2 + 1/C[vy2[1:]]/hy**2) 
 
-            ph1[idx1]=(g[idx1]-(hx*f[ux2[idx1]]-self.ph0[idx1+Ny])/C[ux2[idx1]]/hx**2\
-                    +(hx*f[ux1[idx1]] + self.ph0[idx1-Ny])/C[ux1[idx1]]/hx**2 \
-                    + (hy*f[vy1[idx1]] + self.ph0[idx1-1])/C[vy1[idx1]]/hy**2)\
-                    /((1/C[ux1[idx1]]+1/C[ux2[idx1]])/hx**2+1/C[vy1[idx1]]/hy**2)
-
-            # internal cell
-            idx1, = np.nonzero(~isBDCell)
-            ph1[idx1] = (g[idx1]-(hx*f[ux2[idx1]]-self.ph0[idx1+Ny])/C[ux2[idx1]]/hx**2\
-                    +(hx*f[ux1[idx1]] + self.ph0[idx1-Ny])/C[ux1[idx1]]/hx**2 \
-                    - (hy*f[vy2[idx1]]-self.ph0[idx1+1])/C[vy2[idx1]]/hy**2 \
-                    + (hy*f[vy1[idx1]] + self.ph0[idx1-1])/C[vy1[idx1]]/hy**2)\
-                    /((1/C[ux1[idx1]]+1/C[ux2[idx1]])/hx**2+(1/C[vy2[idx1]]+1/C[vy1[idx1]])/hy**2)
 
             uh1[I] = (f[I] - (ph1[Rx]-ph1[Lx])/hx)/C[I]
             uh1[J] = (f[J] - (ph1[Ly]-ph1[Ry])/hy)/C[J]
@@ -199,27 +208,16 @@ class DarcyForchheimerFDMModel():
             ru = np.sqrt(np.sum(hx*hy*(uh1-self.uh0)**2))
             rp = np.sqrt(np.sum(hx*hy*(ph1-self.ph0)**2))
             print('rp:',rp)
-            print('ru',ru)
-
-#            if LA.norm(f) == 0:
-#                ru = LA.norm(f - A11*u1 - A12*p1)
-#            else:
-#                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
-#            if LA.norm(g) == 0:
-#                rp = LA.norm(g - A21*u1)
-#            else:
-#                rp = LA.norm(g - A21*u1)/LA.norm(g)
-            print('ph0:',self.ph0)
+#            print('ru',ru)
+#            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
 #            print('uh1:',uh1)
 #            print('ph1:',ph1)
-            ph0 = ph1
-            uh0 = uh1
 
-            self.ph0 = ph0
-            self.uh0 = uh0
+            self.ph0[:] = ph1
+            self.uh0[:] = uh1
 
-            print('ph0:',self.ph0)
+#            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
 
             count = count + 1
