@@ -7,12 +7,15 @@ from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
 box = [0, 1, 0, 1]
 n = 4
 qmesh = StructureQuadMesh(box, n, n)
-qmesh.print()
-
+cell2cell = qmesh.ds.cell_to_cell()
+print('cell2cell',cell2cell)
 
 NN = qmesh.number_of_nodes()
 NE = qmesh.number_of_edges()
 NC = qmesh.number_of_cells()
+
+a = cell2cell[:NC:n,0]
+print('a',a)
 
 X = np.zeros(NE + NC, dtype=np.float)
 

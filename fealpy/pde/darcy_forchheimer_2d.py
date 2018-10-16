@@ -7,7 +7,7 @@ class CoscosData1:
     def __init__(self, box):
         self.box = box
         self.mu = 2
-        self.k = 4
+        self.k = 1
         self.rho = 1
         self.beta = 20
 
