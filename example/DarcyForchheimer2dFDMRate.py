@@ -9,16 +9,8 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-<<<<<<< HEAD
 nx = 128
 ny = 128
-||||||| merged common ancestors
-nx = 32
-ny = 32
-=======
-nx = 4
-ny = 4
->>>>>>> b16afe79d6aa4eb27b6c5f452f788f00a7c61f9e
 pde = CoscosData1(box)
 maxit = 1
 Ndof = np.zeros((maxit,), dtype=np.int)
