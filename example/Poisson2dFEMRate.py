@@ -40,7 +40,7 @@ for i in range(maxit):
         errorMatrix[j+4, i] = fem.get_H1_error()
     if i < maxit - 1:
         mesh.uniform_refine()
-
+print('Ndof',Ndof)
 print(errorMatrix)
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()
