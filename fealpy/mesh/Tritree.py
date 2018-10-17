@@ -1,4 +1,5 @@
 import numpy as np
+
 from fealpy.mesh import TriangleMesh 
 
 class Tritree(TriangleMesh):
@@ -52,8 +53,8 @@ class Tritree(TriangleMesh):
             isExpand = np.zeros(NC, dtype=np.bool)
             cell2cell = self.ds.cell_to_cell()
             flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
-            flag = flag1 | flag2
+            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell],axis=1) > 0)
+            flag = flag1 | flag2 
             while np.any(flag):
                 isMarkedCell[flag] = True
                 flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
@@ -170,8 +171,8 @@ class Tritree(TriangleMesh):
             self.child[cidx0, 0] = NC + 4*NCC + np.arange(0, N0)
 
             cell20[N0:2*N0, 0] = edge[flag0, 1]                           
-            cell20[N0:2*N0, 1] = cell20[0:N0, 2]                           
-            cell20[N0:2*N0, 2] = cell20[0:N0, 1]          
+            cell20[N0:2*N0, 1] = edge2center[flag0]                           
+            cell20[N0:2*N0, 2] = cell[cidx0, edge2cell[flag0, 2]]          
             parent20[N0:2*N0, 0] = cidx0                                       
             parent20[N0:2*N0, 1] = 1
             self.child[cidx0, 1] = NC + 4*NCC + np.arange(N0, 2*N0)
@@ -190,8 +191,8 @@ class Tritree(TriangleMesh):
             self.child[cidx1, 0] = NC + 4*NCC + 2*N0 + np.arange(0, N1)
 
             cell21[N1:2*N1, 0] = edge[flag1, 0]                           
-            cell21[N1:2*N1, 1] = cell21[0:N1, 2]                           
-            cell21[N1:2*N1, 2] = cell21[0:N1, 1]          
+            cell21[N1:2*N1, 1] = edge2center[flag1]                           
+            cell21[N1:2*N1, 2] = cell[cidx1, edge2cell[flag1, 3]]          
             parent21[N1:2*N1, 0] = cidx1                                       
             parent21[N1:2*N1, 1] = 1
             self.child[cidx1, 1] = NC + 4*NCC + 2*N0 + np.arange(N1, 2*N1)
