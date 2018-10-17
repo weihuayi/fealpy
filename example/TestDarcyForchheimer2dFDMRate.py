@@ -8,10 +8,10 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 4
-ny = 4
+nx = 8
+ny = 8
 pde = CoscosData1(box)
-maxit = 1
+maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$','$||Dp_I - Dp_h||_0$']
 erruL2 = np.zeros((maxit,), dtype=np.float)

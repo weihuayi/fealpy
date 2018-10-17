@@ -18,6 +18,7 @@ class DarcyForchheimerFDMModel():
         self.uh = np.zeros(NE, dtype=mesh.ftype)
         self.ph = np.zeros(NC, dtype=mesh.ftype)
         
+        isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         bc = mesh.entity_barycenter('edge')
@@ -29,8 +30,11 @@ class DarcyForchheimerFDMModel():
         self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
-        self.uh[isYDEdge] = self.uI[isYDEdge]
-        self.uh[isXDEdge] = self.uI[isXDEdge]
+
+        I, = np.nonzero(isBDEdge & isYDEdge)
+        J, = np.nonzero(isBDEdge & isXDEdge)
+        self.uh[I] = self.uI[I]
+        self.uh[J] = self.uI[J]
 
     def get_nonlinear_coef(self):
         mesh = self.mesh
@@ -159,32 +163,34 @@ class DarcyForchheimerFDMModel():
             p[idx, 3] = - hx*f[cell2edge[idx, 3]] + ph[idx] \
                         + hx*C[cell2edge[idx, 3]]*uh[cell2edge[idx, 3]] 
 
-
-
-            ph[1:]  =  
-            ph1[1:] = (g[1:] - f[ux2[1:]]/hx/C[ux2[1:]] + f[ux1[1:]]/hx/C[ux1[1:]]- f[vy2[1:]]/hy/C[vy2[1:]] + f[vy1[1:]]/hy/C[vy1[1:]]\
-                            + p[1:, 1]/hx**2/C[ux2[1:]]\
-                            + p[1:, 3]/hx**2/C[ux1[1:]]\
-                            + p[1:, 0]/hy**2/C[vy1[1:]]\
-                            + p[1:, 2]/hy**2/C[vy2[1:]])\
-                            /(1/C[ux1[1:]]/hx**2 + 1/C[vy1[1:]]/hy**2 + 1/C[ux2[1:]]/hx**2 + 1/C[vy2[1:]]/hy**2) 
-
+            ph1[1:]  = (g[1:] - f[cell2edge[1:, 1]]/hx/C[cell2edge[1:, 1]]\
+                             + f[cell2edge[1:, 3]]/hx/C[cell2edge[1:, 3]]\
+                             - f[cell2edge[1:, 2]]/hy/C[cell2edge[1:, 2]]\
+                             + f[cell2edge[1:, 0]]/hy/C[cell2edge[1:, 0]]\
+                             + p[1:, 1]/hx**2/C[cell2edge[1:, 1]]\
+                             + p[1:, 3]/hx**2/C[cell2edge[1:, 3]]\
+                             + p[1:, 2]/hy**2/C[cell2edge[1:, 2]]\
+                             + p[1:, 0]/hy**2/C[cell2edge[1:, 0]])\
+                             /(1/hx**2/C[cell2edge[1:, 1]]\
+                             + 1/hx**2/C[cell2edge[1:, 3]]\
+                             + 1/hy**2/C[cell2edge[1:, 0]]\
+                             + 1/hy**2/C[cell2edge[1:, 2]])
 
             uh1[I] = (f[I] - (ph1[Rx]-ph1[Lx])/hx)/C[I]
             uh1[J] = (f[J] - (ph1[Ly]-ph1[Ry])/hy)/C[J]
 
 
-            ru = np.sqrt(np.sum(hx*hy*(uh1-self.uh0)**2))
-            rp = np.sqrt(np.sum(hx*hy*(ph1-self.ph0)**2))
-            print('rp:',rp)
+            ru = np.sqrt(np.sum(hx*hy*(uh1-uh)**2))
+            rp = np.sqrt(np.sum(hx*hy*(ph1-ph)**2))
+#            print('rp:',rp)
 #            print('ru',ru)
 #            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
 #            print('uh1:',uh1)
-#            print('ph1:',ph1)
+#            print('ph1:',p)
 
-            self.ph0[:] = ph1
-            self.uh0[:] = uh1
+            self.ph[:] = ph1
+            self.uh[:] = uh1
 
 #            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
