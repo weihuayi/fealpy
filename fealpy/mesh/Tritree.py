@@ -73,18 +73,18 @@ class Tritree(TriangleMesh):
                 flag = isMarkedCell[self.child[idx0, 0]] | isMarkedCell[self.child[idx0, 1]]
                 
                 isMarkedCell[idx0[flag]] = True
-
-                flag = np.ones(NC, dtype=np.bool)
-                flag[self.child[idx0, 0:2]] = False
-                NN = self.number_of_nodes()
-                cell = self.entity('cell')
-                self.ds.reinit(NN, cell[flag])
-
-                self.child[idx0, 0:2] = -1
-                self.parent = self.parent[flag]
-                self.child = self.child[flag]
-                isMarkedCell = isMarkedCell[flag]
-
+                print(flag)
+#                flag = np.ones(NC, dtype=np.bool)
+#                flag[self.child[idx0, 0:2]] = False
+#                NN = self.number_of_nodes()
+#                cell = self.entity('cell')
+#                self.ds.reinit(NN, cell[flag])
+#
+#                self.child[idx0, 0:2] = -1
+#                self.parent = self.parent[flag]
+#                self.child = self.child[flag]
+#                isMarkedCell = isMarkedCell[flag]
+#
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
@@ -105,7 +105,6 @@ class Tritree(TriangleMesh):
             isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
        
             edge2center = np.zeros(NE, dtype=np.int) 
-
             edge2cell = self.ds.edge_to_cell()
             flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]]) 
             I = self.child[edge2cell[flag0, 1], 3]
