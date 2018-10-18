@@ -138,9 +138,20 @@ class DarcyFDMModel():
         b[NE] = self.ph[0]
 
         # solve
-        x[:] = spsolve(AD, b)
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+        if ctx.myid == 0:
+            ctx.set_centralized_sparse(AD.tocoo())
+            x = b.copy()
+            ctx.set_rhs(x)
+        ctx.set_silent()
+        ctx.run(job=6)
+        
+#        x[:] = spsolve(AD, b)
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
+        ctx.destroy()
+
         return x
     
     def get_max_error(self):

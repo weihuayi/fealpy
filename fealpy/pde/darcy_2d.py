@@ -6,16 +6,8 @@ from ..mesh.Mesh2d import Mesh2d
 class CoscosData:
     def __init__(self, box,mu=1,k=1):
         self.box = box
-<<<<<<< HEAD
-        self.mu = mu
-        self.k = k
-||||||| merged common ancestors
         self.mu = 1
         self.k = 1
-=======
-        self.mu = 2
-        self.k = 1
->>>>>>> bfdfd70078ea8e3fb9846e87d9b2c474668f4d5b
 
     def init_mesh(self, nx, ny):
         box = self.box
