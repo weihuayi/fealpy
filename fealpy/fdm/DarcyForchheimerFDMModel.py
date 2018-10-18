@@ -90,7 +90,6 @@ class DarcyForchheimerFDMModel():
 
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        print('NE',NE)
         NC = mesh.number_of_cells()
 
         itype = mesh.itype
@@ -132,7 +131,6 @@ class DarcyForchheimerFDMModel():
         A21 += coo_matrix((-data/mesh.hy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
         A21 = A21.tocsr()
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
-        print('A',A.shape)
 
         return A
 
@@ -193,13 +191,13 @@ class DarcyForchheimerFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-        tol = 1e-4
+        tol = 1e-5
         ru = 1
         rp = 1
         count = 0
         iterMax = 2000
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
+#        from mumps import DMumpsContext
+#        ctx = DMumpsContext()
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -218,14 +216,14 @@ class DarcyForchheimerFDMModel():
             bnew[NE] = self.ph[0]
 
             # solve
-            #x[:] = spsolve(AD, bnew)
-            if ctx.myid == 0:
-                ctx.set_centralized_sparse(AD)
-                x = bnew.copy()
-                ctx.set_rhs(x) #Modified in place
+            x[:] = spsolve(AD, bnew)
+#            if ctx.myid == 0:
+#                ctx.set_centralized_sparse(AD)
+#                x = bnew.copy()
+#                ctx.set_rhs(x) #Modified in place
                 
-            ctx.run(job=6)
-            ctx.destroy()
+#            ctx.run(job=6)
+#            ctx.destroy()
 
             u1 = x[:NE]
             p1 = x[NE:]
@@ -316,16 +314,16 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         I, = np.nonzero(isBDEdge & isYDEdge)
-        Dph[NC-Ny:NC,0] = self.pde.source2(bc[I[Ny:],:])
+        Dph[NC-ny:NC,0] = self.pde.source2(bc[I[ny:],:])
         J, = np.nonzero(isBDEdge & isXDEdge)
-        Dph[Ny-1:NC:Ny,1] = self.pde.source3(bc[J[1::2],:])
+        Dph[ny-1:NC:ny,1] = self.pde.source3(bc[J[1::2],:])
 
-        Dph[:NC-Ny,0] = (self.ph[Ny:] - self.ph[:NC-Ny])/hx
+        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
         
         m = np.arange(NC)
-        m = m.reshape(Ny,Nx)
+        m = m.reshape(ny,nx)
         n1 = m[:,1:].flatten()
-        n2 = m[:,:Ny-1].flatten()
+        n2 = m[:,:ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
 
         DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
