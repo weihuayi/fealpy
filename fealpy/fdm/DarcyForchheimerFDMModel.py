@@ -3,7 +3,8 @@ from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdi
 from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+#from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+from mumps import spsolve 
 
 class DarcyForchheimerFDMModel():
     def __init__(self, pde, mesh):
@@ -102,7 +103,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
-        A11 = spdiags(C,0,NE,NE).toarray()# correct
+        A11 = spdiags(C,0,NE,NE)
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -198,8 +199,6 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -217,15 +216,8 @@ class DarcyForchheimerFDMModel():
 
             bnew[NE] = self.ph[0]
 
-            # solve
-            #x[:] = spsolve(AD, bnew)
-            if ctx.myid == 0:
-                ctx.set_centralized_sparse(AD)
-                x = bnew.copy()
-                ctx.set_rhs(x) #Modified in place
-                
-            ctx.run(job=6)
-            ctx.destroy()
+            x = spsolve(AD, bnew)
+
 
             u1 = x[:NE]
             p1 = x[NE:]
