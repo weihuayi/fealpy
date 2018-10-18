@@ -56,7 +56,7 @@ class Tritree(TriangleMesh):
             idx0, = np.nonzero(isTwoChildCell)
             if len(idx0) > 0:
                 flag0[self.child[idx0, 0:2]] = True
-        
+            print(flag0)
             # expand the marked cell
             cell2cell = self.ds.cell_to_cell()
             flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
@@ -71,19 +71,19 @@ class Tritree(TriangleMesh):
             if len(idx0) > 0:
                 # delete the children of the cells with two children
                 flag = isMarkedCell[self.child[idx0, 0]] | isMarkedCell[self.child[idx0, 1]]
-                if sum(flag) > 0:
-                    isMarkedCell[idx0[flag]] = True
+                
+                isMarkedCell[idx0[flag]] = True
 
-                    flag1 = np.ones(NC, dtype=np.bool)
-                    flag1[self.child[idx0[flag], 0:2]] = False
-                    NN = self.number_of_nodes()
-                    cell = self.entity('cell')
-                    self.ds.reinit(NN, cell[flag1])
+                flag = np.ones(NC, dtype=np.bool)
+                flag[self.child[idx0, 0:2]] = False
+                NN = self.number_of_nodes()
+                cell = self.entity('cell')
+                self.ds.reinit(NN, cell[flag])
 
-                    self.child[idx0[flag], 0:2] = -1
-                    self.parent = self.parent[flag1]
-                    self.child = self.child[flag1]
-                    isMarkedCell = isMarkedCell[flag1]
+                self.child[idx0, 0:2] = -1
+                self.parent = self.parent[flag]
+                self.child = self.child[flag]
+                isMarkedCell = isMarkedCell[flag]
 
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -164,8 +164,7 @@ class Tritree(TriangleMesh):
             flag1 = isLeafCell[edge2cell[:, 1]] & \
                     (~isMarkedCell[edge2cell[:, 1]]) & \
                     (isMarkedCell[edge2cell[:, 0]] | (~isLeafCell[edge2cell[:, 0]]))
-            print(sum(flag0))
-            print(sum(flag1))
+            
             cidx0 = edge2cell[flag0, 0]
             N0 = len(cidx0)
             cell20 = np.zeros((2*N0, 3), dtype=self.itype)
