@@ -51,6 +51,23 @@ class LinearElasticityVEMModel():
         G[..., 3, 1::2] = -G0[:, 1, :] 
         return G
 
+    def matrix_H(self, p=None):
+        if p is None:
+            p = self.space.p
+        mesh = self.mesh
+        mu = self.pde.mu
+        lam = self.pde.lam
+        phi = self.space.vsmspace.basis
+
+        def f(x, cellidx):
+            phi = self.space.vsmspace.basis(x, cellidx=cellidx, p=p)
+            val = np.einsum('ijkm, ijpm->ijkp', phi, phi)
+            return val
+
+        H = self.integralalg.integral(f, celltype=True)
+
+        return H
+
     def matrix_B(self):
         p = self.space.p
         mesh = self.mesh
@@ -59,7 +76,6 @@ class LinearElasticityVEMModel():
 
         node = mesh.entity('node')
         edge = mesh.entity('edge')
-        NV = mesh.number_of_vertices_of_cells()
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         nm = mesh.edge_normal()
@@ -69,7 +85,7 @@ class LinearElasticityVEMModel():
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
 
         S0 = self.space.vsmspace.strain_basis(ps, cellidx=edge2cell[:, 0])
-        val0 = np.einsum('i, jn, ijkmn->jkim', 2*mu*ws, nm, S0)
+        val0 = np.einsum('i, jn, ijkmn->jkim', 2*mu*ws, nm, S0) 
         D0 = self.space.vsmspace.div_basis(ps, cellidx=edge2cell[:, 0])
         val0 += np.einsum('i, jn, ijk->jkin', lam*ws, nm, D0) 
         shape = val0.shape[:-2] + (-1, )
@@ -87,7 +103,13 @@ class LinearElasticityVEMModel():
         smldof = self.space.vsmspace.number_of_local_dofs()
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float) 
 
+        NV = mesh.number_of_vertices_of_cells()
+
+        if p == 1:
+            B[0, 0::2] = 1/np.repeat(NV, NV)
+            B[1, 1::2] = 
         if p > 1:
+            #TODO: correct for p >= 3?
             def u0(x, cellidx):
                 val0 = self.space.vsmspace.div_strain_basis(x, cellidx=cellidx)
                 val1 = self.space.vsmspace.grad_div_basis(x, cellidx=cellidx)
@@ -97,6 +119,8 @@ class LinearElasticityVEMModel():
 
             idx = (cell2dofLocation[0:-1] + 2*p*NV).reshape(-1, 1) + np.arange(p*(p-1))
             B0 = self.integralalg.integral(u0, celltype=True)
+            H = self.matrix_H(p=p-2)
+            B0 = B0@inv(H)
             B[:, idx] -= B0.swapaxes(0, 1) 
 
 
@@ -107,10 +131,45 @@ class LinearElasticityVEMModel():
             B[:, idx1] += val0[i]
             if isInEdge[i]:
                 idx0 = edge2cell[i, 1]
-                idx1 = cell2dofLocation[idx0] + (edge2cell[i, 3]*p + np.arange(p+1))%(NV[idx0]*p)
+                idx1 = cell2dofLocation[idx0] + (2*edge2cell[i, 3]*p + np.arange(2*(p+1)))%(2*NV[idx0]*p)
                 B[:, idx1] += val1[i]
 
         return B
+
+
+    def matrix_D(self):
+        p = self.space.p
+        mesh = self.mesh
+        NV = mesh.number_of_vertices_of_cells()
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        cell2dof, cell2dofLocation = self.space.cell_to_dof() 
+        smldof = self.space.vsmspace.number_of_local_dofs()
+        D = np.ones((len(cell2dof), smldof), dtype=np.float)
+
+        if p == 1:
+            bc = np.repeat(V.smspace.barycenter, NV, axis=0) 
+            D[:, 1:] = (node[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
+            return D
+
+        qf = GaussLobattoQuadrature(p+1)
+        bcs, ws = qf.quadpts, qf.weights 
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+        phi0 = V.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
+        phi1 = V.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
+        D[idx, :] = phi0
+        idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
+        D[idx, :] = phi1
+        if p > 1:
+            area = V.smspace.area
+            idof = (p-1)*p//2 # the number of dofs of scale polynomial space with degree p-2
+            idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
+            D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
+        return D
             
 
            
