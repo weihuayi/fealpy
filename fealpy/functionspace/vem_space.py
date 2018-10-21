@@ -85,8 +85,14 @@ class ScaledMonomialSpace2d():
 
         Parameters
         ---------- 
-        point : numpy array
+        point : ndarray
             The shape of point is (..., M, 2) 
+
+        Returns
+        -------
+        phi : ndarray  
+            The shape of `phi` is (..., M, ldof)
+
         """
         if p is None:
             p = self.p
