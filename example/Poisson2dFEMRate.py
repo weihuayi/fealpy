@@ -34,6 +34,7 @@ for i in range(maxit):
     for j, p in enumerate(ps):
         integrator = mesh.integrator(q[j])
         fem = PoissonFEMModel(pde, mesh, p, integrator)
+        print(fem.get_right_vector())
         fem.solve()
         Ndof[i] = fem.femspace.number_of_global_dofs()
         errorMatrix[j, i] = fem.get_L2_error()

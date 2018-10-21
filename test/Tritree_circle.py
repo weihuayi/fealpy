@@ -56,7 +56,7 @@ fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
 #tmesh.find_node(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
+#mesh.find_cell(axes, showindex=True)
 #tmesh.find_edge(axes, showindex=True) 
 plt.show()
 

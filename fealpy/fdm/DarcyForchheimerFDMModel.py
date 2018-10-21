@@ -103,7 +103,13 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
+<<<<<<< HEAD
+        A11 = spdiags(C,0,NE,NE)# correct
+||||||| merged common ancestors
+        A11 = spdiags(C,0,NE,NE).toarray()# correct
+=======
         A11 = spdiags(C,0,NE,NE)
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -199,6 +205,16 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
+<<<<<<< HEAD
+#        from mumps import DMumpsContext
+#        ctx = DMumpsContext()
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+||||||| merged common ancestors
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+=======
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -216,8 +232,38 @@ class DarcyForchheimerFDMModel():
 
             bnew[NE] = self.ph[0]
 
+<<<<<<< HEAD
+            # solve
+            x[:] = spsolve(AD, bnew)
+#            if ctx.myid == 0:
+#                ctx.set_centralized_sparse(AD)
+#                x = bnew.copy()
+#                ctx.set_rhs(x)
+
+ #           ctx.run(job=6)
+            x[:] = spsolve(AD, bnew)
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = bnew.copy()
+                ctx.set_rhs(x) #Modified in place
+                
+            ctx.run(job=6)
+            ctx.destroy()
+||||||| merged common ancestors
+            # solve
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = bnew.copy()
+                ctx.set_rhs(x) #Modified in place
+                
+            ctx.run(job=6)
+            ctx.destroy()
+=======
             x = spsolve(AD, bnew)
 
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
 
             u1 = x[:NE]
             p1 = x[NE:]
@@ -243,6 +289,8 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
+
+ #           ctx.destroy()
 
             count = count + 1
  #           print('ru:',ru)
