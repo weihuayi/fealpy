@@ -11,6 +11,21 @@ def get_idx(tritree):
     idx, = np.where(flag)
     return idx
 
+class AdaptiveMarker():
+    def __init__(self):
+        self.theta = 0.2
+
+    def refine_marker(self, tmesh):
+        cell = tmesh.entity('cell')
+        isLeafCell = tmesh.is_leaf_cell()
+        flag = (np.sum(cell == 5, axis=1) == 1) & isLeafCell
+        idx, = np.where(flag)
+        return idx
+
+    def coarsen_marker(self, qtmesh):
+        pass
+
+idx = np.arange(2, 7)
 node = np.array([
     (0, 0), 
     (1, 0), 
@@ -20,16 +35,18 @@ cell = np.array([
     (1, 2, 0), 
     (3, 0, 2)], dtype=np.int)
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(3)
+tmesh.uniform_refine(1)
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
+marker = AdaptiveMarker()
 
-for i in range(5):
-    idx = get_idx(tritree); 
-    tritree.refine(idx);
+for i in range(6):
+    tritree.refine(marker)
 
+
+print(tritree.leaf_cell_index())
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)

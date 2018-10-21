@@ -3,7 +3,8 @@ from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdi
 from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+#from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+from mumps import spsolve 
 
 class DarcyForchheimerFDMModel():
     def __init__(self, pde, mesh):
@@ -101,7 +102,13 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
+<<<<<<< HEAD
         A11 = spdiags(C,0,NE,NE)# correct
+||||||| merged common ancestors
+        A11 = spdiags(C,0,NE,NE).toarray()# correct
+=======
+        A11 = spdiags(C,0,NE,NE)
+>>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -196,8 +203,14 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
+<<<<<<< HEAD
 #        from mumps import DMumpsContext
 #        ctx = DMumpsContext()
+||||||| merged common ancestors
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+=======
+>>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -215,6 +228,7 @@ class DarcyForchheimerFDMModel():
 
             bnew[NE] = self.ph[0]
 
+<<<<<<< HEAD
             # solve
             x[:] = spsolve(AD, bnew)
 #            if ctx.myid == 0:
@@ -224,6 +238,20 @@ class DarcyForchheimerFDMModel():
                 
 #            ctx.run(job=6)
 #            ctx.destroy()
+||||||| merged common ancestors
+            # solve
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = bnew.copy()
+                ctx.set_rhs(x) #Modified in place
+                
+            ctx.run(job=6)
+            ctx.destroy()
+=======
+            x = spsolve(AD, bnew)
+
+>>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
 
             u1 = x[:NE]
             p1 = x[NE:]

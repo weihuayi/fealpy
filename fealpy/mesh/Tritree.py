@@ -1,4 +1,5 @@
 import numpy as np
+
 from fealpy.mesh import TriangleMesh 
 
 class Tritree(TriangleMesh):
@@ -35,7 +36,15 @@ class Tritree(TriangleMesh):
         isLeafCell = self.is_leaf_cell()
         return TriangleMesh(self.node, self.ds.cell[isLeafCell])
 
-    def refine(self, idx):
+    def refine(self, marker=None):
+        if marker == None:
+            idx = self.leaf_cell_index()
+        else:
+            idx = marker.refine_marker(self)
+
+        if idx is None:
+            return False
+
         if len(idx) > 0:
             # Prepare data
             NC = self.number_of_cells()
@@ -49,11 +58,10 @@ class Tritree(TriangleMesh):
                 flag0[self.child[idx0, 0:2]] = True
         
             # expand the marked cell
-            isExpand = np.zeros(NC, dtype=np.bool)
             cell2cell = self.ds.cell_to_cell()
             flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
-            flag = flag1 | flag2
+            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell],axis=1) > 0)
+            flag = flag1 | flag2 
             while np.any(flag):
                 isMarkedCell[flag] = True
                 flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
@@ -63,20 +71,20 @@ class Tritree(TriangleMesh):
             if len(idx0) > 0:
                 # delete the children of the cells with two children
                 flag = isMarkedCell[self.child[idx0, 0]] | isMarkedCell[self.child[idx0, 1]]
-                isMarkedCell[idx0[flag]] = True
+                if sum(flag) > 0:
+                    isMarkedCell[idx0[flag]] = True
 
-                flag = np.ones(NC, dtype=np.bool)
-                flag[self.child[idx0, 0:2]] = False
-                NN = self.number_of_nodes()
-                cell = self.entity('cell')
-                self.ds.reinit(NN, cell[flag])
+                    flag1 = np.ones(NC, dtype=np.bool)
+                    flag1[self.child[idx0[flag], 0:2]] = False
+                    NN = self.number_of_nodes()
+                    cell = self.entity('cell')
+                    self.ds.reinit(NN, cell[flag1])
 
-                self.child[idx0, 0:1] = -1
-                self.parent = self.parent[flag]
-                self.child = self.child[flag]
-                isMarkedCell = isMarkedCell[flag]
+                    self.child[idx0[flag], 0:2] = -1
+                    self.parent = self.parent[flag1]
+                    self.child = self.child[flag1]
+                    isMarkedCell = isMarkedCell[flag1]
 
-            
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
@@ -156,6 +164,8 @@ class Tritree(TriangleMesh):
             flag1 = isLeafCell[edge2cell[:, 1]] & \
                     (~isMarkedCell[edge2cell[:, 1]]) & \
                     (isMarkedCell[edge2cell[:, 0]] | (~isLeafCell[edge2cell[:, 0]]))
+            print(sum(flag0))
+            print(sum(flag1))
             cidx0 = edge2cell[flag0, 0]
             N0 = len(cidx0)
             cell20 = np.zeros((2*N0, 3), dtype=self.itype)
@@ -170,8 +180,8 @@ class Tritree(TriangleMesh):
             self.child[cidx0, 0] = NC + 4*NCC + np.arange(0, N0)
 
             cell20[N0:2*N0, 0] = edge[flag0, 1]                           
-            cell20[N0:2*N0, 1] = cell20[0:N0, 2]                           
-            cell20[N0:2*N0, 2] = cell20[0:N0, 1]          
+            cell20[N0:2*N0, 1] = edge2center[flag0]                           
+            cell20[N0:2*N0, 2] = cell[cidx0, edge2cell[flag0, 2]]          
             parent20[N0:2*N0, 0] = cidx0                                       
             parent20[N0:2*N0, 1] = 1
             self.child[cidx0, 1] = NC + 4*NCC + np.arange(N0, 2*N0)
@@ -190,8 +200,8 @@ class Tritree(TriangleMesh):
             self.child[cidx1, 0] = NC + 4*NCC + 2*N0 + np.arange(0, N1)
 
             cell21[N1:2*N1, 0] = edge[flag1, 0]                           
-            cell21[N1:2*N1, 1] = cell21[0:N1, 2]                           
-            cell21[N1:2*N1, 2] = cell21[0:N1, 1]          
+            cell21[N1:2*N1, 1] = edge2center[flag1]                           
+            cell21[N1:2*N1, 2] = cell[cidx1, edge2cell[flag1, 3]]          
             parent21[N1:2*N1, 0] = cidx1                                       
             parent21[N1:2*N1, 1] = 1
             self.child[cidx1, 1] = NC + 4*NCC + 2*N0 + np.arange(N1, 2*N1)

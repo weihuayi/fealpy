@@ -194,13 +194,7 @@ class DarcyForchheimerFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
         tol = 1e-6
-||||||| merged common ancestors
-        tol = 1e-9
-=======
-        tol = 1e-4
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py
         ru = 1
         rp = 1
         count = 0
@@ -247,14 +241,7 @@ class DarcyForchheimerFDMModel():
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
-            p1 = np.zeros((NC,),dtype=ftype)
-            Anew = A21*A11
-            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
-||||||| merged common ancestors
-            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
-=======
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py
+
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
             else:
@@ -299,7 +286,6 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
     def get_H1_error(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -311,7 +297,7 @@ class DarcyForchheimerFDMModel():
         psemi = np.sqrt(np.sum((ep[1:] - ep[:NC-1])**2)/hx/hy)
         peH1 = peL2 + psemi
         return peH1
-||||||| merged common ancestors
+
 #    def get_L2_perror(self):
 #        uh = self.uh
 #        ph = self.ph
@@ -319,18 +305,6 @@ class DarcyForchheimerFDMModel():
 #        pI = self.pI
 #        err = self.integralalg.L2_error(ph, pI)
 #        return err
- 
-=======
-    def get_H1_error(self):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        hx = mesh.hx
-        hy = mesh.hy
-        ueL2,peL2 = self.get_L2_error()
-        ep = self.ph - self.pI
-        psemi = np.sqrt(np.sum((ep[1:]-ep[:NC-1])**2))
-        peH1 = peL2+psemi
-        return ep,psemi
 
     def get_DpL2_error(self):
         mesh = self.mesh
@@ -366,4 +340,3 @@ class DarcyForchheimerFDMModel():
 
         return DpeL2
 
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py

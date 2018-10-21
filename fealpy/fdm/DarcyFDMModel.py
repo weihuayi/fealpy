@@ -1,5 +1,7 @@
 import numpy as np
+import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
+import scipy.sparse
 from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 class DarcyFDMModel():
@@ -118,6 +120,7 @@ class DarcyFDMModel():
     def solve(self):
         mesh = self.mesh
         NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
         itype = mesh.itype
         ftype = mesh.ftype
 
@@ -134,13 +137,22 @@ class DarcyFDMModel():
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
         AD = T@A@T + Tbd
+        scipy.sparse.save_npz('AD.npz',AD)
+        
 
         b[NE] = self.ph[0]
+        print('b',b)
+        with open("b.csv","w",newline="")as datacsv:
+            csvwriter = csv.writer(datacsv,dialect = ("excel"))
+            csvwriter.writerow(['b'])
+            csvwriter.writerows([b])
 
         # solve
+       
         x[:] = spsolve(AD, b)
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
+
         return x
     
     def get_max_error(self):
