@@ -220,13 +220,14 @@ class DarcyForchheimerFDMModel():
             A12 = AD[:NE,NE:NE+NC]
             A21 = AD[NE:NE+NC,:NE]
             Anew = A21*A11inv*A12
-            b1 = A21*A11inv*b[:NE] - b[NE:NE+NC]
+            b1 = A21*A11inv*bnew[:NE] - bnew[NE:NE+NC]
+
 
             # solve
             p1 = np.zeros((NC,),dtype=ftype)
-            p1[1:NC] = spsolve(Anew[1:NC,1:NC],bnew[1:NC])
+            p1[1:NC] = spsolve(Anew[1:NC,1:NC],b1[1:NC])
             p1[0] = self.pde.pressure(pc[0])
-            u1 = A11inv*(b[:NE] - A12*p1)
+            u1 = A11inv*(bnew[:NE] - A12*p1)
 
             f = b[:NE]
             g = b[NE:]
@@ -250,6 +251,7 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
+            C = self.get_nonlinear_coef()#add
 
             count = count + 1
  #           print('ru:',ru)

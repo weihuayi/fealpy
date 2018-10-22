@@ -108,7 +108,12 @@ class DarcyForchheimerFDMModel():
         A11 = spdiags(C,0,NE,NE).toarray()# correct
 =======
         A11 = spdiags(C,0,NE,NE)
+<<<<<<< HEAD
 >>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
+||||||| merged common ancestors
+=======
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
+>>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 
 
         edge2cell = mesh.ds.edge_to_cell()
@@ -204,6 +209,7 @@ class DarcyForchheimerFDMModel():
         count = 0
         iterMax = 2000
 <<<<<<< HEAD
+<<<<<<< HEAD
 #        from mumps import DMumpsContext
 #        ctx = DMumpsContext()
 ||||||| merged common ancestors
@@ -211,6 +217,19 @@ class DarcyForchheimerFDMModel():
         ctx = DMumpsContext()
 =======
 >>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
+||||||| merged common ancestors
+=======
+<<<<<<< HEAD
+#        from mumps import DMumpsContext
+#        ctx = DMumpsContext()
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+||||||| merged common ancestors
+        from mumps import DMumpsContext
+        ctx = DMumpsContext()
+=======
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
+>>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -228,6 +247,7 @@ class DarcyForchheimerFDMModel():
 
             bnew[NE] = self.ph[0]
 
+<<<<<<< HEAD
 <<<<<<< HEAD
             # solve
             x[:] = spsolve(AD, bnew)
@@ -249,9 +269,46 @@ class DarcyForchheimerFDMModel():
             ctx.run(job=6)
             ctx.destroy()
 =======
+||||||| merged common ancestors
+=======
+<<<<<<< HEAD
+            # solve
+            x[:] = spsolve(AD, bnew)
+#            if ctx.myid == 0:
+#                ctx.set_centralized_sparse(AD)
+#                x = bnew.copy()
+#                ctx.set_rhs(x)
+
+ #           ctx.run(job=6)
+            x[:] = spsolve(AD, bnew)
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = bnew.copy()
+                ctx.set_rhs(x) #Modified in place
+                
+            ctx.run(job=6)
+            ctx.destroy()
+||||||| merged common ancestors
+            # solve
+            #x[:] = spsolve(AD, bnew)
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(AD)
+                x = bnew.copy()
+                ctx.set_rhs(x) #Modified in place
+                
+            ctx.run(job=6)
+            ctx.destroy()
+=======
+>>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
             x = spsolve(AD, bnew)
 
+<<<<<<< HEAD
 >>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
+||||||| merged common ancestors
+=======
+>>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
+>>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 
             u1 = x[:NE]
             p1 = x[NE:]
@@ -277,6 +334,8 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
+
+ #           ctx.destroy()
 
             count = count + 1
  #           print('ru:',ru)
