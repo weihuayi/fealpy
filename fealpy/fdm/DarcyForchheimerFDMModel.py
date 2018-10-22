@@ -103,27 +103,6 @@ class DarcyForchheimerFDMModel():
 
         C = self.get_nonlinear_coef()
         A11 = spdiags(C,0,NE,NE)# correct
-<<<<<<< HEAD
-||||||| merged common ancestors
-        A11 = spdiags(C,0,NE,NE).toarray()# correct
-=======
-        A11 = spdiags(C,0,NE,NE)
-<<<<<<< HEAD
->>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
-||||||| merged common ancestors
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-
-||||||| merged common ancestors
-||||||| merged common ancestors
-        A11 = spdiags(C,0,NE,NE).toarray()# correct
-=======
-        A11 = spdiags(C,0,NE,NE)
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
 
         edge2cell = mesh.ds.edge_to_cell()
         I, = np.nonzero(~isBDEdge & isYDEdge)
@@ -217,42 +196,9 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-#        from mumps import DMumpsContext
-#        ctx = DMumpsContext()
-||||||| merged common ancestors
+
         from mumps import DMumpsContext
         ctx = DMumpsContext()
-=======
->>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
-||||||| merged common ancestors
-=======
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<< HEAD
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
-#        from mumps import DMumpsContext
-#        ctx = DMumpsContext()
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-<<<<<<< HEAD
-||||||| merged common ancestors
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-||||||| merged common ancestors
-||||||| merged common ancestors
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -269,38 +215,7 @@ class DarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
 
             bnew[NE] = self.ph[0]
-
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-            # solve
-            x[:] = spsolve(AD, bnew)
-#            if ctx.myid == 0:
-#                ctx.set_centralized_sparse(AD)
-#                x = bnew.copy()
-#                ctx.set_rhs(x) #Modified in place
-                
-#            ctx.run(job=6)
 #            ctx.destroy()
-||||||| merged common ancestors
-            # solve
-            #x[:] = spsolve(AD, bnew)
-            if ctx.myid == 0:
-                ctx.set_centralized_sparse(AD)
-                x = bnew.copy()
-                ctx.set_rhs(x) #Modified in place
-                
-            ctx.run(job=6)
-            ctx.destroy()
-=======
-||||||| merged common ancestors
-=======
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<< HEAD
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
-            # solve
             x[:] = spsolve(AD, bnew)
             #x[:] = spsolve(AD, bnew)
             if ctx.myid == 0:
@@ -310,27 +225,7 @@ class DarcyForchheimerFDMModel():
                 
             ctx.run(job=6)
             ctx.destroy()
-<<<<<<< HEAD
-=======
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-            x = spsolve(AD, bnew)
 
-<<<<<<< HEAD
->>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
-||||||| merged common ancestors
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-
-||||||| merged common ancestors
-=======
-            x = spsolve(AD, bnew)
-
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-
-=======
- 
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
             u1 = x[:NE]
             p1 = x[NE:]
 

@@ -100,22 +100,8 @@ class DarcyForchheimerFDMModel():
 #        print('C',C.shape)
 #        print('C1',C1.shape)
         C = mu/k + rho*beta*C
-<<<<<<< HEAD
         C1 = mu/k + rho*beta*C1
-
-||||||| merged common ancestors
-=======
-        C1 = mu/k + rho*beta*C1
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-
-<<<<<<< HEAD
         return C,C1 
-||||||| merged common ancestors
-        return C 
-=======
-
-        return C,C1 
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 
     def solve(self):
         mesh = self.mesh
@@ -169,14 +155,7 @@ class DarcyForchheimerFDMModel():
         f = np.r_[fx,fy]
         g = pde.source1(pc)
 
-<<<<<<< HEAD
-        tol = 1e-5
-||||||| merged common ancestors
         tol = 1e-6
-        ru = 1
-=======
-        tol = 1e-6
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
         rp = 1
         ru = 1
         count = 0
@@ -184,24 +163,12 @@ class DarcyForchheimerFDMModel():
 
         ph = self.ph
         uh = self.uh
-<<<<<<< HEAD
     
         pI = self.pI
         uI = self.uI
         while rp+ru > tol and count < iterMax:
             C,C1 = self.get_nonlinear_coef()
 
-||||||| merged common ancestors
-        while ru+rp > tol and count < iterMax:
-            C = self.get_nonlinear_coef()
-=======
-    
-        pI = self.pI
-        uI = self.uI
-        while rp > tol and count < iterMax:
-            C,C1 = self.get_nonlinear_coef()
-
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
             p = ph[cell2cell]
             p1 = pI[cell2cell]
 
@@ -227,7 +194,6 @@ class DarcyForchheimerFDMModel():
             idx = mesh.ds.boundary_cell_index(3)
             p[idx, 3] = - hx*f[cell2edge[idx, 3]] + ph[idx] \
                         + hx*C[cell2edge[idx, 3]]*uh[cell2edge[idx, 3]] 
-<<<<<<< HEAD
             p1[idx, 3] = - hx*f[cell2edge[idx, 3]] + pI[idx] \
                         + hx*C1[cell2edge[idx, 3]]*uI[cell2edge[idx, 3]] 
 #            print('p1',p1)
@@ -313,11 +279,6 @@ class DarcyForchheimerFDMModel():
 #            dp = np.r_[dp1,(ph11 - ph12)/hy]
 #            ru = LA.norm(f - C*uh - dp)
 #            print('rp:',rp)
-||||||| merged common ancestors
-
-
-
-            ph[1:]  =  
             ph1[1:] = (g[1:] - f[ux2[1:]]/hx/C[ux2[1:]] + f[ux1[1:]]/hx/C[ux1[1:]]- f[vy2[1:]]/hy/C[vy2[1:]] + f[vy1[1:]]/hy/C[vy1[1:]]\
                             + p[1:, 1]/hx**2/C[ux2[1:]]\
                             + p[1:, 3]/hx**2/C[ux1[1:]]\
@@ -333,7 +294,7 @@ class DarcyForchheimerFDMModel():
             ru = np.sqrt(np.sum(hx*hy*(uh1-self.uh0)**2))
             rp = np.sqrt(np.sum(hx*hy*(ph1-self.ph0)**2))
             print('rp:',rp)
-=======
+
             p1[idx, 3] = - hx*f[cell2edge[idx, 3]] + pI[idx] \
                         + hx*C1[cell2edge[idx, 3]]*uI[cell2edge[idx, 3]] 
 #            print('p1',p1)
@@ -421,24 +382,15 @@ class DarcyForchheimerFDMModel():
 #            dp = np.r_[dp1,(ph11 - ph12)/hy]
 #            ru = LA.norm(f - C*uh - dp)
 #            print('rp:',rp)
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 #            print('ru',ru)
 #            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
 #            print('uh1:',uh1)
 #            print('ph1:',p)
 
-<<<<<<< HEAD
-            self.ph[:] = ph1
-            self.uh[:] = w
-||||||| merged common ancestors
-            self.ph0[:] = ph1
-            self.uh0[:] = uh1
-=======
             self.ph[:] = ph1
             self.uh[:] = w
             print('uh',uh1)
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 
 #            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
@@ -447,16 +399,9 @@ class DarcyForchheimerFDMModel():
 
         self.uh = w
         self.ph = ph1
-<<<<<<< HEAD
 #        print('g',g)
 #        print('uI',uI)
 #        print('A21',A21)
-||||||| merged common ancestors
-=======
-        print('g',g)
-        print('uI',uI)
-        print('A21',A21)
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 #        print('uh:',self.uh)
         return count
 

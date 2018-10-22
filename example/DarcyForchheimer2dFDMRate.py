@@ -10,48 +10,8 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-nx = 64
-ny = 64
-||||||| merged common ancestors
-nx = 128
-ny = 128
-=======
-||||||| merged common ancestors
-=======
-<<<<<<< HEAD
-||||||| merged common ancestors
-<<<<<<< HEAD
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
-nx = 4
-ny = 4
-<<<<<<< HEAD
-||||||| merged common ancestors
-nx = 128
-ny = 128
-=======
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
 nx = 256 
 ny = 256 
-<<<<<<< HEAD
->>>>>>> 14a86c65b99a6b9c9cbd0ef98e4bbe936af644e6
-||||||| merged common ancestors
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
->>>>>>> e459bb9b45daa737e75766d4a6f7803e2e9905f9
-||||||| merged common ancestors
-||||||| merged common ancestors
-nx = 128
-ny = 128
-=======
-nx = 256 
-ny = 256 
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-=======
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
 pde = CoscosData1(box)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
