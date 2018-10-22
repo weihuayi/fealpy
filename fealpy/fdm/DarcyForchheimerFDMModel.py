@@ -103,14 +103,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
-<<<<<<< HEAD
         A11 = spdiags(C,0,NE,NE)# correct
-||||||| merged common ancestors
-        A11 = spdiags(C,0,NE,NE).toarray()# correct
-=======
-        A11 = spdiags(C,0,NE,NE)
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-
 
         edge2cell = mesh.ds.edge_to_cell()
         I, = np.nonzero(~isBDEdge & isYDEdge)
@@ -205,16 +198,10 @@ class DarcyForchheimerFDMModel():
         rp = 1
         count = 0
         iterMax = 2000
-<<<<<<< HEAD
 #        from mumps import DMumpsContext
 #        ctx = DMumpsContext()
         from mumps import DMumpsContext
         ctx = DMumpsContext()
-||||||| merged common ancestors
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-=======
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -232,15 +219,7 @@ class DarcyForchheimerFDMModel():
 
             bnew[NE] = self.ph[0]
 
-<<<<<<< HEAD
             # solve
-            x[:] = spsolve(AD, bnew)
-#            if ctx.myid == 0:
-#                ctx.set_centralized_sparse(AD)
-#                x = bnew.copy()
-#                ctx.set_rhs(x)
-
- #           ctx.run(job=6)
             x[:] = spsolve(AD, bnew)
             #x[:] = spsolve(AD, bnew)
             if ctx.myid == 0:
@@ -250,21 +229,7 @@ class DarcyForchheimerFDMModel():
                 
             ctx.run(job=6)
             ctx.destroy()
-||||||| merged common ancestors
-            # solve
-            #x[:] = spsolve(AD, bnew)
-            if ctx.myid == 0:
-                ctx.set_centralized_sparse(AD)
-                x = bnew.copy()
-                ctx.set_rhs(x) #Modified in place
-                
-            ctx.run(job=6)
-            ctx.destroy()
-=======
-            x = spsolve(AD, bnew)
-
->>>>>>> 69274f3204aeb7f5e3adbf00770529b605236071
-
+ 
             u1 = x[:NE]
             p1 = x[NE:]
 
@@ -356,14 +321,14 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         I, = np.nonzero(isBDEdge & isYDEdge)
-        Dph[NC-Ny:NC,0] = self.pde.source2(bc[I[Ny:],:])
+        Dph[NC-ny:NC,0] = self.pde.source2(bc[I[ny:],:])
         J, = np.nonzero(isBDEdge & isXDEdge)
-        Dph[Ny-1:NC:Ny,1] = self.pde.source3(bc[J[1::2],:])
+        Dph[ny-1:NC:ny,1] = self.pde.source3(bc[J[1::2],:])
 
-        Dph[:NC-Ny,0] = (self.ph[Ny:] - self.ph[:NC-Ny])/hx
+        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
         
         m = np.arange(NC)
-        m = m.reshape(Ny,Nx)
+        m = m.reshape(ny,nx)
         n1 = m[:,1:].flatten()
         n2 = m[:,:Ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy

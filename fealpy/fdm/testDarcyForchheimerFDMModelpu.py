@@ -57,17 +57,9 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        C = np.zeros(NE, dtype=mesh.ftype)
+        C = np.ones(NE, dtype=mesh.ftype)
         edge2cell = mesh.ds.edge_to_cell()
         cell2edge = mesh.ds.cell_to_edge()
-
-        bc = mesh.entity_barycenter('edge')
-
-        flag = isBDEdge & isYDEdge
-        C[flag] = self.pde.velocity_x(bc[flag])
-
-        flag = isBDEdge & isXDEdge
-        C[flag] = self.pde.velocity_y(bc[flag])
 
         flag = ~isBDEdge & isYDEdge
         L = edge2cell[flag, 0]
@@ -120,24 +112,23 @@ class DarcyForchheimerFDMModel():
 
         idx1, = np.nonzero(~flag3)
         idx2, = np.nonzero(~flag1)
-        data1 = 1/C[cell2edge[idx1, 1]]/hx**2
+        data1 = 1/C[cell2edge[idx1, 3]]/hx**2
         A = coo_matrix((-data1,(idx2,idx1)),shape = (NC, NC), dtype=ftype)
         A += coo_matrix((data1,(idx2,idx2)),shape = (NC, NC),dtype=ftype)
 
         idx3, = np.nonzero(~flag0)
         idx4, = np.nonzero(~flag2)
-        data2 = 1/C[cell2edge[idx4, 0]]/hy**2
+        data2 = 1/C[cell2edge[idx4, 2]]/hy**2
         A += coo_matrix((-data2,(idx3,idx4)),shape = (NC,NC),dtype=ftype)
         A += coo_matrix((data2,(idx3,idx3)),shape = (NC,NC),dtype=ftype)
 
-        data3 = 1/C[cell2edge[idx3, 2]]/hy**2
+        data3 = 1/C[cell2edge[idx3, 0]]/hy**2
         A += coo_matrix((-data3,(idx4,idx3)),shape = (NC,NC),dtype=ftype)
         A += coo_matrix((data3,(idx4,idx4)),shape = (NC,NC),dtype=ftype)
 
-        data4 = 1/C[cell2edge[idx2, 3]]/hx**2
+        data4 = 1/C[cell2edge[idx2, 1]]/hx**2
         A += coo_matrix((-data4,(idx1,idx2)),shape = (NC,NC),dtype=ftype)
         A += coo_matrix((data4,(idx1,idx1)),shape = (NC,NC),dtype=ftype)
-        A = -A
 
 #        print('A',A)
 #        print(flag0)
@@ -177,15 +168,11 @@ class DarcyForchheimerFDMModel():
         fy = pde.source3(bc[sum(isYDEdge):])
         f = np.r_[fx,fy]
         g = pde.source1(pc)
+#        print('f',f)
+#        print('g',g)
 
         C = self.get_nonlinear_coef()
         b = np.zeros(NC, dtype=ftype)
-
-        idx, = np.nonzero(flag0 & flag3)
-        b[idx] = g[idx] - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
-               - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
-               + uI[cell2edge[idx, 3]]/hx\
-               + uI[cell2edge[idx, 0]]/hy
 
         idx, = np.nonzero(flag2 & flag3)
         b[idx] = g[idx] - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
@@ -206,6 +193,8 @@ class DarcyForchheimerFDMModel():
                - uI[cell2edge[idx, 2]]/hy
 
         idx, = np.nonzero(flag3 & ~flag0 & ~flag2)
+#        print('idx',idx)
+#        print('cell2edge',cell2edge[idx,:])
         b[idx] = g[idx] - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
@@ -234,6 +223,8 @@ class DarcyForchheimerFDMModel():
                - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]
+
+        #right
 
         return b        
 
@@ -272,10 +263,11 @@ class DarcyForchheimerFDMModel():
         rp = 1
         ru = 1
         count = 0
-        iterMax = 2
+        iterMax = 200
 
         uh1 = np.zeros((NE,), dtype=ftype)
         ph1 = np.zeros((NC,), dtype=ftype)
+        ph1[0] = self.pI[0]
     
         pI = self.pI
         uI = self.uI
@@ -289,34 +281,23 @@ class DarcyForchheimerFDMModel():
             Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
             AD = T@A@T + Tbd
-            print('A',AD)
-            print('b',b)
+#            print('AD',AD)
+#            print('b',b)
             b[0] = self.pI[0]
 #            print('b',b[0])
 
-            ph1[:] = spsolve(AD, b)
+            ph1[1:NC] = spsolve(A[1:NC,1:], b[1:NC])
+#            print('ph1',ph1)
 
             cell2cell = mesh.ds.cell_to_cell()
             edge2cell = mesh.ds.edge_to_cell()
             p = ph1[cell2cell]
            # print('p',p)
-#            isBDEdge = mesh.ds.boundary_edge_flag()
-#            isYDEdge = mesh.ds.y_direction_edge_flag()
-#            isXDEdge = mesh.ds.x_direction_edge_flag()
-#            idx, = np.nonzero(~isBDEdge & isYDEdge)
-#            uh1[idx] = (f[idx] - (ph1[edge2cell[idx, 1]]-ph1[edge2cell[idx, 0]])/hx)/C[idx] 
-#            idx, = np.nonzero(~isBDEdge & isXDEdge)
-#            uh1[idx] = (f[idx] - (ph1[edge2cell[idx, 0]]-ph1[edge2cell[idx, 1]])/hy)/C[idx]
-#
-#            rp = np.sqrt(np.sum(hx*hy*(self.ph-ph1)**2))
-#            ru = np.sqrt(np.sum(hx*hy*(self.uh-uh1)**2))
-
-
             # bottom boundary cell
             idx = mesh.ds.boundary_cell_index(0)
             p[idx, 0] = - hy*f[cell2edge[idx, 0]] + ph1[idx] \
                         + hy*C[cell2edge[idx, 0]]*self.uh[cell2edge[idx, 0]]
-           # right boundary cell
+            # right boundary cell
             idx = mesh.ds.boundary_cell_index(1)
             p[idx, 1] =   hx*f[cell2edge[idx, 1]] + ph1[idx] \
                         - hx*C[cell2edge[idx, 1]]*self.uh[cell2edge[idx, 1]]
@@ -335,7 +316,7 @@ class DarcyForchheimerFDMModel():
             w1 = (f[cell2edge[:, 1]] - (p[:, 1] - ph1)/hx)/C[cell2edge[:, 1]]
             w2 = (f[cell2edge[:, 2]] - (p[:, 2] - ph1)/hy)/C[cell2edge[:, 2]]
             w3 = (f[cell2edge[:, 3]] - (ph1 - p[:, 3])/hx)/C[cell2edge[:, 3]]
-#            rp = LA.norm(hx*hy*g - (w1-w3)*hy - (w2-w0)*hx)
+            rp = np.sqrt(np.sum(hx*hy*(self.ph - ph1)**2))
 #            print('rp:',rp)
 
             wu = np.r_[w3,w1[NC-ny:]]
@@ -343,9 +324,11 @@ class DarcyForchheimerFDMModel():
             w4 = w2.reshape(ny,nx)
             wv = np.column_stack((w0,w4[:,nx-1])).flatten()
             w = np.r_[wu,wv]
+            ru = np.sqrt(np.sum(hx*hy*(self.uh-w)**2))
+#            print('w',w)
 #            we = w-uI
 #            print('we',we)
-#            print('ru',ru)
+            print('ru',ru)
 #            print('ph0:',self.ph0)
 #            print('w:',w)
 #            print('uh1:',uh1)
@@ -353,8 +336,14 @@ class DarcyForchheimerFDMModel():
 
             self.ph[:] = ph1
             self.uh[:] = w
-            print('uh',uh1)
-#            C = self.get_nonlinear_coef()
+            C = self.get_nonlinear_coef()
+            w0 = (f[cell2edge[:, 0]] - (ph1 - p[:, 0])/hy)/C[cell2edge[:, 0]]
+            w1 = (f[cell2edge[:, 1]] - (p[:, 1] - ph1)/hx)/C[cell2edge[:, 1]]
+            w2 = (f[cell2edge[:, 2]] - (p[:, 2] - ph1)/hy)/C[cell2edge[:, 2]]
+            w3 = (f[cell2edge[:, 3]] - (ph1 - p[:, 3])/hx)/C[cell2edge[:, 3]]
+#            rp = LA.norm(g - (w1-w3)/hx - (w2-w0)/hy)
+            print('rp',rp)
+#            print('uh',self.uh)
             A = self.get_left_matrix()
             b = self.get_right_vector()
 
@@ -381,4 +370,38 @@ class DarcyForchheimerFDMModel():
         ueL2 = np.sqrt(np.sum(hx*hy*(self.uh - self.uI)**2))
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
+
+    def get_DpL2_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
+        ftype = mesh.ftype
+
+        Dph = np.zeros((NC,2),dtype=ftype)
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+        DpI = self.pde.grad_pressure(pc)
+
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        I, = np.nonzero(isBDEdge & isYDEdge)
+        Dph[NC-ny:NC,0] = self.pde.source2(bc[I[ny:],:])
+        J, = np.nonzero(isBDEdge & isXDEdge)
+        Dph[ny-1:NC:ny,1] = self.pde.source3(bc[J[1::2],:])
+
+        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
+
+        m = np.arange(NC)
+        m = m.reshape(ny,nx)
+        n1 = m[:,1:].flatten()
+        n2 = m[:,:ny-1].flatten()
+        Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
+
+        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        return DpeL2
 
