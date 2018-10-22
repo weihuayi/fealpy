@@ -22,6 +22,8 @@ class PolygonMesh(Mesh2d):
 
         self.ds = PolygonMeshDataStructure(node.shape[0], cell, cellLocation)
         self.meshtype = 'polygon'
+        self.itype = cell.dtype
+        self.ftype = node.dtype
 
     def integrator(self, k):
         return TriangleQuadrature(k)

@@ -18,6 +18,9 @@ class QuadrangleMesh(Mesh2d):
         self.meshtype = 'quad'
         self.dtype = dtype
 
+        self.itype = cell.dtype
+        self.ftype = node.dtype
+
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}

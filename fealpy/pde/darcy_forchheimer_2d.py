@@ -9,7 +9,7 @@ class CoscosData1:
         self.mu = 2
         self.k = 1
         self.rho = 1
-        self.beta = 20
+        self.beta = 50
 
 
     def init_mesh(self, nx, ny):

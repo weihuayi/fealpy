@@ -24,13 +24,13 @@ cellLocation = np.array([0, 4], dtype=np.int)
 
 mesh = PolygonMesh(node, cell, cellLocation)
 
-
 pde = LinearElasticityModel(1, 1)
 p = 2
 q = 5
 vem = LinearElasticityVEMModel(pde, mesh, p, q)
 
-G = vem.matrix_G()
-print(G)
-
+#G = vem.matrix_G()
+#print(G)
+B = vem.matrix_B()
+print(B)
 print(vem.uI)

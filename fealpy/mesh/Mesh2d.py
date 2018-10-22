@@ -240,7 +240,7 @@ class Mesh2dDataStructure():
         localEdge = self.localEdge
 
         totalEdge = cell[:, localEdge].reshape(-1, 2)
-        return np.sort(totalEdge, axis=1)
+        return totalEdge
 
     def local_edge(self):
         return self.localEdge
@@ -252,7 +252,7 @@ class Mesh2dDataStructure():
         E = self.E
 
         totalEdge = self.total_edge()
-        _, i0, j = unique_row(totalEdge)
+        _, i0, j = unique_row(np.sort(totalEdge, axis=1))
         NE = i0.shape[0]
         self.NE = NE
 
@@ -266,10 +266,7 @@ class Mesh2dDataStructure():
         self.edge2cell[:, 2] = i0%E 
         self.edge2cell[:, 3] = i1%E 
 
-        cell = self.cell
-        localEdge = self.localEdge
-        edge2cell = self.edge2cell
-        self.edge = cell[edge2cell[:, [0]], localEdge[edge2cell[:, 2]]]
+        self.edge = totalEdge[i0, :]
 
     def cell_to_node(self):
         """ 
