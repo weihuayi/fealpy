@@ -10,8 +10,8 @@ from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
-nx = 512
-ny = 512
+nx = 512 
+ny = 512 
 pde = CoscosData(box)
 
 maxit = 1
@@ -23,13 +23,15 @@ errpL2 = np.zeros((maxit,), dtype=np.float)
 err = np.zeros((2,maxit),dtype=np.float)
 error = np.zeros((2,maxit),dtype=np.float)
 for i in range(maxit):
-    t = time.time()
     mesh = pde.init_mesh(nx,ny)
     fdm = DarcyFDMModel(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
+    t = time.time()
     fdm.solve()
+    elapsed = time.time()-t
+    print('time:',elapsed)
 
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
@@ -40,8 +42,6 @@ for i in range(maxit):
     if i < maxit - 1:
         nx = 2*nx
         ny = 2*ny
-    elapsed = time.time()-t
-    print('time:',elapsed)
 print('err',err)
 print('error',error)
 mesh.add_plot(plt,cellcolor='w')

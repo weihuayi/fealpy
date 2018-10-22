@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from fealpy.fem.integral_alg import IntegralAlg
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+from scipy.sparse.linalg import cg, inv, dsolve
+from mumps import spsolve
 class DarcyFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
@@ -136,21 +137,10 @@ class DarcyFDMModel():
         AD = T@A@T + Tbd
 
         b[NE] = self.ph[0]
-
-        # solve
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-        if ctx.myid == 0:
-            ctx.set_centralized_sparse(AD.tocoo())
-            x = b.copy()
-            ctx.set_rhs(x)
-        ctx.set_silent()
-        ctx.run(job=6)
         
-#        x[:] = spsolve(AD, b)
+        x[:] = spsolve(AD, b)
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
-        ctx.destroy()
 
         return x
     

@@ -1,20 +1,19 @@
 # FEALPy: Finite Element Analysis Library in Python
 
-## Goal
-
-github.com/weihuayi/fealpy
-
 We want to develop an efficient and easy to use finite element software
 package to support our teach and research work. 
 
 We still have lot work to do. 
 
+# Install
 
-## Install by pip 
+## Ubuntu
+
+### Install by pip 
 
 In `fealpy/`, run the following command 
 ```
-sudo pip install .
+sudo pip3 install ./
 ```
 whill copy the fealpy into `/usr/local/lib/python3.x/dist-packages/`
 
@@ -23,12 +22,12 @@ whill copy the fealpy into `/usr/local/lib/python3.x/dist-packages/`
 In the `fealpy/`, run the following command:
 
 ```
-sudo pip install -e .
+sudo pip3 install -e ./
 ```
 which will create a link in `/usr/local/lib/python3.x/dist-packages/`.  
 
 
-## Dependency
+### Dependency
 
 ```
 sudo apt-get install python3 python3-pip ipython3 
@@ -43,12 +42,7 @@ sudo apt-get install petsc-dev
 sudo -H pip3 install petsc4py 
 ```
 
-
-```
-sudo apt-get install python3-skimage
-```
-
-## Option Dependency 
+### Option Dependency 
 
 Install mesh generation package `meshpy`:
 
@@ -81,7 +75,7 @@ sudo -H pip3 install pygmsh
 ```
 
 
-## Anaconda 
+## Windows: Anaconda
 
 ```
 conda install pyamg
@@ -96,6 +90,10 @@ from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy, dowload
 pip install msgpack
 pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
 ```
+## Mac
+
+
+
 
 ## Install Boost with python3 
 

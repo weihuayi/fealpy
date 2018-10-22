@@ -320,7 +320,16 @@ class VectorVirtualElementSpace2d():
         self.GD = 2
 
     def cell_to_dof(self):
-        return self.dof.cell2dof, self.dof.cell2dofLocation
+        
+        NC = self.mesh.number_of_cells()
+        GD = self.GD
+        cell2dof = self.dof.cell2dof[..., np.newaxis]
+        cell2dof = (GD*cell2dof + np.arange(GD)).reshape(-1)
+        NDof = GD*self.dof.number_of_local_dofs()
+        cell2dofLocation = np.zeros(NC+1, dtype=self.mesh.itype)
+        cell2dofLocation[1:] = np.add.accumulate(NDof)
+        
+        return cell2dof, cell2dofLocation
 
     def number_of_global_dofs(self):
         return self.GD*self.dof.number_of_global_dofs()
