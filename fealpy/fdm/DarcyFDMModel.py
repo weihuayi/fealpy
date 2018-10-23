@@ -142,7 +142,6 @@ class DarcyFDMModel():
         
 
         b[NE] = self.ph[0]
-<<<<<<< HEAD
         print('b',b)
         with open("b.csv","w",newline="")as datacsv:
             csvwriter = csv.writer(datacsv,dialect = ("excel"))
@@ -152,7 +151,6 @@ class DarcyFDMModel():
         # solve
        
         x[:] = spsolve(AD, b)
-||||||| merged common ancestors
 
         # solve
         from mumps import DMumpsContext
@@ -163,12 +161,7 @@ class DarcyFDMModel():
             ctx.set_rhs(x)
         ctx.set_silent()
         ctx.run(job=6)
-        
-#        x[:] = spsolve(AD, b)
-=======
-        
-        x[:] = spsolve(AD, b)
->>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
+
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
 

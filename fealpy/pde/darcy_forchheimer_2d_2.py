@@ -21,39 +21,25 @@ class CoscosData1:
     def source1(self, p):
         """ The right hand side of DarcyForchheimer equation
         """
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        rhs = 2*pi*np.cos(pi*x)*np.cos(pi*y)
+        rhs = np.zeros(p.shape[0],1)
         return rhs
-
-
-    def velocity(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        val = np.zeros(p.shape, dtype=p.dtype)
-        val[:,0] = np.sin(pi*x)*np.cos(pi*y)
-        val[:,1] = np.cos(pi*x)*np.sin(pi*y)
-        return val
 
     def velocity_x(self,p):
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
-        val = np.sin(pi*x)*np.cos(pi*y)
+        val = np.sin(x)*np.cos(y)
         return val
     def velocity_y(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
-        val = np.cos(pi*x)*np.sin(pi*y)
+        val = -np.cos(x)*np.sin(y)
         return val
 
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = x*(1-x)*y*(1-y)
+        pi = np.pi
+        val = np.sin(pi*x)*np.sin(pi*y)
         return val
     def source2(self, p):
         x = p[..., 0]
@@ -63,12 +49,12 @@ class CoscosData1:
         k = self.k
         rho = self.rho
         beta = self.beta
-        t0 = np.sin(pi*x)
-        t1 = np.cos(pi*x)
-        t2 = np.sin(pi*y)
-        t3 = np.cos(pi*y)
+        t0 = np.sin(x)
+        t1 = np.cos(x)
+        t2 = np.sin(y)
+        t3 = np.cos(y)
         m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
-        val = m*t0*t3 + (1-2*x)*y*(1-y)
+        val = m*t0*t3 + pi*np.cos(pi*x)*np.sin(pi*y)
         return val
 
     def source3(self, p):
@@ -79,23 +65,18 @@ class CoscosData1:
         k = self.k
         rho = self.rho
         beta = self.beta
-        t0 = np.sin(pi*x)
-        t1 = np.cos(pi*x)
-        t2 = np.sin(pi*y)
-        t3 = np.cos(pi*y)
+        t0 = np.sin(x)
+        t1 = np.cos(x)
+        t2 = np.sin(y)
+        t3 = np.cos(y)
         m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
-        val = m*t1*t2 +  x*(1-x)*(1-2*y)
+        val = -m*t1*t2 + pi*np.sin(pi*x)*np.cos(pi*y)
         return val
     def grad_pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape)
-        val[..., 0] = (1-x)*y*(1-y) - x*y*(1-y)
-        val[..., 1] = x*(1-x)*(1-y) - x*(1-x)*y
+        val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)
+        val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)
         return val
 
-    def dirichlet(self, p):
-        """ Dirichlet boundary condition
-        """
-        val = np.zeros(p.shape[0],1)
-        return val
