@@ -22,7 +22,7 @@ The kinds of mesh :
 
 * IntervalMesh: 区间网格
 * TriangleMesh: 三角形网格
-* QuadrilateralMesh: 四边形网格
+* QuadrangleMesh: 四边形网格
 * TetrahedronMesh: 四面体网格
 * HexahedronMesh: 六面体网格
 * PolygonMesh: 多边形网格

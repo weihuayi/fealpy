@@ -39,16 +39,22 @@ class LinearElasticityVEMModel():
 
         G = self.integralalg.integral(u0, celltype=True)
 
-        def u1(x, cellidx):
-            phip = self.space.vsmspace.scalarspace.basis(x, cellidx=cellidx)
-            val = np.einsum('ijk, ijp->ijpk', phip, phip[..., 0:3])
-            return val
-        G0 = self.integralalg.integral(u1, celltype=True)/self.area[:, np.newaxis, np.newaxis]
 
-        G[..., 0, 0::2] = G0[:, 0, :]
-        G[..., 1, 1::2] = G0[:, 0, :]
-        G[..., 3, 0::2] = G0[:, 2, :]
-        G[..., 3, 1::2] = -G0[:, 1, :] 
+        if p == 1:
+            G[..., 0, 0] = 1
+            G[..., 1, 1] = 1
+            G[..., 3, 0::2] 
+            G[..., 3, 1::2]
+        else:
+            def u1(x, cellidx):
+                phip = self.space.vsmspace.scalarspace.basis(x, cellidx=cellidx)
+                val = np.einsum('ijk, ijp->ijpk', phip, phip[..., 0:3])
+                return val
+            G0 = self.integralalg.integral(u1, celltype=True)/self.area[:, np.newaxis, np.newaxis]
+            G[..., 0, 0::2] = G0[:, 0, :]
+            G[..., 1, 1::2] = G0[:, 0, :]
+            G[..., 3, 0::2] = G0[:, 2, :]
+            G[..., 3, 1::2] = -G0[:, 1, :] 
         return G
 
     def matrix_H(self, p=None):
@@ -107,7 +113,10 @@ class LinearElasticityVEMModel():
 
         if p == 1:
             B[0, 0::2] = 1/np.repeat(NV, NV)
-            B[1, 1::2] = 
+            B[1, 1::2] = B[0, 0::2] 
+            B[3, :] = 
+        else:
+
         if p > 1:
             #TODO: correct for p >= 3?
             def u0(x, cellidx):
@@ -119,8 +128,8 @@ class LinearElasticityVEMModel():
 
             idx = (cell2dofLocation[0:-1] + 2*p*NV).reshape(-1, 1) + np.arange(p*(p-1))
             B0 = self.integralalg.integral(u0, celltype=True)
-            H = self.matrix_H(p=p-2)
-            B0 = B0@inv(H)
+            H = inv(self.matrix_H(p=p-2))*self.area[..., np.newaxis, np.newaxis]
+            B0 = B0@H
             B[:, idx] -= B0.swapaxes(0, 1) 
 
 
