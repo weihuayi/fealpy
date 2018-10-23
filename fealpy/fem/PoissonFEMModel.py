@@ -54,15 +54,21 @@ class PoissonFEMModel(object):
         e = self.uh - self.uI
         return np.sqrt(np.mean(e**2))
 
-    def get_L2_error(self):
+    def get_L2_error(self, uh=None):
         u = self.pde.solution
-        uh = self.uh.value
+        if uh is None:
+            uh = self.uh.value
+        else:
+            uh = uh.value
         L2 = self.integralalg.L2_error(u, uh)
         return L2
 
-    def get_H1_error(self):
+    def get_H1_error(self, uh=None):
         gu = self.pde.gradient
-        guh = self.uh.grad_value
+        if uh is None:
+            guh = self.uh.grad_value
+        else:
+            guh = uh.grad_value
         H1 = self.integralalg.L2_error(gu, guh)
         return H1
 

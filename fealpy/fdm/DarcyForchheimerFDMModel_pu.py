@@ -194,13 +194,7 @@ class DarcyForchheimerFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
 
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
         tol = 1e-6
-||||||| merged common ancestors
-        tol = 1e-9
-=======
-        tol = 1e-4
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py
         ru = 1
         rp = 1
         count = 0
@@ -226,13 +220,14 @@ class DarcyForchheimerFDMModel():
             A12 = AD[:NE,NE:NE+NC]
             A21 = AD[NE:NE+NC,:NE]
             Anew = A21*A11inv*A12
-            b1 = A21*A11inv*b[:NE] - b[NE:NE+NC]
+            b1 = A21*A11inv*bnew[:NE] - bnew[NE:NE+NC]
+
 
             # solve
             p1 = np.zeros((NC,),dtype=ftype)
-            p1[1:NC] = spsolve(Anew[1:NC,1:NC],bnew[1:NC])
+            p1[1:NC] = spsolve(Anew[1:NC,1:NC],b1[1:NC])
             p1[0] = self.pde.pressure(pc[0])
-            u1 = A11inv*(b[:NE] - A12*p1)
+            u1 = A11inv*(bnew[:NE] - A12*p1)
 
             f = b[:NE]
             g = b[NE:]
@@ -247,14 +242,7 @@ class DarcyForchheimerFDMModel():
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
-            p1 = np.zeros((NC,),dtype=ftype)
-            Anew = A21*A11
-            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
-||||||| merged common ancestors
-            ru0 = np.max(f - A11*np.zeros((NE,)) - A12*self.ph0)
-=======
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py
+
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
             else:
@@ -263,6 +251,7 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
+            C = self.get_nonlinear_coef()#add
 
             count = count + 1
  #           print('ru:',ru)
@@ -299,7 +288,6 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
-<<<<<<< HEAD:fealpy/fdm/DarcyForchheimerFDMModel_pu.py
     def get_H1_error(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -311,7 +299,7 @@ class DarcyForchheimerFDMModel():
         psemi = np.sqrt(np.sum((ep[1:] - ep[:NC-1])**2)/hx/hy)
         peH1 = peL2 + psemi
         return peH1
-||||||| merged common ancestors
+
 #    def get_L2_perror(self):
 #        uh = self.uh
 #        ph = self.ph
@@ -319,26 +307,14 @@ class DarcyForchheimerFDMModel():
 #        pI = self.pI
 #        err = self.integralalg.L2_error(ph, pI)
 #        return err
- 
-=======
-    def get_H1_error(self):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        hx = mesh.hx
-        hy = mesh.hy
-        ueL2,peL2 = self.get_L2_error()
-        ep = self.ph - self.pI
-        psemi = np.sqrt(np.sum((ep[1:]-ep[:NC-1])**2))
-        peH1 = peL2+psemi
-        return ep,psemi
 
     def get_DpL2_error(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
         hx = mesh.hx
         hy = mesh.hy
-        Nx = int(1/hx)
-        Ny = int(1/hy)
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
         ftype = mesh.ftype
 
         Dph = np.zeros((NC,2),dtype=ftype)
@@ -350,14 +326,14 @@ class DarcyForchheimerFDMModel():
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         I, = np.nonzero(isBDEdge & isYDEdge)
-        Dph[NC-Ny:NC,0] = self.pde.source2(bc[I[Ny:],:])
+        Dph[NC-ny:NC,0] = self.pde.source2(bc[I[ny:],:])
         J, = np.nonzero(isBDEdge & isXDEdge)
-        Dph[Ny-1:NC:Ny,1] = self.pde.source3(bc[J[1::2],:])
+        Dph[ny-1:NC:ny,1] = self.pde.source3(bc[J[1::2],:])
 
-        Dph[:NC-Ny,0] = (self.ph[Ny:] - self.ph[:NC-Ny])/hx
+        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
         
         m = np.arange(NC)
-        m = m.reshape(Ny,Nx)
+        m = m.reshape(ny,nx)
         n1 = m[:,1:].flatten()
         n2 = m[:,:Ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
@@ -366,4 +342,3 @@ class DarcyForchheimerFDMModel():
 
         return DpeL2
 
->>>>>>> 99da71a9a1166f73488a5da276ebe59f8e088465:fealpy/fdm/DarcyForchheimerFDMModel.py

@@ -30,3 +30,5 @@ log.txt
 fealpyapp
 fealpy.egg-info
 dependcies
+*.npz
+*.csv
