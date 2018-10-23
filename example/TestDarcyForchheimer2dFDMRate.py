@@ -10,10 +10,10 @@ from fealpy.tools.showsolution import showsolution
 
 np.set_printoptions(threshold=np.inf)
 box = [0,1,0,1]
-nx = 1024
-ny = 1024
+nx = 4
+ny = 4
 pde = CoscosData1(box)
-maxit = 1
+maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$','$||Dp_I - Dp_h||_0$']
 erruL2 = np.zeros((maxit,), dtype=np.float)

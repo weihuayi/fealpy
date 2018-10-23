@@ -110,25 +110,25 @@ class DarcyForchheimerFDMModel():
         flag2 = mesh.ds.boundary_cell_flag(2)
         flag3 = mesh.ds.boundary_cell_flag(3)
 
-        idx1, = np.nonzero(~flag3)
-        idx2, = np.nonzero(~flag1)
-        data1 = 1/C[cell2edge[idx1, 3]]/hx**2
-        A = coo_matrix((-data1,(idx2,idx1)),shape = (NC, NC), dtype=ftype)
-        A += coo_matrix((data1,(idx2,idx2)),shape = (NC, NC),dtype=ftype)
+        idx0, = np.nonzero(~flag0)
+        idx2, = np.nonzero(~flag2)
+        idx3, = np.nonzero(~flag3)
+        idx1, = np.nonzero(~flag1)
+        data1 = 1/C[cell2edge[idx3, 3]]/hx**2
+        A = coo_matrix((-data1,(idx1,idx3)),shape = (NC, NC), dtype=ftype)
+        A += coo_matrix((data1,(idx1,idx1)),shape = (NC, NC),dtype=ftype)
 
-        idx3, = np.nonzero(~flag0)
-        idx4, = np.nonzero(~flag2)
-        data2 = 1/C[cell2edge[idx4, 2]]/hy**2
-        A += coo_matrix((-data2,(idx3,idx4)),shape = (NC,NC),dtype=ftype)
-        A += coo_matrix((data2,(idx3,idx3)),shape = (NC,NC),dtype=ftype)
+        data2 = 1/C[cell2edge[idx2, 2]]/hy**2
+        A += coo_matrix((-data2,(idx0,idx2)),shape = (NC,NC),dtype=ftype)
+        A += coo_matrix((data2,(idx0,idx0)),shape = (NC,NC),dtype=ftype)
 
-        data3 = 1/C[cell2edge[idx3, 0]]/hy**2
-        A += coo_matrix((-data3,(idx4,idx3)),shape = (NC,NC),dtype=ftype)
-        A += coo_matrix((data3,(idx4,idx4)),shape = (NC,NC),dtype=ftype)
+        data3 = 1/C[cell2edge[idx0, 0]]/hy**2
+        A += coo_matrix((-data3,(idx2,idx0)),shape = (NC,NC),dtype=ftype)
+        A += coo_matrix((data3,(idx2,idx2)),shape = (NC,NC),dtype=ftype)
 
-        data4 = 1/C[cell2edge[idx2, 1]]/hx**2
-        A += coo_matrix((-data4,(idx1,idx2)),shape = (NC,NC),dtype=ftype)
-        A += coo_matrix((data4,(idx1,idx1)),shape = (NC,NC),dtype=ftype)
+        data4 = 1/C[cell2edge[idx1, 1]]/hx**2
+        A += coo_matrix((-data4,(idx3,idx1)),shape = (NC,NC),dtype=ftype)
+        A += coo_matrix((data4,(idx3,idx3)),shape = (NC,NC),dtype=ftype)
 
 #        print('A',A)
 #        print(flag0)
@@ -281,18 +281,14 @@ class DarcyForchheimerFDMModel():
             Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
             AD = T@A@T + Tbd
-#            print('AD',AD)
-#            print('b',b)
             b[0] = self.pI[0]
-#            print('b',b[0])
 
+            #solve
             ph1[1:NC] = spsolve(A[1:NC,1:], b[1:NC])
-#            print('ph1',ph1)
 
             cell2cell = mesh.ds.cell_to_cell()
             edge2cell = mesh.ds.edge_to_cell()
             p = ph1[cell2cell]
-           # print('p',p)
             # bottom boundary cell
             idx = mesh.ds.boundary_cell_index(0)
             p[idx, 0] = - hy*f[cell2edge[idx, 0]] + ph1[idx] \
@@ -336,11 +332,6 @@ class DarcyForchheimerFDMModel():
 
             self.ph[:] = ph1
             self.uh[:] = w
-            C = self.get_nonlinear_coef()
-            w0 = (f[cell2edge[:, 0]] - (ph1 - p[:, 0])/hy)/C[cell2edge[:, 0]]
-            w1 = (f[cell2edge[:, 1]] - (p[:, 1] - ph1)/hx)/C[cell2edge[:, 1]]
-            w2 = (f[cell2edge[:, 2]] - (p[:, 2] - ph1)/hy)/C[cell2edge[:, 2]]
-            w3 = (f[cell2edge[:, 3]] - (ph1 - p[:, 3])/hx)/C[cell2edge[:, 3]]
 #            rp = LA.norm(g - (w1-w3)/hx - (w2-w0)/hy)
             print('rp',rp)
 #            print('uh',self.uh)
