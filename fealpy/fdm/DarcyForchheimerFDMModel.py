@@ -1,10 +1,10 @@
 import numpy as np
+import time
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
-#from scipy.sparse.linalg import cg, inv, dsolve, spsolve
-from mumps import spsolve 
+from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
 class DarcyForchheimerFDMModel():
     def __init__(self, pde, mesh):
@@ -91,7 +91,6 @@ class DarcyForchheimerFDMModel():
 
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        print('NE',NE)
         NC = mesh.number_of_cells()
 
         itype = mesh.itype
@@ -132,7 +131,6 @@ class DarcyForchheimerFDMModel():
         A21 += coo_matrix((-data/mesh.hy, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
         A21 = A21.tocsr()
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
-        print('A',A.shape)
 
         return A
 
@@ -190,18 +188,21 @@ class DarcyForchheimerFDMModel():
         itype = mesh.itype
         ftype = mesh.ftype
 
+        start = time.time()
         b = self.get_right_vector()
         A = self.get_left_matrix()
+        end = time.time()
+        print('Construct linear system time:',end - start)
 
-        tol = 1e-4
+        tol = 1e-5
         ru = 1
         rp = 1
         count = 0
         iterMax = 2000
+        r = np.zeros((2,iterMax),dtype=ftype)
+
 #        from mumps import DMumpsContext
 #        ctx = DMumpsContext()
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -218,26 +219,25 @@ class DarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
 
             bnew[NE] = self.ph[0]
-
-            # solve
+#            ctx.destroy()
             x[:] = spsolve(AD, bnew)
             #x[:] = spsolve(AD, bnew)
-            if ctx.myid == 0:
-                ctx.set_centralized_sparse(AD)
-                x = bnew.copy()
-                ctx.set_rhs(x) #Modified in place
-                
-            ctx.run(job=6)
-            ctx.destroy()
- 
+#            if ctx.myid == 0:
+#                ctx.set_centralized_sparse(AD)
+#                x = bnew.copy()
+#                ctx.set_rhs(x) #Modified in place
+#                
+#            ctx.run(job=6)
+#            ctx.destroy()
+#
             u1 = x[:NE]
             p1 = x[NE:]
 
             f = b[:NE]
             g = b[NE:]
 
-            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
-            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
+#            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
+#            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
 #            print('uh -u0:',ue)
 #            print('ph - p0:',pe)
 
@@ -256,6 +256,8 @@ class DarcyForchheimerFDMModel():
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
 
  #           ctx.destroy()
+            r[0,count] = rp
+            r[1,count] = ru
 
             count = count + 1
  #           print('ru:',ru)
@@ -264,7 +266,7 @@ class DarcyForchheimerFDMModel():
         self.uh[:] = u1
         self.ph[:] = p1
 #        print('uh:',self.uh)
-        return count
+        return count,r
 
     def grad_pressure(self):
         mesh = self.mesh
@@ -330,7 +332,7 @@ class DarcyForchheimerFDMModel():
         m = np.arange(NC)
         m = m.reshape(ny,nx)
         n1 = m[:,1:].flatten()
-        n2 = m[:,:Ny-1].flatten()
+        n2 = m[:,:ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
 
         DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))

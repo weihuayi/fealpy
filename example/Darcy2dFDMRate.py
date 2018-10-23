@@ -10,8 +10,16 @@ from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
+<<<<<<< HEAD
+nx = 32
+ny = 32
+||||||| merged common ancestors
+nx = 512
+ny = 512
+=======
 nx = 512 
 ny = 512 
+>>>>>>> 5c59a9cab0d9c1c5c5ff527872d9a237d8f21fe6
 pde = CoscosData(box)
 
 maxit = 1

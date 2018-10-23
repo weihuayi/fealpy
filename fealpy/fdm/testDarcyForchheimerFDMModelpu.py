@@ -5,7 +5,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
@@ -263,7 +262,7 @@ class DarcyForchheimerFDMModel():
         rp = 1
         ru = 1
         count = 0
-        iterMax = 200
+        iterMax = 2000
 
         uh1 = np.zeros((NE,), dtype=ftype)
         ph1 = np.zeros((NC,), dtype=ftype)
@@ -271,6 +270,7 @@ class DarcyForchheimerFDMModel():
     
         pI = self.pI
         uI = self.uI
+        r = np.zeros((2,iterMax),dtype=ftype)
         while rp+ru > tol and count < iterMax:
 
             C = self.get_nonlinear_coef()
@@ -338,6 +338,9 @@ class DarcyForchheimerFDMModel():
             A = self.get_left_matrix()
             b = self.get_right_vector()
 
+            r[0,count] = rp
+            r[1,count] = ru
+
 #            print('ph0:',self.ph0)
 #            print('uh0:',self.uh0)
 
@@ -346,7 +349,7 @@ class DarcyForchheimerFDMModel():
         self.uh = w
         self.ph = ph1
 #        
-        return count
+        return count,r
 
 
     def get_max_error(self):

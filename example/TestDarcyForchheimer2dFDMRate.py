@@ -2,9 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.pde.darcy_forchheimer_2d import CoscosData1
-#from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
-#from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
-from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
+from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
+#from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
