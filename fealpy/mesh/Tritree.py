@@ -36,6 +36,48 @@ class Tritree(TriangleMesh):
         isLeafCell = self.is_leaf_cell()
         return TriangleMesh(self.node, self.ds.cell[isLeafCell])
 
+    def refineRG(self, marker=None):
+        if marker == None:
+            idx = self.leaf_cell_index()
+        else:
+            idx = marker.refine_marker(self)
+
+        if idx is None:
+            return False
+
+        if len(idx) > 0:
+            # Prepare data
+            NC = self.number_of_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[idx] = True
+
+            # find the element with two children
+            isTwoChildCell = (self.child[:, 1] > -1) & (self.child[:, 2] == -1)
+            flag0[self.child[isTwoChildCell, 0:2]] = True
+
+            # expand the marked cell
+            cell2cell = self.ds.cell_to_cell()
+            flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell],axis=1) > 0)
+            flag = flag1 | flag2 
+            while np.any(flag):
+                isMarkedCell[flag] = True
+                flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
+                flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
+                flag = flag1 | flag2
+
+
+            cell2edge = self.ds.cell_to_edge()
+            NE = self.number_of_edges()
+            edge2newNode = np.zeros(NE, dtype=np.bool)
+            edge2newNode[cell2edge[isMarkedCell]] = True
+        
+            edge2cell = self.ds.edge_to_cell()
+            isBdEdge = self.ds.boundary_edge_flag()
+            flag = flag0[edge2cell[:, 0]] & flag0[edge2cell[:, 1]] & (~isBdEdge)
+            edge2newNode[flag] = False
+            edge2newNode[cell]
+
     def refine(self, marker=None):
         if marker == None:
             idx = self.leaf_cell_index()
