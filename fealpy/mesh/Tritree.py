@@ -56,7 +56,7 @@ class Tritree(TriangleMesh):
             idx0, = np.nonzero(isTwoChildCell)
             if len(idx0) > 0:
                 flag0[self.child[idx0, 0:2]] = True
-            print(flag0)
+            
             # expand the marked cell
             cell2cell = self.ds.cell_to_cell()
             flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
@@ -73,18 +73,17 @@ class Tritree(TriangleMesh):
                 flag = isMarkedCell[self.child[idx0, 0]] | isMarkedCell[self.child[idx0, 1]]
                 
                 isMarkedCell[idx0[flag]] = True
-                print(flag)
-#                flag = np.ones(NC, dtype=np.bool)
-#                flag[self.child[idx0, 0:2]] = False
-#                NN = self.number_of_nodes()
-#                cell = self.entity('cell')
-#                self.ds.reinit(NN, cell[flag])
-#
-#                self.child[idx0, 0:2] = -1
-#                self.parent = self.parent[flag]
-#                self.child = self.child[flag]
-#                isMarkedCell = isMarkedCell[flag]
-#
+                flag = np.ones(NC, dtype=np.bool)
+                flag[self.child[idx0, 0:2]] = False           
+                NN = self.number_of_nodes()
+                cell = self.entity('cell')
+                self.ds.reinit(NN, cell[flag])
+
+                self.child[idx0, 0:2] = -1
+                self.parent = self.parent[flag]
+                self.child = self.child[flag]
+                isMarkedCell = isMarkedCell[flag]
+
             NN = self.number_of_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
@@ -106,6 +105,7 @@ class Tritree(TriangleMesh):
        
             edge2center = np.zeros(NE, dtype=np.int) 
             edge2cell = self.ds.edge_to_cell()
+
             flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]]) 
             I = self.child[edge2cell[flag0, 1], 3]
             J = edge2cell[flag0, 3]
@@ -158,11 +158,11 @@ class Tritree(TriangleMesh):
 
             # 一分为二的单元
             flag0 = isLeafCell[edge2cell[:, 0]] & \
-                    (~isMarkedCell[edge2cell[:, 0]]) &\
-                    (isMarkedCell[edge2cell[:, 1]] | (~isLeafCell[edge2cell[:, 1]]))
+                    (~isMarkedCell[edge2cell[:, 1]]) &\
+                    (isMarkedCell[edge2cell[:, 1]] | (~isLeafCell[edge2cell[:,1]]))
             flag1 = isLeafCell[edge2cell[:, 1]] & \
-                    (~isMarkedCell[edge2cell[:, 1]]) & \
-                    (isMarkedCell[edge2cell[:, 0]] | (~isLeafCell[edge2cell[:, 0]]))
+                    (~isMarkedCell[edge2cell[:, 0]]) & \
+                    (isMarkedCell[edge2cell[:, 0]] | (~isLeafCell[edge2cell[:,0]]))
             
             cidx0 = edge2cell[flag0, 0]
             N0 = len(cidx0)
