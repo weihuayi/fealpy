@@ -9,8 +9,9 @@ class CoscosData1:
         self.mu = 2
         self.k = 1
         self.rho = 1
-        self.beta = 5
+        self.beta = 30
         self.tol = 1e-6
+        self.flat = 1
 
 
     def init_mesh(self, nx, ny):
@@ -87,12 +88,17 @@ class CoscosData1:
         m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
         val = m*t1*t2 +  x*(1-x)*(1-2*y)
         return val
-    def grad_pressure(self, p):
+    def grad_pressure_x(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape)
-        val[..., 0] = (1-x)*y*(1-y) - x*y*(1-y)
-        val[..., 1] = x*(1-x)*(1-y) - x*(1-x)*y
+        val = (1-x)*y*(1-y) - x*y*(1-y)
+        return val
+
+    def grad_pressure_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = x*(1-x)*(1-y) - x*(1-x)*y
         return val
 
     def dirichlet(self, p):

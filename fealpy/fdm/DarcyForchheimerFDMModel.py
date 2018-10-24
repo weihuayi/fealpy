@@ -306,23 +306,57 @@ class DarcyForchheimerFDMModel():
         ny = mesh.ds.ny
         nx = mesh.ds.nx
         ftype = mesh.ftype
-
+        bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
-        DpI = self.pde.grad_pressure(pc)
-
-        Dph = np.zeros((NC,2),dtype=ftype)
 
         cell = np.arange(NC)
+        DpI = np.zeros(NE, dtype=mesh.ftype)
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
+        DpI[isYDEdge] = self.pde.grad_pressure_x(bc[isYDEdge])
+        DpI[isXDEdge] = self.pde.grad_pressure_y(bc[isXDEdge])
         cell2edge = mesh.ds.cell_to_edge()
         b = self.get_right_vector()
         C = self.get_nonlinear_coef()
-
-        Dph[:,0] = b[cell2edge[:, 1]] - C[cell2edge[:, 1]]*self.uh[cell2edge[:, 1]]
-        Dph[:,1] = b[cell2edge[:, 2]] - C[cell2edge[:, 2]]*self.uh[cell2edge[:, 2]]
-
+        Dph = b[:NE] - C*self.uh
         DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
-
         return DpeL2
 
+    def get_Dp1L2_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
+        ftype = mesh.ftype
+
+        Dph = np.zeros((NC,2),dtype=ftype)
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+        DpI = np.zeros((NC,2), dtype=mesh.ftype)
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        DpI[:NC-ny, 0] = self.pde.grad_pressure_x(bc[I])
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+
+        Dph[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
+        Dph[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
+        DpI[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
+        DpI[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
+
+        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
+        
+        m = np.arange(NC)
+        m = m.reshape(ny,nx)
+        n1 = m[:,1:].flatten()
+        n2 = m[:,:ny-1].flatten()
+        Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
+        DpI[n2,1] = self.pde.grad_pressure_y(bc[J])
+
+        Dp1eL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        return Dp1eL2

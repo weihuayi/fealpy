@@ -144,7 +144,7 @@ class DarcyForchheimerFDMModel():
         pde = self.pde
         itype = mesh.itype
         ftype = mesh.ftype
-        uI = self.uI
+        uh = self.uh
 
         hx = mesh.hx
         hy = mesh.hy
@@ -177,20 +177,20 @@ class DarcyForchheimerFDMModel():
         idx, = np.nonzero(flag2 & flag3)
         s[idx] = g[idx] - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
-               + uI[cell2edge[idx, 3]]/hx\
-               - uI[cell2edge[idx, 2]]/hy
+               + uh[cell2edge[idx, 3]]/hx\
+               - uh[cell2edge[idx, 2]]/hy
 
         idx, = np.nonzero(flag0 & flag1)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
-               - uI[cell2edge[idx, 1]]/hx\
-               + uI[cell2edge[idx, 0]]/hy
+               - uh[cell2edge[idx, 1]]/hx\
+               + uh[cell2edge[idx, 0]]/hy
 
         idx, = np.nonzero(flag2 & flag1)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
-               - uI[cell2edge[idx, 1]]/hx\
-               - uI[cell2edge[idx, 2]]/hy
+               - uh[cell2edge[idx, 1]]/hx\
+               - uh[cell2edge[idx, 2]]/hy
 
         idx, = np.nonzero(flag3 & ~flag0 & ~flag2)
 #        print('idx',idx)
@@ -198,25 +198,26 @@ class DarcyForchheimerFDMModel():
         s[idx] = g[idx] - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
-               + uI[cell2edge[idx, 3]]/hx
+               + uh[cell2edge[idx, 3]]/hx
         
+
         idx, = np.nonzero(flag1 & ~flag0 & ~flag2)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
-               - uI[cell2edge[idx, 1]]/hx
+               - uh[cell2edge[idx, 1]]/hx
 
         idx, = np.nonzero(flag0 & ~flag1 & ~flag3)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
                - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                - f[cell2edge[idx, 2]]/hy/C[cell2edge[idx, 2]]\
-               + uI[cell2edge[idx, 0]]/hy
+               + uh[cell2edge[idx, 0]]/hy
 
         idx, = np.nonzero(flag2 & ~flag1 & ~flag3)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
                - f[cell2edge[idx, 1]]/hx/C[cell2edge[idx, 1]]\
                + f[cell2edge[idx, 0]]/hy/C[cell2edge[idx, 0]]\
-               - uI[cell2edge[idx, 2]]/hy
+               - uh[cell2edge[idx, 2]]/hy
 
         idx, = np.nonzero(~flag)
         s[idx] = g[idx] + f[cell2edge[idx, 3]]/hx/C[cell2edge[idx, 3]]\
@@ -227,6 +228,32 @@ class DarcyForchheimerFDMModel():
         #right
 
         return s
+
+    def get_p_cell2cell(self):
+        mesh = self.mesh
+        ph0 = self.ph0
+        cell2cell = mesh.ds.cell_to_cell()
+        cell2edge = mesh.ds.cell_to_edge()
+        p = ph0[cell2cell]
+
+        idx = mesh.ds.boundary_cell_index(0)
+        p[idx, 0] = - hy*f[cell2edge[idx, 0]] + ph1[idx] \
+                    + hy*C[cell2edge[idx, 0]]*self.uh[cell2edge[idx, 0]]
+        # right boundary cell
+        idx = mesh.ds.boundary_cell_index(1)
+        p[idx, 1] =   hx*f[cell2edge[idx, 1]] + ph1[idx] \
+                    - hx*C[cell2edge[idx, 1]]*self.uh[cell2edge[idx, 1]]
+        # up boundary cell
+        idx = mesh.ds.boundary_cell_index(2)
+        p[idx, 2] =   hy*f[cell2edge[idx, 2]] + ph1[idx] \
+                    - hy*C[cell2edge[idx, 2]]*self.uh[cell2edge[idx, 2]]
+        # left boundary cell
+        idx = mesh.ds.boundary_cell_index(3)
+        p[idx, 3] = - hx*f[cell2edge[idx, 3]] + ph1[idx] \
+                    + hx*C[cell2edge[idx, 3]]*self.uh[cell2edge[idx, 3]]
+
+        pass
+        
     
 
 
@@ -409,7 +436,7 @@ class DarcyForchheimerFDMModel():
         Dph = np.zeros((NC,2),dtype=ftype)
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
-        DpI = self.pde.grad_pressure(pc)
+        DpI = self.pde.grad_pressure(bc)
 
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
