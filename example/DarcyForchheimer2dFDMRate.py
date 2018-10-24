@@ -3,15 +3,17 @@ import matplotlib.pyplot as plt
 import time
 
 from fealpy.pde.darcy_forchheimer_2d import CoscosData1
+#from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
 from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
+#from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 #from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 128
-ny = 128
+nx = 8
+ny = 8
 pde = CoscosData1(box)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)

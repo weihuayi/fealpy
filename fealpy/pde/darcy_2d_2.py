@@ -43,7 +43,7 @@ class CoscosData:
     def pressure(self,p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.exp(x*(1-x)*y*(1-y))
+        val = np.exp(x*(1-x)*y*(1-y)) -1
         return val
 
     def source1(self, p):
