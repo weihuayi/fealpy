@@ -42,11 +42,12 @@ cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
 marker = AdaptiveMarker()
 
-for i in range(6):
+for i in range(4):
     tritree.refine(marker)
 
 
-print(tritree.leaf_cell_index())
+
+
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
