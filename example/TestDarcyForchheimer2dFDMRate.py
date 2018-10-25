@@ -2,12 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.pde.darcy_forchheimer_2d import CoscosData1
-from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
-#from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
+#from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
+from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
-np.set_printoptions(threshold=np.inf)
 box = [0,1,0,1]
 nx = 4
 ny = 4
@@ -26,7 +25,7 @@ for i in range(maxit):
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
-    count[i]= fdm.solve()
+    count[i], r= fdm.solve()
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
     err[1,i] = pe

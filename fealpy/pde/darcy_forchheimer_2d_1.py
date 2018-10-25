@@ -9,7 +9,8 @@ class CoscosData1:
         self.mu = 2
         self.k = 1
         self.rho = 1
-        self.beta = 5
+        self.beta = 0
+        self.tol = 1e-6
 
 
     def init_mesh(self, nx, ny):
@@ -23,7 +24,7 @@ class CoscosData1:
         """
         x = p[..., 0]
         y = p[..., 1]
-        rhs = 2*pi*np.cos(pi*x)
+        rhs = x-y
         return rhs
 
     def velocity_x(self,p):

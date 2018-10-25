@@ -3,7 +3,6 @@ import time
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
 class DarcyForchheimerFDMModel():
@@ -27,15 +26,8 @@ class DarcyForchheimerFDMModel():
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         self.pI = pde.pressure(pc)
-        umax = np.max(self.uI)
-        pmax = np.max(np.abs(self.pI))
-#        print('uI:',self.uI)
-#        print('pI:',self.pI)
-        pc = mesh.entity_barycenter('cell')
-        self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
-        pass
 
     def get_nonlinear_coef(self):
         mesh = self.mesh
@@ -175,7 +167,6 @@ class DarcyForchheimerFDMModel():
         b0[idx] = (mu/k+beta*rho*C[idx])*val
 
         b1 = pde.source1(pc)
-#        print('maxf',np.max(b0))
         return np.r_[b0, b1] 
 
     def solve(self):
@@ -191,18 +182,29 @@ class DarcyForchheimerFDMModel():
         start = time.time()
         b = self.get_right_vector()
         A = self.get_left_matrix()
+#        A11 = A[:NE,:NE]
+#        A12 = A[:NE,NE:NE+NC]
+#        A21 = A[NE:NE+NC,:NE]
         end = time.time()
         print('Construct linear system time:',end - start)
+#        f = b[:NE]
+#        g = b[NE:]
+#        if LA.norm(f) == 0:
+#            ru = LA.norm(f - A11*self.uh - A12*self.ph)
+#        else:
+#            ru = LA.norm(f - A11*self.uh - A12*self.ph)/LA.norm(f)
+#        if LA.norm(g) == 0:
+#            rp = LA.norm(g - A21*self.uh)
+#        else:
+#            rp = LA.norm(g - A21*self.uh)/LA.norm(g)
 
-        tol = 1e-5
+        tol = self.pde.tol
         ru = 1
         rp = 1
         count = 0
         iterMax = 2000
         r = np.zeros((2,iterMax),dtype=ftype)
 
-#        from mumps import DMumpsContext
-#        ctx = DMumpsContext()
         while ru+rp > tol and count < iterMax:
 
             bnew = b
@@ -219,29 +221,20 @@ class DarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
 
             bnew[NE] = self.ph[0]
-#            ctx.destroy()
             x[:] = spsolve(AD, bnew)
-            #x[:] = spsolve(AD, bnew)
-#            if ctx.myid == 0:
-#                ctx.set_centralized_sparse(AD)
-#                x = bnew.copy()
-#                ctx.set_rhs(x) #Modified in place
-#                
-#            ctx.run(job=6)
-#            ctx.destroy()
-#
+
             u1 = x[:NE]
             p1 = x[NE:]
 
             f = b[:NE]
             g = b[NE:]
-
-#            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
+#            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh)**2))
 #            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
 #            print('uh -u0:',ue)
 #            print('ph - p0:',pe)
 
             self.uh0[:] = u1
+            self.ph0[:] = p1
             A = self.get_left_matrix()
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
@@ -255,17 +248,16 @@ class DarcyForchheimerFDMModel():
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
 
- #           ctx.destroy()
+
             r[0,count] = rp
             r[1,count] = ru
 
             count = count + 1
- #           print('ru:',ru)
- #           print('rp:',rp)
+            print('ru:',ru)
+            print('rp:',rp)
 
         self.uh[:] = u1
         self.ph[:] = p1
-#        print('uh:',self.uh)
         return count,r
 
     def grad_pressure(self):
@@ -307,6 +299,31 @@ class DarcyForchheimerFDMModel():
 
     def get_DpL2_error(self):
         mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        hx = mesh.hx
+        hy = mesh.hy
+        ny = mesh.ds.ny
+        nx = mesh.ds.nx
+        ftype = mesh.ftype
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        cell = np.arange(NC)
+        DpI = np.zeros(NE, dtype=mesh.ftype)
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        DpI[isYDEdge] = self.pde.grad_pressure_x(bc[isYDEdge])
+        DpI[isXDEdge] = self.pde.grad_pressure_y(bc[isXDEdge])
+        cell2edge = mesh.ds.cell_to_edge()
+        b = self.get_right_vector()
+        C = self.get_nonlinear_coef()
+        Dph = b[:NE] - C*self.uh
+        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+        return DpeL2
+
+    def get_Dp1L2_error(self):
+        mesh = self.mesh
         NC = mesh.number_of_cells()
         hx = mesh.hx
         hy = mesh.hy
@@ -317,15 +334,19 @@ class DarcyForchheimerFDMModel():
         Dph = np.zeros((NC,2),dtype=ftype)
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
-        DpI = self.pde.grad_pressure(pc)
+        DpI = np.zeros((NC,2), dtype=mesh.ftype)
 
-        isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
-        I, = np.nonzero(isBDEdge & isYDEdge)
-        Dph[NC-ny:NC,0] = self.pde.source2(bc[I[ny:],:])
-        J, = np.nonzero(isBDEdge & isXDEdge)
-        Dph[ny-1:NC:ny,1] = self.pde.source3(bc[J[1::2],:])
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        DpI[:NC-ny, 0] = self.pde.grad_pressure_x(bc[I])
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+
+        Dph[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
+        Dph[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
+        DpI[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
+        DpI[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
 
         Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
         
@@ -334,8 +355,8 @@ class DarcyForchheimerFDMModel():
         n1 = m[:,1:].flatten()
         n2 = m[:,:ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
+        DpI[n2,1] = self.pde.grad_pressure_y(bc[J])
 
-        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+        Dp1eL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
 
-        return DpeL2
-
+        return Dp1eL2

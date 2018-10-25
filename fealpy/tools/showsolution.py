@@ -40,7 +40,6 @@ def showsolution(plt,mesh,pde,uh,ph):
     uI2 = uI[sum(isYDEdge):]
 
     plt.title("U solution")
-
     surf = ax.plot_surface(ux1.reshape((Ny,Nx+1)),uy1.reshape((Ny,Nx+1)),uh1.reshape((Ny,Nx+1)), rstride = 2,cstride = 2,cmap=plt.cm.hot)
     surf = ax.plot_surface(ux2.reshape((Ny,Nx+1)),uy2.reshape((Ny,Nx+1)),uI1.reshape((Ny,Nx+1)), rstride = 2,cstride = 2,cmap=plt.cm.hot)
     fig.colorbar(surf, shrink=0.5, aspect=5)

@@ -33,7 +33,6 @@ class DarcyFDMModel():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        print(NC)
 
         itype = mesh.itype
         ftype = mesh.ftype
@@ -142,7 +141,6 @@ class DarcyFDMModel():
         
 
         b[NE] = self.ph[0]
-        print('b',b)
         with open("b.csv","w",newline="")as datacsv:
             csvwriter = csv.writer(datacsv,dialect = ("excel"))
             csvwriter.writerow(['b'])
@@ -164,6 +162,8 @@ class DarcyFDMModel():
 
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
+        print('ph',self.ph)
+        print('pI',self.pI)
 
         return x
     

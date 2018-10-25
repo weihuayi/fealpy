@@ -1,9 +1,11 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
 from scipy.sparse.linalg import inv
 from fealpy.fem.integral_alg import IntegralAlg
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+from fealpy.tools.showsolution import showsolution
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
@@ -240,8 +242,10 @@ class DarcyForchheimerFDMModel():
             self.uh0[:] = u1
             A = self.get_left_matrix()
             A11 = A[:NE,:NE]
+            A11inv = inv(A11)
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
+
 
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11*u1 - A12*p1)
@@ -252,13 +256,26 @@ class DarcyForchheimerFDMModel():
             else:
                 rp = LA.norm(g - A21*u1)/LA.norm(g)
             C = self.get_nonlinear_coef()#add
+#            ru1 = LA.norm(f - A12*p1 -A11*u1)
+#            rp1 = LA.norm(A21*A11inv*f - g - A21*A11inv*A12*p1)
+
+#            eb = LA.norm(bnew - b)
+#            print('eb',eb)
 
             count = count + 1
- #           print('ru:',ru)
- #           print('rp:',rp)
+            print('ru:',ru)
+            print('rp:',rp)
+#            print('ru1:',ru1)
+#            print('rp1:',rp1)
 
         self.uh[:] = u1
         self.ph[:] = p1
+        uw = showsolution(plt,mesh,self.pde,self.uh,self.ph)
+        print('u1',self.uh)
+        print('uI',self.uI)
+        print('p1',self.ph)
+        print('pI',self.pI)
+        print('UI-u1:',LA.norm(self.uI - self.uh))
 #        print('uh:',self.uh)
         return count
 
@@ -335,7 +352,7 @@ class DarcyForchheimerFDMModel():
         m = np.arange(NC)
         m = m.reshape(ny,nx)
         n1 = m[:,1:].flatten()
-        n2 = m[:,:Ny-1].flatten()
+        n2 = m[:,:ny-1].flatten()
         Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
 
         DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
