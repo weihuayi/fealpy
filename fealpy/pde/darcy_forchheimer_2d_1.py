@@ -9,7 +9,7 @@ class CoscosData1:
         self.mu = 2
         self.k = 1
         self.rho = 1
-        self.beta = 0
+        self.beta = 5
         self.tol = 1e-6
 
 
@@ -67,14 +67,17 @@ class CoscosData1:
         m = mu/k + rho*beta*np.sqrt(x**2*y**2*((1-x)**2 + (1-y)**2))
         val = m*x*y*(1-y) + x*(1-x)*(1-2*y)*np.exp(x*(1-x)*y*(1-y))
         return val
-    def grad_pressure(self, p):
+    def grad_pressure_x(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros(p.shape)
-        val[..., 0] = 1
-        val[..., 1] = -1
+        val = (1-2*x)*y*(1-y)*np.exp(x*(1-x)*y*(1-y))
         return val
 
+    def grad_pressure_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = x*(1-x)*(1-2*y)*np.exp(x*(1-x)*y*(1-y))
+        return val
     def dirichlet(self, p):
         """ Dirichlet boundary condition
         """
