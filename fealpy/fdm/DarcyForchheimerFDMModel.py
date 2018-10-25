@@ -261,19 +261,8 @@ class DarcyForchheimerFDMModel():
 
         self.uh[:] = u1
         self.ph[:] = p1
+        print('solve matrix p and u')
         return count,r
-
-    def grad_pressure(self):
-        mesh = self.mesh
-        ftype = mesh.ftype
-
-        NC = mesh.number_of_cells()
-
-        ph = self.ph
-        hx = mesh.hx
-        hy = mesh.hy
-
-        val = np.zeros((NC,2),dtype=ftype)
 
 
     def get_max_error(self):

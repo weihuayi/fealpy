@@ -406,6 +406,7 @@ class DarcyForchheimerFDMModel():
 
         self.uh = u
         self.ph = ph1
+        print('solve |u|(implicit expression)')
         print('ph',self.ph)
         print('pI',self.pI)
 #        

@@ -4,7 +4,7 @@ import time
 
 from fealpy.pde.darcy_forchheimer_2d import CoscosData1
 #from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
-from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
+#from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
 from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 #from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
