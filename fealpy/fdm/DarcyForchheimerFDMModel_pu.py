@@ -29,12 +29,6 @@ class DarcyForchheimerFDMModel():
         self.uI[isYDEdge] = pde.velocity_x(bc[isYDEdge])
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         self.pI = pde.pressure(pc)
-        umax = np.max(self.uI)
-        pmax = np.max(np.abs(self.pI))
-#        print('uI:',self.uI)
-#        print('pI:',self.pI)
-        pc = mesh.entity_barycenter('cell')
-        self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
         pass
@@ -204,7 +198,7 @@ class DarcyForchheimerFDMModel():
         count = 0
         iterMax = 2000
         r = np.zeros((2,iterMax),dtype=ftype)
-        while eu+ep > tol and count < iterMax:
+        while ru+rp > tol and count < iterMax:
 
             bnew = b
             
@@ -276,6 +270,7 @@ class DarcyForchheimerFDMModel():
 
         self.uh[:] = u1
         self.ph[:] = p1
+        print('solve matrix p then u')
 #        uw = showsolution(plt,mesh,self.pde,self.uh,self.ph)
 #        print('u1',self.uh)
 #        print('uI',self.uI)
@@ -323,40 +318,71 @@ class DarcyForchheimerFDMModel():
         peH1 = peL2 + psemi
         return peH1
 
+    def get_DpL2_error(self):
+        mesh = self.mesh
+        ftype = mesh.ftype
+
+        NE = mesh.number_of_edges()
+        hx = mesh.hx
+        hy = mesh.hy
+
+        C = self.get_nonlinear_coef()
+        b = self.get_right_vector()
+        f = b[:NE]
+
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        Dph = np.zeros(NE, dtype=ftype)
+        DpI = np.zeros(NE, dtype=mesh.ftype)
+        
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        DpI[I] = self.pde.grad_pressure_x(bc[I])
+        Dph[I] = f[I] - C[I]*self.uh[I]
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        DpI[J] = self.pde.grad_pressure_y(bc[J])
+        Dph[J] = f[J] - C[J]*self.uh[J]
+
+        DpL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        return DpL2
+
+
     def get_Dp1L2_error(self):
         mesh = self.mesh
-        NC = mesh.number_of_cells()
+        NE = mesh.number_of_edges()
         hx = mesh.hx
         hy = mesh.hy
         nx = mesh.ds.nx
         ny = mesh.ds.ny
         ftype = mesh.ftype
 
-        Dph = np.zeros((NC,2),dtype=ftype)
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
-        DpI = np.zeros((NC,2), dtype=mesh.ftype)
 
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        Dph = np.zeros(NE, dtype=ftype)
+        DpI = np.zeros(NE, dtype=mesh.ftype)
+
         I, = np.nonzero(~isBDEdge & isYDEdge)
-        DpI[:NC-ny, 0] = self.pde.grad_pressure_x(bc[I])
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        DpI[I] = self.pde.grad_pressure_x(bc[I])
+        Dph[I] = (self.ph[R] - self.ph[L])/hx
+
         J, = np.nonzero(~isBDEdge & isXDEdge)
-
-        Dph[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
-        Dph[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
-        DpI[NC-ny:NC,0] = np.zeros(ny,dtype=ftype)
-        DpI[ny-1:NC:ny,1] = np.zeros(ny,dtype=ftype)
-
-        Dph[:NC-ny,0] = (self.ph[ny:] - self.ph[:NC-ny])/hx
-        
-        m = np.arange(NC)
-        m = m.reshape(ny,nx)
-        n1 = m[:,1:].flatten()
-        n2 = m[:,:ny-1].flatten()
-        Dph[n2,1] = (self.ph[n1] - self.ph[n2])/hy
-        DpI[n2,1] = self.pde.grad_pressure_y(bc[J])
+        L = edge2cell[J, 0]
+        R = edge2cell[J, 1]
+        DpI[J] = self.pde.grad_pressure_y(bc[J])
+        Dph[J] = (self.ph[L] - self.ph[R])/hy
 
         Dp1eL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
 

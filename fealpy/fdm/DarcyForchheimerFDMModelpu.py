@@ -421,3 +421,37 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
+        def get_Dp1L2_error(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
+        ftype = mesh.ftype
+
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        Dph = np.zeros(NE, dtype=ftype)
+        DpI = np.zeros(NE, dtype=mesh.ftype)
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        DpI[I] = self.pde.grad_pressure_x(bc[I])
+        Dph[I] = (self.ph[R] - self.ph[L])/hx
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        L = edge2cell[J, 0]
+        R = edge2cell[J, 1]
+        DpI[J] = self.pde.grad_pressure_y(bc[J])
+        Dph[J] = (self.ph[L] - self.ph[R])/hy
+
+        Dp1eL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        return Dp1eL2
