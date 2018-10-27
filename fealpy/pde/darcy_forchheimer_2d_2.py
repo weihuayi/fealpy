@@ -21,7 +21,8 @@ class CoscosData1:
     def source1(self, p):
         """ The right hand side of DarcyForchheimer equation
         """
-        rhs = np.zeros(p.shape[0],1)
+        x = p.shape[0]
+        rhs = np.zeros(x,)
         return rhs
 
     def velocity_x(self,p):
@@ -72,11 +73,17 @@ class CoscosData1:
         m = mu/k + rho*beta*np.sqrt(t0**2*t3**2 + t1**2*t2**2)
         val = -m*t1*t2 + pi*np.sin(pi*x)*np.cos(pi*y)
         return val
-    def grad_pressure(self, p):
+    def grad_pressure_x(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros(p.shape)
-        val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)
-        val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)
+        pi = np.pi
+        val= pi*np.cos(pi*x)*np.sin(pi*y)
+        return val
+
+    def grad_pressure_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = pi*np.sin(pi*x)*np.cos(pi*y)
         return val
 

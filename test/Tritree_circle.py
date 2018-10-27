@@ -1,12 +1,12 @@
 import numpy as np
-
+import sys
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle
 
 from fealpy.mesh.TriangleMesh import TriangleMesh
 from fealpy.mesh.level_set_function import dcircle
-from fealpy.mesh.Tritree import Tritree
-
+from fealpy.mesh.tree_data_structure import Tritree
+m = int(sys.argv[1])
 class AdaptiveMarker():
     def __init__(self, phi):
         self.phi = phi 
@@ -17,7 +17,7 @@ class AdaptiveMarker():
         idx = tmesh.leaf_cell_index()
         value = self.phi(node)
         valueSign = np.sign(value)
-        valueSign[np.abs(value)<1e-12] = 0
+        valueSign[np.abs(value)<1e-6] = 0
         flag = (np.abs(np.sum(valueSign[cell[idx, :]], axis=1)) < 3)
         idx = idx[flag]
         return idx
@@ -45,19 +45,20 @@ mesh.uniform_refine(1)
 
 node = mesh.entity('node')
 cell = mesh.entity('cell')
-tmesh = Tritree(node, cell)
+tmesh = Tritree(node, cell, irule=1)
 
-for i in range(2):
-    tmesh.refineRG(marker)
+for i in range(m):
+    tmesh.refine(marker)
+
+tmesh.refine(marker)
 
 idx = tmesh.leaf_cell_index()
-mesh = TriangleMesh(tmesh.node, tmesh.ds.cell[idx, :])
 fig = plt.figure()
 axes = fig.gca()
-mesh.add_plot(axes)
-tmesh.find_node(axes, showindex=True)
-#mesh.find_cell(axes, showindex=True)
-tmesh.find_edge(axes, showindex=True) 
+tmesh.add_plot(axes)
+#tmesh.find_node(axes, showindex=True)
+#tmesh.find_cell(axes, showindex=True)
+#tmesh.find_edge(axes, showindex=True) 
 plt.show()
 
 

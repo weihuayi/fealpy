@@ -390,6 +390,7 @@ class DarcyForchheimerFDMModel():
 
             self.ph[:] = ph1
             self.uh[:] = w
+
             print('uh',uh1)
 
 #            print('ph0:',self.ph0)
@@ -399,6 +400,7 @@ class DarcyForchheimerFDMModel():
 
         self.uh = w
         self.ph = ph1
+        print('solve p then solve u(explict expression)')
 #        print('g',g)
 #        print('uI',uI)
 #        print('A21',A21)

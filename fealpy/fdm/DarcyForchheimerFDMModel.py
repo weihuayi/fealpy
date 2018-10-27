@@ -201,11 +201,13 @@ class DarcyForchheimerFDMModel():
         tol = self.pde.tol
         ru = 1
         rp = 1
+        eu = 1
+        ep = 1
         count = 0
         iterMax = 2000
         r = np.zeros((2,iterMax),dtype=ftype)
 
-        while ru+rp > tol and count < iterMax:
+        while eu+ep > tol and count < iterMax:
 
             bnew = b
             
@@ -228,10 +230,11 @@ class DarcyForchheimerFDMModel():
 
             f = b[:NE]
             g = b[NE:]
-#            ue = np.sqrt(np.sum(hx*hy*(u1-self.uh)**2))
-#            pe = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
-#            print('uh -u0:',ue)
-#            print('ph - p0:',pe)
+            eu = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
+            ep = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
+            print('eu',eu)
+            print('ep:',ep)
+#            ptint('euu',max(u1-s))
 
             self.uh0[:] = u1
             self.ph0[:] = p1
@@ -258,19 +261,8 @@ class DarcyForchheimerFDMModel():
 
         self.uh[:] = u1
         self.ph[:] = p1
+        print('solve matrix p and u')
         return count,r
-
-    def grad_pressure(self):
-        mesh = self.mesh
-        ftype = mesh.ftype
-
-        NC = mesh.number_of_cells()
-
-        ph = self.ph
-        hx = mesh.hx
-        hy = mesh.hy
-
-        val = np.zeros((NC,2),dtype=ftype)
 
 
     def get_max_error(self):

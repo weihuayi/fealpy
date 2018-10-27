@@ -2,7 +2,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from fealpy.mesh.TriangleMesh import TriangleMesh
-from fealpy.mesh.Tritree import Tritree
+from fealpy.mesh.tree_data_structure import Tritree
 
 
 class AdaptiveMarker():
@@ -33,11 +33,11 @@ tmesh.uniform_refine(1)
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
-tritree = Tritree(node, cell)
+tritree = Tritree(node, cell, irule=1)
 marker = AdaptiveMarker()
 
-for i in range(2):
-    tritree.refineRG(marker)
+for i in range(6):
+    tritree.refine(marker)
 
 
 
@@ -45,9 +45,9 @@ for i in range(2):
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
-tritree.find_node(axes, showindex=True)
-tritree.find_cell(axes, showindex=True)
-tritree.find_edge(axes, showindex=True) 
+#tritree.find_node(axes, showindex=True)
+#tritree.find_cell(axes, showindex=True)
+#tritree.find_edge(axes, showindex=True) 
 plt.show()
 
 
