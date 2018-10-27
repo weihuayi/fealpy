@@ -47,36 +47,88 @@ class Tritree(TriangleMesh):
 
         if len(idx) > 0:
             # Prepare data
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
             NC = self.number_of_cells()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+
             isMarkedCell = np.zeros(NC, dtype=np.bool)
             isMarkedCell[idx] = True
 
             # find the element with two children
-            isTwoChildCell = (self.child[:, 1] > -1) & (self.child[:, 2] == -1)
+            flag0 = np.zeros(NC, dtype=np.bool)
+            isTwoChildCell = (self.child[:, 2] > -1) & (self.child[:, 3] == -1)
+            isFourChildCell = self.child[:, 3] > -1
             flag0[self.child[isTwoChildCell, 0:2]] = True
 
-            # expand the marked cell
+            # expand the marked cell. 
+            assert self.irule == 1  # TODO: add support for  general k irregular rule case 
             cell2cell = self.ds.cell_to_cell()
-            flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell],axis=1) > 0)
-            flag = flag1 | flag2 
+            flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
             while np.any(flag):
                 isMarkedCell[flag] = True
-                flag1 = (~isMarkedCell) & (~flag0) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-                flag2 = (~isMarkedCell) & flag0 & (np.sum(isMarkedCell[cell2cell], axis=1) > 0)
-                flag = flag1 | flag2
+                flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
 
 
             cell2edge = self.ds.cell_to_edge()
-            NE = self.number_of_edges()
-            edge2newNode = np.zeros(NE, dtype=np.bool)
-            edge2newNode[cell2edge[isMarkedCell]] = True
+            refineFlag = np.zeros(NE, dtype=np.bool)
+            refineFlag[cell2edge[isMarkedCell]] = True
         
             edge2cell = self.ds.edge_to_cell()
             isBdEdge = self.ds.boundary_edge_flag()
             flag = flag0[edge2cell[:, 0]] & flag0[edge2cell[:, 1]] & (~isBdEdge)
-            edge2newNode[flag] = False
-            edge2newNode[cell]
+            refineFlag[flag] = False
+
+            NNN = refineFlag.sum()
+            edge2newNode = np.zeros(NE, dtype=self.itype)
+            edge2newNode[refineFlag] = NN + range(NNN)
+
+            greenIdx, = np.where(isTwoChildCell)
+            edge2newNode[cell2edge[greenIdx, self.child[greenIdx, 2]]] = cell[self.child[greenIdx, 0], 0]
+
+            # red cell 
+            redFlag =  ((~flag0) & isMarkedCell)
+            redIdx, = np.where(redFlag)                                 
+            NCC = len(redIdx) 
+            cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
+            child4 = -np.ones((4*NCC, 4), dtype=self.itype)
+            parent4 = -np.ones((4*NCC, 2), dtype=self.itype) 
+            cell4[:NCC, 0] = cell[isMarkedCell, 0] 
+            cell4[:NCC, 1] = edge2newNode[cell2edge[redFlag, 2]] 
+            cell4[:NCC, 2] = edge2newNode[cell2edge[redFlag, 1]] 
+            parent4[:NCC, 0] = redIdx
+            parent4[:NCC, 1] = 0
+            self.child[redIdx, 0] = NC + np.arange(0, NCC)
+
+            cell4[NCC:2*NCC, 0] = cell[redFlag, 1] 
+            cell4[NCC:2*NCC, 1] = edge2newNode[cell2edge[redFlag, 0]] 
+            cell4[NCC:2*NCC, 2] = edge2newNode[cell2edge[redFlag, 2]] 
+            parent4[NCC:2*NCC, 0] = redIdx
+            parent4[NCC:2*NCC, 1] = 1
+            self.child[redIdx, 1] = NC + np.arange(NCC, 2*NCC)
+
+            cell4[2*NCC:3*NCC, 0] = cell[redFlag, 2] 
+            cell4[2*NCC:3*NCC, 1] = edge2newNode[cell2edge[redFlag, 1]] 
+            cell4[2*NCC:3*NCC, 2] = edge2newNode[cell2edge[redFlag, 0]] 
+            parent4[2*NCC:3*NCC, 0] = redIdx
+            parent4[2*NCC:3*NCC, 1] = 2
+            self.child[redIdx, 2] = NC + np.arange(2*NCC, 3*NCC)
+
+            cell4[3*NCC:4*NCC, 0] = edge2newNode[cell2edge[redFlag, 0]] 
+            cell4[3*NCC:4*NCC, 1] = edge2newNode[cell2edge[redFlag, 1]] 
+            cell4[3*NCC:4*NCC, 2] = edge2newNode[cell2edge[redFlag, 2]]
+            parent4[3*NCC:4*NCC, 0] = redIdx
+            parent4[3*NCC:4*NCC, 1] = 3
+            self.child[redIdx, 3] = NC + np.arange(3*NCC, 4*NCC)
+
+
+            
+
+
+
+
 
     def refine(self, marker=None):
         if marker == None:
