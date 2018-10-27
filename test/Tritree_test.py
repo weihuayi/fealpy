@@ -4,12 +4,6 @@ import matplotlib.pyplot as plt
 from fealpy.mesh.TriangleMesh import TriangleMesh
 from fealpy.mesh.Tritree import Tritree
 
-def get_idx(tritree):
-    cell = tritree.entity('cell')
-    isLeafCell = tritree.is_leaf_cell()
-    flag = (np.sum(cell==5, axis=1) == 1) & isLeafCell
-    idx, = np.where(flag)
-    return idx
 
 class AdaptiveMarker():
     def __init__(self):
@@ -25,7 +19,7 @@ class AdaptiveMarker():
     def coarsen_marker(self, qtmesh):
         pass
 
-idx = np.arange(2, 7)
+
 node = np.array([
     (0, 0), 
     (1, 0), 
@@ -42,8 +36,8 @@ cell = tmesh.entity('cell')
 tritree = Tritree(node, cell)
 marker = AdaptiveMarker()
 
-for i in range(4):
-    tritree.refine(marker)
+for i in range(2):
+    tritree.refineRG(marker)
 
 
 
@@ -51,9 +45,9 @@ for i in range(4):
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
-#tritree.find_node(axes, showindex=True)
-#tritree.find_cell(axes, showindex=True)
-#tritree.find_edge(axes, showindex=True) 
+tritree.find_node(axes, showindex=True)
+tritree.find_cell(axes, showindex=True)
+tritree.find_edge(axes, showindex=True) 
 plt.show()
 
 

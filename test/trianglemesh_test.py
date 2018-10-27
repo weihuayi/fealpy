@@ -21,7 +21,7 @@ node = tmesh.node
 cell = tmesh.entity('cell')
 N = node.shape[0]
 tmeshstrcture = TriangleMeshDataStructure(N, cell)
-print(tmesh.ds.cell_to_node())
+print(cell)
 fig = plt.figure()
 axes = fig.gca()
 tmesh.add_plot(axes)

@@ -41,23 +41,23 @@ marker = AdaptiveMarker(phi)
 circle = Circle(cxy, r, edgecolor='g', fill=False, linewidth=2)
 
 mesh = TriangleMesh(node, cell)
-mesh.uniform_refine(2)
+mesh.uniform_refine(1)
 
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 tmesh = Tritree(node, cell)
 
-for i in range(4):
-    tmesh.refine(marker)
+for i in range(2):
+    tmesh.refineRG(marker)
 
 idx = tmesh.leaf_cell_index()
 mesh = TriangleMesh(tmesh.node, tmesh.ds.cell[idx, :])
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-#tmesh.find_node(axes, showindex=True)
+tmesh.find_node(axes, showindex=True)
 #mesh.find_cell(axes, showindex=True)
-#tmesh.find_edge(axes, showindex=True) 
+tmesh.find_edge(axes, showindex=True) 
 plt.show()
 
 
