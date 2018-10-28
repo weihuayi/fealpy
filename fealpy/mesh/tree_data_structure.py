@@ -77,7 +77,7 @@ class Tritree(TriangleMesh):
             isMarkedCell[idx] = True
 
             # expand the marked cell
-
+            isLeafCell = self.is_leaf_cell()
             edge2cell = self.ds.edge_to_cell()
             flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
             flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
@@ -86,30 +86,34 @@ class Tritree(TriangleMesh):
             rCell = edge2cell[flag1, 1]
 
             idx0 = self.localEdge2childCell[edge2cell[flag0, 3]]
-            idx0 = self.child[edge2cell[flag0, [0]], idx0] 
-            idx1 = self.localEdge2childCell[edge2cell[flag1, 2]]
-            idx1 = self.child[edge2cell[flag1, [1]], idx1]
+            if len(idx0) > 0:
+                idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0] 
 
-            assert self.irule == 1  # TODO: add support for  general k irregular rule case 
+            idx1 = self.localEdge2childCell[edge2cell[flag1, 2]]
+            if len(idx1) > 0:
+                idx1 = self.child[edge2cell[flag1, [0]].reshape(-1, 1), idx1]
+
+            assert self.irule == 1      # TODO: add support for  general k irregular rule case 
             cell2cell = self.ds.cell_to_cell()
             flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]]
-            flag3 = isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]]
+            flag2 = (~isMarkedCell[lCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+            flag3 = (~isMarkedCell[rCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
             while np.any(flag) | np.any(flag2) | np.any(flag3):
                 isMarkedCell[flag] = True
-                isMarkedCell[idx0[flag2]] = True
-                isMarkedCell[idx1[flag3]] = True
+                isMarkedCell[lCell[flag2]] = True
+                isMarkedCell[rCell[flag3]] = True
                 flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-                flag2 = isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]]
-                flag3 = isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]]
+                flag2 = (~isMarkedCell[lCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+                flag3 = (~isMarkedCell[rCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
 
+            cell2edge = self.ds.cell_to_edge()
             refineFlag = np.zeros(NE, dtype=np.bool)
             refineFlag[cell2edge[isMarkedCell]] = True
             refineFlag[flag0 | flag1] = False
 
             NNN = refineFlag.sum()
             edge2newNode = np.zeros(NE, dtype=self.itype)
-            edge2newNode[refineFlag] = NN + range(NNN)
+            edge2newNode[refineFlag] = NN + np.arange(NNN)
 
             edge2newNode[flag0] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
             edge2newNode[flag1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]

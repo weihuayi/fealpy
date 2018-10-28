@@ -2,8 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-from fealpy.pde.darcy_forchheimer_2d import CoscosData1
-#from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
+#from fealpy.pde.darcy_forchheimer_2d import CoscosData1
+from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
 #from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
 from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
@@ -12,10 +12,10 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 4
-ny = 4
+nx = 8
+ny = 8
 pde = CoscosData1(box)
-maxit = 4
+maxit = 1
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$',\
         '$||Dp_I -  Dp_h||_0$','$||Dp1_I - Dp1_h||_0$']
