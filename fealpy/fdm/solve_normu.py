@@ -228,8 +228,8 @@ class DarcyForchheimerFDMModel():
             ph1 = np.zeros(NC, dtype=ftype)
             ph1[0] = self.pI[0]
 
-            s -= G@ph1
-            s[0] = self.pI[0]
+            snew = snew - G@ph1
+            snew[0] = self.pI[0]
 
             bdIdx = np.zeros((G.shape[0],), dtype=itype)
             bdIdx[0] = 1
@@ -265,12 +265,10 @@ class DarcyForchheimerFDMModel():
 #                ru = LA.norm(f - C*uh1 - A12*p1)
 #            else:
 #                ru = LA.norm(f - A11*uh1 - A12*p1)/LA.norm(f)
-            if LA.norm(g) == 0:
-#                rp = LA.norm(s - G*ph1)
-                rp = LA.norm(g - (w1-w3)/hx - (w2-w0)/hy)
+            if LA.norm(s) == 0:
+                rp = LA.norm(s - G@ph1)
             else:
-#                rp = LA.norm(s - G*ph1)/LA.norm(s)
-                rp = LA.norm(g - (w1-w3)/hx - (w2-w0)/hy)/LA.norm(g)
+                rp = LA.norm(s - G@ph1)/LA.norm(s)
 
 #            ru = LA.norm(f -C*u - A12*ph1)/LA.norm(f)
             C = self.get_nonlinear_coef()
