@@ -220,11 +220,16 @@ class DarcyForchheimerFDMModel():
         count = 0
         iterMax = 2000
 
-        uh1 = np.zeros(NE, dtype=ftype)
-        ph1 = np.zeros(NC, dtype=ftype)
         r = np.zeros((2,iterMax),dtype=ftype)
 
         while eu+ep > tol and count < iterMax:
+
+            uh1 = np.zeros(NE, dtype=ftype)
+            ph1 = np.zeros(NC, dtype=ftype)
+            ph1[0] = self.pI[0]
+
+            s -= G@ph1
+            s[0] = self.pI[0]
 
             bdIdx = np.zeros((G.shape[0],), dtype=itype)
             bdIdx[0] = 1
@@ -232,8 +237,7 @@ class DarcyForchheimerFDMModel():
             T = spdiags(1-bdIdx, 0, G.shape[0], G.shape[1])
             GD = T@G@T + Tbd
 
-            ph1[1:] = spsolve(GD[1:,1:], s[1:])
-            ph1[0] = self.pI[0]
+            ph1[:] = spsolve(GD, s)
 
             cell2cell = mesh.ds.cell_to_cell()
             edge2cell = mesh.ds.edge_to_cell()
