@@ -270,7 +270,6 @@ class DarcyForchheimerFDMModel():
                 rp = norm(s - G@ph1)/norm(s)
 
             print(rp)
-
             e = np.r_[eu,ep]
             e = np.max(e)
 
