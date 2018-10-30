@@ -366,7 +366,7 @@ class CosCosData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
+    def init_mesh(self, n=4, meshtype='tri'):
         """ generate the initial mesh
         """
         node = np.array([

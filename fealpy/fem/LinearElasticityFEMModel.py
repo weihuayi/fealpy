@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator, spsolve_triangular
+from scipy.sparse.linalg import cg, inv, dsolve,  gmres, LinearOperator, spsolve_triangular
+from mumps import spsolve
 import pyamg
 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
@@ -88,7 +89,7 @@ class LinearElasticityFEMModel:
         elif gdim == 3:
             d = np.array([1, 1, 1, 2, 2, 2])
 
-        M = np.einsum('i, ijkm, m, ijom, j->jko', ws, aphi, d, phi, self.measure)
+        M = np.einsum('i, ijkm, m, ijom, j->jko', ws, aphi, d, phi, self.measure, optimize=True)
 
         tcell2dof = tspace.cell_to_dof()
         tldof = tspace.number_of_local_dofs()
@@ -99,7 +100,7 @@ class LinearElasticityFEMModel:
 
         dphi = tspace.div_basis(bcs)
         uphi = vspace.basis(bcs)
-        B = np.einsum('i, ikm, ijom, j->jko', ws, uphi, dphi, self.measure)
+        B = np.einsum('i, ikm, ijom, j->jko', ws, uphi, dphi, self.measure, optimize=True)
 
         vgdof = vspace.number_of_global_dofs()
         vldof = vspace.number_of_local_dofs()

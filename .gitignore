@@ -32,3 +32,4 @@ fealpy.egg-info
 dependcies
 *.npz
 *.csv
+*.pyc

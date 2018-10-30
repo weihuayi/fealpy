@@ -3,9 +3,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
-from numpy import linalg as LA
+from numpy.linalg import norm 
 from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+#from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
@@ -208,11 +208,6 @@ class DarcyForchheimerFDMModel():
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        C = self.get_nonlinear_coef()
-        G = self.get_left_matrix()
-        f = self.get_right_vector_f()
-        s = self.get_right_vector()
-        snew = self.get_right_vector()
 
         pc = mesh.entity_barycenter('cell')
         g = self.pde.source1(pc)
@@ -228,11 +223,19 @@ class DarcyForchheimerFDMModel():
         r = np.zeros((2,iterMax),dtype=ftype)
 
         while eu+ep > tol and count < iterMax:
+
+            C = self.get_nonlinear_coef()
+            G = self.get_left_matrix()
+            f = self.get_right_vector_f()
+            s = self.get_right_vector()
+
+            snew = s.copy()
+
             uh1 = np.zeros(NE, dtype=ftype)
             ph1 = np.zeros(NC, dtype=ftype)
             ph1[0] = self.pI[0]
 
-            snew = snew - G@ph1
+            snew -= G@ph1
             snew[0] = self.pI[0]
 
             bdIdx = np.zeros((G.shape[0],), dtype=itype)
@@ -265,25 +268,14 @@ class DarcyForchheimerFDMModel():
             self.ph0[:] = ph1
             self.uh0[:] = uh1
 
-#            if LA.norm(f) == 0:
-#                ru = LA.norm(f - C*uh1 - A12*p1)
-#            else:
-#                ru = LA.norm(f - A11*uh1 - A12*p1)/LA.norm(f)
-            if LA.norm(s) == 0:
-                rp = LA.norm(s - G@ph1)
+            if norm(s) == 0:
+                rp = norm(s - G@ph1)
             else:
-                rp = LA.norm(s - G@ph1)/LA.norm(s)
+                rp = norm(s - G@ph1)/norm(s)
 
-#            ru = LA.norm(f -C*u - A12*ph1)/LA.norm(f)
-            C = self.get_nonlinear_coef()
-            G = self.get_left_matrix()
-            s = self.get_right_vector()
-            f= self.get_right_vector_f()
-            snew = self.get_right_vector()
+            print(rp)
             e = np.r_[eu,ep]
             e = np.max(e)
-#            print('ru',ru)
-            print('rp',rp)
 
             r[0,count] = rp
             r[1,count] = ru
@@ -306,6 +298,7 @@ class DarcyForchheimerFDMModel():
         hy = mesh.hy
         ueL2 = np.sqrt(np.sum(hx*hy*(self.uh - self.uI)**2))
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
+        print(self.ph - self.pI)
         return ueL2,peL2
 
     def get_H1_error(self):

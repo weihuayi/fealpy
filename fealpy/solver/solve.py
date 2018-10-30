@@ -1,6 +1,7 @@
 
 import numpy as np
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+from scipy.sparse.linalg import cg, inv, dsolve
+from mumps import spsolve
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
 import pyamg
@@ -49,7 +50,7 @@ def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
 
     return A 
 
-def solve(dmodel, uh, dirichlet=None, solver='cg'):
+def solve(dmodel, uh, dirichlet=None, solver='direct'):
     space = uh.space
     start = timer()
     A = dmodel.get_left_matrix()
