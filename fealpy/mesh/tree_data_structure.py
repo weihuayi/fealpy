@@ -16,7 +16,7 @@ class Tritree(TriangleMesh):
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
-        self.irule = irule # irregular rule  
+        self.irule = irule              # irregular rule  
         self.meshtype = 'tritree'
 
     def leaf_cell_index(self):
@@ -41,21 +41,7 @@ class Tritree(TriangleMesh):
         else:
             return self.parent[idx, 0] == -1
 
-    def leaf_cell_to_number_of_irregular(self):
-        isLeafCell = self.is_leaf_cell()
-        LNC = len(idx)
-
-        cell2NIrregularNode = np.zeros((LNC, 3), dtype=self.itype)
-
-        cell2cell = self.ds.cell_to_cell()
-        cell2NIrregularNode[~isLeafCell[cell2cell[isLeafCell]]] = 1
-        return cell2NIrregularNode
-
-    def to_mesh(self):
-        isLeafCell = self.is_leaf_cell()
-        return TriangleMesh(self.node, self.ds.cell[isLeafCell])
-    
-    def refine(self, marker=None):
+    def refine(self, marker=None, surface=None):
         if marker == None:
             idx = self.leaf_cell_index()
         else:
@@ -82,30 +68,34 @@ class Tritree(TriangleMesh):
             flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
             flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
 
-            lCell = edge2cell[flag0, 0]
-            rCell = edge2cell[flag1, 1]
+            LCell = edge2cell[flag0, 0]
+            RCell = edge2cell[flag1, 1]
 
             idx0 = self.localEdge2childCell[edge2cell[flag0, 3]]
             if len(idx0) > 0:
                 idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0] 
-
+                 
             idx1 = self.localEdge2childCell[edge2cell[flag1, 2]]
             if len(idx1) > 0:
                 idx1 = self.child[edge2cell[flag1, [0]].reshape(-1, 1), idx1]
 
             assert self.irule == 1      # TODO: add support for  general k irregular rule case 
             cell2cell = self.ds.cell_to_cell()
-            flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-            flag2 = (~isMarkedCell[lCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
-            flag3 = (~isMarkedCell[rCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+            isCell0 = isMarkedCell | (~isLeafCell)
+            isCell1 = isLeafCell & (~isMarkedCell)
+            flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
+            flag2 = ( (~isMarkedCell[LCell]) & isLeafCell[LCell] ) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+            flag3 = ( (~isMarkedCell[RCell]) & isLeafCell[RCell] ) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
             while np.any(flag) | np.any(flag2) | np.any(flag3):
                 isMarkedCell[flag] = True
-                isMarkedCell[lCell[flag2]] = True
-                isMarkedCell[rCell[flag3]] = True
-                flag = (~isMarkedCell) & (np.sum(isMarkedCell[cell2cell], axis=1) > 1)
-                flag2 = (~isMarkedCell[lCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
-                flag3 = (~isMarkedCell[rCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
-
+                isMarkedCell[LCell[flag2]] = True
+                isMarkedCell[RCell[flag3]] = True
+                isCell0 = isMarkedCell | (~isLeafCell)
+                isCell1 = isLeafCell & (~isMarkedCell)
+                flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
+                flag2 = ( (~isMarkedCell[LCell]) & isLeafCell[LCell] ) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+                flag3 = ( (~isMarkedCell[RCell]) & isLeafCell[RCell] ) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+                
             cell2edge = self.ds.cell_to_edge()
             refineFlag = np.zeros(NE, dtype=np.bool)
             refineFlag[cell2edge[isMarkedCell]] = True
@@ -151,16 +141,121 @@ class Tritree(TriangleMesh):
             parent4[3*NCC:4*NCC, 0] = idx
             parent4[3*NCC:4*NCC, 1] = 3
             self.child[idx, 3] = NC + np.arange(3*NCC, 4*NCC)
-
             ec = self.entity_barycenter('edge', refineFlag)
+
+            if surface is not None:
+                ec, _ = surface.project(ec)
+
+            self.node = np.r_['0', node, ec]
             cell = np.r_['0', cell, cell4]                      
-            self.node = np.r_['0', node, ec] 
             self.parent = np.r_['0', self.parent, parent4]           
             self.child = np.r_['0', self.child, child4]              
-            self.ds.reinit(NN + NNN, cell) 
+            self.ds.reinit(NN + NNN, cell)
             return True
         else:
             return False
+
+
+    def to_conformmesh(self):
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell = self.entity('cell')
+        
+        isLeafCell = self.is_leaf_cell()
+        edge2cell = self.ds.edge_to_cell()
+        
+        flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
+        flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
+
+        LCell = edge2cell[flag0, 0]
+        RCell = edge2cell[flag1, 1]
+        isLeafCell = self.is_leaf_cell()
+        idx0 = edge2cell[flag0, 0]
+        N0 = len(idx0)
+        cell20 =np.zeros((2*N0, 3), dtype=self.itype)
+
+        cell20[0:N0, 0] = edge[flag0, 0]
+        cell20[0:N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
+        cell20[0:N0, 2] = cell[idx0, edge2cell[flag0, 2]]
+
+        cell20[N0:2*N0, 0] = edge[flag0, 1]
+        cell20[N0:2*N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
+        cell20[N0:2*N0, 2] = cell[idx0, edge2cell[flag0, 2]]
+
+        idx1 = edge2cell[flag1, 1]
+        N1 = len(idx1)
+        cell21 =np.zeros((2*N1, 3), dtype=self.itype)
+
+        cell21[0:N1, 0] = edge[flag1, 1]
+        cell21[0:N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
+        cell21[0:N1, 2] = cell[idx1, edge2cell[flag1, 3]]
+
+        cell21[N1:2*N1, 0] = edge[flag1, 0]
+        cell21[N1:2*N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
+        cell21[N1:2*N1, 2] = cell[idx1, edge2cell[flag1, 3]]
+        
+        isLRCell = np.zeros(NC, dtype=np.bool)
+        isLRCell[LCell] = True
+        isLRCell[RCell] = True
+
+        idx = np.arange(NC)
+        cell0 = cell[(~isLRCell) & (isLeafCell)] 
+        idx0 = idx[(~isLRCell) & (isLeafCell)]
+        cell = np.r_['0', cell0, cell20, cell21]                      
+        tmesh = TriangleMesh(node, cell) 
+        tmesh.celldata['idxmap'] = np.r_['0', idx0, LCell, RCell, LCell, RCell]        #现在的cell单元与原来树结构中cell的对应关系.
+        return tmesh
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
