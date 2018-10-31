@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import time
 
 from fealpy.pde.darcy_forchheimer_2d import PolyData
-from fealpy.fdm.NuDarcyForchheimerFDMModel import NuDarcyForchheimerFDMModel
+from fealpy.fdm.NonDFFDMModel import NuDarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
