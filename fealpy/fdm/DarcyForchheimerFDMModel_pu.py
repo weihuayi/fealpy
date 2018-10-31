@@ -265,19 +265,11 @@ class DarcyForchheimerFDMModel():
             count = count + 1
             print('ru:',ru)
             print('rp:',rp)
-#            print('ru1:',ru1)
-#            print('rp1:',rp1)
 
         self.uh[:] = u1
         self.ph[:] = p1
         print('solve matrix p then u')
-#        uw = showsolution(plt,mesh,self.pde,self.uh,self.ph)
-#        print('u1',self.uh)
-#        print('uI',self.uI)
-#        print('p1',self.ph)
-        print('pI',self.pI)
-#        print('UI-u1:',LA.norm(self.uI - self.uh))
-#        print('uh:',self.uh)
+
         return count,r
 
     def grad_pressure(self):

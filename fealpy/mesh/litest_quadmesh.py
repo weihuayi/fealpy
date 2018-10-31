@@ -7,7 +7,7 @@ from matplotlib.collections import LineCollection
 
 from .Mesh2d import Mesh2d
 
-class StructureQuadMesh(Mesh2d):
+class StructureQuadMesh1(Mesh2d):
     def __init__(self, box, hx, hy, itype=np.int32, ftype=np.float):
         self.box = box
         self.ds = StructureQuadMeshDataStructure(hx, hy, itype)
@@ -28,13 +28,11 @@ class StructureQuadMesh(Mesh2d):
         ny = self.ny
         box = self.box
 
-        x = np.zeros(nx+1)
-        for i in range(1,nx+1):
-            x[i] = x[i-1] + hx[i-1]
+        x = np.add.accumulate(hx)
+        x = np.r_[0,x]
 
-        y = np.zeros(ny+1)
-        for j in range(1,ny+1):
-            y[j] = y[j-1] + hy[j-1]
+        y = np.add.accumulate(hy)
+        y = np.r_[0,y]
 
         x = x.repeat(ny+1)
         y = np.tile(y,(1,nx+1))

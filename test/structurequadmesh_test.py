@@ -3,10 +3,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import sys
 
-from fealpy.mesh.StructureQuadMesh import StructureQuadMesh 
+#from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
+from fealpy.mesh.litest_quadmesh import StructureQuadMesh1
 box = [0, 1, 0, 1]
 n = 8
-qmesh = StructureQuadMesh(box, n, n)
+qmesh = StructureQuadMesh1(box, nx, ny)
 cell2cell = qmesh.ds.cell_to_cell()
 print('cell2cell',cell2cell)
 
@@ -14,8 +15,8 @@ NN = qmesh.number_of_nodes()
 NE = qmesh.number_of_edges()
 NC = qmesh.number_of_cells()
 
-a = cell2cell[:NC:n,0]
-print('a',a)
+#a = cell2cell[:NC:n,0]
+#print('a',a)
 
 X = np.zeros(NE + NC, dtype=np.float)
 
