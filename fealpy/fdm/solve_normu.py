@@ -5,7 +5,6 @@ from mpl_toolkits.mplot3d import Axes3D
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm 
 from fealpy.fem.integral_alg import IntegralAlg
-#from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class DarcyForchheimerFDMModel():
