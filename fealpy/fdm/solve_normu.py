@@ -109,18 +109,22 @@ class DarcyForchheimerFDMModel():
         idx3, = np.nonzero(~flag3)
 
         data0 = 1/C[cell2edge[idx0, 0]]/hx**2
+        print('data0',data0)
         A = coo_matrix((-data0,(idx0, idx2)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data0,(idx0, idx0)), shape=(NC,NC), dtype=ftype)
 
         data1 = 1/C[cell2edge[idx1, 1]]/hy**2
+        print('data1',data1)
         A += coo_matrix((-data1,(idx1, idx3)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data1, (idx1, idx1)), shape=(NC,NC), dtype=ftype)
 
         data2 = 1/C[cell2edge[idx2, 2]]/hy**2
+        print('data2',data2)
         A += coo_matrix((-data2,(idx2, idx0)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data2, (idx2, idx2)), shape=(NC,NC), dtype=ftype)
 
         data3 = 1/C[cell2edge[idx3, 3]]/hx**2
+        print('data3',data3)
         A += coo_matrix((-data3,(idx3, idx1)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data3,(idx3, idx3)), shape=(NC,NC), dtype=ftype)
 

@@ -1,10 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.pde.darcy_forchheimer_2d import CoscosData1
-#from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
-#from fealpy.pde.darcy_forchheimer_2d_2 import CoscosData1
-#from fealpy.pde.darcy_forchheimer_2d_3 import CoscosData1
+from fealpy.pde.darcy_forchheimer_2d import PolyData
 #from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
 #from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 from fealpy.fdm.solve_normu import DarcyForchheimerFDMModel
@@ -14,7 +11,7 @@ from fealpy.tools.showsolution import showsolution
 box = [0,1,0,1]
 nx = 4
 ny = 4
-pde = CoscosData1(box)
+pde = PolyData(box)
 maxit = 5
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$','$||Dp_I - Dp_h||_0$']
