@@ -181,10 +181,6 @@ class DarcyForchheimerFDMModel():
         start = time.time()
         b = self.get_right_vector()
         A = self.get_left_matrix()
-
-#        A11 = A[:NE,:NE]
-#        A12 = A[:NE,NE:NE+NC]
-#        A21 = A[NE:NE+NC,:NE]
         end = time.time()
         print('Construct linear system time:',end - start)
 #        f = b[:NE]
@@ -221,6 +217,7 @@ class DarcyForchheimerFDMModel():
             Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
             AD = T@A@T + Tbd
+
  
             bnew[NE] = self.ph[0]
  
@@ -234,7 +231,6 @@ class DarcyForchheimerFDMModel():
             ep = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
             print('eu',eu)
             print('ep:',ep)
-#            ptint('euu',max(u1-s))
 
             self.uh0[:] = u1
             self.ph0[:] = p1
@@ -279,16 +275,36 @@ class DarcyForchheimerFDMModel():
         peL2 = np.sqrt(np.sum(hx*hy*(self.ph - self.pI)**2))
         return ueL2,peL2
 
-    def get_H1_error(self):
+    def get_normu_error(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
+        NE = mesh.number_of_edges()
         hx = mesh.hx
         hy = mesh.hy
-        ueL2,peL2 = self.get_L2_error()
-        ep = self.ph - self.pI
-        psemi = np.sqrt(np.sum((ep[1:]-ep[:NC-1])**2))
-        peH1 = peL2+psemi
-        return ep,psemi
+
+        mu = self.pde.mu
+        k = self.pde.k
+
+        rho = self.pde.rho
+        beta = self.pde.beta
+
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        
+        bc = mesh.entity_barycenter('edge')
+        normu = self.pde.norm_u(bc)
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+
+        idx = np.r_[I,J]
+        C = self.get_nonlinear_coef()
+        normuh = (C - mu/k)/rho/beta
+
+        normuL2 = np.sqrt(np.sum(hx*hy*((normu[idx] - normuh[idx])*self.uI[idx])**2))
+
+        return normuL2
 
     def get_DpL2_error(self):
         mesh = self.mesh
@@ -302,18 +318,22 @@ class DarcyForchheimerFDMModel():
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
 
-        cell = np.arange(NC)
         DpI = np.zeros(NE, dtype=mesh.ftype)
+        isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         DpI[isYDEdge] = self.pde.grad_pressure_x(bc[isYDEdge])#modity
         DpI[isXDEdge] = self.pde.grad_pressure_y(bc[isXDEdge])
+
         cell2edge = mesh.ds.cell_to_edge()
         b = self.get_right_vector()
         C = self.get_nonlinear_coef()
         Dph = b[:NE] - C*self.uh
-        print('Dph',Dph)
-        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        idx = np.r_[I,J]
+        DpeL2 = np.sqrt(np.sum(hx*hy*(Dph[idx] - DpI[idx])**2))
         return DpeL2
 
     def get_Dp1L2_error(self):

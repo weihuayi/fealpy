@@ -13,16 +13,16 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 4
-ny = 4
+nx = 16
+ny = 16
 pde = ExponentData(box)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$',\
-        '$||Dp_I -  Dp_h||_0$','$||Dp1_I - Dp1_h||_0$']
+        '$||Dp_I -  Dp_h||_0$','$||Dp1_I - Dp1_h||_0$','$|| |u_I| - |u_h|||$']
 errpL2 = np.zeros((maxit,), dtype=np.float)
 err = np.zeros((2,maxit),dtype=np.float)
-error = np.zeros((4,maxit),dtype=np.float)
+error = np.zeros((5,maxit),dtype=np.float)
 count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
@@ -37,16 +37,17 @@ for i in range(maxit):
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
     err[1,i] = pe
+
     ueL2,peL2 = fdm.get_L2_error()
+    normuL2 = fdm.get_normu_error()
     DpeL2 = fdm.get_DpL2_error()
     Dp1eL2 = fdm.get_Dp1L2_error()
- #   print('I',I)
-#    print('ep',ep)
-#    print('psemi',psemi)
+
     error[0,i] = ueL2
     error[1,i] = peL2
     error[2,i] = DpeL2
     error[3,i] = Dp1eL2
+    error[4,i] = normuL2
 #    showsolution(plt, mesh, pde, uh, ph)
     x = np.arange(count[i])
     fig = plt.figure()

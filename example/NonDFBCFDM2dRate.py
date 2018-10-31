@@ -13,17 +13,17 @@ hy = np.array([0.25,0.13,0.33,0.29])
 #hx = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.25,0.25,0.25,0.25])
 #hx = np.array([0.2,0.2,0.2,0.2,0.2])
-hx = hx/4
-hy = hy/4
-hx = hx.repeat(4)
-hy = hy.repeat(4)
+#hx = hx/4
+#hy = hy/4
+#hx = hx.repeat(4)
+#hy = hy.repeat(4)
 
 pde = PolyData(box)
 maxit = 1
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$',\
         '$||Dp_I -  Dp_h||_0$','$||Dp1_I - Dp1_h||_0$']
-errpL2 = np.zeros((maxit,), dtype=np.float)
+
 err = np.zeros((2,maxit),dtype=np.float)
 error = np.zeros((4,maxit),dtype=np.float)
 count = np.zeros((maxit,), dtype=np.int)

@@ -257,7 +257,8 @@ class NuDarcyForchheimerFDMModel():
 
             bnew = np.copy(b)
             
-            x = np.r_[self.uh, self.ph]#把self.uh,self.ph组合在一起
+            x = np.r_[self.uh, self.ph]#The combination of self.uh and self.ph together
+            print('x',x)
             bnew = bnew - A@x
 
             # Modify matrix
@@ -269,9 +270,12 @@ class NuDarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
  
             bnew[NE] = self.ph[0]
+            print('bnew',bnew[:])
+            print('AD21',AD[NE:,:])
  
             x[:] = spsolve(AD, bnew)
             u1 = x[:NE]
+            print('u1',u1)
             p1 = x[NE:]
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
@@ -287,15 +291,19 @@ class NuDarcyForchheimerFDMModel():
             g = b[NE:]
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
-            AD21 = AD[NE:NE+NC,:NE]
+            A21 = A[NE:NE+NC,:NE]
             if LA.norm(f) == 0:
                 ru = LA.norm(f - A11@u1 - A12@p1)
             else:
                 ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
+
+            print('bnew',bnew[NE:])
+            #print('AD21',AD21)
+            print('u1',u1)
             if LA.norm(g) == 0:
                 rp = LA.norm(bnew[NE:] - AD21@u1)
             else:
-                rp = LA.norm(bnew[NE:] - AD21@u1)/LA.norm(bnew[NE:])
+                rp = LA.norm(g - A21@u1)/LA.norm(g)
 
 
             r[0,count] = rp
