@@ -6,7 +6,7 @@ import sys
 from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
 box = [0, 1, 0, 1]
 n = 8
-qmesh = StructureQuadMesh1(box, nx, ny)
+qmesh = StructureQuadMesh(box, n, n)
 cell2cell = qmesh.ds.cell_to_cell()
 print('cell2cell',cell2cell)
 
