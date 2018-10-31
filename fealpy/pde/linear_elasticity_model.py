@@ -36,7 +36,8 @@ class QiModel3d():
         val[..., 0] = 200*mu*(x - x**2)**2*(2*y**3 - 3*y**2 + y)*(2*z**3 - 3*z**2 + z)  
         val[..., 1] = -100*mu*(y - y**2)**2*(2*x**3 - 3*x**2 + x)*(2*z**3 - 3*z**2 + z)  
         val[..., 2] = -100*mu*(z - z**2)**2*(2*y**3 - 3*y**2 + y)*(2*x**3 - 3*x**2 + x)  
-        val = np.einsum('...j, k->...jk', val, np.array([2**4, 2**5, 2**6]))
+        val = np.einsum('...jk, k->...jk', val, np.array([2**4, 2**5, 2**6]))
+        print('val.shape:', val.shape)
         return val
 
     def grad_displacement(self, p):
@@ -171,9 +172,9 @@ class PolyModel3d():
         lam = self.lam
         mu = self.mu
         du = self.grad_displacement(p)
-        val = mu*(du + du.swapaxes(-1, -2))
-        idx = np.arange(3)
-        val[..., idx, idx] += lam*du.trace(axis1=-2, axis2=-1)[..., np.newaxis]
+        Au = (du + du.swapaxes(-1, -2))/2
+        val = 2*mu*Au
+        val[..., np.arange(3), np.arange(3)] += lam*Au.trace(axis1=-2, axis2=-1)[..., np.newaxis]
         return val
         
 

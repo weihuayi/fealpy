@@ -99,7 +99,7 @@ class Mesh3d():
 
     def add_plot(self, plot,
             nodecolor='k', edgecolor='k',
-             aspect='equal',
+            aspect='equal',
             linewidths=2, markersize=20,  
             showaxis=False, alpha=0.8):
 
@@ -111,10 +111,9 @@ class Mesh3d():
             axes = plot
 
         return show_mesh_3d(axes, self,
-                nodecolor=nodecolor, edgecolor=edgecolor,
-                aspect=aspect,
+                nodecolor=nodecolor, edgecolor=edgecolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,  
-                 showaxis=showaxis, alpha=alpha)
+                showaxis=showaxis, alpha=alpha)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,

@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from timeit import default_timer as timer
 from itertools import combinations
+
 def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     gphi = space.grad_basis(bcs)

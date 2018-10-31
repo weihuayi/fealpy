@@ -24,6 +24,7 @@ class LinearElasticityFEMModel:
         self.uh = self.vectorspace.function()
         self.model = model
         self.sI = self.tensorspace.interpolation(self.model.stress)
+        self.uI = self.vectorspace.interpolation(self.model.displacement)
         self.integrator = integrator
         self.measure = mesh.entity_measure()
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
@@ -83,6 +84,7 @@ class LinearElasticityFEMModel:
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         phi = tspace.basis(bcs)
         aphi = self.model.compliance_tensor(phi)
+        print('phi.shape:', phi.shape)
         
         if gdim == 2:
             d = np.array([1, 1, 2])
@@ -228,4 +230,9 @@ class LinearElasticityFEMModel:
         dsI = self.sI.div_value
         e4 = self.integralalg.L2_error(ds, dsI)
 
-        return e0, e1, e2, e3, e4
+        uI = self.uI.value
+        e5 = self.integralalg.L2_error(u, uI)
+
+        e6 = self.integralalg.L2_error_uI_uh(uI, uh)
+
+        return e0, e1, e2, e3, e4, e5, e6

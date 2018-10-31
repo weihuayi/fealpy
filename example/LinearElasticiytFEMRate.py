@@ -1,7 +1,7 @@
 import numpy as np
 import sys
 
-from fealpy.pde.linear_elasticity_model import PolyModel3d, Model2d, HuangModel2d
+from fealpy.pde.linear_elasticity_model import QiModel3d, PolyModel3d, Model2d, HuangModel2d
 from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.fem.LinearElasticityFEMModel import LinearElasticityFEMModel 
 from fealpy.tools.show import showmultirate
@@ -16,6 +16,7 @@ n = int(sys.argv[3])
 
 if m == 1:
     pde = PolyModel3d()
+    #pde = QiModel3d()
 if m == 2:
     pde = Model2d()
 if m == 3:
@@ -36,6 +37,8 @@ errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||u - u_h||_{0}$',
              '$||\sigma - \sigma_I ||_{0}$',
              '$||div(\sigma - \sigma_I)||_{0}$',
+             '$||u - u_I||_{0}$',
+             '$|| u_I - u_h||_{0}$'
              ]
 Ndof = np.zeros((maxit,))
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)

@@ -41,6 +41,16 @@ class IntegralAlg():
             return np.sqrt(e)
         return 
 
+    def L2_error_uI_uh(self, uI, uh, celltype=False):
+        def f(x):
+            return (uI(x) - uh(x))**2
+        e = self.integral(f, celltype=celltype)
+        if celltype is False:
+            return np.sqrt(e.sum())
+        else:
+            return np.sqrt(e)
+        return 
+
     def Lp_error(self, u, uh, p, celltype=False):
         def f(x):
             xx = self.mesh.bc_to_point(x)

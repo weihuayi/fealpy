@@ -214,8 +214,7 @@ def show_mesh_3d(axes, mesh,
         nodecolor = mapper.to_rgba(nodecolor)
 
     node = mesh.node
-    axes.scatter(node[:, 0], node[:, 1], node[:, 2],
-            color=nodecolor, s=markersize)
+    axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
 
     face = mesh.ds.face
     vts = node[face, :]
