@@ -270,12 +270,10 @@ class NuDarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
  
             bnew[NE] = self.ph[0]
-            print('bnew',bnew[:])
-            print('AD21',AD[NE:,:])
  
             x[:] = spsolve(AD, bnew)
+            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
             u1 = x[:NE]
-            print('u1',u1)
             p1 = x[NE:]
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
@@ -287,6 +285,8 @@ class NuDarcyForchheimerFDMModel():
             self.ph0[:] = p1
             b = self.get_right_vector()
             A = self.get_left_matrix()
+
+
             f = b[:NE]
             g = b[NE:]
             A11 = A[:NE,:NE]
@@ -297,9 +297,6 @@ class NuDarcyForchheimerFDMModel():
             else:
                 ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
 
-            print('bnew',bnew[NE:])
-            #print('AD21',AD21)
-            print('u1',u1)
             if LA.norm(g) == 0:
                 rp = LA.norm(bnew[NE:] - AD21@u1)
             else:
