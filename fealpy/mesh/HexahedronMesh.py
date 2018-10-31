@@ -37,13 +37,15 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
 
 class HexahedronMesh(Mesh3d):
 
-    def __init__(self, node, cell, dtype=np.float):
+    def __init__(self, node, cell):
         self.node = node
         N = node.shape[0]
         self.ds = HexahedronMeshDataStructure(N, cell)
 
         self.meshtype = 'hex'
-        self.dtype= np.float
+
+        self.itype = cell.dtype
+        self.ftype = node.dtype
 
     def volume(self):
         pass

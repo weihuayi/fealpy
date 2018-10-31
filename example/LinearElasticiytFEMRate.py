@@ -28,9 +28,9 @@ if m == 4:
 #mesh = rectangledomainmesh(box, nx=n, ny=n)
 
 mesh = pde.init_mesh(n)
-integrator = mesh.integrator(7)
+integrator = mesh.integrator(5)
 
-maxit = 3 
+maxit = 4 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
              '$||div(\sigma - \sigma_h)||_{0}$',

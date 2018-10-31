@@ -58,7 +58,7 @@ class Mesh3d():
             return self.edge_length()
         elif etype in ['node', 0]:
             NN = self.number_of_nodes()
-            return np.zeros(NN, dtype=np.float)
+            return np.zeros(NN, dtype=self.ftype)
         else:
             raise ValueError("`entitytype` is wrong!")
 
@@ -158,7 +158,7 @@ class Mesh3d():
 
 class Mesh3dDataStructure():
     def __init__(self, NN, cell):
-
+        self.itype = cell.dtype
         self.NN = NN
         self.NC = cell.shape[0]
         self.cell = cell
@@ -210,9 +210,9 @@ class Mesh3dDataStructure():
         NF = i0.shape[0]
         self.NF = NF
 
-        self.face2cell = np.zeros((NF, 4), dtype=np.int)
+        self.face2cell = np.zeros((NF, 4), dtype=self.itype)
 
-        i1 = np.zeros(NF, dtype=np.int) 
+        i1 = np.zeros(NF, dtype=self.itype) 
         F = self.F
         i1[j] = np.arange(F*NC)
 
@@ -272,7 +272,7 @@ class Mesh3dDataStructure():
         face2cell = self.face2cell
         if sparse == False:
             F = self.F
-            cell2face = np.zeros((NC, F), dtype=np.int)
+            cell2face = np.zeros((NC, F), dtype=self.itype)
             cell2face[face2cell[:,0], face2cell[:,2]] = range(NF)
             cell2face[face2cell[:,1], face2cell[:,3]] = range(NF)
             return cell2face
@@ -296,7 +296,7 @@ class Mesh3dDataStructure():
         face2cell = self.face2cell
         if (return_sparse == False) & (return_array == False):
             F = self.F
-            cell2cell = np.zeros((NC, F), dtype=np.int)
+            cell2cell = np.zeros((NC, F), dtype=self.itype)
             cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
             cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
             return cell2cell
@@ -370,7 +370,7 @@ class Mesh3dDataStructure():
             NC = self.NC
             NF = self.NF
             I = np.repeat(range(NF), 2)
-            J = self.face2cell[:, [0, 1]].flatten()
+            J = self.face2cell[:, [0, 1]].flat
             val = np.ones(2*NF, dtype=np.bool)
             face2cell = csr_matrix((val, (I, J)), shape=(NF, NC), dtype=np.bool)
             return face2cell 
@@ -464,8 +464,9 @@ class Mesh3dDataStructure():
         J = np.repeat(range(NC), V)
 
         if return_local_index == True:
-            val = ranges(V*np.ones(NC, dtype=np.int), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int)
+            val = ranges(V*np.ones(NC, dtype=self.itype), start=1) 
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC),
+                    dtype=self.itype)
         else:
             val = np.ones(V*NC, dtype=np.bool)
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
