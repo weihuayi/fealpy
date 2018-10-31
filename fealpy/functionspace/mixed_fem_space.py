@@ -43,17 +43,18 @@ class HuZhangFiniteElementSpace():
         frame[:, 0, :] = t
         for i, (j, k) in enumerate(idx):
             self.TE[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
-
         self.TE[:, gdim:] *=np.sqrt(2) 
+
         if gdim == 3:
             NF = mesh.number_of_faces()
-            n = mesh.face_unit_normal()
-            face2edge = mesh.ds.face_to_edge()
-            ft = t[face2edge]
             self.TF = np.zeros((NF, 6, 6), dtype=np.float)
-            self.TF[:, 0:3, :] = self.TE[face2edge, 0, :] # 
-            self.TF[:, 3:, :] = np.sqrt(2)*(n[:, np.newaxis, idx[:, 0]]*ft[:, :, idx[:, 1]] + n[:, np.newaxis, idx[:, 1]]*ft[:, :, idx[:, 0]])/2
-            print('TF shape is:', self.TF.shape)
+            n = mesh.face_unit_normal()
+            _, _, frame = np.linalg.svd(n[:, np.newaxis, :]) # get the axis frame on the edge by svd
+            frame[:, 0, :] = n 
+            for i, (j, k) in enumerate(idx):
+                self.TF[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2
+
+            self.TF[:, gdim:] *= np.sqrt(2)
 
     def __str__(self):
         return "Hu-Zhang mixed finite element space!"
@@ -400,7 +401,7 @@ class HuZhangFiniteElementSpace():
         val = u(ipoint)[c2d]
 
         ldof = self.dof.number_of_local_dofs()
-        cell2dof = self.cell_to_dof().reshape(-1, ldof, tdim)
+        cell2dof = self.cell2dof.reshape(-1, ldof, tdim)
 
         uI = Function(self)
         dofFlag = self.dof_flags()

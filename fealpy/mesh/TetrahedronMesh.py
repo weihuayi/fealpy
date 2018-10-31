@@ -31,13 +31,15 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
 
 
 class TetrahedronMesh(Mesh3d):
-    def __init__(self, node, cell, dtype=np.float):
+    def __init__(self, node, cell):
         self.node = node
         N = node.shape[0]
         self.ds = TetrahedronMeshDataStructure(N, cell)
 
         self.meshtype = 'tet'
-        self.dtype= dtype
+
+        self.itype = cell.dtype
+        self.ftype = node.dtype
 
         self.celldata = {}
         self.edgedata = {}
@@ -164,8 +166,8 @@ class TetrahedronMesh(Mesh3d):
         r = 3.0*vol/ss
         q = R/r/3.0
         index = self.ds.index
-        g = np.zeros((NC, 4, 3), dtype=np.float)
-        w = np.zeros((NC, 4), dtype=np.float)
+        g = np.zeros((NC, 4, 3), dtype=self.ftype)
+        w = np.zeros((NC, 4), dtype=self.ftype)
         for idx in range(12):
             i = index[idx, 0]
             j = index[idx, 1]
@@ -189,10 +191,10 @@ class TetrahedronMesh(Mesh3d):
 
         g *= q.reshape(-1, 1, 1)
         w *= q.reshape(-1, 1)
-        grad = np.zeros((N, 3), dtype=np.float)
+        grad = np.zeros((N, 3), dtype=self.ftype)
         np.add.at(grad, cell.flatten(), g.reshape(-1, 3))
-        wgt = np.zeros(N, dtype=np.float)
-        np.add.at(wgt, cell.flatten(), w.flatten())
+        wgt = np.zeros(N, dtype=self.ftype)
+        np.add.at(wgt, cell.flat, w.flat)
 
         return grad/wgt.reshape(-1, 1)
 
@@ -201,7 +203,7 @@ class TetrahedronMesh(Mesh3d):
         node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()
-        Dlambda = np.zeros((NC, 4, 3), dtype=self.dtype)
+        Dlambda = np.zeros((NC, 4, 3), dtype=self.ftype)
         volume = self.volume()
         for i in range(4):
             j,k,m = localFace[i]
@@ -227,7 +229,7 @@ class TetrahedronMesh(Mesh3d):
             self.node = np.concatenate((node, newNode), axis=0)
 
             p = edge2newNode[cell2edge]
-            newCell = np.zeros((8*NC, 4), dtype=np.int)
+            newCell = np.zeros((8*NC, 4), dtype=self.itype)
 
             newCell[0:4*NC, 3] = cell.flatten('F')
             newCell[0:NC, 0:3] = p[:, [0, 2, 1]]
@@ -235,7 +237,7 @@ class TetrahedronMesh(Mesh3d):
             newCell[2*NC:3*NC, 0:3] = p[:, [1, 5, 3]]
             newCell[3*NC:4*NC, 0:3] = p[:, [2, 4, 5]]
 
-            l = np.zeros((NC, 3), dtype=np.float)
+            l = np.zeros((NC, 3), dtype=self.ftype)
             node = self.node
             l[:, 0] = np.sum((node[p[:, 0]] - node[p[:, 5]])**2, axis=1)
             l[:, 1] = np.sum((node[p[:, 1]] - node[p[:, 4]])**2, axis=1)

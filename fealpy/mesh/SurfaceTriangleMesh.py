@@ -9,6 +9,7 @@ class SurfaceTriangleMesh():
         self.V = LagrangeFiniteElementSpace(mesh, p)
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
+        self.ds = mesh.ds
 
     def integrator(self, k):
         return TriangleQuadrature(k) 
