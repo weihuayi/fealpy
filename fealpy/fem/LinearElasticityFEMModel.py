@@ -1,7 +1,8 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve, gmres, LinearOperator, spsolve_triangular
+from scipy.sparse.linalg import cg, inv, dsolve,  gmres, LinearOperator, spsolve_triangular
+from mumps import spsolve
 import pyamg
 
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
@@ -13,7 +14,7 @@ from timeit import default_timer as timer
 import cProfile
 
 class LinearElasticityFEMModel:
-    def __init__(self, mesh,  model, p, integrator):
+    def __init__(self, mesh,  pde, p, integrator):
         self.mesh = mesh
         self.tensorspace = HuZhangFiniteElementSpace(mesh, p)
         self.vectorspace = VectorLagrangeFiniteElementSpace(mesh, p-1, spacetype='D') 
@@ -21,12 +22,16 @@ class LinearElasticityFEMModel:
         self.dim = self.tensorspace.dim
         self.sh = self.tensorspace.function()
         self.uh = self.vectorspace.function()
-        self.model = model
-        self.sI = self.tensorspace.interpolation(self.model.stress)
+        self.pde = pde
+        self.sI = self.tensorspace.interpolation(self.pde.stress)
+        self.uI = self.vectorspace.interpolation(self.pde.displacement)
         self.integrator = integrator
         self.measure = mesh.entity_measure()
         self.integralalg = IntegralAlg(self.integrator, mesh, self.measure)
         self.count = 0
+
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
 
     def precondieitoner(self):
 
@@ -74,35 +79,53 @@ class LinearElasticityFEMModel:
         self.PI = csr_matrix((val.flat, (I.flat, J.flat)), shape=(fgdof, cgdof))
 
     def get_left_matrix(self):
+        mesh = self.mesh
         tspace = self.tensorspace
         vspace = self.vectorspace
 
         gdim = tspace.geo_dimension()
 
         bcs, ws = self.integrator.quadpts, self.integrator.weights
-        phi = tspace.basis(bcs)
-        aphi = self.model.compliance_tensor(phi)
         
         if gdim == 2:
             d = np.array([1, 1, 2])
         elif gdim == 3:
             d = np.array([1, 1, 1, 2, 2, 2])
 
-        M = np.einsum('i, ijkm, m, ijom, j->jko', ws, aphi, d, phi, self.measure)
+        tldof = tspace.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        if False:
+            M = np.zeros((NC, tldof, tldof), dtype=mesh.ftype)
+            for i, bc in enumerate(bcs):
+                phi = tspace.basis(bc)
+                aphi = self.pde.compliance_tensor(phi)
+                M += ws[i]*np.einsum('jkm, m, jom->jko', aphi, d, phi, optimize=True)
+            M *= self.measure[..., np.newaxis, np.newaxis]
+        else:
+            phi = tspace.basis(bcs)
+            aphi = self.pde.compliance_tensor(phi)
+            M = np.einsum('i, ijkm, m, ijom, j->jko', ws, aphi, d, phi, self.measure, optimize=True)
 
         tcell2dof = tspace.cell_to_dof()
-        tldof = tspace.number_of_local_dofs()
         I = np.einsum('ij, k->ijk', tcell2dof, np.ones(tldof))
         J = I.swapaxes(-1, -2)
         tgdof = tspace.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
 
-        dphi = tspace.div_basis(bcs)
-        uphi = vspace.basis(bcs)
-        B = np.einsum('i, ikm, ijom, j->jko', ws, uphi, dphi, self.measure)
-
         vgdof = vspace.number_of_global_dofs()
         vldof = vspace.number_of_local_dofs()
+        if False:
+            B = np.zeros((NC, vldof, tldof), dtype=mesh.ftype)
+            for i, bc in enumerate(bcs):
+                dphi = tspace.div_basis(bc)
+                uphi = vspace.basis(bc)
+                B += ws[i]*np.einsum('km, jom->jko', uphi, dphi, optimize=True)
+            B *= self.measure[..., np.newaxis, np.newaxis]
+        else:
+            dphi = tspace.div_basis(bcs)
+            uphi = vspace.basis(bcs)
+            B = np.einsum('i, ikm, ijom, j->jko', ws, uphi, dphi, self.measure, optimize=True)
+
         I = np.einsum('ij, k->ijk', vspace.cell_to_dof(), np.ones(tldof))
         J = np.einsum('ij, k->ikj', tspace.cell_to_dof(), np.ones(vldof))
         B = csr_matrix((B.flat, (I.flat, J.flat)), shape=(vgdof, tgdof))
@@ -114,7 +137,7 @@ class LinearElasticityFEMModel:
 
         bcs, ws = self.integrator.quadpts, self.integrator.weights
         pp = vspace.mesh.bc_to_point(bcs)
-        fval = self.model.source(pp)
+        fval = self.pde.source(pp)
         phi = vspace.basis(bcs)
         bb = np.einsum('i, ikm, ijm, k->kj', ws, fval, phi, self.measure)
 
@@ -209,15 +232,15 @@ class LinearElasticityFEMModel:
         dim = self.dim
         mesh = self.mesh
 
-        s = self.model.stress
+        s = self.pde.stress
         sh = self.sh.value 
         e0 = self.integralalg.L2_error(s, sh)
 
-        ds = self.model.div_stress
+        ds = self.pde.div_stress
         dsh = self.sh.div_value
         e1 = self.integralalg.L2_error(ds, dsh)
 
-        u = self.model.displacement
+        u = self.pde.displacement
         uh = self.uh.value
         e2 = self.integralalg.L2_error(u, uh)
 
@@ -227,4 +250,9 @@ class LinearElasticityFEMModel:
         dsI = self.sI.div_value
         e4 = self.integralalg.L2_error(ds, dsI)
 
-        return e0, e1, e2, e3, e4
+        uI = self.uI.value
+        e5 = self.integralalg.L2_error(u, uI)
+
+        e6 = self.integralalg.L2_error_uI_uh(uI, uh)
+
+        return e0, e1, e2, e3, e4, e5, e6

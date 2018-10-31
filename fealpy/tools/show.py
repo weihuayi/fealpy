@@ -56,9 +56,13 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=
         axes = plot
     if optionlist is None:
         optionlist = ['k-*', 'r-o', 'b-D', 'g-->', 'b--8', 'm--x','b-.x', 'b-.+', 'b-.h', 'm:s', 'm:p', 'm:h']
+
     m, n = errorMatrix.shape
     for i in range(m):
-        showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
+        if len(N.shape) == 1:
+            showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
+        else:
+            showrate(axes, k, N[i], errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
     axes.legend(loc=3, prop={'size': 17})
     return axes
 

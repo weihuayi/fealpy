@@ -407,10 +407,7 @@ class DarcyForchheimerFDMModel():
         self.uh = u
         self.ph = ph1
         print('solve |u|(implicit expression)')
-        print('ph-pI',self.ph - self.pI)
-        print('uh-uI',self.uh - self.uI)
-#        print('pI',self.pI)
-#        
+        
         return count,r
 
 

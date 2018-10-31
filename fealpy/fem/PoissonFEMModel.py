@@ -10,6 +10,9 @@ from ..recovery import FEMFunctionRecoveryAlg
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
+from mumps import spsolve
+from timeit import default_timer as timer
+
 
 
 class PoissonFEMModel(object):
@@ -46,8 +49,19 @@ class PoissonFEMModel(object):
 
     def solve(self):
         bc = DirichletBC(self.femspace, self.pde.dirichlet)
-        AD, b= solve(self, self.uh, dirichlet=bc, solver='direct')
-        return AD, b
+
+        start = timer()
+        A = self.get_left_matrix()
+        b = self.get_right_vector()
+        end = timer()
+        print("Construct linear system time:", end - start)
+
+        AD, b = bc.apply(A, b)
+
+        start = timer()
+        self.uh[:] = spsolve(AD, b)
+        end = timer()
+        print("Solve time:", end-start)
 
     
     def get_l2_error(self):

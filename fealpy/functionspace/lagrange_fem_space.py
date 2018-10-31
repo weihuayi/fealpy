@@ -233,7 +233,7 @@ class VectorLagrangeFiniteElementSpace():
         NC = cell2dof.shape[0]
         return cell2dof.reshape(NC, -1)
 
-    def boundary_dof(self):
+    def boundary_dof_flag(self):
         dim = self.dim
         isBdDof = self.dof.boundary_dof()
         return np.repeat(isBdDof, dim)

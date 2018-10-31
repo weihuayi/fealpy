@@ -1,12 +1,17 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+from timeit import default_timer as timer
+from itertools import combinations
 
 def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     gphi = space.grad_basis(bcs)
 
     # Compute the element sitffness matrix
-    A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure)
+    start = timer()
+    A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure, optimize=True)
+    end = timer()
+    print('einsum time:', end - start)
     
     cell2dof = space.cell_to_dof()
     ldof = space.number_of_local_dofs()
@@ -17,6 +22,23 @@ def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     # Construct the stiffness matrix
     A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
     return A
+
+def stiff_matrix_1(space, qf, measure):
+    bcs, ws = qf.quadpts, qf.weights
+    gphi = space.grad_basis(bcs)
+    gdof = space.number_of_global_dofs()
+    cell2dof = space.cell_to_dof()
+    ldof = space.number_of_local_dofs()
+
+    D = np.einsum('i, ijkm, ijkm, j->jk', ws, gphi, gphi, measure, optimize=True)
+    A = coo_matrix((D.flat, (cell2dof.flat, cell2dof.flat)), shape=(gdof, gdof))
+    for i, j in combinations(range(ldof), 2):
+        D = np.einsum('i, ijm, ijm, j->j', ws, gphi[..., i, :], gphi[..., j, :], measure, optimize=True)
+        A += coo_matrix((D, (cell2dof[:, i], cell2dof[:, j])), shape=(gdof, gdof))
+        A += coo_matrix((D, (cell2dof[:, j], cell2dof[:, i])), shape=(gdof, gdof))
+
+    return A.tocsr() 
+
 
 def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
 

@@ -214,27 +214,27 @@ class DarcyForchheimerFDMModel():
             AD = T@A@T + Tbd
 
             bnew[NE] = self.ph[0]
-            A11 = AD[:NE,:NE]
-            A11inv = inv(A11)
-            A12 = AD[:NE,NE:NE+NC]
-            A21 = AD[NE:NE+NC,:NE]
-            Anew = A21*A11inv*A12
-            b1 = A21*A11inv*bnew[:NE] - bnew[NE:NE+NC]
+            AD11 = AD[:NE,:NE]
+            AD11inv = inv(AD11)
+            AD12 = AD[:NE,NE:NE+NC]
+            AD21 = AD[NE:NE+NC,:NE]
+            Anew = AD21*AD11inv*AD12
+            b1 = AD21*AD11inv*bnew[:NE] - bnew[NE:NE+NC]
 
 
             # solve
             p1 = np.zeros((NC,),dtype=ftype)
             p1[1:NC] = spsolve(Anew[1:NC,1:NC],b1[1:NC])
             p1[0] = self.pde.pressure(pc[0])
-            u1 = A11inv*(bnew[:NE] - A12*p1)
+            u1 = AD11inv*(bnew[:NE] - AD12*p1)
 
             f = b[:NE]
             g = b[NE:]
 
             eu = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
             ep = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
-            print('eu',eu)
-            print('ep:',ep)
+            print('ph0',self.ph0)
+            print('p1',p1)
 
             self.uh0[:] = u1
             self.ph0[:] = p1
@@ -265,19 +265,11 @@ class DarcyForchheimerFDMModel():
             count = count + 1
             print('ru:',ru)
             print('rp:',rp)
-#            print('ru1:',ru1)
-#            print('rp1:',rp1)
 
         self.uh[:] = u1
         self.ph[:] = p1
         print('solve matrix p then u')
-#        uw = showsolution(plt,mesh,self.pde,self.uh,self.ph)
-#        print('u1',self.uh)
-#        print('uI',self.uI)
-#        print('p1',self.ph)
-#        print('pI',self.pI)
-#        print('UI-u1:',LA.norm(self.uI - self.uh))
-#        print('uh:',self.uh)
+
         return count,r
 
     def grad_pressure(self):
