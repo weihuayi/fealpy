@@ -4,9 +4,9 @@ from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
-    def __init__(self, mesh, surface, p=1):
+    def __init__(self, mesh, surface, p=1, integrator):
         self.mesh = mesh
-        self.p = p
+        self.integrator = integrator
         self.V = LagrangeFiniteElementSpace(mesh, p)
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
@@ -84,7 +84,7 @@ class SurfaceTriangleMesh():
 
     def area(self):
         mesh = self.mesh
-        integrator = self.integrator(self.p+2)
+        integrator = self.integrator
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)

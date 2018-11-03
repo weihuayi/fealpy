@@ -70,7 +70,6 @@ class Tritree(TriangleMesh):
 
             LCell = edge2cell[flag0, 0]
             RCell = edge2cell[flag1, 1]
-
             idx0 = self.localEdge2childCell[edge2cell[flag0, 3]]
             if len(idx0) > 0:
                 idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0] 

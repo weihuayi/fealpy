@@ -50,22 +50,20 @@ tmesh = Tritree(node, cell, irule=1)
 for i in range(m):
     tmesh.refine(marker)
 
-print(tmesh.ds.cell)
+
 fig0 = plt.figure()
 axes0 = fig0.gca()
 tmesh.add_plot(axes0)
 #tmesh.find_node(axes, showindex=True)
-tmesh.find_cell(axes0, showindex=True)
+#tmesh.find_cell(axes0, showindex=True)
 #tmesh.find_edge(axes, showindex=True) 
 pmesh = tmesh.to_conformmesh()
-#print(pmesh.node)
-print(pmesh.ds.cell)
-print(pmesh.celldata)
+
 fig1 = plt.figure()
 axes1 = fig1.gca()
 pmesh.add_plot(axes1)
-pmesh.find_node(axes1, showindex=True)
-pmesh.find_cell(axes1, showindex=True)
+#pmesh.find_node(axes1, showindex=True)
+#pmesh.find_cell(axes1, showindex=True)
 #pmesh.find_edge(axes1, showindex=True)
 plt.show()
 
