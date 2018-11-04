@@ -1,11 +1,15 @@
 
 import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve
-from mumps import spsolve
+
+try:
+    from mumps import spsolve
+except  ImportError:
+    from scipy.sparse.linalg import spsolve
+
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
 import pyamg
-#import pylab
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     space = a.space
