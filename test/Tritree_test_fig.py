@@ -12,7 +12,7 @@ class AdaptiveMarker():
     def refine_marker(self, tmesh):
         cell = tmesh.entity('cell')
         isLeafCell = tmesh.is_leaf_cell()
-        flag = (np.sum(cell == 5, axis=1) == 1) & isLeafCell
+        flag = (np.sum(cell == 0, axis=1) == 1) & isLeafCell
         idx, = np.where(flag)
         return idx
 
@@ -21,32 +21,33 @@ class AdaptiveMarker():
 
 
 node = np.array([
-    (0, 0), 
-    (1, 0), 
-    (1, 1),
-    (0, 1)], dtype=np.float)
+    (0, 0.5), 
+    (0.865, 0), 
+    (1.73, 0.5),
+    (0.865, 1)], dtype=np.float)
 cell = np.array([
-    (1, 2, 0), 
-    (3, 0, 2)], dtype=np.int)
+    (1, 2, 3),
+    (3, 0, 1)], dtype=np.int)
+
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(1)
+tmesh.uniform_refine(0)
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
 tritree = Tritree(node, cell, irule=1)
 marker = AdaptiveMarker()
 
-for i in range(6):
+for i in range(1):
     tritree.refine(marker)
 
 
 
-
+a = np.array([2, 4], dtype=np.int)
 fig = plt.figure()
 axes = fig.gca()
 tritree.add_plot(axes)
 #tritree.find_node(axes, showindex=True)
-#tritree.find_cell(axes, showindex=True)
+tritree.find_cell(axes, index=a)
 #tritree.find_edge(axes, showindex=True) 
 plt.show()
 

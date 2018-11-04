@@ -6,6 +6,7 @@ from ..quadrature import TriangleQuadrature
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1):
         self.mesh = mesh
+        self.p = p
         self.V = LagrangeFiniteElementSpace(mesh, p)
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
@@ -81,8 +82,9 @@ class SurfaceTriangleMesh():
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
         return bcp
 
-    def area(self, integrator):
+    def area(self):
         mesh = self.mesh
+        integrator = self.integrator(self.p+2)
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)

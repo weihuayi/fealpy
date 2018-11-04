@@ -9,7 +9,7 @@ from ..fem import doperator
 from .SurfaceIntegralAlg import SurfaceIntegralAlg
 
 class SurfacePoissonFEMModel(object):
-    def __init__(self, mesh, pde, p, k, p0=None):
+    def __init__(self, mesh, pde, p, integrator, p0=None):
         """
         """
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p, p0=p0) 
@@ -18,27 +18,11 @@ class SurfacePoissonFEMModel(object):
         self.pde = pde
         self.uh = self.V.function() 
         self.uI = self.V.interpolation(pde.solution)
-        self.integrator = self.mesh.integrator(k)
-        self.area = self.V.mesh.area(self.integrator)
+        self.integrator = integrator
+        self.area = self.V.mesh.area()
         self.error = SurfaceIntegralAlg(self.integrator, self.mesh, self.area)
 
-    def recover_estimate(self):
-        if self.V.p > 1:
-            raise ValueError('This method only work for p=1!')
-
-        V = self.V
-        mesh = V.mesh.mesh
-
-        p2c = mesh.ds.node_to_cell()
-        inva = 1/mesh.area()
-        asum = p2c@inva
-
-        bc = np.array([1/3]*3, dtype=np.float)
-        guh = self.uh.grad_value(bc)
-
-        VV = VectorLagrangeFiniteElementSpace(mesh, p=1)
-        rguh = VV.function()
-        rguh[:] = np.asarray(p2c@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
+    def recover_estimate(self, rguh):
 
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights

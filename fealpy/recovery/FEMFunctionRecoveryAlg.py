@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import csr_matrix
+from fealpy.quadrature import TriangleQuadrature
 
 def scaleCoor(realp):
     center = np.mean(realp,axis=0)
@@ -18,6 +19,9 @@ class FEMFunctionRecoveryAlg():
     def __init__(self):
         pass
 
+    def integrator(self, k):
+        return TriangleQuadrature()
+    
     def simple_average(self, uh):
         space = uh.space
         mesh = space.mesh
@@ -52,9 +56,8 @@ class FEMFunctionRecoveryAlg():
         space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
-
         node2cell = mesh.ds.node_to_cell()
-        inva = 1/mesh.entity_measure('cell')
+        inva = 1/mesh.area()
         asum = node2cell@inva
 
         bc = np.array([1/3]*3, dtype=np.float)

@@ -168,8 +168,8 @@ class Mesh2d():
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=200, 
-            fontsize=24, fontcolor='k'):
+            color='r', markersize=50, 
+            fontsize=8, fontcolor='k'):
 
         if node is None:
             node = self.node
@@ -181,7 +181,7 @@ class Mesh2d():
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=400, 
+            color='g', markersize=200, 
             fontsize=24, fontcolor='k'):
 
         find_entity(axes, self, entity='edge',
@@ -191,8 +191,8 @@ class Mesh2d():
 
     def find_cell(self, axes, 
             index=None, showindex=False,
-            color='y', markersize=800, 
-            fontsize=24, fontcolor='k'):
+            color='y', markersize=50, 
+            fontsize=8, fontcolor='k'):
         
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex, 
