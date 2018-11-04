@@ -10,7 +10,7 @@ from ..recovery import FEMFunctionRecoveryAlg
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
-from mumps import spsolve
+from scipy.sparse.linalg import spsolve
 from timeit import default_timer as timer
 
 

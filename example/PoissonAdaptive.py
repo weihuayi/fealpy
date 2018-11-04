@@ -34,7 +34,9 @@ for i in range(maxit):
     fem = SurfacePoissonFEMModel(pmesh, pde, p, integrator)
     fem.solve()
     uh = fem.uh
+    print(uh)
     rguh = ralg.harmonic_average(uh)
+    print(rguh)
     eta = fem.recover_estimate(rguh)
     Ndof[i] = len(fem.uh)
     errorMatrix[0, i] = fem.get_l2_error()
