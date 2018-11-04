@@ -87,28 +87,37 @@ class SurfaceLagrangeFiniteElementSpace:
     def value(self, uh, bc, cellidx=None):
         phi = self.basis(bc)
         cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...j, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            val = np.einsum('...j, ij->...i', phi, uh[cell2dof])
+            val = np.einsum(s1, phi, uh[cell2dof])
         else:
-            val = np.einsum('...j, ij->...i', phi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
         return val 
     
     def grad_value(self, uh, bc, cellidx=None):
         gphi = self.grad_basis(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+            val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
         return val
 
     def grad_value_on_surface(self, uh, bc, cellidx=None):
         gphi, ps, n = self.grad_basis_on_surface(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof])
+            val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
         return val, ps, n
 
     def hessian_value(self, uh, bc, cellidx=None):
