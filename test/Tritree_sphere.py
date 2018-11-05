@@ -23,7 +23,7 @@ class AdaptiveMarker():
         pass
 surface = Sphere()
 mesh = surface.init_mesh()
-mesh.uniform_refine(n=1, surface = surface)
+mesh.uniform_refine(n=2, surface = surface)
 node = mesh.node
 cell = mesh.ds.cell
 tmesh = Tritree(node, cell, irule=1)

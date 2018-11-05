@@ -24,7 +24,9 @@ class AdaptiveMarker():
         self.ctheta = ctheta
 
     def refine_marker(self, qtmesh):
-        idx = qtmesh.leaf_cell_index()
+        pmesh = qtmesh.to_conformmesh()
+        pmesh.celldata['idxmap'] = np.array(list(set(pmesh.celldata['idxmap'])))
+        idx = pmesh.celldata['idxmap']
         markedIdx = mark(self.eta, self.theta)
         return idx[markedIdx]
 
