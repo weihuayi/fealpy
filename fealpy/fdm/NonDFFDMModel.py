@@ -160,10 +160,14 @@ class NuDarcyForchheimerFDMModel():
         cell2edge = mesh.ds.cell_to_edge()
         I = np.arange(NC, dtype=itype)
         data = np.ones(NC, dtype=ftype)
-        A21 = coo_matrix((data/hx1, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-data/hx1, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((data/hy1, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-data/hy1, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
+#        A21 = coo_matrix((data/hx1, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
+#        A21 += coo_matrix((-data/hx1, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
+#        A21 += coo_matrix((data/hy1, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
+#        A21 += coo_matrix((-data/hy1, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
+        A21 = coo_matrix((hy1*data, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-hy1*data, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((hx1*data, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
+        A21 += coo_matrix((-hx1*data, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
         A21 = A21.tocsr()
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
 
@@ -172,6 +176,8 @@ class NuDarcyForchheimerFDMModel():
     def get_right_vector(self):
         pde = self.pde
         mesh = self.mesh
+        hx1 = self.hx1
+        hy1 = self.hy1
 
         itype = mesh.itype
         ftype = mesh.ftype
@@ -202,13 +208,13 @@ class NuDarcyForchheimerFDMModel():
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
         val = pde.velocity_x(bc[idx])
-        b0[idx] = (mu/k+beta*rho*C[idx])*val #modify
+        b0[idx] = C[idx]*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
         val = pde.velocity_y(bc[idx])
-        b0[idx] = (mu/k+beta*rho*C[idx])*val
+        b0[idx] = C[idx]*val
 
-        b1 = pde.source1(pc)
+        b1 =hx1*hy1*pde.source1(pc)
         return np.r_[b0, b1]
 
     
@@ -258,7 +264,7 @@ class NuDarcyForchheimerFDMModel():
             bnew = np.copy(b)
             
             x = np.r_[self.uh, self.ph]#The combination of self.uh and self.ph together
-            print('x',x)
+#            print('x',x)
             bnew = bnew - A@x
 
             # Modify matrix
@@ -272,7 +278,7 @@ class NuDarcyForchheimerFDMModel():
             bnew[NE] = self.ph[0]
  
             x[:] = spsolve(AD, bnew)
-            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
+#            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
             u1 = x[:NE]
             p1 = x[NE:]
 
@@ -412,3 +418,117 @@ class NuDarcyForchheimerFDMModel():
         Dp1eL2 = np.sqrt(np.sum(area1*(Dph[idx] - DpI[idx])**2))
 
         return Dp1eL2
+
+    def get_uqunorm_error(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        area1 = self.area1
+        ftype = mesh.ftype
+
+        mu = self.pde.mu
+        k = self.pde.k
+        rho = self.pde.rho
+        beta = self.pde.beta
+
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        normu = np.zeros(NE, dtype=ftype)
+        C = self.get_nonlinear_coef()
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        normu[I] = self.pde.normu_x(bc[I])
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        normu[J] = self.pde.normu_y(bc[J])
+
+        Qu = (C - mu/k)/rho/beta
+
+        idx = np.r_[I,J]
+
+        uqunorm = np.sqrt(np.sum(area1*((normu[idx] - Qu[idx])*self.uI[idx])**2))
+
+        return uqunorm
+
+    def get_uuqunorm_error(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        area1 = self.area1
+        ftype = mesh.ftype
+
+        mu = self.pde.mu
+        k = self.pde.k
+        rho = self.pde.rho
+        beta = self.pde.beta
+
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        normu = np.zeros(NE, dtype=ftype)
+        C = self.get_nonlinear_coef()
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        normu[I] = self.pde.normu_x(bc[I])
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        L = edge2cell[J, 0]
+        R = edge2cell[J, 1]
+        normu[J] = self.pde.normu_y(bc[J])
+
+        Qu = (C - mu/k)/rho/beta
+
+        idx = np.r_[I,J]
+
+        uuqunorm = np.sqrt(np.sum(area1*(normu[idx]*self.uI[idx]\
+                   - Qu[idx]*self.uh[idx])**2))
+
+        return uuqunorm
+
+    def get_uqnorm_error(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        area1 = self.area1
+        ftype = mesh.ftype
+
+        mu = self.pde.mu
+        k = self.pde.k
+        rho = self.pde.rho
+        beta = self.pde.beta
+
+        bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
+
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2cell = mesh.ds.edge_to_cell()
+        normu = np.zeros(NE, dtype=ftype)
+        C = self.get_nonlinear_coef()
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        normu[I] = self.pde.normu_x(bc[I])
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        L = edge2cell[J, 0]
+        R = edge2cell[J, 1]
+        normu[J] = self.pde.normu_y(bc[J])
+
+        idx = np.r_[I,J]
+
+        Qu = (C - mu/k)/rho/beta
+
+        uqnorm = np.sqrt(np.sum(area1*((normu[idx] - Qu[idx]))**2))
+
+        return uqnorm
