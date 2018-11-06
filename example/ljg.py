@@ -21,7 +21,7 @@ theta = 0.2
 integrator = TriangleQuadrature(6)
 ralg = FEMFunctionRecoveryAlg()
 pde = SphereSinSinSinData()
-mesh = pde.init_mesh(3)
+mesh = pde.init_mesh(5)
 tmesh = Tritree(mesh.node, mesh.ds.cell, irule=1)
 pmesh = tmesh.to_conformmesh()
 fig0 = pl.figure()
