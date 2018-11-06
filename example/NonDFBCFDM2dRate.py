@@ -74,10 +74,34 @@ for i in range(maxit):
     x = np.arange(count[i])
     fig = plt.figure()
     ax1 = fig.add_subplot(121)
+    f,(ax,ax3) = plt.subplots(2,1,sharex=True)
+
+    ax.plot(r[0,count[i]-1])
+    ax3.plot(r[0,count[i]-1])
+    ax.set_ylim(0.0007,0.0008)
+    ax3.set_ylim(0,0.00000001)
+
+#hide the spines between ax and ax2
+    ax.spines['bottom'].set_visible(False)
+    ax3.spines['top'].set_visible(False)
+    ax.xaxis.tick_top()
+    ax.tick_params(labeltop=False)
+    ax3.xaxis.tick_bottom()
+
+    d = .015
+    kwargs = dict(transform=ax.transAxes,color='k', clip_on=False)
+    ax.plot((-d, +d), (-d,+d),**kwargs)
+    ax.plot((1-d,1+d), (-d,+d), **kwargs)
+
+    kwargs.update(transform=ax3.transAxes)
+    ax3.plot((-d, +d), (1-d,1+d),**kwargs)
+    ax3.plot((1-d,1+d), (-d,+d), **kwargs)
+    
     ax1.set_title('rp')
     ax1.scatter(x,r[0,:count[i]],c='r',marker = '.')
     plt.text(count[i]/2, r[0,count[i]-1]+0.00002,'rp = %e' %r[0,count[i]-1],ha = 'center')
-    ax1.set_yticks([-0.001,0,0.0002, 0.0008, 0.0009])
+    plt.yscale('symlog')
+#    ax1.set_yticks([-0.001,0,0.0002, 0.0008, 0.0009])
     plt.ylim([-0.0001,0.0009])
     ax2 = fig.add_subplot(122)
     ax2.set_title('ru')
