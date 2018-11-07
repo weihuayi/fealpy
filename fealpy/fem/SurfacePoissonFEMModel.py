@@ -16,7 +16,7 @@ class SurfacePoissonFEMModel(object):
         self.mesh = self.V.mesh
         self.surface = pde.surface
         self.pde = pde
-        self.uh = self.V.function() 
+        self.uh = self.V.function()
         self.uI = self.V.interpolation(pde.solution)
         self.integrator = integrator
         self.area = self.V.mesh.area()
@@ -26,7 +26,6 @@ class SurfacePoissonFEMModel(object):
 
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
-
         val0 = rguh.value(bcs)
         val1 = self.uh.grad_value(bcs)
         l = np.sum((val1 - val0)**2, axis=-1)
