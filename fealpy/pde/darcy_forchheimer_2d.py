@@ -2,6 +2,7 @@ import numpy as np
 
 from ..mesh.litest_quadmesh import StructureQuadMesh1
 from ..mesh.StructureQuadMesh import StructureQuadMesh
+from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Mesh2d import Mesh2d
 
 class PolyData:
@@ -404,3 +405,90 @@ class ArctanData:
         y = p[..., 1]
         val = np.sqrt(x**2 + y**2)
         return val
+
+class DarcyForchheimerdata1:
+    def __init__(self, box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J):
+        self.box = box
+        self.mu = mu
+        self.rho = rho
+        self.beta = beta
+        self.alpha = alpha
+        self.level = level
+        self.tol = tol
+        self.maxN = maxN
+        self.mg_maxN = mg_maxN
+        self.J = J
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1)], dtype=np.float)
+
+        if meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+
+    def g(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        rhs = np.zeros(p.shape[0],)
+
+        return rhs
+
+    def velocity(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[:, 0] = x + y
+        val[:, 1] = x - y
+        return val
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = x**3 + y**3
+        return val
+    def f(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+
+        beta = self.beta
+        m = np.sqrt(2*x**2+2*y**2)
+        val[:, 0] = (1 + beta*m)*(x+y) + 3*x**2
+        val[:, 1] = (1 + beta*m)*(x-y) + 3*y**2
+        return val
+
+    def grad_pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[:, 0] = 3*x**2
+        val[:, 1] = 3*y**2
+        return val
+
+    def Neumann_boundary(self,p):
+        z = np.zeros(p.shape[0],)
+        x = p[..., 0]
+        y = p[..., 1]
+        idx = np.nonzero(abs(x - 1) < np.spacing(0))
+        z[idx] = 1 + y[idx]
+        
+        idx = np.nonzero(abs(x + 1) < np.spacing(0))
+        z[idx] = 1 - y[idx]
+        
+        idx = np.nonzero(abs(y - 1) < np.spacing(0))
+        z[idx] = x[idx] - 1
+        
+        idx = np.nonzero(abs(y + 1) < np.spacing(0))
+        z[idx] = - x[idx] - 1
+        
+        return z        
+
