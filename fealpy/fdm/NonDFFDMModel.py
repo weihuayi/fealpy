@@ -284,8 +284,8 @@ class NuDarcyForchheimerFDMModel():
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
             ep = np.sqrt(np.sum(area2*(p1-self.ph0)**2))
-            print('eu',eu)
-            print('ep:',ep)
+#            print('eu',eu)
+#            print('ep:',ep)
 
             self.uh0[:] = u1
             self.ph0[:] = p1
@@ -304,7 +304,7 @@ class NuDarcyForchheimerFDMModel():
                 ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
 
             if LA.norm(g) == 0:
-                rp = LA.norm(bnew[NE:] - AD21@u1)
+                rp = LA.norm(g - A21@u1)
             else:
                 rp = LA.norm(g - A21@u1)/LA.norm(g)
 
@@ -313,11 +313,15 @@ class NuDarcyForchheimerFDMModel():
             r[1,count] = ru
 
             count = count + 1
-            print('ru:',ru)
-            print('rp:',rp)
+#            print('ru:',ru)
+#            print('rp:',rp)
 
         self.uh[:] = u1
         self.ph[:] = p1
+        print('eu',eu)
+        print('ep:',ep)
+        print('ru:',ru)
+        print('rp:',rp)
         print('solve matrix p and u')
         return count,r
 
@@ -441,10 +445,10 @@ class NuDarcyForchheimerFDMModel():
         C = self.get_nonlinear_coef()
 
         I, = np.nonzero(~isBDEdge & isYDEdge)
-        normu[I] = self.pde.normu_x(bc[I])
+        normu[I] = self.pde.normu(bc[I])
 
         J, = np.nonzero(~isBDEdge & isXDEdge)
-        normu[J] = self.pde.normu_y(bc[J])
+        normu[J] = self.pde.normu(bc[J])
 
         Qu = (C - mu/k)/rho/beta
 
@@ -478,12 +482,12 @@ class NuDarcyForchheimerFDMModel():
         I, = np.nonzero(~isBDEdge & isYDEdge)
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
-        normu[I] = self.pde.normu_x(bc[I])
+        normu[I] = self.pde.normu(bc[I])
 
         J, = np.nonzero(~isBDEdge & isXDEdge)
         L = edge2cell[J, 0]
         R = edge2cell[J, 1]
-        normu[J] = self.pde.normu_y(bc[J])
+        normu[J] = self.pde.normu(bc[J])
 
         Qu = (C - mu/k)/rho/beta
 
@@ -518,12 +522,12 @@ class NuDarcyForchheimerFDMModel():
         I, = np.nonzero(~isBDEdge & isYDEdge)
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
-        normu[I] = self.pde.normu_x(bc[I])
+        normu[I] = self.pde.normu(bc[I])
 
         J, = np.nonzero(~isBDEdge & isXDEdge)
         L = edge2cell[J, 0]
         R = edge2cell[J, 1]
-        normu[J] = self.pde.normu_y(bc[J])
+        normu[J] = self.pde.normu(bc[J])
 
         idx = np.r_[I,J]
 

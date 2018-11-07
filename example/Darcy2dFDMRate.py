@@ -4,7 +4,7 @@ import time
 
 #from fealpy.pde.darcy_2d import CoscosData
 #from fealpy.pde.darcy_2d_1 import CoscosData
-from fealpy.pde.darcy_2d_2 import CoscosData
+from fealpy.pde.darcy_2d import CoscosData
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 #from fealpy.fdm.DarcyFDMModel_1 import DarcyFDMModel
 from fealpy.tools.show import showmultirate
@@ -14,7 +14,7 @@ nx = 8
 ny = 8
 pde = CoscosData(box)
 
-maxit = 1
+maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$',
         '$p_I - p_h$']

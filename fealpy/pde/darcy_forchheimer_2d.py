@@ -17,7 +17,7 @@ class PolyData:
 
     def init_mesh(self, hx, hy):
         box = self.box
-        mesh = StructureQuadMesh1(box, hx, hy)
+        mesh = StructureQuadMesh(box, hx, hy)
         return mesh
 
 
@@ -102,7 +102,7 @@ class PolyData:
         val = x*(1-x)*(1-y) - x*(1-x)*y
         return val
 
-    def normu_x(self, p):
+    def normu(self, p):
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
@@ -113,16 +113,6 @@ class PolyData:
         val = np.sqrt(t0**2*t3**2 + t1**2*t2**2)
         return val
 
-    def normu_y(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        t0 = np.sin(pi*x)
-        t1 = np.cos(pi*x)
-        t2 = np.sin(pi*y)
-        t3 = np.cos(pi*y)
-        val = np.sqrt(t0**2*t3**2 + t1**2*t2**2)
-        return val
 class ExponentData:
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
@@ -199,17 +189,12 @@ class ExponentData:
         y = p[..., 1]
         val = x*(1-x)*(1-2*y)*np.exp(x*(1-x)*y*(1-y))
         return val
-    def normu_x(self, p):
+    def normu(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.sqrt(x**2*y**2*((1-x)**2 + (1-y)**2))
         return val
 
-    def normu_y(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.sqrt(x**2*y**2*((1-x)**2 + (1-y)**2))
-        return val
 class SinsinData:
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
@@ -222,7 +207,7 @@ class SinsinData:
 
     def init_mesh(self, nx, ny):
         box = self.box
-        mesh = StructureQuadMesh(box, nx, ny)
+        mesh = StructureQuadMesh1(box, nx, ny)
         return mesh
 
 
@@ -295,18 +280,7 @@ class SinsinData:
         val = pi*np.sin(pi*x)*np.cos(pi*y)
         return val
 
-    def normu_x(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        t0 = np.sin(x)
-        t1 = np.cos(x)
-        t2 = np.sin(y)
-        t3 = np.cos(y)
-        val = np.sqrt(t0**2*t3**2 + t1**2*t2**2)
-        return val
-
-    def normu_y(self, p):
+    def normu(self, p):
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
@@ -329,7 +303,7 @@ class ArctanData:
 
     def init_mesh(self, nx, ny):
         box = self.box
-        mesh = StructureQuadMesh(box, nx, ny)
+        mesh = StructureQuadMesh1(box, nx, ny)
         return mesh
 
 
@@ -393,14 +367,47 @@ class ArctanData:
         val = 20/(np.pi*(1+(10*(x+y-1))**2))
         return val
 
-    def normu_x(self, p):
+    def normu(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.sqrt(x**2 + y**2)
         return val
 
-    def normu_y(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.sqrt(x**2 + y**2)
-        return val
+class DeltaData:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+    def init_mesh(self, nx, ny):
+        box = self.box
+        mesh = StructureQuadMesh1(box, nx, ny)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        rhs = np.zeros(p.shape[0],)
+
+        return rhs
+
+    def source2(self, p):
+
+        rhs = np.zeros(p.shape[0],)
+        rhs[0] = np.pi
+        rhs[-1] = -np.pi
+
+        return rhs
+
+    def source3(self, p):
+
+        rhs = np.zeros(p.shape[0],)
+        rhs[0] = np.pi
+        rhs[-1] = -np.pi
+
+        return rhs
