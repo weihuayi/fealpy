@@ -23,14 +23,17 @@ integrator = mesh.integrator(p+2)
 
 errorType = ['$|| u - u_h||_0$']#,'$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 1
+maxit = 4
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+Ndof = np.zeros(maxit,dtype = np.int)
 
 for i in range(maxit):
     fem = DarcyForchheimerP0P1(pde, mesh, p, integrator)
-    u,p = fem.solve()
-    print('u',u)
-    print('p',p)
+    u,q = fem.solve()
+    print('q',q)
+    NC = mesh.number_of_cells()
+    NN = mesh.number_of_edges()
+    Ndof[i] = 2*NC+NN
 #    Ndof[i] = fem.femspace.number_of_globla_dof()
     errorMatrix[0, i] = fem.get_pL2_error()
 #    errorMatrix[1, i] = fem.get_pL2_error()

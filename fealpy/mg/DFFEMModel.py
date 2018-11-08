@@ -206,20 +206,17 @@ class DarcyForchheimerP0P1():
         return u,p
 
     def get_pL2_error(self):
-        mesh = self.mesh
-        node = mesh.node
-        p = self.pde.pressure
-        uh,ph = self.solve()
-        ph = ph.value
 
-        pL2 = self.integralalg.L2_error(pI,p)
+        p = self.pde.pressure
+        ph = self.ph.value
+
+        pL2 = self.integralalg.L2_error(p,ph)
         return pL2
 
     def get_uL2_error(self):
         mesh = self.mesh
         bc = mesh.entity_barycenter('cell')
         uI = self.pde.velocity(bc)
-        uh,ph = self.solve()
         
         uh = self.uh.value
         u = self.pde.velocity
