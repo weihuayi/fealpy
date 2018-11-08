@@ -151,7 +151,7 @@ class Mesh2d():
     def add_plot(self, plot,
             nodecolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
-            linewidths=1, markersize=2,  
+            linewidths=1, markersize=50,  
             showaxis=False, showcolorbar=False, cmap='rainbow'):
 
         if isinstance(plot, ModuleType):
@@ -168,11 +168,15 @@ class Mesh2d():
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=50, 
-            fontsize=8, fontcolor='k'):
+            color='r', markersize=100, 
+            fontsize=24, fontcolor='k'):
 
         if node is None:
             node = self.node
+        
+        if (index is None) and (showindex == True): 
+            index = np.array(range(node.shape[0]))
+
         find_node(axes, node, 
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
@@ -181,7 +185,7 @@ class Mesh2d():
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=200, 
+            color='g', markersize=150, 
             fontsize=24, fontcolor='k'):
 
         find_entity(axes, self, entity='edge',
@@ -191,8 +195,8 @@ class Mesh2d():
 
     def find_cell(self, axes, 
             index=None, showindex=False,
-            color='y', markersize=50, 
-            fontsize=8, fontcolor='k'):
+            color='y', markersize=200, 
+            fontsize=24, fontcolor='k'):
         
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex, 
