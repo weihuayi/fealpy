@@ -27,7 +27,7 @@ class DarcyForchheimerFDMModel():
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         self.pI = pde.pressure(pc)
 
-        self.ph[0] = self.pI[0]
+#        self.ph[0] = self.pI[0]
 
     def get_nonlinear_coef(self):
         mesh = self.mesh
@@ -218,12 +218,13 @@ class DarcyForchheimerFDMModel():
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
             AD = T@A@T + Tbd
 
- 
-            bnew[NE] = self.ph[0]
- 
-            x[:] = spsolve(AD, bnew)
+            idx1 = 1 - bdIdx
+            idx2, = np.nonzero(idx1)
+            x[idx2] = spsolve(AD[idx2,:][:,idx2], bnew[idx2])
             u1 = x[:NE]
             p1 = x[NE:]
+
+            p1 = p1 - np.mean(p1)
 
             f = b[:NE]
             g = b[NE:]
@@ -293,7 +294,7 @@ class DarcyForchheimerFDMModel():
         isXDEdge = mesh.ds.x_direction_edge_flag()
         
         bc = mesh.entity_barycenter('edge')
-        normu = self.pde.norm_u(bc)
+        normu = self.pde.normu(bc)
 
         I, = np.nonzero(~isBDEdge & isYDEdge)
         J, = np.nonzero(~isBDEdge & isXDEdge)

@@ -218,15 +218,15 @@ class DarcyForchheimerFDMModel():
             AD11inv = inv(AD11)
             AD12 = AD[:NE,NE:NE+NC]
             AD21 = AD[NE:NE+NC,:NE]
-            Anew = AD21*AD11inv*AD12
-            b1 = AD21*AD11inv*bnew[:NE] - bnew[NE:NE+NC]
+            Anew = AD21@AD11inv@AD12
+            b1 = AD21@AD11inv@bnew[:NE] - bnew[NE:NE+NC]
 
 
             # solve
             p1 = np.zeros((NC,),dtype=ftype)
             p1[1:NC] = spsolve(Anew[1:NC,1:NC],b1[1:NC])
             p1[0] = self.pde.pressure(pc[0])
-            u1 = AD11inv*(bnew[:NE] - AD12*p1)
+            u1 = AD11inv@(bnew[:NE] - AD12@p1)
 
             f = b[:NE]
             g = b[NE:]
@@ -246,13 +246,13 @@ class DarcyForchheimerFDMModel():
 
 
             if LA.norm(f) == 0:
-                ru = LA.norm(f - A11*u1 - A12*p1)
+                ru = LA.norm(f - A11@u1 - A12@p1)
             else:
-                ru = LA.norm(f - A11*u1 - A12*p1)/LA.norm(f)
+                ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
             if LA.norm(g) == 0:
-                rp = LA.norm(g - A21*u1)
+                rp = LA.norm(g - A21@u1)
             else:
-                rp = LA.norm(g - A21*u1)/LA.norm(g)
+                rp = LA.norm(g - A21@u1)/LA.norm(g)
             C = self.get_nonlinear_coef()#add
 #            ru1 = LA.norm(f - A12*p1 -A11*u1)
 #            rp1 = LA.norm(A21*A11inv*f - g - A21*A11inv*A12*p1)

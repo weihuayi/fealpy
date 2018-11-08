@@ -2,8 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-#from fealpy.pde.darcy_forchheimer_2d import PolyData
-from fealpy.pde.darcy_forchheimer_2d import ExponentData
+from fealpy.pde.darcy_forchheimer_2d import PolyData
+#from fealpy.pde.darcy_forchheimer_2d import ExponentData
+#from fealpy.pde.darcy_forchheimer_2d import SinsinData
 #from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
 from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
@@ -13,9 +14,16 @@ from fealpy.tools.show import showmultirate
 from fealpy.tools.showsolution import showsolution
 
 box = [0,1,0,1]
-nx = 16
-ny = 16
-pde = ExponentData(box)
+mu = 2
+k = 1
+rho = 1
+beta = 5
+tol = 1e-6
+nx = 8
+ny = 8
+pde = PolyData(box,mu,k,rho,beta,tol)
+#pde = ExponentData(box)
+#pde = SinsinData(box)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$',\

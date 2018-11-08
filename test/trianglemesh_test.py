@@ -12,14 +12,14 @@ node = np.array([
     (1, 1),
     (0, 1)], dtype=np.float)
 cell = np.array([
-    (2, 0, 1),
+    (1, 2, 0),
     (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
 tmesh.uniform_refine(1)
 node = tmesh.node
 cell = tmesh.entity('cell')
-print(cell)
+print(tmesh.ds.node_to_cell())
 N = node.shape[0]
 tmeshstrcture = TriangleMeshDataStructure(N, cell)
 fig = plt.figure()
