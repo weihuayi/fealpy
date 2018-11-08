@@ -15,10 +15,16 @@ class DarcyForchheimerP0P1():
         self.pde = pde
         self.mesh = self.femspace.mesh
 
+        self.uh = self.femspace.function()
+        self.ph = self.femspace.function()
+#        self.uI = self.femspace.function()
+#        self.pI = self.femspace.interpolation(pde.pressure)
+
         self.cellmeasure = mesh.entity_measure('cell')
         self.integrator = integrator
         self.lfem = DarcyP0P1(self.pde, self.mesh, p, integrator)
         self.uh0,self.ph0 = self.lfem.solve()
+        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
 
     def gradbasis(self):
         mesh = self.mesh
@@ -110,11 +116,12 @@ class DarcyForchheimerP0P1():
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
         mid = ec[isBDEdge,:]
-        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(2,1))
+        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(1,2))
 
         g = np.bincount(np.ravel(bdEdge,'F'),\
                 weights=np.ravel(ii), minlength=NN)
         g = g - b
+
         
         return np.r_[f,g]
 
@@ -150,8 +157,6 @@ class DarcyForchheimerP0P1():
         F = self.uh0/alpha - (mu/rho)*self.uh0 - (A12@self.ph0 - b[:2*NC])/area
         FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
         gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
-        print('uh0',self.uh0)
-        print('ph0',self.ph0)
         uhalf = F/np.r_[gamma,gamma]
         ## Direct Solver 
 
@@ -196,6 +201,40 @@ class DarcyForchheimerP0P1():
             r[0,n] = ru
             r[1,n] = rp
 
-            
-
+        self.u = u
+        self.p = p
         return u,p
+
+    def get_pL2_error(self):
+        mesh = self.mesh
+        node = mesh.node
+        p = self.pde.pressure
+        uh,ph = self.solve()
+        ph = ph.value
+
+        pL2 = self.integralalg.L2_error(pI,p)
+        return pL2
+
+    def get_uL2_error(self):
+        mesh = self.mesh
+        bc = mesh.entity_barycenter('cell')
+        uI = self.pde.velocity(bc)
+        uh,ph = self.solve()
+        
+        uh = self.uh.value
+        u = self.pde.velocity
+
+
+
+#        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        uL2 = self.integralalg.L2_error(u,uh)
+        return uL2
+
+
+    def get_H1_error(self):
+        mesh = self.mesh
+        gp = self.pde.grad_pressure
+        u,p = self.solve()
+        gph = p.grad_value
+        H1 = self.integralalg.L2_error(gp, gph)
+        return H1

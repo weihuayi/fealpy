@@ -21,7 +21,7 @@ pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J)
 mesh = pde.init_mesh(n)
 integrator = mesh.integrator(p+2)
 
-errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
+errorType = ['$|| u - u_h||_0$']#,'$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
 maxit = 1
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
@@ -32,9 +32,9 @@ for i in range(maxit):
     print('u',u)
     print('p',p)
 #    Ndof[i] = fem.femspace.number_of_globla_dof()
-    errorMatrix[0, i] = fem.get_uL2_error()
-    errorMatrix[1, i] = fem.get_pL2_error()
-    errorMatrix[1, i] = fem.get_H1_error()
+    errorMatrix[0, i] = fem.get_pL2_error()
+#    errorMatrix[1, i] = fem.get_pL2_error()
+#    errorMatrix[1, i] = fem.get_H1_error()
 
     if i < maxit -1:
         mesh.uniform_refine()
