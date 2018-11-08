@@ -29,7 +29,19 @@ class PoissonFEMModel(object):
     def recover_estimate(self,rguh):
         if self.femspace.p > 1:
             raise ValueError('This method only work for p=1!')
- 
+        
+        femspace = self.femspace
+        mesh = femspace.mesh
+
+        node2cell = mesh.ds.node_to_cell()
+        inv = 1/self.cellmeasure
+        asum = node2cell@inv
+
+        bc = np.array([1/3]*3, dtype=np.float)
+        guh = self.uh.grad_value(bc)
+        
+        rguh = self.femspace.function(dim=mesh.geo_dimension())
+        rguh[:] = np.asarray(node2cell@(guh*inv.reshape(-1, 1)))/asum.reshape(-1, 1)
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
 
