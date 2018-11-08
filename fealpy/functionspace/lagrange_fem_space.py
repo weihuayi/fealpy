@@ -28,6 +28,10 @@ class LagrangeFiniteElementSpace():
                 self.dof = DPLFEMDof3d(mesh, p)
                 self.dim = 3
 
+        self.spacetype = spacetype
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
+
     def __str__(self):
         return "Lagrange finite element space!"
 
@@ -74,6 +78,12 @@ class LagrangeFiniteElementSpace():
 
         """
         p = self.p   # the degree of polynomial basis function
+
+        if p == 0 and self.spacetype == 'D':
+            if len(bc.shape) == 1:
+                return np.ones(1, dtype=self.ftype)
+            else:
+                return np.ones((bc.shape[0], 1), dtype=self.ftype)
 
         dim = self.dim 
         multiIndex = self.dof.multiIndex 
