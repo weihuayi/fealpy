@@ -517,7 +517,7 @@ class Example7:
 
     def init_mesh(self, hx, hy):
         box = self.box
-        mesh = StructureQuadMesh(box, hx, hy)
+        mesh = StructureQuadMesh1(box, hx, hy)
         return mesh
 
 
@@ -544,13 +544,13 @@ class Example7:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        val = exp(x)*np.sin(y)
+        val = np.exp(x)*np.sin(y)
         return val
     def velocity_y(self, p):
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        val = exp(x)*np.cos(y)
+        val = np.exp(x)*np.cos(y)
         return val
 
     def pressure(self, p):
@@ -567,8 +567,8 @@ class Example7:
         beta = self.beta
         t2 = np.sin(y)
         t3 = np.cos(y)
-        m = mu/k + rho*beta*np.sqrt(exp(x)**2*t2**2 + exp(x)**2*t3**2)
-        val = m*exp(x)*t2 + (1-2*x)*y*(1-y)
+        m = mu/k + rho*beta*np.sqrt(np.exp(x)**2*t2**2 + np.exp(x)**2*t3**2)
+        val = m*np.exp(x)*t2 + (1-2*x)*y*(1-y)
         return val
 
     def source3(self, p):
@@ -581,8 +581,8 @@ class Example7:
         beta = self.beta
         t0 = np.sin(y)
         t1 = np.cos(y)
-        m = mu/k + rho*beta*np.sqrt(t0**2*exp(x)**2 + t1**2*exp(x)**2)
-        val = m*t1*exp(x) +  x*(1-x)*(1-2*y)
+        m = mu/k + rho*beta*np.sqrt(t0**2*np.exp(x)**2 + t1**2*np.exp(x)**2)
+        val = m*t1*np.exp(x) +  x*(1-x)*(1-2*y)
         return val
     def grad_pressure_x(self, p):
         x = p[..., 0]
@@ -603,7 +603,7 @@ class Example7:
 
         t0 = np.sin(y)
         t1 = np.cos(y)
-        val = np.sqrt(t0**2*exp(x)**2 + t1**2*exp(x)**2)
+        val = np.sqrt(t0**2*np.exp(x)**2 + t1**2*np.exp(x)**2)
         return val
        
 class Example8:
@@ -658,7 +658,7 @@ class Example8:
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = x*(1-x)*y*(1-y)
+        val = np.sin(np.pi*x)*np.sin(np.pi*y)
         return val
     def source2(self, p):
         x = p[..., 0]
@@ -670,7 +670,7 @@ class Example8:
         t2 = np.sin(y)
         t3 = np.cos(y)
         m = mu/k + rho*beta*np.sqrt(exp(x)**2*t2**2 + exp(x)**2*t3**2)
-        val = m*exp(x)*t2 + (1-2*x)*y*(1-y)
+        val = m*exp(x)*t2 + np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
         return val
 
     def source3(self, p):
@@ -684,6 +684,107 @@ class Example8:
         t0 = np.sin(y)
         t1 = np.cos(y)
         m = mu/k + rho*beta*np.sqrt(t0**2*exp(x)**2 + t1**2*exp(x)**2)
+        val = m*t1*exp(x) +  np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+        return val
+    def grad_pressure_x(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape)
+        val = np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
+        return val
+
+    def grad_pressure_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+        return val
+
+    def normu(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        t0 = np.sin(y)
+        t1 = np.cos(y)
+        val = np.sqrt(t0**2*exp(x)**2 + t1**2*exp(x)**2)
+        return val
+      
+ 
+class Example9:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        rhs = exp(x) + exp(y)
+        return rhs
+
+
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[:,0] = x*exp(y)
+        val[:,1] = y*exp(x)
+        return val
+
+    def velocity_x(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = x*exp(y)
+        return val
+    def velocity_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = y*exp(x)
+        return val
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = x*(1-x)*y*(1-y)
+        return val
+    def source2(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        mu = self.mu
+        k = self.k
+        rho = self.rho
+        beta = self.beta
+        m = mu/k + rho*beta*np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
+        val = m*exp(x)*t2 + (1-2*x)*y*(1-y)
+        return val
+
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        mu = self.mu
+        k = self.k
+        rho = self.rho
+        beta = self.beta
+        t0 = np.sin(y)
+        t1 = np.cos(y)
+        m = mu/k + rho*beta*np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
         val = m*t1*exp(x) +  x*(1-x)*(1-2*y)
         return val
     def grad_pressure_x(self, p):
@@ -705,8 +806,105 @@ class Example8:
 
         t0 = np.sin(y)
         t1 = np.cos(y)
-        val = np.sqrt(t0**2*exp(x)**2 + t1**2*exp(x)**2)
+        val = np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
         return val
-      
- 
+        
+class Example10:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
 
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = exp(x) + exp(y)
+        return rhs
+
+
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[:,0] = x*exp(y)
+        val[:,1] = y*exp(x)
+        return val
+
+    def velocity_x(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = x*exp(y)
+        return val
+    def velocity_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = y*exp(x)
+        return val
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.sin(np.pi*x)*np.sin(np.pi*y)
+        return val
+    def source2(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        mu = self.mu
+        k = self.k
+        rho = self.rho
+        beta = self.beta
+        t2 = np.sin(y)
+        t3 = np.cos(y)
+        m = mu/k + rho*beta*np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
+        val = m*exp(x)*t2 + np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
+        return val
+
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        mu = self.mu
+        k = self.k
+        rho = self.rho
+        beta = self.beta
+        t0 = np.sin(y)
+        t1 = np.cos(y)
+        m = mu/k + rho*beta*np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
+        val = m*t1*exp(x) +  np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+        return val
+    def grad_pressure_x(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape)
+        val = np.pi*np.cos(np.pi*x)*np.sin(np.pi*y)
+        return val
+
+    def grad_pressure_y(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.pi*np.sin(np.pi*x)*np.cos(np.pi*y)
+        return val
+
+    def normu(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
+        return val
+              
