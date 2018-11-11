@@ -220,7 +220,8 @@ class TriangleMesh(Mesh2d):
                 cell2edge0[L] = cell2edge[idx,2]
                 cell2edge0[R] = cell2edge[idx,1]
             NC = NC+nc
-
+            NN = self.node.shape[0]
+            self.ds.reinit(NN, cell)
         # reconstruct the  data structure
         if u is not None:                                                       
             eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)                         
