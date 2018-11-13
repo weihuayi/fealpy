@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.pde.surface_poisson_model_3d import SphereSinSinSinData
 from fealpy.fem.SurfacePoissonFEMModel import SurfacePoissonFEMModel
-from fealpy.mesh.Tri_adaptive_tools import  AdaptiveMarker
+from fealpy.mesh.adaptive_tools import mark 
 from fealpy.quadrature import TriangleQuadrature
 from fealpy.tools.show import showmultirate
 from fealpy.mesh.tree_data_structure import Tritree
@@ -19,19 +19,21 @@ class AdaptiveMarker():
         self.theta = theta
         self.ctheta = ctheta
 
-    def refine_marker(self, qtmesh):
-        idx = pmesh.celldata['idxmap']
-        markedIdx = mark(self.eta, self.theta)
-        return idx[markedIdx]
+    def refine_marker(self, tree):
+        leafCellIdx = tree.leaf_cell_index()
+        NC = tree.number_of_cells()
+        eta = np.zeros(NC, dtype=tree.ftype)
+        idxmap = tree.celldata['idxmap']
+        np.add.at(eta, idxmap, self.eta) 
+        markedIdx = mark(eta[leafCellIdx], self.theta)
+        return leafCellIdx[markedIdx] 
 
-    def coarsen_marker(self, qtmesh):
-        idx = qtmesh.leaf_cell_index()
-        markedIdx = mark(self.eta, self.ctheta, method='COARSEN')
-        return idx[markedIdx]
+    def coarsen_marker(self, tree):
+        return None 
 
 p = int(sys.argv[1])
-theta = 0.2
-maxit = 4
+theta = 0.1
+maxit = 20 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h ||_{S,0}$',
              '$||\\nabla_S u - \\nabla_S u_h||_{S,0}$'
@@ -40,16 +42,17 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-integrator = TriangleQuadrature(6)
+integrator = TriangleQuadrature(3)
 ralg = FEMFunctionRecoveryAlg()
 pde = SphereSinSinSinData()
 mesh = pde.init_mesh(3)
 tmesh = Tritree(mesh.node, mesh.ds.cell, irule=1)
 pmesh = tmesh.to_conformmesh()
-fig0 = pl.figure()
-axes0 = a3.Axes3D(fig0)
-pmesh.add_plot(axes0)
-pl.show()
+
+fig = pl.figure()
+axes = a3.Axes3D(fig)
+pmesh.add_plot(axes)
+
 for i in range(maxit):
     print('step:', i)
     fem = SurfacePoissonFEMModel(pmesh, pde, p, integrator)
@@ -64,11 +67,11 @@ for i in range(maxit):
     if i < maxit - 1:
         tmesh.refine(marker=AdaptiveMarker(eta, theta=theta))
         pmesh = tmesh.to_conformmesh()
-        fig1 = pl.figure()
-        axes1 = a3.Axes3D(fig1)
-        pmesh.add_plot(axes1)
-        pl.show()
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        pmesh.add_plot(axes)
+pl.show()
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
-showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+showmultirate(plt, 6, Ndof, errorMatrix, errorType)
 plt.show()

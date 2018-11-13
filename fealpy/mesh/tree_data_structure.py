@@ -206,7 +206,7 @@ class Tritree(TriangleMesh):
         idx0 = idx[(~isLRCell) & (isLeafCell)]
         cell = np.r_['0', cell0, cell20, cell21]                      
         tmesh = TriangleMesh(node, cell) 
-        tmesh.celldata['idxmap'] = np.r_['0', idx0, LCell, RCell, LCell, RCell]        #现在的cell单元与原来树结构中cell的对应关系.
+        self.celldata['idxmap'] = np.r_['0', idx0, LCell, RCell, LCell, RCell]        #现在的cell单元与原来树结构中cell的对应关系.
         return tmesh
 
 

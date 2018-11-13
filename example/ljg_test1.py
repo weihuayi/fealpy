@@ -18,21 +18,17 @@ p = int(sys.argv[3])
 
 if m == 1:
     pde = LShapeRSinData()
-    mesh = pde.init_mesh(n=4, meshtype='tri')
+    mesh = pde.init_mesh(n=2, meshtype='tri')
 elif m == 2:
     pde = KelloggData()
-    mesh = pde.init_mesh(n=4, meshtype='tri')
+    mesh = pde.init_mesh(n=2, meshtype='tri')
 
 
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',]
 
-Ndof = np.zeros((maxit,), dtype=np.int)
-errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-integrator = mesh.integrator(6)
-
-theta = 0.35
+theta = 0.5
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
@@ -41,7 +37,7 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-integrator = mesh.integrator(6)
+integrator = mesh.integrator(3)
 
 for i in range(maxit):
     print('step:', i)
@@ -68,7 +64,7 @@ x = mesh.node[:, 0]
 y = mesh.node[:, 1]
 cell = mesh.ds.cell
 axes.plot_trisurf(x, y, cell, fem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
-showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+showmultirate(plt, 20, Ndof, errorMatrix, errorType)
 plt.show()
 
 
