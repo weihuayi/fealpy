@@ -19,27 +19,67 @@ p = int(sys.argv[3])
 if m == 1:
     pde = LShapeRSinData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
-
 elif m == 2:
     pde = KelloggData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
 
-theta = 0.2
-k = maxit -15
+
+errorType = ['$|| u_I - u_h ||_{l_2}$',
+             '$|| u- u_h ||_{0}$',
+             '$|| \\nabla u - \\nabla u_h ||_{0}$',]
+
+Ndof = np.zeros((maxit,), dtype=np.int)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+integrator = mesh.integrator(6)
+
+#for i in range(maxit):
+#    print('step:', i)
+#    fem = PoissonFEMModel(pde, mesh, p, integrator)
+#    fem.solve()
+#    Ndof[i] = fem.mesh.number_of_nodes()
+#    errorMatrix[0, i] = fem.get_l2_error()
+#    errorMatrix[1, i] = fem.get_L2_error()
+#    errorMatrix[2, i] = fem.get_H1_error()
+#    if i < maxit -1:
+#        mesh.uniform_refine()
+#
+#print(errorMatrix)
+#mesh.add_plot(plt, cellcolor='w')
+#fig2 = plt.figure()
+#fig2.set_facecolor('white')
+#axes0 = fig2.gca(projection = '3d')
+#x = mesh.node[:, 0]
+#y = mesh.node[:, 1]
+#cell = mesh.ds.cell
+#axes0.plot_trisurf(x, y, cell, fem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
+#fig1 = plt.figure()
+#fig1.set_facecolor('white')
+#axes1 = fig1.gca(projection = '3d')
+#x = mesh.node[:, 0]
+#y = mesh.node[:, 1]
+#node = mesh.node
+#cell = mesh.ds.cell
+#axes1.plot_trisurf(x, y, cell, pde.solution(node), cmap=plt.cm.jet, lw=0.0)
+#showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+#plt.show()
+
+
+
+theta = 0.35
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
-             '$|| \\nabla u - G(\\nabla u_h) ||_{0}sim$',]
+             '$|| \\nabla u - G(\\nabla u_h) ||_{0}$',]
 
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-integrator = mesh.integrator(7)
+integrator = mesh.integrator(6)
 
 for i in range(maxit):
     print('step:', i)
     fem = PoissonFEMModel(pde, mesh, p, integrator)
-    fem.solve
+    fem.solve()
     uh = fem.uh
     Ndof[i] = fem.mesh.number_of_nodes()
     errorMatrix[0, i] = fem.get_l2_error()
@@ -61,7 +101,7 @@ x = mesh.node[:, 0]
 y = mesh.node[:, 1]
 cell = mesh.ds.cell
 axes.plot_trisurf(x, y, cell, fem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
-showmultirate(plt, k, Ndof, errorMatrix, errorType)
+showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()
 
 

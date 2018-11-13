@@ -6,6 +6,7 @@ from fealpy.pde.darcy_forchheimer_2d import PolyData
 from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
+from fealpy.pde.darcy_forchheimer_2d import Example7
 from fealpy.fdm.NonDFFDMModel import NuDarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 
@@ -15,21 +16,23 @@ k = 1
 rho = 1
 beta = 5
 tol = 1e-6
-#hx = np.array([0.12,0.34,0.22,0.32])
-#hy = np.array([0.25,0.13,0.33,0.29])
+hx = np.array([0.12,0.34,0.22,0.32])
+hy = np.array([0.25,0.13,0.33,0.29])
 #hy = np.array([0.16,0.23,0.32,0.11,0.18])
-hx = np.array([0.25,0.25,0.25,0.25])
-hy = np.array([0.25,0.25,0.25,0.25])
+#hx = np.array([0.25,0.25,0.25,0.25])
+#hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-#hx = hx/4
-#hy = hy/4
-#hx = hx.repeat(4)
-#hy = hy.repeat(4)
+hx = hx/4
+hy = hy/4
+hx = hx.repeat(4)
+hy = hy.repeat(4)
 
 #pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
 #pde = SinsinData(box,mu,k,rho,beta,tol)
-pde = ArctanData(box,mu,k,rho,beta,tol)
+#pde = ArctanData(box,mu,k,rho,beta,tol)
+pde = Example7(box,mu,k,rho,beta,tol)
+
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
