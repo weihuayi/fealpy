@@ -1,13 +1,16 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import h5py
 
 from fealpy.pde.darcy_forchheimer_2d import PolyData
 from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
 from fealpy.pde.darcy_forchheimer_2d import Example7
-from fealpy.fdm.NonDFFDMModel import NuDarcyForchheimerFDMModel
+#from fealpy.fdm.NonDFFDMModel import NonDarcyForchheimerFDMModel
+#from fealpy.fdm.NonDFFDMModel_pu import NuDarcyForchheimerFDMModel
+from fealpy.fdm.NonDFFDMModel_normu import NonDarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
@@ -17,21 +20,21 @@ rho = 1
 beta = 5
 tol = 1e-6
 hx = np.array([0.12,0.34,0.22,0.32])
-hy = np.array([0.25,0.13,0.33,0.29])
-#hy = np.array([0.16,0.23,0.32,0.11,0.18])
+#hy = np.array([0.25,0.13,0.33,0.29])
+hy = np.array([0.16,0.23,0.32,0.11,0.18])
 #hx = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-hx = hx/4
-hy = hy/4
-hx = hx.repeat(4)
-hy = hy.repeat(4)
+#hx = hx/4
+#hy = hy/4
+#hx = hx.repeat(4)
+#hy = hy.repeat(4)
 
-#pde = PolyData(box,mu,k,rho,beta,tol)
+pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
 #pde = SinsinData(box,mu,k,rho,beta,tol)
 #pde = ArctanData(box,mu,k,rho,beta,tol)
-pde = Example7(box,mu,k,rho,beta,tol)
+#pde = Example7(box,mu,k,rho,beta,tol)
 
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
@@ -47,7 +50,7 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-    fdm = NuDarcyForchheimerFDMModel(pde,mesh)
+    fdm = NonDarcyForchheimerFDMModel(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
@@ -123,6 +126,22 @@ print('error1',error1)
 print('error2',error2)
 print('Ndof',Ndof)
 print('iter',count)
+if __name__ =="__main__":
+    f = h5py.File('NdofM1P1b10t7.h5','w')
+    f['NdofM1P1b10t7'] = Ndof
+    f.close()
+if __name__ =="__main__":
+    f = h5py.File('error1M1P1b10t7.h5','w')
+    f['error1M1P1b10t7'] = error1
+    f.close()
+if __name__ =="__main__":
+    f = h5py.File('error2M1P1b10t7.h5','w')
+    f['error2M1P1b10t7'] = error2
+    f.close()
+if __name__ =="__main__":
+    f = h5py.File('euepM1P1b10t7.h5','w')
+    f['euep2M1P1b10t7'] = r
+    f.close()
 #mesh.add_plot(plt,cellcolor='w')
 #showmultirate(plt,0,Ndof,err,errorType)
 showmultirate(plt,0,Ndof,error1,errorType1)

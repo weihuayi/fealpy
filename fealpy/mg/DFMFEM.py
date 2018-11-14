@@ -11,55 +11,103 @@ from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from fealpy.functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 
 class DarcyForchheimerP0P1():
-    def __init__(self, pde, mesh, integrator):
+    def __init__(self, pde, mesh, p, integrator):
         self.space0 = VectorLagrangeFiniteElementSpace(mesh, 0, spacetype='D')
-        self.space1 = LagrangeFiniteElementSpace(mesh, 1, spacetype='C') 
+        self.space1 = LagrangeFiniteElementSpace(mesh, 1, spacetype='C')
         self.pde = pde
-        self.mesh = self.femspace.mesh
+        self.mesh0 = self.space0.mesh
+        self.mesh1 = self.space1.mesh
 
         self.uh = self.space0.function()
         self.ph = self.space1.function()
+#        self.uI = self.femspace.function()
+#        self.pI = self.femspace.interpolation(pde.pressure)
 
         self.cellmeasure = mesh.entity_measure('cell')
         self.integrator = integrator
-        self.lfem = DarcyP0P1(self.pde, self.mesh, p, integrator)
+        self.lfem = DarcyP0P1(self.pde, self.mesh1, p, integrator)
         self.uh0,self.ph0 = self.lfem.solve()
-        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        self.integralalg = IntegralAlg(self.integrator, self.mesh1, self.cellmeasure)
+       # self.integralalg = IntegralAlg(self.integrator0, self.mesh0, self.cellmeasure)
+    def gradbasis(self):
+        mesh1 = self.mesh1
+        NC = mesh1.number_of_cells()
+        node = mesh1.node
+        cell = mesh1.ds.cell
+
+        ve1 = node[cell[:, 2],:] - node[cell[:, 1],:]
+        ve2 = node[cell[:, 0],:] - node[cell[:, 2],:]
+        ve3 = node[cell[:, 1],:] - node[cell[:, 0],:]
+        area = 0.5*(-ve3[:, 0]*ve2[:, 1] + ve3[:, 1]*ve2[:, 0])
+
+        Dlambda = np.zeros((NC,2,3))
+        Dlambda[:,:,2] = np.c_[-ve3[:, 1]/(2*area), ve3[:, 0]/(2*area)]
+        Dlambda[:,:,0] = np.c_[-ve1[:, 1]/(2*area), ve1[:, 0]/(2*area)]
+        Dlambda[:,:,1] = np.c_[-ve2[:, 1]/(2*area), ve2[:, 0]/(2*area)]
+        print('Dlambda',Dlambda)
+
+        return Dlambda
+
 
     def get_left_matrix(self):
+        space1 = self.space1
+        mesh1 = self.mesh1
+        cellmeasure = self.cellmeasure
+        cell = mesh1.ds.cell
+        node = mesh1.node
 
+        NC = mesh1.number_of_cells()
+        NN = mesh1.number_of_nodes()
 
-        bc = np.array([1/3, 1/3, 1/3], dtype=self.ftype)
-        phi = self.space0.basis(bc)
-        gphi = self.space1.grad_basis(bc)
-        A21 = np.einsum('ijm, km, i->ijk', gphi, phi, self.cellmeasure)
+        mu = self.pde.mu
+        rho = self.pde.rho
+        scaledArea = mu/rho*cellmeasure
+        Dlambda = self.gradbasis()
+        A11 = spdiags(np.r_[scaledArea,scaledArea], 0, 2*NC, 2*NC)
+        print('A11',A11)
 
-        cell2dof0 = self.space0.cell_to_dof()
-        ldof0 = self.space0.number_of_local_dofs()
-        cell2dof1 = self.space1.cell_to_dof()
-        ldof1 = space.number_of_local_dofs()
-        I = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
-        J = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
-        gdof = space.number_of_global_dofs()
-        # Construct the stiffness matrix
-        A21 = csr_matrix((A12.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-         
+        ## Assemble gradient matrix for pressure
+        I = np.arange(2*NC)
+        data1 = Dlambda[:, 0, 0]*cellmeasure
+        A12 = coo_matrix((data1, (I[:NC],cell[:, 0])), shape=(2*NC, NN))
+        data2 = Dlambda[:, 1, 0]*cellmeasure
+        A12 += coo_matrix((data2, (I[NC:],cell[:, 0])), shape=(2*NC, NN))
+        
+        data1 = Dlambda[:, 0, 1]*cellmeasure
+        A12 += coo_matrix((data1, (I[:NC],cell[:, 1])), shape=(2*NC, NN))
+        data2 = Dlambda[:, 1, 1]*cellmeasure
+        A12 += coo_matrix((data2, (I[NC:],cell[:, 1])), shape=(2*NC, NN))
+
+        data1 = Dlambda[:, 0, 2]*cellmeasure
+        A12 += coo_matrix((data1, (I[:NC],cell[:, 2])), shape=(2*NC, NN))
+        data2 = Dlambda[:, 1, 2]*cellmeasure
+        A12 += coo_matrix((data2, (I[NC:],cell[:, 2])), shape=(2*NC, NN))
+        A12 = A12.tocsr()
+        print('A12',A12)
+        A21 = A12.transpose()
+        print('A21',A21)
+
+        A = bmat([(A11, A12), (A21, None)], format='csr',dtype=np.float)
+
+    
         return A
 
     def get_right_vector(self):
-        mesh = self.mesh
+        mesh1 = self.mesh1
         cellmeasure = self.cellmeasure
-        node = mesh.node
-        edge = mesh.ds.edge
-        cell = mesh.ds.cell
-        NN = mesh.number_of_nodes()
+        node = mesh1.node
+        edge = mesh1.ds.edge
+        cell = mesh1.ds.cell
+        NN = mesh1.number_of_nodes()
 
-        bc = mesh.entity_barycenter('cell')
+        bc = mesh1.entity_barycenter('cell')
+        print('bc',bc)
         ft = self.pde.f(bc)*np.c_[cellmeasure,cellmeasure]
         f = np.ravel(ft,'F')
+        print('f',f)
 
-        cell2edge = mesh.ds.cell_to_edge()
-        ec = mesh.entity_barycenter('edge')
+        cell2edge = mesh1.ds.cell_to_edge()
+        ec = mesh1.entity_barycenter('edge')
         mid1 = ec[cell2edge[:, 1],:]
         mid2 = ec[cell2edge[:, 2],:]
         mid3 = ec[cell2edge[:, 0],:]
@@ -70,10 +118,10 @@ class DarcyForchheimerP0P1():
 
         b = np.bincount(np.ravel(cell,'F'),weights=np.r_[bt1,bt2,bt3], minlength=NN)
 
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        edge2node = mesh.ds.edge_to_node()
+        isBDEdge = mesh1.ds.boundary_edge_flag()
+        edge2node = mesh1.ds.edge_to_node()
         bdEdge = edge[isBDEdge,:]
-        ec = mesh.entity_barycenter('edge')
+        ec = mesh1.entity_barycenter('edge')
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
         mid = ec[isBDEdge,:]
@@ -87,13 +135,13 @@ class DarcyForchheimerP0P1():
         return np.r_[f,g]
 
     def solve(self):
-        mesh = self.mesh
-        node = mesh.node
-        edge = mesh.ds.edge
-        cell = mesh.ds.cell
+        mesh1 = self.mesh1
+        node = mesh1.node
+        edge = mesh1.ds.edge
+        cell = mesh1.ds.cell
         cellmeasure = self.cellmeasure
-        NN = mesh.number_of_nodes()
-        NC = mesh.number_of_cells()
+        NN = mesh1.number_of_nodes()
+        NC = mesh1.number_of_cells()
         A = self.get_left_matrix()
         A11 = A[:2*NC,:2*NC]
         A12 = A[:2*NC,2*NC:]
@@ -162,11 +210,12 @@ class DarcyForchheimerP0P1():
             r[0,n] = ru
             r[1,n] = rp
 
-        self.u = u
-        self.p = p
+        self.uh = u
+        self.ph = p
         return u,p
 
     def get_pL2_error(self):
+        bc = np.array([1/3, 1/3, 1/3], dtype=self.mesh1.ftype)
 
         p = self.pde.pressure
         ph = self.ph.value

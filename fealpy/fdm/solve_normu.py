@@ -107,12 +107,12 @@ class DarcyForchheimerFDMModel():
         idx2, = np.nonzero(~flag2)
         idx3, = np.nonzero(~flag3)
 
-        data0 = 1/C[cell2edge[idx0, 0]]/hx**2
+        data0 = 1/C[cell2edge[idx0, 0]]/hy**2
         print('data0',data0)
         A = coo_matrix((-data0,(idx0, idx2)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data0,(idx0, idx0)), shape=(NC,NC), dtype=ftype)
 
-        data1 = 1/C[cell2edge[idx1, 1]]/hy**2
+        data1 = 1/C[cell2edge[idx1, 1]]/hx**2
         print('data1',data1)
         A += coo_matrix((-data1,(idx1, idx3)), shape=(NC,NC), dtype=ftype)
         A += coo_matrix((data1, (idx1, idx1)), shape=(NC,NC), dtype=ftype)
@@ -158,11 +158,11 @@ class DarcyForchheimerFDMModel():
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
         val = pde.velocity_x(bc[idx])
-        f[idx] = (mu/k+beta*rho*C[idx])*val #modify
+        f[idx] = C[idx]*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
         val = pde.velocity_y(bc[idx])
-        f[idx] = (mu/k+beta*rho*C[idx])*val
+        f[idx] = C[idx]*val
 
         return f
 
