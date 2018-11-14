@@ -10,10 +10,12 @@ from .Mesh2d import Mesh2d
 class StructureQuadMesh1(Mesh2d):
     def __init__(self, box, hx, hy, itype=np.int32, ftype=np.float):
         self.box = box
-        self.ds = StructureQuadMeshDataStructure(hx, hy, itype)
+        self.nx = hx.shape[0]
+        self.ny = hy.shape[0]
+        self.ds = StructureQuadMeshDataStructure(self.nx, self.ny, itype)
         self.meshtype="quad"
-        self.nx = self.ds.nx
-        self.ny = self.ds.ny
+        self.hx = hx
+        self.hy = hy
         self.data = {}
 
         self.itype = itype 
@@ -22,8 +24,8 @@ class StructureQuadMesh1(Mesh2d):
     @property 
     def node(self):
         NN = self.ds.NN
-        hx = self.ds.hx
-        hy = self.ds.hy
+        hx = self.hx
+        hy = self.hy
         nx = self.nx
         ny = self.ny
         box = self.box
@@ -59,11 +61,9 @@ class StructureQuadMeshDataStructure:
     V = 4
     E = 4
     F = 1
-    def __init__(self, hx, hy, itype):
-        self.hx = hx
-        self.hy = hy
-        self.nx = self.hx.shape[0]
-        self.ny = self.hy.shape[0]
+    def __init__(self, nx, ny, itype):
+        self.nx = nx
+        self.ny = ny
         self.NN = (self.nx+1)*(self.ny+1)
         self.NE = self.ny*(self.nx+1) + self.nx*(self.ny+1)
         self.NC = self.nx*self.ny

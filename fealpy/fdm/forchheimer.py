@@ -1,98 +1,83 @@
 import numpy as np
 import time
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
-from numpy import linalg as LA
+from numpy.linalg import norm
 from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
-class NonDarcyForchheimerFDMModel():
+class Dforchheimer():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh
 
-        hx = mesh.ds.hx
-        hy = mesh.ds.hy
-        nx = mesh.nx
-        ny = mesh.ny
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
 
-        hx1 = hx.repeat(ny)
-        hy1 = np.tile(hy,nx)
-        hx2 = (hx[1:] + hx[:nx-1])/2#gain $hx_{i+1/2}$
-        hy2 = (hy[1:] + hy[:ny-1])/2#gain $hy_{j+1/2}$
-        hx3 = hx2.repeat(ny)
-        hy3 = np.tile(hy2,nx)
+        self.hx1 = hx.repeat(ny)
+        self.hy1 = np.tile(hy,nx)
+        hx2 = (hx[1:] + hx[:nx-1])# get $hx_{i+1/2}$
+        hy2 = (hy[1:] + hy[:ny-1])# get $hy_{j+1/2}$
+        self.hx3 = hx2.repeat(ny)
+        self.hy3 = np.tile(hy2,nx)
 
-        area0 = hx3*hy1[ny:] #area of all $hx_{i+1/2}*hy_{j}$
-        area1 = hx1[nx:]*hy3 #area of all $hx_{i}*hy_{j+1/2}$
-        area2 = hx1*hy1 #Area of all cell
-        area1 = np.r_[area0,area1]
-
-        self.hx1 = hx1
-        self.hy1 = hy1
-        self.hx3 = hx3
-        self.hy3 = hy3
-        self.area1 = area1
-        self.area2 = area2
+        area00 = self.hx3*self.hy1[ny:] # area of all $hx_{i+1/2}*hy_{j}$
+        area01 = self.hx1[nx:]*self.hy3 # area of all $hx_{i}*hy_{j+1/2}$
+        self.area2 = self.hx1*self.hy1 # Area of all cells
+        self.area1 = np.r_[area00, area01]
 
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-
-        self.uh = np.zeros(NE, dtype=mesh.ftype)
-        self.ph = np.zeros(NC, dtype=mesh.ftype)
-        self.uh0 = np.zeros(NE, dtype=mesh.ftype)
-        self.ph0 = np.zeros(NC, dtype=mesh.ftype)
-
-        isYDEdge = mesh.ds.y_direction_edge_flag()
-        isXDEdge = mesh.ds.x_direction_edge_flag()
-        bc = mesh.entity_barycenter('edge')
-        pc = mesh.entity_barycenter('cell')
+        
+        self.uh = np.zeros(NE, dtype=mesh.ftype) # the number solution of u
+        self.ph = np.zeros(NC, dtype=mesh.ftype) # the number solution of p
+        self.uh0 = np.zeros(NE, dtype=mesh.ftype) # Intermediate variables about u
+        self.ph0 = np.zeros(NC, dtype=mesh.ftype) # Intermediate variables about p
 
     def get_nonlinear_coef(self):
         mesh = self.mesh
         uh0 = self.uh0
 
-        nx = mesh.nx
-        ny = mesh.ny
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
 
         hx1 = self.hx1
         hy1 = self.hy1
-        hy3 = self.hy3
         hx3 = self.hx3
-
+        hy3 = self.hy3
 
         itype = mesh.itype
         ftype = mesh.ftype
 
         mu = self.pde.mu
         k = self.pde.k
-
         rho = self.pde.rho
         beta = self.pde.beta
-
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
 
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
-        C = np.ones(NE, dtype=mesh.ftype)
+        NE = mesh.number_of_edges()
+
+        C = np.zeros(NE, dtype=ftype)
         edge2cell = mesh.ds.edge_to_cell()
         cell2edge = mesh.ds.cell_to_edge()
 
         flag = ~isBDEdge & isYDEdge
         L = edge2cell[flag, 0]
         R = edge2cell[flag, 1]
-        P1 = cell2edge[L, 0]# the 0 edge of the left cell
-        D1 = cell2edge[L, 2]# the 2 edge of the left cell
-        P2 = cell2edge[R, 0]# the 0 edge of the right cell
-        D2 = cell2edge[R, 2]# the 2 edge of the right cell
+        P1 = cell2edge[L, 0]
+        D1 = cell2edge[L, 2]
+        P2 = cell2edge[R, 0]
+        D2 = cell2edge[R, 2]
 
-        C[flag] = 1/4/hx3*(hx1[L]*np.sqrt(uh0[flag]**2+uh0[P1]**2)\
-                         + hx1[L]*np.sqrt(uh0[flag]**2+uh0[D1]**2)\
-                         + hx1[R]*np.sqrt(uh0[flag]**2+uh0[P2]**2)\
-                         + hx1[R]*np.sqrt(uh0[flag]**2+uh0[D2]**2))
-
+        C[flag] = 1/4/hx3*(hx1[L]*np.sqrt(uh0[flag]**2 + uh0[P1]**2)\
+                         + hx1[L]*np.sqrt(uh0[flag]**2 + uh0[D1]**2)\
+                         + hx1[R]*np.sqrt(uh0[flag]**2 + uh0[P2]**2)\
+                         + hx1[R]*np.sqrt(uh0[flag]**2 + uh0[D2]**2))
+                         
         flag = ~isBDEdge & isXDEdge
         L = edge2cell[flag, 0]
         R = edge2cell[flag, 1]
@@ -124,19 +109,28 @@ class NonDarcyForchheimerFDMModel():
         itype = mesh.itype
         ftype = mesh.ftype
 
-        idx = np.arange(NE)
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
 
         C = self.get_nonlinear_coef()
         A11 = spdiags(C,0,NE,NE)# correct
+#        I, = np.nonzero(~isBDEdge & isYDEdge)
+#        J, = np.nonzero(~isBDEdge & isXDEdge)
+#        idx = np.r_[I,J]
+#        A11 = coo_matrix((C[idx]*np.r_[hx3,hy3],(idx,idx)), shape=(NE,NE))
+#
+#        I, = np.nonzero(isBDEdge & isYDEdge)
+#        J, = np.nonzero(isBDEdge & isXDEdge)
+#        idx = np.r_[I,J]
+#        A11 += coo_matrix((C[idx], (idx, idx)), shape=(NE, NE))
 
         edge2cell = mesh.ds.edge_to_cell()
         I, = np.nonzero(~isBDEdge & isYDEdge)
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
         data = np.ones(len(I), dtype=ftype)/hx3
+#        data = np.ones(len(I), dtype=ftype)
 
         A12 = coo_matrix((data, (I, R)), shape=(NE, NC))
         A12 += coo_matrix((-data, (I, L)), shape=(NE, NC))
@@ -145,6 +139,7 @@ class NonDarcyForchheimerFDMModel():
         L = edge2cell[I, 0]
         R = edge2cell[I, 1]
         data = np.ones(len(I), dtype=ftype)/hy3
+#        data = np.ones(len(I), dtype=ftype)
         A12 += coo_matrix((-data, (I, R)), shape=(NE, NC))
         A12 += coo_matrix((data, (I, L)), shape=(NE, NC))
         A12 = A12.tocsr()
@@ -157,6 +152,7 @@ class NonDarcyForchheimerFDMModel():
 #        A21 += coo_matrix((-data/hx1, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
 #        A21 += coo_matrix((data/hy1, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
 #        A21 += coo_matrix((-data/hy1, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
+#        A21 = A21.tocsr()
         A21 = coo_matrix((hy1*data, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
         A21 += coo_matrix((-hy1*data, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
         A21 += coo_matrix((hx1*data, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
@@ -169,15 +165,16 @@ class NonDarcyForchheimerFDMModel():
     def get_right_vector(self):
         pde = self.pde
         mesh = self.mesh
+
         hx1 = self.hx1
         hy1 = self.hy1
+        hx3 = self.hx3
+        hy3 = self.hy3
 
         itype = mesh.itype
         ftype = mesh.ftype
 
-        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
         edge = mesh.entity('edge')
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
@@ -185,6 +182,10 @@ class NonDarcyForchheimerFDMModel():
         bc = mesh.entity_barycenter('edge')
         pc = mesh.entity_barycenter('cell')
 
+        mu = self.pde.mu
+        k = self.pde.k
+        rho = self.pde.rho
+        beta = self.pde.beta
 
         ## Modify
         C = self.get_nonlinear_coef()#add
@@ -196,20 +197,12 @@ class NonDarcyForchheimerFDMModel():
         b0[flag] = pde.source3(bc[flag])
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
-        b0[idx] = C[idx] #modify
+        b0[idx] = 0 #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
-        b0[idx] = C[idx]
+        b0[idx] = 0
 
-        b0 = np.zeros(NE, dtype=ftype)
-        flag = isYDEdge
-        b0[flag] = pde.source2(bc[flag])
-
-        flag = isXDEdge
-        b0[flag] = pde.source3(bc[flag])
-
-        b1 =hx1*hy1*pde.source1(pc)
-
+        b1 = hx1*hy1*pde.source1(pc)
         return np.r_[b0, b1]
 
     
@@ -259,70 +252,60 @@ class NonDarcyForchheimerFDMModel():
             bnew = np.copy(b)
             
             x = np.r_[self.uh, self.ph]#The combination of self.uh and self.ph together
-#            print('x',x)
             bnew = bnew - A@x
 
             # Modify matrix
             bdIdx = np.zeros((A.shape[0],), dtype = itype)
             bdIdx[NE] = 1
 
-#            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-#            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
-#            AD = T@A@T + Tbd
-# 
-            idx1 = 1 - bdIdx
-            idx2, = np.nonzero(idx1)
-           # print('idx2',idx2)
-
- 
-            x[idx2] = spsolve(A[idx2,:][:,idx2], bnew[idx2])
-
-#            print('x',x)
-#            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
+            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
+            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
+            AD = T@A@T + Tbd
+            self.ph[0] = 1
+            bnew[NE] = self.ph[0]
+       
+            x[:] = spsolve(AD, bnew)
             u1 = x[:NE]
             p1 = x[NE:]
             p1 = p1 - np.mean(p1)
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
             ep = np.sqrt(np.sum(area2*(p1-self.ph0)**2))
-#            print('eu',eu)
-#            print('ep:',ep)
-
+           
             self.uh0[:] = u1
             self.ph0[:] = p1
             b = self.get_right_vector()
             A = self.get_left_matrix()
-
-
             f = b[:NE]
             g = b[NE:]
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-            if LA.norm(f) == 0:
-                ru = LA.norm(f - A11@u1 - A12@p1)
+            if norm(f) == 0:
+                ru = norm(f - A11@u1 - A12@p1)
             else:
-                ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
+                ru = norm(f - A11@u1 - A12@p1)/norm(f)
 
-            if LA.norm(g) == 0:
-                rp = LA.norm(g - A21@u1)
+            if norm(g) == 0:
+                rp = norm(g - A21@u1)
             else:
-                rp = LA.norm(g - A21@u1)/LA.norm(g)
+                rp = norm(g - A21@u1)/norm(g)
 
 
             r[0,count] = rp
             r[1,count] = ru
 
             count = count + 1
-#            print('ru:',ru)
-#            print('rp:',rp)
 
         self.uh[:] = u1
         self.ph[:] = p1
-        print('eu',eu)
-        print('ep:',ep)
+        print('uh',self.uh.shape)
+        print('ph',self.ph.shape)
         print('ru:',ru)
         print('rp:',rp)
+        print('eu:',eu)
+        print('ep:',ep)
         print('solve matrix p and u')
         return count,self.uh
+
 

@@ -18,7 +18,7 @@ class PolyData:
 
     def init_mesh(self, hx, hy):
         box = self.box
-        mesh = StructureQuadMesh(box, hx, hy)
+        mesh = StructureQuadMesh1(box, hx, hy)
         return mesh
 
 
@@ -907,4 +907,159 @@ class Example10:
 
         val = np.sqrt(exp(y)**2*x**2 + exp(x)**2*y**2)
         return val
+        
+        
+class Example11:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh1(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.zeros(p.shape[0],)
+        return rhs
+        
+    def source2(sel, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.sin(np.pi*x)
+        return rhs
+        
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.sin(np.pi*y)
+        return rhs
+        
+class Example12:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh1(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.zeros(p.shape[0],)
+        return rhs
+        
+    def source2(sel, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = x - x**2
+        return rhs
+        
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = y - y**2
+        return rhs
+
+class Example13:
+    """
+    """
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh1(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.exp(-((x-1/2)**2 + (y-1/2)**2))
+        return rhs
+        
+    def source2(sel, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.ones(p.shape[0],)
+        return rhs
+        
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.zeros(p.shape[1],)
+        return rhs
+        
+class Example14:
+    def __init__(self, box, mu, k, rho, beta, tol):
+        self.box = box
+        self.mu = mu
+        self.k = k
+        self.rho = rho
+        self.beta = beta
+        self.tol = tol
+        self.flat = 1
+
+
+    def init_mesh(self, hx, hy):
+        box = self.box
+        mesh = StructureQuadMesh1(box, hx, hy)
+        return mesh
+
+
+    def source1(self, p):
+        """ The right hand side of DarcyForchheimer equation
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.sin(np.pi*x)*np.sin(2*np.pi*y)
+        return rhs
+        
+    def source2(sel, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.ones(p.shape[0],)
+        return rhs
+        
+    def source3(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        rhs = np.zeros(p.shape[1],)
+        return rhs
+
+              
+
+              
               

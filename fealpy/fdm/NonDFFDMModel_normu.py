@@ -1,9 +1,12 @@
 import numpy as np
 import time
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
-from numpy.linalg import norm
+from numpy.linalg import norm 
 from fealpy.fem.integral_alg import IntegralAlg
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
+from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
 class NonDarcyForchheimerFDMModel():
     def __init__(self, pde, mesh):
@@ -53,8 +56,9 @@ class NonDarcyForchheimerFDMModel():
         self.pI = pde.pressure(pc)
 
         self.ph[0] = self.pI[0]
-
+        
     def get_nonlinear_coef(self):
+        
         mesh = self.mesh
         uh0 = self.uh0
 
@@ -116,76 +120,59 @@ class NonDarcyForchheimerFDMModel():
         C = mu/k + rho*beta*C
 
         return C
-
+        
     def get_left_matrix(self):
-
         mesh = self.mesh
+        pde = self.pde
+        itype = mesh.itype
+        ftype = mesh.ftype
+            
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-
+            
         hx1 = self.hx1
         hy1 = self.hy1
         hx3 = self.hx3
         hy3 = self.hy3
-
-        itype = mesh.itype
-        ftype = mesh.ftype
-
-        idx = np.arange(NE)
-        isBDEdge = mesh.ds.boundary_edge_flag()
-        isYDEdge = mesh.ds.y_direction_edge_flag()
-        isXDEdge = mesh.ds.x_direction_edge_flag()
-
+            
         C = self.get_nonlinear_coef()
-        A11 = spdiags(C,0,NE,NE)# correct
-
-        edge2cell = mesh.ds.edge_to_cell()
-        I, = np.nonzero(~isBDEdge & isYDEdge)
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-        data = np.ones(len(I), dtype=ftype)/hx3
-
-        A12 = coo_matrix((data, (I, R)), shape=(NE, NC))
-        A12 += coo_matrix((-data, (I, L)), shape=(NE, NC))
-
-        I, = np.nonzero(~isBDEdge & isXDEdge)
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-        data = np.ones(len(I), dtype=ftype)/hy3
-        A12 += coo_matrix((-data, (I, R)), shape=(NE, NC))
-        A12 += coo_matrix((data, (I, L)), shape=(NE, NC))
-        A12 = A12.tocsr()
-
-
         cell2edge = mesh.ds.cell_to_edge()
-        I = np.arange(NC, dtype=itype)
-        data = np.ones(NC, dtype=ftype)
-#        A21 = coo_matrix((data/hx1, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
-#        A21 += coo_matrix((-data/hx1, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
-#        A21 += coo_matrix((data/hy1, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
-#        A21 += coo_matrix((-data/hy1, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
-        A21 = coo_matrix((hy1*data, (I, cell2edge[:, 1])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-hy1*data, (I, cell2edge[:, 3])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((hx1*data, (I, cell2edge[:, 2])), shape=(NC, NE), dtype=ftype)
-        A21 += coo_matrix((-hx1*data, (I, cell2edge[:, 0])), shape=(NC, NE), dtype=ftype)
-        A21 = A21.tocsr()
-        A = bmat([(A11, A12), (A21, None)], format='csr', dtype=ftype)
+        edge2cell = mesh.ds.edge_to_cell()
+            
+        flag0 = mesh.ds.boundary_cell_flag(0)
+        flag1 = mesh.ds.boundary_cell_flag(1)
+        flag2 = mesh.ds.boundary_cell_flag(2)
+        flag3 = mesh.ds.boundary_cell_flag(3)
 
+        idx0, = np.nonzero(~flag0)
+        idx1, = np.nonzero(~flag1)
+        idx2, = np.nonzero(~flag2)
+        idx3, = np.nonzero(~flag3)
+        
+        data0 = 1/C[cell2edge[idx0, 0]]/hy1[idx0]/hy3
+        A = coo_matrix((-data0, (idx0,idx2)), shape=(NC, NC), dtype=ftype)
+        A += coo_matrix((data0, (idx0,idx0)), shape=(NC, NC), dtype=ftype)
+        
+        data1 = 1/C[cell2edge[idx1, 1]]/hx1[idx1]/hx3
+        A += coo_matrix((-data1, (idx1,idx3)), shape=(NC, NC), dtype=ftype)
+        A += coo_matrix((data1, (idx1,idx1)), shape=(NC, NC), dtype=ftype)
+        
+        data2 = 1/C[cell2edge[idx2, 2]]/hy1[idx2]/hy3
+        A += coo_matrix((-data2, (idx2,idx0)), shape=(NC, NC), dtype=ftype)
+        A += coo_matrix((data2, (idx2,idx2)), shape=(NC, NC), dtype=ftype)
+        
+        data3 = 1/C[cell2edge[idx3, 3]]/hx1[idx3]/hx3
+        A += coo_matrix((-data3, (idx3,idx1)), shape=(NC, NC), dtype=ftype)
+        A += coo_matrix((data3, (idx3,idx3)), shape=(NC, NC), dtype=ftype)
+        
         return A
-
-    def get_right_vector(self):
-        pde = self.pde
+        
+    def get_right_vector_f(self):
         mesh = self.mesh
-        hx1 = self.hx1
-        hy1 = self.hy1
-
-        itype = mesh.itype
+        pde = self.pde
         ftype = mesh.ftype
 
-        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
-        edge = mesh.entity('edge')
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
@@ -200,42 +187,66 @@ class NonDarcyForchheimerFDMModel():
         ## Modify
         C = self.get_nonlinear_coef()#add
 
-        b0 = np.zeros(NE, dtype=ftype)
+        f = np.zeros(NE, dtype=ftype)
         flag = ~isBDEdge & isYDEdge
-        b0[flag] = pde.source2(bc[flag])
+        f[flag] = pde.source2(bc[flag])
         flag = ~isBDEdge & isXDEdge
-        b0[flag] = pde.source3(bc[flag])
+        f[flag] = pde.source3(bc[flag])
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
         val = pde.velocity_x(bc[idx])
-        b0[idx] = C[idx]*val #modify
+        f[idx] = C[idx]*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
         val = pde.velocity_y(bc[idx])
-        b0[idx] = C[idx]*val
+        f[idx] = C[idx]*val
 
-        b1 =hx1*hy1*pde.source1(pc)
-        return np.r_[b0, b1]
+        return f
 
-    
+    def get_right_vector(self):
+        mesh = self.mesh
+        ftype = mesh.ftype
+        uh0 = self.uh0
 
+        hx1 = self.hx1
+        hy1 = self.hy1
 
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        pc = mesh.entity_barycenter('cell')
+        g = self.pde.source1(pc)
+
+        C = self.get_nonlinear_coef()
+        f = self.get_right_vector_f()
+
+        s = np.zeros(NC, dtype=ftype)
+        cell2edge = mesh.ds.cell_to_edge()
+
+        s[:] = g[:] + f[cell2edge[:, 0]]/hy1/C[cell2edge[:, 0]]\
+                    - f[cell2edge[:, 1]]/hx1/C[cell2edge[:, 1]]\
+                    - f[cell2edge[:, 2]]/hy1/C[cell2edge[:, 2]]\
+                    + f[cell2edge[:, 3]]/hx1/C[cell2edge[:, 3]]
+
+        return s
+        
     def solve(self):
         mesh = self.mesh
+        itype = mesh.itype
+        ftype = mesh.ftype
+
         hx1 = self.hx1
         hy1 = self.hy1
         hx3 = self.hx3
         hy3 = self.hy3
-
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
         area1 = self.area1
         area2 = self.area2
 
-
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        itype = mesh.itype
-        ftype = mesh.ftype
-
+        
         isBDEdge = mesh.ds.boundary_edge_flag()
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
@@ -243,112 +254,102 @@ class NonDarcyForchheimerFDMModel():
         I, = np.nonzero(~isBDEdge & isYDEdge)
         J, = np.nonzero(~isBDEdge & isXDEdge)
         idx = np.r_[I,J]
+        
+        flag0 = mesh.ds.boundary_cell_flag(0)
+        flag1 = mesh.ds.boundary_cell_flag(1)
+        flag2 = mesh.ds.boundary_cell_flag(2)
+        flag3 = mesh.ds.boundary_cell_flag(3)
 
+        idx0, = np.nonzero(~flag0)
+        idx1, = np.nonzero(~flag1)
+        idx2, = np.nonzero(~flag2)
+        idx3, = np.nonzero(~flag3)
+        
         start = time.time()
-        b = self.get_right_vector()
-        A = self.get_left_matrix()
+        G = self.get_left_matrix()
+        s = self.get_right_vector()
         end = time.time()
         print('Con matrix time',end-start)
 
+
+        pc = mesh.entity_barycenter('cell')
+        g = self.pde.source1(pc)
+
         tol = self.pde.tol
-        ru = 1
         rp = 1
-        eu = 1
+        ru = 1
         ep = 1
+        eu = 1
         count = 0
         iterMax = 2000
+
         r = np.zeros((2,iterMax),dtype=ftype)
 
         while eu+ep > tol and count < iterMax:
 
-            bnew = np.copy(b)
+            C = self.get_nonlinear_coef()
+            f = self.get_right_vector_f()
             
-            x = np.r_[self.uh, self.ph]#The combination of self.uh and self.ph together
-#            print('x',x)
-            bnew = bnew - A@x
 
-            # Modify matrix
-            bdIdx = np.zeros((A.shape[0],), dtype = itype)
-            bdIdx[NE] = 1
+            snew = s.copy()
 
-            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
-            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
-            AD = T@A@T + Tbd
- 
-            bnew[NE] = self.ph[0]
- 
-            x[:] = spsolve(AD, bnew)
-#            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
-            u1 = x[:NE]
-            p1 = x[NE:]
+            uh1 = np.zeros(NE, dtype=ftype)
+            ph1 = np.zeros(NC, dtype=ftype)
+            ph1[0] = self.pI[0]
 
-            eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
-            ep = np.sqrt(np.sum(area2*(p1-self.ph0)**2))
-#            print('eu',eu)
-#            print('ep:',ep)
+            snew -= G@ph1
+            snew[0] = self.pI[0]
 
-            self.uh0[:] = u1
-            self.ph0[:] = p1
-            b = self.get_right_vector()
-            A = self.get_left_matrix()
+            bdIdx = np.zeros((G.shape[0],), dtype=itype)
+            bdIdx[0] = 1
+            Tbd = spdiags(bdIdx, 0, G.shape[0], G.shape[1])
+            T = spdiags(1-bdIdx, 0, G.shape[0], G.shape[1])
+            GD = T@G@T + Tbd
 
+            ph1[1:] = spsolve(GD[1:,1:], snew[1:])
+            ph1[0] = self.pI[0]
 
-            f = b[:NE]
-            g = b[NE:]
-            A11 = A[:NE,:NE]
-            A12 = A[:NE,NE:NE+NC]
-            A21 = A[NE:NE+NC,:NE]
-            if norm(f) == 0:
-                ru = norm(f - A11@u1 - A12@p1)
+            cell2cell = mesh.ds.cell_to_cell()
+            edge2cell = mesh.ds.edge_to_cell()
+            cell2edge = mesh.ds.cell_to_edge()
+            p = ph1[cell2cell]
+
+            w0 = (f[cell2edge[idx0, 0]] - (ph1[idx0] - p[idx0, 0])/hy3)/C[cell2edge[idx0, 0]]
+            w1 = (f[cell2edge[idx1, 1]] - (p[idx1, 1] - ph1[idx1])/hx3)/C[cell2edge[idx1, 1]]
+            w2 = (f[cell2edge[idx2, 2]] - (p[idx2, 2] - ph1[idx2])/hy3)/C[cell2edge[idx2, 2]]# only compute inner edge
+            w3 = (f[cell2edge[idx3, 3]] - (ph1[idx3] - p[idx3, 3])/hx3)/C[cell2edge[idx3, 3]]#w0 == w2,w3 == w1
+            
+            uh1[:] = self.uI
+            uh1[I] = w1
+            uh1[J] = w0
+            eu = np.sqrt(np.sum(area1*(self.uh0[idx] - uh1[idx])**2))
+            ep = np.sqrt(np.sum(area2*(self.ph0 - ph1)**2))
+
+            self.ph0[:] = ph1
+            self.uh0[:] = uh1
+
+            if norm(s) == 0:
+                rp = norm(s - G@ph1)
             else:
-                ru = norm(f - A11@u1 - A12@p1)/norm(f)
+                rp = norm(s - G@ph1)/norm(s)
 
-            if norm(g) == 0:
-                rp = norm(g - A21@u1)
-            else:
-                rp = norm(g - A21@u1)/norm(g)
-
+            print(rp)
+            e = np.r_[eu,ep]
+            e = np.max(e)
+            
+            G = self.get_left_matrix()
+            s = self.get_right_vector()
 
             r[0,count] = rp
             r[1,count] = ru
 
             count = count + 1
-#            print('ru:',ru)
-#            print('rp:',rp)
 
-        self.uh[:] = u1
-        self.ph[:] = p1
-        print('eu',eu)
-        print('ep:',ep)
-        print('ru:',ru)
-        print('rp:',rp)
-        print('solve matrix p and u')
-        if __name__ =="__main__":
-            uI = self.uI
-            f = h5py.File('M2P1uI7','w')
-            f['M2P1uI7'] = uI
-            f.close()
-        if __name__ =="__main__":
-            uh = self.uh
-            f = h5py.File('M2P1uh7','w')
-            f['M2P1uh7'] = uh
-            f.close()
-        if __name__ =="__main__":
-            ph = self.ph
-            f = h5py.File('M2P1ph7','w')
-            f['M2P1ph7'] = ph
-            f.close()
-        if __name__ =="__main__":
-            pI = self.pI
-            f = h5py.File('M2P1pI7','w')
-            f['M2P1pI7'] = pI
-            f.close()
-        return count,r
-
+        self.uh[:] = uh1
+        self.ph[:] = ph1
 
         return count,r
-
-
+        
     def get_max_error(self):
         ue = np.max(np.abs(self.uh - self.uI))
         pe = np.max(np.abs(self.ph - self.pI))
@@ -401,9 +402,9 @@ class NonDarcyForchheimerFDMModel():
         DpI[isYDEdge] = self.pde.grad_pressure_x(bc[isYDEdge])#modity
         DpI[isXDEdge] = self.pde.grad_pressure_y(bc[isXDEdge])
         cell2edge = mesh.ds.cell_to_edge()
-        b = self.get_right_vector()
+        f = self.get_right_vector_f()
         C = self.get_nonlinear_coef()
-        Dph = b[:NE] - C*self.uh
+        Dph = f - C*self.uh
         I, = np.nonzero(~isBDEdge & isYDEdge)
         J, = np.nonzero(~isBDEdge & isXDEdge)
         idx = np.r_[I,J]
@@ -551,5 +552,8 @@ class NonDarcyForchheimerFDMModel():
         Qu = (C - mu/k)/rho/beta
 
         uqnorm = np.sqrt(np.sum(area1*((normu[idx] - Qu[idx]))**2))
-
+       
         return uqnorm
+        
+
+

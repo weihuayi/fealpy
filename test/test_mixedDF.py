@@ -19,16 +19,16 @@ n = 1
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J)
 mesh = pde.init_mesh(n)
-integrator = mesh.integrator(p+2)
+integrator1 = mesh.integrator(p+2)
 
 errorType = ['$|| u - u_h||_0$']#,'$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 4
+maxit = 1
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
 
 for i in range(maxit):
-    fem = DarcyForchheimerP0P1(pde, mesh, integrator)
+    fem = DarcyForchheimerP0P1(pde, mesh,1, integrator1)
     u,q = fem.solve()
     print('q',q)
     NC = mesh.number_of_cells()
