@@ -199,8 +199,6 @@ class LagrangeFiniteElementSpace():
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
         uI = Function(self, dim=dim)
-        print(u(ipoint).shape)
-        print(uI.shape)
         uI[:] = u(ipoint)
         return uI
 

@@ -28,7 +28,7 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',]
 
-theta = 0.5
+theta =0.35
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
@@ -55,6 +55,7 @@ for i in range(maxit):
     if i < maxit -1:
         markedCell = mark(eta, theta=theta)
         mesh.bisect(markedCell)
+print(mesh.node.shape)
 mesh.add_plot(plt, cellcolor='w')
 
 fig2 = plt.figure()

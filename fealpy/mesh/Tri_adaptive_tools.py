@@ -23,12 +23,14 @@ class AdaptiveMarker():
         self.theta = theta
         self.ctheta = ctheta
 
-    def refine_marker(self, qtmesh):
-        pmesh = qtmesh.to_conformmesh()
-        pmesh.celldata['idxmap'] = np.array(list(set(pmesh.celldata['idxmap'])))
-        idx = pmesh.celldata['idxmap']
-        markedIdx = mark(self.eta, self.theta)
-        return idx[markedIdx]
+    def refine_marker(self, tree):
+        leafCellIdx = tree.leaf_cell_index()
+        NC = tree.number_of_cells()
+        eta = np.zeros(NC, dtype=tree.ftype)
+        idxmap = tree.celldata['idxmap']
+        np.add.at(eta, idxmap, self.eta)
+        markedIdx = mark(eta[leafCellIdx], self.theta)
+        return leafCellIdx[markedIdx]
 
     def coarsen_marker(self, qtmesh):
         idx = qtmesh.leaf_cell_index()
