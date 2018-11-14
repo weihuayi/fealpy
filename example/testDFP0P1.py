@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mg.DFFEMModel import DarcyForchheimerP0P1
+from fealpy.mg.DFMFEM import DarcyForchheimerP0P1
 from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
 
@@ -23,7 +23,7 @@ integrator = mesh.integrator(p+2)
 
 errorType = ['$|| u - u_h||_0$']#,'$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 1
+maxit = 4
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
 

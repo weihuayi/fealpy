@@ -984,6 +984,8 @@ class Example12:
         return rhs
 
 class Example13:
+    """
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu

@@ -2,16 +2,16 @@ import numpy as np
 import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 import scipy.sparse
-from fealpy.fem.integral_alg import IntegralAlg
+from ..fem.integral_alg import IntegralAlg
 from numpy.linalg import norm
-from fealpy.fem import doperator
-from fealpy.mg.DarcyFEMModel import DarcyP0P1
+from ..fem import doperator
+from ..mg.DarcyFEMModel import DarcyP0P1
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from fealpy.functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 
 class DarcyForchheimerP0P1():
-    def __init__(self, pde, mesh, p, integrator):
+    def __init__(self, pde, mesh, integrator):
         self.space0 = VectorLagrangeFiniteElementSpace(mesh, 0, spacetype='D')
         self.space1 = LagrangeFiniteElementSpace(mesh, 1, spacetype='C')
         self.pde = pde
@@ -20,34 +20,18 @@ class DarcyForchheimerP0P1():
 
         self.uh = self.space0.function()
         self.ph = self.space1.function()
-#        self.uI = self.femspace.function()
-#        self.pI = self.femspace.interpolation(pde.pressure)
+
+        self.uh0 = self.space0.function()
+        self.ph0 = self.space1.function()
+
+        self.uI = self.femspace.function()
+        self.pI = self.femspace.interpolation(pde.pressure)
 
         self.cellmeasure = mesh.entity_measure('cell')
         self.integrator = integrator
-        self.lfem = DarcyP0P1(self.pde, self.mesh1, p, integrator)
+        self.lfem = DarcyP0P1(self.pde, self.mesh1, 1, integrator)
         self.uh0,self.ph0 = self.lfem.solve()
         self.integralalg = IntegralAlg(self.integrator, self.mesh1, self.cellmeasure)
-       # self.integralalg = IntegralAlg(self.integrator0, self.mesh0, self.cellmeasure)
-    def gradbasis(self):
-        mesh1 = self.mesh1
-        NC = mesh1.number_of_cells()
-        node = mesh1.node
-        cell = mesh1.ds.cell
-
-        ve1 = node[cell[:, 2],:] - node[cell[:, 1],:]
-        ve2 = node[cell[:, 0],:] - node[cell[:, 2],:]
-        ve3 = node[cell[:, 1],:] - node[cell[:, 0],:]
-        area = 0.5*(-ve3[:, 0]*ve2[:, 1] + ve3[:, 1]*ve2[:, 0])
-
-        Dlambda = np.zeros((NC,2,3))
-        Dlambda[:,:,2] = np.c_[-ve3[:, 1]/(2*area), ve3[:, 0]/(2*area)]
-        Dlambda[:,:,0] = np.c_[-ve1[:, 1]/(2*area), ve1[:, 0]/(2*area)]
-        Dlambda[:,:,1] = np.c_[-ve2[:, 1]/(2*area), ve2[:, 0]/(2*area)]
-        print('Dlambda',Dlambda)
-
-        return Dlambda
-
 
     def get_left_matrix(self):
         space1 = self.space1
@@ -64,7 +48,6 @@ class DarcyForchheimerP0P1():
         scaledArea = mu/rho*cellmeasure
         Dlambda = self.gradbasis()
         A11 = spdiags(np.r_[scaledArea,scaledArea], 0, 2*NC, 2*NC)
-        print('A11',A11)
 
         ## Assemble gradient matrix for pressure
         I = np.arange(2*NC)
@@ -83,13 +66,9 @@ class DarcyForchheimerP0P1():
         data2 = Dlambda[:, 1, 2]*cellmeasure
         A12 += coo_matrix((data2, (I[NC:],cell[:, 2])), shape=(2*NC, NN))
         A12 = A12.tocsr()
-        print('A12',A12)
         A21 = A12.transpose()
-        print('A21',A21)
 
         A = bmat([(A11, A12), (A21, None)], format='csr',dtype=np.float)
-
-    
         return A
 
     def get_right_vector(self):
@@ -101,10 +80,8 @@ class DarcyForchheimerP0P1():
         NN = mesh1.number_of_nodes()
 
         bc = mesh1.entity_barycenter('cell')
-        print('bc',bc)
         ft = self.pde.f(bc)*np.c_[cellmeasure,cellmeasure]
         f = np.ravel(ft,'F')
-        print('f',f)
 
         cell2edge = mesh1.ds.cell_to_edge()
         ec = mesh1.entity_barycenter('edge')
@@ -205,18 +182,16 @@ class DarcyForchheimerP0P1():
             else:
                 rp = norm(b[2*NC:] - A21@u)/norm(b[2*NC:])
 
-            self.uh0 = u
-            self.ph0 = p
+            self.uh0[:] = u
+            self.ph0[:] = p
             r[0,n] = ru
             r[1,n] = rp
 
-        self.uh = u
-        self.ph = p
+        self.uh[:] = u
+        self.ph[:] = p
         return u,p
 
     def get_pL2_error(self):
-        bc = np.array([1/3, 1/3, 1/3], dtype=self.mesh1.ftype)
-
         p = self.pde.pressure
         ph = self.ph.value
 
@@ -231,9 +206,6 @@ class DarcyForchheimerP0P1():
         uh = self.uh.value
         u = self.pde.velocity
 
-
-
-#        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
         uL2 = self.integralalg.L2_error(u,uh)
         return uL2
 

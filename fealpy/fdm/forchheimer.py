@@ -10,8 +10,8 @@ class Dforchheimer():
         self.pde = pde
         self.mesh = mesh
 
-        hx = mesh.ds.hx
-        hy = mesh.ds.hy
+        hx = mesh.hx
+        hy = mesh.hy
         nx = mesh.ds.nx
         ny = mesh.ds.ny
 
