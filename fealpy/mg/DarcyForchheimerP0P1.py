@@ -5,18 +5,17 @@ import scipy.sparse
 from ..fem.integral_alg import IntegralAlg
 from numpy.linalg import norm
 from ..fem import doperator
-from ..mg.DarcyFEMModel import DarcyP0P1
+from ..mg.DarcyP0P1 import DarcyP0P1
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 
 class DarcyForchheimerP0P1():
-    def __init__(self, pde, mesh, integrator):
+    def __init__(self, pde, mesh, integrator0, integrator1):
         self.space0 = VectorLagrangeFiniteElementSpace(mesh, 0, spacetype='D')
         self.space1 = LagrangeFiniteElementSpace(mesh, 1, spacetype='C')
         self.pde = pde
-        self.mesh0 = self.space0.mesh
-        self.mesh1 = self.space1.mesh
+        self.mesh = mesh
 
         self.uh = self.space0.function()
         self.ph = self.space1.function()
@@ -24,24 +23,44 @@ class DarcyForchheimerP0P1():
         self.uh0 = self.space0.function()
         self.ph0 = self.space1.function()
 
-        self.uI = self.femspace.function()
-        self.pI = self.femspace.interpolation(pde.pressure)
+#        self.uI = self.femspace.function()
+#        self.pI = self.femspace.interpolation(pde.pressure)
 
         self.cellmeasure = mesh.entity_measure('cell')
-        self.integrator = integrator
-        self.lfem = DarcyP0P1(self.pde, self.mesh1, 1, integrator)
+        self.integrator1 = integrator1
+        self.integrator0 = integrator0
+        self.lfem = DarcyP0P1(self.pde, self.mesh, 1, integrator1)
         self.uh0,self.ph0 = self.lfem.solve()
-        self.integralalg = IntegralAlg(self.integrator, self.mesh1, self.cellmeasure)
+        self.integralalg1 = IntegralAlg(self.integrator1, self.mesh, self.cellmeasure)
+        self.integralalg0 = IntegralAlg(self.integrator0, self.mesh, self.cellmeasure)
+        
+    def gradbasis(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        node = mesh.node
+        cell = mesh.ds.cell
+
+        ve1 = node[cell[:, 2],:] - node[cell[:, 1],:]
+        ve2 = node[cell[:, 0],:] - node[cell[:, 2],:]
+        ve3 = node[cell[:, 1],:] - node[cell[:, 0],:]
+        area = 0.5*(-ve3[:, 0]*ve2[:, 1] + ve3[:, 1]*ve2[:, 0])
+
+        Dlambda = np.zeros((NC,2,3))
+        Dlambda[:,:,2] = np.c_[-ve3[:, 1]/(2*area), ve3[:, 0]/(2*area)]
+        Dlambda[:,:,0] = np.c_[-ve1[:, 1]/(2*area), ve1[:, 0]/(2*area)]
+        Dlambda[:,:,1] = np.c_[-ve2[:, 1]/(2*area), ve2[:, 0]/(2*area)]
+
+        return Dlambda
 
     def get_left_matrix(self):
         space1 = self.space1
-        mesh1 = self.mesh1
+        mesh = self.mesh
         cellmeasure = self.cellmeasure
-        cell = mesh1.ds.cell
-        node = mesh1.node
+        cell = mesh.ds.cell
+        node = mesh.node
 
-        NC = mesh1.number_of_cells()
-        NN = mesh1.number_of_nodes()
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
 
         mu = self.pde.mu
         rho = self.pde.rho
@@ -72,19 +91,19 @@ class DarcyForchheimerP0P1():
         return A
 
     def get_right_vector(self):
-        mesh1 = self.mesh1
+        mesh = self.mesh
         cellmeasure = self.cellmeasure
-        node = mesh1.node
-        edge = mesh1.ds.edge
-        cell = mesh1.ds.cell
-        NN = mesh1.number_of_nodes()
+        node = mesh.node
+        edge = mesh.ds.edge
+        cell = mesh.ds.cell
+        NN = mesh.number_of_nodes()
 
-        bc = mesh1.entity_barycenter('cell')
+        bc = mesh.entity_barycenter('cell')
         ft = self.pde.f(bc)*np.c_[cellmeasure,cellmeasure]
         f = np.ravel(ft,'F')
 
-        cell2edge = mesh1.ds.cell_to_edge()
-        ec = mesh1.entity_barycenter('edge')
+        cell2edge = mesh.ds.cell_to_edge()
+        ec = mesh.entity_barycenter('edge')
         mid1 = ec[cell2edge[:, 1],:]
         mid2 = ec[cell2edge[:, 2],:]
         mid3 = ec[cell2edge[:, 0],:]
@@ -95,10 +114,10 @@ class DarcyForchheimerP0P1():
 
         b = np.bincount(np.ravel(cell,'F'),weights=np.r_[bt1,bt2,bt3], minlength=NN)
 
-        isBDEdge = mesh1.ds.boundary_edge_flag()
-        edge2node = mesh1.ds.edge_to_node()
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        edge2node = mesh.ds.edge_to_node()
         bdEdge = edge[isBDEdge,:]
-        ec = mesh1.entity_barycenter('edge')
+        ec = mesh.entity_barycenter('edge')
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
         mid = ec[isBDEdge,:]
@@ -112,13 +131,13 @@ class DarcyForchheimerP0P1():
         return np.r_[f,g]
 
     def solve(self):
-        mesh1 = self.mesh1
-        node = mesh1.node
-        edge = mesh1.ds.edge
-        cell = mesh1.ds.cell
+        mesh = self.mesh
+        node = mesh.node
+        edge = mesh.ds.edge
+        cell = mesh.ds.cell
         cellmeasure = self.cellmeasure
-        NN = mesh1.number_of_nodes()
-        NC = mesh1.number_of_cells()
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
         A = self.get_left_matrix()
         A11 = A[:2*NC,:2*NC]
         A12 = A[:2*NC,2*NC:]
@@ -158,15 +177,15 @@ class DarcyForchheimerP0P1():
             Aalphainv = inv(Aalpha)
             Ap = A21@Aalphainv@A12
             bp = A21@(Aalphainv@fnew) - b[2*NC:]
-            p = np.zeros(NN,dtype=np.float)
-            p[1:] = spsolve(Ap[1:,1:],bp[1:])
-            c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
-            p = p - c
-            u = Aalphainv@(fnew - A12@p)
+            p1 = np.zeros(NN,dtype=np.float)
+            p1[1:] = spsolve(Ap[1:,1:],bp[1:])
+            c = np.sum(np.mean(p1[cell],1)*cellmeasure)/np.sum(cellmeasure)
+            p1 = p1 - c
+            u1 = Aalphainv@(fnew - A12@p1)
 
             ## Step1:Solve the nonlinear Darcy equation
 
-            F = u/alpha - (mu/rho)*u - (A12@p - b[:2*NC])/area
+            F = u1/alpha - (mu/rho)*u1 - (A12@p1 - b[:2*NC])/area
             FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
             gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
             uhalf = F/np.r_[gamma,gamma]
@@ -174,46 +193,46 @@ class DarcyForchheimerP0P1():
             ## Updated residual and error of consective iterations
 
             n = n + 1
-            uLength = np.sqrt(u[:NC]**2 + u[NC:]**2)
-            Lu = A11@u + (beta/rho)*np.tile(uLength*cellmeasure,(1,2))*u + A12@p
+            uLength = np.sqrt(u1[:NC]**2 + u1[NC:]**2)
+            Lu = A11@u1 + (beta/rho)*np.tile(uLength*cellmeasure,(1,2))*u1 + A12@p1
             ru = norm(b[:2*NC] - Lu)/norm(b[:2*NC])
             if norm(b[2*NC:]) == 0:
-                rp = norm(b[2*NC:] - A21@u)
+                rp = norm(b[2*NC:] - A21@u1)
             else:
-                rp = norm(b[2*NC:] - A21@u)/norm(b[2*NC:])
+                rp = norm(b[2*NC:] - A21@u1)/norm(b[2*NC:])
 
-            self.uh0[:] = u
-            self.ph0[:] = p
+            self.uh0[:] = u1
+            self.ph0[:] = p1
             r[0,n] = ru
             r[1,n] = rp
+            
+        u11 = u1[:NC]
+        u22 = u1[NC:]
+        u12 = np.c_[u11,u22].flatten()
 
-        self.uh[:] = u
-        self.ph[:] = p
-        return u,p
+        self.uh[:] = u12
+        self.ph[:] = p1
+        
+        
+    def get_uL2_error(self):
+        
+        uh = self.uh.value
+        u = self.pde.velocity
+
+        uL2 = self.integralalg0.L2_error(u,uh)
+        return uL2
 
     def get_pL2_error(self):
         p = self.pde.pressure
         ph = self.ph.value
 
-        pL2 = self.integralalg.L2_error(p,ph)
+        pL2 = self.integralalg1.L2_error(p,ph)
         return pL2
-
-    def get_uL2_error(self):
-        mesh = self.mesh
-        bc = mesh.entity_barycenter('cell')
-        uI = self.pde.velocity(bc)
-        
-        uh = self.uh.value
-        u = self.pde.velocity
-
-        uL2 = self.integralalg.L2_error(u,uh)
-        return uL2
 
 
     def get_H1_error(self):
         mesh = self.mesh
         gp = self.pde.grad_pressure
-        u,p = self.solve()
-        gph = p.grad_value
-        H1 = self.integralalg.L2_error(gp, gph)
+        gph = self.ph.grad_value
+        H1 = self.integralalg1.L2_error(gp, gph)
         return H1

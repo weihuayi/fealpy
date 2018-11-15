@@ -8,9 +8,9 @@ from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
 from fealpy.pde.darcy_forchheimer_2d import Example7
-#from fealpy.fdm.NonDFFDMModel import NonDarcyForchheimerFDMModel
-#from fealpy.fdm.NonDFFDMModel_pu import NuDarcyForchheimerFDMModel
-from fealpy.fdm.NonDFFDMModel_normu import NonDarcyForchheimerFDMModel
+from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
+from fealpy.fdm.NonDFFDMModel_pu import NonDFFDMModel_pu
+from fealpy.fdm.NonDFFDMModel_normu import NonDFFDMModel_normu
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
@@ -50,7 +50,9 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-    fdm = NonDarcyForchheimerFDMModel(pde,mesh)
+    fdm = NonDFFDMModel(pde,mesh)
+    fdm = NonDFFDMModel_pu(pde,mesh)
+    fdm = NonDFFDMModel_normu(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
