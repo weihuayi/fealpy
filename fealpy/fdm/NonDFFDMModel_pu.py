@@ -2,10 +2,10 @@ import numpy as np
 import time
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm
-from fealpy.fem.integral_alg import IntegralAlg
+from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
-class NuDarcyForchheimerFDMModel():
+class NonDFFDMModel_normu():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh

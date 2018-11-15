@@ -6,6 +6,13 @@ from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Mesh2d import Mesh2d
 
 class PolyData:
+    """
+    u = (np.sin(pi*x)*np.cos(pi*y),np.cos(pi*x)*np.sin(pi*y))^t
+    p = x*(1-x)*y*(1-y)
+    g = 2*pi*np.cos(pi*x)*np.cos(pi*y)
+    f = ((mu/k + rho*beta*np.sqrt(np.sin(pi*x)**2*np.cos(pi*y)**2 + np.cos(pi*x)**2*np.sin(pi*y)**2))*np.sin(pi*x)*np.cos(pi*y) + (1-2*x)*y*(1-y),
+         (mu/k + rho*beta*np.sqrt(np.sin(pi*x)**2*np.cos(pi*y)**2 + np.cos(pi*x)**2*np.sin(pi*y)**2))*np.cos(pi*x)*np.sin(pi*y) + x(1-x)(1-2y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -115,6 +122,13 @@ class PolyData:
         return val
 
 class ExponentData:
+    """
+    u = (-y*x*(1-x),x*y*(1-y))^t
+    p = np.exp(x*(1-x)*y*(1-y)) - 1
+    g = x - y
+    f = (-(mu/k + rho*beta*np.sqrt(x**2*y**2*((1-x)**2 + (1-y)**2)))*x*y*(1-x) + (1-2*x)*y*(1-y)*np.exp(x*(1-x)*y*(1-y)),
+        (mu/k + rho*beta*np.sqrt(x**2*y**2*((1-x)**2 + (1-y)**2)))*x*y*(1-y) + x*(1-x)*(1-2*y)*np.exp(x*(1-x)*y*(1-y)))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -197,6 +211,13 @@ class ExponentData:
         return val
 
 class SinsinData:
+    """
+    u = (np.sin(x)*np.cos(y),-np.cos(x)*np.sin(y))^t
+    p = np.sin(pi*x)*np.sin(pi*y)
+    g = 0
+    f = ((mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.sin(x)*np.cos(x)*np.sin(y) + pi*np.cos(pi*x)*np.sin(pi*y),
+         -(mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.cos(x)*np.sin(y)  + pi*np.sin(pi*x)*np.cos(pi*y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -293,6 +314,13 @@ class SinsinData:
         return val
 
 class ArctanData:
+    """
+    u = (-y,x)^t
+    p = 2/np.pi*np.arctan(10*(x+y-1))
+    g = 0
+    f = (-(mu/k + rho*beta*np.sqrt(x**2+y**2))*y + 20/(np.pi*(1+(10*(x+y-1))**2)),
+         (mu/k + rho*beta*np.sqrt(x**2+y**2))*x + 20/(np.pi*(1+(10*(x+y-1))**2)))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -375,6 +403,10 @@ class ArctanData:
         return val
 
 class DeltaData:
+    """
+    g = 0
+    f = pi*(delta(0,0)-delta(1,1))
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -419,6 +451,12 @@ class DeltaData:
         return val
 
 class DarcyForchheimerdata1:
+    """
+    p = x^3 + y^3
+    u = (x+y,x-y)^t
+    g = 0
+    f = ((1+beta*sqrt(2x^2+2y^2))(x+y)+3x^2,(1+beta*sqrt(2x^2+2y^2))(x-y)+3y^2)
+    """
     def __init__(self, box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J):
         self.box = box
         self.mu = mu
@@ -457,8 +495,8 @@ class DarcyForchheimerdata1:
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape, dtype=np.float)
-        val[:, 0] = x + y
-        val[:, 1] = x - y
+        val[..., 0] = x + y
+        val[..., 1] = x - y
         return val
 
     def pressure(self, p):
@@ -482,8 +520,8 @@ class DarcyForchheimerdata1:
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape, dtype=np.float)
-        val[:, 0] = 3*x**2
-        val[:, 1] = 3*y**2
+        val[..., 0] = 3*x**2
+        val[..., 1] = 3*y**2
         return val
 
     def Neumann_boundary(self,p):
@@ -505,6 +543,12 @@ class DarcyForchheimerdata1:
         return z   
         
 class Example7:
+    """
+    p = (x-x^2)(y-y^2)
+    u = (exp(x)sin(y),exp(x)cos(y))^t
+    g = exp(x)+exp(y)
+    f = (mu/rho/k*sqrt((exp(x)sin(y))^2 + (exp(x)cos(y))^2))*u + ((1-2x)(y-y^2),(x-x^2)(1-2y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -607,6 +651,12 @@ class Example7:
         return val
        
 class Example8:
+    """
+    p = sin(pi*x)sin(pi*y)
+    u = (exp(x)sin(y),exp(x)cos(y))^t
+    g = exp(x)+exp(y)
+    f = (mu/rho/k*sqrt((exp(x)sin(y))^2 + (exp(x)cos(y))^2))*u + (pi*cos(pi*x)sin(pi*y),pi*sin(pi*x)cos(pi*y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -710,6 +760,12 @@ class Example8:
       
  
 class Example9:
+    """
+    p = (x-x^2)(y-y^2)
+    u = (x*exp(y),y*exp(x))^t
+    g = exp(x)+exp(y)
+    f = (mu/rho/k*sqrt((x*exp(y))^2 + (y*exp(x))^2))*u + ((1-2x)(y-y^2),(x-x^2)(1-2y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -810,6 +866,12 @@ class Example9:
         return val
         
 class Example10:
+    """
+    p = sin(pi*x)sin(pi*y)
+    u = (x*exp(y),y*exp(x))^t
+    g = exp(x)+exp(y)
+    f = (mu/rho/k*sqrt((x*exp(y))^2 + (y*exp(x))^2))*u + (pi*cos(pi*x)sin(pi*y),pi*sin(pi*x)cos(pi*y))^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -910,6 +972,10 @@ class Example10:
         
         
 class Example11:
+    """
+    g = 0
+    f = (sin(pi*x), sin(pi*y))
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -947,6 +1013,10 @@ class Example11:
         return rhs
         
 class Example12:
+    """
+    g = 0
+    f = (x-x^2, y-y^2)
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
@@ -985,6 +1055,8 @@ class Example12:
 
 class Example13:
     """
+    g = exp(-((x - 1/2)^2 + (y - 1/2)^2))
+    f = (1,0)^t
     """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
@@ -1023,6 +1095,10 @@ class Example13:
         return rhs
         
 class Example14:
+    """
+    g = sin(pi*x)sin(2*pi*y)
+    f = (1,0)^t
+    """
     def __init__(self, box, mu, k, rho, beta, tol):
         self.box = box
         self.mu = mu
