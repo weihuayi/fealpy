@@ -444,11 +444,6 @@ class DeltaData:
         rhs[-1] = -np.pi
 
         return rhs
-    def normu(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.sqrt(x**2 + y**2)
-        return val
 
 class DarcyForchheimerdata1:
     """
