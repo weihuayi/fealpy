@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from numpy.linalg import norm
 from scipy.sparse.linalg import cg, inv, spsolve
+from scipy.sparse import eye, spdiags
 from fealpy.mg.DarcyForchheimerP0P1 import DarcyForchheimerP0P1
 from fealpy.mg.DarcyP0P1 import DarcyP0P1
 from fealpy.mg.DarcyForchP0P1mg import DarcyForchP0P1mg
@@ -23,14 +24,16 @@ n = 2
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J)
 ## Generate an initial mesh
-mesh = pde.init_mesh(n+3)
+mesh = pde.init_mesh(n+level)
+NC = mesh.number_of_cells()
+
 integrator1 = mesh.integrator(p+2)
 integrator0 = mesh.integrator(p+1)
 
 ## Initial guess
-NC = mesh.number_of_cell()
+NC = mesh.number_of_cells()
 mfem = DarcyP0P1(pde, mesh, 1, integrator1)
-mfem.solve()
+u,p = mfem.solve()
 A = mfem.get_left_matrix()
 A11 = A[:2*NC,:2*NC]
 A12 = A[:2*NC,2*NC:]
@@ -46,20 +49,21 @@ Ap = A21@Aalphainv@A12
 m = 0;
 error = np.ones(maxN, dtype=np.float)
 residual = np.ones(maxN, dtype=np.float)
-Ndof = np.zeros(maxit,dtype = np.int)
+Ndof = np.zeros(maxN,dtype = np.int)
 
-while residual(m) > tol and m < maxN:
-
+while residual[m] > tol and m < maxN:
+    
+    uold = np.zeros(u.shape)
     uold[:] = u
-    femg = DarcyForchP0P1mg()
+    femg = DarcyForchP0P1mg(n, J, pde, integrator0, integrator1)
     m = m + 1
     erru = norm(u - uold)/norm(uold)
-    error(m) = erru
-    residual(n) = rn
+    error[m] = erru
+    residual[n] = rn
 erruIuh = femg.get_uIL2_error()
 errp = femg.get_uL2_error()
 errpH1 = femg.get_H1_error()
-plot(residual)
+plot(np.arange(n),residual[:n],c='r',maker='.')
 
 
 plt.show()
