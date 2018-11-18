@@ -191,7 +191,8 @@ class DarcyForchheimerP0P1():
             uhalf = F/np.r_[gamma,gamma]
 
             ## Updated residual and error of consective iterations
-
+            r[0,n] = ru
+            r[1,n] = rp
             n = n + 1
             uLength = np.sqrt(u1[:NC]**2 + u1[NC:]**2)
             Lu = A11@u1 + (beta/rho)*np.tile(uLength*cellmeasure,(1,2))*u1 + A12@p1
@@ -203,8 +204,7 @@ class DarcyForchheimerP0P1():
 
             self.uh0[:] = u1
             self.ph0[:] = p1
-            r[0,n] = ru
-            r[1,n] = rp
+
             
         u11 = u1[:NC]
         u22 = u1[NC:]

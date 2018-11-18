@@ -125,10 +125,9 @@ class DarcyP0P1():
         ec = mesh.entity_barycenter('edge')
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
-
         mid = ec[isBDEdge,:]
-        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(2,1))
 
+        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(2,1))
         g = np.bincount(np.ravel(bdEdge,'F'),\
                 weights=np.ravel(ii), minlength=NN)
         g = g - b[2*NC:]
