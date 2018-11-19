@@ -225,6 +225,11 @@ class DarcyForchP0P1mg():
         Aalphac = Ac + spdiags(area2/alpha, 0, 2*NC1, 2*NC1)
         Aalphainvc = inv(Aalphac)
         Apc = Gct@Aalphainvc@Gc
-        print(J)
 
-        return DarcyForchP0P1mg(n,J-1,pde,self.integrator0,integrator1)
+        solve()
+
+        ## Prolongate correction to fine space
+        eu = Pro_u@()
+        
+
+        return solve(self)
