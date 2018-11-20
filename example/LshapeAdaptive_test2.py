@@ -8,7 +8,6 @@ from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 from fealpy.recovery import FEMFunctionRecoveryAlg
 from fealpy.mesh.Tri_adaptive_tools import AdaptiveMarker
 from fealpy.mesh.tree_data_structure import Tritree
-from fealpy.quadrature import TriangleQuadrature
 
 from mpl_toolkits.mplot3d import Axes3D
 from fealpy.tools.show import showmultirate
@@ -24,7 +23,7 @@ elif m == 2:
     pde = KelloggData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
 
-theta = 0.7
+theta = 0.3
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
@@ -52,7 +51,6 @@ for i in range(maxit):
     if i < maxit -1:
         tmesh.refine(marker=AdaptiveMarker(eta, theta=theta))
         pmesh = tmesh.to_conformmesh()
-    print(pmesh.node.shape)
 pmesh.add_plot(plt, cellcolor='w')
 fig2 = plt.figure()
 fig2.set_facecolor('white')

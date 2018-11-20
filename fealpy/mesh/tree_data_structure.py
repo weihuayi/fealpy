@@ -182,8 +182,8 @@ class Tritree(TriangleMesh):
         cell20[0:N0, 2] = cell[idx0, edge2cell[flag0, 2]]
 
         cell20[N0:2*N0, 0] = edge[flag0, 1]
-        cell20[N0:2*N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
-        cell20[N0:2*N0, 2] = cell[idx0, edge2cell[flag0, 2]]
+        cell20[N0:2*N0, 1] = cell[idx0, edge2cell[flag0, 2]]
+        cell20[N0:2*N0, 2] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
 
         idx1 = edge2cell[flag1, 1]
         N1 = len(idx1)
@@ -194,8 +194,8 @@ class Tritree(TriangleMesh):
         cell21[0:N1, 2] = cell[idx1, edge2cell[flag1, 3]]
 
         cell21[N1:2*N1, 0] = edge[flag1, 0]
-        cell21[N1:2*N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
-        cell21[N1:2*N1, 2] = cell[idx1, edge2cell[flag1, 3]]
+        cell21[N1:2*N1, 1] = cell[idx1, edge2cell[flag1, 3]]
+        cell21[N1:2*N1, 2] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
         
         isLRCell = np.zeros(NC, dtype=np.bool)
         isLRCell[LCell] = True

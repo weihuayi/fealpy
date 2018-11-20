@@ -30,6 +30,7 @@ class AdaptiveMarker():
         idxmap = tree.celldata['idxmap']
         np.add.at(eta, idxmap, self.eta)
         markedIdx = mark(eta[leafCellIdx], self.theta)
+        print(eta[leafCellIdx])
         return leafCellIdx[markedIdx]
 
     def coarsen_marker(self, qtmesh):
