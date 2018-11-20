@@ -152,6 +152,8 @@ class DarcyForchheimerP0P1():
         maxN = self.pde.maxN
         ru = 1
         rp = 1
+        eu = 1
+        ep = 1
 
         ## P-R iteration for D-F equation
         n = 0
@@ -167,7 +169,7 @@ class DarcyForchheimerP0P1():
 
         Aalpha = A11 + spdiags(area/alpha, 0, 2*NC,2*NC)
 
-        while ru+rp > tol and n < maxN:
+        while eu+ep > tol and n < maxN:
             ## solve the linear Darcy equation
             uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
             fnew = b[:2*NC] + uhalf*area/alpha\
@@ -201,6 +203,8 @@ class DarcyForchheimerP0P1():
                 rp = norm(b[2*NC:] - A21@u1)
             else:
                 rp = norm(b[2*NC:] - A21@u1)/norm(b[2*NC:])
+            eu = np.max(abs(u1 - self.uh0))
+            ep = np.max(abs(p1 - self.ph0))
 
             self.uh0[:] = u1
             self.ph0[:] = p1

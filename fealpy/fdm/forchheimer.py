@@ -197,10 +197,12 @@ class Dforchheimer():
         b0[flag] = pde.source3(bc[flag])
 
         idx, = np.nonzero(isYDEdge & isBDEdge)
-        b0[idx] = 0 #modify
+        val = pde.velocity_x(bc[idx])
+        b0[idx] = C[idx]*val #modify
 
         idx, = np.nonzero(isXDEdge & isBDEdge)
-        b0[idx] = 0
+        val = pde.velocity_y(bc[idx])
+        b0[idx] = C[idx]*val
 
         b1 = hx1*hy1*pde.source1(pc)
         return np.r_[b0, b1]

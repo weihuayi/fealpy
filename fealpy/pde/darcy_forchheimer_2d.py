@@ -568,29 +568,31 @@ class DeltaData:
         """ The right hand side of DarcyForchheimer equation
         """
         rhs = np.zeros(p.shape[0],)
+        rhs[0] = np.pi
+        rhs[-1] = -np.pi
 
         return rhs
 
     def source2(self, p):
 
         rhs = np.zeros(p.shape[0],)
-        rhs[0] = np.pi
-        rhs[-1] = -np.pi
 
         return rhs
 
     def source3(self, p):
 
         rhs = np.zeros(p.shape[0],)
-        rhs[0] = np.pi
-        rhs[-1] = -np.pi
 
         return rhs
-    def normu(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.sqrt(x**2 + y**2)
+
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
         return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
+
 
 class DarcyForchheimerdata1:
     """
