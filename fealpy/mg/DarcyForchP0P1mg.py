@@ -152,9 +152,73 @@ class DarcyForchP0P1mg():
 
         return HB
 
+    def DarcyForchP0P1smoothing21(self):
+        mesh = self.mesh1
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        mu = self.pde.mu
+        rho = self.pde.rho
+        beta = self.pde.beta
+        alpha = self.pde.alpha
+        tol = self.tol
+        maxN = self.pde.maxN
+        cellmeasure = mesh.entity_measure('cell')
+        area = np.r_[cellmeasure, cellmeasure]
+        ## P-R interation for D-F equations
+
+        n = 0
+        ru = np.ones(maxN,)
+        rp = np.ones(maxN,)
+        uhalf = u
+    
+        Aalphadiag = np.arange(0,dtype=np.float)
+        for i in range(A.shape[0]):
+            for j in range(A.shape[1]):
+                if i == j:
+                    Aalphadiag = np.append(Aalphadiag,A[i,j])
+        Aalphadiag = Aalphadiag + area/alpha
+        Aalphainv = spdiags(1/Aalphadiag, 0, 2*NC, 2*NC)
+
+        while ru[n]+rp[n] > tol and n < maxN:
+            ## step 2: Solve the linear Darcy equation
+            # update RHS
+
+            uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
+            fnew = f + uhalf*area/alpha - beta/rho*uhalf*np.r_[uhalfL,uhalfL]
+            bp = Gt@(Aalphainv*fnew) - g
+
+            p = np.zeros(NN, dtype=np.float)
+            p[1:] = spsolve(Ap[1:,1:],bp[1:])
+            c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
+            p = p-c
+            u = Aalphainv@(fnew - G@p)
+
+            ## step 1:Solve the nonlinear Darcy equation
+            # Knowing(u,p), explicitly compute the intermediate velocity
+            # u(n+1/2)
+
+            F = u/alpha - (mu/rho)*u - (G@p - f)*area
+            FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
+            gamma = 1/(2*alpha) + 1/2*np.sqrt((1/alpha**2)+4*(beta/rho)*FL)
+            uhalf = F/np.r_[gamma,gamma]
+
+            ## Update residual and error of consective iterations
+            n = n+1
+            uLength = np.sqrt(u[:NC]**2 + u[NC:]**2)
+            Lu = A@u + (beta/rho)*np.r_[uLength,uLength]*u + G@p
+            ru[n] = norm(f - Lu)/norm(f)
+            if norm(g) == 0:
+                rp[n] = norm[g - Gt@u]
+            else:
+                rp[n] = norm(g - Gt@u)/norm(g)
+        ru = ru[1:n]
+        rp = rp[1:n]
+
+        return ru,rp
 
 
-    def solve(self):
+
+    def DarcyForchsmoothing(self):
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
@@ -225,11 +289,11 @@ class DarcyForchP0P1mg():
         Aalphac = Ac + spdiags(area2/alpha, 0, 2*NC1, 2*NC1)
         Aalphainvc = inv(Aalphac)
         Apc = Gct@Aalphainvc@Gc
+        self.A[:] = Ac
+        print('A',self.A.shape) 
 
-        solve()
+        return uc,pc
 
-        ## Prolongate correction to fine space
-        eu = Pro_u@()
-        
+    def solve(self):
+        self.DarcyForchsmoothing()
 
-        return solve(self)
