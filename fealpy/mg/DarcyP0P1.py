@@ -2,10 +2,10 @@ import numpy as np
 import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 import scipy.sparse
-from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fem import doperator
+from ..fem.integral_alg import IntegralAlg
+from ..fem import doperator
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 
 class DarcyP0P1():
     def __init__(self, pde, mesh, p, integrator):

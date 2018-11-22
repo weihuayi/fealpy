@@ -2,7 +2,7 @@ import numpy as np
 import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 import scipy.sparse
-from fealpy.fem.integral_alg import IntegralAlg
+from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve
 from mumps import spsolve
 class DarcyFDMModel():

@@ -56,6 +56,7 @@ while residual[m] > tol and m < maxN:
     uold = np.zeros(u.shape)
     uold[:] = u
     femg = DarcyForchP0P1mg(n, J, pde, integrator0, integrator1)
+    u,p,rn = femg.solve()
     m = m + 1
     erru = norm(u - uold)/norm(uold)
     error[m] = erru
