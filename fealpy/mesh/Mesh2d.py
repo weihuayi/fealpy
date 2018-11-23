@@ -256,7 +256,10 @@ class Mesh2dDataStructure():
         E = self.E
 
         totalEdge = self.total_edge()
-        _, i0, j = unique_row(np.sort(totalEdge, axis=1))
+        _, i0, j = np.unique(np.sort(totalEdge, axis=1), 
+                return_index=True, 
+                return_inverse=True, 
+                axis=0)
         NE = i0.shape[0]
         self.NE = NE
 
