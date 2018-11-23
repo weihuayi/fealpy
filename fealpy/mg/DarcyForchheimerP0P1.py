@@ -218,7 +218,6 @@ class DarcyForchheimerP0P1():
         self.uh[:] = u12
         self.ph[:] = p1
         return u12, p1
-    def residual_estimators(self):
         
 
     def get_uL2_error(self):

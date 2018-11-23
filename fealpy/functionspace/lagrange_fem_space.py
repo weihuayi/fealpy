@@ -282,6 +282,16 @@ class VectorLagrangeFiniteElementSpace():
         val = np.einsum('...jm, ij->...im',  phi, uh) 
         return val 
 
+    def div_value(self, uh, bcs, cellidx=None):
+        dphi = self.div_basis(bcs, cellidx=cellidx)
+        cell2dof = self.cell_to_dof()
+        if cellidx is None:
+            uh = uh[cell2dof]
+        else:
+            uh = uh[cell2dof[cellidx]]
+        val = np.einsum('...j, ij->...i',  dphi, uh) 
+        return val
+
     def function(self, dim=None):
         f = Function(self)
         return f
