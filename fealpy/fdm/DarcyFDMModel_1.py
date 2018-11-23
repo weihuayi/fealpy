@@ -1,9 +1,9 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from scipy.sparse.linalg import inv
-from fealpy.fem.integral_alg import IntegralAlg
+from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
-class DarcyFDMModel():
+class DarcyFDMModel_1():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh

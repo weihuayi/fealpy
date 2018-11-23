@@ -2,10 +2,10 @@ import numpy as np
 import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 import scipy.sparse
-from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fem import doperator
+from ..fem.integral_alg import IntegralAlg
+from ..fem import doperator
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 
 class DarcyP0P1():
     def __init__(self, pde, mesh, p, integrator):
@@ -125,10 +125,9 @@ class DarcyP0P1():
         ec = mesh.entity_barycenter('edge')
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
-
         mid = ec[isBDEdge,:]
-        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(2,1))
 
+        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(2,1))
         g = np.bincount(np.ravel(bdEdge,'F'),\
                 weights=np.ravel(ii), minlength=NN)
         g = g - b[2*NC:]

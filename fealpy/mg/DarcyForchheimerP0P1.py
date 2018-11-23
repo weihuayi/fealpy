@@ -9,6 +9,7 @@ from ..mg.DarcyP0P1 import DarcyP0P1
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
+from timeit import default_timer as timer
 
 class DarcyForchheimerP0P1():
     def __init__(self, pde, mesh, integrator0, integrator1):
@@ -152,6 +153,8 @@ class DarcyForchheimerP0P1():
         maxN = self.pde.maxN
         ru = 1
         rp = 1
+        eu = 1
+        ep = 1
 
         ## P-R iteration for D-F equation
         n = 0
@@ -167,7 +170,7 @@ class DarcyForchheimerP0P1():
 
         Aalpha = A11 + spdiags(area/alpha, 0, 2*NC,2*NC)
 
-        while ru+rp > tol and n < maxN:
+        while eu+ep > tol and n < maxN:
             ## solve the linear Darcy equation
             uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
             fnew = b[:2*NC] + uhalf*area/alpha\
@@ -191,7 +194,8 @@ class DarcyForchheimerP0P1():
             uhalf = F/np.r_[gamma,gamma]
 
             ## Updated residual and error of consective iterations
-
+            r[0,n] = ru
+            r[1,n] = rp
             n = n + 1
             uLength = np.sqrt(u1[:NC]**2 + u1[NC:]**2)
             Lu = A11@u1 + (beta/rho)*np.tile(uLength*cellmeasure,(1,2))*u1 + A12@p1
@@ -200,11 +204,12 @@ class DarcyForchheimerP0P1():
                 rp = norm(b[2*NC:] - A21@u1)
             else:
                 rp = norm(b[2*NC:] - A21@u1)/norm(b[2*NC:])
+            eu = np.max(abs(u1 - self.uh0))
+            ep = np.max(abs(p1 - self.ph0))
 
             self.uh0[:] = u1
             self.ph0[:] = p1
-            r[0,n] = ru
-            r[1,n] = rp
+
             
         u11 = u1[:NC]
         u22 = u1[NC:]
@@ -212,8 +217,10 @@ class DarcyForchheimerP0P1():
 
         self.uh[:] = u12
         self.ph[:] = p1
+        return u12, p1
+    def residual_estimators(self):
         
-        
+
     def get_uL2_error(self):
         
         uh = self.uh.value
@@ -225,7 +232,6 @@ class DarcyForchheimerP0P1():
     def get_pL2_error(self):
         p = self.pde.pressure
         ph = self.ph.value
-
         pL2 = self.integralalg1.L2_error(p,ph)
         return pL2
 

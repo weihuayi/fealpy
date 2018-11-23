@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from fealpy.pde.surface_poisson_model_3d import SphereSinSinSinData
 from fealpy.fem.SurfacePoissonFEMModel import SurfacePoissonFEMModel
 from fealpy.mesh.Tri_adaptive_tools import AdaptiveMarker
+from fealpy.mesh.level_set_function import Sphere
 from fealpy.quadrature import TriangleQuadrature
 from fealpy.tools.show import showmultirate
 from fealpy.mesh.tree_data_structure import Tritree
@@ -28,7 +29,9 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 integrator = TriangleQuadrature(3)
 ralg = FEMFunctionRecoveryAlg()
 pde = SphereSinSinSinData()
-mesh = pde.init_mesh(2)
+surface = Sphere()
+mesh = surface.init_mesh()
+mesh.uniform_refine(n=2, surface=surface)
 tmesh = Tritree(mesh.node, mesh.ds.cell, irule=1)
 pmesh = tmesh.to_conformmesh()
 
@@ -48,7 +51,7 @@ for i in range(maxit):
     errorMatrix[1, i] = fem.get_L2_error()
     errorMatrix[2, i] = fem.get_H1_semi_error()
     if i < maxit - 1:
-        tmesh.refine(marker=AdaptiveMarker(eta, theta=theta))
+        tmesh.refine(marker=AdaptiveMarker(eta, theta=theta), surface=surface)
         pmesh = tmesh.to_conformmesh()
 
 fig = pl.figure()

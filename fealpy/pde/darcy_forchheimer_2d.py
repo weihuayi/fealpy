@@ -5,6 +5,148 @@ from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Mesh2d import Mesh2d
 
+
+class LShapeRSinData():
+    def __init__(self, mu, rho, beta, alpha, tol, maxN):
+        self.mu = mu
+        self.rho = rho
+        self.beta = beta
+        self.alpha = alpha
+        self.tol = tol
+        self.maxN = maxN
+
+    def init_mesh(self, n=4):
+        node = np.array([
+            (-1, -1),
+            (0, -1),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)], dtype=np.float)
+        cell = np.array([
+            (1, 3, 0),
+            (2, 0, 3),
+            (3, 6, 2),
+            (5, 2, 6),
+            (4, 7, 3),
+            (6, 3, 7)], dtype=np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+    
+    def f(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        mu = self.mu
+        rho = self.rho
+        beta = self.beta
+        pi = np.pi
+        sin = np.sin
+        cos = np.cos
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x**2 + y**2
+        val = np.zeros(p.shape, dtype=p.dtype)
+        t1 = -2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
+        t2 = -2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
+        val[..., 0] = mu/rho*t1 + beta/rho*np.sqrt(t1**2 + t2**2)*t1 - t1
+        val[..., 1] = mu/rho*t2 + beta/rho*np.sqrt(t1**2 + t2**2)*t2 - t2
+        return val
+    
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        p = (x*x + y*y)**(1/3)*np.sin(2/3*theta)
+        return p
+
+    def velocity(self, p):
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x**2 + y**2
+        u = np.zeros(p.shape, dtype=p.dtype)
+        u[..., 0] = -2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
+        u[..., 1] = -2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
+        return u
+    
+    def g(self, p):
+        '''The right hand side of DarcyForchheimer equation
+        '''
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x**2 + y**2
+        val = 4*(x**2/r + y**2/r - 1)*sin(2*theta/3)/(3*r**(2/3))
+        return val
+    
+    def grad_pressure(self, p):
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
+        r = x**2 + y**2
+        u = np.zeros(p.shape, dtype=p.dtype)
+        u[..., 0] = 2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
+        u[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
+        return u
+
+    def Neumann_boundary(self, p):
+        sin = np.sin
+        cos = np.cos
+        pi = np.pi
+        z = np.zeros(p.shape[0],)
+        x = p[..., 0]
+        y = p[..., 1]
+        
+        idx = np.nonzero(abs(x - 1) < np.spacing(0))
+        z[idx] = -2*(sin(2*np.arctan2(y[idx], 1)/3) - y[idx]*cos(2*np.arctan2(y[idx], 1)/3))/(3*(1 + y[idx]**2)**(2/3))
+
+        idx = np.nonzero(abs(x - 0) < np.spacing(0))
+        z[idx] = -2*(sin(2*np.arctan2(y[idx], 0)/3) - y[idx]*cos(2*np.arctan2(y[idx], 0)/3))/(3*(y[idx]**2)**(2/3))
+
+        idx = np.nonzero(abs(x + 1) < np.spacing(0))
+        z[idx] = 2*(sin(2*np.arctan2(y[idx], -1)/3) - y[idx]*cos(2*np.arctan2(y[idx], -1)/3))/(3*(1 + y[idx]**2)**(2/3))
+
+        idx = np.nonzero(abs(y - 1) < np.spacing(0))
+        z[idx] = -2*(x[idx]*cos(2*np.arctan2(1, x[idx])/3) + sin(2*np.arctan2(1, x[idx])/3))/(3*(x[idx]**2 + 1)**(2/3))
+
+        idx = np.nonzero(abs(y - 0) < np.spacing(0))
+        z[idx] = 2*(x[idx]*cos(2*np.arctan2(0, x[idx])/3) + sin(2*np.arctan2(0, x[idx])/3))/(3*(x[idx]**2)**(2/3))
+
+        idx = np.nonzero(abs(y + 1) < np.spacing(0))
+        z[idx] = 2*(x[idx]*cos(2*np.arctan2(-1, x[idx])/3) + sin(2*np.arctan2(-1, x[idx])/3))/(3*(x[idx]**2 + 1)**(2/3))
+
+        return z
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 class PolyData:
     """
     u = (np.sin(pi*x)*np.cos(pi*y),np.cos(pi*x)*np.sin(pi*y))^t
@@ -426,24 +568,31 @@ class DeltaData:
         """ The right hand side of DarcyForchheimer equation
         """
         rhs = np.zeros(p.shape[0],)
+        rhs[0] = np.pi
+        rhs[-1] = -np.pi
 
         return rhs
 
     def source2(self, p):
 
         rhs = np.zeros(p.shape[0],)
-        rhs[0] = np.pi
-        rhs[-1] = -np.pi
 
         return rhs
 
     def source3(self, p):
 
         rhs = np.zeros(p.shape[0],)
-        rhs[0] = np.pi
-        rhs[-1] = -np.pi
 
         return rhs
+
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
+        return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
+
 
 class DarcyForchheimerdata1:
     """
@@ -1130,7 +1279,5 @@ class Example14:
         rhs = np.zeros(p.shape[1],)
         return rhs
 
-              
-
-              
+       
               

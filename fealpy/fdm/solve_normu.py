@@ -7,7 +7,7 @@ from numpy.linalg import norm
 from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
-class DarcyForchheimerFDMModel():
+class solve_normu():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh

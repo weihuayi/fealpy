@@ -16,10 +16,9 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(1)
+tmesh.uniform_refine(2)
 node = tmesh.node
 cell = tmesh.entity('cell')
-print(tmesh.ds.node_to_cell())
 N = node.shape[0]
 tmeshstrcture = TriangleMeshDataStructure(N, cell)
 fig = plt.figure()
