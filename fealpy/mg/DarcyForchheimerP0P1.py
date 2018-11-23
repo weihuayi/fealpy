@@ -9,6 +9,7 @@ from ..mg.DarcyP0P1 import DarcyP0P1
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
+from timeit import default_timer as timer
 
 class DarcyForchheimerP0P1():
     def __init__(self, pde, mesh, integrator0, integrator1):
@@ -216,8 +217,10 @@ class DarcyForchheimerP0P1():
 
         self.uh[:] = u12
         self.ph[:] = p1
+        return u12, p1
+    def residual_estimators(self):
         
-        
+
     def get_uL2_error(self):
         
         uh = self.uh.value
@@ -229,7 +232,6 @@ class DarcyForchheimerP0P1():
     def get_pL2_error(self):
         p = self.pde.pressure
         ph = self.ph.value
-
         pL2 = self.integralalg1.L2_error(p,ph)
         return pL2
 
