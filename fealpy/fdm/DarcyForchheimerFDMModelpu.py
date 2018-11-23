@@ -5,11 +5,11 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy import linalg as LA
-from fealpy.fem.integral_alg import IntegralAlg
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+from ..fem.integral_alg import IntegralAlg
+from ..fdm.DarcyFDMModel import DarcyFDMModel
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 
-class DarcyForchheimerFDMModel():
+class DarcyForchheimerFDMModelpu():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh

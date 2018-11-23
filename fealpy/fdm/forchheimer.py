@@ -5,7 +5,7 @@ from numpy.linalg import norm
 from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
-class Dforchheimer():
+class forchheimer():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh
