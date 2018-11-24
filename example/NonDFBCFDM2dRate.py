@@ -7,7 +7,8 @@ from fealpy.pde.darcy_forchheimer_2d import PolyData
 from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
-from fealpy.fdm.NonDFFDMModel import NuDarcyForchheimerFDMModel
+from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
+from fealpy.fdm.NonDFFDMModel_pu import NonDFFDMModel_pu
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
@@ -19,22 +20,22 @@ tol = 1e-9
 #hx = np.array([0.12,0.34,0.22,0.32])
 #hy = np.array([0.25,0.13,0.33,0.29])
 #hy = np.array([0.16,0.23,0.32,0.11,0.18])
-hx = np.array([0.12,0.34,0.45,0.09])
+#hx = np.array([0.12,0.34,0.45,0.09])
 #hy = np.array([0.25,0.13,0.54,0.08])
-hy = np.array([0.25,0.13,0.34,0.20,0.08])
-#hx = np.array([0.25,0.25,0.25,0.25])
-#hy = np.array([0.25,0.25,0.25,0.25])
+#hy = np.array([0.25,0.13,0.34,0.20,0.08])
+hx = np.array([0.25,0.25,0.25,0.25])
+hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-m = 8
-hx = hx/m
-hy = hy/m
-hx = hx.repeat(m)
-hy = hy.repeat(m)
+#m = 8
+#hx = hx/m
+#hy = hy/m
+#hx = hx.repeat(m)
+#hy = hy.repeat(m)
 
 #pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
-#pde = SinsinData(box,mu,k,rho,beta,tol)
-pde = ArctanData(box,mu,k,rho,beta,tol)
+pde = SinsinData(box,mu,k,rho,beta,tol)
+#pde = ArctanData(box,mu,k,rho,beta,tol)
 maxit = 6
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
@@ -49,7 +50,8 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-    fdm = NuDarcyForchheimerFDMModel(pde,mesh)
+#    fdm = NonDFFDMModel(pde,mesh)
+    fdm = NonDFFDMModel_pu(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
@@ -128,25 +130,9 @@ print('Ndof',Ndof)
 print('M4P4b30t9')
 #mesh.add_plot(plt,cellcolor='w')
 #showmultirate(plt,0,Ndof,err,errorType)
-if __name__ =="__main__":
-    f = h5py.File('NdofM4.h5','w')
-    f['NdofM4'] = Ndof
-    f.close()
-if __name__ =="__main__":
-    f = h5py.File('error1M4P4b30t9.h5','w')
-    f['error1M4P4b30t9'] = error1
-    f.close()
-if __name__ =="__main__":
-    f = h5py.File('error2M4P4b30t9.h5','w')
-    f['error2M4P4b30t9'] = error2
-    f.close()
-if __name__ =="__main__":
-    f = h5py.File('rurpM4P4b30t9.h5','w')
-    f['rurpM4P4b30t9'] = r
-    f.close()
 showmultirate(plt,0,Ndof,error1,errorType1)
-plt.savefig("/home/liao/Desktop/M4P4b30t9updp.eps",dpi=None)
+#plt.savefig("/home/liao/Desktop/M4P4b30t9updp.eps",dpi=None)
 showmultirate(plt,0,Ndof,error2,errorType2)
-plt.savefig("/home/liao/Desktop/M4P4b30t9ucu.eps",dpi=None)
+#plt.savefig("/home/liao/Desktop/M4P4b30t9ucu.eps",dpi=None)
 plt.show()
 

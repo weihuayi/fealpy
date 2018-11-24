@@ -8,7 +8,7 @@ from numpy import linalg as LA
 from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
-class NuDarcyForchheimerFDMModel():
+class NonDFFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh

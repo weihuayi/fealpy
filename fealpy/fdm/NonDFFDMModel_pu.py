@@ -1,5 +1,9 @@
 import numpy as np
 import time
+import h5py
+import pickle
+import sys
+import scipy.sparse as sparse
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm
 from ..fem.integral_alg import IntegralAlg
@@ -327,34 +331,11 @@ class NonDFFDMModel_pu():
 
         self.uh[:] = u1
         self.ph[:] = p1
-        print('eu',eu)
-        print('ep:',ep)
-        print('ru:',ru)
-        print('rp:',rp)
-        print('solve matrix p and u')
-        if __name__ =="__main__":
-            uI = self.uI
-            f = h5py.File('M2P1uI7','w')
-            f['M2P1uI7'] = uI
-            f.close()
-        if __name__ =="__main__":
-            uh = self.uh
-            f = h5py.File('M2P1uh7','w')
-            f['M2P1uh7'] = uh
-            f.close()
-        if __name__ =="__main__":
-            ph = self.ph
-            f = h5py.File('M2P1ph7','w')
-            f['M2P1ph7'] = ph
-            f.close()
-        if __name__ =="__main__":
-            pI = self.pI
-            f = h5py.File('M2P1pI7','w')
-            f['M2P1pI7'] = pI
-            f.close()
-        return count,r
-
-
+#        print('eu',eu)
+#        print('ep:',ep)
+#        print('ru:',ru)
+#        print('rp:',rp)
+        print('solve matrix p then u')
         return count,r
 
 
