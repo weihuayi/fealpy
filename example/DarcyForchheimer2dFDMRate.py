@@ -70,7 +70,7 @@ for i in range(maxit):
         nx = 2*nx
         ny = 2*ny
     tottime = time.time() -t1
-    print('total time:',tottime)
+    print('Total time:',tottime)
     print('Solve time:',Stime)
 print('err',err)
 print('error',error)
