@@ -1,8 +1,11 @@
 import numpy as np
 import time
+import h5py
+import pickle
+import sys
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
-from numpy.linalg import norm
-from ..fem.integral_alg import IntegralAlg
+from numpy import linalg as LA
+from fealpy.fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
 class NonDFFDMModel():
@@ -10,10 +13,10 @@ class NonDFFDMModel():
         self.pde = pde
         self.mesh = mesh
 
-        hx = mesh.hx
-        hy = mesh.hy
-        nx = mesh.ds.nx
-        ny = mesh.ds.ny
+        hx = mesh.ds.hx
+        hy = mesh.ds.hy
+        nx = mesh.nx
+        ny = mesh.ny
 
         hx1 = hx.repeat(ny)
         hy1 = np.tile(hy,nx)
@@ -248,7 +251,7 @@ class NonDFFDMModel():
         b = self.get_right_vector()
         A = self.get_left_matrix()
         end = time.time()
-        print('Con matrix time',end-start)
+        print('Assemble matrix time',end-start)
 
         tol = self.pde.tol
         ru = 1
@@ -258,6 +261,8 @@ class NonDFFDMModel():
         count = 0
         iterMax = 2000
         r = np.zeros((2,iterMax),dtype=ftype)
+        er = np.zeros((2,iterMax),dtype=ftype)
+        
 
         while eu+ep > tol and count < iterMax:
 
@@ -298,19 +303,21 @@ class NonDFFDMModel():
             A11 = A[:NE,:NE]
             A12 = A[:NE,NE:NE+NC]
             A21 = A[NE:NE+NC,:NE]
-            if norm(f) == 0:
-                ru = norm(f - A11@u1 - A12@p1)
+            if LA.norm(f) == 0:
+                ru = LA.norm(f - A11@u1 - A12@p1)
             else:
-                ru = norm(f - A11@u1 - A12@p1)/norm(f)
+                ru = LA.norm(f - A11@u1 - A12@p1)/LA.norm(f)
 
-            if norm(g) == 0:
-                rp = norm(g - A21@u1)
+            if LA.norm(g) == 0:
+                rp = LA.norm(g - A21@u1)
             else:
-                rp = norm(g - A21@u1)/norm(g)
+                rp = LA.norm(g - A21@u1)/LA.norm(g)
 
 
             r[0,count] = rp
             r[1,count] = ru
+            er[0,count] = eu
+            er[0,count] = ep
 
             count = count + 1
 #            print('ru:',ru)
@@ -318,34 +325,27 @@ class NonDFFDMModel():
 
         self.uh[:] = u1
         self.ph[:] = p1
-        print('eu',eu)
-        print('ep:',ep)
-        print('ru:',ru)
-        print('rp:',rp)
+        if NE == 2632:
+            if __name__ == "__main__":
+                f = h5py.File('M4P4rb30t9','w')
+                f['M4P4rb30t9'] = r
+                f.close()
         print('solve matrix p and u')
         if __name__ =="__main__":
             uI = self.uI
-            f = h5py.File('M2P1uI7','w')
-            f['M2P1uI7'] = uI
+            f = h5py.File('M4P4erb30t9','w')
+            f['M4P4erb30t9'] = er
             f.close()
         if __name__ =="__main__":
             uh = self.uh
-            f = h5py.File('M2P1uh7','w')
-            f['M2P1uh7'] = uh
+            f = h5py.File('M4P4uhb30t9','w')
+            f['M4P4uhb30t9'] = uh
             f.close()
         if __name__ =="__main__":
             ph = self.ph
-            f = h5py.File('M2P1ph7','w')
-            f['M2P1ph7'] = ph
+            f = h5py.File('M4P4phb30t9','w')
+            f['M4P4phb30t9'] = ph
             f.close()
-        if __name__ =="__main__":
-            pI = self.pI
-            f = h5py.File('M2P1pI7','w')
-            f['M2P1pI7'] = pI
-            f.close()
-        return count,r
-
-
         return count,r
 
 
@@ -458,18 +458,24 @@ class NonDFFDMModel():
         beta = self.pde.beta
 
         bc = mesh.entity_barycenter('edge')
+        pc = mesh.entity_barycenter('cell')
 
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         isBDEdge = mesh.ds.boundary_edge_flag()
-        
-        normu = self.pde.normu(bc)
-        I, = np.nonzero(~isBDEdge & isYDEdge)
-        J, = np.nonzero(~isBDEdge & isXDEdge)
-        idx = np.r_[I,J]
-
+        edge2cell = mesh.ds.edge_to_cell()
+        normu = np.zeros(NE, dtype=ftype)
         C = self.get_nonlinear_coef()
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        normu[I] = self.pde.normu(bc[I])
+
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+        normu[J] = self.pde.normu(bc[J])
+
         Qu = (C - mu/k)/rho/beta
+
+        idx = np.r_[I,J]
 
         uqunorm = np.sqrt(np.sum(area1*((normu[idx] - Qu[idx])*self.uI[idx])**2))
 
@@ -487,25 +493,15 @@ class NonDFFDMModel():
         beta = self.pde.beta
 
         bc = mesh.entity_barycenter('edge')
-        pc = mesh.entity_barycenter('cell')
+        normu = self.pde.normu(bc)
 
         isYDEdge = mesh.ds.y_direction_edge_flag()
         isXDEdge = mesh.ds.x_direction_edge_flag()
         isBDEdge = mesh.ds.boundary_edge_flag()
-        edge2cell = mesh.ds.edge_to_cell()
-        normu = np.zeros(NE, dtype=ftype)
         C = self.get_nonlinear_coef()
 
         I, = np.nonzero(~isBDEdge & isYDEdge)
-        L = edge2cell[I, 0]
-        R = edge2cell[I, 1]
-        normu[I] = self.pde.normu(bc[I])
-
         J, = np.nonzero(~isBDEdge & isXDEdge)
-        L = edge2cell[J, 0]
-        R = edge2cell[J, 1]
-        normu[J] = self.pde.normu(bc[J])
-
         Qu = (C - mu/k)/rho/beta
 
         idx = np.r_[I,J]

@@ -292,7 +292,7 @@ class DarcyForchP0P1mg():
         Gct = A1[2*NC1:, :2*NC1]
         cellmeasure1 = mesh1.entity_measure('cell')
         ucLength = np.sqrt(uc[:NC1]**2 + uc[NC1:]**2)
-        Lcuc = Ac@uc + beta/rho*np.tile(ucLength,(2,1))*uc + Gc@pc
+        Lcuc = Ac@uc + beta/rho*np.tile(ucLength,2)*uc + Gc@pc
         fc = rc + Lcuc
         gc = Gct@uc
         area2 = np.r_[cellmeasure1,cellmeasure1]

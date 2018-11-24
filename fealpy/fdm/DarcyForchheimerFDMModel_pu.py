@@ -219,6 +219,7 @@ class DarcyForchheimerFDMModel_pu():
             AD12 = AD[:NE,NE:NE+NC]
             AD21 = AD[NE:NE+NC,:NE]
             Anew = AD21@AD11inv@AD12
+            print('Anew',Anew)
             b1 = AD21@AD11inv@bnew[:NE] - bnew[NE:NE+NC]
 
 
