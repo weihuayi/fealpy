@@ -10,7 +10,6 @@ from fealpy.pde.darcy_forchheimer_2d import ArctanData
 from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
 from fealpy.fdm.NonDFFDMModel_pu import NonDFFDMModel_pu
 from fealpy.tools.show import showmultirate
-
 box = [0,1,0,1]
 mu = 2
 k = 1
@@ -36,7 +35,7 @@ hy = np.array([0.25,0.25,0.25,0.25])
 #pde = ExponentData(box,mu,k,rho,beta,tol)
 pde = SinsinData(box,mu,k,rho,beta,tol)
 #pde = ArctanData(box,mu,k,rho,beta,tol)
-maxit = 6
+maxit = 2
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
         '$||Dp -  Dp_h||_0$','$||Dp1 - Dp1_h||_0$']

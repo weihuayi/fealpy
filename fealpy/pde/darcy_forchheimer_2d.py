@@ -1156,6 +1156,14 @@ class Example11:
         rhs = np.sin(np.pi*y)
         return rhs
         
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
+        return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
+        
 class Example12:
     """
     g = 0
@@ -1196,6 +1204,14 @@ class Example12:
         y = p[..., 1]
         rhs = y - y**2
         return rhs
+        
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
+        return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
 
 class Example13:
     """
@@ -1238,6 +1254,14 @@ class Example13:
         rhs = np.zeros(p.shape[1],)
         return rhs
         
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
+        return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
+        
 class Example14:
     """
     g = sin(pi*x)sin(2*pi*y)
@@ -1278,6 +1302,14 @@ class Example14:
         y = p[..., 1]
         rhs = np.zeros(p.shape[1],)
         return rhs
+        
+    def velocity_x(self,p):
+        val = np.zeros(p.shape[0],)
+        return val
+
+    def velocity_y(self, p):
+        val = np.zeros(p.shape[0],)
+        return val
 
        
               
