@@ -218,6 +218,42 @@ class DarcyForchheimerP0P1():
         self.uh[:] = u12
         self.ph[:] = p1
         return u12, p1
+
+
+    def get_residual_estimate(self):
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge2cell = mesh.ds.edge_to_cell()
+        uh = self.uh
+        ph = self.ph
+        pde = self.pde
+
+        bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
+
+        u0 = uh.value(bc)
+        gp = ph.grad_value(bc)
+
+        lu = np.sqrt(np.sum(u0**2, axis=1))
+        J = (pde.mu/pde.rho + pde.beta/pde.rho*lu)*u0 + gp
+        n, t = mesh.edge_frame()
+        l = mesh.entity_measure('edge')
+
+        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+
+        J1 = np.zeros(NE, dtype=mesh.ftype)
+        J2 = np.zeros(NE, dtype=mesh.ftype)
+        J3 = np.zeros(NE, dtype=mesh.ftype)
+
+        J1[isBdEdge] = np.sum(J[edge2cell[isBdEdge, 0]]*n[isBdEdge], axis=-1)
+        j = J[edge2cell[~isBdEdge, 0]] - J[edge2cell[~isBdEdge, 1]] 
+        J1[~isBdEdge] = np.sum(j*n[~isBdEdge], axis=-1)
+        J2[~isBdEdge] = np.sum(j*t[~isBdEdge], axis=-1)
+        J3[~isBdEdge] = np.sum((u0[edge2cell[~isBdEdge, 0]] - u0[edge2cell[~isBdEdge, 1]])*n[~isBdEdge], axis=-1)
+
+        
+        
+
+
         
 
     def get_uL2_error(self):
