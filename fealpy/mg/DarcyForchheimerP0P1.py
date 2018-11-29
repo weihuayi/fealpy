@@ -177,7 +177,7 @@ class DarcyForchheimerP0P1():
                     - beta/rho*uhalf*np.r_[uhalfL,uhalfL]*area
 
             ## Direct Solver
-            Aalphainv = inv(Aalpha)
+            Aalphainv = spdiags(1/Aalpha.data, 0, 2*NC, 2*NC)
             Ap = A21@Aalphainv@A12
             bp = A21@(Aalphainv@fnew) - b[2*NC:]
             p1 = np.zeros(NN,dtype=np.float)

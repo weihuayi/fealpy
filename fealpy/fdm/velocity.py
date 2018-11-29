@@ -10,10 +10,10 @@ class NonDarcyForchheimerFDMModel():
         self.pde = pde
         self.mesh = mesh
 
-        hx = mesh.ds.hx
-        hy = mesh.ds.hy
-        nx = mesh.nx
-        ny = mesh.ny
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
 
         hx1 = hx.repeat(ny)
         hy1 = np.tile(hy,nx)
@@ -281,7 +281,7 @@ class NonDarcyForchheimerFDMModel():
 #            print('b - Ax', LA.norm(bnew - AD@x)/LA.norm(bnew))
             u1 = x[:NE]
             p1 = x[NE:]
-            p1 = p1 - np.mean(p1)
+            p1[0] = p1[0] - np.mean(p1)
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
             ep = np.sqrt(np.sum(area2*(p1-self.ph0)**2))
