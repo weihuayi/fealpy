@@ -6,7 +6,7 @@ from scipy.sparse import eye, spdiags
 from fealpy.mg.DarcyForchheimerP0P1 import DarcyForchheimerP0P1
 from fealpy.mg.DFP0P1mg import DFP0P1mg
 from fealpy.mg.DarcyP0P1 import DarcyP0P1
-from fealpy.mg.DarcyForchP0P1mg import DarcyForchP0P1mg
+#from fealpy.mg.DarcyForchP0P1mg import DarcyForchP0P1mg
 from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
 
@@ -57,7 +57,7 @@ while residual[m] > tol and m < maxN:
     uold = np.zeros(u.shape)
     uold[:] = u
 #    femg = DarcyForchP0P1mg(n, pde, integrator0, integrator1)
-    femg = DFP0P1mg(n, pde, integrator0, integrator1)
+    femg = DFP0P1mg(pde, integrator0, integrator1)
     u,p,rn = femg.solve()
     m = m + 1
     erru = norm(u - uold)/norm(uold)

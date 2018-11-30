@@ -1,19 +1,18 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
+from scipy.sparse import coo_matrix, csr_matrix, eye, bmat, spdiags
 
 from numpy.linalg import norm
 from scipy.sparse.linalg import cg, inv, spsolve
 from ..mg.DarcyP0P1 import DarcyP0P1
 
 class DFP0P1mg():
-    def __init__(self, n, pde, integrator0, integrator1):
-        self.n = n
+    def __init__(self, pde, integrator0, integrator1):
         self.pde = pde
         self.integrator0 = integrator0
         self.integrator1 = integrator1
         self.level = pde.level
         
-        mesh = pde.init_mesh(n + self.level)
+        mesh = pde.init_mesh(self.level)
         NC = mesh.number_of_cells()
         mfem = DarcyP0P1(pde,mesh,1,integrator1)
         self.uh0,self.ph0 = mfem.solve()
@@ -42,20 +41,11 @@ class DFP0P1mg():
         
         
 
-    def DarcyForchP0P1smoothing12(self,level,maxN):
-        mesh =self.pde.init_mesh(self.n+level)
+    def DarcyForchP0P1smoothing12(self,level,maxN, u, p, A, G, Gt, f, g, Ap):
+        mesh =self.pde.init_mesh(level)
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
         cell = mesh.entity('cell')
-
-        uh0 = self.uh0
-        ph0 = self.ph0
-        A = self.A
-        G = self.G
-        Gt = self.Gt
-        f = self.f
-        g = self.g
-        Ap = self.Ap
 
         
         mu = self.pde.mu
@@ -79,22 +69,24 @@ class DFP0P1mg():
         while ru1[n]+rp1[n] > tol and n < maxN:
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
-            F = uh0/alpha - (mu/rho)*uh0 - (G@ph0 - f)/area
+            F = u/alpha - (mu/rho)*u - (G@p - f)/area
             FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
             gamma = 1/(2*alpha) + 1/2*np.sqrt(1/alpha**2 + 4*FL*beta/rho)
-            uhalf = F/np.repeat(gamma,2)
+            uhalf = F/np.repeat(gamma, 2)
 
             ## Step 2: Solve the linear Darcy equation
             # update RHS
             uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
-            fnew = f + uhalf*area/alpha - beta/rho*uhalf*np.repeat(uhalfL,2)
-            bp = Gt@(Aalphainv*fnew) - g
+            fnew = f + uhalf*area/alpha - beta/rho*uhalf*np.repeat(uhalfL, 2)
+            bp = Gt@(Aalphainv@fnew) - g
 
             p = np.zeros(NN, dtype=np.float)
-            p[1:] = spsolve(Ap[1:,1:],bp[1:])
-            c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
-            p = p-c
+            p[1:] = spsolve(Ap[1:, 1:], bp[1:])
+            c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
+            p = p - c
             u = Aalphainv@(fnew - G@p)
+            print('NC',NC)
+            print('u',u)
 
             ## Update residual and error of consective iterations
             n = n+1
@@ -158,7 +150,7 @@ class DFP0P1mg():
 
         return HB
         
-    def DarcyForchP0P1smoothing21(self,uh):
+    def DarcyForchP0P1smoothing21(self, u, A, G, Gt, f, g, Ap):
 #        J = self.pde.J
 #        uh0, ph0, A, G, Gt,f,g,Ap, mesh = self.init_data(J)
         NC = mesh.number_of_cells()
@@ -167,31 +159,31 @@ class DFP0P1mg():
         rho = self.pde.rho
         beta = self.pde.beta
         alpha = self.pde.alpha
-        tol = self.tol
+        tol = self.pde.tol
         maxN = self.pde.mg_maxN
         cellmeasure = mesh.entity_measure('cell')
-        area = np.repeat(cellmeasure,2)
+        area = np.repeat(cellmeasure, 2)
         ## P-R interation for D-F equations
 
         n = 0
         ru1 = np.ones(maxN,)
         rp1 = np.ones(maxN,)
-        uhalf[:] = uh
+        uhalf[:] = u
     
-        Aalphainv = A11 + spdiags(area/alpha, 0, 2*NC, 2*NC)
+        Aalphainv = A + spdiags(area/alpha, 0, 2*NC, 2*NC)
 
         while ru1[n]+rp1[n] > tol and n < maxN:
             ## step 2: Solve the linear Darcy equation
             # update RHS
 
             uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
-            fnew = f + uhalf*area/alpha - beta/rho*uhalf*np.repeat(uhalfL,2)
-            bp = Gt@(Aalphainv*fnew) - g
+            fnew = f + uhalf*area/alpha - beta/rho*uhalf*np.repeat(uhalfL, 2)
+            bp = Gt@(Aalphainv@fnew) - g
 
             p = np.zeros(NN, dtype=np.float)
-            p[1:] = spsolve(Ap[1:,1:],bp[1:])
+            p[1:] = spsolve(Ap[1:, 1:], bp[1:])
             c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
-            p = p-c
+            p = p - c
             u = Aalphainv@(fnew - G@p)
 
             ## step 1:Solve the nonlinear Darcy equation
@@ -201,12 +193,12 @@ class DFP0P1mg():
             F = u/alpha - (mu/rho)*u - (G@p - f)*area
             FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
             gamma = 1/(2*alpha) + 1/2*np.sqrt((1/alpha**2)+4*(beta/rho)*FL)
-            uhalf = F/np.repeat(gamma,2)
+            uhalf = F/np.repeat(gamma, 2)
 
             ## Update residual and error of consective iterations
-            n = n+1
+            n = n + 1
             uLength = np.sqrt(u[:NC]**2 + u[NC:]**2)
-            Lu = A@u + (beta/rho)*np.repeat(uLength,2)*u + G@p
+            Lu = A@u + (beta/rho)*np.repeat(uLength, 2)*u + G@p
             ru1[n] = norm(f - Lu)/norm(f)
             if norm(g) == 0:
                 rp1[n] = norm[g - Gt@u]
@@ -240,20 +232,11 @@ class DFP0P1mg():
 
 
 
-    def DarcyForchheimersmoothing(self,level):
+    def DarcyForchheimersmoothing(self,level, u, p, A, G, Gt, f, g, Ap):
         pde = self.pde
-        mesh = pde.init_mesh(self.n + level)
+        mesh = pde.init_mesh(level)
         NN = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
-
-        uh0 = self.uh0
-        ph0 = self.ph0
-        A = self.A
-        G = self.G
-        Gt = self.Gt
-        f = self.f
-        g = self.g
-        Ap = self.Ap
 
         rho = pde.rho
         beta = pde.beta
@@ -261,16 +244,18 @@ class DFP0P1mg():
         tol = pde.tol
         
         u_c = {}
+        Pro = {}
+        u_Length = {}
 
         # coarsest level: exact solve
         if level - 2 == 1:
-            u,p,ru,rp = self.DarcyForchP0P1smoothing12(level,pde.maxN)
+            u,p,ru,rp = self.DarcyForchP0P1smoothing12(level,pde.maxN, u, p, A, G, Gt, f, g, Ap)
             rn = ru[-1] + rp[-1]
 
             return u,p,rn
 
         ## Presmoothing
-        u,p,ru,rp = self.DarcyForchP0P1smoothing12(level,pde.mg_maxN)
+        u,p,ru,rp = self.DarcyForchP0P1smoothing12(level,pde.mg_maxN, u, p, A, G, Gt, f, g, Ap)
 
         if ru.any() <= tol:
             rn = ru[-1] + rp[-1]
@@ -279,7 +264,7 @@ class DFP0P1mg():
 
         ##Transfer to coarse grid
         # coarsen grid and form transfer operators
-        meshc = pde.init_mesh(self.n + self.level - 1)
+        meshc = pde.init_mesh(level - 1)
         NNc = meshc.number_of_nodes()
         NCc = meshc.number_of_cells()
 
@@ -288,21 +273,25 @@ class DFP0P1mg():
         I = np.arange(4*NCc)
         J = repeat(np.arange(NCc),4)
         Pro_u = coo_matrix((data, (I,J)),dtype=np.int)
-        Pro_u = bmat([(Pro_u, None),(None, Pro_u)], format='csr',dtype=np.int)
+        Pro_u = bmat([(Pro_u, coo_matrix(Pro_u.shape,dtype=np.int)),(None, Pro_u)], format='csr',dtype=np.int)
 
         Res_u = coo_matrix((data,(J,I)),dtype=np.int)
-        Res_u = bmat([(Res_u,None), (None,Res_u)],format='csr',dtype=np.int)
+        Res_u = bmat([(Res_u,coo_matrix(Res_u.shape,dtype=np.int)), (None,Res_u)],format='csr',dtype=np.int)
         # get residual on the fine grid
-        uLength = np.sqrt(uh0[:NC]**2 + uh0[NC:]**2)
-        Lu = A@uh0 + (beta/rho)*np.repeat(gamma,2)*uh0 + G@ph0
+        uLength = np.sqrt(u[:NC]**2 + u[NC:]**2)
+        Lu = A@u + (beta/rho)*np.repeat(uLength, 2)*u + G@p
         r = f - Lu
 
         # restrict residual to the coarse grid
         rc = Res_u@r
-        uc = (Res_u@uh0)/4 #because fine grid = 4(coarse)
-        pc = ph0[:NNc]
+        uc = (Res_u@u)/4 #because fine grid = 4(coarse)
+        pc = p[:NNc]
         u_c[level] = uc
+        Pro[level] = Pro_u
+        u_Length[level] = uLength
         self.u_c = u_c
+        self.Pro = Pro
+        self.u_Length = u_Length
 
         ## Coarse grid correction
 
@@ -315,42 +304,38 @@ class DFP0P1mg():
         Gct = A[2*NCc:, :2*NCc]
         cellmeasure1 = meshc.entity_measure('cell')
         ucLength = np.sqrt(uc[:NCc]**2 + uc[NCc:]**2)
-        Lcuc = Ac@uc + beta/rho*np.repeat(gamma,2)*uc + Gc@pc
+        Lcuc = Ac@uc + beta/rho*np.repeat(ucLength, 2)*uc + Gc@pc
         fc = rc + Lcuc
         gc = Gct@uc
-        areac = np.r_[cellmeasure1, cellmeasure1]
+        areac = np.repeat(cellmeasure1, 2)
 
         Aalphac = Ac + spdiags(areac/alpha, 0, 2*NCc, 2*NCc)
         Aalphainvc = spdiags(1/Aalphac.data, 0, 2*NCc, 2*NCc)
         Apc = Gct@Aalphainvc@Gc
 
-        self.uh0[:] = uc
-        self.ph0[:] = pc
-        self.A[:] = Ac
-        self.G[:] = Gc
-        self.Gt[:] = Gtc
-        self.f[:] = f
-        self.g[:] = g
-        self.Ap[:] = Apc
-
-        return Pro_u, uLength
+        return uc, pc, Ac, Gc, Gct, fc, gc, Apc
         
     def solve(self):
         level = self.pde.level
-        Pro = {}
-        u_Length = {}
+        u = self.uh0
+        p = self.ph0
+        A = self.A
+        G = self.G
+        Gt = self.Gt
+        f = self.f
+        g = self.g
+        Ap = self.Ap
         
         for i in range(level, 2, -1):
             if i > 1:
-                Pro_u, uLength = self.DarcyForchheimersmoothing(i)
-                Pro[i] = Pro_u
-                u_Length[i] = uLength
+                u, p, A, G, Gt, f, g, Ap = self.DarcyForchheimersmoothing(i, u, p, A, G, Gt, f, g, Ap)
             else:
-                v,q,rn = self.DarcyForchheimersmoothing(i)
+                v,q,rn = self.DarcyForchheimersmoothing(i, u, p, A, G, Gt, f, g, Ap)
         print('Pro',Pro)
         for i in range(3, level+1):
-            Pro_u = Pro[i] 
-            uLength = u_Length[i]           
+            Pro_u = self.Pro[i] 
+            uLength = self.u_Length[i]
+            uc = self.u_c[i]           
             ## Prolongate correction to fine space
             eu = Pro_u@(v - uc)
             # project eu back to the div free subspace
@@ -369,7 +354,7 @@ class DFP0P1mg():
             p = p + nodeinterpolate(epc,HB)
 
             ## Postsmoothing 
-            u,p,ru,rp = DarcyForchP0P1smoothing21(u)
+            u,p,ru,rp = DarcyForchP0P1smoothing21(u, A, G, Gt, f, g, Ap)
             rn = ru[-1] + rp[-1]
 
         return u,p,rn
