@@ -7,6 +7,8 @@ from ..fem.integral_alg import IntegralAlg
 from ..fdm.DarcyFDMModel import DarcyFDMModel
 from ..tools.showsolution import showsolution
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+import profile
+
 
 class DarcyForchheimerFDMModel_pu():
     def __init__(self, pde, mesh):
@@ -174,6 +176,7 @@ class DarcyForchheimerFDMModel_pu():
         b1 = pde.source1(pc)
 #        print('maxf',np.max(b0))
         return np.r_[b0, b1] 
+cProfile.run('re.compile("foo|bar")')
 
     def solve(self):
         mesh = self.mesh
@@ -233,8 +236,6 @@ class DarcyForchheimerFDMModel_pu():
 
             eu = np.sqrt(np.sum(hx*hy*(u1-self.uh0)**2))
             ep = np.sqrt(np.sum(hx*hy*(p1-self.ph0)**2))
-            print('ph0',self.ph0)
-            print('p1',p1)
 
             self.uh0[:] = u1
             self.ph0[:] = p1
@@ -271,6 +272,8 @@ class DarcyForchheimerFDMModel_pu():
         print('solve matrix p then u')
 
         return count,r
+        if __name__ == "__main__":
+            profile.run("solve()")
 
     def grad_pressure(self):
         mesh = self.mesh
@@ -379,3 +382,36 @@ class DarcyForchheimerFDMModel_pu():
         Dp1eL2 = np.sqrt(np.sum(hx*hy*(Dph[:] - DpI[:])**2))
 
         return Dp1eL2
+        
+    def get_normu_error(self):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        NE = mesh.number_of_edges()
+        hx = mesh.hx
+        hy = mesh.hy
+
+        mu = self.pde.mu
+        k = self.pde.k
+
+        rho = self.pde.rho
+        beta = self.pde.beta
+
+        isBDEdge = mesh.ds.boundary_edge_flag()
+        isYDEdge = mesh.ds.y_direction_edge_flag()
+        isXDEdge = mesh.ds.x_direction_edge_flag()
+        
+        bc = mesh.entity_barycenter('edge')
+        normu = self.pde.normu(bc)
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        J, = np.nonzero(~isBDEdge & isXDEdge)
+
+        idx = np.r_[I,J]
+        C = self.get_nonlinear_coef()
+        normuh = (C - mu/k)/rho/beta
+
+        normuL2 = np.sqrt(np.sum(hx*hy*((normu[idx] - normuh[idx])*self.uI[idx])**2))
+
+        return normuL2
+
+

@@ -1,5 +1,10 @@
 import numpy as np
 import time
+import h5py
+import pickle
+import sys
+import scipy.sparse as sparse
+from memory_profiler import profile
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm
 from ..fem.integral_alg import IntegralAlg
@@ -277,13 +282,17 @@ class NonDFFDMModel_pu():
             AD = T@A@T + Tbd
  
             bnew[NE] = self.ph[0]
+ #           AD11 = AD[:NE,:NE]       
+            AD11inv = spdiags(1/AD[:NE,:NE].data,0,NE,NE)
             
-            AD11 = AD[:NE,:NE]
-            AD11inv = inv(AD11)
             AD12 = AD[:NE,NE:]
             AD21 = AD[NE:,:NE]
+
+            start = time.time()
             Anew = AD21@AD11inv@AD12
             b1 = AD21@AD11inv@bnew[:NE] - bnew[NE:]
+            end = time.time()
+            print('Ainv1',end-start)
             
             # Solver
             p1 = np.zeros((NC,),dtype=ftype)
@@ -327,34 +336,11 @@ class NonDFFDMModel_pu():
 
         self.uh[:] = u1
         self.ph[:] = p1
-        print('eu',eu)
-        print('ep:',ep)
-        print('ru:',ru)
-        print('rp:',rp)
-        print('solve matrix p and u')
-        if __name__ =="__main__":
-            uI = self.uI
-            f = h5py.File('M2P1uI7','w')
-            f['M2P1uI7'] = uI
-            f.close()
-        if __name__ =="__main__":
-            uh = self.uh
-            f = h5py.File('M2P1uh7','w')
-            f['M2P1uh7'] = uh
-            f.close()
-        if __name__ =="__main__":
-            ph = self.ph
-            f = h5py.File('M2P1ph7','w')
-            f['M2P1ph7'] = ph
-            f.close()
-        if __name__ =="__main__":
-            pI = self.pI
-            f = h5py.File('M2P1pI7','w')
-            f['M2P1pI7'] = pI
-            f.close()
-        return count,r
-
-
+#        print('eu',eu)
+#        print('ep:',ep)
+#        print('ru:',ru)
+#        print('rp:',rp)
+        print('solve matrix p then u')
         return count,r
 
 

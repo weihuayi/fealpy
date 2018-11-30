@@ -19,12 +19,22 @@ class IntegralAlg():
         else:
             return e.sum() 
 
+    def L2_norm(self, uh, celltype=False):
+        def f(x):
+            return uh(x)**2
+
+        e = self.integral(f, celltype=celltype)
+        if celltype is False:
+            return np.sqrt(e.sum())
+        else:
+            return np.sqrt(e)
+
     def L1_error(self, u, uh, celltype=False):
         def f(x):
             xx = self.mesh.bc_to_point(x)
             return np.abs(u(xx) - uh(x))
         e = self.integral(f, celltype=celltype)
-        if elemtype is False:
+        if celltype is False:
             return e.sum()
         else:
             return e
