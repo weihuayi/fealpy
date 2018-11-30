@@ -16,16 +16,15 @@ rho = 1
 beta = 10
 alpha = 1/beta
 tol = 1e-6
-level = 3
+level = 5
 mg_maxN = 3
-J = level -2
+J = level -3
 maxN = 2000
 p = 1
-n = 2
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J)
 ## Generate an initial mesh
-mesh = pde.init_mesh(n+level)
+mesh = pde.init_mesh(level)
 NC = mesh.number_of_cells()
 
 integrator1 = mesh.integrator(p+2)
