@@ -7,8 +7,10 @@ from fealpy.pde.darcy_forchheimer_2d import Example11
 from fealpy.pde.darcy_forchheimer_2d import Example12
 from fealpy.pde.darcy_forchheimer_2d import Example13
 from fealpy.pde.darcy_forchheimer_2d import Example14
-from fealpy.fdm.forchheimer import forchheimer
-#from fealpy.fdm.velocity import NonDarcyForchheimerFDMModel
+from fealpy.pde.darcy_forchheimer_2d import SinsinData
+from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
+from fealpy.fdm.Forchheimer import Forchheimer
+from fealpy.fdm.velocity import NonDarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel
 #from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 #from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
@@ -25,12 +27,13 @@ tol = 1e-6
 hx = np.array([0.25,0.25,0.25,0.25])
 hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-m = 8
+m = 16
 hx = hx/m
 hy = hy/m
 hx = hx.repeat(m)
 hy = hy.repeat(m)
 
+#pde = SinsinData(box,mu,k,rho,beta,tol)
 pde = DeltaData(box,mu,k,rho,beta,tol)
 #pde = Example11(box,mu,k,rho,beta,tol)
 #pde = Example12(box,mu,k,rho,beta,tol)
@@ -38,7 +41,8 @@ pde = DeltaData(box,mu,k,rho,beta,tol)
 #pde = Example14(box,mu,k,rho,beta,tol)
 t1 = time.time()
 mesh = pde.init_mesh(hx,hy)
-fdm = forchheimer(pde,mesh)
+#fdm = Forchheimer(pde,mesh)
+fdm = NonDarcyForchheimerFDMModel(pde, mesh)
 np.set_printoptions(threshold = 1e6)
 count,uh = fdm.solve()
 print('count',count)

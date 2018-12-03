@@ -2,10 +2,10 @@ import numpy as np
 import time
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm
-from fealpy.fem.integral_alg import IntegralAlg
+from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve 
 
-class forchheimer():
+class Forchheimer():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh
@@ -34,6 +34,7 @@ class forchheimer():
         self.ph = np.zeros(NC, dtype=mesh.ftype) # the number solution of p
         self.uh0 = np.zeros(NE, dtype=mesh.ftype) # Intermediate variables about u
         self.ph0 = np.zeros(NC, dtype=mesh.ftype) # Intermediate variables about p
+        self.ph[0] = 1
 
     def get_nonlinear_coef(self):
         mesh = self.mesh
@@ -238,7 +239,7 @@ class forchheimer():
         b = self.get_right_vector()
         A = self.get_left_matrix()
         end = time.time()
-        print('Con matrix time',end-start)
+        print('Assemble matrix time',end-start)
 
         tol = self.pde.tol
         ru = 1
@@ -251,8 +252,7 @@ class forchheimer():
 
         while eu+ep > tol and count < iterMax:
 
-            bnew = np.copy(b)
-            
+            bnew = np.copy(b)            
             x = np.r_[self.uh, self.ph]#The combination of self.uh and self.ph together
             bnew = bnew - A@x
 
@@ -263,13 +263,12 @@ class forchheimer():
             Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[1])
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[1])
             AD = T@A@T + Tbd
-            self.ph[0] = 1
             bnew[NE] = self.ph[0]
        
             x[:] = spsolve(AD, bnew)
             u1 = x[:NE]
             p1 = x[NE:]
-            p1 = p1 - np.mean(p1)
+ #           p1[0] = p1[0] - np.mean(p1)
 
             eu = np.sqrt(np.sum(area1*(u1[idx]-self.uh0[idx])**2))
             ep = np.sqrt(np.sum(area2*(p1-self.ph0)**2))
