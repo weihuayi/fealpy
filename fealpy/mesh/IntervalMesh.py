@@ -15,6 +15,9 @@ class IntervalMesh():
         self.nodedata = {}
         self.celldata = {}
 
+        self.itype = cell.dtype
+        self.ftype = node.dtype
+
 
     def integrator(self, k):
         return IntervalQuadrature(k)

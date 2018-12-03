@@ -30,10 +30,10 @@ which will create a link in `/usr/local/lib/python3.x/dist-packages/`.
 ### Dependency
 
 ```
-sudo apt-get install python3 python3-pip ipython3 
-sudo apt-get install python3-numpy
-sudo apt-get install python3-scipy
-sudo apt-get install pymumps
+sudo apt install python3 python3-pip ipython3 
+sudo apt install python3-numpy
+sudo apt install python3-scipy
+sudo apt install pymumps
 sudo -H pip3 install matplotlib
 sudo -H pip3 install plotly
 ```
@@ -89,7 +89,6 @@ MeshPy‑2018.1‑cp36‑cp37m‑win_amd64.whl # for python 3.7 and 64 bit win s
 ```
 
 ```
-pip install msgpack
 pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
 ```
 
@@ -98,8 +97,9 @@ conda install pyamg # amg fast solver
 conda install -c conda-forge pytools
 ```
 
-
-
+```
+pip install -e ./
+```
 
 ## Mac
 
