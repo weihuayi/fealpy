@@ -128,7 +128,7 @@ class TetrahedronMesh(Mesh3d):
         v = [ node[cell[:,0],:] - node[cell[:,i],:] for i in range(1,4)]
         l = [ np.sum(vi**2, axis=1, keepdims=True) for vi in v]
         d = l[2]*np.cross(v[0], v[1]) + l[0]*np.cross(v[1], v[2]) + l[1]*np.cross(v[2],v[0])
-        volume = self.volume()
+        volume = self.cell_volume()
         d /=12*volume.reshape(-1,1)
         c = node[cell[:,0],:] + d
         R = np.sqrt(np.sum(d**2,axis=1))
@@ -161,7 +161,7 @@ class TetrahedronMesh(Mesh3d):
         dd = np.sum(d[0]**2, axis=1)
 
         ld = np.sqrt(np.sum(d[0]**2, axis=1))
-        vol = self.volume()
+        vol = self.cell_volume()
         R = ld/vol/12.0
         r = 3.0*vol/ss
         q = R/r/3.0

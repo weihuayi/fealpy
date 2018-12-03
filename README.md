@@ -78,22 +78,30 @@ sudo -H pip3 install pygmsh
 
 ## Windows: Anaconda
 
-```
-conda install pyamg
-conda install -c conda-forge pytools
-```
+Dowload anaconda for windows  from https://www.anaconda.com/. 
 
-from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy, dowload 
+Run `Anaconda3-5.3.1-Windows-x86_64.exe` and install Anaconda on you system.
 
-'MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl'
+Dowload the correct version `meshpy` from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy. For example:
+
+```
+MeshPy‑2018.1‑cp36‑cp37m‑win_amd64.whl # for python 3.7 and 64 bit win system.
+```
 
 ```
 pip install msgpack
 pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
 ```
+
+```
+conda install pyamg # amg fast solver
+conda install -c conda-forge pytools
+```
+
+
+
+
 ## Mac
-
-
 
 
 ## Install Boost with python3 
