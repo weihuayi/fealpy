@@ -13,10 +13,10 @@ class NonDFFDMModel():
         self.pde = pde
         self.mesh = mesh
 
-        hx = mesh.ds.hx
-        hy = mesh.ds.hy
-        nx = mesh.nx
-        ny = mesh.ny
+        hx = mesh.hx
+        hy = mesh.hy
+        nx = mesh.ds.nx
+        ny = mesh.ds.ny
 
         hx1 = hx.repeat(ny)
         hy1 = np.tile(hy,nx)
@@ -346,7 +346,7 @@ class NonDFFDMModel():
             f = h5py.File('M4P4phb30t9','w')
             f['M4P4phb30t9'] = ph
             f.close()
-        return count,r
+        return count,r,self.uI,self.ph
 
 
     def get_max_error(self):

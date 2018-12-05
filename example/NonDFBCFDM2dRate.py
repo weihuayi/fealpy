@@ -25,17 +25,17 @@ tol = 1e-9
 hx = np.array([0.25,0.25,0.25,0.25])
 hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-#m = 8
-#hx = hx/m
-#hy = hy/m
-#hx = hx.repeat(m)
-#hy = hy.repeat(m)
+m = 16
+hx = hx/m
+hy = hy/m
+hx = hx.repeat(m)
+hy = hy.repeat(m)
 
 #pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
 pde = SinsinData(box,mu,k,rho,beta,tol)
 #pde = ArctanData(box,mu,k,rho,beta,tol)
-maxit = 2
+maxit = 1
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
         '$||Dp -  Dp_h||_0$','$||Dp1 - Dp1_h||_0$']
@@ -49,8 +49,8 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-#    fdm = NonDFFDMModel(pde,mesh)
-    fdm = NonDFFDMModel_pu(pde,mesh)
+    fdm = NonDFFDMModel(pde,mesh)
+#    fdm = NonDFFDMModel_pu(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC

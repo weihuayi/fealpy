@@ -23,13 +23,12 @@ class DirichletBC:
         isBdDof = self.isBdDof
 
         gdof = V.number_of_global_dofs()
-
         x = np.zeros((gdof,), dtype=np.float)
-
         ipoints = V.interpolation_points()
-        x[isBdDof] = g0(ipoints[isBdDof])
+        # the length of ipoints and isBdDof maybe different
+        idx, = np.nonzero(isBdDof)
+        x[isBdDof] = g0(ipoints[idx])
         b -= A@x
-
         bdIdx = np.zeros(gdof, dtype=np.int)
         bdIdx[isBdDof] = 1
         Tbd = spdiags(bdIdx, 0, gdof, gdof)
