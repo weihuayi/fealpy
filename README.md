@@ -30,10 +30,10 @@ which will create a link in `/usr/local/lib/python3.x/dist-packages/`.
 ### Dependency
 
 ```
-sudo apt-get install python3 python3-pip ipython3 
-sudo apt-get install python3-numpy
-sudo apt-get install python3-scipy
-sudo apt-get install pymumps
+sudo apt install python3 python3-pip ipython3 
+sudo apt install python3-numpy
+sudo apt install python3-scipy
+sudo -H pip3 install pymumps
 sudo -H pip3 install matplotlib
 sudo -H pip3 install plotly
 ```

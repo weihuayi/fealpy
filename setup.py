@@ -16,6 +16,7 @@ setup(name='fealpy',
 	  'boost',
           'pytools',
           'meshpy',
-          'pyamg' 
+          'pyamg',
+          'pymumps'
       ],
       zip_safe=False)

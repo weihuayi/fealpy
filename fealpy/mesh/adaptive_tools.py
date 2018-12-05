@@ -14,8 +14,7 @@ def mark(eta, theta, method='L2'):
         isMarked[idx[0]] = True
     else:
         raise ValueError("I have not code the method")
-    markedCell, = np.nonzero(isMarked)
-    return markedCell
+    return isMarked 
 
 class AdaptiveMarker():
     def __init__(self, eta, theta=0.2, ctheta=0.1):
