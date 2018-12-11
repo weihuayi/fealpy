@@ -36,21 +36,20 @@ class Tritree(TriangleMesh):
             return self.parent[idx, 0] == -1
 
     def adaptive(self, estimator, surface=None):
-        while ~estimator.is_uniform():
+        while estimator.is_uniform() is False:
             isMarkedCell = self.marker(estimator.eta, estimator.theta, 'MAX')
+            edge = self.entity('edge')
             refineFlag = self.refine(isMarkedCell, surface=surface)
             NN1 = self.number_of_nodes()
             NN0 = len(estimator.rho)
             if NN1 > NN0:
-                estimator.newrho = np.zeros(NN1, dtype=self.ftype)
-                estimator.newrho[:NN0] = estimator.rho
-                edge = self.entity('edge')
-                print(len(estimator.rho[edge[refineFlag, 0]]))
-                estimator.newrho[NN0:] = (estimator.rho[edge[refineFlag, 0]] + estimator.rho[edge[refineFlag, 1]])/2.0
+                rho = np.zeros(NN1, dtype=self.ftype)
+                rho[:NN0] = estimator.rho
+                rho[NN0:] = (rho[edge[refineFlag, 0]] + rho[edge[refineFlag, 1]])/2.0
                 mesh = self.to_conformmesh()
-                estimator.update(newrho, mesh)
+                estimator.update(rho, mesh)
             else:
-                estimator.newrho = estimator.rho
+                break
     def marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
