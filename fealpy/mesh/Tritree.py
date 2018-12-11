@@ -51,11 +51,14 @@ class Tritree(TriangleMesh):
         return isMarkedCell 
 
     def adaptive(self, eta, theta, beta, surface=None, data=None):
-        pass
+        isMarkedCell = self.marker(eta, theta, method='MAX')
+        self.refine(isMarkedCell, surface=None, data=None)
+        ec = self.entity_barycenter('edge')
+
 
         
 
-    def refine(self, isMarkedCell, surface=None, data=None):
+    def refine(self, isMarkedCell, surface=None):
         if sum(isMarkedCell) > 0:
             # Prepare data
             NN = self.number_of_nodes()
@@ -148,8 +151,6 @@ class Tritree(TriangleMesh):
 
             if surface is not None:
                 ec, _ = surface.project(ec)
-
-#            if data is not None:
 
             self.node = np.r_['0', node, ec]
             cell = np.r_['0', cell, cell4]                      
