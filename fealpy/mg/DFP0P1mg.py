@@ -38,8 +38,6 @@ class DFP0P1mg():
         self.f = f
         self.g = g
         self.Ap = Ap
-        
-        
 
     def DarcyForchP0P1smoothing12(self,level,maxN, u, p, A, G, Gt, f, g, Ap):
         mesh =self.pde.init_mesh(level)
