@@ -51,6 +51,7 @@ class Tritree(TriangleMesh):
         return isMarkedCell 
 
     def adaptive(self, eta, theta, beta, surface=None, data=None):
+        pass
 
         
 
@@ -148,7 +149,7 @@ class Tritree(TriangleMesh):
             if surface is not None:
                 ec, _ = surface.project(ec)
 
-            if data is not None:
+#            if data is not None:
 
             self.node = np.r_['0', node, ec]
             cell = np.r_['0', cell, cell4]                      

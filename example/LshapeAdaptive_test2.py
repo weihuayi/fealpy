@@ -6,8 +6,7 @@ from fealpy.pde.poisson_model_2d import LShapeRSinData, KelloggData
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 
 from fealpy.recovery import FEMFunctionRecoveryAlg
-from fealpy.mesh.Tri_adaptive_tools import AdaptiveMarker
-from fealpy.mesh.tree_data_structure import Tritree
+from fealpy.mesh.Tritree import Tritree
 
 from mpl_toolkits.mplot3d import Axes3D
 from fealpy.tools.show import showmultirate
@@ -23,7 +22,7 @@ elif m == 2:
     pde = KelloggData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
 
-theta = 0.3
+theta = 0.2
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
@@ -34,7 +33,7 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 integrator = mesh.integrator(3)
 ralg = FEMFunctionRecoveryAlg()
 
-tmesh = Tritree(mesh.node, mesh.ds.cell, irule=1)
+tmesh = Tritree(mesh.node, mesh.ds.cell)
 pmesh = tmesh.to_conformmesh()
 for i in range(maxit):
     print('step:', i)
@@ -48,8 +47,10 @@ for i in range(maxit):
     errorMatrix[1, i] = fem.get_L2_error()
     errorMatrix[2, i] = fem.get_H1_error()
     errorMatrix[3, i] = fem.get_recover_error(rguh)
+    isMarkedCell = tmesh.marker(eta, theta, method='L2')
     if i < maxit -1:
-        tmesh.refine(marker=AdaptiveMarker(eta, theta=theta))
+        isMarkedCell = tmesh.marker(eta, theta, method='L2')
+        tmesh.refine(isMarkedCell)
         pmesh = tmesh.to_conformmesh()
 pmesh.add_plot(plt, cellcolor='w')
 fig2 = plt.figure()
@@ -59,7 +60,7 @@ x = pmesh.node[:, 0]
 y = pmesh.node[:, 1]
 cell = pmesh.ds.cell
 axes.plot_trisurf(x, y, cell, fem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
-showmultirate(plt, 15, Ndof, errorMatrix, errorType)
+showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()
 
 
