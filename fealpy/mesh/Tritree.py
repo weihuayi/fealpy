@@ -37,18 +37,20 @@ class Tritree(TriangleMesh):
 
     def adaptive(self, estimator, surface=None):
         while ~estimator.is_uniform():
-            isMarkedCell = self.marker(self.eta, self.theta, 'MAX')
+            isMarkedCell = self.marker(estimator.eta, estimator.theta, 'MAX')
             refineFlag = self.refine(isMarkedCell, surface=surface)
             NN1 = self.number_of_nodes()
             NN0 = len(estimator.rho)
             if NN1 > NN0:
-                rho = np.zeros(NN1, dtype=self.ftype)
-                rho[:NN0] = self.rho
+                estimator.newrho = np.zeros(NN1, dtype=self.ftype)
+                estimator.newrho[:NN0] = estimator.rho
                 edge = self.entity('edge')
-                rho[NN0:] = (self.rho[edge[refineFlag, 0]] + self.rho[edge[refineFlag, 1]])/2.0
+                print(len(estimator.rho[edge[refineFlag, 0]]))
+                estimator.newrho[NN0:] = (estimator.rho[edge[refineFlag, 0]] + estimator.rho[edge[refineFlag, 1]])/2.0
                 mesh = self.to_conformmesh()
-                estimator.update(rho, mesh)
-
+                estimator.update(newrho, mesh)
+            else:
+                estimator.newrho = estimator.rho
     def marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
@@ -63,22 +65,6 @@ class Tritree(TriangleMesh):
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
-<<<<<<< HEAD
-
-    def adaptive(self, eta, theta, beta, surface=None, data=None):
-        isMarkedCell = self.marker(eta, theta, method='MAX')
-        self.refine(isMarkedCell, surface=None, data=None)
-        ec = self.entity_barycenter('edge')
-
-
-||||||| merged common ancestors
-
-    def adaptive(self, eta, theta, beta, surface=None, data=None):
-        pass
-
-=======
->>>>>>> 75b60ac13e19b30735d8d972e741adf04d44cf70
-        
 
     def refine(self, isMarkedCell, surface=None):
         if sum(isMarkedCell) > 0:
@@ -179,7 +165,7 @@ class Tritree(TriangleMesh):
             self.parent = np.r_['0', self.parent, parent4]           
             self.child = np.r_['0', self.child, child4]              
             self.ds.reinit(NN + NNN, cell)
-            return refineFlag 
+            return refineFlag
         else:
             return
 
