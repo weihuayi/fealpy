@@ -86,7 +86,7 @@ class ScaledMonomialSpace2d():
         Parameters
         ---------- 
         point : ndarray
-            The shape of point is (..., M, 2) 
+            The shape of point is (..., M, 2), M is the number of cells 
 
         Returns
         -------
