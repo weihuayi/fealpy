@@ -1,0 +1,10 @@
+numpy
+scipy
+matplotlib
+msgpack
+PyHamcrest
+boost
+pytools
+meshpy
+pyamg
+pymumps
