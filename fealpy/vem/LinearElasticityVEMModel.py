@@ -11,6 +11,7 @@ from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture
 
 class LinearElasticityVEMModel():
     def __init__(self, pde, mesh, p, q):
+        self.p = p
         self.pde = pde
         self.mesh = mesh
         self.space = VectorVirtualElementSpace2d(mesh, p)
@@ -26,6 +27,7 @@ class LinearElasticityVEMModel():
         self.uI = self.space.interpolation(pde.displacement, self.integralalg.integral)
 
     def matrix_G(self):
+        p = self.p
         mesh = self.mesh
         mu = self.pde.mu
         lam = self.pde.lam
@@ -43,7 +45,7 @@ class LinearElasticityVEMModel():
         if p == 1:
             G[..., 0, 0] = 1
             G[..., 1, 1] = 1
-            G[..., 3, 0::2] 
+            G[..., 3, 0::2]
             G[..., 3, 1::2]
         else:
             def u1(x, cellidx):
@@ -114,8 +116,6 @@ class LinearElasticityVEMModel():
         if p == 1:
             B[0, 0::2] = 1/np.repeat(NV, NV)
             B[1, 1::2] = B[0, 0::2] 
-            B[3, :] = 
-        else:
 
         if p > 1:
             #TODO: correct for p >= 3?

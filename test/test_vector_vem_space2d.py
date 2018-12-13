@@ -31,6 +31,6 @@ vem = LinearElasticityVEMModel(pde, mesh, p, q)
 
 #G = vem.matrix_G()
 #print(G)
+
 B = vem.matrix_B()
 print(B)
-print(vem.uI)
