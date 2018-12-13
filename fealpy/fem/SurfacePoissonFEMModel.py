@@ -9,7 +9,7 @@ from ..fem import doperator
 from .SurfaceIntegralAlg import SurfaceIntegralAlg
 
 class SurfacePoissonFEMModel(object):
-    def __init__(self, mesh, pde, p, integrator, p0=None):
+    def __init__(self, mesh, pde, p, q, p0=None):
         """
         """
         self.V = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p, p0=p0) 
@@ -18,7 +18,7 @@ class SurfacePoissonFEMModel(object):
         self.pde = pde
         self.uh = self.V.function()
         self.uI = self.V.interpolation(pde.solution)
-        self.integrator = integrator
+        self.integrator = mesh.integrator(q)
         self.area = self.V.mesh.area()
         self.error = SurfaceIntegralAlg(self.integrator, self.mesh, self.area)
 

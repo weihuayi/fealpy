@@ -33,3 +33,6 @@ dependcies
 *.npz
 *.csv
 *.pyc
+.fealpy.egg-info
+fealpy.egg-info
+dist

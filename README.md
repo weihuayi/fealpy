@@ -38,7 +38,7 @@ sudo -H pip3 install plotly
 ```
 
 ```
-sudo apt-get install petsc-dev
+sudo apt install petsc-dev
 sudo -H pip3 install petsc4py 
 ```
 
@@ -49,17 +49,17 @@ Install mesh generation package `meshpy`:
 ububtu 18.04 install meshpy
 
 ```
-sudo apt-get install libboost-python-dev
+sudo apt install libboost-python-dev
 sudo -H pip3 install meshpy
 ```
 
 Install "metis"
 ```
-sudo apt-get install metis
+sudo apt install metis
 ```
 
 ```
-sudo apt-get install python3-numexpr 
+sudo apt install python3-numexpr 
 ```
 
 The following can install by pip3

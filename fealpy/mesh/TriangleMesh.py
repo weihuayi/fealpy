@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 
@@ -116,7 +116,10 @@ class TriangleMesh(Mesh2d):
                 N = self.number_of_nodes()
                 self.ds.reinit(N, cell)
 
-    def uniform_refine(self, n=1, surface=None):
+    def uniform_refine(self, n=1, surface=None, returnim=False):
+        if returnim:
+            nodeIMatrix = []
+            cellIMatrix = []
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -126,7 +129,17 @@ class TriangleMesh(Mesh2d):
             cell = self.entity('cell')
             cell2edge = self.ds.cell_to_edge()
             edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
+            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
+
+            if returnim:
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                nodeIMatrix.append(A.tocsr())
+                B = eye(NC, dtype=self.ftype)
+                B = bmat([[B], [B], [B], [B]])
+                cellIMatrix.append(B.tocsr())
+
             if surface is not None:
                 newNode, _ = surface.project(newNode)
             self.node = np.concatenate((node, newNode), axis=0)
@@ -134,6 +147,8 @@ class TriangleMesh(Mesh2d):
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
             NN = self.node.shape[0]
             self.ds.reinit(NN, cell)
+        if returnim:
+            return nodeIMatrix, cellIMatrix
 
     def uniform_bisect(self, n=1):
         for i in range(n):
