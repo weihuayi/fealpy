@@ -50,7 +50,7 @@ class Tritree(TriangleMesh):
                 estimator.update(rho, mesh)
             else:
                 break
-    def marker(self, eta, theta, method):
+    def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys(): 
@@ -74,7 +74,6 @@ class Tritree(TriangleMesh):
             node = self.entity('node')
             edge = self.entity('edge')
             cell = self.entity('cell')
-
 
             # expand the marked cell
             isLeafCell = self.is_leaf_cell()
@@ -168,12 +167,56 @@ class Tritree(TriangleMesh):
         else:
             return
 
-    def coarsen(self, isMarkedCell, data=None):
-        pass
+    def coarsen_marker(self, eta, beta, method):
+        leafCellIdx = self.leaf_cell_index()
+        NC = self.number_of_cells()
+        if 'idxmap' in self.celldata.keys(): 
+            eta0 = np.zeros(NC, dtype=self.ftype)
+            idxmap = self.celldata['idxmap']
+            np.add.at(eta0, idxmap, eta)
+        else:
+            eta0 = eta
+        isMarked = mark(eta0[leafCellIdx], beta, method)
+        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell[leafCellIdx[isMarked]] = True
+        return isMarkedCell 
+    
+    def coarsen(self, isMarkedCell, surface=None):
+        if sum(isMarkedCell) > 0:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            cell = self.entity('cell')
+            
+            parent = self.parent
+            child = self.child
+
+            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell[child[isMarkedCell, :]] = False
+
+            isNotRootCell = (~self.is_root_cell())
+            NNC0 = isRemainCell.sum()
+            while True:
+                isRemainCell[parent[isRemainCell & isNotRootCell, 0]] = True
+                isRemainCell[child[parent[isRemainCell & isNotRootCell], :]] = True
+                NNC1 = isRemainCell.sum()
+                if NNC1 == NNC0:
+                    break
+                else:
+                    NNC0 = NNC1
+            
+            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode[cell[isRemainCell, :]] = True
+            cell = cell[isRemainCell]
+            child = child[isRemainCell]
+            parent = parent[isRemainCell]
+
+            childIdx = np.nonzero(child[:, 0] > -1)
+            isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0
+            child[childIdx[isNewLeafCell], :] = -1
 
 
     def to_conformmesh(self):
-
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
