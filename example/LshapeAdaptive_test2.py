@@ -49,7 +49,7 @@ for i in range(maxit):
     errorMatrix[3, i] = fem.get_recover_error(rguh)
     isMarkedCell = tmesh.marker(eta, theta, method='L2')
     if i < maxit -1:
-        isMarkedCell = tmesh.marker(eta, theta, method='L2')
+        isMarkedCell = tmesh.refine_marker(eta, theta, method='L2')
         tmesh.refine(isMarkedCell)
         pmesh = tmesh.to_conformmesh()
 pmesh.add_plot(plt, cellcolor='w')

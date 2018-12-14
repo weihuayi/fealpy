@@ -223,7 +223,6 @@ class Quadtree(QuadrangleMesh):
         else:
             return False
 
-    def to_pmesh(self):
         """ Transform the quadtree data structure to polygonmesh datastructure
         """
 

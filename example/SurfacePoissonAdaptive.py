@@ -52,7 +52,7 @@ for i in range(maxit):
     errorMatrix[2, i] = fem.get_H1_semi_error()
     isMarkedCell = tmesh.marker(eta, theta, method='L2')
     if i < maxit - 1:
-        isMarkedCell = tmesh.marker(eta, theta, method='L2')
+        isMarkedCell = tmesh.refine_marker(eta, theta, method='L2')
         tmesh.refine(isMarkedCell, surface=surface)
         pmesh = tmesh.to_conformmesh()
 
