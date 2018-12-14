@@ -1,5 +1,5 @@
 import numpy as np
-from numpy.linalg import inv
+from numpy.linalg import inv, det
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from ..functionspace.vector_vem_space import VectorVirtualElementSpace2d 
@@ -41,12 +41,61 @@ class LinearElasticityVEMModel():
 
         G = self.integralalg.integral(u0, celltype=True)
 
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
+        NV = mesh.number_of_vertices_of_cells()
 
         if p == 1:
             G[..., 0, 0] = 1
             G[..., 1, 1] = 1
-            G[..., 3, 0::2]
-            G[..., 3, 1::2]
+
+
+            node = mesh.entity('node')
+            bc = self.space.vsmspace.scalarspace.barycenter
+            h = self.space.vsmspace.scalarspace.h
+            cell = mesh.ds.cell
+
+            idx = np.repeat(range(NC), NV)
+            phi = (node[cell] - bc[idx])/np.repeat(h, NV).reshape(-1, 1)
+
+            xx = phi[:, 0]**2
+            yy = phi[:, 1]**2
+            xy = phi[:, 0]*phi[:, 1]
+            G[..., 3, :] = 0.0
+            np.add.at(G[..., 3, 2], idx, -xy)  
+            np.add.at(G[..., 3, 4], idx, -yy)
+            np.add.at(G[..., 3, 3], idx, xx)
+            G[..., 3, 2:5] /= NV.reshape(-1, 1)
+            G[..., 3, 5] = -G[..., 3, 2] 
+            print(det(G[0]))
+        elif p == 2:
+            u = self.space.vsmspace.scalarspace.basis
+            G0 = self.integralalg.integral(u, celltype=True)/self.area[:, np.newaxis]
+            G[..., 0, 0::2] = G0
+            G[..., 1, 1::2] = G0
+            G[..., 3, :] = 0.0
+
+            node = mesh.entity('node')
+            edge = mesh.entity('edge')
+            edge2cell = mesh.ds.edge_to_cell()
+            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+            qf = GaussLobattoQuadrature(p + 1)
+            bcs = qf.quadpts
+            ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+            phi = u(ps[0:-1], cellidx=edge2cell[:, 0])
+            phi0 = np.sum(phi*phi[:, :, [2]], axis=0)
+            np.add.at(G[..., 3, 0::2], edge2cell[:, 0], -phi0) 
+            phi0 = np.sum(phi*phi[:, :, [1]], axis=0)
+            np.add.at(G[..., 3, 1::2], edge2cell[:, 0], phi0)
+
+            phi = u(ps[-1:0:-1, isInEdge], cellidx=edge2cell[isInEdge, 1])
+            phi0 = np.sum(phi*phi[:, :, [2]], axis=0)
+            np.add.at(G[..., 3, 0::2], edge2cell[isInEdge, 1], -phi0)
+            phi0 = np.sum(phi*phi[:, :, [1]], axis=0)
+            np.add.at(G[..., 3, 1::2], edge2cell[isInEdge, 1], phi0)
+            G[..., 3, :] /= 2*NV.reshape(-1, 1)
+            print(det(G[0]))
         else:
             def u1(x, cellidx):
                 phip = self.space.vsmspace.scalarspace.basis(x, cellidx=cellidx)
@@ -55,8 +104,9 @@ class LinearElasticityVEMModel():
             G0 = self.integralalg.integral(u1, celltype=True)/self.area[:, np.newaxis, np.newaxis]
             G[..., 0, 0::2] = G0[:, 0, :]
             G[..., 1, 1::2] = G0[:, 0, :]
-            G[..., 3, 0::2] = G0[:, 2, :]
-            G[..., 3, 1::2] = -G0[:, 1, :] 
+            G[..., 3, 0::2] = -G0[:, 2, :]
+            G[..., 3, 1::2] = G0[:, 1, :] 
+            print(det(G[0]))
         return G
 
     def matrix_H(self, p=None):
