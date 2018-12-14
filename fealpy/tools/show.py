@@ -67,7 +67,7 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=
     return axes
 
 def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
-    axes.set_xlim(xmin=N[0]/2, xmax=N[-1]*2)
+    axes.set_xlim(left=N[0]/2, right=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
     if isinstance(k, int):
         c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)

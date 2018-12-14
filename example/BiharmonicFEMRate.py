@@ -44,8 +44,12 @@ errorType = [
          ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 meshzoo = MeshZoo()
-n = 10
-dirichlet = False 
+
+if meshtype == 6:
+    mesh = meshzoo.lshape_mesh()
+else:
+    n = 10 
+dirichlet = True 
 for i in range(maxit):
     if meshtype == 1:
         mesh = meshzoo.regular(box, n=n)
@@ -57,8 +61,12 @@ for i in range(maxit):
         mesh = meshzoo.fishbone(box, n=n)
     elif meshtype == 5:
         mesh = load_mat_mesh('../data/square'+str(i+2)+'.mat')
+    elif meshtype == 6:
+        mesh.uniform_refine()
 
-    n *= 2
+    if meshtype is not 6:
+        n *= 2
+
     fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype, dirichlet=dirichlet)
     fem.solve()
 
@@ -82,7 +90,7 @@ for i in range(maxit):
 show_error_table(Ndof, errorType, errorMatrix, end='\\\\\\hline\n')
 showmultirate(plt, 1, Ndof, errorMatrix,  errorType)
 
-n = 10
+n = 4 
 if meshtype == 1:
     mesh = meshzoo.regular(box, n=n)
 elif meshtype == 2:
@@ -93,11 +101,13 @@ elif meshtype == 4:
     mesh = meshzoo.fishbone(box, n=n)
 elif meshtype == 5:
     mesh = load_mat_mesh('../data/square'+str(2)+'.mat')
+elif meshtype == 6:
+    mesh = meshzoo.lshape_mesh(n=n)
 
 fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor='w')
-fig.savefig(d+'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
+fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
 
 plt.show()
