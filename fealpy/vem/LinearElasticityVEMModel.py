@@ -167,7 +167,7 @@ class LinearElasticityVEMModel():
             B[0, 0::2] = 1/np.repeat(NV, NV)
             B[1, 1::2] = B[0, 0::2] 
 
-        if p > 1:
+        elif p > 1:
             #TODO: correct for p >= 3?
             def u0(x, cellidx):
                 val0 = self.space.vsmspace.div_strain_basis(x, cellidx=cellidx)
@@ -181,6 +181,15 @@ class LinearElasticityVEMModel():
             H = inv(self.matrix_H(p=p-2))*self.area[..., np.newaxis, np.newaxis]
             B0 = B0@H
             B[:, idx] -= B0.swapaxes(0, 1) 
+
+        # update the third line of B
+        if p < 3:
+            ipoints = self.space.interpolation_points()
+            mask = np.zeros(cell2dof.shape[0], dtype=np.bool)
+            idx = cell2dofLocation[0:-1].reshape(-1, 1) + p*NV + np.arange(1:p
+            mask[cell2dofLocation[
+
+        else:
 
 
         NE = mesh.number_of_edges()
