@@ -25,7 +25,7 @@ cellLocation = np.array([0, 4], dtype=np.int)
 mesh = PolygonMesh(node, cell, cellLocation)
 
 pde = LinearElasticityModel(1, 1)
-p = 3
+p = 2
 q = 5
 vem = LinearElasticityVEMModel(pde, mesh, p, q)
 
