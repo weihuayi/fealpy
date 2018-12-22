@@ -33,23 +33,23 @@ cell = np.array(mesh.elements, dtype=np.int)
 tmesh = TriangleMesh(point, cell)
 
 # Partition the mesh cells into n parts 
-edgecuts, parts = metis.part_mesh(tmesh, nparts=n, entity='point')
+edgecuts, parts = metis.part_mesh(tmesh, nparts=n, entity='cell', contig=True)
 
-point = tmesh.point
+node = tmesh.node
 edge = tmesh.ds.edge
 cell = tmesh.ds.cell
 cell2edge = tmesh.ds.cell_to_edge()
 edge2cell = tmesh.ds.edge_to_cell()
-isBdPoint = tmesh.ds.boundary_point_flag()
+isBdNode = tmesh.ds.boundary_node_flag()
 
-data = {'Point':point, 'Face':edge+1, 'Elem':cell+1,
-        'Edge2Elem':edge2cell+1, 'isBdPoint':isBdPoint, 'Partitions':parts+1}
+data = {'Point':node, 'Face':edge+1, 'Elem':cell+1,
+        'Edge2Elem':edge2cell+1, 'isBdPoint':isBdNode, 'Partitions':parts+1}
 
 sio.matlab.savemat('test'+str(n)+'parts'+str(h)+'.mat', data)
 
 fig = plt.figure()
 axes = fig.gca()
 tmesh.add_plot(axes, cellcolor='w')
-tmesh.find_point(axes, color=parts, markersize=20)
+tmesh.find_node(axes, color=parts, markersize=20)
 fig.savefig('test.pdf')
 plt.show()

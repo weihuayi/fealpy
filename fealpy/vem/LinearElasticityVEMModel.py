@@ -67,7 +67,6 @@ class LinearElasticityVEMModel():
             np.add.at(G[..., 3, 3], idx, xx)
             G[..., 3, 2:5] /= NV.reshape(-1, 1)
             G[..., 3, 5] = -G[..., 3, 2] 
-            print(det(G[0]))
         elif p == 2:
             u = self.space.vsmspace.scalarspace.basis
             G0 = self.integralalg.integral(u, celltype=True)/self.area[:, np.newaxis]
@@ -106,7 +105,6 @@ class LinearElasticityVEMModel():
             G[..., 1, 1::2] = G0[:, 0, :]
             G[..., 3, 0::2] = -G0[:, 2, :]
             G[..., 3, 1::2] = G0[:, 1, :] 
-            print(det(G[0]))
         return G
 
     def matrix_H(self, p=None):
