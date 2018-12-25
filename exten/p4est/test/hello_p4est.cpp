@@ -1,5 +1,3 @@
-
-
 #include <p4est.h>
 #include <p4est_vtk.h>
 #include <p4est_mesh.h>
@@ -98,7 +96,7 @@ int main(int argc, char **argv)
     for(int i = 0; i < 1; i++)
         p4est_refine(p4est, 0, uniform_refine_fn, NULL);
 
-    for(int i = 0; i < 2; i++)
+    for(int i = 0; i < 10; i++)
         p4est_refine(p4est, 0, refine_fn, NULL);
 
 

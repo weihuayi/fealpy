@@ -11,7 +11,6 @@ from fealpy.tools.show import showmultirate
 
 m = int(sys.argv[1])
 p = int(sys.argv[2]) 
-q = int(sys.argv[3])
 
 if m == 1:
     pde = SphereSinSinSinData()
@@ -30,7 +29,7 @@ elif m == 4:
     mesh = surface.init_mesh()
 
 maxit = 4
-
+integrator = TriangleQuadrature(3)
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h||_{S,0}$',
              '$||\\nabla_S u - \\nabla_S u_h||_{S, 0}$'
@@ -39,7 +38,7 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 for i in range(maxit):
-    fem = SurfacePoissonFEMModel(mesh, pde, p, q)
+    fem = SurfacePoissonFEMModel(mesh, pde, p, integrator)
     fem.solve()
     Ndof[i] = len(fem.uh)
     errorMatrix[0, i] = fem.get_l2_error()

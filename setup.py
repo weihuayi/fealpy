@@ -13,9 +13,11 @@ setup(name='fealpy',
           'scipy', 
           'matplotlib', 
 	  'msgpack',
+          'PyHamcrest',
 	  'boost',
           'pytools',
           'meshpy',
-          'pyamg' 
+          'pyamg',
+          'pymumps'
       ],
       zip_safe=False)

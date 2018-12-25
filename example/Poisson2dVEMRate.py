@@ -1,5 +1,4 @@
 import numpy as np
-import sys
 
 from fealpy.pde.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData, SinSinData
 from fealpy.vem import PoissonVEMModel 
@@ -23,11 +22,8 @@ def show_solution(axes, mesh, uh):
     c0 = Poly3DCollection(p0, linewidths=1, alpha=0.2)
     axes.add_collection3d(c0)
 
-m = int(sys.argv[1])
-
 pde = CosCosData()
 maxit = 4
-
 
 h = 0.2
 box = [0, 1, 0, 1] # [0, 1]^2 domain
@@ -46,6 +42,7 @@ ps = [1, 2, 5]
 
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 integrator = mesh.integrator(7)
+
 for i in range(maxit):
     for j, p in enumerate(ps):
         vem = PoissonVEMModel(pde, mesh, p, integrator)

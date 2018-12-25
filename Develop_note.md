@@ -140,6 +140,7 @@ The member function in a `FunctionSpace`:
 * projection(u): 
 
 * array(dim=None)
+
 * value(u, bc, cellidx=None)
 * grad_value(u, bc, cellidx=None)
 * div_value(u, bc, cellidx=None)

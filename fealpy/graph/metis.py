@@ -754,6 +754,8 @@ def part_mesh(mesh, entity='cell', nparts=2,
     graph = array_to_metis(adj, adjLocation)
 
     options = METIS_Options(**opts)
+    print(options)
+    print(options.keys());
     if tpwgts and not isinstance(tpwgts, ctypes.Array):
         if isinstance(tpwgts[0], (tuple, list)):
             tpwgts = reduce(op.add, tpwgts)

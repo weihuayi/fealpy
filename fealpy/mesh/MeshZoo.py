@@ -138,3 +138,25 @@ class MeshZoo():
         newCell[3*NC:4*NC, 0] = range(NN, NN+NC)
         newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
         return TriangleMesh(newNode, newCell)
+
+    def lshape_mesh(self, n=4):
+        point = np.array([
+            (-1, -1),
+            (0, -1),
+            (-1, 0),
+            (0, 0),
+            (1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1)], dtype=np.float)
+
+        cell = np.array([
+            (1, 3, 0),
+            (2, 0, 3),
+            (3, 6, 2),
+            (5, 2, 6),
+            (4, 7, 3),
+            (6, 3, 7)], dtype=np.int)
+        mesh = TriangleMesh(point, cell)
+        mesh.uniform_refine(n)
+        return mesh

@@ -30,16 +30,15 @@ which will create a link in `/usr/local/lib/python3.x/dist-packages/`.
 ### Dependency
 
 ```
-sudo apt-get install python3 python3-pip ipython3 
-sudo apt-get install python3-numpy
-sudo apt-get install python3-scipy
-sudo apt-get install pymumps
+sudo apt install python3 python3-pip ipython3 
+sudo apt install python3-numpy
+sudo apt install python3-scipy
 sudo -H pip3 install matplotlib
 sudo -H pip3 install plotly
 ```
 
 ```
-sudo apt-get install petsc-dev
+sudo apt install petsc-dev
 sudo -H pip3 install petsc4py 
 ```
 
@@ -50,17 +49,17 @@ Install mesh generation package `meshpy`:
 ububtu 18.04 install meshpy
 
 ```
-sudo apt-get install libboost-python-dev
+sudo apt install libboost-python-dev
 sudo -H pip3 install meshpy
 ```
 
 Install "metis"
 ```
-sudo apt-get install metis
+sudo apt install metis
 ```
 
 ```
-sudo apt-get install python3-numexpr 
+sudo apt install python3-numexpr 
 ```
 
 The following can install by pip3
@@ -78,22 +77,30 @@ sudo -H pip3 install pygmsh
 
 ## Windows: Anaconda
 
+Dowload anaconda for windows  from https://www.anaconda.com/. 
+
+Run `Anaconda3-5.3.1-Windows-x86_64.exe` and install Anaconda on you system.
+
+Dowload the correct version `meshpy` from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy. For example:
+
 ```
-conda install pyamg
+MeshPy‑2018.1‑cp36‑cp37m‑win_amd64.whl # for python 3.7 and 64 bit win system.
+```
+
+```
+pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
+```
+
+```
+conda install pyamg # amg fast solver
 conda install -c conda-forge pytools
 ```
 
-from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy, dowload 
-
-'MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl'
-
 ```
-pip install msgpack
-pip install MeshPy‑2018.1‑cp36‑cp36m‑win_amd64.whl
+pip install -e ./
 ```
+
 ## Mac
-
-
 
 
 ## Install Boost with python3 

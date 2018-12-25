@@ -48,13 +48,13 @@ count,uh = fdm.solve()
 print('count',count)
 nx = hx.shape[0]
 ny = hy.shape[0]
-X1,Y1 = np.meshgrid(np.arange(0,1+hx[0]/2,hx[0]),np.arange(hy[0]/2,1,hy[0]))
-X2,Y2 = np.meshgrid(np.arange(hx[0]/2,1,hx[0]),np.arange(0,1+hy[0]/2,hy[0]))
+X1,Y1 = np.meshgrid(np.arange(0, 1+hx[0]/2,hx[0]), np.arange(hy[0]/2, 1, hy[0]))
+X2,Y2 = np.meshgrid(np.arange(hx[0]/2, 1, hx[0]),  np.arange(0, 1 + hy[0]/2, hy[0]))
 isYDEdge = mesh.ds.y_direction_edge_flag()
 u = uh[:sum(isYDEdge)]
 print(uh.shape)
 print(u.shape)
-U = u.reshape(ny,nx+1)
+U = u.reshape(ny, nx+1)
 v = uh[sum(isYDEdge):]
 V = v.reshape(ny+1,nx)
 plt.figure()

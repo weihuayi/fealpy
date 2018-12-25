@@ -1,8 +1,9 @@
 import sys
-
 import numpy as np  
 import matplotlib.pyplot as plt
+
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
+
 from fealpy.tools.show import showmultirate, show_error_table
 
 d = int(sys.argv[1])
@@ -23,6 +24,7 @@ pde = PDE()
 errorType = ['$|| u - u_h||_0$', '$||\\nabla u - \\nabla u_h||_0$']
 
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+
 Ndof = np.zeros(maxit, dtype=np.int)
 
 mesh = pde.init_mesh(n)
@@ -38,5 +40,5 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 show_error_table(Ndof, errorType, errorMatrix)
-# showmultirate(plt, 0, Ndof, errorMatrix, errorType)
-# plt.show()
+showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+plt.show()

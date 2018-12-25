@@ -133,7 +133,7 @@ def show_mesh_2d(axes, mesh,
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmap='rainbow'):
+        showaxis=False, showcolorbar=False, cmap='gnuplot2'):
     
     axes.set_aspect(aspect)
     if showaxis == False:
