@@ -85,7 +85,7 @@ class DFP0P1mg():
             c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
             p = p - c
             u = Aalphainv@(fnew - G@p)
-            print('NC',NC)
+            #print('NC',NC)
 
             ## Update residual and error of consective iterations
             n = n+1
@@ -331,8 +331,8 @@ class DFP0P1mg():
         g = self.g
         Ap = self.Ap
         
-        for i in range(level, 2, -1):
-            if i > 3:
+        for i in range(level, 3, -1):
+            if i > 4:
                 u, p, A, G, Gt, f, g, Ap = self.DarcyForchheimersmoothing(i, u, p, A, G, Gt, f, g, Ap)
                 print('i',i)
             else:

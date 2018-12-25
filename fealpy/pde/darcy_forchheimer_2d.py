@@ -357,7 +357,7 @@ class SinsinData:
     u = (np.sin(x)*np.cos(y),-np.cos(x)*np.sin(y))^t
     p = np.sin(pi*x)*np.sin(pi*y)
     g = 0
-    f = ((mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.sin(x)*np.cos(x)*np.sin(y) + pi*np.cos(pi*x)*np.sin(pi*y),
+    f = ((mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.sin(x)*np.cos(x) + pi*np.cos(pi*x)*np.sin(pi*y),
          -(mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.cos(x)*np.sin(y)  + pi*np.sin(pi*x)*np.cos(pi*y))^t
     """
     def __init__(self, box, mu, k, rho, beta, tol):
