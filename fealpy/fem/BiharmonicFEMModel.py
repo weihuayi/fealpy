@@ -216,6 +216,80 @@ class BiharmonicRecoveryFEMModel:
             M += D
 
         return M
+    
+    def get_laplace_matrix(self):
+        space = self.space
+        mesh = space.mesh
+        N = mesh.number_of_nodes() 
+        cell = mesh.ds.cell
+        
+        gradphi, measure = self.gradphi, self.measure
+
+        I = np.einsum('ij, k->ijk',  cell, np.ones(3))
+        J = I.swapaxes(-1, -2)
+        val = np.einsum('i, ij, ik->ijk', measure, gradphi[:, :, 0], gradphi[:, :, 0])
+        P = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        val = np.einsum('i, ij, ik->ijk', measure, gradphi[:, :, 0], gradphi[:, :, 1])
+        Q = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+        val = np.einsum('i, ij, ik->ijk', measure, gradphi[:, :, 1], gradphi[:, :, 1])
+        S = csc_matrix((val.flat, (I.flat, J.flat)), shape=(N, N))
+
+        A, B = self.A, self.B
+
+        M = A.transpose()@P@A + A.transpose()@Q@B + B.transpose()@Q.transpose()@A+B.transpose()@S@B 
+
+        return M
+
+    def get_laplace_dirichlet_vector(self):
+        """
+        \int_\Gamma g_2 G(\nabla v_h) \cdot n ds
+        """
+        space = self.space
+        mesh = space.mesh
+        NC = mesh.number_of_cells() 
+        N = mesh.number_of_nodes() 
+        cell = mesh.ds.cell
+        node = mesh.node
+
+        edge2cell = mesh.ds.edge_to_cell()
+        edge = mesh.ds.edge
+        isBdEdge = (edge2cell[:,0]==edge2cell[:,1])
+        bdEdge = edge[isBdEdge]
+
+        b0 = np.zeros(N, dtype=np.float)
+        b1 = np.zeros(N, dtype=np.float)
+
+        qf = IntervalQuadrature(5)
+        bcs, ws = qf.quadpts, qf.weights
+
+        pp = np.einsum('...j, ijk->...ik', bcs, node[bdEdge])
+        val = self.pde.laplace_dirichlet(pp)#TODO: modify pde
+
+        val0 = np.einsum('m, mj, i, mi->ij', ws, bcs, n[:, 0], val)
+        np.add.at(b0, bdEdge, val0)
+        
+        val1 = np.einsum('m, mj, i, mi->ij', ws, bcs, n[:, 1], val)
+        np.add.at(b1, bdEdge, val1)
+
+        return self.A.transpose()@b0 + self.B.transpose()@b1 #TODO: check it 
+
+    def get_laplace_neu_vector(self):
+        """
+        \int_\Gamma g_2 G(\nabla v_h) \cdot n ds
+        """
+        space = self.space
+        mesh = space.mesh
+        NC = mesh.number_of_cells() 
+        N = mesh.number_of_nodes() 
+        cell = mesh.ds.cell
+        node = mesh.node
+
+        edge2cell = mesh.ds.edge_to_cell()
+        edge = mesh.ds.edge
+        isBdEdge = (edge2cell[:,0]==edge2cell[:,1])
+        bdEdge = edge[isBdEdge]
+
+
 
     def get_right_vector(self):
         space = self.space
