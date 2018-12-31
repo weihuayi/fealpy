@@ -1,10 +1,10 @@
 import numpy as np
 import time
-import h5py
+#import h5py
 import pickle
 import sys
 import scipy.sparse as sparse
-from memory_profiler import profile
+#from memory_profiler import profile
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 from numpy.linalg import norm
 from ..fem.integral_alg import IntegralAlg
@@ -438,6 +438,8 @@ class NonDFFDMModel_pu():
         idx = np.r_[I,J]
 
         Dp1eL2 = np.sqrt(np.sum(area1*(Dph[idx] - DpI[idx])**2))
+        print('ph',self.ph)
+        print('Dph',Dph)
 
         return Dp1eL2
 

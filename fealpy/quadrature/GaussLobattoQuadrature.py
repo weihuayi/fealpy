@@ -98,6 +98,8 @@ class GaussLobattoQuadrature():
         self.quadpts[:, 0] = 1 - self.quadpts[:, 1]
         self.weights = A[:, 1]/2
 
+        # tansfer the quad_points from [-1,1] to [0,1], changge the weights at the same time
+
     def get_number_of_quad_points(self):
         return self.quadpts.shape[0] 
 

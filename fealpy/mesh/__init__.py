@@ -7,7 +7,7 @@ This module provide mesh
 '''
 
 from .distmesh import DistMesh2d
-from .TriangleMesh import TriangleMesh
+from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh  
 from .TetrahedronMesh import TetrahedronMesh

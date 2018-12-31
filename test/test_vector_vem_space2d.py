@@ -29,8 +29,8 @@ p = 2
 q = 5
 vem = LinearElasticityVEMModel(pde, mesh, p, q)
 
-#G = vem.matrix_G()
-#print(G)
+G = vem.matrix_G()
+print(G)
 
-B = vem.matrix_B()
-print(B)
+#B = vem.matrix_B()
+#print(B)

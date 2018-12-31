@@ -1,41 +1,42 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
-import h5py
+#import h5py
 
 from fealpy.pde.darcy_forchheimer_2d import PolyData
 from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
-from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
+#from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
 from fealpy.fdm.NonDFFDMModel_pu import NonDFFDMModel_pu
+from fealpy.fdm.NonDFFDMModel_normu import NonDFFDMModel_normu
 from fealpy.tools.show import showmultirate
 box = [0,1,0,1]
 mu = 2
 k = 1
 rho = 1
-beta = 30
+beta = 10
 tol = 1e-9
 #hx = np.array([0.12,0.34,0.22,0.32])
 #hy = np.array([0.25,0.13,0.33,0.29])
 #hy = np.array([0.16,0.23,0.32,0.11,0.18])
-#hx = np.array([0.12,0.34,0.45,0.09])
+hx = np.array([0.12,0.34,0.45,0.09])
 #hy = np.array([0.25,0.13,0.54,0.08])
-#hy = np.array([0.25,0.13,0.34,0.20,0.08])
-hx = np.array([0.25,0.25,0.25,0.25])
-hy = np.array([0.25,0.25,0.25,0.25])
+hy = np.array([0.25,0.13,0.34,0.20,0.08])
+#hx = np.array([0.25,0.25,0.25,0.25])
+#hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
-m = 16
-hx = hx/m
-hy = hy/m
-hx = hx.repeat(m)
-hy = hy.repeat(m)
+#m = 16
+#hx = hx/m
+#hy = hy/m
+#hx = hx.repeat(m)
+#hy = hy.repeat(m)
 
 #pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
-pde = SinsinData(box,mu,k,rho,beta,tol)
-#pde = ArctanData(box,mu,k,rho,beta,tol)
-maxit = 1
+#pde = SinsinData(box,mu,k,rho,beta,tol)
+pde = ArctanData(box,mu,k,rho,beta,tol)
+maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
         '$||Dp -  Dp_h||_0$','$||Dp1 - Dp1_h||_0$']
@@ -49,8 +50,9 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-    fdm = NonDFFDMModel(pde,mesh)
-#    fdm = NonDFFDMModel_pu(pde,mesh)
+#    fdm = NonDFFDMModel(pde,mesh)
+    fdm = NonDFFDMModel_pu(pde,mesh)
+#    fdm = NonDFFDMModel_normu(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC

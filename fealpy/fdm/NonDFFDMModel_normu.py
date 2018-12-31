@@ -409,6 +409,7 @@ class NonDFFDMModel_normu():
         J, = np.nonzero(~isBDEdge & isXDEdge)
         idx = np.r_[I,J]
         DpeL2 = np.sqrt(np.sum(area1*(Dph[idx] - DpI[idx])**2))
+        
         return DpeL2
 
     def get_Dp1L2_error(self):
@@ -444,6 +445,10 @@ class NonDFFDMModel_normu():
         idx = np.r_[I,J]
 
         Dp1eL2 = np.sqrt(np.sum(area1*(Dph[idx] - DpI[idx])**2))
+        print('idx',(Dph[idx] - DpI[idx])**2)
+        print('Dph',Dph[idx])
+        print('DpI',DpI[idx])
+        print('Dp1eL2',Dp1eL2)
 
         return Dp1eL2
 
