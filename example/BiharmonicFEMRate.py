@@ -14,7 +14,7 @@ from fealpy.tools.show import showmultirate
 m = int(sys.argv[1]) 
 meshtype = int(sys.argv[2])
 rtype = int(sys.argv[3])
-d = sys.argv[4]
+#d = sys.argv[4]
 
 if rtype == 1:
     rtype='simple'
@@ -108,6 +108,6 @@ fig = plt.figure()
 fig.set_facecolor('white')
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor='w')
-fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
+#fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
 
 plt.show()

@@ -102,8 +102,6 @@ class DarcyForchP0P1mg():
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
         cell = mesh.entity('cell')
-        print('NC',NC)
-        print('NN',NN)
 
         HB = np.zeros((NN,3),dtype=np.int)
         if NC%4 == 0:
@@ -272,10 +270,6 @@ class DarcyForchP0P1mg():
         uLength = np.sqrt(u[:NC]**2 + u[NC:]**2)
         Lu = A@u + (beta/rho)*np.tile(uLength,2,1)*u + G@p
         r = f - Lu
-        print('r',r.dtype)
-        print('r1',r.shape)
-        print('Res_u',Res_u)
-
 
         # restrict residual to the coarse grid
         rc = Res_u@r
@@ -315,6 +309,7 @@ class DarcyForchP0P1mg():
                 
             elif i > 1:
                 Pro_u,uLength,uc,pc,HB,AC,Gc,Gct,fc,gc,Apc = self.DarcyForchsmoothing(uc,pc,i,Ac,Gc,Gct,fc,gc,Apc)
+                print('J',J)
 
             else:
                 v,q = self.DarcyForchsmoothing(uc,pc,i,Ac,Gc,Gct,fc,gc,Apc)
