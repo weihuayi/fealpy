@@ -10,6 +10,7 @@ from fealpy.mesh.meshio import load_mat_mesh
 
 from fealpy.tools.show import show_error_table 
 from fealpy.tools.show import showmultirate
+from mpl_toolkits.mplot3d import Axes3D
 
 m = int(sys.argv[1]) 
 meshtype = int(sys.argv[2])
@@ -47,9 +48,10 @@ meshzoo = MeshZoo()
 
 if meshtype == 6:
     mesh = meshzoo.lshape_mesh()
+elif meshtype == 7:
+    mesh = pde.init_mesh()
 else:
-    n = 10 
-dirichlet = True 
+    n = 40 
 for i in range(maxit):
     if meshtype == 1:
         mesh = meshzoo.regular(box, n=n)
@@ -63,12 +65,14 @@ for i in range(maxit):
         mesh = load_mat_mesh('../data/square'+str(i+2)+'.mat')
     elif meshtype == 6:
         mesh.uniform_refine()
+    elif meshtype == 7:
+        mesh.uniform_refine()
 
-    if meshtype is not 6:
+    if (meshtype != 6) and  (meshtype != 7):
         n *= 2
 
-    fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype, dirichlet=dirichlet)
-    fem.solve()
+    fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype)
+    fem.solve(4)
 
     Ndof[i] = fem.space.number_of_global_dofs()
     e0, e1, e2, e3, e4 = fem.get_error()
@@ -103,11 +107,20 @@ elif meshtype == 5:
     mesh = load_mat_mesh('../data/square'+str(2)+'.mat')
 elif meshtype == 6:
     mesh = meshzoo.lshape_mesh(n=n)
+elif meshtype == 7:
+    pass
+    #mesh = pde.init_mesh()
 
-fig = plt.figure()
-fig.set_facecolor('white')
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor='w')
+#fig = plt.figure()
+#fig.set_facecolor('white')
+#axes = fig.gca() 
+#mesh.add_plot(axes, cellcolor='w')
 #fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
-
+fig2 = plt.figure()
+fig2.set_facecolor('white')
+axes = fig2.gca(projection='3d')
+x = mesh.node[:, 0]
+y = mesh.node[:, 1]
+cell = mesh.ds.cell
+axes.plot_trisurf(x, y, cell, fem.uh, cmap=plt.cm.jet, lw=0.0)
 plt.show()

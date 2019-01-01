@@ -5,6 +5,7 @@ from scipy.sparse.linalg import cg, inv, dsolve
 try:
     from mumps import spsolve
 except  ImportError:
+    print('Can not import spsolve from mumps!Using spsolve in scipy!')
     from scipy.sparse.linalg import spsolve
 
 from scipy.sparse import spdiags
