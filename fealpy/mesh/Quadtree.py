@@ -11,11 +11,10 @@ class Quadtree(QuadrangleMesh):
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
 
     def __init__(self, node, cell, dtype=np.float):
-        super(Quadtree, self).__init__(node, cell, dtype=dtype)
-        self.dtype = dtype
+        super(Quadtree, self).__init__(node, cell)
         NC = self.number_of_cells()
-        self.parent = -np.ones((NC, 2), dtype=np.int) 
-        self.child = -np.ones((NC, 4), dtype=np.int)
+        self.parent = -np.ones((NC, 2), dtype=self.itype) 
+        self.child = -np.ones((NC, 4), dtype=self.itype)
         self.meshType = 'quadtree'
 
     def leaf_cell_index(self):
@@ -94,8 +93,8 @@ class Quadtree(QuadrangleMesh):
 
             # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号 
             I, J = np.nonzero(isCuttedEdge[cell2edge])
-            cellIdx = np.zeros(NE, dtype=np.int)
-            localIdx = np.zeros(NE, dtype=np.int)
+            cellIdx = np.zeros(NE, dtype=self.itype)
+            localIdx = np.zeros(NE, dtype=self.itype)
             I1 = I[~isLeafCell[I]]
             J1 = J[~isLeafCell[I]]
             cellIdx[cell2edge[I1, J1]] = I1 # the cell idx 
@@ -108,7 +107,7 @@ class Quadtree(QuadrangleMesh):
             cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
             localIdx = self.localEdge2childCell[localIdx, 1]
 
-            edge2center = np.zeros(NE, dtype=np.int)
+            edge2center = np.zeros(NE, dtype=self.itype)
             edge2center[isCuttedEdge] = cell[cellIdx, localIdx]  
 
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1) 
@@ -131,15 +130,15 @@ class Quadtree(QuadrangleMesh):
             ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(4)]
             cc = np.arange(N + NEC, N + NEC + NCC).reshape(-1, 1)
             
-            newCell = np.zeros((4*NCC, 4), dtype=np.int)
-            newChild = -np.ones((4*NCC, 4), dtype=np.int)
-            newParent = -np.ones((4*NCC, 2), dtype=np.int)
+            newCell = np.zeros((4*NCC, 4), dtype=self.itype)
+            newChild = -np.ones((4*NCC, 4), dtype=self.itype)
+            newParent = -np.ones((4*NCC, 2), dtype=self.itype)
             newCell[0::4, :] = np.concatenate((cp[0], ep[0], cc, ep[3]), axis=1) 
             newCell[1::4, :] = np.concatenate((ep[0], cp[1], ep[1], cc), axis=1)
             newCell[2::4, :] = np.concatenate((cc, ep[1], cp[2], ep[2]), axis=1)
             newCell[3::4, :] = np.concatenate((ep[3], cc, ep[2], cp[3]), axis=1)
             newParent[:, 0] = np.repeat(idx, 4)
-            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=np.int)) 
+            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=self.itype)) 
             child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
 
             cell = np.concatenate((cell, newCell), axis=0)
@@ -164,7 +163,7 @@ class Quadtree(QuadrangleMesh):
             return False
 
         if len(idx) > 0:
-            N = self.number_of_nodes()
+            NN = self.number_of_nodes()
             NC = self.number_of_cells()
 
             node = self.node
@@ -200,7 +199,7 @@ class Quadtree(QuadrangleMesh):
             isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0 
             child[childIdx[isNewLeafCell], :] = -1
 
-            cellIdxMap = np.zeros(NC, dtype=np.int)
+            cellIdxMap = np.zeros(NC, dtype=self.itype)
             NNC = isRemainCell.sum()
             cellIdxMap[isRemainCell] = np.arange(NNC)
             child[child > -1] = cellIdxMap[child[child > -1]]
@@ -208,12 +207,12 @@ class Quadtree(QuadrangleMesh):
             self.child = child
             self.parent = parent
 
-            nodeIdxMap = np.zeros(N, dtype=np.int)
-            NN = isRemainNode.sum()
-            nodeIdxMap[isRemainNode] = np.arange(NN)
+            nodeIdxMap = np.zeros(NN, dtype=self.itype)
+            N = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(N)
             cell = nodeIdxMap[cell]
             self.node = node[isRemainNode]
-            self.ds.reinit(NN, cell)
+            self.ds.reinit(N, cell)
 
             if cell.shape[0] == NC:
                 return False 
@@ -293,7 +292,7 @@ class Quadtree(QuadrangleMesh):
 
 
             PNC = isLeafCell.sum()
-            cellIdxMap = np.zeros(NC, dtype=np.int)
+            cellIdxMap = np.zeros(NC, dtype=self.itype)
             cellIdxMap[isLeafCell] = np.arange(PNC)
             cellIdxInvMap, = np.nonzero(isLeafCell)
 
@@ -302,15 +301,15 @@ class Quadtree(QuadrangleMesh):
             # 计算每个叶子四边形单元的每条边上有几条叶子边
             # 因为叶子单元的边不一定是叶子边
             isInPEdge = (pedge2cell[:, 0] != pedge2cell[:, 1])
-            cornerLocation = np.zeros((PNC, 5), dtype=np.int)
+            cornerLocation = np.zeros((PNC, 5), dtype=self.itype)
             np.add.at(cornerLocation.ravel(), 5*pedge2cell[:, 0] + pedge2cell[:, 2] + 1, 1)
             np.add.at(cornerLocation.ravel(), 5*pedge2cell[isInPEdge, 1] + pedge2cell[isInPEdge, 3] + 1, 1)
             cornerLocation = cornerLocation.cumsum(axis=1)
 
 
-            pcellLocation = np.zeros(PNC+1, dtype=np.int)
+            pcellLocation = np.zeros(PNC+1, dtype=self.itype)
             pcellLocation[1:] = cornerLocation[:, 4].cumsum()
-            pcell = np.zeros(pcellLocation[-1], dtype=np.int)
+            pcell = np.zeros(pcellLocation[-1], dtype=self.itype)
             cornerLocation += pcellLocation[:-1].reshape(-1, 1) 
             pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
 

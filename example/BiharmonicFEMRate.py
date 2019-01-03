@@ -47,11 +47,9 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 meshzoo = MeshZoo()
 
 if meshtype == 6:
-    mesh = meshzoo.lshape_mesh()
-elif meshtype == 7:
-    mesh = pde.init_mesh()
+    mesh = meshzoo.lshape_mesh(n=3)
 else:
-    n = 40 
+    n = 20 
 for i in range(maxit):
     if meshtype == 1:
         mesh = meshzoo.regular(box, n=n)
@@ -65,10 +63,8 @@ for i in range(maxit):
         mesh = load_mat_mesh('../data/square'+str(i+2)+'.mat')
     elif meshtype == 6:
         mesh.uniform_refine()
-    elif meshtype == 7:
-        mesh.uniform_refine()
 
-    if (meshtype != 6) and  (meshtype != 7):
+    if meshtype != 6:
         n *= 2
 
     fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype)
@@ -96,7 +92,8 @@ showmultirate(plt, 1, Ndof, errorMatrix,  errorType)
 
 n = 4 
 if meshtype == 1:
-    mesh = meshzoo.regular(box, n=n)
+    #mesh = meshzoo.regular(box, n=n)
+    pass
 elif meshtype == 2:
     mesh = meshzoo.rice_mesh(box, n=n)
 elif meshtype == 3:
@@ -106,10 +103,8 @@ elif meshtype == 4:
 elif meshtype == 5:
     mesh = load_mat_mesh('../data/square'+str(2)+'.mat')
 elif meshtype == 6:
-    mesh = meshzoo.lshape_mesh(n=n)
-elif meshtype == 7:
+    #mesh = meshzoo.lshape_mesh(n=n)
     pass
-    #mesh = pde.init_mesh()
 
 #fig = plt.figure()
 #fig.set_facecolor('white')
