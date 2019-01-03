@@ -10,11 +10,12 @@ from fealpy.mesh.meshio import load_mat_mesh
 
 from fealpy.tools.show import show_error_table 
 from fealpy.tools.show import showmultirate
+from mpl_toolkits.mplot3d import Axes3D
 
 m = int(sys.argv[1]) 
 meshtype = int(sys.argv[2])
 rtype = int(sys.argv[3])
-d = sys.argv[4]
+#d = sys.argv[4]
 
 if rtype == 1:
     rtype='simple'
@@ -46,10 +47,9 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 meshzoo = MeshZoo()
 
 if meshtype == 6:
-    mesh = meshzoo.lshape_mesh()
+    mesh = meshzoo.lshape_mesh(n=3)
 else:
-    n = 10 
-dirichlet = True 
+    n = 20 
 for i in range(maxit):
     if meshtype == 1:
         mesh = meshzoo.regular(box, n=n)
@@ -64,11 +64,11 @@ for i in range(maxit):
     elif meshtype == 6:
         mesh.uniform_refine()
 
-    if meshtype is not 6:
+    if meshtype != 6:
         n *= 2
 
-    fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype, dirichlet=dirichlet)
-    fem.solve()
+    fem = BiharmonicRecoveryFEMModel(mesh, pde, 1, 5, rtype=rtype)
+    fem.solve(4)
 
     Ndof[i] = fem.space.number_of_global_dofs()
     e0, e1, e2, e3, e4 = fem.get_error()
@@ -92,7 +92,8 @@ showmultirate(plt, 1, Ndof, errorMatrix,  errorType)
 
 n = 4 
 if meshtype == 1:
-    mesh = meshzoo.regular(box, n=n)
+    #mesh = meshzoo.regular(box, n=n)
+    pass
 elif meshtype == 2:
     mesh = meshzoo.rice_mesh(box, n=n)
 elif meshtype == 3:
@@ -102,12 +103,19 @@ elif meshtype == 4:
 elif meshtype == 5:
     mesh = load_mat_mesh('../data/square'+str(2)+'.mat')
 elif meshtype == 6:
-    mesh = meshzoo.lshape_mesh(n=n)
+    #mesh = meshzoo.lshape_mesh(n=n)
+    pass
 
-fig = plt.figure()
-fig.set_facecolor('white')
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor='w')
-fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
-
+#fig = plt.figure()
+#fig.set_facecolor('white')
+#axes = fig.gca() 
+#mesh.add_plot(axes, cellcolor='w')
+#fig.savefig(d +'/mesh'+str(m-2)+'-'+str(i)+'.pdf')
+fig2 = plt.figure()
+fig2.set_facecolor('white')
+axes = fig2.gca(projection='3d')
+x = mesh.node[:, 0]
+y = mesh.node[:, 1]
+cell = mesh.ds.cell
+axes.plot_trisurf(x, y, cell, fem.uh, cmap=plt.cm.jet, lw=0.0)
 plt.show()

@@ -191,7 +191,7 @@ class LShapeRSinData:
         pass
 
     def init_mesh(self, n=4, meshtype='quadtree'):
-        point = np.array([
+        node = np.array([
             (-1, -1),
             (0, -1),
             (-1, 0),
@@ -205,7 +205,7 @@ class LShapeRSinData:
                 (0, 1, 3, 2),
                 (2, 3, 6, 5),
                 (3, 4, 7, 6)], dtype=np.int)
-            mesh = Quadtree(point, cell)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
@@ -216,7 +216,7 @@ class LShapeRSinData:
                 (5, 2, 6),
                 (4, 7, 3),
                 (6, 3, 7)], dtype=np.int)
-            mesh = TriangleMesh(point, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         else:

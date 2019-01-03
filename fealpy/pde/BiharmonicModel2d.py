@@ -36,6 +36,20 @@ class SinSinData:
         """
         return self.solution(p)
 
+    def laplace_dirichlet(self, p):
+        return self.laplace(p);
+
+    def laplace_neuman(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        cos = np.cos
+        sin = np.sin
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = 4*pi**3*(-sin(pi*y)**2 + cos(pi*y)**2)*sin(pi*x)*cos(pi*x) - 8*pi**3*sin(pi*x)*sin(pi*y)**2*cos(pi*x)
+        val[..., 1] = 4*pi**3*(-sin(pi*x)**2 + cos(pi*x)**2)*sin(pi*y)*cos(pi*y) - 8*pi**3*sin(pi*x)**2*sin(pi*y)*cos(pi*y)
+        return np.sum(val*n, axis=-1) 
+
     def neuman(self, p, n):
         """ Neuman boundary condition
         """
@@ -199,11 +213,25 @@ class BiharmonicData4:
         r = -8*pi**2*self.solution(p)
         return r
 
+    def laplace_dirichlet(self, p):
+        return self.laplace(p);
+
+    def laplace_neuman(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        cos = np.cos
+        sin = np.sin
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = -16*pi**3*sin(2*pi*y)*cos(2*pi*x)
+        val[..., 1] = -16*pi**3*sin(2*pi*x)*cos(2*pi*y)
+        return np.sum(val*n, axis=-1) 
+
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
-        return np.zeros(p.shape[0:-1], dtype=np.float)
+        return self.solution(p) 
 
     def neuman(self, p, n):
         """ Neuman boundary condition
