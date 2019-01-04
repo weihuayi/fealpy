@@ -10,7 +10,12 @@ from ..recovery import FEMFunctionRecoveryAlg
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
-from scipy.sparse.linalg import spsolve
+try:
+    from mumps import spsolve
+except  ImportError:
+    print('Can not import spsolve from mumps!Using spsolve in scipy!')
+    from scipy.sparse.linalg import spsolve
+
 from timeit import default_timer as timer
 
 
@@ -54,6 +59,7 @@ class PoissonFEMModel(object):
         A = self.get_left_matrix()
         b = self.get_right_vector()
         end = timer()
+
         print("Construct linear system time:", end - start)
 
         AD, b = bc.apply(A, b)
@@ -62,6 +68,10 @@ class PoissonFEMModel(object):
         self.uh[:] = spsolve(AD, b)
         end = timer()
         print("Solve time:", end-start)
+
+        ls = {'A':AD, 'b':b, 'solution':self.uh[:]}
+
+        return ls # return the linear system
 
     
     def get_l2_error(self):

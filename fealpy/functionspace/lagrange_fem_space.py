@@ -7,26 +7,30 @@ class LagrangeFiniteElementSpace():
     def __init__(self, mesh, p=1, spacetype='C'):
         self.mesh = mesh
         self.p = p 
+        self.GD = mesh.node.shape[1]
         if spacetype is 'C':
             if mesh.meshtype is 'interval':
                 self.dof = CPLFEMDof1d(mesh, p)
-                self.dim = 1
+                self.TD = 1
             elif mesh.meshtype is 'tri':
                 self.dof = CPLFEMDof2d(mesh, p) 
-                self.dim = 2
+                self.TD = 2
+            elif mesh.meshtype is 'stri':
+                self.dof = CPLFEMDof2d(mesh, p) 
+                self.TD = 2
             elif mesh.meshtype is 'tet':
                 self.dof = CPLFEMDof3d(mesh, p)
-                self.dim = 3
+                self.TD = 3
         elif spacetype is 'D':
             if mesh.meshtype is 'interval':
                 self.dof = DPLFEMDof1d(mesh, p)
-                self.dim = 1
+                self.TD = 1
             elif mesh.meshtype is 'tri':
                 self.dof = DPLFEMDof2d(mesh, p) 
-                self.dim = 2
+                self.TD = 2
             elif mesh.meshtype is 'tet':
                 self.dof = DPLFEMDof3d(mesh, p)
-                self.dim = 3
+                self.TD = 3
 
         self.spacetype = spacetype
         self.itype = mesh.itype
@@ -51,10 +55,10 @@ class LagrangeFiniteElementSpace():
         return self.dof.boundary_dof()
 
     def geo_dimension(self):
-        return self.dim
+        return self.GD
 
     def top_dimension(self):
-        return self.dim
+        return self.TD
 
     def basis(self, bc):
         """
@@ -85,18 +89,18 @@ class LagrangeFiniteElementSpace():
             else:
                 return np.ones((bc.shape[0], 1), dtype=self.ftype)
 
-        dim = self.dim 
+        TD = self.TD 
         multiIndex = self.dof.multiIndex 
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
         t = np.linspace(0, 1, p, endpoint=False)
-        shape = bc.shape[:-1]+(p+1, dim+1)
-        A = np.ones(shape, dtype=np.float)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
         A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(dim+1)
+        idx = np.arange(TD+1)
         phi = (p**p)*np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
@@ -122,35 +126,35 @@ class LagrangeFiniteElementSpace():
 
         """
         p = self.p   # the degree of polynomial basis function
-        dim = self.dim 
+        TD = self.TD 
 
         multiIndex = self.dof.multiIndex 
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
 
         t = np.linspace(0, 1, p, endpoint=False)
-        shape = bc.shape[:-1]+(p+1, dim+1)
-        A = np.ones(shape, dtype=np.float)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
         A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
 
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = 1
         np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=np.float)
+        F = np.zeros(shape, dtype=self.ftype)
         F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
         F[..., 1:, :] *= P.reshape(-1, 1)
 
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
 
-        Q = A[..., multiIndex, range(dim+1)]
-        M = F[..., multiIndex, range(dim+1)]
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
         ldof = self.number_of_local_dofs()
-        shape = bc.shape[:-1]+(ldof, dim+1)
-        R = np.zeros(shape, dtype=np.float)
-        for i in range(dim+1):
-            idx = list(range(dim+1))
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
@@ -225,44 +229,48 @@ class VectorLagrangeFiniteElementSpace():
         self.mesh = mesh
         self.p = p
         self.dof = self.scalarspace.dof
-        self.dim = self.scalarspace.dim
+        self.TD = self.scalarspace.TD
+        self.GD = self.scalarspace.GD
 
     def __str__(self):
         return "Vector Lagrange finite element space!"
 
     def geo_dimension(self):
-        return self.dim
+        return self.GD
+
+    def top_dimension(self):
+        return self.TD
 
     def vector_dim(self):
-        return self.dim
+        return self.GD
 
     def cell_to_dof(self):
-        dim = self.dim
+        GD = self.GD
         cell2dof = self.dof.cell2dof[..., np.newaxis]
-        cell2dof = dim*cell2dof + np.arange(dim)
+        cell2dof = GD*cell2dof + np.arange(GD)
         NC = cell2dof.shape[0]
         return cell2dof.reshape(NC, -1)
 
     def boundary_dof_flag(self):
-        dim = self.dim
+        GD = self.GD
         isBdDof = self.dof.boundary_dof()
-        return np.repeat(isBdDof, dim)
+        return np.repeat(isBdDof, GD)
 
     def number_of_global_dofs(self):
-        return self.dim*self.dof.number_of_global_dofs()
+        return self.GD*self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self):
-        return self.dim*self.dof.number_of_local_dofs()
+        return self.GD*self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
     def basis(self, bcs):
-        dim = self.dim
+        GD = self.GD
         phi = self.scalarspace.basis(bcs)
         shape = list(phi.shape[:-1])
-        phi = np.einsum('...j, mn->...jmn', phi, np.eye(self.dim))
-        shape += [-1, dim] 
+        phi = np.einsum('...j, mn->...jmn', phi, np.eye(self.GD))
+        shape += [-1, GD] 
         phi = phi.reshape(shape)
         return phi
 
@@ -301,24 +309,26 @@ class VectorLagrangeFiniteElementSpace():
         return np.zeros(gdof, dtype=np.float)
 
     def interpolation(self, u):
-        dim = self.dim
+        GD = self.GD
         c2d = self.dof.cell2dof
         ldof = self.dof.number_of_local_dofs()
-        cell2dof = self.cell_to_dof().reshape(-1, ldof, dim)
+        cell2dof = self.cell_to_dof().reshape(-1, ldof, GD)
         p = self.dof.interpolation_points()[c2d]
         uI = Function(self)
         uI[cell2dof] = u(p)
         return uI
 
 class SymmetricTensorLagrangeFiniteElementSpace():
+    #TODO: improve it 
     def __init__(self, mesh, p, spacetype='C'):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
         self.mesh = mesh
         self.p = p
         self.dof = self.scalarspace.dof
-        self.dim = self.scalarspace.dim
+        self.GD = self.scalarspace.GD
+        self.TD = self.scalarspace.TD
 
-        if self.dim == 2:
+        if self.TD == 2:
             self.T = np.array([[(1, 0), (0, 0)], [(0, 1), (1, 0)], [(0, 0), (0, 1)]])
         elif self.dim == 3:
             self.T = np.array([
