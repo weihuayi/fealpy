@@ -391,3 +391,49 @@ class StructureQuadMeshDataStructure:
         isXDEdge = np.zeros(NE, dtype=np.bool)
         isXDEdge[ny*(nx+1):] = True
         return isXDEdge  
+
+    def left_boundary_node_index(self):
+        nx = self.nx
+        ny = self.ny
+        return np.arange(ny+1)
+
+    def right_boundary_node_index(self):
+        nx = self.nx
+        ny = self.ny
+        NN = self.NN
+        return np.arange(NN-ny-1, NN)
+
+    def bottom_boundary_node__index(self):
+        nx = self.nx
+        ny = self.ny
+        NN = self.NN 
+        return np.arange(0, NN-ny, ny+1)
+
+    def up_boundary_node_index(self):
+        nx = self.nx
+        ny = self.ny
+        NN = self.NN
+        return np.arange(ny, NN, ny+1)
+
+    def peoriod_matrix(self):
+        nx = self.nx
+        ny = self.ny
+        NN = self.NN
+        isPNode = np.zeros(NN, dtype=np.bool)
+        lidx = self.left_boundary_node_index()
+        ridx = self.right_boundary_node_index()
+        bidx = self.bottom_boundary_node__index()
+        uidx = self.up_boundary_node_index()
+
+        isPNode[ridx] = True
+        isPNode[uidx] = True
+        NC = nx*ny
+
+        val = np.ones(NC, dtype=np.bool)
+        I = np.arange(NN)[~isPNode]
+        J = range(NC) 
+        C = coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
+
+        val = 
+        C += c
+

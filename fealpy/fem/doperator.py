@@ -8,11 +8,7 @@ def stiff_matrix(space, qf, measure, cfun=None, barycenter=True):
     gphi = space.grad_basis(bcs)
 
     # Compute the element sitffness matrix
-    start = timer()
     A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure, optimize=True)
-    end = timer()
-    print('einsum time:', end - start)
-    
     cell2dof = space.cell_to_dof()
     ldof = space.number_of_local_dofs()
     I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)

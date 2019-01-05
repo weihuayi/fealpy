@@ -18,7 +18,10 @@ class TriangleMesh(Mesh2d):
         self.node = node
         N = node.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
-        self.meshtype = 'tri'
+        if node.shape[1] == 2:
+            self.meshtype = 'tri'
+        elif node.shape[1] == 3:
+            self.meshtype = 'stri'
 
         self.itype = cell.dtype
         self.ftype = node.dtype

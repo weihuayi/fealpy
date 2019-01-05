@@ -1,6 +1,7 @@
 import sys
 import numpy as np  
 import matplotlib.pyplot as plt
+import scipy.io as sio
 
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 
@@ -32,7 +33,8 @@ integrator = mesh.integrator(p+2)
 
 for i in range(maxit):
     fem = PoissonFEMModel(pde, mesh, p, integrator)
-    fem.solve()
+    ls = fem.solve()
+    sio.savemat('test%d.mat'%(i), ls)
     Ndof[i] = fem.femspace.number_of_global_dofs()
     errorMatrix[0, i] = fem.get_L2_error()
     errorMatrix[1, i] = fem.get_H1_error()
