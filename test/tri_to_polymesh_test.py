@@ -3,14 +3,14 @@ import sys
 import matplotlib.pyplot as plt
 
 from fealpy.mesh.simple_mesh_generator import unitcircledomainmesh
-from fealpy.mesh.TriangleMesh import TriangleMeshWithInfinityPoint
+from fealpy.mesh.TriangleMesh import TriangleMeshWithInfinityNode
 from fealpy.mesh.PolygonMesh import PolygonMesh
 
 
 h = 0.1
 mesh0 = unitcircledomainmesh(h) 
 
-mesh1 = TriangleMeshWithInfinityPoint(mesh0)
+mesh1 = TriangleMeshWithInfinityNode(mesh0)
 
 point, cell, cellLocation = mesh1.to_polygonmesh()
 

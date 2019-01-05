@@ -6,7 +6,7 @@ from fealpy.mesh.level_set_function import Sphere
 from fealpy.mesh.TriangleMesh import TriangleMesh
 from fealpy.mesh.tree_data_structure import Tritree
 
-#m = int(sys.argv[1])
+m = int(sys.argv[1])
 class AdaptiveMarker():
     def __init__(self):
         pass
@@ -39,4 +39,4 @@ pmesh = tmesh.to_conformmesh()
 fig1 = pl.figure()
 axes1 = a3.Axes3D(fig1)
 pmesh.add_plot(axes1)
-pl.show()
+plt.show()

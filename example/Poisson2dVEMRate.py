@@ -47,7 +47,7 @@ for i in range(maxit):
     for j, p in enumerate(ps):
         vem = PoissonVEMModel(pde, mesh, p, integrator)
         vem.solve()
-        Ndof[i] = mesh.number_of_cells() 
+        Ndof[i] = mesh.number_of_cells()
         errorMatrix[j, i] = vem.L2_error()
         errorMatrix[j+3, i] = vem.H1_semi_error()
     if i < maxit - 1:
