@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..mesh.litest_quadmesh import StructureQuadMesh1
-from ..mesh.StructureQuadMesh import StructureQuadMesh
+#from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Mesh2d import Mesh2d
 
@@ -601,7 +601,7 @@ class DarcyForchheimerdata1:
     g = 0
     f = ((1+beta*sqrt(2x^2+2y^2))(x+y)+3x^2,(1+beta*sqrt(2x^2+2y^2))(x-y)+3y^2)
     """
-    def __init__(self, box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN,J):
+    def __init__(self, box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN):
         self.box = box
         self.mu = mu
         self.rho = rho
@@ -611,7 +611,6 @@ class DarcyForchheimerdata1:
         self.tol = tol
         self.maxN = maxN
         self.mg_maxN = mg_maxN
-        self.J = J
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
