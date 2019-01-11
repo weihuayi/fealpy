@@ -48,7 +48,7 @@ class DarcyForchheimerP0P1MGModel:
         rho = pde.rho
 
         bc = np.array([1/3,1/3,1/3], dtype=mesh.ftype)##weight
-        gphi = self.pspaces[-1].grad_value(bc)
+        gphi = self.pspaces[-1].grad_basis(bc)
         cellmeasure = mesh.entity_measure('cell')
 
         NC = mesh.number_of_cells()
