@@ -1,10 +1,7 @@
 import sys
-
 import numpy as np
-
 import matplotlib.pyplot as plt
-
-from fealpy.mesh.TriangleMesh import TriangleMesh, TriangleMeshDataStructure
+from fealpy.mesh import TriangleMesh
 
 node = np.array([
     (0, 0), 
@@ -17,10 +14,8 @@ cell = np.array([
 
 tmesh = TriangleMesh(node, cell)
 tmesh.uniform_refine(2)
-node = tmesh.node
+node = tmesh.entity('node')
 cell = tmesh.entity('cell')
-N = node.shape[0]
-tmeshstrcture = TriangleMeshDataStructure(N, cell)
 fig = plt.figure()
 axes = fig.gca()
 tmesh.add_plot(axes)
