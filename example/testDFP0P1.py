@@ -28,7 +28,7 @@ integrator0 = mesh.integrator(p+1)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 1
+maxit = 3
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 test_errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
@@ -41,8 +41,8 @@ for i in range(maxit):
     test_fem.solve()
     A1 = fem.get_left_matrix()
     A2 = test_fem.get_left_matrix()
-    print('A1',A1)
-    print('A2',A2)
+#    print('A1',A1)
+#    print('A2',A2)
     
     NC = mesh.number_of_cells()
     NN = mesh.number_of_edges()

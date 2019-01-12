@@ -10,7 +10,7 @@ class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
 
-    def __init__(self, node, cell, dtype=np.float):
+    def __init__(self, node, cell):
         super(Quadtree, self).__init__(node, cell)
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype) 
@@ -237,7 +237,7 @@ class Quadtree(QuadrangleMesh):
             pcell = cell.reshape(-1) 
             pcellLocation = np.arange(0, NV*(NC+1), NV)
 
-            return PolygonMesh(node, pcell, pcellLocation, dtype=self.dtype) 
+            return PolygonMesh(node, pcell, pcellLocation) 
         else:
             N = self.number_of_nodes()
             NE = self.number_of_edges()
