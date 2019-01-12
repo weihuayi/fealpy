@@ -98,7 +98,7 @@ class DFP0P1():
         bt2 = cellmeasure*(self.pde.g(mid3) + self.pde.g(mid1))/6
         bt3 = cellmeasure*(self.pde.g(mid1) + self.pde.g(mid2))/6
 
-        b = np.bincount(np.ravel(cell,'F'),weights=np.r_[bt1,bt2,bt3], minlength=NN)
+        b = np.bincount(np.ravel(cell),weights=np.r_[bt1,bt2,bt3], minlength=NN)
         ##
 
         isBDEdge = mesh.ds.boundary_edge_flag()
