@@ -9,6 +9,8 @@ setup(name='fealpy',
       license='GNU',
       packages=['fealpy'],
       install_requires=[
+          'cython',
+          'pybind11',
           'numpy',  
           'scipy', 
           'matplotlib', 
@@ -17,7 +19,6 @@ setup(name='fealpy',
 	  'boost',
           'pytools',
           'meshpy',
-          'pyamg',
-          'pymumps'
+          'pyamg'
       ],
       zip_safe=False)

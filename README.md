@@ -34,7 +34,6 @@ sudo apt install python3 python3-pip ipython3
 sudo apt install python3-numpy
 sudo apt install python3-scipy
 sudo -H pip3 install matplotlib
-sudo -H pip3 install plotly
 ```
 
 ```

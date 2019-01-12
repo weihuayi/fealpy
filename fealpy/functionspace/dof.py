@@ -494,6 +494,9 @@ class DPLFEMDof():
         cell = mesh.ds.cell
         node = mesh.node
 
+        if p == 0:
+            return mesh.entity_barycenter('cell')
+
         if p == 1:
             return node
 

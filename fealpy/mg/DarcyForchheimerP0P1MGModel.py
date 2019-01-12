@@ -28,13 +28,9 @@ class DarcyForchheimerP0P1MGModel:
             self.uspaces.append(uspace)
             pspace = LagrangeFiniteElementSpace(mesh0, p=1, spacetype='C')
             self.pspaces.append(pspace)
-            print(i)
 
-        print(5)
         self.uh = self.uspaces[-1].function()
-        print(6)
         self.ph = self.pspaces[-1].function()
-        print(7)
 
         self.uI = self.uspaces[-1].interpolation(pde.velocity)
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
