@@ -429,11 +429,21 @@ class StructureQuadMeshDataStructure:
         isPNode[uidx] = True
         NC = nx*ny
 
-        val = np.ones(NC, dtype=np.bool)
+        val = np.ones(NC, dtype = np.bool)
         I = np.arange(NN)[~isPNode]
         J = range(NC) 
         C = coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
 
-        val = 
-        C += c
+        val = np.ones(nx, dtype=np.bool) 
+        I = np.arange(NN)[uidx[:-1]]
+        J = np.arange(0, NC-ny+1, ny)
+        C += coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
+
+        val = np.ones(ny+1, dtype=np.bool)
+        I = np.arange(NN)[ridx]
+        J = np.arange(ny+1)
+        J[-1] = 0
+        C += coo_matrix((val,(I, J)), shape=(NN, NC), dtype=np.bool)
+
+        return C
 
