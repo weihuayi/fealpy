@@ -73,7 +73,7 @@ class DarcyForchheimerP0P1MGModel:
         A21 = csr_matrix((A21.flat, (I.flat, J.flat)), shape=(gdof1, gdof0))
         A12 = A21.transpose()
 
-        A = bmat([(A11, A12), (A21, None)], format='csr', dtype==np.float)
+        A = bmat([(A11, A12), (A21, None)], format='csr', dtype=np.float)
 
         cc = mesh.entity_barycenter('cell')## the center of cell
         ft = pde.f(cc)*np.c_[cellmeasure, cellmeasure]
