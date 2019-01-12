@@ -93,11 +93,13 @@ class DFP0P1():
         mid2 = ec[cell2edge[:, 2],:]
         mid3 = ec[cell2edge[:, 0],:]
 
+        ## need modify
         bt1 = cellmeasure*(self.pde.g(mid2) + self.pde.g(mid3))/6
         bt2 = cellmeasure*(self.pde.g(mid3) + self.pde.g(mid1))/6
         bt3 = cellmeasure*(self.pde.g(mid1) + self.pde.g(mid2))/6
 
         b = np.bincount(np.ravel(cell,'F'),weights=np.r_[bt1,bt2,bt3], minlength=NN)
+        ##
 
         isBDEdge = mesh.ds.boundary_edge_flag()
         edge2node = mesh.ds.edge_to_node()
@@ -197,41 +199,7 @@ class DFP0P1():
 
         self.uh[:] = u1
         self.ph[:] = p1
-        return u1, p1
-
-
-    def get_residual_estimate(self):
-        mesh = self.mesh
-        NE = mesh.number_of_edges()
-        edge2cell = mesh.ds.edge_to_cell()
-        uh = self.uh
-        ph = self.ph
-        pde = self.pde
-
-        bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
-
-        u0 = uh.value(bc)
-        gp = ph.grad_value(bc)
-
-        lu = np.sqrt(np.sum(u0**2, axis=1))
-        J = (pde.mu/pde.rho + pde.beta/pde.rho*lu)*u0 + gp
-        n, t = mesh.edge_frame()
-        l = mesh.entity_measure('edge')
-
-        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
-
-        J1 = np.zeros(NE, dtype=mesh.ftype)
-        J2 = np.zeros(NE, dtype=mesh.ftype)
-        J3 = np.zeros(NE, dtype=mesh.ftype)
-
-        J1[isBdEdge] = np.sum(J[edge2cell[isBdEdge, 0]]*n[isBdEdge], axis=-1)
-        j = J[edge2cell[~isBdEdge, 0]] - J[edge2cell[~isBdEdge, 1]] 
-        J1[~isBdEdge] = np.sum(j*n[~isBdEdge], axis=-1)
-        J2[~isBdEdge] = np.sum(j*t[~isBdEdge], axis=-1)
-        J3[~isBdEdge] = np.sum((u0[edge2cell[~isBdEdge, 0]] - u0[edge2cell[~isBdEdge, 1]])*n[~isBdEdge], axis=-1)
-
-        
-        
+        return u1, p1 
 
 
         
