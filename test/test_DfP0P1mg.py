@@ -21,15 +21,15 @@ NC = mesh.number_of_cells()
 NN = mesh.number_of_nodes()
 
 integrator = mesh.integrator(p+2)
+femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
 
-m = 0
-error = np.ones(maxN, dtype=np.float)
-residual = np.ones(maxN, dtype=np.float)
-Ndof = np.zeros(maxN, dtype=np.int)
-u = np.zeros(2*NC + NN)
-while residual[m] > tol and m < maxN:
-    uold = np.zeros(u.shape)
-    uold[:] = u
-    femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
-
+#m = 0
+#error = np.ones(maxN, dtype=np.float)
+#residual = np.ones(maxN, dtype=np.float)
+#Ndof = np.zeros(maxN, dtype=np.int)
+#u = np.zeros(2*NC + NN)
+#while residual[m] > tol and m < maxN:
+#    uold = np.zeros(u.shape)
+#    uold[:] = u
+#
 

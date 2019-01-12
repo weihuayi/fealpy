@@ -1,5 +1,5 @@
 import numpy as np
-
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .function import Function
 from .dof import *
 
@@ -223,6 +223,78 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
 
+    def stiff_matrix(self, qf, measure):
+        p = self.p
+        mesh = self.mesh
+
+        if p == 0:
+            raise ValueError('The space order is 0!') 
+
+        bcs, ws = qf.quadpts, qf.weights
+        gphi = self.grad_basis(bcs)
+
+        # Compute the element sitffness matrix
+        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure, optimize=True)
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs()
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def mass_matrix(self, qf, measure, cfun=None, barycenter=True):
+        p = self.p
+        mesh = self.mesh
+        if p == 0:
+            NC = mesh.number_of_cells()
+            M = spdiags(measure, 0, NC, NC) 
+            return M 
+
+        bcs, ws = qf.quadpts, qf.weights
+        phi = space.basis(bcs)
+        if cfun is None:
+            M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, measure)
+        else:
+            if barycenter is True:
+                val = cfun(bcs)
+            else:
+                pp = space.mesh.bc_to_point(bcs)
+                val = cfun(pp)
+            M = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
+
+        cell2dof = space.cell_to_dof()
+        ldof = space.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+
+        gdof = space.number_of_global_dofs()
+        M = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
+
+    def source_vector(self, f, qf, measure, surface=None):
+        p = self.p
+
+        bcs, ws = qf.quadpts, qf.weights
+        pp = self.mesh.bc_to_point(bcs)
+
+        if surface is not None:
+            pp, _ = surface.project(pp)
+        fval = f(pp)
+
+        if p > 0:
+            phi = self.basis(bcs)
+            bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, measure)
+        else:
+            bb = np.einsum('i, ik, k->k...', ws, fval,  measure)
+
+        cell2dof = self.dof.cell2dof
+        gdof = space.number_of_global_dofs()
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b
+
 class VectorLagrangeFiniteElementSpace():
     def __init__(self, mesh, p, spacetype='C'):
         self.scalarspace = LagrangeFiniteElementSpace(mesh, p, spacetype=spacetype)
@@ -317,6 +389,25 @@ class VectorLagrangeFiniteElementSpace():
         uI = Function(self)
         uI[cell2dof] = u(p)
         return uI
+
+    def mass_matrix(self, qf, measure, cfun=None, barycenter=True):
+        p = self.p
+        mesh = self.mesh
+        GD = self.GD
+
+        M = self.scalarspace.mass_matrix(qf, measure, cfun=cfun, barycenter=barycenter)
+        I, J = np.nonzero(M)
+        gdof = self.number_of_global_dofs()
+        A = coo_matrix(gdof, gdof)
+        for i in range(self.GD):
+            A += coo_matrix((M.data, (GD*I + i, GD*J + i)), shape=(gdof, gdof), dtype=mesh.ftype)
+        return A.tocsr() 
+
+    def source_vector(self, f, qf, measure, surface=None):
+        p = self.p
+        mesh = self.mesh
+        GD = self.GD
+
 
 class SymmetricTensorLagrangeFiniteElementSpace():
     #TODO: improve it 
