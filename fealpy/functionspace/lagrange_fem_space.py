@@ -254,7 +254,7 @@ class LagrangeFiniteElementSpace():
             return M 
 
         bcs, ws = qf.quadpts, qf.weights
-        phi = space.basis(bcs)
+        phi = self.basis(bcs)
         if cfun is None:
             M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, measure)
         else:
@@ -265,12 +265,12 @@ class LagrangeFiniteElementSpace():
                 val = cfun(pp)
             M = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
 
-        cell2dof = space.cell_to_dof()
-        ldof = space.number_of_local_dofs()
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
 
-        gdof = space.number_of_global_dofs()
+        gdof = self.number_of_global_dofs()
         M = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
@@ -406,7 +406,25 @@ class VectorLagrangeFiniteElementSpace():
     def source_vector(self, f, qf, measure, surface=None):
         p = self.p
         mesh = self.mesh
-        GD = self.GD
+        GD = self.GD       
+        
+        bcs, ws = qf.quadpts, qf.weights
+        pp = self.mesh.bc_to_point(bcs)
+        print('pp',pp.shape)
+        
+        if surface is not None:
+            pp, _ = surface.project(pp)
+        fval = f(pp)
+
+        if p > 0:
+            phi = self.basis(bcs)
+            bb = np.einsum('i, ikm, i..., k->k...', ws, fval, phi, measure)
+        else:
+            bb = np.einsum('i, ikm, k->k...', ws, fval,  measure)
+
+        b = np.repeat(bb, GD)
+        return b
+        
 
 
 class SymmetricTensorLagrangeFiniteElementSpace():

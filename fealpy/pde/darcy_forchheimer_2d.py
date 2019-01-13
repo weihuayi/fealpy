@@ -655,8 +655,8 @@ class DarcyForchheimerdata1:
 
         beta = self.beta
         m = np.sqrt(2*x**2+2*y**2)
-        val[:, 0] = (1 + beta*m)*(x+y) + 3*x**2
-        val[:, 1] = (1 + beta*m)*(x-y) + 3*y**2
+        val[..., 0] = (1 + beta*m)*(x+y) + 3*x**2
+        val[..., 1] = (1 + beta*m)*(x-y) + 3*y**2
         return val
 
     def grad_pressure(self, p):
