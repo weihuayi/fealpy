@@ -2,7 +2,6 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from ..fem import doperator 
 
 from .integral_alg import IntegralAlg
 from ..recovery import FEMFunctionRecoveryAlg
@@ -47,10 +46,10 @@ class PoissonFEMModel(object):
     
 
     def get_left_matrix(self):
-        return doperator.stiff_matrix(self.femspace, self.integrator, self.cellmeasure)
+        return self.femspace.stiff_matrix(self.integrator, self.cellmeasure)
 
     def get_right_vector(self):
-        return doperator.source_vector(self.pde.source, self.femspace, self.integrator, self.cellmeasure)
+        return self.femspace.source_vector(self.pde.source, self.integrator, self.cellmeasure)
 
     def solve(self):
         bc = DirichletBC(self.femspace, self.pde.dirichlet)

@@ -10,7 +10,7 @@ rho = 1
 beta = 10
 alpha = 1/beta
 tol = 1e-6
-level = 4
+level = 1
 mg_maxN = 1
 maxN = 2000
 p = 0
@@ -24,4 +24,4 @@ cellmeasure = mesh.entity_measure('cell')
 integrator = mesh.integrator(p+2)
 V = VectorLagrangeFiniteElementSpace(mesh, p, spacetype='D')
 b = V.source_vector(pde.f, integrator, cellmeasure)
-print('b',b.shape)
+print(b)
