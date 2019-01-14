@@ -408,16 +408,19 @@ class VectorLagrangeFiniteElementSpace():
         GD = self.GD       
         
         bcs, ws = qf.quadpts, qf.weights
+        print('bcs', bcs)
+        print('ws', ws)
         pp = self.mesh.bc_to_point(bcs)
         
         if surface is not None:
             pp, _ = surface.project(pp)
         fval = f(pp)
+        print('fval',fval)
 
         if p > 0:
             phi = self.scalarspace.basis(bcs)
             cell2dof = self.dof.cell2dof
-            gdof = space.number_of_global_dofs()
+            gdof = self.number_of_global_dofs()
             b = np.zeros((gdof, GD), dtype=mesh.ftype)
             for i in range(GD):
                 bb = np.einsum('i, ik, i..., k->k...', ws, fval[..., i], phi, measure)
