@@ -50,6 +50,7 @@ class Tritree(TriangleMesh):
                 estimator.update(rho, mesh)
             else:
                 break
+
     def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
@@ -167,7 +168,7 @@ class Tritree(TriangleMesh):
         else:
             return
 
-    def coarsen_marker(self, eta, beta, method):
+    def coarsen_marker(self, eta, beta):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys(): 
@@ -176,7 +177,8 @@ class Tritree(TriangleMesh):
             np.add.at(eta0, idxmap, eta)
         else:
             eta0 = eta
-        isMarked = mark(eta0[leafCellIdx], beta, method)
+        
+        isMarked = mark(eta0[leafCellIdx], beta, method="COARSEN")
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
@@ -191,29 +193,28 @@ class Tritree(TriangleMesh):
             parent = self.parent
             child = self.child
 
-            isRemainCell = np.ones(NC, dtype=np.bool)
-            isRemainCell[child[isMarkedCell, :]] = False
+            isRootCell = self.is_root_cell()
+            isLeafCell = self.is_leaf_cell()
 
-            isNotRootCell = (~self.is_root_cell())
-            NNC0 = isRemainCell.sum()
+            isNotLeafCell = ~isLeafCell 
+
+            isMarkedCell[isRootCell] = False
+
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            isMarkedParentCell[parent[isMarkedCell, 0]] = True
+
+            cell2cell = self.ds.cell_to_cell()
             while True:
-                isRemainCell[parent[isRemainCell & isNotRootCell, 0]] = True
-                isRemainCell[child[parent[isRemainCell & isNotRootCell], :]] = True
-                NNC1 = isRemainCell.sum()
-                if NNC1 == NNC0:
-                    break
+                flag = (~isMarkedParentCell[cell2cell])) & isNotLeafCell[cell2cell]
+                flag = flag.sum(axis=-1) > 1
+                if flag.sum() > 0:
+                    isMarkedParentCell[flag] = False
                 else:
-                    NNC0 = NNC1
-            
-            isRemainNode = np.zeros(NN, dtype=np.bool)
-            isRemainNode[cell[isRemainCell, :]] = True
-            cell = cell[isRemainCell]
-            child = child[isRemainCell]
-            parent = parent[isRemainCell]
+                    break
 
-            childIdx = np.nonzero(child[:, 0] > -1)
-            isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0
-            child[childIdx[isNewLeafCell], :] = -1
+            isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
+            isNeedRemovedCell[child[isMarkedParentCell, :]] = True
+
 
 
     def to_conformmesh(self):
