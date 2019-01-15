@@ -28,8 +28,10 @@ class PoissonVEMModel():
         """
         self.vemspace =VirtualElementSpace2d(mesh, p) 
         self.mesh = self.vemspace.mesh
-        self.pde = pde  
-        self.uh = self.vemspace.function() 
+        self.pde = pde 
+        #print(self.pde.solution)
+        self.uh = self.vemspace.function()
+        print('uh',self.uh.shape) 
         self.area = self.vemspace.smspace.area 
         self.integrator = integrator
 
@@ -50,6 +52,7 @@ class PoissonVEMModel():
         g = lambda x: x[0]@self.uh[x[1]]
         S = self.vemspace.smspace.function()
         S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
+        #print('s',S.shape)
         return S
 
     def recover_estimate(self, rtype='simple', residual=True):

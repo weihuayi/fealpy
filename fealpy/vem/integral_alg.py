@@ -25,14 +25,17 @@ class PolygonMeshIntegralAlg():
         pmesh = self.pmesh
         node = pmesh.node
         bc = self.barycenter
+        #print('bc', bc.shape)
 
         edge = pmesh.ds.edge
         edge2cell = pmesh.ds.edge2cell
 
         NC = pmesh.number_of_cells()
+        #print('NC', NC)
 
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
+        #print('bcs',bcs)
 
 
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
@@ -73,7 +76,10 @@ class PolygonMeshIntegralAlg():
 
     def L2_error(self, u, uh, celltype=False):
         def f(x, cellidx):
+            #print(u(x).shape, uh(x, cellidx))
             return (u(x) - uh(x, cellidx))**2
+        #print('uh',uh)
+        #print('u',u)
         e = self.integral(f, celltype=celltype)
         if isinstance(e, np.ndarray):
             e = e.sum()

@@ -29,6 +29,7 @@ class PoissonVEMModel():
         self.vemspace =VirtualElementSpace2d(mesh, p) 
         self.mesh = self.vemspace.mesh
         self.pde = pde  
+        print('pde',self.pde)
         self.uh = self.vemspace.function() 
         self.area = self.vemspace.smspace.area
         self.integrator = integrator
