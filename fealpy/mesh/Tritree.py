@@ -12,7 +12,7 @@ class Tritree(TriangleMesh):
         self.child = -np.ones((NC, 4), dtype=self.itype)
         self.irule = irule              # irregular rule  
         self.meshtype = 'tritree'
-
+    
     def leaf_cell_index(self):
         child = self.child
         idx, = np.nonzero(child[:, 0] == -1)
@@ -168,7 +168,7 @@ class Tritree(TriangleMesh):
         else:
             return
 
-    def coarsen_marker(self, eta, beta):
+    def coarsen_marker(self, eta, beta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys(): 
@@ -205,7 +205,7 @@ class Tritree(TriangleMesh):
 
             cell2cell = self.ds.cell_to_cell()
             while True:
-                flag = (~isMarkedParentCell[cell2cell])) & isNotLeafCell[cell2cell]
+                flag = (~isMarkedParentCell[cell2cell]) & isNotLeafCell[cell2cell]
                 flag = flag.sum(axis=-1) > 1
                 if flag.sum() > 0:
                     isMarkedParentCell[flag] = False
