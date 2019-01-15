@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.sparse.linalg import cg, inv, spsolve
 from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
 from fealpy.functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 
@@ -17,6 +16,8 @@ p = 0
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
 mesh = pde.init_mesh(level)
+node = mesh.node
+cell = mesh.ds.cell
 NC = mesh.number_of_cells()
 NN = mesh.number_of_nodes()
 cellmeasure = mesh.entity_measure('cell')
@@ -24,4 +25,10 @@ cellmeasure = mesh.entity_measure('cell')
 integrator = mesh.integrator(p+2)
 V = VectorLagrangeFiniteElementSpace(mesh, p, spacetype='D')
 b = V.source_vector(pde.f, integrator, cellmeasure)
-print(b)
+print(cell)
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
+plt.show()
