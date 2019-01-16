@@ -204,10 +204,12 @@ class Mesh2d():
                 fontsize=fontsize, fontcolor=fontcolor)
 
     def print(self):
-        print("Point:\n", self.node)
-        print("Cell:\n", self.ds.cell)
-        print("Edge and Edge2cell:\n", np.concatenate((self.ds.edge, self.ds.edge2cell), axis=1))
-        print("Cell2edge:\n", self.ds.cell_to_edge())
+        print("node:\n", self.node)
+        print("cell:\n", self.ds.cell)
+        print("edge:\n", self.ds.edge)
+        print("edge2cell:\n", self.ds.edge2cell)
+        print("cell2edge:\n", self.ds.cell_to_edge())
+        print("cell2cell:\n", self.ds.cell_to_cell())
 
 class Mesh2dDataStructure():
     """ The topology data structure of mesh 2d
