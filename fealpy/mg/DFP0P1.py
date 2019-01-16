@@ -51,7 +51,9 @@ class DFP0P1():
 	    
         bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
         phi = space0.basis(bc)
+        print('phi',phi)
         gphi = space1.grad_basis(bc)
+        print('gphi',gphi)
 	    
         scaledArea = mu/rho*cellmeasure
 

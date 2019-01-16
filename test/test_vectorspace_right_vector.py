@@ -22,16 +22,27 @@ cell = np.array([
     (1, 2, 0),
     (3, 0, 2)], dtype=np.int)
 
-p = 0
+p = 1
 print('p',p)
 mesh = TriangleMesh(node, cell)
 mesh.uniform_refine()
+node = mesh.node
+cell = mesh.ds.cell
+NC = mesh.number_of_cells()
 bc = mesh.entity_barycenter('cell')
 print('bc',bc)
 if p == 0:
     integrator = mesh.integrator(1)
 else:
     integrator = mesh.integrator(p+2)
+    bcs = integrator.quadpts
+    ws = integrator.weights
+    pxy = np.zeros((6,NC,2), dtype=np.float)
+    print('node',node[cell[:, 1]])
+    for i in range(6):
+        pxy[i,:,:] = bcs[i,0]*node[cell[:,0]] + bcs[i,1]*node[cell[:,1]]\
+                + bcs[i,2]*node[cell[:,2]]
+        print('pxy', pxy[i,:,:])
 print('integrator', integrator)
 cellmeasure = mesh.entity_measure('cell')
 

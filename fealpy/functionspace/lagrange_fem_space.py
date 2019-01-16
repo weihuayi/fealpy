@@ -409,13 +409,19 @@ class VectorLagrangeFiniteElementSpace():
         
         bcs, ws = qf.quadpts, qf.weights
         print('bcs', bcs)
-        print('ws', ws)
+        print('ws', ws.shape)
         pp = self.mesh.bc_to_point(bcs)
+        print('pp',pp)
         
         if surface is not None:
             pp, _ = surface.project(pp)
         fval = f(pp)
         print('fval',fval)
+        phi = self.scalarspace.basis(bcs)
+        print('phi',phi)
+        for i in range(ws.shape[0]):
+            ff = ws[i]*phi[i,:]*fval[i,:,:]
+            print('ff',ff)
 
         if p > 0:
             phi = self.scalarspace.basis(bcs)

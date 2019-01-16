@@ -27,7 +27,7 @@ integrator0 = mesh.integrator(p+1)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 4
+maxit = 1
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 test_errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
@@ -36,7 +36,6 @@ Ndof = np.zeros(maxit,dtype = np.int)
 for i in range(maxit):
     fem = DarcyForchheimerP0P1(pde, mesh, integrator0, integrator1)
     test_fem = DFP0P1(pde, mesh, integrator0, integrator1)
-    print(fem.get_right_vector())
     fem.solve()
     test_fem.solve()
     A1 = fem.get_left_matrix()
