@@ -254,7 +254,7 @@ class LagrangeFiniteElementSpace():
             return M 
 
         bcs, ws = qf.quadpts, qf.weights
-        phi = space.basis(bcs)
+        phi = self.basis(bcs)
         if cfun is None:
             M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, measure)
         else:
@@ -265,12 +265,12 @@ class LagrangeFiniteElementSpace():
                 val = cfun(pp)
             M = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
 
-        cell2dof = space.cell_to_dof()
-        ldof = space.number_of_local_dofs()
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
 
-        gdof = space.number_of_global_dofs()
+        gdof = self.number_of_global_dofs()
         M = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
@@ -287,12 +287,11 @@ class LagrangeFiniteElementSpace():
         if p > 0:
             phi = self.basis(bcs)
             bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, measure)
+            cell2dof = self.dof.cell2dof
+            gdof = self.number_of_global_dofs()
+            b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
         else:
-            bb = np.einsum('i, ik, k->k...', ws, fval,  measure)
-
-        cell2dof = self.dof.cell2dof
-        gdof = space.number_of_global_dofs()
-        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+            b = np.einsum('i, ik, k->k', ws, fval,  measure)
         return b
 
 class VectorLagrangeFiniteElementSpace():
@@ -406,7 +405,36 @@ class VectorLagrangeFiniteElementSpace():
     def source_vector(self, f, qf, measure, surface=None):
         p = self.p
         mesh = self.mesh
-        GD = self.GD
+        GD = self.GD       
+        
+        bcs, ws = qf.quadpts, qf.weights
+        print('bcs', bcs)
+        print('ws', ws.shape)
+        pp = self.mesh.bc_to_point(bcs)
+        print('pp',pp)
+        
+        if surface is not None:
+            pp, _ = surface.project(pp)
+        fval = f(pp)
+        print('fval',fval)
+        phi = self.scalarspace.basis(bcs)
+        print('phi',phi)
+        for i in range(ws.shape[0]):
+            ff = ws[i]*phi[i,:]*fval[i,:,:]
+            print('ff',ff)
+
+        if p > 0:
+            phi = self.scalarspace.basis(bcs)
+            cell2dof = self.dof.cell2dof
+            gdof = self.number_of_global_dofs()
+            b = np.zeros((gdof, GD), dtype=mesh.ftype)
+            for i in range(GD):
+                bb = np.einsum('i, ik, i..., k->k...', ws, fval[..., i], phi, measure)
+                b[:, i]  = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        else:
+            b = np.einsum('i, ikm, k->km', ws, fval,  measure)
+
+        return b.reshape(-1)
 
 
 class SymmetricTensorLagrangeFiniteElementSpace():

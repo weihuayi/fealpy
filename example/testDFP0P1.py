@@ -22,13 +22,12 @@ n = 1
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
 mesh = pde.init_mesh(n)
 node = mesh.node
-print('node',node)
 integrator1 = mesh.integrator(p+2)
 integrator0 = mesh.integrator(p+1)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 3
+maxit = 1
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 test_errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)

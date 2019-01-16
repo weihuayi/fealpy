@@ -3,6 +3,45 @@ import numpy as np
 from ..mesh.TriangleMesh import TriangleMesh  
 from ..mesh.tree_data_structure import Quadtree 
 
+
+class Exp:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=4, meshtype='tri'):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        cell = np.array([
+            (1, 2, 0), 
+            (3, 0, 2)], dtype=np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.exp(x**2 + y**2)
+        return val
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 2*x*np.exp(x**2 + y**2)
+        val[..., 1] = 2*y*np.exp(x**2 + y**2)
+        return val
+
+    def dirichlet(self, p):
+        return self.solution(p)
+
+ 
 class ffData:
     def __init__(self):
         pass
