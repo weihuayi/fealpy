@@ -389,6 +389,19 @@ class VectorLagrangeFiniteElementSpace():
         uI[cell2dof] = u(p)
         return uI
 
+    def stiff_matrix(self, qf, measure):
+        p = self.p
+        mesh = self.mesh
+        GD = self.GD
+        S = self.scalarspace.stiff_matrix(qf, measure)
+
+        I, J = np.nonzero(S)
+        gdof = self.number_of_global_dofs()
+        A = coo_matrix(gdof, gdof)
+        for i in range(self.GD):
+            A += coo_matrix((S.data, (GD*I + i, GD*J + i)), shape=(gdof, gdof), dtype=mesh.ftype)
+        return A.tocsr() 
+
     def mass_matrix(self, qf, measure, cfun=None, barycenter=True):
         p = self.p
         mesh = self.mesh
@@ -408,25 +421,16 @@ class VectorLagrangeFiniteElementSpace():
         GD = self.GD       
         
         bcs, ws = qf.quadpts, qf.weights
-        print('bcs', bcs)
-        print('ws', ws.shape)
         pp = self.mesh.bc_to_point(bcs)
-        print('pp',pp)
         
         if surface is not None:
             pp, _ = surface.project(pp)
-        fval = f(pp)
-        phi = self.scalarspace.basis(bcs)
-        for i in range(2):
-            print('phi',phi.shape)
-            print('fval', fval.shape)
-            ff = np.einsum('i, ik, i..., k->k...', ws, fval[..., i], phi, measure)
-            print('ff',ff)
 
+        fval = f(pp)
         if p > 0:
             phi = self.scalarspace.basis(bcs)
             cell2dof = self.dof.cell2dof
-            gdof = self.number_of_global_dofs()
+            gdof = self.dof.number_of_global_dofs()
             b = np.zeros((gdof, GD), dtype=mesh.ftype)
             for i in range(GD):
                 bb = np.einsum('i, ik, i..., k->k...', ws, fval[..., i], phi, measure)
