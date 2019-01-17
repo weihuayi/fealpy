@@ -215,6 +215,34 @@ class Tritree(TriangleMesh):
             isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
             isNeedRemovedCell[child[isMarkedParentCell, :]] = True
 
+            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode[cell[~isNeedRemovedCell, :]] = True
+
+            cell = cell[~isNeedRemovedCell]
+            child = child[~isNeedRemovedCell]
+            parent = parent[~isNeedRemovedCell]
+
+            childIdx, = np.nonzero(child[:, 0] > -1)
+            isNewLeafCell = np.sum(~isNeedRemovedCell[child[childIdx, :]], axis=1) == 0 
+            child[childIdx[isNewLeafCell], :] = -1
+
+            cellIdxMap = np.zeros(NC, dtype=np.int)
+            NNC = ~isNeedRemovedCell.sum()
+            cellIdxMap[~isNeedRemoveCell] = np.arange(NNC)
+            child[child > -1] = cellIdxMap[child[child > -1]]
+            parent[parent > -1] = cellIdxMap[parent[parent > -1]]
+            self.child = child
+            self.parent = parent
+
+            nodeIdxMap = np.zeros(N, dtype=np.int)
+            NN = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(NN)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
+            self.ds.reinit(NN, cell)
+            return 
+
+
 
 
     def to_conformmesh(self):

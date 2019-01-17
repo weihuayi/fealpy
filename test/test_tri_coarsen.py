@@ -1,7 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.pde.poisson_2d import Exp 
 from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from fealpy.mesh import Tritree
 from fealpy.mesh import TriangleMesh
@@ -23,7 +22,7 @@ class Estimator:
         Dlambda = mesh.grad_lambda()
         grad = np.einsum('ij, ijm->im', self.rho[cell], Dlambda)
         self.eta = np.sqrt(np.sum(grad**2, axis=1)*self.area)
-
+        return self.eta
     def update(self, rho, mesh, smooth=True):
         self.rho = rho
         self.mesh = mesh
@@ -79,7 +78,7 @@ mesh.uniform_refine(4)
 femspace = LagrangeFiniteElementSpace(mesh, p=1) 
 uI = femspace.interpolation(f1)
 
-estimator = Estimator(uI[:], mesh, 0.3, 0.5)
+estimator = Estimator(uI[:], mesh, 0.3, 0.3)
 
 fig = plt.figure()
 axes = fig.gca() 
@@ -99,7 +98,9 @@ femspace = LagrangeFiniteElementSpace(mesh, p=1)
 uI = femspace.interpolation(f2)
 estimator = Estimator(uI[:], mesh, 0.3, 0.5)
 
-tmesh.coarsen()
+eta = estimator.compute_eta()
+isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
+tmesh.coarsen(isMarkedCell)
 
 plt.show()
 
