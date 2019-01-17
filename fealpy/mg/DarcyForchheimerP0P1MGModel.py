@@ -36,6 +36,10 @@ class DarcyForchheimerP0P1MGModel:
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
 
         self.nlevel = n + 1
+        
+    def stiff_matrix(self):
+        A = pspaces[-1].stiff_matrix()
+    
 
     def compute_initial_value(self):
         mesh = self.pspaces[-1].mesh
