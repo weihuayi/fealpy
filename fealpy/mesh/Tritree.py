@@ -35,9 +35,9 @@ class Tritree(TriangleMesh):
         else:
             return self.parent[idx, 0] == -1
 
-    def adaptive(self, estimator, surface=None):
+    def adaptive_refine(self, estimator, surface=None):
         while estimator.is_uniform() is False:
-            isMarkedCell = self.marker(estimator.eta, estimator.theta, 'MAX')
+            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'MAX')
             edge = self.entity('edge')
             refineFlag = self.refine(isMarkedCell, surface=surface)
             NN1 = self.number_of_nodes()
