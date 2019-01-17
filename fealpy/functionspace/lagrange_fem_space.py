@@ -416,11 +416,11 @@ class VectorLagrangeFiniteElementSpace():
         if surface is not None:
             pp, _ = surface.project(pp)
         fval = f(pp)
-        print('fval',fval)
         phi = self.scalarspace.basis(bcs)
-        print('phi',phi)
-        for i in range(ws.shape[0]):
-            ff = ws[i]*phi[i,:]*fval[i,:,:]
+        for i in range(2):
+            print('phi',phi.shape)
+            print('fval', fval.shape)
+            ff = np.einsum('i, ik, i..., k->k...', ws, fval[..., i], phi, measure)
             print('ff',ff)
 
         if p > 0:
