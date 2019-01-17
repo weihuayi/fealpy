@@ -12,6 +12,7 @@ from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh  
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
+from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .MeshZoo import MeshZoo
 
 from .Tritree import Tritree
@@ -24,6 +25,7 @@ from .level_set_function import DistDomain2d
 from .level_set_function import DistDomain3d
 from .level_set_function import dcircle
 from .level_set_function import drectangle
+from .level_set_function import Sphere
 
 from .sizing_function import huniform
 
