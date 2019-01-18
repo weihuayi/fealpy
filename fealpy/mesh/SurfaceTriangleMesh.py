@@ -84,7 +84,7 @@ class SurfaceTriangleMesh():
 
     def area(self):
         mesh = self.mesh
-        integrator = self.integrator(self.p+2)
+        integrator = self.integrator(self.p+4)
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)
