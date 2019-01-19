@@ -94,14 +94,14 @@ class LagrangeFiniteElementSpace():
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
-        t = np.linspace(0, 1, p, endpoint=False)
+        t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
         A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
         np.cumprod(A, axis=-2, out=A)
         A[..., 1:, :] *= P.reshape(-1, 1)
         idx = np.arange(TD+1)
-        phi = (p**p)*np.prod(A[..., multiIndex, idx], axis=-1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
     def grad_basis(self, bc, cellidx=None):
@@ -133,13 +133,13 @@ class LagrangeFiniteElementSpace():
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
 
-        t = np.linspace(0, 1, p, endpoint=False)
+        t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
         A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
 
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = 1
+        FF[..., range(p), range(p)] = p
         np.cumprod(FF, axis=-2, out=FF)
         F = np.zeros(shape, dtype=self.ftype)
         F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
@@ -158,12 +158,11 @@ class LagrangeFiniteElementSpace():
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        pp = p**p
         Dlambda = self.mesh.grad_lambda()
         if cellidx is None:
-            gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda)
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         else:
-            gphi = np.einsum('...ij, kjm->...kim', pp*R, Dlambda[cellidx, :, :])
+            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[cellidx, :, :])
         return gphi 
 
     def value(self, uh, bc, cellidx=None):

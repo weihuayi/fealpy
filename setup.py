@@ -1,5 +1,4 @@
 from setuptools import setup
-
 setup(name='fealpy',
       version='0.1',
       description='FEALPy: Finite Element Analysis Library in Python',
@@ -9,14 +8,14 @@ setup(name='fealpy',
       license='GNU',
       packages=['fealpy'],
       install_requires=[
-          'cython',
-          'pybind11',
           'numpy',  
           'scipy', 
           'matplotlib', 
-	  'msgpack',
+          'cython',
+          'pybind11',
+          'msgpack',
           'PyHamcrest',
-	  'boost',
+          'boost',
           'pytools',
           'meshpy',
           'pyamg'

@@ -102,6 +102,10 @@ eta = estimator.compute_eta()
 isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
 tmesh.coarsen(isMarkedCell)
 
+fig = plt.figure()
+axes = fig.gca()
+tmesh.add_plot(axes)
+
 plt.show()
 
 

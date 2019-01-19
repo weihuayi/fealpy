@@ -207,7 +207,7 @@ class Tritree(TriangleMesh):
             while True:
                 flag = (~isMarkedParentCell[cell2cell]) & isNotLeafCell[cell2cell]
                 flag = flag.sum(axis=-1) > 1
-                if flag.sum() > 0:
+                if isMarkedParentCell[flag].sum() > 0:
                     isMarkedParentCell[flag] = False
                 else:
                     break
@@ -227,14 +227,14 @@ class Tritree(TriangleMesh):
             child[childIdx[isNewLeafCell], :] = -1
 
             cellIdxMap = np.zeros(NC, dtype=np.int)
-            NNC = ~isNeedRemovedCell.sum()
-            cellIdxMap[~isNeedRemoveCell] = np.arange(NNC)
+            NNC = (~isNeedRemovedCell).sum()
+            cellIdxMap[~isNeedRemovedCell] = np.arange(NNC)
             child[child > -1] = cellIdxMap[child[child > -1]]
             parent[parent > -1] = cellIdxMap[parent[parent > -1]]
             self.child = child
             self.parent = parent
 
-            nodeIdxMap = np.zeros(N, dtype=np.int)
+            nodeIdxMap = np.zeros(NN, dtype=np.int)
             NN = isRemainNode.sum()
             nodeIdxMap[isRemainNode] = np.arange(NN)
             cell = nodeIdxMap[cell]
