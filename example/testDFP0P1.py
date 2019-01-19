@@ -7,7 +7,7 @@ from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
 
 np.set_printoptions(threshold=np.inf)
 
-box = [-1,1,-1,1]
+box = [0,1,0,1]
 mu = 1
 rho = 1
 beta = 10
@@ -38,10 +38,6 @@ for i in range(maxit):
     test_fem = DFP0P1(pde, mesh, integrator0, integrator1)
     fem.solve()
     test_fem.solve()
-    A1 = fem.get_left_matrix()
-    A2 = test_fem.get_left_matrix()
-#    print('A1',A1)
-#    print('A2',A2)
     
     NC = mesh.number_of_cells()
     NN = mesh.number_of_edges()

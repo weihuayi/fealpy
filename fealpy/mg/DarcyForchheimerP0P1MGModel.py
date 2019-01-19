@@ -37,7 +37,7 @@ class DarcyForchheimerP0P1MGModel:
 
         self.nlevel = n + 1
         
-    def stiff_matrix(self):
+    def get_stiff_matrix(self):
 #        pde = self.pde
 #        mesh = self.pspaces[0].mesh
 #        cellmeasure = mesh.entity_measure('cell')
@@ -46,13 +46,13 @@ class DarcyForchheimerP0P1MGModel:
 #        B = self.pspaces[0].stiff_matrix(integrator0 ,cellmeasure)
 #        print(A.toarray())
         
-        mesh = self.pspaces[0].mesh
+        mesh = self.pspaces[-1].mesh
         pde = self.pde
         mu = pde.mu
         rho = pde.rho
 
         bc = np.array([1/3,1/3,1/3], dtype=mesh.ftype)##weight
-        gphi = self.pspaces[0].grad_basis(bc)
+        gphi = self.pspaces[-1].grad_basis(bc)
         cellmeasure = mesh.entity_measure('cell')
 
         NC = mesh.number_of_cells()
@@ -60,34 +60,35 @@ class DarcyForchheimerP0P1MGModel:
         scaledArea = mu/rho*cellmeasure
 
         A11 = spdiags(np.repeat(scaledArea, 2), 0, 2*NC, 2*NC)
-        print('A11',A11.toarray())
 
-        phi = self.uspaces[0].basis(bc)
+        phi = self.uspaces[-1].basis(bc)
         A21 = np.einsum('ijm, km, i->ijk', gphi, phi, cellmeasure)
 
-        cell2dof0 = self.uspaces[0].cell_to_dof()
-        ldof0 = self.uspaces[0].number_of_local_dofs()
-        cell2dof1 = self.pspaces[0].cell_to_dof()
-        ldof1 = self.pspaces[0].number_of_local_dofs()
+        cell2dof0 = self.uspaces[-1].cell_to_dof()
+        ldof0 = self.uspaces[-1].number_of_local_dofs()
+        cell2dof1 = self.pspaces[-1].cell_to_dof()
+        ldof1 = self.pspaces[-1].number_of_local_dofs()
 		
-        gdof0 = self.uspaces[0].number_of_global_dofs()
-        gdof1 = self.pspaces[0].number_of_global_dofs()
+        gdof0 = self.uspaces[-1].number_of_global_dofs()
+        gdof1 = self.pspaces[-1].number_of_global_dofs()
         I = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
         J = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
 
         A21 = csr_matrix((A21.flat, (I.flat, J.flat)), shape=(gdof1, gdof0))
-        print('A21',A21)
         A12 = A21.transpose()
 
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=np.float)
         
         return A
         
-    def right_vector(self):
-        
-    
-
-    def compute_initial_value(self):
+    def get_right_vector(self):
+        mesh = self.pspaces[-1].mesh
+        pde = self.pde
+        mu = pde.mu
+        rho = pde.rho
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
+        cellmeasure = mesh.entity_measure('cell')
         
         cc = mesh.entity_barycenter('cell')## the center of cell
         ft = pde.f(cc)*np.c_[cellmeasure, cellmeasure]
@@ -103,30 +104,44 @@ class DarcyForchheimerP0P1MGModel:
         bt2 = cellmeasure*(pde.g(mid3) + pde.g(mid1))/6
         bt3 = cellmeasure*(pde.g(mid1) + pde.g(mid2))/6
         
-        cell = mesh.ds.cell()
+        cell = mesh.entity('cell')
+        edge = mesh.entity('edge')
+        node = mesh.entity('node')
 
-        b = np.bincount(np.ravel(cell, 'F'), weight=np.r_[bt1,bt2,bt3], minlenth = NN)
-		
+        b = np.bincount(np.ravel(cell, 'F'), weights=np.r_[bt1,bt2,bt3], minlength = NN)
+        	
 		## Neumann boundary condition
         isBDEdge = mesh.ds.boundary_edge_flag()
         edge2node = mesh.ds.edge_to_node()
         bdEdge = edge[isBDEdge, :]
         d = np.sqrt(np.sum((node[edge2node[isBDEdge, 0], :]\
-            - node[edge2node[isBDEdge, 1], :]**2, 1)))
+            - node[edge2node[isBDEdge, 1], :])**2, 1))
         mid = ec[isBDEdge, :]
 
         ii = np.c_[d*pde.Neumann_boundary(mid)/2, d*pde.Neumann_boundary(mid)/2]
         g = np.bincount(np.ravel(bdEdge), weights = ii.flatten(), minlength=NN)
 		
-        g = g - b[2*NC:]
+        g = g - b       
 
-        ## Solver
-        b1 = np.r_[b[:2*NC], g]
+        b1 = np.r_[f, g]
+        return b1
+    
+
+    def compute_initial_value(self):
+        mesh = self.pspaces[-1].mesh
+        pde = self.pde
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        cell = mesh.entity('cell')
+        cellmeasure = mesh.entity_measure('cell')
+        
+        A = self.get_stiff_matrix()
+        b = self.get_right_vector()
         up = np.zeros(2*NC+NN, dtype=np.float)
         idx = np.arange(2*NC+NN-1)
-        up[idx] = spsolve(A[idx, :][:, idx], b1[idx])
+        up[idx] = spsolve(A[idx, :][:, idx], b[idx])
         u = up[:2*NC]
         p = up[2*NC:]
-        c = np.sum(np.mean(p,1)*cellmeasure)/np.sum(cellmeasure)
+        c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
         return u,p
 
