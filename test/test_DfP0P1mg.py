@@ -19,22 +19,7 @@ p = 1
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
 mesh = pde.init_mesh(1)
-NC = mesh.number_of_cells()
-node = mesh.entity('node')
-print('node',node)
-print('NC',NC)
-NN = mesh.number_of_nodes()
-
 integrator = mesh.integrator(p+2)
 femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
 u = femmg.compute_initial_value()
-#m = 0
-#error = np.ones(maxN, dtype=np.float)
-#residual = np.ones(maxN, dtype=np.float)
-#Ndof = np.zeros(maxN, dtype=np.int)
-#u = np.zeros(2*NC + NN)
-#while residual[m] > tol and m < maxN:
-#    uold = np.zeros(u.shape)
-#    uold[:] = u
-#
 

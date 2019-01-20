@@ -106,7 +106,7 @@ class LShapeRSinData():
         u[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
         return u
 
-    def Neumann_boundary(self, p):
+    def neumann(self, p):
         sin = np.sin
         cos = np.cos
         pi = np.pi
@@ -133,19 +133,6 @@ class LShapeRSinData():
         z[idx] = 2*(x[idx]*cos(2*np.arctan2(-1, x[idx])/3) + sin(2*np.arctan2(-1, x[idx])/3))/(3*(x[idx]**2 + 1)**(2/3))
 
         return z
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 class PolyData:
     """
@@ -667,7 +654,7 @@ class DarcyForchheimerdata1:
         val[..., 1] = 3*y**2
         return val
 
-    def Neumann_boundary(self,p):
+    def neumann(self,p):
         z = np.zeros(p.shape[0],)
         x = p[..., 0]
         y = p[..., 1]
