@@ -20,10 +20,10 @@ p = 1
 n = 1
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
-mesh = pde.init_mesh(n)
+mesh = pde.init_mesh(1)
 node = mesh.node
 integrator1 = mesh.integrator(p+2)
-integrator0 = mesh.integrator(p+1)
+integrator0 = mesh.integrator(p)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 

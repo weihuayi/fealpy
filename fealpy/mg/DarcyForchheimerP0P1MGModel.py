@@ -15,6 +15,8 @@ class DarcyForchheimerP0P1MGModel:
         self.IMatrix = []
 
         mesh0 = TriangleMesh(mesh.node, mesh.ds.cell)
+        self.integrator1 = mesh.integrator(3)
+        self.integrator0 = mesh.integrator(1)
         uspace = VectorLagrangeFiniteElementSpace(mesh0, p=0, spacetype='D')
         self.uspaces.append(uspace)
         pspace = LagrangeFiniteElementSpace(mesh0, p=1, spacetype='C')
@@ -90,27 +92,11 @@ class DarcyForchheimerP0P1MGModel:
         NC = mesh.number_of_cells()
         cellmeasure = mesh.entity_measure('cell')
         
-        cc = mesh.entity_barycenter('cell')## the center of cell
-        ft = pde.f(cc)*np.c_[cellmeasure, cellmeasure]
-        f = ft.flatten()
-		
-        cell2edge = mesh.ds.cell_to_edge()
-        ec = mesh.entity_barycenter('edge')
-        mid1 = ec[cell2edge[:,1], :]
-        mid2 = ec[cell2edge[:,2], :]
-        mid3 = ec[cell2edge[:,0], :]
-        
-        bt1 = cellmeasure*(pde.g(mid2) + pde.g(mid3))/6
-        bt2 = cellmeasure*(pde.g(mid3) + pde.g(mid1))/6
-        bt3 = cellmeasure*(pde.g(mid1) + pde.g(mid2))/6
-        
-        cell = mesh.entity('cell')
-        edge = mesh.entity('edge')
-        node = mesh.entity('node')
+        f = self.uspaces[-1].source_vector(self.pde.f, self.integrator0, cellmeasure)
 
-        b = np.bincount(np.ravel(cell, 'F'), weights=np.r_[bt1,bt2,bt3], minlength = NN)
+        b = self.pspaces[-1].source_vector(self.pde.g, self.integrator1, cellmeasure)
         	
-		## Neumann boundary condition
+	## Neumann boundary condition
         isBDEdge = mesh.ds.boundary_edge_flag()
         edge2node = mesh.ds.edge_to_node()
         bdEdge = edge[isBDEdge, :]
@@ -118,10 +104,11 @@ class DarcyForchheimerP0P1MGModel:
             - node[edge2node[isBDEdge, 1], :])**2, 1))
         mid = ec[isBDEdge, :]
 
-        ii = np.c_[d*pde.Neumann_boundary(mid)/2, d*pde.Neumann_boundary(mid)/2]
-        g = np.bincount(np.ravel(bdEdge), weights = ii.flatten(), minlength=NN)
+        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(1,2))
+        g = np.bincount(np.ravel(bdEdge,'F'), weights = np.ravel(ii), minlength=NN)
 		
-        g = g - b       
+        g = g - b  
+        print('g',g)     
 
         b1 = np.r_[f, g]
         return b1
