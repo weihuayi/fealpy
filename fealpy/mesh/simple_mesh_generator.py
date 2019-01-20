@@ -135,7 +135,7 @@ def triangle(box, h, meshtype='tri'):
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
 
-def distmesh2d(fd, h0, bbox, pfix, meshtype='tri', dtype=np.float):
+def distmesh2d(fd, h0, bbox, pfix, meshtype='tri'):
     fh = huniform
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)

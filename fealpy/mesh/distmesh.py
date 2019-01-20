@@ -51,7 +51,7 @@ class DistMesh2d():
         y = mg[0, :, :]
         x[1::2, :] = x[1::2, :] + h/2 
         p = np.concatenate((x.reshape((-1,1)), y.reshape((-1,1))), axis=1)
-        p = p[fd(p, *args) < self.geps, :]
+        p = p[fd(p, *args) < -self.geps, :]
         r0 = 1/fh(p, *args)**2
         p = p[np.random.random((p.shape[0],)) < r0/np.max(r0),:]
         if pfix is not None:
@@ -121,7 +121,7 @@ class DistMesh2d():
         d = Delaunay(p)
         t = d.simplices
         pc = (p[t[:, 0], :]+p[t[:, 1], :]+p[t[:, 2], :])/3
-        return  t[fd(pc, *args) < - self.geps, :]
+        return  t[fd(pc, *args) < -self.geps, :]
 
 class DistMesh3d:
     def __init__(self,
