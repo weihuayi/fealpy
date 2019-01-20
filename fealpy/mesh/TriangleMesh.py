@@ -33,6 +33,13 @@ class TriangleMesh(Mesh2d):
     def integrator(self, k):
         return TriangleQuadrature(k)
 
+    def delete_cell(self, dflag):
+        cell = self.entity('cell')
+        cell = cell[~dflag]
+        NN = self.number_of_nodes()
+        self.ds.reinit(NN, cell)
+        
+
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
@@ -116,8 +123,8 @@ class TriangleMesh(Mesh2d):
                 cell[edge2cell[isNonDelaunayEdge, 1], 1] = p0
                 cell[edge2cell[isNonDelaunayEdge, 1], 2] = p2
 
-                N = self.number_of_nodes()
-                self.ds.reinit(N, cell)
+                NN = self.number_of_nodes()
+                self.ds.reinit(NN, cell)
 
     def uniform_refine(self, n=1, surface=None, returnim=False):
         if returnim:
@@ -188,8 +195,6 @@ class TriangleMesh(Mesh2d):
 
             NN = self.node.shape[0] 
             self.ds.reinit(NN, cell)
-
-    def bisect(self, markedCell, u=None):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()

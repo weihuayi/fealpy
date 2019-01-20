@@ -614,10 +614,10 @@ class DarcyForchheimerdata1:
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
-            (-1, -1),
-            (1, -1),
+            (0, 0),
+            (1, 0),
             (1, 1),
-            (-1, 1)], dtype=np.float)
+            (0, 1)], dtype=np.float)
 
         if meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
@@ -630,7 +630,7 @@ class DarcyForchheimerdata1:
     def g(self, p):
         """ The right hand side of DarcyForchheimer equation
         """
-        rhs = np.zeros(p.shape[0],)
+        rhs = np.zeros(p.shape[0:-1])
 
         return rhs
 

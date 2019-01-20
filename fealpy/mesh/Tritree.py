@@ -35,9 +35,9 @@ class Tritree(TriangleMesh):
         else:
             return self.parent[idx, 0] == -1
 
-    def adaptive(self, estimator, surface=None):
+    def adaptive_refine(self, estimator, surface=None):
         while estimator.is_uniform() is False:
-            isMarkedCell = self.marker(estimator.eta, estimator.theta, 'MAX')
+            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'MAX')
             edge = self.entity('edge')
             refineFlag = self.refine(isMarkedCell, surface=surface)
             NN1 = self.number_of_nodes()
@@ -207,13 +207,41 @@ class Tritree(TriangleMesh):
             while True:
                 flag = (~isMarkedParentCell[cell2cell]) & isNotLeafCell[cell2cell]
                 flag = flag.sum(axis=-1) > 1
-                if flag.sum() > 0:
+                if isMarkedParentCell[flag].sum() > 0:
                     isMarkedParentCell[flag] = False
                 else:
                     break
 
             isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
             isNeedRemovedCell[child[isMarkedParentCell, :]] = True
+
+            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode[cell[~isNeedRemovedCell, :]] = True
+
+            cell = cell[~isNeedRemovedCell]
+            child = child[~isNeedRemovedCell]
+            parent = parent[~isNeedRemovedCell]
+
+            childIdx, = np.nonzero(child[:, 0] > -1)
+            isNewLeafCell = np.sum(~isNeedRemovedCell[child[childIdx, :]], axis=1) == 0 
+            child[childIdx[isNewLeafCell], :] = -1
+
+            cellIdxMap = np.zeros(NC, dtype=np.int)
+            NNC = (~isNeedRemovedCell).sum()
+            cellIdxMap[~isNeedRemovedCell] = np.arange(NNC)
+            child[child > -1] = cellIdxMap[child[child > -1]]
+            parent[parent > -1] = cellIdxMap[parent[parent > -1]]
+            self.child = child
+            self.parent = parent
+
+            nodeIdxMap = np.zeros(NN, dtype=np.int)
+            NN = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(NN)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
+            self.ds.reinit(NN, cell)
+            return 
+
 
 
 

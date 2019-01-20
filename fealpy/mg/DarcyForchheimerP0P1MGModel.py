@@ -15,6 +15,8 @@ class DarcyForchheimerP0P1MGModel:
         self.IMatrix = []
 
         mesh0 = TriangleMesh(mesh.node, mesh.ds.cell)
+        self.integrator1 = mesh.integrator(3)
+        self.integrator0 = mesh.integrator(1)
         uspace = VectorLagrangeFiniteElementSpace(mesh0, p=0, spacetype='D')
         self.uspaces.append(uspace)
         pspace = LagrangeFiniteElementSpace(mesh0, p=1, spacetype='C')
@@ -36,8 +38,16 @@ class DarcyForchheimerP0P1MGModel:
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
 
         self.nlevel = n + 1
-
-    def compute_initial_value(self):
+        
+    def get_stiff_matrix(self):
+#        pde = self.pde
+#        mesh = self.pspaces[0].mesh
+#        cellmeasure = mesh.entity_measure('cell')
+#        integrator0 = mesh.integrator(1)
+#        integrator1 = mesh.integrator(3)
+#        B = self.pspaces[0].stiff_matrix(integrator0 ,cellmeasure)
+#        print(A.toarray())
+        
         mesh = self.pspaces[-1].mesh
         pde = self.pde
         mu = pde.mu
@@ -61,8 +71,8 @@ class DarcyForchheimerP0P1MGModel:
         cell2dof1 = self.pspaces[-1].cell_to_dof()
         ldof1 = self.pspaces[-1].number_of_local_dofs()
 		
-        gdof0 = self.uspaces.number_of_global_dofs()
-        gdof1 = self.pspaces.number_of_global_dofs()
+        gdof0 = self.uspaces[-1].number_of_global_dofs()
+        gdof1 = self.pspaces[-1].number_of_global_dofs()
         I = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
         J = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
 
@@ -70,43 +80,55 @@ class DarcyForchheimerP0P1MGModel:
         A12 = A21.transpose()
 
         A = bmat([(A11, A12), (A21, None)], format='csr', dtype=np.float)
-
-        cc = mesh.entity_barycenter('cell')## the center of cell
-        ft = pde.f(cc)*np.c_[cellmeasure, cellmeasure]
-        f = ft.flatten()
-		
-        cell2edge = mesh.ds.cell_to_edge()
-        ec = mesh.entity_barycenter('edge')
-        mid1 = ec[cell2edge[:,1], :]
-        mid2 = ec[cell2edge[:,2], :]
-        mid3 = ec[cell2edge[:,0], :]
         
-        bt1 = cellmeasure*(pde.g(mid2) + pde.g(mid3))/6
-        bt2 = cellmeasure*(pde.g(mid3) + pde.g(mid1))/6
-        bt3 = cellmeasure*(pde.g(mid1) + pde.g(mid2))/6
+        return A
+        
+    def get_right_vector(self):
+        mesh = self.pspaces[-1].mesh
+        pde = self.pde
+        mu = pde.mu
+        rho = pde.rho
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
+        cellmeasure = mesh.entity_measure('cell')
+        
+        f = self.uspaces[-1].source_vector(self.pde.f, self.integrator0, cellmeasure)
 
-        b = np.bincount(np.ravel(cell, 'F'), weight=np.r_[bt1,bt2,bt3], minlenth = NN)
-		
-		## Neumann boundary condition
+        b = self.pspaces[-1].source_vector(self.pde.g, self.integrator1, cellmeasure)
+        	
+	## Neumann boundary condition
         isBDEdge = mesh.ds.boundary_edge_flag()
         edge2node = mesh.ds.edge_to_node()
         bdEdge = edge[isBDEdge, :]
         d = np.sqrt(np.sum((node[edge2node[isBDEdge, 0], :]\
-            - node[edge2node[isBDEdge, 1], :]**2, 1)))
+            - node[edge2node[isBDEdge, 1], :])**2, 1))
         mid = ec[isBDEdge, :]
 
-        ii = np.c_[d*pde.Neumann_boundary(mid)/2, d*pde.Neumann_boundary(mid)/2]
-        g = np.bincount(np.ravel(bdEdge), weights = ii.flatten(), minlength=NN)
+        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(1,2))
+        g = np.bincount(np.ravel(bdEdge,'F'), weights = np.ravel(ii), minlength=NN)
 		
-        g = g - b[2*NC:]
+        g = g - b  
+        print('g',g)     
 
-        ## Solver
-        b1 = np.r_[b[:2*NC], g]
+        b1 = np.r_[f, g]
+        return b1
+    
+
+    def compute_initial_value(self):
+        mesh = self.pspaces[-1].mesh
+        pde = self.pde
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        cell = mesh.entity('cell')
+        cellmeasure = mesh.entity_measure('cell')
+        
+        A = self.get_stiff_matrix()
+        b = self.get_right_vector()
         up = np.zeros(2*NC+NN, dtype=np.float)
         idx = np.arange(2*NC+NN-1)
-        up[idx] = spsolve(A[idx, :][:, idx], b1[idx])
+        up[idx] = spsolve(A[idx, :][:, idx], b[idx])
         u = up[:2*NC]
         p = up[2*NC:]
-        c = np.sum(np.mean(p,1)*cellmeasure)/np.sum(cellmeasure)
+        c = np.sum(np.mean(p[cell],1)*cellmeasure)/np.sum(cellmeasure)
         return u,p
 

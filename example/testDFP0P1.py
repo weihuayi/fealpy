@@ -7,7 +7,7 @@ from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
 
 np.set_printoptions(threshold=np.inf)
 
-box = [-1,1,-1,1]
+box = [0,1,0,1]
 mu = 1
 rho = 1
 beta = 10
@@ -20,14 +20,14 @@ p = 1
 n = 1
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
-mesh = pde.init_mesh(n)
+mesh = pde.init_mesh(1)
 node = mesh.node
 integrator1 = mesh.integrator(p+2)
-integrator0 = mesh.integrator(p+1)
+integrator0 = mesh.integrator(p)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 4
+maxit = 1
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 test_errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
@@ -36,13 +36,8 @@ Ndof = np.zeros(maxit,dtype = np.int)
 for i in range(maxit):
     fem = DarcyForchheimerP0P1(pde, mesh, integrator0, integrator1)
     test_fem = DFP0P1(pde, mesh, integrator0, integrator1)
-    print(fem.get_right_vector())
     fem.solve()
     test_fem.solve()
-    A1 = fem.get_left_matrix()
-    A2 = test_fem.get_left_matrix()
-#    print('A1',A1)
-#    print('A2',A2)
     
     NC = mesh.number_of_cells()
     NN = mesh.number_of_edges()

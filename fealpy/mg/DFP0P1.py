@@ -86,6 +86,7 @@ class DFP0P1():
         bc = mesh.entity_barycenter('cell')
         ft = self.pde.f(bc)*np.c_[cellmeasure,cellmeasure]
         f = ft.flatten()
+        f2 = self.space0.source_vector(self.pde.f, self.integrator0, cellmeasure)# f == f2
 
         cell2edge = mesh.ds.cell_to_edge()
         ec = mesh.entity_barycenter('edge')
@@ -99,8 +100,10 @@ class DFP0P1():
         bt3 = cellmeasure*(self.pde.g(mid1) + self.pde.g(mid2))/6
 
         b = np.bincount(np.ravel(cell),weights=np.r_[bt1,bt2,bt3], minlength=NN)
+        print('b',b)
         ##
-
+        b2 = self.space1.source_vector(self.pde.g, self.integrator1, cellmeasure)
+        print('b2',b2)
         isBDEdge = mesh.ds.boundary_edge_flag()
         edge2node = mesh.ds.edge_to_node()
         bdEdge = edge[isBDEdge,:]
@@ -113,6 +116,7 @@ class DFP0P1():
         g = np.bincount(np.ravel(bdEdge),\
                 weights=ii.flatten(), minlength=NN)
         g = g - b
+        print('g',g)
 
         
         return np.r_[f,g]

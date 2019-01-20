@@ -76,6 +76,8 @@ class DarcyP0P1():
         A12 += coo_matrix((data2, (I[NC:],cell[:, 2])), shape=(2*NC, NN))
         A12 = A12.tocsr()
         A21 = A12.transpose()
+        print('A12', A12.toarray())
+        print('A21', A21.toarray())
 
         A = bmat([(A11, A12), (A21, None)], format='csr',dtype=np.float)
 
