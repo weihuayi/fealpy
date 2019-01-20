@@ -630,7 +630,7 @@ class DarcyForchheimerdata1:
     def g(self, p):
         """ The right hand side of DarcyForchheimer equation
         """
-        rhs = np.zeros(p.shape[0],)
+        rhs = np.zeros(p.shape[0:-1])
 
         return rhs
 
