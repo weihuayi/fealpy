@@ -78,7 +78,7 @@ mesh.uniform_refine(4)
 femspace = LagrangeFiniteElementSpace(mesh, p=1) 
 uI = femspace.interpolation(f1)
 
-estimator = Estimator(uI[:], mesh, 0.3, 0.3)
+estimator = Estimator(uI[:], mesh, 0.5, 0.5)
 
 fig = plt.figure()
 axes = fig.gca() 
@@ -87,25 +87,38 @@ mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 tmesh = Tritree(node, cell)
-tmesh.adaptive_refine(estimator)
+#tmesh.adaptive_refine(estimator)
+tmesh.adaptive_coarsen(estimator)
 
 mesh = estimator.mesh
 fig = plt.figure()
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
-femspace = LagrangeFiniteElementSpace(mesh, p=1)
-uI = femspace.interpolation(f2)
-estimator = Estimator(uI[:], mesh, 0.3, 0.5)
 
-eta = estimator.compute_eta()
-isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
-tmesh.coarsen(isMarkedCell)
 
-fig = plt.figure()
-axes = fig.gca()
-tmesh.add_plot(axes)
 
+
+
+
+
+
+
+#femspace = LagrangeFiniteElementSpace(mesh, p=1)
+#uI = femspace.interpolation(f2)
+#estimator = Estimator(uI[:], mesh, 0.3, 0.5)
+#
+#eta = estimator.compute_eta()
+#isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
+#tmesh.coarsen(isMarkedCell)
+#pmesh = tmesh.to_conformmesh()
+#
+#fig = plt.figure()
+#axes = fig.gca()
+#pmesh.add_plot(axes)
+#tmesh.find_node(axes, markersize=20, fontsize=10, showindex=True)
+#tmesh.find_cell(axes, markersize=20, fontsize=10, showindex=True)
+#tmesh.find_edge(axes, markersize=100,sfontsize=24,showindex=True)
 plt.show()
 
 
