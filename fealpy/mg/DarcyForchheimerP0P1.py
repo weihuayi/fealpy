@@ -62,8 +62,7 @@ class DarcyForchheimerP0P1():
 
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
-        print('NC',NC)
-        print('NN',NN)
+
 
         mu = self.pde.mu
         rho = self.pde.rho
@@ -129,6 +128,7 @@ class DarcyForchheimerP0P1():
         g = np.bincount(np.ravel(bdEdge,'F'),\
                 weights=np.ravel(ii), minlength=NN)
         g = g - b
+        print('g',np.r_[f,g])
 
         
         return np.r_[f,g]

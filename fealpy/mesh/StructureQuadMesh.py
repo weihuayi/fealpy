@@ -2,9 +2,6 @@ import numpy as np
 
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import triu, tril
-
-from matplotlib.collections import LineCollection
-
 from .Mesh2d import Mesh2d
 
 class StructureQuadMesh(Mesh2d):
