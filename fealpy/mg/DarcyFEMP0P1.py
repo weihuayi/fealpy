@@ -6,44 +6,32 @@ from ..fem.integral_alg import IntegralAlg
 from ..fem import doperator
 from scipy.sparse.linalg import cg, inv, dsolve,spsolve
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..functionspace.lagrange_fem_space import VectorLagrangeFiniteElementSpace
 
-class DarcyP0P1():
-    def __init__(self, pde, mesh, p, integrator):
-        self.femspace = LagrangeFiniteElementSpace(mesh, p)
+class DarcyFEMP0P1():
+    def __init__(self, pde, mesh, integrator0, integrator1):
+        self.space0 = VectorLagrangeFiniteElementSpace(mesh, 0, spacetype='D')
+        self.space1 = LagrangeFiniteElementSpace(mesh, 1, spacetype='C')
         self.pde = pde
-        self.mesh = self.femspace.mesh
+        self.mesh = self.space0.mesh
 
-#        self.uh = self.femspace.function()
-#        self.uI = self.femspace.interpoletion(pde.solution)
+        self.uh = self.space0.function()
+        self.ph = self.space1.function()
+
+#        self.uI = self.femspace.function()
+#        self.pI = self.femspace.interpolation(pde.pressure)
+
         self.cellmeasure = mesh.entity_measure('cell')
-        self.integrator = integrator
-        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        self.integrator1 = integrator1
+        self.integrator0 = integrator0
 
-        self.node = mesh.node
-        self.cell = mesh.ds.cell
-        NC = mesh.number_of_cells()
-
-    def gradbasis(self):
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        node = self.node
-        cell = self.cell
-
-        ve1 = node[cell[:, 2],:] - node[cell[:, 1],:]
-        ve2 = node[cell[:, 0],:] - node[cell[:, 2],:]
-        ve3 = node[cell[:, 1],:] - node[cell[:, 0],:]
-        area = 0.5*(-ve3[:, 0]*ve2[:, 1] + ve3[:, 1]*ve2[:, 0])
-
-        Dlambda = np.zeros((NC,2,3))
-        Dlambda[:,:,2] = np.c_[-ve3[:, 1]/(2*area), ve3[:, 0]/(2*area)]
-        Dlambda[:,:,0] = np.c_[-ve1[:, 1]/(2*area), ve1[:, 0]/(2*area)]
-        Dlambda[:,:,1] = np.c_[-ve2[:, 1]/(2*area), ve2[:, 0]/(2*area)]
-
-        return Dlambda
+        self.integralalg1 = IntegralAlg(self.integrator1, self.mesh, self.cellmeasure)
+        self.integralalg0 = IntegralAlg(self.integrator0, self.mesh, self.cellmeasure)
 
 
     def get_left_matrix(self):
-        femspace = self.femspace
+        space1 = self.space1
+        space0 = self.space0
         mesh = self.mesh
         cellmeasure = self.cellmeasure
         cell = mesh.ds.cell
@@ -51,47 +39,46 @@ class DarcyP0P1():
 
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
-
         mu = self.pde.mu
         rho = self.pde.rho
+	    
+        bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
+        phi = space0.basis(bc)
+        gphi = space1.grad_basis(bc)
+	    
         scaledArea = mu/rho*cellmeasure
-        Dlambda = self.gradbasis()
-        A11 = spdiags(np.r_[scaledArea,scaledArea], 0, 2*NC, 2*NC)
 
-        ## Assemble gradient matrix for pressure
-        I = np.arange(2*NC)
-        data1 = Dlambda[:, 0, 0]*cellmeasure
-        A12 = coo_matrix((data1, (I[:NC],cell[:, 0])), shape=(2*NC, NN))
-        data2 = Dlambda[:, 1, 0]*cellmeasure
-        A12 += coo_matrix((data2, (I[NC:],cell[:, 0])), shape=(2*NC, NN))
-        
-        data1 = Dlambda[:, 0, 1]*cellmeasure
-        A12 += coo_matrix((data1, (I[:NC],cell[:, 1])), shape=(2*NC, NN))
-        data2 = Dlambda[:, 1, 1]*cellmeasure
-        A12 += coo_matrix((data2, (I[NC:],cell[:, 1])), shape=(2*NC, NN))
+        A11 = spdiags(np.repeat(scaledArea, 2), 0, 2*NC, 2*NC)
 
-        data1 = Dlambda[:, 0, 2]*cellmeasure
-        A12 += coo_matrix((data1, (I[:NC],cell[:, 2])), shape=(2*NC, NN))
-        data2 = Dlambda[:, 1, 2]*cellmeasure
-        A12 += coo_matrix((data2, (I[NC:],cell[:, 2])), shape=(2*NC, NN))
-        A12 = A12.tocsr()
-        A21 = A12.transpose()
+        A21 = np.einsum('ijm, km, i->ijk', gphi, phi, cellmeasure)
 
+        cell2dof0 = space0.cell_to_dof()
+        ldof0 = space0.number_of_local_dofs()
+        cell2dof1 = space1.cell_to_dof()
+        ldof1 = space1.number_of_local_dofs()
+
+        gdof0 = space0.number_of_global_dofs()
+        gdof1 = space1.number_of_global_dofs()
+        I = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
+        J = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
+	    
+        A21 = csr_matrix((A21.flat, (I.flat, J.flat)), shape=(gdof1, gdof0))
+        A12 = A21.transpose() 
         A = bmat([(A11, A12), (A21, None)], format='csr',dtype=np.float)
-
-    
         return A
+
 
     def get_right_vector(self):
         mesh = self.mesh
         cellmeasure = self.cellmeasure
         node = mesh.node
+        edge = mesh.ds.edge
         cell = mesh.ds.cell
         NN = mesh.number_of_nodes()
 
         bc = mesh.entity_barycenter('cell')
         ft = self.pde.f(bc)*np.c_[cellmeasure,cellmeasure]
-        f = np.ravel(ft,'F')
+        f = ft.flatten()
 
         cell2edge = mesh.ds.cell_to_edge()
         ec = mesh.entity_barycenter('edge')
@@ -99,23 +86,28 @@ class DarcyP0P1():
         mid2 = ec[cell2edge[:, 2],:]
         mid3 = ec[cell2edge[:, 0],:]
 
+        ## need modify
         bt1 = cellmeasure*(self.pde.g(mid2) + self.pde.g(mid3))/6
         bt2 = cellmeasure*(self.pde.g(mid3) + self.pde.g(mid1))/6
         bt3 = cellmeasure*(self.pde.g(mid1) + self.pde.g(mid2))/6
 
-        g = np.bincount(np.ravel(cell,'F'),weights=np.r_[bt1,bt2,bt3], minlength=NN)
+        g = np.bincount(np.ravel(cell),weights=np.r_[bt1,bt2,bt3], minlength=NN)
         
         return np.r_[f,g]
 
     def solve(self):
         mesh = self.mesh
-        node = self.node
-        edge = mesh.ds.edge
-        cell = mesh.ds.cell
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        cell = mesh.entity('cell')
         cellmeasure = self.cellmeasure
         NN = mesh.number_of_nodes()
         NC = mesh.number_of_cells()
         A = self.get_left_matrix()
+        A11 = A[:2*NC, :2*NC]
+        A12 = A[:2*NC, 2*NC:]
+        A21 = A[2*NC:, :2*NC]
+        #A12 = A21.transpose()
         b = self.get_right_vector()
 
         ## Neumann boundary condition

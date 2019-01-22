@@ -123,12 +123,11 @@ class DarcyForchheimerP0P1():
         d = np.sqrt(np.sum((node[edge2node[isBDEdge,0],:]\
                 - node[edge2node[isBDEdge,1],:])**2,1))
         mid = ec[isBDEdge,:]
-        ii = np.tile(d*self.pde.Neumann_boundary(mid)/2,(1,2))
+        ii = np.tile(d*self.pde.neumann(mid)/2,(2,1))
 
         g = np.bincount(np.ravel(bdEdge,'F'),\
                 weights=np.ravel(ii), minlength=NN)
         g = g - b
-        print('g',np.r_[f,g])
 
         
         return np.r_[f,g]
@@ -162,9 +161,16 @@ class DarcyForchheimerP0P1():
         n = 0
         r = np.ones((2,maxN),dtype=np.float)
         area = np.r_[cellmeasure,cellmeasure]
+        
         ##  Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
 
         F = self.uh0/alpha - (mu/rho)*self.uh0 - (A12@self.ph0 - b[:2*NC])/area
+#        print('ua2', self.uh0/alpha)
+#        print('mu2', (mu/rho)*self.uh0)
+#        print('m2', (A12@self.ph0))
+#        print('Ab1', A12@self.ph0 - b[:2*NC])
+#        print('F1',F[:NC])
+#        print('F2',F[NC:])
         FL = np.sqrt(F[:NC]**2 + F[NC:]**2)
         gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
         uhalf = F/np.r_[gamma,gamma]
@@ -177,11 +183,11 @@ class DarcyForchheimerP0P1():
             uhalfL = np.sqrt(uhalf[:NC]**2 + uhalf[NC:]**2)
             fnew = b[:2*NC] + uhalf*area/alpha\
                     - beta/rho*uhalf*np.r_[uhalfL,uhalfL]*area
-
             ## Direct Solver
             Aalphainv = spdiags(1/Aalpha.data, 0, 2*NC, 2*NC)
             Ap = A21@Aalphainv@A12
             bp = A21@(Aalphainv@fnew) - b[2*NC:]
+
             p1 = np.zeros(NN,dtype=np.float)
             p1[1:] = spsolve(Ap[1:,1:],bp[1:])
             c = np.sum(np.mean(p1[cell],1)*cellmeasure)/np.sum(cellmeasure)

@@ -13,7 +13,7 @@ beta = 10
 alpha = 1/beta
 tol = 1e-6
 level = 4
-mg_maxN = 1
+mg_maxN = 3
 maxN = 2000
 p = 1
 

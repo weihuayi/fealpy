@@ -27,7 +27,7 @@ integrator0 = mesh.integrator(p)
 
 errorType = ['$|| u - u_h||_0$','$|| p - p_h||$', '$||\\nabla p - \\nabla p_h||_0$']
 
-maxit = 1
+maxit = 2
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 test_errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 Ndof = np.zeros(maxit,dtype = np.int)
