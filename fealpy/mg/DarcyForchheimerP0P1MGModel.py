@@ -37,6 +37,12 @@ class DarcyForchheimerP0P1MGModel:
             pspace = LagrangeFiniteElementSpace(mesh0, p=1, spacetype='C')
             self.pspaces.append(pspace)
 
+        for i in range(n+1):
+            A11, A12 = self.get_linear_stiff_matrix(i)
+            self.A.append((A11, A12))
+            f, g = sefl.get_right_vector(i)
+            self.b.append((f, g))
+
         self.uh = self.uspaces[-1].function()
         self.ph = self.pspaces[-1].function()
         self.uI = self.uspaces[-1].interpolation(pde.velocity)
@@ -62,11 +68,10 @@ class DarcyForchheimerP0P1MGModel:
         NN = mesh.number_of_nodes()
         scaledArea = mu/rho*cellmeasure
 
-        A11 = spdiags(np.repeat(scaledArea, 2), 0, 2*NC, 2*NC)
+        A11 = np.repeat(scaledArea, 2)
 
         phi = self.uspaces[level].basis(bc)
-        A21 = np.einsum('ijm, km, i->ijk', gphi, phi, cellmeasure)
-
+        data = np.einsum('ijm, km, i->ijk', gphi, phi, cellmeasure)
         cell2dof0 = self.uspaces[level].cell_to_dof()
         ldof0 = self.uspaces[level].number_of_local_dofs()
         cell2dof1 = self.pspaces[level].cell_to_dof()
@@ -74,15 +79,11 @@ class DarcyForchheimerP0P1MGModel:
 		
         gdof0 = self.uspaces[level].number_of_global_dofs()
         gdof1 = self.pspaces[level].number_of_global_dofs()
-        I = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
-        J = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
-
-        A21 = csr_matrix((A21.flat, (I.flat, J.flat)), shape=(gdof1, gdof0))
-        A12 = A21.transpose()
-
-        A = bmat([(A11, A12), (A21, None)], format='csr', dtype=np.float)
+        J = np.einsum('ij, k->ijk', cell2dof1, np.ones(ldof0))
+        I = np.einsum('ij, k->ikj', cell2dof0, np.ones(ldof1))
+        A12 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
         
-        return A
+        return A11, A12 
         
     def get_right_vector(self, level):
         mesh = self.pspaces[level].mesh
@@ -109,29 +110,30 @@ class DarcyForchheimerP0P1MGModel:
 
         ii = np.tile(d*self.pde.neumann(mid)/2,(1,2))
         g = np.bincount(np.ravel(bdEdge,'F'), weights = np.ravel(ii), minlength=NN)
-		
         g = g - b  
 
-        b1 = np.r_[f, g]
-        return b1
-    
+        return f, g    
 
     def compute_initial_value(self):
         mesh = self.pspaces[-1].mesh
         pde = self.pde
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
-        cell = mesh.entity('cell')
-        cellmeasure = mesh.entity_measure('cell')
-        A = self.get_linear_stiff_matrix(-1)
-        b = self.get_right_vector(-1)
+
+        A11, A12 = self.A[-1]
+        f, g = self.b[-1]
+
+        A = bmat([[A11, A12], [A12.transpose(), None]], dtype=mesh.ftype) 
+        b = np.r_[f, g]
         
         up = np.zeros(2*NC+NN, dtype=np.float)
         idx = np.arange(2*NC+NN-1)
         up[idx] = spsolve(A[idx, :][:, idx], b[idx])
-
         u = up[:2*NC]
         p = up[2*NC:]
+
+        cell = mesh.entity('cell')
+        cellmeasure = mesh.entity_measure('cell')
         c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
         p -= c
 
@@ -149,26 +151,23 @@ class DarcyForchheimerP0P1MGModel:
         alpha = self.pde.alpha
         tol = self.pde.tol
         cellmeasure = mesh.entity_measure('cell')
-        area = np.repeat(cellmeasure,2)
+        area = np.repeat(cellmeasure, 2)
 
-        # 每层的A，b
-        A = self.get_linear_stiff_matrix(level)
-        A11 = A[:2*NC, :2*NC]
-        A12 = A[:2*NC, 2*NC:]
-        A21 = A[2*NC:, :2*NC]
-        b = self.get_right_vector(level)
+        # get A，b on current level
+        A11, A12 = slf.A[level]
+        A21 = A12.transpose()
+        f, g =  self.b[level]
+
         ## P-R interation for D-F equation
         n = 0
         ru1 = np.ones(maxN+1, dtype=np.float)
         rp1 = np.ones(maxN+1, dtype=np.float)
-        Aalpha = A11 + spdiags(area/alpha, 0, 2*NC, 2*NC)
-        Aalphainv = spdiags(1/Aalpha.data, 0, 2*NC, 2*NC)
-        
+        Aalpha = A11 + area/alpha
         
         while ru1[n]+rp1[n] > tol and n < maxN:
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
-            F = u/alpha - (mu/rho)*u - (A12@p - b[:2*NC])/area
+            F = u/alpha - (mu/rho)*u - (A12@p - f)/area
             FL = np.sqrt(F[::2]**2 + F[1::2]**2)
             gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
             uhalf = F/np.repeat(gamma, 2)
@@ -176,14 +175,14 @@ class DarcyForchheimerP0P1MGModel:
             ## Step 2: Solve the linear Darcy equation
             # update RHS
             uhalfL = np.sqrt(uhalf[::2]**2 + uhalf[1::2]**2)
-            fnew = b[:2*NC] + uhalf*area/alpha\
+            fnew = f + uhalf*area/alpha\
                     - beta/rho*uhalf*np.repeat(uhalfL, 2)*area
             
             ## Direct Solver
-            Aalphainv = spdiags(1/Aalpha.data, 0, 2*NC, 2*NC)
+            Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
             Ap = A21@Aalphainv@A12
            # print('Ap',Ap.toarray())
-            bp = A21@(Aalphainv@fnew) - b[2*NC:]
+            bp = A21@(Aalphainv@fnew) - g 
            # print('bp', bp)
             p1 = np.zeros(NN,dtype=np.float)
             p1[1:] = spsolve(Ap[1:,1:],bp[1:])
@@ -197,19 +196,19 @@ class DarcyForchheimerP0P1MGModel:
             n = n + 1
             uLength = np.sqrt(u1[::2]**2 + u1[1::2]**2)
             Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
-            ru = norm(b[:2*NC] - Lu)/norm(b[:2*NC])
-            if norm(b[2*NC:]) == 0:
-                rp = norm(b[2*NC:] - A21@u1)
+            ru = norm(f - Lu)/norm(f)
+            if norm(g) == 0:
+                rp = norm(g - A21@u1)
             else:
-                rp = norm(b[2*NC:] - A21@u1)/norm(b[2*NC:])
+                rp = norm(g - A21@u1)/norm(g)
             eu = np.max(abs(u1 - self.uh0))
             ep = np.max(abs(p1 - self.ph0))
 
             h[:] = u1
             p[:] = p1
             
-            self.uu = u1.append(u1)                            
-            self.pp = p1.append(p1)                    
+            self.uu.append(u1)                            
+            self.pp.append(p1)                    
         
         return u, p, ru, rp
 
