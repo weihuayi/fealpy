@@ -23,11 +23,13 @@ class Estimator:
         grad = np.einsum('ij, ijm->im', self.rho[cell], Dlambda)
         self.eta = np.sqrt(np.sum(grad**2, axis=1)*self.area)
         return self.eta
+
     def update(self, rho, mesh, smooth=True):
         self.rho = rho
         self.mesh = mesh
         self.area = mesh.entity_measure('cell')
-        self.smooth_rho()
+        if smooth is True:
+            self.smooth_rho()
         self.compute_eta()
 
     def smooth_rho(self):
@@ -46,7 +48,7 @@ class Estimator:
     def is_uniform(self):
         stde = np.std(self.eta)/self.maxeta
         print('The current relative std of eta is ', stde)
-        if stde < 0.05:
+        if stde < 0.025:
             return True
         else:
             return False
@@ -75,50 +77,43 @@ cell = np.array([
 mesh = TriangleMesh(node, cell)
 mesh.uniform_refine(4)
 
+node = mesh.entity('node')
+cell = mesh.entity('cell')
+tmesh = Tritree(node, cell)
+
 femspace = LagrangeFiniteElementSpace(mesh, p=1) 
 uI = femspace.interpolation(f1)
-
-estimator = Estimator(uI[:], mesh, 0.5, 0.5)
+estimator = Estimator(uI[:], mesh, 0.3, 0.5)
 
 fig = plt.figure()
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-tmesh = Tritree(node, cell)
-#tmesh.adaptive_refine(estimator)
-tmesh.adaptive_coarsen(estimator)
-
+tmesh.adaptive_refine(estimator)
 mesh = estimator.mesh
 fig = plt.figure()
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
 
+femspace = LagrangeFiniteElementSpace(mesh, p=1)
+uI = femspace.interpolation(f2)
+estimator = Estimator(uI[:], mesh, 0.3, 0.5)
 
+tmesh.adaptive_coarsen(estimator)
+mesh = estimator.mesh
+fig = plt.figure()
+axes = fig.gca() 
+mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
+femspace = LagrangeFiniteElementSpace(mesh, p=1)
+uI = femspace.interpolation(f2)
+tmesh.adaptive_refine(estimator)
+mesh = estimator.mesh
+fig = plt.figure()
+axes = fig.gca() 
+mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
-
-
-
-
-
-#femspace = LagrangeFiniteElementSpace(mesh, p=1)
-#uI = femspace.interpolation(f2)
-#estimator = Estimator(uI[:], mesh, 0.3, 0.5)
-#
-#eta = estimator.compute_eta()
-#isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
-#tmesh.coarsen(isMarkedCell)
-#pmesh = tmesh.to_conformmesh()
-#
-#fig = plt.figure()
-#axes = fig.gca()
-#pmesh.add_plot(axes)
-#tmesh.find_node(axes, markersize=20, fontsize=10, showindex=True)
-#tmesh.find_cell(axes, markersize=20, fontsize=10, showindex=True)
-#tmesh.find_edge(axes, markersize=100,sfontsize=24,showindex=True)
 plt.show()
 
 

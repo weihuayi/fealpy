@@ -167,13 +167,21 @@ class Tritree(TriangleMesh):
             return refineFlag
         else:
             return
+
+
     def adaptive_coarsen(self, estimator, surface=None):
-            while estimator.is_uniform() is False:
-                isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
-                self.coarsen(isMarkedCell)
-                mesh = self.to_conformmesh()
-                rho = estimator.rho
-                estimator.update(rho, mesh)
+
+        while estimator.is_uniform() is False:
+            isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
+            isRemainNode = self.coarsen(isMarkedCell)
+            mesh = self.to_conformmesh()
+            rho = estimator.rho[isRemainNode]
+            estimator.update(rho, mesh, smooth=False)
+
+            isRootCell = self.is_root_cell()
+            NC = self.number_of_cells()
+            if isRootCell.sum() == NC:
+                break
                  
 
     def coarsen_marker(self, eta, beta, method):
@@ -248,6 +256,8 @@ class Tritree(TriangleMesh):
             cell = nodeIdxMap[cell]
             self.node = node[isRemainNode]
             self.ds.reinit(NN, cell)
+            return isRemainNode
+        else:
             return 
 
     def to_conformmesh(self):
