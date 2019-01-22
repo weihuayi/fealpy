@@ -36,22 +36,22 @@ which will create a soft link in `/usr/local/lib/python3.6/dist-packages/`.
 
 ## Windows: Anaconda
 
-1. Dowload visual studio for windows https://code.visualstudio.com/download and 
-   install it on you win system. 
+1. Dowload visual studio IDE for windows (community 2017) from https://visualstudio.microsoft.com/ and 
+   install it on you win system. Notice that you just need to install the c++ component. 
 
-2. Download anaconda for windows from https://www.anaconda.com/ and install it
+2. Download anaconda for windows from https://repo.continuum.io/archive/Anaconda3-2018.12-Windows-x86_64.exe and install it
    on your system.
 
 3. Download the correct version `meshpy` from https://www.lfd.uci.edu/~gohlke/pythonlibs/#meshpy. For example:
 
 ```
-pip install MeshPy‑2018.2.1‑cp37‑cp37m‑win_amd64.whl # for64 bit win system with python 3.7
+pip install MeshPy‑2018.2.1‑cp37‑cp37m‑win_amd64.whl # For 64 bit win system with python 3.7
 ```
 
 4. Download the correct version `pyamg` from https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyamg. For example:
 
 ```
-pip install pyamg‑4.0.0‑cp37‑cp37m‑win_amd64.whl # for 64 bit win system with python 3.7
+pip install pyamg‑4.0.0‑cp37‑cp37m‑win_amd64.whl # For 64 bit win system with python 3.7
 ```
 
 5. enter fealpy directory, run the following command:

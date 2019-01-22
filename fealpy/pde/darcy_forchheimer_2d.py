@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..mesh.litest_quadmesh import StructureQuadMesh1
-#from ..mesh.StructureQuadMesh import StructureQuadMesh
+from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Mesh2d import Mesh2d
 
@@ -106,7 +106,7 @@ class LShapeRSinData():
         u[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
         return u
 
-    def neumann(self, p):
+    def Neumann_boundary(self, p):
         sin = np.sin
         cos = np.cos
         pi = np.pi
@@ -133,6 +133,19 @@ class LShapeRSinData():
         z[idx] = 2*(x[idx]*cos(2*np.arctan2(-1, x[idx])/3) + sin(2*np.arctan2(-1, x[idx])/3))/(3*(x[idx]**2 + 1)**(2/3))
 
         return z
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class PolyData:
     """
@@ -344,7 +357,7 @@ class SinsinData:
     u = (np.sin(x)*np.cos(y),-np.cos(x)*np.sin(y))^t
     p = np.sin(pi*x)*np.sin(pi*y)
     g = 0
-    f = ((mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.sin(x)*np.cos(x) + pi*np.cos(pi*x)*np.sin(pi*y),
+    f = ((mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.sin(x)*np.cos(x)*np.sin(y) + pi*np.cos(pi*x)*np.sin(pi*y),
          -(mu/k + rho*beta*np.sqrt(np.sin(x)**2*np.cos(y)**2 + np.cos(x)**2*np.sin(y)**2))*np.cos(x)*np.sin(y)  + pi*np.sin(pi*x)*np.cos(pi*y))^t
     """
     def __init__(self, box, mu, k, rho, beta, tol):
@@ -601,10 +614,10 @@ class DarcyForchheimerdata1:
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
-            (0, 0),
-            (1, 0),
+            (-1, -1),
+            (1, -1),
             (1, 1),
-            (0, 1)], dtype=np.float)
+            (-1, 1)], dtype=np.float)
 
         if meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
@@ -617,7 +630,7 @@ class DarcyForchheimerdata1:
     def g(self, p):
         """ The right hand side of DarcyForchheimer equation
         """
-        rhs = np.zeros(p.shape[0:-1])
+        rhs = np.zeros(p.shape[0:-1],)
 
         return rhs
 
