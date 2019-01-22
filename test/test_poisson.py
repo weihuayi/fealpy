@@ -1,10 +1,17 @@
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from fealpy.mesh import Tritree
-from fealpy.mesh import TriangleMesh
+from fealpy.pde.poisson_model_2d import LShapeRSinData
+from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 
+from fealpy.mesh.Tritree import Tritree
+
+from mpl_toolkits.mplot3d import Axes3D
+from fealpy.tools.show import showmultirate
+
+p = int(sys.argv[1])
+maxit = int(sys.argv[2])
 
 class Estimator:
     def __init__(self, rho, mesh, theta, beta):
@@ -39,7 +46,7 @@ class Estimator:
         node2cell = mesh.ds.node_to_cell()
         inva = 1/self.area
         s = node2cell@inva
-        for i in range(2):
+        for i in range(3):
             crho = (self.rho[cell[:, 0]] + self.rho[cell[:, 1]] + self.rho[cell[:, 2]])/3.0
             self.rho = np.asarray(node2cell@(crho*inva))/s
 
@@ -51,75 +58,39 @@ class Estimator:
         else:
             return False
 
-def f1(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    val = np.exp(5*(x**2 + y**2))/np.exp(10)
-    return val
-
-def f2(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    val = np.exp(5*(x**2 + (y-1)**2))/np.exp(10)
-    return val
-
-node = np.array([
-    (0, 0),
-    (1, 0),
-    (1, 1),
-    (0, 1)], dtype=np.float)
-
-cell = np.array([
-    (1, 2, 0), 
-    (3, 0, 2)], dtype=np.int)
-mesh = TriangleMesh(node, cell)
-mesh.uniform_refine(4)
-
-femspace = LagrangeFiniteElementSpace(mesh, p=1) 
-uI = femspace.interpolation(f1)
-
-estimator = Estimator(uI[:], mesh, 0.5, 0.5)
-
-fig = plt.figure()
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
-
+pde = LShapeRSinData()
+mesh = pde.init_mesh(n=4, meshtype='tri')
+integrator = mesh.integrator(3)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 tmesh = Tritree(node, cell)
-#tmesh.adaptive_refine(estimator)
-tmesh.adaptive_coarsen(estimator)
+pmesh = tmesh.to_conformmesh()
 
-mesh = estimator.mesh
+tol = 1.0e-4
+
+for i in range(maxit):
+    fem = PoissonFEMModel(pde, pmesh, p, integrator)
+    fem.solve()
+    uh = fem.uh
+    res = fem.get_l2_error()
+    #res = fem.get_L2_error()
+    #res = fem.get_H1_error()
+
+    estimator = Estimator(uh[:], mesh, 0.5, 0.5)
+
+    fig = plt.figure()
+    axes = fig.gca() 
+    mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
+    
+    if  res < tol:
+        break
+    tmesh.adaptive_refine(estimator)
+    pmesh = tmesh.to_conformmesh()
+    print("Steps:", i)
+    mesh = estimator.mesh
 fig = plt.figure()
 axes = fig.gca() 
 mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
-
-
-
-
-
-
-
-
-
-
-#femspace = LagrangeFiniteElementSpace(mesh, p=1)
-#uI = femspace.interpolation(f2)
-#estimator = Estimator(uI[:], mesh, 0.3, 0.5)
-#
-#eta = estimator.compute_eta()
-#isMarkedCell = tmesh.coarsen_marker(eta, 0.3, "COARSEN")
-#tmesh.coarsen(isMarkedCell)
-#pmesh = tmesh.to_conformmesh()
-#
-#fig = plt.figure()
-#axes = fig.gca()
-#pmesh.add_plot(axes)
-#tmesh.find_node(axes, markersize=20, fontsize=10, showindex=True)
-#tmesh.find_cell(axes, markersize=20, fontsize=10, showindex=True)
-#tmesh.find_edge(axes, markersize=100,sfontsize=24,showindex=True)
+   
 plt.show()
-
-
 
