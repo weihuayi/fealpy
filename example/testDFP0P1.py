@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mg.DarcyForchheimerP0P1 import DarcyForchheimerP0P1
+#from fealpy.mg.DarcyForchheimerP0P1 import DarcyForchheimerP0P1
 from fealpy.mg.DFP0P1 import DFP0P1
 from fealpy.tools.show import showmultirate, show_error_table
 from fealpy.pde.darcy_forchheimer_2d import DarcyForchheimerdata1
@@ -34,17 +34,12 @@ Ndof = np.zeros(maxit,dtype = np.int)
 
 
 for i in range(maxit):
-    fem = DarcyForchheimerP0P1(pde, mesh, integrator0, integrator1)
     test_fem = DFP0P1(pde, mesh, integrator0, integrator1)
-    fem.solve()
     test_fem.solve()
     
     NC = mesh.number_of_cells()
     NN = mesh.number_of_edges()
     Ndof[i] = 2*NC+NN
-    errorMatrix[0, i] = fem.get_uL2_error()
-    errorMatrix[1, i] = fem.get_pL2_error()
-    errorMatrix[2, i] = fem.get_H1_error()
 
     test_errorMatrix[0, i] = test_fem.get_uL2_error()
     test_errorMatrix[1, i] = test_fem.get_pL2_error()
