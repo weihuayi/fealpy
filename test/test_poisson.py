@@ -30,6 +30,7 @@ class Estimator:
         grad = np.einsum('ij, ijm->im', self.rho[cell], Dlambda)
         self.eta = np.sqrt(np.sum(grad**2, axis=1)*self.area)
         return self.eta
+
     def update(self, rho, mesh, smooth=True):
         self.rho = rho
         self.mesh = mesh
@@ -71,12 +72,10 @@ tol = 1.0e-4
 for i in range(maxit):
     fem = PoissonFEMModel(pde, pmesh, p, integrator)
     fem.solve()
-    uh = fem.uh
-    res = fem.get_l2_error()
+    res = fem.get_H1_error()
     #res = fem.get_L2_error()
-    #res = fem.get_H1_error()
 
-    estimator = Estimator(uh[:], mesh, 0.5, 0.5)
+    estimator = Estimator(fem.uh[:], mesh, 0.3, 0.5)
 
     fig = plt.figure()
     axes = fig.gca() 
