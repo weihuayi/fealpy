@@ -18,8 +18,11 @@ class DarcyForchheimerP0P1MGModel:
         self.IMatrix = []
         self.A = []
         self.b = []
-        self.uu = []
-        self.pp = []
+        self.uu = [] ## 磨光之后的值
+        self.pp = [] ## 磨光之后的值
+        self.uuc = [] ## 每层网格的初值
+        self.ppc = [] ## 每层网格的初值
+        self.r = []
 
         mesh0 = TriangleMesh(mesh.node, mesh.ds.cell)
         uspace = VectorLagrangeFiniteElementSpace(mesh0, p=0, spacetype='D')
@@ -29,7 +32,7 @@ class DarcyForchheimerP0P1MGModel:
         self.pspaces.append(pspace)
 
         for i in range(n):
-            I0, I1 = mesh.uniform_refine(returnim=True)
+            I0, I1 = mesh.uniform_refine(returnim=True) # I0:NodeMatrix(u), I1:CellMatrix(p)
             self.IMatrix.append((I0[0], I1[0]))
             mesh0 = TriangleMesh(mesh.node, mesh.ds.cell)
             uspace = VectorLagrangeFiniteElementSpace(mesh0, p=0, spacetype='D')
@@ -40,7 +43,7 @@ class DarcyForchheimerP0P1MGModel:
         for i in range(n+1):
             A11, A12 = self.get_linear_stiff_matrix(i)
             self.A.append((A11, A12))
-            f, g = sefl.get_right_vector(i)
+            f, g = self.get_right_vector(i)
             self.b.append((f, g))
 
         self.uh = self.uspaces[-1].function()
@@ -49,9 +52,9 @@ class DarcyForchheimerP0P1MGModel:
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
 
         self.nlevel = n + 1
-
-        #self.A = self.get_linear_stiff_matrix()
-        #self.b = self.get_right_vector()
+        u,p = self.compute_initial_value()
+        self.uu.append(u)
+        self.pp.append(p)
         
     def get_linear_stiff_matrix(self, level):
         
@@ -68,7 +71,7 @@ class DarcyForchheimerP0P1MGModel:
         NN = mesh.number_of_nodes()
         scaledArea = mu/rho*cellmeasure
 
-        A11 = np.repeat(scaledArea, 2)
+        A11 = spdiags(np.r_[scaledArea,scaledArea], 0, 2*NC, 2*NC)
 
         phi = self.uspaces[level].basis(bc)
         data = np.einsum('ijm, km, i->ijk', gphi, phi, cellmeasure)
@@ -122,8 +125,8 @@ class DarcyForchheimerP0P1MGModel:
 
         A11, A12 = self.A[-1]
         f, g = self.b[-1]
-
-        A = bmat([[A11, A12], [A12.transpose(), None]], dtype=mesh.ftype) 
+        
+        A = bmat([(A11, A12), (A12.transpose(), None)], format='csr',dtype=np.float)
         b = np.r_[f, g]
         
         up = np.zeros(2*NC+NN, dtype=np.float)
@@ -154,7 +157,7 @@ class DarcyForchheimerP0P1MGModel:
         area = np.repeat(cellmeasure, 2)
 
         # get A，b on current level
-        A11, A12 = slf.A[level]
+        A11, A12 = self.A[level]
         A21 = A12.transpose()
         f, g =  self.b[level]
 
@@ -162,7 +165,7 @@ class DarcyForchheimerP0P1MGModel:
         n = 0
         ru1 = np.ones(maxN+1, dtype=np.float)
         rp1 = np.ones(maxN+1, dtype=np.float)
-        Aalpha = A11 + area/alpha
+        Aalpha = A11.data + area/alpha
         
         while ru1[n]+rp1[n] > tol and n < maxN:
             ## step 1: Solve the nonlinear Darcy equation
@@ -204,11 +207,9 @@ class DarcyForchheimerP0P1MGModel:
             eu = np.max(abs(u1 - self.uh0))
             ep = np.max(abs(p1 - self.ph0))
 
-            h[:] = u1
+            u[:] = u1
             p[:] = p1
-            
-            self.uu.append(u1)                            
-            self.pp.append(p1)                    
+                                
         
         return u, p, ru, rp
 
@@ -225,12 +226,10 @@ class DarcyForchheimerP0P1MGModel:
         cellmeasure = mesh.entity_measure('cell')
         area = np.repeat(cellmeasure,2)
         
-        # 每层的A，b
-        A = self.get_linear_stiff_matrix(level)
-        A11 = A[:2*NC, :2*NC]
-        A12 = A[:2*NC, 2*NC:]
-        A21 = A[2*NC:, :2*NC]
-        b = self.get_right_vector(level)
+        # get A，b on current level
+        A11, A12 = self.A[level]
+        A21 = A12.transpose()
+        f, g =  self.b[level]
         
         ## P-R interation for D-F equations
 
@@ -238,21 +237,19 @@ class DarcyForchheimerP0P1MGModel:
         ru1 = np.ones(maxN,)
         rp1 = np.ones(maxN,)
         uhalf[:] = uh
-    
-        Aalphainv = A11 + spdiags(area/alpha, 0, 2*NC, 2*NC)
-        
+        Aalpha = A11.data + area/alpha
+        Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
+        Ap = A21@Aalphainv@A12
         while ru1[n]+rp1[n] > tol and n < maxN:
             ## step 2: Solve the linear Darcy equation
             # update RHS
             uhalfL = np.sqrt(uhalf[::2]**2 + uhalf[1::2]**2)
-            fnew = b[:2*NC] + uhalf*area/alpha\
+            fnew = f + uhalf*area/alpha\
                     - beta/rho*uhalf*np.repeat(uhalfL, 2)*area
             
             ## Direct Solver
-            Aalphainv = spdiags(1/Aalpha.data, 0, 2*NC, 2*NC)
-            Ap = A21@Aalphainv@A12
            # print('Ap',Ap.toarray())
-            bp = A21@(Aalphainv@fnew) - b[2*NC:]
+            bp = A21@(Aalphainv@fnew) - g
            # print('bp', bp)
             p1 = np.zeros(NN,dtype=np.float)
             p1[1:] = spsolve(Ap[1:,1:],bp[1:])
@@ -262,7 +259,7 @@ class DarcyForchheimerP0P1MGModel:
             
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
-            F = u/alpha - (mu/rho)*u - (A12@p - b[:2*NC])/area
+            F = u/alpha - (mu/rho)*u - (A12@p - f)/area
             FL = np.sqrt(F[::2]**2 + F[1::2]**2)
             gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
             uhalf = F/np.repeat(gamma, 2)
@@ -273,11 +270,11 @@ class DarcyForchheimerP0P1MGModel:
             n = n + 1
             uLength = np.sqrt(u1[::2]**2 + u1[1::2]**2)
             Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
-            ru = norm(b[:2*NC] - Lu)/norm(b[:2*NC])
-            if norm(b[2*NC:]) == 0:
-                rp = norm(b[2*NC:] - A21@u1)
+            ru = norm(f - Lu)/norm(f)
+            if norm(g) == 0:
+                rp = norm(g - A21@u1)
             else:
-                rp = norm(b[2*NC:] - A21@u1)/norm(b[2*NC:])
+                rp = norm(g - A21@u1)/norm(g)
             eu = np.max(abs(u1 - self.uh0))
             ep = np.max(abs(p1 - self.ph0))
 
@@ -286,9 +283,7 @@ class DarcyForchheimerP0P1MGModel:
             
         return u, p, ru, rp
 
-    def fas(self):
-        u, p = self.compute_initial_value()
-        
+    def fas(self, level):       
         mesh = self.pspaces[level].mesh
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
@@ -296,30 +291,149 @@ class DarcyForchheimerP0P1MGModel:
         rho = self.pde.rho
         beta = self.pde.beta
         alpha = self.pde.alpha
-        tol = self.tol
+        tol = self.pde.tol
         # coarsest level: exact solve
-        if level == 1:##???
-            u,p,ru,rp = prev_smoothing(self, self.uu[-1], self.pp[-1], level, self.pde.mg_maxN)
+        if level == 1:##
+            u,p,ru,rp = self.prev_smoothing(self, self.uuc[-1], self.ppc[-1], level, self.pde.maxN)
             rn = ru[end] + rp[end]
+            uu.append(u)
+            pp.append(p)
             return u,p
             
         ## Presmoothing
-        u,p,ru, rp = prev_smoothing(self, self.uu[level], self.pp[level], level, self.pde.mg_maxN)
-        
+        u,p,ru, rp = self.prev_smoothing(self, self.uuc[level], self.ppc[level], level, self.pde.mg_maxN)
+        uu.append(u)
+        pp.append(p)
         # form residual on the fine grid
-        # 每层的A，b
-        A = self.get_linear_stiff_matrix(level)
-        A11 = A[:2*NC, :2*NC]
-        A12 = A[:2*NC, 2*NC:]
-        #A21 = A[2*NC:, :2*NC]
-        b = self.get_right_vector(level)
+        # get A，b on current level
+        A11, A12 = self.A[level]
+        A21 = A12.transpose()
+        f, g =  self.b[level]
+        
         uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
         Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
         r = b[:2*NC] - Lu
         
         # restrict residual to the coarse grid
-        rc = self.IMatrix[level].T@r
-        uc = (self.IMatrix[level].T@u)/4
+        I0, I1 = self.IMatrix[level]
+        rc = I0.T@r
+        uc = (I0.T@u)/4## ????要不要除以4
         pc = p[:Nc]
+        self.uuc.append(uc)                            
+        self.ppc.append(pc)
+        self.r.append(rc)
+        ## ????
         
-        return u, p
+    def mg(self):    
+        mu = self.pde.mu
+        rho = self.pde.rho
+        beta = self.pde.beta
+        alpha = self.pde.alpha
+        tol = self.pde.tol
+        level = self.nlevel
+        
+        for i in range(level-1,0,-1):
+            self.fas(i) ###???需要循环结束再做提升
+        
+        for i in range(level-1, 0, -1):
+            mesh = self.pspaces[level].mesh
+            cellmeasure = mesh.entity_measure('cell')
+            I0, I1 = self.IMatrix[i]
+            u = self.uu[i]
+            eu = I0@(u - self.uuc[i])
+            
+            # project eu back to the div free subspace
+            # get A，b on current level
+            A11, A12 = self.A[i]
+            A21 = A12.transpose()
+            f, g =  self.b[i]
+            uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
+            Au = A11.data + beta*rho*np.repeat(uLength*area, 2)
+            Auinv = spdiags(1/Au, 0, 2*NC, 2*NC)
+            Atuta = A21@Auinv@A12
+            bp = A21@eu
+            
+            theta = np.zeros(bp.shape())
+            theta[1:] = spsolve(Atuta[1:, 1:], bp[1:])
+            c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
+            theta -= c
+            delta = Auinv@(A12@theta)
+            u = u + eu - delta
+            epc = self.pp[i] - self.ppc[i]
+            HB = self.uniformcoarsenred(i)
+            p = p + self.nodeinterpolate(epc, HB)
+            
+            ## Postsmoothing
+            u, p, ru, rp = self.post_smoothing(u, p, i)
+            
+            
+    def uniformcoarsenred(self,level):
+        mesh = self.pspaces[level].mesh
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        cell = mesh.entity('cell')
+
+        HB = np.zeros((NN,3),dtype=np.int)
+        if NC%4 == 0:
+            NCc = NC//4 # number of triangles in the coarse grid
+
+        else:
+            return
+
+        ## Find nodes
+        t1 = np.arange(NCc)
+        t2 = t1 + NCc
+        t3 = t2 + NCc
+        t4 = t3 + NCc
+
+        if any(cell[t1,1] != cell[t2,0]) or any(cell[t1,2] != cell[t3,0]) or\
+                any(cell[t4,0] != cell[t2,2]) or any(cell[t4,1] != cell[t3,0]):
+            return
+        p1 = cell[t1, 0]
+        p2 = cell[t2, 1]
+        p3 = cell[t3, 2]
+        p4 = cell[t4, 0]
+        p5 = cell[t1, 2]
+        p6 = cell[t1, 1]
+
+        ## Update and remove triangles
+        cell[t1,:] = np.c_[p1,p2,p3]
+        cell = cell[t1,:]
+
+        ## Record HB
+        HB[p6,:] = np.c_[p6, p1, p2]
+        HB[p4,:] = np.c_[p4, p2, p3]
+        HB[p5,:] = np.c_[p5, p1, p3]
+        
+        Nc = np.max(cell)
+        HB = HB[Nc:,:]
+
+        ## Update boundary edges
+        bdFlag = np.arange(0)
+
+        return HB
+        
+    def nodeinterpolate(self,u,HB):
+        oldN = u.shape[0]
+        newN = max(HB.shape[0],HB.shape[1])
+        if oldN >= newN:
+            idx = (HB == 0)
+            u[idx,:] = np.arange(0)
+        else:
+            u[newN,:] = 0
+            if min(HB[:,0]) > oldN:
+                u[HB[:,0],:] = (u[HB[:,1],:] + u[HB[:,2],:])/2
+            else:
+                while oldN < newN:
+                    newNode = np.arange(oldN, newN)
+                    firstNewNode = newNode[(HB[newNode,1] <= oldN) and (HB[newNode,2] <= oldN)]
+                    u[HB[firstNewNode,0]] = (u[HB[firstNewNode,1]] + u[HB[firstNewNode,2]])/2
+
+        return u
+           
+            
+            
+            
+            
+               
+               

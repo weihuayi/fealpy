@@ -6,7 +6,7 @@ from fealpy.mg.DarcyForchheimerP0P1MGModel import DarcyForchheimerP0P1MGModel
 
 np.set_printoptions(threshold = np.inf)
 
-box = [0, 1, 0, 1]
+box = [-1, 1, -1, 1]
 mu = 1
 rho = 1
 beta = 10
@@ -21,5 +21,5 @@ pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
 mesh = pde.init_mesh(1)
 integrator = mesh.integrator(p+2)
 femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
-u = femmg.compute_initial_value()
+u = femmg.mg()
 

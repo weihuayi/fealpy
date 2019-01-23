@@ -32,18 +32,39 @@ class Estimator:
             self.smooth_rho()
         self.compute_eta()
 
+    def is_extreme_node(self):
+
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        edge = mesh.entity('edge')
+
+        isSmall = self.rho[edge[:, 0]] < self.rho[edge[:, 1]]
+        minv = np.zeros(NN, dtype=np.int)
+        maxv = np.zeros(NN, dtype=np.int)
+        np.add.at(minv, edge[isSmall, 0], -1)
+        np.add.at(minv, edge[~isSmall, 1], -1)
+        np.add.at(maxv, edge[isSmall, 1], 1)
+        np.add.at(maxv, edge[~isSmall, 0), 1)
+        node2node = self.ds.node_to_node()
+        V = np.sum(node2node, axis=1)
+
+        isExtremeNode = (np.abs(minv) == V) || (np.abs(maxv) == V)
+        return isExtremeNode
+
     def smooth_rho(self):
         '''
         smooth the rho
         '''
         mesh = self.mesh
         cell = mesh.entity('cell')
+        isExtremeNode = self.is_extreme_node()
         node2cell = mesh.ds.node_to_cell()
         inva = 1/self.area
         s = node2cell@inva
         for i in range(2):
             crho = (self.rho[cell[:, 0]] + self.rho[cell[:, 1]] + self.rho[cell[:, 2]])/3.0
-            self.rho = np.asarray(node2cell@(crho*inva))/s
+            rho = np.asarray(node2cell@(crho*inva))/s
+            self.rho[~isExtremeNode] = rho[~isExtremeNode]
 
     def is_uniform(self):
         stde = np.std(self.eta)/self.maxeta
