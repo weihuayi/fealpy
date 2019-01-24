@@ -37,18 +37,16 @@ class Estimator:
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         edge = mesh.entity('edge')
+        node2node = mesh.ds.node_to_node()
+        V = np.asarray(np.sum(node2node, axis=1)).reshape(-1)
 
         isSmall = self.rho[edge[:, 0]] < self.rho[edge[:, 1]]
-        minv = np.zeros(NN, dtype=np.int)
-        maxv = np.zeros(NN, dtype=np.int)
-        np.add.at(minv, edge[isSmall, 0], -1)
-        np.add.at(minv, edge[~isSmall, 1], -1)
-        np.add.at(maxv, edge[isSmall, 1], 1)
-        np.add.at(maxv, edge[~isSmall, 0], 1)
-        node2node = mesh.ds.node_to_node()
-        V = np.sum(node2node, axis=1)
+        v = np.zeros(NN, dtype=np.int)
+        np.add.at(v, edge[isSmall, 0], 1)
+        np.add.at(v, edge[~isSmall, 1], 1)
 
-        isExtremeNode = (np.abs(minv) == V) | (np.abs(maxv) == V)
+        isExtremeNode = (v == V) | (V == (V - v))
+
         return isExtremeNode
 
     def smooth_rho(self):
@@ -81,16 +79,16 @@ def peak(p):
     return val
 
 node = np.array([
-    (0, 0), 
-    (1, 0), 
-    (1, 1),
-    (0, 1)], dtype=np.float)
+    (-5, -5), 
+    (5, -5), 
+    (5, 5),
+    (-5, 5)], dtype=np.float)
 cell = np.array([
     (1, 2, 0),
     (3, 0, 2)], dtype=np.int)
 
 mesh = TriangleMesh(node, cell)
-mesh.uniform_refine(4)
+mesh.uniform_refine(5)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 tmesh = Tritree(node, cell)
@@ -101,31 +99,25 @@ estimator = Estimator(uI[:], mesh, 0.3, 0.5)
 isExtremeNode = estimator.is_extreme_node()
 print(isExtremeNode.sum())
 
+tmesh.adaptive_refine(estimator)
+
+mesh = estimator.mesh
+isExtremeNode = estimator.is_extreme_node()
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, index=isExtremeNode)
 
 
+fig2 = plt.figure()
+fig2.set_facecolor('white')
+axes = fig2.gca(projection = '3d')
+x = mesh.node[:, 0]
+y = mesh.node[:, 1]
+cell = mesh.ds.cell
+femspace = LagrangeFiniteElementSpace(mesh, p=1) 
+uI = femspace.interpolation(peak)
+axes.plot_trisurf(x, y, cell, estimator.rho, cmap=plt.cm.jet, lw=0.0)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-x, y = np.meshgrid(node[:, 0], node[:, 1])
-#u = peak(node)
-#fig = plt.figure()
-#ax = Axes3D(fig)
-#ax.plot_surface(x, y, u, rstride=1, cstride=1, cmap=cm.viridis)
-#
-#plt.show()
+plt.show()
