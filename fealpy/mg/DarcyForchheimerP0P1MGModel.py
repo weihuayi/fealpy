@@ -53,8 +53,8 @@ class DarcyForchheimerP0P1MGModel:
 
         self.nlevel = n + 1
         u,p = self.compute_initial_value()
-        self.uu.append(u)
-        self.pp.append(p)
+        self.uuc.append(u)
+        self.ppc.append(p)
         
     def get_linear_stiff_matrix(self, level):
         
@@ -163,11 +163,11 @@ class DarcyForchheimerP0P1MGModel:
 
         ## P-R interation for D-F equation
         n = 0
-        ru1 = np.ones(maxN+1, dtype=np.float)
-        rp1 = np.ones(maxN+1, dtype=np.float)
+        ru = 1
+        rp = 1
         Aalpha = A11.data + area/alpha
         
-        while ru1[n]+rp1[n] > tol and n < maxN:
+        while ru+rp > tol and n < maxN:
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
             F = u/alpha - (mu/rho)*u - (A12@p - f)/area
@@ -194,8 +194,6 @@ class DarcyForchheimerP0P1MGModel:
             u1 = Aalphainv@(fnew - A12@p1)
             
             ## Updated residual and error of consective iterations
-            r[0,n] = ru
-            r[1,n] = rp
             n = n + 1
             uLength = np.sqrt(u1[::2]**2 + u1[1::2]**2)
             Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
@@ -204,8 +202,8 @@ class DarcyForchheimerP0P1MGModel:
                 rp = norm(g - A21@u1)
             else:
                 rp = norm(g - A21@u1)/norm(g)
-            eu = np.max(abs(u1 - self.uh0))
-            ep = np.max(abs(p1 - self.ph0))
+            eu = np.max(abs(u1 - u))
+            ep = np.max(abs(p1 - p))
 
             u[:] = u1
             p[:] = p1
@@ -234,13 +232,13 @@ class DarcyForchheimerP0P1MGModel:
         ## P-R interation for D-F equations
 
         n = 0
-        ru1 = np.ones(maxN,)
-        rp1 = np.ones(maxN,)
+        ru = 1
+        rp = 1
         uhalf[:] = uh
         Aalpha = A11.data + area/alpha
         Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
         Ap = A21@Aalphainv@A12
-        while ru1[n]+rp1[n] > tol and n < maxN:
+        while ru+rp > tol and n < maxN:
             ## step 2: Solve the linear Darcy equation
             # update RHS
             uhalfL = np.sqrt(uhalf[::2]**2 + uhalf[1::2]**2)
@@ -265,8 +263,6 @@ class DarcyForchheimerP0P1MGModel:
             uhalf = F/np.repeat(gamma, 2)
             
             ## Updated residual and error of consective iterations
-            r[0,n] = ru
-            r[1,n] = rp
             n = n + 1
             uLength = np.sqrt(u1[::2]**2 + u1[1::2]**2)
             Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
@@ -275,10 +271,10 @@ class DarcyForchheimerP0P1MGModel:
                 rp = norm(g - A21@u1)
             else:
                 rp = norm(g - A21@u1)/norm(g)
-            eu = np.max(abs(u1 - self.uh0))
-            ep = np.max(abs(p1 - self.ph0))
+            eu = np.max(abs(u1 - u))
+            ep = np.max(abs(p1 - p))
 
-            h[:] = u1
+            u[:] = u1
             p[:] = p1
             
         return u, p, ru, rp
@@ -287,23 +283,27 @@ class DarcyForchheimerP0P1MGModel:
         mesh = self.pspaces[level].mesh
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
+        cellmeasure = mesh.entity_measure('cell')
+        
         mu = self.pde.mu
         rho = self.pde.rho
         beta = self.pde.beta
         alpha = self.pde.alpha
         tol = self.pde.tol
+        J = self.nlevel
         # coarsest level: exact solve
         if level == 1:##
-            u,p,ru,rp = self.prev_smoothing(self, self.uuc[-1], self.ppc[-1], level, self.pde.maxN)
+            u,p,ru,rp = self.prev_smoothing(self.uuc[J-level-1], self.ppc[J-level-1], level, self.pde.maxN)
             rn = ru[end] + rp[end]
             uu.append(u)
             pp.append(p)
             return u,p
             
         ## Presmoothing
-        u,p,ru, rp = self.prev_smoothing(self, self.uuc[level], self.ppc[level], level, self.pde.mg_maxN)
-        uu.append(u)
-        pp.append(p)
+        print(J-level-1)
+        u,p,ru, rp = self.prev_smoothing(self.uuc[J-level-1], self.ppc[J-level-1], level, self.pde.mg_maxN)
+        self.uu.append(u)
+        self.pp.append(p)
         # form residual on the fine grid
         # get A，b on current level
         A11, A12 = self.A[level]
@@ -311,8 +311,8 @@ class DarcyForchheimerP0P1MGModel:
         f, g =  self.b[level]
         
         uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
-        Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
-        r = b[:2*NC] - Lu
+        Lu = A11@u + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u + A12@p
+        r = f - Lu
         
         # restrict residual to the coarse grid
         I0, I1 = self.IMatrix[level]
@@ -339,8 +339,8 @@ class DarcyForchheimerP0P1MGModel:
             mesh = self.pspaces[level].mesh
             cellmeasure = mesh.entity_measure('cell')
             I0, I1 = self.IMatrix[i]
-            u = self.uu[i]
-            eu = I0@(u - self.uuc[i])
+            u = self.uu[level-i-1]
+            eu = I0@(u - self.uuc[level-i-1])
             
             # project eu back to the div free subspace
             # get A，b on current level
@@ -359,7 +359,7 @@ class DarcyForchheimerP0P1MGModel:
             theta -= c
             delta = Auinv@(A12@theta)
             u = u + eu - delta
-            epc = self.pp[i] - self.ppc[i]
+            epc = self.pp[level-i-1] - self.ppc[level-i-1]
             HB = self.uniformcoarsenred(i)
             p = p + self.nodeinterpolate(epc, HB)
             
