@@ -6,10 +6,14 @@ class SurfaceIntegralAlg():
         self.mesh = mesh
         self.area = area
 
-    def integral(self, u, celltype=False):
+    def integral(self, u, celltype=False, barycenter=True):
         qf = self.integrator  
         bcs, ws = qf.quadpts, qf.weights
-        val = u(bcs)
+        if barycenter:
+            val = u(bcs)
+        else:
+            pp = self.mesh.bc_to_point(bcs)
+            val = u(pp)
         e = np.einsum('i, ij..., j->j...', ws, val, self.area)
         if celltype is True:
             return e
@@ -71,6 +75,7 @@ class SurfaceIntegralAlg():
 #        return np.sqrt(e.sum()) 
 
     def l2_error(self, u, uh):
+        e = self.integral(u, barycenter=False)/np.sum(self.area)
         uI = uh.space.interpolation(u)
         gdof = uh.space.number_of_global_dofs()
         return np.sqrt(np.sum((uI - uh)**2)/gdof)
