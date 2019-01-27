@@ -24,18 +24,28 @@ class Estimator:
         mesh = self.mesh
         cell = mesh.entity('cell')
         Dlambda = mesh.grad_lambda()
-        grad = np.einsum('ij, ijm->im', self.rho[cell], Dlambda)
-        eta = np.sqrt(np.sum(grad**2, axis=1)*self.area)
-        return eta
+        guh = np.einsum('ij, ijm->im', self.rho[cell], Dlambda)
+
+        node2cell = mesh.ds.node_to_cell()
+        inva = 1/mesh.area()
+        asum = node2cell@inva
+        rguh = np.asarray(node2cell@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
+
+        bc = np.array([1/3, 1/3, 1/3])
+        err = np.einsum('ijk, j->ik', rguh[cell], bc) - guh
+        eta0 = np.sqrt(np.sum(err**2, axis=1)*self.area)
+        eta1 = np.sqrt(np.sum(guh**2, axis=1)*self.area)
+        
+        return eta1 + eta0
 
     def update(self, rho, mesh, smooth=True):
         self.rho = rho
         self.mesh = mesh
         self.area = mesh.entity_measure('cell')
         if smooth is True:
-            #self.smooth_rho()
-            self.loop_smooth_rho()
-        self.compute_eta()
+            self.smooth_rho()
+            #self.loop_smooth_rho()
+        self.eta = self.compute_eta()
 
     def is_extreme_node(self):
         mesh = self.mesh
@@ -102,7 +112,7 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$||\\nabla u - \\nabla u_h||_{0}$', 
              '$||\\nabla u - G(\\nabla u_h)||_{0}sim$',]
 
-maxit = 5
+maxit = 1
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)

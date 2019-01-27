@@ -36,7 +36,9 @@ class Tritree(TriangleMesh):
             return self.parent[idx, 0] == -1
 
     def adaptive_refine(self, estimator, surface=None):
+        i = 0 
         while estimator.is_uniform() is False:
+            i += 1
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             rho = self.refine(isMarkedCell, surface=surface, rho=estimator.rho)
             if rho is not None:
@@ -45,14 +47,15 @@ class Tritree(TriangleMesh):
             else:
                 break
 
+            if i > 3:
+                break
+
     def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys(): 
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
-            print(eta.shape)
-            print(idxmap.shape)
             np.add.at(eta0, idxmap, eta)
         else:
             eta0 = eta
