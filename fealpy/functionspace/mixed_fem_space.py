@@ -78,6 +78,7 @@ class HuZhangFiniteElementSpace():
             gdof += (tdim-1)*edof*NE # 边内部连续自由度的个数 
             E = mesh.number_of_edges_of_cells() # 单元边的个数
             gdof += NC*E*edof # 边内部不连续自由度的个数 
+            #TODO: 找到错误了，对于三维边上连续的自由度个数为 2 个！
 
         if p > 2:
             fdof = (p+1)*(p+2)//2 - 3*p # 面内部自由度的个数
