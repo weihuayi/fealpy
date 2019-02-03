@@ -158,8 +158,8 @@ def show_mesh_2d(axes, mesh,
         if showcolorbar:
             f = axes.get_figure()
             cbar = f.colorbar(mapper, shrink=0.5, ax=axes)
-    node = mesh.node
-    cell = mesh.ds.cell
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
 
 
     if mesh.meshtype is not 'polygon':
