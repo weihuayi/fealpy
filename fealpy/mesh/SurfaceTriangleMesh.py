@@ -108,9 +108,9 @@ class SurfaceTriangleMesh():
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
         return bcp
 
-    def area(self):
+    def area(self, idx=3):
         mesh = self.mesh
-        integrator = self.integrator(10)
+        integrator = self.integrator(idx)
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)
