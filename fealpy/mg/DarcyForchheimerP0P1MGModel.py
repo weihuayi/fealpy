@@ -18,11 +18,6 @@ class DarcyForchheimerP0P1MGModel:
         self.IMatrix = []
         self.A = []
         self.b = []
-        self.uu = [] ## 磨光之后的值
-        self.pp = [] ## 磨光之后的值
-        self.uuc = [] ## 每层网格的初值
-        self.ppc = [] ## 每层网格的初值
-        self.r = []
 
         mesh0 = TriangleMesh(mesh.node, mesh.ds.cell)
         uspace = VectorLagrangeFiniteElementSpace(mesh0, p=0, spacetype='D')
@@ -52,9 +47,6 @@ class DarcyForchheimerP0P1MGModel:
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
 
         self.nlevel = n + 1
-        u,p = self.compute_initial_value()
-        self.uuc.append(u)
-        self.ppc.append(p)
         
     def get_linear_stiff_matrix(self, level):
         
@@ -279,7 +271,7 @@ class DarcyForchheimerP0P1MGModel:
             
         return u, p, ru, rp
 
-    def fas(self, level):       
+    def fas(self, level, u, p):       
         mesh = self.pspaces[level].mesh
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
@@ -300,7 +292,6 @@ class DarcyForchheimerP0P1MGModel:
             return u,p
             
         ## Presmoothing
-        print(J-level-1)
         u,p,ru, rp = self.prev_smoothing(self.uuc[J-level-1], self.ppc[J-level-1], level, self.pde.mg_maxN)
         self.uu.append(u)
         self.pp.append(p)
@@ -323,6 +314,36 @@ class DarcyForchheimerP0P1MGModel:
         self.ppc.append(pc)
         self.r.append(rc)
         ## ????
+        u, p = self.fas(level-1, uc, pc)
+        
+        eu = I0@(u - self.uuc[level-i-1])
+            
+        # project eu back to the div free subspace
+        # get A，b on current level
+        A11, A12 = self.A[i]
+        A21 = A12.transpose()
+        f, g =  self.b[i]
+        uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
+        Au = A11.data + beta*rho*np.repeat(uLength*area, 2)
+        Auinv = spdiags(1/Au, 0, 2*NC, 2*NC)
+        Atuta = A21@Auinv@A12
+        bp = A21@eu
+            
+        theta = np.zeros(bp.shape())
+        theta[1:] = spsolve(Atuta[1:, 1:], bp[1:])
+        c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
+        theta -= c
+        delta = Auinv@(A12@theta)
+        u = u + eu - delta
+        epc = self.pp[level-i-1] - self.ppc[level-i-1]
+        HB = self.uniformcoarsenred(i)
+        p = p + self.nodeinterpolate(epc, HB)
+            
+        ## Postsmoothing
+        u, p, ru, rp = self.post_smoothing(u, p, i)
+        rn = ru + rp
+        
+        return u, p, rn
         
     def mg(self):    
         mu = self.pde.mu
@@ -332,40 +353,8 @@ class DarcyForchheimerP0P1MGModel:
         tol = self.pde.tol
         level = self.nlevel
         
-        for i in range(level-1,0,-1):
-            self.fas(i) ###???需要循环结束再做提升
-        
-        for i in range(level-1, 0, -1):
-            mesh = self.pspaces[level].mesh
-            cellmeasure = mesh.entity_measure('cell')
-            I0, I1 = self.IMatrix[i]
-            u = self.uu[level-i-1]
-            eu = I0@(u - self.uuc[level-i-1])
-            
-            # project eu back to the div free subspace
-            # get A，b on current level
-            A11, A12 = self.A[i]
-            A21 = A12.transpose()
-            f, g =  self.b[i]
-            uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
-            Au = A11.data + beta*rho*np.repeat(uLength*area, 2)
-            Auinv = spdiags(1/Au, 0, 2*NC, 2*NC)
-            Atuta = A21@Auinv@A12
-            bp = A21@eu
-            
-            theta = np.zeros(bp.shape())
-            theta[1:] = spsolve(Atuta[1:, 1:], bp[1:])
-            c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
-            theta -= c
-            delta = Auinv@(A12@theta)
-            u = u + eu - delta
-            epc = self.pp[level-i-1] - self.ppc[level-i-1]
-            HB = self.uniformcoarsenred(i)
-            p = p + self.nodeinterpolate(epc, HB)
-            
-            ## Postsmoothing
-            u, p, ru, rp = self.post_smoothing(u, p, i)
-            
+        u,p = self.compute_initial_value()      
+        u, p, rn = self.fas(level-1, u, p) ###???需要循环结束再做提升
             
     def uniformcoarsenred(self,level):
         mesh = self.pspaces[level].mesh
