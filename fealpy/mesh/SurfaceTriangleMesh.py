@@ -5,12 +5,38 @@ from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1):
+        """
+        Initial a object of Surface Triangle Mesh. 
+
+        Parameters
+        ----------
+        self : 
+            Surface Triangle Mesh Object 
+        mesh : 
+            mesh object, represents a triangulation with flat triangle faces.
+        surface : 
+            The continuous surface which was represented as a level set
+            function.
+        p : int
+            The degree of the Lagrange space 
+
+        Returns
+        -------
+
+        See Also
+        --------
+            
+        Notes
+        -----
+        """ 
         self.mesh = mesh
         self.p = p
         self.V = LagrangeFiniteElementSpace(mesh, p)
         self.node, d = surface.project(self.V.interpolation_points())
         self.surface = surface
         self.ds = mesh.ds
+        self.ftype = mesh.ftype
+        self.itype = mesh.itype
 
     def integrator(self, k):
         return TriangleQuadrature(k) 
@@ -82,9 +108,9 @@ class SurfaceTriangleMesh():
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
         return bcp
 
-    def area(self):
+    def area(self, idx=3):
         mesh = self.mesh
-        integrator = self.integrator(self.p+4)
+        integrator = self.integrator(idx)
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)

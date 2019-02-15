@@ -11,7 +11,7 @@ class HuZhangFiniteElementSpace():
         self.mesh = mesh
         self.p = p
         self.dof = self.space.dof
-        self.dim = self.space.dim
+        self.dim = self.space.GD
         self.init_orth_matrices()
         self.init_cell_to_dof()
 
@@ -150,8 +150,9 @@ class HuZhangFiniteElementSpace():
             if gdim == 2:
                 cell2dof[:, idx, :] = base1 + tdim*(c2d[:, idx] - base0) + np.arange(tdim)
             elif gdim == 3:
-                # 0, 1, 2号局部自由度对应切向不连续的张量自由度, 留到后面重新编号
-                cell2dof[:, idx, 3:]= base1 + (tdim - 3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
+                # 1, 2, 3 号局部自由度对应切向不连续的张量自由度, 留到后面重新编号
+                # TODO: check it is right
+                cell2dof[:, idx.reshape(-1, 1), np.array([0, 4, 5])]= base1 + (tdim - 3)*(c2d[:, idx] - base0) + np.arange(tdim - 3)
 
         fdof = (p+1)*(p+2)//2 - 3*p # 边内部自由度
         if gdim == 3:
@@ -173,8 +174,9 @@ class HuZhangFiniteElementSpace():
         if gdim == 3:
             base1 += NC*len(idx)
             idx, = np.nonzero(dofFlags[2])
+            print(idx)
             if len(idx) > 0:
-                cell2dof[:, idx, 0:3] = base1 + np.arange(NC*len(idx)*3).reshape(NC, len(idx), 3)
+                cell2dof[:, idx.reshape(-1, 1), np.array([1, 2, 3])] = base1 + np.arange(NC*len(idx)*3).reshape(NC, len(idx), 3)
 
         self.cell2dof = cell2dof.reshape(NC, -1)
 

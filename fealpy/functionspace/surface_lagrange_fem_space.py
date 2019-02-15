@@ -145,8 +145,8 @@ class SurfaceLagrangeFiniteElementSpace:
         uI[:] = u(ipoint)
         return uI
 
-    def function(self, dim=None):
-        f = Function(self, dim=dim)
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
         return f
 
     def projection(self, u, up):
