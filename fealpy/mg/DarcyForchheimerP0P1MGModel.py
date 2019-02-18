@@ -8,11 +8,12 @@ from ..mesh import TriangleMesh
 
 class DarcyForchheimerP0P1MGModel:
 
-    def __init__(self, pde, mesh, n):
+    def __init__(self, pde, mesh, n, GD):
 
         self.integrator1 = mesh.integrator(3)
         self.integrator0 = mesh.integrator(1)
         self.pde = pde
+        self.GD = GD
         self.uspaces = []
         self.pspaces = []
         self.IMatrix = []
@@ -207,14 +208,16 @@ class DarcyForchheimerP0P1MGModel:
         mesh = self.pspaces[level].mesh
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
+        cell = mesh.entity('cell')
+        cellmeasure = mesh.entity_measure('cell')
+        area = np.repeat(cellmeasure,2)
+        
         mu = self.pde.mu
         rho = self.pde.rho
         beta = self.pde.beta
         alpha = self.pde.alpha
-        tol = self.tol
-        maxN = self.pde.mg_maxN
-        cellmeasure = mesh.entity_measure('cell')
-        area = np.repeat(cellmeasure,2)
+        tol = self.pde.tol
+        maxN = self.pde.mg_maxN       
         
         # get A，b on current level
         A11, A12 = self.A[level]
@@ -226,7 +229,8 @@ class DarcyForchheimerP0P1MGModel:
         n = 0
         ru = 1
         rp = 1
-        uhalf[:] = uh
+        uhalf = np.zeros(u.shape)
+        uhalf[:] = u
         Aalpha = A11.data + area/alpha
         Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
         Ap = A21@Aalphainv@A12
@@ -275,6 +279,7 @@ class DarcyForchheimerP0P1MGModel:
         mesh = self.pspaces[level].mesh
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
+        cell = mesh.entity('cell')
         cellmeasure = mesh.entity_measure('cell')
         
         mu = self.pde.mu
@@ -285,16 +290,12 @@ class DarcyForchheimerP0P1MGModel:
         J = self.nlevel
         # coarsest level: exact solve
         if level == 1:##
-            u,p,ru,rp = self.prev_smoothing(self.uuc[J-level-1], self.ppc[J-level-1], level, self.pde.maxN)
-            rn = ru[end] + rp[end]
-            uu.append(u)
-            pp.append(p)
+            u,p,ru,rp = self.prev_smoothing(u, p, level, self.pde.maxN)
+            rn = ru + rp
             return u,p
             
         ## Presmoothing
-        u,p,ru, rp = self.prev_smoothing(self.uuc[J-level-1], self.ppc[J-level-1], level, self.pde.mg_maxN)
-        self.uu.append(u)
-        self.pp.append(p)
+        u, p, ru, rp = self.prev_smoothing(u, p, level, self.pde.mg_maxN)
         # form residual on the fine grid
         # get A，b on current level
         A11, A12 = self.A[level]
@@ -304,44 +305,66 @@ class DarcyForchheimerP0P1MGModel:
         uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
         Lu = A11@u + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u + A12@p
         r = f - Lu
-        
+
+        # get A, b on the coarse grid
+        Ac11, Ac12 = self.A[level-1]
+        Ac21 = Ac12.transpose()
+        fc, gc = self.b[level-1]
+        gm, = gc.shape
         # restrict residual to the coarse grid
-        I0, I1 = self.IMatrix[level]
-        rc = I0.T@r
-        uc = (I0.T@u)/4## ????要不要除以4
-        pc = p[:Nc]
-        self.uuc.append(uc)                            
-        self.ppc.append(pc)
-        self.r.append(rc)
+        Pro_p, I1 = self.IMatrix[level-1]
+        m1, m2 = I1.shape
+        I, J = np.nonzero(I1)
+        Pro_u = coo_matrix((self.GD*m1, self.GD*m2))
+        for i in range(self.GD):
+            Pro_u += coo_matrix((I1.data, (self.GD*I + i, self.GD*J + i)), shape = (self.GD*m1, self.GD*m2))
+
+        Pro_u = Pro_u.tocsr()
+        print('Pro_u', Pro_u.shape)
+        print('r', r.shape)
+        rc = Pro_u.T@r
+        uc = (Pro_u.T@u)/4## ????要不要除以4
+        pc = p[:gm]
+        print('uc', uc.shape)
+        print('p', p.shape)
+        print('pc', pc.shape)
+
+
         ## ????
-        u, p = self.fas(level-1, uc, pc)
-        
-        eu = I0@(u - self.uuc[level-i-1])
+        print('3')
+        v, q, rn = self.fas(level-1, uc, pc)
+        print('1')
+        eu = Pro_u@(v - uc)
             
         # project eu back to the div free subspace
         # get A，b on current level
-        A11, A12 = self.A[i]
+        A11, A12 = self.A[level]
         A21 = A12.transpose()
-        f, g =  self.b[i]
-        uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
-        Au = A11.data + beta*rho*np.repeat(uLength*area, 2)
+        f, g =  self.b[level]
+        #uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
+        print('eu', eu.shape)
+        print('uLength', uLength.shape)
+        print('cellmeasure', cellmeasure.shape)
+        Au = A11.data + beta*rho*np.repeat(uLength*cellmeasure, 2)
         Auinv = spdiags(1/Au, 0, 2*NC, 2*NC)
         Atuta = A21@Auinv@A12
         bp = A21@eu
             
-        theta = np.zeros(bp.shape())
+        theta = np.zeros(bp.shape)
         theta[1:] = spsolve(Atuta[1:, 1:], bp[1:])
-        c = np.sum(np.mean(p[cell], 1)*cellmeasure)/np.sum(cellmeasure)
+        c = np.sum(np.mean(theta[cell], 1)*cellmeasure)/np.sum(cellmeasure)
         theta -= c
         delta = Auinv@(A12@theta)
         u = u + eu - delta
-        epc = self.pp[level-i-1] - self.ppc[level-i-1]
-        HB = self.uniformcoarsenred(i)
-        p = p + self.nodeinterpolate(epc, HB)
+
+        epc = q - pc
+        HB = self.uniformcoarsenred(level)
+        p = p + Pro_p@epc
             
         ## Postsmoothing
-        u, p, ru, rp = self.post_smoothing(u, p, i)
+        u, p, ru, rp = self.post_smoothing(u, p, level)
         rn = ru + rp
+        print('2')
         
         return u, p, rn
         
@@ -402,23 +425,28 @@ class DarcyForchheimerP0P1MGModel:
 
         return HB
         
-    def nodeinterpolate(self,u,HB):
+    def nodeinterpolate(self, u, HB):
         oldN = u.shape[0]
-        newN = max(HB.shape[0],HB.shape[1])
+        newN = max(HB.shape[0],np.max(HB))
         if oldN >= newN:
             idx = (HB == 0)
-            u[idx,:] = np.arange(0)
+            u[idx,:] = []
         else:
-            u[newN,:] = 0
-            if min(HB[:,0]) > oldN:
-                u[HB[:,0],:] = (u[HB[:,1],:] + u[HB[:,2],:])/2
+            u1 = np.zeros(newN)
+            u1[:oldN] = u[:]
+            print('2', HB)
+            if np.min(HB[:,0]) > oldN:
+                u1[HB[:,0],:] = (u1[HB[:,1],:] + u1[HB[:,2],:])/2
             else:
                 while oldN < newN:
                     newNode = np.arange(oldN, newN)
-                    firstNewNode = newNode[(HB[newNode,1] <= oldN) and (HB[newNode,2] <= oldN)]
-                    u[HB[firstNewNode,0]] = (u[HB[firstNewNode,1]] + u[HB[firstNewNode,2]])/2
 
-        return u
+                    print('1', HB[newNode, 1] <= oldN)
+                    print('newNode', newNode[()])
+                    firstNewNode = newNode[(HB[newNode,1] <= oldN) and (HB[newNode,2] <= oldN)]
+                    u1[HB[firstNewNode,0]] = (u1[HB[firstNewNode,1]] + u1[HB[firstNewNode,2]])/2
+
+        return u1
            
             
             

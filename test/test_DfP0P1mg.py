@@ -16,10 +16,12 @@ level = 4
 mg_maxN = 3
 maxN = 2000
 p = 1
+GD = 2
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
 mesh = pde.init_mesh(1)
 integrator = mesh.integrator(p+2)
-femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
-u = femmg.mg()
+femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level, GD)
+uu, pp = femmg.compute_initial_value()
+u = femmg.fas(level, uu, pp)
 
