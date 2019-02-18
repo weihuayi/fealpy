@@ -48,6 +48,7 @@ class DarcyForchheimerP0P1MGModel:
         self.pI = self.pspaces[-1].interpolation(pde.pressure)
 
         self.nlevel = n + 1
+        self.rnorm = 0
         
     def get_linear_stiff_matrix(self, level):
         
@@ -232,8 +233,6 @@ class DarcyForchheimerP0P1MGModel:
         uhalf = np.zeros(u.shape)
         uhalf[:] = u
         Aalpha = A11.data + area/alpha
-        Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
-        Ap = A21@Aalphainv@A12
         while ru+rp > tol and n < maxN:
             ## step 2: Solve the linear Darcy equation
             # update RHS
@@ -243,17 +242,20 @@ class DarcyForchheimerP0P1MGModel:
             
             ## Direct Solver
            # print('Ap',Ap.toarray())
+            Aalphainv = spdiags(1/Aalpha, 0, 2*NC, 2*NC)
+            Ap = A21@Aalphainv@A12
             bp = A21@(Aalphainv@fnew) - g
            # print('bp', bp)
-            p1 = np.zeros(NN,dtype=np.float)
-            p1[1:] = spsolve(Ap[1:,1:],bp[1:])
-            c = np.sum(np.mean(p1[cell],1)*cellmeasure)/np.sum(cellmeasure)
+            p1 = np.zeros(NN, dtype=np.float)
+            p1[1:] = spsolve(Ap[1:,1:], bp[1:])
+            c = np.sum(np.mean(p1[cell], 1)*cellmeasure)/np.sum(cellmeasure)
             p1 -= c
             u1 = Aalphainv@(fnew - A12@p1)
             
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
-            F = u/alpha - (mu/rho)*u - (A12@p - f)/area
+            F = u1/alpha - (mu/rho)*u1 - (A12@p1 - f)/area
+            print('F', F)
             FL = np.sqrt(F[::2]**2 + F[1::2]**2)
             gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
             uhalf = F/np.repeat(gamma, 2)
@@ -263,12 +265,16 @@ class DarcyForchheimerP0P1MGModel:
             uLength = np.sqrt(u1[::2]**2 + u1[1::2]**2)
             Lu = A11@u1 + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u1 + A12@p1
             ru = norm(f - Lu)/norm(f)
+            #print('f', f)
+            #print('Lu', Lu)
             if norm(g) == 0:
                 rp = norm(g - A21@u1)
             else:
                 rp = norm(g - A21@u1)/norm(g)
             eu = np.max(abs(u1 - u))
             ep = np.max(abs(p1 - p))
+            print('ru1', ru)
+            print('rp1', rp)
 
             u[:] = u1
             p[:] = p1
@@ -292,10 +298,13 @@ class DarcyForchheimerP0P1MGModel:
         if level == 1:##
             u,p,ru,rp = self.prev_smoothing(u, p, level, self.pde.maxN)
             rn = ru + rp
-            return u,p
+            self.rnorm = rn
+            return u, p
             
         ## Presmoothing
         u, p, ru, rp = self.prev_smoothing(u, p, level, self.pde.mg_maxN)
+        #print('u', u)
+        #print('p', p)
         # form residual on the fine grid
         # get A，b on current level
         A11, A12 = self.A[level]
@@ -303,8 +312,11 @@ class DarcyForchheimerP0P1MGModel:
         f, g =  self.b[level]
         
         uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
+        #print('uLength', uLength)
         Lu = A11@u + (beta/rho)*np.repeat(uLength*cellmeasure, 2)*u + A12@p
+        #print('Lu', Lu)
         r = f - Lu
+        #print('r', r)
 
         # get A, b on the coarse grid
         Ac11, Ac12 = self.A[level-1]
@@ -320,20 +332,20 @@ class DarcyForchheimerP0P1MGModel:
             Pro_u += coo_matrix((I1.data, (self.GD*I + i, self.GD*J + i)), shape = (self.GD*m1, self.GD*m2))
 
         Pro_u = Pro_u.tocsr()
-        print('Pro_u', Pro_u.shape)
-        print('r', r.shape)
+        #print('Pro_u', Pro_u.shape)
+        #print('r', r.shape)
         rc = Pro_u.T@r
         uc = (Pro_u.T@u)/4## ????要不要除以4
         pc = p[:gm]
-        print('uc', uc.shape)
-        print('p', p.shape)
-        print('pc', pc.shape)
+        #print('uc', uc)
+        #print('rc', rc)
+        #print('pc', pc)
 
 
         ## ????
-        print('3')
-        v, q, rn = self.fas(level-1, uc, pc)
-        print('1')
+        v, q = self.fas(level-1, uc, pc) #v, q 的值不对
+        #print('v', v)
+        #print('q', q)
         eu = Pro_u@(v - uc)
             
         # project eu back to the div free subspace
@@ -342,9 +354,9 @@ class DarcyForchheimerP0P1MGModel:
         A21 = A12.transpose()
         f, g =  self.b[level]
         #uLength = np.sqrt(u[::2]**2 + u[1::2]**2)
-        print('eu', eu.shape)
-        print('uLength', uLength.shape)
-        print('cellmeasure', cellmeasure.shape)
+        #print('eu', eu.shape)
+        #print('uLength', uLength.shape)
+        #print('cellmeasure', cellmeasure.shape)
         Au = A11.data + beta*rho*np.repeat(uLength*cellmeasure, 2)
         Auinv = spdiags(1/Au, 0, 2*NC, 2*NC)
         Atuta = A21@Auinv@A12
@@ -364,20 +376,36 @@ class DarcyForchheimerP0P1MGModel:
         ## Postsmoothing
         u, p, ru, rp = self.post_smoothing(u, p, level)
         rn = ru + rp
-        print('2')
+        print('rn', rn)
+        self.rnorm = rn
         
-        return u, p, rn
+        return u, p
         
     def mg(self):    
-        mu = self.pde.mu
-        rho = self.pde.rho
-        beta = self.pde.beta
-        alpha = self.pde.alpha
-        tol = self.pde.tol
-        level = self.nlevel
+        ## MG iteration
+        level = self.nlevel - 1
+        maxN = self.pde.maxN
+        n = 0
+        error = np.ones(maxN,)
+        residual = np.ones(maxN,)
+        uold, pold = self.compute_initial_value()
+        u1 = np.zeros(uold.shape)
         
-        u,p = self.compute_initial_value()      
-        u, p, rn = self.fas(level-1, u, p) ###???需要循环结束再做提升
+        while n <= maxN and residual[n] >= self.pde.tol:
+            u1[:] = uold
+            u, p = self.fas(level, uold, pold)
+            n = n + 1
+            erru = norm(u - u1)/norm(u1)
+            error[n] = erru
+            residual[n] = self.rnorm
+            uold[:] = u
+            pold[:] = p
+            print('error', error[n])
+            print('res', residual[n])
+            
+        return n
+            
+        
             
     def uniformcoarsenred(self,level):
         mesh = self.pspaces[level].mesh
