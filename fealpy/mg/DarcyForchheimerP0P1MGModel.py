@@ -202,6 +202,9 @@ class DarcyForchheimerP0P1MGModel:
             u[:] = u1
             p[:] = p1
                                 
+            #print('u1', u1)
+            #print('uu', u)
+        #print('uuu', u)
         
         return u, p, ru, rp
 
@@ -255,7 +258,7 @@ class DarcyForchheimerP0P1MGModel:
             ## step 1: Solve the nonlinear Darcy equation
             # Knowing (u,p), explicitly compute the intermediate velocity u(n+1/2)
             F = u1/alpha - (mu/rho)*u1 - (A12@p1 - f)/area
-            print('F', F)
+            #print('F', F)
             FL = np.sqrt(F[::2]**2 + F[1::2]**2)
             gamma = 1.0/(2*alpha) + np.sqrt((1.0/alpha**2) + 4*(beta/rho)*FL)/2
             uhalf = F/np.repeat(gamma, 2)
@@ -297,6 +300,7 @@ class DarcyForchheimerP0P1MGModel:
         # coarsest level: exact solve
         if level == 1:##
             u,p,ru,rp = self.prev_smoothing(u, p, level, self.pde.maxN)
+            #print('u', u)
             rn = ru + rp
             self.rnorm = rn
             return u, p
@@ -336,7 +340,8 @@ class DarcyForchheimerP0P1MGModel:
         #print('r', r.shape)
         rc = Pro_u.T@r
         uc = (Pro_u.T@u)/4## ????要不要除以4
-        pc = p[:gm]
+        #pc = p[:gm]
+        pc = Pro_p.T@p
         #print('uc', uc)
         #print('rc', rc)
         #print('pc', pc)
