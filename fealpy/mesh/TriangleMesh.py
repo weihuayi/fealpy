@@ -256,6 +256,66 @@ class TriangleMesh(Mesh2d):
         else:                                                                   
             return(Iu, True) 
 
+    def bisect(self, markedCell, u=None):
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+
+        cell = self.ds.cell
+        edge = self.ds.edge
+        cell2edge = self.ds.cell_to_edge()
+        cell2cell = self.ds.cell_to_cell()
+
+        isCutEdge = np.zeros((NE,), dtype=np.bool)
+        while len(markedCell)>0:
+            isCutEdge[cell2edge[markedCell, 0]]=True
+            refineNeighbor = cell2cell[markedCell, 0]
+            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
+
+        edge2newNode = np.zeros((NE,), dtype=self.itype)
+        edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
+
+        node = self.node
+        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
+        self.node = np.concatenate((node, newNode), axis=0)
+        cell2edge0 = cell2edge[:, 0]
+
+        for k in range(2):
+            idx, = np.nonzero(edge2newNode[cell2edge0]>0)
+            nc = len(idx)
+            if nc == 0:
+                break
+            L = idx
+            R = np.arange(NC, NC+nc)
+            p0 = cell[idx,0]
+            p1 = cell[idx,1]
+            p2 = cell[idx,2]
+            p3 = edge2newNode[cell2edge0[idx]]
+            cell = np.concatenate((cell, np.zeros((nc,3), dtype=self.itype)), axis=0)
+            cell[L,0] = p3 
+            cell[L,1] = p0 
+            cell[L,2] = p1 
+            cell[R,0] = p3 
+            cell[R,1] = p2 
+            cell[R,2] = p0 
+            if k == 0:
+                cell2edge0 = np.zeros((NC+nc,), dtype=self.itype)
+                cell2edge0[0:NC] = cell2edge[:,0]
+                cell2edge0[L] = cell2edge[idx,2]
+                cell2edge0[R] = cell2edge[idx,1]
+            NC = NC+nc
+
+        # reconstruct the  data structure
+        if u is not None:                                                       
+            eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)                         
+            Iu = np.concatenate((u, eu), axis=0)                                
+        if u is None:                                                           
+            return True                                                         
+        else:                                                                   
+            return(Iu, True) 
+        NN = self.node.shape[0]
+        self.ds.reinit(NN, cell)
 
     def grad_lambda(self):
         node = self.node
