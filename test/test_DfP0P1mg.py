@@ -12,14 +12,16 @@ rho = 1
 beta = 10
 alpha = 1/beta
 tol = 1e-6
-level = 4
+level = 1
 mg_maxN = 3
 maxN = 2000
 p = 1
+GD = 2
 
 pde = DarcyForchheimerdata1(box,mu,rho,beta,alpha,level,tol,maxN,mg_maxN)
-mesh = pde.init_mesh(1)
+mesh = pde.init_mesh(4)
 integrator = mesh.integrator(p+2)
-femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level)
-u = femmg.mg()
+femmg = DarcyForchheimerP0P1MGModel(pde, mesh, level, GD)
+m = femmg.mg()
 
+print(m)
