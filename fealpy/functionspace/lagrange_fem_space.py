@@ -198,7 +198,6 @@ class LagrangeFiniteElementSpace():
         else:
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
-
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
         uI = Function(self, dim=dim)
@@ -270,7 +269,7 @@ class LagrangeFiniteElementSpace():
         J = I.swapaxes(-1, -2)
 
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
     def source_vector(self, f, qf, measure, surface=None):
