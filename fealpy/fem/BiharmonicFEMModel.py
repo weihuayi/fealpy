@@ -8,6 +8,7 @@ from ..boundarycondition import DirichletBC
 
 from .integral_alg import IntegralAlg
 from timeit import default_timer as timer
+
 try:
     from mumps import spsolve
 except  ImportError:

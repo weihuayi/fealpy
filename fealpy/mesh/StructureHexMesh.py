@@ -11,12 +11,12 @@ class StructureHexMesh(Mesh3d):
     
     @property
     def node(self):
-        N = self.ds.N
+        NN = self.ds.NN
         box = self.box
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        node = np.zeros((N, 3), dtype=np.float)
+        node = np.zeros((NN, 3), dtype=np.float)
         X, Y, Z = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1),
@@ -57,19 +57,19 @@ class StructureHexMeshDataStructure():
         self.ny = ny
         self.nz = nz
 
-        self.N = (nx+1)*(ny+1)*(nz+1)
+        self.NN = (nx+1)*(ny+1)*(nz+1)
         self.NE = nz*(ny+1)*(nx+1) + ny*(nx+1)*(nz+1) + nx*(ny+1)*(nz+1)
         self.NF = 3*nx*ny*nz + nx*ny + ny*nz + nz*nx
         self.NC = nx*ny*nz
 
     @property
     def cell(self):
-        N = self.N
+        NN = self.NN
         nx = self.nx
         ny = self.ny
         nz = self.nz
         NC = self.NC
-        idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
         cell = np.zeros((NC, 8), dtype=np.int)
         nyz = (ny + 1)*(nz + 1)
@@ -85,13 +85,13 @@ class StructureHexMeshDataStructure():
 
     @property
     def face(self):
-        N = self.N
+        NN = self.NN
         NF = self.NF
 
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
 
         face = np.zeros((NF, 4), dtype=np.int)
         c = idx[:, :-1, :-1]
@@ -124,7 +124,7 @@ class StructureHexMeshDataStructure():
 
     @property
     def face2cell(self):
-        N = self.N
+        NN = self.NN
         NF = self.NF
         NC = self.NC
 
@@ -189,11 +189,11 @@ class StructureHexMeshDataStructure():
 
     @property
     def edge(self):
-        N = self.N
+        NN = self.NN
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
 
         NE = self.NE
         edge = np.zeros((NE, 2), dtype=np.int)
@@ -221,11 +221,11 @@ class StructureHexMeshDataStructure():
 
     @property
     def cell2edge(self):
-        N = self.N
+        NN = self.NN
         NE = self.NE
         edge = self.edge
         idx = range(1, NE+1)
-        p2p = csr_matrix((idx, (edge[:, 0], edge[:, 1])), shape=(N, N),
+        p2p = csr_matrix((idx, (edge[:, 0], edge[:, 1])), shape=(NN, NN),
                 dtype=np.int)
         totalEdge = self.total_edge()
         cell2edge = np.asarray(p2p[totalEdge[:, 0], totalEdge[:, 1]]).reshape(-1, 12)
@@ -241,7 +241,7 @@ class StructureHexMeshDataStructure():
     def cell_to_node(self):
         """ 
         """
-        N = self.N
+        NN = self.NN
         NC = self.NC
         V = self.V
 
