@@ -65,8 +65,10 @@ class BiharmonicRecoveryFEMModel:
         e = np.sqrt(e)
         return e 
 
-    def recover_grad(self):
-        uh = self.uh
+    def recover_grad(self, uh=None):
+        if uh is None:
+            uh = self.uh
+
         self.rgh[:, 0] = self.A@uh
         self.rgh[:, 1] = self.B@uh
         mesh = self.space.mesh

@@ -13,6 +13,13 @@ class VSSPData:
         r = np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*y)
         return r
 
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=p.dtype)
+        return val
+
     def init_mesh(self, meshtype='tri', n=1, ftype=np.float, itype=np.int):
         node = np.array([
             (0.0, 0.0),
