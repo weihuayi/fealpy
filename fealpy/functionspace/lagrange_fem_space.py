@@ -219,7 +219,7 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=self.ftype)
 
     def stiff_matrix(self, qf, measure):
         p = self.p
@@ -375,7 +375,7 @@ class VectorLagrangeFiniteElementSpace():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        return np.zeros(gdof, dtype=np.float)
+        return np.zeros(gdof, dtype=self.mesh.ftype)
 
     def interpolation(self, u):
         GD = self.GD
