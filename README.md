@@ -1,5 +1,7 @@
 # FEALPy: Finite Element Analysis Library in Python
 
+[![Join the chat at https://gitter.im/weihuayi/fealpy](https://badges.gitter.im/weihuayi/fealpy.svg)](https://gitter.im/weihuayi/fealpy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 We want to develop an efficient and easy to use finite element software
 package to support our teach and research work. 
 
