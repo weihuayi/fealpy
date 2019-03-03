@@ -1,7 +1,6 @@
 import numpy as np
 from numpy.linalg import norm
 
-
 class SteepestDescentAlg:
     def __init__(self, problem):
         self.problem = problem

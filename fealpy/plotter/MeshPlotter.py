@@ -1,4 +1,3 @@
-
 import numpy as np
 from paraview.simple import *
 import vtk
@@ -8,8 +7,12 @@ import multiprocessing
 import time
 
 class MeshPlotter:
-    def __init__(self, node, cell, celltype, show, nodedata=None, celldata=None, meshdata=None, simulation=None):
-
+    def __init__(self, node, cell, celltype, show, 
+            celllocation=None,
+            nodedata=None, 
+            celldata=None, 
+            meshdata=None, 
+            simulation=None):
         self.show = show
         NN = node.shape[1]
         NC = cell.shape[0]
@@ -42,12 +45,13 @@ class MeshPlotter:
         self.view.ViewSize = [2418, 1297]
         self.display = Show(self.source, self.view)
 
+        LUT = GetColorTransferFunction(self.show[1])
         self.display.RescaleTransferFunctionToDataRange(True, False)
         self.display.SetScalarBarVisibility(self.view, True)
         self.display.NonlinearSubdivisionLevel = 4
-        LUT = GetColorTransferFunction(self.show[1])
         ColorBy(self.display, self.show)
         Render()
+        print('test')
 
         self.queue = multiprocessing.Queue()
         self.process = multiprocessing.Process(None, simulation,
