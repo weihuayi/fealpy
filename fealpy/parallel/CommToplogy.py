@@ -1,5 +1,5 @@
 import numpy as np
-import .ParaArray import ParaArray
+from .ParaArray import ParaArray
 
 class CommToplogy():
     """
@@ -27,7 +27,7 @@ class CSRMatrixCommToplogy(CommToplogy):
     进程进行任务分割，并建立好通信拓扑，然后广播给每个进程。两种方式需要探讨优劣
     。
     """
-    def __init__(self, comm， N):
+    def __init__(self, comm, N):
         """__init__
 
         :param comm: 通信子
@@ -95,14 +95,14 @@ class CSRMatrixCommToplogy(CommToplogy):
 
         #接收当前进程需要发送数据的编号信息
         for r in self.neighbor:  
-            data = self.sendds[r]
+            data = self.sds[r]
             req = comm.Irecv(data, source=r, tag=r)
             req.Wait()
 
     def get_parallel_operator(self, A):
         rank = self.comm.Get_rank()
         A = A[self.location[rank]:self.location[rank+1]]
-        self.build_comm_toplogy(A.indices)
+        self.create_comm_toplogy(A.indices)
         return A
 
     def get_parallel_array(self, a):
