@@ -4,7 +4,7 @@ class NumCompComponent():
     """
     并行计算构件， 负责局部计算和通信
     """
-    def __init__(self, commtop, numop):
+    def __init__(self, commtop):
         """
         初始化函数
 
@@ -19,7 +19,9 @@ class NumCompComponent():
         ----
         """
         self.commtop = commtop
-        self.numop = numop 
+
+    def computing(self, A, parray):
+        parray.update(A@parray)
 
     def communicating(self, parray):
         ct = self.commtop

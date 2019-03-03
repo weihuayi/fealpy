@@ -1,4 +1,5 @@
 import numpy as np
+import .ParaArray import ParaArray
 
 class CommToplogy():
     """
@@ -64,7 +65,6 @@ class CSRMatrixCommToplogy(CommToplogy):
         rank = comm.Get_rank()
 
         indices = np.unique(indices)
-
         isNotLocal = (indices < self.location[rank]) | (indices >= self.location[rank+1])
         indices = indices[isNotLocal]
 
