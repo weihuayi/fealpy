@@ -42,7 +42,7 @@ class SurfaceLagrangeFiniteElementSpace:
         self.surface = surface
         
         if p0 == p:
-            self.dof = self.mesh.V.dof
+            self.dof = self.mesh.space.dof
             self.dim = 2
         else:
             if spacetype is 'C':
@@ -59,7 +59,7 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         Compute all basis function values at a given barrycenter.
         """
-        return self.mesh.V.basis(bc)
+        return self.mesh.space.basis(bc)
 
     def grad_basis(self, bc, cellidx=None):
         """

@@ -31,12 +31,14 @@ class SurfaceTriangleMesh():
         """ 
         self.mesh = mesh
         self.p = p
-        self.V = LagrangeFiniteElementSpace(mesh, p)
-        self.node, d = surface.project(self.V.interpolation_points())
+        self.space = LagrangeFiniteElementSpace(mesh, p)
+        self.node, d = surface.project(self.space.interpolation_points())
         self.surface = surface
         self.ds = mesh.ds
         self.ftype = mesh.ftype
         self.itype = mesh.itype
+        self.nodedata = {}
+        self.celldata = {}
 
     def integrator(self, k):
         return TriangleQuadrature(k) 
@@ -49,7 +51,7 @@ class SurfaceTriangleMesh():
         elif etype in ['node', 0]:
             return self.mesh.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise spacealueError("`entitytype` is wrong!")
 
     def number_of_nodes(self):
         return self.node.shape[0] 
@@ -69,9 +71,9 @@ class SurfaceTriangleMesh():
     def jacobi_matrix(self, bc, cellidx=None):
         mesh = self.mesh
         cell = mesh.ds.cell
-        cell2dof = self.V.dof.cell2dof
+        cell2dof = self.space.dof.cell2dof
 
-        grad = self.V.grad_basis(bc, cellidx=cellidx)
+        grad = self.space.grad_basis(bc, cellidx=cellidx)
         # the tranpose of the jacobi matrix between S_h and K 
         Jh = mesh.jacobi_matrix(cellidx=cellidx) 
 
@@ -100,8 +102,8 @@ class SurfaceTriangleMesh():
 
 
     def bc_to_point(self, bc, cellidx=None):
-        basis = self.V.basis(bc)
-        cell2dof = self.V.dof.cell2dof
+        basis = self.space.basis(bc)
+        cell2dof = self.space.dof.cell2dof
         if cellidx is None:
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof, :])
         else:
