@@ -22,7 +22,7 @@ elif m == 2:
     pde = KelloggData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
 
-theta = 0.2
+theta = 0.45
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u- u_h ||_{0}$',
              '$|| \\nabla u - \\nabla u_h ||_{0}$',
@@ -47,7 +47,7 @@ for i in range(maxit):
     errorMatrix[1, i] = fem.get_L2_error()
     errorMatrix[2, i] = fem.get_H1_error()
     errorMatrix[3, i] = fem.get_recover_error(rguh)
-    isMarkedCell = tmesh.marker(eta, theta, method='L2')
+    #isMarkedCell = tmesh.refine_marker(eta, theta, method='L2')
     if i < maxit -1:
         isMarkedCell = tmesh.refine_marker(eta, theta, method='L2')
         tmesh.refine(isMarkedCell)

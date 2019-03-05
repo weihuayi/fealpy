@@ -21,10 +21,11 @@ def load_vtk_mesh(fileName):
     return pmesh
 
 def write_vtk_mesh(mesh, fileName):
-    point = mesh.point
+    node = mesh.entity('node')
     if point.shape[1] == 2:
-        point = np.concatenate((point, np.zeros((point.shape[0], 1), dtype=np.float)), axis=1)
-    ug = tvtk.UnstructuredGrid(points=point)
+        node = np.concatenate((node, np.zeros((node.shape[0], 1),
+            dtype=mesh.ftype)), axis=1)
+    ug = tvtk.UnstructuredGrid(points=node)
 
     if mesh.meshtype is 'hex':
         cell_type = tvtk.Hexahedron().cell_type

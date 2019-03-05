@@ -68,7 +68,7 @@ class PoissonFEMModel(object):
         end = timer()
         print("Solve time:", end-start)
 
-        ls = {'A':AD, 'b':b, 'solution':self.uh[:]}
+        ls = {'A':AD, 'b':b, 'solution':self.uh.copy()}
 
         return ls # return the linear system
 

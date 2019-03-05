@@ -8,6 +8,7 @@ from ..boundarycondition import DirichletBC
 
 from .integral_alg import IntegralAlg
 from timeit import default_timer as timer
+
 try:
     from mumps import spsolve
 except  ImportError:
@@ -64,18 +65,20 @@ class BiharmonicRecoveryFEMModel:
         e = np.sqrt(e)
         return e 
 
-    def recover_grad(self):
-        uh = self.uh
+    def recover_grad(self, uh=None):
+        if uh is None:
+            uh = self.uh
+
         self.rgh[:, 0] = self.A@uh
         self.rgh[:, 1] = self.B@uh
         mesh = self.space.mesh
         node = mesh.node
-        isBdNodes = mesh.ds.boundary_node_flag()
-        val = self.pde.gradient(node[isBdNodes])
-        isNotNan = np.isnan(val)
-        self.rgh[isBdNodes][isNotNan] = val[isNotNan] 
-
-        self.rgh[isBdNodes, :] = self.pde.gradient(node[isBdNodes, :])
+#        isBdNodes = mesh.ds.boundary_node_flag()
+#        val = self.pde.gradient(node[isBdNodes])
+#        isNotNan = np.isnan(val)
+#        self.rgh[isBdNodes][isNotNan] = val[isNotNan] 
+#
+#        self.rgh[isBdNodes, :] = self.pde.gradient(node[isBdNodes, :])
 
     def recover_laplace(self):
         b = np.array([1/3, 1/3, 1/3])

@@ -36,19 +36,18 @@ class Tritree(TriangleMesh):
             return self.parent[idx, 0] == -1
 
     def adaptive_refine(self, estimator, surface=None):
+        i = 0 
         while estimator.is_uniform() is False:
-            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'MAX')
-            edge = self.entity('edge')
-            refineFlag = self.refine(isMarkedCell, surface=surface)
-            NN1 = self.number_of_nodes()
-            NN0 = len(estimator.rho)
-            if NN1 > NN0:
-                rho = np.zeros(NN1, dtype=self.ftype)
-                rho[:NN0] = estimator.rho
-                rho[NN0:] = (rho[edge[refineFlag, 0]] + rho[edge[refineFlag, 1]])/2.0
+            i += 1
+            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
+            rho = self.refine(isMarkedCell, surface=surface, rho=estimator.rho)
+            if rho is not None:
                 mesh = self.to_conformmesh()
-                estimator.update(rho, mesh)
+                estimator.update(rho, mesh, smooth=True)
             else:
+                break
+
+            if i > 3:
                 break
 
     def refine_marker(self, eta, theta, method):
@@ -66,7 +65,7 @@ class Tritree(TriangleMesh):
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
 
-    def refine(self, isMarkedCell, surface=None):
+    def refine(self, isMarkedCell, surface=None, rho=None):
         if sum(isMarkedCell) > 0:
             # Prepare data
             NN = self.number_of_nodes()
@@ -155,6 +154,14 @@ class Tritree(TriangleMesh):
             parent4[3*NCC:4*NCC, 1] = 3
             self.child[idx, 3] = NC + np.arange(3*NCC, 4*NCC)
             ec = self.entity_barycenter('edge', refineFlag)
+            
+            if rho is not None:
+                I = cell[edge2cell[refineFlag, 0], edge2cell[refineFlag, 2]]
+                J = cell[edge2cell[refineFlag, 1], edge2cell[refineFlag, 3]]
+                t = (3*rho[edge[refineFlag, 0]] + 3*rho[edge[refineFlag, 1]] + 
+                        rho[I] + rho[J])/8
+                rho = np.r_['0', rho, t]
+
 
             if surface is not None:
                 ec, _ = surface.project(ec)
@@ -164,9 +171,25 @@ class Tritree(TriangleMesh):
             self.parent = np.r_['0', self.parent, parent4]           
             self.child = np.r_['0', self.child, child4]              
             self.ds.reinit(NN + NNN, cell)
-            return refineFlag
-        else:
-            return
+
+            if rho is not None:
+                return rho
+
+
+    def adaptive_coarsen(self, estimator, surface=None):
+
+        while estimator.is_uniform() is False:
+            isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
+            isRemainNode = self.coarsen(isMarkedCell)
+            mesh = self.to_conformmesh()
+            rho = estimator.rho[isRemainNode]
+            estimator.update(rho, mesh, smooth=False)
+
+            isRootCell = self.is_root_cell()
+            NC = self.number_of_cells()
+            if isRootCell.sum() == NC:
+                break
+                 
 
     def coarsen_marker(self, eta, beta, method):
         leafCellIdx = self.leaf_cell_index()
@@ -240,10 +263,9 @@ class Tritree(TriangleMesh):
             cell = nodeIdxMap[cell]
             self.node = node[isRemainNode]
             self.ds.reinit(NN, cell)
+            return isRemainNode
+        else:
             return 
-
-
-
 
     def to_conformmesh(self):
         NN = self.number_of_nodes()

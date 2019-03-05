@@ -198,7 +198,6 @@ class LagrangeFiniteElementSpace():
         else:
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
-
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
         uI = Function(self, dim=dim)
@@ -220,7 +219,7 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=self.ftype)
 
     def stiff_matrix(self, qf, measure):
         p = self.p
@@ -270,7 +269,7 @@ class LagrangeFiniteElementSpace():
         J = I.swapaxes(-1, -2)
 
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
     def source_vector(self, f, qf, measure, surface=None):
@@ -376,7 +375,7 @@ class VectorLagrangeFiniteElementSpace():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        return np.zeros(gdof, dtype=np.float)
+        return np.zeros(gdof, dtype=self.mesh.ftype)
 
     def interpolation(self, u):
         GD = self.GD

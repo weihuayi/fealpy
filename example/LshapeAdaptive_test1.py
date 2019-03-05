@@ -54,7 +54,7 @@ for i in range(maxit):
     markedCell = mark(eta, theta=theta)
     if i < maxit -1:
         markedCell = mark(eta, theta=theta)
-        mesh.bisect(markedCell)
+        mesh.uniform_bisect(markedCell)
 print(mesh.node.shape)
 mesh.add_plot(plt, cellcolor='w')
 

@@ -13,7 +13,7 @@ p = int(sys.argv[2])
 q = int(sys.argv[3])
 if m == 1:
     pde = SphereSinSinSinData()
-    mesh = pde.init_mesh(2)
+    mesh = pde.init_mesh()
 elif m == 2:
     model = ToruSurfacesData() 
     surface = model.surface 

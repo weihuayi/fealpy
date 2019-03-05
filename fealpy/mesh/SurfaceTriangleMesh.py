@@ -5,12 +5,40 @@ from ..quadrature import TriangleQuadrature
 
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1):
+        """
+        Initial a object of Surface Triangle Mesh. 
+
+        Parameters
+        ----------
+        self : 
+            Surface Triangle Mesh Object 
+        mesh : 
+            mesh object, represents a triangulation with flat triangle faces.
+        surface : 
+            The continuous surface which was represented as a level set
+            function.
+        p : int
+            The degree of the Lagrange space 
+
+        Returns
+        -------
+
+        See Also
+        --------
+            
+        Notes
+        -----
+        """ 
         self.mesh = mesh
         self.p = p
-        self.V = LagrangeFiniteElementSpace(mesh, p)
-        self.node, d = surface.project(self.V.interpolation_points())
+        self.space = LagrangeFiniteElementSpace(mesh, p)
+        self.node, d = surface.project(self.space.interpolation_points())
         self.surface = surface
         self.ds = mesh.ds
+        self.ftype = mesh.ftype
+        self.itype = mesh.itype
+        self.nodedata = {}
+        self.celldata = {}
 
     def integrator(self, k):
         return TriangleQuadrature(k) 
@@ -23,7 +51,7 @@ class SurfaceTriangleMesh():
         elif etype in ['node', 0]:
             return self.mesh.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise spacealueError("`entitytype` is wrong!")
 
     def number_of_nodes(self):
         return self.node.shape[0] 
@@ -43,9 +71,9 @@ class SurfaceTriangleMesh():
     def jacobi_matrix(self, bc, cellidx=None):
         mesh = self.mesh
         cell = mesh.ds.cell
-        cell2dof = self.V.dof.cell2dof
+        cell2dof = self.space.dof.cell2dof
 
-        grad = self.V.grad_basis(bc, cellidx=cellidx)
+        grad = self.space.grad_basis(bc, cellidx=cellidx)
         # the tranpose of the jacobi matrix between S_h and K 
         Jh = mesh.jacobi_matrix(cellidx=cellidx) 
 
@@ -74,17 +102,17 @@ class SurfaceTriangleMesh():
 
 
     def bc_to_point(self, bc, cellidx=None):
-        basis = self.V.basis(bc)
-        cell2dof = self.V.dof.cell2dof
+        basis = self.space.basis(bc)
+        cell2dof = self.space.dof.cell2dof
         if cellidx is None:
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof, :])
         else:
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
         return bcp
 
-    def area(self):
+    def area(self, idx=3):
         mesh = self.mesh
-        integrator = self.integrator(self.p+4)
+        integrator = self.integrator(idx)
         bcs, ws = integrator.quadpts, integrator.weights 
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)

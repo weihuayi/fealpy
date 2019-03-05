@@ -1,6 +1,57 @@
 import numpy as np
 from ..mesh.TriangleMesh import TriangleMesh  
 
+
+class VSSPData:
+    def __init__(self):
+        pass
+
+    def solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        r = np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*y)
+        return r
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=p.dtype)
+        return val
+
+    def init_mesh(self, meshtype='tri', n=1, ftype=np.float, itype=np.int):
+        node = np.array([
+            (0.0, 0.0),
+            (0.5, 0.0),
+            (0.0, 0.5),
+            (0.5, 0.5),
+            (1.0, 0.5),
+            (0.0, 1.0),
+            (0.5, 1.0),
+            (1.0, 1.0)], dtype=ftype)
+        if meshtype is 'tri':
+            cell = np.array([
+                (1, 3, 0),
+                (2, 0, 3),
+                (3, 6, 2),
+                (5, 2, 6),
+                (4, 7, 3),
+                (6, 3, 7)], dtype=itype)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quadtree':
+            cell = np.array([
+                (0, 1, 3, 2),
+                (2, 3, 6, 5),
+                (3, 4, 7, 6)], dtype=itype)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("".format)
+
 class SinSinData:
     def __init__(self):
         pass

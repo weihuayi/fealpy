@@ -1,10 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+from matplotlib import cm
+from mpl_toolkits.mplot3d import Axes3D
+from fealpy.mesh import TriangleMesh
 from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from fealpy.mesh import Tritree
-from fealpy.mesh import TriangleMesh
-
 
 class Estimator:
     def __init__(self, rho, mesh, theta, beta):
@@ -29,26 +29,24 @@ class Estimator:
         self.mesh = mesh
         self.area = mesh.entity_measure('cell')
         if smooth is True:
-            self.smooth_rho()
+            #self.smooth_rho()
+            self.loop_smooth_rho()
         self.compute_eta()
 
     def is_extreme_node(self):
-
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         edge = mesh.entity('edge')
+        node2node = mesh.ds.node_to_node()
+        V = np.asarray(np.sum(node2node, axis=1)).reshape(-1)
 
         isSmall = self.rho[edge[:, 0]] < self.rho[edge[:, 1]]
-        minv = np.zeros(NN, dtype=np.int)
-        maxv = np.zeros(NN, dtype=np.int)
-        np.add.at(minv, edge[isSmall, 0], -1)
-        np.add.at(minv, edge[~isSmall, 1], -1)
-        np.add.at(maxv, edge[isSmall, 1], 1)
-        np.add.at(maxv, edge[~isSmall, 0), 1)
-        node2node = self.ds.node_to_node()
-        V = np.sum(node2node, axis=1)
+        v = np.zeros(NN, dtype=np.int)
+        np.add.at(v, edge[isSmall, 0], 1)
+        np.add.at(v, edge[~isSmall, 1], 1)
 
-        isExtremeNode = (np.abs(minv) == V) || (np.abs(maxv) == V)
+        isExtremeNode = (v == V) | (V == (V - v))
+
         return isExtremeNode
 
     def smooth_rho(self):
@@ -66,76 +64,72 @@ class Estimator:
             rho = np.asarray(node2cell@(crho*inva))/s
             self.rho[~isExtremeNode] = rho[~isExtremeNode]
 
+    def loop_smooth_rho(self):
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+        node2node = mesh.ds.node_to_node()
+        NN = mesh.number_of_nodes()
+        v = np.bincount(cell.flat, minlength=NN)
+        isExtremeNode = self.is_extreme_node()
+        a = (5/8 - (3/8 + 0.25*np.cos(2*np.pi/v)**2))/v
+        for i in range(2):
+            rho = (1 - v*a)*self.rho + a*(node2node@self.rho)
+            self.rho[~isExtremeNode] = rho[~isExtremeNode]
+
     def is_uniform(self):
         stde = np.std(self.eta)/self.maxeta
         print('The current relative std of eta is ', stde)
-        if stde < 0.025:
+        if stde < 0.01:
             return True
         else:
             return False
 
-def f1(p):
+def peak(p):
     x = p[..., 0]
     y = p[..., 1]
-    val = np.exp(5*(x**2 + y**2))/np.exp(10)
-    return val
-
-def f2(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    val = np.exp(5*(x**2 + (y-1)**2))/np.exp(10)
+    val = 3*(1-x)**2*np.exp(-(x**2)-(y+1)**2) - 10*(x/5 - pow(x, 3) - pow(y, 5))*np.exp(-x**2-y**2) - 1/3*np.exp(-(x+1)**2-y**2)
     return val
 
 node = np.array([
-    (0, 0),
-    (1, 0),
-    (1, 1),
-    (0, 1)], dtype=np.float)
-
+    (-5, -5), 
+    (5, -5), 
+    (5, 5),
+    (-5, 5)], dtype=np.float)
 cell = np.array([
-    (1, 2, 0), 
+    (1, 2, 0),
     (3, 0, 2)], dtype=np.int)
-mesh = TriangleMesh(node, cell)
-mesh.uniform_refine(4)
 
+mesh = TriangleMesh(node, cell)
+mesh.uniform_refine(5)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 tmesh = Tritree(node, cell)
 
 femspace = LagrangeFiniteElementSpace(mesh, p=1) 
-uI = femspace.interpolation(f1)
-estimator = Estimator(uI[:], mesh, 0.3, 0.5)
-
-fig = plt.figure()
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
+uI = femspace.interpolation(peak)
+estimator = Estimator(uI[:], mesh, 0.2, 0.5)
+isExtremeNode = estimator.is_extreme_node()
+print(isExtremeNode.sum())
 
 tmesh.adaptive_refine(estimator)
+
 mesh = estimator.mesh
+isExtremeNode = estimator.is_extreme_node()
 fig = plt.figure()
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, index=isExtremeNode)
 
 
-femspace = LagrangeFiniteElementSpace(mesh, p=1)
-uI = femspace.interpolation(f2)
-estimator = Estimator(uI[:], mesh, 0.3, 0.5)
+fig2 = plt.figure()
+fig2.set_facecolor('white')
+axes = fig2.gca(projection = '3d')
+x = mesh.node[:, 0]
+y = mesh.node[:, 1]
+cell = mesh.ds.cell
+femspace = LagrangeFiniteElementSpace(mesh, p=1) 
+uI = femspace.interpolation(peak)
+axes.plot_trisurf(x, y, cell, estimator.rho, cmap=plt.cm.jet, lw=0.0)
 
-tmesh.adaptive_coarsen(estimator)
-mesh = estimator.mesh
-fig = plt.figure()
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
-
-femspace = LagrangeFiniteElementSpace(mesh, p=1)
-uI = femspace.interpolation(f2)
-tmesh.adaptive_refine(estimator)
-mesh = estimator.mesh
-fig = plt.figure()
-axes = fig.gca() 
-mesh.add_plot(axes, cellcolor=estimator.eta, showcolorbar=True)
 
 plt.show()
-
-
-
