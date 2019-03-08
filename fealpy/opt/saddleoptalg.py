@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import norm
 
 class SteepestDescentAlg:
-    def __init__(self, problem, options):
+    def __init__(self, problem, options=None):
         self.problem = problem
         self.options = options
 
@@ -14,8 +14,8 @@ class SteepestDescentAlg:
 
     def run(self, q=None):
         problem = self.problem
-                
-        options = self.options        
+        
+        options = self.options
         alpha = options['StepLength']
 
         gnorm = norm(self.g)

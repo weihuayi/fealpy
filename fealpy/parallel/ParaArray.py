@@ -15,6 +15,6 @@ class ParaArray(np.ndarray):
         self.lidx = lidx
         return self
 
-    def update(self, data):
+    def local_update(self, data):
         self[self.lidx] = data
 
