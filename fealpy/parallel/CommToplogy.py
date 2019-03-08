@@ -1,5 +1,4 @@
 import numpy as np
-from .ParaArray import ParaArray
 
 class CommToplogy():
     """
@@ -105,7 +104,6 @@ class CSRMatrixCommToplogy(CommToplogy):
         self.create_comm_toplogy(A.indices)
         return A
 
-    def get_parallel_array(self, a):
+    def get_local_idx(self):
         rank = self.comm.Get_rank()
-        lidx = np.arange(self.location[rank], self.location[rank+1])
-        return ParaArray(lidx, array=a)
+        return np.arange(self.location[rank], self.location[rank+1], dtype='i')
