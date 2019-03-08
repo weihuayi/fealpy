@@ -2,8 +2,10 @@ import numpy as np
 from numpy.linalg import norm
 
 class SteepestDescentAlg:
-    def __init__(self, problem):
+    def __init__(self, problem, options):
         self.problem = problem
+        self.options = options
+
         self.debug = True
         self.NF = 0 # 计算函数值和梯度的次数
         self.fun = problem['objective']
@@ -12,7 +14,8 @@ class SteepestDescentAlg:
 
     def run(self, q=None):
         problem = self.problem
-        options = problem['options']
+                
+        options = self.options        
         alpha = options['StepLength']
 
         gnorm = norm(self.g)
