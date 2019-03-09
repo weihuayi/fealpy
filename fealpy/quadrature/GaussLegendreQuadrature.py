@@ -1,7 +1,7 @@
 import numpy as np
 
 #http://keisan.casio.com/exec/system/1280624821
-class GaussLegendreQuadrture():
+class GaussLegendreQuadrature():
     def __init__(self, k):
         if k == 1:
             A = np.array([[0, 2]], dtype=np.float)
@@ -271,4 +271,3 @@ class GaussLegendreQuadrture():
 
     def get_gauss_point_and_weight(self, i):
         return self.quadpts[i,:], self.weights[i] 
-

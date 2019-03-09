@@ -1,6 +1,6 @@
 import numpy as np
 
-from .GaussLegendreQuadrture import GaussLegendreQuadrture 
+from .GaussLegendreQuadrature import GaussLegendreQuadrature 
 
 class QuadrangleQuadrature():
     def __init__(self, k):
