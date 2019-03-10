@@ -403,10 +403,6 @@ class VirtualElementSpace2d():
     def div_value(self, uh, bc):
         pass
 
-   # def function(self, dim=None):
-   #     return Function(self, dim=dim)
-   # 
-    
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f
