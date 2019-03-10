@@ -20,6 +20,7 @@ class NumCompComponent():
         """
         self.commtop = commtop
 
+
     def communicating(self, array):
         ct = self.commtop
         comm = ct.comm

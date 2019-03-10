@@ -237,14 +237,27 @@ class ScaledMonomialSpace2d():
             assert(point.shape[-2] == len(cellidx))
             return np.einsum('ij, ...ij->...i', uh[cell2dof[cellIdx]], lphi)
 
-    def function(self):
-        f = Function(self)
-        return f 
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
+        return f
+
+   # def function(self, dim=None):
+   #     return Function(self, dim=dim)
+   #
+#    def array(self, dim=None):
+#        ldof = self.number_of_local_dofs()
+#        NC = self.mesh.number_of_cells()
+#        return np.zeros(NC*ldof, dtype=np.float)
 
     def array(self, dim=None):
-        ldof = self.number_of_local_dofs()
-        NC = self.mesh.number_of_cells()
-        return np.zeros(NC*ldof, dtype=np.float)
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
 
     def number_of_local_dofs(self, p=None):
         return self.dof.number_of_local_dofs(p=p)
@@ -398,8 +411,14 @@ class VirtualElementSpace2d():
     def div_value(self, uh, bc):
         pass
 
-    def function(self, dim=None):
-        return Function(self, dim=dim)
+   # def function(self, dim=None):
+   #     return Function(self, dim=dim)
+   # 
+    
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
+        return f
+
 
     def interpolation(self, u, integral=None):
         mesh = self.mesh
