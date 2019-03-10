@@ -241,14 +241,6 @@ class ScaledMonomialSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-   # def function(self, dim=None):
-   #     return Function(self, dim=dim)
-   #
-#    def array(self, dim=None):
-#        ldof = self.number_of_local_dofs()
-#        NC = self.mesh.number_of_cells()
-#        return np.zeros(NC*ldof, dtype=np.float)
-
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
         if dim is None:
