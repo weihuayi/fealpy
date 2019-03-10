@@ -20,18 +20,18 @@ class NumCompComponent():
         """
         self.commtop = commtop
 
-    def computing(self, A, parray):
-        parray.update(A@parray)
 
-    def communicating(self, parray):
+    def communicating(self, array):
         ct = self.commtop
         comm = ct.comm
         rank = comm.Get_rank()
         for r in ct.neighbor: 
-            data = parray[ct.sds[r]]
+            data = array[ct.sds[r]]
+            print("rank: ", rank, "data: ", len(ct.sds[r]), len(ct.rds[r]), "r: ", r)
             comm.Isend(data, dest=r, tag=rank) 
+
         for r in ct.neighbor:  
-            data = np.zeros(len(ct.rds[r]), dtype=parray.dtype)
+            data = np.zeros(len(ct.rds[r]), dtype=array.dtype)
             req = comm.Irecv(data, source=r, tag=r)
             req.Wait()
-            parray[ct.rds[r]] = data
+            array[ct.rds[r]] = data

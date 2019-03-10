@@ -1,9 +1,18 @@
 import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
-from scipy.sparse import spdiags
+from scipy.sparse import spdiags, csr_matrix
 from timeit import default_timer as timer
 
+
+
 class AMGSolver():
+    """
+    代数多重网格解法器类。用代数多重网格方法求解
+
+    Ax = b
+
+    要从 A 图结构中生成一个抽象的网格。
+    """
     def __init__(self):
         pass
 
@@ -13,31 +22,36 @@ class AMGSolver():
     def solve(self, b):
         pass
 
-
     def coarsen_rs(self, theta=0.025):
         A = self.A
         N = A.shape[0]
+
         MAi = np.min(A, axis=0) # 最小的副对角线的值， 绝对值是是最大的
-        D = spdiags(1/MAi, 0, N, N)
+        D = A.min(axis=0).toarray()
+        D = spdiags(1/D.reshape(-1), 0, N, N)
         Am = D@A
 
-        # 删除弱连续关系
+        # 删除弱连通关系
         i, j = Am.nonzero()
-        val = Am[i, j]
+        val = np.asarray(Am[i, j]).reshape(-1)
 
         idx = (-val > theta) 
-        As = csr_matrix((np.ones(len(idx)), (i[idx], j[idx])), 
-                shape=(N, N), dtype=np.double) 
-        Am = csr_matrix((val[idx], (i[idx], j[idx])), 
-                shape=(N, N), dtype=np.double)
+        data = np.ones(idx.sum(), dtype=np.int)
+        As = csr_matrix((data, (i[idx], j[idx])), shape=(N, N), dtype=np.int) 
+        Am = csr_matrix((val[idx], (i[idx], j[idx])), shape=(N, N), dtype=A.dtype)
         Ass = (As + As.T)/2
 
         # 把孤立点放到 F 集合
         isF = np.zeros(N, dtype=np.bool)
-        valence = A.sum(axis=1)
+        dgIn = np.asarray(As.sum(axis=1)).reshape(-1)
         isF[valence == 0] = True
 
 
-        isC = np.zeros(N, dtype=np.bool)
-        UDNode = np.arange(N)
+        isC = np.zeros(N, dtype=np.bool) # C: coarse node
+        U = np.arange(N)                 # U: undecided node 
+        degFin = np.zeros(N, dtype=np.int) # number of F nodes strong connected to
+
+        while isC.sum() < N/2 and U.shape[0] > 20:
+            # S: selected set, changing in the coarsening
+            isS = np.zeros(N, dtype=np.bool) 
 

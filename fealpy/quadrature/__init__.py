@@ -1,5 +1,5 @@
 from .GaussLobattoQuadrature import GaussLobattoQuadrature
-from .GaussLegendreQuadrture import GaussLegendreQuadrture
+from .GaussLegendreQuadrature import GaussLegendreQuadrature
 from .IntervalQuadrature import IntervalQuadrature
 from .TriangleQuadrature import TriangleQuadrature
 from .TetrahedronQuadrature import TetrahedronQuadrature

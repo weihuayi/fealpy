@@ -21,17 +21,17 @@ from timeit import default_timer as timer
 
 class PoissonFEMModel(object):
     def __init__(self, pde, mesh, p, integrator):
-        self.femspace = LagrangeFiniteElementSpace(mesh, p) 
-        self.mesh = self.femspace.mesh
+        self.space = LagrangeFiniteElementSpace(mesh, p) 
+        self.mesh = self.space.mesh
         self.pde = pde 
-        self.uh = self.femspace.function()
-        self.uI = self.femspace.interpolation(pde.solution)
+        self.uh = self.space.function()
+        self.uI = self.space.interpolation(pde.solution)
         self.cellmeasure = mesh.entity_measure('cell')
         self.integrator = integrator 
         self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
 
     def recover_estimate(self,rguh):
-        if self.femspace.p > 1:
+        if self.space.p > 1:
             raise ValueError('This method only work for p=1!')
         
         qf = self.integrator  
@@ -46,13 +46,13 @@ class PoissonFEMModel(object):
     
 
     def get_left_matrix(self):
-        return self.femspace.stiff_matrix(self.integrator, self.cellmeasure)
+        return self.space.stiff_matrix(self.integrator, self.cellmeasure)
 
     def get_right_vector(self):
-        return self.femspace.source_vector(self.pde.source, self.integrator, self.cellmeasure)
+        return self.space.source_vector(self.pde.source, self.integrator, self.cellmeasure)
 
     def solve(self):
-        bc = DirichletBC(self.femspace, self.pde.dirichlet)
+        bc = DirichletBC(self.space, self.pde.dirichlet)
 
         start = timer()
         A = self.get_left_matrix()
