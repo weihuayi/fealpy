@@ -12,7 +12,7 @@ class SteepestDescentAlg:
         self.x = problem['x0']
         self.f, self.g = self.fun(self.x) # 初始目标函数值和梯度值
 
-    def run(self, q=None):
+    def run(self, maxit=None, q=None):
         problem = self.problem
         
         options = self.options
@@ -21,7 +21,10 @@ class SteepestDescentAlg:
         gnorm = norm(self.g)
         print("Initial energe: %12.11g, gnorm :%12.11g"%(self.f, gnorm))
 
-        for i in range(options['MaxIters']):
+        if maxit is None:
+            maxit = options['MaxIters']
+
+        for i in range(maxit):
             self.x[:, 0] += alpha*self.g[:, 0]
             self.x[:, 1] -= alpha*self.g[:, 1]
             f, g = self.fun(self.x)
