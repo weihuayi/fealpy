@@ -5,3 +5,6 @@ from .TriangleQuadrature import TriangleQuadrature
 from .TetrahedronQuadrature import TetrahedronQuadrature
 from .QuadrangleQuadrature import QuadrangleQuadrature
 
+from .FEMeshIntegralAlg import FEMeshIntegralAlg
+from .PolygonMeshIntegralAlg import PolygonMeshIntegralAlg
+
