@@ -132,17 +132,17 @@ class HybridConjugateGradientAlg:
                 self.fun.show(queue=queue)
                 print("Step %d with energe: %12.11g, gnorm :%12.11g"%(i, self.f, gnorm))
             
-            fdiff = np.abs(f - self.f)
+            diff = np.abs(f - self.f)
             self.f = f
             self.g = g
 
             gnorm = norm(self.g)
             if (gnorm < options['NormGradTol']) or (fdiff < options['FunValDiff']):
                 print("""
-                The norm of gradeint value : %12.11g (th tol  is %12.11g)
+                The norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
                 """%(gnorm, options['NormGradTol'], 
-                     fdiff, options['FunValDiff'])
+                     diff, options['FunValDiff'])
                 break
 
         if options['Display'] is 'plot':
