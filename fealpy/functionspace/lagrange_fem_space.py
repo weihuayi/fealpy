@@ -207,8 +207,8 @@ class LagrangeFiniteElementSpace():
     def projection(self, u, up):
         pass
 
-    def function(self, dim=None):
-        f = Function(self, dim=dim)
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
         return f
 
     def array(self, dim=None):

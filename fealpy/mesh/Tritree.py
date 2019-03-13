@@ -63,10 +63,9 @@ class Tritree(TriangleMesh):
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
             np.add.at(eta0, idxmap, eta)
-        else:
-            eta0 = eta
+            eta = eta0[leafCellIdx]
 
-        isMarked = mark(eta0[leafCellIdx], theta, method)
+        isMarked = mark(eta, theta, method)
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 

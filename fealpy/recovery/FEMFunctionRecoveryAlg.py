@@ -57,7 +57,7 @@ class FEMFunctionRecoveryAlg():
         mesh = space.mesh
         GD = mesh.geo_dimension()
         node2cell = mesh.ds.node_to_cell()
-        inva = 1/mesh.area()
+        inva = 1/mesh.entity_measure('cell')
         asum = node2cell@inva
 
         bc = np.array([1/3]*3, dtype=np.float)
