@@ -12,7 +12,7 @@ class SteepestDescentAlg:
         self.x = problem['x0']
         self.f, self.g = self.fun(self.x) # 初始目标函数值和梯度值
 
-    def run(self, maxit=None, q=None):
+    def run(self, queue=None, maxit=None):
         problem = self.problem
         
         options = self.options
@@ -123,7 +123,6 @@ class HybridConjugateGradientAlg:
             self.x[:, 0] += alpha*d0
             self.x[:, 1] += alpha*d1
             f, g = self.fun(self.x)
-            diff = np.abs(f - self.f)
 
             if adaptive: # adaptive adjust hybrid factor 
                 if f < self.f:
@@ -142,12 +141,6 @@ class HybridConjugateGradientAlg:
                 d1 = -g[:, 1]
 
             diff = np.abs(f - self.f)
-
-            if options['Display'] is 'plot':
-                self.fun.show(queue=queue)
-                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
-            
-            
             self.f = f
             self.g = g
 
@@ -162,7 +155,7 @@ class HybridConjugateGradientAlg:
                 The difference of function : %12.11g (the tol is %12.11g)
                 """%(gnorm, options['NormGradTol'], diff,
                     options['FunValDiff']))
-               break
+                break
 
 
         self.fun.output('', queue=queue, stop=True)

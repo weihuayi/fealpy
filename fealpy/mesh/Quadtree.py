@@ -50,7 +50,7 @@ class Quadtree(QuadrangleMesh):
     def sizing_adaptive(self, eta):
         pass 
 
-    def adaptive_refine(self, estimator, data=None):
+    def adaptive_refine(self, estimator, data=None, maxrefine=3):
         i = 0 
         if data is not None:
             if 'rho' not in data:
@@ -68,7 +68,7 @@ class Quadtree(QuadrangleMesh):
             else:
                 break
 
-            if i > 3:
+            if i > maxrefine:
                 break
 
     def refine_marker(self, eta, theta, method):
@@ -77,6 +77,8 @@ class Quadtree(QuadrangleMesh):
         
         isMarked = mark(eta, theta, method)
         isMarkedCell = np.zeros(NC, dtype=np.bool)
+        print(leafCellIdx.shape)
+        print(isMarked.shape)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
 
@@ -84,11 +86,9 @@ class Quadtree(QuadrangleMesh):
         if isMarkedCell is None:
             idx = self.leaf_cell_index()
         else:
-            leafCellIdx = self.leaf_cell_index()
-            isLeafCell = self.is_leaf_cell()
-            idx = isLeafCell[isMarkedCell]]
+            print('1', self.number_of_cells(), isMarkedCell.shape)
+            idx, = np.nonzero(isMarkedCell)
 
-            print('idx', idx)
         if len(idx) > 0:
             # Prepare data
             N = self.number_of_nodes()
@@ -148,7 +148,9 @@ class Quadtree(QuadrangleMesh):
                 isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
                 for key, value in data.items():
                     evalue = 0.5*np.sum(value[edge[isNeedCutEdge]], axis=1)
-                    cvalue = np.sum(value[cell[isNeedCutCell], :], axis=1)/4
+                    print('2', value.shape)
+                    print('3', cell[isNeedCutCell].shape)
+                    cvalue = np.sum(value[cell[isNeedCutCell]], axis=1)/4
                     data[key] = np.concatenate((value, evalue, cvalue), axis=0)
 
             NEC = len(edgeCenter)
