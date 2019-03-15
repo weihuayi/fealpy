@@ -111,6 +111,7 @@ class HybridConjugateGradientAlg:
             self.x[:, 0] += alpha*d0
             self.x[:, 1] += alpha*d1
             f, g = self.fun(self.x)
+            diff = np.abs(f - self.f)
 
             if adaptive: # adaptive adjust hybrid factor 
                 if f < self.f:
@@ -130,21 +131,22 @@ class HybridConjugateGradientAlg:
 
             if options['Display'] is 'plot':
                 self.fun.show(queue=queue)
-                print("Step %d with energe: %12.11g, gnorm :%12.11g"%(i, self.f, gnorm))
+                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
             
-            diff = np.abs(f - self.f)
             self.f = f
             self.g = g
 
             gnorm = norm(self.g)
-            if (gnorm < options['NormGradTol']) or (fdiff < options['FunValDiff']):
+            if (gnorm < options['NormGradTol']) or (diff < options['FunValDiff']):
                 print("""
                 The norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
-                """%(gnorm, options['NormGradTol'], 
-                     diff, options['FunValDiff'])
+                """%(gnorm, options['NormGradTol'], diff,
+                    options['FunValDiff']))
                 break
 
         if options['Display'] is 'plot':
             self.fun.show(queue=queue, stop=True)
         return self.x, self.f, self.g
+
+

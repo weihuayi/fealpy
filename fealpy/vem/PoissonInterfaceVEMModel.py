@@ -8,7 +8,7 @@ from ..boundarycondition import DirichletBC
 from ..vem import doperator
 from .integral_alg import PolygonMeshIntegralAlg
 
-from ..quadrature import GaussLegendreQuadrture
+from ..quadrature import GaussLegendreQuadrature
 
 from timeit import default_timer as timer
 
