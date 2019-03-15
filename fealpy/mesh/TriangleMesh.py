@@ -33,6 +33,9 @@ class TriangleMesh(Mesh2d):
     def integrator(self, k):
         return TriangleQuadrature(k)
 
+    def copy(self):
+        return TriangleMesh(self.node.copy(), self.ds.cell.copy());
+
     def delete_cell(self, dflag):
         cell = self.entity('cell')
         cell = cell[~dflag]
@@ -256,7 +259,7 @@ class TriangleMesh(Mesh2d):
         else:                                                                   
             return(Iu, True) 
 
-    def bisect(self, markedCell):
+    def bisect(self, markedCell, returnim=False):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
@@ -280,6 +283,15 @@ class TriangleMesh(Mesh2d):
         newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
+
+        if returnim:
+            nn = len(newNode)
+            IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))), 
+                    shape=(NN+nn, NN), dtype=np.float)
+            IM += coo_matrix((0.5*np.ones(nn), (NN+np.arange(nn),
+                edge[isCutEdge, 0])), shape=(NN+nn, NN), dtype=np.float)
+            IM += coo_matrix((0.5*np.ones(nn), (NN+np.arange(nn),
+                edge[isCutEdge, 1])), shape=(NN+nn, NN), dtype=np.float)
 
         for k in range(2):
             idx, = np.nonzero(edge2newNode[cell2edge0]>0)
@@ -308,6 +320,9 @@ class TriangleMesh(Mesh2d):
 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
+
+        if returnim:
+            return IM.tocsr()
 
     def grad_lambda(self):
         node = self.node

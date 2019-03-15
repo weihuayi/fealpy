@@ -32,13 +32,22 @@ class SteepestDescentAlg:
             self.f = f
             self.g = g
             gnorm = norm(self.g)
-            if options['Display'] is 'plot':
-                self.fun.show()
+
+            if options['Output']:
                 print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
-            if diff < options['FunValDiff']:
-                print('energe diff %12.11g is smaller than tol %g'%(diff,
-                    options['FunValDiff']))
+                self.fun.output(str(i), queue=queue)
+
+            if (gnorm < options['NormGradTol']) or (diff < options['FunValDiff']):
+                print("""
+                The norm of gradeint value : %12.11g (the tol  is %12.11g)
+                The difference of function : %12.11g (the tol is %12.11g)
+                """%(gnorm, options['NormGradTol'], 
+                     diff, options['FunValDiff'])
+                )
                 break
+
+        self.fun.output('', queue=queue, stop=True)
+
         return self.x, self.f, self.g
 
     def step(self, alpha=2):
@@ -57,7 +66,7 @@ def HCG_options(
         RestartSteps=0, 
         Adaptive=False,
         ScaleFactors=(0.618, 0.618, 1/0.618),
-        Display='plot'):
+        Output= True):
 
     options = {
             'MaxIters'          :MaxIters,
@@ -70,7 +79,7 @@ def HCG_options(
             'RestartSteps'      :RestartSteps,
             'Adaptive'          :Adaptive,
             'ScaleFactors'      :ScaleFactors,
-            'Display'           :Display # 'plot' or 'iter'
+            'Output'            :Output 
             }
     return options
 
@@ -90,7 +99,7 @@ class HybridConjugateGradientAlg:
         else:
             self.options = options
 
-    def run(self, queue=None):
+    def run(self, queue=None, maxit=None, ):
         problem = self.problem
         options = self.options 
         alpha = options['StepLength']
@@ -103,6 +112,9 @@ class HybridConjugateGradientAlg:
 
         gnorm = norm(self.g)
         print("The initial energe is %12.11g, the norm of grad is %12.11g"%(self.f, gnorm))
+
+        if maxit is None:
+            maxit = options['MaxIters']
 
         # the initial direction
         d0 =  self.g[:, 0]
@@ -129,24 +141,32 @@ class HybridConjugateGradientAlg:
                 d0 =  g[:, 0]
                 d1 = -g[:, 1]
 
+            diff = np.abs(f - self.f)
+
             if options['Display'] is 'plot':
                 self.fun.show(queue=queue)
                 print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
+            
             
             self.f = f
             self.g = g
 
             gnorm = norm(self.g)
+            if options['Output']:
+                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
+                self.fun.output(str(i), queue=queue)
+
             if (gnorm < options['NormGradTol']) or (diff < options['FunValDiff']):
                 print("""
                 The norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
                 """%(gnorm, options['NormGradTol'], diff,
                     options['FunValDiff']))
-                break
+               break
 
-        if options['Display'] is 'plot':
-            self.fun.show(queue=queue, stop=True)
+
+        self.fun.output('', queue=queue, stop=True)
+
         return self.x, self.f, self.g
 
 
