@@ -10,7 +10,7 @@ class Tritree(TriangleMesh):
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
-        self.irule = irule              # irregular rule  
+        self.irule = irule                
         self.meshtype = 'tritree'
     
     def leaf_cell_index(self):
@@ -47,7 +47,7 @@ class Tritree(TriangleMesh):
             i += 1
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             self.refine(isMarkedCell, surface=surface, data=data)
-            if rho is not None:
+            if data is not None:
                 mesh = self.to_conformmesh()
                 estimator.update(data['rho'], mesh, smooth=True)
             else:
@@ -59,9 +59,12 @@ class Tritree(TriangleMesh):
     def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
+        print("NC:", NC)
+        print("eta:", eta.shape)
         if 'idxmap' in self.celldata.keys(): 
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
+            print("idxmap:", len(idxmap))
             np.add.at(eta0, idxmap, eta)
             eta = eta0[leafCellIdx]
 
@@ -178,8 +181,6 @@ class Tritree(TriangleMesh):
             self.child = np.r_['0', self.child, child4]              
             self.ds.reinit(NN + NNN, cell)
 
-            if rho is not None:
-                return rho
 
     def adaptive_coarsen(self, estimator, surface=None, data=None):
 
