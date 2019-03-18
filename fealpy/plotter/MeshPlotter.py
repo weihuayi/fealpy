@@ -1,7 +1,7 @@
 import numpy as np
 from paraview.simple import *
-import vtk
-import vtk.util.numpy_support as vnp
+import pvtk
+import pvtk.util.numpy_support as vnp
 
 import multiprocessing
 import time

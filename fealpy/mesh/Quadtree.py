@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .QuadrangleMesh import QuadrangleMesh 
 from .PolygonMesh import PolygonMesh
 from ..common import ranges
+from .adaptive_tools import mark
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
@@ -49,14 +50,41 @@ class Quadtree(QuadrangleMesh):
     def sizing_adaptive(self, eta):
         pass 
 
-    def refine(self, marker=None, u=None):
-        if marker == None:
+    def adaptive_refine(self, estimator, data=None, maxrefine=3):
+        i = 0 
+        if data is not None:
+            if 'rho' not in data:
+                data['rho'] = estimator.rho
+        else:
+            data = {'rho':rho}
+        
+        while estimator.is_uniform() is False:
+            i += 1
+            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
+            self.refine(isMarkedCell, data=data)
+            if data is not None:
+                mesh = self.to_pmesh()
+                estimator.update(data['rho'], mesh, smooth=True)
+            else:
+                break
+
+            if i > maxrefine:
+                break
+
+    def refine_marker(self, eta, theta, method):
+        leafCellIdx = self.leaf_cell_index()
+        NC = self.number_of_cells()
+        
+        isMarked = mark(eta, theta, method)
+        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell[leafCellIdx[isMarked]] = True
+        return isMarkedCell
+
+    def refine(self, isMarkedCell=None, data=None):
+        if isMarkedCell is None:
             idx = self.leaf_cell_index()
         else:
-            idx = marker.refine_marker(self)
-
-        if idx is None:
-            return False
+            idx, = np.nonzero(isMarkedCell)
 
         if len(idx) > 0:
             # Prepare data
@@ -112,14 +140,13 @@ class Quadtree(QuadrangleMesh):
 
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1) 
             cellCenter = self.entity_barycenter('cell', isNeedCutCell)
-            if u is not None:
+           
+            if data is not None:
                 isNeedCutEdge = (~isCuttedEdge) & isCutEdge 
-                eu = 0.5*np.sum(u[edge[isNeedCutEdge]], axis=1)
-                
-                cu = np.sum(u[cell[isNeedCutCell], :], axis=1)/4
-                Iu = np.concatenate((u, eu, cu), axis=0)
-            
-                
+                for key, value in data.items():
+                    evalue = 0.5*np.sum(value[edge[isNeedCutEdge]], axis=1)
+                    cvalue = np.sum(value[cell[isNeedCutCell]], axis=1)/4
+                    data[key] = np.concatenate((value, evalue, cvalue), axis=0)
 
             NEC = len(edgeCenter)
             NCC = len(cellCenter)
@@ -146,19 +173,42 @@ class Quadtree(QuadrangleMesh):
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
-            if u is None:
-                return True
-            else:
-                return (Iu,True)
+ 
+    def adaptive_coarsen(self, estimator, data=None):
+        if data is not None:
+            if 'rho' not in data:
+                data['rho'] = estimator.rho
         else:
-            return False
+            data = {'rho':rho}
+        while estimator.is_uniform() is False:
+            isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
+            isRemainNode = self.coarsen(isMarkedCell)
+            mesh = self.to_pmesh()
+            for key, value in data.items():
+                data[key] = value[isRemainNode]
+                print('data[rho]', data['rho'])
+            estimator.update(data['rho'], mesh, smooth=False)
+
+            isRootCell = self.is_root_cell()
+            NC = self.number_of_cells()
+            if isRootCell.sum() == NC:
+                break
+
+       
+    def coarsen_marker(self, eta, beta, method):
+        leafCellIdx = self.leaf_cell_index()
+        NC = self.number_of_cells()
         
+        isMarked = mark(eta, beta, method="COARSEN")
+        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell[leafCellIdx[isMarked]] = True
+        return isMarkedCell
 
 
-    def coarsen(self, marker):
+    def coarsen(self, isMarkedCell):
         """ marker will marke the leaf cells which will be coarsen
         """
-        idx = marker.coarsen_marker(self)
+        idx, = np.nonzero(isMarkedCell)
         if idx is None:
             return False
 
@@ -186,7 +236,7 @@ class Quadtree(QuadrangleMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode = np.zeros(NN, dtype=np.bool)
             isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]

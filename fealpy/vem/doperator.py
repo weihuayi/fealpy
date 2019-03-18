@@ -1,5 +1,5 @@
 import numpy as np
-from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrture 
+from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrature 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from numpy.linalg import inv
 
@@ -181,7 +181,7 @@ def matrix_H(V):
 
     NC = mesh.number_of_cells()
 
-    qf = GaussLegendreQuadrture(p + 1)
+    qf = GaussLegendreQuadrature(p + 1)
     bcs, ws = qf.quadpts, qf.weights 
     ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
     phi0 = V.smspace.basis(ps, cellidx=edge2cell[:, 0])
