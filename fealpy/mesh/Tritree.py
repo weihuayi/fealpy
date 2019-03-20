@@ -48,8 +48,6 @@ class Tritree(TriangleMesh):
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             self.refine(isMarkedCell, surface=surface, data=data)
             mesh = self.to_conformmesh()
-            print(mesh.number_of_nodes())
-            print(data['rho'].shape)
             estimator.update(data['rho'], mesh, smooth=True)
 
             if i > 3:
@@ -181,16 +179,15 @@ class Tritree(TriangleMesh):
     def adaptive_coarsen(self, estimator, surface=None, data=None):
 
         if data is not None:
-            if 'rho' not in data:
-                data['rho'] = estimator.rho
+            data['rho'] = estimator.rho
         else:
             data = {'rho':rho}
         while estimator.is_uniform() is False:
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
             isRemainNode = self.coarsen(isMarkedCell)
+            mesh = self.to_conformmesh()
             for key, value in data.items():
                 data[key] = value[isRemainNode]
-                mesh = estimator.mesh
                 estimator.update(data['rho'], mesh, smooth=False)
 
             isRootCell = self.is_root_cell()
