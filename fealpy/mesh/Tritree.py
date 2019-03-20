@@ -48,7 +48,8 @@ class Tritree(TriangleMesh):
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             self.refine(isMarkedCell, surface=surface, data=data)
             if data is not None:
-                mesh = estimator.mesh
+                mesh = estimator.mesh           # attention mesh
+#                mesh = self.to_conformmesh()
                 estimator.update(data['rho'], mesh, smooth=True)
             else:
                 break
@@ -189,9 +190,9 @@ class Tritree(TriangleMesh):
         while estimator.is_uniform() is False:
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
             isRemainNode = self.coarsen(isMarkedCell)
-            mesh = estimator.mesh
             for key, value in data.items():
                 data[key] = value[isRemainNode]
+                mesh = estimator.mesh
                 estimator.update(data['rho'], mesh, smooth=False)
 
             isRootCell = self.is_root_cell()
