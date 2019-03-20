@@ -53,6 +53,13 @@ class SurfaceTriangleMesh():
         else:
             raise spacealueError("`entitytype` is wrong!")
 
+    def entity_measure(self, etype=2):
+        p = self.p
+        if etype in ['cell', 2]:
+            return self.area(idx=p+3) 
+        else:
+            raise spacealueError("`entitytype` is wrong!")
+
     def number_of_nodes(self):
         return self.node.shape[0] 
 

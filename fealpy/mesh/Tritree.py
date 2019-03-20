@@ -47,12 +47,10 @@ class Tritree(TriangleMesh):
             i += 1
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             self.refine(isMarkedCell, surface=surface, data=data)
-            if data is not None:
-                mesh = estimator.mesh           # attention mesh
-#                mesh = self.to_conformmesh()
-                estimator.update(data['rho'], mesh, smooth=True)
-            else:
-                break
+            mesh = self.to_conformmesh()
+            print(mesh.number_of_nodes())
+            print(data['rho'].shape)
+            estimator.update(data['rho'], mesh, smooth=True)
 
             if i > 3:
                 break
