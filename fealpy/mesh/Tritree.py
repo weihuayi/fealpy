@@ -47,11 +47,10 @@ class Tritree(TriangleMesh):
             i += 1
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
             self.refine(isMarkedCell, surface=surface, data=data)
-            if data is not None:
-                mesh = self.to_conformmesh()
-                estimator.update(data['rho'], mesh, smooth=True)
-            else:
-                break
+            mesh = self.to_conformmesh()
+            print(mesh.number_of_nodes())
+            print(data['rho'].shape)
+            estimator.update(data['rho'], mesh, smooth=True)
 
             if i > 3:
                 break
@@ -59,12 +58,9 @@ class Tritree(TriangleMesh):
     def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        print("NC:", NC)
-        print("eta:", eta.shape)
         if 'idxmap' in self.celldata.keys(): 
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
-            print("idxmap:", len(idxmap))
             np.add.at(eta0, idxmap, eta)
             eta = eta0[leafCellIdx]
 
@@ -192,10 +188,10 @@ class Tritree(TriangleMesh):
         while estimator.is_uniform() is False:
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
             isRemainNode = self.coarsen(isMarkedCell)
-            mesh = self.to_conformmesh()
             for key, value in data.items():
                 data[key] = value[isRemainNode]
-            estimator.update(data['rho'], mesh, smooth=False)
+                mesh = estimator.mesh
+                estimator.update(data['rho'], mesh, smooth=False)
 
             isRootCell = self.is_root_cell()
             NC = self.number_of_cells()

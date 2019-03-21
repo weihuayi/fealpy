@@ -35,7 +35,7 @@ for i in range(maxit):
     fem = PoissonFEMModel(pde, mesh, p, integrator)
     ls = fem.solve()
     sio.savemat('test%d.mat'%(i), ls)
-    Ndof[i] = fem.femspace.number_of_global_dofs()
+    Ndof[i] = fem.space.number_of_global_dofs()
     errorMatrix[0, i] = fem.get_L2_error()
     errorMatrix[1, i] = fem.get_H1_error()
     if i < maxit - 1:
