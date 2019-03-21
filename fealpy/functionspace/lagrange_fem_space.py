@@ -221,7 +221,7 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
-    def stiff_matrix(self, qf, measure):
+    def stiff_matrix(self, qf, cellmeasure):
         p = self.p
         mesh = self.mesh
 
@@ -232,7 +232,7 @@ class LagrangeFiniteElementSpace():
         gphi = self.grad_basis(bcs)
 
         # Compute the element sitffness matrix
-        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, measure, optimize=True)
+        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
