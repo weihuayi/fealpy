@@ -22,7 +22,7 @@ class SteepestDescentAlg:
         print("Initial energe: %12.11g, gnorm :%12.11g"%(self.f, gnorm))
 
         if maxit is None:
-            maxit = options['MaxIters']
+            maxit = options['MaxFunEvals']
 
         for i in range(maxit):
             self.x[:, 0] += alpha*self.g[:, 0]

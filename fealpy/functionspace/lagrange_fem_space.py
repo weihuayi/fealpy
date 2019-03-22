@@ -60,6 +60,41 @@ class LagrangeFiniteElementSpace():
     def top_dimension(self):
         return self.TD
 
+    def edge_basis(self, bc, cellidx, lidx):
+        """
+        compute the basis function values at barycentric point bc on edge
+
+        Parameters
+        ----------
+        bc : numpy.array
+            the shape of `bc` can be `(tdim,)` or `(NQ, tdim)`        
+
+        Returns
+        -------
+        phi : numpy.array
+            the shape of 'phi' can be `(NE, ldof)` or `(NE, NQ, ldof)`
+
+        See also
+        --------
+
+        Notes
+        -----
+
+        """
+        print(bc)
+
+        NE = len(cellidx)
+
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.mesh.ftype) # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NE)
+        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        return bcs
+
+
     def basis(self, bc):
         """
         compute the basis function values at barycentric point bc 
