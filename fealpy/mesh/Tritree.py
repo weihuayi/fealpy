@@ -211,7 +211,7 @@ class Tritree(TriangleMesh):
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
     
-    def coarsen(self, isMarkedCell, surface=None):
+    def coarsen(self, isMarkedCell, data=None):
         if sum(isMarkedCell) > 0:
             NN = self.number_of_nodes()
             NC = self.number_of_cells()

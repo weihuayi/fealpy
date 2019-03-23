@@ -28,27 +28,27 @@ class SteepestDescentAlg:
             self.x[:, 0] += alpha*self.g[:, 0]
             self.x[:, 1] -= alpha*self.g[:, 1]
             f, g = self.fun(self.x)
-            diff = np.abs(f - self.f)
+            self.diff = np.abs(f - self.f)
             self.f = f
             self.g = g
             gnorm = norm(self.g)
 
             if options['Output']:
-                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, diff))
+                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, self.diff))
                 self.fun.output(str(i), queue=queue)
 
-            if (gnorm < options['NormGradTol']) or (diff < options['FunValDiff']):
+            if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
                 print("""
                 The norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
                 """%(gnorm, options['NormGradTol'], 
-                     diff, options['FunValDiff'])
+                     self.diff, options['FunValDiff'])
                 )
                 break
 
-        self.fun.output('tag', queue=queue, stop=True)
+        self.fun.output('', queue=queue, stop=True)
 
-        return self.x, self.f, self.g
+        return self.x, self.f, self.g, self.diff
 
     def step(self, alpha=2):
         self.x[:, 0] += alpha*self.g[:, 0]
