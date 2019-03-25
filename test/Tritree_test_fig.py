@@ -2,7 +2,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from fealpy.mesh.TriangleMesh import TriangleMesh
-from fealpy.mesh.tree_data_structure import Tritree
+from fealpy.mesh.Tritree import Tritree
 
 
 class AdaptiveMarker():
