@@ -1,13 +1,14 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import time
+import scipy.io as sio
 #import h5py
 
 from fealpy.pde.darcy_forchheimer_2d import PolyData
 from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 from fealpy.pde.darcy_forchheimer_2d import ArctanData
-#from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
+from fealpy.fdm.NonDFFDMModel import NonDFFDMModel
 from fealpy.fdm.NonDFFDMModel_pu import NonDFFDMModel_pu
 from fealpy.fdm.NonDFFDMModel_normu import NonDFFDMModel_normu
 from fealpy.tools.show import showmultirate
@@ -17,12 +18,12 @@ k = 1
 rho = 1
 beta = 10
 tol = 1e-9
-#hx = np.array([0.12,0.34,0.22,0.32])
-#hy = np.array([0.25,0.13,0.33,0.29])
+hx = np.array([0.12,0.34,0.22,0.32])
+hy = np.array([0.25,0.13,0.33,0.29])
 #hy = np.array([0.16,0.23,0.32,0.11,0.18])
-hx = np.array([0.12,0.34,0.45,0.09])
+#hx = np.array([0.12,0.34,0.45,0.09])
 #hy = np.array([0.25,0.13,0.54,0.08])
-hy = np.array([0.25,0.13,0.34,0.20,0.08])
+#hy = np.array([0.25,0.13,0.34,0.20,0.08])
 #hx = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.25,0.25,0.25,0.25])
 #hy = np.array([0.2,0.2,0.2,0.2,0.2])
@@ -32,10 +33,10 @@ hy = np.array([0.25,0.13,0.34,0.20,0.08])
 #hx = hx.repeat(m)
 #hy = hy.repeat(m)
 
-#pde = PolyData(box,mu,k,rho,beta,tol)
+pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box,mu,k,rho,beta,tol)
 #pde = SinsinData(box,mu,k,rho,beta,tol)
-pde = ArctanData(box,mu,k,rho,beta,tol)
+#pde = ArctanData(box,mu,k,rho,beta,tol)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType1 = ['$|| u - u_h||_0$','$||p - p_h||_0$',\
@@ -50,14 +51,17 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(hx,hy)
-#    fdm = NonDFFDMModel(pde,mesh)
-    fdm = NonDFFDMModel_pu(pde,mesh)
+    fdm = NonDFFDMModel(pde,mesh)
+#    fdm = NonDFFDMModel_pu(pde,mesh)
 #    fdm = NonDFFDMModel_normu(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
     t2 = time.time()
-    count[i],r= fdm.solve()
+    count[i],r,u,p= fdm.solve()
+    x = np.r_[u, p]
+    data = {"up":x}
+    sio.savemat('data.mat', data)
     Stime = time.time() - t2
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
@@ -79,9 +83,9 @@ for i in range(maxit):
     error2[1,i] = uuqunorm
     error2[2,i] = uqnorm
 
-    x = np.arange(count[i])
-    fig = plt.figure()
-    ax1 = fig.add_subplot(121)
+#    x = np.arange(count[i])
+#    fig = plt.figure()
+#    ax1 = fig.add_subplot(121)
 #    f,(ax,ax3) = plt.subplots(2,1,sharex=True)
 #
 #    ax.plot(r[0,count[i]-1])
@@ -105,15 +109,15 @@ for i in range(maxit):
 #    ax3.plot((-d, +d), (1-d,1+d),**kwargs)
 #    ax3.plot((1-d,1+d), (-d,+d), **kwargs)
 #    
-    ax1.set_title('rp')
-    ax1.scatter(x,r[0,:count[i]],c='r',marker = '.')
-    plt.text(count[i]/2, r[0,count[i]-1]+0.00002,'rp = %e' %r[0,count[i]-1],ha = 'center')
-    plt.yscale('symlog')
-    ax1.set_yticks([-0.001,0,0.0002, 0.0008, 0.0009])
-    plt.ylim([-0.0001,0.0009])
-    ax2 = fig.add_subplot(122)
-    ax2.set_title('ru')
-    ax2.scatter(x,r[1,:count[i]],c='b',marker = '.')
+#    ax1.set_title('rp')
+#    ax1.scatter(x,r[0,:count[i]],c='r',marker = '.')
+#    plt.text(count[i]/2, r[0,count[i]-1]+0.00002,'rp = %e' %r[0,count[i]-1],ha = 'center')
+#    plt.yscale('symlog')
+#    ax1.set_yticks([-0.001,0,0.0002, 0.0008, 0.0009])
+#    plt.ylim([-0.0001,0.0009])
+#    ax2 = fig.add_subplot(122)
+#    ax2.set_title('ru')
+#    ax2.scatter(x,r[1,:count[i]],c='b',marker = '.')
 
     if i < maxit - 1:
         hx = hx/2

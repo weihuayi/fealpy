@@ -142,36 +142,7 @@ class DarcyFDMModel():
         b[NE] = self.ph[0]
         K = AD.todense()
         # solve
-        aa = []
-        ia = [1]
-        ja = []
-        n = 1
-        for i in range(A.shape[0]):
-            for j in range(A.shape[0]):
-                if K[i][j] != 0:
-                    aa.append(K[i][j])
-                    ja.append(j)
-                    n = n +1
-            ia.append(n)
-        
-        def write_file(mat_name, b_name, ia, ja, aa, F):
-            with open("./" + mat_name + '.txt','w') as f:
-                f.write(str(len(ia) - 1) + '\n')
-                for k in ia:
-                    f.write(str(k) + '\n')
-                for m in ja:
-                    f.write(str(m) + '\n')
-                for n in aa:
-                    f.write(str(n) + '\n')
 
-            with open("./" + b_name + '.txt','w') as f:
-                f.write(str(len(ia) - 1) + '\n')
-                for k in F:
-                    f.write(str(k[0]) + '\n')
-
-
-        write_file("mat", "rhs", ia, ja, aa, b)
-       
         x[:] = spsolve(AD, b)
 
         # solve

@@ -27,7 +27,7 @@ class DarcyForchheimerFDMModel():
         self.uI[isXDEdge] = pde.velocity_y(bc[isXDEdge]) 
         self.pI = pde.pressure(pc)
 
-#        self.ph[0] = self.pI[0]
+        self.ph[0] = self.pI[0]
 
     def get_nonlinear_coef(self):
         mesh = self.mesh

@@ -10,25 +10,25 @@ class CoscosData:
         self.mu = 1
         self.k = 1
 
-#    def init_mesh(self, nx, ny):
-#        box = self.box
-#        mesh = StructureQuadMesh(box, nx, ny)
-#        return mesh
+    def init_mesh(self, nx, ny):
+        box = self.box
+        mesh = StructureQuadMesh(box, nx, ny)
+        return mesh
         
-    def init_mesh(self, n=1, meshtype='tri'):
-        node = np.array([
-            (-1, -1),
-            (1, -1),
-            (1, 1),
-            (-1, 1)], dtype=np.float)
+#    def init_mesh(self, n=1, meshtype='tri'):
+#        node = np.array([
+#            (-1, -1),
+#            (1, -1),
+#            (1, 1),
+#            (-1, 1)], dtype=np.float)
 
-        if meshtype is 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        else:
-            raise ValueError("".format)
+#        if meshtype is 'tri':
+#            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+#            mesh = TriangleMesh(node, cell)
+#            mesh.uniform_refine(n)
+#            return mesh
+#        else:
+#            raise ValueError("".format)
         
 
     def velocity(self, p):
