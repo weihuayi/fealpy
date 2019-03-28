@@ -339,7 +339,7 @@ class StructureQuadMeshDataStructure:
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros((N,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool)
         isBdPoint[edge[isBdEdge,:]] = True
         return isBdPoint
 

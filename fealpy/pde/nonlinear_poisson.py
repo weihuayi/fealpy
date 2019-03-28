@@ -3,7 +3,7 @@ import numpy as np
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.Mesh2d import Mesh2d
 
-class SinsinData:
+class SinSinData:
     """
     -\Delta u + u**2 = f
     u = sin(pi*x)*sin(pi*y)
@@ -38,7 +38,7 @@ class SinsinData:
         y = p[..., 1]
         pi = np.pi
 
-        val = 2*pi**2*np.sin(pi*x)*sin(pi*y) + \
+        val = 2*pi**2*np.sin(pi*x)*np.sin(pi*y) + \
                 np.sin(pi*x)*np.sin(pi*x)*np.sin(pi*y)*np.sin(pi*y)
 
         return val
