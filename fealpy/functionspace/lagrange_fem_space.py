@@ -81,10 +81,8 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        print(bc)
 
         NE = len(cellidx)
-
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
@@ -92,7 +90,21 @@ class LagrangeFiniteElementSpace():
         idx = np.arange(NE)
         bcs[idx, ..., nmap[lidx]] = bc[..., 0]
         bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        return bcs
+
+        return self.basis(bcs)
+
+    def edge_grad_basis(self, bc, cellidx, lidx):
+        NE = len(cellidx)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.mesh.ftype) # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NE)
+        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        print("edge_grad_basis", bcs.shape)
+
+        return self.grad_basis(bcs, cellidx=cellidx)
 
 
     def basis(self, bc):
@@ -170,6 +182,7 @@ class LagrangeFiniteElementSpace():
 
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
+        print('shape:', shape)
         A = np.ones(shape, dtype=self.ftype)
         A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
 
