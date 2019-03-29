@@ -1,7 +1,7 @@
 import numpy as np
 
 from scipy.sparse import coo_matrix, csr_matrix
-from scipy.sparse import triu, tril
+from scipy.sparse import triu, tril, diags, kron, eye
 from .Mesh2d import Mesh2d
 
 class StructureQuadMesh(Mesh2d):
@@ -43,6 +43,25 @@ class StructureQuadMesh(Mesh2d):
     def geo_dimension(self):
         return self.node.shape[1]
 
+    def laplace_operator(self):
+        n0 = self.ds.ny + 1
+        n1 = self.ds.nx + 1
+        hx = 1/(self.hx**2)
+        hy = 1/(self.hy**2)
+
+        d0 = (2*hy)*np.ones(n0, dtype=np.float)
+        d1 = -hy*np.ones(n0-1, dtype=np.float)
+        T0 = diags([d0, d1, d1], [0, -1, 1])
+        I0 = eye(n0)
+
+       
+        d0 = (2*hx)*np.ones(n1, dtype=np.float)
+        d1 = -hx*np.ones(n1-1, dtype=np.float)
+        T1 = diags([d0, d1, d1], [0, -1, 1])
+        I1 = eye(n1)
+
+        A = kron(I1, T0) + kron(T1, I0)
+        return A
 class StructureQuadMeshDataStructure:
     localEdge = np.array([(0,1),(1,2),(2,3),(3,0)])
     V = 4
@@ -320,7 +339,7 @@ class StructureQuadMeshDataStructure:
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros((N,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool)
         isBdPoint[edge[isBdEdge,:]] = True
         return isBdPoint
 
