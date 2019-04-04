@@ -116,10 +116,9 @@ class LagrangeFiniteElementSpace():
         P = 1.0/np.multiply.accumulate(c)
 
         t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        print('shape:', shape)
+        shape = bcs.shape[:-1]+(p+1, TD+1)
         A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        A[..., 1:, :] = p*bcs[..., np.newaxis, :] - t.reshape(-1, 1)
 
         FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
         FF[..., range(p), range(p)] = p
@@ -134,7 +133,7 @@ class LagrangeFiniteElementSpace():
         Q = A[..., multiIndex, range(TD+1)]
         M = F[..., multiIndex, range(TD+1)]
         ldof = self.number_of_local_dofs()
-        shape = bc.shape[:-1]+(ldof, TD+1)
+        shape = bcs.shape[:-1]+(ldof, TD+1)
         R = np.zeros(shape, dtype=self.ftype)
         for i in range(TD+1):
             idx = list(range(TD+1))
@@ -142,9 +141,6 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        print("R:", R.shape)
-        print("Dlambda[cellidx, :, :]:", Dlambda[celllidx, :, :].shape)
-
         gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
         return gphi 
 
