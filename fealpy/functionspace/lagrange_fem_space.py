@@ -104,7 +104,46 @@ class LagrangeFiniteElementSpace():
         bcs[idx, ..., pmap[lidx]] = bc[..., 1]
         print("edge_grad_basis", bcs.shape)
 
-        return self.grad_basis(bcs, cellidx=cellidx)
+        p = self.p   # the degree of polynomial basis function
+        TD = self.TD 
+
+        multiIndex = self.dof.multiIndex 
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        print('shape:', shape)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.mesh.grad_lambda()
+        print("R:", R.shape)
+        print("Dlambda[cellidx, :, :]:", Dlambda[celllidx, :, :].shape)
+
+        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
+        return gphi 
 
 
     def basis(self, bc):
