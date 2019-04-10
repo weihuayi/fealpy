@@ -2,9 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-#from fealpy.pde.darcy_2d import CoscosData
-#from fealpy.pde.darcy_2d_1 import CoscosData
-from fealpy.pde.darcy_2d import CoscosData
+from fealpy.pde.darcy_2d import PolynormialData
 from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
 #from fealpy.fdm.DarcyFDMModel_1 import DarcyFDMModel
 from fealpy.tools.show import showmultirate
@@ -12,7 +10,7 @@ from fealpy.tools.show import showmultirate
 box = [0,1,0,1]
 nx = 8
 ny = 8
-pde = CoscosData(box)
+pde = PolynormialData(box)
 
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)

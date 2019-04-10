@@ -33,10 +33,10 @@ The kinds of mesh :
 * BlockStructureQuadMesh: 
 * BlockStructureHexMesh
 
-* QuadtreeMesh
-* OctreeMesh
+* Quadtree
+* Octree
 
-* TritreeMesh
+* Tritree
 * BitreeMesh
 
 The name of basic mesh entity:

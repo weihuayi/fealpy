@@ -6,8 +6,8 @@ from fealpy.pde.darcy_forchheimer_2d import PolyData
 #from fealpy.pde.darcy_forchheimer_2d import ExponentData
 from fealpy.pde.darcy_forchheimer_2d import SinsinData
 #from fealpy.pde.darcy_forchheimer_2d_1 import CoscosData1
-#from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
-from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel_pu
+from fealpy.fdm.DarcyForchheimerFDMModel import DarcyForchheimerFDMModel
+#from fealpy.fdm.DarcyForchheimerFDMModel_pu import DarcyForchheimerFDMModel_pu
 #from fealpy.fdm.DarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 #from fealpy.fdm.testDarcyForchheimerFDMModelpu import DarcyForchheimerFDMModel
 from fealpy.tools.show import showmultirate
@@ -21,9 +21,9 @@ beta = 30
 tol = 1e-9
 nx = 4
 ny = 4
-#pde = PolyData(box,mu,k,rho,beta,tol)
+pde = PolyData(box,mu,k,rho,beta,tol)
 #pde = ExponentData(box)
-pde = SinsinData(box,mu,k,rho,beta,tol)
+#pde = SinsinData(box,mu,k,rho,beta,tol)
 maxit = 4
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u_I - u_h||_0$','$||p_I - p_h||_0$',\
@@ -35,7 +35,7 @@ count = np.zeros((maxit,), dtype=np.int)
 for i in range(maxit):
     t1 = time.time()
     mesh = pde.init_mesh(nx,ny)
-    fdm = DarcyForchheimerFDMModel_pu(pde,mesh)
+    fdm = DarcyForchheimerFDMModel(pde,mesh)
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC

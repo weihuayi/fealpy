@@ -9,25 +9,21 @@ from ..recovery import FEMFunctionRecoveryAlg
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 
-try:
-    from mumps import spsolve
-except  ImportError:
-    print('Can not import spsolve from mumps!Using spsolve in scipy!')
-    from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve
 
 from timeit import default_timer as timer
 
 
 
 class PoissonFEMModel(object):
-    def __init__(self, pde, mesh, p, integrator):
+    def __init__(self, pde, mesh, p, q=3):
         self.space = LagrangeFiniteElementSpace(mesh, p) 
         self.mesh = self.space.mesh
         self.pde = pde 
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
         self.cellmeasure = mesh.entity_measure('cell')
-        self.integrator = integrator 
+        self.integrator = mesh.integrator(q)
         self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
 
     def recover_estimate(self,rguh):

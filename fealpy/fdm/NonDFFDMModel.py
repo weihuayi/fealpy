@@ -325,28 +325,8 @@ class NonDFFDMModel():
 
         self.uh[:] = u1
         self.ph[:] = p1
-        if NE == 2632:
-            if __name__ == "__main__":
-                f = h5py.File('M4P4rb30t9','w')
-                f['M4P4rb30t9'] = r
-                f.close()
-        print('solve matrix p and u')
-        if __name__ =="__main__":
-            uI = self.uI
-            f = h5py.File('M4P4erb30t9','w')
-            f['M4P4erb30t9'] = er
-            f.close()
-        if __name__ =="__main__":
-            uh = self.uh
-            f = h5py.File('M4P4uhb30t9','w')
-            f['M4P4uhb30t9'] = uh
-            f.close()
-        if __name__ =="__main__":
-            ph = self.ph
-            f = h5py.File('M4P4phb30t9','w')
-            f['M4P4phb30t9'] = ph
-            f.close()
-        return count,r,self.uI,self.ph
+
+        return count,r,self.uh,self.ph
 
 
     def get_max_error(self):

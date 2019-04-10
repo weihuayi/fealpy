@@ -371,7 +371,7 @@ class SinsinData:
 
     def init_mesh(self, nx, ny):
         box = self.box
-        mesh = StructureQuadMesh1(box, nx, ny)
+        mesh = StructureQuadMesh(box, nx, ny)
         return mesh
 
 

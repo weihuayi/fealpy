@@ -7,7 +7,10 @@ class LagrangeFiniteElementSpace():
     def __init__(self, mesh, p=1, spacetype='C'):
         self.mesh = mesh
         self.p = p 
-        self.GD = mesh.node.shape[1]
+        if len(mesh.node.shape) == 1:
+            self.GD = 1
+        else: 
+            self.GD = mesh.node.shape[1]
         if spacetype is 'C':
             if mesh.meshtype is 'interval':
                 self.dof = CPLFEMDof1d(mesh, p)
@@ -81,10 +84,8 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        print(bc)
 
         NE = len(cellidx)
-
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
@@ -92,7 +93,56 @@ class LagrangeFiniteElementSpace():
         idx = np.arange(NE)
         bcs[idx, ..., nmap[lidx]] = bc[..., 0]
         bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        return bcs
+
+        return self.basis(bcs)
+
+    def edge_grad_basis(self, bc, cellidx, lidx):
+        NE = len(cellidx)
+        nmap = np.array([1, 2, 0])
+        pmap = np.array([2, 0, 1])
+        shape = (NE, ) + bc.shape[0:-1] + (3, )
+        bcs = np.zeros(shape, dtype=self.mesh.ftype) # (NE, 3) or (NE, NQ, 3)
+        idx = np.arange(NE)
+        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        print("edge_grad_basis", bcs.shape)
+
+        p = self.p   # the degree of polynomial basis function
+        TD = self.TD 
+
+        multiIndex = self.dof.multiIndex 
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bcs.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bcs[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bcs.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.mesh.grad_lambda()
+        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
+        return gphi 
 
 
     def basis(self, bc):
@@ -170,6 +220,7 @@ class LagrangeFiniteElementSpace():
 
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
+        print('shape:', shape)
         A = np.ones(shape, dtype=self.ftype)
         A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
 
