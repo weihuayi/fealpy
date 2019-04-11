@@ -1,11 +1,10 @@
 
 import numpy as np
-import sys
 
-from fealpy.model.simplified_frictional_contact_problem import SFContactProblemData, SFContactProblemData1
-from fealpy.vemmodel.SFContactVEMModel2d import SFContactVEMModel2d 
+from fealpy.pde.sfc_2d import SFCModelData
+from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
 from fealpy.tools.show import showmultirate, show_error_table
-from fealpy.quadrature import TriangleQuadrature 
+from fealpy.quadrature import TriangleQuadrature
 from fealpy.mesh import PolygonMesh
 
 import matplotlib.pyplot as plt
@@ -13,7 +12,7 @@ import scipy.io as sio
 
 maxit = 6 
 
-model = SFContactProblemData()
+model = SFCModelData()
 qmesh= model.init_mesh(n=2, meshtype='quad')
 
 integrator = TriangleQuadrature(4)
