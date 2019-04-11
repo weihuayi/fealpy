@@ -9,7 +9,7 @@ from ..boundarycondition import DirichletBC
 from ..vemmodel import doperator, PolygonMeshIntegralAlg
 from ..quadrature import GaussLobattoQuadrature
 
-class SFContactVEMModel2d():
+class SFCVEMModel2d():
     def __init__(self, model, mesh, p=1, integrator=None):
         """
         Initialize a Poisson virtual element model. 

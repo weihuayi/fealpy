@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python3
+#
 import numpy as np
 
 from fealpy.pde.sfc_2d import SFCModelData
@@ -10,15 +11,15 @@ from fealpy.mesh import PolygonMesh
 import matplotlib.pyplot as plt
 import scipy.io as sio
 
-maxit = 6 
+maxit = 6
 
 model = SFCModelData()
-qmesh= model.init_mesh(n=2, meshtype='quad')
+qmesh = model.init_mesh(n=2, meshtype='quad')
 
 integrator = TriangleQuadrature(4)
 
-pmesh = PolygonMesh.from_mesh(qmesh) 
-vem = SFContactVEMModel2d(model, pmesh, p=1, integrator=integrator)
+pmesh = PolygonMesh.from_mesh(qmesh)
+vem = SFCVEMModel2d(model, pmesh, p=1, integrator=integrator)
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 data = []
@@ -32,12 +33,11 @@ for i in range(maxit):
     cell = np.zeros(NC, dtype=np.object)
     cell[:] = list(qmesh.ds.cell+1)
 
-
     solution['mesh{}'.format(2+i)] = {
-            'vertices':qmesh.point,
-            'elements':cell.reshape(-1, 1),
-            'boundary':qmesh.ds.boundary_edge()+1,
-            'solution':vem.uh.reshape(-1, 1)}
+            'vertices': qmesh.point,
+            'elements': cell.reshape(-1, 1),
+            'boundary': qmesh.ds.boundary_edge()+1,
+            'solution': vem.uh.reshape(-1, 1)}
     if i < maxit - 1:
         data.append(vem.uh.copy())
         edge = qmesh.ds.edge
@@ -50,7 +50,7 @@ for i in range(maxit):
             cdata = S.value(bc)
             data[j] = np.r_[pdata, edata, cdata]
         qmesh.uniform_refine()
-        pmesh = PolygonMesh.from_mesh(qmesh) 
+        pmesh = PolygonMesh.from_mesh(qmesh)
         vem.reinit(pmesh)
 
 # error analysis
