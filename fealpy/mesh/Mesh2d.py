@@ -150,8 +150,8 @@ class Mesh2d():
 
     def add_plot(self, plot,
             nodecolor='w', edgecolor='k',
-            cellcolor='white', aspect='equal',
-            linewidths=0.6, markersize=50,  
+            cellcolor=[0.5, 0.9, 0.45], aspect='equal',
+            linewidths=1, markersize=50,  
             showaxis=False, showcolorbar=False, cmap='rainbow'):
 
         if isinstance(plot, ModuleType):
