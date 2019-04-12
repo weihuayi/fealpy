@@ -63,7 +63,7 @@ class LagrangeFiniteElementSpace():
     def top_dimension(self):
         return self.TD
 
-    def edge_basis(self, bc, cellidx, lidx):
+    def edge_basis(self, bc, cellidx, lidx, direction=True):
         """
         compute the basis function values at barycentric point bc on edge
 
@@ -89,23 +89,31 @@ class LagrangeFiniteElementSpace():
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
-        bcs = np.zeros(shape, dtype=self.mesh.ftype) # (NE, 3) or (NE, NQ, 3)
+        bcs = np.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
         idx = np.arange(NE)
-        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
-        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
 
         return self.basis(bcs)
 
-    def edge_grad_basis(self, bc, cellidx, lidx):
+    def edge_grad_basis(self, bc, cellidx, lidx, direction=True):
         NE = len(cellidx)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
-        bcs = np.zeros(shape, dtype=self.mesh.ftype) # (NE, 3) or (NE, NQ, 3)
+        bcs = np.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
         idx = np.arange(NE)
-        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
-        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        print("edge_grad_basis", bcs.shape)
+        if direction:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+        else:
+            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
+            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
 
         p = self.p   # the degree of polynomial basis function
         TD = self.TD 
