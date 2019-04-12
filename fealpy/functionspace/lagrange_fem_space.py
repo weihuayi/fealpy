@@ -228,7 +228,6 @@ class LagrangeFiniteElementSpace():
 
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
-        print('shape:', shape)
         A = np.ones(shape, dtype=self.ftype)
         A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
 
