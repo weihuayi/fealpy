@@ -5,7 +5,6 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .QuadrangleMesh import QuadrangleMesh 
 from .PolygonMesh import PolygonMesh
 from ..common import ranges
-from .adaptive_tools import mark
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
@@ -48,34 +47,37 @@ class Quadtree(QuadrangleMesh):
             self.refine()
 
     def sizing_adaptive(self, eta):
-        pass 
+        pass
 
-    def adaptive_refine(self, estimator, data=None, maxrefine=3):
-        i = 0 
+    def mark(self, eta, theta, ep, method="refine"):
+        if method is "refine":
+            isMarked = eta > theta*ep
+        elif method is "coarsen":
+            isMarked = eta < theta*ep
+        return isMarked
+
+    def adaptive_refine(self, estimator, surface=None, data=None):
+        i = 0
         if data is not None:
             if 'rho' not in data:
                 data['rho'] = estimator.rho
         else:
-            data = {'rho':rho}
-        
-        while estimator.is_uniform() is False:
+            data = {'rho': estimator.rho}
+
+        while True:
             i += 1
-            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, 'L2')
-            self.refine(isMarkedCell, data=data)
-            if data is not None:
-                mesh = self.to_pmesh()
-                estimator.update(data['rho'], mesh, smooth=True)
-            else:
+            isMarkedCell = self.refine_marker(
+                    estimator.eta, estimator.theta, estimator.ep)
+            if sum(isMarkedCell) == 0 or i > 3:
                 break
+            self.refine(isMarkedCell, surface=surface, data=data)
+            mesh = self.to_conformmesh()
+            estimator.update(data['rho'], mesh, smooth=True)
 
-            if i > maxrefine:
-                break
-
-    def refine_marker(self, eta, theta, method):
+    def refine_marker(self, eta, theta, ep):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        
-        isMarked = mark(eta, theta, method)
+        isMarked = self.mark(eta, theta, ep, "refine")
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
@@ -180,17 +182,15 @@ class Quadtree(QuadrangleMesh):
             if 'rho' not in data:
                 data['rho'] = estimator.rho
         else:
-            data = {'rho':rho}
-        print(estimator.is_uniform())
+
+            data = {'rho': estimator.rho}
         while estimator.is_uniform() is False:
             i += 1
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
-            #print(isMarkedCell)
             isRemainNode = self.coarsen(isMarkedCell)
             mesh = self.to_pmesh()
             for key, value in data.items():
                 data[key] = value[isRemainNode]
-                print('datia[rho]', data['rho'])
             estimator.update(data['rho'], mesh, smooth=False)
 
             isRootCell = self.is_root_cell()
@@ -200,15 +200,13 @@ class Quadtree(QuadrangleMesh):
             if i > maxcoarsen:
                 break
 
-       
-    def coarsen_marker(self, eta, beta, method):
-        leafCellIdx = self.leaf_cell_index()     
-        isMarked = mark(eta, beta, method="COARSEN")
+    def coarsen_marker(self, eta, beta, ep):
+        leafCellIdx = self.leaf_cell_index() 
+        isMarked = self.mark(eta, beta, ep, method="coarsen")
         NC = self.number_of_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
-
 
     def coarsen(self, isMarkedCell, data=None):
         """ marker will marke the leaf cells which will be coarsen
@@ -240,7 +238,6 @@ class Quadtree(QuadrangleMesh):
                 else:
                     NNC0 = NNC1
 
-
             isRemainNode = np.zeros(NN, dtype=np.bool)
             isRemainNode[cell[isRemainCell, :]] = True
 
@@ -268,8 +265,6 @@ class Quadtree(QuadrangleMesh):
             cell = nodeIdxMap[cell]
             self.node = node[isRemainNode]
             self.ds.reinit(N, cell)
-            print(NC)
-            print(cell.shape)
 
             if cell.shape[0] == NC:
                 return False 
@@ -309,7 +304,6 @@ class Quadtree(QuadrangleMesh):
             parent = self.parent
             child = self.child
 
-
             isLeafCell = self.is_leaf_cell()
             isLeafEdge = isLeafCell[edge2cell[:, 0]] & isLeafCell[edge2cell[:, 1]]
 
@@ -317,32 +311,30 @@ class Quadtree(QuadrangleMesh):
             pedge = edge[isLeafEdge, :]
 
             isRootCell = self.is_root_cell()
-            isLevelBdEdge =  (pedge2cell[:, 0] == pedge2cell[:, 1]) 
+            isLevelBdEdge = (pedge2cell[:, 0] == pedge2cell[:, 1])
 
             # Find the index of all boundary edges on each tree level
             pedgeIdx, = np.nonzero(isLevelBdEdge)
             while len(pedgeIdx) > 0:
-                cellIdx = pedge2cell[pedgeIdx, 1] 
+                cellIdx = pedge2cell[pedgeIdx, 1]
                 localIdx = pedge2cell[pedgeIdx, 3]
 
-                parentCellIdx = parent[cellIdx, 0] 
-                
+                parentCellIdx = parent[cellIdx, 0]
                 neighborCellIdx = cell2cell[parentCellIdx, localIdx]
-                
                 isFound = isLeafCell[neighborCellIdx] | isRootCell[neighborCellIdx]
                 pedge2cell[pedgeIdx[isFound], 1] = neighborCellIdx[isFound]
 
                 edgeIdx = cell2edge[parentCellIdx, localIdx]
 
                 isCase = (edge2cell[edgeIdx, 0] != parentCellIdx) & isFound
-                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2] 
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 2]
 
                 isCase = (edge2cell[edgeIdx, 0] == parentCellIdx) & isFound
-                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3] 
+                pedge2cell[pedgeIdx[isCase], 3] = edge2cell[edgeIdx[isCase], 3]
 
                 isSpecial = isFound & (parentCellIdx == neighborCellIdx) 
-                pedge2cell[pedgeIdx[isSpecial], 1] =  pedge2cell[pedgeIdx[isSpecial], 0]
-                pedge2cell[pedgeIdx[isSpecial], 3] =  pedge2cell[pedgeIdx[isSpecial], 2]
+                pedge2cell[pedgeIdx[isSpecial], 1] = pedge2cell[pedgeIdx[isSpecial], 0]
+                pedge2cell[pedgeIdx[isSpecial], 3] = pedge2cell[pedgeIdx[isSpecial], 2]
 
                 pedgeIdx = pedgeIdx[~isFound]
                 pedge2cell[pedgeIdx, 1] = parentCellIdx[~isFound]

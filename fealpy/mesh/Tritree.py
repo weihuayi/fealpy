@@ -184,21 +184,22 @@ class Tritree(TriangleMesh):
             self.child = np.r_['0', self.child, child4]              
             self.ds.reinit(NN + NNN, cell)
 
-
     def adaptive_coarsen(self, estimator, surface=None, data=None):
 
         if data is not None:
             data['rho'] = estimator.rho
         else:
-            data = {'rho':rho}
+            data = {'rho': estimator.rho}
 
         i = 0
         while True:
             i += 1
-            isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta,
+            isMarkedCell = self.coarsen_marker(
+                    estimator.eta,
+                    estimator.beta,
                     estimator.ep)
 
-            if sum(isMarkedCell) == 0 or i > 3:
+            if (sum(isMarkedCell) == 0) or i > 3:
                 break
 
             isRemainNode = self.coarsen(isMarkedCell)
@@ -209,9 +210,9 @@ class Tritree(TriangleMesh):
 
             isRootCell = self.is_root_cell()
             NC = self.number_of_cells()
+
             if isRootCell.sum() == NC:
                 break
-                 
 
     def coarsen_marker(self, eta, beta, ep):
         leafCellIdx = self.leaf_cell_index()
@@ -220,7 +221,6 @@ class Tritree(TriangleMesh):
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
             np.add.at(eta0, idxmap, eta)
-            
         else:
             eta0 = eta
         isMarked = self.mark(eta0[leafCellIdx], beta, ep, method="coarsen")

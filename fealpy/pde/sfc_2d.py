@@ -4,32 +4,32 @@ The model datas for the Simplified Friction Problem
 
 import numpy as np
 from ..mesh import TriangleMesh, QuadrangleMesh
-from ..mesh.tree_data_structure import Quadtree
+from ..mesh.Quadtree import Quadtree
 
 
 class SFCModelData:
-    def __init__(self, eta=0.4):
-        self.eta = eta
+    def __init__(self, g=0.4):
+        self.g = g
 
     def init_mesh(self, n=4, meshtype='quadtree'):
-        point = np.array([
+        node = np.array([
             (0, 0),
             (1, 0),
             (1, 1),
             (0, 1)], dtype=np.float)
         if meshtype is 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = Quadtree(point, cell)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'quad':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = QuadrangleMesh(point, cell)
+            mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-            mesh = TriangleMesh(point, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         else:
@@ -70,24 +70,24 @@ class SFCModelData1:
         self.eta = 1
 
     def init_mesh(self, n=4, meshtype='quadtree'):
-        point = np.array([
+        node = np.array([
             (0, 0),
             (1, 0),
             (1, 1),
             (0, 1)], dtype=np.float)
         if meshtype is 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = Quadtree(point, cell)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'quad':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = QuadrangleMesh(point, cell)
+            mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-            mesh = TriangleMesh(point, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         else:
@@ -133,31 +133,35 @@ class SFCModelData2:
         self.g = g
 
     def init_mesh(self, n=4, meshtype='quadtree'):
-        point = np.array([
+        node = np.array([
             (0, 0),
             (1, 0),
             (1, 1),
             (0, 1)], dtype=np.float)
         if meshtype is 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = Quadtree(point, cell)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'quad':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = QuadrangleMesh(point, cell)
+            mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-            mesh = TriangleMesh(point, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         else:
             raise ValueError("".format)
 
     def solution(self, p):
-        return np.zeros(p.shape[0:-1])
+        x = p[..., 0]
+        y = p[..., 1]
+        r = np.sqrt((x - 0.8)**2 + (y + 0.2)**2)
+        val = np.arctan(20*(r - 0.5))
+        return val
 
     def gradient(self, p):
         return np.zeros(p.shape)
@@ -167,21 +171,35 @@ class SFCModelData2:
         """
         x = p[..., 0]
         y = p[..., 1]
-        r = (x - 0.8)**2 + (y + 0.2)**2
-        val = np.arctan(20*(r - 0.5))
+        sqrt = np.sqrt
+        atan = np.arctan
+        r2 = (x - 0.8)**2 + (y + 0.2)**2
+        r = sqrt(r2)
+        r3 = r2*r
+        r4 = r2*r2
+        r5 = r4*r
+        r6 = r3*r3
+        t0 = (20*r - 10.0)**2 + 1
+        t1 = 16000*r - 8000
+        val = (
+                r6*t0**2*atan(20*r - 10.0) -
+                40*r5*t0 +
+                r4*t1*(x - 0.8)**2 +
+                r4*t1*(y - 0.2)**2 +
+                20*r3*t0*(x - 0.8)**2 +
+                20*r3*t0*(y - 0.2)**2
+                )/(r6*t0**2)
         return val
 
     def dirichlet(self, p):
-        return np.zeros(p.shape[0:-1])
+        return self.solution(p)
 
     def is_dirichlet(self, p):
-        eps = 1e-14
-        x = p[..., 0]
-        y = p[..., 1]
-        return (x < eps) | (y > 1.0 - eps) | (x > 1.0 - eps)
+        shape = p.shape[:-1]
+        return np.zeros(shape, dtype=np.bool)
 
     def is_contact(self, p):
         eps = 1e-14
         x = p[..., 0]
         y = p[..., 1]
-        return y < eps
+        return (x < eps) | (y > 1.0 - eps) | (x > 1.0 - eps) | (y < eps)
