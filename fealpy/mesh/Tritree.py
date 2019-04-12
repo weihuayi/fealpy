@@ -1,7 +1,7 @@
 import numpy as np
 
 from .TriangleMesh import TriangleMesh 
-from .adaptive_tools import mark
+
 
 class Tritree(TriangleMesh):
     localEdge2childCell = np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32)
@@ -40,19 +40,20 @@ class Tritree(TriangleMesh):
             isMarked = eta > theta*ep
         elif method is "coarsen":
             isMarked = eta < theta*ep
-
+        return isMarked
 
     def adaptive_refine(self, estimator, surface=None, data=None):
-        i = 0 
+        i = 0
         if data is not None:
             if 'rho' not in data:
                 data['rho'] = estimator.rho
         else:
-            data = {'rho':rho}
+            data = {'rho': estimator.rho}
 
         while True:
             i += 1
-            isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, estimator.ep)
+            isMarkedCell = self.refine_marker(
+                    estimator.eta, estimator.theta, estimator.ep)
             if sum(isMarkedCell) == 0 or i > 3:
                 break
             self.refine(isMarkedCell, surface=surface, data=data)
@@ -62,7 +63,7 @@ class Tritree(TriangleMesh):
     def refine_marker(self, eta, theta, ep):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        if 'idxmap' in self.celldata.keys(): 
+        if 'idxmap' in self.celldata.keys():
             eta0 = np.zeros(NC, dtype=self.ftype)
             idxmap = self.celldata['idxmap']
             np.add.at(eta0, idxmap, eta)
@@ -71,7 +72,7 @@ class Tritree(TriangleMesh):
         isMarked = self.mark(eta, theta, ep, "refine")
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
-        return isMarkedCell 
+        return isMarkedCell
 
     def refine(self, isMarkedCell, surface=None, data=None):
         if sum(isMarkedCell) > 0:
@@ -86,8 +87,10 @@ class Tritree(TriangleMesh):
             # expand the marked cell
             isLeafCell = self.is_leaf_cell()
             edge2cell = self.ds.edge_to_cell()
-            flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
-            flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
+            flag0 = isLeafCell[edge2cell[:, 0]] & (
+                    ~isLeafCell[edge2cell[:, 1]])
+            flag1 = isLeafCell[edge2cell[:, 1]] & (
+                    ~isLeafCell[edge2cell[:, 0]])
 
             LCell = edge2cell[flag0, 0]
             RCell = edge2cell[flag1, 1]
