@@ -53,7 +53,7 @@ class Tritree(TriangleMesh):
         while True:
             i += 1
             isMarkedCell = self.refine_marker(estimator.eta, estimator.theta, estimator.ep)
-            if sum(isMarkedCell) == 0 || i > 3:
+            if sum(isMarkedCell) == 0 or i > 3:
                 break
             self.refine(isMarkedCell, surface=surface, data=data)
             mesh = self.to_conformmesh()
@@ -195,7 +195,7 @@ class Tritree(TriangleMesh):
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta,
                     estimator.ep)
 
-            if sum(isMarkedCell) == 0 || i > 3:
+            if sum(isMarkedCell) == 0 or i > 3:
                 break
 
             isRemainNode = self.coarsen(isMarkedCell)

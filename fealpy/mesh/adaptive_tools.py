@@ -2,7 +2,6 @@ import numpy as np
 
 def mark(eta, theta, method='L2'):
     isMarked = np.zeros(len(eta), dtype=np.bool)
-        ep = np.max(eta)
     if method is 'MAX':
         isMarked[eta > theta*np.max(eta)] = True
     elif method is 'COARSEN':
