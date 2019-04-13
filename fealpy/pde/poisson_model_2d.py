@@ -1,10 +1,9 @@
 import numpy as np
-import math
 import scipy.io as sio
 
 from ..mesh.TriangleMesh import TriangleMesh  
-from ..mesh.tree_data_structure import Quadtree 
-from numpy import *
+from ..mesh.Quadtree import Quadtree 
+
 
 class ffData:
     def __init__(self):
@@ -31,10 +30,8 @@ class ffData:
             raise ValueError("".format)
 
     def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
         return np.zeros(p.shape[0:-1])
-    
+
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -46,8 +43,8 @@ class ffData:
         y = p[..., 1]
 
         val = np.ones(x.shape, dtype=np.float)
-        I = np.floor(4*x) + np.floor(4*y)
-        isMinus = (I%2 == 0)
+        flag = np.floor(4*x) + np.floor(4*y)
+        isMinus = (flag % 2 == 0)
         val[isMinus] = - 1
         return val 
 
@@ -56,6 +53,7 @@ class ffData:
         """
         val = np.zeros(p.shape[0:-1])
         return val
+
 
 class KelloggData:
     def __init__(self):
@@ -188,6 +186,7 @@ class KelloggData:
         """Dilichlet boundary condition
         """
         return self.solution(p)
+
 
 class LShapeRSinData:
     def __init__(self):

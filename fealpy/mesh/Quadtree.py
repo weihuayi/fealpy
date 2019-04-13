@@ -1,10 +1,11 @@
 
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix
-
-from .QuadrangleMesh import QuadrangleMesh 
+from scipy.sparse import coo_matrix
+from .QuadrangleMesh import QuadrangleMesh
 from .PolygonMesh import PolygonMesh
 from ..common import ranges
+from .adaptive_tools import mark
+
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
@@ -49,13 +50,6 @@ class Quadtree(QuadrangleMesh):
     def sizing_adaptive(self, eta):
         pass
 
-    def mark(self, eta, theta, ep, method="refine"):
-        if method is "refine":
-            isMarked = eta > theta*ep
-        elif method is "coarsen":
-            isMarked = eta < theta*ep
-        return isMarked
-
     def adaptive_refine(self, estimator, surface=None, data=None):
         i = 0
         if data is not None:
@@ -74,10 +68,10 @@ class Quadtree(QuadrangleMesh):
             mesh = self.to_conformmesh()
             estimator.update(data['rho'], mesh, smooth=True)
 
-    def refine_marker(self, eta, theta, ep):
+    def refine_marker(self, eta, theta):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        isMarked = self.mark(eta, theta, ep, "refine")
+        isMarked = mark(eta, theta, method="L2")
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
@@ -175,7 +169,7 @@ class Quadtree(QuadrangleMesh):
             self.parent = np.concatenate((parent, newParent), axis=0)
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
- 
+           
     def adaptive_coarsen(self, estimator, data=None, maxcoarsen=3):
         i = 0
         if data is not None:
@@ -184,6 +178,7 @@ class Quadtree(QuadrangleMesh):
         else:
 
             data = {'rho': estimator.rho}
+
         while estimator.is_uniform() is False:
             i += 1
             isMarkedCell = self.coarsen_marker(estimator.eta, estimator.beta, 'COARSEN')
@@ -200,9 +195,9 @@ class Quadtree(QuadrangleMesh):
             if i > maxcoarsen:
                 break
 
-    def coarsen_marker(self, eta, beta, ep):
-        leafCellIdx = self.leaf_cell_index() 
-        isMarked = self.mark(eta, beta, ep, method="coarsen")
+    def coarsen_marker(self, eta, beta):
+        leafCellIdx = self.leaf_cell_index()
+        isMarked = mark(eta, beta, method="COARSEN")
         NC = self.number_of_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True

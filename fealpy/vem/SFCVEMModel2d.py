@@ -36,6 +36,7 @@ class SFCVEMModel2d():
         self.integrator = mesh.integrator(q)
         self.area = self.space.smspace.area 
 
+
         self.uh = self.space.function() 
         self.lh = self.space.function()
 

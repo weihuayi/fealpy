@@ -6,6 +6,7 @@ friction problem.
 """
 
 import numpy as np
+import matplotlib.pyplot as plt
 from fealpy.pde.sfc_2d import SFCModelData2
 from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
 
@@ -15,3 +16,16 @@ pmesh = qtree.to_pmesh()
 
 vem = SFCVEMModel2d(pde, pmesh, p=1, q=4)
 vem.solve(rho=0.1, maxit=40000)
+
+fig = plt.figure()
+
+uI = vem.space.interpolation(pde.solution)
+
+e = np.max(np.abs(uI - vem.uh))
+print("The max error:", e)
+print(uI)
+print(vem.uh)
+
+axes = fig.gca()
+pmesh.add_plot(axes)
+plt.show()
