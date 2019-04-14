@@ -7,9 +7,9 @@ from ..mesh import TriangleMesh, QuadrangleMesh
 from ..mesh.Quadtree import Quadtree
 
 
-class SFCModelData:
-    def __init__(self, g=0.4):
-        self.g = g
+class SFCModelData0:
+    def __init__(self, eta=0.4):
+        self.eta = eta 
 
     def init_mesh(self, n=4, meshtype='quadtree'):
         node = np.array([
@@ -129,8 +129,8 @@ class SFCModelData1:
 
 
 class SFCModelData2:
-    def __init__(self, g=0.4):
-        self.g = g
+    def __init__(self, eta=0.4):
+        self.eta = eta 
 
     def init_mesh(self, n=4, meshtype='quadtree'):
         node = np.array([
@@ -196,7 +196,9 @@ class SFCModelData2:
 
     def is_dirichlet(self, p):
         shape = p.shape[:-1]
-        return np.zeros(shape, dtype=np.bool)
+        flag = np.zeros(shape, dtype=np.bool)
+        # flag[0] = True
+        return flag
 
     def is_contact(self, p):
         eps = 1e-14

@@ -37,8 +37,8 @@ class SFCVEMModel2d():
         self.area = self.space.smspace.area 
 
 
-        self.uh = self.space.function() 
-        self.lh = self.space.function()
+        self.uh = self.space.function() # the solution 
+        self.lh = self.space.function() # \lambda_h 
 
         self.integralalg = PolygonMeshIntegralAlg(
                 self.integrator, 
@@ -135,17 +135,17 @@ class SFCVEMModel2d():
         b = self.get_right_vector() 
 
         k = 0
-        g = self.pde.g
+        eta = self.pde.eta
 
         AD = bc.apply_on_matrix(A)
         ml = pyamg.ruge_stuben_solver(AD)  
         while k < maxit:
             b1 = self.get_lagrangian_multiplier_vector(edge, edge2dof)
-            bd = bc.apply_on_vector(b - g*b1, A)
+            bd = bc.apply_on_vector(b - eta*b1, A)
             uh0 = uh.copy()
             lh0 = lh.copy()
             uh[:] = ml.solve(bd, tol=1e-12, accel='cg').reshape(-1)
-            lh[isContactDof] = np.clip(lh[isContactDof] + rho*g*uh[isContactDof], -1, 1) 
+            lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1) 
             e0 = np.sqrt(np.sum((uh - uh0)**2))
             e1 = np.sqrt(np.sum((lh - lh0)**2))
             print('k:', k, 'error:', e0, e1)
