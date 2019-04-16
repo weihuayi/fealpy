@@ -2,6 +2,7 @@ import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh  
 from ..mesh.tree_data_structure import Quadtree 
+from ..mesh.StructureQuadMesh import StructureQuadMesh
 
  
 class ffData:
@@ -454,6 +455,10 @@ class SinSinData:
             return mesh
         else:
             raise ValueError("".format)
+    
+    def init_structurequadmesh(self, box, nx, ny):
+        mesh = StructureQuadMesh(box, nx, ny)
+        return mesh
 
     def solution(self, p):
         """ The exact solution 
