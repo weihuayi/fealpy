@@ -152,6 +152,8 @@ class PolygonMeshDataStructure():
     def __init__(self, NN, cell, cellLocation):
         self.NN = NN
         self.NC = cellLocation.shape[0] - 1
+        self.nx = int(np.sqrt(NN)-1)
+        self.ny = self.nx
 
         self.cell = cell
         self.cellLocation = cellLocation
@@ -380,3 +382,4 @@ class PolygonMeshDataStructure():
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
         return idx
+        

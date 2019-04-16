@@ -432,6 +432,9 @@ class StructureQuadMeshDataStructure:
         return np.arange(ny, NN, ny+1)
 
     def peoriod_matrix(self):
+        """
+        we can get a matarix under periodic boundary condition 
+        """
         nx = self.nx
         ny = self.ny
         NN = self.NN
@@ -444,17 +447,17 @@ class StructureQuadMeshDataStructure:
         isPNode[ridx] = True
         isPNode[uidx] = True
         NC = nx*ny
-
+        #First, we get the inner elements , the left boundary and the lower boundary of the matrix.
         val = np.ones(NC, dtype = np.bool)
         I = np.arange(NN)[~isPNode]
         J = range(NC) 
         C = coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
-
+        #second,  we make the upper boundary equal to the lower boundary.
         val = np.ones(nx, dtype=np.bool) 
         I = np.arange(NN)[uidx[:-1]]
         J = np.arange(0, NC-ny+1, ny)
         C += coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
-
+        #thrid, we make the right boundary equal to the left boundary.
         val = np.ones(ny+1, dtype=np.bool)
         I = np.arange(NN)[ridx]
         J = np.arange(ny+1)

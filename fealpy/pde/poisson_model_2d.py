@@ -1,7 +1,9 @@
 import numpy as np
+import scipy.io as sio
 
 from ..mesh.TriangleMesh import TriangleMesh  
-from ..mesh.tree_data_structure import Quadtree 
+from ..mesh.Quadtree import Quadtree 
+
 
 class ffData:
     def __init__(self):
@@ -28,10 +30,8 @@ class ffData:
             raise ValueError("".format)
 
     def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
         return np.zeros(p.shape[0:-1])
-    
+
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -43,8 +43,8 @@ class ffData:
         y = p[..., 1]
 
         val = np.ones(x.shape, dtype=np.float)
-        I = np.floor(4*x) + np.floor(4*y)
-        isMinus = (I%2 == 0)
+        flag = np.floor(4*x) + np.floor(4*y)
+        isMinus = (flag % 2 == 0)
         val[isMinus] = - 1
         return val 
 
@@ -53,6 +53,7 @@ class ffData:
         """
         val = np.zeros(p.shape[0:-1])
         return val
+
 
 class KelloggData:
     def __init__(self):
@@ -185,6 +186,7 @@ class KelloggData:
         """Dilichlet boundary condition
         """
         return self.solution(p)
+
 
 class LShapeRSinData:
     def __init__(self):
@@ -366,7 +368,7 @@ class CosCosData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
+    def init_mesh(self, n=1, meshtype='quadtree'):
         """ generate the initial mesh
         """
         node = np.array([
@@ -379,6 +381,7 @@ class CosCosData:
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
+            print('node',mesh.node.shape)
             return mesh
         elif meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
@@ -386,15 +389,19 @@ class CosCosData:
             mesh.uniform_refine(n)
             return mesh
         else:
-            raise ValueError("".format)
+            raise ValueError("".format)   
 
     def solution(self, p):
         """ The exact solution 
         """
+        print ('p',p.shape)
         x = p[..., 0]
+        print('x',x.shape)
         y = p[..., 1]
+        print('y',y.shape)
         pi = np.pi
         val = np.cos(pi*x)*np.cos(pi*y)
+        print('v',val.shape)
         return val
 
     def source(self, p):
@@ -402,6 +409,7 @@ class CosCosData:
         INPUT:
             p: array object,  
         """
+        print('p',p.shape)
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
@@ -458,6 +466,7 @@ class SinSinData:
         """ The exact solution 
         """
         x = p[..., 0]
+        print('x',x)
         y = p[..., 1]
         pi = np.pi
         u = np.sin(pi*x)*np.sin(pi*y) - 1
@@ -577,3 +586,52 @@ class ExpData:
     def is_boundary(self, p):
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+        
+class sp:
+    def __init__(self):
+        self.N = 128
+        k1 =np.arange(self.N/2+1)
+        k2=np.arange(1-self.N/2,0,1)
+        self.kk =np.append(k1,k2)
+
+        data = sio.loadmat('u_128.mat')
+        self.u1 = data['phi_a']
+ 
+   
+
+    def f(self,x,y):
+        N =self.N
+        kk =self.kk
+        f = 0
+        u1 = self.u1
+        u1 = np.fft.ifft2(u1)
+        for i1 in range(N):
+            for i2 in range(N):
+                f += u1[i1,i2]*exp(1j*(kk[i1]*x+kk[i2]*y))
+        #f =sum(u1@exp(1j*(kk*x.T+kk*y.T)),axis=0)
+        return f
+
+
+    
+    def solution(self, p):
+        x = p[..., 0]
+        x = x.reshape(-1)
+        y = p[..., 1]
+        y = y.reshape(-1)
+        u =self.f(x,y).real
+        u = u.reshape(10,-1)
+        return u
+        
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        pass
+    def source(self, p):
+        pass 
+    def gradient(self, p):
+        pass        
+    def is_boundary(self, p):
+        pass        
+                
+             
+               

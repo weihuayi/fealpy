@@ -1,7 +1,6 @@
 import numpy as np
 
 class TriangleQuadrature():
-
     def get_number_of_quad_points(self):
         return self.quadpts.shape[0] 
 

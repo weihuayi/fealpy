@@ -6,14 +6,18 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     V = 4
     E = 4
     F = 1
-    def __init__(self, N, cell):
+    def __init__(self, N, cell,cellLocation):
         super(QuadrangleMeshDataStructure, self).__init__(N, cell)
+        self.cellLocation = cellLocation
 
 class QuadrangleMesh(Mesh2d):
     def __init__(self, node, cell, dtype=np.float):
         self.node = node
         N = node.shape[0]
-        self.ds = QuadrangleMeshDataStructure(N, cell)
+        self.nx = int(np.sqrt(N)-1)
+        self.ny = self.nx
+        cellLocation = np.arange(0, 4*(self.nx*self.ny+1), 4)
+        self.ds = QuadrangleMeshDataStructure(N, cell, cellLocation)
 
         self.meshtype = 'quad'
         self.dtype = dtype
