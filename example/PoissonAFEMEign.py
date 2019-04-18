@@ -107,17 +107,18 @@ def eigns_0(pde, theta, maxit, step=0):
 
     uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
 
+    if (step > 0) and (0 in idx):
+        N = mesh.number_of_nodes()
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+        mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh_0_0_' + str(N) +'.pdf')
+
     # 2. 以 u_H 为右端项自适应求解 -\Deta u = d*u_H
 
     I = eye(gdof) 
     for i in range(maxit):
-        if (step > 0) and (i in idx):
-            N = mesh.number_of_nodes()
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca() 
-            mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_0_' + str(i) + '_' + str(N) +'.pdf')
 
         # 恢复型后验误差估计
         uh = space.function(array=uh)
@@ -133,6 +134,14 @@ def eigns_0(pde, theta, maxit, step=0):
         markedCell = mark(eta, theta)
         # 自适应
         IM = mesh.bisect(markedCell, returnim=True)
+
+        if (step > 0) and (i in idx):
+            N = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca() 
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig('mesh_0_' + str(i+1) + '_' + str(N) +'.pdf')
 
         # 插值
         I = IM@I
@@ -213,16 +222,17 @@ def eigns_1(pde, theta, maxit, step=0):
     uh = space.function()
     uh[:] = uH
 
+    if (step > 0) and (0 in idx):
+        N = mesh.number_of_nodes()
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+        mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh_1_0_' + str(N) + '.pdf')
+
     # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
     I = eye(gdof) 
     for i in range(maxit):
-        if (step > 0) and (i in idx):
-            N = mesh.number_of_nodes()
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca() 
-            mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_1_' + str(i) + '_' + str(N) + '.pdf')
 
         # 重构型后验误差估计与二分法自适应
         rguh = ralg.harmonic_average(uh)
@@ -234,6 +244,15 @@ def eigns_1(pde, theta, maxit, step=0):
         
         markedCell = mark(eta, theta)
         IM = mesh.bisect(markedCell, returnim=True)
+    
+        if (step > 0) and (i in idx):
+            N = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca() 
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig('mesh_1_' + str(i+1) + '_' + str(N) +'.pdf')
+
         I = IM@I
         uH = IM@uH
 
@@ -314,15 +333,15 @@ def eigns_2(pde, theta, maxit, step=0):
     M = M[isFreeDof, :][:, isFreeDof].tocsr()
     uh[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof))) 
 
+    if (step > 0) and (0 in idx):
+        N = mesh.number_of_nodes()
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca() 
+        mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh_2_0_' + str(N) + '.pdf')
 
     for i in range(maxit):
-        if (step > 0) and (i in idx):
-            N = mesh.number_of_nodes()
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca() 
-            mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_2_' + str(i) + '_' + str(N) + '.pdf')
 
         uh = space.function(array=uh)
         rguh = ralg.harmonic_average(uh)
@@ -334,6 +353,15 @@ def eigns_2(pde, theta, maxit, step=0):
         
         markedCell = mark(eta, theta)
         IM = mesh.bisect(markedCell, returnim=True)
+
+        if (step > 0) and (i in idx):
+            N = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca() 
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig('mesh_2_' + str(i+1) + '_' + str(N) +'.pdf')
+
         uh = IM@uh
 
         space = LagrangeFiniteElementSpace(mesh, 1) 
@@ -390,16 +418,16 @@ maxit : %d
 print(info)
 
 
-pde = LShapeRSinData()
-#pde = CrackData()
+#pde = LShapeRSinData()
+pde = CrackData()
 
 u0 = eigns_0(pde, theta, maxit, step)
 u1 = eigns_1(pde, theta, maxit, step)
 u2 = eigns_2(pde, theta, maxit, step)
 
-u0.add_plot(plt)
-u1.add_plot(plt)
-u2.add_plot(plt)
+#u0.add_plot(plt)
+#u1.add_plot(plt)
+#u2.add_plot(plt)
 
 savesolution(u0, 'u0.mat')
 savesolution(u1, 'u1.mat')
