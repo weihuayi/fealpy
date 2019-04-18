@@ -12,6 +12,7 @@ from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh  
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
+from .StructureIntervalMesh import StructureIntervalMesh
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .MeshZoo import MeshZoo
 

@@ -112,8 +112,8 @@ def show_mesh_1d(axes, mesh,
     else:
         axes.set_axis_on()
 
-    node = mesh.node
-    cell = mesh.ds.cell
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
 
     dim = mesh.geo_dimension() 
     if dim == 1:
