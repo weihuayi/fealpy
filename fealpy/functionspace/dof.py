@@ -170,7 +170,7 @@ class CPLFEMDof2d():
             isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
             idof = ldof - 3*p
             cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
-            
+
         return cell2dof
 
     def interpolation_points(self):

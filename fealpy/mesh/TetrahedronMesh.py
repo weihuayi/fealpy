@@ -212,6 +212,33 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
         return Dlambda
 
+    def label(self, cellidx=None):
+        NC = self.number_of_cells()
+        NE = self.number_of_edges()
+        NN = self.number_of_nodes()
+        if cellidx is None:
+            cellidx = np.arange(NC, dtype=self.itype)
+
+
+
+    def bisect(self, isMarkedCell=None, data=None):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        if isMarkedCell is None:
+            idx = np.arange(NC, dtype=self.itype)
+        else:
+            idx, = np.nonzero(isMarkedCell)
+
+        node = np.zeros((9*NN, 3), dtype=self.ftype)
+        cell = np.zeros((4*NC, 4), dtype=self.itype)
+
+        generation = np.zeros(NN + 6*NC)
+        cutEdge = np.zeros((8*NN, 3), dtype=self.itype) # cut edges
+        nCut = 0 # number of cut edges
+        nonConforming = np.ones(8*NN) # flag of the non-conformity of edges
+        while idx
+
+
     def uniform_refine(self, n=1):
         for i in range(n):
             N = self.number_of_nodes()

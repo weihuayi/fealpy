@@ -70,7 +70,7 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(tdim,)` or `(NQ, tdim)`        
+            the shape of `bc` can be `(tdim,)` or `(NQ, tdim)`
 
         Returns
         -------
@@ -85,6 +85,11 @@ class LagrangeFiniteElementSpace():
 
         """
 
+        mesh = self.mesh
+
+        cell2cell = mesh.ds.cell_to_cell()
+        isInEdge = (cell2cell[cellidx, lidx] != cellidx)
+
         NE = len(cellidx)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
@@ -92,12 +97,12 @@ class LagrangeFiniteElementSpace():
         bcs = np.zeros(shape, dtype=self.mesh.ftype)  # (NE, 3) or (NE, NQ, 3)
         idx = np.arange(NE)
 
-        if direction:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 0]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 1]
-        else:
-            bcs[idx, ..., nmap[lidx]] = bc[..., 1]
-            bcs[idx, ..., pmap[lidx]] = bc[..., 0]
+        bcs[idx, ..., nmap[lidx]] = bc[..., 0]
+        bcs[idx, ..., pmap[lidx]] = bc[..., 1]
+
+        if direction is False:
+            bcs[idx[isInEdge], ..., nmap[lidx[isInEdge]]] = bc[..., 1]
+            bcs[idx[isInEdge], ..., pmap[lidx[isInEdge]]] = bc[..., 0]
 
         return self.basis(bcs)
 
