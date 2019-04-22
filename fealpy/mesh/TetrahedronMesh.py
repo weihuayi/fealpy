@@ -212,31 +212,104 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
         return Dlambda
 
-    def label(self, cellidx=None):
-        NC = self.number_of_cells()
-        NE = self.number_of_edges()
-        NN = self.number_of_nodes()
+    def label(self, node, cell, cellidx=None):
         if cellidx is None:
             cellidx = np.arange(NC, dtype=self.itype)
-
-
+        NC = cellidx.shape[0]
+        localEdge = self.ds.localEdge
+        totalEdge = cell[cellidx, localEdge].reshape(-1, localEdge.shape[1])
+        NE = totalEdge.shape[0]
+        length = np.sum((node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
+                    axis = -1)
+        length += 0.1*np.random.rand(NE)*length
+        cellEdgeLength = length.reshape(NC, 6)
+        lidx = np.argmax(cellEdgeLength, axis=-1)
+        cell[idx[lidx==1], :] = cell[idx[lidx==1], [2, 0, 1, 3]]
+        cell[idx[lidx==2], :] = cell[idx[lidx==2], [0, 3, 1, 2]]
+        cell[idx[lidx==3], :] = cell[idx[lidx==3], [1, 2, 0, 3]]
+        cell[idx[lidx==4], :] = cell[idx[lidx==4], [1, 3, 2, 0]]
+        cell[idx[lidx==5], :] = cell[idx[lidx==5], [3, 2, 1, 0]]
 
     def bisect(self, isMarkedCell=None, data=None):
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         if isMarkedCell is None:
-            idx = np.arange(NC, dtype=self.itype)
+            markedCell = np.arange(NC, dtype=self.itype)
         else:
-            idx, = np.nonzero(isMarkedCell)
+            markedCell, = np.nonzero(isMarkedCell)
 
+        # allocate new memory for node and cell
         node = np.zeros((9*NN, 3), dtype=self.ftype)
         cell = np.zeros((4*NC, 4), dtype=self.itype)
+
+        cell[:NC] = self.ds.cell
+        node[:NN] = self.node
 
         generation = np.zeros(NN + 6*NC)
         cutEdge = np.zeros((8*NN, 3), dtype=self.itype) # cut edges
         nCut = 0 # number of cut edges
-        nonConforming = np.ones(8*NN) # flag of the non-conformity of edges
-        while idx
+        nonConforming = np.ones(8*NN, dtype=np.bool) # flag of the non-conformity of edges
+        while len(markedCell) != 0:
+            # switch cell nodes such tha cell(idx, 0:2) is the longest edge of
+            # idx
+            cell = self.label(node, cell, idx)
+            p0 = cell[idx, 0]
+            p1 = cell[idx, 1]
+            p2 = cell[idx, 2]
+            p3 = cell[idx, 3]
+
+            # Find new cut edges and new nodes
+            nMarked = len(idx) # number of marked cells
+            p4 = np.zeros(nMarked, dtype=self.iftype) # init the new nodes
+            if nCut == 0: # if it is the first round, all marked
+                idx = np.arange(nMarked) # cells introduce new cut edges
+            else:
+                # all non-conforming edges
+                ncEdge = np.nonzero(nonConforming[:nCut])
+                NE = len(ncEdge)
+                nv2v = csr_matrix(
+                        (
+                            np.ones(NE),
+                            (
+                                cutEdge[ncEdge, 2], cutEdge[ncEdge, 0]
+                            )
+                        ),
+                        shape=(NN, NN), dtype=self.itype)
+                nv2v += csr_matrix(
+                        (
+                            np.ones(NE),
+                            (
+                                cutEdge[ncEdge, 2], cutEdge[ncEdge, 1]
+                            )
+                        ),
+                        shape=(NN, NN), dtype=self.itype)
+                i, j =  np.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
+                p4[j] = i
+                idx, = np.nonzero(p4 == 0)
+
+            if len(idx) != 0:
+                NE = len(idx)
+                cellCutEdge = np.zeros((NE, 2), dtype=self.itype)
+                cellCutEdge[:, 0] = p0[idx]
+                cellCutEdge[:, 1] = p1[idx]
+                cellCutEdge.sort(axis=-1)
+                s = csr_matrix(
+                    (
+                        np.ones(NE, dtype=np.bool),
+                        (
+                            cellCutEdge[:, 0],
+                            cellCutEdge[:, 1]
+                        )
+                    ), shape=(NN, NN))
+                i, j = s.nonzero()
+                nNew = len(i)
+                newCutEdge = np.arange(nCut, nCut+nNew)
+                cutEdge[newCutEdge, 0] = i
+                cutEdge[newCutEdge, 1] = j
+                cutEdge[newCutEdge, 2] = range(NN, NN+nNew)
+                node[NN:NN+nNew, :] = (node[i, :] + node[j, :])/2.0
+                nCut += nNew
+                NN += nNew
 
 
     def uniform_refine(self, n=1):
