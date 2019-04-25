@@ -198,7 +198,7 @@ def show_mesh_3d(axes, mesh,
         nodecolor='k', edgecolor='k', facecolor='w',
         aspect='equal',
         linewidths=1, markersize=20,  
-        showaxis=False, alpha=0.8):
+        showaxis=False, alpha=0.8, showedge=False):
 
     axes.set_aspect('equal')
     if showaxis == False:
@@ -214,13 +214,27 @@ def show_mesh_3d(axes, mesh,
         nodecolor = mapper.to_rgba(nodecolor)
 
     node = mesh.node
-    axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
+    axes.scatter(
+            node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
 
-    face = mesh.ds.face
-    vts = node[face, :]
-    faces = a3.art3d.Poly3DCollection(vts, facecolor=facecolor, linewidths=linewidths, edgecolor=edgecolor, alpha = alpha)
-    return axes.add_collection3d(faces)
-    
+    if showedge:
+        edge = mesh.ds.edge
+        vts = node[edge]
+        edges = a3.art3d.Line3DCollection(
+               vts,
+               linewidths=linewidths,
+               color=edgecolor)
+        return axes.add_collection3d(edges)
+    else:
+        face = mesh.ds.face
+        vts = node[face]
+        faces = a3.art3d.Poly3DCollection(
+                vts,
+                facecolor=facecolor,
+                linewidths=linewidths,
+                edgecolor=edgecolor, 
+                alpha = alpha)
+        return axes.add_collection3d(faces)
 
 
 def unique_row(a):

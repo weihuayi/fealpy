@@ -45,59 +45,66 @@ class StructureIntervalMesh(object):
     def laplace_operator(self):
         NN = self.NN
         h = self.h
-        d = 2*np.ones(NN, dtype=np.float)/h**2
-        c = -np.ones(NN - 1, dtype=np.float)/h**2
+        d = -2*np.ones(NN, dtype=np.float)/h**2
+        c = np.ones(NN - 1, dtype=np.float)/h**2
         A = diags([c, d, c], [-1, 0, 1])
         return A
 
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k', 
-            aspect='equal', linewidths=1, 
+    def add_plot(
+            self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1,
             markersize=200,  showaxis=False):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca() 
+            axes = fig.gca()
         else:
             axes = plot
-        return show_mesh_1d(axes, self,
+        return show_mesh_1d(
+                axes, self,
                 nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,  
+                linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis)
 
-    def find_node(self, axes, node=None,
+    def find_node(
+            self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=200, 
+            color='r', markersize=200,
             fontsize=24, fontcolor='k'):
 
         if node is None:
             node = self.entity('node')
-        find_node(axes, node, 
-                index=index, showindex=showindex, 
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-
-    def find_edge(self, axes, 
-            index=None, showindex=False,
-            color='g', markersize=400, 
-            fontsize=24, fontcolor='k'):
-
-        find_entity(axes, self, entity='edge',
-                index=index, showindex=showindex, 
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-    def find_cell(self, axes, 
-            index=None, showindex=False,
-            color='y', markersize=800, 
-            fontsize=24, fontcolor='k'):
-        find_entity(axes, self, entity='cell',
+        find_node(
+                axes, node,
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
-      
+
+    def find_edge(
+            self, axes,
+            index=None, showindex=False,
+            color='g', markersize=400,
+            fontsize=24, fontcolor='k'):
+
+        find_entity(
+                axes, self, entity='edge',
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
+    def find_cell(
+            self, axes,
+            index=None, showindex=False,
+            color='y', markersize=800,
+            fontsize=24, fontcolor='k'):
+        find_entity(
+                axes, self, entity='cell',
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
 
 class StructureIntervalMeshDataStructure():
     def __init__(self, NN, NC):

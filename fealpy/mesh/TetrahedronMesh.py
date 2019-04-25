@@ -212,13 +212,31 @@ class TetrahedronMesh(Mesh3d):
             Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
         return Dlambda
 
-    def label(self, node, cell, cellidx=None):
+    def label(self, node=None, cell=None, cellidx=None):
+        """单元顶点的重新排列，使得cell[:, :2] 存储了单元的最长边
+        Parameter
+        ---------
+
+        Return
+        ------
+        cell ： in-place modify
+
+        """
+
+        rflag = False
+        if node is None:
+            node = self.entity('node')
+
+        if cell is None:
+            cell = self.entity('cell')
+            rflag = True
+
         if cellidx is None:
             cellidx = np.arange(len(cell))
 
         NC = cellidx.shape[0]
         localEdge = self.ds.localEdge
-        totalEdge = cell[cellidx, localEdge].reshape(
+        totalEdge = cell[cellidx][:, localEdge].reshape(
                 -1, localEdge.shape[1])
         NE = totalEdge.shape[0]
         length = np.sum(
@@ -227,11 +245,30 @@ class TetrahedronMesh(Mesh3d):
         length += 0.1*np.random.rand(NE)*length
         cellEdgeLength = length.reshape(NC, 6)
         lidx = np.argmax(cellEdgeLength, axis=-1)
-        cell[cellidx[lidx==1], :] = cell[cellidx[lidx==1], [2, 0, 1, 3]]
-        cell[cellidx[lidx==2], :] = cell[cellidx[lidx==2], [0, 3, 1, 2]]
-        cell[cellidx[lidx==3], :] = cell[cellidx[lidx==3], [1, 2, 0, 3]]
-        cell[cellidx[lidx==4], :] = cell[cellidx[lidx==4], [1, 3, 2, 0]]
-        cell[cellidx[lidx==5], :] = cell[cellidx[lidx==5], [3, 2, 1, 0]]
+
+        flag = (lidx == 1)
+        if  sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [2, 0, 1, 3]]
+
+        flag = (lidx == 2)
+        if sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [0, 3, 1, 2]]
+
+        flag = (lidx == 3)
+        if sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [1, 2, 0, 3]]
+
+        flag = (lidx == 4)
+        if sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [1, 3, 2, 0]]
+
+        flag = (lidx == 5)
+        if sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [3, 2, 1, 0]]
+
+        if rflag == True:
+            self.ds.construct()
+
 
     def bisect(self, isMarkedCell=None, data=None):
         NN = self.number_of_nodes()
@@ -247,25 +284,32 @@ class TetrahedronMesh(Mesh3d):
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
+        # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = np.zeros(NN + 6*NC, dtype=np.uint8)
-        cutEdge = np.zeros((8*NN, 3), dtype=self.itype) # cut edges
-        nCut = 0 # number of cut edges
-        # flag of the non-conformity of edges
-        nonConforming = np.ones(8*NN, dtype=np.bool) 
+
+        # 用于记录被二分的边及其中点编号
+        cutEdge = np.zeros((8*NN, 3), dtype=self.itype)
+
+        # 当前的二分边的数目
+        nCut = 0
+
+        # 非协调边的标记数组 
+        nonConforming = np.ones(8*NN, dtype=np.bool)
         while len(markedCell) != 0:
-            # switch cell nodes such tha cell(idx, 0:2) is the longest
-            # edge of  idx
+            # 标记最长边
             self.label(node, cell, markedCell)
+
+            # 获取标记单元的四个顶点编号
             p0 = cell[markedCell, 0]
             p1 = cell[markedCell, 1]
             p2 = cell[markedCell, 2]
             p3 = cell[markedCell, 3]
 
-            # Find new cut edges and new nodes
-            nMarked = len(markedCell) # number of marked cells
-            # init the new nodes
-            p4 = np.zeros(nMarked, dtype=self.iftype)
-            if nCut == 0: # if it is the first round, all marked
+            # 找到新的二分边和新的中点 
+            nMarked = len(markedCell)
+            p4 = np.zeros(nMarked, dtype=self.itype)
+
+            if nCut == 0: # 如果是第一次循环 
                 idx = np.arange(nMarked) # cells introduce new cut edges
             else:
                 # all non-conforming edges
@@ -282,21 +326,19 @@ class TetrahedronMesh(Mesh3d):
                 idx, = np.nonzero(p4 == 0)
 
             if len(idx) != 0:
-                # find the unique cut edges
+                # 把需要二分的边唯一化 
                 NE = len(idx)
-                cellCutEdge = np.zeros((NE, 2), dtype=self.itype)
-                cellCutEdge[:, 0] = p0[idx]
-                cellCutEdge[:, 1] = p1[idx]
-                cellCutEdge.sort(axis=-1)
+                cellCutEdge = np.array([p0, p1])
+                cellCutEdge.sort(axis=0)
                 s = csr_matrix(
                     (
                         np.ones(NE, dtype=np.bool),
                         (
-                            cellCutEdge[:, 0],
-                            cellCutEdge[:, 1]
+                            cellCutEdge[0, :],
+                            cellCutEdge[1, :]
                         )
                     ), shape=(NN, NN))
-                # eliminates possibal duplications in cellCutEdge
+                # 获得唯一的边 
                 i, j = s.nonzero()
                 nNew = len(i)
                 newCutEdge = np.arange(nCut, nCut+nNew)
@@ -306,9 +348,10 @@ class TetrahedronMesh(Mesh3d):
                 node[NN:NN+nNew, :] = (node[i, :] + node[j, :])/2.0
                 nCut += nNew
                 NN += nNew
-                # incidence matrix of new vertices and old vertices
-                I = cutEdge[newCutEdge, [2, 2]].reshape(-1)
-                J = cutEdge[newCutEdge, [0, 1]].reshape(-1)
+
+                # 新点和旧点的邻接矩阵 
+                I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
                 val = np.ones(len(I), dtype=np.bool)
                 nv2v = csr_matrix(
                         (val, (I, J)),
@@ -316,6 +359,7 @@ class TetrahedronMesh(Mesh3d):
                 i, j =  np.nonzero(nv2v[:, p0].multiply(nv2v[:, p1]))
                 p4[j] = i
 
+            # 如果新点的代数仍然为 0
             idx = (generation[p4] == 0)
             cellGeneration = np.max(
                     generation[cell[markedCell[idx]]],
@@ -333,22 +377,22 @@ class TetrahedronMesh(Mesh3d):
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3, p4
 
-            # Find non-conforming cells
+            # 找到非协调的单元 
             checkEdge, = np.nonzero(nonConforming[:nCut])
             isCheckNode = np.zeros(NN, dtype=np.bool)
             isCheckNode[cutEdge[checkEdge]] = True
             isCheckCell = np.sum(
                     isCheckNode[cell[:NC]],
                     axis= -1) > 0
-            # all cell containing checking nodes
+            # 找到所有包含检查节点的单元编号 
             checkCell, = np.nonzero(isCheckCell)
             I = np.repeat(checkCell, 4)
             J = cell[checkCell].reshape(-1)
             val = np.ones(len(I), dtype=np.bool)
-            t2v = csr_matrix((val, (I, J)), shape=(NC, NN))
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j = np.nonzero(
-                    t2v[:, cutEdge[checkEdge, 0]].multiply(
-                        t2v[:, cutEdge[checkEdge, 1]]
+                    cell2node[:, cutEdge[checkEdge, 0]].multiply(
+                        cell2node[:, cutEdge[checkEdge, 1]]
                         ))
             markedCell = np.unique(i)
             nonConforming[checkEdge] = False

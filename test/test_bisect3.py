@@ -1,8 +1,8 @@
 
 import numpy as np
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
-
-ax1 = a3.Axes3D(pl.figure())
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 node = np.array([
     [-1, -1, -1],
@@ -23,10 +23,14 @@ cell = np.array([
     [0, 2, 3, 6]], dtype=np.int)
 
 mesh = TetrahedronMesh(node, cell)
+mesh.bisect()
+mesh.bisect()
+mesh.bisect()
+mesh.bisect()
 fig = plt.figure()
-mesh.add_plot(ax1)
-mesh.find_node(ax1)
-mesh.find_edge(ax1)
-mesh.find_face(ax1)
-mesh.find_cell(ax1)
+axes = fig.gca(projection='3d')
+mesh.add_plot(axes, alpha=0, showedge=True)
+mesh.find_node(axes)
+mesh.find_edge(axes)
+mesh.find_cell(axes)
 plt.show()
