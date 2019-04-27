@@ -3,8 +3,9 @@ from numpy.linalg import norm
 import pyamg
 
 
-def picard(A, M, u0, tol=1e-12, atol = 1e-12):
-    ml = pyamg.ruge_stuben_solver(A)  
+def picard(A, M, u0, tol=1e-12, atol = 1e-12, ml=None):
+    if ml is None:
+        ml = pyamg.ruge_stuben_solver(A)
     d0 = (u0@A@u0)/(u0@M@u0)
     while True:
         u1 = ml.solve(d0*M@u0, x0=u0, tol=1e-12, accel='cg').reshape(-1)

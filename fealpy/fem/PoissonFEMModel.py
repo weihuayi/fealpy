@@ -1,12 +1,8 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-
 from .integral_alg import IntegralAlg
-from ..recovery import FEMFunctionRecoveryAlg
 
-from ..solver import solve
 from ..boundarycondition import DirichletBC
 
 from scipy.sparse.linalg import spsolve
@@ -14,23 +10,22 @@ from scipy.sparse.linalg import spsolve
 from timeit import default_timer as timer
 
 
-
 class PoissonFEMModel(object):
     def __init__(self, pde, mesh, p, q=3):
-        self.space = LagrangeFiniteElementSpace(mesh, p) 
+        self.space = LagrangeFiniteElementSpace(mesh, p)
         self.mesh = self.space.mesh
-        self.pde = pde 
+        self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
         self.cellmeasure = mesh.entity_measure('cell')
         self.integrator = mesh.integrator(q)
-        self.integralalg = IntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        self.integralalg = IntegralAlg(
+                self.integrator, self.mesh, self.cellmeasure)
 
-    def recover_estimate(self,rguh):
+    def recover_estimate(self, rguh):
         if self.space.p > 1:
             raise ValueError('This method only work for p=1!')
-        
-        qf = self.integrator  
+        qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
 
         val0 = rguh.value(bcs)
@@ -39,7 +34,6 @@ class PoissonFEMModel(object):
         e = np.einsum('i, ij->j', ws, l)
         e *= self.cellmeasure
         return np.sqrt(e)
-    
 
     def get_left_matrix(self):
         return self.space.stiff_matrix(self.integrator, self.cellmeasure)
@@ -64,11 +58,10 @@ class PoissonFEMModel(object):
         end = timer()
         print("Solve time:", end-start)
 
-        ls = {'A':AD, 'b':b, 'solution':self.uh.copy()}
+        ls = {'A': AD, 'b': b, 'solution': self.uh.copy()}
 
-        return ls # return the linear system
+        return ls  # return the linear system
 
-    
     def get_l2_error(self):
         e = self.uh - self.uI
         return np.sqrt(np.mean(e**2))
@@ -91,9 +84,9 @@ class PoissonFEMModel(object):
         H1 = self.integralalg.L2_error(gu, guh)
         return H1
 
-    def get_recover_error(self,rguh):
+    def get_recover_error(self, rguh):
         gu = self.pde.gradient
         guh = rguh.value
         mesh = self.mesh
-        re = self.integralalg.L2_error(gu, guh, mesh)  
+        re = self.integralalg.L2_error(gu, guh, mesh)
         return re

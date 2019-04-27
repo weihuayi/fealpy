@@ -10,7 +10,6 @@ def scaleCoor(realp):
     diff = realp - center*np.ones((pn,2))
 
     h = np.max(np.sqrt(np.sum(diff**2,axis=1)))
-    
     refp = diff/h
     return refp, center, h
 
@@ -21,16 +20,21 @@ class FEMFunctionRecoveryAlg():
 
     def integrator(self, k):
         return TriangleQuadrature()
-    
+
     def simple_average(self, uh):
         space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
 
         node2cell = mesh.ds.node_to_cell()
         valence = node2cell.sum(axis=1)
 
-        bc = np.array([1/3]*3, dtype=np.float)
+        if TD == 2:
+            bc = np.array([1/3]*3, dtype=np.float)
+        elif TD == 3:
+            bc = np.array([1/4]*4, dtype=np.float)
+
         guh = uh.grad_value(bc)
         rguh = space.function(dim=GD)
         rguh[:] = np.asarray(node2cell@guh)/valence.reshape(-1, 1)
@@ -40,12 +44,17 @@ class FEMFunctionRecoveryAlg():
         space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
+        TD = mesh.geo_dimension()
 
         node2cell = mesh.ds.node_to_cell()
         measure = mesh.entity_measure('cell')
         asum = node2cell@measure
 
-        bc = np.array([1/3]*3, dtype=np.float)
+        if TD == 2:
+            bc = np.array([1/3]*3, dtype=np.float)
+        elif TD == 3:
+            bc = np.array([1/4]*4, dtype=np.float)
+
         guh = uh.grad_value(bc)
 
         rguh = space.function(dim=GD)
@@ -56,17 +65,22 @@ class FEMFunctionRecoveryAlg():
         space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
+        TD = mesh.geo_dimension()
+
         node2cell = mesh.ds.node_to_cell()
         inva = 1/mesh.entity_measure('cell')
         asum = node2cell@inva
 
-        bc = np.array([1/3]*3, dtype=np.float)
-        guh = uh.grad_value(bc)
+        if TD == 2:
+            bc = np.array([1/3]*3, dtype=np.float)
+        elif TD == 3:
+            bc = np.array([1/4]*4, dtype=np.float)
 
+        guh = uh.grad_value(bc)
         rguh = space.function(dim=GD)
         rguh[:] = np.asarray(node2cell@(guh*inva.reshape(-1, 1)))/asum.reshape(-1, 1)
         return rguh
-    
+
     def distance_harmonic_average(self, uh):
         space = uh.space
         mesh = space.mesh
@@ -109,7 +123,7 @@ class FEMFunctionRecoveryAlg():
 
 
     def SCR(self,uh):
-        space = uh.space 
+        space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
         rguh = space.function(dim=GD)

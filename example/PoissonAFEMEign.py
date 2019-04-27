@@ -67,7 +67,7 @@ import pyamg
 def savesolution(uh, fname):
     """Save the fem solution for matlab plotting
 
-    :uh: FEM solution 
+    :uh: FEM solution
     :fname: file name
     :returns: None
 
@@ -94,7 +94,7 @@ def eigns_0(pde, theta, maxit, step=0):
 
     # 1. 粗网格上求解最小特征值问题
     area = mesh.entity_measure('cell')
-    space = LagrangeFiniteElementSpace(mesh, 1) 
+    space = LagrangeFiniteElementSpace(mesh, 1)
     gdof = space.number_of_global_dofs()
     uh = np.zeros(gdof, dtype=np.float)
 
@@ -188,7 +188,6 @@ def eigns_0(pde, theta, maxit, step=0):
     uh *= u[-1]
     uh += I@u[:-1]
     uh /= np.max(np.abs(uh))
-    
     uh = space.function(array=uh)
     return uh
 
@@ -241,15 +240,15 @@ def eigns_1(pde, theta, maxit, step=0):
             return (rguh.value(x) - uh.grad_value(x))**2
         eta = intalg.integral(fun, celltype=True)
         eta = np.sqrt(eta.sum(axis=-1))
-        
+
         markedCell = mark(eta, theta)
         IM = mesh.bisect(markedCell, returnim=True)
-    
+
         if (step > 0) and (i in idx):
             N = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
-            axes = fig.gca() 
+            axes = fig.gca()
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig('mesh_1_' + str(i+1) + '_' + str(N) +'.pdf')
 
@@ -302,6 +301,93 @@ def eigns_1(pde, theta, maxit, step=0):
     return uh
 
 def eigns_2(pde, theta, maxit, step=0):
+    start = timer()
+
+    if step == 0:
+        idx = []
+    else:
+        idx =list(range(0, maxit, step)) + [maxit-1]
+
+    ralg = FEMFunctionRecoveryAlg()
+
+    mesh = pde.init_mesh(n=4, meshtype='tri')
+    integrator = mesh.integrator(3)
+
+    # 1. 粗网格上求解最小特征值问题
+    area = mesh.entity_measure('cell')
+    space = LagrangeFiniteElementSpace(mesh, 1) 
+    AH = space.stiff_matrix(integrator, area)
+    MH = space.mass_matrix(integrator, area)
+    isFreeHDof = ~(space.boundary_dof())
+
+    gdof = space.number_of_global_dofs()
+    uH = np.zeros(gdof, dtype=np.float)
+
+    A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
+    M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
+    uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
+
+    uh = space.function()
+    uh[:] = uH
+
+    if (step > 0) and (0 in idx):
+        N = mesh.number_of_nodes()
+        fig = plt.figure()
+        fig.set_facecolor('white')
+        axes = fig.gca()
+        mesh.add_plot(axes, cellcolor='w')
+        fig.savefig('mesh_1_0_' + str(N) + '.pdf')
+
+    # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
+    I = eye(gdof)
+    for i in range(maxit):
+
+        # 重构型后验误差估计与二分法自适应
+        rguh = ralg.harmonic_average(uh)
+        intalg = FEMeshIntegralAlg(integrator, mesh, area)
+        def fun(x):
+            return (rguh.value(x) - uh.grad_value(x))**2
+        eta = intalg.integral(fun, celltype=True)
+        eta = np.sqrt(eta.sum(axis=-1))
+        
+        markedCell = mark(eta, theta)
+        IM = mesh.bisect(markedCell, returnim=True)
+    
+        if (step > 0) and (i in idx):
+            N = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig('mesh_1_' + str(i+1) + '_' + str(N) +'.pdf')
+
+        I = IM@I
+        uH = IM@uH
+
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        gdof = space.number_of_global_dofs()
+        print(i, ": ", gdof)
+
+        area = mesh.entity_measure('cell')
+        A = space.stiff_matrix(integrator, area)
+        M = space.mass_matrix(integrator, area)
+        isFreeDof = ~(space.boundary_dof())
+        b = M@uH
+
+        ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
+        uh = space.function()
+        uh[:] = uH
+        uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+
+    # 3. 把 uh 加入粗网格空间, 组装刚度和质量矩阵
+    A = A[isFreeDof, :][:, isFreeDof].tocsr()
+    M = M[isFreeDof, :][:, isFreeDof].tocsr()
+    uh[isFreeDof], d = picard(A, M, uh[isFreeDof], ml=ml) 
+    end = timer()
+    print("smallest eigns:", d, "with time: ", end - start)
+    return uh
+
+def eigns_3(pde, theta, maxit, step=0):
     """
     经典求解自适应求解最小特征值的方法：
     1. 在每层网格上求解最小特征值
@@ -321,7 +407,7 @@ def eigns_2(pde, theta, maxit, step=0):
 
     # 1. 粗网格上求解最小特征值问题
     area = mesh.entity_measure('cell')
-    space = LagrangeFiniteElementSpace(mesh, 1) 
+    space = LagrangeFiniteElementSpace(mesh, 1)
     A = space.stiff_matrix(integrator, area)
     M = space.mass_matrix(integrator, area)
     isFreeDof = ~(space.boundary_dof())

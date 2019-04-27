@@ -47,6 +47,7 @@ class TetrahedronMesh(Mesh3d):
         self.nodedata = {}
 
     def integrator(self, k):
+        print(k)
         return TetrahedronQuadrature(k)
 
     def direction(self, i):
@@ -315,8 +316,8 @@ class TetrahedronMesh(Mesh3d):
                 # all non-conforming edges
                 ncEdge = np.nonzero(nonConforming[:nCut])
                 NE = len(ncEdge)
-                I = cutEdge[ncEdge, [2, 2]].reshape(-1)
-                J = cutEdge[ncEdge, [0, 1]].reshape(-1)
+                I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
                 val = np.ones(len(I), dtype=np.bool)
                 nv2v = csr_matrix(
                         (val, (I, J)),
@@ -328,7 +329,7 @@ class TetrahedronMesh(Mesh3d):
             if len(idx) != 0:
                 # 把需要二分的边唯一化 
                 NE = len(idx)
-                cellCutEdge = np.array([p0, p1])
+                cellCutEdge = np.array([p0[idx], p1[idx]])
                 cellCutEdge.sort(axis=0)
                 s = csr_matrix(
                     (
