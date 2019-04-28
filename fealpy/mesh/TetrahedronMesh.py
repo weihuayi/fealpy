@@ -271,9 +271,12 @@ class TetrahedronMesh(Mesh3d):
             self.ds.construct()
 
 
-    def bisect(self, isMarkedCell=None, data=None):
+    def bisect(self, isMarkedCell=None, data=None, returnim=False):
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
+        NN0 = NN  # 记录下二分加密之前的节点数目
+        print("old NN:", NN0)
+
         if isMarkedCell is None:
             markedCell = np.arange(NC, dtype=self.itype)
         else:
@@ -291,8 +294,11 @@ class TetrahedronMesh(Mesh3d):
         # 用于记录被二分的边及其中点编号
         cutEdge = np.zeros((8*NN, 3), dtype=self.itype)
 
+
         # 当前的二分边的数目
         nCut = 0
+
+
 
         # 非协调边的标记数组 
         nonConforming = np.ones(8*NN, dtype=np.bool)
@@ -399,9 +405,57 @@ class TetrahedronMesh(Mesh3d):
             nonConforming[checkEdge] = False
             nonConforming[checkEdge[j]] = True;
 
+        print("The max idx of node in cutEdge:", np.max(cutEdge[:NN, 0:2]))
+
+        if returnim is True:
+            nn = NN - NN0
+            IM = coo_matrix(
+                    (
+                        np.ones(NN0),
+                        (
+                            np.arange(NN0),
+                            np.arange(NN0)
+                        )
+                    ), shape=(NN, NN), dtype=self.ftype)
+            cutEdge = cutEdge[:nn]
+            VAl = np.full((nn, 2), 0.5, dtype=self.ftype)
+
+            g = 2
+            markedNode, = np.nonzero(generation == g)
+
+            N = len(markedNode)
+            while N != 0:
+                nidx = markedNode - NN0
+                i = cutEdge[nidx, 0]
+                j = cutEdge[nidx, 1]
+                ic = np.zeros((N, 2), dtype=self.ftype)
+                jc = np.zeros((N, 2), dtype=self.ftype)
+                ic[i < NN0, 0] = 1.0
+                jc[j < NN0, 1] = 1.0
+                ic[i >= NN0, :] = VAL[i[i >= NN0] - NN0, :]
+                jc[j >= NN0, :] = VAL[j[j >= NN0] - NN0, :]
+                VAL[markedNode - NN0, :] = 0.5*(ic + jc)
+                cutEdge[nidx[i >= NN0], 0] = cutEdge[i[i >= NN0] - NN0, 0]
+                cutEdge[nidx[j >= NN0], 1] = cutEdge[j[j >= NN0] - NN0, 1]
+                g += 1
+                markedNode, = np.nonzero(generation == g)
+                N = len(markedNode)
+
+            IM += coo_matrix(
+                    (
+                        VAL.flat,
+                        (
+                            cutEdge[:, [2, 2]].flat,
+                            cutEdge[:, [0, 1]].flat
+                        )
+                    ), shape=(NN, NN0), dtype=self.ftype)
+
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
+
+        if returnim is True:
+            return IM.tocsr()
 
     def uniform_refine(self, n=1):
         for i in range(n):

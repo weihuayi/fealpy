@@ -185,12 +185,12 @@ class TriangleMesh(Mesh2d):
                 p2 = cell[0:NC,2]
                 p3 = edge2newNode[cell2edge0[0:NC]]
                 cell = np.zeros((2*NC,3), dtype=self.itype)
-                cell[0:NC,0] = p3 
-                cell[0:NC,1] = p0 
-                cell[0:NC,2] = p1 
-                cell[NC:, 0] = p3 
-                cell[NC:, 1] = p2 
-                cell[NC:, 2] = p0 
+                cell[0:NC,0] = p3
+                cell[0:NC,1] = p0
+                cell[0:NC,2] = p1
+                cell[NC:, 0] = p3
+                cell[NC:, 1] = p2
+                cell[NC:, 2] = p0
                 if k == 0:
                     cell2edge0[0:NC] = cell2edge[:,2]
                     cell2edge0[NC:] = cell2edge[:,1]
@@ -234,12 +234,12 @@ class TriangleMesh(Mesh2d):
             p2 = cell[idx,2]
             p3 = edge2newNode[cell2edge0[idx]]
             cell = np.concatenate((cell, np.zeros((nc,3), dtype=self.itype)), axis=0)
-            cell[L,0] = p3 
-            cell[L,1] = p0 
-            cell[L,2] = p1 
-            cell[R,0] = p3 
-            cell[R,1] = p2 
-            cell[R,2] = p0 
+            cell[L,0] = p3
+            cell[L,1] = p0
+            cell[L,2] = p1
+            cell[R,0] = p3
+            cell[R,1] = p2
+            cell[R,2] = p0
             if k == 0:
                 cell2edge0 = np.zeros((NC+nc,), dtype=self.itype)
                 cell2edge0[0:NC] = cell2edge[:,0]
@@ -251,13 +251,13 @@ class TriangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
         # reconstruct the  data structure
-        if u is not None:                                                       
-            eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)                         
-            Iu = np.concatenate((u, eu), axis=0)                                
-        if u is None:                                                           
-            return True                                                         
-        else:                                                                   
-            return(Iu, True) 
+        if u is not None:
+            eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)
+            Iu = np.concatenate((u, eu), axis=0)
+        if u is None:
+            return True
+        else:
+            return(Iu, True)
 
     def bisect(self, markedCell, returnim=False):
 
@@ -280,18 +280,31 @@ class TriangleMesh(Mesh2d):
         edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
 
         node = self.node
-        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
+        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:])
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
         if returnim:
             nn = len(newNode)
-            IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))), 
-                    shape=(NN+nn, NN), dtype=np.float)
-            IM += coo_matrix((0.5*np.ones(nn), (NN+np.arange(nn),
-                edge[isCutEdge, 0])), shape=(NN+nn, NN), dtype=np.float)
-            IM += coo_matrix((0.5*np.ones(nn), (NN+np.arange(nn),
-                edge[isCutEdge, 1])), shape=(NN+nn, NN), dtype=np.float)
+            IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
+                    shape=(NN+nn, NN), dtype=self.ftype)
+            val = np.full(nn, 0.5)
+            IM += coo_matrix(
+                    (
+                        val,
+                        (
+                            NN+np.arange(nn),
+                            edge[isCutEdge, 0]
+                        )
+                    ), shape=(NN+nn, NN), dtype=self.ftype)
+            IM += coo_matrix(
+                    (
+                        val,
+                        (
+                            NN+np.arange(nn),
+                            edge[isCutEdge, 1]
+                        )
+                    ), shape=(NN+nn, NN), dtype=self.ftype)
 
         for k in range(2):
             idx, = np.nonzero(edge2newNode[cell2edge0]>0)
@@ -305,12 +318,12 @@ class TriangleMesh(Mesh2d):
             p2 = cell[idx,2]
             p3 = edge2newNode[cell2edge0[idx]]
             cell = np.concatenate((cell, np.zeros((nc,3), dtype=self.itype)), axis=0)
-            cell[L,0] = p3 
-            cell[L,1] = p0 
-            cell[L,2] = p1 
-            cell[R,0] = p3 
-            cell[R,1] = p2 
-            cell[R,2] = p0 
+            cell[L,0] = p3
+            cell[L,1] = p0
+            cell[L,2] = p1
+            cell[R,0] = p3
+            cell[R,1] = p2
+            cell[R,2] = p0
             if k == 0:
                 cell2edge0 = np.zeros((NC+nc,), dtype=self.itype)
                 cell2edge0[0:NC] = cell2edge[:,0]
