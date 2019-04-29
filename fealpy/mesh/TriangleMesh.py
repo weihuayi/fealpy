@@ -259,18 +259,21 @@ class TriangleMesh(Mesh2d):
         else:
             return(Iu, True)
 
-    def bisect(self, markedCell, returnim=False):
+    def bisect(self, isMarkedCell, returnim=False, refine=None):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
-        cell = self.ds.cell
-        edge = self.ds.edge
+        cell = self.entity('cell')
+        edge = self.entity('edge')
+
         cell2edge = self.ds.cell_to_edge()
         cell2cell = self.ds.cell_to_cell()
 
         isCutEdge = np.zeros((NE,), dtype=np.bool)
+
+        markedCell, = np.nonzero(isMarkedCell)
         while len(markedCell)>0:
             isCutEdge[cell2edge[markedCell, 0]]=True
             refineNeighbor = cell2cell[markedCell, 0]
@@ -336,6 +339,84 @@ class TriangleMesh(Mesh2d):
 
         if returnim:
             return IM.tocsr()
+
+    def label(self, node=None, cell=None, cellidx=None):
+        """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
+        Parameter
+        ---------
+
+        Return
+        ------
+        cell ： in-place modify
+
+        """
+
+        rflag = False
+        if node is None:
+            node = self.entity('node')
+
+        if cell is None:
+            cell = self.entity('cell')
+            rflag = True
+
+        if cellidx is None:
+            cellidx = np.arange(len(cell))
+
+        NC = cellidx.shape[0]
+        localEdge = self.ds.localEdge
+        totalEdge = cell[cellidx][:, localEdge].reshape(
+                -1, localEdge.shape[1])
+        NE = totalEdge.shape[0]
+        length = np.sum(
+                (node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
+                axis = -1)
+        length += 0.1*np.random.rand(NE)*length
+        cellEdgeLength = length.reshape(NC, 3)
+        lidx = np.argmax(cellEdgeLength, axis=-1)
+
+        flag = (lidx == 1)
+        if  sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [1, 2, 0]]
+
+        flag = (lidx == 2)
+        if sum(flag) > 0:
+            cell[cellidx[flag], :] = cell[cellidx[flag]][:, [2, 0, 1]]
+
+        if rflag == True:
+            self.ds.construct()
+
+    def bisect_1(self, isMarkedCell):
+        GD = self.geo_dimension()
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NN0 = NN  # 记录下二分加密之前的节点数目
+        print("old NN:", NN0)
+
+        if isMarkedCell is None:
+            markedCell = np.arange(NC, dtype=self.itype)
+        else:
+            markedCell, = np.nonzero(isMarkedCell)
+
+        # allocate new memory for node and cell
+        node = np.zeros((5*NN, GD), dtype=self.ftype)
+        cell = np.zeros((2*NC, 3), dtype=self.itype)
+
+        node[:NN] = self.entity('node')
+        cell[:NC] = self.entity('cell')
+        # 用于存储网格节点的代数，初始所有节点都为第 0 代
+        generation = np.zeros(NN + 2*NC, dtype=np.uint8)
+        # 用于记录被二分的边及其中点编号
+        cutEdge = np.zeros((4*NN, 3), dtype=self.itype)
+        # 当前的二分边的数目
+        nCut = 0
+        # 非协调边的标记数组 
+        nonConforming = np.ones(4*NN, dtype=np.bool)
+        while len(markedCell) != 0:
+            pass
+
+    def adaptive_bisect(self, nrefine):
+        pass
+
 
     def grad_lambda(self):
         node = self.node

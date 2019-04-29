@@ -1,18 +1,19 @@
 import numpy as np
 
-from .TriangleMesh import TriangleMesh 
+from .TriangleMesh import TriangleMesh
 
 
 class Tritree(TriangleMesh):
     localEdge2childCell = np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32)
+
     def __init__(self, node, cell, irule=1):
         super(Tritree, self).__init__(node, cell)
         NC = self.number_of_cells()
         self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
-        self.irule = irule                
+        self.irule = irule
         self.meshtype = 'tritree'
-    
+
     def leaf_cell_index(self):
         child = self.child
         idx, = np.nonzero(child[:, 0] == -1)
@@ -96,8 +97,8 @@ class Tritree(TriangleMesh):
             RCell = edge2cell[flag1, 1]
             idx0 = self.localEdge2childCell[edge2cell[flag0, 3]]
             if len(idx0) > 0:
-                idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0] 
-                 
+                idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0]
+
             idx1 = self.localEdge2childCell[edge2cell[flag1, 2]]
             if len(idx1) > 0:
                 idx1 = self.child[edge2cell[flag1, [0]].reshape(-1, 1), idx1]
@@ -107,8 +108,8 @@ class Tritree(TriangleMesh):
             isCell0 = isMarkedCell | (~isLeafCell)
             isCell1 = isLeafCell & (~isMarkedCell)
             flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
-            flag2 = ( (~isMarkedCell[LCell]) & isLeafCell[LCell] ) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
-            flag3 = ( (~isMarkedCell[RCell]) & isLeafCell[RCell] ) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+            flag2 = ((~isMarkedCell[LCell]) & isLeafCell[LCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+            flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
             while np.any(flag) | np.any(flag2) | np.any(flag3):
                 isMarkedCell[flag] = True
                 isMarkedCell[LCell[flag2]] = True
@@ -116,9 +117,9 @@ class Tritree(TriangleMesh):
                 isCell0 = isMarkedCell | (~isLeafCell)
                 isCell1 = isLeafCell & (~isMarkedCell)
                 flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
-                flag2 = ( (~isMarkedCell[LCell]) & isLeafCell[LCell] ) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
-                flag3 = ( (~isMarkedCell[RCell]) & isLeafCell[RCell] ) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
-                
+                flag2 = ((~isMarkedCell[LCell]) & isLeafCell[LCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+                flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+
             cell2edge = self.ds.cell_to_edge()
             refineFlag = np.zeros(NE, dtype=np.bool)
             refineFlag[cell2edge[isMarkedCell]] = True
@@ -131,9 +132,9 @@ class Tritree(TriangleMesh):
             edge2newNode[flag0] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
             edge2newNode[flag1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
 
-            # red cell 
-            idx, = np.where(isMarkedCell)                                 
-            NCC = len(idx) 
+            # red cell
+            idx, = np.where(isMarkedCell)
+            NCC = len(idx)
             cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
             child4 = -np.ones((4*NCC, 4), dtype=self.itype)
             parent4 = -np.ones((4*NCC, 2), dtype=self.itype) 
@@ -165,7 +166,7 @@ class Tritree(TriangleMesh):
             parent4[3*NCC:4*NCC, 1] = 3
             self.child[idx, 3] = NC + np.arange(3*NCC, 4*NCC)
             ec = self.entity_barycenter('edge', refineFlag)
-            
+
             if data is not None:
                 I = cell[edge2cell[refineFlag, 0], edge2cell[refineFlag, 2]]
                 J = cell[edge2cell[refineFlag, 1], edge2cell[refineFlag, 3]]
@@ -174,14 +175,13 @@ class Tritree(TriangleMesh):
                             value[I] + value[J])/8
                     data[key] = np.r_['0', value, t]
 
-
             if surface is not None:
                 ec, _ = surface.project(ec)
 
             self.node = np.r_['0', node, ec]
-            cell = np.r_['0', cell, cell4]                      
-            self.parent = np.r_['0', self.parent, parent4]           
-            self.child = np.r_['0', self.child, child4]              
+            cell = np.r_['0', cell, cell4]
+            self.parent = np.r_['0', self.parent, parent4]
+            self.child = np.r_['0', self.child, child4]
             self.ds.reinit(NN + NNN, cell)
 
     def adaptive_coarsen(self, estimator, surface=None, data=None):
