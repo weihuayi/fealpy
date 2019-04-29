@@ -1,10 +1,10 @@
 import numpy as np
 
-from ..mesh.TriangleMesh import TriangleMesh  
-from ..mesh.Quadtree import Quadtree 
+from ..mesh.TriangleMesh import TriangleMesh
+from ..mesh.Quadtree import Quadtree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 
- 
+
 class ffData:
     def __init__(self):
         pass
@@ -33,11 +33,11 @@ class ffData:
         x = p[..., 0]
         y = p[..., 1]
         return np.zeros(p.shape[0:-1])
-    
+
     def gradient(self, p):
         """ The gradient of the exact solution
         """
-        val = np.zeros(p.shape,dtype=p.dtype)     
+        val = np.zeros(p.shape, dtype=p.dtype)
         return val
 
     def source(self, p):
@@ -55,6 +55,7 @@ class ffData:
         """
         val = np.zeros(p.shape[0:-1])
         return val
+
 
 class KelloggData:
     def __init__(self):
@@ -85,7 +86,7 @@ class KelloggData:
                 (1, 4, 0),
                 (3, 0, 4),
                 (4, 1, 5),
-                (2, 5, 1), 
+                (2, 5, 1),
                 (4, 7, 3),
                 (6, 3, 7),
                 (7, 4, 8),
@@ -107,7 +108,7 @@ class KelloggData:
         get the subdomain flag of the subdomain including point p.
         """
         is_subdomain = [p[..., 0]*p[..., 1] > 0, p[..., 0]*p[..., 1] < 0]
-        return is_subdomain 
+        return is_subdomain
 
     def solution(self, p):
         x = p[..., 0]
@@ -117,7 +118,7 @@ class KelloggData:
         gamma = 0.1
         sigma = -14.9225565104455152
         rho = pi/4
-        r = np.sqrt(x**2 + y**2) # r=x^2+y^2
+        r = np.sqrt(x**2 + y**2)
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta + 2*pi)
 
@@ -176,7 +177,7 @@ class KelloggData:
         INPUT:
             p:array object, N*2
         """
-        rhs = np.zeros(p.shape[0:-1]) 
+        rhs = np.zeros(p.shape[0:-1])
         return rhs
 
     def dirichlet(self, p):
