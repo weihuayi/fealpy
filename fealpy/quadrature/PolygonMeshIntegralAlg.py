@@ -15,8 +15,8 @@ class PolygonMeshIntegralAlg():
             self.barycenter = barycenter
 
     def triangle_area(self, tri):
-        v1 = tri[1] - tri[0] 
-        v2 = tri[2] - tri[0] 
+        v1 = tri[1] - tri[0]
+        v2 = tri[2] - tri[0]
         area = np.cross(v1, v2)/2
         return area
 
@@ -75,7 +75,12 @@ class PolygonMeshIntegralAlg():
             return (u(x) - uh(x, cellidx))**2
         e = self.integral(f, celltype=celltype)
         if isinstance(e, np.ndarray):
+            if len(e.shape) == 2:  # TODO: for tensor
+                e = e.sum(axis=-1)
+
+        if celltype is False:
             e = e.sum()
+
         return np.sqrt(e)
 
     def Lp_error(self, u, uh, p, celltype=False):
@@ -83,6 +88,3 @@ class PolygonMeshIntegralAlg():
             return np.abs(u(x) - uh(x, cellidx))**p
         e = self.integral(f, celltype=celltype)
         return e**(1/p)
-
-        
-

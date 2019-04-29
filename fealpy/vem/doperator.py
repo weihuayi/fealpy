@@ -1,5 +1,5 @@
 import numpy as np
-from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrature 
+from ..quadrature import GaussLobattoQuadrature, GaussLegendreQuadrature
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from numpy.linalg import inv
 
@@ -23,7 +23,7 @@ def stiff_matrix(V, area, cfun=None, mat=None):
 
     def f(x):
         x[0, :] = 0
-        return x 
+        return x
 
     p = V.p
     if mat is None:
@@ -54,12 +54,12 @@ def stiff_matrix(V, area, cfun=None, mat=None):
             f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
             K = list(map(f1, zip(DD, PI1, tG)))
         else:
-            barycenter = V.smspace.barycenter 
+            barycenter = V.smspace.barycenter
             k = cfun(barycenter)
             f1 = lambda x: (x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[3]
             K = list(map(f1, zip(DD, PI1, tG, k)))
-            
-    f2 = lambda x: np.repeat(x, x.shape[0]) 
+
+    f2 = lambda x: np.repeat(x, x.shape[0])
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
@@ -91,7 +91,7 @@ def mass_matrix(V, area, cfun=None, mat=None):
     f1 = lambda x: x[0].T@x[1]@x[0] + x[3]*(np.eye(x[2].shape[1]) - x[2]).T@(np.eye(x[2].shape[1]) - x[2])
     K = list(map(f1, zip(PI0, H, PIS, area)))
 
-    f2 = lambda x: np.repeat(x, x.shape[0]) 
+    f2 = lambda x: np.repeat(x, x.shape[0])
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
@@ -100,7 +100,7 @@ def mass_matrix(V, area, cfun=None, mat=None):
     val = np.concatenate(list(map(f4, K)))
     gdof = V.number_of_global_dofs()
     M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-    return M 
+    return M
 
 def cross_mass_matrix(integral, wh, vemspace, area, PI0):
     p = vemspace.p
@@ -115,10 +115,10 @@ def cross_mass_matrix(integral, wh, vemspace, area, PI0):
     NC = len(cell2dofLocation) - 1
     cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
 
-    f1 = lambda x: x[0].T@x[1]@x[0] 
+    f1 = lambda x: x[0].T@x[1]@x[0]
     K = list(map(f1, zip(PI0, H)))
 
-    f2 = lambda x: np.repeat(x, x.shape[0]) 
+    f2 = lambda x: np.repeat(x, x.shape[0])
     f3 = lambda x: np.tile(x, x.shape[0])
     f4 = lambda x: x.flatten()
 
@@ -127,7 +127,7 @@ def cross_mass_matrix(integral, wh, vemspace, area, PI0):
     val = np.concatenate(list(map(f4, K)))
     gdof = vemspace.number_of_global_dofs()
     M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
-    return M 
+    return M
 
 def source_vector(integral, f, vemspace, PI0):
     phi = vemspace.smspace.basis
@@ -182,12 +182,12 @@ def matrix_H(V):
     NC = mesh.number_of_cells()
 
     qf = GaussLegendreQuadrature(p + 1)
-    bcs, ws = qf.quadpts, qf.weights 
+    bcs, ws = qf.quadpts, qf.weights
     ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
     phi0 = V.smspace.basis(ps, cellidx=edge2cell[:, 0])
     phi1 = V.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
     H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
-    H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1) 
+    H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
     nm = mesh.edge_normal()
     b = node[edge[:, 0]] - V.smspace.barycenter[edge2cell[:, 0]]
@@ -206,7 +206,7 @@ def matrix_H(V):
     return H
 
 def matrix_H_test(V, vem=None):
-    qf = vem.error.integrator  
+    qf = vem.error.integrator
     bcs, ws = qf.quadpts, qf.weights
     pp = vem.quadtree.bc_to_point(bcs)
     phi = vem.V.smspace.basis(pp)
@@ -219,26 +219,26 @@ def matrix_D(V, H):
     smldof = V.smspace.number_of_local_dofs()
     mesh = V.mesh
     NV = mesh.number_of_vertices_of_cells()
-    h = V.smspace.h 
+    h = V.smspace.h
     node = mesh.node
     edge = mesh.ds.edge
     edge2cell = mesh.ds.edge2cell
     isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation 
+    cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
     D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
     if p == 1:
-        bc = np.repeat(V.smspace.barycenter, NV, axis=0) 
+        bc = np.repeat(V.smspace.barycenter, NV, axis=0)
         D[:, 1:] = (node[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
         return D
 
     qf = GaussLobattoQuadrature(p+1)
-    bcs, ws = qf.quadpts, qf.weights 
+    bcs, ws = qf.quadpts, qf.weights
     ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
     phi0 = V.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
     phi1 = V.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
-    idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)  
+    idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
     D[idx, :] = phi0
     idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
     D[idx, :] = phi1
@@ -254,20 +254,20 @@ def matrix_B(V):
     smldof = V.smspace.number_of_local_dofs()
     mesh = V.mesh
     NV = mesh.number_of_vertices_of_cells()
-    h = V.smspace.h 
+    h = V.smspace.h
     cell2dof, cell2dofLocation = V.dof.cell2dof, V.dof.cell2dofLocation
-    B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float) 
+    B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
     if p == 1:
         B[0, :] = 1/np.repeat(NV, NV)
         B[1:, :] = mesh.node_normal().T/np.repeat(h, NV).reshape(1, -1)
         return B
     else:
-        idx = cell2dofLocation[0:-1] + NV*p 
+        idx = cell2dofLocation[0:-1] + NV*p
         B[0, idx] = 1
         idof = (p-1)*p//2
         start = 3
         r = np.arange(1, p+1)
-        r = r[0:-1]*r[1:] 
+        r = r[0:-1]*r[1:]
         for i in range(2, p+1):
             idx0 = np.arange(start, start+i-1)
             idx1 =  np.arange(start-2*i+1, start-i)
@@ -281,7 +281,7 @@ def matrix_B(V):
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         qf = GaussLobattoQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights 
+        bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         gphi0 = V.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
         gphi1 = V.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
@@ -293,7 +293,7 @@ def matrix_B(V):
         #TODO: vectorize
         NE = mesh.number_of_edges()
         for i in range(NE):
-            idx0 = edge2cell[i, 0] 
+            idx0 = edge2cell[i, 0]
             idx1 = cell2dofLocation[idx0] + (edge2cell[i, 2]*p + np.arange(p+1))%(NV[idx0]*p)
             B[:, idx1] += val[i]
 
@@ -323,7 +323,7 @@ def matrix_G(V, B, D):
     return G
 
 def matrix_G_test(V, vem=None):
-    qf = vem.error.integrator  
+    qf = vem.error.integrator
     bcs, ws = qf.quadpts, qf.weights
     pp = vem.quadtree.bc_to_point(bcs)
     gphi = vem.V.smspace.grad_basis(pp)

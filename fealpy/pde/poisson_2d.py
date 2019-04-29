@@ -1,7 +1,7 @@
 import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh  
-from ..mesh.tree_data_structure import Quadtree 
+from ..mesh.Quadtree import Quadtree 
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 
  
@@ -97,27 +97,23 @@ class KelloggData:
         return mesh
 
     def diffusion_coefficient(self, p):
-        idx = p[..., 0]*p[..., 1] >0
+        idx = (p[..., 0]*p[..., 1] > 0)
         k = np.ones(p.shape[:-1], dtype=np.float)
-        k[idx] = self.a  
+        k[idx] = self.a
         return k
 
     def subdomain(self, p):
         """
         get the subdomain flag of the subdomain including point p.
         """
-        is_subdomain = [ p[..., 0]*p[..., 1] >0, p[..., 0]*p[..., 1] < 0]
+        is_subdomain = [p[..., 0]*p[..., 1] > 0, p[..., 0]*p[..., 1] < 0]
         return is_subdomain 
 
     def solution(self, p):
-    
         x = p[..., 0]
         y = p[..., 1]
-    
         pi = np.pi
         cos = np.cos
-        sin = np.sin
-    
         gamma = 0.1
         sigma = -14.9225565104455152
         rho = pi/4
@@ -139,23 +135,23 @@ class KelloggData:
         x = p[..., 0]
         y = p[..., 1]
 
-        val = np.zeros(p.shape, dtype=p.dtype)                      
-        
+        val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
         cos = np.cos
         sin = np.sin
-        
         gamma = 0.1
         sigma = -14.9225565104455152
-        rho =pi/4        
-    
-        theta = np.arctan2(y, x) 
-        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)    
+        rho = pi/4
+        theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         t = 1 + (y/x)**2
         r = np.sqrt(x**2 + y**2)
-        rg = r**gamma 
+        rg = r**gamma
 
-        ux1= ((x >= 0.0) & (y >= 0.0))*(gamma*rg*cos((pi/2-sigma)*gamma)*(x*cos((theta-pi/2+rho)*gamma)/(r*r) + y*sin((theta-pi/2+rho)*gamma)/(x*x*t)))
+        ux1 = ((x >= 0.0) & (y >= 0.0))*(
+                gamma*rg*cos((pi/2-sigma)*gamma)*(x*cos((theta-pi/2+rho)*gamma)/(r*r)
+                + y*sin((theta-pi/2+rho)*gamma)/(x*x*t))
+            )
 
         uy1 = ((x >= 0.0) & (y >= 0.0))*(gamma*rg*cos((pi/2-sigma)*gamma)*(y*cos((theta-pi/2+rho)*gamma)/(r*r) - sin((theta-pi/2+rho)*gamma)/(x*t)))
 
@@ -171,10 +167,10 @@ class KelloggData:
 
         uy4 = ((x >= 0.0) & (y <= 0.0))*(gamma*rg*cos((pi/2-rho)*gamma)*(y*cos((theta-3*pi/2-sigma)*gamma)/(r*r)-sin((theta-3*pi/2-sigma)*gamma)/(x*t)))
 
-        val[...,0] =  ux1+ux2+ux3+ux4
-        val[...,1] =  uy1+uy2+uy3+uy4
+        val[..., 0] =  ux1+ux2+ux3+ux4
+        val[..., 1] =  uy1+uy2+uy3+uy4
         return val
-    
+
     def source(self, p):
         """the right hand side of Possion equation
         INPUT:
@@ -187,6 +183,7 @@ class KelloggData:
         """Dilichlet boundary condition
         """
         return self.solution(p)
+
 
 class LShapeRSinData:
     def __init__(self):

@@ -148,27 +148,28 @@ class Mesh2d():
             v = node[edge[index,1],:] - node[edge[index,0],:]
         return v 
 
-    def add_plot(self, plot,
+    def add_plot(
+            self, plot,
             nodecolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
-            linewidths=1, markersize=50,  
+            linewidths=1, markersize=50,
             showaxis=False, showcolorbar=False, cmap='rainbow'):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca() 
+            axes = fig.gca()
         else:
             axes = plot
         return show_mesh_2d(axes, self,
                 nodecolor=nodecolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,  
+                linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis, showcolorbar=showcolorbar, cmap=cmap)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=100, 
+            color='r', markersize=100,
             fontsize=24, fontcolor='k'):
 
         if node is None:
