@@ -19,7 +19,7 @@ from fealpy.tools.show import showmultirate
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=2, meshtype='tri')
 
-maxit = 50
+maxit = 2 
 theta = 0.2
 k = maxit - 15
 p = 1
@@ -45,10 +45,10 @@ for i in range(maxit):
     rguh = ralg.harmonic_average(uh)
     eta = fem.recover_estimate(rguh)
     errorMatrix[3, i] = fem.get_recover_error(rguh)
-    markedCell = mark(eta, theta=theta)
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
-        mesh.bisect(isMarkedCell)
+        A = mesh.bisect_1(isMarkedCell, returnim=True)
+        print(A.toarray())
 
 fig = plt.figure()
 axes = fig.gca()

@@ -385,14 +385,14 @@ class TriangleMesh(Mesh2d):
         if rflag == True:
             self.ds.construct()
 
-    def bisect_1(self, isMarkedCell):
+    def bisect_1(self, isMarkedCell=None, returnim=False):
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NN0 = NN  # 记录下二分加密之前的节点数目
-        print("old NN:", NN0)
 
         if isMarkedCell is None:
+            # 默认加密所有的单元
             markedCell = np.arange(NC, dtype=self.itype)
         else:
             markedCell, = np.nonzero(isMarkedCell)
@@ -403,16 +403,166 @@ class TriangleMesh(Mesh2d):
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
+
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = np.zeros(NN + 2*NC, dtype=np.uint8)
+
         # 用于记录被二分的边及其中点编号
         cutEdge = np.zeros((4*NN, 3), dtype=self.itype)
+
         # 当前的二分边的数目
         nCut = 0
         # 非协调边的标记数组 
         nonConforming = np.ones(4*NN, dtype=np.bool)
         while len(markedCell) != 0:
-            pass
+            # 标记最长边
+            self.label(node, cell, markedCell)
+
+            # 获取标记单元的四个顶点编号
+            p0 = cell[markedCell, 0]
+            p1 = cell[markedCell, 1]
+            p2 = cell[markedCell, 2]
+
+            # 找到新的二分边和新的中点 
+            nMarked = len(markedCell)
+            p3 = np.zeros(nMarked, dtype=self.itype)
+
+            if nCut == 0: # 如果是第一次循环 
+                idx = np.arange(nMarked) # cells introduce new cut edges
+            else:
+                # all non-conforming edges
+                ncEdge = np.nonzero(nonConforming[:nCut])
+                NE = len(ncEdge)
+                I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
+                val = np.ones(len(I), dtype=np.bool)
+                nv2v = csr_matrix(
+                        (val, (I, J)),
+                        shape=(NN, NN))
+                i, j =  np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
+                p3[j] = i
+                idx, = np.nonzero(p3 == 0)
+
+            if len(idx) != 0:
+                # 把需要二分的边唯一化 
+                NE = len(idx)
+                cellCutEdge = np.array([p1[idx], p2[idx]])
+                cellCutEdge.sort(axis=0)
+                s = csr_matrix(
+                    (
+                        np.ones(NE, dtype=np.bool),
+                        (
+                            cellCutEdge[0, :],
+                            cellCutEdge[1, :]
+                        )
+                    ), shape=(NN, NN))
+                # 获得唯一的边 
+                i, j = s.nonzero()
+                nNew = len(i)
+                newCutEdge = np.arange(nCut, nCut+nNew)
+                cutEdge[newCutEdge, 0] = i
+                cutEdge[newCutEdge, 1] = j
+                cutEdge[newCutEdge, 2] = range(NN, NN+nNew)
+                node[NN:NN+nNew, :] = (node[i, :] + node[j, :])/2.0
+                nCut += nNew
+                NN += nNew
+
+                # 新点和旧点的邻接矩阵 
+                I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
+                J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
+                val = np.ones(len(I), dtype=np.bool)
+                nv2v = csr_matrix(
+                        (val, (I, J)),
+                        shape=(NN, NN))
+                i, j =  np.nonzero(nv2v[:, p1].multiply(nv2v[:, p2]))
+                p3[j] = i
+
+            # 如果新点的代数仍然为 0
+            idx = (generation[p3] == 0)
+            cellGeneration = np.max(
+                    generation[cell[markedCell[idx]]],
+                    axis=-1)
+            # 第几代点 
+            generation[p3[idx]] = cellGeneration + 1
+            cell[markedCell, 0] = p3
+            cell[markedCell, 1] = p0
+            cell[markedCell, 2] = p1
+            cell[NC:NC+nMarked, 0] = p3
+            cell[NC:NC+nMarked, 1] = p2
+            cell[NC:NC+nMarked, 2] = p0
+            NC = NC + nMarked
+            del cellGeneration, p0, p1, p2, p3
+
+            # 找到非协调的单元 
+            checkEdge, = np.nonzero(nonConforming[:nCut])
+            isCheckNode = np.zeros(NN, dtype=np.bool)
+            isCheckNode[cutEdge[checkEdge]] = True
+            isCheckCell = np.sum(
+                    isCheckNode[cell[:NC]],
+                    axis= -1) > 0
+            # 找到所有包含检查节点的单元编号 
+            checkCell, = np.nonzero(isCheckCell)
+            I = np.repeat(checkCell, 3)
+            J = cell[checkCell].reshape(-1)
+            val = np.ones(len(I), dtype=np.bool)
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
+            i, j = np.nonzero(
+                    cell2node[:, cutEdge[checkEdge, 0]].multiply(
+                        cell2node[:, cutEdge[checkEdge, 1]]
+                        ))
+            markedCell = np.unique(i)
+            nonConforming[checkEdge] = False
+            nonConforming[checkEdge[j]] = True;
+
+        if returnim is True:
+            nn = NN - NN0
+            IM = coo_matrix(
+                    (
+                        np.ones(NN0),
+                        (
+                            np.arange(NN0),
+                            np.arange(NN0)
+                        )
+                    ), shape=(NN, NN), dtype=self.ftype)
+            cutEdge = cutEdge[:nn]
+            val = np.full((nn, 2), 0.5, dtype=self.ftype)
+
+            g = 2
+            markedNode, = np.nonzero(generation == g)
+
+            N = len(markedNode)
+            while N != 0:
+                nidx = markedNode - NN0
+                i = cutEdge[nidx, 0]
+                j = cutEdge[nidx, 1]
+                ic = np.zeros((N, 2), dtype=self.ftype)
+                jc = np.zeros((N, 2), dtype=self.ftype)
+                ic[i < NN0, 0] = 1.0
+                jc[j < NN0, 1] = 1.0
+                ic[i >= NN0, :] = val[i[i >= NN0] - NN0, :]
+                jc[j >= NN0, :] = val[j[j >= NN0] - NN0, :]
+                val[markedNode - NN0, :] = 0.5*(ic + jc)
+                cutEdge[nidx[i >= NN0], 0] = cutEdge[i[i >= NN0] - NN0, 0]
+                cutEdge[nidx[j >= NN0], 1] = cutEdge[j[j >= NN0] - NN0, 1]
+                g += 1
+                markedNode, = np.nonzero(generation == g)
+                N = len(markedNode)
+
+            IM += coo_matrix(
+                    (
+                        val.flat,
+                        (
+                            cutEdge[:, [2, 2]].flat,
+                            cutEdge[:, [0, 1]].flat
+                        )
+                    ), shape=(NN, NN0), dtype=self.ftype)
+
+        self.node = node[:NN]
+        cell = cell[:NC]
+        self.ds.reinit(NN, cell)
+
+        if returnim is True:
+            return IM.tocsr()
 
     def adaptive_bisect(self, nrefine):
         pass
