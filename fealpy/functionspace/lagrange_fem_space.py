@@ -3,13 +3,14 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .function import Function
 from .dof import *
 
+
 class LagrangeFiniteElementSpace():
     def __init__(self, mesh, p=1, spacetype='C'):
         self.mesh = mesh
-        self.p = p 
+        self.p = p
         if len(mesh.node.shape) == 1:
             self.GD = 1
-        else: 
+        else:
             self.GD = mesh.node.shape[1]
         if spacetype is 'C':
             if mesh.meshtype is 'interval':
@@ -156,7 +157,6 @@ class LagrangeFiniteElementSpace():
         Dlambda = self.mesh.grad_lambda()
         gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
         return gphi 
-
 
     def basis(self, bc):
         """

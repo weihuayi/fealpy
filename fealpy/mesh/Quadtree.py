@@ -6,6 +6,7 @@ from .PolygonMesh import PolygonMesh
 from ..common import ranges
 from .adaptive_tools import mark
 
+
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
@@ -13,7 +14,7 @@ class Quadtree(QuadrangleMesh):
     def __init__(self, node, cell):
         super(Quadtree, self).__init__(node, cell)
         NC = self.number_of_cells()
-        self.parent = -np.ones((NC, 2), dtype=self.itype) 
+        self.parent = -np.ones((NC, 2), dtype=self.itype)
         self.child = -np.ones((NC, 4), dtype=self.itype)
         self.meshType = 'quadtree'
 
@@ -49,6 +50,249 @@ class Quadtree(QuadrangleMesh):
     def sizing_adaptive(self, eta):
         pass
 
+    def adaptive(
+            self, eta,
+            data=None,
+            maxrefine=3,
+            maxcoarsen=0,
+            theta=1.0,
+            method='mean'):
+
+        leafCellIdx = self.leaf_cell_index()
+        NC = self.number_of_cells()
+        numrefine = np.zeros(NC, dtype=np.int8)
+
+        if method is 'mean':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.mean(eta))))
+        elif method is 'max':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.max(eta))))
+        elif method is 'median':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.median(eta))))
+        elif method is 'min':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.min(eta))))
+        else:
+            raise ValueError(
+                    "I don't know anyting about method %s!".format(method))
+        numrefine[numrefine > maxrefine] = maxrefine
+        numrefine[numrefine < -maxcoarsen] = -maxcoarsen
+
+        # refine
+        print("Number of cells before:", NC)
+        isMarkedCell = (numrefine > 0)
+        while sum(isMarkedCell) > 0:
+            numrefine = self.refine_1(
+                    isMarkedCell=isMarkedCell,
+                    numrefine=numrefine,
+                    data=data
+                )
+            print("Number of cells after refine:", self.number_of_cells())
+            isMarkedCell = (numrefine > 0)
+
+        # coarsen
+        if maxcoarsen > 0:
+            isMarkedCell = (numrefine < 0)
+            while sum(isMarkedCell) > 0:
+                NN0 = self.number_of_cells()
+                numrefine = self.coarsen_1(
+                        isMarkedCell=isMarkedCell,
+                        numrefine=numrefine,
+                        data=data
+                    )
+                NN = self.number_of_cells()
+                if NN == NN0:
+                    break
+                print("Number of cells after coarsen:", self.number_of_cells())
+                isMarkedCell = (numrefine < 0)
+
+    def refine_1(self, isMarkedCell=None, numrefine=None, data=None):
+        if isMarkedCell is None:
+            # 默认加密所有的叶子单元
+            idx = self.leaf_cell_index()
+        else:
+            idx, = np.nonzero(isMarkedCell)
+
+        if len(idx) > 0:
+            # Prepare data
+            N = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            node = self.node
+            edge = self.ds.edge
+            cell = self.ds.cell
+
+            parent = self.parent
+            child = self.child
+
+            isLeafCell = self.is_leaf_cell()
+
+            # Construct
+            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell[idx] = True
+            isNeedCutCell = isNeedCutCell & isLeafCell
+
+            # Find the cutted edge
+            cell2edge = self.ds.cell_to_edge()
+
+            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge[cell2edge[isNeedCutCell, :]] = True
+
+            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge[cell2edge[~isLeafCell, :]] = True
+            isCuttedEdge = isCuttedEdge & isCutEdge
+
+            isNeedCutEdge = (~isCuttedEdge) & isCutEdge
+
+            # 找到每条非叶子边对应的单元编号， 及在该单元中的局部编号
+            I, J = np.nonzero(isCuttedEdge[cell2edge])
+            cellIdx = np.zeros(NE, dtype=self.itype)
+            localIdx = np.zeros(NE, dtype=self.itype)
+            I1 = I[~isLeafCell[I]]
+            J1 = J[~isLeafCell[I]]
+            cellIdx[cell2edge[I1, J1]] = I1  # the cell idx
+            localIdx[cell2edge[I1, J1]] = J1  #
+            del I, J, I1, J1
+
+            # 找到该单元相应孩子单元编号， 及对应的中点编号
+            cellIdx = cellIdx[isCuttedEdge]
+            localIdx = localIdx[isCuttedEdge]
+            cellIdx = child[cellIdx, self.localEdge2childCell[localIdx, 0]]
+            localIdx = self.localEdge2childCell[localIdx, 1]
+
+            edge2center = np.zeros(NE, dtype=self.itype)
+            edge2center[isCuttedEdge] = cell[cellIdx, localIdx]
+
+            edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
+            cellCenter = self.entity_barycenter('cell', isNeedCutCell)
+
+            if data is not None:
+                isNeedCutEdge = (~isCuttedEdge) & isCutEdge
+                for key, value in data.items():
+                    evalue = 0.5*np.sum(value[edge[isNeedCutEdge]], axis=1)
+                    cvalue = np.sum(value[cell[isNeedCutCell]], axis=1)/4
+                    data[key] = np.concatenate((value, evalue, cvalue), axis=0)
+
+            NEC = len(edgeCenter)
+            NCC = len(cellCenter)
+
+            edge2center[isNeedCutEdge] = np.arange(N, N+NEC)
+
+            cp = [cell[isNeedCutCell, i].reshape(-1, 1) for i in range(4)]
+            ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(4)]
+            cc = np.arange(N + NEC, N + NEC + NCC).reshape(-1, 1)
+
+            if numrefine is not None:
+                num = numrefine[isNeedCutCell]
+                newCellRefine = np.zeros(4*NCC)
+                newCellRefine[0::4] = num - 1
+                newCellRefine[1::4] = num - 1
+                newCellRefine[2::4] = num - 1
+                newCellRefine[3::4] = num - 1
+                numrefine[isNeedCutCell] = 0
+                numrefine = np.r_[numrefine, newCellRefine]
+
+            newCell = np.zeros((4*NCC, 4), dtype=self.itype)
+            newChild = -np.ones((4*NCC, 4), dtype=self.itype)
+            newParent = -np.ones((4*NCC, 2), dtype=self.itype)
+            newCell[0::4, :] = np.concatenate(
+                    (cp[0], ep[0], cc, ep[3]), axis=1)
+            newCell[1::4, :] = np.concatenate(
+                    (ep[0], cp[1], ep[1], cc), axis=1)
+            newCell[2::4, :] = np.concatenate(
+                    (cc, ep[1], cp[2], ep[2]), axis=1)
+            newCell[3::4, :] = np.concatenate(
+                    (ep[3], cc, ep[2], cp[3]), axis=1)
+            newParent[:, 0] = np.repeat(idx, 4)
+            newParent[:, 1] = ranges(4*np.ones(NCC, dtype=self.itype))
+            child[idx, :] = np.arange(NC, NC + 4*NCC).reshape(NCC, 4)
+
+            cell = np.concatenate((cell, newCell), axis=0)
+            self.node = np.concatenate((node, edgeCenter, cellCenter), axis=0)
+            self.parent = np.concatenate((parent, newParent), axis=0)
+            self.child = np.concatenate((child, newChild), axis=0)
+            self.ds.reinit(N + NEC + NCC, cell)
+
+        if numrefine is not None:
+            return numrefine
+
+    def coarsen_1(self, isMarkedCell=None, numrefine=None, data=None):
+        """ marker will marke the leaf cells which will be coarsen
+        """
+        isRootCell = self.is_root_cell()
+        if np.all(isRootCell):
+            return False
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        parent = self.parent
+        child = self.child
+
+        isLeafCell = self.is_leaf_cell()
+        isBranchCell = np.zeros(NC, dtype=np.bool)
+        isBranchCell[parent[isLeafCell & (~isRootCell), 0]] = True
+
+        idx, = np.nonzero(isBranchCell)
+        isCoarsenCell = np.sum(isMarkedCell[child[isBranchCell]], axis=1) == 4
+
+        idx = idx[isCoarsenCell]
+
+        if len(idx) > 0:
+
+            node = self.node
+            cell = self.ds.cell
+            if numrefine is not None:
+                numrefine[idx] = np.max(
+                        numrefine[child[idx]], axis=-1
+                    ) + 1
+
+            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell[child[idx, :]] = False
+
+            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode[cell[isRemainCell, :]] = True
+
+            cell = cell[isRemainCell]
+            child = child[isRemainCell]
+            parent = parent[isRemainCell]
+
+            # 子单元不需要保留的单元， 是新的叶子单元
+
+            childIdx, = np.nonzero(child[:, 0] > -1)
+            isNewLeafCell = (
+                    np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0
+                )
+            child[childIdx[isNewLeafCell], :] = -1
+
+            cellIdxMap = np.zeros(NC, dtype=self.itype)
+            NNC = isRemainCell.sum()
+            cellIdxMap[isRemainCell] = np.arange(NNC)
+            child[child > -1] = cellIdxMap[child[child > -1]]
+            parent[parent > -1] = cellIdxMap[parent[parent > -1]]
+            self.child = child
+            self.parent = parent
+
+            nodeIdxMap = np.zeros(NN, dtype=self.itype)
+            N = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(N)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
+            self.ds.reinit(N, cell)
+
+            if numrefine is not None:
+                numrefine = numrefine[isRemainCell]
+
+            if data is not None:
+                for key, value in data.items():
+                    data[key] = value[isRemainNode]
+
+        if numrefine is not None:
+            return numrefine
+
     def adaptive_refine(self, estimator, data=None):
         i = 0
         if data is not None:
@@ -70,10 +314,10 @@ class Quadtree(QuadrangleMesh):
             if i > 3:
                 break
 
-    def refine_marker(self, eta, theta):
+    def refine_marker(self, eta, theta, method="L2"):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        isMarked = mark(eta, theta, method="L2")
+        isMarked = mark(eta, theta, method=method)
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
@@ -225,7 +469,7 @@ class Quadtree(QuadrangleMesh):
 
         isLeafCell = self.is_leaf_cell()
         isBranchCell = np.zeros(NC, dtype=np.bool)
-        isBranchCell[parent[isLeafCell, 0]] = True 
+        isBranchCell[parent[isLeafCell & (~isRootCell), 0]] = True
 
         idx, = np.nonzero(isBranchCell)
         isCoarsenCell = np.sum(isMarkedCell[child[isBranchCell]], axis=1) == 4
@@ -239,16 +483,6 @@ class Quadtree(QuadrangleMesh):
 
             isRemainCell = np.ones(NC, dtype=np.bool)
             isRemainCell[child[idx, :]] = False
-            isNotRootCell = (~self.is_root_cell())
-            NNC0 = isRemainCell.sum()
-            while True:
-                isRemainCell[parent[isRemainCell & isNotRootCell, 0]] = True
-                isRemainCell[child[parent[isRemainCell & isNotRootCell, 0], :]] = True
-                NNC1 = isRemainCell.sum()
-                if NNC1 == NNC0:
-                    break
-                else:
-                    NNC0 = NNC1
 
             isRemainNode = np.zeros(NN, dtype=np.bool)
             isRemainNode[cell[isRemainCell, :]] = True
@@ -260,7 +494,9 @@ class Quadtree(QuadrangleMesh):
             # 子单元不需要保留的单元， 是新的叶子单元
 
             childIdx, = np.nonzero(child[:, 0] > -1)
-            isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0
+            isNewLeafCell = np.sum(
+                    isRemainCell[child[childIdx, :]], axis=1
+                ) == 0
             child[childIdx[isNewLeafCell], :] = -1
 
             cellIdxMap = np.zeros(NC, dtype=self.itype)

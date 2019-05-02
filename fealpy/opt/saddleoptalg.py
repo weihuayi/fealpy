@@ -14,7 +14,7 @@ class SteepestDescentAlg:
 
     def run(self, queue=None, maxit=None):
         problem = self.problem
-        
+ 
         options = self.options
         alpha = options['StepLength']
 

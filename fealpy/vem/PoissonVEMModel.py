@@ -6,6 +6,7 @@ from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..vem import doperator
 from ..quadrature import PolygonMeshIntegralAlg
+from ..quadrature import GaussLegendreQuadrature
 
 
 class PoissonVEMModel():
@@ -146,13 +147,13 @@ class PoissonVEMModel():
         except  AttributeError:
             if rtype is 'simple':
                 d = n2c.sum(axis=1)
-                ruh = np.asarray((p2c@grad)/d.reshape(-1, 1))
+                ruh = np.asarray((n2c@grad)/d.reshape(-1, 1))
             elif rtype is 'area':
                 d = n2c@area
-                ruh = np.asarray((p2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
+                ruh = np.asarray((n2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
             elif rtype is 'inv_area':
                 d = n2c@(1/area)
-                ruh = np.asarray((p2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
+                ruh = np.asarray((n2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
             else:
                 raise ValueError("I have note code method: {}!".format(rtype))
 
@@ -174,7 +175,7 @@ class PoissonVEMModel():
         node = mesh.node
         gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
         gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
-        eta = np.bincount(idx, weights=gx**2+gy**2)/NV*area
+        eta = k*np.bincount(idx, weights=gx**2+gy**2)/NV*area
 
         if residual is True:
             fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
@@ -225,15 +226,57 @@ class PoissonVEMModel():
         gu = self.pde.gradient
         S = self.project_to_smspace(self.uh)
         guh = S.grad_value
-        # eta = self.integralalg.L2_error(gu, guh, celltype=True)
-        e = np.sqrt(np.sum(eta**2))
+        e = self.integralalg.L2_error(gu, guh)
         return e
-#        e = self.integralalg.L2_error(gu, guh, celltype=True)
-#        barycenter = self.space.smspace.barycenter
-#        try:
-#            k = self.pde.diffusion_coefficient(barycenter)
-#        except  AttributeError:
-#            k = np.ones(NC)
-#        eta = np.sqrt(k)*e
-#        e =  np.sqrt(np.sum(k*e**2))
-#        return e, eta
+
+    def H1_semi_error_Kellogg(self):
+        """
+
+        """
+        wh = self.space.function()
+        isBdDof = self.space.boundary_dof()
+        wh[isBdDof] = self.uh[isBdDof]
+
+        uh = self.project_to_smspace(self.uh)
+        guh = uh.grad_value
+        wh = self.project_to_smspace(wh)
+        gwh = wh.grad_value
+        gu = self.pde.gradient
+
+        def f(x, cellidx):
+            val0 = gu(x) - guh(x, cellidx)
+            val1 = gwh(x, cellidx)
+            val = np.sum(val0*val1, axis=-1)
+            return val
+
+        e = self.integralalg.integral(f, celltype=True)
+
+        barycenter = self.space.smspace.barycenter
+        k = self.pde.diffusion_coefficient(barycenter)
+        e *= k
+
+        # 边界单元积分
+        mesh = self.mesh
+        isBdCell = mesh.ds.boundary_cell_flag()
+        e = np.sum(e[isBdCell])
+
+        # 边界边上的积分
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        isBdEdge = mesh.ds.boundary_edge_flag()
+        n = mesh.edge_normal(index=isBdEdge)
+
+        qf = GaussLegendreQuadrature(8)
+        bcs, ws = qf.quadpts, qf.weights
+        edge2cell = mesh.ds.edge_to_cell()
+        cidx = edge2cell[isBdEdge, 0]
+        k = k[cidx]
+        pts = np.einsum('ij, kjm->ikm', bcs, node[edge[isBdEdge]])
+        uval = self.pde.solution(pts)
+        guval = np.einsum('ikm, km->ik', self.pde.gradient(pts), n)
+        uhval = np.einsum('ij, kj->ik', bcs, self.uh[edge[isBdEdge]])
+
+        e1 = np.einsum('i, ik, k->k', ws, (uval - uhval)*guval, k)
+        e = e1.sum() - e
+
+        return np.sqrt(e)

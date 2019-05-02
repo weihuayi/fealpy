@@ -30,9 +30,8 @@ class PolygonMeshIntegralAlg():
 
         NC = pmesh.number_of_cells()
 
-        qf = self.integrator  
+        qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
-
 
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
         a = self.triangle_area(tri)
@@ -47,7 +46,11 @@ class PolygonMeshIntegralAlg():
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if np.sum(isInEdge) > 0:
-            tri = [bc[edge2cell[isInEdge, 1]], node[edge[isInEdge, 1]], node[edge[isInEdge, 0]]]
+            tri = [
+                    bc[edge2cell[isInEdge, 1]],
+                    node[edge[isInEdge, 1]],
+                    node[edge[isInEdge, 0]]
+                    ]
             a = self.triangle_area(tri)
             pp = np.einsum('ij, jkm->ikm', bcs, tri)
             val = u(pp, edge2cell[isInEdge, 1])
@@ -57,7 +60,7 @@ class PolygonMeshIntegralAlg():
         if celltype is True:
             return e
         else:
-            return e.sum(axis=0) 
+            return e.sum(axis=0)
 
     def fun_integral(self, f, celltype=False):
         def u(x, cellidx):
@@ -75,9 +78,10 @@ class PolygonMeshIntegralAlg():
             return (u(x) - uh(x, cellidx))**2
         e = self.integral(f, celltype=celltype)
         if isinstance(e, np.ndarray):
-            if len(e.shape) == 2:  # TODO: for tensor
-                e = e.sum(axis=-1)
-
+            n = len(e.shape) - 1
+            if n > 0:
+                for i in range(n):
+                    e = e.sum(axis=-1)
         if celltype is False:
             e = e.sum()
 

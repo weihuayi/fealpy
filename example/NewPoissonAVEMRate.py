@@ -2,22 +2,20 @@
 # 
 
 import numpy as np
-import sys
-
 from fealpy.vem import PoissonVEMModel
-from fealpy.mesh.adaptive_tools import AdaptiveMarker
 from fealpy.tools.show import showmultirate
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-
-m = 1
+m = 2
 p = 1
-q = 8
-maxit = 75
-theta = 0.2
-k = maxit - 15
+q = 3
+maxit = 10
+maxrefine = 3
+theta = 1.0
+method = 'mean'
+k = maxit - 5
 
 if m == 1:
     from fealpy.pde.poisson_2d import KelloggData
@@ -67,14 +65,17 @@ for i in range(maxit):
     errorMatrix[2, i] = vem.L2_error()
     if m == 1:
         errorMatrix[3, i] = vem.H1_semi_error_Kellogg()
-        errorMatrix[3, i] = vem.H1_semi_error()
     else:
         errorMatrix[3, i] = vem.H1_semi_error()
 
     errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
-        isMarkedCell = quadtree.refine_marker(eta, theta, method="L2")
-        quadtree.refine(isMarkedCell)
+        quadtree.adaptive(
+                eta,
+                maxrefine=maxrefine,
+                theta=theta,
+                method=method
+                )
         mesh = quadtree.to_pmesh()
 
 mesh.add_plot(plt, showaxis=True)

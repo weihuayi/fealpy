@@ -385,7 +385,7 @@ class TriangleMesh(Mesh2d):
         if rflag == True:
             self.ds.construct()
 
-    def bisect_1(self, isMarkedCell=None, returnim=False):
+    def bisect_1(self, isMarkedCell=None, numrefine=None, returnim=False):
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
@@ -400,6 +400,9 @@ class TriangleMesh(Mesh2d):
         # allocate new memory for node and cell
         node = np.zeros((5*NN, GD), dtype=self.ftype)
         cell = np.zeros((2*NC, 3), dtype=self.itype)
+
+        if numrefine is not None:
+            numrefine = np.r_[numrefine, np.zeros(NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
@@ -490,6 +493,11 @@ class TriangleMesh(Mesh2d):
             cell[NC:NC+nMarked, 0] = p3
             cell[NC:NC+nMarked, 1] = p2
             cell[NC:NC+nMarked, 2] = p0
+
+            if numrefine is not None:
+                numrefine[markedCell] -= 1
+                numrefine[NC:NC+nMarked] = numrefine[markedCell]
+
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3
 
@@ -561,12 +569,16 @@ class TriangleMesh(Mesh2d):
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
 
-        if returnim is True:
-            return IM.tocsr()
+        if numrefine is not None:
+            return numrefine[:NC]
 
-    def adaptive_bisect(self, nrefine):
-        pass
 
+    def adaptive_bisect_1(self, eta):
+        numrefine = np.around(np.log2(eta/np.mean(eta)))
+        isMarkedCell = (numrefine > 0)
+        while sum(isMarkedCell) > 0:
+            numrefine = self.bisect_1(isMarkedCell, numrefine=numrefine)
+            isMarkedCell = (numrefine > 0)
 
     def grad_lambda(self):
         node = self.node
@@ -633,7 +645,7 @@ class TriangleMesh(Mesh2d):
     def area(self, index=None):
         node = self.node
         cell = self.ds.cell
-        dim = self.node.shape[1] 
+        dim = self.node.shape[1]
         if index is None:
             v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
             v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
@@ -650,7 +662,7 @@ class TriangleMesh(Mesh2d):
     def cell_area(self, index=None):
         node = self.node
         cell = self.ds.cell
-        dim = self.node.shape[1] 
+        dim = self.node.shape[1]
         if index is None:
             v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
             v2 = node[cell[:, 2], :] - node[cell[:, 0], :]

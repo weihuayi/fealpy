@@ -6,7 +6,6 @@ from types import ModuleType
 
 class Mesh2d():
     """ The base class of TriangleMesh and QuadrangleMesh
-        
         The class is just a abstract class, and you can not use it directly.
     """
     def number_of_nodes(self):

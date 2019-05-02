@@ -19,9 +19,9 @@ from fealpy.tools.show import showmultirate
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=2, meshtype='tri')
 
-maxit = 2 
+maxit = 40
 theta = 0.2
-k = maxit - 15
+k = maxit - 5
 p = 1
 q = 3
 errorType = ['$|| u_I - u_h ||_{l_2}$',
@@ -32,6 +32,10 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+
+mesh.add_plot(plt)
+plt.savefig('/home/why/result/test-0.png')
+plt.close()
 
 for i in range(maxit):
     print('step:', i)
@@ -46,9 +50,11 @@ for i in range(maxit):
     eta = fem.recover_estimate(rguh)
     errorMatrix[3, i] = fem.get_recover_error(rguh)
     if i < maxit - 1:
-        isMarkedCell = mark(eta, theta=theta)
-        A = mesh.bisect_1(isMarkedCell, returnim=True)
-        print(A.toarray())
+        # isMarkedCell = mark(eta, theta=theta)
+        mesh.adaptive_bisect_1(eta)
+        mesh.add_plot(plt)
+        plt.savefig('/home/why/result/test-' + str(i+1) + '.png')
+        plt.close()
 
 fig = plt.figure()
 axes = fig.gca()
