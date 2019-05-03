@@ -95,6 +95,11 @@ class Quadtree(QuadrangleMesh):
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
+        elif isinstance(options['method'], float):
+            val = options['method']
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/val)
+                )
         else:
             raise ValueError(
                     "I don't know anyting about method %s!".format(
