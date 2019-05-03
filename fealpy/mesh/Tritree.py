@@ -43,6 +43,277 @@ class Tritree(TriangleMesh):
             isMarked = eta < theta*ep
         return isMarked
 
+    def adaptive(
+            self, eta,
+            data=None,
+            maxrefine=3,
+            maxcoarsen=0,
+            theta=1.0,
+            method='mean'):
+
+        leafCellIdx = self.leaf_cell_index()
+        NC = self.number_of_cells()
+        if 'idxmap' in self.celldata.keys():
+            eta0 = np.zeros(NC, dtype=self.ftype)
+            idxmap = self.celldata['idxmap']
+            np.add.at(eta0, idxmap, eta)
+            eta = eta0[leafCellIdx]
+        numrefine = np.zeros(NC, dtype=np.int8)
+
+        if method is 'mean':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.mean(eta))))
+        elif method is 'max':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.max(eta))))
+        elif method is 'median':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.median(eta))))
+        elif method is 'min':
+            numrefine[leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.min(eta))))
+        else:
+            raise ValueError(
+                    "I don't know anyting about method %s!".format(method))
+        numrefine[numrefine > maxrefine] = maxrefine
+
+        # refine
+        print("Number of cells before:", NC)
+        isMarkedCell = (numrefine > 0)
+        while sum(isMarkedCell) > 0:
+            numrefine = self.refine_1(
+                    isMarkedCell=isMarkedCell,
+                    numrefine=numrefine,
+                    data=data
+                )
+            print("Number of cells after refine:", self.number_of_cells())
+            isMarkedCell = (numrefine > 0)
+
+        # coarsen
+        if maxcoarsen > 0:
+            numrefine[numrefine < -maxcoarsen] = -maxcoarsen
+            isMarkedCell = (numrefine < 0)
+            while sum(isMarkedCell) > 0:
+                NN0 = self.number_of_cells()
+                numrefine = self.coarsen_1(
+                        isMarkedCell=isMarkedCell,
+                        numrefine=numrefine,
+                        data=data
+                    )
+                NN = self.number_of_cells()
+                if NN == NN0:
+                    break
+                print("Number of cells after coarsen:", self.number_of_cells())
+                isMarkedCell = (numrefine < 0)
+
+    def refine_1(
+            self,
+            isMarkedCell=None,
+            numrefine=None,
+            data=None,
+            surface=None):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        if isMarkedCell is None:
+            idx = self.leaf_cell_index()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[idx] = True
+
+        if sum(isMarkedCell) > 0:
+            # Prepare data
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+
+            # expand the marked cell
+            isLeafCell = self.is_leaf_cell()
+            edge2cell = self.ds.edge_to_cell()
+            flag0 = isLeafCell[edge2cell[:, 0]] & (
+                    ~isLeafCell[edge2cell[:, 1]])
+            flag1 = isLeafCell[edge2cell[:, 1]] & (
+                    ~isLeafCell[edge2cell[:, 0]])
+
+            LCell = edge2cell[flag0, 0]
+            RCell = edge2cell[flag1, 1]
+            idx0 = self.localEdge2childCell[edge2cell[flag0, 3]]
+            if len(idx0) > 0:
+                idx0 = self.child[edge2cell[flag0, [1]].reshape(-1, 1), idx0]
+
+            idx1 = self.localEdge2childCell[edge2cell[flag1, 2]]
+            if len(idx1) > 0:
+                idx1 = self.child[edge2cell[flag1, [0]].reshape(-1, 1), idx1]
+
+            # TODO: add support for  general k irregular rule case 
+            assert self.irule == 1
+            cell2cell = self.ds.cell_to_cell()
+            isCell0 = isMarkedCell | (~isLeafCell)
+            isCell1 = isLeafCell & (~isMarkedCell)
+            flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
+            flag2 = ((~isMarkedCell[LCell]) & isLeafCell[LCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+            flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+            while np.any(flag) | np.any(flag2) | np.any(flag3):
+                isMarkedCell[flag] = True
+                isMarkedCell[LCell[flag2]] = True
+                isMarkedCell[RCell[flag3]] = True
+                isCell0 = isMarkedCell | (~isLeafCell)
+                isCell1 = isLeafCell & (~isMarkedCell)
+                flag = (isCell1) & (np.sum(isCell0[cell2cell], axis=1) > 1)
+                flag2 = ((~isMarkedCell[LCell]) & isLeafCell[LCell]) & (isMarkedCell[idx0[:, 0]] | isMarkedCell[idx0[:, 1]])
+                flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
+
+            cell2edge = self.ds.cell_to_edge()
+            refineFlag = np.zeros(NE, dtype=np.bool)
+            refineFlag[cell2edge[isMarkedCell]] = True
+            refineFlag[flag0 | flag1] = False
+
+            NNN = refineFlag.sum()
+            edge2newNode = np.zeros(NE, dtype=self.itype)
+            edge2newNode[refineFlag] = NN + np.arange(NNN)
+
+            edge2newNode[flag0] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
+            edge2newNode[flag1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
+
+            # red cell
+            idx, = np.where(isMarkedCell)
+            NCC = len(idx)
+            cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
+            child4 = -np.ones((4*NCC, 4), dtype=self.itype)
+            parent4 = -np.ones((4*NCC, 2), dtype=self.itype)
+            cell4[:NCC, 0] = cell[isMarkedCell, 0]
+            cell4[:NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 2]]
+            cell4[:NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 1]]
+            parent4[:NCC, 0] = idx
+            parent4[:NCC, 1] = 0
+            self.child[idx, 0] = NC + np.arange(0, NCC)
+
+            cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1]
+            cell4[NCC:2*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 0]]
+            cell4[NCC:2*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 2]]
+            parent4[NCC:2*NCC, 0] = idx
+            parent4[NCC:2*NCC, 1] = 1
+            self.child[idx, 1] = NC + np.arange(NCC, 2*NCC)
+
+            cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2]
+            cell4[2*NCC:3*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 1]]
+            cell4[2*NCC:3*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 0]]
+            parent4[2*NCC:3*NCC, 0] = idx
+            parent4[2*NCC:3*NCC, 1] = 2
+            self.child[idx, 2] = NC + np.arange(2*NCC, 3*NCC)
+
+            cell4[3*NCC:4*NCC, 0] = edge2newNode[cell2edge[isMarkedCell, 0]]
+            cell4[3*NCC:4*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 1]]
+            cell4[3*NCC:4*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 2]]
+            parent4[3*NCC:4*NCC, 0] = idx
+            parent4[3*NCC:4*NCC, 1] = 3
+            self.child[idx, 3] = NC + np.arange(3*NCC, 4*NCC)
+            ec = self.entity_barycenter('edge', refineFlag)
+
+            if numrefine is not None:
+                num = numrefine[idx] - 1
+                newCellRefine = np.zeros(4*NCC)
+                newCellRefine[:NCC] = num
+                newCellRefine[NCC:2*NCC] = num
+                newCellRefine[2*NCC:3*NCC] = num
+                newCellRefine[3*NCC:] = num
+                numrefine[idx] = 0
+                numrefine = np.r_[numrefine, newCellRefine]
+
+            if data is not None:
+                I = cell[edge2cell[refineFlag, 0], edge2cell[refineFlag, 2]]
+                J = cell[edge2cell[refineFlag, 1], edge2cell[refineFlag, 3]]
+                for key, value in data.items():
+                    t = (3*value[edge[refineFlag, 0]]
+                            + 3*value[edge[refineFlag, 1]]
+                            + value[I] + value[J])/8
+                    data[key] = np.r_['0', value, t]
+
+            if surface is not None:
+                ec, _ = surface.project(ec)
+
+            self.node = np.r_['0', node, ec]
+            cell = np.r_['0', cell, cell4]
+            self.parent = np.r_['0', self.parent, parent4]
+            self.child = np.r_['0', self.child, child4]
+            self.ds.reinit(NN + NNN, cell)
+
+        if numrefine is not None:
+            return numrefine
+
+    def coarsen_1(
+            self,
+            isMarkedCell=None,
+            numrefine=None,
+            data=None):
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        if isMarkedCell is None:
+            idx = self.leaf_cell_index()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[idx] = True
+
+        if sum(isMarkedCell) > 0:
+            node = self.entity('node')
+            cell = self.entity('cell')
+
+            parent = self.parent
+            child = self.child
+
+            isRootCell = self.is_root_cell()
+            isLeafCell = self.is_leaf_cell()
+
+            isNotLeafCell = ~isLeafCell
+
+            isMarkedCell[isRootCell] = False
+
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            isMarkedParentCell[parent[isMarkedCell, 0]] = True
+
+            cell2cell = self.ds.cell_to_cell()
+            while True:
+                flag = (~isMarkedParentCell[cell2cell]) & isNotLeafCell[cell2cell]
+                flag = flag.sum(axis=-1) > 1
+                if isMarkedParentCell[flag].sum() > 0:
+                    isMarkedParentCell[flag] = False
+                else:
+                    break
+
+            isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
+            isNeedRemovedCell[child[isMarkedParentCell, :]] = True
+
+            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode[cell[~isNeedRemovedCell, :]] = True
+
+            cell = cell[~isNeedRemovedCell]
+            child = child[~isNeedRemovedCell]
+            parent = parent[~isNeedRemovedCell]
+
+            childIdx, = np.nonzero(child[:, 0] > -1)
+            isNewLeafCell = np.sum(
+                    ~isNeedRemovedCell[child[childIdx, :]], axis=1
+                ) == 0
+            child[childIdx[isNewLeafCell], :] = -1
+
+            cellIdxMap = np.zeros(NC, dtype=np.int)
+            NNC = (~isNeedRemovedCell).sum()
+            cellIdxMap[~isNeedRemovedCell] = np.arange(NNC)
+            child[child > -1] = cellIdxMap[child[child > -1]]
+            parent[parent > -1] = cellIdxMap[parent[parent > -1]]
+            self.child = child
+            self.parent = parent
+
+            nodeIdxMap = np.zeros(NN, dtype=np.int)
+            NN = isRemainNode.sum()
+            nodeIdxMap[isRemainNode] = np.arange(NN)
+            cell = nodeIdxMap[cell]
+            self.node = node[isRemainNode]
+            self.ds.reinit(NN, cell)
+            return isRemainNode
+        else:
+            return
+        pass
+
     def adaptive_refine(self, estimator, surface=None, data=None):
         i = 0
         if data is not None:
@@ -227,14 +498,14 @@ class Tritree(TriangleMesh):
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
-    
+
     def coarsen(self, isMarkedCell, data=None):
         if sum(isMarkedCell) > 0:
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
             node = self.entity('node')
             cell = self.entity('cell')
-            
+
             parent = self.parent
             child = self.child
 

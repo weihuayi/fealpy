@@ -56,7 +56,8 @@ class Quadtree(QuadrangleMesh):
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
-            method='mean'):
+            method='mean',
+            crho=None):
 
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
@@ -77,6 +78,11 @@ class Quadtree(QuadrangleMesh):
         else:
             raise ValueError(
                     "I don't know anyting about method %s!".format(method))
+
+        if crho is not None:
+            cellrho = np.zeros(NC, dtype=np.float)
+            cellrho[leafCellIdx] = crho
+            numrefine[(cellrho < 0.1) & (numrefine > 0)] = 0
         numrefine[numrefine > maxrefine] = maxrefine
         numrefine[numrefine < -maxcoarsen] = -maxcoarsen
 
@@ -186,12 +192,12 @@ class Quadtree(QuadrangleMesh):
             cc = np.arange(N + NEC, N + NEC + NCC).reshape(-1, 1)
 
             if numrefine is not None:
-                num = numrefine[isNeedCutCell]
+                num = numrefine[isNeedCutCell] - 1
                 newCellRefine = np.zeros(4*NCC)
-                newCellRefine[0::4] = num - 1
-                newCellRefine[1::4] = num - 1
-                newCellRefine[2::4] = num - 1
-                newCellRefine[3::4] = num - 1
+                newCellRefine[0::4] = num
+                newCellRefine[1::4] = num
+                newCellRefine[2::4] = num
+                newCellRefine[3::4] = num
                 numrefine[isNeedCutCell] = 0
                 numrefine = np.r_[numrefine, newCellRefine]
 

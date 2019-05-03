@@ -65,9 +65,9 @@ for i in range(maxit):
     errorMatrix[0, i] = vem.l2_error()
     errorMatrix[1, i] = vem.uIuh_error()
     errorMatrix[2, i] = vem.L2_error()
+
     if m == 1:
-        errorMatrix[3, i] = vem.H1_semi_error_Kellogg()
-        errorMatrix[3, i] = vem.H1_semi_error()
+        errorMatrix[3, i] = vem.H1_semi_error_Kellogg_1()
     else:
         errorMatrix[3, i] = vem.H1_semi_error()
 

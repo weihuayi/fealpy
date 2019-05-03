@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from ..functionspace.vem_space import VirtualElementSpace2d 
+from ..functionspace.vem_space import VirtualElementSpace2d
 from ..solver import solve
 from ..boundarycondition import DirichletBC
 from ..vem import doperator
@@ -229,7 +229,45 @@ class PoissonVEMModel():
         e = self.integralalg.L2_error(gu, guh)
         return e
 
+    def L2_error_Kellogg(self):
+        u = self.pde.solution
+        S = self.project_to_smspace(self.uh)
+        uh = S.value
+        e = self.integralalg.L2_error(u, uh, celltype=True)
+
+        NC = self.mesh.number_of_cells()
+        NV = self.mesh.number_of_nodes_of_cells()
+
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+        isOrgin = (np.sum(node == 0.0, axis=-1) == 2)
+        flag = np.zeros(NC, dtype=np.int)
+        idx = np.repeat(range(NC), NV)
+        np.add.at(flag, idx, isOrgin[cell])
+        isBadCell = (flag > 0)
+        e = np.sqrt(np.sum(e[~isBadCell]**2))
+        return e
+
     def H1_semi_error_Kellogg(self):
+        gu = self.pde.gradient
+        S = self.project_to_smspace(self.uh)
+        guh = S.grad_value
+        e = self.integralalg.L2_error(gu, guh, celltype=True)
+
+        NC = self.mesh.number_of_cells()
+        NV = self.mesh.number_of_nodes_of_cells()
+
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+        isOrgin = (np.sum(node == 0.0, axis=-1) == 2)
+        flag = np.zeros(NC, dtype=np.int)
+        idx = np.repeat(range(NC), NV)
+        np.add.at(flag, idx, isOrgin[cell])
+        isBadCell = (flag > 0)
+        e = np.sqrt(np.sum(e[~isBadCell]**2))
+        return e
+
+    def H1_semi_error_Kellogg_1(self):
         """
 
         """
