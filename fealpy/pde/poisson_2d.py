@@ -2,6 +2,7 @@ import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Quadtree import Quadtree
+from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 
 
@@ -26,8 +27,13 @@ class ffData:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
+        elif meshtype is 'tritree':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = Tritree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
         else:
-            raise ValueError("".format)
+            raise ValueError("I don't know the meshtype %s".format(meshtype))
 
     def solution(self, p):
         x = p[..., 0]
@@ -219,9 +225,20 @@ class LShapeRSinData:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
+        elif meshtype is 'tritree':
+            cell = np.array([
+                (1, 3, 0),
+                (2, 0, 3),
+                (3, 6, 2),
+                (5, 2, 6),
+                (4, 7, 3),
+                (6, 3, 7)], dtype=np.int)
+            mesh = Tritree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
         else:
-            raise ValueError("".format)
-    
+            raise ValueError("I don't know the meshtype %s".format(meshtype))
+ 
     def domain(self, n):
         pass
 
@@ -270,27 +287,27 @@ class CrackData:
     def init_mesh(self, n=4, meshtype='quadtree'):
         if meshtype is 'quadtree':
             r = 1-2**(1/2)/2
-            a = 1/2 - 2**(1/2)/2 
+            a = 1/2 - 2**(1/2)/2
             rr = 1/2
-            point = np.array([
+            node = np.array([
                 (0, -1),
                 (-rr, -rr),
                 (rr, -rr),
                 (-r, -r),
-                (0, -r), 
+                (0, -r),
                 (r, -r),
                 (-1, 0),
                 (-r, 0),
                 (0, 0),
                 (r, 0),
-                (1, 0), 
+                (1, 0),
                 (r, 0),
                 (-r, r),
                 (0, r),
                 (r, r),
-                (-rr,rr),
-                (rr,rr),
-                (0,1)],dtype=np.float)
+                (-rr, rr),
+                (rr, rr),
+                (0, 1)], dtype=np.float)
             cell = np.array([
                 (0, 4, 3, 1),
                 (2, 5, 4, 0),
@@ -302,13 +319,13 @@ class CrackData:
                 (7, 8, 13, 12),
                 (8, 11, 14, 13),
                 (11, 10, 16, 14),
-                (12, 13, 17, 15),    
+                (12, 13, 17, 15),
                 (13, 14, 16, 17)], dtype=np.int)
-            mesh = Quadtree(point, cell)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':
-            point = np.array([
+            node = np.array([
                 (0, -1),
                 (-1, 0),
                 (0, 0),
@@ -321,11 +338,29 @@ class CrackData:
                 (2, 0, 3),
                 (2, 5, 1),
                 (2, 4, 5)], dtype=np.int)
-            mesh = TriangleMesh(point, cell)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tritree':
+            node = np.array([
+                (0, -1),
+                (-1, 0),
+                (0, 0),
+                (1, 0),
+                (1, 0),
+                (0, 1)], dtype=np.float)
+
+            cell = np.array([
+                (2, 1, 0),
+                (2, 0, 3),
+                (2, 5, 1),
+                (2, 4, 5)], dtype=np.int)
+            mesh = Tritree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         else:
-            raise ValueError("".format)
+            raise ValueError("I don't know the meshtype %s".format(meshtype))
+
     def domain(self, n):
         pass 
 

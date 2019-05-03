@@ -17,11 +17,10 @@ from fealpy.mesh.adaptive_tools import mark
 from fealpy.tools.show import showmultirate
 
 pde = LShapeRSinData()
-mesh = pde.init_mesh(n=2, meshtype='tri')
+mesh = pde.init_mesh(n=4, meshtype='tri')
 
-maxit = 40
-theta = 0.2
-k = maxit - 5
+maxit = 60
+k = maxit - 15
 p = 1
 q = 3
 errorType = ['$|| u_I - u_h ||_{l_2}$',
@@ -43,15 +42,16 @@ for i in range(maxit):
     fem.solve()
     uh = fem.uh
     Ndof[i] = fem.mesh.number_of_nodes()
-    errorMatrix[0, i] = fem.get_l2_error()
-    errorMatrix[1, i] = fem.get_L2_error()
-    errorMatrix[2, i] = fem.get_H1_error()
+    errorMatrix[0, i] = fem.l2_error()
+    errorMatrix[1, i] = fem.L2_error()
+    errorMatrix[2, i] = fem.H1_semi_error()
     rguh = ralg.harmonic_average(uh)
     eta = fem.recover_estimate(rguh)
     errorMatrix[3, i] = fem.get_recover_error(rguh)
     if i < maxit - 1:
         # isMarkedCell = mark(eta, theta=theta)
-        mesh.adaptive_bisect_1(eta)
+        options = mesh.adaptive_options(method='max', theta=0.5)
+        mesh.adaptive(eta, options)
         mesh.add_plot(plt)
         plt.savefig('/home/why/result/test-' + str(i+1) + '.png')
         plt.close()
@@ -59,5 +59,5 @@ for i in range(maxit):
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+showmultirate(plt, k, Ndof, errorMatrix, errorType)
 plt.show()

@@ -43,78 +43,90 @@ class Quadtree(QuadrangleMesh):
         else:
             return self.parent[idx, 0] == -1
 
-    def uniform_refine(self, r=1):
-        for i in range(r):
-            self.refine()
-
     def sizing_adaptive(self, eta):
         pass
 
-    def adaptive(
-            self, eta,
-            data=None,
+    def adaptive_options(
+            self,
+            method='mean',
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
-            method='mean',
-            crho=None):
+            data=None,
+            HB=None,
+            imatrix=False,
+            disp=True,
+            ):
 
+        options = {
+                'method': method,
+                'maxrefine': maxrefine,
+                'maxcoarsen': maxcoarsen,
+                'theta': theta,
+                'data': data,
+                'HB': HB,
+                'imatrix': imatrix,
+                'disp': disp
+            }
+        return options
+
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            self.refine_1()
+
+    def adaptive(self, eta, options):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
-        numrefine = np.zeros(NC, dtype=np.int8)
-
-        if method is 'mean':
-            numrefine[leafCellIdx] = np.around(
-                    np.log2(eta/(theta*np.mean(eta))))
-        elif method is 'max':
-            numrefine[leafCellIdx] = np.around(
-                    np.log2(eta/(theta*np.max(eta))))
-        elif method is 'median':
-            numrefine[leafCellIdx] = np.around(
-                    np.log2(eta/(theta*np.median(eta))))
-        elif method is 'min':
-            numrefine[leafCellIdx] = np.around(
-                    np.log2(eta/(theta*np.min(eta))))
+        options['numrefine'] = np.zeros(NC, dtype=np.int8)
+        theta = options['theta']
+        if options['method'] is 'mean':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.mean(eta)))
+                )
+        elif options['method'] is 'max':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.max(eta)))
+                )
+        elif options['method'] is 'median':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.median(eta)))
+                )
+        elif options['method'] is 'min':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.min(eta)))
+                )
         else:
             raise ValueError(
-                    "I don't know anyting about method %s!".format(method))
+                    "I don't know anyting about method %s!".format(
+                        options['method']))
 
-        if crho is not None:
-            cellrho = np.zeros(NC, dtype=np.float)
-            cellrho[leafCellIdx] = crho
-            numrefine[(cellrho < 0.1) & (numrefine > 0)] = 0
-        numrefine[numrefine > maxrefine] = maxrefine
-        numrefine[numrefine < -maxcoarsen] = -maxcoarsen
+        flag = options['numrefine'] > options['maxrefine']
+        options['numrefine'][flag] = options['maxrefine']
+        flag = options['numrefine'] < -options['maxcoarsen']
+        options['numrefine'][flag] = -options['maxcoarsen']
 
         # refine
+        NC = self.number_of_cells()
         print("Number of cells before:", NC)
-        isMarkedCell = (numrefine > 0)
+        isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
-            numrefine = self.refine_1(
-                    isMarkedCell=isMarkedCell,
-                    numrefine=numrefine,
-                    data=data
-                )
+            self.refine_1(isMarkedCell, options)
             print("Number of cells after refine:", self.number_of_cells())
-            isMarkedCell = (numrefine > 0)
+            isMarkedCell = (options['numrefine'] > 0)
 
         # coarsen
-        if maxcoarsen > 0:
-            isMarkedCell = (numrefine < 0)
+        if options['maxcoarsen'] > 0:
+            isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
-                numrefine = self.coarsen_1(
-                        isMarkedCell=isMarkedCell,
-                        numrefine=numrefine,
-                        data=data
-                    )
+                self.coarsen_1(isMarkedCell, options)
                 NN = self.number_of_cells()
                 if NN == NN0:
                     break
                 print("Number of cells after coarsen:", self.number_of_cells())
-                isMarkedCell = (numrefine < 0)
+                isMarkedCell = (options['numrefine'] < 0)
 
-    def refine_1(self, isMarkedCell=None, numrefine=None, data=None):
+    def refine_1(self, isMarkedCell=None, options={'disp': True}):
         if isMarkedCell is None:
             # 默认加密所有的叶子单元
             idx = self.leaf_cell_index()
@@ -175,31 +187,30 @@ class Quadtree(QuadrangleMesh):
             edgeCenter = 0.5*np.sum(node[edge[isNeedCutEdge]], axis=1)
             cellCenter = self.entity_barycenter('cell', isNeedCutCell)
 
-            if data is not None:
+            if ('data' in options) and (options['data'] is not None):
                 isNeedCutEdge = (~isCuttedEdge) & isCutEdge
-                for key, value in data.items():
+                for key, value in options['data'].items():
                     evalue = 0.5*np.sum(value[edge[isNeedCutEdge]], axis=1)
                     cvalue = np.sum(value[cell[isNeedCutCell]], axis=1)/4
-                    data[key] = np.concatenate((value, evalue, cvalue), axis=0)
+                    options['data'][key] = np.concatenate((value, evalue, cvalue), axis=0)
 
             NEC = len(edgeCenter)
             NCC = len(cellCenter)
-
             edge2center[isNeedCutEdge] = np.arange(N, N+NEC)
 
             cp = [cell[isNeedCutCell, i].reshape(-1, 1) for i in range(4)]
             ep = [edge2center[cell2edge[isNeedCutCell, i]].reshape(-1, 1) for i in range(4)]
             cc = np.arange(N + NEC, N + NEC + NCC).reshape(-1, 1)
 
-            if numrefine is not None:
-                num = numrefine[isNeedCutCell] - 1
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                num = options['numrefine'][idx] - 1
                 newCellRefine = np.zeros(4*NCC)
                 newCellRefine[0::4] = num
                 newCellRefine[1::4] = num
                 newCellRefine[2::4] = num
                 newCellRefine[3::4] = num
-                numrefine[isNeedCutCell] = 0
-                numrefine = np.r_[numrefine, newCellRefine]
+                options['numrefine'][idx] = 0
+                options['numrefine'] = np.r_[options['numrefine'], newCellRefine]
 
             newCell = np.zeros((4*NCC, 4), dtype=self.itype)
             newChild = -np.ones((4*NCC, 4), dtype=self.itype)
@@ -222,10 +233,7 @@ class Quadtree(QuadrangleMesh):
             self.child = np.concatenate((child, newChild), axis=0)
             self.ds.reinit(N + NEC + NCC, cell)
 
-        if numrefine is not None:
-            return numrefine
-
-    def coarsen_1(self, isMarkedCell=None, numrefine=None, data=None):
+    def coarsen_1(self, isMarkedCell=None, options={'disp': True}):
         """ marker will marke the leaf cells which will be coarsen
         """
         isRootCell = self.is_root_cell()
@@ -251,9 +259,9 @@ class Quadtree(QuadrangleMesh):
 
             node = self.node
             cell = self.ds.cell
-            if numrefine is not None:
-                numrefine[idx] = np.max(
-                        numrefine[child[idx]], axis=-1
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'][idx] = np.max(
+                        options['numrefine'][child[idx]], axis=-1
                     ) + 1
 
             isRemainCell = np.ones(NC, dtype=np.bool)
@@ -289,15 +297,12 @@ class Quadtree(QuadrangleMesh):
             self.node = node[isRemainNode]
             self.ds.reinit(N, cell)
 
-            if numrefine is not None:
-                numrefine = numrefine[isRemainCell]
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'] = options['numrefine'][isRemainCell]
 
-            if data is not None:
-                for key, value in data.items():
-                    data[key] = value[isRemainNode]
-
-        if numrefine is not None:
-            return numrefine
+            if ('data' in options) and (options['data'] is not None):
+                for key, value in options['data'].items():
+                    options['data'][key] = value[isRemainNode]
 
     def adaptive_refine(self, estimator, data=None):
         i = 0

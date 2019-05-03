@@ -62,11 +62,11 @@ class PoissonFEMModel(object):
 
         return ls  # return the linear system
 
-    def get_l2_error(self):
+    def l2_error(self):
         e = self.uh - self.uI
         return np.sqrt(np.mean(e**2))
 
-    def get_L2_error(self, uh=None):
+    def L2_error(self, uh=None):
         u = self.pde.solution
         if uh is None:
             uh = self.uh.value
@@ -75,7 +75,7 @@ class PoissonFEMModel(object):
         L2 = self.integralalg.L2_error(u, uh)
         return L2
 
-    def get_H1_error(self, uh=None):
+    def H1_semi_error(self, uh=None):
         gu = self.pde.gradient
         if uh is None:
             guh = self.uh.grad_value
@@ -84,7 +84,7 @@ class PoissonFEMModel(object):
         H1 = self.integralalg.L2_error(gu, guh)
         return H1
 
-    def get_recover_error(self, rguh):
+    def recover_error(self, rguh):
         gu = self.pde.gradient
         guh = rguh.value
         mesh = self.mesh

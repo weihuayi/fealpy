@@ -385,7 +385,81 @@ class TriangleMesh(Mesh2d):
         if rflag == True:
             self.ds.construct()
 
-    def bisect_1(self, isMarkedCell=None, numrefine=None, returnim=False):
+    def adaptive_options(
+            self,
+            method='mean',
+            maxrefine=5,
+            maxcoarsen=0,
+            theta=1.0,
+            HB=None,
+            imatrix=False,
+            data=None,
+            disp=True,
+            ):
+
+        options = {
+                'method': method,
+                'maxrefine': maxrefine,
+                'maxcoarsen': maxcoarsen,
+                'theta': theta,
+                'data': data,
+                'HB': HB,
+                'imatrix': imatrix,
+                'disp': disp
+            }
+        return options
+
+
+    def adaptive(self, eta, options):
+        theta = options['theta']
+        if options['method'] is 'mean':
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*np.mean(eta)))
+                )
+        elif options['method'] is 'max':
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*np.max(eta)))
+                )
+        elif options['method'] is 'median':
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*np.median(eta)))
+                )
+        elif options['method'] is 'min':
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*np.min(eta)))
+                )
+        else:
+            raise ValueError(
+                    "I don't know anyting about method %s!".format(options['method']))
+
+        flag = options['numrefine'] > options['maxrefine']
+        options['numrefine'][flag] = options['maxrefine']
+        flag = options['numrefine'] < -options['maxcoarsen']
+        options['numrefine'][flag] = -options['maxcoarsen']
+
+        # refine
+        NC = self.number_of_cells()
+        print("Number of cells before:", NC)
+        isMarkedCell = (options['numrefine'] > 0)
+        while sum(isMarkedCell) > 0:
+            self.bisect_1(isMarkedCell, options)
+            print("Number of cells after refine:", self.number_of_cells())
+            isMarkedCell = (options['numrefine'] > 0)
+
+        # coarsen
+        if options['maxcoarsen'] > 0:
+            isMarkedCell = (options['numrefine'] < 0)
+            while sum(isMarkedCell) > 0:
+                NN0 = self.number_of_cells()
+                self.coarsen_1(isMarkedCell, options)
+                NN = self.number_of_cells()
+                if NN == NN0:
+                    break
+                print("Number of cells after coarsen:", self.number_of_cells())
+                isMarkedCell = (options['numrefine'] < 0)
+
+    def bisect_1(self, isMarkedCell=None, options={'disp': True}):
+
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
@@ -401,8 +475,8 @@ class TriangleMesh(Mesh2d):
         node = np.zeros((5*NN, GD), dtype=self.ftype)
         cell = np.zeros((2*NC, 3), dtype=self.itype)
 
-        if numrefine is not None:
-            numrefine = np.r_[numrefine, np.zeros(NC)]
+        if ('numrefine' in options) and (options['numrefine'] is not None):
+            options['numrefine'] = np.r_[options['numrefine'], np.zeros(NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
@@ -494,9 +568,9 @@ class TriangleMesh(Mesh2d):
             cell[NC:NC+nMarked, 1] = p2
             cell[NC:NC+nMarked, 2] = p0
 
-            if numrefine is not None:
-                numrefine[markedCell] -= 1
-                numrefine[NC:NC+nMarked] = numrefine[markedCell]
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'][markedCell] -= 1
+                options['numrefine'][NC:NC+nMarked] = options['numrefine'][markedCell]
 
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3
@@ -522,7 +596,7 @@ class TriangleMesh(Mesh2d):
             nonConforming[checkEdge] = False
             nonConforming[checkEdge[j]] = True;
 
-        if returnim is True:
+        if ('imatrix' in options) and (options['imatrix'] is True):
             nn = NN - NN0
             IM = coo_matrix(
                     (
@@ -564,21 +638,17 @@ class TriangleMesh(Mesh2d):
                             cutEdge[:, [0, 1]].flat
                         )
                     ), shape=(NN, NN0), dtype=self.ftype)
+            options['imatrix'] = IM.tocsr()
 
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
 
-        if numrefine is not None:
-            return numrefine[:NC]
+
+    def coarsen_1(self, isMarkedCell=None, options=None):
+        pass
 
 
-    def adaptive_bisect_1(self, eta):
-        numrefine = np.around(np.log2(eta/np.mean(eta)))
-        isMarkedCell = (numrefine > 0)
-        while sum(isMarkedCell) > 0:
-            numrefine = self.bisect_1(isMarkedCell, numrefine=numrefine)
-            isMarkedCell = (numrefine > 0)
 
     def grad_lambda(self):
         node = self.node
@@ -609,7 +679,7 @@ class TriangleMesh(Mesh2d):
         Return
         ------
         J : numpy.array
-            `J` is the transpose o  jacobi matrix of each cell. 
+            `J` is the transpose o  jacobi matrix of each cell.
             The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
         """
         node = self.node

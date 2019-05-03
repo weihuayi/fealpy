@@ -12,9 +12,6 @@ m = 2
 p = 1
 q = 3
 maxit = 10
-maxrefine = 3
-theta = 1.0
-method = 'mean'
 k = maxit - 5
 
 if m == 1:
@@ -70,12 +67,8 @@ for i in range(maxit):
 
     errorMatrix[4, i] = np.sqrt(np.sum(eta**2))
     if i < maxit - 1:
-        quadtree.adaptive(
-                eta,
-                maxrefine=maxrefine,
-                theta=theta,
-                method=method
-                )
+        options = quadtree.adaptive_options()
+        quadtree.adaptive(eta, options)
         mesh = quadtree.to_pmesh()
 
 mesh.add_plot(plt, showaxis=True)
