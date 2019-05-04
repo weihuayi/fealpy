@@ -865,6 +865,3 @@ class TriangleMeshWithInfinityNode:
             currentIdx += 1
 
         return pnode, pcell, pcellLocation
-
-    
-

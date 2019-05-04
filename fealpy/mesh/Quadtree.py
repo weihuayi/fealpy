@@ -43,17 +43,14 @@ class Quadtree(QuadrangleMesh):
         else:
             return self.parent[idx, 0] == -1
 
-    def sizing_adaptive(self, eta):
-        pass
-
     def adaptive_options(
             self,
             method='mean',
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
-            maxsize=0.1,
-            minsize=1e-8,
+            maxsize=None,
+            minsize=None,
             data=None,
             HB=None,
             imatrix=False,
@@ -114,25 +111,57 @@ class Quadtree(QuadrangleMesh):
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
 
-        # refine
-        NC = self.number_of_cells()
         h = np.sqrt(self.entity_measure('cell'))
+        if options['minsize'] is not None:
+            flag = (0.5*h < options['minsize']) & (options['numrefine'] > 0)
+            options['numrefine'][flag] = 0
+
         if options['disp'] is True:
             print(
-                    'max size of cells: ', np.max(h),
-                    'min size of cells: ', np.min(h),
-                    'mean size of cells: ', np.mean(h),
-                    'median size of cells: ', np.median(h),
-                    'std size of cells: ', np.std(h)
+                    '\n',
+                    '\n number of cells: ', len(leafCellIdx),
+                    '\n max size of cells: ', np.max(h[leafCellIdx]),
+                    '\n min size of cells: ', np.min(h[leafCellIdx]),
+                    '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                    '\n median size of cells: ', np.median(h[leafCellIdx]),
+                    '\n std size of cells: ', np.std(h[leafCellIdx]),
+                    '\n max val of eta: ', np.max(eta),
+                    '\n min val of eta: ', np.min(eta),
+                    '\n mean val of eta: ', np.mean(eta),
+                    '\n median val of eta: ', np.median(eta),
+                    '\n std val of eta: ', np.std(eta)
                 )
+
+        # refine
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
             self.refine_1(isMarkedCell, options)
-            print("Number of cells after refine:", self.number_of_cells())
+
+            h = np.sqrt(self.entity_measure('cell'))
+            if options['minsize'] is not None:
+                flag = (0.5*h < options['minsize']) & (options['numrefine'] > 0)
+                options['numrefine'][flag] = 0
+
+            if options['disp'] is True:
+                leafCellIdx = self.leaf_cell_index()
+                print(
+                        '\n',
+                        '\n number of cells: ', len(leafCellIdx),
+                        '\n max size of cells: ', np.max(h[leafCellIdx]),
+                        '\n min size of cells: ', np.min(h[leafCellIdx]),
+                        '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                        '\n median size of cells: ', np.median(h[leafCellIdx]),
+                        '\n std size of cells: ', np.std(h[leafCellIdx])
+                    )
             isMarkedCell = (options['numrefine'] > 0)
 
         # coarsen
         if options['maxcoarsen'] > 0:
+            h = np.sqrt(self.entity_measure('cell'))
+            if options['maxsize'] is not None:
+                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                options['numrefine'][flag] = 0
+
             isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
@@ -140,7 +169,25 @@ class Quadtree(QuadrangleMesh):
                 NN = self.number_of_cells()
                 if NN == NN0:
                     break
-                print("Number of cells after coarsen:", self.number_of_cells())
+                h = np.sqrt(self.entity_measure('cell'))
+                if options['maxsize'] is not None:
+                    flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                    options['numrefine'][flag] = 0
+
+                if options['disp'] is True:
+                    leafCellIdx = self.leaf_cell_index()
+                    print(
+                            '\n',
+                            '\n number of cells: ', len(leafCellIdx),
+                            '\n max size of cells: ', np.max(h[leafCellIdx]),
+                            '\n min size of cells: ', np.min(h[leafCellIdx]),
+                            '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                            '\n median size of cells: ', np.median(h[leafCellIdx]),
+                            '\n std size of cells: ', np.std(h[leafCellIdx])
+                        )
+
+                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                options['numrefine'][flag] = 0
                 isMarkedCell = (options['numrefine'] < 0)
 
     def refine_1(self, isMarkedCell=None, options={'disp': True}):

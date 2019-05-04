@@ -42,10 +42,12 @@ class Tritree(TriangleMesh):
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
+            maxsize=None,
+            minsize=None,
             data=None,
             HB=None,
             imatrix=False,
-            disp=True,
+            disp=True
             ):
 
         options = {
@@ -53,6 +55,8 @@ class Tritree(TriangleMesh):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'maxsize': maxsize,
+                'minsize': minsize,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -60,12 +64,15 @@ class Tritree(TriangleMesh):
             }
         return options
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, surface=None):
         for i in range(n):
-            self.refine_1()
+            self.refine_1(surface=surface)
 
-    def adaptive(self, eta, options):
+    def adaptive(self, eta, options, surface=None):
+        """
+        """
         leafCellIdx = self.leaf_cell_index()
+
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys():
             eta0 = np.zeros(NC, dtype=self.ftype)
@@ -106,17 +113,57 @@ class Tritree(TriangleMesh):
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
 
+        h = np.sqrt(self.entity_measure('cell'))
+        if options['minsize'] is not None:
+            flag = (0.5*h < options['minsize']) & (options['numrefine'] > 0)
+            options['numrefine'][flag] = 0
+
+        if options['disp'] is True:
+            print(
+                    '\n',
+                    '\n number of cells: ', len(leafCellIdx),
+                    '\n max size of cells: ', np.max(h[leafCellIdx]),
+                    '\n min size of cells: ', np.min(h[leafCellIdx]),
+                    '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                    '\n median size of cells: ', np.median(h[leafCellIdx]),
+                    '\n std size of cells: ', np.std(h[leafCellIdx]),
+                    '\n max val of eta: ', np.max(eta),
+                    '\n min val of eta: ', np.min(eta),
+                    '\n mean val of eta: ', np.mean(eta),
+                    '\n median val of eta: ', np.median(eta),
+                    '\n std val of eta: ', np.std(eta)
+                )
+
         # refine
-        NC = self.number_of_cells()
-        print("Number of cells before:", NC)
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
-            self.refine_1(isMarkedCell, options)
-            print("Number of cells after refine:", self.number_of_cells())
+            self.refine_1(isMarkedCell, options, surface=surface)
+
+            h = np.sqrt(self.entity_measure('cell'))
+            if options['minsize'] is not None:
+                flag = (0.5*h < options['minsize']) & (options['numrefine'] > 0)
+                options['numrefine'][flag] = 0
+
+            if options['disp'] is True:
+                leafCellIdx = self.leaf_cell_index()
+                print(
+                        '\n',
+                        '\n number of cells: ', len(leafCellIdx),
+                        '\n max size of cells: ', np.max(h[leafCellIdx]),
+                        '\n min size of cells: ', np.min(h[leafCellIdx]),
+                        '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                        '\n median size of cells: ', np.median(h[leafCellIdx]),
+                        '\n std size of cells: ', np.std(h[leafCellIdx])
+                    )
             isMarkedCell = (options['numrefine'] > 0)
 
         # coarsen
         if options['maxcoarsen'] > 0:
+            h = np.sqrt(self.entity_measure('cell'))
+            if options['maxsize'] is not None:
+                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                options['numrefine'][flag] = 0
+
             isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
@@ -124,10 +171,32 @@ class Tritree(TriangleMesh):
                 NN = self.number_of_cells()
                 if NN == NN0:
                     break
-                print("Number of cells after coarsen:", self.number_of_cells())
+                h = np.sqrt(self.entity_measure('cell'))
+                if options['maxsize'] is not None:
+                    flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                    options['numrefine'][flag] = 0
+
+                if options['disp'] is True:
+                    leafCellIdx = self.leaf_cell_index()
+                    print(
+                            '\n',
+                            '\n number of cells: ', len(leafCellIdx),
+                            '\n max size of cells: ', np.max(h[leafCellIdx]),
+                            '\n min size of cells: ', np.min(h[leafCellIdx]),
+                            '\n mean size of cells: ', np.mean(h[leafCellIdx]),
+                            '\n median size of cells: ', np.median(h[leafCellIdx]),
+                            '\n std size of cells: ', np.std(h[leafCellIdx])
+                        )
+
+                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                options['numrefine'][flag] = 0
                 isMarkedCell = (options['numrefine'] < 0)
 
-    def refine_1(self, isMarkedCell=None, options={'disp': True}):
+    def refine_1(
+            self,
+            isMarkedCell=None,
+            options={'disp': True},
+            surface=None):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
@@ -241,8 +310,8 @@ class Tritree(TriangleMesh):
                     t = 0.5*(value[edge[refineFlag, 0]] + value[edge[refineFlag, 1]])
                     options['data'][key] = np.r_['0', value, t]
 
-            if ('surface' in options) and (options['surface'] is not None):
-                ec, _ = options['surface'].project(ec)
+            if surface is not None:
+                ec, _ = surface.project(ec)
 
             self.node = np.r_['0', node, ec]
             cell = np.r_['0', cell, cell4]
@@ -292,7 +361,10 @@ class Tritree(TriangleMesh):
             isRemainNode[cell[~isNeedRemovedCell, :]] = True
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
-                num = options['numrefine'][idx] - 1
+                options['numrefine'][isMarkedParentCell] = np.max(
+                        options['numrefine'][child[isMarkedParentCell]],
+                        axis=-1
+                    ) + 1
 
             cell = cell[~isNeedRemovedCell]
             child = child[~isNeedRemovedCell]
@@ -318,6 +390,13 @@ class Tritree(TriangleMesh):
             cell = nodeIdxMap[cell]
             self.node = node[isRemainNode]
             self.ds.reinit(NN, cell)
+
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'] = options['numrefine'][~isNeedRemovedCell]
+
+            if ('data' in options) and (options['data'] is not None):
+                for key, value in options['data'].items():
+                    options['data'][key] = value[isRemainNode]
 
     def adaptive_refine(self, estimator, surface=None, data=None):
         i = 0
