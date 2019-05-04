@@ -52,10 +52,12 @@ class Quadtree(QuadrangleMesh):
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
+            maxsize=0.1,
+            minsize=1e-8,
             data=None,
             HB=None,
             imatrix=False,
-            disp=True,
+            disp=True
             ):
 
         options = {
@@ -63,6 +65,8 @@ class Quadtree(QuadrangleMesh):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'maxsize': maxsize,
+                'minsize': minsize,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -112,7 +116,15 @@ class Quadtree(QuadrangleMesh):
 
         # refine
         NC = self.number_of_cells()
-        print("Number of cells before:", NC)
+        h = np.sqrt(self.entity_measure('cell'))
+        if options['disp'] is True:
+            print(
+                    'max size of cells: ', np.max(h),
+                    'min size of cells: ', np.min(h),
+                    'mean size of cells: ', np.mean(h),
+                    'median size of cells: ', np.median(h),
+                    'std size of cells: ', np.std(h)
+                )
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
             self.refine_1(isMarkedCell, options)

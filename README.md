@@ -33,6 +33,12 @@ which will create a soft link in `/usr/local/lib/python3.6/dist-packages/`.
 
 4. You can open `ipython3` from bash shell to test fealpy.
 
+5. If you want to upgrade numpy 
+
+```
+sudo -H pip3 --upgrade numpy
+```
+
 
 ## Windows: Anaconda
 
