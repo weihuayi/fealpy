@@ -33,7 +33,7 @@ class Mesh3d():
         return self.ds.number_of_faces_of_cells()
 
     def geo_dimension(self):
-        return self.node.shape[1] 
+        return self.node.shape[1]
 
     def top_dimension(self):
         return 3
@@ -81,15 +81,6 @@ class Mesh3d():
 
         return bc
 
-    def face_unit_normal(self):
-        face = self.ds.face
-        node = self.node
-        v01 = node[face[:, 1], :] - node[face[:, 0], :]
-        v02 = node[face[:, 2], :] - node[face[:, 0], :]
-        dim = self.node.shape[1] 
-        nv = np.cross(v01, v02)
-        length = np.sqrt(np.square(nv).sum(axis=1))
-        return nv/length.reshape(-1,1) 
 
     def edge_unit_tagent(self):
         edge = self.ds.edge

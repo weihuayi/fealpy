@@ -14,14 +14,23 @@ class Mesh2d():
     def number_of_edges(self):
         return self.ds.NE
 
+    def number_of_faces(self):
+        return self.ds.NE
+
     def number_of_cells(self):
         return self.ds.NC
 
-    def number_of_vertices_of_cells(self):
+    def number_of_nodes_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
     def number_of_edges_of_cells(self):
         return self.ds.number_of_edges_of_cells()
+
+    def number_of_faces_of_cells(self):
+        return self.ds.number_of_edges_of_cells()
+
+    def number_of_vertices_of_cells(self):
+        return self.ds.number_of_vertices_of_cells()
 
     def geo_dimension(self):
         return self.node.shape[1]
@@ -37,7 +46,7 @@ class Mesh2d():
                 bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
             else:
                 bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
-        elif etype in ['edge', 1]:
+        elif etype in ['edge', 'face', 1]:
             edge = self.ds.edge
             if index is None:
                 bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
@@ -56,7 +65,7 @@ class Mesh2d():
     def entity(self, etype=2):
         if etype in ['cell', 2]:
             return self.ds.cell
-        elif etype in ['edge', 1]:
+        elif etype in ['edge', 'face', 1]:
             return self.ds.edge
         elif etype in ['node', 0]:
             return self.node
@@ -66,7 +75,7 @@ class Mesh2d():
     def entity_measure(self, etype=2, index=None):
         if etype in ['cell', 2]:
             return self.cell_area(index)
-        elif etype in ['edge', 1]:
+        elif etype in ['edge', 'face', 1]:
             return self.edge_length(index)
         elif etype in ['node', 0]:
             return 0
@@ -81,7 +90,7 @@ class Mesh2d():
                 bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
             else:
                 bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
-        elif etype in ['edge', 1]:
+        elif etype in ['edge', 'face', 1]:
             edge = self.ds.edge
             if index is None:
                 bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
@@ -96,6 +105,40 @@ class Mesh2d():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
+
+    def face_unit_normal(self, index=None):
+        #TODO: 3D Case
+        v = self.face_unit_tagent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    def face_unit_tagent(self, index=None):
+        edge = self.ds.edge
+        node = self.node
+        NE = self.number_of_edges()
+        if index is None:
+            v = node[edge[:,1],:] - node[edge[:,0],:]
+            length = np.sqrt(np.sum(v**2,axis=1))
+            v /= length.reshape(-1, 1)
+        else:
+            v = node[edge[index,1],:] - node[edge[index,0],:]
+            length = np.sqrt(np.sum(v**2, axis=1))
+            v /= length.reshape(-1, 1)
+        return v
+
+    def face_normal(self, index=None):
+        v = self.face_tagent(index=index)
+        w = np.array([(0,-1),(1,0)])
+        return v@w
+
+    def face_tagent(self, index=None):
+        node = self.node
+        edge = self.ds.edge
+        if index is None:
+            v = node[edge[:,1],:] - node[edge[:,0],:]
+        else:
+            v = node[edge[index,1],:] - node[edge[index,0],:]
+        return v
 
     def edge_length(self, index=None):
         node = self.entity('node')
@@ -112,7 +155,6 @@ class Mesh2d():
         w = np.array([(0,-1),(1,0)])
         n = v@w
         return n, t
-
     def edge_unit_normal(self, index=None):
         #TODO: 3D Case
         v = self.edge_unit_tagent(index=index)
@@ -145,7 +187,7 @@ class Mesh2d():
             v = node[edge[:,1],:] - node[edge[:,0],:]
         else:
             v = node[edge[index,1],:] - node[edge[index,0],:]
-        return v 
+        return v
 
     def add_plot(
             self, plot,
@@ -173,12 +215,12 @@ class Mesh2d():
 
         if node is None:
             node = self.node
-        
-        if (index is None) and (showindex == True): 
+
+        if (index is None) and (showindex == True):
             index = np.array(range(node.shape[0]))
 
-        find_node(axes, node, 
-                index=index, showindex=showindex, 
+        find_node(axes, node,
+                index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
@@ -233,11 +275,17 @@ class Mesh2dDataStructure():
         self.edge = None
         self.edge2cell = None
 
-    def number_of_vertices_of_cells(self):
+    def number_of_nodes_of_cells(self):
         return self.V
 
     def number_of_edges_of_cells(self):
         return self.E
+
+    def number_of_faces_of_cells(self):
+        return self.E
+
+    def number_of_vertices_of_cells(self):
+        return self.V
 
     def total_edge(self):
         NC = self.NC
@@ -251,16 +299,16 @@ class Mesh2dDataStructure():
     def local_edge(self):
         return self.localEdge
 
-    def construct(self):  
+    def construct(self):
         """ Construct edge and edge2cell from cell
         """
         NC = self.NC
         E = self.E
 
         totalEdge = self.total_edge()
-        _, i0, j = np.unique(np.sort(totalEdge, axis=1), 
-                return_index=True, 
-                return_inverse=True, 
+        _, i0, j = np.unique(np.sort(totalEdge, axis=1),
+                return_index=True,
+                return_inverse=True,
                 axis=0)
         NE = i0.shape[0]
         self.NE = NE

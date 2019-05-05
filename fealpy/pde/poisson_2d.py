@@ -10,21 +10,21 @@ class ffData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=1, meshtype='quadtree'):
+    def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
             (0, 0),
             (1, 0),
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype is 'tri':
+        if meshtype is 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tritree':
@@ -36,8 +36,6 @@ class ffData:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
 
     def solution(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
         return np.zeros(p.shape[0:-1])
 
     def gradient(self, p):
@@ -52,9 +50,9 @@ class ffData:
 
         val = np.ones(x.shape, dtype=np.float)
         I = np.floor(4*x) + np.floor(4*y)
-        isMinus = (I%2 == 0)
+        isMinus = (I % 2 == 0)
         val[isMinus] = - 1
-        return val 
+        return val
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
@@ -68,7 +66,7 @@ class KelloggData:
         self.a = 161.4476387975881
         self.b = 1
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
+    def init_mesh(self, n=4, meshtype='tri'):
         node = np.array([
             (-1, -1),
             (0, -1),
@@ -79,15 +77,7 @@ class KelloggData:
             (-1, 1),
             (0, 1),
             (1, 1)], dtype=np.float)
-        if meshtype is 'quadtree':
-            cell = np.array([
-                (0, 1, 4, 3),
-                (1, 2, 5, 4),
-                (3, 4, 7, 6),
-                (4, 5, 8, 7)], dtype=np.int)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-        elif meshtype is 'tri':
+        if meshtype is 'tri':
             cell = np.array([
                 (1, 4, 0),
                 (3, 0, 4),
@@ -98,6 +88,14 @@ class KelloggData:
                 (7, 4, 8),
                 (5, 8, 4)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+        elif meshtype is 'quadtree':
+            cell = np.array([
+                (0, 1, 4, 3),
+                (1, 2, 5, 4),
+                (3, 4, 7, 6),
+                (4, 5, 8, 7)], dtype=np.int)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
         else:
             raise ValueError("".format)
@@ -196,7 +194,7 @@ class LShapeRSinData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
+    def init_mesh(self, n=4, meshtype='tri'):
         node = np.array([
             (-1, -1),
             (0, -1),
@@ -206,15 +204,7 @@ class LShapeRSinData:
             (-1, 1),
             (0, 1),
             (1, 1)], dtype=np.float)
-        if meshtype is 'quadtree':
-            cell = np.array([
-                (0, 1, 3, 2),
-                (2, 3, 6, 5),
-                (3, 4, 7, 6)], dtype=np.int)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype is 'tri':
+        if meshtype is 'tri':
             cell = np.array([
                 (1, 3, 0),
                 (2, 0, 3),
@@ -223,6 +213,14 @@ class LShapeRSinData:
                 (4, 7, 3),
                 (6, 3, 7)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quadtree':
+            cell = np.array([
+                (0, 1, 3, 2),
+                (2, 3, 6, 5),
+                (3, 4, 7, 6)], dtype=np.int)
+            mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tritree':
@@ -238,7 +236,7 @@ class LShapeRSinData:
             return mesh
         else:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
- 
+
     def domain(self, n):
         pass
 
@@ -256,7 +254,7 @@ class LShapeRSinData:
         INPUT:
             p: array object, N*2
         """
-        rhs = np.zeros(p.shape[0:-1]) 
+        rhs = np.zeros(p.shape[0:-1])
         return rhs
 
     def gradient(self, p):
@@ -270,9 +268,9 @@ class LShapeRSinData:
         theta = np.arctan2(y, x)
         theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         r = x**2 + y**2
-        val = np.zeros(p.shape,dtype=p.dtype)
+        val = np.zeros(p.shape, dtype=p.dtype)
         val[..., 0] = 2*(x*sin(2*theta/3) - y*cos(2*theta/3))/(3*r**(2/3))
-        val[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3)) 
+        val[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
         return val
 
     def dirichlet(self, p):
@@ -280,12 +278,30 @@ class LShapeRSinData:
         """
         return self.solution(p)
 
+
 class CrackData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
-        if meshtype is 'quadtree':
+    def init_mesh(self, n=4, meshtype='tri'):
+        if meshtype is 'tri':
+            node = np.array([
+                (0, -1),
+                (-1, 0),
+                (0, 0),
+                (1, 0),
+                (1, 0),
+                (0, 1)], dtype=np.float)
+
+            cell = np.array([
+                (2, 1, 0),
+                (2, 0, 3),
+                (2, 5, 1),
+                (2, 4, 5)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quadtree':
             r = 1-2**(1/2)/2
             a = 1/2 - 2**(1/2)/2
             rr = 1/2
@@ -322,23 +338,6 @@ class CrackData:
                 (12, 13, 17, 15),
                 (13, 14, 16, 17)], dtype=np.int)
             mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype is 'tri':
-            node = np.array([
-                (0, -1),
-                (-1, 0),
-                (0, 0),
-                (1, 0),
-                (1, 0),
-                (0, 1)], dtype=np.float)
-
-            cell = np.array([
-                (2, 1, 0),
-                (2, 0, 3),
-                (2, 5, 1),
-                (2, 4, 5)], dtype=np.int)
-            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tritree':
