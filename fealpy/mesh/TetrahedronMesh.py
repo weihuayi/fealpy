@@ -76,6 +76,23 @@ class TetrahedronMesh(Mesh3d):
         volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
         return volume
 
+    def face_normal(self):
+        face = self.ds.face
+        node = self.node
+        v01 = node[face[:, 1], :] - node[face[:, 0], :]
+        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+        nv = np.cross(v01, v02)
+        return nv
+
+    def face_unit_normal(self):
+        face = self.ds.face
+        node = self.node
+        v01 = node[face[:, 1], :] - node[face[:, 0], :]
+        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+        nv = np.cross(v01, v02)
+        length = np.sqrt(np.square(nv).sum(axis=1))
+        return nv/length.reshape(-1, 1)
+
     def cell_volume(self):
         cell = self.ds.cell
         node = self.node
@@ -90,10 +107,9 @@ class TetrahedronMesh(Mesh3d):
         node = self.node
         v01 = node[face[:, 1], :] - node[face[:, 0], :]
         v02 = node[face[:, 2], :] - node[face[:, 0], :]
-        dim = self.geo_dimension() 
         nv = np.cross(v01, v02)
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
-        return area 
+        return area
 
     def edge_length(self):
         edge = self.ds.edge
@@ -416,9 +432,9 @@ class TetrahedronMesh(Mesh3d):
                             np.arange(NN0),
                             np.arange(NN0)
                         )
-                    ), shape=(NN, NN), dtype=self.ftype)
+                    ), shape=(NN, NN0), dtype=self.ftype)
             cutEdge = cutEdge[:nn]
-            VAl = np.full((nn, 2), 0.5, dtype=self.ftype)
+            VAL = np.full((nn, 2), 0.5, dtype=self.ftype)
 
             g = 2
             markedNode, = np.nonzero(generation == g)

@@ -35,6 +35,50 @@ class PoissonFEMModel(object):
         e *= self.cellmeasure
         return np.sqrt(e)
 
+    def residual_estimate(self, uh=None):
+        if uh is None:
+            uh = self.uh
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+
+        n = mesh.face_normal()
+        bc = np.array([1/(GD+1)]*(GD+1), dtype=mesh.ftype)
+        grad = uh.grad_value(bc)
+
+        ps = mesh.bc_to_point(bc)
+        try:
+            d = self.pde.diffusion_coefficient(ps)
+        except AttributeError:
+            d = np.ones(NC, dtype=mesh.ftype)
+
+        if isinstance(d, float):
+            grad *= d
+        elif len(d) == GD:
+            grad = np.einsum('m, im->im', d, grad)
+        elif isinstance(d, np.ndarray):
+            if len(d.shape) == 1:
+                grad = np.einsum('i, im->im', d, grad)
+            elif len(d.shape) == 2:
+                grad = np.einsum('im, im->im', d, grad)
+            elif len(d.shape) == 3:
+                grad = np.einsum('imn, in->in', d, grad)
+
+        if GD == 2:
+            face2cell = mesh.ds.edge_to_cell()
+            h = np.sqrt(np.sum(n**2, axis=-1))
+        elif GD == 3:
+            face2cell = mesh.ds.face_to_cell()
+            h = np.sum(n**2, axis=-1)**(1/4)
+
+        J = h*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+
+        NC = mesh.number_of_cells()
+        eta = np.zeros(NC, dtype=mesh.ftype)
+        np.add.at(eta, face2cell[:, 0], J)
+        np.add.at(eta, face2cell[:, 1], J)
+        return np.sqrt(eta)
+
     def get_left_matrix(self):
         return self.space.stiff_matrix(self.integrator, self.cellmeasure)
 

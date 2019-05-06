@@ -18,7 +18,7 @@ from fealpy.tools.show import showmultirate
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=2, meshtype='tet')
 
-maxit = 30
+maxit = 20
 theta = 0.2
 k = maxit - 15
 p = 1
@@ -38,16 +38,17 @@ for i in range(maxit):
     fem.solve()
     uh = fem.uh
     Ndof[i] = fem.mesh.number_of_nodes()
-    errorMatrix[0, i] = fem.get_l2_error()
-    errorMatrix[1, i] = fem.get_L2_error()
-    errorMatrix[2, i] = fem.get_H1_error()
-    rguh = ralg.harmonic_average(uh)
-    eta = fem.recover_estimate(rguh)
-    errorMatrix[3, i] = fem.get_recover_error(rguh)
+    errorMatrix[0, i] = fem.l2_error()
+    errorMatrix[1, i] = fem.L2_error()
+    errorMatrix[2, i] = fem.H1_semi_error()
+    # rguh = ralg.harmonic_average(uh)
+    # eta = fem.recover_estimate(rguh)
+    eta = fem.residual_estimate()
+    errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
     markedCell = mark(eta, theta=theta)
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
-        mesh.bisect(isMarkedCell)
+        A = mesh.bisect(isMarkedCell, returnim=True)
 
 fig = plt.figure()
 axes = fig.gca(projection='3d')
