@@ -346,8 +346,8 @@ class LagrangeFiniteElementSpace():
         mesh = self.mesh
         if p == 0:
             NC = mesh.number_of_cells()
-            M = spdiags(measure, 0, NC, NC) 
-            return M 
+            M = spdiags(measure, 0, NC, NC)
+            return M
 
         bcs, ws = qf.quadpts, qf.weights
         phi = self.basis(bcs)
@@ -357,7 +357,7 @@ class LagrangeFiniteElementSpace():
             if barycenter is True:
                 val = cfun(bcs)
             else:
-                pp = space.mesh.bc_to_point(bcs)
+                pp = mesh.bc_to_point(bcs)
                 val = cfun(pp)
             M = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
 
@@ -368,7 +368,7 @@ class LagrangeFiniteElementSpace():
 
         gdof = self.number_of_global_dofs()
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return M 
+        return M
 
     def source_vector(self, f, qf, measure, surface=None):
         p = self.p
