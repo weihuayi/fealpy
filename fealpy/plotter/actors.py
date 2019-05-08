@@ -2,6 +2,40 @@ import vtk
 import fealpy.plotter.colors as colors
 
 
+def meshactor(mesh):
+    NN = mesh.number_of_nodes()
+    NC = mesh.number_of_cells()
+    node = mesh.entity('node')
+    edge = mesh.entity('edge')
+
+    GD = mesh.geo_dimension()
+
+    points = vtk.vtkPoints()
+    points.SetData(vnp.numpy_to_vtk(node))
+    cells = vtk.vtkCellArray()
+    cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+
+    self.mesh =vtk.vtkUnstructuredGrid() 
+    self.mesh.SetPoints(points)
+    self.mesh.SetCells(celltype, cells)
+
+    if celldata is not None:
+        cdata = self.mesh.GetCellData()
+        for key, value in celldata.items():
+            data = vnp.numpy_to_vtk(value)
+            data.SetName(key)
+            cdata.AddArray(data)
+
+    if nodedata is not None:
+        ndata = self.mesh.GetPointData()
+        for key, value in nodedata.items():
+            data = vnp.numpy_to_vtk(value)
+            data.SetName(key)
+            ndata.AddArray(data)
+
+    if mesh.meshtype is 'tri':
+
+
 class Actor(vtk.vtkActor):
 
     def __init__(
