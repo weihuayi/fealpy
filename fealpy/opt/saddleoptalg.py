@@ -13,9 +13,6 @@ class SteepestDescentAlg:
         self.x = problem['x0']
         self.f, self.g = self.fun(self.x)  # 初始目标函数值和梯度值
 
-    def reinit(self):
-        self.x = self.problem['x0']
-        self.f, self.g = self.fun(self.x)
 
     def run(self, queue=None, maxit=None):
         options = self.options
@@ -25,7 +22,7 @@ class SteepestDescentAlg:
         self.diff = np.Inf
         if options['Output']:
             print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
-            self.fun.output(str(self.NF).zfill(6), queue=queue)
+            self.fun.output('', queue=queue)
 
         self.NF += 1
 
@@ -43,7 +40,7 @@ class SteepestDescentAlg:
 
             if options['Output']:
                 print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
-                self.fun.output(str(self.NF).zfill(6), queue=queue)
+                self.fun.output(str(self.NF).zfill(4), queue=queue)
             self.NF += 1
 
             if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
