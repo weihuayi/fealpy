@@ -1,3 +1,7 @@
 from fealpy.plotter import VTKPlotter
+from fealpy.plotter.shapes import Sphere
 
-plotter = VTKPlotter()
+
+actor = Sphere()
+plotter = VTKPlotter(shape=(2, 2))
+plotter.show(actor)
