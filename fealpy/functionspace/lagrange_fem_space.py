@@ -156,7 +156,7 @@ class LagrangeFiniteElementSpace():
 
         Dlambda = self.mesh.grad_lambda()
         gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
-        return gphi 
+        return gphi
 
     def basis(self, bc):
         """
