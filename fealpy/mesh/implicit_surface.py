@@ -194,7 +194,7 @@ class TwelveSpheres:
             c = self.center
             r = self.radius
             d  = np.sqrt(np.sum((p - c.reshape(-1, 1, 3))**2, axis=2)) - r.reshape(-1, 1)
-            return np.min(d, axis=0).reshape(X.shape)  
+            return np.min(d, axis=0).reshape(X.shape)
         else:
             raise ValueError("the args must be a N*3 or X, Y, Z")
 
