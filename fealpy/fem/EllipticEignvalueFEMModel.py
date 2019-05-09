@@ -104,7 +104,8 @@ class EllipticEignvalueFEMModel:
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
         uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
 
-        if (self.step > 0) and (0 in idx):
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx) and GD == 2:
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
@@ -121,7 +122,7 @@ class EllipticEignvalueFEMModel:
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
 
-            if (self.step > 0) and (i in idx):
+            if (self.step > 0) and (i in idx) and GD == 2:
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
@@ -214,7 +215,8 @@ class EllipticEignvalueFEMModel:
         uh = space.function()
         uh[:] = uH
 
-        if (self.step > 0) and (0 in idx):
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx) and GD == 2:
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
@@ -232,7 +234,7 @@ class EllipticEignvalueFEMModel:
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
 
-            if (self.step > 0) and (i in idx):
+            if (self.step > 0) and (i in idx) and GD == 2:
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
@@ -322,7 +324,8 @@ class EllipticEignvalueFEMModel:
         uh = space.function()
         uh[:] = uH
 
-        if (self.step > 0) and (0 in idx):
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx) and GD == 2:
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
@@ -338,7 +341,7 @@ class EllipticEignvalueFEMModel:
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
-            if (self.step > 0) and (i in idx):
+            if (self.step > 0) and (i in idx) and GD == 2:
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
@@ -394,6 +397,7 @@ class EllipticEignvalueFEMModel:
         uh = np.ones(gdof, dtype=mesh.ftype)
         uh[~isFreeDof] = 0
         IM = eye(gdof)
+        GD = mesh.geo_dimension()
         for i in range(self.maxit+1):
             print(i, ":", gdof)
             area = mesh.entity_measure('cell')
@@ -404,7 +408,7 @@ class EllipticEignvalueFEMModel:
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
             uh[isFreeDof], d = picard(A, M, uh[isFreeDof])
 
-            if (self.step > 0) and (i in idx):
+            if (self.step > 0) and (i in idx) and GD == 2:
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
@@ -441,6 +445,7 @@ class EllipticEignvalueFEMModel:
 
         mesh = self.pde.init_mesh(n=self.numrefine)
         integrator = mesh.integrator(self.q)
+        GD = mesh.geo_dimension()
         for i in range(self.maxit+1):
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
@@ -459,7 +464,7 @@ class EllipticEignvalueFEMModel:
             uh = space.function()
             uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
 
-            if (self.step > 0) and (i in idx):
+            if (self.step > 0) and (i in idx) and GD == 2:
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
@@ -478,6 +483,14 @@ class EllipticEignvalueFEMModel:
 
         print("smallest eigns:", d, "with time: ", end - start)
         return uh
+
+    def savemesh(self, uh, fname):
+        mesh = uh.space.mesh
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        data = {'node': node, 'elem': cell+1}
+        sio.matlab.savemat(fname, data)
+
 
     def savesolution(self, uh, fname):
         mesh = uh.space.mesh

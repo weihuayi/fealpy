@@ -30,6 +30,10 @@ class TriangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
 
+    def vtk_cell_type(self):
+        VTK_TRIANGLE = 5
+        return VTK_TRIANGLE
+
     def integrator(self, k):
         return TriangleQuadrature(k)
 
@@ -41,7 +45,6 @@ class TriangleMesh(Mesh2d):
         cell = cell[~dflag]
         NN = self.number_of_nodes()
         self.ds.reinit(NN, cell)
-        
 
     def circumcenter(self):
         node = self.node

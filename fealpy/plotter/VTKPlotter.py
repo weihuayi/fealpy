@@ -1,27 +1,27 @@
 import numpy as np
 import vtk
 import multiprocessing
+from .actors import *
+
 
 
 __doc__ = """
 This the plotter class for fealpy, which is totally based on vtk.
 
-Here I directly use many codes from
-[vtkplotter](https://github.com/marcomusy/vtkplotter). And I learn many things
-from vtkplotter.
 """
 
 
-class VTKPlotter_new(object):
+class VTKPlotter(object):
 
     def __init__(
             self,
             shape=(1, 1),
-            bgcolor='',
+            bgcolor='White',
             position=None,
             title=None,
             sharecam=True,
-            simulation=None  # 模拟程序，发送需要可视化的数据给 Plotter
+            interactive=True,
+            simulation=None,  # 模拟程序，发送需要可视化的数据给 Plotter
             ):
 
         self.colors = vtk.vtkNamedColors()
@@ -31,6 +31,8 @@ class VTKPlotter_new(object):
         self.actors = []  # 可视对象列表
         self.renderers = []  # 渲染器列表
         self.legends = []  # 可视对象的图例列表 
+
+        self.interactive = interactive
 
         self.sliders = []
         self.buttons = []
@@ -59,9 +61,18 @@ class VTKPlotter_new(object):
 
         self.renderWindow.SetWindowName(title)
 
-        # rdender window interactor
-        self.interactor = vtk.vtkRenderWindowInteractor()
-        self.interactor.SetRenderWindow(self.renderWindow)
+        if interactive is True:  # rdender window interactor
+            self.interactor = vtk.vtkRenderWindowInteractor()
+            self.interactor.SetRenderWindow(self.renderWindow)
+        else:
+            self.interactor = None
+
+        if simulation is not None:
+            self.queue = multiprocessing.Queue()
+            self.process = multiprocessing.Process(None, simulation,
+                    args=(self.queue,))
+        else:
+            self.process = None
 
     def show(
             self,
@@ -83,5 +94,21 @@ class VTKPlotter_new(object):
         self.renderWindow.AddRenderer(self.crenderer)
         self.renderWindow.Render()
 
-        # begin mouse interaction
-        self.interactor.Start()
+        if self.interactor is not None:  # begin mouse interaction
+            self.interactor.Start()
+
+    def run(self):
+        self.process.start()
+        while True:
+            if not self.queue.empty():
+                data = self.queue.get()
+                if data is not -1:
+                    if 'mesh' in data:
+                        actor = meshactor(data['mesh'])
+                        self.show(actors=actor)
+                else:
+                    print('exit program!')
+                    self.process.join()
+                    break
+            else:
+                self.renderWindow.Render()
