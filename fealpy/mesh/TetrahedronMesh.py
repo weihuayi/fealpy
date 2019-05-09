@@ -46,12 +46,15 @@ class TetrahedronMesh(Mesh3d):
         self.facedata = {}
         self.nodedata = {}
 
+    def vtk_cell_type(self):
+        VTK_TETRA = 10
+        return VTK_TETRA
+
     def integrator(self, k):
-        print(k)
         return TetrahedronQuadrature(k)
 
     def direction(self, i):
-        """ Compute the direction on every vertex of 
+        """ Compute the direction on every vertex of
 
         0 <= i < 4
         """

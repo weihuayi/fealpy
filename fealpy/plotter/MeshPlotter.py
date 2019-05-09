@@ -7,11 +7,11 @@ import multiprocessing
 import time
 
 class MeshPlotter:
-    def __init__(self, node, cell, celltype, show, 
+    def __init__(self, node, cell, celltype, show,
             celllocation=None,
-            nodedata=None, 
-            celldata=None, 
-            meshdata=None, 
+            nodedata=None,
+            celldata=None,
+            meshdata=None,
             simulation=None):
         self.show = show
         NN = node.shape[1]
