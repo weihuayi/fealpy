@@ -22,27 +22,27 @@ k = maxit - 15
 if m == 1:
     from fealpy.pde.poisson_2d import KelloggData
     pde = KelloggData()
-    quadtree = pde.init_mesh(n=4)
+    quadtree = pde.init_mesh(n=4, meshtype='quadtree')
 elif m == 2:
     from fealpy.pde.poisson_model_2d import LShapeRSinData
     pde = LShapeRSinData()
-    quadtree = pde.init_mesh(n=4)
+    quadtree = pde.init_mesh(n=4, meshtype='quadtree')
 elif m == 3:
     from fealpy.pde.poisson_model_2d import CrackData
     pde = CrackData()
-    quadtree = pde.init_mesh(n=4)
+    quadtree = pde.init_mesh(n=4, meshtype='quadtree')
 elif m == 4:
     from fealpy.pde.poisson_model_2d import CosCosData
     pde = CosCosData()
-    quadtree = pde.init_mesh(n=2)
+    quadtree = pde.init_mesh(n=2, meshtype='quadtree')
 elif m == 5:
     from fealpy.pde.poisson_model_2d import SinSinData
     pde = SinSinData()
-    quadtree = pde.init_mesh(n=3)
+    quadtree = pde.init_mesh(n=3, meshtype='quadtree')
 elif m == 6:
     from fealpy.pde.poisson_model_2d import ffData
     pde = ffData()
-    quadtree = pde.init_mesh(n=2)
+    quadtree = pde.init_mesh(n=2, meshtype='quadtree')
 
 errorType = [
         '$\| u_I - u_h \|_{l_2}$',
