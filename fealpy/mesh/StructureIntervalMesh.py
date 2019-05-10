@@ -48,7 +48,7 @@ class StructureIntervalMesh(object):
         d = -2*np.ones(NN, dtype=np.float)/h**2
         c = np.ones(NN - 1, dtype=np.float)/h**2
         A = diags([c, d, c], [-1, 0, 1])
-        return A
+        return A.tocsr()
 
     def add_plot(
             self, plot,

@@ -205,7 +205,12 @@ class Mesh3dDataStructure():
 
         totalFace = self.total_face()
 
-        _, i0, j = unique_row(np.sort(totalFace, axis=1))
+        _, i0, j = np.unique(
+                np.sort(totalFace, axis=1),
+                return_index=True,
+                return_inverse=True,
+                axis=0)
+
         self.face = totalFace[i0]
 
         NF = i0.shape[0]
@@ -223,7 +228,11 @@ class Mesh3dDataStructure():
         self.face2cell[:, 3] = i1 % F
 
         totalEdge = self.total_edge()
-        self.edge, i2, j = unique_row(np.sort(totalEdge, axis=1))
+        self.edge, i2, j = np.unique(
+                np.sort(totalEdge, axis=1),
+                return_index=True,
+                return_inverse=True,
+                axis=0)
         E = self.E
         self.cell2edge = np.reshape(j, (NC, E))
         self.NE = self.edge.shape[0]
