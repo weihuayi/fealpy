@@ -1,7 +1,10 @@
 import numpy as np
+from .Quadrature import Quadrature
 
 # http://keisan.casio.com/exec/system/1280801905
-class GaussLobattoQuadrature():
+
+
+class GaussLobattoQuadrature(Quadrature):
     def __init__(self, k):
         if k == 2:
             A = np.array([[-1, 1], [1, 1]], dtype=np.float)
