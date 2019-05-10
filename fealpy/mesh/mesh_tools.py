@@ -226,7 +226,11 @@ def show_mesh_3d(axes, mesh,
                color=edgecolor)
         return axes.add_collection3d(edges)
     else:
-        face = mesh.ds.face
+        face = mesh.entity('face')
+        face2cell = mesh.ds.face_to_cell()
+        isBdFace = (face2cell[:, 0] == face2cell[:, 1])
+        isBdFace 
+
         vts = node[face]
         faces = a3.art3d.Poly3DCollection(
                 vts,

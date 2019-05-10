@@ -1,11 +1,8 @@
 import numpy as np
+from .Quadrature import Quadrature
 
-class IntervalQuadrature():
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
 
-    def get_gauss_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 
+class IntervalQuadrature(Quadrature):
 
     def __init__(self, index):
         if index == 1:

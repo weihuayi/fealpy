@@ -1,14 +1,8 @@
 import numpy as np
+from .Quadrature import Quadrature
 
-class TriangleQuadrature():
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
 
-    def get_gauss_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 
-
-    def get_all_gauss_point_and_weight(self):
-        return self.quadpts, self.weights
+class TriangleQuadrature(Quadrature):
 
     def __init__(self, index):
         if index==1: #  Order 1, nQuad 1
