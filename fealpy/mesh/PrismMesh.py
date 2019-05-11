@@ -1,22 +1,38 @@
 
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import PrismQuadrature
+
 
 class PrismMesh(Mesh3d):
     def __init__(self, node, cell):
         self.node = node
         self.cell = cell
         NN = node.shape[0]
-        self.ds = PrismMeshDatastructure(NN, cell)
+        self.ds = PrismMeshDataStructure(NN, cell)
+        self.meshtype = 'prism'
 
     def integrator(self, k):
         return PrismQuadrature(k)
 
+    def bc_to_point(self, bc):
+        node = self.node
+        cell = self.ds.cell
+        p0 = np.einsum('...j, ijk->...ik', bc[:, 2:], node[cell[:, 0:3]])
+        p1 = np.einsum('...j, ijk->...ik', bc[:, 2:], node[cell[:, 3:]])
+        p = np.einsum(
+                '..., ...ik->...ik',
+                bc[:, 0],
+                p0) + np.einsum('..., ...ik->...ik', bc[:, 1], p1)
+        return p
 
-class PrismMeshDatastructure(Mesh3dDataStructure):
+    def boundary_face(self):
+        face = self.entity('face')
+        isBdFace = self.ds.boundary_face_flag()
+        return face[isBdFace]
+
+
+class PrismMeshDataStructure(Mesh3dDataStructure):
     localTFace = np.array([(1, 0, 2),  (3, 4, 5)])
     localQFace = np.array([(1, 2, 5, 4),  (0, 3, 5, 2), (0, 1, 4, 3)])
     localEdge = np.array([
@@ -30,8 +46,7 @@ class PrismMeshDatastructure(Mesh3dDataStructure):
     F = 5
 
     def __init__(self, NN, cell):
-        self.cell = cell
-        self.NN = NN
+        super(PrismMeshDataStructure, self).__init__(NN, cell)
 
     def total_face(self):
         cell = self.cell
@@ -44,7 +59,7 @@ class PrismMeshDatastructure(Mesh3dDataStructure):
         NTF = totalTFace.shape[0]
         NQF = totalQFace.shape[0]
         totalFace = np.zeros((NTF+NQF, 4), dtype=np.int)
-        totalFace[:NTF, -1] = -np.inf
+        totalFace[:NTF, -1] = -1e9
         totalFace[:NTF, :-1] = totalTFace
         totalFace[NTF:, :] = totalQFace
         return totalFace

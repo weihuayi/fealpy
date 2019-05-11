@@ -22,3 +22,6 @@ class HexahedronQuadrature(Quadrature):
                     bcs[:, idx[i, 1]],
                     bcs[:, idx[i, 2]])
             self.quadpts[:, i] = (X*Y*Z).flat
+
+        w0, w1, w2 = np.meshgrid(ws, ws, ws)
+        self.weights = (w0*w0*w0).flatten()

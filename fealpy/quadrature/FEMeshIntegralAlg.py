@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class FEMeshIntegralAlg():
     def __init__(self, integrator, mesh, measure=None):
         self.mesh = mesh
@@ -7,17 +8,17 @@ class FEMeshIntegralAlg():
         if measure is None:
             self.measure = mesh.entity_measure()
         else:
-            self.measure = measure 
+            self.measure = measure
 
     def integral(self, u, celltype=False):
-        qf = self.integrator  
+        qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
         val = u(bcs)
         e = np.einsum('i, ij..., j->j...', ws, val, self.measure)
         if celltype is True:
             return e
         else:
-            return e.sum() 
+            return e.sum()
 
     def L2_norm(self, uh, celltype=False):
         def f(x):

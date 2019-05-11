@@ -1,12 +1,14 @@
 import numpy as np
+from .Quadrature import Quadrature
+from .GaussLegendreQuadrature import GaussLegendreQuadrature
 
-from .GaussLegendreQuadrature import GaussLegendreQuadrature 
 
-class QuadrangleQuadrature():
+class QuadrangleQuadrature(Quadrature):
     def __init__(self, k):
-        qf = GaussLegendreQuadrture(k)
-        bcs, ws = qf.quadpts, qf.weights
-        self.quadpts = np.zeros((len(ws)**2, 4), dtype=np.float)
+        q0 = GaussLegendreQuadrature(k)
+        nq = q0.number_of_quadrature_points()
+        bcs, ws = q0.get_quadrature_points_and_weights()
+        self.quadpts = np.zeros((nq**2, 4), dtype=np.float)
         X, Y = np.meshgrid(bcs[:, 0], bcs[:, 0])
         self.quadpts[:, 0] = (X*Y).flat
         X, Y = np.meshgrid(bcs[:, 1], bcs[:, 0])
@@ -16,11 +18,4 @@ class QuadrangleQuadrature():
         X, Y = np.meshgrid(bcs[:, 0], bcs[:, 1])
         self.quadpts[:, 3] = (X*Y).flat
         W1, W2 = np.meshgrid(ws, ws)
-        self.weights = (W1*W2).flatten() 
-
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
-
-    def get_gauss_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 
-
+        self.weights = (W1*W2).flatten()

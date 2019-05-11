@@ -14,6 +14,7 @@ from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
+from .PrismMesh import PrismMesh
 from .MeshZoo import MeshZoo
 
 from .Tritree import Tritree

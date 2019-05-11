@@ -1,12 +1,13 @@
 import numpy as np
 
-# from mpl_toolkits.mplot3d import Axes3D
-# import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
 
 import vtk
 from vtk.util import numpy_support as vns
 from vtkplotter import *
 from fealpy.mesh.implicit_surface import Sphere
+from fealpy.mesh import PrismMesh
 
 
 
@@ -51,14 +52,21 @@ newNode, d = s1.project(node)
 pnode = np.r_['0', node, newNode]
 pcell = np.r_['1', cell, cell + NN]
 
-actor = pmeshactor(pnode, pcell)
+pmesh = PrismMesh(pnode, pcell)
 
-vp = Plotter()
-vp.show(actor)
+face = pmesh.entity('face')
+isTFace = (face[:, -1] == -1e9)
+bdface = pmesh.boundary_face()
+print(bdface)
+print(face[isTFace])
 
 
+# actor = pmeshactor(pnode, pcell)
 
-#fig = plt.figure()
-#axes = fig.add_subplot(111, projection='3d')
-#mesh.add_plot(axes)
-#plt.show()
+# vp = Plotter()
+# vp.show(actor)
+
+fig = plt.figure()
+axes = fig.add_subplot(111, projection='3d')
+pmesh.add_plot(axes)
+plt.show()
