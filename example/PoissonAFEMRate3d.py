@@ -18,7 +18,7 @@ from fealpy.tools.show import showmultirate
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=2, meshtype='tet')
 
-maxit = 20
+maxit = 40
 theta = 0.2
 k = maxit - 15
 p = 1
@@ -52,6 +52,6 @@ for i in range(maxit):
 
 fig = plt.figure()
 axes = fig.gca(projection='3d')
-mesh.add_plot(axes, alpha=0, showedge=True)
+mesh.add_plot(axes, alpha=1)
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()

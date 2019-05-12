@@ -240,7 +240,7 @@ def show_mesh_3d(
     else:
         face = mesh.boundary_face()
         if mesh.meshtype is 'prism':
-            isTFace = (face[:, -1] == -np.inf)
+            isTFace = (face[:, -1] == -1e9)
             tface = face[isTFace, 0:3]
             tfaces = a3.art3d.Poly3DCollection(
                     node[tface],
@@ -256,8 +256,8 @@ def show_mesh_3d(
                     edgecolor=edgecolor,
                     alpha=alpha)
 
-            axes.add_collection3d(tfaces)
-            return axes.add_collection3d(qfaces)
+            return axes.add_collection3d([tfaces, qfaces])
+            # return axes.add_collection3d(qfaces)
         else:
             faces = a3.art3d.Poly3DCollection(
                     node[face],

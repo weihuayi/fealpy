@@ -46,6 +46,11 @@ class TetrahedronMesh(Mesh3d):
         self.facedata = {}
         self.nodedata = {}
 
+    def boundary_face(self):
+        face = self.entity('face')
+        isBdFace = self.ds.boundary_face_flag()
+        return face[isBdFace]
+
     def vtk_cell_type(self):
         VTK_TETRA = 10
         return VTK_TETRA
@@ -294,7 +299,6 @@ class TetrahedronMesh(Mesh3d):
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NN0 = NN  # 记录下二分加密之前的节点数目
-        print("old NN:", NN0)
 
         if isMarkedCell is None:
             markedCell = np.arange(NC, dtype=self.itype)
@@ -423,8 +427,6 @@ class TetrahedronMesh(Mesh3d):
             markedCell = np.unique(i)
             nonConforming[checkEdge] = False
             nonConforming[checkEdge[j]] = True;
-
-        print("The max idx of node in cutEdge:", np.max(cutEdge[:NN, 0:2]))
 
         if returnim is True:
             nn = NN - NN0

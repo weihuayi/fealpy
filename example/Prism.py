@@ -9,7 +9,43 @@ from vtkplotter import *
 from fealpy.mesh.implicit_surface import Sphere
 from fealpy.mesh import PrismMesh
 
+from fealpy.pde.poisson_2d import CosCosData
 
+
+def plane_pmesh():
+    pde = CosCosData()
+    mesh = pde.init_mesh(n=0)
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    NN = mesh.number_of_nodes()
+    pnode = np.zeros((2*NN, 3), dtype=mesh.ftype)
+    pnode[:NN, 0:2] = node
+    pnode[NN:, 0:2] = node
+    pnode[NN:, 2] = 1
+    pcell = np.r_['1', cell, cell + NN]
+
+    pmesh = PrismMesh(pnode, pcell)
+    return pmesh
+
+
+def sphere_pmesh():
+    s0 = Sphere(radius=1.0)
+    s1 = Sphere(radius=1.2)
+
+    mesh = s0.init_mesh()
+
+    mesh.uniform_refine(3, surface=s0)
+
+    NN = mesh.number_of_nodes()
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+
+    newNode, d = s1.project(node)
+    pnode = np.r_['0', node, newNode]
+    pcell = np.r_['1', cell, cell + NN]
+
+    pmesh = PrismMesh(pnode, pcell)
+    return pmesh
 
 
 def pmeshactor(node, cell):
@@ -35,36 +71,14 @@ def pmeshactor(node, cell):
 
     return Actor(gf.GetOutput)
 
-s0 = Sphere(radius=1.0)
-s1 = Sphere(radius=1.2)
 
-mesh = s0.init_mesh()
-
-mesh.uniform_refine(3, surface=s0)
-
-NN = mesh.number_of_nodes()
-NC = mesh.number_of_cells()
-node = mesh.entity('node')
-cell = mesh.entity('cell')
-
-
-newNode, d = s1.project(node)
-pnode = np.r_['0', node, newNode]
-pcell = np.r_['1', cell, cell + NN]
-
-pmesh = PrismMesh(pnode, pcell)
-
+pmesh = plane_pmesh()
 face = pmesh.entity('face')
-isTFace = (face[:, -1] == -1e9)
+print(face)
 bdface = pmesh.boundary_face()
-print(bdface)
-print(face[isTFace])
+isTFace = bdface[:, -1] == -1e9
 
-
-# actor = pmeshactor(pnode, pcell)
-
-# vp = Plotter()
-# vp.show(actor)
+print(bdface[~isTFace])
 
 fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')

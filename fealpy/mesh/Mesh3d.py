@@ -2,7 +2,6 @@ import numpy as np
 
 from types import ModuleType
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-import mpl_toolkits.mplot3d as a3
 from .mesh_tools import unique_row, find_entity, show_mesh_3d, find_node
 from ..common import ranges
 
@@ -74,13 +73,12 @@ class Mesh3d():
         elif etype in ['edge', 1]:
             edge = self.ds.edge
             bc = np.sum(node[edge, :], axis=1).reshape(-1, 3)/edge.shape[1]
-        elif etype in  ['node', 0]:
+        elif etype in ['node', 0]:
             bc = node
         else:
             raise ValueError("`etype` is wrong!")
 
         return bc
-
 
     def edge_unit_tagent(self):
         edge = self.ds.edge
