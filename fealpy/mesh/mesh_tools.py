@@ -208,8 +208,8 @@ def show_mesh_3d(
         axes, mesh,
         nodecolor='k', edgecolor='k', facecolor='w',
         aspect='equal',
-        linewidths=1, markersize=20,
-        showaxis=False, alpha=0.8, showedge=False):
+        linewidths=0.5, markersize=0,
+        showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
     axes.set_aspect('equal')
     if showaxis is False:
@@ -225,11 +225,12 @@ def show_mesh_3d(
         nodecolor = mapper.to_rgba(nodecolor)
 
     node = mesh.node
-    axes.scatter(
-            node[:, 0], node[:, 1], node[:, 2],
-            color=nodecolor, s=markersize)
+    if shownode is True:
+        axes.scatter(
+                node[:, 0], node[:, 1], node[:, 2],
+                color=nodecolor, s=markersize)
 
-    if showedge:
+    if showedge is True:
         edge = mesh.ds.edge
         vts = node[edge]
         edges = a3.art3d.Line3DCollection(
@@ -237,35 +238,22 @@ def show_mesh_3d(
                linewidths=linewidths,
                color=edgecolor)
         return axes.add_collection3d(edges)
-    else:
-        face = mesh.boundary_face()
-        if mesh.meshtype is 'prism':
-            isTFace = (face[:, -1] == -1e9)
-            tface = face[isTFace, 0:3]
-            tfaces = a3.art3d.Poly3DCollection(
-                    node[tface],
-                    facecolor=facecolor,
-                    linewidths=linewidths,
-                    edgecolor=edgecolor,
-                    alpha=alpha)
-            qface = face[~isTFace]
-            qfaces = a3.art3d.Poly3DCollection(
-                    node[qface],
-                    facecolor=facecolor,
-                    linewidths=linewidths,
-                    edgecolor=edgecolor,
-                    alpha=alpha)
-
-            return axes.add_collection3d([tfaces, qfaces])
-            # return axes.add_collection3d(qfaces)
-        else:
-            faces = a3.art3d.Poly3DCollection(
-                    node[face],
-                    facecolor=facecolor,
-                    linewidths=linewidths,
-                    edgecolor=edgecolor,
-                    alpha=alpha)
-            return axes.add_collection3d(faces)
+    face = mesh.boundary_face(threshold=threshold)
+    faces = a3.art3d.Poly3DCollection(
+            node[face],
+            facecolor=facecolor,
+            linewidths=linewidths,
+            edgecolor=edgecolor,
+            alpha=alpha)
+    h = axes.add_collection3d(faces)
+    minp = np.min(node, axis=0)
+    maxp = np.max(node, axis=0)
+    i = np.argmax(maxp - minp)
+    h = np.max(maxp - minp)/10
+    axes.set_xlim(minp[i]-h, maxp[i]+h)
+    axes.set_xlim(minp[i]-h, maxp[i]+h)
+    axes.set_xlim(minp[i]-h, maxp[i]+h)
+    return h
 
 
 def unique_row(a):

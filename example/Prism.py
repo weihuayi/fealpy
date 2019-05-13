@@ -47,40 +47,11 @@ def sphere_pmesh():
     pmesh = PrismMesh(pnode, pcell)
     return pmesh
 
-
-def pmeshactor(node, cell):
-
-    points = vtk.vtkPoints()
-    points.SetData(vns.numpy_to_vtk(node))
-
-    NC = len(cell)
-    cells = vtk.vtkCellArray()
-    cells.SetCells(NC, vns.numpy_to_vtkIdTypeArray(cell))
-
-    celltype = 15
-
-    vmesh = vtk.vtkUnstructuredGrid()
-    vmesh.SetPoints(points)
-    vmesh.SetCells(celltype, cells)
-
-    gf = vtk.vtkUnstructuredGridGeometryFilter()
-    gf.SetInputData(vmesh)
-    gf.Update()
-
-    pd = gf.GetOutput()
-
-    return Actor(gf.GetOutput)
-
-
-pmesh = plane_pmesh()
-face = pmesh.entity('face')
-print(face)
-bdface = pmesh.boundary_face()
-isTFace = bdface[:, -1] == -1e9
-
-print(bdface[~isTFace])
+#pmesh = plane_pmesh()
+pmesh = sphere_pmesh()
+pmesh.print()
 
 fig = plt.figure()
-axes = fig.add_subplot(111, projection='3d')
-pmesh.add_plot(axes)
+axes = Axes3D(fig)
+pmesh.add_plot(axes, alpha=0,  threshold=lambda bc: bc[:, 0] < 0.5)
 plt.show()

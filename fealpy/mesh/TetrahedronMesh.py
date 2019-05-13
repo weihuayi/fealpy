@@ -46,14 +46,12 @@ class TetrahedronMesh(Mesh3d):
         self.facedata = {}
         self.nodedata = {}
 
-    def boundary_face(self):
-        face = self.entity('face')
-        isBdFace = self.ds.boundary_face_flag()
-        return face[isBdFace]
-
     def vtk_cell_type(self):
         VTK_TETRA = 10
         return VTK_TETRA
+
+    def to_vtk_object(self, vtk):
+        pass
 
     def integrator(self, k):
         return TetrahedronQuadrature(k)

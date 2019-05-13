@@ -37,6 +37,66 @@ class Mesh3d():
     def top_dimension(self):
         return 3
 
+    def boundary_face(self, threshold=None):
+        face = self.entity('face')
+        isBdFace = self.ds.boundary_face_flag()
+        if threshold is None:
+            return face[isBdFace]
+        else:
+            bc = self.entity_barycenter('cell')
+            isKeepCell = threshold(bc)
+            face2cell = self.ds.face_to_cell()
+            isInterfaceFace = np.sum(
+                    isKeepCell[face2cell[:, 0:2]],
+                    axis=-1) == 1
+            isBdFace = (np.sum(
+                    isKeepCell[face2cell[:, 0:2]],
+                    axis=-1) == 2) & isBdFace
+            return face[isBdFace | isInterfaceFace]
+
+    def to_vtk(self, vtk, vns, filename=None):
+        nodes = vtk.vtkPoints()
+        nodes.SetData(vns.numpy_to_vtk(node))
+
+        NC = len(cell)
+        cells = vtk.vtkCellArray()
+        cells.SetCells(NC, vns.numpy_to_vtkIdTypeArray(cell))
+
+        celltype = self.vtk_cell_type()
+
+        vmesh = vtk.vtkUnstructuredGrid()
+        vmesh.SetPoints(points)
+        vmesh.SetCells(celltype, cells)
+
+        if len(self.celldata) > 0:
+            cdata = vmesh.GetCellData()
+            for key, value in self.celldata.items():
+                data = vns.numpy_to_vtk(value)
+                data.SetName(key)
+                cdata.AddArray(data)
+
+        if len(self.nodedata) > 0:
+            ndata = vmesh.GetPointData()
+            for key, value in self.nodedata.items():
+                data = vns.numpy_to_vtk(value)
+                data.SetName(key)
+                ndata.AddArray(data)
+
+        if len(self.edgedata) > 0:
+            ndata = vmesh.GetPointData()
+            for key, value in self.edgedata.items():
+                data = vns.numpy_to_vtk(value)
+                data.SetName(key)
+                ndata.AddArray(data)
+
+        if len(self.facedata) > 0:
+            ndata = vmesh.GetPointData()
+            for key, value in self.facedata.items():
+                data = vns.numpy_to_vtk(value)
+                data.SetName(key)
+                ndata.AddArray(data)
+        return vmesh
+
     def entity(self, etype='cell'):
         if etype in ['cell', 3]:
             return self.ds.cell
@@ -47,7 +107,7 @@ class Mesh3d():
         elif etype in ['node', 0]:
             return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`etype` is wrong!")
 
     def entity_measure(self, etype=3):
         if etype in ['cell', 3]:
@@ -92,7 +152,7 @@ class Mesh3d():
             nodecolor='k', edgecolor='k',
             aspect='equal',
             linewidths=2, markersize=20,
-            showaxis=False, alpha=0.8, showedge=False):
+            showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
@@ -105,7 +165,9 @@ class Mesh3d():
                 axes, self,
                 nodecolor=nodecolor, edgecolor=edgecolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis, alpha=alpha, showedge=showedge)
+                showaxis=showaxis, alpha=alpha, shownode=shownode,
+                showedge=showedge,
+                threshold=threshold)
 
     def find_node(
             self, axes,
@@ -155,6 +217,11 @@ class Mesh3d():
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
+
+    def print(self):
+        print('cell:\n', self.ds.cell)
+        print('face:\n', self.ds.face)
+        print('face2cell:\n', self.ds.face2cell)
 
 
 class Mesh3dDataStructure():
