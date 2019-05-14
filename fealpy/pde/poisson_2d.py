@@ -400,7 +400,7 @@ class CosCosData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='tri'):
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
         """ generate the initial mesh
         """
         node = np.array([
@@ -418,6 +418,9 @@ class CosCosData:
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'stri':
+            mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
         else:
             raise ValueError("".format)
@@ -469,7 +472,11 @@ class SinSinData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=4, meshtype='quadtree'):
+    def init_mesh(
+            self, n=4, meshtype='quadtree',
+            h=0.1,
+            nx=10,
+            ny=10):
         point = np.array([
             (-1, -1),
             (1, -1),
@@ -485,12 +492,11 @@ class SinSinData:
             mesh = TriangleMesh(point, cell)
             mesh.uniform_refine(n)
             return mesh
+        elif meshtype is 'stri':
+            mesh = StructureQuadMesh([0, 1, 0, 1], nx, ny)
+            return mesh
         else:
             raise ValueError("".format)
-    
-    def init_structurequadmesh(self, box, nx, ny):
-        mesh = StructureQuadMesh(box, nx, ny)
-        return mesh
 
     def solution(self, p):
         """ The exact solution 
@@ -498,7 +504,7 @@ class SinSinData:
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        u = np.sin(pi*x)*np.sin(pi*y) - 1
+        u = np.sin(pi*x)*np.sin(pi*y)
         return u
 
     def source(self, p):

@@ -3,9 +3,12 @@ import matplotlib.pyplot as plt
 from fealpy.mesh.IntervalMesh import IntervalMesh
 from fealpy.mesh import StructureIntervalMesh
 from scipy.sparse.linalg import spsolve
+from fealpy.pde.poisson_2d import CosCosData
+from fealpy.pde.poisson_2d import SinSinData
+
+
 
 class SinData:
-
     def __init__(self):
         pass
 
@@ -51,10 +54,13 @@ class SinData:
 
 maxit = 4
 h = 0.1
-pde = SinData()
+# pde = SinData()
+nx = 10 
+ny = 10
+pde = SinSinData()
 
 for i in range(maxit):
-    mesh = pde.init_mesh(h=h)
+    mesh = pde.init_mesh(nx=nx, ny=ny, meshtype='stri')
 
     NN = mesh.number_of_nodes()
     node = mesh.entity('node')
@@ -62,7 +68,7 @@ for i in range(maxit):
     u = np.zeros(NN, dtype=np.float)
     b = pde.source(node)
 
-    A = -mesh.laplace_operator()
+    A = mesh.laplace_operator()
 
     isBdNode = mesh.ds.boundary_node_flag()
 
@@ -73,11 +79,11 @@ for i in range(maxit):
     print(e)
 
     if i < maxit-1:
-        h /= 2
+        # h /= 2
+        nx *= 2
+        ny *= 2
 
 fig = plt.figure()
 axes = fig.gca()
-axes.plot(node, u)
 mesh.add_plot(axes, markersize=12)
-mesh.find_node(axes, markersize=12)
 plt.show()
