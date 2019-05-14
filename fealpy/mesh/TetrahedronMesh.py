@@ -294,6 +294,7 @@ class TetrahedronMesh(Mesh3d):
 
 
     def bisect(self, isMarkedCell=None, data=None, returnim=False):
+
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NN0 = NN  # 记录下二分加密之前的节点数目
@@ -439,7 +440,7 @@ class TetrahedronMesh(Mesh3d):
             cutEdge = cutEdge[:nn]
             VAL = np.full((nn, 2), 0.5, dtype=self.ftype)
 
-            g = 2
+            g = 1
             markedNode, = np.nonzero(generation == g)
 
             N = len(markedNode)

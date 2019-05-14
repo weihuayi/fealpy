@@ -16,6 +16,7 @@ from fealpy.recovery import FEMFunctionRecoveryAlg
 from fealpy.mesh.adaptive_tools import mark
 from fealpy.tools.show import showmultirate
 
+
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=4, meshtype='tri')
 

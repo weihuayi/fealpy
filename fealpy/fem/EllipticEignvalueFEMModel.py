@@ -72,6 +72,9 @@ class EllipticEignvalueFEMModel:
         M = space.mass_matrix(integrator, area)
         return M
 
+    def u(self, p):
+        return np.sum(p, axis=-1)
+
     def alg_0(self):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
@@ -120,11 +123,15 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_h 为右端项自适应求解 -\Deta u = d*u_h
         I = eye(gdof)
+        u0 = self.u(mesh.entity('node'))
         for i in range(self.maxit):
             uh = space.function(array=uh)
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
+            ui = self.u(mesh.entity('node'))
+            u0 = IM@u0
+            print("intetpolation error: ", np.max(np.abs(ui - u0)))
 
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
