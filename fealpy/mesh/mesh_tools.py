@@ -206,7 +206,7 @@ def show_mesh_2d(
 
 def show_mesh_3d(
         axes, mesh,
-        nodecolor='k', edgecolor='k', facecolor='w',
+        nodecolor='k', edgecolor='k', facecolor='w', cellcolor='w',
         aspect='equal',
         linewidths=0.5, markersize=0,
         showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
@@ -246,13 +246,10 @@ def show_mesh_3d(
             edgecolor=edgecolor,
             alpha=alpha)
     h = axes.add_collection3d(faces)
-    minp = np.min(node, axis=0)
-    maxp = np.max(node, axis=0)
-    i = np.argmax(maxp - minp)
-    h = np.max(maxp - minp)/10
-    axes.set_xlim(minp[i]-h, maxp[i]+h)
-    axes.set_xlim(minp[i]-h, maxp[i]+h)
-    axes.set_xlim(minp[i]-h, maxp[i]+h)
+    box = np.zeros((2, 3), dtype=np.float)
+    box[0, :] = np.min(node, axis=0)
+    box[1, :] = np.max(node, axis=0)
+    axes.scatter(box[:, 0], box[:, 1], box[:, 2])
     return h
 
 

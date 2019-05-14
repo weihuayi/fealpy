@@ -51,7 +51,7 @@ for i in range(maxit):
         A = mesh.bisect(isMarkedCell, returnim=True)
 
 fig = plt.figure()
-axes = fig.gca(projection='3d')
+axes = Axes3D(fig)
 mesh.add_plot(axes, alpha=1)
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()

@@ -6,6 +6,44 @@ class example1:
         pass
 
     def init_mesh(self, n=1, meshtype='tet'):
+        node = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1]], dtype=np.float)
+
+        cell = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
+        mesh = TetrahedronMesh(node, cell)
+        mesh.uniform_refine(n)
+
+        NN = mesh.number_of_nodes()
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        bc = mesh.entity_barycenter('cell')
+        isDelCell = ((bc[:, 0] > 0) & (bc[:, 1] < 0))
+        cell = cell[~isDelCell]
+        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+
+        idxMap = np.zeros(NN, dtype=mesh.itype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+        mesh = TetrahedronMesh(node, cell)
+
+        return mesh
+
+    def init_mesh_1(self, n=1, meshtype='tet'):
         """L-shape domain
         \Omega = [0, 1]*[0, 1]*[0, 1]\[0, 0.5)*[0, 0.5)*[0, 1]
         """
