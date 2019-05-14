@@ -4,6 +4,7 @@ from scipy.sparse import eye, csr_matrix, bmat
 import scipy.io as sio
 import pyamg
 from timeit import default_timer as timer
+from mpl_toolkits.mplot3d import Axes3D
 
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..solver.eigns import picard
@@ -105,11 +106,14 @@ class EllipticEignvalueFEMModel:
         uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
 
         GD = mesh.geo_dimension()
-        if (self.step > 0) and (0 in idx) and GD == 2:
+        if (self.step > 0) and (0 in idx):
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig('mesh_0_0_' + str(NN) +'.pdf')
             plt.close()
@@ -122,11 +126,14 @@ class EllipticEignvalueFEMModel:
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
 
-            if (self.step > 0) and (i in idx) and GD == 2:
+            if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
-                axes = fig.gca()
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig('mesh_0_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
@@ -216,11 +223,14 @@ class EllipticEignvalueFEMModel:
         uh[:] = uH
 
         GD = mesh.geo_dimension()
-        if (self.step > 0) and (0 in idx) and GD == 2:
+        if (self.step > 0) and (0 in idx):
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig('mesh_1_0_' + str(NN) + '.pdf')
             plt.close()
@@ -234,11 +244,14 @@ class EllipticEignvalueFEMModel:
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
 
-            if (self.step > 0) and (i in idx) and GD == 2:
+            if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
-                axes = fig.gca()
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig('mesh_1_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
@@ -325,11 +338,14 @@ class EllipticEignvalueFEMModel:
         uh[:] = uH
 
         GD = mesh.geo_dimension()
-        if (self.step > 0) and (0 in idx) and GD == 2:
+        if (self.step > 0) and (0 in idx):
             NN = mesh.number_of_nodes()
             fig = plt.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig('mesh_2_0_' + str(NN) + '.pdf')
             plt.close()
@@ -341,11 +357,14 @@ class EllipticEignvalueFEMModel:
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
-            if (self.step > 0) and (i in idx) and GD == 2:
+            if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
-                axes = fig.gca()
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig('mesh_2_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
@@ -408,11 +427,14 @@ class EllipticEignvalueFEMModel:
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
             uh[isFreeDof], d = picard(A, M, uh[isFreeDof])
 
-            if (self.step > 0) and (i in idx) and GD == 2:
+            if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
-                axes = fig.gca()
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig('mesh_3_' + str(i) + '_' + str(NN) + '.pdf')
                 plt.close()
@@ -464,11 +486,14 @@ class EllipticEignvalueFEMModel:
             uh = space.function()
             uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
 
-            if (self.step > 0) and (i in idx) and GD == 2:
+            if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
                 fig.set_facecolor('white')
-                axes = fig.gca()
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig('mesh_4_' + str(i) + '_' + str(NN) +'.pdf')
                 plt.close()

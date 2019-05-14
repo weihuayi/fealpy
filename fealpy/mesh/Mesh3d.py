@@ -149,9 +149,9 @@ class Mesh3d():
 
     def add_plot(
             self, plot,
-            nodecolor='k', edgecolor='k',
+            nodecolor='k', edgecolor='k', facecolor='w', cellcolor='w',
             aspect='equal',
-            linewidths=2, markersize=20,
+            linewidths=0.5, markersize=20,
             showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
         if isinstance(plot, ModuleType):
@@ -163,7 +163,9 @@ class Mesh3d():
 
         return show_mesh_3d(
                 axes, self,
-                nodecolor=nodecolor, edgecolor=edgecolor, aspect=aspect,
+                nodecolor=nodecolor, edgecolor=edgecolor,
+                facecolor=facecolor, cellcolor=cellcolor,
+                aspect=aspect,
                 linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis, alpha=alpha, shownode=shownode,
                 showedge=showedge,

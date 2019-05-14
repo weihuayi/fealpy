@@ -66,7 +66,7 @@ for i in range(maxit):
         print('Interpolation error: ', np.max(np.abs(ui - u0)))
 
 fig = plt.figure()
-axes = fig.gca(projection='3d')
+axes = Axes3D(fig)
 mesh.add_plot(axes, alpha=1)
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
 plt.show()
