@@ -15,6 +15,14 @@ from fealpy.recovery import FEMFunctionRecoveryAlg
 from fealpy.mesh.adaptive_tools import mark
 from fealpy.tools.show import showmultirate
 
+
+def u(p):
+    x = p[:, 0]
+    y = p[:, 1]
+    z = p[:, 2]
+    return x + y + z
+
+
 pde = LShapeRSinData()
 mesh = pde.init_mesh(n=2, meshtype='tet')
 
@@ -31,6 +39,9 @@ errorType = ['$|| u_I - u_h ||_{l_2}$',
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+
+node = mesh.entity('node')
+u0 = u(node)
 
 for i in range(maxit):
     print('step:', i)
@@ -49,6 +60,10 @@ for i in range(maxit):
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
         A = mesh.bisect(isMarkedCell, returnim=True)
+        node = mesh.entity('node')
+        ui = u(node)
+        u0 = A@u0
+        print('Interpolation error: ', np.max(np.abs(ui - u0)))
 
 fig = plt.figure()
 axes = fig.gca(projection='3d')
