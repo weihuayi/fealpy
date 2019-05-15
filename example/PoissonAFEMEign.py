@@ -83,24 +83,25 @@ model = EllipticEignvalueFEMModel(
         step=step,
         n=3,  # 初始网格加密次数
         p=1,  # 线性元
-        q=3)  # 积分精度
+        q=3,  # 积分精度
+        resultdir='/home/why/result/')
 
 u0 = model.alg_0()
 
-#  u1 = model.alg_1()
-#  u2 = model.alg_2()
-#  u3 = model.alg_3()
-#  u4 = model.alg_4()
-#  
-#  
-#  model.savesolution(u0, 'u0.mat')
-#  model.savesolution(u1, 'u1.mat')
-#  model.savesolution(u2, 'u2.mat')
-#  model.savesolution(u3, 'u3.mat')
-#  model.savesolution(u4, 'u4.mat')
-#  model.savemesh(u0, 'mesh0.mat')
-#  model.savemesh(u1, 'mesh1.mat')
-#  model.savemesh(u2, 'mesh2.mat')
-#  model.savemesh(u3, 'mesh3.mat')
-#  model.savemesh(u4, 'mesh4.mat')
+u1 = model.alg_1()
+u2 = model.alg_2()
+u3 = model.alg_3()
+u4 = model.alg_4()
+
+
+model.savesolution(u0, 'u0.mat')
+model.savesolution(u1, 'u1.mat')
+model.savesolution(u2, 'u2.mat')
+model.savesolution(u3, 'u3.mat')
+model.savesolution(u4, 'u4.mat')
+model.savemesh(u0, 'mesh0.mat')
+model.savemesh(u1, 'mesh1.mat')
+model.savemesh(u2, 'mesh2.mat')
+model.savemesh(u3, 'mesh3.mat')
+model.savemesh(u4, 'mesh4.mat')
 

@@ -13,7 +13,8 @@ from ..mesh.adaptive_tools import mark
 
 
 class EllipticEignvalueFEMModel:
-    def __init__(self, pde, theta=0.2, maxit=30, step=0, n=3, p=1, q=3):
+    def __init__(self, pde, theta=0.2, maxit=30, step=0, n=3, p=1, q=3,
+            resultdir='~/'):
         self.pde = pde
         self.step = step
         self.theta = theta
@@ -21,6 +22,7 @@ class EllipticEignvalueFEMModel:
         self.p = p
         self.q = q
         self.numrefine = n
+        self.resultdir = resultdir
 
     def residual_estimate(self, uh):
         mesh = uh.space.mesh
@@ -118,7 +120,7 @@ class EllipticEignvalueFEMModel:
             else:
                 axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_0_0_' + str(NN) +'.pdf')
+            fig.savefig(self.resultdir + 'mesh_0_0_' + str(NN) +'.pdf')
             plt.close()
 
         # 2. 以 u_h 为右端项自适应求解 -\Deta u = d*u_h
@@ -142,7 +144,7 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig('mesh_0_' + str(i+1) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_0_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
 
             I = IM@I
@@ -239,7 +241,7 @@ class EllipticEignvalueFEMModel:
             else:
                 axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_1_0_' + str(NN) + '.pdf')
+            fig.savefig(self.resultdir + 'mesh_1_0_' + str(NN) + '.pdf')
             plt.close()
 
 
@@ -260,7 +262,7 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig('mesh_1_' + str(i+1) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_1_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
 
             I = IM@I
@@ -354,7 +356,7 @@ class EllipticEignvalueFEMModel:
             else:
                 axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
-            fig.savefig('mesh_2_0_' + str(NN) + '.pdf')
+            fig.savefig(self.resultdir + 'mesh_2_0_' + str(NN) + '.pdf')
             plt.close()
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
@@ -373,7 +375,7 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig('mesh_2_' + str(i+1) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_2_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
 
             I = IM@I
@@ -443,7 +445,7 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig('mesh_3_' + str(i) + '_' + str(NN) + '.pdf')
+                fig.savefig(self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.pdf')
                 plt.close()
 
             if i < self.maxit:
@@ -502,7 +504,7 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig('mesh_4_' + str(i) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.pdf')
                 plt.close()
 
             if i < self.maxit:
@@ -521,7 +523,7 @@ class EllipticEignvalueFEMModel:
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         data = {'node': node, 'elem': cell+1}
-        sio.matlab.savemat(fname, data)
+        sio.matlab.savemat(self.resultdir + fname, data)
 
 
     def savesolution(self, uh, fname):
@@ -529,4 +531,4 @@ class EllipticEignvalueFEMModel:
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         data = {'node': node, 'elem': cell+1, 'solution': uh}
-        sio.matlab.savemat(fname, data)
+        sio.matlab.savemat(self.resultdir + fname, data)

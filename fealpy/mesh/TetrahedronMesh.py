@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import spdiags, eye, tril, triu, bmat
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature
@@ -297,7 +298,6 @@ class TetrahedronMesh(Mesh3d):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
-        NN0 = NN  # 记录下二分加密之前的节点数目
 
         if isMarkedCell is None:
             markedCell = np.arange(NC, dtype=self.itype)
@@ -324,6 +324,7 @@ class TetrahedronMesh(Mesh3d):
 
         # 非协调边的标记数组 
         nonConforming = np.ones(8*NN, dtype=np.bool)
+        IM = eye(NN)
         while len(markedCell) != 0:
             # 标记最长边
             self.label(node, cell, markedCell)
@@ -375,6 +376,17 @@ class TetrahedronMesh(Mesh3d):
                 cutEdge[newCutEdge, 1] = j
                 cutEdge[newCutEdge, 2] = range(NN, NN+nNew)
                 node[NN:NN+nNew, :] = (node[i, :] + node[j, :])/2.0
+                if returnim is True:
+                    val = np.full(nNew, 0.5)
+                    I = coo_matrix(
+                            (val, (range(nNew), i)), shape=(nNew, NN),
+                            dtype=self.ftype)
+                    I += coo_matrix(
+                            (val, (range(nNew), j)), shape=(nNew, NN),
+                            dtype=self.ftype)
+                    I = bmat([[eye(NN)], [I]], format='csr')
+                    IM = I@IM
+
                 nCut += nNew
                 NN += nNew
 
@@ -427,55 +439,13 @@ class TetrahedronMesh(Mesh3d):
             nonConforming[checkEdge] = False
             nonConforming[checkEdge[j]] = True;
 
-        if returnim is True:
-            nn = NN - NN0
-            IM = coo_matrix(
-                    (
-                        np.ones(NN0),
-                        (
-                            np.arange(NN0),
-                            np.arange(NN0)
-                        )
-                    ), shape=(NN, NN0), dtype=self.ftype)
-            cutEdge = cutEdge[:nn]
-            VAL = np.full((nn, 2), 0.5, dtype=self.ftype)
-
-            g = 1
-            markedNode, = np.nonzero(generation == g)
-
-            N = len(markedNode)
-            while N != 0:
-                nidx = markedNode - NN0
-                i = cutEdge[nidx, 0]
-                j = cutEdge[nidx, 1]
-                ic = np.zeros((N, 2), dtype=self.ftype)
-                jc = np.zeros((N, 2), dtype=self.ftype)
-                ic[i < NN0, 0] = 1.0
-                jc[j < NN0, 1] = 1.0
-                ic[i >= NN0, :] = VAL[i[i >= NN0] - NN0, :]
-                jc[j >= NN0, :] = VAL[j[j >= NN0] - NN0, :]
-                VAL[markedNode - NN0, :] = 0.5*(ic + jc)
-                cutEdge[nidx[i >= NN0], 0] = cutEdge[i[i >= NN0] - NN0, 0]
-                cutEdge[nidx[j >= NN0], 1] = cutEdge[j[j >= NN0] - NN0, 1]
-                g += 1
-                markedNode, = np.nonzero(generation == g)
-                N = len(markedNode)
-
-            IM += coo_matrix(
-                    (
-                        VAL.flat,
-                        (
-                            cutEdge[:, [2, 2]].flat,
-                            cutEdge[:, [0, 1]].flat
-                        )
-                    ), shape=(NN, NN0), dtype=self.ftype)
 
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
 
         if returnim is True:
-            return IM.tocsr()
+            return IM
 
     def uniform_refine(self, n=1):
         for i in range(n):
