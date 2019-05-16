@@ -3,10 +3,10 @@
 
 import sys
 from fealpy.pde.poisson_2d import LShapeRSinData
-from fealpy.pde.ElgenvalueData2d import example1data
-from fealpy.pde.ElgenvalueData2d import example3_A
-from fealpy.pde.ElgenvalueData2d import example3_B
-from fealpy.pde.ElgenvalueData3d import example1
+from fealpy.pde.EigenvalueData2d import example1data
+from fealpy.pde.EigenvalueData2d import example3_A
+from fealpy.pde.EigenvalueData2d import example3_B
+from fealpy.pde.EigenvalueData3d import example1
 
 
 from fealpy.fem import EllipticEignvalueFEMModel

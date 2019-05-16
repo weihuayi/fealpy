@@ -153,7 +153,7 @@ class Mesh2d():
     def edge_frame(self, index=None):
         t = self.edge_unit_tagent(index=index)
         w = np.array([(0,-1),(1,0)])
-        n = v@w
+        n = t@w
         return n, t
     def edge_unit_normal(self, index=None):
         #TODO: 3D Case
