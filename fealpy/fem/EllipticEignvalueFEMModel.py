@@ -67,7 +67,11 @@ class EllipticEignvalueFEMModel:
         return np.sqrt(eta)
 
     def get_stiff_matrix(self, space, integrator, area):
-        A = space.stiff_matrix(integrator, area)
+        try:
+            A = space.stiff_matrix(integrator, area,
+                    cfun=self.pde.diffusion_coefficient)
+        except AttributeError:
+            A = space.stiff_matrix(integrator, area)
         return A
 
     def get_mass_matrix(self, space, integrator, area):
@@ -122,19 +126,15 @@ class EllipticEignvalueFEMModel:
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig(self.resultdir + 'mesh_0_0_' + str(NN) +'.pdf')
             plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_0_0_' + str(NN) +'.mat')
 
         # 2. 以 u_h 为右端项自适应求解 -\Deta u = d*u_h
         I = eye(gdof)
-        u0 = self.u(mesh.entity('node'))
         for i in range(self.maxit):
             uh = space.function(array=uh)
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
-            ui = self.u(mesh.entity('node'))
-            u0 = IM@u0
-            print("intetpolation error: ", np.max(np.abs(ui - u0)))
-
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
@@ -146,6 +146,9 @@ class EllipticEignvalueFEMModel:
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig(self.resultdir + 'mesh_0_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
+                self.savemesh(
+                        mesh,
+                        self.resultdir + 'mesh_0_' + str(i+1) + '_' + str(NN) +'.mat')
 
             I = IM@I
             uh = IM@uh
@@ -243,6 +246,8 @@ class EllipticEignvalueFEMModel:
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig(self.resultdir + 'mesh_1_0_' + str(NN) + '.pdf')
             plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_1_0_' + str(NN) + '.mat')
 
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
@@ -264,6 +269,8 @@ class EllipticEignvalueFEMModel:
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig(self.resultdir + 'mesh_1_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_1_' + str(i+1) + '_' + str(NN) +'.mat')
 
             I = IM@I
             uH = IM@uH
@@ -358,6 +365,7 @@ class EllipticEignvalueFEMModel:
             mesh.add_plot(axes, cellcolor='w')
             fig.savefig(self.resultdir + 'mesh_2_0_' + str(NN) + '.pdf')
             plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_2_0_' + str(NN) + '.mat')
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
@@ -377,6 +385,8 @@ class EllipticEignvalueFEMModel:
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig(self.resultdir + 'mesh_2_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_2_' + str(i+1) + '_' + str(NN) +'.mat')
 
             I = IM@I
             uH = IM@uH
@@ -386,8 +396,8 @@ class EllipticEignvalueFEMModel:
             print(i+1, ": ", gdof)
 
             area = mesh.entity_measure('cell')
-            A = space.stiff_matrix(integrator, area)
-            M = space.mass_matrix(integrator, area)
+            A = self.get_stiff_matrix(space, integrator, area)
+            M = self.get_mass_matrix(space, integrator, area)
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
@@ -447,6 +457,8 @@ class EllipticEignvalueFEMModel:
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig(self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.pdf')
                 plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.mat')
 
             if i < self.maxit:
                 uh = space.function(array=uh)
@@ -506,6 +518,8 @@ class EllipticEignvalueFEMModel:
                 mesh.add_plot(axes, cellcolor='w')
                 fig.savefig(self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.pdf')
                 plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.mat')
 
             if i < self.maxit:
                 eta = self.residual_estimate(uh)
@@ -518,12 +532,11 @@ class EllipticEignvalueFEMModel:
         print("smallest eigns:", d, "with time: ", end - start)
         return uh
 
-    def savemesh(self, uh, fname):
-        mesh = uh.space.mesh
+    def savemesh(self, mesh, fname):
         node = mesh.entity('node')
         cell = mesh.entity('cell')
         data = {'node': node, 'elem': cell+1}
-        sio.matlab.savemat(self.resultdir + fname, data)
+        sio.matlab.savemat(fname, data)
 
 
     def savesolution(self, uh, fname):

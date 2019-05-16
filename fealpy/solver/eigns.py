@@ -12,12 +12,12 @@ def picard(A, M, u0, tol=1e-12, atol = 1e-12, ml=None):
         L0 = u1@M@u1
         L1 = u1@A@u1
         d1 = L1/L0
-        if norm(u1 - u0, ord=1)/norm(u1, ord=1) < tol or np.abs(d1 - d0) < atol:
-            u0 = u1/np.max(np.abs(u1))
+        if np.max(np.abs(u1 - u0)) < tol or np.abs(d1 - d0) < atol:
+            u0 = u1/np.sqrt(L0)
             d0 = d1
             break
         else:
-            u0 = u1/np.max(np.abs(u1))
+            u0 = u1/np.sqrt(L0)
             d0 = d1
 
     return u0, d0

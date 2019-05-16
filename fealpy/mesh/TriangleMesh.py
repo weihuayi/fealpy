@@ -40,10 +40,23 @@ class TriangleMesh(Mesh2d):
     def copy(self):
         return TriangleMesh(self.node.copy(), self.ds.cell.copy());
 
-    def delete_cell(self, dflag):
-        cell = self.entity('cell')
-        cell = cell[~dflag]
+    def delete_cell(self, threshold):
         NN = self.number_of_nodes()
+
+        cell = self.entity('cell')
+        bc = mesh.entity_barycenter('cell')
+        isKeepCell = ~threshold(bc)
+        cell = cell[isKeepCell]
+
+        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+
+        idxMap = np.zeros(NN, dtype=mesh.itype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+        self.node = node
+        NN = len(node)
         self.ds.reinit(NN, cell)
 
     def circumcenter(self):

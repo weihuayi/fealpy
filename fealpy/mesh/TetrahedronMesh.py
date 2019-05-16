@@ -54,6 +54,25 @@ class TetrahedronMesh(Mesh3d):
     def integrator(self, k):
         return TetrahedronQuadrature(k)
 
+    def delete_cell(self, threshold):
+        NN = self.number_of_nodes()
+
+        cell = self.entity('cell')
+        bc = mesh.entity_barycenter('cell')
+        isKeepCell = ~threshold(bc)
+        cell = cell[isKeepCell]
+
+        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+
+        idxMap = np.zeros(NN, dtype=mesh.itype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+        self.node = node
+        NN = len(node)
+        self.ds.reinit(NN, cell)
+
     def direction(self, i):
         """ Compute the direction on every vertex of
 
@@ -127,7 +146,7 @@ class TetrahedronMesh(Mesh3d):
         NC = self.number_of_cells()
         node = self.node
         cell = self.ds.cell
-        localFace = self.ds.localFace 
+        localFace = self.ds.localFace
         n = [np.cross(node[cell[:, j],:] - node[cell[:, i],:],
             node[cell[:, k],:] - node[cell[:, i],:]) for i, j, k in localFace]
         l =[ np.sqrt(np.sum(ni**2, axis=1)) for ni in n]

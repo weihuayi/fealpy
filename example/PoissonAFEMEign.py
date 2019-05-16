@@ -2,12 +2,9 @@
 # 
 
 import sys
-from fealpy.pde.poisson_2d import LShapeRSinData
-from fealpy.pde.EigenvalueData2d import example1data
-from fealpy.pde.EigenvalueData2d import example3_A
-from fealpy.pde.EigenvalueData2d import example3_B
-from fealpy.pde.EigenvalueData3d import example1
-
+from fealpy.pde.EigenvalueData2d import EigenLShape2d 
+from fealpy.pde.EigenvalueData2d import EigenSquareDC 
+from fealpy.pde.EigenvalueData2d import EigenGWWA, EigenGWWB
 
 from fealpy.fem import EllipticEignvalueFEMModel
 
@@ -68,13 +65,8 @@ maxit : %d
 """ % (theta, maxit, step)
 print(info)
 
-
-#pde = LShapeRSinData()
-#pde = example1data()
-#pde = example3_A()
-#pde = example3_B()
-pde = example1()
-
+pde = EigenLShape2d()
+pde = EigenSquareDC()
 
 model = EllipticEignvalueFEMModel(
         pde,
@@ -87,7 +79,6 @@ model = EllipticEignvalueFEMModel(
         resultdir='/home/why/result/')
 
 u0 = model.alg_0()
-
 u1 = model.alg_1()
 u2 = model.alg_2()
 u3 = model.alg_3()
@@ -99,9 +90,4 @@ model.savesolution(u1, 'u1.mat')
 model.savesolution(u2, 'u2.mat')
 model.savesolution(u3, 'u3.mat')
 model.savesolution(u4, 'u4.mat')
-model.savemesh(u0, 'mesh0.mat')
-model.savemesh(u1, 'mesh1.mat')
-model.savemesh(u2, 'mesh2.mat')
-model.savemesh(u3, 'mesh3.mat')
-model.savemesh(u4, 'mesh4.mat')
 

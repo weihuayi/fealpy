@@ -1,20 +1,28 @@
 import numpy as np
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
 
-class example1:
+
+class LShape3d:
+    """
+    example 4.4
+
+    -\Delta u = \lambda u in \Omega
+    u = 0 on \partial \Omega
+    """
+
     def __init__(self):
         pass
 
     def init_mesh(self, n=1, meshtype='tet'):
         node = np.array([
-            [-1, -1, -1],
-            [1, -1, -1],
-            [1, 1, -1],
-            [-1, 1, -1],
-            [-1, -1, 1],
-            [1, -1, 1],
+            [0, 0, 0],
+            [1, 0, 0],
+            [1, 1, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [1, 0, 1],
             [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float)
+            [0, 1, 1]], dtype=np.float)
 
         cell = np.array([
             [0, 1, 2, 6],
@@ -25,104 +33,26 @@ class example1:
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
-
-        NN = mesh.number_of_nodes()
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-        bc = mesh.entity_barycenter('cell')
-        isDelCell = ((bc[:, 0] > 0) & (bc[:, 1] < 0))
-        cell = cell[~isDelCell]
-        isValidNode = np.zeros(NN, dtype=np.bool)
-        isValidNode[cell] = True
-        node = node[isValidNode]
-
-        idxMap = np.zeros(NN, dtype=mesh.itype)
-        idxMap[isValidNode] = range(isValidNode.sum())
-        cell = idxMap[cell]
-        mesh = TetrahedronMesh(node, cell)
-
-        return mesh
-
-    def init_mesh_1(self, n=1, meshtype='tet'):
-        """L-shape domain
-        \Omega = [0, 1]*[0, 1]*[0, 1]\[0, 0.5)*[0, 0.5)*[0, 1]
-        """
-        node = np.array([
-            [0.5, 0, 0],
-            [1, 0, 0],
-            [0, 0.5, 0],
-            [0.5, 0.5, 0],
-            [1, 0.5, 0],
-            [0, 1, 0],
-            [0.5, 1, 0],
-            [1, 1, 0],
-            [0.5, 0, 0.5],
-            [1, 0, 0.5],
-            [0, 0.5, 0.5],
-            [0.5, 0.5, 0.5],
-            [1, 0.5, 0.5],
-            [0, 1, 0.5],
-            [0.5, 1, 0.5],
-            [1, 1, 0.5],
-            [0.5, 0, 1],
-            [1, 0, 1],
-            [0, 0.5, 1],
-            [0.5, 0.5, 1],
-            [1, 0.5, 1],
-            [0, 1, 1],
-            [0.5, 1, 1],
-            [1, 1, 1]], dtype=np.float)
-
-        cell = np.array([
-            [1,4,3,11],
-            [1,12,4,11],
-            [1,9,12,11],
-            [1,8,9,11],
-            [1,0,8,11],
-            [1,3,0,11],
-            [3,6,5,13],
-            [3,14,6,13],
-            [3,11,14,13],
-            [3,10,11,13],
-            [3,2,10,13],
-            [3,5,2,13],
-            [4,7,6,14],
-            [4,15,7,14],
-            [4,12,15,14],
-            [4,11,12,14],
-            [4,3,11,14],
-            [4,6,3,14],
-            [9,12,11,19],
-            [9,20,12,19],
-            [9,17,20,19],
-            [9,16,17,19],
-            [9,8,16,19],
-            [9,11,8,19],
-            [11,14,13,21],
-            [11,22,14,21],
-            [11,19,22,21],
-            [11,18,19,21],
-            [11,10,18,21],
-            [11,13,10,21],
-            [12,15,14,22],
-            [12,23,15,22],
-            [12,20,23,22],
-            [12,19,20,22],
-            [12,11,19,22],
-            [12,14,11,22]], dtype=np.int)
-
-        mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
+        mesh.delete_cell(lambda bc: bc[:, 0] < 0.5 & bc[:, 1] < 0.5)
         return mesh
 
     def solution(self, p):
-
         return 0
 
     def Dirichlet(self, p):
         return self.solution(p)
 
-class example2:
+
+class HarmonicOscillator:
+    """
+    example 4.5
+
+    -1/2*\Delta u + 1/2*|x|^2 u = \lambda u  in R^3
+
+    lambda = 1.5
+
+    u = c exp(-|x|^2/2)
+    """
     def __init__(self):
         pass
 
@@ -132,161 +62,83 @@ class example2:
         5.5]
         """
         node = np.array([
-            [0, -5.5, -5.5],
+            [-5.5, -5.5, -5.5],
             [5.5, -5.5, -5.5],
-            [-5.5, 0, -5.5],
-            [0, 0, -5.5],
-            [5.5, 0, -5.5],
-            [-5.5, 5.5, -5.5],
-            [0, 5.5, -5.5],
             [5.5, 5.5, -5.5],
-            [0, -5.5, 0],
-            [5.5, -5.5, 0],
-            [-5.5, 0, 0],
-            [0, 0, 0],
-            [5.5, 0, 0],
-            [-5.5, 5.5, 0],
-            [0, 5.5, 0],
-            [5.5, 5.5, 0],
-            [0, -5.5, 5.5],
+            [-5.5, 5.5, -5.5],
+            [-5.5, -5.5, 5.5],
             [5.5, -5.5, 5.5],
-            [-5.5, 0, 5.5],
-            [0, 0, 5.5],
-            [5.5, 0, 5.5],
-            [-5.5, 5.5, 5.5],
-            [0, 5.5, 5.5],
-            [5.5, 5.5, 5.5]], dtype=np.float)
+            [5.5, 5.5, 5.5],
+            [-5.5, 5.5, 5.5]], dtype=np.float)
 
         cell = np.array([
-            [1,4,3,11],
-            [1,12,4,11],
-            [1,9,12,11],
-            [1,8,9,11],
-            [1,0,8,11],
-            [1,3,0,11],
-            [3,6,5,13],
-            [3,14,6,13],
-            [3,11,14,13],
-            [3,10,11,13],
-            [3,2,10,13],
-            [3,5,2,13],
-            [4,7,6,14],
-            [4,15,7,14],
-            [4,12,15,14],
-            [4,11,12,14],
-            [4,3,11,14],
-            [4,6,3,14],
-            [9,12,11,19],
-            [9,20,12,19],
-            [9,17,20,19],
-            [9,16,17,19],
-            [9,8,16,19],
-            [9,11,8,19],
-            [11,14,13,21],
-            [11,22,14,21],
-            [11,19,22,21],
-            [11,18,19,21],
-            [11,10,18,21],
-            [11,13,10,21],
-            [12,15,14,22],
-            [12,23,15,22],
-            [12,20,23,22],
-            [12,19,20,22],
-            [12,11,19,22],
-            [12,14,11,22]], dtype=np.int)
-
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
 
-    def solution(self, p):
-        x = p[..., 1]
-        val = c*exp(-abs(x)**2/2)
+    def diffusion_coefficient(self, p):
+        return 0.5
 
+    def reaction_coefficient(self, p):
+        return 0.5*np.sum(p**2, axis=-1)
+
+    def solution(self, p):
+        val = np.exp(-np.sum(p**2, axis=-1)/2)
         return val
+
+    def smallest_eignvalue(self):
+        return 1.5
 
     def Dirichlet(self, p):
         return self.solution(p)
 
-class example3:
+
+class Schrodinger:
+    """
+    example  4.6
+
+    \init_R^3  |u|^2 dx = 1
+    \lambda_n = -1/(2*n*n)
+    """
     def __init__(self):
         pass
 
     def init_mesh(self, n=1, meshtype='tet'):
-        """L-shape domain
-        \Omega = [-20, 20]*[-20, 20]*[-20, 20]\[-20, 0)*[-20, 0)*[-20, 20]
-        """
         node = np.array([
-            [0, -20, -20],
+            [-20, -20, -20],
             [20, -20, -20],
-            [-20, 0, -20],
-            [0, 0, -20],
-            [20, 0, -20],
-            [-20, 20, -20],
-            [0, 20, -20],
             [20, 20, -20],
-            [0, -20, 0],
-            [20, -20, 0],
-            [-20, 0, 0],
-            [0, 0, 0],
-            [20, 0, 0],
-            [-20, 20, 0],
-            [0, 20, 0],
-            [20, 20, 0],
-            [0, -20, 20],
+            [-20, 20, -20],
+            [-20, -20, 20],
             [20, -20, 20],
-            [-20, 0, 20],
-            [0, 0, 20],
-            [20, 0, 20],
-            [-20, 20, 20],
-            [0, 20, 20],
-            [20, 20, 20]], dtype=np.float)
+            [20, 20, 20],
+            [-20, 20, 20]], dtype=np.float)
 
         cell = np.array([
-            [1,4,3,11],
-            [1,12,4,11],
-            [1,9,12,11],
-            [1,8,9,11],
-            [1,0,8,11],
-            [1,3,0,11],
-            [3,6,5,13],
-            [3,14,6,13],
-            [3,11,14,13],
-            [3,10,11,13],
-            [3,2,10,13],
-            [3,5,2,13],
-            [4,7,6,14],
-            [4,15,7,14],
-            [4,12,15,14],
-            [4,11,12,14],
-            [4,3,11,14],
-            [4,6,3,14],
-            [9,12,11,19],
-            [9,20,12,19],
-            [9,17,20,19],
-            [9,16,17,19],
-            [9,8,16,19],
-            [9,11,8,19],
-            [11,14,13,21],
-            [11,22,14,21],
-            [11,19,22,21],
-            [11,18,19,21],
-            [11,10,18,21],
-            [11,13,10,21],
-            [12,15,14,22],
-            [12,23,15,22],
-            [12,20,23,22],
-            [12,19,20,22],
-            [12,11,19,22],
-            [12,14,11,22]], dtype=np.int)
-
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
 
     def solution(self, p):
-
         return 0
+
+    def diffusion_coefficient(self, p):
+        return 0.5
+
+    def reaction_coefficient(self, p):
+        return -0.5*np.sum(p**2, axis=-1)
 
     def Dirichlet(self, p):
         return self.solution(p)

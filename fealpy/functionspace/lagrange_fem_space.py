@@ -340,12 +340,12 @@ class LagrangeFiniteElementSpace():
                 dgphi = np.einsum('m, ...im->...im', d, gphi)
             elif isinstance(d, np.ndarray):
                 if len(d.shape) == 1:
-                    dgphi = np.einsum('i, ...im->...im', d, gphi)
+                    dgphi = np.einsum('i, ...imn->...imn', d, gphi)
                 elif len(d.shape) == 2:
-                    dgphi = np.einsum('im, ...im->...im', d, gphi)
-                elif len(d.shape) == 3:
-                    dgphi = np.einsum('imn, ...in->...im', d, gphi)
-                elif len(d.shape) == 4:
+                    dgphi = np.einsum('...i, ...imn->...imn', d, gphi)
+                elif len(d.shape) == 3: #TODO:
+                    dgphi = np.einsum('...imn, ...in->...im', d, gphi)
+                elif len(d.shape) == 4: #TODO:
                     dgphi = np.einsum('...imn, ...in->...im', d, gphi)
                 else:
                     raise ValueError("The ndarray shape length should < 5!")
