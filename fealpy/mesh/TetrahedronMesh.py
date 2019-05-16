@@ -51,9 +51,6 @@ class TetrahedronMesh(Mesh3d):
         VTK_TETRA = 10
         return VTK_TETRA
 
-    def to_vtk_object(self, vtk):
-        pass
-
     def integrator(self, k):
         return TetrahedronQuadrature(k)
 

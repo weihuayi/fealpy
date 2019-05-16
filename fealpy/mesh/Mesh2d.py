@@ -38,30 +38,6 @@ class Mesh2d():
     def top_dimension(self):
         return 2
 
-    def barycenter(self, etype='cell', index=None):
-        node = self.node
-        if etype in ['cell', 2]:
-            cell = self.ds.cell
-            if index is None:
-                bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
-            else:
-                bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
-        elif etype in ['edge', 'face', 1]:
-            edge = self.ds.edge
-            if index is None:
-                bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
-            else:
-                bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
-        elif etype in ['node', 0]:
-            if index is None:
-                bc = node
-            else:
-                bc = node[index]
-        else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
-        return bc
-
-
     def entity(self, etype=2):
         if etype in ['cell', 2]:
             return self.ds.cell
@@ -105,9 +81,7 @@ class Mesh2d():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-
     def face_unit_normal(self, index=None):
-        #TODO: 3D Case
         v = self.face_unit_tagent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
