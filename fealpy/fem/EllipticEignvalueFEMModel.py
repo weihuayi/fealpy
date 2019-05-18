@@ -29,7 +29,7 @@ class EllipticEignvalueFEMModel:
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
 
-        n = mesh.face_normal()
+        n = mesh.face_unit_normal()
         bc = np.array([1/(GD+1)]*(GD+1), dtype=mesh.ftype)
         grad = uh.grad_value(bc)
 
@@ -60,10 +60,11 @@ class EllipticEignvalueFEMModel:
 
         cell2cell = mesh.ds.cell_to_cell()
         cell2face = mesh.ds.cell_to_face()
+        measure = mesh.entity_measure('cell')
         J = 0
         for i in range(cell2cell.shape[1]):
             J += np.sum((grad - grad[cell2cell[:, i]])*n[cell2face[:, i]], axis=-1)**2
-        return np.sqrt(J)
+        return np.sqrt(J*measure)
 
     def get_stiff_matrix(self, space, integrator, area):
         try:

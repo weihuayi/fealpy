@@ -2,7 +2,7 @@ import numpy as np
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
 
 
-class LShape3d:
+class EigenLShape3d:
     """
     example 4.4
 
@@ -33,7 +33,7 @@ class LShape3d:
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
-        mesh.delete_cell(lambda bc: bc[:, 0] < 0.5 & bc[:, 1] < 0.5)
+        mesh.delete_cell(lambda bc: (bc[:, 0] < 0.5) & (bc[:, 1] < 0.5))
         return mesh
 
     def solution(self, p):
