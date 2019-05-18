@@ -72,6 +72,13 @@ class EllipticEignvalueFEMModel:
                     cfun=self.pde.diffusion_coefficient)
         except AttributeError:
             A = space.stiff_matrix(integrator, area)
+
+        try:
+            A += space.mass_matrix(integrator, area,
+                    cfun=self.pde.reaction_coefficient)
+        except AttributeError:
+            pass
+
         return A
 
     def get_mass_matrix(self, space, integrator, area):

@@ -327,7 +327,7 @@ class LagrangeFiniteElementSpace():
         if p == 0:
             raise ValueError('The space order is 0!')
 
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
         gphi = self.grad_basis(bcs)
 
         if cfun is not None:
@@ -376,7 +376,7 @@ class LagrangeFiniteElementSpace():
             M = spdiags(cellmeasure, 0, NC, NC)
             return M
 
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
 
         if cfun is not None:

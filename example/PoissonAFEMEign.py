@@ -8,6 +8,9 @@ from fealpy.pde.EigenvalueData2d import EigenCrack
 from fealpy.pde.EigenvalueData2d import EigenGWWA, EigenGWWB
 
 from fealpy.pde.EigenvalueData3d import EigenLShape3d
+from fealpy.pde.EigenvalueData3d import EigenHarmonicOscillator3d
+from fealpy.pde.EigenvalueData3d import EigenSchrodinger3d
+
 
 from fealpy.fem import EllipticEignvalueFEMModel
 
@@ -71,7 +74,9 @@ print(info)
 # pde = EigenLShape2d()
 # pde = EigenSquareDC()
 # pde = EigenCrack()
-pde = EigenLShape3d()
+
+#pde = EigenLShape3d()
+pde = EigenHarmonicOscillator3d()
 
 model = EllipticEignvalueFEMModel(
         pde,
@@ -83,11 +88,11 @@ model = EllipticEignvalueFEMModel(
         q=3,  # 积分精度
         resultdir='/home/why/result/')
 
-u0 = model.alg_0(maxit=40)
-u1 = model.alg_1(maxit=41)
-u2 = model.alg_2(maxit=41)
-u3 = model.alg_3(maxit=40)
-u4 = model.alg_4(maxit=41)
+u0 = model.alg_0()
+u1 = model.alg_1()
+u2 = model.alg_2()
+u3 = model.alg_3()
+u4 = model.alg_4()
 model.savesolution(u0, 'u0.mat')
 model.savesolution(u1, 'u1.mat')
 model.savesolution(u2, 'u2.mat')

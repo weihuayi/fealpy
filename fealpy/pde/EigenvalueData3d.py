@@ -43,7 +43,7 @@ class EigenLShape3d:
         return self.solution(p)
 
 
-class HarmonicOscillator:
+class EigenHarmonicOscillator3d:
     """
     example 4.5
 
@@ -99,7 +99,7 @@ class HarmonicOscillator:
         return self.solution(p)
 
 
-class Schrodinger:
+class EigenSchrodinger3d:
     """
     example  4.6
 
