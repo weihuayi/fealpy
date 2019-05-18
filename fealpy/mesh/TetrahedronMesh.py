@@ -311,12 +311,16 @@ class TetrahedronMesh(Mesh3d):
             self.ds.construct()
 
 
+    def uniform_bisect(self, n=1):
+        for i in range(2*n):
+            self.bisect()
+
     def bisect(self, isMarkedCell=None, data=None, returnim=False):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
-        if isMarkedCell is None:
+        if isMarkedCell is None: # 加密所有的单元
             markedCell = np.arange(NC, dtype=self.itype)
         else:
             markedCell, = np.nonzero(isMarkedCell)
@@ -333,11 +337,8 @@ class TetrahedronMesh(Mesh3d):
         # 用于记录被二分的边及其中点编号
         cutEdge = np.zeros((8*NN, 3), dtype=self.itype)
 
-
         # 当前的二分边的数目
         nCut = 0
-
-
 
         # 非协调边的标记数组 
         nonConforming = np.ones(8*NN, dtype=np.bool)
@@ -381,10 +382,10 @@ class TetrahedronMesh(Mesh3d):
                     (
                         np.ones(NE, dtype=np.bool),
                         (
-                            cellCutEdge[0, :],
-                            cellCutEdge[1, :]
+                            cellCutEdge[0, ...],
+                            cellCutEdge[1, ...]
                         )
-                    ), shape=(NN, NN))
+                    ), shape=(NN, NN), dtype=np.bool)
                 # 获得唯一的边 
                 i, j = s.nonzero()
                 nNew = len(i)

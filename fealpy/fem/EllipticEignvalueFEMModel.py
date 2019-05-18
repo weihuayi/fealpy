@@ -81,7 +81,7 @@ class EllipticEignvalueFEMModel:
     def u(self, p):
         return np.sum(p, axis=-1)
 
-    def alg_0(self):
+    def alg_0(self, maxit=None):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
         2. 自适应求解  - \Delta u_h = d_H*u_H
@@ -92,6 +92,9 @@ class EllipticEignvalueFEMModel:
            在最粗网格上求解最小特征值问题。
         """
         print("算法 0")
+        if maxit is None:
+            maxit = self.maxit
+
         start = timer()
         if self.step == 0:
             idx = []
@@ -130,7 +133,7 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_h 为右端项自适应求解 -\Deta u = d*u_h
         I = eye(gdof)
-        for i in range(self.maxit):
+        for i in range(maxit):
             uh = space.function(array=uh)
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -170,7 +173,7 @@ class EllipticEignvalueFEMModel:
         uh = space.function(array=uh)
         return uh
 
-    def alg_1(self):
+    def alg_1(self, maxit=None):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
         2. 自适应求解  - \Delta u_h = u_H
@@ -179,6 +182,8 @@ class EllipticEignvalueFEMModel:
            求解最小特征值问题。
         """
         print("算法 1")
+        if maxit is None:
+            maxit = self.maxit
 
         start = timer()
         if self.step == 0:
@@ -226,7 +231,7 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
-        for i in range(self.maxit):
+        for i in range(maxit):
 
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -292,7 +297,7 @@ class EllipticEignvalueFEMModel:
         uh = space.function(array=uh)
         return uh
 
-    def alg_2(self):
+    def alg_2(self, maxit=None):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
         2. 自适应求解  - \Delta u_h = u_H
@@ -300,6 +305,10 @@ class EllipticEignvalueFEMModel:
         3. 在最细网格上求解一次最小特征值问题
         """
         print("算法 2")
+
+        if maxit is None:
+            maxit = self.maxit
+
         start = timer()
 
         if self.step == 0:
@@ -343,7 +352,7 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
-        for i in range(self.maxit):
+        for i in range(maxit):
 
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -389,11 +398,15 @@ class EllipticEignvalueFEMModel:
         print("smallest eigns:", d, "with time: ", end - start)
         return uh
 
-    def alg_3(self):
+    def alg_3(self, maxit=None):
         """
         1. 自适应在每层网格上求解最小特征值问题
         """
         print("算法 3")
+
+        if maxit is None:
+            maxit = self.maxit
+
         start = timer()
         if self.step == 0:
             idx = []
@@ -410,7 +423,7 @@ class EllipticEignvalueFEMModel:
         uh[~isFreeDof] = 0
         IM = eye(gdof)
         GD = mesh.geo_dimension()
-        for i in range(self.maxit+1):
+        for i in range(maxit+1):
             print(i, ":", gdof)
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
@@ -434,7 +447,7 @@ class EllipticEignvalueFEMModel:
                 self.savemesh(mesh,
                         self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.mat')
 
-            if i < self.maxit:
+            if i < maxit:
                 uh = space.function(array=uh)
                 eta = self.residual_estimate(uh)
                 markedCell = mark(eta, self.theta)
@@ -448,12 +461,15 @@ class EllipticEignvalueFEMModel:
         uh = space.function(array=uh)
         return uh
 
-    def alg_4(self):
+    def alg_4(self, maxit=None):
         """
         1. 自适应求解 -\Delta u = 1。
         1. 在最细网格上求最小特征值和特征向量。
         """
         print("算法 4")
+        if maxit is None:
+            maxit = self.maxit
+
         start = timer()
         if self.step == 0:
             idx = []
@@ -463,7 +479,7 @@ class EllipticEignvalueFEMModel:
         mesh = self.pde.init_mesh(n=self.numrefine)
         integrator = mesh.integrator(self.q)
         GD = mesh.geo_dimension()
-        for i in range(self.maxit+1):
+        for i in range(maxit+1):
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
             print(i, ":", gdof)
@@ -495,7 +511,7 @@ class EllipticEignvalueFEMModel:
                 self.savemesh(mesh,
                         self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.mat')
 
-            if i < self.maxit:
+            if i < maxit:
                 eta = self.residual_estimate(uh)
                 markedCell = mark(eta, self.theta)
                 mesh.bisect(markedCell)

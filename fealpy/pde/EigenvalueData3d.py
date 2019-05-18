@@ -32,7 +32,7 @@ class EigenLShape3d:
             [0, 3, 7, 6],
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
+        mesh.uniform_bisect(n)
         mesh.delete_cell(lambda bc: (bc[:, 0] < 0.5) & (bc[:, 1] < 0.5))
         return mesh
 
@@ -79,7 +79,7 @@ class HarmonicOscillator:
             [0, 3, 7, 6],
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
+        mesh.uniform_bisect(n)
         return mesh
 
     def diffusion_coefficient(self, p):
@@ -128,7 +128,7 @@ class Schrodinger:
             [0, 3, 7, 6],
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
+        mesh.uniform_bisect(n)
         return mesh
 
     def solution(self, p):

@@ -8,6 +8,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import scipy.io as sio
 
 from fealpy.pde.poisson_3d import LShapeRSinData
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
@@ -15,6 +16,11 @@ from fealpy.recovery import FEMFunctionRecoveryAlg
 from fealpy.mesh.adaptive_tools import mark
 from fealpy.tools.show import showmultirate
 
+def savemesh(mesh, fname):
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
+    data = {'node': node, 'elem': cell+1}
+    sio.matlab.savemat(fname, data)
 
 def u(p):
     x = p[:, 0]
@@ -24,7 +30,7 @@ def u(p):
 
 
 pde = LShapeRSinData()
-mesh = pde.init_mesh(n=2, meshtype='tet')
+mesh = pde.init_mesh(n=4, meshtype='tet')
 
 maxit = 40
 theta = 0.2
@@ -42,7 +48,6 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 node = mesh.entity('node')
 u0 = u(node)
-
 for i in range(maxit):
     print('step:', i)
     fem = PoissonFEMModel(pde, mesh, 1, q=3)
@@ -57,8 +62,11 @@ for i in range(maxit):
     eta = fem.residual_estimate()
     errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
     markedCell = mark(eta, theta=theta)
+    savemesh(mesh, '/home/why/result/test/test_' + str(i) + '.mat')
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
+        if i == 2:
+            print(i)
         A = mesh.bisect(isMarkedCell, returnim=True)
         node = mesh.entity('node')
         ui = u(node)

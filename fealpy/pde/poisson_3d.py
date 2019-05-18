@@ -69,7 +69,7 @@ class LShapeRSinData:
     def __init__(self):
         pass
 
-    def init_mesh(self, n=1, meshtype='tet'):
+    def init_mesh(self, n=2, meshtype='tet'):
         node = np.array([
             [-1, -1, -1],
             [1, -1, -1],
@@ -88,7 +88,8 @@ class LShapeRSinData:
             [0, 3, 7, 6],
             [0, 2, 3, 6]], dtype=np.int)
         mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
+        for i in range(n):
+            mesh.bisect()
 
         NN = mesh.number_of_nodes()
         node = mesh.entity('node')
