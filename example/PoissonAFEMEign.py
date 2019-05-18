@@ -4,6 +4,7 @@
 import sys
 from fealpy.pde.EigenvalueData2d import EigenLShape2d
 from fealpy.pde.EigenvalueData2d import EigenSquareDC
+from fealpy.pde.EigenvalueData2d import EigenCrack
 from fealpy.pde.EigenvalueData2d import EigenGWWA, EigenGWWB
 
 from fealpy.fem import EllipticEignvalueFEMModel
@@ -66,7 +67,7 @@ maxit : %d
 print(info)
 
 #pde = EigenLShape2d()
-pde = EigenSquareDC()
+#pde = EigenSquareDC()
 
 model = EllipticEignvalueFEMModel(
         pde,
