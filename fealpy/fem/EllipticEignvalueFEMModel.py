@@ -97,6 +97,8 @@ class EllipticEignvalueFEMModel:
                阵，M 为当前网格层的质量矩阵。
         3. 最细网格层上求出的 uh 做为一个基函数，加入到最粗网格的有限元空间中，
            在最粗网格上求解最小特征值问题。
+
+        自适应 maxit， picard： 1
         """
         print("算法 0")
         if maxit is None:
@@ -114,7 +116,7 @@ class EllipticEignvalueFEMModel:
         # 1. 粗网格上求解最小特征值问题
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
-        print(0, ":", gdof)
+        print("initial mesh:", gdof)
         uh = np.zeros(gdof, dtype=np.float)
         area = mesh.entity_measure('cell')
         AH = self.get_stiff_matrix(space, integrator, area)
@@ -145,6 +147,7 @@ class EllipticEignvalueFEMModel:
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
+            print(i+1, "refine: ", mesh.number_of_nodes())
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
@@ -164,7 +167,6 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-            print(i+1, ":", gdof)
 
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
@@ -174,6 +176,7 @@ class EllipticEignvalueFEMModel:
             ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
             uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
             d = uh@A@uh/(uh@M@uh)
+
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
 
@@ -187,6 +190,8 @@ class EllipticEignvalueFEMModel:
             *  u_H 插值到下一层网格上做为新 u_H
         3. 最新网格层上求出的 uh 做为一个基函数，加入到最粗网格的有限元空间中，
            求解最小特征值问题。
+
+        自适应 maxit， picard:2
         """
         print("算法 1")
         if maxit is None:
@@ -210,7 +215,8 @@ class EllipticEignvalueFEMModel:
         isFreeHDof = ~(space.boundary_dof())
 
         gdof = space.number_of_global_dofs()
-        print(0, ":", gdof)
+        print("initial mesh :", gdof)
+
         uH = np.zeros(gdof, dtype=np.float)
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
@@ -239,11 +245,10 @@ class EllipticEignvalueFEMModel:
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
         for i in range(maxit):
-
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
-
+            print(i+1, "refine :", mesh.number_of_nodes())
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
@@ -263,7 +268,6 @@ class EllipticEignvalueFEMModel:
 
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-            print(i+1, ":", gdof)
 
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
@@ -310,6 +314,8 @@ class EllipticEignvalueFEMModel:
         2. 自适应求解  - \Delta u_h = u_H
             *  u_H 插值到下一层网格上做为新 u_H
         3. 在最细网格上求解一次最小特征值问题
+
+        自适应 maxit, picard:2
         """
         print("算法 2")
 
@@ -321,7 +327,7 @@ class EllipticEignvalueFEMModel:
         if self.step == 0:
             idx = []
         else:
-            idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
+            idx =list(range(0, self.maxit, self.step))
 
         mesh = self.pde.init_mesh(n=self.numrefine)
         integrator = mesh.integrator(self.q)
@@ -334,7 +340,7 @@ class EllipticEignvalueFEMModel:
 
         gdof = space.number_of_global_dofs()
         uH = np.zeros(gdof, dtype=mesh.ftype)
-        print(0, ":", gdof)
+        print("initial mesh :", gdof)
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
@@ -359,11 +365,11 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
-        for i in range(maxit):
-
+        for i in range(maxit-1):
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
+            print(i+1, "refine : ", mesh.number_of_nodes())
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
@@ -383,7 +389,6 @@ class EllipticEignvalueFEMModel:
 
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-            print(i+1, ": ", gdof)
 
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
@@ -397,9 +402,38 @@ class EllipticEignvalueFEMModel:
             uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
 
         # 3. 在最细网格上求解一次最小特征值问题 
+        eta = self.residual_estimate(uh)
+        markedCell = mark(eta, self.theta)
+        IM = mesh.bisect(markedCell, returnim=True)
+        print(self.maxit, "refine : ", mesh.number_of_nodes())
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_2_' + str(maxit) + '_' + str(NN) +'.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_2_' + str(maxit) + '_' + str(NN) +'.mat')
+        uh = IM@uh
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        gdof = space.number_of_global_dofs()
+        area = mesh.entity_measure('cell')
+        A = self.get_stiff_matrix(space, integrator, area)
+        M = self.get_mass_matrix(space, integrator, area)
+        isFreeDof = ~(space.boundary_dof())
+
+        ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
+        uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
         uh[isFreeDof], d = picard(A, M, uh[isFreeDof], ml=ml)
+
         end = timer()
 
         print("smallest eigns:", d, "with time: ", end - start)
@@ -408,6 +442,8 @@ class EllipticEignvalueFEMModel:
     def alg_3(self, maxit=None):
         """
         1. 自适应在每层网格上求解最小特征值问题
+
+        refine: maxit, picard： maxit + 1
         """
         print("算法 3")
 
@@ -421,6 +457,21 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
 
         mesh = self.pde.init_mesh(n=self.numrefine)
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_' + str(0) + '_' + str(NN) + '.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_' + str(0) + '_' + str(NN) + '.mat')
+
         integrator = mesh.integrator(self.q)
 
         space = LagrangeFiniteElementSpace(mesh, 1)
@@ -429,9 +480,7 @@ class EllipticEignvalueFEMModel:
         uh = np.ones(gdof, dtype=mesh.ftype)
         uh[~isFreeDof] = 0
         IM = eye(gdof)
-        GD = mesh.geo_dimension()
         for i in range(maxit+1):
-            print(i, ":", gdof)
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
             M = self.get_mass_matrix(space, integrator, area)
@@ -440,25 +489,26 @@ class EllipticEignvalueFEMModel:
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
             uh[isFreeDof], d = picard(A, M, uh[isFreeDof])
 
-            if (self.step > 0) and (i in idx):
-                NN = mesh.number_of_nodes()
-                fig = plt.figure()
-                fig.set_facecolor('white')
-                if GD == 2:
-                    axes = fig.gca()
-                else:
-                    axes = Axes3D(fig)
-                mesh.add_plot(axes, cellcolor='w')
-                fig.savefig(self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.pdf')
-                plt.close()
-                self.savemesh(mesh,
-                        self.resultdir + 'mesh_3_' + str(i) + '_' + str(NN) + '.mat')
-
             if i < maxit:
                 uh = space.function(array=uh)
                 eta = self.residual_estimate(uh)
                 markedCell = mark(eta, self.theta)
                 IM = mesh.bisect(markedCell, returnim=True)
+                print(i+1, "refine: ", mesh.number_of_nodes())
+                if (self.step > 0) and (i in idx):
+                    NN = mesh.number_of_nodes()
+                    fig = plt.figure()
+                    fig.set_facecolor('white')
+                    if GD == 2:
+                        axes = fig.gca()
+                    else:
+                        axes = Axes3D(fig)
+                    mesh.add_plot(axes, cellcolor='w')
+                    fig.savefig(self.resultdir + 'mesh_3_' + str(i+1) + '_' + str(NN) + '.pdf')
+                    plt.close()
+                    self.savemesh(mesh,
+                            self.resultdir + 'mesh_3_' + str(i+1) + '_' + str(NN) + '.mat')
+
                 space = LagrangeFiniteElementSpace(mesh, 1)
                 isFreeDof = ~(space.boundary_dof())
                 gdof = space.number_of_global_dofs()
@@ -472,6 +522,8 @@ class EllipticEignvalueFEMModel:
         """
         1. 自适应求解 -\Delta u = 1。
         1. 在最细网格上求最小特征值和特征向量。
+
+        refine maxit， picard: 1
         """
         print("算法 4")
         if maxit is None:
@@ -484,12 +536,25 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
 
         mesh = self.pde.init_mesh(n=self.numrefine)
-        integrator = mesh.integrator(self.q)
         GD = mesh.geo_dimension()
-        for i in range(maxit+1):
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_4_' + str(0) + '_' + str(NN) +'.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_4_' + str(0) + '_' + str(NN) +'.mat')
+
+        integrator = mesh.integrator(self.q)
+        for i in range(maxit):
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-            print(i, ":", gdof)
 
             area = mesh.entity_measure('cell')
             A = self.get_stiff_matrix(space, integrator, area)
@@ -504,6 +569,11 @@ class EllipticEignvalueFEMModel:
             uh = space.function()
             uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
 
+
+            eta = self.residual_estimate(uh)
+            markedCell = mark(eta, self.theta)
+            IM = mesh.bisect(markedCell, returnim=True)
+            print(i+1, "refine :", mesh.number_of_nodes())
             if (self.step > 0) and (i in idx):
                 NN = mesh.number_of_nodes()
                 fig = plt.figure()
@@ -513,21 +583,29 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig(self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_4_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
                 self.savemesh(mesh,
-                        self.resultdir + 'mesh_4_' + str(i) + '_' + str(NN) +'.mat')
+                        self.resultdir + 'mesh_4_' + str(i+1) + '_' + str(NN) +'.mat')
 
-            if i < maxit:
-                eta = self.residual_estimate(uh)
-                markedCell = mark(eta, self.theta)
-                mesh.bisect(markedCell)
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        gdof = space.number_of_global_dofs()
 
+        area = mesh.entity_measure('cell')
+        A = self.get_stiff_matrix(space, integrator, area)
+        M = self.get_mass_matrix(space, integrator, area)
+        isFreeDof = ~(space.boundary_dof())
+        A = A[isFreeDof, :][:, isFreeDof].tocsr()
+        M = M[isFreeDof, :][:, isFreeDof].tocsr()
+
+        ml = pyamg.ruge_stuben_solver(A)
+        uh = IM@uh
         uh[isFreeDof], d = picard(A, M, uh[isFreeDof], ml=ml)
+
         end = timer()
 
         print("smallest eigns:", d, "with time: ", end - start)
-        return uh
+        return space.function(array=uh)
 
     def savemesh(self, mesh, fname):
         node = mesh.entity('node')

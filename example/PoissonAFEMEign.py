@@ -75,8 +75,8 @@ print(info)
 # pde = EigenSquareDC()
 # pde = EigenCrack()
 
-#pde = EigenLShape3d()
-pde = EigenHarmonicOscillator3d()
+pde = EigenLShape3d()
+# pde = EigenHarmonicOscillator3d()
 
 model = EllipticEignvalueFEMModel(
         pde,
