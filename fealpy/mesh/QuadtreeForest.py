@@ -2,9 +2,17 @@ import numpy as np
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 
-class QuadMeshDataStructure(Mesh2dDataStructure):
+class QuadtreeMeshDataStructure(Mesh2dDataStructure):
     """
     Notice that vertex order of cell in QuadMesh is z-order as following:
+
+        c_yc_x
+
+        0: 00
+        1: 01
+        2: 10
+        3: 11
+
         2-------------3
         |             |
         |             |
@@ -19,16 +27,16 @@ class QuadMeshDataStructure(Mesh2dDataStructure):
     F = 1
 
     def __init__(self, NN, cell):
-        super(QuadMeshDataStructure, self).__init__(NN, cell)
+        super(QuadtreeMeshDataStructure, self).__init__(NN, cell)
 
 
-class QuadMesh(Mesh2d):
+class QuadtreeMesh(Mesh2d):
     def __init__(self, node, cell):
         self.node = node
         NN = node.shape[0]
-        self.ds = QuadMeshDataStructure(NN, cell)
+        self.ds = QuadtreeMeshDataStructure(NN, cell)
 
-        self.meshtype = 'quad'
+        self.meshtype = 'quadtreemesh'
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -36,31 +44,6 @@ class QuadMesh(Mesh2d):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
-
-    def area(self, index=None):
-        return self.cell_area(index=index)
-
-    def cell_area(self, index=None):
-        node = self.entity('node')
-        cell = self.entity('cell')
-        if index is None:
-            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
-            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
-        else:
-            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
-            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
-        nv = np.cross(v1, v2)
-        a0 = nv/2.0
-
-        if index is None:
-            v1 = node[cell[:, 3], :] - node[cell[:, 2], :]
-            v2 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        else:
-            v1 = node[cell[index, 3], :] - node[cell[index, 2], :]
-            v2 = node[cell[index, 0], :] - node[cell[index, 2], :]
-        nv = np.cross(v1, v2)
-        a1 = nv/2.0
-        return a0 + a1
 
     def uniform_refine(self, n=1):
         for i in range(n):
