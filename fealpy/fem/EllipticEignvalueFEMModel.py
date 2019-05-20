@@ -14,7 +14,8 @@ from ..mesh.adaptive_tools import mark
 
 class EllipticEignvalueFEMModel:
     def __init__(self, pde, theta=0.2, maxit=30, step=0, n=3, p=1, q=3,
-            resultdir='~/'):
+            sigma=None, resultdir='~/'):
+        self.sigma = sigma
         self.pde = pde
         self.step = step
         self.theta = theta
@@ -95,8 +96,6 @@ class EllipticEignvalueFEMModel:
             *  每层网格上求出的 u_h，插值到下一层网格上做为 u_H
             *  并更新 d_H = u_h@A@u_h/u_h@M@u_h， 其中 A 是当前网格层上的刚度矩
                阵，M 为当前网格层的质量矩阵。
-        3. 最细网格层上求出的 uh 做为一个基函数，加入到最粗网格的有限元空间中，
-           在最粗网格上求解最小特征值问题。
 
         自适应 maxit， picard： 1
         """
@@ -124,7 +123,8 @@ class EllipticEignvalueFEMModel:
         isFreeHDof = ~(space.boundary_dof())
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
+        uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
+                sigma=self.sigma)
 
         GD = mesh.geo_dimension()
         if (self.step > 0) and (0 in idx):
@@ -173,8 +173,13 @@ class EllipticEignvalueFEMModel:
             M = self.get_mass_matrix(space, integrator, area)
             isFreeDof = ~(space.boundary_dof())
             b = d*M@uh
-            ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
-            uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+
+            if self.sigma is None:
+                ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
+                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            else:
+                ml = pyamg.ruge_stuben_solver(-A[isFreeDof, :][:, isFreeDof].tocsr())
+                uh[isFreeDof] = ml.solve(-b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
             d = uh@A@uh/(uh@M@uh)
 
         end = timer()
@@ -221,7 +226,8 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
+        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
+                sigma=self.sigma)
 
         uh = space.function()
         uh[:] = uH
@@ -275,10 +281,16 @@ class EllipticEignvalueFEMModel:
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
-            ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
-            uh = space.function()
-            uh[:] = uH
-            uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            if self.sigma is None:
+                ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
+                uh = space.function()
+                uh[:] = uH
+                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            else:
+                ml = pyamg.ruge_stuben_solver(-A[isFreeDof, :][:, isFreeDof].tocsr())
+                uh = space.function()
+                uh[:] = uH
+                uh[isFreeDof] = ml.solve(-b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
 
         # 3. 把 uh 加入粗网格空间, 组装刚度和质量矩阵
         w0 = uh@A
@@ -344,7 +356,8 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)))
+        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
+                sigma=self.sigma)
 
         uh = space.function()
         uh[:] = uH
