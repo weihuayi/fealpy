@@ -157,8 +157,6 @@ class DarcyFDMModel():
 
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
-        print('ph',self.ph)
-        print('pI',self.pI)
 
         return x
     
