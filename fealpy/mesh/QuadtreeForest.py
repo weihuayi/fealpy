@@ -19,6 +19,15 @@ class QuadtreeMeshDataStructure(Mesh2dDataStructure):
         |             |
         |             |
         0-------------1
+
+    cell2cell <===> NO(k, f) = k'
+    r \in {0, 1}
+    f' \in {0, 1, 2, 3}
+    NF(k, f) = 4r + f'
+
+    if f is a boundary,  NF(k, f) = 4r+f
+
+    for k-th octree, is f < f'
     """
     localEdge = np.array([(0, 2), (1, 3), (0, 1), (2, 3)])
     ccw = np.array([0, 1, 3, 2], dtype=np.int8)
