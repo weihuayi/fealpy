@@ -3,6 +3,11 @@
 """
 This script include the test code of the adaptive VEM for the simplified
 friction problem.
+
+Note
+----
+1. 质量矩阵的稳定项
+1. 右端计算是否合适
 """
 
 import numpy as np

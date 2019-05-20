@@ -7,18 +7,19 @@ import matplotlib.colors as colors
 from matplotlib.tri import Triangulation
 
 from matplotlib.collections import PolyCollection, LineCollection, PatchCollection
-import matplotlib.cm as cm 
+import matplotlib.cm as cm
 from matplotlib.patches import Polygon
 
 
-def find_node(axes, node, index=None, 
-        showindex=False, color='r', 
+def find_node(
+        axes, node, index=None,
+        showindex=False, color='r',
         markersize=20, fontsize=24, fontcolor='k'):
 
     if len(node.shape) == 1:
         node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
 
-    if (index is None) or ( index is 'all'):
+    if (index is None) or (index is 'all'):
         index = range(node.shape[0])
     elif (type(index) is np.ndarray) & (index.dtype == np.bool):
         index, = np.nonzero(index)
@@ -99,21 +100,27 @@ def find_entity(axes, mesh, entity=None,
         axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
         if showindex:
             for i in range(len(index)):
-                axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]), 
-                        multialignment='center', fontsize=fontsize, color=fontcolor) 
-def show_mesh_1d(axes, mesh, 
-        nodecolor='k', cellcolor='k',
-        aspect='equal', 
+                axes.text(
+                        bc[i, 0], bc[i, 1], bc[i, 2],
+                        str(index[i]),
+                        multialignment='center',
+                        fontsize=fontsize, color=fontcolor)
+
+def show_mesh_1d(
+        axes, mesh,
+        nodecolor='k',
+        cellcolor='k',
+        aspect='equal',
         linewidths=1, markersize=20,
         showaxis=False):
     axes.set_aspect(aspect)
-    if showaxis == False :
+    if showaxis is False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
 
-    node = mesh.node
-    cell = mesh.ds.cell
+    node = mesh.entity('node')
+    cell = mesh.entity('cell')
 
     dim = mesh.geo_dimension() 
     if dim == 1:
@@ -129,14 +136,16 @@ def show_mesh_1d(axes, mesh,
         lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor)
         return axes.add_collection3d(vts)
 
-def show_mesh_2d(axes, mesh,  
+
+def show_mesh_2d(
+        axes, mesh,
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
         showaxis=False, showcolorbar=False, cmap='gnuplot2'):
-    
+
     axes.set_aspect(aspect)
-    if showaxis == False:
+    if showaxis is False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
@@ -157,22 +166,22 @@ def show_mesh_2d(axes, mesh,
         cellcolor = mapper.to_rgba(cellcolor)
         if showcolorbar:
             f = axes.get_figure()
-            cbar = f.colorbar(mapper, shrink=0.5, ax=axes)
+            f.colorbar(mapper, shrink=0.5, ax=axes)
     node = mesh.entity('node')
     cell = mesh.entity('cell')
-
 
     if mesh.meshtype is not 'polygon':
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell, :])
         else:
-            poly = a3.art3d.Poly3DCollection(node[cell,:])
+            poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
         cellLocation = mesh.ds.cellLocation
         NC = mesh.number_of_cells()
-        patches = [Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True) for i in range(NC)]
+        patches = [
+                Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                for i in range(NC)]
         poly = PatchCollection(patches)
-
 
     poly.set_edgecolor(edgecolor)
     poly.set_linewidth(linewidths)
@@ -194,14 +203,16 @@ def show_mesh_2d(axes, mesh,
 
     return axes.add_collection(poly)
 
-def show_mesh_3d(axes, mesh,
-        nodecolor='k', edgecolor='k', facecolor='w',
+
+def show_mesh_3d(
+        axes, mesh,
+        nodecolor='k', edgecolor='k', facecolor='w', cellcolor='w',
         aspect='equal',
-        linewidths=1, markersize=20,  
-        showaxis=False, alpha=0.8):
+        linewidths=0.5, markersize=0,
+        showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
     axes.set_aspect('equal')
-    if showaxis == False:
+    if showaxis is False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
@@ -214,13 +225,32 @@ def show_mesh_3d(axes, mesh,
         nodecolor = mapper.to_rgba(nodecolor)
 
     node = mesh.node
-    axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
+    if shownode is True:
+        axes.scatter(
+                node[:, 0], node[:, 1], node[:, 2],
+                color=nodecolor, s=markersize)
 
-    face = mesh.ds.face
-    vts = node[face, :]
-    faces = a3.art3d.Poly3DCollection(vts, facecolor=facecolor, linewidths=linewidths, edgecolor=edgecolor, alpha = alpha)
-    return axes.add_collection3d(faces)
-    
+    if showedge is True:
+        edge = mesh.ds.edge
+        vts = node[edge]
+        edges = a3.art3d.Line3DCollection(
+               vts,
+               linewidths=linewidths,
+               color=edgecolor)
+        return axes.add_collection3d(edges)
+    face = mesh.boundary_face(threshold=threshold)
+    faces = a3.art3d.Poly3DCollection(
+            node[face],
+            facecolor=facecolor,
+            linewidths=linewidths,
+            edgecolor=edgecolor,
+            alpha=alpha)
+    h = axes.add_collection3d(faces)
+    box = np.zeros((2, 3), dtype=np.float)
+    box[0, :] = np.min(node, axis=0)
+    box[1, :] = np.max(node, axis=0)
+    axes.scatter(box[:, 0], box[:, 1], box[:, 2])
+    return h
 
 
 def unique_row(a):

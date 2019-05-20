@@ -31,6 +31,9 @@ class PolygonMesh(Mesh2d):
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
+    def number_of_nodes_of_cells(self):
+        return self.ds.number_of_vertices_of_cells()
+
     def to_vtk(self):
         NC = self.number_of_cells()
         cell = self.ds.cell
@@ -42,7 +45,7 @@ class PolygonMesh(Mesh2d):
         isIdx[np.add.accumulate(NV+1)[:-1]] = False
         cells[~isIdx] = NV
         cells[isIdx] = cell
-        return NC, cells 
+        return NC, cells
 
     @classmethod
     def from_mesh(cls, mesh):
@@ -65,7 +68,7 @@ class PolygonMesh(Mesh2d):
         if etype in ['cell', 2]:
             cell2node = self.ds.cell_to_node()
             NV = self.number_of_vertices_of_cells().reshape(-1,1)
-            bc = cell2node*node/NV 
+            bc = cell2node*node/NV
         elif etype in ['edge', 1]:
             edge = self.ds.edge
             bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
@@ -172,12 +175,16 @@ class PolygonMeshDataStructure():
         self.edge2cell = None
 
     def number_of_vertices_of_cells(self):
-        cellLocation = self.cellLocation 
-        return cellLocation[1:] - cellLocation[0:-1] 
+        cellLocation = self.cellLocation
+        return cellLocation[1:] - cellLocation[0:-1]
+
+    def number_of_nodes_of_cells(self):
+        cellLocation = self.cellLocation
+        return cellLocation[1:] - cellLocation[0:-1]
 
     def number_of_edges_of_cells(self):
-        cellLocation = self.cellLocation 
-        return cellLocation[1:] - cellLocation[0:-1] 
+        cellLocation = self.cellLocation
+        return cellLocation[1:] - cellLocation[0:-1]
 
     def total_edge(self):
         cell = self.cell
@@ -185,20 +192,20 @@ class PolygonMeshDataStructure():
 
         NN = self.NN
         NC = self.NC
-        NV = self.number_of_vertices_of_cells() 
+        NV = self.number_of_nodes_of_cells()
 
         totalEdge = np.zeros((cell.shape[0], 2), dtype=np.int)
         totalEdge[:, 0] = cell
-        totalEdge[:-1, 1] = cell[1:] 
+        totalEdge[:-1, 1] = cell[1:]
         totalEdge[cellLocation[1:] - 1, 1] = cell[cellLocation[:-1]]
         return totalEdge
 
-    def construct(self):  
+    def construct(self):
         NC = self.NC
-        
+
         cell = self.cell
         cellLocation = self.cellLocation
-        NV = self.number_of_vertices_of_cells() 
+        NV = self.number_of_vertices_of_cells()
 
         totalEdge = self.total_edge()
         _, i0, j = unique_row(np.sort(totalEdge, axis=1))
@@ -207,19 +214,19 @@ class PolygonMeshDataStructure():
         self.NE = NE
         self.edge2cell = np.zeros((NE, 4), dtype=np.int)
 
-        i1 = np.zeros(NE, dtype=np.int) 
+        i1 = np.zeros(NE, dtype=np.int)
         i1[j] = np.arange(len(cell))
 
         self.edge = totalEdge[i0]
 
         cellIdx = np.repeat(range(NC), NV)
-        
+ 
         localIdx = ranges(NV)
 
-        self.edge2cell[:, 0] = cellIdx[i0] 
-        self.edge2cell[:, 1] = cellIdx[i1] 
-        self.edge2cell[:, 2] = localIdx[i0] 
-        self.edge2cell[:, 3] = localIdx[i1] 
+        self.edge2cell[:, 0] = cellIdx[i0]
+        self.edge2cell[:, 1] = cellIdx[i1]
+        self.edge2cell[:, 2] = localIdx[i0]
+        self.edge2cell[:, 3] = localIdx[i1]
 
     def cell_to_node(self):
         NN = self.NN
@@ -228,7 +235,7 @@ class PolygonMeshDataStructure():
 
         cell = self.cell
         cellLocation = self.cellLocation
-        NV = self.number_of_vertices_of_cells() 
+        NV = self.number_of_vertices_of_cells()
         I = np.repeat(range(NC), NV)
         J = cell
 
@@ -366,12 +373,12 @@ class PolygonMeshDataStructure():
 
         isBdCell = np.zeros(NC, dtype=np.bool)
         isBdCell[edge2cell[isBdEdge,0]] = True
-        return isBdCell 
+        return isBdCell
 
     def boundary_node_index(self):
         isBdNode = self.boundary_node_flag()
         idx, = np.nonzero(isBdNode)
-        return idx 
+        return idx
 
     def boundary_edge_index(self):
         isBdEdge = self.boundary_edge_flag()
@@ -382,4 +389,3 @@ class PolygonMeshDataStructure():
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
         return idx
-        

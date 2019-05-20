@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-
 class DirichletBC:
     def __init__(self, V, g0, is_dirichlet_dof=None):
         self.V = V

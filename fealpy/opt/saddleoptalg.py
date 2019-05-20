@@ -1,25 +1,30 @@
 import numpy as np
 from numpy.linalg import norm
 
+
 class SteepestDescentAlg:
     def __init__(self, problem, options=None):
         self.problem = problem
         self.options = options
 
         self.debug = True
-        self.NF = 0 # 计算函数值和梯度的次数
+        self.NF = 0  # 计算函数值和梯度的次数
         self.fun = problem['objective']
         self.x = problem['x0']
-        self.f, self.g = self.fun(self.x) # 初始目标函数值和梯度值
+        self.f, self.g = self.fun(self.x)  # 初始目标函数值和梯度值
+
 
     def run(self, queue=None, maxit=None):
-        problem = self.problem
-        
         options = self.options
         alpha = options['StepLength']
 
         gnorm = norm(self.g)
-        print("Initial energe: %12.11g, gnorm :%12.11g"%(self.f, gnorm))
+        self.diff = np.Inf
+        if options['Output']:
+            print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+            self.fun.output('', queue=queue)
+
+        self.NF += 1
 
         if maxit is None:
             maxit = options['MaxFunEvals']
@@ -34,15 +39,17 @@ class SteepestDescentAlg:
             gnorm = norm(self.g)
 
             if options['Output']:
-                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(i, self.f, gnorm, self.diff))
-                self.fun.output(str(i), queue=queue)
+                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+                self.fun.output(str(self.NF).zfill(4), queue=queue)
+            self.NF += 1
 
             if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
                 print("""
                 The norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
-                """%(gnorm, options['NormGradTol'], 
-                     self.diff, options['FunValDiff'])
+                """ % (
+                    gnorm, options['NormGradTol'],
+                    self.diff, options['FunValDiff'])
                 )
                 break
 

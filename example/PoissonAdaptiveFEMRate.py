@@ -2,7 +2,7 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.pde.poisson_model_2d import LShapeRSinData,CrackData,KelloggData,CosCosData,SinSinData
+from fealpy.pde.poisson_model_2d import LShapeRSinData, CrackData, KelloggData, CosCosData, SinSinData
 from fealpy.fem.PoissonFEMModel import PoissonFEMModel
 
 from fealpy.recovery import FEMFunctionRecoveryAlg
@@ -21,8 +21,8 @@ if m == 1:
     pde = LShapeRSinData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
 elif m == 2:
-    pde = KelloggData() #TODO
-    mesh = pde.init_mesh(n=4,meshtype='tri')
+    pde = KelloggData()
+    mesh = pde.init_mesh(n=4, meshtype='tri')
 elif m == 3:
     pde = CrackData()
     mesh = pde.init_mesh(n=4, meshtype='tri')
@@ -35,11 +35,11 @@ elif m == 5:
 
 
 theta = 0.1
-k = maxit - 15 
+k = maxit - 15
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h||_{0}$',
-             '$||\\nabla u - \\nabla u_h||_{0}$', 
-             '$||\\nabla u - G(\\nabla u_h)||_{0}sim$',]
+             '$||\\nabla u - \\nabla u_h||_{0}$',
+             '$||\\nabla u - G(\\nabla u_h)||_{0}sim$']
 
 ralg = FEMFunctionRecoveryAlg()
 Ndof = np.zeros((maxit,), dtype=np.int)

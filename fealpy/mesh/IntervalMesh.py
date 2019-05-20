@@ -123,7 +123,7 @@ class IntervalMesh():
 
     def add_plot(self, plot,
             nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=200,  
+            aspect='equal', linewidths=1, markersize=20,  
             showaxis=False):
 
         if isinstance(plot, ModuleType):

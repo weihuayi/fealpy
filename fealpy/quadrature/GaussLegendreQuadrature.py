@@ -1,7 +1,10 @@
 import numpy as np
+from .Quadrature import Quadrature
 
-#http://keisan.casio.com/exec/system/1280624821
-class GaussLegendreQuadrature():
+# http://keisan.casio.com/exec/system/1280624821
+
+
+class GaussLegendreQuadrature(Quadrature):
     def __init__(self, k):
         if k == 1:
             A = np.array([[0, 2]], dtype=np.float)
@@ -265,9 +268,3 @@ class GaussLegendreQuadrature():
         self.quadpts[:, 0] = (A[:,0] + 1)/2.0
         self.quadpts[:, 1] = 1 - self.quadpts[:, 0]
         self.weights = A[:, 1]/2
-
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
-
-    def get_gauss_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 

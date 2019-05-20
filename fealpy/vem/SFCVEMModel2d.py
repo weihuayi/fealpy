@@ -7,7 +7,7 @@ import pyamg
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..boundarycondition import DirichletBC
 from ..vem import doperator 
-from ..quadrature import GaussLobattoQuadrature, PolygonMeshIntegralAlg
+from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg
 
 
 class SFCVEMModel2d():
@@ -68,7 +68,7 @@ class SFCVEMModel2d():
 
         self.mat = doperator.basic_matrix(self.space, self.area)
 
-    def project_to_smspace(self, uh=None):
+    def project_to_smspace(self, uh=None, ptype='H1'):
         if uh is None:
             uh = self.uh
         p = self.space.p
@@ -76,9 +76,75 @@ class SFCVEMModel2d():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.space.smspace.function()
-        S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
+        if ptype is 'H1':
+            S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
+        elif ptype is 'L2':
+            S[:] = np.concatenate(list(map(g, zip(self.mat.PI0, cd))))
+        else:
+            raise ValueError("ptype value should be H1 or L2! But you input
+                    %s".format(ptype)
         return S
 
+    def residual_estimator(self):
+
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+
+        fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
+        def f(x, cellidx):
+            val = (self.S.laplace_value(x, cellidx) - 
+                self.S.value(x, cellidx) + fh[cellidx])
+            return val**2
+
+        e0 = self.integralalg.integral(f, celltype=True)
+
+        edge2cell = self.mesh.ds.edge_to_cell()
+        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+
+        # 计算内部边上的跳量，一个积分点就足够了
+        bc = mesh.entity_barycenter('edge') 
+        isContactEdge = self.pde.is_contact(bc)
+        n = mesh.edge_unit_normal()
+        h = np.sqrt(np.sum((node[edge[:, 0]] - node[edge[:, 1]])**2, axis=-1))
+
+
+        # 获取区间积分公式
+        qf = IntervalQuadrature(3)
+        bcs, ws = qf.quadpts, qf.weights
+        points = np.einsum('ij, kjm->ikm', bcs, node[edge])
+
+        # 内部边上的积分
+        lgrad = self.S.grad_value(points, cellidx=edge2cell[:, 0])
+        rgrad = self.S.grad_value(points, cellidx=edge2cell[:, 1])
+        e1 = np.array(NE, dtype=mesh.ftype)
+
+        t0 = np.einsum(
+            'ijm, jm->ij', 
+            lgrad[:, ~isBdEdge] - rgrad[:, ~isBdEdge],
+            n[~isBdEdge])
+        e1[~isBdEdge] = t0**2*h[~isBdEdge]
+
+
+        # 接触边界上的积分 
+
+        eta = self.pdd.eta
+        t0 = (
+            np.einsum('ij, ...ij->...i', 
+                n[isContactEdge], 
+                lgrad[:, isContactEdge]) + 
+            eta*self.lh.value(
+                points[:, isContactEdge], 
+                cellidx=edge2cell[isContactEdge, 0])
+            )**2*h[isContactEdge]
+        e1[isBdEdge] = t0**2*h[isContactEdge] 
+
+        np.add.at(e0, edge2cell[:, 0], e1)
+        np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
+        return np.sqrt(e0)
+    
+    
     def get_left_matrix(self):
         space = self.space
         area = self.area

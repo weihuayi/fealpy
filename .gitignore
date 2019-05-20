@@ -36,3 +36,5 @@ dependcies
 .fealpy.egg-info
 fealpy.egg-info
 dist
+*.pdf
+*.png
