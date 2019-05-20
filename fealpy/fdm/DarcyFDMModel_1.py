@@ -3,7 +3,7 @@ from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdi
 from scipy.sparse.linalg import inv
 from ..fem.integral_alg import IntegralAlg
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
-class DarcyFDMModel_1():
+class DarcyFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
         self.mesh = mesh
@@ -31,7 +31,6 @@ class DarcyFDMModel_1():
         mesh = self.mesh
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        print(NC)
 
         itype = mesh.itype
         ftype = mesh.ftype

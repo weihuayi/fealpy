@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import time
 
 from fealpy.pde.darcy_2d import PolynormialData
-from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
-#from fealpy.fdm.DarcyFDMModel_1 import DarcyFDMModel
+#from fealpy.fdm.DarcyFDMModel import DarcyFDMModel
+from fealpy.fdm.DarcyFDMModel_1 import DarcyFDMModel
 from fealpy.tools.show import showmultirate
 
 box = [0,1,0,1]
@@ -26,10 +26,7 @@ for i in range(maxit):
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
     Ndof[i] = NE + NC
-    t = time.time()
     fdm.solve()
-    elapsed = time.time()-t
-    print('time:',elapsed)
 
     ue,pe = fdm.get_max_error()
     err[0,i] = ue
