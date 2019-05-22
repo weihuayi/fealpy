@@ -75,10 +75,12 @@ print(info)
 # pde = EigenSquareDC()
 # pde = EigenCrack()
 
+pde = EigenGWWA()
+pde = EigenGWWB()
+
 # pde = EigenLShape3d()
 # pde = EigenHarmonicOscillator3d()
-
-pde = EigenSchrodinger3d()
+# pde = EigenSchrodinger3d()
 
 model = EllipticEignvalueFEMModel(
         pde,
@@ -88,7 +90,9 @@ model = EllipticEignvalueFEMModel(
         n=3,  # 初始网格加密次数
         p=1,  # 线性元
         q=3,  # 积分精度
-        resultdir='/home/why/result/')
+        resultdir='/home/why/result/',
+        sigma=None,
+        multieigs=True)
 
 u0 = model.alg_0()
 u1 = model.alg_1()
@@ -100,4 +104,3 @@ model.savesolution(u1, 'u1.mat')
 model.savesolution(u2, 'u2.mat')
 model.savesolution(u3, 'u3.mat')
 model.savesolution(u4, 'u4.mat')
-

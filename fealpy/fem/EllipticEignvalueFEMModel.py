@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import eye, csr_matrix, bmat
+from scipy.sparse.linalg import spsolve, eigs, LinearOperator
 import scipy.io as sio
 import pyamg
 from timeit import default_timer as timer
@@ -14,7 +15,8 @@ from ..mesh.adaptive_tools import mark
 
 class EllipticEignvalueFEMModel:
     def __init__(self, pde, theta=0.2, maxit=30, step=0, n=3, p=1, q=3,
-            sigma=None, resultdir='~/'):
+            sigma=None, multieigs=False, resultdir='~/'):
+        self.multieigs = multieigs
         self.sigma = sigma
         self.pde = pde
         self.step = step
@@ -86,8 +88,16 @@ class EllipticEignvalueFEMModel:
         M = space.mass_matrix(integrator, area)
         return M
 
-    def u(self, p):
-        return np.sum(p, axis=-1)
+    def linear_operator(self, x):
+        y = self.M@x
+        z = self.ml.solve(y, tol=1e-12, accel='cg').reshape(-1)
+        return z
+
+    def eigs(self, k=50):
+        NN = self.A.shape[0]
+        P = LinearOperator((NN, NN), matvec=self.linear_operator)
+        vals, vecs = eigs(P, k=k)
+        print(1/vals.real)
 
     def alg_0(self, maxit=None):
         """
@@ -173,17 +183,26 @@ class EllipticEignvalueFEMModel:
             M = self.get_mass_matrix(space, integrator, area)
             isFreeDof = ~(space.boundary_dof())
             b = d*M@uh
-
             if self.sigma is None:
                 ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
                 uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
             else:
-                ml = pyamg.ruge_stuben_solver(-A[isFreeDof, :][:, isFreeDof].tocsr())
-                uh[isFreeDof] = ml.solve(-b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+                K = A[isFreeDof, :][:, isFreeDof].tocsr() + self.sigma*M[isFreeDof, :][:, isFreeDof].tocsr()
+                b += self.sigma*M@uh
+                ml = pyamg.ruge_stuben_solver(K)
+                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape(-1)
+                # uh[isFreeDof] = spsolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
             d = uh@A@uh/(uh@M@uh)
+
 
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
+
+        if self.multieigs is True:
+            self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
+            self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
 
         uh = space.function(array=uh)
         return uh
@@ -287,10 +306,15 @@ class EllipticEignvalueFEMModel:
                 uh[:] = uH
                 uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
             else:
-                ml = pyamg.ruge_stuben_solver(-A[isFreeDof, :][:, isFreeDof].tocsr())
                 uh = space.function()
-                uh[:] = uH
-                uh[isFreeDof] = ml.solve(-b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+                uh[isFreeDof] = spsolve(A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof]).reshape(-1)
+
+        if self.multieigs is True:
+            self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
+            self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
 
         # 3. 把 uh 加入粗网格空间, 组装刚度和质量矩阵
         w0 = uh@A
@@ -309,10 +333,11 @@ class EllipticEignvalueFEMModel:
         ## 求解特征值
         A = AA[isFreeDof, :][:, isFreeDof].tocsr()
         M = MM[isFreeDof, :][:, isFreeDof].tocsr()
-        u[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof)))
+        u[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof)), sigma=self.sigma)
         end = timer()
-
         print("smallest eigns:", d, "with time: ", end - start)
+
+
         uh *= u[-1]
         uh += I@u[:-1]
 
@@ -409,10 +434,14 @@ class EllipticEignvalueFEMModel:
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
-            ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
-            uh = space.function()
-            uh[:] = uH
-            uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            if self.sigma is None:
+                ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
+                uh = space.function()
+                uh[:] = uH
+                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            else:
+                uh = space.function()
+                uh[isFreeDof] = spsolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
 
         # 3. 在最细网格上求解一次最小特征值问题 
         eta = self.residual_estimate(uh)
@@ -440,14 +469,17 @@ class EllipticEignvalueFEMModel:
         A = self.get_stiff_matrix(space, integrator, area)
         M = self.get_mass_matrix(space, integrator, area)
         isFreeDof = ~(space.boundary_dof())
-
-        ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
         uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
-        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], ml=ml)
-
+        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
         end = timer()
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
 
         print("smallest eigns:", d, "with time: ", end - start)
         return uh
@@ -500,7 +532,7 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
-            uh[isFreeDof], d = picard(A, M, uh[isFreeDof])
+            uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
 
             if i < maxit:
                 uh = space.function(array=uh)
@@ -525,9 +557,15 @@ class EllipticEignvalueFEMModel:
                 space = LagrangeFiniteElementSpace(mesh, 1)
                 isFreeDof = ~(space.boundary_dof())
                 gdof = space.number_of_global_dofs()
-
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
+
         uh = space.function(array=uh)
         return uh
 
@@ -578,9 +616,13 @@ class EllipticEignvalueFEMModel:
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
-            ml = pyamg.ruge_stuben_solver(A)
-            uh = space.function()
-            uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            if self.sigma is None:
+                ml = pyamg.ruge_stuben_solver(A)
+                uh = space.function()
+                uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            else:
+                uh = space.function()
+                uh[isFreeDof] = spsolve(A, b[isFreeDof]).reshape(-1)
 
 
             eta = self.residual_estimate(uh)
@@ -611,11 +653,15 @@ class EllipticEignvalueFEMModel:
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
-        ml = pyamg.ruge_stuben_solver(A)
         uh = IM@uh
-        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], ml=ml)
-
+        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
         end = timer()
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
 
         print("smallest eigns:", d, "with time: ", end - start)
         return space.function(array=uh)
