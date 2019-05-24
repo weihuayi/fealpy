@@ -6,11 +6,12 @@ from ..quadrature import TriangleQuadrature
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
+    ccw = np.array([0, 1, 2])
     V = 3
     E = 3
     F = 1
     def __init__(self, N, cell):
-        super(TriangleMeshDataStructure, self).__init__(N, cell) 
+        super(TriangleMeshDataStructure, self).__init__(N, cell)
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):

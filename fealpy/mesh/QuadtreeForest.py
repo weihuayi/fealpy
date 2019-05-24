@@ -62,8 +62,8 @@ class QuadtreeMesh(Mesh2d):
 
             # Find the cutted edge 
             cell2edge = self.ds.cell_to_edge()
-            edgeCenter = self.barycenter(entity='edge')
-            cellCenter = self.barycenter(entity='cell')
+            edgeCenter = self.entity_barycenter('edge')
+            cellCenter = self.entity_barycenter('cell')
 
             edge2center = np.arange(NN, NN+NE)
 
@@ -96,3 +96,29 @@ class QuadtreeMesh(Mesh2d):
         cell = self.ds.cell
         p = np.einsum('...j, ijk->...ik', bc, node[cell[:, self.ccw]])
         return p
+
+
+class QuadtreeForest():
+    """
+
+    leaf node:
+    interior node:
+    siblings:
+    descendants:
+    ancestor:
+    subtree:
+    level: The depth of a node from the root.
+
+    linear octrees:
+        + It has lower storage costs than other representations.
+        + The other representations use pointers, which add synchronization 
+          and communication overhead for parallel implementations.
+
+    Morton encoding:
+    anchor: Any octant in the domain can be uniquely identified
+            by specifying one of its vertices
+
+    (4, 2) --> (0100, 0010)--> from right to left interleave 00011000
+    """
+    def __init__(self):
+        pass

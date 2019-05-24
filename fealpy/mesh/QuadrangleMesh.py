@@ -4,6 +4,7 @@ from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
+    ccw = np.array([0, 1, 2, 3])
     V = 4
     E = 4
     F = 1

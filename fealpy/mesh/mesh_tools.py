@@ -172,7 +172,7 @@ def show_mesh_2d(
 
     if mesh.meshtype is not 'polygon':
         if mesh.geo_dimension() == 2:
-            poly = PolyCollection(node[cell, :])
+            poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
