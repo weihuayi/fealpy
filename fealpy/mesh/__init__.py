@@ -21,7 +21,7 @@ from .Tritree import Tritree
 from .Quadtree import Quadtree
 from .Octree import Octree
 
-from .QuadtreeForest import QuadtreeMesh
+from .QuadtreeForest import QuadtreeMesh, QuadtreeForest
 
 from .simple_mesh_generator import *
 

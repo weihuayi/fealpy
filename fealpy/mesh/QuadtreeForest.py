@@ -120,5 +120,27 @@ class QuadtreeForest():
 
     (4, 2) --> (0100, 0010)--> from right to left interleave 00011000
     """
-    def __init__(self):
+    def __init__(self, mesh, maxdepth):
+        self.mesh = mesh
+        self.maxdepth = maxdepth
+        self.level = None
+        self.leaf = None
+
+
+    def morton_encoding(self):
         pass
+
+    def add_plot(self, plt):
+        mesh = self.mesh
+        maxdepth = self.maxdepth
+
+        qmesh = QuadtreeMesh(mesh.node.copy(), mesh.ds.cell.copy())
+        qmesh.uniform_refine(maxdepth)
+        qmesh.node *= 2**maxdepth
+        fig = plt.figure()
+        axes = fig.gca()
+        qmesh.add_plot(axes, showaxis=True, cellcolor='lightgray', edgecolor='gray', linewidths=1)
+        plt.xticks(np.arange(2**maxdepth+1))
+        plt.yticks(np.arange(2**maxdepth+1))
+
+
