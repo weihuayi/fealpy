@@ -99,6 +99,14 @@ class EllipticEignvalueFEMModel:
         vals, vecs = eigs(P, k=k)
         print(1/vals.real)
 
+    def eig(self, A, M):
+        NN = A.shape[0]
+        self.M = M
+        self.ml = self.ml = pyamg.ruge_stuben_solver(A)
+        P = LinearOperator((NN, NN), matvec=self.linear_operator)
+        vals, vecs = eigs(P, k=1)
+        return vecs.reshape(-1).real, 1/vals.real[0]
+
     def alg_0(self, maxit=None):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
@@ -133,8 +141,9 @@ class EllipticEignvalueFEMModel:
         isFreeHDof = ~(space.boundary_dof())
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
-                sigma=self.sigma)
+
+        # uh[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)), sigma=self.sigma)
+        uh[isFreeHDof], d = self.eig(A, M)
 
         GD = mesh.geo_dimension()
         if (self.step > 0) and (0 in idx):
@@ -245,8 +254,8 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
-                sigma=self.sigma)
+        # uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)), sigma=self.sigma)
+        uH[isFreeHDof], d = self.eig(A, M)
 
         uh = space.function()
         uh[:] = uH
@@ -333,7 +342,8 @@ class EllipticEignvalueFEMModel:
         ## 求解特征值
         A = AA[isFreeDof, :][:, isFreeDof].tocsr()
         M = MM[isFreeDof, :][:, isFreeDof].tocsr()
-        u[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof)), sigma=self.sigma)
+        # u[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof)), sigma=self.sigma)
+        u[isFreeDof], d = self.eig(A, M)
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
 
@@ -381,8 +391,8 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)),
-                sigma=self.sigma)
+        # uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)), sigma=self.sigma)
+        uH[isFreeHDof], d = self.eig(A, M)
 
         uh = space.function()
         uh[:] = uH
@@ -472,7 +482,8 @@ class EllipticEignvalueFEMModel:
         uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
-        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+        # uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+        uh[isFreeDof], d = self.eig(A, M)
         end = timer()
 
         if self.multieigs is True:
@@ -532,7 +543,8 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
-            uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+            # uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+            uh[isFreeDof], d = self.eig(A, M)
 
             if i < maxit:
                 uh = space.function(array=uh)
@@ -654,7 +666,8 @@ class EllipticEignvalueFEMModel:
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
         uh = IM@uh
-        uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+        # uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
+        uh[isFreeDof], d = self.eig(A, M)
         end = timer()
 
         if self.multieigs is True:

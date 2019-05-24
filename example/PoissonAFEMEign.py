@@ -75,11 +75,11 @@ print(info)
 # pde = EigenSquareDC()
 # pde = EigenCrack()
 
-pde = EigenGWWA()
-pde = EigenGWWB()
+# pde = EigenGWWA()
+# pde = EigenGWWB()
 
 # pde = EigenLShape3d()
-# pde = EigenHarmonicOscillator3d()
+pde = EigenHarmonicOscillator3d()
 # pde = EigenSchrodinger3d()
 
 model = EllipticEignvalueFEMModel(
@@ -92,7 +92,7 @@ model = EllipticEignvalueFEMModel(
         q=3,  # 积分精度
         resultdir='/home/why/result/',
         sigma=None,
-        multieigs=True)
+        multieigs=False)
 
 u0 = model.alg_0()
 u1 = model.alg_1()

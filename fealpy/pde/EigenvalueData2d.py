@@ -189,7 +189,7 @@ class EigenGWWB:
             (2, 6, 1),
             (2, 3, 6),
             (5, 8, 4),
-            (7, 4, 0)], dtype=np.int)
+            (7, 4, 8)], dtype=np.int)
 
         mesh = TriangleMesh(node, cell)
         mesh.uniform_bisect(2)
