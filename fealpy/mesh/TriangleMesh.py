@@ -181,105 +181,16 @@ class TriangleMesh(Mesh2d):
 
     def uniform_bisect(self, n=1):
         for i in range(n):
-            NN = self.number_of_nodes()
-            NC = self.number_of_cells()
-            NE = self.number_of_edges()
-            node = self.node
-            edge = self.ds.edge
-            cell = self.ds.cell
-            cell2edge = self.ds.cell_to_edge()
+            self.bisect()
 
-            cell2edge0 = np.zeros((2*NC,), dtype=self.itype)
-            cell2edge0[0:NC] = cell2edge[:,0]
-
-            edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0],:]+node[edge[:,1],:])/2.0
-            self.node = np.concatenate((node, newNode), axis=0)
-            for k in range(2):
-                p0 = cell[0:NC,0]
-                p1 = cell[0:NC,1]
-                p2 = cell[0:NC,2]
-                p3 = edge2newNode[cell2edge0[0:NC]]
-                cell = np.zeros((2*NC,3), dtype=self.itype)
-                cell[0:NC,0] = p3
-                cell[0:NC,1] = p0
-                cell[0:NC,2] = p1
-                cell[NC:, 0] = p3
-                cell[NC:, 1] = p2
-                cell[NC:, 2] = p0
-                if k == 0:
-                    cell2edge0[0:NC] = cell2edge[:,2]
-                    cell2edge0[NC:] = cell2edge[:,1]
-                NC = 2*NC
-
-            NN = self.node.shape[0] 
-            self.ds.reinit(NN, cell)
+    def bisect(self, isMarkedCell='all', returnim=False, refine=None):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
-        cell = self.ds.cell
-        edge = self.ds.edge
-        cell2edge = self.ds.cell_to_edge()
-        cell2cell = self.ds.cell_to_cell()
-
-        isCutEdge = np.zeros((NE,), dtype=np.bool)
-        while len(markedCell)>0:
-            isCutEdge[cell2edge[markedCell, 0]]=True
-            refineNeighbor = cell2cell[markedCell, 0]
-            markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
-
-        edge2newNode = np.zeros((NE,), dtype=self.itype)
-        edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
-
-        node = self.node
-        newNode =0.5*(node[edge[isCutEdge,0],:] + node[edge[isCutEdge,1],:]) 
-        self.node = np.concatenate((node, newNode), axis=0)
-        cell2edge0 = cell2edge[:, 0]
-
-        for k in range(2):
-            idx, = np.nonzero(edge2newNode[cell2edge0]>0)
-            nc = len(idx)
-            if nc == 0:
-                break
-            L = idx
-            R = np.arange(NC, NC+nc)
-            p0 = cell[idx,0]
-            p1 = cell[idx,1]
-            p2 = cell[idx,2]
-            p3 = edge2newNode[cell2edge0[idx]]
-            cell = np.concatenate((cell, np.zeros((nc,3), dtype=self.itype)), axis=0)
-            cell[L,0] = p3
-            cell[L,1] = p0
-            cell[L,2] = p1
-            cell[R,0] = p3
-            cell[R,1] = p2
-            cell[R,2] = p0
-            if k == 0:
-                cell2edge0 = np.zeros((NC+nc,), dtype=self.itype)
-                cell2edge0[0:NC] = cell2edge[:,0]
-                cell2edge0[L] = cell2edge[idx,2]
-                cell2edge0[R] = cell2edge[idx,1]
-            NC = NC+nc
-
-        NN = self.node.shape[0]
-        self.ds.reinit(NN, cell)
-
-        # reconstruct the  data structure
-        if u is not None:
-            eu = 0.5*np.sum(u[edge[isCutEdge]], axis=1)
-            Iu = np.concatenate((u, eu), axis=0)
-        if u is None:
-            return True
-        else:
-            return(Iu, True)
-
-    def bisect(self, isMarkedCell, returnim=False, refine=None):
-
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        NE = self.number_of_edges()
+        if isMarkedCell is 'all':
+            isMarkedCell = np.ones(NC, dtype=np.bool)
 
         cell = self.entity('cell')
         edge = self.entity('edge')
