@@ -123,16 +123,33 @@ class QuadtreeForest():
     def __init__(self, mesh, maxdepth):
         self.mesh = mesh
         self.maxdepth = maxdepth
-        self.level = np.array([0], dtype=np.uint8)
-        self.leaf = np.array([0], dtype=np.uint8)
+        NC = self.mesh.number_of_cells()
+        self.levels = np.empty(NC, dtype=np.ndarray)
+        self.forest = np.empty(NC, dtype=np.ndarray)
 
-    def uniform_refine(self):
-        N
-        self.leaf = np.array([0, 2, 1, 3], dtype=np.uint8)
-        self.level = np.ones(4, dtype=np.uint8)
+        self.forest.fill(np.zeros(1, dtype=np.uint8))
+        self.levels.fill(np.zeros(1, dtype=np.uint8))
+
+    def number_of_trees(self):
+        return self.forest.shape[0]
+
+    def uniform_refine(self, n=1):
+        NT = self.number_of_trees();
+        for i in range(n):
+            for j in range(NT):
+                NL = len(self.forest[j])
+                level = np.repeat(self.levels[j], 4)
+                tree = np.repeat(self.forest[j], 4)
+                child = np.tile([0, 2, 1, 3], NL)
+                self.forest[j] =  tree + np.left_shift(child, 2*level)
+                self.levels[j] = level + 1
 
     def print(self):
-        print([bin(x)[2:].zfill(8) for x in self.leaf])
+        NT = self.number_of_trees()
+        for j in range(NT):
+            print("The {0}-th tree:\n".format(j))
+            print("levels:\n", self.levels[j])
+            print([bin(x)[2:].zfill(8) for x in self.forest[j]])
 
     def add_plot(self, plt):
         mesh = self.mesh
