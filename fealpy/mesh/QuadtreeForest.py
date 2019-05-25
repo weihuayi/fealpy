@@ -123,9 +123,8 @@ class QuadtreeForest():
     def __init__(self, mesh, maxdepth):
         self.mesh = mesh
         self.maxdepth = maxdepth
-        self.level = None
-        self.leaf = None
-
+        self.level = 0
+        self.leaf = np.array([0], dtype=np.int8)
 
     def morton_encoding(self):
         pass
