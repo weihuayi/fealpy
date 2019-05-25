@@ -16,6 +16,8 @@ cell = np.array([(0, 1, 2, 3)], dtype=np.int)
 mesh = QuadtreeMesh(node, cell)
 
 forest = QuadtreeForest(mesh, maxdepth)
+forest.uniform_refine()
+forest.print()
 
 forest.add_plot(plt)
 plt.show()
