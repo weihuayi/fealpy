@@ -144,6 +144,15 @@ class QuadtreeForest():
                 self.forest[j] =  tree + np.left_shift(child, 2*level)
                 self.levels[j] = level + 1
 
+    def octant(self):
+        NT = self.number_of_trees();
+        for j in range(NT):
+            tree = self.forest[j]
+            NL = len(tree)
+            print(tree.dtype)
+            a = np.unpackbits(tree).reshape(-1, 8)
+
+
     def print(self):
         NT = self.number_of_trees()
         for j in range(NT):

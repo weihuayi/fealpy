@@ -36,30 +36,30 @@ class EllipticEignvalueFEMModel:
         bc = np.array([1/(GD+1)]*(GD+1), dtype=mesh.ftype)
         grad = uh.grad_value(bc)
 
-#        ps = mesh.bc_to_point(bc)
-#        try:
-#            d = self.pde.diffusion_coefficient(ps)
-#        except AttributeError:
-#            d = np.ones(NC, dtype=mesh.ftype)
-#
-#        if isinstance(d, float):
-#            grad *= d
-#        elif len(d) == GD:
-#            grad = np.einsum('m, im->im', d, grad)
-#        elif isinstance(d, np.ndarray):
-#            if len(d.shape) == 1:
-#                grad = np.einsum('i, im->im', d, grad)
-#            elif len(d.shape) == 2:
-#                grad = np.einsum('im, im->im', d, grad)
-#            elif len(d.shape) == 3:
-#                grad = np.einsum('imn, in->in', d, grad)
+        ps = mesh.bc_to_point(bc)
+        try:
+            d = self.pde.diffusion_coefficient(ps)
+        except AttributeError:
+            d = np.ones(NC, dtype=mesh.ftype)
 
-#        if GD == 2:
-#            face2cell = mesh.ds.edge_to_cell()
-#            h = np.sqrt(np.sum(n**2, axis=-1))
-#        elif GD == 3:
-#            face2cell = mesh.ds.face_to_cell()
-#            h = np.sum(n**2, axis=-1)**(1/4)
+        if isinstance(d, float):
+            grad *= d
+        elif len(d) == GD:
+            grad = np.einsum('m, im->im', d, grad)
+        elif isinstance(d, np.ndarray):
+            if len(d.shape) == 1:
+                grad = np.einsum('i, im->im', d, grad)
+            elif len(d.shape) == 2:
+                grad = np.einsum('im, im->im', d, grad)
+            elif len(d.shape) == 3:
+                grad = np.einsum('imn, in->in', d, grad)
+
+        if GD == 2:
+            face2cell = mesh.ds.edge_to_cell()
+            h = np.sqrt(np.sum(n**2, axis=-1))
+        elif GD == 3:
+            face2cell = mesh.ds.face_to_cell()
+            h = np.sum(n**2, axis=-1)**(1/4)
 
         cell2cell = mesh.ds.cell_to_cell()
         cell2face = mesh.ds.cell_to_face()
