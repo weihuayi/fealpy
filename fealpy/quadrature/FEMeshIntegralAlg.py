@@ -30,6 +30,16 @@ class FEMeshIntegralAlg():
         else:
             return np.sqrt(e)
 
+    #   def f(x):
+    #        return np.sum(uh.grad_value(x)**2, axis=-1)
+
+    def L2_norm_1(self, f, celltype=False):
+        e = self.integral(f, celltype=celltype)
+        if celltype is False:
+            return np.sqrt(e.sum())
+        else:
+            return np.sqrt(e)
+
     def L1_error(self, u, uh, celltype=False):
         def f(x):
             xx = self.mesh.bc_to_point(x)
