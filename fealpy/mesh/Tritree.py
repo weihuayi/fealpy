@@ -1,7 +1,7 @@
 import numpy as np
 
 from .TriangleMesh import TriangleMesh
-
+from .adaptive_tools import mark
 
 class Tritree(TriangleMesh):
     localEdge2childCell = np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32)
@@ -416,7 +416,7 @@ class Tritree(TriangleMesh):
             mesh = self.to_conformmesh()
             estimator.update(data['rho'], mesh, smooth=True)
 
-    def refine_marker(self, eta, theta, ep):
+    def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys():
@@ -425,7 +425,7 @@ class Tritree(TriangleMesh):
             np.add.at(eta0, idxmap, eta)
             eta = eta0[leafCellIdx]
 
-        isMarked = self.mark(eta, theta, ep, "refine")
+        isMarked = mark(eta, theta, method)
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
@@ -569,7 +569,7 @@ class Tritree(TriangleMesh):
             if isRootCell.sum() == NC:
                 break
 
-    def coarsen_marker(self, eta, beta, ep):
+    def coarsen_marker(self, eta, beta, method):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         if 'idxmap' in self.celldata.keys(): 
@@ -578,7 +578,7 @@ class Tritree(TriangleMesh):
             np.add.at(eta0, idxmap, eta)
         else:
             eta0 = eta
-        isMarked = self.mark(eta0[leafCellIdx], beta, ep, method="coarsen")
+        isMarked = mark(eta0[leafCellIdx], beta, method)
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
