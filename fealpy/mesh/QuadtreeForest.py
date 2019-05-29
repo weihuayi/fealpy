@@ -120,14 +120,14 @@ class QuadtreeForest():
 
     (4, 2) --> (0100, 0010)--> from right to left interleave 00011000
     """
-    def __init__(self, mesh, maxdepth):
+    def __init__(self, mesh, maxdepth=32):
         self.mesh = mesh
         self.maxdepth = maxdepth
         NC = self.mesh.number_of_cells()
         self.levels = np.empty(NC, dtype=np.ndarray)
         self.forest = np.empty(NC, dtype=np.ndarray)
 
-        self.forest.fill(np.zeros(1, dtype=np.uint8))
+        self.forest.fill(np.zeros(1, dtype=np.uint64))
         self.levels.fill(np.zeros(1, dtype=np.uint8))
 
     def number_of_trees(self):
@@ -140,17 +140,27 @@ class QuadtreeForest():
                 NL = len(self.forest[j])
                 level = np.repeat(self.levels[j], 4)
                 tree = np.repeat(self.forest[j], 4)
-                child = np.tile([0, 2, 1, 3], NL)
-                self.forest[j] =  tree + np.left_shift(child, 2*level)
-                self.levels[j] = level + 1
+                child = np.tile(np.array([0, 2, 1, 3], dtype=np.uint64), NL)
+                self.forest[j] = tree + np.left_shift(child, 2*level)
+                self.levels[j] = level + np.uint8(1)
 
     def octant(self):
         NT = self.number_of_trees();
+        maxdepth = self.maxdepth
         for j in range(NT):
             tree = self.forest[j]
             NL = len(tree)
-            print(tree.dtype)
-            a = np.unpackbits(tree).reshape(-1, 8)
+            a = np.unpackbits(tree.view(np.uint8)).reshape(-1, 64)
+            print(a)
+            x = np.zeros((NL, 32), dtype=np.uint8)
+            y = np.zeros((NL, 32), dtype=np.uint8)
+            x = a[:, 0::2]
+            y = a[:, 1::2]
+            print(a)
+            print(x)
+            print(y)
+            x = np.packbits(x.flat).view(np.uint32)
+            y = np.packbits(y.flat).view(np.uint32)
 
 
     def print(self):
@@ -158,7 +168,7 @@ class QuadtreeForest():
         for j in range(NT):
             print("The {0}-th tree:\n".format(j))
             print("levels:\n", self.levels[j])
-            print([bin(x)[2:].zfill(8) for x in self.forest[j]])
+            print([bin(x)[2:].zfill(64) for x in self.forest[j]])
 
     def add_plot(self, plt):
         mesh = self.mesh
