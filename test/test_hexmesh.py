@@ -6,7 +6,7 @@ import pylab as pl
 
 import sys
 
-from fealpy.mesh.HexahedronMesh import HexahedronMesh  
+from fealpy.mesh import HexahedronMesh  
 
 from fealpy.mesh.simple_mesh_generator import cubehexmesh 
 
@@ -27,6 +27,9 @@ def hex_mesh():
 
 cube = [ 0, 1, 0, 1, 0, 1]
 mesh = cubehexmesh(cube, nx = 2, ny = 2, nz = 2)
+
+cell = mesh.entity('cell')
+print(cell)
 
 axes = a3.Axes3D(pl.figure())
 
