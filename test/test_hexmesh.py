@@ -1,4 +1,5 @@
-
+#!/usr/bin/env python3
+# 
 import numpy as np
 import mpl_toolkits.mplot3d as a3
 import matplotlib.colors as colors
@@ -35,6 +36,11 @@ axes = a3.Axes3D(pl.figure())
 
 cell2edge = mesh.ds.cell_to_edge().flatten()
 cell2face = mesh.ds.cell_to_face().flatten()
+
+print(mesh.number_of_nodes())
+print(mesh.number_of_edges())
+print(mesh.number_of_faces())
+print(mesh.number_of_cells())
 
 mesh.add_plot(axes)
 mesh.find_node(axes, showindex=True, markersize=300, color='r')
