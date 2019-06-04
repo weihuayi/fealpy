@@ -1,12 +1,14 @@
 import numpy as np
 from .Mesh3d import Mesh3d 
 
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
+from scipy.sparse import spdiags, eye, tril, triu, diags, kron
 
 
 class StructureHexMesh(Mesh3d):
     def __init__(self, box, nx, ny, nz):
         self.box = box
+        self.h = (box[1] - box[0])/nx
         self.ds = StructureHexMeshDataStructure(nx, ny, nz)
     
     @property
@@ -29,7 +31,19 @@ class StructureHexMesh(Mesh3d):
         return node
 
     def number_of_nodes(self):
-        return self.ds.N 
+        return self.ds.NN
+
+    def laplace_operator(self):
+        NX = self.ds.nx + 1
+        h = self.h
+        d = 2*np.ones(NX, dtype=np.float)
+        c = -np.ones(NX - 1, dtype=np.float)
+        A = diags([c, d, c], [-1, 0, 1])
+        A = A.tocsr()
+
+        I = eye(NX)
+        A = kron(kron(A, I), I) + kron(kron(I, A), I) + kron(kron(I, I), A)
+        return A, h**2
 
 
 
@@ -482,10 +496,10 @@ class StructureHexMeshDataStructure():
         return node2cell
 
     def boundary_node_flag(self):
-        N = self.N
+        NN = self.NN
         face = self.face
         isBdFace = self.boundary_face_flag()
-        isBdPoint = np.zeros((N,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool)
         isBdPoint[face[isBdFace,:]] = True 
         return isBdPoint 
 
