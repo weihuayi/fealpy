@@ -12,16 +12,15 @@ Note
 
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.pde.sfc_2d import SFCModelData0
+from fealpy.pde.sfc_2d import SFCModelData1
 from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
 
-pde = SFCModelData0()
+pde = SFCModelData1()
 qtree = pde.init_mesh(n=6, meshtype='quadtree')
 pmesh = qtree.to_pmesh()
 
 vem = SFCVEMModel2d(pde, pmesh, p=1, q=4)
 vem.solve(rho=0.05, maxit=40000)
-
 
 uI = vem.space.interpolation(pde.solution)
 

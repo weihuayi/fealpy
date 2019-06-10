@@ -7,7 +7,7 @@ import pyamg
 from ..functionspace.vem_space import VirtualElementSpace2d 
 from ..boundarycondition import DirichletBC
 from ..vem import doperator 
-from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg
+from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg, GaussLobattoQuadrature
 
 
 class SFCVEMModel2d():
@@ -81,8 +81,7 @@ class SFCVEMModel2d():
         elif ptype is 'L2':
             S[:] = np.concatenate(list(map(g, zip(self.mat.PI0, cd))))
         else:
-            raise ValueError("ptype value should be H1 or L2! But you input
-                    %s".format(ptype)
+            raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
         return S
 
     def residual_estimator(self):
@@ -94,8 +93,7 @@ class SFCVEMModel2d():
 
         fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
         def f(x, cellidx):
-            val = (self.S.laplace_value(x, cellidx) - 
-                self.S.value(x, cellidx) + fh[cellidx])
+            val = (self.S.laplace_value(x, cellidx) - self.S.value(x, cellidx) + fh[cellidx])
             return val**2
 
         e0 = self.integralalg.integral(f, celltype=True)
