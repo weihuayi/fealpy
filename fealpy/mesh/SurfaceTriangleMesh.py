@@ -7,7 +7,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 
 
 class SurfaceTriangleMesh():
-    def __init__(self, mesh, surface, p=1):
+    def __init__(self, mesh, surface, p=1, scale=1.0):
         """
         Initial a object of Surface Triangle Mesh.
 
@@ -35,7 +35,8 @@ class SurfaceTriangleMesh():
         self.mesh = mesh
         self.p = p
         self.space = LagrangeFiniteElementSpace(mesh, p)
-        self.node, d = surface.project(self.space.interpolation_points())
+        self.node, d = surface.project(self.space.interpolation_points()/scale)
+        self.node *= scale
         self.surface = surface
         self.ds = mesh.ds
         self.ftype = mesh.ftype

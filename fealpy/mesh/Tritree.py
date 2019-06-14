@@ -68,7 +68,7 @@ class Tritree(TriangleMesh):
         for i in range(n):
             self.refine_1(surface=surface)
 
-    def adaptive(self, eta, options, surface=None):
+    def adaptive(self, eta, options, surface=None, scale=1.0):
         """
         """
         leafCellIdx = self.leaf_cell_index()
@@ -137,7 +137,7 @@ class Tritree(TriangleMesh):
         # refine
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
-            self.refine_1(isMarkedCell, options, surface=surface)
+            self.refine_1(isMarkedCell, options, surface=surface, scale=scale)
 
             h = np.sqrt(self.entity_measure('cell'))
             if options['minsize'] is not None:
@@ -196,7 +196,8 @@ class Tritree(TriangleMesh):
             self,
             isMarkedCell=None,
             options={'disp': True},
-            surface=None):
+            surface=None,
+            scale=1.0):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
@@ -311,7 +312,8 @@ class Tritree(TriangleMesh):
                     options['data'][key] = np.r_['0', value, t]
 
             if surface is not None:
-                ec, _ = surface.project(ec)
+                ec, _ = surface.project(ec/scale)
+                ec *= scale
 
             self.node = np.r_['0', node, ec]
             cell = np.r_['0', cell, cell4]

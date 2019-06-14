@@ -7,7 +7,7 @@ from .dof import CPLFEMDof2d, DPLFEMDof2d
 from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh 
 
 class SurfaceLagrangeFiniteElementSpace:
-    def __init__(self, mesh, surface, p=1, p0=None, spacetype='C'):
+    def __init__(self, mesh, surface, p=1, p0=None, spacetype='C', scale=1.0):
         """
         Initial a object of SurfaceLagrangeFiniteElementSpace. 
 
@@ -37,8 +37,9 @@ class SurfaceLagrangeFiniteElementSpace:
         if p0 is None:
             p0 = p
 
+        self.scale = scale
         self.p = p
-        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0) 
+        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale) 
         self.surface = surface
         
         if p0 == p:
@@ -133,7 +134,8 @@ class SurfaceLagrangeFiniteElementSpace:
         return self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
-        ipoint, _ = self.surface.project(self.dof.interpolation_points())
+        ipoint, _ = self.surface.project(self.dof.interpolation_points()/self.scale)
+        ipoint *= self.scale
         return ipoint
     
     def cell_to_dof(self):
