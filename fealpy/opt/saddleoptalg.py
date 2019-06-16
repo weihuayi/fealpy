@@ -40,7 +40,7 @@ class SteepestDescentAlg:
 
             if options['Output']:
                 print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
-                self.fun.output(str(self.NF).zfill(4), queue=queue)
+                self.fun.output(str(self.NF).zfill(6), queue=queue)
             self.NF += 1
 
             if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
