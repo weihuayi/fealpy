@@ -1,5 +1,91 @@
 import numpy as np
 from numpy.linalg import norm
+from scipy.optimize import minimize
+
+
+class AndersonAccelerationAlg:
+    def __init__(self, problem, options=None):
+        self.problem = problem
+        self.options = options
+
+        self.debug = True
+        self.NF = 0  # 计算函数值和梯度的次数
+        self.fun = problem['objective']
+        self.x = problem['x0']
+        self.f, self.g = self.fun(self.x)  # 初始目标函数值和梯度值
+        g = self.g.copy()
+        g[:, 1] *= -1
+        self.F = [g]
+        self.m = 5
+
+        # compute one step
+        self.x[:, 0] += self.g[:, 0]
+        self.x[:, 1] -= self.g[:, 1]
+        self.f, self.g = self.fun(self.x)
+        g = self.g.copy()
+        g[:, 1] *= -1
+        self.F += [g]
+
+    def run(self, queue=None, maxit=None):
+        options = self.options
+        alpha = options['StepLength']
+
+        gnorm = norm(self.g)
+        self.diff = np.Inf
+        if options['Output']:
+            print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+            self.fun.output('', queue=queue)
+
+        self.NF += 1
+
+        if maxit is None:
+            maxit = options['MaxFunEvals']
+
+        for i in range(maxit):
+            alpha = self.minfun()
+            self.x += sum(map(lambda x: x[0]*x[1], zip(alpha, self.F)))
+            f, g = self.fun(self.x)
+            self.diff = np.abs(f - self.f)
+            self.f = f
+            self.g = g
+            g = g.copy()
+            g[:, 1] *= -1
+            if len(self.F) < self.m:
+                self.F += [g]
+            else:
+                self.F = self.F[1:] + [g]
+            gnorm = norm(self.g)
+
+            if options['Output']:
+                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+                self.fun.output(str(self.NF).zfill(6), queue=queue)
+            self.NF += 1
+
+            if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
+                print("""
+                The norm of gradeint value : %12.11g (the tol  is %12.11g)
+                The difference of function : %12.11g (the tol is %12.11g)
+                """ % (
+                    gnorm, options['NormGradTol'],
+                    self.diff, options['FunValDiff'])
+                )
+                break
+
+        self.fun.output('', queue=queue, stop=True)
+
+        return self.x, self.f, self.g, self.diff
+
+    def minfun(self):
+        n = len(self.F)
+        x0 = 1/n*np.ones(n, dtype=np.float)
+        eq_cons = {'type': 'eq',
+                   'fun': lambda x: np.array([sum(x) - 1]),
+                   'jac': lambda x: np.ones(n)}
+        res = minimize(
+                lambda x: norm(sum(map(lambda y: y[0]*y[1], zip(x, self.F)))),
+                x0, method='SLSQP', constraints=[eq_cons],
+                options={'ftol': 1e-9, 'disp': True})
+        return res.x
 
 
 class SteepestDescentAlg:
