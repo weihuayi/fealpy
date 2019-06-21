@@ -65,7 +65,7 @@ class FEMFunctionRecoveryAlg():
         space = uh.space
         mesh = space.mesh
         GD = mesh.geo_dimension()
-        TD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
 
         node2cell = mesh.ds.node_to_cell()
         inva = 1/mesh.entity_measure('cell')

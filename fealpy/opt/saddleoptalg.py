@@ -31,6 +31,7 @@ class AndersonAccelerationAlg:
         alpha = options['StepLength']
 
         gnorm = norm(self.g)
+        N = len(self.g)
         self.diff = np.Inf
         if options['Output']:
             print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
@@ -55,18 +56,18 @@ class AndersonAccelerationAlg:
             else:
                 self.F = self.F[1:] + [g]
             gnorm = norm(self.g)
-
+            maxg = np.sqrt(np.max(np.sum(self.g**2, axis=-1)))
             if options['Output']:
-                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+                print("Step %d with energe: %12.11g, maxgnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, maxg, self.diff))
                 self.fun.output(str(self.NF).zfill(6), queue=queue)
             self.NF += 1
 
-            if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
+            if (maxg < options['NormGradTol']):
                 print("""
-                The norm of gradeint value : %12.11g (the tol  is %12.11g)
+                The max norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
                 """ % (
-                    gnorm, options['NormGradTol'],
+                    maxg, options['NormGradTol'],
                     self.diff, options['FunValDiff'])
                 )
                 break
@@ -124,17 +125,18 @@ class SteepestDescentAlg:
             self.g = g
             gnorm = norm(self.g)
 
+            maxg = np.sqrt(np.max(np.sum(self.g**2, axis=-1)))
             if options['Output']:
-                print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
+                print("Step %d with energe: %12.11g, maxgnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, maxg, self.diff))
                 self.fun.output(str(self.NF).zfill(6), queue=queue)
             self.NF += 1
 
-            if (gnorm < options['NormGradTol']) or (self.diff < options['FunValDiff']):
+            if (maxg < options['NormGradTol']):
                 print("""
-                The norm of gradeint value : %12.11g (the tol  is %12.11g)
+                The max norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
                 """ % (
-                    gnorm, options['NormGradTol'],
+                    maxg, options['NormGradTol'],
                     self.diff, options['FunValDiff'])
                 )
                 break
