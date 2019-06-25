@@ -1,30 +1,30 @@
 import numpy as np
 from numpy.linalg import norm
+import matplotlib.pyplot as plt
 
 """
 Reference
---------
-https://en.wikipedia.org/wiki/Nonlinear_conjugate_gradient_method
+---------
+https://en.wikipedia.org/wiki/Gradient_descent
 """
 
 
-class NonlinearConjugateGradientAlg:
-
+class GradientDescentAlg:
     def __init__(self, problem, options=None):
         self.problem = problem
-        if options is None:
-            self.options = self.get_options()
-        else:
-            self.options = options
-
-        self.NF = 0  # 计算函数值和梯度的次数
-        self.fun = problem['objective']
-        self.x = problem['x0']
-        self.f, self.g = self.fun(self.x)  # 初始目标函数值和梯度值
+        self.options = options
 
         self.debug = True
+        self.NF = 0  # 计算函数值和梯度的次数
 
+        # compute the initial function value and gradient
+        self.fun = problem['objective']
+        self.x = problem['x0']
+        self.f, self.g = self.fun(self.x)
+
+    @classmethod
     def get_options(
+            cls,
             MaxIters=500,
             MaxFunEvals=5000,
             NormGradTol=1e-6,
@@ -41,6 +41,7 @@ class NonlinearConjugateGradientAlg:
                 'FunValDiff'        : FunValDiff,
                 'StepLength'        : StepLength,
                 'StepTol'           : StepTol,
+                'Disp'              : Disp,
                 'Output'            : Output
                 }
 
@@ -49,10 +50,14 @@ class NonlinearConjugateGradientAlg:
     def run(self, queue=None, maxit=None):
         options = self.options
         alpha = options['StepLength']
+
         gnorm = norm(self.g)
         self.diff = np.Inf
-        if options['Output']:
+
+        if options['Disp']:
             print("The initial F(x): %12.11g, grad:%12.11g, diff:%12.11g"%(self.f, gnorm, self.diff))
+
+        if options['Output']:
             self.fun.output('', queue=queue)
 
         self.NF += 1
@@ -60,27 +65,24 @@ class NonlinearConjugateGradientAlg:
         if maxit is None:
             maxit = options['MaxFunEvals']
 
-        d = - self.g
         for i in range(maxit):
-            self.x -= alpha*d
+            self.show_linear_search(i, self.x, -self.g, self.fun, 0, 20)
 
+            self.x -= alpha*self.g
             f, g = self.fun(self.x)
-
-            beta = np.sum(g*(g - self.g))/np.sum(self.g*self.g)
-            beta = max(0, beta)
-            d = -self.g + beta*d
-
             self.diff = np.abs(f - self.f)
             self.f = f
             self.g = g
+
             gnorm = norm(self.g)
 
-            if options['Output']:
+            if options['Disp']:
                 print("Step %d with F(x): %12.11g, grad:%12.11g, diff:%12.11g"%(i, self.f, gnorm, self.diff))
+
+            if options['Output']:
                 self.fun.output(str(self.NF).zfill(6), queue=queue)
 
             self.NF += 1
-
             maxg = np.max(np.abs(self.g.flat))
             if (maxg < options['NormGradTol']):
                 print("""
@@ -96,3 +98,17 @@ class NonlinearConjugateGradientAlg:
             self.fun.output('', queue=queue, stop=True)
 
         return self.x, self.f, self.g, self.diff
+
+    def show_linear_search(self, tag, x0,  d, fun, a, b):
+        t = np.linspace(a, b, 40)
+        N = t.shape[0]
+        f = np.zeros(N)
+        for i in range(N):
+            f[i], g = fun(x0 + t[i]*d)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        axes.plot(t, f)
+        plt.savefig(str(tag) + '.png')
+        plt.close()
+
