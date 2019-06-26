@@ -1,19 +1,20 @@
 
 import numpy as np
+from numpy.linalg import norm
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 import pyamg
 
-from ..functionspace.vem_space import VirtualElementSpace2d 
+from ..functionspace.vem_space import VirtualElementSpace2d
 from ..boundarycondition import DirichletBC
-from ..vem import doperator 
+from ..vem import doperator
 from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg, GaussLobattoQuadrature
 
 
 class SFCVEMModel2d():
-    def __init__(self, pde, mesh, p=1, q=4):
+    def __init__(self, pde, mesh, p=1, q=6):
         """
-        Initialize a vem model for the simplified friction problem. 
+        Initialize a vem model for the simplified friction problem.
 
         Parameters
         ----------
@@ -21,49 +22,48 @@ class SFCVEMModel2d():
         pde:  PDE Model object
         mesh: PolygonMesh object
         p: int
-        q: 
-        
+        q: the number of degrees
+
         See Also
         --------
 
         Notes
         -----
         """
-        self.space = VirtualElementSpace2d(mesh, p) 
+        self.space = VirtualElementSpace2d(mesh, p)
         self.mesh = self.space.mesh
-        self.pde = pde  
+        self.pde = pde
 
         self.integrator = mesh.integrator(q)
-        self.area = self.space.smspace.area 
+        self.area = self.space.smspace.area
 
 
         self.uh = self.space.function() # the solution 
         self.lh = self.space.function() # \lambda_h 
 
         self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator, 
-                self.mesh, 
-                area=self.area, 
+                self.integrator,
+                self.mesh,
+                area=self.area,
                 barycenter=self.space.smspace.barycenter)
 
         self.mat = doperator.basic_matrix(self.space, self.area)
 
-        self.errorType = ['$\| u - \Pi^\\nabla u_h\|_0$', '$\|\\nabla u - \\nabla \Pi^\\nabla u_h\|$']
 
     def reinit(self, mesh, p=None):
         if p is None:
             p = self.space.p
-        self.space = VirtualElementSpace2d(mesh, p) 
+        self.space = VirtualElementSpace2d(mesh, p)
         self.mesh = self.space.mesh
 
-        self.uh = self.space.function() 
+        self.uh = self.space.function()
         self.lh = self.space.function()
 
         self.area = self.space.smspace.area
         self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator, 
-                self.mesh, 
-                area=self.area, 
+                self.integrator,
+                self.mesh,
+                area=self.area,
                 barycenter=self.space.smspace.barycenter)
 
         self.mat = doperator.basic_matrix(self.space, self.area)
@@ -93,6 +93,8 @@ class SFCVEMModel2d():
 
         fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
         def f(x, cellidx):
+            a = self.S.laplace_value(x, cellidx)
+            print(a.shape)
             val = (self.S.laplace_value(x, cellidx) - self.S.value(x, cellidx) + fh[cellidx])
             return val**2
 
@@ -102,7 +104,7 @@ class SFCVEMModel2d():
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
 
         # 计算内部边上的跳量，一个积分点就足够了
-        bc = mesh.entity_barycenter('edge') 
+        bc = mesh.entity_barycenter('edge')
         isContactEdge = self.pde.is_contact(bc)
         n = mesh.edge_unit_normal()
         h = np.sqrt(np.sum((node[edge[:, 0]] - node[edge[:, 1]])**2, axis=-1))
@@ -119,7 +121,7 @@ class SFCVEMModel2d():
         e1 = np.array(NE, dtype=mesh.ftype)
 
         t0 = np.einsum(
-            'ijm, jm->ij', 
+            'ijm, jm->ij',
             lgrad[:, ~isBdEdge] - rgrad[:, ~isBdEdge],
             n[~isBdEdge])
         e1[~isBdEdge] = t0**2*h[~isBdEdge]
@@ -129,20 +131,19 @@ class SFCVEMModel2d():
 
         eta = self.pdd.eta
         t0 = (
-            np.einsum('ij, ...ij->...i', 
-                n[isContactEdge], 
-                lgrad[:, isContactEdge]) + 
+            np.einsum('ij, ...ij->...i',
+                n[isContactEdge],
+                lgrad[:, isContactEdge]) +
             eta*self.lh.value(
-                points[:, isContactEdge], 
+                points[:, isContactEdge],
                 cellidx=edge2cell[isContactEdge, 0])
             )**2*h[isContactEdge]
-        e1[isBdEdge] = t0**2*h[isContactEdge] 
+        e1[isBdEdge] = t0**2*h[isContactEdge]
 
         np.add.at(e0, edge2cell[:, 0], e1)
         np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
         return np.sqrt(e0)
-    
-    
+
     def get_left_matrix(self):
         space = self.space
         area = self.area
@@ -152,23 +153,23 @@ class SFCVEMModel2d():
 
     def get_right_vector(self):
         f = self.pde.source
-        integral = self.integralalg.integral 
+        integral = self.integralalg.integral
         return doperator.source_vector(
                 integral,
-                f, 
+                f,
                 self.space,
                 self.mat.PI0)
 
     def get_lagrangian_multiplier_vector(self, cedge, cedge2dof):
         p = self.space.p
         node = self.mesh.node
-        v = node[cedge[:, 1]] - node[cedge[:, 0]] 
+        v = node[cedge[:, 1]] - node[cedge[:, 0]]
         l = np.sqrt(np.sum(v**2, axis=1))
         qf = GaussLobattoQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights 
+        bcs, ws = qf.quadpts, qf.weights
         lh = self.lh
         bb = np.einsum('i, ji, j->ji', ws, lh[cedge2dof], l)
-        
+
         gdof = self.space.number_of_global_dofs()
         b = np.bincount(cedge2dof.flat, weights=bb.flat, minlength=gdof)
         return b
@@ -182,7 +183,7 @@ class SFCVEMModel2d():
 
         edge = mesh.ds.edge
         edge2dof = space.dof.edge_to_dof()
-        bc = mesh.entity_barycenter(etype='edge') 
+        bc = mesh.entity_barycenter(etype='edge')
         isContactEdge = self.pde.is_contact(bc)
 
         edge = edge[isContactEdge]
@@ -196,13 +197,13 @@ class SFCVEMModel2d():
                 is_dirichlet_dof=self.pde.is_dirichlet)
 
         A = self.get_left_matrix()
-        b = self.get_right_vector() 
+        b = self.get_right_vector()
 
         k = 0
         eta = self.pde.eta
 
         AD = bc.apply_on_matrix(A)
-        ml = pyamg.ruge_stuben_solver(AD)  
+        ml = pyamg.ruge_stuben_solver(AD)
         while k < maxit:
             b1 = self.get_lagrangian_multiplier_vector(edge, edge2dof)
             bd = bc.apply_on_vector(b - eta*b1, A)
@@ -210,8 +211,8 @@ class SFCVEMModel2d():
             lh0 = lh.copy()
             uh[:] = ml.solve(bd, tol=1e-12, accel='cg').reshape(-1)
             lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1) 
-            e0 = np.sqrt(np.sum((uh - uh0)**2))
-            e1 = np.sqrt(np.sum((lh - lh0)**2))
+            e0 = np.max(np.abs(uh - uh0))
+            e1 = np.max(np.abs(lh - lh0))
             print('k:', k, 'error:', e0, e1)
             if e0 < tol:
                 break

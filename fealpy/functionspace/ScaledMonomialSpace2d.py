@@ -159,14 +159,14 @@ class ScaledMonomialSpace2d():
             p = self.p
         area = self.area
 
-        ldof = self.number_of_local_dofs() 
+        ldof = self.number_of_local_dofs()
 
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
             start = 3
             r = np.arange(1, p+1)
-            r = r[0:-1]*r[1:] 
+            r = r[0:-1]*r[1:]
             phi = self.basis(point, cellidx=cellidx)
             for i in range(2, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
@@ -222,6 +222,7 @@ class ScaledMonomialSpace2d():
 
     def laplace_value(self, uh, point, cellidx=None):
         lphi = self.laplace_basis(point, cellidx=cellidx)
+        print(lphi.shape)
         cell2dof = self.dof.cell2dof
         if cellidx is None:
             return np.einsum('ij, ...ij->...i', uh[cell2dof], lphi)

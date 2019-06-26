@@ -24,6 +24,10 @@ class Function(np.ndarray):
         space = self.space
         return space.grad_value(self, bc, cellidx=cellidx)
 
+    def laplace_value(self, bc, cellidx=None):
+        space = self.space
+        return space.grad_value(self, bc, cellidx=cellidx)
+
     def div_value(self, bc, cellidx=None):
         space = self.space
         return space.div_value(self, bc, cellidx=cellidx)

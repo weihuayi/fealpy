@@ -6,25 +6,43 @@ friction problem.
 
 Note
 ----
-1. 质量矩阵的稳定项
-1. 右端计算是否合适
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.pde.sfc_2d import SFCModelData1
 from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
+from fealpy.tools.show import showmultirate
 
+maxit = 30 
+theta = 0.2
+k = maxit - 15
+
+# prepare the pde model
 pde = SFCModelData1()
-qtree = pde.init_mesh(n=6, meshtype='quadtree')
-pmesh = qtree.to_pmesh()
 
-vem = SFCVEMModel2d(pde, pmesh, p=1, q=4)
-vem.solve(rho=0.05, maxit=40000)
+qtree = pde.init_mesh(n=4, meshtype='quadtree')
+mesh = qtree.to_pmesh()
 
-uI = vem.space.interpolation(pde.solution)
+errorType = ['$\eta$']
+Ndof = np.zeros((maxit,), dtype=np.int)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
-node = pmesh.entity('node')
+for i in range(maxit):
+    vem = SFCVEMModel2d(pde, mesh, p=1, q=4)
+    vem.solve(rho=0.5, maxit=40000)
+    eta = vem.residual_estimator()
+    Ndof[i] = vem.space.number_of_global_dofs()
+    errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
+
+    if i < maxit - 1:
+        isMarkedCell = qtree.refine_marker(eta, theta, method="L2")
+        qtree.refine(isMarkedCell)
+        mesh = qtree.to_pmesh()
+
+showmultirate(plt, k, Ndof, errorMatrix, errorType)
+
+node = mesh.entity('node')
 x = node[:, 0]
 y = node[:, 1]
 tri = qtree.leaf_cell(celltype='tri')
@@ -35,11 +53,6 @@ axes = fig0.gca(projection='3d')
 axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
 
 fig1 = plt.figure()
-fig1.set_facecolor('white')
-axes = fig1.gca(projection='3d')
-axes.plot_trisurf(x, y, tri, uI[:len(x)], cmap=plt.cm.jet, lw=0.0)
-
-fig1 = plt.figure()
 axes = fig1.gca()
-pmesh.add_plot(axes)
+mesh.add_plot(axes)
 plt.show()
