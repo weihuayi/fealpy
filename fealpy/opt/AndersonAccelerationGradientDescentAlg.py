@@ -9,7 +9,7 @@ https://en.wikipedia.org/wiki/Gradient_descent
 """
 
 
-class GradientDescentAlg:
+class AndersonAccelerationGradientDescentAlg:
     def __init__(self, problem, options=None):
         self.problem = problem
         self.options = options
