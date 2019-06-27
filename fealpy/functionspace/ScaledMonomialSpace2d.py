@@ -142,8 +142,10 @@ class ScaledMonomialSpace2d():
         if cellidx is None:
             return gphi/h.reshape(-1, 1, 1)
         else:
-            assert(point.shape[-2] == len(cellidx))
-            return gphi/h[cellidx].reshape(-1, 1, 1)
+            if point.shape[-2] == len(cellidx):
+                return gphi/h[cellidx].reshape(-1, 1, 1)
+            elif point.shape[0] == len(cellidx):
+                return gphi/h[cellidx].reshape(-1, 1, 1, 1)
 
     def grad_value(self, uh, point, cellidx=None):
         gphi = self.grad_basis(point, cellidx=cellidx)
@@ -151,8 +153,10 @@ class ScaledMonomialSpace2d():
         if cellidx is None:
             return np.einsum('ij, ...ijm->...im', uh[cell2dof], gphi)
         else:
-            assert(point.shape[-2] == len(cellidx))
-            return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
+            if point.shape[-2] == len(cellidx):
+                return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
+            elif point.shape[0] == len(cellidx):
+                return np.einsum('ij, ikjm->ikm', uh[cell2dof[cellidx]], gphi)
 
     def laplace_basis(self, point, cellidx=None, p=None):
         if p is None:
@@ -222,7 +226,6 @@ class ScaledMonomialSpace2d():
 
     def laplace_value(self, uh, point, cellidx=None):
         lphi = self.laplace_basis(point, cellidx=cellidx)
-        print(lphi.shape)
         cell2dof = self.dof.cell2dof
         if cellidx is None:
             return np.einsum('ij, ...ij->...i', uh[cell2dof], lphi)

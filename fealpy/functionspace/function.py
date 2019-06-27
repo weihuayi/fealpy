@@ -1,12 +1,13 @@
 import numpy as np
 
+
 class Function(np.ndarray):
     def __new__(cls, space, dim=None, array=None):
         if array is None:
             self = space.array(dim=dim).view(cls)
         else:
             self = array.view(cls)
-        self.space = space 
+        self.space = space
         return self
 
     def index(self, i):
@@ -26,7 +27,7 @@ class Function(np.ndarray):
 
     def laplace_value(self, bc, cellidx=None):
         space = self.space
-        return space.grad_value(self, bc, cellidx=cellidx)
+        return space.laplace_value(self, bc, cellidx=cellidx)
 
     def div_value(self, bc, cellidx=None):
         space = self.space

@@ -93,17 +93,15 @@ class SFCVEMModel2d():
 
         fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
         def f(x, cellidx):
-            a = self.S.laplace_value(x, cellidx)
-            print(a.shape)
             val = (self.S.laplace_value(x, cellidx) - self.S.value(x, cellidx) + fh[cellidx])
             return val**2
 
-        e0 = self.integralalg.integral(f, celltype=True)
+        e0 = self.area*self.integralalg.integral(f, celltype=True)
 
         edge2cell = self.mesh.ds.edge_to_cell()
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
 
-        # 计算内部边上的跳量，一个积分点就足够了
+        # 计算内部边跳量
         bc = mesh.entity_barycenter('edge')
         isContactEdge = self.pde.is_contact(bc)
         n = mesh.edge_unit_normal()
@@ -118,27 +116,28 @@ class SFCVEMModel2d():
         # 内部边上的积分
         lgrad = self.S.grad_value(points, cellidx=edge2cell[:, 0])
         rgrad = self.S.grad_value(points, cellidx=edge2cell[:, 1])
-        e1 = np.array(NE, dtype=mesh.ftype)
+        e1 = np.zeros(NE, dtype=mesh.ftype)
 
         t0 = np.einsum(
-            'ijm, jm->ij',
+            'ijm, jm->j',
             lgrad[:, ~isBdEdge] - rgrad[:, ~isBdEdge],
             n[~isBdEdge])
         e1[~isBdEdge] = t0**2*h[~isBdEdge]
 
 
         # 接触边界上的积分 
+        ipoints = self.space.interpolation_points()
+        edge2dof = self.space.dof.edge_to_dof()
 
-        eta = self.pdd.eta
-        t0 = (
-            np.einsum('ij, ...ij->...i',
-                n[isContactEdge],
-                lgrad[:, isContactEdge]) +
-            eta*self.lh.value(
-                points[:, isContactEdge],
-                cellidx=edge2cell[isContactEdge, 0])
-            )**2*h[isContactEdge]
-        e1[isBdEdge] = t0**2*h[isContactEdge]
+        eta = self.pde.eta
+        points = ipoints[edge2dof[isContactEdge]]
+        lh = self.lh[edge2dof[isContactEdge]]
+        lgrad = self.S.grad_value(points, cellidx=edge2cell[isContactEdge, 0])
+
+        t0 = np.einsum('ijm, im->ij', lgrad, n[isContactEdge]) + eta*lh
+        e1[isContactEdge] += np.einsum('ij, i->i', t0**2, h[isContactEdge])
+
+        e1 *= h
 
         np.add.at(e0, edge2cell[:, 0], e1)
         np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
@@ -210,7 +209,7 @@ class SFCVEMModel2d():
             uh0 = uh.copy()
             lh0 = lh.copy()
             uh[:] = ml.solve(bd, tol=1e-12, accel='cg').reshape(-1)
-            lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1) 
+            lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1)
             e0 = np.max(np.abs(uh - uh0))
             e1 = np.max(np.abs(lh - lh0))
             print('k:', k, 'error:', e0, e1)

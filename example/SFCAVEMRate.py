@@ -30,10 +30,28 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     vem = SFCVEMModel2d(pde, mesh, p=1, q=4)
-    vem.solve(rho=0.5, maxit=40000)
+    vem.solve(rho=0.7, maxit=40000)
     eta = vem.residual_estimator()
     Ndof[i] = vem.space.number_of_global_dofs()
     errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
+
+    node = mesh.entity('node')
+    x = node[:, 0]
+    y = node[:, 1]
+    tri = qtree.leaf_cell(celltype='tri')
+
+    fig0 = plt.figure()
+    fig0.set_facecolor('white')
+    axes = fig0.gca(projection='3d')
+    axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
+    plt.savefig(str(i) + '-solution.png')
+    plt.close()
+
+    fig1 = plt.figure()
+    axes = fig1.gca()
+    mesh.add_plot(axes)
+    plt.savefig(str(i) + '-mesh.png')
+    plt.close()
 
     if i < maxit - 1:
         isMarkedCell = qtree.refine_marker(eta, theta, method="L2")
@@ -41,18 +59,4 @@ for i in range(maxit):
         mesh = qtree.to_pmesh()
 
 showmultirate(plt, k, Ndof, errorMatrix, errorType)
-
-node = mesh.entity('node')
-x = node[:, 0]
-y = node[:, 1]
-tri = qtree.leaf_cell(celltype='tri')
-
-fig0 = plt.figure()
-fig0.set_facecolor('white')
-axes = fig0.gca(projection='3d')
-axes.plot_trisurf(x, y, tri, vem.uh[:len(x)], cmap=plt.cm.jet, lw=0.0)
-
-fig1 = plt.figure()
-axes = fig1.gca()
-mesh.add_plot(axes)
 plt.show()

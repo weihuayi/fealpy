@@ -97,14 +97,14 @@ class VEMDof2d():
         node = mesh.entity('node')
 
         if p == 1:
-            return node 
+            return node
         if p > 1:
             NN = mesh.number_of_nodes()
-            GD = mesh.geo_dimension() 
+            GD = mesh.geo_dimension()
             NE = mesh.number_of_edges()
 
             ipoint = np.zeros((NN+(p-1)*NE, GD), dtype=np.float)
-            ipoint[:NN, :] = node 
+            ipoint[:NN, :] = node
             edge = mesh.entity('edge')
 
             qf = GaussLobattoQuadrature(p + 1)
