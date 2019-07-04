@@ -44,7 +44,7 @@ def stiff_matrix(V, area, cfun=None, mat=None):
             f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
             K = list(map(f1, zip(DD, PI1)))
         else:
-            barycenter = V.smspace.barycenter 
+            barycenter = V.smspace.barycenter
             k = cfun(barycenter)
             f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
             K = list(map(f1, zip(DD, PI1, k)))

@@ -14,9 +14,9 @@ from fealpy.pde.sfc_2d import SFCModelData1
 from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
 from fealpy.tools.show import showmultirate
 
-maxit = 30 
-theta = 0.2
-k = maxit - 15
+maxit = 20
+theta = 0.5
+k = maxit - 10
 
 # prepare the pde model
 pde = SFCModelData1()
@@ -24,7 +24,7 @@ pde = SFCModelData1()
 qtree = pde.init_mesh(n=4, meshtype='quadtree')
 mesh = qtree.to_pmesh()
 
-errorType = ['$\eta$']
+errorType = ['$\eta$', '$\Psi$']
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
@@ -32,8 +32,10 @@ for i in range(maxit):
     vem = SFCVEMModel2d(pde, mesh, p=1, q=4)
     vem.solve(rho=0.7, maxit=40000)
     eta = vem.residual_estimator()
+    psi = vem.high_order_term()
     Ndof[i] = vem.space.number_of_global_dofs()
     errorMatrix[0, i] = np.sqrt(np.sum(eta**2))
+    errorMatrix[1, i] = np.sqrt(psi)
 
     node = mesh.entity('node')
     x = node[:, 0]

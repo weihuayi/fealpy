@@ -143,6 +143,33 @@ class SFCVEMModel2d():
         np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
         return np.sqrt(e0)
 
+    def high_order_term(self):
+        space = self.space
+        area = self.area
+        mat = self.mat
+
+        G = mat.G
+        PI0 = mat.PI0
+        PI1 = mat.PI1
+        D = mat.D
+
+        cell2dof, cell2dofLocation = space.dof.cell2dof, space.dof.cell2dofLocation
+        uh = self.uh[cell2dof]
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+        uh = np.hsplit(uh, cell2dofLocation[1:-1])
+
+        def f0(x):
+            val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
+            return np.sum(val*val)
+        psi = sum(map(f0, zip(DD, PI1, uh)))
+
+        def f1(x):
+            val = x[3]*(np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
+            return np.sum(val*val)
+        psi += sum(map(f1, zip(DD, PI0, uh, area)))
+        return psi
+
+
     def get_left_matrix(self):
         space = self.space
         area = self.area
