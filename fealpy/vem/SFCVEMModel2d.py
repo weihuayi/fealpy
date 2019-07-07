@@ -163,10 +163,13 @@ class SFCVEMModel2d():
             return np.sum(val*val)
         psi = sum(map(f0, zip(DD, PI1, uh)))
 
+        """
         def f1(x):
             val = x[3]*(np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
             return np.sum(val*val)
-        psi += sum(map(f1, zip(DD, PI0, uh, area)))
+        psi = sum(map(f1, zip(DD, PI0, uh, area)))
+        """
+
         return psi
 
 

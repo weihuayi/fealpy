@@ -15,7 +15,7 @@ from fealpy.vem.SFCVEMModel2d import SFCVEMModel2d
 from fealpy.tools.show import showmultirate
 
 maxit = 20
-theta = 0.5
+theta = 0.2
 k = maxit - 10
 
 # prepare the pde model
