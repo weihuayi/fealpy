@@ -161,16 +161,14 @@ class SFCVEMModel2d():
         def f0(x):
             val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
             return np.sum(val*val)
-        psi = sum(map(f0, zip(DD, PI1, uh)))
+        psi0 = sum(map(f0, zip(DD, PI1, uh)))
 
-        """
         def f1(x):
             val = x[3]*(np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
             return np.sum(val*val)
-        psi = sum(map(f1, zip(DD, PI0, uh, area)))
-        """
+        psi1 = sum(map(f1, zip(DD, PI0, uh, area)))
 
-        return psi
+        return psi0, psi1
 
 
     def get_left_matrix(self):
@@ -203,7 +201,13 @@ class SFCVEMModel2d():
         b = np.bincount(cedge2dof.flat, weights=bb.flat, minlength=gdof)
         return b
 
-    def solve(self, rho=1, maxit=10000, tol=1e-8):
+    def solve(self, rho=1, maxit=10000, tol=1e-8, uh=None, lh=None):
+        if uh is not None:
+            self.uh[:] = uh[:]
+
+        if lh is not None:
+            self.lh[:] = lh[:]
+
         uh = self.uh
         lh = self.lh
 
@@ -238,15 +242,16 @@ class SFCVEMModel2d():
             bd = bc.apply_on_vector(b - eta*b1, A)
             uh0 = uh.copy()
             lh0 = lh.copy()
-            uh[:] = ml.solve(bd, tol=1e-12, accel='cg').reshape(-1)
+            uh[:] = ml.solve(bd, x0=uh, tol=1e-12, accel='cg').reshape(-1)
             lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1)
             e0 = np.max(np.abs(uh - uh0))
             e1 = np.max(np.abs(lh - lh0))
-            print('k:', k, 'error:', e0, e1)
+            #print('k:', k, 'error:', e0, e1)
             if e0 < tol:
                 break
             k += 1
 
+        print('k:', k, 'error:', e0, e1)
         self.S = self.project_to_smspace(uh)
 
     def l2_error(self):
