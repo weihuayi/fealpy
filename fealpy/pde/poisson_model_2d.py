@@ -35,17 +35,17 @@ class ffData:
     def gradient(self, p):
         """ The gradient of the exact solution
         """
-        val = np.zeros(p.shape,dtype=p.dtype)     
+        val = np.zeros(p.shape, dtype=p.dtype)
         return val
 
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
 
-        val = np.ones(x.shape, dtype=np.float)
+        val = 10*np.ones(x.shape, dtype=np.float)
         flag = np.floor(4*x) + np.floor(4*y)
         isMinus = (flag % 2 == 0)
-        val[isMinus] = - 1
+        val[isMinus] = - 10
         return val 
 
     def dirichlet(self, p):
