@@ -1,8 +1,8 @@
 import numpy as np
 import scipy.io as sio
 
-from ..mesh.TriangleMesh import TriangleMesh  
-from ..mesh.Quadtree import Quadtree 
+from ..mesh.TriangleMesh import TriangleMesh
+from ..mesh.Quadtree import Quadtree
 
 
 class ffData:
@@ -35,7 +35,7 @@ class ffData:
     def gradient(self, p):
         """ The gradient of the exact solution
         """
-        val = np.zeros(p.shape,dtype=p.dtype)     
+        val = np.zeros(p.shape, dtype=p.dtype)
         return val
 
     def source(self, p):
@@ -46,7 +46,7 @@ class ffData:
         flag = np.floor(4*x) + np.floor(4*y)
         isMinus = (flag % 2 == 0)
         val[isMinus] = - 1
-        return val 
+        return val
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
