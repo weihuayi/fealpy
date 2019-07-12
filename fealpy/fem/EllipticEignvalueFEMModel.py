@@ -226,7 +226,7 @@ class EllipticEignvalueFEMModel:
 
         自适应 maxit， picard:2
         """
-        print("算法 1")
+        print("算法 3.4")
         if maxit is None:
             maxit = self.maxit
 
@@ -364,7 +364,7 @@ class EllipticEignvalueFEMModel:
 
         自适应 maxit, picard:2
         """
-        print("算法 2")
+        print("算法 3.3")
 
         if maxit is None:
             maxit = self.maxit
@@ -501,7 +501,7 @@ class EllipticEignvalueFEMModel:
 
         refine: maxit, picard： maxit + 1
         """
-        print("算法 3")
+        print("算法 3.1")
 
         if maxit is None:
             maxit = self.maxit
@@ -588,7 +588,7 @@ class EllipticEignvalueFEMModel:
 
         refine maxit， picard: 1
         """
-        print("算法 4")
+        print("算法 3.2")
         if maxit is None:
             maxit = self.maxit
 

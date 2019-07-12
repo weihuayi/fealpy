@@ -42,16 +42,11 @@ class ffData:
         x = p[..., 0]
         y = p[..., 1]
 
-        val = 10*np.ones(x.shape, dtype=np.float)
+        val = np.ones(x.shape, dtype=np.float)
         flag = np.floor(4*x) + np.floor(4*y)
         isMinus = (flag % 2 == 0)
-<<<<<<< HEAD
         val[isMinus] = - 1
         return val
-=======
-        val[isMinus] = - 10
-        return val 
->>>>>>> 4b634b8f2c47af38e04a4f2551c9c4ad8896f6c8
 
     def dirichlet(self, p):
         """ Dilichlet boundary condition
