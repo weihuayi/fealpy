@@ -47,7 +47,8 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
     if flag:
         out.close()
 
-def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=15):
+def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
+        ms=4):
     if isinstance(plot, ModuleType):
         fig = plot.figure()
         fig.set_facecolor('white')
@@ -63,10 +64,10 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=4, ms=
             showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
         else:
             showrate(axes, k, N[i], errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
-    axes.legend(loc=3, prop={'size': 17})
+    axes.legend(loc=3, framealpha=0.2, fancybox=True, prop={'size': 10})
     return axes
 
-def showrate(axes, k, N, error, option, label=None, lw=4, ms=15):
+def showrate(axes, k, N, error, option, label=None, lw=1, ms=4):
     axes.set_xlim(left=N[0]/2, right=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
     if isinstance(k, int):

@@ -3,6 +3,7 @@ import numpy as np
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import PrismQuadrature
 
+
 class PrismMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([
         (1, 0, 2, 2),  (3, 4, 5, 5),
@@ -12,7 +13,7 @@ class PrismMeshDataStructure(Mesh3dDataStructure):
         (0, 1), (0, 2), (0, 3),
         (1, 2), (1, 4), (2, 5),
         (3, 4), (3, 5), (4, 5)])
-    localTFace2edge = np.array([
+    localFace2edge = np.array([
         (1, 3, 0, 0), (8, 7, 6, 6),
         (3, 5, 8, 4), (2, 7, 5, 1),
         (0, 4, 6, 2)])
@@ -32,13 +33,20 @@ class PrismMesh(Mesh3d):
         self.ds = PrismMeshDataStructure(NN, cell)
         self.meshtype = 'prism'
 
+    def number_of_tri_faces(self):
+        face = self.ds.face
+        return sum(face[:, -2] == face[:, -1])
+
+    def number_of_quad_faces(self):
+        face = self.ds.face
+        return sum(face[:, -2] != face[:, -1])
+
     def integrator(self, k):
         return PrismQuadrature(k)
 
     def vtk_cell_type(self):
         VTK_PENTAGONAL_PRISM = 15
         return VTK_PENTAGONAL_PRISM
-
 
     def bc_to_point(self, bc):
         node = self.node

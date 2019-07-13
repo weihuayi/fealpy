@@ -17,7 +17,7 @@ from fealpy.tools.show import showmultirate
 
 import pickle
 
-maxit = 43 
+maxit = 43
 theta = 0.2
 k = maxit - 10
 
@@ -38,7 +38,7 @@ for i in range(maxit):
     if i == 0:
         vem.solve(rho=0.7, maxit=40000)
     else:
-        vem.solve(rho=0.8, maxit=40000, uh=data[2*(i-1)], lh=data[2*(i-1)+1])
+        vem.solve(rho=0.9, maxit=40000, uh=data[2*(i-1)], lh=data[2*(i-1)+1])
 
     data[2*i] = vem.uh
     data[2*i+1] = vem.lh

@@ -120,13 +120,13 @@ class CPLFEMDof2d():
         mesh = self.mesh
 
         NE= mesh.number_of_edges()
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int) 
         edge2dof[:, [0, -1]] = edge 
         if p > 1:
-            edge2dof[:, 1:-1] = N + np.arange(NE*(p-1)).reshape(NE, p-1)
+            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
 
     def cell_to_dof(self):
@@ -250,9 +250,9 @@ class CPLFEMDof3d():
         idx = np.arange(0, fdof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         faceMultiIndex = np.zeros((fdof, 3), dtype=np.int)
-        faceMultiIndex[:,2] = idx - idx0*(idx0 + 1)/2
-        faceMultiIndex[:,1] = idx0 - faceMultiIndex[:,2]
-        faceMultiIndex[:,0] = p - faceMultiIndex[:, 1] - faceMultiIndex[:, 2] 
+        faceMultiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
+        faceMultiIndex[:, 1] = idx0 - faceMultiIndex[:, 2]
+        faceMultiIndex[:, 0] = p - faceMultiIndex[:, 1] - faceMultiIndex[:, 2]
         return faceMultiIndex
 
     def is_on_node_local_dof(self):

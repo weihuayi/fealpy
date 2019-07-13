@@ -50,6 +50,7 @@ def sphere_pmesh():
 #pmesh = plane_pmesh()
 pmesh = sphere_pmesh()
 pmesh.print()
+print(pmesh.ds.face)
 
 fig = plt.figure()
 axes = Axes3D(fig)

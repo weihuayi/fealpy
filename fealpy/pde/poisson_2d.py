@@ -391,6 +391,7 @@ class CrackData:
     def dirichlet(self, p):
         return self.solution(p)
 
+
 class TwoSigularData:
     def __init__(self):
         pass
@@ -427,7 +428,7 @@ class TwoSigularData:
         y = p[..., 1]
         t0 = (x + 0.5)**2 + (y - 0.5)**2 + 0.01
         t1 = (x - 0.5)**2 + (y + 0.5)**2 + 0.01
-        return 1/t0 - 1/t1 
+        return 1/t0 - 1/t1
 
     def source(self, p):
         """ The right hand side of Possion equation
@@ -436,20 +437,94 @@ class TwoSigularData:
         """
         x = p[..., 0]
         y = p[..., 1]
-        t0 = (x + 0.5)**2 + (y - 0.5)**2
-        t1 = (x - 0.5)**2 + (y + 0.5)**2
+        t0 = (x + 0.5)**2 + (y - 0.5)**2 + 0.01
+        t1 = (x - 0.5)**2 + (y + 0.5)**2 + 0.01
+        val = (
+                (2*x - 1.0)*(4*x - 2.0)/t1**3 -
+                (2*x + 1.0)*(4*x + 2.0)/t0**3 -
+                (2*y - 1.0)*(4*y - 2.0)/t0**3 +
+                (2*y + 1.0)*(4*y + 2.0)/t1**3 + 4/t0**2 - 4/t1**2
+            )
+
         return val
 
-
     def gradient(self, p):
-        """ The gradient of the exact solution 
+        """ The gradient of the exact solution
         """
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
+        t0 = (x + 0.5)**2 + (y - 0.5)**2 + 0.01
+        t1 = (x - 0.5)**2 + (y + 0.5)**2 + 0.01
         val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
-        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        val[..., 0] = -(1.0 - 2*x)/t1**2 + (-2*x - 1.0)/t0**2
+        val[..., 1] =(1.0 - 2*y)/t0**2 - (-2*y - 1.0)/t1**2
+        return val
+
+    def dirichlet(self, p):
+        return self.solution(p)
+
+    def neuman(self, p):
+        """ Neuman  boundary condition
+        """
+        pass
+
+    def robin(self, p):
+        pass
+
+class CornerSigularData:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        if meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'stri':
+            mesh = StructureQuadMesh([0, 1, 0, 1], h)
+            return mesh
+        else:
+            raise ValueError("".format)
+
+    def solution(self, p):
+        """ The exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        return (x**2 + y**2)**0.2 
+
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = -0.16*(x**2 + y**2)**(-0.8)
+        return val
+
+    def gradient(self, p):
+        """ The gradient of the exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0.4*x*(x**2 + y**2)**(-0.8)
+        val[..., 1] = 0.4*y*(x**2 + y**2)**(-0.8)
         return val
 
     def dirichlet(self, p):
