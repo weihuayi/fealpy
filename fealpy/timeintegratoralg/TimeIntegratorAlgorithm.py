@@ -1,42 +1,36 @@
 import numpy as np
+from .timeline import ChebyshevTimeLine
+
 
 class TimeIntegratorAlgorithm():
-    def __init__(self, timeline):
-        self.timeline = timeline
-        self.current = 0 
-        self.stop = len(timeline)
+    def __init__(self):
 
-    def step(self):
-        self.current += 1 
-        A, b = self.get_current_linear_system()
-        X  = self.solve(A, b) 
-        return X
-
-    def get_current_time(self):
-        return self.timeline[self.current]
-
-    def get_stop_time(self):
-        return self.timeline[self.stopstopTime] 
-
-    def get_step_length(self):
-        return self.timeline[self.current + 1] - self.timeline[self.current]
+    def advance(self):
+        dt = self.timeline.get_current_time_step_length()
+        self.solve(dt)
 
     def get_current_linear_system(self):
         pass
 
-    def run(self):
-        while self.current < self.stop: 
-            try:
-                dt = self.get_step_length()
-                currentSolution = self.step(dt)
-                self.accept_solution(currentSolution)
-            except StopIteration:
-                break
+    def run(self, timeline, uh):
+        while ~self.timeline.stop():
+            self.advance()
 
-    def accept_solution(self, currentSolution):
+class SDCTimeIntegratorAlgorithm():
+
+    def __init__(self, nupdate=10):
+        self.nupdate = nupdate
+
+    def run(self, ctimeline, uh):
+        for i in range(self.nupdate):
+            while ~ctimeline.stop():
+                dt = ctimeline.get_current_time_step_length()
+                self.solve(dt)
+            self.update()
+
+    def update(self):
         pass
 
-    def solve(self, A, b):
-        pass
+
 
 
