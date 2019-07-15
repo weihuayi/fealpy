@@ -57,7 +57,10 @@ class LagrangeFiniteElementSpace():
         return self.dof.cell2dof
 
     def boundary_dof(self):
-        return self.dof.boundary_dof()
+        if self.spacetype is 'C':
+            return self.dof.boundary_dof()
+        else:
+            raise ValueError('This space is a discontinuous space!')
 
     def geo_dimension(self):
         return self.GD
@@ -123,9 +126,9 @@ class LagrangeFiniteElementSpace():
             bcs[idx, ..., pmap[lidx]] = bc[..., 0]
 
         p = self.p   # the degree of polynomial basis function
-        TD = self.TD 
+        TD = self.TD
 
-        multiIndex = self.dof.multiIndex 
+        multiIndex = self.dof.multiIndex
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
