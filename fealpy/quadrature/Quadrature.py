@@ -4,7 +4,6 @@ class Quadrature():
         return self.quadpts.shape[0]
 
     def get_quadrature_points_and_weights(self):
-        bcs, ws = qf.quadpts, qf.weights
         return self.quadpts, self.weights
 
     def get_quadrature_point_and_weight(self, i):
