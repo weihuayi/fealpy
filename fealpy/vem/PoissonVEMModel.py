@@ -186,9 +186,17 @@ class PoissonVEMModel():
 
         if returnsup is True:
             def f(x, cellidx):
-                pass
-
-        return np.sqrt(eta)
+                g = self.pde.gradient(x)
+                val = (
+                        (g[..., 0] - S0.value(x, cellidx))**2 +
+                        (g[..., 1] - S1.value(x, cellidx))**2
+                    )
+                return val
+            e = self.integralalg.integral(f, True)
+        if returnsup is False:
+            return np.sqrt(eta)
+        else:
+            return np.sqrt(eta), np.sqrt(np.sum(e))
 
     def get_left_matrix(self):
         space = self.space
