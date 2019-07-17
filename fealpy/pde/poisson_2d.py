@@ -238,20 +238,8 @@ class LShapeRSinData:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
 
     def domain(self):
-        points = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (-1, 1),
-            (-1, -1),
-            (0, -1)], dtype=np.float)
-        facets = np.array([
-            (0, 1),
-            (1, 2),
-            (2, 3),
-            (3, 4),
-            (4, 5),
-            (5, 0)], dtype=np.float)
+        points = [[0, 0], [1, 0], [1, 1], [-1, 1], [-1, -1], [0, -1]]
+        facets = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
         return points, facets
 
     def solution(self, p):
