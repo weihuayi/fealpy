@@ -92,6 +92,7 @@ class PoissonFEMModel(object):
         A = self.get_left_matrix()
         b = self.get_right_vector()
         end = timer()
+        self.A = A
 
         print("Construct linear system time:", end - start)
 
@@ -109,6 +110,10 @@ class PoissonFEMModel(object):
     def l2_error(self):
         e = self.uh - self.uI
         return np.sqrt(np.mean(e**2))
+
+    def uIuh_error(self):
+        e = self.uh - self.uI
+        return np.sqrt(e@self.A@e)
 
     def L2_error(self, uh=None):
         u = self.pde.solution
