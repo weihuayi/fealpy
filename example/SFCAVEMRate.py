@@ -57,7 +57,7 @@ for i in range(maxit):
 
     fname = sys.argv[1] + 'error' + '-' + str(i) + '.data'
     f = open(fname, 'wb')
-    pickle.dump([Ndof[:i], errorMatrix[:, :i], errorType], f)
+    pickle.dump([Ndof[:i+1], errorMatrix[:, :i+1], errorType], f)
 
     node = mesh.entity('node')
     x = node[:, 0]

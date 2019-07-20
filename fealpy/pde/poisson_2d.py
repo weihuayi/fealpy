@@ -237,8 +237,10 @@ class LShapeRSinData:
         else:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
 
-    def domain(self, n):
-        pass
+    def domain(self):
+        points = [[0, 0], [1, 0], [1, 1], [-1, 1], [-1, -1], [0, -1]]
+        facets = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
+        return points, facets
 
     def solution(self, p):
         x = p[..., 0]

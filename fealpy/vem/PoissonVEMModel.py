@@ -75,7 +75,8 @@ class PoissonVEMModel():
         S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
         return S
 
-    def recover_estimate(self, uh=None, rtype='simple', residual=True):
+    def recover_estimate(self, uh=None, rtype='simple', residual=True,
+            returnsup=False):
         """
         estimate the recover-type error
 
@@ -183,7 +184,19 @@ class PoissonVEMModel():
             g1 = S1.grad_value(barycenter)
             eta += (fh + k*(g0[:, 0] + g1[:, 1]))**2*area**2
 
-        return np.sqrt(eta)
+        if returnsup is True:
+            def f(x, cellidx):
+                g = self.pde.gradient(x)
+                val = (
+                        (g[..., 0] - S0.value(x, cellidx))**2 +
+                        (g[..., 1] - S1.value(x, cellidx))**2
+                    )
+                return val
+            e = self.integralalg.integral(f, True)
+        if returnsup is False:
+            return np.sqrt(eta)
+        else:
+            return np.sqrt(eta), np.sqrt(np.sum(e))
 
     def get_left_matrix(self):
         space = self.space
