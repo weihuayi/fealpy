@@ -20,7 +20,7 @@ class UniformTimeLine():
         return self.dt
 
     def stop(self):
-        return self.current >= self.NT - 2
+        return self.current >= self.NT - 1
 
     def advance(self):
         self.current += 1
@@ -71,7 +71,7 @@ class ChebyshevTimeLine():
         return self.dt[self.current]
 
     def stop(self):
-        return self.current >= self.NT - 2
+        return self.current >= self.NT - 1
 
     def advance(self):
         self.current += 1
