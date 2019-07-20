@@ -429,7 +429,9 @@ class LagrangeFiniteElementSpace():
         p = self.p
 
         bcs, ws = qf.quadpts, qf.weights
+        print('bcs', bcs)
         pp = self.mesh.bc_to_point(bcs)
+        print('pp', pp)
 
         if surface is not None:
             pp, _ = surface.project(pp)

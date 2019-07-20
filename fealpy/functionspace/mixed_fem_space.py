@@ -479,7 +479,7 @@ class RTFiniteElementSpace2d:
         cell2edgeSign = self.cell_to_edge_sign()
         W = np.array([[0, 1], [-1, 0]], dtype=np.float)
         Rlambda= mesh.rot_lambda()
-        Dlambda = Rlambda@W
+        DDlambda = mesh.grad_lambda()
         if p == 0:
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 2, :]) 
@@ -533,7 +533,7 @@ class RTFiniteElementSpace2d:
 
         ldof = self.number_of_local_dofs()
         if p == 0:
-            cell2dof = mesh.ds.cell2edge
+            cell2dof = mesh.ds.cell_to_edge()
         else:
             #TODO: raise a error 
             print('error!')
@@ -616,7 +616,7 @@ class RTFiniteElementSpace2d:
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=self.ftype)
+        return np.zeros(shape, dtype=np.float)
 
 class BDMFiniteElementSpace2d:
     def __init__(self, mesh, p=1, dtype=np.float):
