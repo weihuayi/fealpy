@@ -48,7 +48,7 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
         out.close()
 
 def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
-        ms=4):
+        ms=4, propsize=10):
     if isinstance(plot, ModuleType):
         fig = plot.figure()
         fig.set_facecolor('white')
@@ -56,7 +56,7 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
     else:
         axes = plot
     if optionlist is None:
-        optionlist = ['k-*', 'r-o', 'b-D', 'g-->', 'b--8', 'm--x','b-.x', 'b-.+', 'b-.h', 'm:s', 'm:p', 'm:h']
+        optionlist = ['k-*', 'r-o', 'b-D', 'g-->', 'k--8', 'm--x','r-.x', 'b-.+', 'b-.h', 'm:s', 'm:p', 'm:h']
 
     m, n = errorMatrix.shape
     for i in range(m):
@@ -64,7 +64,7 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
             showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
         else:
             showrate(axes, k, N[i], errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
-    axes.legend(loc=3, framealpha=0.2, fancybox=True, prop={'size': 10})
+    axes.legend(loc=3, framealpha=0.2, fancybox=True, prop={'size': propsize})
     return axes
 
 def showrate(axes, k, N, error, option, label=None, lw=1, ms=4):

@@ -198,6 +198,7 @@ class PoissonVEMModel():
         else:
             return np.sqrt(eta), np.sqrt(np.sum(e))
 
+
     def get_left_matrix(self):
         space = self.space
         area = self.area
@@ -241,6 +242,33 @@ class PoissonVEMModel():
         guh = S.grad_value
         e = self.integralalg.L2_error(gu, guh)
         return e
+
+    def stability_term(self):
+        space = self.space
+        area = self.area
+        mat = self.mat
+
+        G = mat.G
+        PI0 = mat.PI0
+        PI1 = mat.PI1
+        D = mat.D
+
+        cell2dof, cell2dofLocation = space.dof.cell2dof, space.dof.cell2dofLocation
+        uh = self.uh[cell2dof]
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+        uh = np.hsplit(uh, cell2dofLocation[1:-1])
+
+        def f0(x):
+            val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
+            return np.sum(val*val)
+        psi0 = sum(map(f0, zip(DD, PI1, uh)))
+
+        def f1(x):
+            val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
+            return x[3]*np.sum(val*val)
+        psi1 = sum(map(f1, zip(DD, PI0, uh, area)))
+
+        return psi0, psi1
 
     def L2_error_Kellogg(self):
         u = self.pde.solution
