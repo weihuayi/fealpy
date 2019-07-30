@@ -138,7 +138,7 @@ class EigenSchrodinger3d:
         return 0.5
 
     def reaction_coefficient(self, p):
-        return -0.5*np.sum(p**2, axis=-1)
+        return -1/np.sqrt(np.sum(p**2, axis=-1))
 
     def Dirichlet(self, p):
         return self.solution(p)
