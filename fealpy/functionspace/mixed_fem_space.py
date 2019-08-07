@@ -479,7 +479,7 @@ class RTFiniteElementSpace2d:
         cell2edgeSign = self.cell_to_edge_sign()
         W = np.array([[0, 1], [-1, 0]], dtype=np.float)
         Rlambda= mesh.rot_lambda()
-        DDlambda = mesh.grad_lambda()
+        Dlambda = mesh.grad_lambda()
         if p == 0:
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 2, :]) 
