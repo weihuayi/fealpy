@@ -378,7 +378,7 @@ class Mesh2dDataStructure():
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """ Consctruct the neighbor information of cells
         """
-        if return_array:                                                             
+        if return_array:
              return_sparse = False
              return_boundary = False
  

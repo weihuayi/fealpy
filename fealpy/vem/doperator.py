@@ -352,7 +352,7 @@ def matrix_C(V, B, D, H, area):
         return C
     else:
         l = lambda x: np.r_[
-                '0', 
+                '0',
                 np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
                 x[2][idof:, :]]
         return list(map(l, zip(NV, area, C)))

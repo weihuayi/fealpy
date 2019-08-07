@@ -314,5 +314,5 @@ class TriangleQuadrature(Quadrature):
                 [0.4932203038571030,	0.0135593922857950,	0.4932203038571030,	0.0102120341890470],
                 [0.0135593922857950,	0.4932203038571030,	0.4932203038571030,	0.0102120341890470]], dtype=np.float)
 	
-        self.quadpts = A[:,0:3]
-        self.weights = A[:,3]
+        self.quadpts = A[:, 0:3]
+        self.weights = A[:, 3]

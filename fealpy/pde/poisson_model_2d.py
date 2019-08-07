@@ -394,22 +394,17 @@ class CosCosData:
     def solution(self, p):
         """ The exact solution 
         """
-        print ('p',p.shape)
         x = p[..., 0]
-        print('x',x.shape)
         y = p[..., 1]
-        print('y',y.shape)
         pi = np.pi
         val = np.cos(pi*x)*np.cos(pi*y)
-        print('v',val.shape)
         return val
 
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
-            p: array object,  
+            p: array object,
         """
-        print('p',p.shape)
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi

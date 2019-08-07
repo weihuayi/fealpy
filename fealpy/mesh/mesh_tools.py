@@ -238,6 +238,7 @@ def show_mesh_3d(
                linewidths=linewidths,
                color=edgecolor)
         return axes.add_collection3d(edges)
+
     face = mesh.boundary_face(threshold=threshold)
     faces = a3.art3d.Poly3DCollection(
             node[face],

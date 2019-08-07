@@ -10,8 +10,8 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     V = 3
     E = 3
     F = 1
-    def __init__(self, N, cell):
-        super(TriangleMeshDataStructure, self).__init__(N, cell)
+    def __init__(self, NN, cell):
+        super(TriangleMeshDataStructure, self).__init__(NN, cell)
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
@@ -688,25 +688,25 @@ class TriangleMeshWithInfinityNode:
         bdEdgeIdx = mesh.ds.boundary_edge_index()
         NBE = len(bdEdgeIdx)
         NC = mesh.number_of_cells()
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
 
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
         newCell = np.zeros((NC + NBE, 3), dtype=self.itype)
         newCell[:NC, :] = mesh.ds.cell
-        newCell[NC:, 0] = N 
+        newCell[NC:, 0] = NN
         newCell[NC:, 1:3] = edge[bdEdgeIdx, 1::-1]
 
         node = mesh.node
         self.node = np.append(node, [[np.nan, np.nan]], axis=0)
-        self.ds = TriangleMeshDataStructure(N+1, newCell)
-        self.center = np.append(mesh.barycenter(),
+        self.ds = TriangleMeshDataStructure(NN+1, newCell)
+        self.center = np.append(mesh.entity_barycenter(),
                 0.5*(node[edge[bdEdgeIdx, 0], :] + node[edge[bdEdgeIdx, 1], :]), axis=0)
         self.meshtype = 'tri'
 
     def number_of_nodes(self):
-        return self.node.shape[0] 
+        return self.node.shape[0]
 
     def number_of_edges(self):
         return self.ds.NE

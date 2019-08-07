@@ -59,4 +59,24 @@ class PrismMesh(Mesh3d):
                 p0) + np.einsum('..., ...ik->...ik', bc[:, 1], p1)
         return p
 
+    def uniform_refine(self, n=1, surface=None, returnim=False):
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NE = self.number_of_edges()
+            NF = self.number_of_faces()
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+
+            cell2edge = self.ds.cell_to_edge()
+            edge2newNode = np.arange(NN, NN+NE)
+            newNode = (node[edge[:, 0], :] + node[edge[:, 1], :])/2.0
+
+            self.node = np.concatenate((node, newNode), axis=0)
+            p = np.r_['-1', cell, edge2newNode[cell2edge]] 
+            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
+            NN = self.node.shape[0]
+            self.ds.reinit(NN, cell)
+
 

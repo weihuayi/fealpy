@@ -41,11 +41,10 @@ errorType = ['$|| u - \Pi^\\nabla u_h||_0$ with p=1',
 ps = [1, 2, 5]
 
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-integrator = mesh.integrator(7)
 
 for i in range(maxit):
     for j, p in enumerate(ps):
-        vem = PoissonVEMModel(pde, mesh, p, integrator)
+        vem = PoissonVEMModel(pde, mesh, p, q=7)
         vem.solve()
         Ndof[i] = mesh.number_of_cells()
         errorMatrix[j, i] = vem.L2_error()

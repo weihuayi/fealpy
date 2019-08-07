@@ -162,8 +162,8 @@ class PolygonMeshDataStructure():
         self.cellLocation = cellLocation
         self.construct()
 
-    def reinit(self, N, cell, cellLocation):
-        self.N = N
+    def reinit(self, NN, cell, cellLocation):
+        self.NN = NN
         self.NC = cellLocation.shape[0] - 1
 
         self.cell = cell
@@ -208,8 +208,10 @@ class PolygonMeshDataStructure():
         NV = self.number_of_vertices_of_cells()
 
         totalEdge = self.total_edge()
-        _, i0, j = unique_row(np.sort(totalEdge, axis=1))
-
+        _, i0, j = np.unique(np.sort(totalEdge, axis=1),
+                return_index=True,
+                return_inverse=True,
+                axis=0)
         NE = i0.shape[0]
         self.NE = NE
         self.edge2cell = np.zeros((NE, 4), dtype=np.int)
