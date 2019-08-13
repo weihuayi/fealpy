@@ -462,6 +462,8 @@ class RTFiniteElementSpace2d:
             phi[..., 1, :] = bc[..., 2, np.newaxis, np.newaxis]*Rlambda[:, 0, :] - bc[..., 0, np.newaxis, np.newaxis]*Rlambda[:, 2, :]
             phi[..., 2, :] = bc[..., 0, np.newaxis, np.newaxis]*Rlambda[:, 1, :] - bc[..., 1, np.newaxis, np.newaxis]*Rlambda[:, 0, :]
             phi *= cell2edgeSign.reshape(-1, 3, 1)
+        elif p == 1:
+            pass
         else:
             raise ValueError('p')
 
@@ -483,17 +485,17 @@ class RTFiniteElementSpace2d:
         if p == 0:
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 2, :]) 
-            gradPhi[:, 0, :, :] = A - B 
+            gradPhi[:, 0, :, :] = A - B
 
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 0, :], Dlambda[:, 2, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 0, :])
-            gradPhi[:, 1, :, :] = A - B 
+            gradPhi[:, 1, :, :] = A - B
 
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 0, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 0, :], Dlambda[:, 1, :])
-            gradPhi[:, 2, :, :] = A - B 
+            gradPhi[:, 2, :, :] = A - B
 
-            gradPhi *= cell2edgeSign.reshape(-1, 3, 1, 1) 
+            gradPhi *= cell2edgeSign.reshape(-1, 3, 1, 1)
         else:
             #TODO:raise a error
             print("error")

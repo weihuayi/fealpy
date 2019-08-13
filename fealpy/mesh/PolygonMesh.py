@@ -261,8 +261,8 @@ class PolygonMeshDataStructure():
             return cell2edge.tocsr()
         else:
             cell2edge = np.zeros(cell.shape[0], dtype=np.int)
-            cell2edge[cellLocation[:-1]+edge2cell[:, 2]] = range(NE)
-            cell2edge[cellLocation[:-1]+edge2cell[:, 3]] = range(NE)
+            cell2edge[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = range(NE)
+            cell2edge[cellLocation[edge2cell[:, 1]] + edge2cell[:, 3]] = range(NE)
             return cell2edge
 
     def cell_to_edge_sign(self):

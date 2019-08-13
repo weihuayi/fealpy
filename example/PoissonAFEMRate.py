@@ -34,7 +34,7 @@ Ndof = np.zeros((maxit,), dtype=np.int)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 mesh.add_plot(plt)
-plt.savefig('/home/why/result/test-0.png')
+plt.savefig('/home/why/test-0.png')
 plt.close()
 
 for i in range(maxit):
@@ -55,7 +55,7 @@ for i in range(maxit):
         options = mesh.adaptive_options(method='max', theta=0.5)
         mesh.adaptive(eta, options)
         mesh.add_plot(plt)
-        plt.savefig('/home/why/result/test-' + str(i+1) + '.png')
+        plt.savefig('/home/why/test-' + str(i+1) + '.png')
         plt.close()
 
 fig = plt.figure()

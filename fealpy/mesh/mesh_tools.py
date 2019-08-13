@@ -51,17 +51,19 @@ def find_node(
                 axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]),
                          multialignment='center', fontsize=fontsize, color=fontcolor) 
 
-def find_entity(axes, mesh, entity=None,
+
+def find_entity(
+        axes, mesh, entity='node',
         index=None, showindex=False,
-        color='r', markersize=20, 
+        color='r', markersize=20,
         fontsize=24, fontcolor='k'):
 
     bc = mesh.entity_barycenter(entity)
-    if (index is None) or ( index is 'all') :
-        if (entity is None) or (entity is 'node'): 
+    if (index is None) or (index is 'all'):
+        if entity is 'node':
             N = mesh.number_of_nodes()
             index = range(N)
-        elif entity is 'edge': 
+        elif entity is 'edge':
             NE = mesh.number_of_edges()
             index = range(NE)
         elif entity is 'face':
@@ -88,14 +90,14 @@ def find_entity(axes, mesh, entity=None,
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
 
-    dim = mesh.geo_dimension() 
+    dim = mesh.geo_dimension()
     bc = bc[index]
     if dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
             for i in range(len(index)):
-                axes.text(bc[i, 0], bc[i, 1], str(index[i]), 
-                        multialignment='center', fontsize=fontsize, color=fontcolor) 
+                axes.text(bc[i, 0], bc[i, 1], str(index[i]),
+                        multialignment='center', fontsize=fontsize, color=fontcolor)
     else:
         axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
         if showindex:
@@ -105,6 +107,7 @@ def find_entity(axes, mesh, entity=None,
                         str(index[i]),
                         multialignment='center',
                         fontsize=fontsize, color=fontcolor)
+
 
 def show_mesh_1d(
         axes, mesh,

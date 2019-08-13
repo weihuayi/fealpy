@@ -1,5 +1,6 @@
 from .lagrange_fem_space import LagrangeFiniteElementSpace
 from .mixed_fem_space import RTFiniteElementSpace2d
-from .vem_space import VirtualElementSpace2d
+from .vem_space import VEMDof2d, VirtualElementSpace2d
+from .vem_space import NCVEMDof2d, NonConformingVirtualElementSpace2d
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .PrismFiniteElementSpace import CPPFEMDof3d
