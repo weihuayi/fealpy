@@ -1,3 +1,4 @@
-from .PoissonVEMModel import PoissonVEMModel 
+from .PoissonVEMModel import PoissonVEMModel
+from .PoissonNCVEMModel import PoissonNCVEMModel
 from .PoissonInterfaceVEMModel import PoissonInterfaceVEMModel
 from .integral_alg import PolygonMeshIntegralAlg

@@ -1,9 +1,13 @@
+from pdb import set_trace
 """
 Virtual Element Space
 
 """
 
 import numpy as np
+from numpy.linalg import inv
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+
 from .function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
@@ -201,14 +205,12 @@ class VirtualElementSpace2d():
 
 class NCVEMDof2d():
     """
-    The dof manager of non conforming vem space.
+    The dof manager of non conforming vem 2d space.
     """
     def __init__(self, mesh, p):
         self.p = p
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
-        print(self.cell2dof)
-        print(self.cell2dofLocation)
 
     def boundary_dof(self):
         gdof = self.number_of_global_dofs()
@@ -226,6 +228,14 @@ class NCVEMDof2d():
         return edge2dof
 
     def cell_to_dof(self):
+        """
+        Construct the cell2dof array which are 1D array with a location array
+        cell2dofLocation. 
+
+        The following code give the dofs of i-th cell.
+
+        cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
+        """
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
@@ -268,11 +278,16 @@ class NCVEMDof2d():
     def number_of_local_dofs(self):
         p = self.p
         mesh = self.mesh
-        NV = mesh.number_of_vertices_of_cells()
-        ldofs = NV*p + (p-1)*p//2
+        NCE = mesh.number_of_edges_of_cells()
+        ldofs = NCE*p + (p-1)*p//2
         return ldofs
 
     def interpolation_points(self):
+        """
+        Get the node-value-type interpolation points.
+
+        On every edge, there exist p points
+        """
         p = self.p
         mesh = self.mesh
         node = mesh.entity('node')
@@ -290,11 +305,110 @@ class NCVEMDof2d():
 
 
 class NonConformingVirtualElementSpace2d():
+    """
+    The non conforming 2d vem space.
+    """
     def __init__(self, mesh, p=1):
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.dof = NCVEMDof2d(mesh, p)
+
+        self.H = self.matrix_H()
+        self.D = self.matrix_D(self.H)
+        self.B = self.matrix_B()
+        self.G = self.matrix_G(self.B, self.D)
+
+        self.PI1 = self.matrix_PI_1(self.G, self.B)
+        self.C = self.matrix_C(self.H, self.PI1)
+
+        self.PI0 = self.matrix_PI_0(self.H, self.C)
+
+    def project_to_smspace(self, uh):
+        """
+        Project a non conforming vem function uh into polynomial space.
+        """
+        p = self.p
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.smspace.function()
+        S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+        return S
+
+    def stiff_matrix(self):
+        p = self.p
+        G = self.G
+        D = self.D
+        PI1 = self.PI1
+
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+        def f(x):
+            x[0, :] = 0
+            return x
+        tG = list(map(f, G))
+
+        f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+        K = list(map(f1, zip(DD, PI1, tG)))
+
+        f2 = lambda x: np.repeat(x, x.shape[0])
+        f3 = lambda x: np.tile(x, x.shape[0])
+        f4 = lambda x: x.flatten()
+
+        I = np.concatenate(list(map(f2, cd)))
+        J = np.concatenate(list(map(f3, cd)))
+        val = np.concatenate(list(map(f4, K)))
+        gdof = self.number_of_global_dofs()
+        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        return A
+
+    def mass_matrix(self):
+        p = self.p
+
+        # the projector matrix
+        D = self.D
+        H = self.H
+        C = self.C
+
+        # the dof arrays
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+
+        f1 = lambda x: x[0]@x[1]
+        PI0 = self.PI0
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+        PIS = list(map(f1, zip(DD, PI0)))
+
+        f1 = lambda x: x[0].T@x[1]@x[0] + x[3]*(np.eye(x[2].shape[1]) - x[2]).T@(np.eye(x[2].shape[1]) - x[2])
+        K = list(map(f1, zip(PI0, H, PIS, area)))
+
+        f2 = lambda x: np.repeat(x, x.shape[0])
+        f3 = lambda x: np.tile(x, x.shape[0])
+        f4 = lambda x: x.flatten()
+
+        I = np.concatenate(list(map(f2, cd)))
+        J = np.concatenate(list(map(f3, cd)))
+        val = np.concatenate(list(map(f4, K)))
+        gdof = self.number_of_global_dofs()
+        M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        return M
+
+
+    def source_vector(self, f, integral):
+        phi = self.smspace.basis
+        def u(x, cellidx):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        bb = integral(u, celltype=True)
+        g = lambda x: x[0].T@x[1]
+        bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
+        gdof = self.number_of_global_dofs()
+        b = np.bincount(self.dof.cell2dof, weights=bb, minlength=gdof)
+        return b
 
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
@@ -330,14 +444,14 @@ class NonConformingVirtualElementSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-    def interpolation(self, u, integral=None):
+    def interpolation(self, u, integral):
+        p = self.p
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
-        p = self.p
         ipoint = self.dof.interpolation_points()
         uI = self.function()
-        uI[:NN+(p-1)*NE] = u(ipoint)
+        uI[:NE*p] = u(ipoint)
         if p > 1:
             phi = self.smspace.basis
 
@@ -345,7 +459,7 @@ class NonConformingVirtualElementSpace2d():
                 return np.einsum('ij, ij...->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
 
             bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
-            uI[NN+(p-1)*NE:] = bb.reshape(-1)
+            uI[p*NE:] = bb.reshape(-1)
         return uI
 
     def number_of_global_dofs(self):
@@ -377,13 +491,13 @@ class NonConformingVirtualElementSpace2d():
 
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
-
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         NC = mesh.number_of_cells()
 
         qf = GaussLegendreQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
         phi1 = self.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
@@ -411,6 +525,7 @@ class NonConformingVirtualElementSpace2d():
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
         node = mesh.node
+
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -423,8 +538,10 @@ class NonConformingVirtualElementSpace2d():
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
         phi1 = self.smspace.basis(ps[p-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi0
+
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi1
         if p > 1:
@@ -451,6 +568,21 @@ class NonConformingVirtualElementSpace2d():
 
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
 
+        # the internal part
+        if p > 1:
+            NCE = mesh.number_of_edges_of_cells()
+            idx = cell2dofLocation[0:-1] + NCE*p
+            start = 3
+            r = np.arange(1, p+1)
+            r = r[0:-1]*r[1:]
+            for i in range(2, p+1):
+                idx0 = np.arange(start, start+i-1)
+                idx1 = np.arange(start-2*i+1, start-i)
+                idx1 = idx.reshape(-1, 1) + idx1
+                B[idx0, idx1] -= r[i-2::-1]
+                B[idx0+2, idx1] -= r[0:i-1]
+                start += i+1
+
         # the normal deriveration part
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
@@ -458,16 +590,17 @@ class NonConformingVirtualElementSpace2d():
                 ps[-1::-1, isInEdge, :],
                 cellidx=edge2cell[isInEdge, 1])
         nm = mesh.edge_normal()
+        h = np.sqrt(np.sum(nm**2, axis=-1))
         # m: the scaled basis number,
         # j: the edge number,
-        # i: the virtual basis number
+        # i: the virtual element basis number
         val = np.einsum('ijmk, jk->mji', gphi0, nm)
         val = np.einsum('i, mji->mji', ws, val)
         idx = (
                 cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
                 ).reshape(-1, 1) + np.arange(p)
         B[:, idx] += val
-        B[0, idx] += ws.reshape(1, -1)
+        B[0, idx] = h.reshape(-1, 1)*ws
 
         val = np.einsum('ijmk, jk->mji', gphi1, -nm[isInEdge])
         val = np.einsum('i, mji->mji', ws, val)
@@ -475,21 +608,7 @@ class NonConformingVirtualElementSpace2d():
                 cell2dofLocation[edge2cell[isInEdge, 1]]
                 + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
         B[:, idx] += val
-        B[0, idx] += ws.reshape(1, -1)
-
-        # the internal part
-
-        start = 3
-        r = np.arange(1, p+1)
-        r = r[0:-1]*r[1:]
-        for i in range(2, p+1):
-            idx0 = np.arange(start, start+i-1)
-            idx1 = np.arange(start-2*i+1, start-i)
-            idx1 = idx.reshape(-1, 1) + idx1
-            B[idx0, idx1] -= r[i-2::-1]
-            B[idx0+2, idx1] -= r[0:i-1]
-            start += i+1
-
+        B[0, idx] = h[isInEdge].reshape(-1, 1)*ws
         return B
 
     def matrix_G(self, B, D):
@@ -501,7 +620,16 @@ class NonConformingVirtualElementSpace2d():
         G = list(map(g, zip(BB, DD)))
         return G
 
-    def matrix_C(self, G, H):
+    def matrix_G_test(self, integralalg):
+        def u(x, cellidx=None):
+            gphi = self.smspace.grad_basis(x, cellidx=cellidx)
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi, optimize=True)
+
+        G = integralalg.integral(u, celltype=True)
+        return G
+
+
+    def matrix_C(self, H, PI1):
         p = self.p
 
         smldof = self.smspace.number_of_local_dofs()
@@ -509,16 +637,13 @@ class NonConformingVirtualElementSpace2d():
         idof = (p-1)*p//2
 
         mesh = self.mesh
-        NV = mesh.number_of_vertices_of_cells()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
-        BB = np.hsplit(B, cell2dofLocation[1:-1])
-        DD = np.vsplit(D, cell2dofLocation[1:-1])
-        g = lambda x: x[0]@x[1]
-        d = lambda x: x[0]@inv(x[1])@x[2]
-        C = list(map(d, zip(H, G, BB)))
+        d = lambda x: x[0]@x[1]
+        C = list(map(d, zip(H, PI1)))
         if p == 1:
             return C
         else:
+            NV = mesh.number_of_vertices_of_cells()
             l = lambda x: np.r_[
                     '0',
                     np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],

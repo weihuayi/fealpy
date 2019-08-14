@@ -260,7 +260,6 @@ class GaussLegendreQuadrature(Quadrature):
                 [-0.9122344282513259058678,        0.0626720483341090635695],
                 [-0.9639719272779137912677,        0.040601429800386941331],
                 [-0.9931285991850949247861,        0.0176140071391521183119]],dtype=np.float)
-                
 
         numpts = A.shape[0]
         self.quadpts = np.zeros((numpts, 2), dtype=np.float)

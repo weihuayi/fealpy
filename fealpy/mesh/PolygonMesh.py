@@ -31,6 +31,9 @@ class PolygonMesh(Mesh2d):
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
+    def number_of_edges_of_cells(self):
+        return self.ds.number_of_edges_of_cells()
+
     def number_of_nodes_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
