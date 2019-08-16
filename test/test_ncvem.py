@@ -6,6 +6,7 @@ from numpy.linalg import inv
 
 from fealpy.mesh import PolygonMesh
 from fealpy.functionspace import NCVEMDof2d, NonConformingVirtualElementSpace2d
+from fealpy.functionspace import CVEMDof2d, ConformingVirtualElementSpace2d
 from fealpy.mesh.simple_mesh_generator import unitcircledomainmesh
 from fealpy.quadrature import PolygonMeshIntegralAlg
 
@@ -42,25 +43,16 @@ mesh = PolygonMesh(node, cell, cellLocation)
 qf = mesh.integrator(7)
 
 
-space = NonConformingVirtualElementSpace2d(mesh, p=2)
-print("Cell2dof:\n", space.cell_to_dof())
+space = ConformingVirtualElementSpace2d(mesh, p=2)
 print("Interpolation points:\n", space.interpolation_points())
 print("H:\n", space.H)
 print("D:\n", space.D)
 print("G:\n", space.G)
 print("B:\n", space.B)
 
-integralalg = PolygonMeshIntegralAlg(
-        qf,
-        mesh,
-        barycenter=space.smspace.barycenter)
-G = space.matrix_G_test(integralalg)
-print("G:\n", G)
-
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True) 
-mesh.find_node(axes, node=space.interpolation_points(), showindex=True,
-        color='b')
+mesh.find_node(axes, showindex=True)
+mesh.find_node(axes, node=space.interpolation_points(), showindex=True, color='b')
 plt.show()
