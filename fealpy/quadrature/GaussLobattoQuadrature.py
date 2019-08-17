@@ -34,7 +34,6 @@ class GaussLobattoQuadrature(Quadrature):
                 [ 0.2852315164806450963142,  0.5548583770354863530167],
                 [ 0.765055323929464692851,   0.3784749562978469803166],
                 [ 1,                         0.06666666666666666666667]], dtype=np.float)
-                
         if k == 7:
             A = np.array([
                 [-1,                         0.04761904761904761904762],
@@ -97,17 +96,6 @@ class GaussLobattoQuadrature(Quadrature):
                 dtype=np.float)
         numpts = A.shape[0]
         self.quadpts = np.zeros((numpts, 2), dtype=np.float)
-        self.quadpts[:, 1] = (A[:,0] + 1)/2.0
+        self.quadpts[:, 1] = (A[:, 0] + 1)/2.0
         self.quadpts[:, 0] = 1 - self.quadpts[:, 1]
         self.weights = A[:, 1]/2
-
-        # tansfer the quad_points from [-1,1] to [0,1], changge the weights at the same time
-
-    def get_number_of_quad_points(self):
-        return self.quadpts.shape[0] 
-
-    def get_quad_point_and_weight(self, i):
-        return self.quadpts[i,:], self.weights[i] 
-
-
-

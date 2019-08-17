@@ -5,6 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
+from ..quadrature import PolygonMeshIntegralAlg
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 
@@ -114,10 +115,11 @@ class CVEMDof2d():
 
 
 class ConformingVirtualElementSpace2d():
-    def __init__(self, mesh, p=1):
+    def __init__(self, mesh, p=1, q=None):
         self.mesh = mesh
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.area = self.smspace.area
         self.dof = CVEMDof2d(mesh, p)
 
         self.H = self.matrix_H()
@@ -129,6 +131,17 @@ class ConformingVirtualElementSpace2d():
         self.C = self.matrix_C(self.H, self.PI1)
 
         self.PI0 = self.matrix_PI_0(self.H, self.C)
+
+        if q is None:
+            self.integrator = mesh.integrator(p+1)
+        else:
+            self.integrator = mesh.integrator(q)
+
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.integrator,
+                self.mesh,
+                area=self.area,
+                barycenter=self.smspace.barycenter)
 
     def project_to_smspace(self, uh):
         """
@@ -143,7 +156,8 @@ class ConformingVirtualElementSpace2d():
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
-    def stiff_matrix(self, area, cfun=None):
+    def stiff_matrix(self, cfun=None):
+        area = self.smspace.area
 
         def f(x):
             x[0, :] = 0
@@ -191,7 +205,8 @@ class ConformingVirtualElementSpace2d():
         A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
         return A
 
-    def mass_matrix(self, area, cfun=None):
+    def mass_matrix(self, cfun=None):
+        area = self.smspace.area
         p = self.p
 
         PI0 = self.PI0
@@ -221,16 +236,19 @@ class ConformingVirtualElementSpace2d():
         M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
         return M
 
-    def cross_mass_matrix(self, integral, wh, area, PI0):
+    def cross_mass_matrix(self, wh):
         p = self.p
         mesh = self.mesh
+
+        area = self.smspace.area
+        PI0 = self.PI0
 
         phi = self.smspace.basis
         def u(x, cellidx):
             val = phi(x, cellidx=cellidx)
             wval = wh(x, cellidx=cellidx)
             return np.einsum('ij, ijm, ijn->ijmn', wval, val, val)
-        H = integral(u, celltype=True)
+        H = self.integralalg.integral(u, celltype=True)
 
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = len(cell2dofLocation) - 1
@@ -250,11 +268,12 @@ class ConformingVirtualElementSpace2d():
         M = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
         return M
 
-    def source_vector(self, f, integral):
+    def source_vector(self, f):
+        PI0 = self.PI0
         phi = self.smspace.basis
         def u(x, cellidx):
             return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
-        bb = integral(u, celltype=True)
+        bb = self.integralalg.integral(u, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(PI0, bb))))
         gdof = self.number_of_global_dofs()
@@ -295,7 +314,7 @@ class ConformingVirtualElementSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-    def interpolation(self, u, integral=None):
+    def interpolation(self, u):
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
@@ -311,7 +330,7 @@ class ConformingVirtualElementSpace2d():
                         'ij, ij...->ij...',
                         u(x), phi(x, cellidx=cellidx, p=p-2))
 
-            bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+            bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
             uI[NN+(p-1)*NE:] = bb.reshape(-1)
         return uI
 
@@ -434,6 +453,7 @@ class ConformingVirtualElementSpace2d():
                 B[idx0, idx1] -= r[i-2::-1]
                 B[idx0+2, idx1] -= r[0:i-1]
                 start += i+1
+
             node = mesh.node
             edge = mesh.ds.edge
             edge2cell = mesh.ds.edge2cell
@@ -450,20 +470,20 @@ class ConformingVirtualElementSpace2d():
             # j: the edge number,
             # i: the virtual element basis number
 
-            val = np.einsum('ijmk, jk->mji', gphi0, nm)
-            val = np.einsum('i, mji->mji', ws, val)
-            idx = (
-                    cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-                    ).reshape(-1, 1) + np.arange(p)
-            B[:, idx] += val
+            NV = mesh.number_of_vertices_of_cells()
+
+            val = np.einsum('i, ijmk, jk->mji', ws, gphi0, nm, optimize=True)
+            idx = cell2dofLocation[edge2cell[:, [0]]] + \
+                    (edge2cell[:, [2]]*p + np.arange(p+1))%(NV[edge2cell[:, [0]]]*p)
+            np.add.at(B, (np.s_[:], idx), val)
 
 
-            val = np.einsum('ijmk, jk->mji', gphi1, -nm[isInEdge])
-            val = np.einsum('i, mji->mji', ws, val)
-            idx = (
-                    cell2dofLocation[edge2cell[isInEdge, 1]]
-                    + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
-            B[:, idx] += val
+            if isInEdge.sum() > 0:
+                val = np.einsum('i, ijmk, jk->mji', ws, gphi1, -nm[isInEdge], optimize=True)
+                idx = cell2dofLocation[edge2cell[isInEdge, 1]].reshape(-1, 1) + \
+                        (edge2cell[isInEdge, 3].reshape(-1, 1)*p + np.arange(p+1)) \
+                        %(NV[edge2cell[isInEdge, 1]].reshape(-1, 1)*p)
+                np.add.at(B, (np.s_[:], idx), val)
             return B
 
     def matrix_G(self, B, D):
@@ -495,7 +515,7 @@ class ConformingVirtualElementSpace2d():
                     '0',
                     np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
                     x[2][idof:, :]]
-            return list(map(l, zip(NV, area, C)))
+            return list(map(l, zip(NV, self.smspace.area, C)))
 
     def matrix_PI_0(self, H, C):
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation

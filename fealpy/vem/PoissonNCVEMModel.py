@@ -4,12 +4,11 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..functionspace import NonConformingVirtualElementSpace2d
 from ..solver import solve
 from ..boundarycondition import DirichletBC
-from ..quadrature import PolygonMeshIntegralAlg
 from ..quadrature import GaussLegendreQuadrature
 
 
 class PoissonNCVEMModel():
-    def __init__(self, pde, mesh, p=1, q=4):
+    def __init__(self, pde, mesh, p=1, q=None):
         """
         Initialize a Poisson non-conforming virtual element model.
 
@@ -26,43 +25,27 @@ class PoissonNCVEMModel():
         Notes
         -----
         """
-        self.space =NonConformingVirtualElementSpace2d(mesh, p)
+        self.space = NonConformingVirtualElementSpace2d(mesh, p, q)
         self.mesh = self.space.mesh
         self.pde = pde
         self.uh = self.space.function()
         self.area = self.space.smspace.area
-        self.integrator = mesh.integrator(q)
 
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=self.space.smspace.barycenter)
+        self.uI = self.space.interpolation(pde.solution)
 
-        self.uI = self.space.interpolation(pde.solution, self.integralalg.integral)
-
-    def reinit(self, mesh, p):
-        self.space =NonConformingVirtualElementSpace2d(mesh, p)
+    def reinit(self, mesh, p, q=None):
+        self.space =NonConformingVirtualElementSpace2d(mesh, p, q)
         self.mesh = self.space.mesh
         self.uh = self.space.function()
-        self.area = self.space.smspace.area
 
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=self.space.smspace.barycenter)
-
-        self.uI = self.space.interpolation(
-                self.pde.solution, self.integralalg.integral)
+        self.uI = self.space.interpolation(self.pde.solution)
 
     def get_left_matrix(self):
         return self.space.stiff_matrix()
 
     def get_right_vector(self):
         f = self.pde.source
-        integral = self.integralalg.integral
-        return self.space.source_vector(f, integral)
+        return self.space.source_vector(f)
 
     def solve(self):
         uh = self.uh
@@ -81,13 +64,13 @@ class PoissonNCVEMModel():
         u = self.pde.solution
         S = self.space.project_to_smspace(self.uh)
         uh = S.value
-        return self.integralalg.L2_error(u, uh)
+        return self.space.integralalg.L2_error(u, uh)
 
     def H1_semi_error(self):
         gu = self.pde.gradient
         S = self.space.project_to_smspace(self.uh)
         guh = S.grad_value
-        e = self.integralalg.L2_error(gu, guh)
+        e = self.space.integralalg.L2_error(gu, guh)
         return e
 
     def stability_term(self):

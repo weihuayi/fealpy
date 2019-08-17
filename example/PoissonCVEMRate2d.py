@@ -1,7 +1,10 @@
+#!/usr/bin/env python3
+#
+
 import numpy as np
 
 from fealpy.pde.poisson_model_2d import CrackData, LShapeRSinData, CosCosData, KelloggData, SinSinData
-from fealpy.vem import PoissonVEMModel 
+from fealpy.vem import PoissonCVEMModel 
 from fealpy.tools.show import showmultirate
 from fealpy.mesh.simple_mesh_generator import triangle
 
@@ -44,7 +47,7 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 
 for i in range(maxit):
     for j, p in enumerate(ps):
-        vem = PoissonVEMModel(pde, mesh, p, q=7)
+        vem = PoissonCVEMModel(pde, mesh, p, q=7)
         vem.solve()
         Ndof[i] = mesh.number_of_cells()
         errorMatrix[j, i] = vem.L2_error()

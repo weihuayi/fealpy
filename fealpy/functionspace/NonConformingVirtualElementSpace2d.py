@@ -4,6 +4,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .function import Function
 from ..quadrature import GaussLegendreQuadrature
+from ..quadrature import PolygonMeshIntegralAlg
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 class NCVEMDof2d():
@@ -111,11 +112,22 @@ class NonConformingVirtualElementSpace2d():
     """
     The non conforming 2d vem space.
     """
-    def __init__(self, mesh, p=1):
-        self.mesh = mesh
+    def __init__(self, mesh, p=1, q=None):
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.mesh = mesh
         self.dof = NCVEMDof2d(mesh, p)
+
+        if q is None:
+            self.integrator = mesh.integrator(p+1)
+        else:
+            self.integrator = mesh.integrator(q)
+
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.integrator,
+                self.mesh,
+                area=self.smspace.area,
+                barycenter=self.smspace.barycenter)
 
         self.H = self.matrix_H()
         self.D = self.matrix_D(self.H)
@@ -188,7 +200,7 @@ class NonConformingVirtualElementSpace2d():
         PIS = list(map(f1, zip(DD, PI0)))
 
         f1 = lambda x: x[0].T@x[1]@x[0] + x[3]*(np.eye(x[2].shape[1]) - x[2]).T@(np.eye(x[2].shape[1]) - x[2])
-        K = list(map(f1, zip(PI0, H, PIS, area)))
+        K = list(map(f1, zip(PI0, H, PIS, self.smspace.area)))
 
         f2 = lambda x: np.repeat(x, x.shape[0])
         f3 = lambda x: np.tile(x, x.shape[0])
@@ -202,11 +214,11 @@ class NonConformingVirtualElementSpace2d():
         return M
 
 
-    def source_vector(self, f, integral):
+    def source_vector(self, f):
         phi = self.smspace.basis
         def u(x, cellidx):
             return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
-        bb = integral(u, celltype=True)
+        bb = self.integralalg.integral(u, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
         gdof = self.number_of_global_dofs()
@@ -247,7 +259,7 @@ class NonConformingVirtualElementSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-    def interpolation(self, u, integral):
+    def interpolation(self, u):
         p = self.p
         mesh = self.mesh
         NN = mesh.number_of_nodes()
@@ -261,7 +273,7 @@ class NonConformingVirtualElementSpace2d():
             def f(x, cellidx):
                 return np.einsum('ij, ij...->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
 
-            bb = integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+            bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
             uI[p*NE:] = bb.reshape(-1)
         return uI
 
@@ -348,10 +360,9 @@ class NonConformingVirtualElementSpace2d():
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi1
         if p > 1:
-            area = self.smspace.area
             idof = (p-1)*p//2  # the number of dofs of scale polynomial space with degree p-2
             idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
-            D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
+            D[idx, :] = H[:, :idof, :]/self.smspace.area.reshape(-1, 1, 1)
         return D
 
     def matrix_B(self):
@@ -397,18 +408,15 @@ class NonConformingVirtualElementSpace2d():
         # m: the scaled basis number,
         # j: the edge number,
         # i: the virtual element basis number
-        val = np.einsum('ijmk, jk->mji', gphi0, nm)
-        val = np.einsum('i, mji->mji', ws, val)
-        idx = (
-                cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-                ).reshape(-1, 1) + np.arange(p)
+        val = np.einsum('i, ijmk, jk->mji', ws, gphi0, nm, optimize=True)
+        idx = (cell2dofLocation[edge2cell[:, 0]]
+                + edge2cell[:, 2]*p).reshape(-1, 1) + np.arange(p)
         B[:, idx] += val
         B[0, idx] = h.reshape(-1, 1)*ws
 
-        val = np.einsum('ijmk, jk->mji', gphi1, -nm[isInEdge])
-        val = np.einsum('i, mji->mji', ws, val)
-        idx = (
-                cell2dofLocation[edge2cell[isInEdge, 1]]
+        val = np.einsum('i, ijmk, jk->mji', ws, gphi1, -nm[isInEdge],
+                optimize=True)
+        idx = ( cell2dofLocation[edge2cell[isInEdge, 1]]
                 + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
         B[:, idx] += val
         B[0, idx] = h[isInEdge].reshape(-1, 1)*ws
@@ -436,7 +444,6 @@ class NonConformingVirtualElementSpace2d():
         p = self.p
 
         smldof = self.smspace.number_of_local_dofs()
-        area = self.smspace.area
         idof = (p-1)*p//2
 
         mesh = self.mesh
@@ -451,7 +458,7 @@ class NonConformingVirtualElementSpace2d():
                     '0',
                     np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
                     x[2][idof:, :]]
-            return list(map(l, zip(NV, area, C)))
+            return list(map(l, zip(NV, self.smspace.area, C)))
 
     def matrix_PI_0(self, H, C):
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
