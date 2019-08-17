@@ -5,7 +5,7 @@ from .TriangleQuadrature import TriangleQuadrature
 from .TetrahedronQuadrature import TetrahedronQuadrature
 from .QuadrangleQuadrature import QuadrangleQuadrature
 from .HexahedronQuadrature import HexahedronQuadrature
-
+from .PrismQuadrature import PrismQuadrature
 from .FEMeshIntegralAlg import FEMeshIntegralAlg
 from .PolygonMeshIntegralAlg import PolygonMeshIntegralAlg
 
