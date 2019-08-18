@@ -51,14 +51,17 @@ class PrismMesh(Mesh3d):
     def bc_to_point(self, bc):
         node = self.node
         cell = self.ds.cell
+        NC = self.number_of_cells()
         bc0 = bc[0]
         bc1 = bc[1]
-        p0 = np.einsum('...j, ijk->...ik', bc0, node[cell[:, 0:3]])
-        p1 = np.einsum('...j, ijk->...ik', bc0, node[cell[:, 3:]])
-        p = np.einsum('', bc1, p0) + np.einsum('', bc1, p1)
-        return p
+        n0 = bc0.shape[0]
+        n1 = bc1.shape[0]
+        p0 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 0:3]])
+        p1 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 3:]])
+        p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
+        return p.reshape(n0*n1, NC, 3)
 
-    def multi_index_matrix(self):
+    def multi_index_matrix_2(self):
         p = 2
         ldof = (p+1)*(p+2)//2
         idx = np.arange(0, ldof)
@@ -78,7 +81,7 @@ class PrismMesh(Mesh3d):
         w1 = np.zeros((p+1, 2), dtype=np.int8)
         w1[:, 0] = np.arange(p, -1, -1)
         w1[:, 1] = w1[-1::-1, 0]
-        w2 = self.multi_index_matrix()
+        w2 = self.multi_index_matrix_2()
         w3 = np.einsum('ij, km->ijkm', w1, w2)
 
         w = np.zeros((ldof, 6), dtype=np.int8)

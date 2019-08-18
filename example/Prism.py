@@ -59,16 +59,16 @@ def sphere_pmesh(n=3):
     pmesh = PrismMesh(pnode, pcell)
     return pmesh
 
-pmesh = one_pmesh()
-qf = pmesh.integrator(4)
 
+pmesh = plane_pmesh()
+qf = pmesh.integrator(2)
 bcs, ws = qf.get_quadrature_points_and_weights()
-p = pmesh.bc_to_point(bcs).reshape(-1, 3)
+p = pmesh.bc_to_point(bcs)
 
 fig = plt.figure()
 axes = Axes3D(fig)
 pmesh.add_plot(axes, alpha=0, showedge=True)
-pmesh.find_node(axes, node=p, showindex=True)
+pmesh.find_node(axes, node=p[:, 0, :], showindex=True)
 plt.show()
 
 # pmesh = sphere_pmesh(n=6)
