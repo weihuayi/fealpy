@@ -10,7 +10,7 @@ from fealpy.mesh.implicit_surface import Sphere
 from fealpy.mesh import PrismMesh
 
 from fealpy.pde.poisson_2d import CosCosData
-from fealpy.functionspace import CPPFEMDof3d
+from fealpy.functionspace import CPPFEMDof3d, PrismFiniteElementSpace
 
 
 def one_pmesh():
@@ -60,10 +60,9 @@ def sphere_pmesh(n=3):
     return pmesh
 
 
-pmesh = plane_pmesh()
+pmesh = one_pmesh()
 qf = pmesh.integrator(2)
 bcs, ws = qf.get_quadrature_points_and_weights()
-p = pmesh.bc_to_point(bcs)
 
 fig = plt.figure()
 axes = Axes3D(fig)

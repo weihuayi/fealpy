@@ -573,11 +573,9 @@ class VectorLagrangeFiniteElementSpace():
     def source_vector(self, f, qf, measure, surface=None):
         p = self.p
         mesh = self.mesh
-        GD = self.GD       
-        
+        GD = self.GD
         bcs, ws = qf.quadpts, qf.weights
         pp = self.mesh.bc_to_point(bcs)
-        
         if surface is not None:
             pp, _ = surface.project(pp)
 
