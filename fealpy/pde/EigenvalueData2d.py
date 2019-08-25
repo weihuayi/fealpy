@@ -145,7 +145,7 @@ class EigenGWWA:
 
         mesh = TriangleMesh(node, cell)
         mesh.uniform_bisect(2)
-        mesh.uniform_refine(2)
+        mesh.uniform_refine(n)
 
         return mesh
 
@@ -193,7 +193,7 @@ class EigenGWWB:
 
         mesh = TriangleMesh(node, cell)
         mesh.uniform_bisect(2)
-        mesh.uniform_refine(2)
+        mesh.uniform_refine(n)
 
         return mesh
 
