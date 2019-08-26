@@ -76,9 +76,9 @@ class PoissonCVEMModel():
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
         if uh is None:
-            S = self.project_to_smspace(self.uh)
+            S = self.space.project_to_smspace(self.uh)
         else:
-            S = self.project_to_smspace(uh)
+            S = self.space.project_to_smspace(uh)
 
         grad = S.grad_value(barycenter)
         S0 = space.smspace.function()
@@ -128,11 +128,11 @@ class PoissonCVEMModel():
             for i in range(ldof):
                 S0[i::ldof] = np.bincount(
                         idx,
-                        weights=self.mat.B[i, :]*ruh[cell, 0],
+                        weights=self.space.B[i, :]*ruh[cell, 0],
                         minlength=NC)
                 S1[i::ldof] = np.bincount(
                         idx,
-                        weights=self.mat.B[i, :]*ruh[cell, 1],
+                        weights=self.space.B[i, :]*ruh[cell, 1],
                         minlength=NC)
 
         try:
