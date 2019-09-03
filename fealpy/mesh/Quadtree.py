@@ -47,7 +47,7 @@ class Quadtree(QuadrangleMesh):
             self,
             method='mean',
             maxrefine=3,
-            maxcoarsen=0,
+            maxcoarsen=3,
             theta=1.0,
             maxsize=1e-2,
             minsize=1e-12,
