@@ -324,12 +324,10 @@ class ConformingVirtualElementSpace2d():
         uI[:NN+(p-1)*NE] = u(ipoint)
         if p > 1:
             phi = self.smspace.basis
-
             def f(x, cellidx):
                 return np.einsum(
                         'ij, ij...->ij...',
                         u(x), phi(x, cellidx=cellidx, p=p-2))
-
             bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
             uI[NN+(p-1)*NE:] = bb.reshape(-1)
         return uI
