@@ -1,6 +1,8 @@
 
 import numpy as np
 
+
+
 class SinCosExpData:
     def __init__(self):
         self.diffusionCoefficient = 1/16
