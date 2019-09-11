@@ -38,11 +38,11 @@ Ndof = np.zeros(maxit, dtype=np.int)
 mesh = pde.init_mesh(n)
 
 for i in range(maxit):
-    fem = PoissonFEMModel(pde, mesh, p, p+2) # 创建 Poisson 有限元模型
+    fem = PoissonFEMModel(pde, mesh, p, q=p+2) # 创建 Poisson 有限元模型
     ls = fem.solve() # 求解
     Ndof[i] = fem.space.number_of_global_dofs() # 获得空间自由度个数
-    errorMatrix[0, i] = fem.get_L2_error() # 计算 L2 误差
-    errorMatrix[1, i] = fem.get_H1_error() # 计算 H1 误差
+    errorMatrix[0, i] = fem.L2_error() # 计算 L2 误差
+    errorMatrix[1, i] = fem.H1_semi_error() # 计算 H1 误差
     if i < maxit - 1:
         mesh.uniform_refine() # 一致加密网格
 

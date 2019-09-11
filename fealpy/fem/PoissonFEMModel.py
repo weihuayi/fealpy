@@ -12,15 +12,11 @@ from timeit import default_timer as timer
 
 class PoissonFEMModel(object):
     def __init__(self, pde, mesh, p, q=3):
-        self.space = LagrangeFiniteElementSpace(mesh, p)
+        self.space = LagrangeFiniteElementSpace(mesh, p, q=q)
         self.mesh = self.space.mesh
         self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
-        self.cellmeasure = mesh.entity_measure('cell')
-        self.integrator = mesh.integrator(q)
-        self.integralalg = IntegralAlg(
-                self.integrator, self.mesh, self.cellmeasure)
 
     def recover_estimate(self, rguh):
         if self.space.p > 1:
@@ -32,7 +28,7 @@ class PoissonFEMModel(object):
         val1 = self.uh.grad_value(bcs)
         l = np.sum((val1 - val0)**2, axis=-1)
         e = np.einsum('i, ij->j', ws, l)
-        e *= self.cellmeasure
+        e *= self.space.cellmeasure
         return np.sqrt(e)
 
     def residual_estimate(self, uh=None):
@@ -80,10 +76,10 @@ class PoissonFEMModel(object):
         return np.sqrt(eta)
 
     def get_left_matrix(self):
-        return self.space.stiff_matrix(self.integrator, self.cellmeasure)
+        return self.space.stiff_matrix()
 
     def get_right_vector(self):
-        return self.space.source_vector(self.pde.source, self.integrator, self.cellmeasure)
+        return self.space.source_vector(self.pde.source)
 
     def solve(self):
         bc = DirichletBC(self.space, self.pde.dirichlet)
@@ -121,7 +117,7 @@ class PoissonFEMModel(object):
             uh = self.uh.value
         else:
             uh = uh.value
-        L2 = self.integralalg.L2_error(u, uh)
+        L2 = self.space.integralalg.L2_error(u, uh)
         return L2
 
     def H1_semi_error(self, uh=None):
@@ -130,12 +126,12 @@ class PoissonFEMModel(object):
             guh = self.uh.grad_value
         else:
             guh = uh.grad_value
-        H1 = self.integralalg.L2_error(gu, guh)
+        H1 = self.space.integralalg.L2_error(gu, guh)
         return H1
 
     def recover_error(self, rguh):
         gu = self.pde.gradient
         guh = rguh.value
         mesh = self.mesh
-        re = self.integralalg.L2_error(gu, guh, mesh)
+        re = self.space.integralalg.L2_error(gu, guh, mesh)
         return re

@@ -4,10 +4,14 @@ from .function import Function
 from .dof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .dof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
+from ..quadrature import GaussLegendreQuadrature
+from ..quadrature import FEMeshIntegralAlg
+
 
 class LagrangeFiniteElementSpace():
-    def __init__(self, mesh, p=1, spacetype='C'):
+    def __init__(self, mesh, p=1, q=None, spacetype='C'):
         self.mesh = mesh
+        self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
         if len(mesh.node.shape) == 1:
             self.GD = 1
@@ -40,6 +44,16 @@ class LagrangeFiniteElementSpace():
         self.spacetype = spacetype
         self.itype = mesh.itype
         self.ftype = mesh.ftype
+
+        if q is None:
+            self.integrator = mesh.integrator(p+1)
+        else:
+            self.integrator = mesh.integrator(q)
+
+        self.integralalg = FEMeshIntegralAlg(
+                self.integrator,
+                self.mesh,
+                self.cellmeasure)
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -323,14 +337,14 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
-    def stiff_matrix(self, qf, cellmeasure, cfun=None):
+    def stiff_matrix(self, cfun=None):
         p = self.p
         GD = self.mesh.geo_dimension()
 
         if p == 0:
             raise ValueError('The space order is 0!')
 
-        bcs, ws = qf.get_quadrature_points_and_weights()
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
         gphi = self.grad_basis(bcs)
 
         if cfun is not None:
@@ -360,7 +374,7 @@ class LagrangeFiniteElementSpace():
             dgphi = gphi
 
         # Compute the element sitffness matrix
-        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, dgphi, gphi, cellmeasure, optimize=True)
+        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, dgphi, gphi, self.cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
@@ -371,7 +385,7 @@ class LagrangeFiniteElementSpace():
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
-    def mass_matrix(self, qf, cellmeasure, cfun=None, barycenter=False):
+    def mass_matrix(self, cfun=None, barycenter=False):
         p = self.p
         mesh = self.mesh
         if p == 0:
@@ -379,7 +393,7 @@ class LagrangeFiniteElementSpace():
             M = spdiags(cellmeasure, 0, NC, NC)
             return M
 
-        bcs, ws = qf.get_quadrature_points_and_weights()
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
 
         if cfun is not None:
@@ -413,7 +427,7 @@ class LagrangeFiniteElementSpace():
         elif len(dphi.shape) == 3:
             M = np.einsum(
                     'm, mij, mk, i->ijk',
-                    ws, dphi, phi, cellmeasure,
+                    ws, dphi, phi, self.cellmeasure,
                     optimize=True)
 
         cell2dof = self.cell_to_dof()
@@ -425,21 +439,18 @@ class LagrangeFiniteElementSpace():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
 
-    def source_vector(self, f, qf, measure, surface=None):
+    def source_vector(self, f, surface=None):
         p = self.p
 
-        bcs, ws = qf.quadpts, qf.weights
-        print('bcs', bcs)
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
         pp = self.mesh.bc_to_point(bcs)
-        print('pp', pp)
-
         if surface is not None:
             pp, _ = surface.project(pp)
         fval = f(pp)
 
         if p > 0:
             phi = self.basis(bcs)
-            bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, measure)
+            bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, self.cellmeasure)
             cell2dof = self.dof.cell2dof
             gdof = self.number_of_global_dofs()
             b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
