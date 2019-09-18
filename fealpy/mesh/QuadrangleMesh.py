@@ -1,5 +1,6 @@
 import numpy as np
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
+from ..quadrature import QuadrangleQuadrature
 
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
@@ -8,9 +9,14 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     V = 4
     E = 4
     F = 1
+    localCell = np.array([
+        (0, 1, 2, 3),
+        (1, 2, 3, 0),
+        (2, 3, 0, 1),
+        (3, 0, 1, 2)])
 
-    def __init__(self, N, cell):
-        super(QuadrangleMeshDataStructure, self).__init__(N, cell)
+    def __init__(self, NN, cell):
+        super(QuadrangleMeshDataStructure, self).__init__(NN, cell)
 
 
 class QuadrangleMesh(Mesh2d):
@@ -28,30 +34,34 @@ class QuadrangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
 
+    def reorder_cell(self, idx):
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        cell = self.entity('cell')
+        cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
+        self.ds.reinit(NN, cell)
+
+    def integrator(self, k):
+        return QuadrangleQuadrature(k)
+
+
     def area(self, index=None):
         return self.cell_area(index=index)
 
     def cell_area(self, index=None):
-        node = self.node
-        cell = self.ds.cell
-        if index is None:
-            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
-            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
-        else:
-            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
-            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
-        nv = np.cross(v1, v2)
-        a0 = nv/2.0
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        v = self.edge_normal()
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
 
-        if index is None:
-            v1 = node[cell[:, 3], :] - node[cell[:, 2], :]
-            v2 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        else:
-            v1 = node[cell[index, 3], :] - node[cell[index, 2], :]
-            v2 = node[cell[index, 0], :] - node[cell[index, 2], :]
-        nv = np.cross(v1, v2)
-        a1 = nv/2.0
-        return a0 + a1
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+        a /=2
+        return a
 
     def uniform_refine(self, n=1):
         for i in range(n):
@@ -61,10 +71,10 @@ class QuadrangleMesh(Mesh2d):
 
             # Find the cutted edge  
             cell2edge = self.ds.cell_to_edge()
-            edgeCenter = self.barycenter(entity='edge')
-            cellCenter = self.barycenter(entity='cell')
+            edgeCenter = self.entity_barycenter('edge')
+            cellCenter = self.entity_barycenter('cell')
 
-            edge2center = np.arange(N, N+NE) 
+            edge2center = np.arange(N, N+NE)
 
             cell = self.ds.cell
             cp = [cell[:, i].reshape(-1, 1) for i in range(4)]

@@ -13,10 +13,10 @@ class StructureQuadMesh(Mesh2d):
         self.hy = (box[3] - box[2])/ny
         self.data = {}
 
-        self.itype = itype 
-        self.ftype = ftype 
+        self.itype = itype
+        self.ftype = ftype
 
-    @property 
+    @property
     def node(self):
         NN = self.ds.NN
         nx = self.ds.nx
@@ -24,7 +24,7 @@ class StructureQuadMesh(Mesh2d):
         box = self.box
 
         X, Y = np.mgrid[
-                box[0]:box[1]:complex(0, nx+1), 
+                box[0]:box[1]:complex(0, nx+1),
                 box[2]:box[3]:complex(0, ny+1)]
         node = np.zeros((NN, 2), dtype=self.ftype)
         node[:, 0] = X.flat
@@ -53,8 +53,7 @@ class StructureQuadMesh(Mesh2d):
         d1 = -hy*np.ones(n0-1, dtype=np.float)
         T0 = diags([d0, d1, d1], [0, -1, 1])
         I0 = eye(n0)
-
-       
+ 
         d0 = (2*hx)*np.ones(n1, dtype=np.float)
         d1 = -hx*np.ones(n1-1, dtype=np.float)
         T1 = diags([d0, d1, d1], [0, -1, 1])
@@ -62,6 +61,7 @@ class StructureQuadMesh(Mesh2d):
 
         A = kron(I1, T0) + kron(T1, I0)
         return A
+
 class StructureQuadMeshDataStructure:
     localEdge = np.array([(0,1),(1,2),(2,3),(3,0)])
     V = 4

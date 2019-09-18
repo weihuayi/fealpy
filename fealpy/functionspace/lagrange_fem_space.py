@@ -1,8 +1,8 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
 from .function import Function
-from .dof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
-from .dof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
+from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
+from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import FEMeshIntegralAlg

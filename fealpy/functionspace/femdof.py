@@ -5,8 +5,8 @@ from functools import reduce
 class CPLFEMDof1d():
     def __init__(self, mesh, p):
         self.mesh = mesh
-        self.p = p 
-        self.multiIndex = self.multi_index_matrix() 
+        self.p = p
+        self.multiIndex = self.multi_index_matrix()
         self.cell2dof = self.cell_to_dof()
 
     def multi_index_matrix(self):
@@ -15,7 +15,7 @@ class CPLFEMDof1d():
         multiIndex = np.zeros((ldof, 2), dtype=np.int)
         multiIndex[:, 0] = np.arange(p, -1, -1)
         multiIndex[:, 1] = p - multiIndex[:, 0]
-        return multiIndex 
+        return multiIndex
 
     def boundary_dof(self):
         gdof = self.number_of_global_dofs()
@@ -61,7 +61,7 @@ class CPLFEMDof1d():
         if p == 1:
             return node
         else:
-            NN = mesh.number_of_nodes() 
+            NN = mesh.number_of_nodes()
             gdof = self.number_of_global_dofs()
             shape = (gdof,) + node.shape[1:]
             ipoint = np.zeros(shape, dtype=np.float)
@@ -84,19 +84,19 @@ class CPLFEMDof1d():
 class CPLFEMDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
-        self.p = p 
-        self.multiIndex = self.multi_index_matrix() 
+        self.p = p
+        self.multiIndex = self.multi_index_matrix()
         self.cell2dof = self.cell_to_dof()
 
     def multi_index_matrix(self):
         p = self.p
-        ldof = self.number_of_local_dofs() 
+        ldof = self.number_of_local_dofs()
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 3), dtype=np.int)
         multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
         multiIndex[:,1] = idx0 - multiIndex[:,2]
-        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2] 
+        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
         return multiIndex
 
     def is_on_node_local_dof(self):
@@ -105,7 +105,7 @@ class CPLFEMDof2d():
         return isNodeDof
 
     def is_on_edge_local_dof(self):
-        return self.multiIndex == 0 
+        return self.multiIndex == 0
 
     def boundary_dof(self):
         gdof = self.number_of_global_dofs()
@@ -123,8 +123,8 @@ class CPLFEMDof2d():
         NN = mesh.number_of_nodes()
 
         edge = mesh.ds.edge
-        edge2dof = np.zeros((NE, p+1), dtype=np.int) 
-        edge2dof[:, [0, -1]] = edge 
+        edge2dof = np.zeros((NE, p+1), dtype=np.int)
+        edge2dof[:, [0, -1]] = edge
         if p > 1:
             edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
@@ -201,7 +201,7 @@ class CPLFEMDof2d():
             ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell,:]).reshape(-1, dim)
 
-        return ipoint  
+        return ipoint
 
     def number_of_global_dofs(self):
         p = self.p
@@ -213,8 +213,8 @@ class CPLFEMDof2d():
 
         if p > 2:
             ldof = self.number_of_local_dofs()
-            NC = self.mesh.number_of_cells() 
-            gdof += (ldof - 3*p)*NC 
+            NC = self.mesh.number_of_cells()
+            gdof += (ldof - 3*p)*NC
         return gdof
 
     def number_of_local_dofs(self):
@@ -224,8 +224,8 @@ class CPLFEMDof2d():
 class CPLFEMDof3d():
     def __init__(self, mesh, p):
         self.mesh = mesh
-        self.p = p 
-        self.multiIndex = self.multi_index_matrix() 
+        self.p = p
+        self.multiIndex = self.multi_index_matrix()
         self.faceMultiIndex = self.face_multi_index_matrix()
         self.cell2dof = self.cell_to_dof()
 
@@ -233,7 +233,7 @@ class CPLFEMDof3d():
         p = self.p
         ldof = self.number_of_local_dofs()
         idx = np.arange(1, ldof)
-        idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3) 
+        idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
         idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
         idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
         idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
@@ -284,8 +284,8 @@ class CPLFEMDof3d():
 
         base = N
         edge = mesh.ds.edge
-        edge2dof = np.zeros((NE, p+1), dtype=np.int) 
-        edge2dof[:, [0, -1]] = edge 
+        edge2dof = np.zeros((NE, p+1), dtype=np.int)
+        edge2dof[:, [0, -1]] = edge
         if p > 1:
             edge2dof[:,1:-1] = base + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
@@ -312,7 +312,7 @@ class CPLFEMDof3d():
 
         face2dof = np.zeros((NF, fdof), dtype=np.int)
         faceIdx = self.faceMultiIndex
-        isEdgeDof = (faceIdx == 0) 
+        isEdgeDof = (faceIdx == 0)
 
         fe = np.array([1, 0, 0])
         for i in range(3):
@@ -351,7 +351,7 @@ class CPLFEMDof3d():
         NF = mesh.number_of_faces()
         NC = mesh.number_of_cells()
 
-        face = mesh.ds.face 
+        face = mesh.ds.face
         cell = mesh.ds.cell
 
         cell2face = mesh.ds.cell_to_face()
@@ -378,12 +378,62 @@ class CPLFEMDof3d():
             cell2dof[:, isFaceDof[:, i]] = face2dof[cell2face[:, [i]], a]
 
         if p > 3:
-            base = N + (p-1)*NE + (fdof - 3*p)*NF 
+            base = N + (p-1)*NE + (fdof - 3*p)*NF
             idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
             isInCellDof = ~(isFaceDof[:, 0] | isFaceDof[:, 1] | isFaceDof[:, 2] | isFaceDof[:, 3])
             cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
 
         return cell2dof
+
+    def cell_to_dof_new(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs()
+        cell2dof = np.zeros((NC, ldof), dtype=np.int)
+
+        idx = np.array([
+            0,
+            ldof - (p+1)*(p+2)//2 - 1,
+            ldof - p -1,
+            ldof - 1], dtype=np.int)
+
+        cell2dof[:, idx] = cell
+
+        if p == 1:
+            return cell2dof
+        if p == 2:
+            cell2edge = mesh.ds.cell_to_edge()
+            idx = np.array([1, 2, 3, 5, 6, 8], dtype=np.int)
+            cel2dof[:, idx] = cell2edge + NN
+            return cell2dof
+        else:
+            w = self.multiIndex
+
+            flag = (w != 0)
+            isCellIDof = (flag.sum(axis=-1) == 4)
+            isNodeDof = (flag.sum(axis=-1) == 1)
+            isNewBdDof = ~(isCellIDof | isNodeDof)
+
+            nd = isNewBdDof.sum()
+            ps = np.einsum('im, km->ikm', cell + NN + NC, w[isNewBdDof])
+            ps.sort()
+            _, i0, j = np.unique(
+                    ps.reshape(-1, 4),
+                    return_index=True,
+                    return_inverse=True,
+                    axis=0)
+            cell2dof[:, isNewBdDof] = j.reshape(-1, nd) + NN
+
+            NB = len(i0)
+            nd = isCellIDof.sum()
+            if nd > 0:
+                cell2dof[:, isCellIDof] = NB + NN + nd*np.arange(NC).reshape(-1, 1) \
+                        + np.arange(nd)
+            return cell2dof
 
     def number_of_global_dofs(self):
         p = self.p
@@ -426,7 +476,7 @@ class CPLFEMDof3d():
 
         N = node.shape[0]
         dim = node.shape[1]
-        NC = mesh.number_of_cells() 
+        NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
@@ -438,8 +488,7 @@ class CPLFEMDof3d():
             w = np.zeros((p-1,2), dtype=np.float)
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, dim)
-            
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, dim) 
         if p > 2:
             NF = mesh.number_of_faces()
             fidof = (p+1)*(p+2)//2 - 3*p
@@ -455,7 +504,7 @@ class CPLFEMDof3d():
             w = self.multiIndex[isInCellDof, :]/p
             ipoint[N+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell,:]).reshape(-1, dim)
-        return ipoint  
+        return ipoint
 
 
 class DPLFEMDof():

@@ -5,3 +5,4 @@ from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElement
 from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .PrismFiniteElementSpace import CPPFEMDof3d
+from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
