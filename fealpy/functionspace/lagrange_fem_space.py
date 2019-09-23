@@ -9,14 +9,10 @@ from ..quadrature import FEMeshIntegralAlg
 
 
 class LagrangeFiniteElementSpace():
-    def __init__(self, mesh, p=1, q=None, spacetype='C'):
+    def __init__(self, mesh, p=1, spacetype='C', q=None):
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
-        if len(mesh.node.shape) == 1:
-            self.GD = 1
-        else:
-            self.GD = mesh.node.shape[1]
         if spacetype is 'C':
             if mesh.meshtype is 'interval':
                 self.dof = CPLFEMDof1d(mesh, p)
@@ -40,6 +36,11 @@ class LagrangeFiniteElementSpace():
             elif mesh.meshtype is 'tet':
                 self.dof = DPLFEMDof3d(mesh, p)
                 self.TD = 3
+
+        if len(mesh.node.shape) == 1:
+            self.GD = 1
+        else:
+            self.GD = mesh.node.shape[1]
 
         self.spacetype = spacetype
         self.itype = mesh.itype
