@@ -122,7 +122,7 @@ class ConformingVirtualElementSpace2d():
         self.area = self.smspace.area
         self.dof = CVEMDof2d(mesh, p)
 
-        self.H = self.matrix_H()
+        self.H = self.smspace.matrix_H()
         self.D = self.matrix_D(self.H)
         self.B = self.matrix_B()
         self.G = self.matrix_G(self.B, self.D)
@@ -133,7 +133,7 @@ class ConformingVirtualElementSpace2d():
         self.PI0 = self.matrix_PI_0(self.H, self.C)
 
         if q is None:
-            self.integrator = mesh.integrator(p+1)
+            self.integrator = mesh.integrator(p+3)
         else:
             self.integrator = mesh.integrator(q)
 
@@ -145,7 +145,7 @@ class ConformingVirtualElementSpace2d():
 
     def project_to_smspace(self, uh):
         """
-        Project a non conforming vem function uh into polynomial space.
+        Project a conforming vem function uh into polynomial space.
         """
         p = self.p
         cell2dof = self.dof.cell2dof
@@ -155,6 +155,25 @@ class ConformingVirtualElementSpace2d():
         S = self.smspace.function()
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
+
+    def project(self, F, space1):
+        """
+        S is a function in ScaledMonomialSpace2d, this function project  S to 
+        MonomialSpace2d.
+        """
+        space0 = F.space
+        def f(x, cellidx):
+            return np.einsum(
+                    '...im, ...in->...imn',
+                    mspace.basis(x, cellidx),
+                    smspace.basis(x, cellidx)
+                    )
+        C = self.integralalg.integral(f, celltype=True)
+        H = space1.matrix_H()
+        PI0 = inv(H)@C
+        SS = mspace.function()
+        SS[:] = np.einsum('ikj, ij->ik', PI0, S[smspace.cell_to_dof()]).reshape(-1)
+        return SS
 
     def stiff_matrix(self, cfun=None):
         area = self.smspace.area
@@ -353,42 +372,6 @@ class ConformingVirtualElementSpace2d():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
-
-    def matrix_H(self):
-        p = self.p
-        mesh = self.mesh
-        node = mesh.entity('node')
-
-        edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
-
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-        NC = mesh.number_of_cells()
-
-        qf = GaussLegendreQuadrature(p + 1)
-        bcs, ws = qf.quadpts, qf.weights
-        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
-        H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
-        H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
-
-        nm = mesh.edge_normal()
-        b = node[edge[:, 0]] - self.smspace.barycenter[edge2cell[:, 0]]
-        H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-        b = node[edge[isInEdge, 0]] - self.smspace.barycenter[edge2cell[isInEdge, 1]]
-        H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
-
-        ldof = self.smspace.number_of_local_dofs()
-        H = np.zeros((NC, ldof, ldof), dtype=np.float)
-        np.add.at(H, edge2cell[:, 0], H0)
-        np.add.at(H, edge2cell[isInEdge, 1], H1)
-
-        multiIndex = self.smspace.dof.multiIndex
-        q = np.sum(multiIndex, axis=1)
-        H /= q + q.reshape(-1, 1) + 2
-        return H
 
     def matrix_D(self, H):
         p = self.p
