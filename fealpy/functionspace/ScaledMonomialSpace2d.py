@@ -55,13 +55,16 @@ class SMDof2d():
 
 
 class ScaledMonomialSpace2d():
-    def __init__(self, mesh, p, q=None):
+    def __init__(self, mesh, p, q=None, bc=None):
         """
         The Scaled Momomial Space in R^2
         """
 
         self.mesh = mesh
-        self.barycenter = mesh.entity_barycenter('cell')
+        if bc is None:
+            self.barycenter = mesh.entity_barycenter('cell')
+        else:
+            self.barycenter = bc
         self.p = p
         self.area = mesh.entity_measure('cell')
         self.h = np.sqrt(self.area)

@@ -115,10 +115,15 @@ class CVEMDof2d():
 
 
 class ConformingVirtualElementSpace2d():
-    def __init__(self, mesh, p=1, q=None):
+    def __init__(self, mesh, p=1, q=None, bc=None):
+        """
+        p: the space order
+        q: the index of integral formular
+        bc: user can give a barycenter for every mesh cell
+        """
         self.mesh = mesh
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.smspace = ScaledMonomialSpace2d(mesh, p, bc=bc)
         self.area = self.smspace.area
         self.dof = CVEMDof2d(mesh, p)
 
