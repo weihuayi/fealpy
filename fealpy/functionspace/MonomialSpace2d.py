@@ -75,7 +75,7 @@ class MonomialSpace2d():
                 self.integrator,
                 self.mesh,
                 area=self.area,
-                barycenter=mesh.entity_barycenter('cell'))
+                barycenter=mesh.entity_barycenter('cell')) 
 
     def projection(self, F):
         """
@@ -113,6 +113,7 @@ class MonomialSpace2d():
         """
         if p is None:
             p = self.p
+        h = self.h
         NC = self.mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs(p=p)
