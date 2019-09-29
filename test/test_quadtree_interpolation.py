@@ -6,7 +6,7 @@ from fealpy.functionspace import ConformingVirtualElementSpace2d, ScaledMonomial
 p = 2
 
 pde = CosCosData()
-quadtree = pde.init_mesh(n=3, meshtype='quadtree')
+quadtree = pde.init_mesh(n=4, meshtype='quadtree')
 options = quadtree.adaptive_options(method='numrefine', maxsize=1, HB=True)
 
 pmesh = quadtree.to_pmesh()
@@ -28,9 +28,8 @@ quadtree.adaptive(eta, options)
 pmesh = quadtree.to_pmesh()
 
 space1 = ConformingVirtualElementSpace2d(pmesh, p=p)
-smspace1 = space1.smspace
-print(options['HB'])
-sh1 = smspace1.interpolation(sh0, options['HB'])
+uI = space1.interpolation(sh0, options['HB'])
+sh1 = space1.project_to_smspace(uI)
 
 error = space1.integralalg.L2_error(pde.solution, sh1.value)
 print(error)

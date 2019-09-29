@@ -148,6 +148,9 @@ class ConformingVirtualElementSpace2d():
                 area=self.area,
                 barycenter=self.smspace.barycenter)
 
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
     def project_to_smspace(self, uh):
         """
         Project a conforming vem function uh into polynomial space.
@@ -339,6 +342,9 @@ class ConformingVirtualElementSpace2d():
         return f
 
     def interpolation(self, u, HB=None):
+        """
+        u: 可以是一个连续函数， 也可以是一个缩放单项式函数
+        """
         if HB is None:
             mesh = self.mesh
             NN = mesh.number_of_nodes()
@@ -357,18 +363,27 @@ class ConformingVirtualElementSpace2d():
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
         else:
-            uh = self.project_to_smspace(u)
-            uI = self.smspace.interpolation(uh, HB)
-            ldofs = self.smspace.number_of_local_dofs()
+            uh = self.smspace.interpolation(u, HB)
 
             cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
             NC = len(cell2dofLocation) - 1
             cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-            DD = np.vsplit(D, cell2dofLocation[1:-1])
+            DD = np.vsplit(self.D, cell2dofLocation[1:-1])
 
+            smldof = self.smspace.number_of_local_dofs()
             f1 = lambda x: x[0]@x[1]
-            uI = np.concatenate(map(f1, zip(DD, uI.reshape(-1, ldots))))
-            area = 1/self.area
+            uh = np.concatenate(list(map(f1, zip(DD, uh.reshape(-1, smldof)))))
+
+            ldof = self.number_of_local_dofs()
+            w = np.repeat(1/self.area, ldof)
+            uh *= w
+
+            uI = self.function()
+            ws = np.zeros(uI.shape[0], dtype=self.ftype)
+            np.add.at(uI, cell2dof, uh)
+            np.add.at(ws, cell2dof, w)
+            uI /=ws
+            return uI
 
 
     def number_of_global_dofs(self):
