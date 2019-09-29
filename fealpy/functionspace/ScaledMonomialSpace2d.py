@@ -82,6 +82,9 @@ class ScaledMonomialSpace2d():
                 area=self.area,
                 barycenter=mesh.entity_barycenter('cell'))
 
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
     def geo_dimension(self):
         return self.GD
 
@@ -328,3 +331,48 @@ class ScaledMonomialSpace2d():
                     )
         C = self.integralalg.integral(f, celltype=True)
         return C
+
+    def interpolation(self, sh0, HB):
+        """
+         interpolation sh in space into self space.
+        """
+        p = self.p
+        ldofs = self.number_of_local_dofs()
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+
+        space0 = sh0.space
+        h0 = space0.h
+
+        space1 = self
+        h1 = space1.h
+        sh1 = space1.function()
+
+        bc = (space1.barycenter[HB[:, 0]] - space0.barycenter[HB[:,
+            1]])/h0[HB[:, [1]]]
+        h = h1[HB[:, 0]]/h0[HB[:, 1]]
+
+        c = sh0.reshape(-1, ldofs)
+        d = sh1.reshape(-1, ldofs)
+
+        num = np.zeros(NC, dtype=self.itype)
+        np.add.at(num, HB[:, 0], 1)
+
+        m = HB.shape[0]
+        td = np.zeros((m, ldofs), dtype=self.ftype)
+
+        td[:, 0] = c[HB[:, 1], 0] + c[HB[:, 1], 1]*bc[:, 0] + c[HB[:, 1], 2]*bc[:, 1]
+        td[:, 1] = h*c[HB[:, 1], 1]
+        td[:, 2] = h*c[HB[:, 1], 2]
+
+        if p > 1:
+            td[:, 0] += c[HB[:, 1], 3]*bc[:, 0]**2 + c[HB[:, 1], 4]*bc[:, 0]*bc[:, 1] + c[HB[:, 1], 5]*bc[:, 1]**2
+            td[:, 1] += 2*c[HB[:, 1], 3]*bc[:, 0]*h + c[HB[:, 1], 4]*bc[:, 1]*h
+            td[:, 2] += c[HB[:, 1], 4]*bc[:, 0]*h + 2*c[HB[:, 1], 5]*bc[:, 1]*h
+            td[:, 3] = c[HB[:, 1], 3]*h**2
+            td[:, 4] = c[HB[:, 1], 4]*h**2
+            td[:, 5] = c[HB[:, 1], 5]*h**2
+
+        np.add.at(d, (HB[:, 0], np.s_[:]), td)
+        d /= num.reshape(-1, 1)
+        return sh1

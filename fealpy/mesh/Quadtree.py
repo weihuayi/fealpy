@@ -88,10 +88,10 @@ class Quadtree(QuadrangleMesh):
         options['numrefine'] = np.zeros(NC, dtype=np.int8)
         theta = options['theta']
         if options['method'] is 'mean':
-#            options['numrefine'][leafCellIdx] = np.around(
-#                    np.log2(eta/(theta*np.mean(eta)))
-#                )
-            options['numrefine'][leafCellIdx] = eta
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.mean(eta)))
+                )
+            # options['numrefine'][leafCellIdx] = eta
         elif options['method'] is 'max':
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
@@ -104,6 +104,8 @@ class Quadtree(QuadrangleMesh):
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
+        elif options['method'] is 'numrefine':
+            options['numrefine'][leafCellIdx] = eta
         elif isinstance(options['method'], float):
             val = options['method']
             options['numrefine'][leafCellIdx] = np.around(
@@ -143,8 +145,6 @@ class Quadtree(QuadrangleMesh):
         # refine
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
-            # 生成新的新旧单元对应关系
-
             self.refine_1(isMarkedCell, options)
 
             h = np.sqrt(self.entity_measure('cell'))
@@ -381,7 +381,9 @@ class Quadtree(QuadrangleMesh):
             # 老单元与新单元的编号映射关系
             cellIdxMap = np.zeros(NC, dtype=self.itype)
             cellIdxMap[isRemainCell] = np.arange(NNC)
-            cellIdxMap[child[idx, :]] = np.reshape(idx, (-1, 1))
+            # 下面的代码有 bug 
+            # cellIdxMap[child[idx, :]] = np.reshape(idx, (-1, 1)) 
+            cellIdxMap[self.child[idx, :]] = np.reshape(idx, (-1, 1))
             child[child > -1] = cellIdxMap[child[child > -1]]
             parent[parent > -1] = cellIdxMap[parent[parent > -1]]
 
@@ -389,10 +391,13 @@ class Quadtree(QuadrangleMesh):
                 # 粗化要更新 HB[:, 0]
                 leafIdx = self.leaf_cell_index()
                 idx0 = leafIdx[options['HB'][:, 0]] # 叶子单元在所有单元中对应的编号
+                print(idx0)
                 idx0 = cellIdxMap[idx0] # 在保留单元中的编号
                 isLeafCell = (child[:, 0] == -1) # 新网格的叶子单元
                 idxMap = np.zeros(NNC, dtype=self.itype)
                 idxMap[isLeafCell] = range(isLeafCell.sum())
+                print(idx0)
+                print(idxMap[idx0])
                 options['HB'][:, 0] = idxMap[idx0]
 
             self.child = child

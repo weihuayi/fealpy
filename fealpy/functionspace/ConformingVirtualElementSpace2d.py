@@ -338,23 +338,38 @@ class ConformingVirtualElementSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-    def interpolation(self, u):
-        mesh = self.mesh
-        NN = mesh.number_of_nodes()
-        NE = mesh.number_of_edges()
-        p = self.p
-        ipoint = self.dof.interpolation_points()
-        uI = self.function()
-        uI[:NN+(p-1)*NE] = u(ipoint)
-        if p > 1:
-            phi = self.smspace.basis
-            def f(x, cellidx):
-                return np.einsum(
-                        'ij, ij...->ij...',
-                        u(x), phi(x, cellidx=cellidx, p=p-2))
-            bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
-            uI[NN+(p-1)*NE:] = bb.reshape(-1)
-        return uI
+    def interpolation(self, u, HB=None):
+        if HB is None:
+            mesh = self.mesh
+            NN = mesh.number_of_nodes()
+            NE = mesh.number_of_edges()
+            p = self.p
+            ipoint = self.dof.interpolation_points()
+            uI = self.function()
+            uI[:NN+(p-1)*NE] = u(ipoint)
+            if p > 1:
+                phi = self.smspace.basis
+                def f(x, cellidx):
+                    return np.einsum(
+                            'ij, ij...->ij...',
+                            u(x), phi(x, cellidx=cellidx, p=p-2))
+                bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+                uI[NN+(p-1)*NE:] = bb.reshape(-1)
+            return uI
+        else:
+            uh = self.project_to_smspace(u)
+            uI = self.smspace.interpolation(uh, HB)
+            ldofs = self.smspace.number_of_local_dofs()
+
+            cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+            NC = len(cell2dofLocation) - 1
+            cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+            DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+            f1 = lambda x: x[0]@x[1]
+            uI = np.concatenate(map(f1, zip(DD, uI.reshape(-1, ldots))))
+            area = 1/self.area
+
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
