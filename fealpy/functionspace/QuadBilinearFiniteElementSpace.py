@@ -185,9 +185,16 @@ class QuadBilinearFiniteElementSpace():
         v = np.einsum('imn, ...in->...im', self.bvector, v) # NQ x NC x 2
         xe = np.einsum('imn, ...in->...im', self.cmatrix, v) # NQ x NC x 2
 
+        ctheta = np.cross(self.bvector[:, 0, :], self.bvector[:, 1, :])
+        grad = np.zeros(self.bvector.shape, dtype=np.float)
+        grad[:, 0, 0] = self.bvector[:, 1, 1]
+        grad[:, 0, 1] = -self.bvector[:, 1, 0]
+        grad[:, 1, 0] = -self.bvector[:, 0, 1]
+        grad[:, 1, 1] = self.bvector[:, 0, 0]
+
+        grad[:, 0, :] /= ctheta.reshape(-1, 1)
+        grad[:, 1, :] /= ctheta.reshape(-1, 1)
         shape = v.shape[:-1] + (ldof, GD)
-        h2 = np.sum(self.bvector**2, axis=-1, keepdims=True)
-        grad = self.bvector/h2 # NC x 2 x 2
         gphi = np.zeros(shape, dtype=mesh.ftype)
         gxe = (
                 xe[..., 0, np.newaxis]*grad[np.newaxis, :, 1, :] +
@@ -259,3 +266,35 @@ class QuadBilinearFiniteElementSpace():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
+
+    def stiff_matrix(self, cfun=None):
+        GD = self.mesh.geo_dimension()
+
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        gphi = self.grad_basis(bcs)
+
+        # Compute the element sitffness matrix
+        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, self.cellmeasure, optimize=True)
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs()
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def source_vector(self, f):
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        pp = self.mesh.bc_to_point(bcs)
+        fval = f(pp)
+
+        phi = self.basis(bcs)
+        bb = np.einsum('i, ik, ik..., k->k...', ws, fval, phi, self.cellmeasure)
+        cell2dof = self.cell_to_dof()
+        print(cell2dof.shape)
+        print(bb.shape)
+        gdof = self.number_of_global_dofs()
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b

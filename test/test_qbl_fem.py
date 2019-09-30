@@ -50,13 +50,14 @@ cell = np.array([
 
 pde = CosCosData()
 mesh = QuadrangleMesh(node, cell)
-mesh.uniform_refine(5)
+mesh.uniform_refine(7)
 space = QuadBilinearFiniteElementSpace(mesh)
 
 uI = space.interpolation(pde.solution)
 
 L2 = space.integralalg.L2_error(pde.solution, uI.value)
+print("L2:", L2)
 H1 = space.integralalg.L2_error(pde.gradient, uI.grad_value)
-print(H1)
+print("H1:", H1)
 
 
