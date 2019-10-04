@@ -75,7 +75,7 @@ class PolygonMeshIntegralAlg():
 
     def L2_error(self, u, uh, celltype=False):
         def f(x, cellidx):
-            return (u(x) - uh(x, cellidx))**2
+            return (u(x, cellidx) - uh(x, cellidx))**2
         e = self.integral(f, celltype=celltype)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1

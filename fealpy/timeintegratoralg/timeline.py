@@ -16,6 +16,9 @@ class UniformTimeLine():
     def get_current_time_step(self):
         return self.current
 
+    def get_next_time(self):
+        return self.T0 + self.dt*(self.current)
+
     def get_current_time_step_length(self):
         return self.dt
 
@@ -43,6 +46,9 @@ class ChebyshevTimeLine():
         d = np.zeros(F.shape, dtype=np.float)
         d[..., 1:] = (F[..., 1:] - F[..., 0:-1])/self.dt
         return d
+
+    def get_next_time(self):
+        return self.time[self.current+1]
 
     def time_integral(self, q):
         N = self.NT - 1
