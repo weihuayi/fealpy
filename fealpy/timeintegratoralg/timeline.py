@@ -66,6 +66,13 @@ class ChebyshevTimeLine():
         intq = idct(A, type=1)/2 - 0.25*a[:, [-1]]/(N+1)*theta
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
+    
+    def new_time_integral(self, q):
+        N = self.NT - 1
+        a = dct(q, type=1)/N
+        intq = a[:, 0] + np.sum(2*a[:, 2:N:2]/(1 - np.arange(2, N, 2)**2), axis=-1) + a[:, -1]/(1 - N**2)
+        intq *= 0.5*(self.time[-1] - self.time[0])
+        return intq
 
     def get_number_of_time_steps(self):
         return self.NT

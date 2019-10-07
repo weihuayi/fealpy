@@ -3,7 +3,7 @@ from numpy.linalg import inv
 
 from .function import Function
 from ..common import ranges
-from .dof import CPLFEMDof2d, DPLFEMDof2d 
+from .femdof import CPLFEMDof2d, DPLFEMDof2d 
 from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh 
 
 class SurfaceLagrangeFiniteElementSpace:
