@@ -549,6 +549,9 @@ class CosCosData:
     def __init__(self):
         pass
 
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+
     def init_mesh(self, n=4, meshtype='tri', h=0.1):
         """ generate the initial mesh
         """
