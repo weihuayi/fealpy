@@ -3,15 +3,32 @@ import numpy as np
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.functionspace import ConformingVirtualElementSpace2d
 from fealpy.mesh.simple_mesh_generator import triangle
-from 
+from scipy.sparse.linalg import spsolve
 
-
+maxit = 6
+p = 4
 pde = CosCosData()
 domain = pde.domain()
-h = 0.1
-mesh = triangle(domain, h, meshtype='polygon')
+h = 0.2
+error = np.zeros(maxit)
 
-space = ConformingVirtualElementSpace2d(mesh, p=1, q=4)
+for i in range(maxit):
+    print(i)
+    mesh = triangle(domain, h, meshtype='polygon')
+    space = ConformingVirtualElementSpace2d(mesh, p=p, q=p+3)
+    M = space.mass_matrix()
+    F = space.source_vector(pde.solution)
 
-M = space.mass_matrix()
+    uh = space.function()
+    uh[:] = spsolve(M, F).reshape(-1)
+
+    sh = space.project_to_smspace(uh)
+
+    def efun(x, cellidx=None):
+        return (pde.solution(x) - sh(x, cellidx))**2
+
+    error[i] = np.sqrt(space.integralalg.error(efun))
+    h /= 2
+
+print(error[:-1]/error[1:])
 

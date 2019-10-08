@@ -67,6 +67,17 @@ class PolygonMeshIntegralAlg():
             return f(x)
         return self.integral(u, celltype)
 
+    def error(self, efun, celltype=False):
+        e = self.integral(efun, celltype=celltype)
+        if isinstance(e, np.ndarray):
+            n = len(e.shape) - 1
+            if n > 0:
+                for i in range(n):
+                    e = e.sum(axis=-1)
+        if celltype is False:
+            e = e.sum()
+        return e
+
     def L1_error(self, u, uh, celltype=False):
         def f(x, cellidx):
             return np.abs(u(x) - uh(x, cellidx))
