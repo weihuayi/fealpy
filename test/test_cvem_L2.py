@@ -11,7 +11,6 @@ pde = CosCosData()
 domain = pde.domain()
 h = 0.2
 error = np.zeros(maxit)
-
 for i in range(maxit):
     print(i)
     mesh = triangle(domain, h, meshtype='polygon')
