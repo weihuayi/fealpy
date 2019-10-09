@@ -67,7 +67,7 @@ class PolygonMeshIntegralAlg():
             return f(x)
         return self.integral(u, celltype)
 
-    def error(self, efun, celltype=False):
+    def error(self, efun, celltype=False, power=None):
         e = self.integral(efun, celltype=celltype)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
@@ -76,7 +76,11 @@ class PolygonMeshIntegralAlg():
                     e = e.sum(axis=-1)
         if celltype is False:
             e = e.sum()
-        return e
+
+        if power is not None:
+            return power(e)
+        else:
+            return e
 
     def L1_error(self, u, uh, celltype=False):
         def f(x, cellidx):
@@ -85,8 +89,9 @@ class PolygonMeshIntegralAlg():
         return e
 
     def L2_error(self, u, uh, celltype=False):
+        #TODO: deal with u is a discrete Function 
         def f(x, cellidx):
-            return (u(x, cellidx) - uh(x, cellidx))**2
+            return (u(x) - uh(x, cellidx))**2
         e = self.integral(f, celltype=celltype)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1

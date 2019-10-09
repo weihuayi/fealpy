@@ -6,7 +6,7 @@ from fealpy.mesh.simple_mesh_generator import triangle
 from scipy.sparse.linalg import spsolve
 
 maxit = 6
-p = 4
+p = 2
 pde = CosCosData()
 domain = pde.domain()
 h = 0.2
@@ -27,7 +27,7 @@ for i in range(maxit):
     def efun(x, cellidx=None):
         return (pde.solution(x) - sh(x, cellidx))**2
 
-    error[i] = np.sqrt(space.integralalg.error(efun))
+    error[i] = space.integralalg.error(efun, power=np.sqrt)
     h /= 2
 
 print(error[:-1]/error[1:])
