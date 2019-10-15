@@ -54,7 +54,8 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
     if isinstance(plot, ModuleType):
         fig = plot.figure()
         fig.set_facecolor('white')
-        axes = fig.gca() 
+        axes = fig.gca()
+       
     else:
         axes = plot
     if optionlist is None:
