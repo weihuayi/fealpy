@@ -317,9 +317,8 @@ class LagrangeFiniteElementSpace():
 
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
-        uI = Function(self, dim=dim)
-        uI[:] = u(ipoint)
-        return uI
+        uI = u(ipoint)
+        return self.function(dim=dim, array=uI)
 
     def projection(self, u, up):
         pass
