@@ -20,7 +20,7 @@ mesh = ialg.run('interfacemesh')
 
 alg = SurfaceTriangleMeshOptAlg(surface, mesh, gamma=1, theta=0.1)
 
-isNonDelaunayEdge = alg.run(10)
+isNonDelaunayEdge = alg.run(100)
 
 NC = mesh.number_of_cells()
 NN = mesh.number_of_nodes()
@@ -33,7 +33,7 @@ isNonDelaunayCell[edge2cell[isNonDelaunayEdge, 0:2]] = True
 
 mesh0 = TriangleMesh(node, cell[isNonDelaunayCell])
 
-fig = plt.figure() 
+fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')
-mesh0.add_plot(axes)
+mesh.add_plot(axes)
 plt.show()

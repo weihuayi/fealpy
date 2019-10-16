@@ -15,7 +15,7 @@ class SurfaceTriangleMeshOptAlg:
             mesh.edge_swap()
 
         print('CVT smoothing:')
-        for i in range(1):
+        for i in range(maxit):
             print(i)
             mesh.node = self.cvt_smoothing()
             print('test')
