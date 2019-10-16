@@ -21,33 +21,29 @@ class AdaptiveMarker():
 
 
 node = np.array([
-    (0, 0.5), 
-    (0.865, 0), 
-    (1.73, 0.5),
-    (0.865, 1)], dtype=np.float)
+    (0, 0), 
+    (1, 0), 
+    (1, 1),
+    (0, 1)], dtype=np.float)
 cell = np.array([
-    (1, 2, 3),
-    (3, 0, 1)], dtype=np.int)
+    (1, 2, 0),
+    (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
 tmesh.uniform_refine(0)
 
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
+ismarkedcell = np.array([True, False])
 tritree = Tritree(node, cell, irule=1)
-marker = AdaptiveMarker()
+tritree.refine(ismarkedcell)
+pmesh = tritree.to_conformmesh()
 
-for i in range(1):
-    tritree.refine(marker)
-
-
-
-a = np.array([2, 4], dtype=np.int)
 fig = plt.figure()
 axes = fig.gca()
-tritree.add_plot(axes)
+tmesh.add_plot(axes, cellcolor='w', linewidths=1.5)
 #tritree.find_node(axes, showindex=True)
-tritree.find_cell(axes, index=a)
+#tmesh.find_cell(axes, showindex=True)
 #tritree.find_edge(axes, showindex=True) 
 plt.show()
 
