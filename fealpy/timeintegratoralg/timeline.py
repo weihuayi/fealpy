@@ -22,6 +22,9 @@ class UniformTimeLine():
     def get_current_time_step_length(self):
         return self.dt
 
+    def get_time_step_length(self):
+        return self.dt
+
     def stop(self):
         return self.current >= self.NT - 1
 
