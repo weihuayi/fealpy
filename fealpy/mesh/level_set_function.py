@@ -346,11 +346,14 @@ class HeartSurface:
         return J
 
 
-    def init_mesh(self):
+    def init_mesh(self, f=None):
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
  
-        data = sio.loadmat('../../fealpy/data/heart2697.mat')
+        if f is None:
+            data = sio.loadmat('../../fealpy/data/heart2697.mat')
+        else:
+            data = sio.loadmat(f)
         node = data['node']
         cell = data['elem'] - 1
         return TriangleMesh(node, cell)
