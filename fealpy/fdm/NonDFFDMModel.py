@@ -1,6 +1,6 @@
 import numpy as np
 import time
-import h5py
+#import h5py
 import pickle
 import sys
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
