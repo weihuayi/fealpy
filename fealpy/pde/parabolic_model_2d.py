@@ -136,15 +136,22 @@ class SpaceMeasureDiracSourceData:
         return val
 
     def gradient(self, p, t):
+
+        val = np.zeros(p.shape, dtype=p.dtype)
         pi = np.pi
         cos = np.cos
         sin = np.sin
 
         gt = 1 - np.exp(-500*(t - 0.5)^2)
         p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
-        val = x - p0
-        r = -1/(2*pi*np.sum(g**2, axis=-1))*gt
-        val *= r[..., np.newaxis]
+        x = p - p0
+        r = -1/(2*pi*np.sum(x**2, axis=-1))*gt
+
+        val[..., 0] = r*gt*x[..., 0]
+        val[..., 1] = r*gt*x[..., 1]
+
+#        r = -1/(2*pi*np.sum(g**2, axis=-1))*gt
+#        val *= r[..., np.newaxis]
         return val
 
     def source(self, p, t):
@@ -185,3 +192,67 @@ class SpaceMeasureDiracSourceData:
         x = p[..., 0]
         y = p[..., 1]
         return (x < eps) | (x > 1.0 - eps) | (y < eps) | (z > 1.0 - eps)
+
+
+class TimeMeasureDiracSourceData:
+    def __init__(self):
+        pass
+
+    def domain(self):
+        points = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+        facets = [(0, 1), (1, 2), (2, 3), (3, 0)]
+        return points, facets
+
+    def time_mesh(self, t0, t1, N): ##???
+        return UniformTimeLine(t0, t1, N)
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1)], dtype=np.float)
+
+        if meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype is 'tritree':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = Tritree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        else:
+            raise ValueError("I don't know the meshtype %s".format(meshtype))
+
+    def init_value(self, p):
+        return self.solution(p, 0.0)
+
+    def solution(self, p, t):
+        """ The exact solution
+        """
+        if t < 0.5:
+            t0 = t**2
+        else:
+            t0 = t**2 + 2*t
+        
+        r = np.sum((p - (t - 0.5))**2, axis=-1)
+        val = 0.1*np.exp(-25*r)*t0
+        return val
+
+
+    def gradient(self, p, t):
+
+        gt = 1 - np.exp(-500*(t - 0.5)^2)
+        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
+        val = x - p0
+        r = -1/(2*pi*np.sum(g**2, axis=-1))*gt
+        val *= r[..., np.newaxis]
+        return val
+
