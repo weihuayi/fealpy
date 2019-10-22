@@ -166,8 +166,8 @@ class SpaceMeasureDiracSourceData:
         gt = -250*(2*t - 1.0)*np.exp(-500*(t - 0.5)^2)/pi
         p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
         r = np.sqrt(np.sum((p - p0)**2, axis=-1))
-        val = np.log(r)*log(r)
-        return 0.0
+        val = gt*np.log(r)
+        return val
 
     def dirac_source(self, p, t):
         pi = np.pi
@@ -249,10 +249,50 @@ class TimeMeasureDiracSourceData:
 
     def gradient(self, p, t):
 
-        gt = 1 - np.exp(-500*(t - 0.5)^2)
-        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
-        val = x - p0
-        r = -1/(2*pi*np.sum(g**2, axis=-1))*gt
-        val *= r[..., np.newaxis]
+        val = np.zeros(p.shape, dtype=p.dtype)
+        pi = np.pi
+        x = p - (t - 0.5)
+        gt = 0.1*np.exp(-25*np.sum(x**2, axis=-1))
+        g0 = -25/(np.sum(x**2, axis=-1))
+
+        if t < 0.5:
+            val[..., 0] = g0*gt*x[..., 0]*t**2
+            val[..., 1] = g0*gt*x[..., 1]*t**2
+        else:
+            val[..., 0] = g0*gt*x[..., 0]*(t**2 + 2*t)
+            val[..., 1] = g0*gt*x[..., 1]*(t**2 + 2*t)
+
         return val
+
+    def source(self, p, t):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object, N*2
+        """
+        val = 0.0
+        return val
+
+    def dirac_source(self, p, t):
+
+        gt = 0.1*np.exp(-25*np.sum((p - (t - 0.5))**2, axis=-1))
+        p0 = 1/2 
+        return gt, p0
+
+    def dirichlet(self, p, t):
+        """ Dilichlet boundary condition
+        """
+        return 0.0
+
+    def neuman(self, p, t):
+        """ Neuman boundary condition
+        """
+        return 0.0
+
+    def is_dirichlet_boundary(self, p):
+        eps = 1e-14
+        x = p[..., 0]
+        y = p[..., 1]
+        return (x < eps) | (x > 1.0 - eps) | (y < eps) | (z > 1.0 - eps)
+
+
 
