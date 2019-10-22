@@ -6,10 +6,14 @@ from ..mesh.QuadrangleMesh import QuadrangleMesh
 from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 
+from ..timeintegratoralg.timeline import UniformTimeLine
 
 class SinCosExpData:
     def __init__(self):
         self.diffusion_coefficient = 1.0/3.0
+
+    def time_mesh(self, t0, t1, N):
+        return UniformTimeLine(t0, t1, N)
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
@@ -87,6 +91,9 @@ class SpaceMeasureDiracSourceData:
         facets = [(0, 1), (1, 2), (2, 3), (3, 0)]
         return points, facets
 
+    def time_mesh(self, t0, t1, N):
+        return UniformTimeLine(t0, t1, N)
+
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
             (-1, -1),
@@ -122,8 +129,8 @@ class SpaceMeasureDiracSourceData:
         cos = np.cos
         sin = np.sin
 
-        gt = 1 - np.exp(-500*(t - 0.5)^2)
-        p0 = np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
+        gt = 1 - np.exp(-500*(t - 0.5)**2)
+        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
         r = np.sqrt(np.sum((p - p0)**2, axis=-1))
         val = -0.5*np.log(r)*gt/pi
         return val
@@ -133,12 +140,8 @@ class SpaceMeasureDiracSourceData:
         cos = np.cos
         sin = np.sin
 
-        pi = np.pi
-        cos = np.cos
-        sin = np.sin
-
         gt = 1 - np.exp(-500*(t - 0.5)^2)
-        p0 = np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
+        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
         val = x - p0
         r = -1/(2*pi*np.sum(g**2, axis=-1))*gt
         val *= r[..., np.newaxis]
@@ -149,7 +152,23 @@ class SpaceMeasureDiracSourceData:
         INPUT:
             p: array object, N*2
         """
+        pi = np.pi
+        cos = np.cos
+        sin = np.sin
+
+        gt = -250*(2*t - 1.0)*np.exp(-500*(t - 0.5)^2)/pi
+        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
+        r = np.sqrt(np.sum((p - p0)**2, axis=-1))
+        val = np.log(r)*log(r)
         return 0.0
+
+    def dirac_source(self, p, t):
+        pi = np.pi
+        cos = np.cos
+        sin = np.sin
+        gt = 1 - np.exp(-500*(t - 0.5)^2)
+        p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
+        return gt, p0
 
     def dirichlet(self, p, t):
         """ Dilichlet boundary condition
@@ -162,9 +181,7 @@ class SpaceMeasureDiracSourceData:
         return 0.0
 
     def is_dirichlet_boundary(self, p):
-        eps = 1e-14 
-        return (p[:, 0] < eps) | (p[:, 0] > 1.0 - eps) 
-
-    def is_neuman_boundary(self, p):
         eps = 1e-14
-        return (p[:, 1] < eps) | (p[:, 1] > 1.0 - eps)
+        x = p[..., 0]
+        y = p[..., 1]
+        return (x < eps) | (x > 1.0 - eps) | (y < eps) | (z > 1.0 - eps)
