@@ -2,6 +2,7 @@ import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Quadtree import Quadtree
+from ..mesh.QuadrangleMesh import QuadrangleMesh
 from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 
@@ -548,6 +549,9 @@ class CosCosData:
     def __init__(self):
         pass
 
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+
     def init_mesh(self, n=4, meshtype='tri', h=0.1):
         """ generate the initial mesh
         """
@@ -560,6 +564,23 @@ class CosCosData:
         if meshtype is 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        if meshtype is 'quad':
+            node = np.array([
+                (0, 0),
+                (1, 0),
+                (1, 1),
+                (0, 1),
+                (0.5, 0),
+                (1, 0.4),
+                (0.3, 1),
+                (0, 0.6),
+                (0.5, 0.45)], dtype=np.float)
+            cell = np.array([
+                (0, 4, 8, 7), (4, 1, 5, 8),
+                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int)
+            mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype is 'tri':

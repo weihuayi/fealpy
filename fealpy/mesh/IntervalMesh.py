@@ -3,7 +3,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
-from ..quadrature import IntervalQuadrature
+from ..quadrature import GaussLegendreQuadrature 
 
 class IntervalMesh():
     def __init__(self, node, cell):
@@ -20,7 +20,7 @@ class IntervalMesh():
 
 
     def integrator(self, k):
-        return IntervalQuadrature(k)
+        return GaussLegendreQuadrature(k)
 
     def number_of_nodes(self):
         return self.ds.NN

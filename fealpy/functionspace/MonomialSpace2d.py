@@ -6,9 +6,9 @@ from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 
 
-class SMDof2d():
+class MDof2d():
     """
-    缩放单项式空间自由度管理类
+    单项式空间自由度管理类
     """
     def __init__(self, mesh, p):
         self.mesh = mesh
@@ -54,21 +54,16 @@ class SMDof2d():
         return NC*ldof
 
 
-class ScaledMonomialSpace2d():
-    def __init__(self, mesh, p, q=None, bc=None):
+class MonomialSpace2d():
+    def __init__(self, mesh, p, q=None):
         """
         The Scaled Momomial Space in R^2
         """
 
         self.mesh = mesh
-        if bc is None:
-            self.barycenter = mesh.entity_barycenter('cell')
-        else:
-            self.barycenter = bc
         self.p = p
         self.area = mesh.entity_measure('cell')
-        self.h = np.sqrt(self.area)
-        self.dof = SMDof2d(mesh, p)
+        self.dof = MDof2d(mesh, p)
         self.GD = 2
 
         if q is None:
@@ -80,10 +75,20 @@ class ScaledMonomialSpace2d():
                 self.integrator,
                 self.mesh,
                 area=self.area,
-                barycenter=mesh.entity_barycenter('cell'))
+                barycenter=mesh.entity_barycenter('cell')) 
 
-        self.itype = self.mesh.itype
-        self.ftype = self.mesh.ftype
+    def projection(self, F):
+        """
+        F is a function in ScaledMonomialSpace2d, here project  F to
+        MonomialSpace2d.
+        """
+        smspace = F.space
+        C = self.matrix_C(smspace)
+        H = self.matrix_H()
+        PI0 = inv(H)@C
+        SS = self.function()
+        SS[:] = np.einsum('ikj, ij->ik', PI0, F[self.cell_to_dof()]).reshape(-1)
+        return SS
 
     def geo_dimension(self):
         return self.GD
@@ -120,10 +125,10 @@ class ScaledMonomialSpace2d():
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)
         if cellidx is None:
             assert(point.shape[-2] == NC)
-            phi[..., 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+            phi[..., 1:3] = point
         else:
             assert(point.shape[-2] == len(cellidx))
-            phi[..., 1:3] = (point - self.barycenter[cellidx])/h[cellidx].reshape(-1, 1)
+            phi[..., 1:3] = point
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -145,7 +150,6 @@ class ScaledMonomialSpace2d():
     def grad_basis(self, point, cellidx=None, p=None):
         if p is None:
             p = self.p
-        h = self.h
         ldof = self.number_of_local_dofs(p=p)
         shape = point.shape[:-1]+(ldof, 2)
         gphi = np.zeros(shape, dtype=np.float)
@@ -159,13 +163,7 @@ class ScaledMonomialSpace2d():
                 gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
                 gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
                 start += i+1
-        if cellidx is None:
-            return gphi/h.reshape(-1, 1, 1)
-        else:
-            if point.shape[-2] == len(cellidx):
-                return gphi/h[cellidx].reshape(-1, 1, 1)
-            elif point.shape[0] == len(cellidx):
-                return gphi/h[cellidx].reshape(-1, 1, 1, 1)
+        return gphi
 
     def grad_value(self, uh, point, cellidx=None):
         gphi = self.grad_basis(point, cellidx=cellidx)
@@ -181,10 +179,8 @@ class ScaledMonomialSpace2d():
     def laplace_basis(self, point, cellidx=None, p=None):
         if p is None:
             p = self.p
-        area = self.area
 
         ldof = self.number_of_local_dofs()
-
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
@@ -197,11 +193,7 @@ class ScaledMonomialSpace2d():
                 lphi[..., start+2:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 start += i+1
 
-        if cellidx is None:
-            return lphi/area.reshape(-1, 1)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return lphi/area[cellidx].reshape(-1, 1)
+        return lphi/area.reshape(-1, 1)
 
     def hessian_basis(self, point, cellidx=None, p=None):
         """
@@ -220,9 +212,7 @@ class ScaledMonomialSpace2d():
         if p is None:
             p = self.p
 
-        area = self.area
         ldof = self.number_of_local_dofs()
-
         shape = point.shape[:-1]+(ldof, 3)
         hphi = np.zeros(shape, dtype=np.float)
         if p > 1:
@@ -238,11 +228,7 @@ class ScaledMonomialSpace2d():
                 hphi[..., start+1:start+i, 2] = np.einsum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
                 start += i+1
 
-        if cellidx is None:
-            return hphi/area.reshape(-1, 1, 1)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return hphi/area[cellidx].reshape(-1, 1, 1)
+        return hphi/area.reshape(-1, 1, 1)
 
     def laplace_value(self, uh, point, cellidx=None):
         lphi = self.laplace_basis(point, cellidx=cellidx)
@@ -294,9 +280,9 @@ class ScaledMonomialSpace2d():
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
         nm = mesh.edge_normal()
-        b = node[edge[:, 0]] - self.barycenter[edge2cell[:, 0]]
+        b = node[edge[:, 0]]
         H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-        b = node[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]]
+        b = node[edge[isInEdge, 0]]
         H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
         ldof = self.number_of_local_dofs()
@@ -309,70 +295,12 @@ class ScaledMonomialSpace2d():
         H /= q + q.reshape(-1, 1) + 2
         return H
 
-    def projection(self, F):
-        """
-        F is a function in MonomialSpace2d, this function project  F to 
-        ScaledMonomialSpace2d.
-        """
-        mspace = F.space
-        C = self.matrix_C(mspace)
-        H = self.matrix_H()
-        PI0 = inv(H)@C
-        SS = self.function()
-        SS[:] = np.einsum('ikj, ij->ik', PI0, F[self.cell_to_dof()]).reshape(-1)
-        return SS
-
-    def matrix_C(self, mspace):
+    def matrix_C(self, smspace):
         def f(x, cellidx):
             return np.einsum(
                     '...im, ...in->...imn',
                     self.basis(x, cellidx),
-                    mspace.basis(x, cellidx)
+                    smspace.basis(x, cellidx)
                     )
         C = self.integralalg.integral(f, celltype=True)
         return C
-
-    def interpolation(self, sh0, HB):
-        """
-         interpolation sh in space into self space.
-        """
-        p = self.p
-        ldofs = self.number_of_local_dofs()
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-
-        space0 = sh0.space
-        h0 = space0.h
-
-        space1 = self
-        h1 = space1.h
-        sh1 = space1.function()
-
-        bc = (space1.barycenter[HB[:, 0]] - space0.barycenter[HB[:,
-            1]])/h0[HB[:, [1]]]
-        h = h1[HB[:, 0]]/h0[HB[:, 1]]
-
-        c = sh0.reshape(-1, ldofs)
-        d = sh1.reshape(-1, ldofs)
-
-        num = np.zeros(NC, dtype=self.itype)
-        np.add.at(num, HB[:, 0], 1)
-
-        m = HB.shape[0]
-        td = np.zeros((m, ldofs), dtype=self.ftype)
-
-        td[:, 0] = c[HB[:, 1], 0] + c[HB[:, 1], 1]*bc[:, 0] + c[HB[:, 1], 2]*bc[:, 1]
-        td[:, 1] = h*c[HB[:, 1], 1]
-        td[:, 2] = h*c[HB[:, 1], 2]
-
-        if p > 1:
-            td[:, 0] += c[HB[:, 1], 3]*bc[:, 0]**2 + c[HB[:, 1], 4]*bc[:, 0]*bc[:, 1] + c[HB[:, 1], 5]*bc[:, 1]**2
-            td[:, 1] += 2*c[HB[:, 1], 3]*bc[:, 0]*h + c[HB[:, 1], 4]*bc[:, 1]*h
-            td[:, 2] += c[HB[:, 1], 4]*bc[:, 0]*h + 2*c[HB[:, 1], 5]*bc[:, 1]*h
-            td[:, 3] = c[HB[:, 1], 3]*h**2
-            td[:, 4] = c[HB[:, 1], 4]*h**2
-            td[:, 5] = c[HB[:, 1], 5]*h**2
-
-        np.add.at(d, (HB[:, 0], np.s_[:]), td)
-        d /= num.reshape(-1, 1)
-        return sh1

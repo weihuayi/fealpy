@@ -3,6 +3,7 @@ import numpy as np
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .QuadrangleMesh import QuadrangleMesh 
 from .HexahedronMesh import HexahedronMesh 
+from .TetrahedronMesh import TetrahedronMesh
 from .PolygonMesh import PolygonMesh 
 
 from .level_set_function import DistDomain2d, DistDomain3d
@@ -176,6 +177,46 @@ def unitcircledomainmesh(h0, meshtype='tri', dtype=np.float):
         mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
+
+def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex'):
+    N = (nx+1)*(ny+1)*(nz+1)
+    NC = nx*ny*nz
+    node = np.zeros((N, 3), dtype=np.float)
+    X, Y, Z = np.mgrid[
+            box[0]:box[1]:complex(0, nx+1), 
+            box[2]:box[3]:complex(0, ny+1),
+            box[4]:box[5]:complex(0, nz+1)
+            ]
+    node[:, 0] = X.flatten()
+    node[:, 1] = Y.flatten()
+    node[:, 2] = Z.flatten()
+
+    idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
+    c = idx[:-1, :-1, :-1]
+
+    cell = np.zeros((NC, 8), dtype=np.int)
+    nyz = (ny + 1)*(nz + 1)
+    cell[:, 0] = c.flatten()
+    cell[:, 1] = cell[:, 0] + nyz
+    cell[:, 2] = cell[:, 1] + nz + 1
+    cell[:, 3] = cell[:, 0] + nz + 1
+    cell[:, 4] = cell[:, 0] + 1
+    cell[:, 5] = cell[:, 4] + nyz
+    cell[:, 6] = cell[:, 5] + nz + 1
+    cell[:, 7] = cell[:, 4] + nz + 1
+    if meshtype is 'hex':
+        return HexahedronMesh(node, cell)
+    elif meshtype is 'tet':
+        localCell = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
+        cell = cell[:, localCell].reshape(-1, 4)
+        return TetrahedronMesh(node, cell)
+
 
 def cubehexmesh(cube, nx=10, ny=10, nz=10):
     N = (nx+1)*(ny+1)*(nz+1)

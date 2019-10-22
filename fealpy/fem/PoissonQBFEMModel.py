@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from ..functionspace import QuadBilinearFiniteElementSpace
 from .integral_alg import IntegralAlg
 
 from ..boundarycondition import DirichletBC
@@ -10,9 +10,9 @@ from scipy.sparse.linalg import spsolve
 from timeit import default_timer as timer
 
 
-class PoissonFEMModel(object):
-    def __init__(self, pde, mesh, p, q=3):
-        self.space = LagrangeFiniteElementSpace(mesh, p, q=q)
+class PoissonQBFEMModel(object):
+    def __init__(self, pde, mesh, q=3):
+        self.space = QuadBilinearFiniteElementSpace(mesh, q=q)
         self.mesh = self.space.mesh
         self.pde = pde
         self.uh = self.space.function()

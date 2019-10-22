@@ -8,13 +8,13 @@ class QiModel3d():
         from ..mesh import TetrahedronMesh
         node = np.array([
             [0, 0, 0],
-            [1, 0, 0], 
+            [1, 0, 0],
             [1, 1, 0],
             [0, 1, 0],
             [0, 0, 1],
-            [1, 0, 1], 
+            [1, 0, 1],
             [1, 1, 1],
-            [0, 1, 1]], dtype=np.float) 
+            [0, 1, 1]], dtype=np.float)
 
         cell = np.array([
             [0,1,2,6],

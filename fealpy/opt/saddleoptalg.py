@@ -62,7 +62,7 @@ class AndersonAccelerationAlg:
                 self.fun.output(str(self.NF).zfill(6), queue=queue)
             self.NF += 1
 
-            if (maxg < options['NormGradTol']):
+            if (maxg < options['NormGradTol']) or (self.diff < options['FunValDiff']):
                 print("""
                 The max norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)
@@ -131,7 +131,7 @@ class SteepestDescentAlg:
                 self.fun.output(str(self.NF).zfill(6), queue=queue)
             self.NF += 1
 
-            if (maxg < options['NormGradTol']):
+            if (maxg < options['NormGradTol']) or (self.diff < options['FunValDiff']):
                 print("""
                 The max norm of gradeint value : %12.11g (the tol  is %12.11g)
                 The difference of function : %12.11g (the tol is %12.11g)

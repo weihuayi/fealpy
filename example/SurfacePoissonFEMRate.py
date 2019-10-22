@@ -27,7 +27,7 @@ elif m == 4:
     surface = model.surface 
     mesh = surface.init_mesh()
 
-maxit = 4
+maxit = 7
 errorType = ['$|| u_I - u_h ||_{l_2}$',
              '$|| u - u_h||_{S,0}$',
              '$||\\nabla_S u - \\nabla_S u_h||_{S, 0}$'

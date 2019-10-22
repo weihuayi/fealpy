@@ -65,7 +65,7 @@ class HuZhangFiniteElementSpace():
         """
         p = self.p
         gdim = self.geo_dimension()
-        tdim = self.tensor_dimension() 
+        tdim = self.tensor_dimension()
 
         mesh = self.mesh
 
@@ -425,7 +425,7 @@ class HuZhangFiniteElementSpace():
                 TF = np.einsum('ijk, kmn->ijmn', self.TF[cell2face[:, i]], self.T)
                 uI[cell2dof[:, isDof, :]] = np.einsum('ikmn, ijmn->ikj', val[..., isDof, :, :], TF) 
         return uI
-        
+ 
         def function(self, dim=None):
             f = Function(self)
         return f
