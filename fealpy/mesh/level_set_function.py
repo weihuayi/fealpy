@@ -350,10 +350,10 @@ class HeartSurface:
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
  
-        data = sio.loadmat('../data/heartsurfaceopt.mat')
-        point = data['node']
+        data = sio.loadmat('../../fealpy/data/heart2697.mat')
+        node = data['node']
         cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        return TriangleMesh(node, cell)
 
 class EllipsoidSurface:
     def __init__(self, c=[9, 3, 1]):
