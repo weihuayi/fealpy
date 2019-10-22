@@ -1,39 +1,38 @@
 import numpy as np
 
-def project(surface, p0, maxit=200, tol=1e-8):
+def project(surface, p0, maxit=200, tol=1e-12):
     eps = np.finfo(float).eps
     p = p0
     value = surface(p)
     s = np.sign(value)
     grad = surface.gradient(p)
-    lg = np.sum(grad**2, axis=-1, keepdims=True)  
+    lg = np.sum(grad**2, axis=-1, keepdims=True)
     grad /= lg
     grad *= value[..., np.newaxis]
-    pp = p - grad 
+    pp = p - grad
     v = s[..., np.newaxis]*(pp - p0)
     d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
     d *= s[..., np.newaxis]
 
     g = surface.gradient(pp)
     g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-    g *= d 
-    p = p0 - g 
-    
+    g *= d
+    p = p0 - g
     k = 0
     while True:
         value = surface(p)
         grad = surface.gradient(p)
-        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
+        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
         grad /= lg
 
         v = s[..., np.newaxis]*(p0 - p)
         d = np.sqrt(np.sum(v**2, axis=-1))
-        isOK = d < eps
+        isOK = d < tol
         v[isOK] = grad[isOK]
         v[~isOK] /= d[~isOK][..., np.newaxis]
         d *= s
 
-        ev = grad - v 
+        ev = grad - v
         e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
         if e < tol:
             break
@@ -51,7 +50,7 @@ def project(surface, p0, maxit=200, tol=1e-8):
             g = surface.gradient(pp)
             g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
             g *= d
-            p = p0 - g 
+            p = p0 - g
     return p, d
 
 class Sphere(object):
@@ -298,14 +297,17 @@ class HeartSurface:
         return J
 
 
-    def init_mesh(self):
+    def init_mesh(self, f=None):
         import scipy.io as sio
         from .TriangleMesh import TriangleMesh
  
-        data = sio.loadmat('../data/heartsurfaceopt.mat')
-        point = data['node']
+        if f is None:
+            data = sio.loadmat('../../fealpy/data/heart2697.mat')
+        else:
+            data = sio.loadmat(f)
+        node = data['node']
         cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        return TriangleMesh(node, cell)
 
 class EllipsoidSurface:
     def __init__(self, c=[9, 3, 1]):

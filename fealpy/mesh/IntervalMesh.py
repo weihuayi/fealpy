@@ -64,7 +64,7 @@ class IntervalMesh():
     def geo_dimension(self):
         node = self.node
         if len(node.shape) == 1:
-            return 1 
+            return 1
         else:
             return node.shape[-1]
 
@@ -110,63 +110,68 @@ class IntervalMesh():
             NC = self.number_of_cells()
             node = self.entity('node')
             cell = self.entity('cell')
+            print(cell)
+            print(node)
             cell2newNode = np.arange(NN, NN+NC)
-            newNode = (node[cell[:,0]] + node[cell[:,1]])/2
-            self.node = np.r_['-1', node, newNode] 
-            p = np.r_['-1', cell, cell2newNode.reshape(-1,1)] 
-            cell = np.r_['0', p[:, [0, 2]], p[:, [2, 1]]] 
+            newNode = (node[cell[:, 0]] + node[cell[:, 1]])/2
+            self.node = np.r_['0', node, newNode]
+            p = np.r_['-1', cell, cell2newNode.reshape(-1,1)]
+            ncell = np.zeros((2*NC, 2), dtype=np.int)
+            ncell[0:NC, 0] = cell[:, 0]
+            ncell[0:NC, 1] = range(NN, NN+NC)
+            ncell[NC:, 0] = range(NN, NN+NC)
+            ncell[NC:, 1] = cell[:, 1]
             NN = self.node.shape[0]
-            self.ds.reinit(NN, cell)
+            self.ds.reinit(NN, ncell)
 
 
 
 
     def add_plot(self, plot,
             nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,  
+            aspect='equal', linewidths=1, markersize=20,
             showaxis=False):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca() 
+            axes = fig.gca()
         else:
             axes = plot
         return show_mesh_1d(axes, self,
                 nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,  
+                linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=200, 
+            color='r', markersize=200,
             fontsize=24, fontcolor='k'):
 
         if node is None:
             node = self.node
-        find_node(axes, node, 
-                index=index, showindex=showindex, 
+        find_node(axes, node,
+                index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
 
-    def find_edge(self, axes, 
+    def find_edge(self, axes,
             index=None, showindex=False,
-            color='g', markersize=400, 
+            color='g', markersize=400,
             fontsize=24, fontcolor='k'):
 
         find_entity(axes, self, entity='edge',
-                index=index, showindex=showindex, 
+                index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
-    def find_cell(self, axes, 
+    def find_cell(self, axes,
             index=None, showindex=False,
-            color='y', markersize=800, 
+            color='y', markersize=800,
             fontsize=24, fontcolor='k'):
-        
         find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex, 
+                index=index, showindex=showindex,
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
