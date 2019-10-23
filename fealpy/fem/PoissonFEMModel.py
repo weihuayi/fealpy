@@ -1,12 +1,8 @@
 import numpy as np
 
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from .integral_alg import IntegralAlg
-
 from ..boundarycondition import DirichletBC
-
 from scipy.sparse.linalg import spsolve
-
 from timeit import default_timer as timer
 
 
