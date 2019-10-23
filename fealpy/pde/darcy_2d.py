@@ -99,10 +99,10 @@ class CoscosData:
         return val
 
 class PolynormialData:
-    def __init__(self, box):
+    def __init__(self, box, mu, k):
         self.box = box
-        self.mu = 2
-        self.k = 1
+        self.mu = mu
+        self.k = k
 
     def init_mesh(self, nx, ny):
         box = self.box
