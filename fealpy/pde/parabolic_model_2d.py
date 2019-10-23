@@ -142,7 +142,7 @@ class SpaceMeasureDiracSourceData:
         cos = np.cos
         sin = np.sin
 
-        gt = 1 - np.exp(-500*(t - 0.5)^2)
+        gt = 1 - np.exp(-500*(t - 0.5)**2)
         p0 = 0.4*np.array([cos(2*pi*t), sin(2*pi*t)], dtype=p.dtype)
         x = p - p0
         r = -1/(2*pi*np.sum(x**2, axis=-1))*gt

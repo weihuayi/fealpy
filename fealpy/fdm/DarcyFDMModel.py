@@ -3,8 +3,8 @@ import csv
 from scipy.sparse import coo_matrix, csr_matrix, eye, hstack, vstack, bmat, spdiags
 import scipy.sparse
 from ..fem.integral_alg import IntegralAlg
-from scipy.sparse.linalg import cg, inv, dsolve
-from mumps import spsolve
+from scipy.sparse.linalg import cg, inv, dsolve, spsolve
+#from mumps import spsolve
 class DarcyFDMModel():
     def __init__(self, pde, mesh):
         self.pde = pde
@@ -140,20 +140,19 @@ class DarcyFDMModel():
         
 
         b[NE] = self.ph[0]
-        K = AD.todense()
         # solve
 
         x[:] = spsolve(AD, b)
 
         # solve
-        from mumps import DMumpsContext
-        ctx = DMumpsContext()
-        if ctx.myid == 0:
-            ctx.set_centralized_sparse(AD.tocoo())
-            x = b.copy()
-            ctx.set_rhs(x)
-        ctx.set_silent()
-        ctx.run(job=6)
+#        from mumps import DMumpsContext
+#        ctx = DMumpsContext()
+#        if ctx.myid == 0:
+#            ctx.set_centralized_sparse(AD.tocoo())
+#            x = b.copy()
+#            ctx.set_rhs(x)
+#        ctx.set_silent()
+#        ctx.run(job=6)
 
         self.uh[:] = x[:NE]
         self.ph[:] = x[NE:]
