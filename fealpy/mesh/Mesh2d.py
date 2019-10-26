@@ -209,11 +209,10 @@ class Mesh2d():
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
-    def find_cell(self, axes, 
+    def find_cell(self, axes,
             index=None, showindex=False,
-            color='y', markersize=200, 
+            color='y', markersize=200,
             fontsize=24, fontcolor='k'):
-        
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
@@ -229,7 +228,7 @@ class Mesh2d():
 
 class Mesh2dDataStructure():
     """ The topology data structure of mesh 2d
-        This is just a abstract class, and you can not use it directly. 
+        This is just a abstract class, and you can not use it directly.
     """
 
     def __init__(self, NN, cell):
@@ -280,7 +279,8 @@ class Mesh2dDataStructure():
         E = self.E
 
         totalEdge = self.total_edge()
-        _, i0, j = np.unique(np.sort(totalEdge, axis=1),
+        print('totalEdge:\n', totalEdge[-30:])
+        _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
                 return_index=True,
                 return_inverse=True,
                 axis=0)
@@ -289,13 +289,13 @@ class Mesh2dDataStructure():
 
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
-        i1 = np.zeros(NE, dtype=self.itype) 
+        i1 = np.zeros(NE, dtype=self.itype)
         i1[j] = np.arange(E*NC, dtype=self.itype)
 
-        self.edge2cell[:, 0] = i0//E 
+        self.edge2cell[:, 0] = i0//E
         self.edge2cell[:, 1] = i1//E
-        self.edge2cell[:, 2] = i0%E 
-        self.edge2cell[:, 3] = i1%E 
+        self.edge2cell[:, 2] = i0%E
+        self.edge2cell[:, 3] = i1%E
 
         self.edge = totalEdge[i0, :]
 

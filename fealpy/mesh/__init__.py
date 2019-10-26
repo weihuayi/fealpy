@@ -26,12 +26,6 @@ from .QuadtreeForest import QuadtreeMesh, QuadtreeForest
 
 from .simple_mesh_generator import *
 
-from .level_set_function import DistDomain2d
-from .level_set_function import DistDomain3d
-from .level_set_function import dcircle
-from .level_set_function import drectangle
-from .level_set_function import Sphere
-
 from .sizing_function import huniform
 
 from .mesh_tools import *
