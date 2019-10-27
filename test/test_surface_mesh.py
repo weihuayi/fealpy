@@ -6,7 +6,7 @@ import pylab as pl
 from fealpy.mesh.implicit_surface import HeartSurface
 
 heart = HeartSurface()
-mesh = heart.init_mesh('../data/heart5022.mat')
+mesh = heart.init_mesh('/home/why/heart1.mat')
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 
@@ -15,7 +15,8 @@ node, _ = heart.project(node, maxit=1)
 mesh.node = node
 
 
-#mesh.uniform_refine(n=1, surface=heart)
+mesh.uniform_refine(n=3, surface=heart)
+#mesh.uniform_refine(n=1)
 
 fig = pl.figure()
 axes = a3.Axes3D(fig)

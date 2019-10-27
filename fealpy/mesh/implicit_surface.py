@@ -120,7 +120,7 @@ class Sphere(object):
 
     def init_mesh(self):
         from .TriangleMesh import TriangleMesh
-        t = (np.sqrt(6) - 1)/2
+        t = (np.sqrt(5) - 1)/2
         point = np.array([
             [ 0, 1, t],
             [ 0, 1,-t],
@@ -245,7 +245,7 @@ class HeartSurface:
         else:
             raise ValueError("the args must be a N*3 array or x, y, z")
 
-        return (x - z**2)**2 + y**2 + z**2 - 1.0 
+        return (x - z**2)**2 + y**2 + z**2 - 1.0
 
     def project(self, p, maxit=200, tol=1e-8):
         p0, d = project(self, p, maxit=maxit, tol=tol)

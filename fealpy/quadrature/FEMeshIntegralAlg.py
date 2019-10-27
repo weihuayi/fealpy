@@ -49,7 +49,7 @@ class FEMeshIntegralAlg():
             return e.sum()
         else:
             return e
-        return 
+        return
 
     def L2_error(self, u, uh, celltype=False):
         def f(x):
