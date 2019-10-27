@@ -10,6 +10,8 @@ def mark(eta, theta, method='L2'):
         eta = eta**2
         idx = np.argsort(eta)[-1::-1]
         x = np.cumsum(eta[idx])
+        print('x', x.shape)
+        print('idx', idx.shape)
         isMarked[idx[x < theta*x[-1]]] = True
         isMarked[idx[0]] = True
     else:
