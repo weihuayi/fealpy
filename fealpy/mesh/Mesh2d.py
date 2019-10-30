@@ -279,7 +279,6 @@ class Mesh2dDataStructure():
         E = self.E
 
         totalEdge = self.total_edge()
-        print('totalEdge:\n', totalEdge[-30:])
         _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
                 return_index=True,
                 return_inverse=True,
