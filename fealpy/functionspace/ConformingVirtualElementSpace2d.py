@@ -164,6 +164,53 @@ class ConformingVirtualElementSpace2d():
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
+    def grad_recovery(self, uh):
+
+        smldof = self.smspace.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        h = self.smspace.h
+
+        s = self.project_to_smspace(uh).reshape(-1, smldof)
+        sx = np.zeros(NC, smldof)
+        sy = np.zeros(NC, smldof)
+
+        sx[:, 1] = s[:, 1]
+        sy[:, 2] = s[:, 2]
+        if p > 1:
+            start = 3
+            r = np.arange(1, p+1)
+            for i in range(2, p+1):
+                sx[:, start:start+i] = np.einsum('i, ...i->...i', r[i-1::-1], s[:, start-i:start])
+                sy[:, start+1:start+i+1] = np.einsum('i, ...i->...i', r[0:i], s[:, start-i:start])
+                start += i+1
+
+        sx /= h.reshape(-1, 1)
+        sy /= h.reshape(-1, 1)
+
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        NC = len(cell2dofLocation) - 1
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        DD = np.vsplit(self.D, cell2dofLocation[1:-1])
+
+        f1 = lambda x: x[0]@x[1]
+        sx = np.concatenate(list(map(f1, zip(DD, sx))))
+        sy = np.concatenate(list(map(f1, zip(DD, sy))))
+
+
+        ldof = self.number_of_local_dofs()
+        w = np.repeat(1/self.area, ldof)
+        sx *= w
+        sy *= w
+
+        uh = self.function(dim=2)
+        ws = np.zeros(uh.shape[0], dtype=self.ftype)
+        np.add.at(uh[:, 0], cell2dof, sx)
+        np.add.at(uh[:, 1], cell2dof, sy)
+        np.add.at(ws, cell2dof, w)
+        uh /=ws.reshape(-1, 1)
+        return uh
+
+
     def project(self, F, space1):
         """
         S is a function in ScaledMonomialSpace2d, this function project  S to 
