@@ -174,14 +174,14 @@ class ConformingVirtualElementSpace2d():
         sx = np.zeros(NC, smldof)
         sy = np.zeros(NC, smldof)
 
-        sx[:, 1] = s[:, 1]
-        sy[:, 2] = s[:, 2]
+        sx[:, 0] = s[:, 1]
+        sy[:, 0] = s[:, 2]
         if p > 1:
             start = 3
             r = np.arange(1, p+1)
             for i in range(2, p+1):
-                sx[:, start:start+i] = np.einsum('i, ...i->...i', r[i-1::-1], s[:, start-i:start])
-                sy[:, start+1:start+i+1] = np.einsum('i, ...i->...i', r[0:i], s[:, start-i:start])
+                sx[:, start-i:start] = np.einsum('i, ...i->...i', r[i-1::-1], s[:, start:start+i])
+                sy[:, start-i:start] = np.einsum('i, ...i->...i', r[0:i], s[:, start+1:start+i+1])
                 start += i+1
 
         sx /= h.reshape(-1, 1)
