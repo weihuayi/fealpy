@@ -20,12 +20,19 @@ S = space.project_to_smspace(uI)
 
 error = space.integralalg.L2_error(pde.solution, S.value)
 print(error)
-
 uh = space.grad_recovery(uI)
-
 S = space.project_to_smspace(uh)
 
+def f(x, cellidx):
+    val = S.value(x, cellidx)
+    return np.sum(val**2, axis=-1)
+
+a = space.integralalg.integral(f, celltype=True)
+a = np.sqrt(a)
+print(a)
+
 gu = pde.gradient
+
 
 error = space.integralalg.L2_error(gu, S.value)
 print(error)
