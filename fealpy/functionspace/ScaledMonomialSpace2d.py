@@ -136,11 +136,14 @@ class ScaledMonomialSpace2d():
     def value(self, uh, point, cellidx=None):
         phi = self.basis(point, cellidx=cellidx)
         cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
-            return np.einsum('ij, ...ij->...i', uh[cell2dof], phi)
+            return np.einsum(s1, phi, uh[cell2dof])
         else:
             assert(point.shape[-2] == len(cellidx))
-            return np.einsum('ij, ...ij->...i', uh[cell2dof[cellidx]], phi)
+            return np.einsum(s1, phi, uh[cell2dof[cellidx]])
 
     def grad_basis(self, point, cellidx=None, p=None):
         if p is None:
@@ -259,7 +262,7 @@ class ScaledMonomialSpace2d():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim is None:
+        if dim in [None, 1]:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)

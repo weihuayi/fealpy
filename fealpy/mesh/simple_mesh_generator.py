@@ -1,16 +1,16 @@
 
 import numpy as np
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .QuadrangleMesh import QuadrangleMesh 
-from .HexahedronMesh import HexahedronMesh 
+from .QuadrangleMesh import QuadrangleMesh
+from .HexahedronMesh import HexahedronMesh
 from .TetrahedronMesh import TetrahedronMesh
-from .PolygonMesh import PolygonMesh 
+from .PolygonMesh import PolygonMesh
 
-from .level_set_function import DistDomain2d, DistDomain3d
-from .level_set_function import dcircle, drectangle
-from .level_set_function import ddiff 
+from ..geometry import DistDomain2d, DistDomain3d
+from ..geometry import dcircle, drectangle
+from ..geometry import ddiff
 from .sizing_function import huniform
-from .distmesh import DistMesh2d 
+from .distmesh import DistMesh2d
 
 
 def tri_to_polygonmesh(mesh, n):

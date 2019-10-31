@@ -155,34 +155,33 @@ class ConformingVirtualElementSpace2d():
         """
         Project a conforming vem function uh into polynomial space.
         """
+        dim = len(uh.shape)
         p = self.p
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
-        S = self.smspace.function()
+        S = self.smspace.function(dim=dim)
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
     def grad_recovery(self, uh):
 
+        p = self.p
         smldof = self.smspace.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         h = self.smspace.h
 
         s = self.project_to_smspace(uh).reshape(-1, smldof)
-        sx = np.zeros(NC, smldof)
-        sy = np.zeros(NC, smldof)
+        sx = np.zeros((NC, smldof), dtype=self.ftype)
+        sy = np.zeros((NC, smldof), dtype=self.ftype)
 
-        sx[:, 0] = s[:, 1]
-        sy[:, 0] = s[:, 2]
-        if p > 1:
-            start = 3
-            r = np.arange(1, p+1)
-            for i in range(2, p+1):
-                sx[:, start-i:start] = np.einsum('i, ...i->...i', r[i-1::-1], s[:, start:start+i])
-                sy[:, start-i:start] = np.einsum('i, ...i->...i', r[0:i], s[:, start+1:start+i+1])
-                start += i+1
+        start = 1
+        r = np.arange(1, p+1)
+        for i in range(p):
+            sx[:, start-i-1:start] = r[i::-1]*s[:, start:start+i+1]
+            sy[:, start-i-1:start] = r[0:i+1]*s[:, start+1:start+i+2]
+            start += i+2
 
         sx /= h.reshape(-1, 1)
         sy /= h.reshape(-1, 1)

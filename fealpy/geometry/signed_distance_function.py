@@ -1,5 +1,13 @@
 import numpy as np
 
+class DistDomain2d():
+    def __init__(self, fd, fh, bbox, pfix=None, *args):
+        self.params = fd, fh, bbox, pfix, args
+
+class DistDomain3d():
+    def __init__(self, fd, fh, bbox, pfix=None, *args):
+        self.params = fd, fh, bbox, pfix, args
+
 def dcircle(p, cxy=[0, 0], r=1):
     x = p[:, 0]
     y = p[:, 1]
