@@ -15,8 +15,8 @@ node, _ = heart.project(node, maxit=1)
 mesh.node = node
 
 
-mesh.uniform_refine(n=3, surface=heart)
-#mesh.uniform_refine(n=1)
+mesh.uniform_refine(n=2, surface=heart)
+mesh.uniform_refine(n=1)
 
 fig = pl.figure()
 axes = a3.Axes3D(fig)
