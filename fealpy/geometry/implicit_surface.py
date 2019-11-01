@@ -1,57 +1,5 @@
 import numpy as np
-
-def project(surface, p0, maxit=200, tol=1e-12):
-    eps = np.finfo(float).eps
-    p = p0
-    value = surface(p)
-    s = np.sign(value)
-    grad = surface.gradient(p)
-    lg = np.sum(grad**2, axis=-1, keepdims=True)
-    grad /= lg
-    grad *= value[..., np.newaxis]
-    pp = p - grad
-    v = s[..., np.newaxis]*(pp - p0)
-    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-    d *= s[..., np.newaxis]
-
-    g = surface.gradient(pp)
-    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-    g *= d
-    p = p0 - g
-    k = 0
-    while True:
-        value = surface(p)
-        grad = surface.gradient(p)
-        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
-        grad /= lg
-
-        v = s[..., np.newaxis]*(p0 - p)
-        d = np.sqrt(np.sum(v**2, axis=-1))
-        isOK = d < tol
-        v[isOK] = grad[isOK]
-        v[~isOK] /= d[~isOK][..., np.newaxis]
-        d *= s
-
-        ev = grad - v
-        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
-        if e < tol:
-            break
-        else:
-            k += 1
-            if k > maxit:
-                break
-            grad /= lg
-            grad *= value[..., np.newaxis]
-            pp = p - grad
-            v = s[..., np.newaxis]*(pp - p0)
-            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-            d *= s[..., np.newaxis]
-
-            g = surface.gradient(pp)
-            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-            g *= d
-            p = p0 - g
-    return p, d
+from .geoalg import project
 
 class Sphere(object):
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
@@ -306,7 +254,7 @@ class HeartSurface:
         else:
             data = sio.loadmat(f)
         node = data['node']
-        cell = data['elem'] - 1
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
         return TriangleMesh(node, cell)
 
 class EllipsoidSurface:
