@@ -1,7 +1,7 @@
 import numpy as np
 from .geoalg import project
 
-class Sphere(object):
+class Sphere():
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
         self.radius = radius
@@ -67,7 +67,7 @@ class Sphere(object):
         return p, d
 
     def init_mesh(self):
-        from .TriangleMesh import TriangleMesh
+        from fealpy.mesh import TriangleMesh
         t = (np.sqrt(5) - 1)/2
         point = np.array([
             [ 0, 1, t],
@@ -196,7 +196,7 @@ class HeartSurface:
         return (x - z**2)**2 + y**2 + z**2 - 1.0
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
+        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
         return p0, d
 
     def gradient(self, p):
@@ -245,14 +245,13 @@ class HeartSurface:
         return J
 
 
-    def init_mesh(self, f=None):
+    def init_mesh(self, meshdata=None):
         import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
- 
-        if f is None:
-            data = sio.loadmat('../../fealpy/data/heart2697.mat')
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/heart.mat')
         else:
-            data = sio.loadmat(f)
+            data = sio.loadmat(meshdata)
         node = data['node']
         cell = np.array(data['elem'] - 1, dtype=np.int64)
         return TriangleMesh(node, cell)
@@ -279,7 +278,7 @@ class EllipsoidSurface:
  
    
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
+        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
         return p0, d
 
 
@@ -333,13 +332,16 @@ class EllipsoidSurface:
         n = grad/l
         return n
 
-    def init_mesh(self):
+    def init_mesh(self, meshdata=None):
         import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
-        data = sio.loadmat('../data/ellipsoidsurface.mat')
-        point = data['node']
-        cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/ellipsoid.mat')
+        else:
+            data = sio.load(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
 
 class TorusSurface:
     def __init__(self):
@@ -359,7 +361,7 @@ class TorusSurface:
         return np.sqrt(x**2 + y**2 + z**2 + 16 - 8*np.sqrt(x**2 + y**2)) - 1 
     
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
+        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
         return p0, d
 
     def gradient(self, p):
@@ -409,14 +411,16 @@ class TorusSurface:
         n = grad/l
         return n
     
-    def init_mesh(self):
+    def init_mesh(self, meshdata=None):
         import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
- 
-        data = sio.loadmat('../data/torus4770.mat')
-        point = data['node']
-        cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/torus.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
 
 
 
@@ -448,7 +452,7 @@ class OrthocircleSurface:
         return d1*d2*d3 - c[0]**2*(1 + c[1]*r2) 
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
+        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
         return p0, d
 
     def gradient(self, p):
@@ -475,14 +479,16 @@ class OrthocircleSurface:
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         return grad/l
 
-    def init_mesh(self):
+    def init_mesh(self, meshdata=None):
         import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
- 
-        data = sio.loadmat('../data/orthocircle5482.mat')
-        point = data['node']
-        cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/orthocircle.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
 
 
 class QuarticsSurface:
@@ -507,7 +513,7 @@ class QuarticsSurface:
         return  (x2 - 1)**2 + (y2 - 1)**2 + (z2 - 1)**2 - r
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol)
+        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
         return p0, d
 
     def gradient(self, p):
@@ -524,14 +530,16 @@ class QuarticsSurface:
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         return grad/l
 
-    def init_mesh(self):
+    def init_mesh(self, meshdata=None):
         import scipy.io as sio
-        from .TriangleMesh import TriangleMesh
- 
-        data = sio.loadmat('../data/quarticssurfaceopt.mat')
-        point = data['node']
-        cell = data['elem'] - 1
-        return TriangleMesh(point,cell)
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/quartics.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
 
 
 class ImplicitSurface:

@@ -1,6 +1,6 @@
 import numpy as np
 
-def project(imfun, p0, maxit=200, tol=1e-8):
+def project(imfun, p0, maxit=200, tol=1e-12):
 
     eps = np.finfo(float).eps
     p = p0

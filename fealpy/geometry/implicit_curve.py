@@ -20,11 +20,11 @@ class Circle():
         return n
 
     def distvalue(self, p):
-        p[:], d, n= project(self, p)
+        p[:], d, n= project(self, p, maxit=200, tol=1e-8)
         return d, n
 
     def project(self, p):
-        p[:], d, n= project(self, p)
+        p[:], d, n= project(self, p, maxit=200, tol=1e-8)
         return d, n
 
 class FoldCurve():
@@ -75,11 +75,11 @@ class FoldCurve():
         return grad
 
     def distvalue(self, p):
-        p[:], d, n= project(self, p)
+        p[:], d, n= project(self, p, maxit=200, tol=1e-8)
         return d, n
 
     def project(self, p):
-        p[:], d, n= project(self, p)
+        p[:], d, n= project(self, p, maxit=200, tol=1e-8)
         return d, n
 
 
