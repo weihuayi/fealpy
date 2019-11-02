@@ -2,7 +2,7 @@ import numpy as np
 from .geoalg import project
 
 
-class Circle():
+class CircleCurve():
     def __init__(self, center=np.array([0.0, 0.0]), radius=1.0):
         self.center = center
         self.radius = radius

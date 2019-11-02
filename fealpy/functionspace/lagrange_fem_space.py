@@ -300,7 +300,7 @@ class LagrangeFiniteElementSpace():
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         if self.geo_dimension() == 1:
-            s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+            s1 = '...ijm, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         else:
             s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
 
