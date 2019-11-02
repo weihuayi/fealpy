@@ -110,8 +110,6 @@ class IntervalMesh():
             NC = self.number_of_cells()
             node = self.entity('node')
             cell = self.entity('cell')
-            print(cell)
-            print(node)
             cell2newNode = np.arange(NN, NN+NC)
             newNode = (node[cell[:, 0]] + node[cell[:, 1]])/2
             self.node = np.r_['0', node, newNode]
