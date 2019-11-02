@@ -54,9 +54,8 @@ class SurfacePoissonFEMModel(object):
         return isBdDof
 
     def get_l2_error(self):
-        u = self.pde.solution
-        uh = self.uh
-        return self.error.l2_error(u, uh)
+        e = self.uh - self.uI
+        return np.sqrt(np.mean(e**2))
 
     def get_L2_error(self):
         u = self.pde.solution
