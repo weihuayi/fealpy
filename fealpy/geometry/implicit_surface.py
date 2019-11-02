@@ -1,7 +1,13 @@
 import numpy as np
 from .geoalg import project
 
+<<<<<<< HEAD
 class Sphere():
+||||||| merged common ancestors
+class Sphere(object):
+=======
+class SphereSurface(object):
+>>>>>>> 04813f5e0243f25da759f53f09443395251593c5
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
         self.radius = radius

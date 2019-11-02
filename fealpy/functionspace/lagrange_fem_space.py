@@ -299,7 +299,11 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        if self.geo_dimension() == 1:
+            s1 = '...ijm, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        else:
+            s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+
         if cellidx is None:
             val = np.einsum(s1, gphi, uh[cell2dof])
         else:
@@ -329,7 +333,7 @@ class LagrangeFiniteElementSpace():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim is None:
+        if dim in [None, 1]:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)
