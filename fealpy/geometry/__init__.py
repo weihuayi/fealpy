@@ -3,9 +3,8 @@ from .signed_distance_function import dcircle, drectangle, dpoly
 from .signed_distance_function import DistDomain2d, DistDomain3d
 
 from .geoalg import project
-<<<<<<< HEAD
 
-from .implicit_curve import Circle
+from .implicit_curve import CircleCurve
 from .implicit_curve import FoldCurve
 from .implicit_curve import Curve2
 from .implicit_curve import Curve3
@@ -18,7 +17,7 @@ from .implicit_curve import LameCurve
 from .implicit_curve import PearShapedCurve
 from .implicit_curve import SpiricSectionsCurve
 
-from .implicit_surface import Sphere
+from .implicit_surface import SphereSurface
 from .implicit_surface import TwelveSpheres
 from .implicit_surface import HeartSurface
 from .implicit_surface import EllipsoidSurface
@@ -27,27 +26,6 @@ from .implicit_surface import OrthocircleSurface
 from .implicit_surface import QuarticsSurface
 from .implicit_surface import ImplicitSurface
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-||||||| merged common ancestors
-from .implicit_curve import Circle
-from .implicit_surface import Sphere, Heart
-=======
-from .implicit_curve import CircleCurve
-from .implicit_surface import SphereSurface, HeartSurface
-
 # rename 
 from .implicit_surface import SphereSurface as Sphere
-from .implicit_curve import CircleCurve as Circle 
->>>>>>> 04813f5e0243f25da759f53f09443395251593c5
+from .implicit_curve import CircleCurve as Circle
