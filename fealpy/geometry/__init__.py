@@ -4,4 +4,4 @@ from .signed_distance_function import DistDomain2d, DistDomain3d
 
 from .geoalg import project
 from .implicit_curve import Circle
-from .implicit_surface import Sphere, Heart
+from .implicit_surface import SphereSurface, HeartSurface
