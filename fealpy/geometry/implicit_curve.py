@@ -1,59 +1,6 @@
 import numpy as np
+from .geoalg import project
 
-def project(curve, p0, maxit=200, tol=1e-8):
-    eps = np.finfo(float).eps
-    p = p0
-    value = curve(p)
-    s = np.sign(value)
-    grad = curve.gradient(p)
-    lg = np.sum(grad**2, axis=-1, keepdims=True)  
-    grad /= lg
-    grad *= value[..., np.newaxis]
-    pp = p - grad 
-    v = s[..., np.newaxis]*(pp - p0)
-    d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-    d *= s[..., np.newaxis]
-
-    g = curve.gradient(pp)
-    g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-    g *= d 
-    p = p0 - g 
-    
-    k = 0
-    while True:
-        value = curve(p)
-        grad = curve.gradient(p)
-        lg = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))  
-        grad /= lg
-
-        v = s[..., np.newaxis]*(p0 - p)
-        d = np.sqrt(np.sum(v**2, axis=-1))
-        isOK = d < eps
-        d[isOK] = 0
-        v[isOK] = grad[isOK]
-        v[~isOK] /= d[~isOK][..., np.newaxis]
-        d *= s
-
-        ev = grad - v 
-        e = np.max(np.sqrt((value/lg.reshape(lg.shape[0:-1]))**2 + np.sum(ev**2, axis=-1)))
-        if e < tol:
-            break
-        else:
-            k += 1
-            if k > maxit:
-                break
-            grad /= lg
-            grad *= value[..., np.newaxis]
-            pp = p - grad
-            v = s[..., np.newaxis]*(pp - p0)
-            d = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-            d *= s[..., np.newaxis]
-
-            g = curve.gradient(pp)
-            g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
-            g *= d
-            p = p0 - g 
-    return p, d, grad
 
 class Circle():
     def __init__(self, center=np.array([0.0, 0.0]), radius=1.0):
@@ -158,7 +105,7 @@ class Curve2():
 
         x1 = np.arccos(-1/4)/4
         x0 = pi/2 - x1 - np.sin(4*x1)
-         
+ 
         theta = np.arctan2(y, x)
         isNeg = theta < 0
         theta[isNeg] = theta[isNeg] + 2*pi
