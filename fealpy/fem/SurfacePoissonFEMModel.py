@@ -4,15 +4,17 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from ..solver import solve
+from scipy.sparse.linalg import spsolve
 from ..boundarycondition import DirichletBC
+from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
 
 class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, pde, p, q, p0=None):
         """
         """
-        self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p, p0=p0)
+        self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.sphere, p=p, p0=p0)
         self.mesh = self.space.mesh
-        self.surface = pde.surface
+        self.surface = pde.sphere
         self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
@@ -31,14 +33,14 @@ class SurfacePoissonFEMModel(object):
         return self.space.stiff_matrix()
 
     def get_right_vector(self):
-        b = self.space.source_vector(pde.source)
+        b = self.space.source_vector(self.pde.source)
         b -= np.mean(b)
         return b
 
     def solve(self):
         uh = self.uh
         u = self.pde.solution
-        bc = DirichletBC(self.V, u, self.is_boundary_dof)
+        bc = DirichletBC(self.space, u, self.is_boundary_dof)
         solve(self, uh, dirichlet=bc, solver='direct')
 
     def is_boundary_dof(self, p):

@@ -196,7 +196,7 @@ class HeartSurface:
         return (x - z**2)**2 + y**2 + z**2 - 1.0
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):
@@ -278,7 +278,7 @@ class EllipsoidSurface:
  
    
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
 
@@ -361,7 +361,7 @@ class TorusSurface:
         return np.sqrt(x**2 + y**2 + z**2 + 16 - 8*np.sqrt(x**2 + y**2)) - 1 
     
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):
@@ -452,7 +452,7 @@ class OrthocircleSurface:
         return d1*d2*d3 - c[0]**2*(1 + c[1]*r2) 
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):
@@ -513,7 +513,7 @@ class QuarticsSurface:
         return  (x2 - 1)**2 + (y2 - 1)**2 + (z2 - 1)**2 - r
 
     def project(self, p, maxit=200, tol=1e-8):
-        p0, d, _ = project(self, p, maxit=maxit, tol=tol)
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
         return p0, d
 
     def gradient(self, p):

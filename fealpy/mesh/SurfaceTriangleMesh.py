@@ -128,7 +128,7 @@ class SurfaceTriangleMesh():
         else:
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
 
-        bcp = self.surface.project(bcp)
+        bcp, _ = self.surface.project(bcp)
         return bcp
 
     def area(self, idx=3):

@@ -1,10 +1,12 @@
 import numpy as np
 from numpy.linalg import inv
-
+from scipy.sparse import coo_matrix, csr_matrix, spdiags
 from .function import Function
 from ..common import ranges
 from .femdof import CPLFEMDof2d, DPLFEMDof2d
 from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh
+from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
+
 
 class SurfaceLagrangeFiniteElementSpace:
     def __init__(self, mesh, surface, p=1, p0=None, q=None, spacetype='C', scale=None):
