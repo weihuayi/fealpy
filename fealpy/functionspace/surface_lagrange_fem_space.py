@@ -3,25 +3,25 @@ from numpy.linalg import inv
 
 from .function import Function
 from ..common import ranges
-from .femdof import CPLFEMDof2d, DPLFEMDof2d 
-from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh 
+from .femdof import CPLFEMDof2d, DPLFEMDof2d
+from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh
 
 class SurfaceLagrangeFiniteElementSpace:
-    def __init__(self, mesh, surface, p=1, p0=None, spacetype='C', scale=1.0):
+    def __init__(self, mesh, surface, p=1, p0=None, q=None, spacetype='C', scale=None):
         """
-        Initial a object of SurfaceLagrangeFiniteElementSpace. 
+        Initial a object of SurfaceLagrangeFiniteElementSpace.
 
         Parameters
         ----------
-        self : 
-            Object 
-        mesh : 
+        self :
+            Object
+        mesh :
             This is a mesh object
-        surface : 
+        surface :
             The continuous surface which was represented as a level set
             function.
         p : int
-            The degree of the Lagrangian space 
+            The degree of the Lagrangian space
         p0 : int
             The degree of the surface mesh
 
@@ -30,10 +30,9 @@ class SurfaceLagrangeFiniteElementSpace:
 
         See Also
         --------
-            
         Notes
         -----
-        """ 
+        """
         if p0 is None:
             p0 = p
 
@@ -41,20 +40,80 @@ class SurfaceLagrangeFiniteElementSpace:
         self.p = p
         self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale) 
         self.surface = surface
-        
+
+        self.cellmeasure = self.mesh.entity_measure('cell')
+
         if p0 == p:
             self.dof = self.mesh.space.dof
             self.dim = 2
         else:
             if spacetype is 'C':
-                self.dof = CPLFEMDof2d(mesh, p) 
+                self.dof = CPLFEMDof2d(mesh, p)
                 self.dim = 2
             elif spacetype is 'D':
-                self.dof = DPLFEMDof2d(mesh, p) 
+                self.dof = DPLFEMDof2d(mesh, p)
                 self.dim = 2
+
+        if q is None:
+            self.integrator = mesh.integrator(p+1)
+        else:
+            self.integrator = mesh.integrator(q)
+
+        self.integralalg = FEMeshIntegralAlg(
+                self.integrator,
+                self.mesh,
+                self.cellmeasure)
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
+
+    def stiff_matrix(self):
+        p = self.p
+        GD = self.mesh.geo_dimension()
+
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        gphi = self.grad_basis(bcs)
+
+        # Compute the element sitffness matrix
+        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, gphi, gphi, self.cellmeasure, optimize=True)
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+
+        # Construct the stiffness matrix
+        gdof = self.number_of_global_dofs()
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def mass_matrix(self):
+        p = self.p
+        mesh = self.mesh
+
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.basis(bcs)
+        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, cellmeasure, optimize=True)
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+
+        # Construct the stiffness matrix
+        gdof = self.number_of_global_dofs()
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M
+
+    def source_vector(self, f):
+        p = self.p
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        pp = self.mesh.bc_to_point(bcs)
+        fval = f(pp)
+        phi = self.basis(bcs)
+        bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, self.cellmeasure)
+        cell2dof = self.dof.cell2dof
+        gdof = self.number_of_global_dofs()
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b
 
     def basis(self, bc):
         """
@@ -95,8 +154,8 @@ class SurfaceLagrangeFiniteElementSpace:
             val = np.einsum(s1, phi, uh[cell2dof])
         else:
             val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
-        return val 
-    
+        return val
+
     def grad_value(self, uh, bc, cellidx=None):
         gphi = self.grad_basis(bc, cellidx=cellidx)
         cell2dof = self.cell_to_dof()
@@ -126,7 +185,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def div_value(self, uh, bc, cellidx=None):
         pass
-    
+
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
@@ -134,10 +193,8 @@ class SurfaceLagrangeFiniteElementSpace:
         return self.dof.number_of_local_dofs()
 
     def interpolation_points(self):
-        ipoint, _ = self.surface.project(self.dof.interpolation_points()/self.scale)
-        ipoint *= self.scale
-        return ipoint
-    
+        return self.mesh.node
+
     def cell_to_dof(self):
         return self.dof.cell2dof
 
@@ -156,7 +213,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim is None:
+        if dim in [None, 1]:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)

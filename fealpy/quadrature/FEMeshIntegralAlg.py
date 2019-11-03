@@ -1,6 +1,5 @@
 import numpy as np
 
-
 class FEMeshIntegralAlg():
     def __init__(self, integrator, mesh, measure=None):
         self.mesh = mesh

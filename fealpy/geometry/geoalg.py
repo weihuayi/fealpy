@@ -1,6 +1,6 @@
 import numpy as np
 
-def project(imfun, p0, maxit=200, tol=1e-12):
+def project(imfun, p0, maxit=200, tol=1e-12, returngrad=False, returnd=False):
 
     eps = np.finfo(float).eps
     p = p0
@@ -54,4 +54,12 @@ def project(imfun, p0, maxit=200, tol=1e-12):
             g /= np.sqrt(np.sum(g**2, axis=-1, keepdims=True))
             g *= d
             p = p0 - g
-    return p, d, grad
+
+    if (returnd is True) and (returngrad is True):
+        return p, d, grad
+    elif (returnd is False) and (returngrad is True):
+        return p, grad
+    elif (returnd is True) and (returngrad is False):
+        return p, d
+    else:
+        return p
