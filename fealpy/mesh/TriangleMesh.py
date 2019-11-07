@@ -59,6 +59,34 @@ class TriangleMesh(Mesh2d):
         NN = len(node)
         self.ds.reinit(NN, cell)
 
+    def line_walk(self, p):
+        NC = self.number_of_cells()
+        NP = p.shape[0]
+        cell = self.entity('cell')
+
+        cidx = np.random.randint(0, NC, NP)
+        isNotOK = np.ones(NP, dtype=np.bool)
+        while isNotOK.sum() > 0:
+            idx0, = np.find(isNotOK)
+            cidx0 = cidx[isNotOK]
+            pp = p[isNotOK]
+
+            a = np.zeros((len(cidx0), 3), dtype=self.ftype)
+            p0 = cell[cidx0, 0]
+            p1 = cell[cidx0, 1]
+            p2 = cell[cidx0, 2]
+
+            v0 = p0 - pp
+            v1 = p1 - pp
+            v2 = p2 - pp
+            a[:, 0] = np.cross(v1, v2)
+            a[:, 1] = np.cross(v2, v0)
+            a[:, 2] = np.cross(v0, v1)
+            idx = np.argmin(a, axis=-1)
+
+            isOK = a[range(a.shape[0]), idx] >= 0
+
+
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
