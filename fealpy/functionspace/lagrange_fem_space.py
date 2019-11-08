@@ -1,5 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
+from scipy.sparse.linalg import spsolve
+
 from .function import Function
 from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
@@ -324,8 +326,14 @@ class LagrangeFiniteElementSpace():
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
-    def projection(self, u, up):
-        pass
+    def projection(self, u):
+        """
+        """
+        M= self.mass_matrix()
+        F = self.source_vector(u)
+        uh = self.function()
+        uh[:] = spsolve(M, F).reshape(-1)
+        return uh
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -343,7 +351,7 @@ class LagrangeFiniteElementSpace():
 
     def stiff_matrix(self, cfun=None):
         p = self.p
-        GD = self.mesh.geo_dimension()
+        GD = self.geo_dimension()
 
         if p == 0:
             raise ValueError('The space order is 0!')
@@ -378,7 +386,11 @@ class LagrangeFiniteElementSpace():
             dgphi = gphi
 
         # Compute the element sitffness matrix
-        A = np.einsum('i, ijkm, ijpm, j->jkp', ws, dgphi, gphi, self.cellmeasure, optimize=True)
+        # ws:(NQ,)
+        # dgphi: (NQ, NC, ldof, GD)
+        A = np.einsum('i, ijkm, ijpm, j->jkp',
+                ws, dgphi, gphi, self.cellmeasure,
+                optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
@@ -392,20 +404,25 @@ class LagrangeFiniteElementSpace():
     def mass_matrix(self, cfun=None, barycenter=False):
         p = self.p
         mesh = self.mesh
+        cellmeasure = self.cellmeasure
+
         if p == 0:
             NC = mesh.number_of_cells()
             M = spdiags(cellmeasure, 0, NC, NC)
             return M
 
+        # bcs: (NQ, TD+1)
+        # ws: (NQ, )
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        # phi: (NQ, ldof)
         phi = self.basis(bcs)
 
         if cfun is not None:
             if barycenter is True:
                 d = cfun(bcs)
             else:
-                ps = self.mesh.bc_to_point(bcs)
-                d = cfun(ps)
+                ps = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
+                d = cfun(ps) # (NQ, NC)
 
             if isinstance(d, (int, float)):
                 dphi = d*phi
@@ -436,7 +453,7 @@ class LagrangeFiniteElementSpace():
 
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        I = np.einsum('ij, k->ijk',  cell2dof, np.ones(ldof))
         J = I.swapaxes(-1, -2)
 
         gdof = self.number_of_global_dofs()
@@ -446,6 +463,7 @@ class LagrangeFiniteElementSpace():
     def source_vector(self, f, surface=None):
         p = self.p
 
+        cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         pp = self.mesh.bc_to_point(bcs)
         if surface is not None:
@@ -454,12 +472,14 @@ class LagrangeFiniteElementSpace():
 
         if p > 0:
             phi = self.basis(bcs)
-            bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, self.cellmeasure)
-            cell2dof = self.dof.cell2dof
+            # bb: (NC, ldof)
+            bb = np.einsum('m, mi, mk, i->ik',
+                    ws, fval, phi, self.cellmeasure)
+            cell2dof = self.cell_to_dof() #(NC, ldof)
             gdof = self.number_of_global_dofs()
             b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
         else:
-            b = np.einsum('i, ik, k->k', ws, fval,  measure)
+            b = np.einsum('i, ik, k->k', ws, fval, cellmeasure)
         return b
 
 
