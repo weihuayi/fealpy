@@ -151,6 +151,26 @@ class ConformingVirtualElementSpace2d():
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
+    def integral(self, uh):
+        """
+        计算虚单元函数的积分 \int_\Omega uh dx
+        """
+ 
+        p = self.p
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        if p == 1:
+            cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+            f = lambda x: sum(uh[x[0]]*x[0, :])
+            val = sum(map(f, zip(cd, self.C)))
+            return val
+        else:
+            NV = self.mesh.number_of_vertices_of_cells()
+            idx =cell2dof[cell2dofLocation[0:-1]+NV*p]
+            val = np.sum(uh[idx]*self.area)
+            return val
+
+
+
     def project_to_smspace(self, uh):
         """
         Project a conforming vem function uh into polynomial space.
