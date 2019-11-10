@@ -7,15 +7,17 @@ import pyamg
 from timeit import default_timer as timer
 from mpl_toolkits.mplot3d import Axes3D
 
-from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
-from ..solver.eigns import picard
-from ..quadrature import FEMeshIntegralAlg
-from ..mesh.adaptive_tools import mark
+from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from fealpy.solver.eigns import picard
+from fealpy.quadrature import FEMeshIntegralAlg
+from fealpy.mesh.adaptive_tools import mark
+
+import transplant
 
 
 class EllipticEignvalueFEMModel:
     def __init__(self, pde, theta=0.2, maxit=50, step=0, maxdof=1e5, n=3, p=1, q=3,
-            sigma=None, multieigs=False, resultdir='~/'):
+            sigma=None, multieigs=False, matlab=False, resultdir='~/'):
         self.multieigs = multieigs
         self.sigma = sigma
         self.pde = pde
@@ -28,6 +30,10 @@ class EllipticEignvalueFEMModel:
         self.numrefine = n
         self.resultdir = resultdir
         self.picard = False
+        if matlab is True:
+            self.matlab = transplant.Matlab()
+        else:
+            self.matlab = False
 
     def residual_estimate(self, uh):
         mesh = uh.space.mesh
@@ -104,14 +110,35 @@ class EllipticEignvalueFEMModel:
     def eig(self, A, M):
         NN = A.shape[0]
         self.M = M
-        self.ml = self.ml = pyamg.ruge_stuben_solver(A)
+        if self.sigma is None:
+            self.ml = pyamg.ruge_stuben_solver(A)
+        else:
+            self.ml = pyamg.ruge_stuben_solver(A + self.sigma*M)
         P = LinearOperator((NN, NN), matvec=self.linear_operator)
         vals, vecs = eigs(P, k=1)
-        return vecs.reshape(-1).real, 1/vals.real[0]
+        if self.sigma is None:
+            return vecs.reshape(-1).real, 1/vals.real[0]
+        else:
+            return vecs.reshape(-1).real, 1/vals.real[0] - self.sigma
+
+    def psolve(self, A, b, M):
+        if self.sigma is None:
+            self.ml = pyamg.ruge_stuben_solver(A)
+        else:
+            self.ml = pyamg.ruge_stuben_solver(A + self.sigma*M)
+        return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
 
     def deig(self, A, M):
         vals, vecs = eigs(A, k=1, M=M, which='SM')
         return vecs.reshape(-1).real, vals.real[0]
+
+    def msolve(self, A, b):
+        x = self.matlab.mldivide(A, b.reshape(-1, 1))
+        return x.reshape(-1)
+
+    def meigs(self, A, M):
+        u, d, flag = self.matlab._call('eigs', [A + 100*M, M, 1, 'SM'])
+        return u.reshape(-1), d - 100
 
     def alg_0(self, maxit=None):
         """
@@ -275,10 +302,11 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
-            if self.picard is True:
-                uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
-            else:
+
+            if self.matlab is False:
                 uh[isFreeDof], d = self.eig(A, M)
+            else:
+                uh[isFreeDof], d = self.meigs(A, M)
 
             if i < maxit:
                 uh = space.function(array=uh)
@@ -286,6 +314,7 @@ class EllipticEignvalueFEMModel:
                 markedCell = mark(eta, self.theta)
                 IM = mesh.bisect(markedCell, returnim=True)
                 print(i+1, "refine: ", mesh.number_of_nodes())
+
                 if (self.step > 0) and (i in idx):
                     NN = mesh.number_of_nodes()
                     fig = plt.figure()
@@ -305,6 +334,20 @@ class EllipticEignvalueFEMModel:
                 gdof = space.number_of_global_dofs()
             if gdof > self.maxdof:
                 break
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_1_' + str(i+1) + '_' + str(NN) + '.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_1_' + str(i+1) + '_' + str(NN) + '.mat')
 
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
@@ -351,6 +394,7 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_2_0_' + str(NN) +'.mat')
 
+        final = 0
         integrator = mesh.integrator(self.q)
         for i in range(maxit):
             space = LagrangeFiniteElementSpace(mesh, 1)
@@ -365,15 +409,11 @@ class EllipticEignvalueFEMModel:
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
-            if self.sigma is None:
-                ml = pyamg.ruge_stuben_solver(A)
-                uh = space.function()
-                uh[isFreeDof] = ml.solve(b[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(A, b[isFreeDof], M)
             else:
-                uh = space.function()
-                uh[isFreeDof] = spsolve(A, b[isFreeDof]).reshape(-1)
-
-
+                uh[isFreeDof] = self.msolve(A, b[isFreeDof])
 
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -388,12 +428,27 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig(self.resultdir + 'mesh_3_2' + str(i+1) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_3_2_' + str(i+1) + '_' + str(NN) +'.pdf')
                 plt.close()
                 self.savemesh(mesh,
-                        self.resultdir + 'mesh_3_2' + str(i+1) + '_' + str(NN) +'.mat')
+                        self.resultdir + 'mesh_3_2_' + str(i+1) + '_' + str(NN) +'.mat')
+            final = i+1
             if NN > self.maxdof:
                 break
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_2_' + str(final) + '_' + str(NN) +'.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_2_' + str(final) + '_' + str(NN) +'.mat')
 
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
@@ -406,10 +461,10 @@ class EllipticEignvalueFEMModel:
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
         uh = IM@uh
-        if self.picard is True:
-            uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
-        else:
+        if self.matlab is False:
             uh[isFreeDof], d = self.eig(A, M)
+        else:
+            uh[isFreeDof], d = self.meigs(A, M)
         end = timer()
 
         if self.multieigs is True:
@@ -457,10 +512,10 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        if self.picard is True:
-            uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)), sigma=self.sigma)
-        else:
+        if self.matlab is False:
             uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
 
         uh = space.function()
         uh[:] = uH
@@ -481,6 +536,7 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
+        final = 0
         for i in range(maxit-1):
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -500,6 +556,7 @@ class EllipticEignvalueFEMModel:
                 plt.close()
                 self.savemesh(mesh,
                         self.resultdir + 'mesh_3_3_' + str(i+1) + '_' + str(NN) +'.mat')
+            final = i+1
             if NN > self.maxdof:
                 break
 
@@ -515,15 +572,14 @@ class EllipticEignvalueFEMModel:
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
-            if self.sigma is None:
-                ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
-                uh = space.function()
-                uh[:] = uH
-                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
             else:
-                uh = space.function()
-                uh[isFreeDof] = spsolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
-
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
 
         # 3. 在最细网格上求解一次最小特征值问题 
 
@@ -536,11 +592,10 @@ class EllipticEignvalueFEMModel:
             else:
                 axes = Axes3D(fig)
             mesh.add_plot(axes, cellcolor='w')
-            fig.savefig(self.resultdir + 'mesh_3_3_' + str(maxit) + '_' + str(NN) +'.pdf')
+            fig.savefig(self.resultdir + 'mesh_3_3_' + str(final) + '_' + str(NN) +'.pdf')
             plt.close()
-            self.savemesh(mesh,
-                    self.resultdir + 'mesh_3_3_' + str(maxit) + '_' + str(NN) +'.mat')
-        uh = IM@uh
+            self.savemesh(mesh, self.resultdir + 'mesh_3_3_' + str(final) + '_' + str(NN) +'.mat')
+
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
         area = mesh.entity_measure('cell')
@@ -550,10 +605,13 @@ class EllipticEignvalueFEMModel:
         uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
-        if self.picard is True:
-            uh[isFreeDof], d = picard(A, M, uh[isFreeDof], sigma=self.sigma)
-        else:
+        uh = space.function()
+
+        if self.matlab is False:
             uh[isFreeDof], d = self.eig(A, M)
+        else:
+            uh[isFreeDof], d = self.meigs(A, M)
+
         end = timer()
 
         if self.multieigs is True:
@@ -586,7 +644,6 @@ class EllipticEignvalueFEMModel:
         else:
             idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
 
-
         mesh = self.pde.init_mesh(n=self.numrefine)
         integrator = mesh.integrator(self.q)
 
@@ -604,10 +661,11 @@ class EllipticEignvalueFEMModel:
 
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
-        if self.picard is True:
-            uH[isFreeHDof], d = picard(A, M, np.ones(sum(isFreeHDof)), sigma=self.sigma)
-        else:
+
+        if self.matlab is False:
             uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
 
         uh = space.function()
         uh[:] = uH
@@ -630,6 +688,7 @@ class EllipticEignvalueFEMModel:
 
         # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
         I = eye(gdof)
+        final = 0
         for i in range(maxit):
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
@@ -661,16 +720,15 @@ class EllipticEignvalueFEMModel:
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
-            if self.sigma is None:
-                ml = pyamg.ruge_stuben_solver(A[isFreeDof, :][:, isFreeDof].tocsr())
-                uh = space.function()
-                uh[:] = uH
-                uh[isFreeDof] = ml.solve(b[isFreeDof], x0=uh[isFreeDof], tol=1e-12, accel='cg').reshape((-1,))
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
             else:
-                uh = space.function()
-                uh[isFreeDof] = spsolve(A[isFreeDof, :][:, isFreeDof].tocsr(),
-                        b[isFreeDof]).reshape(-1)
-
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+            final = i+1
             if gdof > self.maxdof:
                 break
 
@@ -679,6 +737,20 @@ class EllipticEignvalueFEMModel:
             self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_4_' + str(final) + '_' + str(NN) +'.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_4_' + str(final) + '_' + str(NN) +'.mat')
 
         # 3. 把 uh 加入粗网格空间, 组装刚度和质量矩阵
         w0 = uh@A
@@ -698,10 +770,10 @@ class EllipticEignvalueFEMModel:
         ## 求解特征值
         A = AA[isFreeDof, :][:, isFreeDof].tocsr()
         M = MM[isFreeDof, :][:, isFreeDof].tocsr()
-        if self.picard is True:
-            u[isFreeDof], d = picard(A, M, np.ones(sum(isFreeDof)), sigma=self.sigma)
-        else:
+        if self.matlab is False:
             u[isFreeDof], d = self.eig(A, M)
+        else:
+            u[isFreeDof], d = self.meigs(A, M)
         end = timer()
         print("smallest eigns:", d, "with time: ", end - start)
 

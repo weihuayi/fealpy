@@ -12,7 +12,7 @@ from fealpy.pde.EigenvalueData3d import EigenHarmonicOscillator3d
 from fealpy.pde.EigenvalueData3d import EigenSchrodinger3d
 
 
-from fealpy.fem import EllipticEignvalueFEMModel
+from EllipticEignvalueFEMModel import EllipticEignvalueFEMModel
 
 """
 几种计算最小特征值最小特征值方法的比较
@@ -63,11 +63,13 @@ model = EllipticEignvalueFEMModel(
         theta=theta,
         maxit=maxit,
         step=step,
-        n=6,  # 初始网格加密次数
+        n=8,  # 初始网格加密次数
         p=1,  # 线性元
         q=3,  # 积分精度
-        resultdir='/home/why/result/',
-        sigma=None,
+        resultdir=sys.argv[4],
+        maxdof=2e5,
+        sigma=10,
+        matlab=True,
         multieigs=False)
 
 u1 = model.alg_3_1()
