@@ -7,3 +7,4 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .MonomialSpace2d import MonomialSpace2d
 from .PrismFiniteElementSpace import CPPFEMDof3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
+from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
