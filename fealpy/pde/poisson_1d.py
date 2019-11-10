@@ -11,13 +11,13 @@ class CosData:
         mesh = IntervalMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
-        
+
     def solution(self, p):
         """ the exact solution
         """
         u = np.cos(np.pi*p)
         return u
-    
+
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -25,11 +25,11 @@ class CosData:
         sin = np.sin
         cos = np.cos
         val = -pi*sin(pi*p)
-        return val[..., np.newaxis]
+        return val
 
     def source(self, p):
         val = np.pi**2*np.cos(np.pi*p)
-        return val 
+        return val
 
     def dirichlet(self, p):
         """Dilichlet boundary condition
