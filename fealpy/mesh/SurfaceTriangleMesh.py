@@ -35,14 +35,15 @@ class SurfaceTriangleMesh():
         self.mesh = mesh
         self.p = p
         self.space = LagrangeFiniteElementSpace(mesh, p)
-        if scale is None:
-            self.node, d = surface.project(self.space.interpolation_points())
-        else:
-            self.node, d = surface.project(self.space.interpolation_points()/scale)
-            self.node *= scale
-
         self.surface = surface
         self.ds = mesh.ds
+
+        if scale is None:
+            self.node, d = self.surface.project(self.space.interpolation_points())
+        else:
+            self.node, d = self.surface.project(self.space.interpolation_points()/scale)
+            self.node *= scale
+
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.nodedata = {}
