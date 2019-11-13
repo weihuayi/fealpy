@@ -28,6 +28,9 @@ class SurfacePoissonFEMModel(object):
         e = np.einsum('i, ij->j', ws, l)
         e *= self.area
         return np.sqrt(e)
+    
+    def get_grad_basis(self, bc):
+        return self.space.grad_basis(bc, returncond=True)
 
     def get_left_matrix(self):
         return self.space.stiff_matrix()

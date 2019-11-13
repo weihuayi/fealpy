@@ -4,7 +4,7 @@ from scipy.sparse import coo_matrix, csr_matrix, spdiags
 from .function import Function
 from ..common import ranges
 from .femdof import CPLFEMDof2d, DPLFEMDof2d
-from ..mesh.SurfaceTriangleMesh import SurfaceTriangleMesh
+from fealpy.mesh import SurfaceTriangleMesh
 from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
 
 
@@ -57,14 +57,11 @@ class SurfaceLagrangeFiniteElementSpace:
                 self.dim = 2
 
         if q is None:
-            self.integrator = mesh.integrator(p+1)
+            self.integrator = self.mesh.integrator(p+1)
         else:
-            self.integrator = mesh.integrator(q)
+            self.integrator = self.mesh.integrator(q)
 
-        self.integralalg = FEMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                self.cellmeasure)
+        self.integralalg = FEMeshIntegralAlg(self.integrator, self.mesh, self.cellmeasure)
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
@@ -94,7 +91,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
-        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, cellmeasure, optimize=True)
+        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, self.cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
@@ -123,16 +120,20 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         return self.mesh.space.basis(bc)
 
-    def grad_basis(self, bc, cellidx=None):
+    def grad_basis(self, bc, cellidx=None, returncond=False):
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
         Jp, grad = self.mesh.jacobi_matrix(bc, cellidx=cellidx)
         Gp = np.einsum('...ijk, ...imk->...ijm', Jp, Jp)
         Gp = np.linalg.inv(Gp)
+        Gp_cond = np.linalg.cond(Gp)
         grad = np.einsum('...ijk, ...imk->...imj', Gp, grad)
         grad = np.einsum('...ijk, ...imj->...imk', Jp, grad)
-        return grad
+        if returncond is True:
+            return grad, Gp_cond
+        else:
+            return grad
 
     def grad_basis_on_surface(self, bc, cellidx=None):
         Js, grad, ps = self.mesh.surface_jacobi_matrix(bc, cellidx=cellidx)

@@ -4,9 +4,13 @@ import mpl_toolkits.mplot3d as a3
 import pylab as pl
 from fealpy.geometry import Circle
 from fealpy.geometry import Sphere, HeartSurface, EllipsoidSurface,TorusSurface, OrthocircleSurface, QuarticsSurface
+
+
+
+
 surface =  HeartSurface()
 mesh = surface.init_mesh()
-mesh.uniform_refine(n=4, surface=surface)
+mesh.uniform_refine(n=0, surface=surface)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 
