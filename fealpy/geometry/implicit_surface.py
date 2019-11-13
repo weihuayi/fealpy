@@ -213,8 +213,8 @@ class HeartSurface:
         grad = self.gradient(p)
         l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
         n = grad/l
-        return n 
-    
+        return n
+
     def hessian(self, p):
         x = p[..., 0]
         y = p[..., 1]

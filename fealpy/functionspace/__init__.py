@@ -1,4 +1,5 @@
 from .lagrange_fem_space import LagrangeFiniteElementSpace
+from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from .mixed_fem_space import RTFiniteElementSpace2d
 from .vem_space import VEMDof2d, VirtualElementSpace2d
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d

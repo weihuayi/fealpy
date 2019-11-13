@@ -6,7 +6,9 @@ from timeit import default_timer as timer
 
 
 class CPPFEMDof3d():
-
+    """
+    自由度管理类.
+    """
     def __init__(self, mesh, p=1):
         self.mesh = mesh
         self.p = p
@@ -15,6 +17,9 @@ class CPPFEMDof3d():
         self.cell_to_dof_new()
 
     def multi_index_matrix(self, TD):
+        """
+        一维和二维的多重指标.
+        """
         p = self.p
         if TD == 1:
             ldof = self.number_of_local_dofs()
@@ -33,10 +38,17 @@ class CPPFEMDof3d():
             return multiIndex
 
     def number_of_local_dofs(self):
+        """
+        每个单元上的自由度的个数.
+        """
         p = self.p
         return (p+1)*(p+1)*(p+2)//2
 
     def number_of_global_dofs(self):
+        """
+        全部自由度的个数.
+        """
+
         p = self.p
         mesh = self.mesh
         NN = mesh.number_of_nodes()
@@ -57,6 +69,9 @@ class CPPFEMDof3d():
         return gdof
 
     def cell_to_dof(self):
+        """
+        每个单元对应的全局自由度的编号.
+        """
         p = self.p
         mesh = self.mesh
         NN = mesh.number_of_nodes()
