@@ -34,7 +34,7 @@ class DirichletBC:
         T = spdiags(1-bdIdx, 0, gdof, gdof)
         A = T@A@T + Tbd
 
-        b[isBdDof] = x[isBdDof] 
+        b[isBdDof] = x[isBdDof]
         return A, b
 
     def apply_on_matrix(self, A):
