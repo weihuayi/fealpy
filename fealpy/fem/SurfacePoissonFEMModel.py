@@ -12,9 +12,9 @@ class SurfacePoissonFEMModel(object):
     def __init__(self, mesh, pde, p, q, p0=None):
         """
         """
-        self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.sphere, p=p, p0=p0)
+        self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p, p0=p0)
         self.mesh = self.space.mesh
-        self.surface = pde.sphere
+        self.surface = pde.surface
         self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
