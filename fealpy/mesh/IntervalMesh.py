@@ -122,6 +122,8 @@ class IntervalMesh():
             NN = self.node.shape[0]
             self.ds.reinit(NN, ncell)
 
+    def refine(self, isMarkedCell):
+        pass
 
 
 
