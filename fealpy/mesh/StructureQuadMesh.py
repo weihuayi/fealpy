@@ -64,6 +64,7 @@ class StructureQuadMesh(Mesh2d):
 
 class StructureQuadMeshDataStructure:
     localEdge = np.array([(0,1),(1,2),(2,3),(3,0)])
+    ccw = np.array([0, 1, 2, 3])
     V = 4
     E = 4
     F = 1
@@ -74,8 +75,7 @@ class StructureQuadMeshDataStructure:
         self.NE = ny*(nx+1) + nx*(ny+1)
         self.NC = nx*ny
         self.itype = itype
-
-    
+ 
     @property
     def cell(self):
 
