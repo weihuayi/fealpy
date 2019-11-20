@@ -215,6 +215,16 @@ class HeartSurface:
         n = grad/l
         return n
 
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        div = 6 - 4*x + 12*z**2
+        div = div[..., np.newaxis]/l
+        return div
+
     def hessian(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -350,9 +360,9 @@ class TorusSurface:
     def __call__(self, *args):
         if len(args) == 1:
             p, = args
-            x = p[..., :, 0]
-            y = p[..., :, 1]
-            z = p[..., :, 2]
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
         elif len(args) == 3:
             x, y, z = args
         else:
@@ -365,18 +375,17 @@ class TorusSurface:
         return p0, d
 
     def gradient(self, p):
-        x = p[..., :, 0]
-        y = p[..., :, 1]
-        z = p[..., :, 2]
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
         s1 = np.sqrt(x**2 + y**2)
         s2 = np.sqrt(s1**2 + z**2 + 16 - 8*s1)
         grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[..., :, 0] = -(4 - s1)*x/(s1*s2) 
-        grad[..., :, 1] = -(4 - s1)*y/(s1*s2) 
-        grad[..., :, 2] = z/s2 
+        grad[..., 0] = -(4 - s1)*x/(s1*s2)
+        grad[..., 1] = -(4 - s1)*y/(s1*s2)
+        grad[..., 2] = z/s2
         return grad
 
-    
     def hessian(self, p):
         x = p[..., :, 0]
         y = p[..., :, 1]
@@ -384,17 +393,16 @@ class TorusSurface:
         H = np.zeros((len(p), 3, 3), dtype=np.float)
         S = np.sqrt(x**2+y**2)
 
-        H[..., :, 0, 0] = -(x-4*x/S)**2 + 1+4*x**2/S**3-4/S
-        H[..., :, 0, 1] = x*y*(1-4/S)**2 + 4*x*y/S**3
-        H[..., :, 1, 0] = H[..., :, 0, 1]
-        H[..., :, 0, 2] = -(x-4*x/S)*z
-        H[..., :, 2, 0] = H[..., :, 0, 2]
-        H[..., :, 1, 1] = -(y-4*y/S)**2 + 1+4*y**2/S**3-4/S
-        H[..., :, 1, 2] = (y-4*y/S)*z
-        H[..., :, 2, 1] = H[..., :, 1, 2]
-        H[..., :, 2, 2] = -z**2+1
+        H[..., 0, 0] = -(x-4*x/S)**2 + 1+4*x**2/S**3-4/S
+        H[..., 0, 1] = x*y*(1-4/S)**2 + 4*x*y/S**3
+        H[..., 1, 0] = H[..., 0, 1]
+        H[..., 0, 2] = -(x-4*x/S)*z
+        H[..., 2, 0] = H[..., 0, 2]
+        H[..., 1, 1] = -(y-4*y/S)**2 + 1+4*y**2/S**3-4/S
+        H[..., 1, 2] = (y-4*y/S)*z
+        H[..., 2, 1] = H[..., 1, 2]
+        H[..., 2, 2] = -z**2+1
         return H
-    
 
     def jacobi_matrix(self, p):
         H = self.hessian(p)
@@ -410,7 +418,7 @@ class TorusSurface:
         l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
         n = grad/l
         return n
-    
+
     def init_mesh(self, meshdata=None):
         import scipy.io as sio
         from fealpy.mesh import TriangleMesh
