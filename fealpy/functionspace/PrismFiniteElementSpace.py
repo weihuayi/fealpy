@@ -244,13 +244,3 @@ class PrismFiniteElementSpace():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
-
-
-"""
-        dtype = np.dtype([('nidx', np.int), ('widx', np.int8)])
-        ps = np.zeros((NC, ldof, 6), dtype=dtype)
-        ps['nidx'][:, :, :] = cell[:, np.newaxis, :]
-        ps['widx'][:, :, :] = w[np.newaxis, :, :]
-        ps['nidx'][ps['widx'] == 0] = -1
-        ps.sort()
-"""

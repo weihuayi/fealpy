@@ -61,6 +61,21 @@ class PrismMesh(Mesh3d):
         p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
         return p.reshape(n0*n1, NC, 3)
 
+    def cell_volume(self):
+        pass
+
+    def jacobi_matrix(self, bc):
+        bc0 = bc[0]
+        bc1 = bc[1]
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        n0 = bc0.shape[0]
+        n1 = bc1.shape[0]
+        NC = self.number_of_cells()
+        shape = (n0, n1, NC, 3, 3)
+        J = np.zeros(shape, dtype=self.ftype)
+
     def multi_index_matrix_2(self):
         p = 2
         ldof = (p+1)*(p+2)//2
