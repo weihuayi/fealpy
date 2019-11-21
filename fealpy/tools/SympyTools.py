@@ -21,6 +21,7 @@ class SympyTools():
         div_n = sym.simplify(div_n)
         hessian = Matrix(derive_by_array(gradient, var)).reshape(m, m)
         laplace = trace(hessian)
+        laplace = sym.simplify(laplace)
         val = {'grad': gradient, 'Hessian': hessian, 'Laplace': laplace,
                 'unit_normal':n, 'div_unit_normal':div_n}
         if returnlatex is False:
