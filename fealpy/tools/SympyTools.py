@@ -1,17 +1,35 @@
 from sympy import *
+import sympy as sym
+import sympy.printing as printing
 
-class SympyTools:
 
+class SympyTools():
     def __init__(self):
         pass
 
-    def symbols(self, s):
-        return symbols(s)
+    def symbols(self, var):
+        return symbols(var)
 
-    def laplace_model(self, u, var):
-        from sympy.tensor.array import derive_by_array
-        grad = derive_by_array(u, var)
-        hess = derive_by_array(grad, var)
-        source = -hess.trace()
-        return {'grad': grad, 'Hessian': hess, 'source': source}
+    def model(self, u, var, returnlatex=False):
+        from sympy.tensor.array import derive_by_array, tensorproduct
+        m = len(var)
+        gradient = Matrix(derive_by_array(u, var))
+        length = sqrt(trace(Matrix(tensorproduct(gradient, gradient)).reshape(m, m)))
+        n = gradient/length
+        div = Matrix(derive_by_array(n, var)).reshape(m, m)
+        div_n = trace(div)
+        div_n = sym.simplify(div_n)
+        hessian = Matrix(derive_by_array(gradient, var)).reshape(m, m)
+        laplace = trace(hessian)
+        val = {'grad': gradient, 'Hessian': hessian, 'Laplace': laplace,
+                'unit_normal':n, 'div_unit_normal':div_n}
+        if returnlatex is False:
+            return val
+        else:
+            print('grad:\n', printing.latex(val['grad']))
+            print('Hessian:\n', printing.latex(val['Hessian']))
+            print('Laplace:\n', printing.latex(val['Laplace']))
+            print('unit_normal:\n', printing.latex(val['unit_normal']))
+            print('div_unit_normal:\n', printing.latex(val['div_unit_normal']))
+
 
