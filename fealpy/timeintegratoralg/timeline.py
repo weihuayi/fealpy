@@ -16,11 +16,11 @@ class UniformTimeLine():
     def get_current_time_step(self):
         return self.current
 
-    def get_next_time(self):
-        return self.T0 + self.dt*(self.current)
+    def get_current_time(self):
+        return self.T0 + self.current*self.dt
 
-    def get_current_time_step_length(self):
-        return self.dt
+    def get_next_current_time(self):
+        return self.T0 + (self.current + 1)*self.dt
 
     def get_time_step_length(self):
         return self.dt
