@@ -85,6 +85,11 @@ class LagrangeFiniteElementSpace():
     def top_dimension(self):
         return self.TD
 
+    def grad_recovery(self, uh):
+        cellmeasure = self.cellmeasure
+        cell2dof = self.cell_to_dof()
+        bc = self.dof.multiIndex
+        pass
     def edge_basis(self, bc, cellidx, lidx, direction=True):
         """
         compute the basis function values at barycentric point bc on edge
