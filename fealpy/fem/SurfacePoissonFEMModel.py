@@ -3,12 +3,11 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
-from ..solver import solve
-from scipy.sparse.linalg import spsolve
+from fealpy.solver import MatlabSolver
 from ..boundarycondition import DirichletBC
 from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
 
-class SurfacePoissonFEMModel(object):
+class SurfacePoissonFEMModel():
     def __init__(self, mesh, pde, p, q, p0=None):
         """
         """
@@ -41,10 +40,13 @@ class SurfacePoissonFEMModel(object):
         return b
 
     def solve(self):
-        uh = self.uh
         u = self.pde.solution
         bc = DirichletBC(self.space, u, self.is_boundary_dof)
-        solve(self, uh, dirichlet=bc, solver='direct')
+        solver = MatlabSolver()
+        A = self.get_left_matrix()
+        b = self.get_right_vector()
+        AD, b = bc.apply(A, b)
+        self.uh[:] = solver.divide(AD, b)
 
     def is_boundary_dof(self, p):
         isBdDof = np.zeros(p.shape[0], dtype=np.bool)
