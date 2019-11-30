@@ -1,14 +1,13 @@
 import numpy as np
 
-
 class StructureMeshND:
     def __init__(self, box, N):
         self.box = box
         self.N = N
         self.GD = len(box)//2
 
-        self.ftype = type(box[0])
-        self.itype = np.int
+        self.ftype = np.float
+        self.itype = np.int32
 
     @property
     def node(self):
@@ -29,8 +28,9 @@ class StructureMeshND:
         box = self.box
         n = N//2
         k = np.mgrid[tuple(slice(-n, n+1) for i in range(GD))]
-        return node
+        return k
 
     def ps_coefficients_square(self):
+        GD = self.GD
         k = self.ps_coefficients()
         return np.sum(k**2, axis=0)
