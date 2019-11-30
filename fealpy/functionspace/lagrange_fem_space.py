@@ -86,10 +86,19 @@ class LagrangeFiniteElementSpace():
         return self.TD
 
     def grad_recovery(self, uh):
+        GD = self.GD
         cellmeasure = self.cellmeasure
+        gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        bc = self.dof.multiIndex
-        pass
+        p = self.p
+        bc = self.dof.multiIndex/p
+        gphi = uh.grad_value(bc)
+
+        guh = self.function(dim=GD)
+        deg = np.bincount(cell2dof, 1, minlength=gdof)
+        np.add.at(guh, (cell2dof, np.s_[:]), gphi)
+        return guh/deg.reshape(-1, 1)
+
     def edge_basis(self, bc, cellidx, lidx, direction=True):
         """
         compute the basis function values at barycentric point bc on edge
