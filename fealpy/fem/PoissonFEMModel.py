@@ -13,10 +13,8 @@ class PoissonFEMModel(object):
         self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
-
+        self.integrator = self.mesh.integrator(p+2)
     def recover_estimate(self, rguh):
-        if self.space.p > 1:
-            raise ValueError('This method only work for p=1!')
         qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
 

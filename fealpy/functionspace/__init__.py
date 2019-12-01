@@ -6,6 +6,7 @@ from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElement
 from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .MonomialSpace2d import MonomialSpace2d
-from .PrismFiniteElementSpace import CPPFEMDof3d, PrismFiniteElementSpace
+from .PrismFiniteElementSpace import PrismFiniteElementSpace
+from .femdof import CPPFEMDof3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace

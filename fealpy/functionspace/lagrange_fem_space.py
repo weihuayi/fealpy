@@ -87,17 +87,20 @@ class LagrangeFiniteElementSpace():
 
     def grad_recovery(self, uh):
         GD = self.GD
-        cellmeasure = self.cellmeasure
-        gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
         p = self.p
         bc = self.dof.multiIndex/p
-        gphi = uh.grad_value(bc)
-
-        guh = self.function(dim=GD)
-        deg = np.bincount(cell2dof, 1, minlength=gdof)
-        np.add.at(guh, (cell2dof, np.s_[:]), gphi)
-        return guh/deg.reshape(-1, 1)
+        guh = uh.grad_value(bc)
+        guh = guh.swapaxes(0, 1)
+        
+        sguh = self.function(dim=GD)
+        rguh = self.function(dim=GD)
+        deg = np.bincount(cell2dof.flat,minlength = gdof)
+        np.add.at(sguh, (cell2dof, np.s_[:]), guh)
+        
+        rguh[:] = sguh/deg.reshape(-1, 1)
+        return rguh
 
     def edge_basis(self, bc, cellidx, lidx, direction=True):
         """

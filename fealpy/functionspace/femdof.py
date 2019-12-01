@@ -109,7 +109,7 @@ class CPLFEMDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = multi_index_matrix2d()
+        self.multiIndex = multi_index_matrix2d(p)
         self.cell2dof = self.cell_to_dof()
 
     def is_on_node_local_dof(self):
