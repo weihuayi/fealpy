@@ -276,6 +276,9 @@ class ScaledMonomialSpace2d():
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
+    def mass_matrix(self):
+        return self.matrix_H()
+
     def matrix_H(self):
         p = self.p
         mesh = self.mesh

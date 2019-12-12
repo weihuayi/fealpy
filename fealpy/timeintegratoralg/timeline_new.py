@@ -16,19 +16,27 @@ class UniformTimeLine():
         self.dt = (self.T1 - self.T0)/NT
         self.current = 0
 
-    def get_number_of_time_levels(self):
+    def uniform_refine(self):
+        self.NL = 2*(self.NL - 1) + 1
+        self.dt = (self.T1 - self.T0)/(self.NL - 1)
+        self.current = 0
+
+    def number_of_time_levels(self):
         return self.NL
 
-    def get_current_time_level_index(self):
+    def all_time_levels(self):
+        return np.linspace(self.T0, self.T1, num=self.NL)
+
+    def current_time_level_index(self):
         return self.current
 
-    def get_current_time_level(self):
+    def current_time_level(self):
         return self.T0 + self.current*self.dt
 
-    def get_next_time_level(self):
+    def next_time_level(self):
         return self.T0 + (self.current + 1)*self.dt
 
-    def get_current_time_step_length(self):
+    def current_time_step_length(self):
         return self.dt
 
     def stop(self):
@@ -40,6 +48,15 @@ class UniformTimeLine():
     def reset(self):
         self.current = 0
 
+    def time_integration(self, uh, dmodel, solver):
+        self.reset()
+        while not self.stop():
+            A = dmodel.get_current_left_matrix(self)
+            b = dmodel.get_current_right_vector(uh[:, self.current], self)
+            AD, bd = dmodel.apply_boundary_condition()
+            uh[:, self.current+1] = solver(AD, bd)
+            self.current += 1
+        self.reset()
 
 class ChebyshevTimeLine():
     def __init__(self, T0, T1, NT):
@@ -58,19 +75,22 @@ class ChebyshevTimeLine():
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
 
-    def get_number_of_time_levels(self):
+    def number_of_time_levels(self):
         return self.NL
 
-    def get_current_time_level_index(self):
+    def all_time_levels(self):
+        return self.time
+
+    def current_time_level_index(self):
         return self.current
 
-    def get_current_time_level(self):
+    def current_time_level(self):
         return self.time[self.current]
 
-    def get_next_time_level(self):
+    def next_time_level(self):
         return self.time[self.current+1]
 
-    def get_current_time_step_length(self):
+    def current_time_step_length(self):
         return self.dt[self.current]
 
     def stop(self):
@@ -81,7 +101,6 @@ class ChebyshevTimeLine():
 
     def reset(self):
         self.current = 0
-
 
     def diff(self, F):
         d = np.zeros(F.shape, dtype=np.float)
