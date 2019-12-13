@@ -1,4 +1,5 @@
 import numpy as np
+from fealpy.mesh.simple_mesh_generator import triangle
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
 from fealpy.timeintegratoralg.timeline_new import ChebyshevTimeLine
 from fealpy.boundarycondition import DirichletBC
@@ -44,8 +45,9 @@ class ParabolicFEMModel():
         t0 = timeline.current_time_level()
         t1 = timeline.next_time_level()
         f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
+        #f0 = lambda x: self.pde.source(x, t1)
         F = self.space.source_vector(f0)
-        return self.M@uh - 0.5*dt*(self.A@uh -F)
+        return self.M@uh - 0.5*dt*(self.A@uh - F)
 
     def apply_boundary_condition(self, A, b, timeline):
         t1 = timeline.next_time_level()
@@ -64,18 +66,22 @@ class TimeIntegratorAlgTest():
     def test_ParabolicFEMModel_time(self, maxit=4):
         from fealpy.pde.parabolic_model_2d import SinSinExpData
         pde = SinSinExpData()
-        mesh = pde.init_mesh(10)
-        timeline = pde.time_mesh(0, 1, 10)
-        dmodel = ParabolicFEMModel(pde, mesh)
+        domain = pde.domain()
+        mesh = triangle(domain, h=0.01)
+        timeline = pde.time_mesh(0, 1, 2)
         error = np.zeros(maxit, dtype=mesh.ftype)
         for i in range(maxit):
             print(i)
+            dmodel = ParabolicFEMModel(pde, mesh)
             uh = dmodel.init_solution(timeline)
             uI = dmodel.interpolation(timeline)
             uh[:, 0] = uI[:, 0]
+
             timeline.time_integration(uh, dmodel, self.solver.divide)
+
             error[i] = np.max(np.abs(uh - uI))
             timeline.uniform_refine()
+            mesh.uniform_refine()
 
         print(error[:-1]/error[1:])
         print(error)

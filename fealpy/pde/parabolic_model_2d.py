@@ -13,6 +13,8 @@ class SinSinExpData:
     def __init__(self):
         self.diffusion_coefficient = 1
 
+    def domain(self):
+        return [0, 1, 0, 1]
     def time_mesh(self, t0, t1, NT, timeline='uniform'):
         if timeline is 'uniform':
             return UniformTimeLine(t0, t1, NT)
