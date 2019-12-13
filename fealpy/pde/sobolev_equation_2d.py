@@ -72,6 +72,7 @@ class SinSinExpData:
         val = np.zeros(p.shape, dtype=p.dtype)
         val[..., 0] = pi*np.cos(pi*x)*np.sin(pi*y)*np.exp(-t)
         val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)*np.exp(-t)
+        return val
 
     def flux(self, p, t):
         nu = self.nu

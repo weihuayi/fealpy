@@ -130,6 +130,25 @@ class WeakGalerkinSpace2d:
         H = np.einsum('i, ik, im, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 
+    def cell_to_dof(self):
+        return self.dof.cell2dof, self.dof.cell2dofLocation
+
+    def weak_grad(self, uh):
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
+        R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
+        c2d = self.smspace.cell_to_dof()
+        ph = self.smspace.function(dim=2)
+
+        f0 = lambda x: x[0]@(x[1]@uh[x[2]])
+        ph[:, 0] = np.concatenate(list(map(f0, zip(self.H0, R0, cd))))
+        ph[:, 1] = np.concatenate(list(map(f0, zip(self.H0, R1, cd))))
+        return ph
+
+    def weak_div(self):
+        pass
+
     def weak_matrix(self):
         """
         计算单元上的弱梯度和弱散度算子的右端矩阵
@@ -149,13 +168,13 @@ class WeakGalerkinSpace2d:
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
         phi1 = self.smspace.basis(
-                ps[::-1, isInEdge, :],
+                ps[:, isInEdge, :],
                 cellidx=edge2cell[isInEdge, 1]
                 )
         phi = self.edge_basis(bcs)
 
         F0 = np.einsum('i, ijm, in, j->mjn', ws, phi0, phi, h)
-        F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi, h[isInEdge])
+        F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi[:, -1::-1], h[isInEdge])
 
         smldof = self.smspace.number_of_local_dofs()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
@@ -166,11 +185,12 @@ class WeakGalerkinSpace2d:
                 edge2cell[:, [2]]*(p+1) + np.arange(p+1)
         R0[:, idx] = n[np.newaxis, :, [0]]*F0
         R1[:, idx] = n[np.newaxis, :, [1]]*F0
-        idx = cell2dofLocation[edge2cell[isInEdge, 1]].reshape(-1, 1) + \
-                edge2cell[isInEdge, [3]].reshape(-1, 1)*(p+1) + np.arange(p+1)
-        n = n[isInEdge]
-        R0[:, idx] = n[np.newaxis, :, [0]]*F1
-        R1[:, idx] = n[np.newaxis, :, [1]]*F1
+        if isInEdge.sum() > 0:
+            idx = cell2dofLocation[edge2cell[isInEdge, 1]].reshape(-1, 1) + \
+                    (p+1)*edge2cell[isInEdge, [3]].reshape(-1, 1) + np.arange(p+1)
+            n = n[isInEdge]
+            R0[:, idx] = n[np.newaxis, :, [0]]*F1
+            R1[:, idx] = n[np.newaxis, :, [1]]*F1
 
         def f(x, cellidx):
             gphi = self.grad_basis(x, cellidx)
