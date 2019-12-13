@@ -1,3 +1,4 @@
+import numpy as np
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
 from fealpy.timeintegratoralg.timeline_new import ChebyshevTimeLine
 from fealpy.boundarycondition import DirichletBC
@@ -8,7 +9,7 @@ class ParabolicFEMModel():
     def __init__(self, pde, mesh, p=1, q=6):
         from fealpy.functionspace import LagrangeFiniteElementSpace
         from fealpy.boundarycondition import DirichletBC
-        self.space = LagrangeFiniteElementSpace(mesh, p, q)
+        self.space = LagrangeFiniteElementSpace(mesh, p)
         self.mesh = self.space.mesh
         self.pde = pde
 
@@ -39,16 +40,16 @@ class ParabolicFEMModel():
         return self.M + 0.5*dt*self.A
 
     def get_current_right_vector(self, uh, timeline):
-        dt = self.timeline.current_time_step_length()
-        t0 = self.timeline.current_time_level()
-        t1 = self.timeline.next_time_level()
-        F = self.space.source_vector(
-                lambda x:self.pde.source(x, t0) + self.pde.source(x, t1)
-                )
+        dt = timeline.current_time_step_length()
+        t0 = timeline.current_time_level()
+        t1 = timeline.next_time_level()
+        f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
+        F = self.space.source_vector(f0)
         return self.M@uh - 0.5*dt*(self.A@uh -F)
 
-    def apply_boundary_condition(self, A, b):
-        bc = DirichletBC(self.space, self.pde.dirichlet)
+    def apply_boundary_condition(self, A, b, timeline):
+        t1 = timeline.next_time_level()
+        bc = DirichletBC(self.space, lambda x:self.pde.dirichlet(x, t1))
         A, b = bc.apply(A, b)
         return A, b
 
@@ -60,20 +61,24 @@ class TimeIntegratorAlgTest():
     def __init__(self):
         self.solver = MatlabSolver()
 
-    def test_ParabolicFEMModel_time(self):
+    def test_ParabolicFEMModel_time(self, maxit=4):
         from fealpy.pde.parabolic_model_2d import SinSinExpData
         pde = SinSinExpData()
-        mesh = pde.init_mesh(6)
+        mesh = pde.init_mesh(10)
         timeline = pde.time_mesh(0, 1, 10)
         dmodel = ParabolicFEMModel(pde, mesh)
-        for i in range(4):
+        error = np.zeros(maxit, dtype=mesh.ftype)
+        for i in range(maxit):
+            print(i)
             uh = dmodel.init_solution(timeline)
             uI = dmodel.interpolation(timeline)
             uh[:, 0] = uI[:, 0]
             timeline.time_integration(uh, dmodel, self.solver.divide)
-            error = np.max(np.abs(uh - uI))
-            print(error)
+            error[i] = np.max(np.abs(uh - uI))
             timeline.uniform_refine()
+
+        print(error[:-1]/error[1:])
+        print(error)
 
 
 

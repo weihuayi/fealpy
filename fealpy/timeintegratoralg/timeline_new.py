@@ -53,8 +53,8 @@ class UniformTimeLine():
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
             b = dmodel.get_current_right_vector(uh[:, self.current], self)
-            AD, bd = dmodel.apply_boundary_condition()
-            uh[:, self.current+1] = solver(AD, bd)
+            A, b = dmodel.apply_boundary_condition(A, b, self)
+            uh[:, self.current+1] = solver(A, b)
             self.current += 1
         self.reset()
 

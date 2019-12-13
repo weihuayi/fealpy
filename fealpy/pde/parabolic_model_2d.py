@@ -53,8 +53,8 @@ class SinSinExpData:
     def solution(self, p, t):
         """ The exact solution
         """
-        x = p[:, 0]
-        y = p[:, 1]
+        x = p[..., 0]
+        y = p[..., 1]
         pi = np.pi
         u = np.sin(pi*x)*np.sin(pi*y)*np.exp(-t)
         return u
@@ -69,7 +69,7 @@ class SinSinExpData:
     def dirichlet(self, p, t):
         """ Dilichlet boundary condition
         """
-        return 0.0
+        return self.solution(p, t)
 
 class SinCosExpData:
     def __init__(self):
