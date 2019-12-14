@@ -138,7 +138,6 @@ class WeakGalerkinSpace2d:
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
         R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
-        c2d = self.smspace.cell_to_dof()
         ph = self.smspace.function(dim=2)
 
         f0 = lambda x: x[0]@(x[1]@uh[x[2]])
@@ -151,9 +150,7 @@ class WeakGalerkinSpace2d:
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
         R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
-        c2d = self.smspace.cell_to_dof()
         dh = self.smspace.function()
-
         f0 = lambda x: x[0]@(x[1]@ph[x[3], 0] + x[2]@ph[x[3], 1])
         dh[:] = np.concatenate(list(map(f0, zip(self.H0, R0, R1, cd))))
         return dh
