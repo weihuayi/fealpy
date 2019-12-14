@@ -74,6 +74,10 @@ class SinSinExpData:
         val[..., 1] = pi*np.sin(pi*x)*np.cos(pi*y)*np.exp(-t)
         return val
 
+    def laplace(self, p, t):
+        val = -2*np.pi**2*self.solution(p, t)
+        return val
+
     def flux(self, p, t):
         nu = self.nu
         epsilon = self.epsilon

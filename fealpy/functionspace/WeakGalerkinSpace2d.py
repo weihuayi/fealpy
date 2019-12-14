@@ -146,8 +146,17 @@ class WeakGalerkinSpace2d:
         ph[:, 1] = np.concatenate(list(map(f0, zip(self.H0, R1, cd))))
         return ph
 
-    def weak_div(self):
-        pass
+    def weak_div(self, ph):
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
+        R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
+        c2d = self.smspace.cell_to_dof()
+        dh = self.smspace.function()
+
+        f0 = lambda x: x[0]@(x[1]@ph[x[3], 0] + x[2]@ph[x[3], 1])
+        dh[:] = np.concatenate(list(map(f0, zip(self.H0, R0, R1, cd))))
+        return dh
 
     def weak_matrix(self):
         """
@@ -189,8 +198,8 @@ class WeakGalerkinSpace2d:
             idx = cell2dofLocation[edge2cell[isInEdge, 1]].reshape(-1, 1) + \
                     (p+1)*edge2cell[isInEdge, [3]].reshape(-1, 1) + np.arange(p+1)
             n = n[isInEdge]
-            R0[:, idx] = n[np.newaxis, :, [0]]*F1
-            R1[:, idx] = n[np.newaxis, :, [1]]*F1
+            R0[:, idx] = -n[np.newaxis, :, [0]]*F1
+            R1[:, idx] = -n[np.newaxis, :, [1]]*F1
 
         def f(x, cellidx):
             gphi = self.grad_basis(x, cellidx)
@@ -237,7 +246,7 @@ class WeakGalerkinSpace2d:
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def projection(self, u):
+    def projection(self, u, dim=1):
 
         p = self.p
         mesh = self.mesh
@@ -246,24 +255,32 @@ class WeakGalerkinSpace2d:
         h = mesh.entity_measure('edge')
         NE = mesh.number_of_edges()
 
-        uh = self.function()
+        uh = self.function(dim=dim)
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         uI = u(ps)
-        ephi = self.edge_basis(bcs)
-        b = np.einsum('i, ij, ik, j->jk', ws, uI, ephi, h)
 
-        f0 = lambda x: x[0]@x[1]
-        uh[:NE*(p+1)] = np.concatenate(list(map(f0, zip(self.H1, b))))
+        ephi = self.edge_basis(bcs)
+        b = np.einsum('i, ij..., ik, j->j...k', ws, uI, ephi, h)
+        if dim == 1:
+            uh[:NE*(p+1), ...].flat = (self.H1@b[:, :, np.newaxis]).flat
+        else:
+            uh[:NE*(p+1), ...].flat = (self.H1@b).flat
+
+        t = 'd'
+        s = '...{}, ...m->...m{}'.format(t[:dim>1], t[:dim>1])
 
         def f1(x, cellidx):
             phi = self.basis(x, cellidx)
-            return np.einsum('..., ...m->...m', u(x), phi)
-        b = self.integralalg.integral(f1, celltype=True)
+            return np.einsum(s, u(x), phi)
 
-        uh[NE*(p+1):] = np.concatenate(list(map(f0, zip(self.H0, b))))
+        b = self.integralalg.integral(f1, celltype=True)
+        if dim in [None, 1]:
+            uh[NE*(p+1):, ...].flat = (self.H0@b[:, :, np.newaxis]).flat
+        else:
+            uh[NE*(p+1):, ...].flat = (self.H0@b).flat
         return uh
 
 
@@ -273,7 +290,7 @@ class WeakGalerkinSpace2d:
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim is None:
+        if dim in [None, 1]:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)
