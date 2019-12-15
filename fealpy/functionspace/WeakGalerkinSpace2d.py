@@ -71,6 +71,44 @@ class WGDof2d():
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge,
             3]*(p+1)).reshape(-1, 1) + np.arange(p+1)
+        cell2dof[idx] = edge2dof[isInEdge]
+
+        NV = mesh.number_of_vertices_of_cells()
+        NE = mesh.number_of_edges()
+        idof = (p+1)*(p+2)//2
+        idx = (cell2dofLocation[:-1] + NV*(p+1)).reshape(-1, 1) + np.arange(idof)
+        cell2dof[idx] = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
+        return cell2dof, cell2dofLocation
+
+    def cell_to_dof_1(self):
+        """
+        Construct the cell2dof array which are 1D array with a location array
+        cell2dofLocation. 
+
+        The following code give the dofs of i-th cell.
+
+        cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
+        """
+        p = self.p
+        mesh = self.mesh
+        cellLocation = mesh.ds.cellLocation
+        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+
+        NC = mesh.number_of_cells()
+
+        ldof = self.number_of_local_dofs()
+        cell2dofLocation = np.zeros(NC+1, dtype=np.int)
+        cell2dofLocation[1:] = np.add.accumulate(ldof)
+        cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
+
+        edge2dof = self.edge_to_dof()
+        edge2cell = mesh.ds.edge_to_cell()
+        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*(p+1) + np.arange(p+1)
+        cell2dof[idx] = edge2dof
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge,
+            3]*(p+1)).reshape(-1, 1) + np.arange(p+1)
         cell2dof[idx] = edge2dof[isInEdge, p::-1]
 
         NV = mesh.number_of_vertices_of_cells()
@@ -107,28 +145,17 @@ class WeakGalerkinSpace2d:
 
         self.dof = WGDof2d(mesh, p)
 
-        self.integrator = self.smspace.integrator
         self.integralalg = self.smspace.integralalg
-        self.H0 = inv(self.smspace.mass_matrix())
-        self.H1 = inv(self.edge_mass_matrix())
-        self.R0, self.R1 = self.weak_matrix()
+
+        self.H0 = inv(self.smspace.cell_mass_matrix())
+        self.H1 = inv(self.smspace.edge_mass_matrix())
+        self.R0, self.R1 = self.left_weak_matrix()
 
     def number_of_local_dofs(self):
         return self.dof.number_of_local_dofs()
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
-
-    def edge_mass_matrix(self):
-        p = self.p
-        mesh = self.mesh
-        edge = mesh.entity('edge')
-        measure = mesh.entity_measure('edge')
-        qf = GaussLegendreQuadrature(p + 3)
-        bcs, ws = qf.quadpts, qf.weights
-        phi = self.edge_basis(bcs)
-        H = np.einsum('i, ik, im, j->jkm', ws, phi, phi, measure, optimize=True)
-        return H
 
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
@@ -155,9 +182,9 @@ class WeakGalerkinSpace2d:
         dh[:] = np.concatenate(list(map(f0, zip(self.H0, R0, R1, cd))))
         return dh
 
-    def weak_matrix(self):
+    def left_weak_matrix(self):
         """
-        计算单元上的弱梯度和弱散度算子的右端矩阵
+        计算单元上的弱梯度和弱散度投影算子的右端矩阵
         """
         p = self.p
         mesh = self.mesh
@@ -166,7 +193,7 @@ class WeakGalerkinSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        h = mesh.entity_measure('edge')
+        h = self.integralalg.edgemeasure
         n = mesh.edge_unit_normal()
 
         qf = GaussLegendreQuadrature(p + 3)
@@ -179,8 +206,11 @@ class WeakGalerkinSpace2d:
                 )
         phi = self.edge_basis(bcs)
 
-        F0 = np.einsum('i, ijm, in, j->mjn', ws, phi0, phi, h)
-        F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi[:, -1::-1], h[isInEdge])
+        F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
+        F1 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])
+
+        #F0 = np.einsum('i, ijm, in, j->mjn', ws, phi0, phi, h)
+        #F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi[:, -1::-1], h[isInEdge])
 
         smldof = self.smspace.number_of_local_dofs()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
@@ -228,6 +258,9 @@ class WeakGalerkinSpace2d:
         return self.smspace.grad_value(uh[NE*(p+1):, ...], point, cellidx=cellidx)
 
     def edge_basis(self, bc):
+        return self.smspace.edge_basis(bc)
+
+    def lagrange_edge_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
         multiIndex = self.dof.multiIndex1d
         c = np.arange(1, p+1, dtype=np.int)
@@ -250,7 +283,8 @@ class WeakGalerkinSpace2d:
 
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'[:dim]
-        s1 = '...j, ij{}->...i{}'.format(s0, s0)
+        s1 = '...ij, ij{}->...i{}'.format(s0, s0)
+        #s1 = '...j, ij{}->...i{}'.format(s0, s0)
         val = np.einsum(s1, phi, uh[edge2dof])
         return val
 
@@ -270,7 +304,8 @@ class WeakGalerkinSpace2d:
         uI = u(ps)
 
         ephi = self.edge_basis(bcs)
-        b = np.einsum('i, ij..., ik, j->jk...', ws, uI, ephi, h)
+        b = np.einsum('i, ij..., ijk, j->jk...', ws, uI, ephi, h)
+        #b = np.einsum('i, ij..., ik, j->jk...', ws, uI, ephi, h)
         if dim == 1:
             uh[:NE*(p+1), ...].flat = (self.H1@b[:, :, np.newaxis]).flat
         else:

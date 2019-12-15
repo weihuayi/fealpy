@@ -1,40 +1,42 @@
 import numpy as np
+from .GaussLobattoQuadrature import GaussLobattoQuadrature
+from .GaussLegendreQuadrature import GaussLegendreQuadrature
 
 class PolygonMeshIntegralAlg():
-    def __init__(self, integrator, pmesh, area=None, barycenter=None):
+    def __init__(self, pmesh, q, cellmeasure=None, cellbarycenter=None):
         self.pmesh = pmesh
-        self.integrator = integrator
-        if area is None:
-            self.area = pmesh.entity_measure('cell')
-        else:
-            self.area = area
 
-        if barycenter is None:
-            self.barycenter = pmesh.entity_barycenter('cell')
-        else:
-            self.barycenter = barycenter
+        self.cellmeasure = cellmeasure if cellmeasure is not None \
+                else pmesh.entity_measure('cell')
+        self.cellbarycenter = cellbarycenter if cellbarycenter is not None \
+                else pmesh.entity_barycenter('cell')
+        self.cellintegrator = pmesh.integrator(q)
 
-    def triangle_area(self, tri):
+        self.edgemeasure = pmesh.entity_measure('edge')
+        self.edgebarycenter = pmesh.entity_barycenter('edge')
+        self.edgeintegrator = GaussLegendreQuadrature(q)
+
+    def triangle_measure(self, tri):
         v1 = tri[1] - tri[0]
         v2 = tri[2] - tri[0]
         area = np.cross(v1, v2)/2
         return area
 
-    def integral(self, u, celltype=False):
+    def integral(self, u, celltype=False, q=None):
         pmesh = self.pmesh
         node = pmesh.node
-        bc = self.barycenter
+        bc = self.cellbarycenter
 
         edge = pmesh.ds.edge
         edge2cell = pmesh.ds.edge2cell
 
         NC = pmesh.number_of_cells()
 
-        qf = self.integrator
+        qf = self.cellintegrator if q is None else self.pmesh.integrator(q)
         bcs, ws = qf.quadpts, qf.weights
 
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
-        a = self.triangle_area(tri)
+        a = self.triangle_measure(tri)
         pp = np.einsum('ij, jkm->ikm', bcs, tri)
         val = u(pp, edge2cell[:, 0])
 
@@ -51,7 +53,7 @@ class PolygonMeshIntegralAlg():
                     node[edge[isInEdge, 1]],
                     node[edge[isInEdge, 0]]
                     ]
-            a = self.triangle_area(tri)
+            a = self.triangle_measure(tri)
             pp = np.einsum('ij, jkm->ikm', bcs, tri)
             val = u(pp, edge2cell[isInEdge, 1])
             ee = np.einsum('i, ij..., j->j...', ws, val, a)
@@ -62,13 +64,13 @@ class PolygonMeshIntegralAlg():
         else:
             return e.sum(axis=0)
 
-    def fun_integral(self, f, celltype=False):
+    def fun_integral(self, f, celltype=False, q=None):
         def u(x, cellidx):
             return f(x)
-        return self.integral(u, celltype)
+        return self.integral(u, celltype=celltype, q=q)
 
-    def error(self, efun, celltype=False, power=None):
-        e = self.integral(efun, celltype=celltype)
+    def error(self, efun, celltype=False, power=None, q=None):
+        e = self.integral(efun, celltype=celltype, q=q)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
             if n > 0:
@@ -82,17 +84,17 @@ class PolygonMeshIntegralAlg():
         else:
             return e
 
-    def L1_error(self, u, uh, celltype=False):
+    def L1_error(self, u, uh, celltype=False, q=None):
         def f(x, cellidx):
             return np.abs(u(x) - uh(x, cellidx))
-        e = self.integral(f, celltype=celltype)
+        e = self.integral(f, celltype=celltype, q=q)
         return e
 
-    def L2_error(self, u, uh, celltype=False):
+    def L2_error(self, u, uh, celltype=False, q=None):
         #TODO: deal with u is a discrete Function 
         def f(x, cellidx):
             return (u(x) - uh(x, cellidx))**2
-        e = self.integral(f, celltype=celltype)
+        e = self.integral(f, celltype=celltype, q=q)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
             if n > 0:
@@ -103,8 +105,27 @@ class PolygonMeshIntegralAlg():
 
         return np.sqrt(e)
 
-    def Lp_error(self, u, uh, p, celltype=False):
+    def edge_L2_error(self, u, uh, celltype=False, q=None):
+        mesh = self.pmesh
+        NE = mesh.number_of_edges()
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        p = uh.space.p
+
+        qf = self.edgeintegrator if q is None else GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+        val = u(ps) - uh.edge_value(bcs)
+        e = np.sqrt(np.sum(
+                np.einsum(
+                    'i, ij..., ij..., j->...', ws, val, val, self.edgemeasure
+                    )/NE)
+                )
+        return e
+
+    def Lp_error(self, u, uh, p, celltype=False, q=None):
         def f(x, cellidx):
             return np.abs(u(x) - uh(x, cellidx))**p
-        e = self.integral(f, celltype=celltype)
+        e = self.integral(f, celltype=celltype, q=q)
         return e**(1/p)
