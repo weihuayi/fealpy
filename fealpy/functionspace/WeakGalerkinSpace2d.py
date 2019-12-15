@@ -195,8 +195,8 @@ class WeakGalerkinSpace2d:
             idx = cell2dofLocation[edge2cell[isInEdge, 1]].reshape(-1, 1) + \
                     (p+1)*edge2cell[isInEdge, [3]].reshape(-1, 1) + np.arange(p+1)
             n = n[isInEdge]
-            R0[:, idx] = -n[np.newaxis, :, [0]]*F1
-            R1[:, idx] = -n[np.newaxis, :, [1]]*F1
+            R0[:, idx] = -n[np.newaxis, :, [0]]*F1 # 这里应该加上负号
+            R1[:, idx] = -n[np.newaxis, :, [1]]*F1 # 这里应该加上负号
 
         def f(x, cellidx):
             gphi = self.grad_basis(x, cellidx)
@@ -209,7 +209,6 @@ class WeakGalerkinSpace2d:
         idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
         R0[:, idx] = -M[:, 0].swapaxes(0, 1)
         R1[:, idx] = -M[:, 1].swapaxes(0, 1)
-
         return R0, R1
 
     def basis(self, point, cellidx=None):
@@ -243,8 +242,19 @@ class WeakGalerkinSpace2d:
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def projection(self, u, dim=1):
+    def edge_value(self, uh, bcs):
+        NE = self.mesh.number_of_edges()
+        p = self.p
+        phi = self.edge_basis(bcs)
+        edge2dof = self.dof.edge_to_dof()
 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'[:dim]
+        s1 = '...j, ij{}->...i{}'.format(s0, s0)
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
+
+    def projection(self, u, dim=1):
         p = self.p
         mesh = self.mesh
         node = mesh.entity('node')
@@ -260,7 +270,7 @@ class WeakGalerkinSpace2d:
         uI = u(ps)
 
         ephi = self.edge_basis(bcs)
-        b = np.einsum('i, ij..., ik, j->j...k', ws, uI, ephi, h)
+        b = np.einsum('i, ij..., ik, j->jk...', ws, uI, ephi, h)
         if dim == 1:
             uh[:NE*(p+1), ...].flat = (self.H1@b[:, :, np.newaxis]).flat
         else:
@@ -268,13 +278,12 @@ class WeakGalerkinSpace2d:
 
         t = 'd'
         s = '...{}, ...m->...m{}'.format(t[:dim>1], t[:dim>1])
-
         def f1(x, cellidx):
             phi = self.basis(x, cellidx)
             return np.einsum(s, u(x), phi)
 
         b = self.integralalg.integral(f1, celltype=True)
-        if dim in [None, 1]:
+        if dim == 1:
             uh[NE*(p+1):, ...].flat = (self.H0@b[:, :, np.newaxis]).flat
         else:
             uh[NE*(p+1):, ...].flat = (self.H0@b).flat

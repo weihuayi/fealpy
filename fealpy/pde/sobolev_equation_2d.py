@@ -1,6 +1,7 @@
 import numpy as np
 
-from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+from ..timeintegratoralg.timeline_new import UniformTimeLine
+from ..mesh import TriangleMesh
 
 class PolyExpData:
     def __init__(self, nu=1, epsilon=1):
@@ -110,7 +111,8 @@ class SinSinExpData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n)
+        if meshtype is 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
         return mesh
