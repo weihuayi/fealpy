@@ -106,7 +106,7 @@ class ScaledMonomialSpace2d():
             phi[..., 1] = val
         else:
             phi[..., 1:] = val[..., np.newaxis]
-            np.multiply.accumulate(phi, axis=-1)
+            np.multiply.accumulate(phi, axis=-1, out=phi)
         return phi
 
     def basis(self, point, cellidx=None, p=None):

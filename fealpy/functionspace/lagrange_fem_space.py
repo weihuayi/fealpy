@@ -48,15 +48,10 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        if q is None:
-            self.integrator = mesh.integrator(p+1)
-        else:
-            self.integrator = mesh.integrator(q)
-
+        q = q if q is not None else p+3
         self.integralalg = FEMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                self.cellmeasure)
+                self.mesh, q,
+                cellmeasure=self.cellmeasure)
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -366,6 +361,92 @@ class LagrangeFiniteElementSpace():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
+
+    def linear_elasticity_matrix(self, nu, lam):
+        mesh = self.mesh
+        cellmeasure = space.cellmeasure
+        cell2dof = self.cell_to_dof()
+        GD = self.GD
+
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs)
+
+        ldof = self.number_of_local_dofs()
+        gdof = self.number_of_global_dofs()
+
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        if GD == 2:
+            idx = [(0, 0), (0, 1),  (1, 1)]
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+
+        A = []
+        for i, j in idx:
+            A.append(np.einsum('i, ijm, ijn, j->jmn',
+                ws, grad[..., i], grad[..., j], cellmeasure))
+            
+
+        if GD == 2:
+            A00 = np.einsum('i, ijm, ijn, j->jmn',
+                ws, grad[..., 0], grad[..., 0], cellmeasure)
+
+            A01 = np.einsum('i, ijm, ijn, j->jmn',
+                ws, grad[..., 0], grad[..., 1], cellmeasure)
+
+            A11 = np.einsum('i, ijm, ijn, j->jmn',
+                ws, grad[..., 1], grad[..., 1], cellmeasure)
+
+            B00 = (2*mu+lam)*A00 + mu*A11   # 单元刚度矩阵的第一块
+            B01 = lam*A01 + mu*A01.swapaxes(-1, -2)
+            B11 = (2*mu+lam)*A11 + mu*A00
+
+            C00 = csr_matrix((B00.flat, (I.flat, J.flat)), shape=(gdof, gdof))  # 把单元刚度矩阵第一块方在总刚中的相应位置上
+            C01 = csr_matrix((B01.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C11 = csr_matrix((B11.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+            A = bmat([[C00, C01], [C01.T, C11]], format='csr') # format = bsr ??
+
+        if GD == 3:
+            A00 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 0], grad[..., 0], cellmeasure)
+
+            A01 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 0], grad[..., 1], cellmeasure)
+
+            A02 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 0], grad[..., 2], cellmeasure)
+
+            A11 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 1], grad[..., 1], cellmeasure)
+
+            A12 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 1], grad[..., 2], cellmeasure)
+
+            A22 = np.einsum('i, ijm, ijn, j->jmn',
+                    ws, grad[..., 2], grad[..., 2], cellmeasure)
+
+            B00 = (2*mu+lam)*A00 + mu*A11 + mu*A22
+            B01 = lam*A01 + mu*A01.swapaxes(-1, -2)
+            B02 = lam*A02 + mu*A02.swapaxes(-1, -2)
+
+            B11 = (2*mu+lam)*A11 + mu*A00 + mu*A22
+            B12 = lam*A12 + mu*A12.swapaxes(-1, -2)
+            B22 = (2*mu+lam)*A22 + mu*A11 + mu*A00
+
+
+            C00 = csr_matrix((B00.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C01 = csr_matrix((B01.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C02 = csr_matrix((B02.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C11 = csr_matrix((B11.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C12 = csr_matrix((B12.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            C22 = csr_matrix((B22.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+            A = bmat([[C00, C01, C02], [C01.T, C11, C12], [C02.T, C12.T, C22]], format='csr') # format = bsr ??
+
+        return A
+        pass
 
     def stiff_matrix(self, cfun=None):
         p = self.p
