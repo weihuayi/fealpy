@@ -3,7 +3,7 @@ import numpy as np
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
-        self.integrator = pmesh.integrator(q)
+        self.integrator = mesh.integrator(q)
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
 
