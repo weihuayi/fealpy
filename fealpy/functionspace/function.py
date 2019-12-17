@@ -37,6 +37,10 @@ class Function(np.ndarray):
         space = self.space
         return space.hessian_value(self, bc, cellidx=cellidx)
 
+    def edge_value(self, bc, cellidx=None):
+        space = self.space
+        return space.edge_value(self, bc)
+
     def add_plot(self, plt):
         mesh = self.space.mesh
         if mesh.meshtype is 'tri':

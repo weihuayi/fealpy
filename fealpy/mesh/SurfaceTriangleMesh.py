@@ -1,10 +1,11 @@
 
 import numpy as np
+from types import ModuleType
+
 from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
 from ..quadrature import TriangleQuadrature
-from types import ModuleType
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 
+from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 
 class SurfaceTriangleMesh():
     def __init__(self, mesh, surface, p=1, scale=None):

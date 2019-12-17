@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix, spdiags
+from scipy.sparse import coo_matrix, csr_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
 from .function import Function
@@ -48,15 +48,11 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        if q is None:
-            self.integrator = mesh.integrator(p+1)
-        else:
-            self.integrator = mesh.integrator(q)
-
+        q = q if q is not None else p+3
         self.integralalg = FEMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                self.cellmeasure)
+                self.mesh, q,
+                cellmeasure=self.cellmeasure)
+        self.integrator = self.integralalg.integrator
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -86,8 +82,7 @@ class LagrangeFiniteElementSpace():
         return self.TD
 
     def grad_recovery(self, uh, method='simple'):
-        
-        D = self.GD
+        GD = self.GD
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
         p = self.p
@@ -366,6 +361,53 @@ class LagrangeFiniteElementSpace():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
+
+    def linear_elasticity_matrix(self, mu, lam):
+        """
+        construct the linear elasticity fem matrix
+        """
+        cellmeasure = self.cellmeasure
+        cell2dof = self.cell_to_dof()
+        GD = self.GD
+
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs)
+
+        ldof = self.number_of_local_dofs()
+        gdof = self.number_of_global_dofs()
+
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+
+        if GD == 2:
+            idx = [(0, 0), (0, 1),  (1, 1)]
+            imap = {(0, 0):0, (0, 1):1, (1, 1):2}
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+            imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
+        A = []
+        for k, (i, j) in enumerate(idx):
+            Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
+            A.append(csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)))
+
+        T = csr_matrix((gdof, gdof), dtype=self.ftype)
+        D = csr_matrix((gdof, gdof), dtype=self.ftype)
+        C = []
+        for i in range(GD):
+            D += A[imap[(i, i)]]
+            C.append([T]*GD)
+        D *= mu
+
+        for i in range(GD):
+            for j in range(i, GD):
+                if i == j:
+                    C[i][j] = D + (mu+lam)*A[imap[(i, i)]]
+                else:
+                    C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
+                    C[j][i] = C[i][j].T
+        A = bmat(C, format='csr') # format = bsr ??
+        return A
 
     def stiff_matrix(self, cfun=None):
         p = self.p

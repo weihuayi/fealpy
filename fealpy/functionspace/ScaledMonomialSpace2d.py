@@ -61,26 +61,23 @@ class ScaledMonomialSpace2d():
         """
 
         self.mesh = mesh
+
         if bc is None:
-            self.barycenter = mesh.entity_barycenter('cell')
+            self.cellbarycenter = mesh.entity_barycenter('cell')
         else:
-            self.barycenter = bc
+            self.cellbarycenter = bc
+
         self.p = p
-        self.area = mesh.entity_measure('cell')
-        self.h = np.sqrt(self.area)
+        self.cellmeasure = mesh.entity_measure('cell')
+        self.cellsize = np.sqrt(self.cellmeasure)
         self.dof = SMDof2d(mesh, p)
         self.GD = 2
 
-        if q is None:
-            self.integrator = mesh.integrator(p+3)
-        else:
-            self.integrator = mesh.integrator(q)
-
+        q = q if q is not None else p+3
         self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=mesh.entity_barycenter('cell'))
+                self.mesh, q,
+                cellmeasure=self.cellmeasure,
+                cellbarycenter=self.cellbarycenter)
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
@@ -90,6 +87,27 @@ class ScaledMonomialSpace2d():
 
     def cell_to_dof(self):
         return self.dof.cell2dof
+
+    def edge_basis(self, bc, p=None):
+        p = self.p if p is None else p
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        ps = np.einsum('ij, kjm->ikm', bc, node[edge])
+
+        center = self.integralalg.edgebarycenter
+        h = self.integralalg.edgemeasure
+        t = mesh.edge_unit_tagent()
+
+        v = np.sum((ps - center)*t, axis=-1)
+        phi = np.ones(v.shape + (p+1,), dtype=self.ftype)
+        val = v/h
+        if p == 1:
+            phi[..., 1] = val
+        else:
+            phi[..., 1:] = val[..., np.newaxis]
+            np.multiply.accumulate(phi, axis=-1, out=phi)
+        return phi
 
     def basis(self, point, cellidx=None, p=None):
         """
@@ -108,7 +126,7 @@ class ScaledMonomialSpace2d():
         """
         if p is None:
             p = self.p
-        h = self.h
+        h = self.cellsize
         NC = self.mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs(p=p)
@@ -120,10 +138,10 @@ class ScaledMonomialSpace2d():
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)
         if cellidx is None:
             assert(point.shape[-2] == NC)
-            phi[..., 1:3] = (point - self.barycenter)/h.reshape(-1, 1)
+            phi[..., 1:3] = (point - self.cellbarycenter)/h.reshape(-1, 1)
         else:
             assert(point.shape[-2] == len(cellidx))
-            phi[..., 1:3] = (point - self.barycenter[cellidx])/h[cellidx].reshape(-1, 1)
+            phi[..., 1:3] = (point - self.cellbarycenter[cellidx])/h[cellidx].reshape(-1, 1)
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -148,7 +166,7 @@ class ScaledMonomialSpace2d():
     def grad_basis(self, point, cellidx=None, p=None):
         if p is None:
             p = self.p
-        h = self.h
+        h = self.cellsize
         ldof = self.number_of_local_dofs(p=p)
         shape = point.shape[:-1]+(ldof, 2)
         gphi = np.zeros(shape, dtype=np.float)
@@ -184,7 +202,7 @@ class ScaledMonomialSpace2d():
     def laplace_basis(self, point, cellidx=None, p=None):
         if p is None:
             p = self.p
-        area = self.area
+        area = self.cellmeasure
 
         ldof = self.number_of_local_dofs()
 
@@ -223,7 +241,7 @@ class ScaledMonomialSpace2d():
         if p is None:
             p = self.p
 
-        area = self.area
+        area = self.cellmeasure
         ldof = self.number_of_local_dofs()
 
         shape = point.shape[:-1]+(ldof, 3)
@@ -276,6 +294,23 @@ class ScaledMonomialSpace2d():
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
+    def cell_mass_matrix(self):
+        return self.matrix_H()
+
+    def edge_mass_matrix(self, p=None):
+        p = self.p if p is None else p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        measure = mesh.entity_measure('edge')
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        phi = self.edge_basis(bcs, p=p)
+        H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
+        return H
+
+    def mass_matrix(self):
+        return self.matrix_H()
+
     def matrix_H(self):
         p = self.p
         mesh = self.mesh
@@ -297,9 +332,9 @@ class ScaledMonomialSpace2d():
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
         nm = mesh.edge_normal()
-        b = node[edge[:, 0]] - self.barycenter[edge2cell[:, 0]]
+        b = node[edge[:, 0]] - self.cellbarycenter[edge2cell[:, 0]]
         H0 = np.einsum('ij, ij, ikm->ikm', b, nm, H0)
-        b = node[edge[isInEdge, 0]] - self.barycenter[edge2cell[isInEdge, 1]]
+        b = node[edge[isInEdge, 0]] - self.cellbarycenter[edge2cell[isInEdge, 1]]
         H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
         ldof = self.number_of_local_dofs()
@@ -345,13 +380,13 @@ class ScaledMonomialSpace2d():
         NC = mesh.number_of_cells()
 
         space0 = sh0.space
-        h0 = space0.h
+        h0 = space0.cellsize
 
         space1 = self
-        h1 = space1.h
+        h1 = space1.cellsize
         sh1 = space1.function()
 
-        bc = (space1.barycenter[HB[:, 0]] - space0.barycenter[HB[:,
+        bc = (space1.cellbarycenter[HB[:, 0]] - space0.cellbarycenter[HB[:,
             1]])/h0[HB[:, [1]]]
         h = h1[HB[:, 0]]/h0[HB[:, 1]]
 

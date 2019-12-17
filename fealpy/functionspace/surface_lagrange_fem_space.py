@@ -1,11 +1,12 @@
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
-from .function import Function
-from ..common import ranges
+
+from ..mesh import SurfaceTriangleMesh
+from ..quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg
+
 from .femdof import CPLFEMDof2d, DPLFEMDof2d
-from fealpy.mesh import SurfaceTriangleMesh
-from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
+from .function import Function
 
 
 class SurfaceLagrangeFiniteElementSpace:
@@ -40,7 +41,8 @@ class SurfaceLagrangeFiniteElementSpace:
 
         self.scale = scale
         self.p = p
-        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale)
+        print(type(SurfaceTriangleMesh))
+        self.mesh = SurfaceTriangleMesh.SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale)
         self.surface = surface
 
         self.cellmeasure = self.mesh.entity_measure('cell')
@@ -56,12 +58,11 @@ class SurfaceLagrangeFiniteElementSpace:
                 self.dof = DPLFEMDof2d(mesh, p)
                 self.dim = 2
 
-        if q is None:
-            self.integrator = self.mesh.integrator(p+1)
-        else:
-            self.integrator = self.mesh.integrator(q)
-
-        self.integralalg = FEMeshIntegralAlg(self.integrator, self.mesh, self.cellmeasure)
+        q = q if q is not None else p+3
+        self.integralalg = FEMeshIntegralAlg(
+                self.mesh, q,
+                cellmeasure=self.cellmeasure)
+        self.integrator = self.integralalg.integrator
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"

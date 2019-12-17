@@ -123,8 +123,8 @@ class ConformingVirtualElementSpace2d():
         """
         self.mesh = mesh
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p, bc=bc)
-        self.area = self.smspace.area
+        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q, bc=bc)
+        self.cellmeasure = self.smspace.cellmeasure
         self.dof = CVEMDof2d(mesh, p)
 
         self.H = self.smspace.matrix_H()
@@ -137,17 +137,7 @@ class ConformingVirtualElementSpace2d():
 
         self.PI0 = self.matrix_PI_0(self.H, self.C)
 
-        if q is None:
-            self.integrator = mesh.integrator(p+3)
-        else:
-            self.integrator = mesh.integrator(q)
-
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=self.smspace.barycenter)
-
+        self.integralalg = self.smspace.integralalg
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
@@ -190,7 +180,7 @@ class ConformingVirtualElementSpace2d():
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
-        h = self.smspace.h
+        h = self.smspace.cellsize
 
         s = self.project_to_smspace(uh).reshape(-1, smldof)
         sx = np.zeros((NC, smldof), dtype=self.ftype)
@@ -217,7 +207,7 @@ class ConformingVirtualElementSpace2d():
 
 
         ldof = self.number_of_local_dofs()
-        w = np.repeat(1/self.area, ldof)
+        w = np.repeat(1/self.cellsize, ldof)
         sx *= w
         sy *= w
 
@@ -250,7 +240,7 @@ class ConformingVirtualElementSpace2d():
         return SS
 
     def stiff_matrix(self, cfun=None):
-        area = self.smspace.area
+        area = self.smspace.cellmeasure
 
         def f(x):
             x[0, :] = 0
@@ -272,8 +262,8 @@ class ConformingVirtualElementSpace2d():
                 f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
                 K = list(map(f1, zip(DD, PI1)))
             else:
-                barycenter = V.smspace.barycenter
-                k = cfun(barycenter)
+                cellbarycenter = V.smspace.cellbarycenter
+                k = cfun(cellbarycenter)
                 f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
                 K = list(map(f1, zip(DD, PI1, k)))
         else:
@@ -282,8 +272,8 @@ class ConformingVirtualElementSpace2d():
                 f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
                 K = list(map(f1, zip(DD, PI1, tG)))
             else:
-                barycenter = V.smspace.barycenter
-                k = cfun(barycenter)
+                cellbarycenter = self.smspace.cellbarycenter
+                k = cfun(cellbarycenter)
                 f1 = lambda x: (x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[3]
                 K = list(map(f1, zip(DD, PI1, tG, k)))
 
@@ -299,7 +289,7 @@ class ConformingVirtualElementSpace2d():
         return A
 
     def mass_matrix(self, cfun=None):
-        area = self.smspace.area
+        area = self.smspace.cellmeasure
         p = self.p
 
         PI0 = self.PI0
@@ -333,7 +323,7 @@ class ConformingVirtualElementSpace2d():
         p = self.p
         mesh = self.mesh
 
-        area = self.smspace.area
+        area = self.smspace.cellmeasure
         PI0 = self.PI0
 
         phi = self.smspace.basis
@@ -479,7 +469,7 @@ class ConformingVirtualElementSpace2d():
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
-        h = self.smspace.h
+        h = self.smspace.cellsize
         node = mesh.node
         edge = mesh.ds.edge
         edge2cell = mesh.ds.edge2cell
@@ -489,7 +479,7 @@ class ConformingVirtualElementSpace2d():
         D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
         if p == 1:
-            bc = np.repeat(self.smspace.barycenter, NV, axis=0)
+            bc = np.repeat(self.smspace.cellbarycenter, NV, axis=0)
             D[:, 1:] = (node[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
             return D
 
@@ -503,7 +493,7 @@ class ConformingVirtualElementSpace2d():
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi1
         if p > 1:
-            area = self.smspace.area
+            area = self.smspace.cellmeasure
             idof = (p-1)*p//2 # the number of dofs of scale polynomial space with degree p-2
             idx = cell2dofLocation[1:].reshape(-1, 1) + np.arange(-idof, 0)
             D[idx, :] = H[:, :idof, :]/area.reshape(-1, 1, 1)
@@ -514,7 +504,7 @@ class ConformingVirtualElementSpace2d():
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
-        h = self.smspace.h
+        h = self.smspace.cellsize
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
         if p == 1:
@@ -597,7 +587,7 @@ class ConformingVirtualElementSpace2d():
                     '0',
                     np.r_['1', np.zeros((idof, p*x[0])), x[1]*np.eye(idof)],
                     x[2][idof:, :]]
-            return list(map(l, zip(NV, self.smspace.area, C)))
+            return list(map(l, zip(NV, self.smspace.cellmeasure, C)))
 
     def matrix_PI_0(self, H, C):
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
