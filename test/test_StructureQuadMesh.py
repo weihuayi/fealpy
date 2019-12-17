@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import StructureQuadMesh
 from fealpy.pde.poisson_2d import CosCosData
+from fealpy.tools.show import showmultirate
+
 class StructureQuadMeshTest:
     def __init__(self):
         box = [0.0, 1.0, 0.0, 1.0]
@@ -33,7 +35,32 @@ class StructureQuadMeshTest:
         print(F3.shape)
         F4 = self.mesh.interpolation(pde.solution, intertype='cell')
         print(F4.shape)
-        
+
+    def test_polation_interoperator(self):
+        pde = CosCosData()
+        maxit = 4
+        errorType = ['$|u_I - u_h|_{max}$']
+        Maxerror = np.zeros((len(errorType), maxit), dtype=np.float)
+        NE = np.zeros(maxit,)
+
+        for i in range(maxit):
+            mesh = self.mesh
+            isBDEdge = mesh.ds.boundary_edge_flag()
+            NE[i] = mesh.number_of_edges()
+            bc = mesh.entity_barycenter('cell')
+            ec = mesh.entity_barycenter('edge')
+
+            uI = mesh.polation_interoperator(pde.solution(bc))
+            uh = pde.solution(ec)
+            Maxerror[0, i] = max(abs(uh - uI))
+
+            if i < maxit - 1:
+                mesh.uniform_refine()
+
+        showmultirate(plt, 0, NE, Maxerror, errorType)
+        print('Maxerror', Maxerror)
+        plt.show()
+
 
 
 
@@ -42,4 +69,5 @@ class StructureQuadMeshTest:
 
 test = StructureQuadMeshTest()
 #test.test_cell_location()
-test.test_interpolation()
+#test.test_interpolation()
+test.test_polation_interoperator()
