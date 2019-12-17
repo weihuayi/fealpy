@@ -16,4 +16,4 @@ class PrismQuadrature(Quadrature):
     def number_of_quadrature_points(self):
         n0 = self.quadpts[0].shape[0]
         n1 = self.quadpts[1].shape[1]
-        return n0*n1 
+        return n0*n1

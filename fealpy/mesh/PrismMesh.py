@@ -1,5 +1,7 @@
 
 import numpy as np
+from numpy.linalg import det
+
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import PrismQuadrature
 
@@ -33,6 +35,9 @@ class PrismMesh(Mesh3d):
         self.ds = PrismMeshDataStructure(NN, cell)
         self.meshtype = 'prism'
 
+        self.ftype = node.dtype
+        self.itype = cell.dtype
+
     def number_of_tri_faces(self):
         face = self.ds.face
         return sum(face[:, -2] == face[:, -1])
@@ -62,7 +67,14 @@ class PrismMesh(Mesh3d):
         return p.reshape(n0*n1, NC, 3)
 
     def cell_volume(self):
-        pass
+        qf = PrismQuadrature(2)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs)
+        ws0 = ws[0]
+        ws1 = ws[1]
+        DJ = det(J) # (NQ0, NQ1, NC)
+        vol = 0.5*np.einsum('i, j, ijk->k', ws0, ws1, DJ)
+        return vol
 
     def jacobi_matrix(self, bc):
         bc0 = bc[0]
@@ -70,11 +82,22 @@ class PrismMesh(Mesh3d):
         node = self.entity('node')
         cell = self.entity('cell')
 
-        n0 = bc0.shape[0]
-        n1 = bc1.shape[0]
+        NQ0 = bc0.shape[0]
+        NQ1 = bc1.shape[0]
+
         NC = self.number_of_cells()
-        shape = (n0, n1, NC, 3, 3)
+
+        shape = (NQ0, NQ1, NC, 3, 3)
         J = np.zeros(shape, dtype=self.ftype)
+
+        v = node[cell[:, 3:]] - node[cell[:, 0:3]] # (NC, 3, 3)
+        J[..., 2] = np.einsum('ij, kjm->ikm', bc0, v)[:, np.newaxis, ...]
+
+        idx0 = np.array([[1, 4], [2, 5]], dtype=np.int)
+        idx1 = np.array([[0, 3]], dtype=np.int)
+        v = node[cell[:, idx0]] - node[cell[:, idx1]]
+        J[..., 0:2] = np.einsum('ij, knjm->ikmn', bc1, v) # bc1: (NQ1, 2), v:(NC, 2, 2, 3)
+        return J
 
     def multi_index_matrix_2(self):
         p = 2
