@@ -8,6 +8,7 @@ class SobolevEquationWGModel2d:
         self.pde = pde
         self.mesh = mesh
         self.space = WeakGalerkinSpace2d(mesh, p=p, q=q)
+        self.construct_marix()
 
     def init_solution(self, timeline):
         NL = timeline.number_of_time_levels()
@@ -66,6 +67,33 @@ class SobolevEquationWGModel2d:
         self.A1 = self.D + self.M/self.pde.mu
         self.A2 = self.G*self.pdf.mu
 
+    def construct_s_matrix(self):
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        qf = self.space.integralalg.edgeintegrator
+        bcs, ws = qf.quadpts, qf.weights
+
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+
+        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.smspace.basis(
+                ps[:, isInEdge, :],
+                cellidx=edge2cell[isInEdge, 1]
+                )
+        phi = self.edge_basis(bcs)
+
+        edge2dof = self.space.dof.edge_to_dof()
+        cell2dof = self.space.cell_to_dof(doftype='cell')
+
+        F0 = -np.einsum('i, ijm, ijn->mjn', ws, phi0, phi)
+        F1 = -np.einsum('i, ijm, ijn->mjn', ws, phi1, phi[:, isInEdge, :])
+
+        F2 = -np.einsum('i, ijm, ijn->mjn', ws, phi, phi)
+
     def solution_projection(self, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
@@ -102,14 +130,15 @@ class SobolevEquationWGModel2d:
         R0 = self.space.R0
         R1 = self.space.R1
 
+        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
+        # epsilon/mu(\nabla u, \bfq)
         F0 = np.zeros((gdof, 2), dtype=self.space.ftype)
         f00 = lambda j: R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
         f01 = lambda j: R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
-
-        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
         F0[cell2dof.flat, 0] = np.concatenate(list(map(f00, range(NC))))
         F0[cell2dof.flat, 1] = np.concatenate(list(map(f01, range(NC))))
 
+        # -(f, \nabla\cdot \bfq)
         F1 = np.zeros((gdof, 2), dtype=self.space.ftype)
         f11 = lambda j: fh[cell2dof[j, :], i]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
         f12 = lambda j: fh[cell2dof[j, :], i]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
@@ -119,9 +148,10 @@ class SobolevEquationWGModel2d:
         F1[cell2dof.flat, 1] = np.concatenate(
             list(map(f12, range(NC)))
             )
+
         F = epsilon/mu*F0 - F1
         ph[:, i] = solver(self.A1, F.reshape(-1, order='F'))
-        
+
         dt = timeline.current_time_step_length()
         t0 = timeline.current_time_level()
         f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
