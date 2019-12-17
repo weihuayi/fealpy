@@ -5,6 +5,104 @@ from ..mesh.Quadtree import Quadtree
 from ..mesh.QuadrangleMesh import QuadrangleMesh
 from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
+from ..mesh.TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
+from ..mesh.PolygonMesh import PolygonMesh
+
+class TwoHolesData:
+    def __init__(self):
+        pass
+
+    def domain(self, domaintype='meshpy'):
+        if domaintype is 'meshpy':
+            from meshpy.triangle import MeshInfo
+            domain = MeshInfo()
+            points = np.zeros((16, 2), dtype=np.float)
+            points[0:4, :] = np.array(
+                    [(0.0, 0.0),
+                     (1.0, 0.0),
+                     (1.0, 1.0),
+                     (0.0, 1.0)], dtype=np.float)
+            idx = np.arange(5, -1, -1)
+            points[4:10, 0] = 0.25 + 0.1*np.cos(idx*np.pi/3)
+            points[4:10, 1] = 0.75 + 0.1*np.sin(idx*np.pi/3)
+            points[10:, 0] = 0.6 + 0.1*np.cos(idx*np.pi/3)
+            points[10:, 1] = 0.4 + 0.1*np.sin(idx*np.pi/3)
+
+            facets = np.zeros((16, 2), dtype=np.int)
+            facets[0:4, :] = np.array([(0, 1), (1, 2), (2, 3), (3, 0)],
+                    dtype=np.int)
+            facets[4:10, :] = np.array(
+                    [(4, 5), (5, 6), (6, 7), (7, 8), (8, 9), (9, 4)],
+                    dtype=np.int)
+            facets[10:, :] = np.array(
+                    [(10, 11), (11, 12), (12, 13), (13, 14),
+                        (14, 15), (15, 10)], dtype=np.int)
+            domain.set_points(points)
+            domain.set_facets(facets)
+            domain.set_holes([(0.25, 0.75), (0.6, 0.4)])
+        return domain
+
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+        """ generate the initial mesh
+        """
+        from meshpy.triangle import build
+        domain = self.domain(domaintype='meshpy')
+        mesh = build(domain, max_volume=h**2)
+        node = np.array(mesh.points, dtype=np.float)
+        cell = np.array(mesh.elements, dtype=np.int)
+        if meshtype is 'tri':
+            return TriangleMesh(node, cell)
+        elif meshtype is 'polygon':
+            mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
+            pnode, pcell, pcellLocation = mesh.to_polygonmesh()
+            return PolygonMesh(pnode, pcell, pcellLocation)
+
+    def diffusion_coefficient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = 1 + 10*x**2 + y**2
+        return val
+
+    def solution(self, p):
+        """ The exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = 0.0 
+        return val
+
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = 1.0 
+        return val
+
+    def gradient(self, p):
+        """ The gradient of the exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0.0
+        val[..., 1] = 0.0
+        return val
+
+    def dirichlet(self, p):
+        return 0.0
+
+    def neuman(self, p):
+        """ Neuman  boundary condition
+        """
+        pass
+
+    def robin(self, p):
+        pass
 
 class CosCosData:
     """
@@ -59,6 +157,7 @@ class CosCosData:
         else:
             raise ValueError("".format)
 
+
     def solution(self, p):
         """ The exact solution 
         """
@@ -67,6 +166,7 @@ class CosCosData:
         pi = np.pi
         val = np.cos(pi*x)*np.cos(pi*y)
         return val
+
 
     def source(self, p):
         """ The right hand side of Possion equation
