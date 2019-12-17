@@ -16,6 +16,9 @@ class SobolevEquationWGModel2d:
         return uh
 
     def construct_marix(self):
+        """
+        构造 Soblove 方程对应的所有矩阵
+        """
         gdof = self.space.number_of_global_dofs()
         cell2dof, cell2dofLocation = self.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
@@ -37,41 +40,91 @@ class SobolevEquationWGModel2d:
         J = np.concatenate(list(map(f2, cd)))
 
         val = np.concatenate(list(map(f3, M00)))
-        M00 = coo_matrix((val, (I, J)), shape=(gdof, gdof))
+        M00 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
 
         val = np.concatenate(list(map(f3, M01)))
-        M01 = coo_matrix((val, (I, J)), shape=(gdof, gdof))
+        M01 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
 
         val = np.concatenate(list(map(f3, M11)))
-        M11 = coo_matrix((val, (I, J)), shape=(gdof, gdof))
+        M11 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
 
-        D = bmat([[M00, M01], [M01.T, M11]], format='csr')
-        return M
+        self.D = bmat([[M00, M01], [M01.T, M11]], format='csr') # weak divergence matrix
+        self.G = M00 + M11 # weak gradient matrix
 
-    def grad_matrix(self):
-       pass 
 
-    def projection(self, timeline):
+        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
+        ldof = cell2dof.shape[1]
+        gdof = self.space.number_of_global_dofs()
+
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        M = csr_matrix(
+                (self.space.CM.flat, (I.flat, J.flat)), shape=(gdof, gdof)
+                )
+        self.M = bmat([[M, csr_matrix((gdof, gdof))], [csr_matrix((gdof, gdof)), M]], format='csr')
+
+        self.A1 = self.D + self.M/self.pde.mu
+        self.A2 = self.G*self.pdf.mu
+
+    def solution_projection(self, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
-        uI = self.space.function(dim=NL)
+        uh = self.space.function(dim=NL)
         times = timeline.all_time_levels()
         for i, t in enumerate(times):
-            uI[:, i] = self.space.projection(lambda x:self.pde.solution(x, t)) 
-        return uI
+            uh[:, i] = self.space.projection(lambda x:self.pde.solution(x, t))
+        return uh
+
+    def source_projection(self, timeline):
+        NL = timeline.number_of_time_levels()
+        gdof = self.space.number_of_global_dofs()
+        fh = self.space.function(dim=NL)
+        times = timeline.all_time_levels()
+        for i, t in enumerate(times):
+            fh[:, i] = self.space.projection(lambda x:self.pde.source(x, t))
+        return fh
 
     def get_current_left_matrix(self, timeline):
-        dt = timeline.current_time_step_length()
-        return self.M + 0.5*dt*self.A
+        return self.G
 
-    def get_current_right_vector(self, uh, timeline):
+    def get_current_right_vector(self, data, timeline):
+        mu = self.pde.mu
+        epsilon = self.pde.epsilon
+
+        uh = data[0]
+        ph = data[1]
+        fh = data[2]
+        solver = data[4]
+        i = timeline.current
+
+        cell2dof, cell2dofLocation = self.cell_to_dof(doftype='all')
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        R0 = self.space.R0
+        R1 = self.space.R1
+
+        F0 = np.zeros((gdof, 2), dtype=self.space.ftype)
+        f00 = lambda j: R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
+        f01 = lambda j: R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
+
+        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
+        F0[cell2dof.flat, 0] = np.concatenate(list(map(f00, range(NC))))
+        F0[cell2dof.flat, 1] = np.concatenate(list(map(f01, range(NC))))
+
+        F1 = np.zeros((gdof, 2), dtype=self.space.ftype)
+        f11 = lambda j: fh[cell2dof[j, :], i]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f12 = lambda j: fh[cell2dof[j, :], i]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        F1[cell2dof.flat, 0] = np.concatenate(
+            list(map(f11, range(NC)))
+            )
+        F1[cell2dof.flat, 1] = np.concatenate(
+            list(map(f12, range(NC)))
+            )
+        F = epsilon/mu*F0 - F1
+        ph[:, i] = solver(self.A1, F.reshape(-1, order='F'))
+        
         dt = timeline.current_time_step_length()
         t0 = timeline.current_time_level()
-        t1 = timeline.next_time_level()
         f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
-        #f0 = lambda x: self.pde.source(x, t1)
-        F = self.space.source_vector(f0)
-        return self.M@uh - 0.5*dt*(self.A@uh - F)
 
     def apply_boundary_condition(self, A, b, timeline):
         t1 = timeline.next_time_level()
