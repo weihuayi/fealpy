@@ -62,6 +62,293 @@ class StructureQuadMesh(Mesh2d):
         A = kron(I1, T0) + kron(T1, I0)
         return A
 
+    def polation_interoperator(self, uh):
+        """
+        只适应在边界中点的插值
+        """
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        isYDEdge = self.ds.y_direction_edge_flag()
+        isXDEdge = self.ds.x_direction_edge_flag()
+        isBDEdge = self.ds.boundary_edge_flag()
+        bc = self.entity_barycenter()
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        edge2cell = self.ds.edge_to_cell()
+        cell2cell = self.ds.cell_to_cell()
+        Pi = np.zeros(NE, dtype=self.ftype)
+
+        I, = np.nonzero(~isBDEdge & isYDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+
+        Pi[I] = (uh[L] + uh[R])/2
+                                       
+        I, = np.nonzero(~isBDEdge & isXDEdge)
+        L = edge2cell[I, 0]
+        R = edge2cell[I, 1]
+        Pi[I] = (uh[L] + uh[R])/2
+        
+        I, = np.nonzero(isBDEdge & isYDEdge)
+        J = edge2cell[I, 0]
+        L = cell2cell[J[ny:], 3]
+        R = cell2cell[J[:ny], 1]
+        
+        Pi[I[:ny]] = (3*uh[J[:ny]] - uh[R])/2
+        Pi[I[ny:]] = (3*uh[J[ny:]] - uh[L])/2
+
+        I, = np.nonzero(isBDEdge & isXDEdge)
+        J = edge2cell[I, 0]
+        R = cell2cell[J[1::2], 0]
+        L = cell2cell[J[::2], 2]
+        Pi[I[1::2]] = (3*uh[J[1::2]] - uh[R])/2
+        Pi[I[::2]] = (3*uh[J[::2]] - uh[L])/2
+        
+        return Pi
+
+
+
+    def cbar_interpolation(self, ch, cellidx, xbar):
+        nx = self.ds.nx
+        ny = self.ds.ny
+        cvalue = np.zeros(((ny+2), (nx+2)), dtype=self.ftype)
+        cvalue[1:-1, 1:-1] = ch.reshape(ny, nx)
+
+        Pi = self.polation_interoperator(ch)
+        isYDEdge = self.ds.y_direction_edge_flag()
+        isXDEdge = self.ds.x_direction_edge_flag()
+        isBDEdge = self.ds.boundary_edge_flag()
+        JY = isYDEdge & isBDEdge
+        JX = isXDEdge & isBDEdge
+        I, = np.nonzero(isYDEdge & isBDEdge)
+        J, = np.nonzero(isXDEdge & isBDEdge)
+
+        data = Pi[I]
+        cvalue[::nx+1, 1:-1] = data.reshape(2, ny)
+        data = Pi[J]
+        cvalue[1:-1, ::ny+1] = data.reshape(nx, 2)
+
+        cvalue[0, 0] = cvalue[0, 1] + cvalue[1, 0] - cvalue[1, 1]
+        cvalue[-1, -1] = cvalue[-1, -2] + cvalue[-2, -1] - cvalue[-2, -2]
+        cvalue[0, -1] = cvalue[0, -2] + cvalue[1, -1] - cvalue[1, -2]
+        cvalue[-1, 0] = cvalue[-2, 0] + cvalue[-1, 1] - cvalue[-2, 1]
+        
+        NC = self.number_of_cells()
+        newcellidx = np.zeros((NC, ), dtype=self.ftype)
+        cell2cell = self.ds.cell_to_cell()
+        isBDCell = self.ds.boundary_cell_flag()
+        iscell = cellidx == cellidx
+
+        for i in range(NC):
+            for j in range(nx):
+                if j*ny <= cellidx[i] < (j+1)*ny:
+                    newcellidx[i] = cellidx[i] + 2*j + ny + 3
+
+
+        wx1 = np.zeros((NC, ), dtype=self.ftype)
+        wx2 = np.zeros((NC, ), dtype=self.ftype)
+        wx3 = np.zeros((NC, ), dtype=self.ftype)
+        wy1 = np.zeros((NC, ), dtype=self.ftype)
+        wy2 = np.zeros((NC, ), dtype=self.ftype)
+        wy3 = np.zeros((NC, ), dtype=self.ftype)
+
+
+        bc = self.entity_barycenter('cell')
+        ec = self.entity_barycenter('edge')
+        incell = ~isBDCell & iscell
+        Ic, = np.nonzero(incell)
+
+        ## bc[Ic, 0] is (i, j)
+        ## bc[cell2cell[Ic, 1], 0] is (i+1, j)
+        ## bc[cell2cell[Ic, 3], 0] is (i-1, j)
+        wx1[Ic] = (xbar[Ic, 0] - bc[Ic, 0])\
+                *(xbar[Ic, 0] - bc[cell2cell[Ic, 1], 0])\
+                /(bc[cell2cell[Ic, 3], 0] - bc[Ic, 0])\
+                /(bc[cell2cell[Ic, 3], 0] - bc[cell2cell[Ic, 1], 0])
+        wx2[Ic] = (xbar[Ic, 0] - bc[cell2cell[Ic, 3], 0])\
+                *(xbar[Ic, 0] - bc[cell2cell[Ic, 1], 0])\
+                /(bc[Ic, 0] - bc[cell2cell[Ic, 3], 0])\
+                /(bc[Ic, 0] - bc[cell2cell[Ic, 1], 0])
+        wx3[Ic] = (xbar[Ic, 0] - bc[cell2cell[Ic, 3], 0])\
+                *(xbar[Ic, 0] - bc[Ic, 0])\
+                /(bc[cell2cell[Ic, 1], 0] - bc[cell2cell[Ic, 3], 0])\
+                /(bc[cell2cell[Ic, 1], 0] - bc[Ic, 0])
+
+        ## bc[Ic, 1] is (i, j)
+        ## bc[cell2cell[Ic, 0], 1] is (i, j-1)
+        ## bc[cell2cell[Ic, 2], 1] is (i, j+1)
+
+ 
+        wy1[Ic] = (xbar[Ic, 1] - bc[Ic, 1])\
+                *(xbar[Ic, 1] - bc[cell2cell[Ic, 2], 1])\
+                /(bc[cell2cell[Ic, 0], 1] - bc[Ic, 1])\
+                /(bc[cell2cell[Ic, 0], 1] - bc[cell2cell[Ic, 2], 1])
+        wy2[Ic] = (xbar[Ic, 1] - bc[cell2cell[Ic, 0], 1])\
+                *(xbar[Ic, 1] - bc[cell2cell[Ic, 2], 1])\
+                /(bc[Ic, 1] - bc[cell2cell[Ic, 0], 1])\
+                /(bc[Ic, 1] - bc[cell2cell[Ic, 2], 1])
+        wy3[Ic] = (xbar[Ic, 1] - bc[cell2cell[Ic, 0], 1])\
+                *(xbar[Ic, 1] - bc[Ic, 1])\
+                /(bc[cell2cell[Ic, 2], 1] - bc[cell2cell[Ic, 0], 1])\
+                /(bc[cell2cell[Ic, 2], 1] - bc[Ic, 1])
+ 
+
+        cell2edge = self.ds.cell_to_edge()
+        edge2cell = self.ds.edge_to_cell()
+
+        LRCell = edge2cell[I, 0]
+        UACell = edge2cell[J, 0]
+
+        LC = LRCell[:ny]
+        P1 = ec[I[:ny], 0]
+        ## bc[LC, 0] is (i, j)
+        ## bc[cell2cell[LC, 1], 0] is (i+1, j)
+        ## P1 is (i-1, j)
+ 
+        wx1[LC] = (xbar[LC, 0] - bc[LC, 0])\
+                *(xbar[LC, 0] - bc[cell2cell[LC, 1], 0])\
+                /(P1 - bc[LC, 0])\
+                /(P1 - bc[cell2cell[LC, 1], 0])
+        wx2[LC] = (xbar[LC, 0] - P1)\
+                *(xbar[LC, 0] - bc[cell2cell[LC, 1], 0])\
+                /(bc[LC, 0] - P1)\
+                /(bc[LC, 0] - bc[cell2cell[LC, 1], 0])
+        wx3[LC] = (xbar[LC, 0] - P1)\
+                *(xbar[LC, 0] - bc[LC, 0])\
+                /(bc[cell2cell[LC, 1], 0] - P1)\
+                /(bc[cell2cell[LC, 1], 0] - bc[LC, 0])
+
+        wy1[LC[1:-1]] = (xbar[LC[1:-1], 1] - bc[LC[1:-1], 1])\
+                *(xbar[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 2], 1])\
+                /(bc[cell2cell[LC[1:-1], 0], 1] - bc[LC[1:-1], 1])\
+                /(bc[cell2cell[LC[1:-1], 0], 1] - bc[cell2cell[LC[1:-1], 2], 1])
+        wy2[LC[1:-1]] = (xbar[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 0], 1])\
+                *(xbar[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 2], 1])\
+                /(bc[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 0], 1])\
+                /(bc[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 2], 1])
+        wy3[LC[1:-1]] = (xbar[LC[1:-1], 1] - bc[cell2cell[LC[1:-1], 0], 1])\
+                *(xbar[LC[1:-1], 1] - bc[LC[1:-1], 1])\
+                /(bc[cell2cell[LC[1:-1], 2], 1] - bc[cell2cell[LC[1:-1], 0], 1])\
+                /(bc[cell2cell[LC[1:-1], 2], 1] - bc[LC[1:-1], 1])
+ 
+
+        RC = LRCell[ny:]
+        P1 = ec[I[ny:], 0]
+        ## bc[RC, 0] is (i, j)
+        ## bc[cell2cell[RC, 3], 0] is (i-1, j)
+        ## P1 is (i+1, j)
+ 
+        wx1[RC] = (xbar[RC, 0] - bc[RC, 0])\
+                *(xbar[RC, 0] - P1)\
+                /(bc[cell2cell[RC, 3], 0] - bc[RC, 0])\
+                /(bc[cell2cell[RC, 3], 0] - P1)
+        wx2[RC] = (xbar[RC, 0] - bc[cell2cell[RC, 3], 0])\
+                *(xbar[RC, 0] - P1)\
+                /(bc[RC, 0] - bc[cell2cell[RC, 3], 0])\
+                /(bc[RC, 0] - P1)
+        wx3[RC] = (xbar[RC, 0] - bc[cell2cell[RC, 3], 0])\
+                *(xbar[RC, 0] - bc[RC, 0])\
+                /(P1 - bc[cell2cell[RC, 3], 0])\
+                /(P1 - bc[RC, 0])
+
+        wy1[RC[1:-1]] = (xbar[RC[1:-1], 1] - bc[RC[1:-1], 1])\
+                *(xbar[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 2], 1])\
+                /(bc[cell2cell[RC[1:-1], 0], 1] - bc[RC[1:-1], 1])\
+                /(bc[cell2cell[RC[1:-1], 0], 1] - bc[cell2cell[RC[1:-1], 2], 1])
+        wy2[RC[1:-1]] = (xbar[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 0], 1])\
+                *(xbar[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 2], 1])\
+                /(bc[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 0], 1])\
+                /(bc[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 2], 1])
+        wy3[RC[1:-1]] = (xbar[RC[1:-1], 1] - bc[cell2cell[RC[1:-1], 0], 1])\
+                *(xbar[RC[1:-1], 1] - bc[RC[1:-1], 1])\
+                /(bc[cell2cell[RC[1:-1], 2], 1] - bc[cell2cell[RC[1:-1], 0], 1])\
+                /(bc[cell2cell[RC[1:-1], 2], 1] - bc[RC[1:-1], 1])
+ 
+        UC = UACell[::2]
+        P1 = ec[J[::2], 1]
+        ## bc[UC, 1] is (i, j)
+        ## bc[cell2cell[UC, 2], 1] is (i, j+1)
+        ## P1 is (i, j-1)
+        wx1[UC[1:-1]] = (xbar[UC[1:-1], 0] - bc[UC[1:-1], 0])\
+                *(xbar[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 1], 0])\
+                /(bc[cell2cell[UC[1:-1], 3], 0] - bc[UC[1:-1], 0])\
+                /(bc[cell2cell[UC[1:-1], 3], 0] - bc[cell2cell[UC[1:-1], 1], 0])
+        wx2[UC[1:-1]] = (xbar[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 3], 0])\
+                *(xbar[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 1], 0])\
+                /(bc[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 3], 0])\
+                /(bc[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 1], 0])
+        wx3[UC[1:-1]] = (xbar[UC[1:-1], 0] - bc[cell2cell[UC[1:-1], 3], 0])\
+                *(xbar[UC[1:-1], 0] - bc[UC[1:-1], 0])\
+                /(bc[cell2cell[UC[1:-1], 1], 0] - bc[cell2cell[UC[1:-1], 3], 0])\
+                /(bc[cell2cell[UC[1:-1], 1], 0] - bc[UC[1:-1], 0])
+
+        wy1[UC] = (xbar[UC, 1] - bc[UC, 1])\
+                *(xbar[UC, 1] - bc[cell2cell[UC, 2], 1])\
+                /(P1 - bc[UC, 1])\
+                /(P1 - bc[cell2cell[UC, 2], 1])
+        wy2[UC] = (xbar[UC, 1] - P1)\
+                *(xbar[UC, 1] - bc[cell2cell[UC, 2], 1])\
+                /(bc[UC, 1] - P1)\
+                /(bc[UC, 1] - bc[cell2cell[UC, 2], 1])
+        wy3[UC] = (xbar[UC, 1] - P1)\
+                *(xbar[UC, 1] - bc[UC, 1])\
+                /(bc[cell2cell[UC, 2], 1] - P1)\
+                /(bc[cell2cell[UC, 2], 1] - bc[UC, 1])
+ 
+        AC = UACell[1::2]
+        P1 = ec[J[1::2], 1]
+
+
+        ## bc[AC, 1] is (i, j)
+        ## bc[cell2cell[AC, 0], 1] is (i, j-1)
+        ## P1 is (i, j+1)
+
+        wx1[AC[1:-1]] = (xbar[AC[1:-1], 0] - bc[AC[1:-1], 0])\
+                *(xbar[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 1], 0])\
+                /(bc[cell2cell[AC[1:-1], 3], 0] - bc[AC[1:-1], 0])\
+                /(bc[cell2cell[AC[1:-1], 3], 0] - bc[cell2cell[AC[1:-1], 1], 0])
+        wx2[AC[1:-1]] = (xbar[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 3], 0])\
+                *(xbar[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 1], 0])\
+                /(bc[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 3], 0])\
+                /(bc[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 1], 0])
+        wx3[AC[1:-1]] = (xbar[AC[1:-1], 0] - bc[cell2cell[AC[1:-1], 3], 0])\
+                *(xbar[AC[1:-1], 0] - bc[AC[1:-1], 0])\
+                /(bc[cell2cell[AC[1:-1], 1], 0] - bc[cell2cell[AC[1:-1], 3], 0])\
+                /(bc[cell2cell[AC[1:-1], 1], 0] - bc[AC[1:-1], 0])
+
+
+        wy1[AC] = (xbar[AC, 1] - bc[AC, 1])\
+                *(xbar[AC, 1] - P1)\
+                /(bc[cell2cell[AC, 0], 1] - bc[AC, 1])\
+                /(bc[cell2cell[AC, 0], 1] - P1)
+        wy2[AC] = (xbar[AC, 1] - bc[cell2cell[AC, 0], 1])\
+                *(xbar[AC, 1] - P1)\
+                /(bc[AC, 1] - bc[cell2cell[AC, 0], 1])\
+                /(bc[AC, 1] - P1)
+        wy3[AC] = (xbar[AC, 1] - bc[cell2cell[AC, 0], 1])\
+                *(xbar[AC, 1] - bc[AC, 1])\
+                /(P1 - bc[cell2cell[AC, 0], 1])\
+                /(P1 - bc[AC, 1])
+        
+        i = np.zeros((NC,), dtype=self.itype)
+        j = np.zeros((NC,), dtype=self.itype)
+        i[:] = newcellidx // (ny+2)
+        j[:] = newcellidx % (ny+2)
+
+
+        cbar = wy1[cellidx]*(wx1[cellidx]*cvalue[i-1, j-1] \
+             + wx2[cellidx]*cvalue[i, j-1] + wx3[cellidx]*cvalue[i+1, j-1])\
+             + wy2[cellidx]*(wx1[cellidx]*cvalue[i-1, j] \
+             + wx2[cellidx]*cvalue[i, j] + wx3[cellidx]*cvalue[i+1, j])\
+             + wy3[cellidx]*(wx1[cellidx]*cvalue[i-1, j+1] \
+             + wx2[cellidx]*cvalue[i, j+1] + wx3[cellidx]*cvalue[i+1, j+1])\
+
+
+        return cbar
+
+
 class StructureQuadMeshDataStructure:
     localEdge = np.array([(0,1),(1,2),(2,3),(3,0)])
     ccw = np.array([0, 1, 2, 3])
