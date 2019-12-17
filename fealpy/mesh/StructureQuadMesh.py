@@ -16,6 +16,16 @@ class StructureQuadMesh(Mesh2d):
         self.itype = itype
         self.ftype = ftype
 
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            nx = 2*self.ds.nx
+            ny = 2*self.ds.ny
+            itype = self.ds.itype
+            self.ds = StructureQuadMeshDataStructure(nx, ny, itype)
+            self.hx = (self.box[1] - self.box[0])/nx
+            self.hy = (self.box[3] - self.box[2])/ny
+            self.data = {}
+
     @property
     def node(self):
         NN = self.ds.NN
@@ -43,6 +53,27 @@ class StructureQuadMesh(Mesh2d):
     def geo_dimension(self):
         return self.node.shape[1]
 
+
+    def interpolation(self, f, intertype='node'):
+        node = self.node
+        if intertype is 'node':
+            F = f(node)
+        elif intertype is 'edge':
+            ec = self.entity_barycenter('edge')
+            F = f(ec)
+        elif intertype is 'edgex':
+            isXDEdge = self.ds.x_direction_edge_flag()
+            ec = self.entity_barycenter('edge')
+            F = f(ec[isXDEdge])
+        elif intertype is 'edgey':
+            isYDEdge = self.ds.y_direction_edge_flag()
+            ec = self.entity_barycenter('edge')
+            F = f(ec[isYDEdge])
+        elif intertype is 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
     def laplace_operator(self):
         n0 = self.ds.ny + 1
         n1 = self.ds.nx + 1
@@ -61,6 +92,31 @@ class StructureQuadMesh(Mesh2d):
 
         A = kron(I1, T0) + kron(T1, I0)
         return A
+
+    def cell_location(self, px):
+        """
+        给定一组点，确定所有点所在的单元
+
+        Parameter
+        ---------
+        px: numpy ndarray
+
+        Note
+        ----
+        这里假设所有的点都在区域内部
+        """
+        box = self.box
+        hx = self.hx
+        hy = self.hy
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        v = px - np.array(box[0::2], dtype=self.ftype)
+        n0 = v[..., 0]//hx
+        n1 = v[..., 1]//hy
+
+        cidx = n0*ny + n1
+        return cidx.astype(self.itype)
 
     def polation_interoperator(self, uh):
         """
