@@ -209,6 +209,12 @@ class WeakGalerkinSpace2d:
         F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
         F1 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])
 
+        F2 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi0, h)
+        F3 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi1, h[isInEdge])
+
+        edge2dof = self.dof.edge_to_dof()
+        cell2dof = self.cell_to_dof(doftype='cell')
+
         #F0 = np.einsum('i, ijm, in, j->mjn', ws, phi0, phi, h)
         #F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi[:, -1::-1], h[isInEdge])
 
