@@ -24,7 +24,7 @@ class QuadBilinearFiniteElementSpace():
         self.GD = 2
         self.TD = 2
 
-        q = q if q is not None else p+3
+        q = q if q is not None else 4
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)

@@ -7,11 +7,7 @@ from fealpy.mesh import QuadrangleMesh
 class QuadBilinearFiniteElementSpaceTest:
     def __init__(self):
         self.pde = CosCosData()
-
-        node = 
-        cell = 
-        self.mesh = QuadrangleMesh(node, cell)
-
+        self.mesh = self.pde.init_mesh(meshtype='quad')
         self.space = QuadBilinearFiniteElementSpace(self.mesh)
 
     def test_intetpolation(self):
