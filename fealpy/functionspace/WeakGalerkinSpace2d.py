@@ -147,8 +147,11 @@ class WeakGalerkinSpace2d:
 
         self.integralalg = self.smspace.integralalg
 
-        self.H0 = inv(self.smspace.cell_mass_matrix())
-        self.H1 = inv(self.smspace.edge_mass_matrix())
+        self.CM = self.smspace.cell_mass_matrix()
+        self.EM = self.smspace.edge_mass_matrix()
+
+        self.H0 = inv(self.CM)
+        self.H1 = inv(self.CM)
         self.R0, self.R1 = self.left_weak_matrix()
 
     def number_of_local_dofs(self):
@@ -157,8 +160,15 @@ class WeakGalerkinSpace2d:
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
-    def cell_to_dof(self):
-        return self.dof.cell2dof, self.dof.cell2dofLocation
+    def cell_to_dof(self, doftype='all'):
+        if doftype is 'all':
+            return self.dof.cell2dof, self.dof.cell2dofLocation
+        elif doftype is 'cell':
+            p = self.p
+            NE = self.mesh.number_of_edges()
+            idof = (p+1)*(p+2)//2
+            cell2dof = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
+            return cell2dof
 
     def weak_grad(self, uh):
         cell2dof, cell2dofLocation = self.cell_to_dof()

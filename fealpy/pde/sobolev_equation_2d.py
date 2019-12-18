@@ -4,8 +4,8 @@ from ..timeintegratoralg.timeline_new import UniformTimeLine
 from ..mesh import TriangleMesh
 
 class PolyExpData:
-    def __init__(self, nu=1, epsilon=1):
-        self.nu = nu
+    def __init__(self, mu=1, epsilon=1):
+        self.mu = mu
         self.epsilon = epsilon
 
     def domain(self):
@@ -25,9 +25,9 @@ class PolyExpData:
         val[..., 1] = (1-2*y)*x*(1-x)*np.exp(-t)
 
     def flux(self, p, t):
-        nu = self.nu
+        mu = self.mu
         epsilon = self.epsilon
-        val = (epsilon - nu)*self.gradient(p, t)
+        val = (epsilon - mu)*self.gradient(p, t)
         return val
 
     def dirichlet(self, p, t):
@@ -52,8 +52,8 @@ class PolyExpData:
         return mesh
 
 class SinSinExpData:
-    def __init__(self, nu=1, epsilon=1):
-        self.nu = nu
+    def __init__(self, mu=1, epsilon=1):
+        self.mu = mu
         self.epsilon = epsilon
 
     def domain(self):
@@ -80,9 +80,9 @@ class SinSinExpData:
         return val
 
     def flux(self, p, t):
-        nu = self.nu
+        mu = self.mu
         epsilon = self.epsilon
-        val = (epsilon - nu)*self.gradient(p, t)
+        val = (epsilon - mu)*self.gradient(p, t)
         return val
 
     def source(self, p, t):
@@ -90,9 +90,9 @@ class SinSinExpData:
         y = p[..., 1]
         pi = np.pi
 
-        nu = self.nu
+        mu = self.mu
         epsilon = self.epsilon
-        f = (-2*pi**2*nu + 2*pi**2*epsilon - 1)*exp(-t)*sin(pi*x)*sin(pi*y)
+        f = (-2*pi**2*mu + 2*pi**2*epsilon - 1)*exp(-t)*sin(pi*x)*sin(pi*y)
         return f
 
     def dirichlet(self, p, t):
