@@ -139,6 +139,7 @@ class WeakGalerkinSpace2d:
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.mesh = mesh
+        self.cellsize = self.smspace.cellsize
 
         self.ftype = self.mesh.ftype
         self.itype = self.mesh.itype
@@ -159,6 +160,9 @@ class WeakGalerkinSpace2d:
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
+
+    def edge_to_dof(self):
+        return self.dof.edge_to_dof()
 
     def cell_to_dof(self, doftype='all'):
         if doftype is 'all':
@@ -218,12 +222,6 @@ class WeakGalerkinSpace2d:
 
         F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
         F1 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])
-
-        F2 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi0, h)
-        F3 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi1, h[isInEdge])
-
-        edge2dof = self.dof.edge_to_dof()
-        cell2dof = self.cell_to_dof(doftype='cell')
 
         #F0 = np.einsum('i, ijm, in, j->mjn', ws, phi0, phi, h)
         #F1 = np.einsum('i, ijm, in, j->mjn', ws, phi1, phi[:, -1::-1], h[isInEdge])

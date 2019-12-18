@@ -64,10 +64,12 @@ class SobolevEquationWGModel2d:
                 )
         self.M = bmat([[M, csr_matrix((gdof, gdof))], [csr_matrix((gdof, gdof)), M]], format='csr')
 
-        self.A1 = self.D + self.M/self.pde.mu
+        S = self.construct_stabilizer_matrix()
+        self.A1 = self.D + self.M/self.pde.mu + bmat([[S, csr_matrix((gdof,
+            gdof)
         self.A2 = self.G*self.pdf.mu
 
-    def construct_s_matrix(self):
+    def construct_stabilizer_matrix(self):
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -79,15 +81,62 @@ class SobolevEquationWGModel2d:
 
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
 
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(
+        phi0 = self.space.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.space.basis(
                 ps[:, isInEdge, :],
                 cellidx=edge2cell[isInEdge, 1]
                 )
         phi = self.edge_basis(bcs)
 
-        edge2dof = self.space.dof.edge_to_dof()
+        edge2dof = self.space.edge_to_dof()
         cell2dof = self.space.cell_to_dof(doftype='cell')
+
+        cellsize = self.space.cellsize
+        h0 = cellsize[edge2cell[:, 0]].reshape(-1, 1, 1)
+        h1 = cellsize[edge2cell[isInEdge, 1]].reshape(-1, 1, 1)
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)/h0
+        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])/h1
+
+        F2 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi0, h)/h0
+        F3 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi1, h[isInEdge])/h1
+
+        F4 = np.einsum('i, ijm, ijn, j->jmn', ws, phi, phi, h)
+        F5 = F4[isInEdge]/h1
+        F4 /=h0
+
+
+        edge2dof = self.dof.edge_to_dof()
+        cell2dof = self.cell_to_dof(doftype='cell')
+
+        cdof = cell2dof.shape[1]
+        edof = edge2dof.shape[1]
+        gdof = self.number_of_global_dofs()
+        S = csr_matrix((gdof, gdof), dtype=self.ftype)
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(edof))
+        J = np.einsum('ik, j->ijk', edge2dof, np.ones(cdof))
+        S -= csr_matrix((F0.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        S -= csr_matrix((F0.flat, (J.flat, I.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(edof))
+        S -= csr_matrix((F1.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        S -= csr_matrix((F1.flat, (J.flat, I.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(cdof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F2.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(cdof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F3.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', edge2dof, np.ones(edof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F4.flat, (I, J)), shape=(gdof, gdof))
+        I = np.einsum('ij, k->ijk', edge2dof[isInEdge], np.ones(edof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F5.flat, (I, J)), shape=(gdof, gdof))
+        return S
 
 
     def solution_projection(self, timeline):
