@@ -89,10 +89,6 @@ class SobolevEquationWGModel2d:
         edge2dof = self.space.dof.edge_to_dof()
         cell2dof = self.space.cell_to_dof(doftype='cell')
 
-        F0 = -np.einsum('i, ijm, ijn->mjn', ws, phi0, phi)
-        F1 = -np.einsum('i, ijm, ijn->mjn', ws, phi1, phi[:, isInEdge, :])
-
-        F2 = -np.einsum('i, ijm, ijn->mjn', ws, phi, phi)
 
     def solution_projection(self, timeline):
         NL = timeline.number_of_time_levels()
