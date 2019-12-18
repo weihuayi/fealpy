@@ -24,15 +24,12 @@ class QuadBilinearFiniteElementSpace():
         self.GD = 2
         self.TD = 2
 
-        if q is None:
-            self.integrator = mesh.integrator(2)
-        else:
-            self.integrator = mesh.integrator(q)
-
+        q = q if q is not None else p+3
         self.integralalg = FEMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                self.cellmeasure)
+                self.mesh, q,
+                cellmeasure=self.cellmeasure)
+        self.integrator = self.integralalg.integrator
+
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
@@ -95,7 +92,7 @@ class QuadBilinearFiniteElementSpace():
 
     def basis_coefficients(self):
         """
-        Compute the coefficients 
+        Compute the coefficients
         """
         mesh = self.mesh
         node = mesh.entity('node')
