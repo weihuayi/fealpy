@@ -38,6 +38,9 @@ class SobolevEquationWGModel2dTest:
         print(error)
         print(error[0:-1]/error[1:])
 
+    def test_sobolev_equation(self, maxit=4):
+        pass
+
 
 test = SobolevEquationWGModel2dTest()
 test.test_poisson_equaion()
