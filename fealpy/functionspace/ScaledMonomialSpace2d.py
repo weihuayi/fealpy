@@ -88,20 +88,17 @@ class ScaledMonomialSpace2d():
     def cell_to_dof(self):
         return self.dof.cell2dof
 
-    def edge_basis(self, bc, p=None):
+    def edge_basis(self, point, edgeidx=None, p=None):
         p = self.p if p is None else p
-        mesh = self.mesh
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        ps = np.einsum('ij, kjm->ikm', bc, node[edge])
-
         center = self.integralalg.edgebarycenter
         h = self.integralalg.edgemeasure
-        t = mesh.edge_unit_tagent()
+        t = self.mesh.edge_unit_tagent()
 
-        v = np.sum((ps - center)*t, axis=-1)
-        phi = np.ones(v.shape + (p+1,), dtype=self.ftype)
-        val = v/h
+        if edgeidx is None:
+            val = np.sum((point - center)*t, axis=-1)/h
+        else:
+            val = np.sum((point - center[edgeidx])*t[edgeidx], axis=-1)/h[edgeidx]
+        phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:
             phi[..., 1] = val
         else:
@@ -304,7 +301,8 @@ class ScaledMonomialSpace2d():
         measure = mesh.entity_measure('edge')
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        phi = self.edge_basis(bcs, p=p)
+        ps = self.mesh.edge_bc_to_point(bcs)
+        phi = self.edge_basis(ps, p=p)
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 

@@ -135,9 +135,9 @@ class WGDof2d():
 
 
 class WeakGalerkinSpace2d:
-    def __init__(self, mesh, p=1):
+    def __init__(self, mesh, p=1, q=None):
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
         self.mesh = mesh
         self.cellsize = self.smspace.cellsize
 
@@ -152,7 +152,7 @@ class WeakGalerkinSpace2d:
         self.EM = self.smspace.edge_mass_matrix()
 
         self.H0 = inv(self.CM)
-        self.H1 = inv(self.CM)
+        self.H1 = inv(self.EM)
         self.R0, self.R1 = self.left_weak_matrix()
 
     def number_of_local_dofs(self):
@@ -160,6 +160,9 @@ class WeakGalerkinSpace2d:
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
+
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
 
     def edge_to_dof(self):
         return self.dof.edge_to_dof()
@@ -170,6 +173,7 @@ class WeakGalerkinSpace2d:
         elif doftype is 'cell':
             p = self.p
             NE = self.mesh.number_of_edges()
+            NC = self.mesh.number_of_cells()
             idof = (p+1)*(p+2)//2
             cell2dof = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
@@ -218,7 +222,7 @@ class WeakGalerkinSpace2d:
                 ps[:, isInEdge, :],
                 cellidx=edge2cell[isInEdge, 1]
                 )
-        phi = self.edge_basis(bcs)
+        phi = self.edge_basis(ps)
 
         F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
         F1 = np.einsum('i, ijm, ijn, j->mjn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])
@@ -255,6 +259,126 @@ class WeakGalerkinSpace2d:
         R1[:, idx] = -M[:, 1].swapaxes(0, 1)
         return R0, R1
 
+    def mass_matrix(self):
+        cell2dof = self.cell_to_dof(doftype='cell') # only get the dofs in cell
+        ldof = cell2dof.shape[1]
+        gdof = self.number_of_global_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        M = csr_matrix(
+                (self.CM.flat, (I.flat, J.flat)), shape=(gdof, gdof)
+                )
+        return M
+
+    def weak_grad_matrix(self):
+        pass
+
+    def weak_div_matrix(self):
+        pass
+
+    def stabilizer_matrix(self):
+        mesh = self.mesh
+
+        qf = self.integralalg.edgeintegrator
+        bcs, ws = qf.quadpts, qf.weights
+
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        ps = self.mesh.edge_bc_to_point(bcs)
+        phi0 = self.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.basis(
+                ps[:, isInEdge, :],
+                cellidx=edge2cell[isInEdge, 1]
+                )
+        phi = self.edge_basis(ps)
+
+        edge2dof = self.edge_to_dof()
+        cell2dof = self.cell_to_dof(doftype='cell')
+
+        h = mesh.entity_measure('edge')
+        cellsize = self.cellsize
+        h0 = cellsize[edge2cell[:, 0]].reshape(-1, 1, 1)
+        h1 = cellsize[edge2cell[isInEdge, 1]].reshape(-1, 1, 1)
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)/h0
+        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])/h1
+
+        F2 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi0, h)/h0
+        F3 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi1, h[isInEdge])/h1
+
+        F4 = np.einsum('i, ijm, ijn, j->jmn', ws, phi, phi, h)
+        F5 = F4[isInEdge]/h1
+        F4 /=h0
+
+
+        edge2dof = self.edge_to_dof()
+        cell2dof = self.cell_to_dof(doftype='cell')
+
+        cdof = cell2dof.shape[1]
+        edof = edge2dof.shape[1]
+        gdof = self.number_of_global_dofs()
+        S = csr_matrix((gdof, gdof), dtype=self.ftype)
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(edof))
+        J = np.einsum('ik, j->ijk', edge2dof, np.ones(cdof))
+        S -= csr_matrix((F0.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        S -= csr_matrix((F0.flat, (J.flat, I.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(edof))
+        J = np.einsum('ik, j->ijk', edge2dof[isInEdge], np.ones(cdof))
+        S -= csr_matrix((F1.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        S -= csr_matrix((F1.flat, (J.flat, I.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(cdof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F2.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(cdof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F3.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+        I = np.einsum('ij, k->ijk', edge2dof, np.ones(edof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F4.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        I = np.einsum('ij, k->ijk', edge2dof[isInEdge], np.ones(edof))
+        J = I.swapaxes(-1, -2)
+        S += csr_matrix((F5.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return S
+
+    def apply_dirichlet_bc(self, g, A, F):
+        """ Modify matrix A and b
+        """
+
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        isBdEdge = mesh.ds.boundary_edge_flag()
+        isBdDof = self.boundary_dof()
+
+        qf = GaussLegendreQuadrature(self.p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
+        gI = g(ps)
+
+        ephi = self.edge_basis(ps, edgeidx=isBdEdge)
+        h = mesh.entity_measure('edge')
+        b = np.einsum('i, ij, ijk, j->jk', ws, gI, ephi, h[isBdEdge])
+
+        gdof = self.number_of_global_dofs()
+        x = np.zeros((gdof,), dtype=self.ftype)
+
+        x[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
+        F -= A@x
+
+        bdIdx = np.zeros(gdof, dtype=np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, gdof, gdof)
+        T = spdiags(1-bdIdx, 0, gdof, gdof)
+        A = T@A@T + Tbd
+
+        F[isBdDof] = x[isBdDof]
+        return A, F
+
     def basis(self, point, cellidx=None):
         return self.smspace.basis(point, cellidx=cellidx)
 
@@ -271,8 +395,8 @@ class WeakGalerkinSpace2d:
         p = self.p
         return self.smspace.grad_value(uh[NE*(p+1):, ...], point, cellidx=cellidx)
 
-    def edge_basis(self, bc):
-        return self.smspace.edge_basis(bc)
+    def edge_basis(self, point, edgeidx=None):
+        return self.smspace.edge_basis(point, edgeidx=edgeidx)
 
     def lagrange_edge_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
@@ -302,6 +426,16 @@ class WeakGalerkinSpace2d:
         val = np.einsum(s1, phi, uh[edge2dof])
         return val
 
+    def source_vector(self, f):
+        phi = self.basis
+        def u(x, cellidx):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        bb = self.integralalg.integral(u, celltype=True)
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof(doftype='cell')
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b
+
     def projection(self, u, dim=1):
         p = self.p
         mesh = self.mesh
@@ -319,7 +453,6 @@ class WeakGalerkinSpace2d:
 
         ephi = self.edge_basis(bcs)
         b = np.einsum('i, ij..., ijk, j->jk...', ws, uI, ephi, h)
-        #b = np.einsum('i, ij..., ik, j->jk...', ws, uI, ephi, h)
         if dim == 1:
             uh[:NE*(p+1), ...].flat = (self.H1@b[:, :, np.newaxis]).flat
         else:

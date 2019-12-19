@@ -145,6 +145,15 @@ class PolygonMesh(Mesh2d):
         a /=2
         return a
 
+    def edge_bc_to_point(self, bcs, edgeidx=None):
+        node = self.entity('node')
+        edge = self.entity('edge')
+        if edgeidx is None:
+            ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+        else:
+            ps = np.einsum('ij, kjm->ikm', bcs, node[edge[edgeidx]])
+        return ps
+
     def print(self):
         print("Node:\n", self.node)
         print("Cell:\n", self.ds.cell)

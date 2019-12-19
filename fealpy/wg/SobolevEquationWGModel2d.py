@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, bmat
+from scipy.sparse import coo_matrix, csr_matrix, bmat
 
 from ..functionspace import WeakGalerkinSpace2d
 
@@ -21,7 +21,7 @@ class SobolevEquationWGModel2d:
         构造 Soblove 方程对应的所有矩阵
         """
         gdof = self.space.number_of_global_dofs()
-        cell2dof, cell2dofLocation = self.cell_to_dof()
+        cell2dof, cell2dofLocation = self.space.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = np.hsplit(self.space.R0, cell2dofLocation[1:-1])
         R1 = np.hsplit(self.space.R1, cell2dofLocation[1:-1])
@@ -53,91 +53,11 @@ class SobolevEquationWGModel2d:
         self.G = M00 + M11 # weak gradient matrix
 
 
-        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
-        ldof = cell2dof.shape[1]
-        gdof = self.space.number_of_global_dofs()
+        self.S = self.space.stabilizer_matrix()
+        self.M = self.space.mass_matrix()
 
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-        M = csr_matrix(
-                (self.space.CM.flat, (I.flat, J.flat)), shape=(gdof, gdof)
-                )
-        self.M = bmat([[M, csr_matrix((gdof, gdof))], [csr_matrix((gdof, gdof)), M]], format='csr')
-
-        S = self.construct_stabilizer_matrix()
-        self.A1 = self.D + self.M/self.pde.mu + bmat([[S, csr_matrix((gdof,
-            gdof)
-        self.A2 = self.G*self.pdf.mu
-
-    def construct_stabilizer_matrix(self):
-        mesh = self.mesh
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-
-        qf = self.space.integralalg.edgeintegrator
-        bcs, ws = qf.quadpts, qf.weights
-
-        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-
-        phi0 = self.space.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.space.basis(
-                ps[:, isInEdge, :],
-                cellidx=edge2cell[isInEdge, 1]
-                )
-        phi = self.edge_basis(bcs)
-
-        edge2dof = self.space.edge_to_dof()
-        cell2dof = self.space.cell_to_dof(doftype='cell')
-
-        cellsize = self.space.cellsize
-        h0 = cellsize[edge2cell[:, 0]].reshape(-1, 1, 1)
-        h1 = cellsize[edge2cell[isInEdge, 1]].reshape(-1, 1, 1)
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)/h0
-        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])/h1
-
-        F2 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi0, h)/h0
-        F3 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi1, h[isInEdge])/h1
-
-        F4 = np.einsum('i, ijm, ijn, j->jmn', ws, phi, phi, h)
-        F5 = F4[isInEdge]/h1
-        F4 /=h0
-
-
-        edge2dof = self.dof.edge_to_dof()
-        cell2dof = self.cell_to_dof(doftype='cell')
-
-        cdof = cell2dof.shape[1]
-        edof = edge2dof.shape[1]
-        gdof = self.number_of_global_dofs()
-        S = csr_matrix((gdof, gdof), dtype=self.ftype)
-
-        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(edof))
-        J = np.einsum('ik, j->ijk', edge2dof, np.ones(cdof))
-        S -= csr_matrix((F0.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        S -= csr_matrix((F0.flat, (J.flat, I.flat)), shape=(gdof, gdof))
-
-        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(edof))
-        S -= csr_matrix((F1.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        S -= csr_matrix((F1.flat, (J.flat, I.flat)), shape=(gdof, gdof))
-
-        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[:, 0]], np.ones(cdof))
-        J = I.swapaxes(-1, -2)
-        S += csr_matrix((F2.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-
-        I = np.einsum('ij, k->ijk', cell2dof[edge2cell[isInEdge, 1]], np.ones(cdof))
-        J = I.swapaxes(-1, -2)
-        S += csr_matrix((F3.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-
-        I = np.einsum('ij, k->ijk', edge2dof, np.ones(edof))
-        J = I.swapaxes(-1, -2)
-        S += csr_matrix((F4.flat, (I, J)), shape=(gdof, gdof))
-        I = np.einsum('ij, k->ijk', edge2dof[isInEdge], np.ones(edof))
-        J = I.swapaxes(-1, -2)
-        S += csr_matrix((F5.flat, (I, J)), shape=(gdof, gdof))
-        return S
-
+        self.A1 = self.D + bmat([[self.S, None], [None, self.S]], format='csr') + bmat([[self.M, None], [None, self.M]], format='csr')/self.pde.mu
+        self.A2 = self.G + self.S
 
     def solution_projection(self, timeline):
         NL = timeline.number_of_time_levels()
@@ -158,16 +78,15 @@ class SobolevEquationWGModel2d:
         return fh
 
     def get_current_left_matrix(self, timeline):
-        return self.G
+        return self.A2
 
     def get_current_right_vector(self, data, timeline):
         mu = self.pde.mu
         epsilon = self.pde.epsilon
 
         uh = data[0]
-        ph = data[1]
-        fh = data[2]
-        solver = data[4]
+        fh = data[1]
+        solver = data[2]
         i = timeline.current
 
         cell2dof, cell2dofLocation = self.cell_to_dof(doftype='all')
@@ -175,34 +94,39 @@ class SobolevEquationWGModel2d:
         R0 = self.space.R0
         R1 = self.space.R1
 
-        cell2dof = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
+        c2d = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
         # epsilon/mu(\nabla u, \bfq)
         F0 = np.zeros((gdof, 2), dtype=self.space.ftype)
         f00 = lambda j: R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
         f01 = lambda j: R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]@uh[cd[j], i]
-        F0[cell2dof.flat, 0] = np.concatenate(list(map(f00, range(NC))))
-        F0[cell2dof.flat, 1] = np.concatenate(list(map(f01, range(NC))))
+        F0[c2d.flat, 0] = np.concatenate(list(map(f00, range(NC))))
+        F0[c2d.flat, 1] = np.concatenate(list(map(f01, range(NC))))
 
         # -(f, \nabla\cdot \bfq)
         F1 = np.zeros((gdof, 2), dtype=self.space.ftype)
-        f11 = lambda j: fh[cell2dof[j, :], i]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
-        f12 = lambda j: fh[cell2dof[j, :], i]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f10 = lambda j: fh[c2d[j, :], i]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f11 = lambda j: fh[c2d[j, :], i]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
         F1[cell2dof.flat, 0] = np.concatenate(
-            list(map(f11, range(NC)))
+            list(map(f10, range(NC)))
             )
         F1[cell2dof.flat, 1] = np.concatenate(
-            list(map(f12, range(NC)))
+            list(map(f11, range(NC)))
             )
 
         F = epsilon/mu*F0 - F1
-        ph[:, i] = solver(self.A1, F.reshape(-1, order='F'))
+        ph = solver(self.A1, F.reshape(-1, order='F')).reshape(-1, 2, order='F')
 
         dt = timeline.current_time_step_length()
         t0 = timeline.current_time_level()
-        f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
+        F = (1- dt*epsilon/mu)*(self.A2@uh[:, i])
 
-    def apply_boundary_condition(self, A, b, timeline):
+        f20 = lambda j: qh[c2d[j, :], 0]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f22 = lambda j: qh[c2d[j, :], 1]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f = lambda j: f20(j) + f22(j)
+        F[cell2dof] +=  np.concatenate(list(map(f, range(NC))))
+        return F
+
+    def apply_boundary_condition(self, A, F, timeline):
         t1 = timeline.next_time_level()
-        bc = DirichletBC(self.space, lambda x:self.pde.dirichlet(x, t1))
-        A, b = bc.apply(A, b)
-        return A, b
+        A, F = self.space.apply_dirichlet_bc(lambda x: self.pde.dirichlet(x, t1), A, F)
+        return A, F
