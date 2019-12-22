@@ -83,7 +83,7 @@ class WGDof2d():
     def cell_to_dof_1(self):
         """
         Construct the cell2dof array which are 1D array with a location array
-        cell2dofLocation. 
+        cell2dofLocation.
 
         The following code give the dofs of i-th cell.
 
