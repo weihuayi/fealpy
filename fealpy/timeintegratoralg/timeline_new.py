@@ -54,7 +54,7 @@ class UniformTimeLine():
             A = dmodel.get_current_left_matrix(self)
             b = dmodel.get_current_right_vector(data, self)
             A, b = dmodel.apply_boundary_condition(A, b, self)
-            dmodel.solve(A, b, solver, self)
+            dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
 
@@ -127,4 +127,14 @@ class ChebyshevTimeLine():
 
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
+
+    def time_integration(self, data, dmodel, solver):
+        self.reset()
+        while not self.stop():
+            A = dmodel.get_current_left_matrix(self)
+            b = dmodel.get_current_right_vector(data, self)
+            A, b = dmodel.apply_boundary_condition(A, b, self)
+            dmodel.solve(data, A, b, solver, self)
+            self.current += 1
+        self.reset()
 

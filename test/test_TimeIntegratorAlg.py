@@ -24,16 +24,17 @@ class ParabolicFEMModel():
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         uh = np.zeros((gdof, NL), dtype=self.mesh.ftype)
+        uh[:, 0] = self.space.interpolation(lambda x:self.pde.solution(x, 0.0))
         return uh
 
-    def interpolation(self, timeline):
+    def interpolation(self, u, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         ps = self.space.interpolation_points()
         uI = np.zeros((gdof, NL), dtype=self.mesh.ftype)
         times = timeline.all_time_levels()
         for i, t in enumerate(times):
-            uI[:, i] = self.pde.solution(ps, t)
+            uI[:, i] = u(ps, t)
         return uI
 
     def get_current_left_matrix(self, timeline):
@@ -45,9 +46,8 @@ class ParabolicFEMModel():
         dt = timeline.current_time_step_length()
         t0 = timeline.current_time_level()
         t1 = timeline.next_time_level()
-        f0 = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
-        #f0 = lambda x: self.pde.source(x, t1)
-        F = self.space.source_vector(f0)
+        f = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
+        F = self.space.source_vector(f)
         return self.M@uh[:, i] - 0.5*dt*(self.A@uh[:, i] - F)
 
     def apply_boundary_condition(self, A, b, timeline):
@@ -83,23 +83,14 @@ class SurfaceParabolicFEMModel():
         uh[:, 0] = self.space.interpolation(lambda x:self.pde.solution(x, 0.0))
         return uh
 
-    def init_source_vector(self, timeline):
-        NL = timeline.number_of_time_levels()
-        gdof = self.space.number_of_global_dofs()
-        ps = self.space.interpolation_points()
-        self.F = np.zeros((gdof, NL), dtype=self.mesh.ftype)
-        times = timeline.all_time_levels()
-        for i, t in enumerate(times):
-            self.F[:, i] = self.space.source_vector(lambda x: self.pde.source(x, t))
-
-    def interpolation(self, timeline):
+    def interpolation(self, u, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         ps = self.space.interpolation_points()
         uI = np.zeros((gdof, NL), dtype=self.mesh.ftype)
         times = timeline.all_time_levels()
         for i, t in enumerate(times):
-            uI[:, i] = self.pde.solution(ps, t)
+            uI[:, i] = u(ps, t)
         return uI
 
     def get_current_left_matrix(self, timeline):
@@ -109,7 +100,11 @@ class SurfaceParabolicFEMModel():
     def get_current_right_vector(self, uh, timeline):
         dt = timeline.current_time_step_length()
         i = timeline.current
-        return self.M@uh - 0.5*dt*(self.A@uh[:, i] - self.F[:, i] - self.F[:, i+1])
+        t0 = timeline.current_time_level()
+        t1 = timeline.next_time_level()
+        f = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
+        F = self.space.source_vector(f)
+        return self.M@uh[:, i] - 0.5*dt*(self.A@uh[:, i] - F)
 
     def apply_boundary_condition(self, A, b, timeline):
         t1 = timeline.next_time_level()
@@ -141,12 +136,13 @@ class TimeIntegratorAlgTest():
             print(i)
             dmodel = ParabolicFEMModel(pde, mesh)
             uh = dmodel.init_solution(timeline)
-            uI = dmodel.interpolation(timeline)
-            uh[:, 0] = uI[:, 0]
 
             timeline.time_integration(uh, dmodel, self.solver.divide)
 
+            uI = dmodel.interpolation(timeline)
+
             error[i] = np.max(np.abs(uh - uI))
+
             timeline.uniform_refine()
             mesh.uniform_refine()
 
@@ -163,18 +159,20 @@ class TimeIntegratorAlgTest():
             print(i)
             dmodel = SurfaceParabolicFEMModel(pde, mesh)
             uh = dmodel.init_solution(timeline)
-            dmodel.init_source_vector(timeline)
+
             timeline.time_integration(uh, dmodel, self.solver.divide)
 
-            uI = dmodel.interpolation(timeline)
+            uI = dmodel.interpolation(pde.solution, timeline)
             error[i] = np.max(np.abs(uh - uI))
-            print('error:', error[i])
 
             timeline.uniform_refine()
             mesh.uniform_refine(surface=pde.surface)
 
         print(error[:-1]/error[1:])
         print(error)
+
+    def test_SurfaceParabolicFEMModel_sdc_time(self, maxit=4):
+        pass
 
 
 

@@ -451,7 +451,7 @@ class WeakGalerkinSpace2d:
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         uI = u(ps)
 
-        ephi = self.edge_basis(bcs)
+        ephi = self.edge_basis(ps)
         b = np.einsum('i, ij..., ijk, j->jk...', ws, uI, ephi, h)
         if dim == 1:
             uh[:NE*(p+1), ...].flat = (self.H1@b[:, :, np.newaxis]).flat
