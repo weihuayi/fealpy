@@ -4,6 +4,10 @@ from scipy.sparse import coo_matrix, csr_matrix, bmat
 from ..functionspace import WeakGalerkinSpace2d
 
 class SobolevEquationWGModel2d:
+    """
+    Solve Sobolev equation by weak Galerkin method.
+
+    """
     def __init__(self, pde, mesh, p, q=None):
         self.pde = pde
         self.mesh = mesh
@@ -59,23 +63,14 @@ class SobolevEquationWGModel2d:
         self.A1 = self.D + bmat([[self.S, None], [None, self.S]], format='csr') + bmat([[self.M, None], [None, self.M]], format='csr')/self.pde.mu
         self.A2 = self.G + self.S
 
-    def solution_projection(self, timeline):
+    def projection(self, u, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         uh = self.space.function(dim=NL)
         times = timeline.all_time_levels()
         for i, t in enumerate(times):
-            uh[:, i] = self.space.projection(lambda x:self.pde.solution(x, t))
+            uh[:, i] = self.space.projection(lambda x:u(x, t))
         return uh
-
-    def source_projection(self, timeline):
-        NL = timeline.number_of_time_levels()
-        gdof = self.space.number_of_global_dofs()
-        fh = self.space.function(dim=NL)
-        times = timeline.all_time_levels()
-        for i, t in enumerate(times):
-            fh[:, i] = self.space.projection(lambda x:self.pde.source(x, t))
-        return fh
 
     def get_current_left_matrix(self, timeline):
         return self.A2
@@ -89,11 +84,14 @@ class SobolevEquationWGModel2d:
         solver = data[2]
         i = timeline.current
 
-        cell2dof, cell2dofLocation = self.cell_to_dof(doftype='all')
+        cell2dof, cell2dofLocation = self.space.cell_to_dof(doftype='all')
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = self.space.R0
         R1 = self.space.R1
 
+        NC = len(cd)
+
+        gdof = self.space.number_of_global_dofs()
         c2d = self.space.cell_to_dof(doftype='cell') # only get the dofs in cell
         # epsilon/mu(\nabla u, \bfq)
         F0 = np.zeros((gdof, 2), dtype=self.space.ftype)
@@ -120,11 +118,16 @@ class SobolevEquationWGModel2d:
         t0 = timeline.current_time_level()
         F = (1- dt*epsilon/mu)*(self.A2@uh[:, i])
 
-        f20 = lambda j: qh[c2d[j, :], 0]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
-        f22 = lambda j: qh[c2d[j, :], 1]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f20 = lambda j: ph[c2d[j, :], 0]@R0[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
+        f22 = lambda j: ph[c2d[j, :], 1]@R1[:, cell2dofLocation[j]:cell2dofLocation[j+1]]
         f = lambda j: f20(j) + f22(j)
         F[cell2dof] +=  np.concatenate(list(map(f, range(NC))))
         return F
+
+    def solve(self, data, A, b, solver, timeline):
+        uh = data[0]
+        i = timeline.current
+        uh[:, i] = solver(A, b)
 
     def apply_boundary_condition(self, A, F, timeline):
         t1 = timeline.next_time_level()
