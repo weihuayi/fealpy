@@ -62,7 +62,7 @@ class ParabolicFEMModel():
         uh[:, i+1] = solver(A, b)
 
 class SurfaceParabolicFEMModel():
-    def __init__(self, pde, mesh, p=2, q=6, p0=None):
+    def __init__(self, pde, mesh, p=1, q=6, p0=None):
         from fealpy.functionspace import SurfaceLagrangeFiniteElementSpace
         from fealpy.boundarycondition import DirichletBC
         self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p,
@@ -200,48 +200,62 @@ class TimeIntegratorAlgTest():
         pde = SinSinSinExpDataSphere()
         mesh = pde.init_mesh(n=5)
         timeline = pde.time_mesh(0, 1, 2)
-        error = np.zeros(maxit, dtype=mesh.ftype)
+
+        errorType = ['$||u-u_h||_0$']
+        errorMatrix = np.zeros((len(errorType), maxit), dtype=mesh.ftype)
+        Ndof = np.zeros(maxit, dtype=mesh.itype)
         for i in range(maxit):
             print(i)
-            dmodel = SurfaceParabolicFEMModel(pde, mesh)
+            dmodel = SurfaceParabolicFEMModel(pde, mesh, p=1)
+            Ndof[i] = dmodel.space.number_of_global_dofs()
+
             uh = dmodel.init_solution(timeline)
 
             timeline.time_integration(uh, dmodel, self.solver.divide)
+            
+            u = lambda x:dmodel.pde.solution(x, 1.0)
+            uh = dmodel.space.function(array=uh[:, -1])
+            errorMatrix[0, i] = dmodel.space.integralalg.L2_error(u, uh)
 
             uI = dmodel.interpolation(pde.solution, timeline)
-            error[i] = np.max(np.abs(uh - uI))
-
             timeline.uniform_refine()
             mesh.uniform_refine(surface=pde.surface)
+        show_error_table(Ndof, errorType, errorMatrix)
+        showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+        plt.show()
 
-        print(error[:-1]/error[1:])
-        print(error)
-
-    def test_SurfaceParabolicFEMModel_sdc_time(self, maxit=2):
+    def test_SurfaceParabolicFEMModel_sdc_time(self, maxit=4):
         from fealpy.pde.surface_parabolic_model_3d import SinSinSinExpDataSphere
         pde = SinSinSinExpDataSphere()
         mesh = pde.init_mesh(n=5)
         timeline = pde.time_mesh(0, 1, 2, timeline='chebyshev')
-        error = np.zeros(maxit, dtype=mesh.ftype)
+        
+        errorType = ['$||u-u_h||_0$']
+        errorMatrix = np.zeros((len(errorType), maxit), dtype=mesh.ftype)
+        Ndof = np.zeros(maxit, dtype=mesh.itype)
         for i in range(maxit):
             print(i)
-            dmodel = SurfaceParabolicFEMModel(pde, mesh)
+            dmodel = SurfaceParabolicFEMModel(pde, mesh, p=1)
+            Ndof[i] = dmodel.space.number_of_global_dofs()
 
             uh = dmodel.init_solution(timeline)
             timeline.time_integration(uh, dmodel, self.solver.divide, nupdate=1)
+            u = lambda x:dmodel.pde.solution(x, 1.0)
+            uh = dmodel.space.function(array=uh[:, -1])
+            errorMatrix[0, i] = dmodel.space.integralalg.L2_error(u, uh)
 
             uI = dmodel.interpolation(pde.solution, timeline)
-            error[i] = np.max(np.abs(uh - uI))
 
             timeline.uniform_refine()
             mesh.uniform_refine(surface=pde.surface)
+        show_error_table(Ndof, errorType, errorMatrix)
+        showmultirate(plt, 0, Ndof, errorMatrix, errorType)
+        plt.show()
 
-        print(error[:-1]/error[1:])
-        print(error)
 
 
 
 test = TimeIntegratorAlgTest()
 test.test_SurfaceParabolicFEMModel_sdc_time()
-
+#test.test_SurfaceParabolicFEMModel_time()
  
