@@ -166,21 +166,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         G[:, smldof+idx[0].reshape(-1, 1), idx[1]] += 0.5*mxy
         G[:, idx[1].reshape(-1, 1), smldof+idx[0]] += 0.5*mxy.swapaxes(-1, -2)
 
-<<<<<<< HEAD
-        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-#        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-#                L, CM[:, idx0.reshape(-1, 1))
-
-||||||| merged common ancestors
-        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-                L, CM[:, idx0.reshape(-1, 1))
-
-=======
         B = np.zeros((NC, 2*smldof, smldof-p-1), dtype=self.ftype)
         B[:, idx[0]] = np.einsum('ij, ijk->ijk', L, CM[:, idx0])
         B[:, smdof+idx[1]] = np.einsum('ij, ijk->ijk', R, CM[:, idx0])
->>>>>>> e3261433e1fb86a54f0b00836f85f1f9f1a74728
 
         area = self.smspace.cellmeasure
         mx = L*CM[:, 0, idx0]/area[:, np.newaxis]

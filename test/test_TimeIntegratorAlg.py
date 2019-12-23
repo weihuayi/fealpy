@@ -62,7 +62,7 @@ class ParabolicFEMModel():
         uh[:, i+1] = solver(A, b)
 
 class SurfaceParabolicFEMModel():
-    def __init__(self, pde, mesh, p=1, q=6, p0=None):
+    def __init__(self, pde, mesh, p=2, q=6, p0=None):
         from fealpy.functionspace import SurfaceLagrangeFiniteElementSpace
         from fealpy.boundarycondition import DirichletBC
         self.space = SurfaceLagrangeFiniteElementSpace(mesh, pde.surface, p=p,
@@ -141,7 +141,7 @@ class SurfaceParabolicFEMModel():
     def get_error_right_vector(self, data, timeline):
         uh = data[0]
         d = data[2]
-        delta = data[3]
+        delta = data[-1]
         M = self.space.mass_matrix()
         i = timeline.current
         dt = timeline.current_time_step_length()
@@ -217,7 +217,7 @@ class TimeIntegratorAlgTest():
         print(error[:-1]/error[1:])
         print(error)
 
-    def test_SurfaceParabolicFEMModel_sdc_time(self, maxit=1):
+    def test_SurfaceParabolicFEMModel_sdc_time(self, maxit=2):
         from fealpy.pde.surface_parabolic_model_3d import SinSinSinExpDataSphere
         pde = SinSinSinExpDataSphere()
         mesh = pde.init_mesh(n=5)
