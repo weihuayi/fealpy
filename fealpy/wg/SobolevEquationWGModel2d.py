@@ -18,6 +18,7 @@ class SobolevEquationWGModel2d:
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         uh = self.space.function(dim=NL)
+        uh[:, 0] = self.space.projection(lambda x:pde.solution(x, t))
         return uh
 
     def construct_marix(self):
