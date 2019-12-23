@@ -128,7 +128,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         mask1[idx1] = False
         idx0 = idx[mask0]
         idx1 = idx[mask1]
-        
+
         idx = np.repeat(range(2, p+2), range(1, p+1))
         idx4 = ranges(range(p+1), start=1)
         idx3 = idx - idx4
@@ -139,15 +139,54 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         p = self.p
         CM = self.CM
         print(CM)
-        sldof = self.smspace.number_of_local_dofs()
+        smldof = self.smspace.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         h = self.smspace.cellsize
-        self.G = np.zeros((NC, 2*sldof, 2*sldof), dtype=self.ftype)
+        self.G = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
 
-        idx0 = np.arange(sldof - p - 1)
-        mxx = CM[:, idx0.reshape(-1, 1), idx0]
         idx = self.index()
-        self.G[:, idx[0].reshape(-1, 1), idx[0]] = CM[:, idx0.reshape(-1, 1), idx0]
+        print(idx)
+        idx0 = np.arange(smldof - p - 1)
+        L = idx[2][np.newaxis, ...]/h[..., np.newaxis]
+        R = idx[3][np.newaxis, ...]/h[..., np.newaxis]
+        mxx = np.einsum('ij, ijk, ik->ijk',
+                L, CM[:, idx0.reshape(-1, 1), idx0], L)
+        mxy = np.einsum('ij, ijk, ik->ijk',
+                L, CM[:, idx0.reshape(-1, 1), idx0], R)
+        myy = np.einsum('ij, ijk, ik->ijk',
+                R, CM[:, idx0.reshape(-1, 1), idx0], R)
+
+        G = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
+        G[:, idx[0].reshape(-1, 1), idx[0]] += mxx
+        G[:, idx[1].reshape(-1, 1), idx[1]] += 0.5*myy
+
+        G[:, smldof+idx[1].reshape(-1, 1), smldof+idx[1]] += myy
+        G[:, smldof+idx[0].reshape(-1, 1), smldof+idx[0]] += 0.5*mxx
+
+        G[:, smldof+idx[0].reshape(-1, 1), idx[1]] += 0.5*mxy
+        G[:, idx[1].reshape(-1, 1), smldof+idx[0]] += 0.5*mxy.swapaxes(-1, -2)
+
+        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
+        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
+                L, CM[:, idx0.reshape(-1, 1))
+
+
+        area = self.smspace.cellmeasure
+        mx = L*CM[:, 0, idx0]/area[:, np.newaxis]
+        my = R*CM[:, 0, idx0]/area[:, np.newaxis]
+        G[:, idx[1].reshape(-1, 1), idx[1]] += np.einsum('ij, ik->ijk', my, my)
+        G[:, smldof+idx[0].reshape(-1, 1), smldof+idx[0]] += np.einsum('ij, ik->ijk', mx, mx)
+        G[:, smldof+idx[0].reshape(-1, 1), idx[1]] -= np.einsum('ij, ik->ijk', mx, my)
+        G[:, idx[1].reshape(-1, 1), idx[0]] = G[:, smldof+idx[0].reshape(-1, 1), idx[1]].swapaxes(-1, -2)
+
+
+        m = CM[:, 0, :]/area
+        idx0 = np.arange(smldof)
+        G[:, idx0.reshape(-1, 1), idx0] += np.einsum('ij, ik->ijk', m, m)
+        G[:, smldof+idx0.reshape(-1, 1), smldof+idx0] += G[:, idx0.reshape(-1, 1), idx0]
+        return G
+
+
 
 
     def number_of_global_dofs(self):
