@@ -153,7 +153,7 @@ class SurfaceParabolicFEMModel():
             A, b = bc.apply(A, b)
             return A, b
         else:
-            bc = DirichletBC(self.space, 0, self.is_boundary_dof)
+            bc = DirichletBC(self.space, lambda x: 0, self.is_boundary_dof)
             A, b = bc.apply(A, b)
             return A, b
 

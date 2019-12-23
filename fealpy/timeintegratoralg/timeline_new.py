@@ -136,7 +136,7 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, solver):
+    def time_integration(self, data, dmodel, solver, update=1):
         self.reset()
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
@@ -145,6 +145,8 @@ class ChebyshevTimeLine():
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
+        for i in range(update):
+            pass
 
     def residual_integration(self, data, dmodel):
         q = dmodel.get_residual(data, self)
