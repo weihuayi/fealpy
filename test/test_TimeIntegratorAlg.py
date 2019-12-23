@@ -131,14 +131,19 @@ class SurfaceParabolicFEMModel():
         return -A@uh + F
 
     def get_error(self, data, timeline):
+        uh = data[0]
+        intq = data[1]
         M = self.space.mass_matrix()
-        return data[0][:, [0]] + spsolve(M, data[1]) - data[0]
+        return uh[:, [0]] + spsolve(M, intq) - uh
 
     def get_error_right_vector(self, data, timeline):
+        delta = data[0]
+        uh = data[1]
+        d = data[2]
         M = self.space.mass_matrix()
         i = timeline.current
         dt = timeline.current_time_step_length()
-        return self.get_current_right_vector(data[0], timeline, returnF=False) + dt*M@data[2][:, i+1]
+        return self.get_current_right_vector(delta, timeline, returnF=False) + dt*M@d[:, i+1]
 
 
     def apply_boundary_condition(self, A, b, timeline, returnu=True):

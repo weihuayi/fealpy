@@ -161,7 +161,7 @@ class ChebyshevTimeLine():
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
             b = dmodel.get_error_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=False)
+            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=True)
             dmodel.solve(data[1], A, b, solver, self)
             self.current += 1
         self.reset()
