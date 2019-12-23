@@ -13,7 +13,8 @@ cell = np.array([
     (3, 0, 2)], dtype=np.int)
 
 tmesh = TriangleMesh(node, cell)
-tmesh.uniform_refine(1)
+tmesh.uniform_refine(0)
+print(tmesh.ds.node_to_cell())
 node = tmesh.entity('node')
 cell = tmesh.entity('cell')
 fig = plt.figure()
