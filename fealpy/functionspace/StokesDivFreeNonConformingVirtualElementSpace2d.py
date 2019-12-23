@@ -113,12 +113,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.ftype = self.mesh.ftype
         self.itype = self.mesh.itype
 
-    def index(self, p=None):
+    def index0(self, p=None):
         if p is None:
             p = self.p
 
         n = (p+1)*(p+2)//2
-        idx = np.arange(n)
         idx1 = np.cumsum(np.arange(p+1))
         idx0 = np.arange(p+1) + idx1
 
@@ -126,6 +125,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         mask1 = np.ones(n, dtype=np.bool)
         mask0[idx0] = False
         mask1[idx1] = False
+
+        idx = np.arange(n)
         idx0 = idx[mask0]
         idx1 = idx[mask1]
 
@@ -134,6 +135,44 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         idx3 = idx - idx4
         return idx0, idx1, idx3, idx4
 
+    def index1(self, p=None):
+        if p is None:
+            p = self.p
+
+        n = (p+1)*(p+2)//2
+        mask0 = np.ones(n, dtype=np.bool)
+        mask1 = np.ones(n, dtype=np.bool)
+        mask2 = np.ones(n, dtype=np.bool)
+
+        idx1 = np.cumsum(np.arange(p+1))
+        idx0 = np.arange(p+1) + idx1
+        mask0[idx0] = False
+        mask1[idx1] = False
+
+        mask2[idx0] = False
+        mask2[idx1] = False
+
+        idx0 = np.cumsum([1]+list(range(3, p+2)))
+        idx1 = np.cumsum([2]+list(range(2, p+1)))
+        mask0[idx0] = False
+        mask1[idx1] = False
+
+        idx = np.arange(n)
+        idx0 = idx[mask0]
+        idx1 = idx[mask1]
+        idx2 = idx[mask2]
+
+        idxa = np.repeat(range(2, p+1), range(1, p))
+        idxb = np.repeat(range(4, p+3), range(1, p))
+
+        idxc = ranges(range(p), start=1)
+        idxd = ranges(range(p), start=2)
+
+        idx3 = (idxa - idxc)*(idxb - idxd)
+        idx4 = idxc*idxd
+        idx5 = idxc*(idxa - idxc)
+
+        return idx0, idx1, idx2, idx3, idx4, idx5
 
     def matrix_G_B(self):
         p = self.p
@@ -144,7 +183,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         h = self.smspace.cellsize
         self.G = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
 
-        idx = self.index()
+        idx = self.index0()
         print(idx)
         idx0 = np.arange(smldof - p - 1)
         L = idx[2][np.newaxis, ...]/h[..., np.newaxis]
@@ -166,21 +205,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         G[:, smldof+idx[0].reshape(-1, 1), idx[1]] += 0.5*mxy
         G[:, idx[1].reshape(-1, 1), smldof+idx[0]] += 0.5*mxy.swapaxes(-1, -2)
 
-<<<<<<< HEAD
-        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-#        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-#                L, CM[:, idx0.reshape(-1, 1))
-
-||||||| merged common ancestors
-        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-                L, CM[:, idx0.reshape(-1, 1))
-
-=======
         B = np.zeros((NC, 2*smldof, smldof-p-1), dtype=self.ftype)
         B[:, idx[0]] = np.einsum('ij, ijk->ijk', L, CM[:, idx0])
         B[:, smdof+idx[1]] = np.einsum('ij, ijk->ijk', R, CM[:, idx0])
->>>>>>> e3261433e1fb86a54f0b00836f85f1f9f1a74728
 
         area = self.smspace.cellmeasure
         mx = L*CM[:, 0, idx0]/area[:, np.newaxis]
@@ -206,13 +233,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         n = (p-1)*p//2  # P_{k-2}(K)
 
+        idx = self.index1()
         R0 = np.zeros((NC, n0, n0), dtype=self.ftype)
         R1 = np.zeros((2, NE, p, p), dtype=self.ftype)
         R0[:, range(n0), range(n0)] = area[:, np.newaxis]
-
-
-
-
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()

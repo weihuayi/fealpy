@@ -12,7 +12,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         self.mesh = triangle(self.pde.domain(), h, meshtype='polygon')
         self.space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
 
-    def test_index(self):
+    def test_index0(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -22,7 +22,20 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
-        idx = space.index()
+        idx = space.index0(p=4)
+        print(idx)
+
+    def test_index1(self, p=2):
+        node = np.array([
+            (0.0, 0.0),
+            (1.0, 0.0),
+            (1.0, 1.0),
+            (0.0, 1.0)], dtype=np.float)
+        cell = np.array([0, 1, 2, 3], dtype=np.int)
+        cellLocation = np.array([0, 4], dtype=np.int)
+        mesh = PolygonMesh(node, cell, cellLocation)
+        space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
+        idx = space.index1()
         print(idx)
 
     def test_matrix_G(self):
@@ -46,5 +59,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
 
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
-#test.test_index()
-test.test_matrix_G()
+test.test_index1()
+#test.test_index0()
+#test.test_matrix_G()
