@@ -231,12 +231,22 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
 
-        n = (p-1)*p//2  # P_{k-2}(K)
-
         idx = self.index1()
-        R0 = np.zeros((NC, n0, n0), dtype=self.ftype)
-        R1 = np.zeros((2, NE, p, p), dtype=self.ftype)
-        R0[:, range(n0), range(n0)] = area[:, np.newaxis]
+        R0 = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
+        R1 = np.zeros((2, NE, 2*smldof, 2*p), dtype=self.ftype)
+        R0[:, idx[0], idx[0]] += 1.0
+        R0[:, idx[1], idx[1]] += 0.5
+
+        R0[:, smldof+idx[0], smldof+idx[0]] += 0.5
+        R0[:, smldof+idx[1], smldof+idx[1]] += 1.0
+        R0[:, idx[2], smldof+idx[2]] += 0.5
+        R0[:, smldof+idx[2], idx[2]] += 0.5
+
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge = mesh.entity('edge')
+        n = mesh.edge_unit_normal()
+        edge2cell = mesh.ds.edge_to_cell()
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()

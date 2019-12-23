@@ -35,7 +35,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
-        idx = space.index1()
+        idx = space.index1(p=4)
         print(idx)
 
     def test_matrix_G(self):
