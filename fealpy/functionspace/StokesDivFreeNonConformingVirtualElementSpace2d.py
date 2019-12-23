@@ -1,0 +1,177 @@
+
+import numpy as np
+from numpy.linalg import inv
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+
+from .function import Function
+from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from ..quadrature import GaussLegendreQuadrature
+from ..quadrature import PolygonMeshIntegralAlg
+from ..common import ranges
+
+class SDFNCVEMDof2d():
+    """
+    The dof manager of Stokes Div-Free Non Conforming VEM 2d space.
+    """
+    def __init__(self, mesh, p):
+        """
+
+        Parameter
+        ---------
+        mesh : the polygon mesh
+        p : the order the space with p>=2
+        """
+        self.p = p
+        self.mesh = mesh
+        self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
+
+    def boundary_dof(self):
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdDof[edge2dof[isBdEdge]] = True
+        return isBdDof
+
+    def edge_to_dof(self):
+        p = self.p
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge2dof = np.arange(NE*p).reshape(NE, p)
+        return edge2dof
+
+    def cell_to_dof(self):
+        """
+        Construct the cell2dof array which are 1D array with a location array
+        cell2dofLocation.
+
+        The following code give the dofs of i-th cell.
+
+        cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
+        """
+        p = self.p
+        mesh = self.mesh
+        cellLocation = mesh.ds.cellLocation
+        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+
+        NC = mesh.number_of_cells()
+
+        ldof = self.number_of_local_dofs()
+        cell2dofLocation = np.zeros(NC+1, dtype=np.int)
+        cell2dofLocation[1:] = np.add.accumulate(ldof)
+        cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
+
+        edge2dof = self.edge_to_dof()
+        edge2cell = mesh.ds.edge_to_cell()
+        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+        cell2dof[idx] = edge2dof
+
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
+        cell2dof[idx] = edge2dof[isInEdge]
+
+        NV = mesh.number_of_vertices_of_cells()
+        NE = mesh.number_of_edges()
+        idof = (p-1)*p//2
+        idx = (cell2dofLocation[:-1] + NV*p).reshape(-1, 1) + np.arange(idof)
+        cell2dof[idx] = NE*p + np.arange(NC*idof).reshape(NC, idof)
+        return cell2dof, cell2dofLocation
+
+    def number_of_global_dofs(self):
+        p = self.p
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        gdof = NE*p + NC*(p-1)*p//2
+        return gdof
+
+    def number_of_local_dofs(self):
+        p = self.p
+        mesh = self.mesh
+        NCE = mesh.number_of_edges_of_cells()
+        ldofs = NCE*p + (p-1)*p//2
+        return ldofs
+
+
+class StokesDivFreeNonConformingVirtualElementSpace2d:
+
+    def __init__(self, mesh, p, q=None):
+        """
+        Parameter
+        ---------
+        mesh : polygon mesh
+        p : the space order, p>=2
+        """
+        self.p = p
+        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
+        self.mesh = mesh
+        self.dof = SDFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
+        self.integralalg = self.smspace.integralalg
+
+        self.CM = self.smspace.cell_mass_matrix()
+
+        self.ftype = self.mesh.ftype
+        self.itype = self.mesh.itype
+
+    def index(self, p=None):
+        if p is None:
+            p = self.p
+
+        n = (p+1)*(p+2)//2
+        idx = np.arange(n)
+        idx1 = np.cumsum(np.arange(p+1))
+        idx0 = np.arange(p+1) + idx1
+
+        mask0 = np.ones(n, dtype=np.bool)
+        mask1 = np.ones(n, dtype=np.bool)
+        mask0[idx0] = False
+        mask1[idx1] = False
+        idx0 = idx[mask0]
+        idx1 = idx[mask1]
+        
+        idx = np.repeat(range(2, p+2), range(1, p+1))
+        idx4 = ranges(range(p+1), start=1)
+        idx3 = idx - idx4
+        return idx0, idx1, idx3, idx4
+
+
+    def matrix_G(self):
+        p = self.p
+        CM = self.CM
+        print(CM)
+        sldof = self.smspace.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        h = self.smspace.cellsize
+        self.G = np.zeros((NC, 2*sldof, 2*sldof), dtype=self.ftype)
+
+        idx0 = np.arange(sldof - p - 1)
+        mxx = CM[:, idx0.reshape(-1, 1), idx0]
+        idx = self.index()
+        self.G[:, idx[0].reshape(-1, 1), idx[0]] = CM[:, idx0.reshape(-1, 1), idx0]
+
+
+    def number_of_global_dofs(self):
+        return 2*self.dof.number_of_global_dofs()
+
+    def number_of_local_dofs(self):
+        return 2*self.dof.number_of_local_dofs()
+
+    def cell_to_dof(self):
+        return self.dof.cell2dof, self.dof.cell2dofLocation
+
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
+
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
+        return f
+
+    def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = (2, gdof)
+        elif type(dim) is int:
+            shape = (dim, 2, gdof)
+        elif type(dim) is tuple:
+            shape = dim + (2, gdof)
+        return np.zeros(shape, dtype=np.float)
