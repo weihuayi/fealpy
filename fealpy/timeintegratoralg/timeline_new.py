@@ -71,7 +71,15 @@ class ChebyshevTimeLine():
         self.T1 = T1
         self.NL = NT + 1
         self.theta = np.arange(self.NL)*np.pi/NT
-        self.time = 0.5*(T0+T1) - 0.5*(T1 - T0)*np.cos(self.theta)
+        self.time = 0.5*(T0 + T1) - 0.5*(T1 - T0)*np.cos(self.theta)
+        self.dt = self.time[1:] - self.time[0:-1]
+        self.current = 0
+    
+    def uniform_refine(self):
+        self.NL = 2*(self.NL - 1) + 1
+        NT = self.NL - 1
+        self.theta = np.arange(self.NL)*np.pi/NT
+        self.time = 0.5*(self.T0 + self.T1) - 0.5*(self.T1 - self.T0)*np.cos(self.theta)
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
 
@@ -108,7 +116,7 @@ class ChebyshevTimeLine():
         return d
 
     def dct_time_integral(self, q, return_all=True):
-        N = self.NT - 1
+        N = self.NL - 1
         theta = self.theta
         a = dct(q, type=1)/N
         if return_all:
@@ -132,9 +140,48 @@ class ChebyshevTimeLine():
         self.reset()
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_current_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self)
+            b = dmodel.get_current_right_vector(data, self, returnF=True)
+            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=True)
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
+
+    def residual_integration(self, data, dmodel):
+        q = dmodel.get_residual(data, self)
+        intq = self.dct_time_integral(q, return_all=True)
+        return intq
+
+    def error(self, data, dmodel):
+        r = dmodel.get_error(data, self)
+        d = self.diff(r)
+        return d
+    
+    def error_integration(self, data, dmodel, solver):
+        self.reset()
+        while not self.stop():
+            A = dmodel.get_current_left_matrix(self)
+            b = dmodel.get_error_right_vector(data, self)
+            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=False)
+            dmodel.solve(data[1], A, b, solver, self)
+            self.current += 1
+        self.reset()
+        data[1] += data[0]
+
+
+           
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
