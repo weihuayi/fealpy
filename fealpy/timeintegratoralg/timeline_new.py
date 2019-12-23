@@ -140,31 +140,27 @@ class ChebyshevTimeLine():
         self.reset()
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_current_right_vector(data, self, returnF=True)
-            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=True)
+            b = dmodel.get_current_right_vector(data, self)
+            A, b = dmodel.apply_boundary_condition(A, b, self)
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
+        Q = dmodel.residual_integration(data, self)
+        if type(data) is not list:
+            data = [data, Q]
+        else:
+            data += [Q]
+        data += [dmodel.error_integration(data, self)]
+        data += [dmodel.init_delta(self)]
         for i in range(nupdate):
-            intq = dmodel.residual_integration(data, self)
-            data.append(intq)
-            r = dmodel.error_integration(data, self)
-            data.append(r)
-            delta = dmodel.init_delta(self)
-            data.append(delta)
-        while not self.stop():
-            A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_error_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=False)
-            dmodel.solve(data[3], A, b, solver, self)
-            self.current += 1
-        self.reset()
-        data[0] += data[3]
-
-
-           
-
-
+            while not self.stop():
+                A = dmodel.get_current_left_matrix(self)
+                b = dmodel.get_error_right_vector(data, self, sdc=True)
+                A, b = dmodel.apply_boundary_condition(A, b, self, sdc=True)
+                dmodel.solve(data[-1], A, b, solver, self)
+                self.current += 1
+            self.reset()
+            data[0] += data[-1]
 
 
 
