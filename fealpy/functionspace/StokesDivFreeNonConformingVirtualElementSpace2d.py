@@ -135,7 +135,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         return idx0, idx1, idx3, idx4
 
 
-    def matrix_G(self):
+    def matrix_G_B(self):
         p = self.p
         CM = self.CM
         print(CM)
@@ -166,10 +166,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         G[:, smldof+idx[0].reshape(-1, 1), idx[1]] += 0.5*mxy
         G[:, idx[1].reshape(-1, 1), smldof+idx[0]] += 0.5*mxy.swapaxes(-1, -2)
 
-        B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-                L, CM[:, idx0.reshape(-1, 1))
-
+        B = np.zeros((NC, 2*smldof, smldof-p-1), dtype=self.ftype)
+        B[:, idx[0]] = np.einsum('ij, ijk->ijk', L, CM[:, idx0])
+        B[:, smdof+idx[1]] = np.einsum('ij, ijk->ijk', R, CM[:, idx0])
 
         area = self.smspace.cellmeasure
         mx = L*CM[:, 0, idx0]/area[:, np.newaxis]
@@ -185,6 +184,20 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         G[:, idx0.reshape(-1, 1), idx0] += np.einsum('ij, ik->ijk', m, m)
         G[:, smldof+idx0.reshape(-1, 1), smldof+idx0] += G[:, idx0.reshape(-1, 1), idx0]
         return G
+
+    def matrix_R_J(self):
+        p = self.p
+        smldof = self.smspace.number_of_local_dofs()
+        area = self.smspace.cellmeasure
+        NC = self.mesh.number_of_cells()
+        NE = self.mesh.number_of_edges()
+
+        n = (p-1)*p//2  # P_{k-2}(K)
+
+        R0 = np.zeros((NC, n0, n0), dtype=self.ftype)
+        R1 = np.zeros((2, NE, p, p), dtype=self.ftype)
+        R0[:, range(n0), range(n0)] = area[:, np.newaxis]
+
 
 
 
