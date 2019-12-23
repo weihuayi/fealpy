@@ -161,8 +161,7 @@ class ChebyshevTimeLine():
                 self.current += 1
             self.reset()
             data[0] += data[-1]
-
-
+        
 
 
 
