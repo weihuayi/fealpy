@@ -167,8 +167,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         G[:, idx[1].reshape(-1, 1), smldof+idx[0]] += 0.5*mxy.swapaxes(-1, -2)
 
         B = np.zeros((NC, 2*smdof, smdof-p-1), dtype=self.ftype)
-        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
-                L, CM[:, idx0.reshape(-1, 1))
+#        B[:, idx[0].reshape(-1, 1)] = np.einsum(''
+#                L, CM[:, idx0.reshape(-1, 1))
 
 
         area = self.smspace.cellmeasure

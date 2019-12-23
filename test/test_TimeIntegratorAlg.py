@@ -113,7 +113,8 @@ class SurfaceParabolicFEMModel():
         dt = timeline.current_time_step_length()
         return self.M + 0.5*dt*self.A
 
-    def get_current_right_vector(self, uh, timeline, returnF=True):
+    def get_current_right_vector(self, data, timeline, returnF=True):
+        uh = data[0]
         dt = timeline.current_time_step_length()
         i = timeline.current
         t0 = timeline.current_time_level()
@@ -125,26 +126,28 @@ class SurfaceParabolicFEMModel():
         else:
             return self.M@uh[:, i] - 0.5*dt*self.A@uh[:, i]
     
-    def get_residual(self, uh, timeline):
+    def residual_integration(self, data, timeline):
+        uh = data[0]
         A = self.space.stiff_matrix()
         F = self.init_source(timeline)
-        return -A@uh + F
+        q = -A@uh + F
+        return timeline.dct_time_integral(q, return_all=True) 
 
-    def get_error(self, data, timeline):
+    def error_integration(self, data, timeline):
         uh = data[0]
         intq = data[1]
         M = self.space.mass_matrix()
-        return uh[:, [0]] + spsolve(M, intq) - uh
+        r = uh[:, [0]] + spsolve(M, intq) - uh
+        return timeline.diff(r)
 
     def get_error_right_vector(self, data, timeline):
-        delta = data[0]
-        uh = data[1]
+        uh = data[0]
         d = data[2]
+        delta = data[3]
         M = self.space.mass_matrix()
         i = timeline.current
         dt = timeline.current_time_step_length()
         return self.get_current_right_vector(delta, timeline, returnF=False) + dt*M@d[:, i+1]
-
 
     def apply_boundary_condition(self, A, b, timeline, returnu=True):
         if returnu is True:
@@ -153,7 +156,7 @@ class SurfaceParabolicFEMModel():
             A, b = bc.apply(A, b)
             return A, b
         else:
-            bc = DirichletBC(self.space, lambda x: 0, self.is_boundary_dof)
+            bc = DirichletBC(self.space, lambda x:0, self.is_boundary_dof)
             A, b = bc.apply(A, b)
             return A, b
 
@@ -162,7 +165,8 @@ class SurfaceParabolicFEMModel():
         isBdDof[0] = True
         return isBdDof
 
-    def solve(self, uh, A, b, solver, timeline):
+    def solve(self, data, A, b, solver, timeline):
+        uh = data[0]
         i = timeline.current
         uh[:, i+1] = solver(A, b)
 
@@ -227,15 +231,7 @@ class TimeIntegratorAlgTest():
             dmodel = SurfaceParabolicFEMModel(pde, mesh)
 
             uh = dmodel.init_solution(timeline)
-
-            timeline.time_integration(uh, dmodel, self.solver.divide)
-
-            intq = timeline.residual_integration(uh, dmodel)
-
-            d = timeline.error([uh, intq], dmodel)
-            delta = dmodel.init_delta(timeline) 
-            timeline.error_integration([delta, uh, d], dmodel, self.solver.divide)
-
+            timeline.time_integration([uh], dmodel, self.solver.divide, nupdate=1)
 
             uI = dmodel.interpolation(pde.solution, timeline)
             error[i] = np.max(np.abs(uh - uI))

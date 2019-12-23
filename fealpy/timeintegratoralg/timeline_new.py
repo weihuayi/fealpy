@@ -136,7 +136,7 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, solver, update=1):
+    def time_integration(self, data, dmodel, solver, nupdate=1):
         self.reset()
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
@@ -145,29 +145,21 @@ class ChebyshevTimeLine():
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
-        for i in range(update):
-            pass
-
-    def residual_integration(self, data, dmodel):
-        q = dmodel.get_residual(data, self)
-        intq = self.dct_time_integral(q, return_all=True)
-        return intq
-
-    def error(self, data, dmodel):
-        r = dmodel.get_error(data, self)
-        d = self.diff(r)
-        return d
-    
-    def error_integration(self, data, dmodel, solver):
-        self.reset()
+        for i in range(nupdate):
+            intq = dmodel.residual_integration(data, self)
+            data.append(intq)
+            r = dmodel.error_integration(data, self)
+            data.append(r)
+            delta = dmodel.init_delta(self)
+            data.append(delta)
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
             b = dmodel.get_error_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=True)
-            dmodel.solve(data[1], A, b, solver, self)
+            A, b = dmodel.apply_boundary_condition(A, b, self, returnu=False)
+            dmodel.solve(data[3], A, b, solver, self)
             self.current += 1
         self.reset()
-        data[1] += data[0]
+        data[0] += data[3]
 
 
            
