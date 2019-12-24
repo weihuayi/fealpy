@@ -1,11 +1,12 @@
 import numpy as np
+import matplotlib.pyplot as plt
 from fealpy.mesh.simple_mesh_generator import triangle
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
 from fealpy.timeintegratoralg.timeline_new import ChebyshevTimeLine
 from fealpy.boundarycondition import DirichletBC
 from fealpy.solver import MatlabSolver
 from scipy.sparse.linalg import spsolve
-
+from fealpy.tools.show import showmultirate, show_error_table
 
 class ParabolicFEMModel():
     def __init__(self, pde, mesh, p=1, q=6):
