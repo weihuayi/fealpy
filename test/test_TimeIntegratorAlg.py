@@ -202,7 +202,7 @@ class TimeIntegratorAlgTest():
         mesh = pde.init_mesh(n=5)
         timeline = pde.time_mesh(0, 1, 2)
 
-        errorType = ['$|| u - u_h ||_\infty', '$||u-u_h||_0$']
+        errorType = ['$|| u - u_h ||_\infty$', '$||u-u_h||_0$']
         errorMatrix = np.zeros((len(errorType), maxit), dtype=mesh.ftype)
         Ndof = np.zeros(maxit, dtype=mesh.itype)
         for i in range(maxit):
@@ -234,7 +234,7 @@ class TimeIntegratorAlgTest():
         mesh = pde.init_mesh(n=5)
         timeline = pde.time_mesh(0, 1, 2, timeline='chebyshev')
         
-        errorType = ['$||u-u_h||_0$']
+        errorType = ['$|| u - u_h ||_\infty$', '$||u-u_h||_0$']
         errorMatrix = np.zeros((len(errorType), maxit), dtype=mesh.ftype)
         Ndof = np.zeros(maxit, dtype=mesh.itype)
         for i in range(maxit):
@@ -244,11 +244,13 @@ class TimeIntegratorAlgTest():
 
             uh = dmodel.init_solution(timeline)
             timeline.time_integration(uh, dmodel, self.solver.divide, nupdate=1)
+            uI = dmodel.interpolation(pde.solution, timeline)
+            errorMatrix[0, i] = np.max(np.abs(uI - uh))
+
             u = lambda x:dmodel.pde.solution(x, 1.0)
             uh = dmodel.space.function(array=uh[:, -1])
-            errorMatrix[0, i] = dmodel.space.integralalg.L2_error(u, uh)
-
-            uI = dmodel.interpolation(pde.solution, timeline)
+            errorMatrix[1, i] = dmodel.space.integralalg.L2_error(u, uh)
+            print(errorMatrix)
 
             timeline.uniform_refine()
             mesh.uniform_refine(surface=pde.surface)
