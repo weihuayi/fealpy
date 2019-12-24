@@ -122,7 +122,7 @@ class SurfaceParabolicFEMModel():
         f = lambda x: self.pde.source(x, t0) + self.pde.source(x, t1)
         F = self.space.source_vector(f)
         if sdc is False:
-            return self.M@uh[:, i] - 0.5*dt*(self.A@uh[:, i] + F)
+            return self.M@uh[:, i] - 0.5*dt*(self.A@uh[:, i] - F)
         else:
             return self.M@uh[:, i] - 0.5*dt*self.A@uh[:, i]
 
@@ -202,7 +202,7 @@ class TimeIntegratorAlgTest():
         mesh = pde.init_mesh(n=5)
         timeline = pde.time_mesh(0, 1, 2)
 
-        errorType = ['$||u-u_h||_0$']
+        errorType = ['$|| u - u_h ||_\infty', '$||u-u_h||_0$']
         errorMatrix = np.zeros((len(errorType), maxit), dtype=mesh.ftype)
         Ndof = np.zeros(maxit, dtype=mesh.itype)
         for i in range(maxit):
@@ -213,14 +213,17 @@ class TimeIntegratorAlgTest():
             uh = dmodel.init_solution(timeline)
 
             timeline.time_integration(uh, dmodel, self.solver.divide)
-            
+            uI = dmodel.interpolation(pde.solution, timeline)
+            errorMatrix[0, i] = np.max(np.abs(uI - uh))
+
             u = lambda x:dmodel.pde.solution(x, 1.0)
             uh = dmodel.space.function(array=uh[:, -1])
-            errorMatrix[0, i] = dmodel.space.integralalg.L2_error(u, uh)
+            errorMatrix[1, i] = dmodel.space.integralalg.L2_error(u, uh)
+            print(errorMatrix)
 
-            uI = dmodel.interpolation(pde.solution, timeline)
             timeline.uniform_refine()
             mesh.uniform_refine(surface=pde.surface)
+
         show_error_table(Ndof, errorType, errorMatrix)
         showmultirate(plt, 0, Ndof, errorMatrix, errorType)
         plt.show()
@@ -257,6 +260,5 @@ class TimeIntegratorAlgTest():
 
 
 test = TimeIntegratorAlgTest()
-test.test_SurfaceParabolicFEMModel_sdc_time()
-#test.test_SurfaceParabolicFEMModel_time()
- 
+#test.test_SurfaceParabolicFEMModel_sdc_time()
+test.test_SurfaceParabolicFEMModel_time()
