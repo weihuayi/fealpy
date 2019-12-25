@@ -59,6 +59,38 @@ class TriangleMesh(Mesh2d):
         NN = len(node)
         self.ds.reinit(NN, cell)
 
+    def to_quadmesh(self):
+        from ..mesh import QuadrangleMesh
+
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        node0 = self.entity('node')
+        cell0 = self.entity('cell')
+        ec = self.entity_barycenter('edge')
+        cc = self.entity_barycenter('cell')
+        cell2edge = self.ds.cell_to_edge()
+
+        node = np.r_['0', node0, ec, cc]
+        cell = np.zeros((3*NC, 4), dtype=self.itype)
+        idx = np.arange(NC)
+        cell[:NC, 0] = NN + NE + idx
+        cell[:NC, 1] = cell2edge[:, 0] + NN
+        cell[:NC, 2] = cell[:, 2]
+        cell[:NC, 3] = cell2edge[:, 1] + NN
+
+        cell[NC:2*NC, 0] = cell[:NC, 0]
+        cell[NC:2*NC, 1] = cell2edge[:, 1] + NN
+        cell[NC:2*NC, 2] = cell[:, 0]
+        cell[NC:2*NC, 3] = cell2edge[:, 2] + NN
+
+        cell[2*NC:3*NC, 0] = cell[:NC, 0]
+        cell[2*NC:3*NC, 1] = cell2edge[:, 2] + NN
+        cell[2*NC:3*NC, 2] = cell[:, 1]
+        cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
+        return QuadrangleMesh(node, cell)
+
+
     def line_walk(self, p):
         NC = self.number_of_cells()
         NP = p.shape[0]

@@ -109,6 +109,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.integralalg = self.smspace.integralalg
 
         self.CM = self.smspace.cell_mass_matrix()
+        self.EM = self.smspace.edge_mass_matrix()
+
+        self.H0 = inv(self.CM)
+        self.H1 = inv(self.EM)
 
         self.ftype = self.mesh.ftype
         self.itype = self.mesh.itype
@@ -233,7 +237,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         idx = self.index1()
         R0 = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
-        R1 = np.zeros((2, NE, 2*smldof, 2*p), dtype=self.ftype)
         R0[:, idx[0], idx[0]] += 1.0
         R0[:, idx[1], idx[1]] += 0.5
 
@@ -246,7 +249,46 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         NE = mesh.number_of_edges()
         edge = mesh.entity('edge')
         n = mesh.edge_unit_normal()
+        h = mesh.entity_measure('edge')
         edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi1 = self.smspace.basis(
+                ps[:, isInEdge, :],
+                cellidx=edge2cell[isInEdge, 1]
+                )
+        phi = self.edge_basis(ps)
+
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
+        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge], h[isInEdge])
+
+        F0 = F0@self.H1
+        F1 = F1@self.H1
+
+        F0 *= h[:, np.newaxis, np.newaxis]
+        F1 *= h[isInEdge, np.newaxis, np.newaxis]
+        R1 = np.zeros((2, NE, 2*smldof, 2*p), dtype=self.ftype)
+        idx0 = np.arange(smldof - p - 1)
+        idx = self.index0()
+
+        R1[0, idx[0].reshape(-1, 1), np.arange(p)] += np.einsum('j, i',
+                idx[2], F0[:, idx0], n[:, 0])
+        R1[0, idx[1].reshape(-1, 1), np.arange(p)] += 0.5*F0[:, idx0]*n[:, 1, np.newaxis]
+        R1[0, smldof+idx[0].reshape(-1, 1), p+np.arange(p)] += 0.5*F0[:, idx0]*n[:, 0, np.newaxis]
+        R1[0, smldof+idx[1].reshape(-1, 1), p+np.arange(p)] += F0[:, idx0]*n[:, 1, np.newaxis]
+
+        R1[0, idx[1].reshape(-1, 1), np.arange(p, 2*p)] = 
+
+        R1[1, idx[0].reshape(-1, 1), np.arange(p)] -= F0[:, idx0]*n[:, 0, np.newaxis]
+        R1[1, idx[1].reshape(-1, 1), np.arange(p)] -= 0.5*F0[:, idx0]*n[:, 1, np.newaxis]
+
+        R1[1, smldof+idx[0].reshape(-1, 1), p+np.arange(p)] -= 0.5*F0[:, idx0]*n[:, 0, np.newaxis]
+        R1[1, smldof+idx[1].reshape(-1, 1), p+np.arange(p)] -= F0[:, idx0]*n[:, 1, np.newaxis]
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()

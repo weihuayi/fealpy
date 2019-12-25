@@ -22,7 +22,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
-        idx = space.index0(p=4)
+        idx = space.index0(p=3)
         print(idx)
 
     def test_index1(self, p=2):
@@ -35,7 +35,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = StokesDivFreeNonConformingVirtualElementSpace2d(self.mesh, p)
-        idx = space.index1(p=4)
+        idx = space.index1(p=3)
         print(idx)
 
     def test_matrix_G(self):
@@ -52,13 +52,13 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 8], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p=2)
-        G = space.matrix_G()
+        G = space.matrix_G_B()
         print(G)
 
 
 
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
+test.test_index0()
 test.test_index1()
-#test.test_index0()
 #test.test_matrix_G()
