@@ -230,20 +230,27 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
     def matrix_R_J(self):
         p = self.p
-        smldof = self.smspace.number_of_local_dofs()
         area = self.smspace.cellmeasure
+        size = self.smspace.cellsize
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
+        NV = mesh.number_of_vertices_of_cells()
+        smldof = self.smspace.number_of_local_dofs()
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
 
         idx = self.index1()
-        R0 = np.zeros((NC, 2*smldof, 2*smldof), dtype=self.ftype)
-        R0[:, idx[0], idx[0]] += 1.0
-        R0[:, idx[1], idx[1]] += 0.5
+        R00 = np.zeros((smldof, len(cell2dof)), dtype=np.float)
+        R01 = np.zeros((smldof, len(cell2dof)), dtype=np.float)
+        R10 = np.zeros((smldof, len(cell2dof)), dtype=np.float)
+        R11 = np.zeros((smldof, len(cell2dof)), dtype=np.float)
 
-        R0[:, smldof+idx[0], smldof+idx[0]] += 0.5
-        R0[:, smldof+idx[1], smldof+idx[1]] += 1.0
-        R0[:, idx[2], smldof+idx[2]] += 0.5
-        R0[:, smldof+idx[2], idx[2]] += 0.5
+        start = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1)
+        R00[:, start+idx[0]] = idx[3]
+        R00[:, start+idx[1]] = 0.5*idx[4]
+        R01[:, start+idx[3]] = 0.5*idx[5]
+        R10[:, start+idx[3]] = 0.5*idx[5]
+        R11[:, start+idx[0]] = 0.5*idx[3]
+        R11[:, start+idx[1]] = idx[4]
 
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -258,37 +265,49 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(
-                ps[:, isInEdge, :],
-                cellidx=edge2cell[isInEdge, 1]
-                )
+        phi1 = self.smspace.basis(ps, cellidx=edge2cell[:, 1])
         phi = self.edge_basis(ps)
 
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
-        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge], h[isInEdge])
-
-        F0 = F0@self.H1
-        F1 = F1@self.H1
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)@self.H1
+        F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi, h)@self.H1
 
         F0 *= h[:, np.newaxis, np.newaxis]
         F1 *= h[isInEdge, np.newaxis, np.newaxis]
-        R1 = np.zeros((2, NE, 2*smldof, 2*p), dtype=self.ftype)
-        idx0 = np.arange(smldof - p - 1)
+
         idx = self.index0()
+        ndof = smldof - p - 1
+        idx0 = cell2dofLocation[edge2cell[:, 0:1]] + edge2cell[:, 2:3]*p + np.arange(p)
+        h2 = idx[2].reshape(1, -1)/size[edge2cell[:, [0]]
+        h3 = idx[3].reshape(1, -1)/size[edge2cell[:, [0]]
+        val = np.einsum('ij, ijk, i->jik', h2, F0[:, 0:ndof], n[:, 0])
+        np.add.at(R00, (idx[0], idx0), val)
+        val = np.einsum('ij, ijk, j->jik', h3, F0[:, 0:ndof], 0.5*n[:, 1])
+        np.add.at(R00, (idx[1], idx0), val)
+        val = np.einsum('ij, ijk, j->jik', h3, F0[:, 0:ndof], 0.5*n[:, 0])
+        np.add.at(R01, (idx[1], idx0), val)
+        val = np.einsum('ij, ijk, j->jik', h2, F0[:, 0:ndof], 0.5*n[:, 1])
+        np.add.at(R10, (idx[0], idx0), val)
+        val = np.einsum('ij, ijk, i->jik', h2, F0[:, 0:ndof], 0.5*n[:, 0])
+        np.add.at(R11, (idx[0], idx0), val)
+        val = np.einsum('j, ijk, j->jik', h3, F0[:, 0:ndof], n[:, 1])
+        np.add.at(R11, (idx[1], idx0), val)
 
-        R1[0, idx[0].reshape(-1, 1), np.arange(p)] += np.einsum('j, i',
-                idx[2], F0[:, idx0], n[:, 0])
-        R1[0, idx[1].reshape(-1, 1), np.arange(p)] += 0.5*F0[:, idx0]*n[:, 1, np.newaxis]
-        R1[0, smldof+idx[0].reshape(-1, 1), p+np.arange(p)] += 0.5*F0[:, idx0]*n[:, 0, np.newaxis]
-        R1[0, smldof+idx[1].reshape(-1, 1), p+np.arange(p)] += F0[:, idx0]*n[:, 1, np.newaxis]
+        idx0 = cell2dofLocation[edge2cell[:, 1:2]] + edge2cell[:, 3:4] + np.arange(p)
+        h2 = idx[2].reshape(1, -1)/size[edge2cell[:, 1:2]
+        h3 = idx[3].reshape(1, -1)/size[edge2cell[:, 1:2]
+        val = np.einsum('ij, ijk, i->jik', h2, F0[:, 0:ndof], n[:, 0])
+        np.add.at(R00, (idx[0], idx0[isInEdge]), val[:, isInEdge])
+        val = np.einsum('ij, ijk, j->jik', h3, F0[:, 0:ndof], 0.5*n[:, 1])
+        np.add.at(R00, (idx[1], idx0[isInEdge]), val[:, isInEdge])
+        val = np.einsum('ij, ijk, j->jik', h3, F0[:, 0:ndof], 0.5*n[:, 0])
+        np.add.at(R01, (idx[1], idx0[isInEdge]), val[:, isInEdge])
+        val = np.einsum('ij, ijk, j->jik', h2, F0[:, 0:ndof], 0.5*n[:, 1])
+        np.add.at(R10, (idx[0], idx0[isInEdge]), val[:, isInEdge])
+        val = np.einsum('ij, ijk, i->jik', h2, F0[:, 0:ndof], 0.5*n[:, 0])
+        np.add.at(R11, (idx[0], idx0[isInEdge]), val[:, isInEdge])
+        val = np.einsum('j, ijk, j->jik', h3, F0[:, 0:ndof], n[:, 1])
+        np.add.at(R11, (idx[1], idx0[isInEdge]), val[:, isInEdge])
 
-        R1[0, idx[1].reshape(-1, 1), np.arange(p, 2*p)] = 
-
-        R1[1, idx[0].reshape(-1, 1), np.arange(p)] -= F0[:, idx0]*n[:, 0, np.newaxis]
-        R1[1, idx[1].reshape(-1, 1), np.arange(p)] -= 0.5*F0[:, idx0]*n[:, 1, np.newaxis]
-
-        R1[1, smldof+idx[0].reshape(-1, 1), p+np.arange(p)] -= 0.5*F0[:, idx0]*n[:, 0, np.newaxis]
-        R1[1, smldof+idx[1].reshape(-1, 1), p+np.arange(p)] -= F0[:, idx0]*n[:, 1, np.newaxis]
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()
