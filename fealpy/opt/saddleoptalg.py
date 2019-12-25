@@ -88,7 +88,6 @@ class AndersonAccelerationAlg:
                 options={'ftol': 1e-9, 'disp': True})
         return res.x
 
-
 class SteepestDescentAlg:
     def __init__(self, problem, options=None):
         self.problem = problem
@@ -100,13 +99,13 @@ class SteepestDescentAlg:
         self.x = problem['x0']
         self.f, self.g = self.fun(self.x)  # 初始目标函数值和梯度值
 
-
-    def run(self, queue=None, maxit=None):
+    def run(self, queue=None, maxit=None, eta_ref = None):
         options = self.options
         alpha = options['StepLength']
 
         gnorm = norm(self.g)
         self.diff = np.Inf
+
         if options['Output']:
             print("Step %d with energe: %12.11g, gnorm :%12.11g, energe diff:%12.11g"%(self.NF, self.f, gnorm, self.diff))
             self.fun.output('', queue=queue)
@@ -121,6 +120,7 @@ class SteepestDescentAlg:
             self.x[:, 1] -= alpha*self.g[:, 1]
             f, g = self.fun(self.x)
             self.diff = np.abs(f - self.f)
+
             self.f = f
             self.g = g
             gnorm = norm(self.g)
@@ -140,6 +140,12 @@ class SteepestDescentAlg:
                     self.diff, options['FunValDiff'])
                 )
                 break
+
+            #TODO
+            if eta_ref is not None:
+                eta_ref = self.fun.eta_ref
+                if eta_ref < options['etarefTol']:
+                    break
 
         self.fun.output('', queue=queue, stop=True)
 
