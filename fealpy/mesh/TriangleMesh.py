@@ -76,17 +76,17 @@ class TriangleMesh(Mesh2d):
         idx = np.arange(NC)
         cell[:NC, 0] = NN + NE + idx
         cell[:NC, 1] = cell2edge[:, 0] + NN
-        cell[:NC, 2] = cell[:, 2]
+        cell[:NC, 2] = cell0[:, 2]
         cell[:NC, 3] = cell2edge[:, 1] + NN
 
         cell[NC:2*NC, 0] = cell[:NC, 0]
         cell[NC:2*NC, 1] = cell2edge[:, 1] + NN
-        cell[NC:2*NC, 2] = cell[:, 0]
+        cell[NC:2*NC, 2] = cell0[:, 0]
         cell[NC:2*NC, 3] = cell2edge[:, 2] + NN
 
         cell[2*NC:3*NC, 0] = cell[:NC, 0]
         cell[2*NC:3*NC, 1] = cell2edge[:, 2] + NN
-        cell[2*NC:3*NC, 2] = cell[:, 1]
+        cell[2*NC:3*NC, 2] = cell0[:, 1]
         cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
         return QuadrangleMesh(node, cell)
 
