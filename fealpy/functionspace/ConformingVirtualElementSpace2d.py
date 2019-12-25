@@ -207,7 +207,7 @@ class ConformingVirtualElementSpace2d():
 
 
         ldof = self.number_of_local_dofs()
-        w = np.repeat(1/self.cellsize, ldof)
+        w = np.repeat(1/self.smspace.cellsize, ldof)
         sx *= w
         sy *= w
 
@@ -431,7 +431,7 @@ class ConformingVirtualElementSpace2d():
             uh = np.concatenate(list(map(f1, zip(DD, uh.reshape(-1, smldof)))))
 
             ldof = self.number_of_local_dofs()
-            w = np.repeat(1/self.area, ldof)
+            w = np.repeat(1/self.smspace.cellmeasure, ldof)
             uh *= w
 
             uI = self.function()
