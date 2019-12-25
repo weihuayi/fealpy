@@ -71,7 +71,15 @@ class ChebyshevTimeLine():
         self.T1 = T1
         self.NL = NT + 1
         self.theta = np.arange(self.NL)*np.pi/NT
-        self.time = 0.5*(T0+T1) - 0.5*(T1 - T0)*np.cos(self.theta)
+        self.time = 0.5*(T0 + T1) - 0.5*(T1 - T0)*np.cos(self.theta)
+        self.dt = self.time[1:] - self.time[0:-1]
+        self.current = 0
+    
+    def uniform_refine(self):
+        self.NL = 2*(self.NL - 1) + 1
+        NT = self.NL - 1
+        self.theta = np.arange(self.NL)*np.pi/NT
+        self.time = 0.5*(self.T0 + self.T1) - 0.5*(self.T1 - self.T0)*np.cos(self.theta)
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
 
@@ -108,7 +116,7 @@ class ChebyshevTimeLine():
         return d
 
     def dct_time_integral(self, q, return_all=True):
-        N = self.NT - 1
+        N = self.NL - 1
         theta = self.theta
         a = dct(q, type=1)/N
         if return_all:
@@ -128,7 +136,7 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, solver):
+    def time_integration(self, data, dmodel, solver, nupdate=1):
         self.reset()
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
@@ -137,4 +145,32 @@ class ChebyshevTimeLine():
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
+        Q = dmodel.residual_integration(data, self)
+        if type(data) is not list:
+            data = [data, Q]
+        else:
+            data += [Q]
+        data += [dmodel.error_integration(data, self)]
+        data += [dmodel.init_delta(self)]
+        for i in range(nupdate):
+            while not self.stop():
+                A = dmodel.get_current_left_matrix(self)
+                b = dmodel.get_error_right_vector(data, self)
+                A, b = dmodel.apply_boundary_condition(A, b, self, sdc=True)
+                dmodel.solve(data[-1], A, b, solver, self)
+                self.current += 1
+            self.reset()
+            data[0] += data[-1]
+        
+
+
+
+
+
+
+
+
+
+
+
 

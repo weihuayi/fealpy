@@ -11,3 +11,4 @@ from .femdof import CPPFEMDof3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
+from .StokesDivFreeNonConformingVirtualElementSpace2d import StokesDivFreeNonConformingVirtualElementSpace2d
