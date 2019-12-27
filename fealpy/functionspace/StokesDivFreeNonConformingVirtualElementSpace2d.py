@@ -541,7 +541,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             S = inv(G)@R
             D = np.eye(S.shape[1])
             D[:ndof1, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[0*ndof1:1*ndof1, :]
-            D[ndof1:2*ndof1, :] - = self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[1*ndof1:2*ndof1, :]
+            D[ndof1:2*ndof1, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[1*ndof1:2*ndof1, :]
 
             A = D.T@np.block([[S00[i], S01[i]], [S01[i].T, S11[i]]])@D
             
@@ -557,7 +557,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             print(F00.shape)
             print(F11.shape)
             print(F01.shape)
-            return (A[+F00+0.5*F11).flat, (A11+F11+0.5*F00).flat, (A01+0.5*F01).flat
+            return (A+F00+0.5*F11).flat, (A11+F11+0.5*F00).flat, (A01+0.5*F01).flat
         S = np.array(list(map(f4, range(NC))))
 
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])

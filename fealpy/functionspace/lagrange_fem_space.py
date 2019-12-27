@@ -479,7 +479,7 @@ class LagrangeFiniteElementSpace():
 
         if cfun is not None:
             if barycenter is True:
-                d = cfun(bcs)
+                d = cfun(bcs) # (NQ, NC)
             else:
                 ps = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
                 d = cfun(ps) # (NQ, NC)
