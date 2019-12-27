@@ -69,10 +69,24 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print("L:", space.L)
         print("D:", space.D)
 
+    def test_matrix_A(self, p=2):
+        node = np.array([
+            (0.0, 0.0),
+            (1.0, 0.0),
+            (1.0, 1.0),
+            (0.0, 1.0)], dtype=np.float)
+        cell = np.array([0, 1, 2, 3], dtype=np.int)
+        cellLocation = np.array([0, 4], dtype=np.int)
+        mesh = PolygonMesh(node, cell, cellLocation)
+        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        A = space.matrix_A()
+        print(A)
+
 
 
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_index1()
 #test.test_index2()
-test.test_matrix(p=2)
+#test.test_matrix(p=2)
+test.test_matrix_A()
