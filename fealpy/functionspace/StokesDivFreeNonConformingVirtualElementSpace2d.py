@@ -230,7 +230,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         val = np.einsum('ij, ik->ijk', m, m)
         G00[:, 0:smldof, 0:smldof] += val
         G11[:, 0:smldof, 0:smldof] += val
-        G = [[G00, G01], [G01.swapaxes(-1, -2), G11]]
+        G = [G00, G11, G01]
 
         # 分块矩阵 B = [[B0], [B1]]
         B0 = np.zeros((NC, smldof, ndof), dtype=self.ftype)
@@ -238,7 +238,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         B0[:, idx[0]] = np.einsum('ij, ijk->ijk', L, CM[:, 0:ndof, 0:ndof])
         B1[:, idx[1]] = np.einsum('ij, ijk->ijk', R, CM[:, 0:ndof, 0:ndof])
 
-        B = [[B0], [B1]]
+        B = [B0, [B1]]
         return G, B
 
     def matrix_R_J(self):
@@ -471,43 +471,79 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
     def matrix_A(self):
         
+        p = self.p
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
-        
-        def f00(i):
+
+        def f0(k, i, j):
+            Ji = self.J[i][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            Jj = self.J[j][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return (Ji.T@self.H0[i]@Jj).flat
+        F00 = np.concatenate(map(lambda k: f0(k, 0, 0), range(NC)))
+        F11 = np.concatenate(map(lambda k: f1(k, 1, 1), range(NC)))
+        F10 = np.concatenate(map(lambda k: f1(k, 1, 0), range(NC)))
+
+        def f1(i, copy):
             cd = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-            J0 = self.J[0][:, cd]
-            return (J0.T@self.H0[i]@J0).flat
-
-        def f01(i):
-            cd = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-            J0 = self.J[0][:, cd]
-            J1 = self.J[1][:, cd]
-            return (J1.T@self.H0[i]@J0).flat
-
-        def f11(i):
-            cd = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-            J1 = self.J[1][:, cd]
-            return (J1.T@self.H0[i]@J1).flat
-
-        F00 = np.concatenate(map(f00, range(NC)))
-        F10 = np.concatenate(map(f01, range(NC)))
-        F11 = np.concatenate(map(f11, range(NC)))
-
-        f2 = lambda x: np.repeat(x, x.shape[0])
-        f3 = lambda x: np.tile(x, x.shape[0])
-        I = np.concatenate(list(map(f2, cd)))
-        J = np.concatenate(list(map(f3, cd)))
+            return copy(cd, cd.shape[0])
+        I = np.concatenate(list(map(lambda i: f1(i, np.repeat), range(NC))))
+        J = np.concatenate(list(map(lambda i: f1(i, np.tile), range(NC))))
 
         val00 = F00 + 0.5*F11
         val11 = 0.5*F00 + F11
-        val01 = 0.5*F01
+        val01 = 0.5*F10
 
-        gdof = self.dof.number_of_global_dofs() 
-        A00 = coo_matrix((val00, (I, J)), shape=(gdof, gdof))
-        A01 = coo_matrix((val01, (I, J)), shape=(gdof, gdof))
-        A11 = coo_matrix((val11, (I, J)), shape=(gdof, gdof))
+        gdof = self.dof.number_of_global_dofs() # 注意这里是标量的自由度管理
+        A00 = coo_matrix((val00, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
+        A01 = coo_matrix((val01, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
+        A11 = coo_matrix((val11, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
 
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge2cell = mesh.ds.edge_to_cell()
+        eh = mesh.entity_measure('edge')
+        area = self.smspace.cellmeasure
+        ch = self.smspace.cellsize
+
+        ldof = self.dof.number_of_local_dofs()
+        f2 = lambda ndof: np.zeros((ndof, ndof), dtype=self.ftype)
+        S00 = np.array(list(map(f2, ldof)))
+        S11 = np.array(list(map(f2, ldof)))
+        S01 = np.array(list(map(f2, ldof)))
+
+        def f3(i):
+            j = edge2cell[i, 2]
+            c = h[i]**2/ch[edge2cell[i, 0]]
+            S00[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+            S11[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+
+        def f4(i):
+            if isInEdge[i]:
+                j = edge2cell[i, 3]
+                c = h[i]**2/ch[edge2cell[i, 1]]
+                S00[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+                S11[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+        list(map(f3, range(NE)))
+        list(map(f4, range(NE)))
+
+        if p > 2:
+            Q = self.Q
+            L = self.L
+            def f5(i):
+                L0 = L[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+                L1 = L[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+                H = inv(Q[i])/area[i]
+                S00[i] += L0.T@H@L0
+                S11[i] += L1.T@H@L1
+                S01[i] += L0.T@H@L1
+            list(map(f5, range(NC)))
+
+        def f6(i):
+            G00 = self.G[0][i]
+            G11 = self.G[1][i]
+            G01 = self.G[2][i]
+            B0 = self.B[0]
+            B1 = self.B[1]
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()
