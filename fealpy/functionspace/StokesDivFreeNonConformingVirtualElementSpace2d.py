@@ -104,6 +104,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         """
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
+        self.pspace = ScaledMonomialSpace2d(mesh, p-1, q=q)
         self.mesh = mesh
         self.dof = SDFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
         self.integralalg = self.smspace.integralalg
@@ -394,8 +395,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
             np.subtract(J1, (np.s_[:], idx1[isInEdge]), val[isInEdge])
 
-        J = [J0, J1] # U = [[J0, None]， [J1, None]， [None， J0]， [None，J1]]
-
+        J = [J0, J1]
+        # U = [[J0, None]， [J1, None]， [None， J0]， [None，J1]]
         return R, J
 
 
@@ -576,6 +577,31 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
                 shape=(gdof, gdof), dtype=self.ftype)
 
         return bmat([[A00, A01], [A01.T, A11]], format='csr')
+
+    def matrix_P(self):
+        p = self.p
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        NC = self.mesh.number_of_cells()
+        cd0 = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        cd1 = self.pspace.cell_to_dof()
+        idx = np.array(list(map(np.meshgrid, cd0, cd1)))
+        I = np.concatenate(list(map(lambda x: x.flat, idx[:, 1])))
+        J = np.concatenate(list(map(lambda x: x.flat, idx[:, 0])))
+
+        def f(i):
+            J0 = self.J[0][cell2dofLocation[i]:cell2dofLocation[i+1]]
+            J1 = self.J[1][cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return J0.flatten(), J1.flatten()
+        P = np.array(list(map(f, range(NC))))
+        P0 = coo_matrix((np.concatenate(P[:, 0]), (I, J)),
+                shape=(gdof, gdof), dtype=self.ftype)
+        P1 = coo_matrix((np.concatenate(P[:, 1]), (I, J)),
+                shape=(gdof, gdof), dtype=self.ftype)
+
+        return bmat([P0, P1], format='csr')
+
+    def source_vector(self, f):
+        pass
 
     def number_of_global_dofs(self):
         return 2*self.dof.number_of_global_dofs()

@@ -412,3 +412,24 @@ class ScaledMonomialSpace2d():
         np.add.at(d, (HB[:, 0], np.s_[:]), td)
         d /= num.reshape(-1, 1)
         return sh1
+
+    def source_vector(self, f, p=None):
+        if p is None:
+            p = self.p
+        cellmeasure = self.cellmeasure
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        pp = self.mesh.bc_to_point(bcs)
+        fval = f(pp)
+
+        if p > 0:
+            phi = self.basis(bcs, p=p)
+            # bb: (NC, ldof)
+            bb = np.einsum('m, mi, mk, i->ik',
+                    ws, fval, phi, self.cellmeasure)
+            cell2dof = self.cell_to_dof() #(NC, ldof)
+            gdof = self.number_of_global_dofs()
+            b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        else:
+            b = np.einsum('i, ik, k->k', ws, fval, cellmeasure)
+        return b
+
