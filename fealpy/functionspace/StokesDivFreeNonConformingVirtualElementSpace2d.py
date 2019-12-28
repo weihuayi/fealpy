@@ -1,7 +1,7 @@
 
 import numpy as np
 from numpy.linalg import inv
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+from scipy.sparse import bmat, coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -517,8 +517,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             list(map(f3, range(NC)))
 
         ndof0 = p*(p+1)//2
-        ndof1= (p+1)*(p+2)//2
+        ndof1 = (p+1)*(p+2)//2
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
+        ldof = self.dof.number_of_local_dofs()
         def f4(i):
             print("cell idx:", i)
             G00 = self.G[0][i]
@@ -540,24 +541,25 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
                  self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
             S = inv(G)@R
             D = np.eye(S.shape[1])
-            D[:ndof1, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[0*ndof1:1*ndof1, :]
-            D[ndof1:2*ndof1, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[1*ndof1:2*ndof1, :]
+            print("S:", S.shape)
+            print("D:", D.shape)
+            print("ldof[i]:", ldof[i])
+            print("ndof1:", ndof1)
+            D[:ldof[i], :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[:ndof1, :]
+            D[ldof[i]:, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[ndof1:2*ndof1, :]
 
             A = D.T@np.block([[S00[i], S01[i]], [S01[i].T, S11[i]]])@D
-            
-            print(A00.shape)
-            print(A11.shape)
-            print(A01.shape)
 
             J0 = self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
             J1 = self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
             F00 = J0.T@self.H0[i]@J0
             F11 = J1.T@self.H0[i]@J1
             F01 = J1.T@self.H0[i]@J0
-            print(F00.shape)
-            print(F11.shape)
-            print(F01.shape)
-            return (A+F00+0.5*F11).flat, (A11+F11+0.5*F00).flat, (A01+0.5*F01).flat
+            A00 = A[:ldof[i], :ldof[i]]
+            A11 = A[ldof[i]:, ldof[i]:]
+            A01 = A[:ldof[i], ldof[i]:]
+            return (A00+F00+0.5*F11).flatten(), (A11+F11+0.5*F00).flatten(), (A01+0.5*F01).flatten()
+
         S = np.array(list(map(f4, range(NC))))
 
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
