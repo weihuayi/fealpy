@@ -94,7 +94,6 @@ class SDFNCVEMDof2d():
 
 
 class StokesDivFreeNonConformingVirtualElementSpace2d:
-
     def __init__(self, mesh, p, q=None):
         """
         Parameter
@@ -124,6 +123,56 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.R, self.J = self.matrix_R_J()
         self.D = self.matrix_D()
         self.Q, self.L = self.matrix_Qp_L()
+        self.PI0 = self.matrix_PI0()
+
+
+    def projection(self, u):
+        cell2dof = self.cell_to_dof()
+        uh = self.function()
+        phi = lambda x: self.smspace.basis(x, p=p-2)
+        def u(x, cellidx):
+            return np.einsum('ij..., ijm->ijm...', f(x), phi(x, cellidx=cellidx))
+        bb = self.integralalg.integral(u, celltype=True)
+        edge2dof = self.dof.edge_to_dof()
+
+    def project_to_smspace(self, uh):
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        smldof = self.smspace.number_of_local_dofs()
+        sh = self.smspace.function(dim=2)
+        c2d = self.smspace.cell_to_dof()
+        def f(i):
+            PI0 = self.PI0[i]
+            x = uh[cell2dofLocation[i]:cell2dofLocation[i+1]]
+            y = PI0@x.T.flat
+            sh[c2d[i], 0] = y[:smldof]
+            sh[c2d[i], 1] = y[smldof:2smldof]
+        list(map(f, range(NC)))
+        return sh
+
+    def matrix_PI0(self):
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        def f(i):
+            G00 = self.G[0][i]
+            G11 = self.G[1][i]
+            G01 = self.G[2][i]
+            B0 = self.B[0][i]
+            B1 = self.B[1][i]
+            G = np.block([
+                [G00, G01, B0],
+                [G01.T, G11, B1],
+                [B0.T, B1.T, Z]]
+                )
+            R =  np.block([
+                [self.R[0][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
+                 self.R[0][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
+                [self.R[1][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
+                 self.R[1][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
+                [self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
+                 self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
+            PI0 = inv(G)@R
+            return PI0
+        PI0 = np.array(list(map(f, range(NC))))
+        return PI0
 
     def index1(self, p=None):
         if p is None:
@@ -522,32 +571,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         ldof = self.dof.number_of_local_dofs()
         def f4(i):
-            print("cell idx:", i)
-            G00 = self.G[0][i]
-            G11 = self.G[1][i]
-            G01 = self.G[2][i]
-            B0 = self.B[0][i]
-            B1 = self.B[1][i]
-            G = np.block([
-                [G00, G01, B0],
-                [G01.T, G11, B1],
-                [B0.T, B1.T, Z]]
-                )
-            R =  np.block([
-                [self.R[0][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[0][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.R[1][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[1][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
-            S = inv(G)@R
-            D = np.eye(S.shape[1])
-            print("S:", S.shape)
-            print("D:", D.shape)
-            print("ldof[i]:", ldof[i])
-            print("ndof1:", ndof1)
-            D[:ldof[i], :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[:ndof1, :]
-            D[ldof[i]:, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@S[ndof1:2*ndof1, :]
+            PI0 = self.PI0[i]
+            D = np.eye(PI0.shape[1])
+            D[:ldof[i], :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@PI0[:ndof1, :]
+            D[ldof[i]:, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@PI0[ndof1:2*ndof1, :]
 
             A = D.T@np.block([[S00[i], S01[i]], [S01[i].T, S11[i]]])@D
 
@@ -568,7 +595,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         I = np.concatenate(list(map(lambda x: x.flat, idx[:, 1])))
         J = np.concatenate(list(map(lambda x: x.flat, idx[:, 0])))
 
-        gdof = self.dof.number_of_global_dofs() # 注意这里是标量的自由度管理
+        gdof = self.number_of_global_dofs() # 注意这里是标量的自由度管理
         A00 = coo_matrix((np.concatenate(S[:, 0]), (I, J)),
                 shape=(gdof, gdof), dtype=self.ftype)
         A11 = coo_matrix((np.concatenate(S[:, 1]), (I, J)),
@@ -593,24 +620,65 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             J1 = self.J[1][cell2dofLocation[i]:cell2dofLocation[i+1]]
             return J0.flatten(), J1.flatten()
         P = np.array(list(map(f, range(NC))))
+        gdof = self.number_of_global_dofs()
         P0 = coo_matrix((np.concatenate(P[:, 0]), (I, J)),
                 shape=(gdof, gdof), dtype=self.ftype)
         P1 = coo_matrix((np.concatenate(P[:, 1]), (I, J)),
                 shape=(gdof, gdof), dtype=self.ftype)
 
-        return bmat([P0, P1], format='csr')
+        return bmat([[P0, P1]], format='csr')
 
     def source_vector(self, f):
-        pass
+        p = self.p
+        ndof = self.smspace.number_of_local_dofs(p=p-2)
+        PI0 = inv(self.CM[:, :ndof, :ndof])
+        phi = lambda x: self.smspace.basis(x, p=p-2)
+        def u(x, cellidx):
+            return np.einsum('ij..., ijm->ijm...', f(x), phi(x, cellidx=cellidx))
+        bb = self.integralalg.integral(u, celltype=True)
+        bb = PI0@bb
+        bb *= self.smspace.cellmeasure[:, None, None]
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof(doftype='cell')
+        b = np.zeros((gdof, 2), dtype=self.ftype)
+        b[cell2dof, :] = bb
+        return b.T.flat
+
+    def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
+        """
+        """
+        mesh = self.mesh
+        isBdEdge = mesh.ds.boundary_edge_flag()
+        edge2dof = self.dof.edge_to_dof()
+
+        qf = GaussLegendreQuadrature(self.p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
+        val = g(ps)
+
+        ephi = self.pspace.edge_basis(ps, edgeidx=isBdEdge)
+        h = mesh.entity_measure('edge')
+        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi, h[isBdEdge])
+        gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
 
     def number_of_global_dofs(self):
-        return 2*self.dof.number_of_global_dofs()
+        return self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self):
-        return 2*self.dof.number_of_local_dofs()
+        return self.dof.number_of_local_dofs()
 
-    def cell_to_dof(self):
-        return self.dof.cell2dof, self.dof.cell2dofLocation
+    def cell_to_dof(self, doftype='all'):
+        if doftype is 'all':
+            return self.dof.cell2dof, self.dof.cell2dofLocation
+        elif doftype is 'cell':
+            p = self.p
+            NE = self.mesh.number_of_edges()
+            NC = self.mesh.number_of_cells()
+            idof = (p-1)*p//2
+            cell2dof = NE*p + np.arange(NC*idof).reshape(NC, idof)
+            return cell2dof
+        elif doftype is 'edge':
+            return self.dof.edge_to_dof()
 
     def boundary_dof(self):
         return self.dof.boundary_dof()
@@ -619,12 +687,12 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         f = Function(self, dim=dim, array=array)
         return f
 
-    def array(self, dim=None):
+    def array(self, dim=2):
         gdof = self.number_of_global_dofs()
-        if dim is None:
-            shape = (2, gdof)
+        if dim in [None, 1]:
+            shape = gdof
         elif type(dim) is int:
-            shape = (dim, 2, gdof)
+            shape = (gdof, dim)
         elif type(dim) is tuple:
-            shape = dim + (2, gdof)
-        return np.zeros(shape, dtype=np.float)
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=self.ftype)

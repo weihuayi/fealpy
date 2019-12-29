@@ -367,6 +367,7 @@ class WeakGalerkinSpace2d:
         gdof = self.number_of_global_dofs()
         x = np.zeros((gdof,), dtype=self.ftype)
 
+        #TODO: 这里有问题
         x[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
         F -= A@x
 

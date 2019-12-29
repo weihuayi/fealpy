@@ -40,12 +40,11 @@ class SinSinData:
             pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
- 
 
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros((len(x),2), dtype=np.float)
+        val = np.zeros(p.shape, dtype=np.float)
         val[:,0] = np.sin(x)*np.sin(y)
         val[:,1] = np.cos(x)*np.cos(y)
         return val
@@ -59,7 +58,7 @@ class SinSinData:
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros((len(x),2), dtype=np.float)
+        val = np.zeros(p.shape, dtype=np.float)
         val[:,0] = (2*self.nu - 2*self.alpha)*np.sin(x)*np.sin(y)
         val[:,1] = (2*self.nu + 2*self.alpha)*np.cos(x)*np.cos(y)
         return val
@@ -70,6 +69,9 @@ class SinSinData:
 class CosSinData:
     def __init__(self, box):
         self.box = box
+
+    def domain(self):
+        return [0, 1, 0, 1]
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([

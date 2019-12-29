@@ -36,10 +36,10 @@ class SMDof2d():
         multiIndex[:, 0] = idx0 - multiIndex[:, 1]
         return multiIndex
 
-    def cell_to_dof(self):
+    def cell_to_dof(self, p=None):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(p=p)
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
@@ -48,8 +48,8 @@ class SMDof2d():
             p = self.p
         return (p+1)*(p+2)//2
 
-    def number_of_global_dofs(self):
-        ldof = self.number_of_local_dofs()
+    def number_of_global_dofs(self, p=None):
+        ldof = self.number_of_local_dofs(p=p)
         NC = self.mesh.number_of_cells()
         return NC*ldof
 
@@ -85,8 +85,8 @@ class ScaledMonomialSpace2d():
     def geo_dimension(self):
         return self.GD
 
-    def cell_to_dof(self):
-        return self.dof.cell2dof
+    def cell_to_dof(self, p=None):
+        return self.dof.cell_to_dof(p=p)
 
     def edge_basis(self, point, edgeidx=None, p=None):
         p = self.p if p is None else p
@@ -288,8 +288,8 @@ class ScaledMonomialSpace2d():
     def number_of_local_dofs(self, p=None):
         return self.dof.number_of_local_dofs(p=p)
 
-    def number_of_global_dofs(self):
-        return self.dof.number_of_global_dofs()
+    def number_of_global_dofs(self, p=None):
+        return self.dof.number_of_global_dofs(p=p)
 
     def cell_mass_matrix(self):
         return self.matrix_H()
@@ -412,24 +412,3 @@ class ScaledMonomialSpace2d():
         np.add.at(d, (HB[:, 0], np.s_[:]), td)
         d /= num.reshape(-1, 1)
         return sh1
-
-    def source_vector(self, f, p=None):
-        if p is None:
-            p = self.p
-        cellmeasure = self.cellmeasure
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        pp = self.mesh.bc_to_point(bcs)
-        fval = f(pp)
-
-        if p > 0:
-            phi = self.basis(bcs, p=p)
-            # bb: (NC, ldof)
-            bb = np.einsum('m, mi, mk, i->ik',
-                    ws, fval, phi, self.cellmeasure)
-            cell2dof = self.cell_to_dof() #(NC, ldof)
-            gdof = self.number_of_global_dofs()
-            b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
-        else:
-            b = np.einsum('i, ik, k->k', ws, fval, cellmeasure)
-        return b
-
