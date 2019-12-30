@@ -1,6 +1,7 @@
 import numpy as np
 
 from fealpy.functionspace import StokesDivFreeNonConformingVirtualElementSpace2d
+from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.mesh.simple_mesh_generator import triangle
 from fealpy.mesh import PolygonMesh
 from fealpy.pde.poisson_2d import CosCosData
@@ -140,8 +141,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             uh[:, 1] = x[udof:2*udof]
             ph[:] = x[2*udof:]
 
+            up = uspace.project(pde.velocity)
             integralalg = uspace.integralalg
-            error[i] = integralalg.L2_error(pde.solution, uh)
+            error[i] = integralalg.L2_error(pde.velocity, up)
             h /= 2
 
         print(error)
@@ -153,4 +155,5 @@ test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_index2()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
-test.test_matrix_P()
+#test.test_matrix_P()
+test.test_stokes_equaion()

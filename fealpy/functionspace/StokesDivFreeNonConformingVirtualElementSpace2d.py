@@ -103,7 +103,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         """
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
-        self.pspace = ScaledMonomialSpace2d(mesh, p-1, q=q)
         self.mesh = mesh
         self.dof = SDFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
         self.integralalg = self.smspace.integralalg
@@ -126,14 +125,22 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.PI0 = self.matrix_PI0()
 
 
-    def projection(self, u):
-        cell2dof = self.cell_to_dof()
+    def project(self, u):
+        cell2dof = self.cell_to_dof('cell')
         uh = self.function()
-        phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u(x, cellidx):
-            return np.einsum('ij..., ijm->ijm...', f(x), phi(x, cellidx=cellidx))
-        bb = self.integralalg.integral(u, celltype=True)
+        phi0 = lambda x: self.smspace.basis(x, p=p-2)
+        def u0(x, cellidx):
+            return np.einsum('ij..., ijm->ijm...', f(x), phi0(x, cellidx=cellidx))
+        area = self.smspace.cellmeasure
+        uh[cell2dof] = self.integralalg.integral(u0, celltype=True)/area[:, None]
+
+        phi1 = lambda x: self.smspace.edge_basis(x, p=p-1)
+        def u1(x):
+            return np.einsum('ij..., ijm->ijm...', f(x), phi1(x))
         edge2dof = self.dof.edge_to_dof()
+        h = self.mesh.entity_measure('edge')
+        uh[edge2dof] = self.integralalg.edge_integral(u1, edgetype=True)/h[:, None]
+        return uh
 
     def project_to_smspace(self, uh):
         cell2dof, cell2dofLocation = self.cell_to_dof()
@@ -145,13 +152,18 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             x = uh[cell2dofLocation[i]:cell2dofLocation[i+1]]
             y = PI0@x.T.flat
             sh[c2d[i], 0] = y[:smldof]
-            sh[c2d[i], 1] = y[smldof:2smldof]
+            sh[c2d[i], 1] = y[smldof:2*smldof]
         list(map(f, range(NC)))
         return sh
 
     def matrix_PI0(self):
+        p = self.p
+        NC = self.mesh.number_of_cells()
         cell2dof, cell2dofLocation = self.cell_to_dof()
+        ndof0 = self.smspace.number_of_local_dofs(p=p-1)
+        Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
+            print(i)
             G00 = self.G[0][i]
             G11 = self.G[1][i]
             G01 = self.G[2][i]
@@ -169,9 +181,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
                  self.R[1][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
                 [self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
                  self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
-            PI0 = inv(G)@R
-            return PI0
-        PI0 = np.array(list(map(f, range(NC))))
+            PI = inv(G)@R
+            return PI
+        PI0 = list(map(f, range(NC)))
         return PI0
 
     def index1(self, p=None):
@@ -326,9 +338,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         R11[idx[0][:, None, None], idx0] -= 0.5*idx[3][:, None, None]
         R11[idx[1][:, None, None], idx0] -= idx[4][:, None, None]
 
-        val = CM[:, :, 0].T/area
-        R00[:, idx0] += val[:, None]
-        R11[:, idx0] += val[:, None]
+        val = CM[:, :, 0].T/area[None, :]
+        R00[:, idx0] += val[..., None]
+        R11[:, idx0] += val[..., None]
 
 
         node = mesh.entity('node')
@@ -440,9 +452,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         if isInEdge.sum() > 0:
             idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('ijk, i->jik', F1, n[:, 0])
-            np.subtract(J0, (np.s_[:], idx1[isInEdge]), val[isInEdge])
+            np.subtract.at(J0, (np.s_[:], idx1[isInEdge]), val[:, isInEdge])
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
-            np.subtract(J1, (np.s_[:], idx1[isInEdge]), val[isInEdge])
+            np.subtract.at(J1, (np.s_[:], idx1[isInEdge]), val[:, isInEdge])
 
         J = [J0, J1]
         # U = [[J0, None]， [J1, None]， [None， J0]， [None，J1]]
@@ -610,7 +622,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
         cd0 = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        cd1 = self.pspace.cell_to_dof()
+        cd1 = self.smspace.cell_to_dof(p=p-1)
         idx = np.array(list(map(np.meshgrid, cd0, cd1)))
         I = np.concatenate(list(map(lambda x: x.flat, idx[:, 1])))
         J = np.concatenate(list(map(lambda x: x.flat, idx[:, 0])))
@@ -631,12 +643,12 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
     def source_vector(self, f):
         p = self.p
         ndof = self.smspace.number_of_local_dofs(p=p-2)
-        PI0 = inv(self.CM[:, :ndof, :ndof])
+        Q = inv(self.CM[:, :ndof, :ndof])
         phi = lambda x: self.smspace.basis(x, p=p-2)
         def u(x, cellidx):
             return np.einsum('ij..., ijm->ijm...', f(x), phi(x, cellidx=cellidx))
         bb = self.integralalg.integral(u, celltype=True)
-        bb = PI0@bb
+        bb = Q@bb
         bb *= self.smspace.cellmeasure[:, None, None]
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof(doftype='cell')
@@ -647,6 +659,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
         """
         """
+        p = self.p
         mesh = self.mesh
         isBdEdge = mesh.ds.boundary_edge_flag()
         edge2dof = self.dof.edge_to_dof()
@@ -656,7 +669,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
         val = g(ps)
 
-        ephi = self.pspace.edge_basis(ps, edgeidx=isBdEdge)
+        ephi = self.smspace.edge_basis(ps, edgeidx=isBdEdge, p=p-1)
         h = mesh.entity_measure('edge')
         b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi, h[isBdEdge])
         gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
