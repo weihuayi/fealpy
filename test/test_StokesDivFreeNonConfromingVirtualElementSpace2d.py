@@ -1,4 +1,7 @@
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy.sparse import spdiags, bmat
+from scipy.sparse.linalg import spsolve
 
 from fealpy.functionspace import StokesDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
@@ -108,7 +111,16 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         for i in range(maxit):
             mesh = triangle(domain, h, meshtype='polygon')
 
+            if 0:
+                fig = plt.figure()
+                axes = fig.gca()
+                mesh.add_plot(axes)
+                mesh.find_cell(axes, index=np.array([51], dtype=np.int))
+                plt.show()
+
             uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+            ldof = uspace.number_of_local_dofs()
+            print(ldof[51])
             pspace = ScaledMonomialSpace2d(mesh, p-1)
             isBdDof = uspace.boundary_dof()
 
@@ -119,9 +131,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             ph = pspace.function()
             uspace.set_dirichlet_bc(uh, pde.dirichlet)
 
-            A = space.matrix_A()
-            P = space.matrix_P()
-            F = space.source_vector(pde.source)
+            A = uspace.matrix_A()
+            P = uspace.matrix_P()
+            F = uspace.source_vector(pde.source)
 
 
             AA = bmat([[A, P.T], [P, None]], format='csr')
@@ -129,8 +141,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             x = np.block([uh.T.flat, ph])
             isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
 
+            gdof = 2*udof + pdof
             FF -= AA@x
-            bdIdx = np.zeros(2*udof+pdof, dtype=np.int)
+            bdIdx = np.zeros(gdof, dtype=np.int)
             bdIdx[isBdDof] = 1
             Tbd = spdiags(bdIdx, 0, gdof, gdof)
             T = spdiags(1-bdIdx, 0, gdof, gdof)
@@ -142,9 +155,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             ph[:] = x[2*udof:]
 
             up = uspace.project(pde.velocity)
+            up = uspace.project_to_smspace(up)
             integralalg = uspace.integralalg
             error[i] = integralalg.L2_error(pde.velocity, up)
             h /= 2
+
 
         print(error)
         print(error[0:-1]/error[1:])

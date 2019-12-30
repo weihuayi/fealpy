@@ -66,9 +66,8 @@ class SDFNCVEMDof2d():
         idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         cell2dof[idx] = edge2dof
 
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
-        cell2dof[idx] = edge2dof[isInEdge]
+        idx = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+        cell2dof[idx] = edge2dof
 
         NV = mesh.number_of_vertices_of_cells()
         NE = mesh.number_of_edges()
@@ -126,30 +125,33 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
 
     def project(self, u):
+        p = self.p
         cell2dof = self.cell_to_dof('cell')
         uh = self.function()
         phi0 = lambda x: self.smspace.basis(x, p=p-2)
         def u0(x, cellidx):
-            return np.einsum('ij..., ijm->ijm...', f(x), phi0(x, cellidx=cellidx))
+            return np.einsum('ij..., ijm->ijm...', u(x),
+                    self.smspace.basis(x, p=p-2, cellidx=cellidx))
         area = self.smspace.cellmeasure
-        uh[cell2dof] = self.integralalg.integral(u0, celltype=True)/area[:, None]
-
-        phi1 = lambda x: self.smspace.edge_basis(x, p=p-1)
+        uh[cell2dof] = self.integralalg.integral(u0, celltype=True)/area[:,
+                None, None]
         def u1(x):
-            return np.einsum('ij..., ijm->ijm...', f(x), phi1(x))
+            return np.einsum('ij..., ijm->ijm...', u(x),
+                    self.smspace.edge_basis(x, p=p-1))
         edge2dof = self.dof.edge_to_dof()
         h = self.mesh.entity_measure('edge')
-        uh[edge2dof] = self.integralalg.edge_integral(u1, edgetype=True)/h[:, None]
+        uh[edge2dof] = self.integralalg.edge_integral(u1, edgetype=True)
         return uh
 
     def project_to_smspace(self, uh):
+        NC = self.mesh.number_of_cells()
         cell2dof, cell2dofLocation = self.cell_to_dof()
         smldof = self.smspace.number_of_local_dofs()
         sh = self.smspace.function(dim=2)
         c2d = self.smspace.cell_to_dof()
         def f(i):
             PI0 = self.PI0[i]
-            x = uh[cell2dofLocation[i]:cell2dofLocation[i+1]]
+            x = uh[cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]]
             y = PI0@x.T.flat
             sh[c2d[i], 0] = y[:smldof]
             sh[c2d[i], 1] = y[smldof:2*smldof]
@@ -163,7 +165,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ndof0 = self.smspace.number_of_local_dofs(p=p-1)
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
-            print(i)
             G00 = self.G[0][i]
             G11 = self.G[1][i]
             G01 = self.G[2][i]
@@ -598,22 +599,25 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
             A00 = A[:ldof[i], :ldof[i]]
             A11 = A[ldof[i]:, ldof[i]:]
             A01 = A[:ldof[i], ldof[i]:]
-            return (A00+F00+0.5*F11).flatten(), (A11+F11+0.5*F00).flatten(), (A01+0.5*F01).flatten()
+            return A00+F00+0.5*F11, A11+F11+0.5*F00, A01+0.5*F01
 
-        S = np.array(list(map(f4, range(NC))))
+        S = list(map(f4, range(NC)))
 
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        idx = np.array(list(map(np.meshgrid, cd, cd)))
-        I = np.concatenate(list(map(lambda x: x.flat, idx[:, 1])))
-        J = np.concatenate(list(map(lambda x: x.flat, idx[:, 0])))
+        idx = list(map(np.meshgrid, cd, cd))
+        I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
+        J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
         gdof = self.number_of_global_dofs() # 注意这里是标量的自由度管理
-        A00 = coo_matrix((np.concatenate(S[:, 0]), (I, J)),
-                shape=(gdof, gdof), dtype=self.ftype)
-        A11 = coo_matrix((np.concatenate(S[:, 1]), (I, J)),
-                shape=(gdof, gdof), dtype=self.ftype)
-        A01 = coo_matrix((np.concatenate(S[:, 2]), (I, J)),
-                shape=(gdof, gdof), dtype=self.ftype)
+
+        A00 = np.concatenate(list(map(lambda x: x[0].flat, S)))
+        A00 = coo_matrix((A00, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
+
+        A11 = np.concatenate(list(map(lambda x: x[1].flat, S)))
+        A11 = coo_matrix((A11, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
+
+        A01 = np.concatenate(list(map(lambda x: x[2].flat, S)))
+        A01 = coo_matrix((A01, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
 
         return bmat([[A00, A01], [A01.T, A11]], format='csr')
 
@@ -623,20 +627,20 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         NC = self.mesh.number_of_cells()
         cd0 = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         cd1 = self.smspace.cell_to_dof(p=p-1)
-        idx = np.array(list(map(np.meshgrid, cd0, cd1)))
-        I = np.concatenate(list(map(lambda x: x.flat, idx[:, 1])))
-        J = np.concatenate(list(map(lambda x: x.flat, idx[:, 0])))
-
-        def f(i):
-            J0 = self.J[0][cell2dofLocation[i]:cell2dofLocation[i+1]]
-            J1 = self.J[1][cell2dofLocation[i]:cell2dofLocation[i+1]]
-            return J0.flatten(), J1.flatten()
-        P = np.array(list(map(f, range(NC))))
-        gdof = self.number_of_global_dofs()
-        P0 = coo_matrix((np.concatenate(P[:, 0]), (I, J)),
-                shape=(gdof, gdof), dtype=self.ftype)
-        P1 = coo_matrix((np.concatenate(P[:, 1]), (I, J)),
-                shape=(gdof, gdof), dtype=self.ftype)
+        idx = list(map(np.meshgrid, cd0, cd1))
+        I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
+        J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
+        def f(i, k):
+            J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return J.flatten()
+        gdof0 = self.smspace.number_of_global_dofs(p=p-1)
+        gdof1 = self.number_of_global_dofs()
+        P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
+        P0 = coo_matrix((P0, (I, J)),
+                shape=(gdof0, gdof1), dtype=self.ftype)
+        P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
+        P1 = coo_matrix((P1, (I, J)),
+                shape=(gdof0, gdof1), dtype=self.ftype)
 
         return bmat([[P0, P1]], format='csr')
 
@@ -646,7 +650,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         Q = inv(self.CM[:, :ndof, :ndof])
         phi = lambda x: self.smspace.basis(x, p=p-2)
         def u(x, cellidx):
-            return np.einsum('ij..., ijm->ijm...', f(x), phi(x, cellidx=cellidx))
+            return np.einsum('ij..., ijm->ijm...', f(x),
+                    self.smspace.basis(x, cellidx=cellidx, p=p-2))
         bb = self.integralalg.integral(u, celltype=True)
         bb = Q@bb
         bb *= self.smspace.cellmeasure[:, None, None]
@@ -670,8 +675,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         val = g(ps)
 
         ephi = self.smspace.edge_basis(ps, edgeidx=isBdEdge, p=p-1)
-        h = mesh.entity_measure('edge')
-        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi, h[isBdEdge])
+        b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
         gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
 
     def number_of_global_dofs(self):
@@ -696,7 +700,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
     def boundary_dof(self):
         return self.dof.boundary_dof()
 
-    def function(self, dim=None, array=None):
+    def function(self, dim=2, array=None):
         f = Function(self, dim=dim, array=array)
         return f
 

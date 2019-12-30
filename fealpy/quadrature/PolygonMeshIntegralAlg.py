@@ -27,9 +27,8 @@ class PolygonMeshIntegralAlg():
         NE = mesh.number_of_edges()
         node = mesh.entity('node')
         edge = mesh.entity('edge')
-        p = uh.space.p
 
-        qf = self.edgeintegrator if q is None else GaussLegendreQuadrature(p + 3)
+        qf = self.edgeintegrator
         bcs, ws = qf.quadpts, qf.weights
 
         ps = mesh.edge_bc_to_point(bcs)

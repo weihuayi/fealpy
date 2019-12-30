@@ -126,7 +126,7 @@ class CosSinData:
         y = p[..., 1]
         sin = np.sin
         cos = np.cos
-        val = np.zeros((len(x),2), dtype=np.float)
+        val = np.zeros(p.shape, dtype=np.float)
         val[..., 0] = -3*cos(x)*cos(x)*sin(y)*cos(y) \
                  + sin(x)*sin(x)*sin(y)*cos(y) - cos(x) + sin(y)
         val[..., 1] = 3*sin(x)*cos(x)*cos(y)*cos(y) \
