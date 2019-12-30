@@ -6,8 +6,8 @@ from .TriangleQuadrature import TriangleQuadrature
 
 class PrismQuadrature(Quadrature):
     def __init__(self, index, dtype=np.float):
-        q0 = TriangleQuadrature(index)
-        q1 = GaussLegendreQuadrature(index)
+        q0 = GaussLegendreQuadrature(index)
+        q1 = TriangleQuadrature(index)
         bc0, ws0 = q0.get_quadrature_points_and_weights()
         bc1, ws1 = q1.get_quadrature_points_and_weights()
         self.quadpts = (bc0, bc1)

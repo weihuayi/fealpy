@@ -661,7 +661,6 @@ class CPPFEMDof3d():
         self.p = p
         self.cell2dof = self.cell_to_dof()
         self.dpoints = self.interpolation_points()
-        self.cell_to_dof_new()
 
     def multi_index_matrix(self, TD):
         """
@@ -669,19 +668,10 @@ class CPPFEMDof3d():
         """
         p = self.p
         if TD == 1:
-            ldof = self.number_of_local_dofs()
-            multiIndex = np.zeros((ldof, 2), dtype=np.int)
-            multiIndex[:, 0] = np.arange(p, -1, -1)
-            multiIndex[:, 1] = p - multiIndex[:, 0]
+            multiIndex = multi_index_matrix1d(p)
             return multiIndex
         elif TD == 2:
-            ldof = (p+1)*(p+2)//2
-            idx = np.arange(0, ldof)
-            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-            multiIndex = np.zeros((ldof, 3), dtype=np.int8)
-            multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
-            multiIndex[:, 1] = idx0 - multiIndex[:, 2]
-            multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            multiIndex = multi_index_matrix2d(p)
             return multiIndex
 
     def number_of_local_dofs(self):
@@ -802,6 +792,9 @@ class CPPFEMDof3d():
         mesh = self.mesh
         cell = mesh.entity('cell')
         node = mesh.entity('node')
+
+        if p == 1:
+            return node
 
         GD = mesh.geo_dimension()
 
