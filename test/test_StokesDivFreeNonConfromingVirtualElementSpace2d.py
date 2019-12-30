@@ -119,9 +119,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
                 plt.show()
 
             uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-            ldof = uspace.number_of_local_dofs()
-            print(ldof[51])
             pspace = ScaledMonomialSpace2d(mesh, p-1)
+
+            """
             isBdDof = uspace.boundary_dof()
 
             udof = uspace.number_of_global_dofs()
@@ -153,6 +153,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             uh[:, 0] = x[:udof]
             uh[:, 1] = x[udof:2*udof]
             ph[:] = x[2*udof:]
+            """
 
             up = uspace.project(pde.velocity)
             up = uspace.project_to_smspace(up)
