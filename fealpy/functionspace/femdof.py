@@ -718,23 +718,23 @@ class CPPFEMDof3d():
         if p == 1:
             return cell
         else:
-            ldof = self.number_of_local_dofs()
             w1 = self.multi_index_matrix(1)
             w2 = self.multi_index_matrix(2)
-            w3 = np.einsum('ij, km->ikjm', w1, w2)
+            w = np.einsum('ij, km->ikjm', w1, w2)
+            ldof1 = len(w1)
+            ldof2 = len(w2)
 
-            w = np.zeros((ldof, 6), dtype=np.int8)
-            w[:, 0:3] = w3[:, 0, :, :].reshape(-1, 3)
-            w[:, 3:] = w3[:, 1, :, :].reshape(-1, 3)
-
-            ps = np.einsum('im, km->ikm', cell + (NN + NC), w)
+            idx = cell.reshape(NC, 2, 3) + NN + NC
+            # w: (ldof1, ldof2, 2, 3)
+            # idx: (NC, 2, 3)
+            ps = np.einsum('ijk, mnjk->imnjk', idx, w).reshape(NC, ldof1, ldof2, 6)
             ps.sort()
             t, self.i0, j = np.unique(
                     ps.reshape(-1, 6),
                     return_index=True,
                     return_inverse=True,
                     axis=0)
-            return j.reshape(-1, ldof)
+            return j.reshape(-1, ldof1*ldof2)
 
     def cell_to_dof_1(self):
         """
@@ -819,6 +819,33 @@ class CPPFEMDof3d():
             return cell2dof
 
     def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+
+        if p == 1:
+            return node
+
+        GD = mesh.geo_dimension()
+
+        ldof = self.number_of_local_dofs()
+        w1 = self.multi_index_matrix(1)/p
+        w2 = self.multi_index_matrix(2)/p
+        w = np.einsum('ij, km->ikjm', w1, w2)
+
+        ldof1 = len(w1)
+        ldof2 = len(w2)
+        NC = mesh.number_of_cells()
+        idx = cell.reshape(NC, 2, 3)
+        # node[idx]: (NC, 2, 3, GD)
+        # w: (ldof1, ldof2, 2, 3)
+        # ps: (NC, ldof1, ldof2, GD)
+        ps = np.einsum('ijkm, nljk->inlm', node[idx], w).reshape(-1, GD)
+        ipoint = ps[self.i0]
+        return ipoint
+
+    def interpolation_points_1(self):
         p = self.p
         mesh = self.mesh
         cell = mesh.entity('cell')

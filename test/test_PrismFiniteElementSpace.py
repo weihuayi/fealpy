@@ -29,6 +29,21 @@ class PrismFiniteElementSpaceTest():
         pmesh = PrismMesh(pnode, pcell)
         return pmesh
 
+    def test_cell_to_dof(self, plot=False):
+        mesh = self.space.mesh
+        cell = mesh.entity('cell')
+        cell2dof = self.space.cell_to_dof()
+        ipoints = self.space.interpolation_points()
+        print('cell:', cell)
+        print('cell2dof:', cell2dof)
+        if plot is True:
+            fig = plt.figure()
+            axes = Axes3D(fig)
+            mesh.add_plot(axes, alpha=0, showedge=True)
+            mesh.find_node(axes, showindex=True, color='r')
+            mesh.find_node(axes, node=ipoints, showindex=True, color='b')
+            plt.show()
+
     def test_basis(self):
         pass
 
@@ -37,6 +52,8 @@ class PrismFiniteElementSpaceTest():
         self.space.grad_basis(bcs)
         print(self.space.cell_to_dof())
 
-p = 1
+p = 2
 test = PrismFiniteElementSpaceTest(p=p)
-test.test_grad_basis()
+#test.test_cell_to_dof(plot=True)
+#test.test_grad_basis()
+

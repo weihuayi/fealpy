@@ -7,7 +7,7 @@ class FEMeshIntegralAlg():
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
 
-    def integral(self, u, celltype=False):
+    def integral(self, u, celltype=False, barycenter=True):
         qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
         val = u(bcs)
