@@ -721,6 +721,37 @@ class CPPFEMDof3d():
             ldof = self.number_of_local_dofs()
             w1 = self.multi_index_matrix(1)
             w2 = self.multi_index_matrix(2)
+            w3 = np.einsum('ij, km->ikjm', w1, w2)
+
+            w = np.zeros((ldof, 6), dtype=np.int8)
+            w[:, 0:3] = w3[:, 0, :, :].reshape(-1, 3)
+            w[:, 3:] = w3[:, 1, :, :].reshape(-1, 3)
+
+            ps = np.einsum('im, km->ikm', cell + (NN + NC), w)
+            ps.sort()
+            t, self.i0, j = np.unique(
+                    ps.reshape(-1, 6),
+                    return_index=True,
+                    return_inverse=True,
+                    axis=0)
+            return j.reshape(-1, ldof)
+
+    def cell_to_dof_1(self):
+        """
+        每个单元对应的全局自由度的编号.
+        """
+        p = self.p
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_cells()
+
+        cell = mesh.entity('cell')
+        if p == 1:
+            return cell
+        else:
+            ldof = self.number_of_local_dofs()
+            w1 = self.multi_index_matrix(1)
+            w2 = self.multi_index_matrix(2)
             w3 = np.einsum('ij, km->ijkm', w1, w2)
 
             w = np.zeros((ldof, 6), dtype=np.int8)
@@ -736,7 +767,7 @@ class CPPFEMDof3d():
                     axis=0)
             return j.reshape(-1, ldof)
 
-    def cell_to_dof_new(self):
+    def cell_to_dof_2(self):
         p = self.p
         mesh = self.mesh
         cell = mesh.entity('cell')

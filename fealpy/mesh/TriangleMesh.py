@@ -118,7 +118,6 @@ class TriangleMesh(Mesh2d):
 
             isOK = a[range(a.shape[0]), idx] >= 0
 
-
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
@@ -129,15 +128,15 @@ class TriangleMesh(Mesh2d):
         v2 = node[cell[:,1],:] - node[cell[:,0],:]
         nv = np.cross(v2, -v1)
         if dim == 2:
-            area = nv/2.0 
+            area = nv/2.0
             x2 = np.sum(node**2, axis=1, keepdims=True)
             w0 = x2[cell[:,2]] + x2[cell[:,1]]
             w1 = x2[cell[:,0]] + x2[cell[:,2]]
             w2 = x2[cell[:,1]] + x2[cell[:,0]]
             W = np.array([[0, -1],[1, 0]], dtype=self.ftype)
-            fe0 = w0*v0@W 
+            fe0 = w0*v0@W
             fe1 = w1*v1@W
-            fe2 = w2*v2@W 
+            fe2 = w2*v2@W
             c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
             R = np.sqrt(np.sum((c-node[cell[:,0], :])**2,axis=1))
         elif dim == 3:
