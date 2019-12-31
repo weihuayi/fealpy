@@ -85,18 +85,66 @@ class LagrangeFiniteElementSpace():
         GD = self.GD
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
         p = self.p
         bc = self.dof.multiIndex/p
         guh = uh.grad_value(bc)
         guh = guh.swapaxes(0, 1)
         rguh = self.function(dim=GD)
-        deg = np.bincount(cell2dof.flat, minlength = gdof)
-        if GD > 1:
-            np.add.at(rguh, (cell2dof, np.s_[:]), guh)
-        else:
-            np.add.at(rguh, cell2dof, guh)
+        
+        if method is 'simple':
+            deg = np.bincount(cell2dof.flat, minlength = gdof)
+            if GD > 1:
+                np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            else:
+                np.add.at(rguh, cell2dof, guh)
+        
+        elif method is 'area':
+            measure = self.mesh.entity_measure('cell')
+            ws = np.einsum('i, j->ij', measure,np.ones(ldof))
+            deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = np.einsum('ij..., i->ij...',guh,measure)
+            if GD > 1:
+                np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            else:
+                np.add.at(rguh, cell2dof, guh)
+                
+        elif method is 'distance':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
+            d = np.sqrt(np.sum(v**2, axis=-1))
+            deg = np.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = np.einsum('ij..., ij->ij...',guh,d)
+            if GD > 1:
+                np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            else:
+                np.add.at(rguh, cell2dof, guh)
+                
+        elif method is 'area_harmonic':
+            measure = 1/self.mesh.entity_measure('cell')
+            ws = np.einsum('i, j->ij', measure,np.ones(ldof))
+            deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
+            guh = np.einsum('ij..., i->ij...',guh,measure)
+            if GD > 1:
+                np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            else:
+                np.add.at(rguh, cell2dof, guh)
+        
+        elif method is 'distance_harmonic':
+            ipoints = self.interpolation_points()
+            bp = self.mesh.entity_barycenter('cell')
+            v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
+            d = 1/np.sqrt(np.sum(v**2, axis=-1))
+            deg = np.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
+            guh = np.einsum('ij..., ij->ij...',guh,d)
+            if GD > 1:
+                np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            else:
+                np.add.at(rguh, cell2dof, guh)
         rguh /= deg.reshape(-1, 1)
         return rguh
+        
 
     def edge_basis(self, bc, cellidx, lidx, direction=True):
         """
