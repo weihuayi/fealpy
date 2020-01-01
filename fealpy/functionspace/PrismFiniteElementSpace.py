@@ -94,13 +94,14 @@ class PrismFiniteElementSpace():
             gphi[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         return gphi
 
-    def basis(self, bc):
-        bc0 = bc[0] # triangle 
-        bc1 = bc[1] # interval
+    def basis(self, bcs):
+        bc0 = bcs[0] # triangle 
+        bc1 = bcs[1] # interval
         phi0 = self.lagranian_basis(bc0, 1)
         phi1 = self.lagranian_basis(bc1, 2)
         phi = np.einsum('ij, kl->ikjl', phi0, phi1)
-        return phi
+        shape = phi.shape[0:2] + (-1, )
+        return phi.reshape(shape) # (NQ0, NQ1, ldof0*ldof1)
 
     def grad_basis(self, bc, cellidx=None):
         bc0 = bc[0]
@@ -130,7 +131,39 @@ class PrismFiniteElementSpace():
         # J: (NQ0, NQ1, NC, 3, 3)
         # gphi: (NQ0, NQ1, ldof0, ldof1, 3)
         gphi = np.einsum('...imn, ...jln->...ijlm', J, gphi)
-        return gphi
+        shape = gphi.shape[0:2] + (-1, 3)
+        return gphi.reshape(shape)
+
+    def value(self, uh, bcs, cellidx=None):
+        phi = self.basis(bcs) # (NQ0, NQ1, ldof0, ldof1)
+        cell2dof = self.cell_to_dof() # (NC, ldof0, ldof1)
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, kij{}->...k{}'.format(s0[:dim], s0[:dim])
+        if cellidx is None:
+            uh = uh[cell2dof] # (NC, ldof0*ldof1, ...)
+        else:
+            uh = uh[cell2dof[cellidx]]
+        val = np.einsum(s1, phi, uh)
+        return val
+
+    def grad_value(self, uh, bcs, cellidx=None):
+        gphi = self.grad_basis(bc, cellidx=cellidx)#(NQ0, NQ1, NC, ldof0, ldof1, GD)
+        cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...kijm, kij{}->...k{}m'.format(s0[:dim], s0[:dim])
+        if cellidx is None:
+            uh = uh[cell2dof] # (NC, ldof0, ldof1, ...)
+        else:
+            uh = uh[cell2dof[cellidx]]
+        val = np.einsum(s1, gphi, uh)
+        return val
+
+    def interpolation(self, u, dim=None):
+        ipoint = self.dof.interpolation_points()
+        uI = u(ipoint)
+        return self.function(dim=dim, array=uI)
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -145,3 +178,58 @@ class PrismFiniteElementSpace():
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
+
+    def stiff_matrix(self, cfun=None):
+        p = self.p
+        GD = self.geo_dimension()
+
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        gphi = self.grad_basis(bcs) #(NQ0, NQ1, NC, ldof0, ldof1, GD)
+
+        A = np.einsum('i, ijkm, ijpm, j->jkp',
+                ws, dgphi, gphi, self.cellmeasure,
+                optimize=True)
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs()
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def mass_matrix(self, cfun=None, barycenter=False):
+        p = self.p
+        mesh = self.mesh
+        cellmeasure = self.cellmeasure
+
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.basis(bcs)
+
+        M = np.einsum( 'm, mj, mk, i->ijk', ws, dphi, phi, cellmeasure, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        I = np.einsum('ij, k->ijk',  cell2dof, np.ones(ldof))
+        J = I.swapaxes(-1, -2)
+
+        gdof = self.number_of_global_dofs()
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M
+
+    def source_vector(self, f):
+        p = self.p
+        cellmeasure = self.cellmeasure
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        pp = self.mesh.bc_to_point(bcs)
+        fval = f(pp)
+        phi = self.basis(bcs)
+        # bb: (NC, ldof)
+        bb = np.einsum('m, mi, mk, i->ik',
+                ws, fval, phi, self.cellmeasure)
+        cell2dof = self.cell_to_dof() #(NC, ldof)
+        gdof = self.number_of_global_dofs()
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b
+

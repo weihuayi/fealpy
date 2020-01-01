@@ -705,6 +705,11 @@ class CPPFEMDof3d():
 
         return gdof
 
+    def boundary_dof(self):
+        mesh = self.mesh
+        face = mesh.entity('face')
+        pass
+
     def cell_to_dof(self):
         """
         每个单元对应的全局自由度的编号.
@@ -718,23 +723,23 @@ class CPPFEMDof3d():
         if p == 1:
             return cell
         else:
-            w1 = self.multi_index_matrix(1)
-            w2 = self.multi_index_matrix(2)
-            w = np.einsum('ij, km->ikjm', w1, w2)
+            w0 = self.multi_index_matrix(1)
+            w1 = self.multi_index_matrix(2)
+            w = np.einsum('ij, km->ikjm', w0, w1)
+            ldof0 = len(w0)
             ldof1 = len(w1)
-            ldof2 = len(w2)
 
             idx = cell.reshape(NC, 2, 3) + NN + NC
             # w: (ldof1, ldof2, 2, 3)
             # idx: (NC, 2, 3)
-            ps = np.einsum('ijk, mnjk->imnjk', idx, w).reshape(NC, ldof1, ldof2, 6)
+            ps = np.einsum('ijk, mnjk->imnjk', idx, w).reshape(NC, ldof0, ldof1, 6)
             ps.sort()
             t, self.i0, j = np.unique(
                     ps.reshape(-1, 6),
                     return_index=True,
                     return_inverse=True,
                     axis=0)
-            return j.reshape(-1, ldof1*ldof2)
+            return j.reshape(-1, ldof0*ldof1)
 
     def cell_to_dof_1(self):
         """

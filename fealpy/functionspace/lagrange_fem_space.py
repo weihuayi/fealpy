@@ -120,7 +120,7 @@ class LagrangeFiniteElementSpace():
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
                 np.add.at(rguh, cell2dof, guh)
-                
+
         elif method is 'area_harmonic':
             measure = 1/self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
@@ -130,7 +130,7 @@ class LagrangeFiniteElementSpace():
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
                 np.add.at(rguh, cell2dof, guh)
-        
+
         elif method is 'distance_harmonic':
             ipoints = self.interpolation_points()
             bp = self.mesh.entity_barycenter('cell')
@@ -144,7 +144,6 @@ class LagrangeFiniteElementSpace():
                 np.add.at(rguh, cell2dof, guh)
         rguh /= deg.reshape(-1, 1)
         return rguh
-        
 
     def edge_basis(self, bc, cellidx, lidx, direction=True):
         """
