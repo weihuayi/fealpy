@@ -1,7 +1,54 @@
 import numpy as np
 
-from ..mesh.StructureQuadMesh import StructureQuadMesh
-from ..mesh.Mesh2d import Mesh2d
+from ..mesh import TriangleMesh, StructureQuadMesh
+
+class CosCosData():
+    """
+    -\Delta u  + u**3 = f
+    u = cos(pi*x)*cos(pi*y)
+    """
+    def __init__(self):
+        pass
+
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
+    def solution(self, p):
+        """ The exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.cos(pi*x)*np.cos(pi*y)
+        return val
+
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)+(np.cos(pi*x)*np.cos(pi*y))**3
+        return val
+
+    def dirichlet(self, p):
+        return self.solution(p)
 
 class SinSinData:
     """
@@ -62,4 +109,3 @@ class SinSinData:
         """
         return self.solution(p)
         
-
