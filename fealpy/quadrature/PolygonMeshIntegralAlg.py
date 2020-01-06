@@ -22,6 +22,23 @@ class PolygonMeshIntegralAlg():
         area = np.cross(v1, v2)/2
         return area
 
+    def edge_integral(self, u, edgetype=False, q=None):
+        mesh = self.pmesh
+        NE = mesh.number_of_edges()
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+
+        qf = self.edgeintegrator
+        bcs, ws = qf.quadpts, qf.weights
+
+        ps = mesh.edge_bc_to_point(bcs)
+        val = u(ps)
+        if edgetype is True:
+            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure)
+        else:
+            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
+        return e
+
     def integral(self, u, celltype=False, q=None):
         pmesh = self.pmesh
         node = pmesh.node

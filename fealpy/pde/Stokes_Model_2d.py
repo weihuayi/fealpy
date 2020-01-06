@@ -40,12 +40,11 @@ class SinSinData:
             pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
- 
 
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros((len(x),2), dtype=np.float)
+        val = np.zeros(p.shape, dtype=np.float)
         val[:,0] = np.sin(x)*np.sin(y)
         val[:,1] = np.cos(x)*np.cos(y)
         return val
@@ -59,7 +58,7 @@ class SinSinData:
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val = np.zeros((len(x),2), dtype=np.float)
+        val = np.zeros(p.shape, dtype=np.float)
         val[:,0] = (2*self.nu - 2*self.alpha)*np.sin(x)*np.sin(y)
         val[:,1] = (2*self.nu + 2*self.alpha)*np.cos(x)*np.cos(y)
         return val
@@ -68,8 +67,11 @@ class SinSinData:
         return self.solution(p)
 
 class CosSinData:
-    def __init__(self, box):
-        self.box = box
+    def __init__(self):
+        self.box = [0, 1, 0, 1]
+
+    def domain(self):
+        return self.box
 
     def init_mesh(self, n=1, meshtype='tri'):
         node = np.array([
@@ -108,9 +110,9 @@ class CosSinData:
         y = p[..., 1]
         cos = np.cos
         sin = np.sin
-        val = np.zeros((len(x),2), dtype=np.float)
-        val[:,0] = -1/2*cos(x)*cos(x)*cos(y)*sin(y)
-        val[:,1] = 1/2*cos(x)*sin(x)*cos(y)*cos(y)
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = -1/2*cos(x)*cos(x)*cos(y)*sin(y)
+        val[..., 1] = 1/2*cos(x)*sin(x)*cos(y)*cos(y)
         return val
 
     def pressure(self, p):
@@ -124,15 +126,15 @@ class CosSinData:
         y = p[..., 1]
         sin = np.sin
         cos = np.cos
-        val = np.zeros((len(x),2), dtype=np.float)
-        val[:,0] = -3*cos(x)*cos(x)*sin(y)*cos(y) \
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = -3*cos(x)*cos(x)*sin(y)*cos(y) \
                  + sin(x)*sin(x)*sin(y)*cos(y) - cos(x) + sin(y)
-        val[:,1] = 3*sin(x)*cos(x)*cos(y)*cos(y) \
+        val[..., 1] = 3*sin(x)*cos(x)*cos(y)*cos(y) \
                  - cos(x)*sin(x)*sin(y)*sin(y) - sin(x) + cos(y)
         return val
 
     def dirichlet(self, p):
-        return self.solution(p)
+        return self.velocity(p)
 
 class PolyData:
     def __init__(self, box):

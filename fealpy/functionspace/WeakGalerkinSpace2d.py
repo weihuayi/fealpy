@@ -153,7 +153,7 @@ class WeakGalerkinSpace2d:
 
         self.H0 = inv(self.CM)
         self.H1 = inv(self.EM)
-        self.R0, self.R1 = self.left_weak_matrix()
+        self.R = self.left_weak_matrix()
 
     def number_of_local_dofs(self):
         return self.dof.number_of_local_dofs()
@@ -345,10 +345,10 @@ class WeakGalerkinSpace2d:
         S += csr_matrix((F5.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return S
 
-    def apply_dirichlet_bc(self, g, A, F):
-        """ Modify matrix A and b
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_edge=None):
         """
-
+        初始化解 uh  的第一类边界条件。
+        """
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -359,25 +359,10 @@ class WeakGalerkinSpace2d:
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
         gI = g(ps)
-
         ephi = self.edge_basis(ps, edgeidx=isBdEdge)
         h = mesh.entity_measure('edge')
         b = np.einsum('i, ij, ijk, j->jk', ws, gI, ephi, h[isBdEdge])
-
-        gdof = self.number_of_global_dofs()
-        x = np.zeros((gdof,), dtype=self.ftype)
-
-        x[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
-        F -= A@x
-
-        bdIdx = np.zeros(gdof, dtype=np.int)
-        bdIdx[isBdDof] = 1
-        Tbd = spdiags(bdIdx, 0, gdof, gdof)
-        T = spdiags(1-bdIdx, 0, gdof, gdof)
-        A = T@A@T + Tbd
-
-        F[isBdDof] = x[isBdDof]
-        return A, F
+        uh[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
 
     def basis(self, point, cellidx=None):
         return self.smspace.basis(point, cellidx=cellidx)
@@ -436,7 +421,7 @@ class WeakGalerkinSpace2d:
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
         return b
 
-    def projection(self, u, dim=1):
+    def project(self, u, dim=1):
         p = self.p
         mesh = self.mesh
         node = mesh.entity('node')

@@ -91,12 +91,16 @@ class PrismMesh(Mesh3d):
         J = np.zeros(shape, dtype=self.ftype)
 
         v = node[cell[:, 3:]] - node[cell[:, 0:3]] # (NC, 3, 3)
-        J[..., 2] = np.einsum('ij, kjm->ikm', bc0, v)[:, np.newaxis, ...]
+        # right hand: (NQ1, NC, 3)
+        # J[..., 2]: (NQ0, NQ1, NC, 3)
+        J[..., 2] = np.einsum('ij, kjm->ikm', bc1, v)
 
         idx0 = np.array([[1, 4], [2, 5]], dtype=np.int)
         idx1 = np.array([[0, 3]], dtype=np.int)
         v = node[cell[:, idx0]] - node[cell[:, idx1]]
-        J[..., 0:2] = np.einsum('ij, knjm->ikmn', bc1, v) # bc1: (NQ1, 2), v:(NC, 2, 2, 3)
+        # einsum: (NQ0, NC, 3, 2) 
+        # J[..., 0:2] : (NQ0, NQ1, NC, 3, 2)
+        J[..., 0:2] = np.einsum('ij, knjm->ikmn', bc0, v)[:, np.newaxis]
         return J
 
     def multi_index_matrix_2(self):

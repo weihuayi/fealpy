@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse.linalg import spsolve
+from scipy.sparse import spdiags
 
 from fealpy.pde.poisson_2d import CosCosData
 
@@ -19,7 +20,7 @@ class SobolevEquationWGModel2dTest:
         self.pde = SinSinExpData(nu, epsilon)
         self.solver = MatlabSolver()
 
-    def test_poisson_equaion(self, p=1, maxit=4):
+    def test_poisson_equation(self, p=1, maxit=4):
         h = 0.1
         pde = CosCosData()
         domain = pde.domain()
@@ -27,11 +28,23 @@ class SobolevEquationWGModel2dTest:
         for i in range(maxit):
             mesh = triangle(domain, h, meshtype='polygon')
             dmodel = SobolevEquationWGModel2d(self.pde, mesh, p=p)
+            uh = dmodel.space.function()
+            dmodel.space.set_dirichlet_bc(uh, pde.dirichlet)
+
             S = dmodel.space.stabilizer_matrix()
             A = dmodel.G + S
             F = dmodel.space.source_vector(pde.source)
-            A, F = dmodel.space.apply_dirichlet_bc(pde.dirichlet, A, F)
-            uh = dmodel.space.function()
+            F -= A@uh
+
+            isBdDof = dmodel.space.boundary_dof()
+            gdof = dmodel.space.number_of_global_dofs()
+            bdIdx = np.zeros(gdof, dtype=np.int)
+            bdIdx[isBdDof] = 1
+            Tbd = spdiags(bdIdx, 0, gdof, gdof)
+            T = spdiags(1-bdIdx, 0, gdof, gdof)
+            A = T@A@T + Tbd
+
+            F[isBdDof] = uh[isBdDof]
             uh[:] = spsolve(A, F)
             integralalg = dmodel.space.integralalg
             error[i] = integralalg.L2_error(pde.solution, uh)
@@ -67,5 +80,5 @@ class SobolevEquationWGModel2dTest:
 
 
 test = SobolevEquationWGModel2dTest()
-#test.test_poisson_equaion()
-test.test_sobolev_equation()
+test.test_poisson_equation()
+#test.test_sobolev_equation()

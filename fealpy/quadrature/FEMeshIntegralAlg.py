@@ -7,11 +7,19 @@ class FEMeshIntegralAlg():
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
 
-    def integral(self, u, celltype=False):
+
+    def integral(self, u, celltype=False, barycenter=True):
         qf = self.integrator
         bcs, ws = qf.quadpts, qf.weights
-        val = u(bcs)
-        e = np.einsum('i, ij..., j->j...', ws, val, self.cellmeasure)
+        if barycenter:
+            val = u(bcs)
+        else:
+            ps = self.mesh.bc_to_point(bcs)
+            val = u(ps)
+        dim = len(ws.shape)
+        s0 = 'abcde'
+        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+        e = np.einsum(s1, ws, val, self.cellmeasure)
         if celltype is True:
             return e
         else:

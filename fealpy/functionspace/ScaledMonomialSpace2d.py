@@ -36,10 +36,10 @@ class SMDof2d():
         multiIndex[:, 0] = idx0 - multiIndex[:, 1]
         return multiIndex
 
-    def cell_to_dof(self):
+    def cell_to_dof(self, p=None):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(p=p)
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
@@ -48,8 +48,8 @@ class SMDof2d():
             p = self.p
         return (p+1)*(p+2)//2
 
-    def number_of_global_dofs(self):
-        ldof = self.number_of_local_dofs()
+    def number_of_global_dofs(self, p=None):
+        ldof = self.number_of_local_dofs(p=p)
         NC = self.mesh.number_of_cells()
         return NC*ldof
 
@@ -85,8 +85,8 @@ class ScaledMonomialSpace2d():
     def geo_dimension(self):
         return self.GD
 
-    def cell_to_dof(self):
-        return self.dof.cell2dof
+    def cell_to_dof(self, p=None):
+        return self.dof.cell_to_dof(p=p)
 
     def edge_basis(self, point, edgeidx=None, p=None):
         p = self.p if p is None else p
@@ -288,8 +288,8 @@ class ScaledMonomialSpace2d():
     def number_of_local_dofs(self, p=None):
         return self.dof.number_of_local_dofs(p=p)
 
-    def number_of_global_dofs(self):
-        return self.dof.number_of_global_dofs()
+    def number_of_global_dofs(self, p=None):
+        return self.dof.number_of_global_dofs(p=p)
 
     def cell_mass_matrix(self):
         return self.matrix_H()

@@ -2,8 +2,11 @@ import numpy as np
 from scipy.sparse import triu, tril
 
 
-class OptAlg():
+def tri_odt_opt(mesh):
+    pass
 
+
+class OptAlg():
     def __init__(self, mesh, quality):
         self.mesh = mesh
         self.quality = quality 
