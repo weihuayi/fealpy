@@ -5,15 +5,17 @@ class SphereSinSinSinData():
         from fealpy.geometry import SphereSurface
         self.surface = SphereSurface()
 
+    def domain(self):
+        return self.surface
+
     def init_mesh(self, n=0):
         mesh = self.surface.init_mesh()
         mesh.uniform_refine(n, self.surface)
         return mesh
 
     def solution(self,p):
-        """ The exact solution 
+        """ The exact solution
         """
-  
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
@@ -24,7 +26,7 @@ class SphereSinSinSinData():
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
-            p: array object, N*3 
+            p: array object, N*3
         """
         x = p[..., 0]
         y = p[..., 1]

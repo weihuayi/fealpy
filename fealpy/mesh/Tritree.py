@@ -651,48 +651,49 @@ class Tritree(TriangleMesh):
         node = self.entity('node')
         edge = self.entity('edge')
         cell = self.entity('cell')
-        
+
         isLeafCell = self.is_leaf_cell()
         edge2cell = self.ds.edge_to_cell()
-        
+
+        # flag0: 左边单元是叶子单元
+        # flag1: 右边单元是叶子单元
         flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
         flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
 
         LCell = edge2cell[flag0, 0]
         RCell = edge2cell[flag1, 1]
-        isLeafCell = self.is_leaf_cell()
-        idx0 = edge2cell[flag0, 0]
-        N0 = len(idx0)
+
+        N0 = len(LCell)
         cell20 =np.zeros((2*N0, 3), dtype=self.itype)
 
         cell20[0:N0, 0] = edge[flag0, 0]
         cell20[0:N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
-        cell20[0:N0, 2] = cell[idx0, edge2cell[flag0, 2]]
+        cell20[0:N0, 2] = cell[LCell, edge2cell[flag0, 2]]
 
         cell20[N0:2*N0, 0] = edge[flag0, 1]
-        cell20[N0:2*N0, 1] = cell[idx0, edge2cell[flag0, 2]]
+        cell20[N0:2*N0, 1] = cell[LCell, edge2cell[flag0, 2]]
         cell20[N0:2*N0, 2] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
 
-        idx1 = edge2cell[flag1, 1]
-        N1 = len(idx1)
+        N1 = len(RCell)
         cell21 =np.zeros((2*N1, 3), dtype=self.itype)
-
         cell21[0:N1, 0] = edge[flag1, 1]
         cell21[0:N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
-        cell21[0:N1, 2] = cell[idx1, edge2cell[flag1, 3]]
-
+        cell21[0:N1, 2] = cell[RCell, edge2cell[flag1, 3]]
         cell21[N1:2*N1, 0] = edge[flag1, 0]
-        cell21[N1:2*N1, 1] = cell[idx1, edge2cell[flag1, 3]]
+        cell21[N1:2*N1, 1] = cell[RCell, edge2cell[flag1, 3]]
         cell21[N1:2*N1, 2] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
-        
+
         isLRCell = np.zeros(NC, dtype=np.bool)
         isLRCell[LCell] = True
         isLRCell[RCell] = True
 
         idx = np.arange(NC)
-        cell0 = cell[(~isLRCell) & (isLeafCell)] 
+        cell0 = cell[(~isLRCell) & (isLeafCell)]
         idx0 = idx[(~isLRCell) & (isLeafCell)]
-        cell = np.r_['0', cell0, cell20, cell21]                      
-        tmesh = TriangleMesh(node, cell) 
-        self.celldata['idxmap'] = np.r_['0', idx0, LCell, RCell, LCell, RCell]        #现在的cell单元与原来树结构中cell的对应关系.
+        cell = np.r_['0', cell0, cell20, cell21]
+        tmesh = TriangleMesh(node, cell)
+        #现在的cell单元与原来树结构中cell的对应关系.
+        self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]  
+        print('idx0:', idx0.shape)
+        print('LCell:', LCell.shape)
         return tmesh

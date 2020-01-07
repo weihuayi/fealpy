@@ -58,7 +58,7 @@ class CVEMDof2d():
 
             idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
             cell2dof[idx] = edge2dof[:, 0:p]
- 
+
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
