@@ -135,11 +135,11 @@ class PrismFiniteElementSpace():
         return gphi.reshape(shape)
 
     def value(self, uh, bcs, cellidx=None):
-        phi = self.basis(bcs) # (NQ0, NQ1, ldof0, ldof1)
-        cell2dof = self.cell_to_dof() # (NC, ldof0, ldof1)
+        phi = self.basis(bcs) # (NQ0, NQ1, ldof0*ldof1)
+        cell2dof = self.cell_to_dof() # (NC, ldof0*ldof1)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ij, kij{}->...k{}'.format(s0[:dim], s0[:dim])
+        s1 = '...i, ki{}->...k{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
             uh = uh[cell2dof] # (NC, ldof0*ldof1, ...)
         else:
@@ -148,11 +148,11 @@ class PrismFiniteElementSpace():
         return val
 
     def grad_value(self, uh, bcs, cellidx=None):
-        gphi = self.grad_basis(bc, cellidx=cellidx)#(NQ0, NQ1, NC, ldof0, ldof1, GD)
+        gphi = self.grad_basis(bc, cellidx=cellidx)#(NQ0, NQ1, NC, ldof0*ldof1, GD)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...kijm, kij{}->...k{}m'.format(s0[:dim], s0[:dim])
+        s1 = '...kim, ki{}->...k{}m'.format(s0[:dim], s0[:dim])
         if cellidx is None:
             uh = uh[cell2dof] # (NC, ldof0, ldof1, ...)
         else:

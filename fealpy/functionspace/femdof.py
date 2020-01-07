@@ -710,6 +710,21 @@ class CPPFEMDof3d():
         face = mesh.entity('face')
         pass
 
+    def face_to_dof(self):
+        p = self.p
+        w0 = self.multi_index_matrix(1)
+        w1 = self.multi_index_matrix(2)
+        w = np.einsum('ij, km->ikjm', w0, w1)
+        ldof0 = len(w0)
+        ldof1 = len(w1)
+        face = self.mesh.entity('face')
+        isTriFace = (face[:, 2] == face[:, 3])
+        face2cell = self.mesh.face_to_cell()
+        pass
+
+    def edge_to_dof(self):
+        pass
+
     def cell_to_dof(self):
         """
         每个单元对应的全局自由度的编号.

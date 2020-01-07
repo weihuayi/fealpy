@@ -54,6 +54,6 @@ class PrismFiniteElementSpaceTest():
 
 p = 2
 test = PrismFiniteElementSpaceTest(p=p)
-#test.test_cell_to_dof(plot=True)
+test.test_cell_to_dof(plot=True)
 #test.test_grad_basis()
 

@@ -569,7 +569,6 @@ class LagrangeFiniteElementSpace():
 
     def source_vector(self, f, surface=None):
         p = self.p
-
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         pp = self.mesh.bc_to_point(bcs)
@@ -589,6 +588,17 @@ class LagrangeFiniteElementSpace():
             b = np.einsum('i, ik, k->k', ws, fval, cellmeasure)
         return b
 
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        ipoints = self.interpolation_points()
+        if is_dirichlet_boundary is not None:
+            isDDof = is_dirichlet_boundary(ipoints)
+        else:
+            isDDof = self.boundary_dof()
+        idx, = np.nonzero(isDDof)
+        uh[isDDof] = g(ipoints[isDDof])
 
 class VectorLagrangeFiniteElementSpace():
     def __init__(self, mesh, p, spacetype='C'):

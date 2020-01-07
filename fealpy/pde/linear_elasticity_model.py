@@ -1,5 +1,80 @@
 import numpy as np
 
+class CantileverBeam2d():
+    def __init__(self, E=3*10**7, nu=0.3, P=1000, L=48, W=12):
+        self.E = E
+        self.nu = nu
+        self.lam = self.nu*self.E/((1+self.nu)*(1-2*self.nu))
+        self.mu = self.E/(2*(1+self.nu))
+
+        self.L = L  # length
+        self.W = W  # width 
+        self.P = P  # load at the right end
+        self.I = self.W**3/12
+
+    def domain(self):
+        return [0, self.L, -self.W/2, self.W/2]
+
+    def init_mesh(self, n=1):
+        from ..mesh.simple_mesh_generator import  rectangledomainmesh
+        box = self.domain()
+        mesh = rectangledomainmesh(domain, nx=8, ny=2)
+        mesh.uniform_refine(n)
+        return mesh
+
+    def displacement(self, p):
+        L = self.L
+        P = self.P
+        W = self.W
+        I = self.I
+        E = self.E
+        nu = self.nu
+
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = P*y/(6*E*I)*((6*L-3*x)*x+(2+nu)*(y**2 - W**2/4))
+        val[..., 1] = -P/(6*E*I)*(3*nu*y**2*(L-x)+(4+5*nu)*W**2*x/4+(3*L-x)*x**2)
+        return val
+
+    def stress(self, p):
+        P = self.P
+        L = self.L
+        I = self.I
+        W = self.W
+
+        x = p[..., 0]
+        y = p[..., 1]
+
+        val = np.zeros((len(x), 2, 2), dtype=np.float)
+        val[..., 0, 0] = P*(L-x)*y/I
+        val[..., 0, 1] = -P/(2*I)*(W**2/4 - y**2)
+        val[..., 1, 0] = -P/(2*I)*(W**2/4 - y**2)
+        return val
+
+    def source(self, p):
+        val = np.zeros(p.shape, dtype=np.float)
+        return val
+
+    def neuman(self, p):  # p 是受到面力的节点索引
+        """
+        """
+        W = self.W
+        P = self.P
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 1] = (y + W/2)*(y - W/2)*P
+        return val
+
+    def is_dirichlet_boundary(self, p):
+        return  np.abs(p[..., 0]) < 1e-12
+
+    def is_neuman_boundary(self, p):
+        return np.abs(p[..., 0] - self.L) < 1e-12
+
+
 class QiModel3d():
     def __init__(self, lam=1.0, mu=0.5):
         self.lam = lam

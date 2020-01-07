@@ -64,16 +64,14 @@ class PrismMesh(Mesh3d):
         p0 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 0:3]])
         p1 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 3:]])
         p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
-        return p.reshape(n0*n1, NC, 3)
+        return p
 
     def cell_volume(self):
         qf = PrismQuadrature(2)
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs)
-        ws0 = ws[0]
-        ws1 = ws[1]
         DJ = det(J) # (NQ0, NQ1, NC)
-        vol = 0.5*np.einsum('i, j, ijk->k', ws0, ws1, DJ)
+        vol = 0.5*np.einsum('ij, ijk->k', ws, DJ)
         return vol
 
     def jacobi_matrix(self, bc):
