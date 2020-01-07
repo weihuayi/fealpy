@@ -55,12 +55,14 @@ class StructureQuadMeshTest:
             mesh = self.mesh
             isBDEdge = mesh.ds.boundary_edge_flag()
             NE[i] = mesh.number_of_edges()
+            h = mesh.hx
             bc = mesh.entity_barycenter('cell')
             ec = mesh.entity_barycenter('edge')
 
             uI = mesh.polation_interoperator(pde.solution(bc))
             uh = pde.solution(ec)
-            Maxerror[0, i] = max(abs(uh - uI))
+            Maxerror[0, i] = np.sqrt(np.sum(h**2*(uh - uI)**2))
+#            Maxerror[0, i] = max(abs(uh - uI))
             end3 = time.time()
             print('time of %d iteration' %i, end3 - start3)
 
@@ -92,7 +94,7 @@ class StructureQuadMeshTest:
 
 
 test = StructureQuadMeshTest()
-test.test_cell_location()
-test.test_interpolation()
+#test.test_cell_location()
+#test.test_interpolation()
 test.test_polation_interoperator()
-test.test_cbar()
+#test.test_cbar()
