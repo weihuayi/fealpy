@@ -28,10 +28,28 @@ class TritreeTest:
             mesh = self.tritree.to_conformmesh()
             print(self.tritree.celldata['idxmap'])
             cell = self.tritree.entity('cell')
-            print(cell[46])
+            print(cell[15])
             cell = mesh.entity('cell')
-            print(cell[105])
-            print(cell[141])
+            print(cell[104])
+            print(cell[140])
+
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        self.tritree.add_plot(axes)
+        plt.show()
+
+    def test_interpolation(self):
+        options = self.tritree.adaptive_options(maxrefine=1)
+        mesh = self.tritree.to_conformmesh()
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=2)
+        uI = space.interpolation(self.pde.solution)
+        self.tritree.interpolation(uI)
+
+        phi = lambda x : uI.grad_value(x)**2
+        eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
+        eta = eta.sum(axis=-1)
+        self.tritree.adaptive(eta, options, surface=self.surface)
+        mesh = self.tritree.to_conformmesh()
 
         fig = pl.figure()
         axes = a3.Axes3D(fig)
@@ -44,3 +62,4 @@ class TritreeTest:
 
 test = TritreeTest()
 test.test_adaptive()
+#test.test_interpolation()

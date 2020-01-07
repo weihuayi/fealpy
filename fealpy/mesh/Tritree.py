@@ -540,7 +540,6 @@ class Tritree(TriangleMesh):
             self.ds.reinit(NN + NNN, cell)
 
     def adaptive_coarsen(self, estimator, surface=None, data=None):
-
         if data is not None:
             data['rho'] = estimator.rho
         else:
@@ -693,7 +692,24 @@ class Tritree(TriangleMesh):
         cell = np.r_['0', cell0, cell20, cell21]
         tmesh = TriangleMesh(node, cell)
         #现在的cell单元与原来树结构中cell的对应关系.
-        self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]  
-        print('idx0:', idx0.shape)
-        print('LCell:', LCell.shape)
+        self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]
+        self.celldata['elidx'] = np.r_['0', -np.ones(idx0.shape,
+            dtype=np.int), edge2cell[flag0, 2], edge2cell[flag0, 2],
+            edge2cell[flag1, 3], edge2cell[flag1, 3]]
         return tmesh
+
+    def interpolation(self, uh):
+        """
+        把协调网格上的数据插值到三角树网格上。
+        """
+        space = uh.space
+        mesh = space.mesh
+        cell2dof = space.cell_to_dof()
+        idxmap = self.celldata['idxmap']
+        elidx = self.celldata['elidx']
+        edge2cell = mesh.ds.edge_to_cell()
+        isBrotherCell = (edge2cell[:, 0] != edge2cell[:, 1]) & \
+                (idxmap[edge2cell[:, 0]] == idxmap[edge2cell[:, 1]])
+        data = uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]]
+
+
