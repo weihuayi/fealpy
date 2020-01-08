@@ -601,13 +601,14 @@ class LagrangeFiniteElementSpace():
         uh[isDDof] = g(ipoints[isDDof])
 
     def to_function(self, data):
+        print('data of adaptive after:', data)
+        print('data of adaptive after:', data[:, [0, 5, 4, 1, 3, 2]])
+        print('cell2dof:', self.cell_to_dof())
         cell2dof = self.cell_to_dof()
-        gdof = self.number_of_global_dofs()
-        d = np.zeros((gdof, ), dtype=self.itype)
         uh = self.function()
-        np.add.at(uh, cell2dof, data[:, [0, 5, 4, 1, 3, 2]])
-        np.add.at(d, cell2dof, 1)
-        uh /= d
+        uh[cell2dof] = data[:, [0, 5, 4, 1, 3,2]]
+        print('uh:', uh)
+        print('uh[cell2dof]:', uh[self.cell_to_dof()])
         return uh
 
 
