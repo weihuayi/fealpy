@@ -2,6 +2,7 @@ import numpy as np
 
 from .TriangleMesh import TriangleMesh
 from .adaptive_tools import mark
+from ..functionspace import SimplexSetSpace
 
 class Tritree(TriangleMesh):
     localEdge2childCell = np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int32)
@@ -42,6 +43,7 @@ class Tritree(TriangleMesh):
             maxrefine=3,
             maxcoarsen=0,
             theta=1.0,
+            p=1,
             maxsize=None,
             minsize=None,
             data=None,
@@ -55,6 +57,7 @@ class Tritree(TriangleMesh):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'p': p,
                 'maxsize': maxsize,
                 'minsize': minsize,
                 'data': data,
@@ -64,9 +67,9 @@ class Tritree(TriangleMesh):
             }
         return options
 
-    def uniform_refine(self, n=1, surface=None):
+    def uniform_refine(self, n=1, options=None, surface=None):
         for i in range(n):
-            self.refine_1(surface=surface)
+            self.refine_1(options=options, surface=surface)
 
     def adaptive(self, eta, options, surface=None):
         """
@@ -306,9 +309,21 @@ class Tritree(TriangleMesh):
                 options['numrefine'] = np.r_[options['numrefine'], newCellRefine]
 
             if ('data' in options) and (options['data'] is not None):
-                for key, value in options['data'].items():
-                    t = 0.5*(value[edge[refineFlag, 0]] + value[edge[refineFlag, 1]])
-                    options['data'][key] = np.r_['0', value, t]
+                if options['p'] == 1:
+                    for key, value in options['data'].items():
+                        t = 0.5*(value[edge[refineFlag, 0]] + value[edge[refineFlag, 1]])
+                        options['data'][key] = np.r_['0', value, t]
+                elif options['p'] == 2:
+                    space = SimplexSetSpace(2, ftype=self.ftype)
+                    w = space.multi_index_matrix(4)/4
+                    for key, data in options['data'].items():
+                        val = space.value(data[:, [0, 5, 4, 1, 3, 2]], w, p=2).T
+                        options['data'][key] = np.r_['0',
+                                data,
+                                val[:, [0, 3, 5, 4, 2, 1]],
+                                val[:, [10, 12, 3, 7, 6, 11]],
+                                val[:, [14, 5, 12, 8, 13, 9]],
+                                val[:, [12, 5, 3, 4, 7, 8]]]
 
             if surface is not None:
                 ec, _ = surface.project(ec)
@@ -395,8 +410,18 @@ class Tritree(TriangleMesh):
                 options['numrefine'] = options['numrefine'][~isNeedRemovedCell]
 
             if ('data' in options) and (options['data'] is not None):
-                for key, value in options['data'].items():
-                    options['data'][key] = value[isRemainNode]
+                if options['p'] == 1:
+                    for key, value in options['data'].items():
+                        options['data'][key] = value[isRemainNode]
+                elif options['p'] == 2:
+                    for key, data in options['data'].items():
+                        data[isMarkedParentCell, 0] = data[self.child[isMarkedParentCell, 0], 0] 
+                        data[isMarkedParentCell, 1] = data[self.child[isMarkedParentCell, 1], 0] 
+                        data[isMarkedParentCell, 2] = data[self.child[isMarkedParentCell, 2], 0] 
+                        data[isMarkedParentCell, 3] = data[self.child[isMarkedParentCell, 1], 1] 
+                        data[isMarkedParentCell, 4] = data[self.child[isMarkedParentCell, 0], 2] 
+                        data[isMarkedParentCell, 5] = data[self.child[isMarkedParentCell, 0], 1] 
+                        options['data'][key] = data[~isNeedRemovedCell]
 
     def adaptive_refine(self, estimator, surface=None, data=None):
         i = 0
@@ -415,6 +440,164 @@ class Tritree(TriangleMesh):
             self.refine(isMarkedCell, surface=surface, data=data)
             mesh = self.to_conformmesh()
             estimator.update(data['rho'], mesh, smooth=True)
+
+    def to_conformmesh(self, options=None):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell = self.entity('cell')
+
+        isLeafCell = self.is_leaf_cell()
+        edge2cell = self.ds.edge_to_cell()
+
+        # flag0: 左边单元是叶子单元
+        # flag1: 右边单元是叶子单元
+        flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
+        flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
+
+        LCell = edge2cell[flag0, 0]
+        RCell = edge2cell[flag1, 1]
+
+        N0 = len(LCell)
+        cell20 =np.zeros((2*N0, 3), dtype=self.itype)
+
+        cell20[0:N0, 0] = edge[flag0, 0]
+        cell20[0:N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
+        cell20[0:N0, 2] = cell[LCell, edge2cell[flag0, 2]]
+
+        cell20[N0:2*N0, 0] = edge[flag0, 1]
+        cell20[N0:2*N0, 1] = cell[LCell, edge2cell[flag0, 2]]
+        cell20[N0:2*N0, 2] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
+
+        N1 = len(RCell)
+        cell21 =np.zeros((2*N1, 3), dtype=self.itype)
+        cell21[0:N1, 0] = edge[flag1, 1]
+        cell21[0:N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
+        cell21[0:N1, 2] = cell[RCell, edge2cell[flag1, 3]]
+        cell21[N1:2*N1, 0] = edge[flag1, 0]
+        cell21[N1:2*N1, 1] = cell[RCell, edge2cell[flag1, 3]]
+        cell21[N1:2*N1, 2] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
+
+        isLRCell = np.zeros(NC, dtype=np.bool)
+        isLRCell[LCell] = True
+        isLRCell[RCell] = True
+
+        idx = np.arange(NC)
+        cell0 = cell[(~isLRCell) & (isLeafCell)]
+        idx0 = idx[(~isLRCell) & (isLeafCell)]
+        cell = np.r_['0', cell0, cell20, cell21]
+        tmesh = TriangleMesh(node, cell)
+        #现在的cell单元与原来树结构中cell的对应关系.
+        self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]
+        self.meshdata['brother'] = [(idx0, len(idx0)), (LCell, N0, flag0),
+                (RCell, N1, flag1)]
+        if (options is not None) and ('data' in options) and (options['data'] is not None):
+            if options['p'] == 2:
+                space = SimplexSetSpace(2, ftype=self.ftype)
+                nex = np.array([1, 2, 0])
+                pre = np.array([2, 0, 1])
+                w = np.array([
+                    [0.0, 0.75, 0.25],
+                    [0.0, 0.25, 0.75],
+                    [0.5, 0.25, 0.25]], dtype=self.ftype)
+                print(w)
+                for key, data in options['data'].items():
+                    i0 = edge2cell[flag0, 2]
+                    i1 = edge2cell[flag1, 3]
+                    c0 = data[LCell, i0]
+                    c1 = data[LCell, nex[i0]]
+                    c2 = data[LCell, pre[i0]]
+                    e0 = data[LCell, 3 + i0]
+                    e1 = data[LCell, 3 + nex[i0]]
+                    e2 = data[LCell, 3 + pre[i0]]
+                    data[LCell, 0] = c0
+                    data[LCell, 1] = c1
+                    data[LCell, 2] = c2
+                    data[LCell, 3] = e0
+                    data[LCell, 4] = e1
+                    data[LCell, 5] = e2
+
+                    c0 = data[RCell, i1]
+                    c1 = data[RCell, nex[i1]]
+                    c2 = data[RCell, pre[i1]]
+                    e0 = data[RCell, 3 + i1]
+                    e1 = data[RCell, 3 + nex[i1]]
+                    e2 = data[RCell, 3 + pre[i1]]
+                    data[RCell, 0] = c0
+                    data[RCell, 1] = c1
+                    data[RCell, 2] = c2
+                    data[RCell, 3] = e0
+                    data[RCell, 4] = e1
+                    data[RCell, 5] = e2
+                    d1 = space.value(data[LCell.reshape(-1, 1), [0, 5, 4, 1, 3, 2]], w, p=2)
+                    d2 = space.value(data[RCell.reshape(-1, 1), [0, 5, 4, 1, 3, 2]], w, p=2)
+
+                    data1 = np.zeros((N0, 6), dtype=self.ftype)
+                    data2 = np.zeros((N0, 6), dtype=self.ftype)
+                    data3 = np.zeros((N1, 6), dtype=self.ftype)
+                    data4 = np.zeros((N1, 6), dtype=self.ftype)
+                    data1[:, [0, 1, 2, 4]] = data[LCell.reshape(-1, 1), [1, 3, 0, 5]]
+                    data1[:, 5] = d1[0, :]
+                    data1[:, 3] = d1[2, :]
+                    data2[:, [0, 1, 2, 5]] = data[LCell.reshape(-1, 1), [2, 0, 3, 4]]
+                    data2[:, 3] = d1[2, :]
+                    data2[:, 4] = d1[1, :]
+
+                    data3[:, [0, 1, 2, 4]] = data[RCell.reshape(-1, 1), [1, 3, 0, 5]]
+                    data3[:, 5] = d2[0, :]
+                    data3[:, 3] = d2[2, :]
+                    data4[:, [0, 1, 2, 5]] = data[RCell.reshape(-1, 1), [2, 0, 3, 4]]
+                    data4[:, 3] = d2[2, :]
+                    data4[:, 4] = d2[1, :]
+
+                    options['data'][key] = np.r_['0', data[idx0], data1, data2,
+                            data3, data4]
+        return tmesh
+
+    def interpolation(self, uh):
+        """
+        把协调网格上的数据插值到三角树网格上。
+        """
+        space = uh.space
+        p = space.p
+        mesh = space.mesh
+        cell2dof = space.cell_to_dof()
+        NC = self.number_of_cells()
+        edge2cell = self.ds.edge_to_cell()
+        if p == 1:
+            data0 = uh[cell2dof]
+            data = np.zeros((NC, 3), dtype=self.ftype)
+        else:
+            data0 = uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]]
+            data = np.zeros((NC, 6), dtype=self.ftype)
+
+        I = self.meshdata['brother']
+        N = I[0][1]
+        N0 = I[1][1]
+        N1 = I[2][1]
+        nex = np.array([1, 2, 0])
+        pre = np.array([2, 0, 1])
+        idx0 = edge2cell[I[1][2], 2]
+        idx1 = edge2cell[I[2][2], 3]
+
+        data[I[0][0]] = data0[0:N]
+
+        data[I[1][0], 3+idx0] = data0[N:N+N0, 1]
+        data[I[1][0], nex[idx0]] = data0[N:N+N0, 0]
+        data[I[1][0], idx0] = data0[N:N+N0, 2]
+        data[I[1][0], 3 + pre[idx0]] = data0[N:N+N0, 4]
+        data[I[1][0], pre[idx0]] = data0[N+N0:N+2*N0, 0]
+        data[I[1][0], 3 + nex[idx0]] = data0[N+N0:N+2*N0, 5]
+
+        data[I[2][0], 3+idx1] = data0[N+2*N0:N+2*N0+N1, 1]
+        data[I[2][0], nex[idx1]] = data0[N+2*N0:N+2*N0+N1, 0]
+        data[I[2][0], idx1] = data0[N+2*N0:N+2*N0+N1, 2]
+        data[I[2][0], 3+pre[idx1]] = data0[N+2*N0:N+2*N0+N1, 4]
+        data[I[2][0], pre[idx1]] =data0[N+2*N0+N1:, 0]
+        data[I[2][0], 3+pre[idx1]] = data0[N+2*N0+N1:, 5]
+        return data
 
     def refine_marker(self, eta, theta, method):
         leafCellIdx = self.leaf_cell_index()
@@ -492,25 +675,25 @@ class Tritree(TriangleMesh):
             NCC = len(idx)
             cell4 = np.zeros((4*NCC, 3), dtype=self.itype)
             child4 = -np.ones((4*NCC, 4), dtype=self.itype)
-            parent4 = -np.ones((4*NCC, 2), dtype=self.itype) 
-            cell4[:NCC, 0] = cell[isMarkedCell, 0] 
-            cell4[:NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 2]] 
-            cell4[:NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 1]] 
-            parent4[:NCC, 0] = idx 
+            parent4 = -np.ones((4*NCC, 2), dtype=self.itype)
+            cell4[:NCC, 0] = cell[isMarkedCell, 0]
+            cell4[:NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 2]]
+            cell4[:NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 1]]
+            parent4[:NCC, 0] = idx
             parent4[:NCC, 1] = 0
             self.child[idx, 0] = NC + np.arange(0, NCC)
 
-            cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1] 
-            cell4[NCC:2*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 0]] 
-            cell4[NCC:2*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 2]] 
-            parent4[NCC:2*NCC, 0] = idx 
+            cell4[NCC:2*NCC, 0] = cell[isMarkedCell, 1]
+            cell4[NCC:2*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 0]]
+            cell4[NCC:2*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 2]]
+            parent4[NCC:2*NCC, 0] = idx
             parent4[NCC:2*NCC, 1] = 1
             self.child[idx, 1] = NC + np.arange(NCC, 2*NCC)
 
-            cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2] 
-            cell4[2*NCC:3*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 1]] 
-            cell4[2*NCC:3*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 0]] 
-            parent4[2*NCC:3*NCC, 0] = idx 
+            cell4[2*NCC:3*NCC, 0] = cell[isMarkedCell, 2]
+            cell4[2*NCC:3*NCC, 1] = edge2newNode[cell2edge[isMarkedCell, 1]]
+            cell4[2*NCC:3*NCC, 2] = edge2newNode[cell2edge[isMarkedCell, 0]]
+            parent4[2*NCC:3*NCC, 0] = idx
             parent4[2*NCC:3*NCC, 1] = 2
             self.child[idx, 2] = NC + np.arange(2*NCC, 3*NCC)
 
@@ -642,74 +825,4 @@ class Tritree(TriangleMesh):
             return isRemainNode
         else:
             return 
-
-    def to_conformmesh(self):
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        node = self.entity('node')
-        edge = self.entity('edge')
-        cell = self.entity('cell')
-
-        isLeafCell = self.is_leaf_cell()
-        edge2cell = self.ds.edge_to_cell()
-
-        # flag0: 左边单元是叶子单元
-        # flag1: 右边单元是叶子单元
-        flag0 = isLeafCell[edge2cell[:, 0]] & (~isLeafCell[edge2cell[:, 1]])
-        flag1 = isLeafCell[edge2cell[:, 1]] & (~isLeafCell[edge2cell[:, 0]])
-
-        LCell = edge2cell[flag0, 0]
-        RCell = edge2cell[flag1, 1]
-
-        N0 = len(LCell)
-        cell20 =np.zeros((2*N0, 3), dtype=self.itype)
-
-        cell20[0:N0, 0] = edge[flag0, 0]
-        cell20[0:N0, 1] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
-        cell20[0:N0, 2] = cell[LCell, edge2cell[flag0, 2]]
-
-        cell20[N0:2*N0, 0] = edge[flag0, 1]
-        cell20[N0:2*N0, 1] = cell[LCell, edge2cell[flag0, 2]]
-        cell20[N0:2*N0, 2] = cell[self.child[edge2cell[flag0, 1], 3], edge2cell[flag0, 3]]
-
-        N1 = len(RCell)
-        cell21 =np.zeros((2*N1, 3), dtype=self.itype)
-        cell21[0:N1, 0] = edge[flag1, 1]
-        cell21[0:N1, 1] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
-        cell21[0:N1, 2] = cell[RCell, edge2cell[flag1, 3]]
-        cell21[N1:2*N1, 0] = edge[flag1, 0]
-        cell21[N1:2*N1, 1] = cell[RCell, edge2cell[flag1, 3]]
-        cell21[N1:2*N1, 2] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
-
-        isLRCell = np.zeros(NC, dtype=np.bool)
-        isLRCell[LCell] = True
-        isLRCell[RCell] = True
-
-        idx = np.arange(NC)
-        cell0 = cell[(~isLRCell) & (isLeafCell)]
-        idx0 = idx[(~isLRCell) & (isLeafCell)]
-        cell = np.r_['0', cell0, cell20, cell21]
-        tmesh = TriangleMesh(node, cell)
-        #现在的cell单元与原来树结构中cell的对应关系.
-        self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]
-        self.celldata['elidx'] = np.r_['0', -np.ones(idx0.shape,
-            dtype=np.int), edge2cell[flag0, 2], edge2cell[flag0, 2],
-            edge2cell[flag1, 3], edge2cell[flag1, 3]]
-        return tmesh
-
-    def interpolation(self, uh):
-        """
-        把协调网格上的数据插值到三角树网格上。
-        """
-        space = uh.space
-        mesh = space.mesh
-        cell2dof = space.cell_to_dof()
-        idxmap = self.celldata['idxmap']
-        elidx = self.celldata['elidx']
-        edge2cell = mesh.ds.edge_to_cell()
-        isBrotherCell = (edge2cell[:, 0] != edge2cell[:, 1]) & \
-                (idxmap[edge2cell[:, 0]] == idxmap[edge2cell[:, 1]])
-        data = uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]]
-
 

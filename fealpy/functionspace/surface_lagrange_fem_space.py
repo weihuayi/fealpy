@@ -62,6 +62,8 @@ class SurfaceLagrangeFiniteElementSpace:
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
         self.integrator = self.integralalg.integrator
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
 
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
@@ -223,4 +225,14 @@ class SurfaceLagrangeFiniteElementSpace:
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
+
+    def to_function(self, data):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        d = np.zeros((gdof, ), dtype=self.itype)
+        uh = self.function()
+        np.add.at(uh, cell2dof, data[:, [0, 5, 4, 1, 3, 2]])
+        np.add.at(d, cell2dof, 1)
+        uh /= d
+        return uh
 

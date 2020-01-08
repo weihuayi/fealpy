@@ -29,6 +29,7 @@ class TriangleMesh(Mesh2d):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
+        self.meshdata = {}
 
     def vtk_cell_type(self):
         VTK_TRIANGLE = 5
