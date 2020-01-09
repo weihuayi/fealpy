@@ -33,7 +33,10 @@ class BoundaryCondition():
             p = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
             val = self.neuman(p, n) # (NQ, NF, ...)
-            np.einsum('i, ', ws, val, phi, measure)
+            bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
+            b
+            np.add.at(b, (face2dof[idx], np.s_[:]), bb)
+            
 
     def apply_dirichlet_bc(self, A, b, uh, is_dirichlet_boundary=None):
         if self.dirichlet is not None:
