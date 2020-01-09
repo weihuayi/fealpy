@@ -2,7 +2,7 @@ import numpy as np
 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
-from ..functionspace.surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
+from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.solver import MatlabSolver
 from ..boundarycondition import DirichletBC
 from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 

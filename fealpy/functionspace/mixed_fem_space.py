@@ -1,6 +1,7 @@
 import numpy as np
 from .function import Function
-from .lagrange_fem_space import LagrangeFiniteElementSpace
+
+from fealpy.functionspace import LagrangeFiniteElementSpace
 from ..quadrature import  IntervalQuadrature
 
 class HuZhangFiniteElementSpace():

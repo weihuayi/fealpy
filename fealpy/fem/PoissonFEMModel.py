@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from fealpy.functionspace import LagrangeFiniteElementSpace
 from ..boundarycondition import DirichletBC
 from scipy.sparse.linalg import spsolve
 from timeit import default_timer as timer

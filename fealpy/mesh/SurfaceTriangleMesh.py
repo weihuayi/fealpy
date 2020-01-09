@@ -2,7 +2,7 @@
 import numpy as np
 from types import ModuleType
 
-from ..functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from fealpy.functionspace import LagrangeFiniteElementSpace
 from ..quadrature import TriangleQuadrature
 
 from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d

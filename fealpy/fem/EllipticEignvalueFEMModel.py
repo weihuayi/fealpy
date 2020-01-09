@@ -7,7 +7,7 @@ import pyamg
 from timeit import default_timer as timer
 from mpl_toolkits.mplot3d import Axes3D
 
-from fealpy.functionspace.lagrange_fem_space import LagrangeFiniteElementSpace
+from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.solver.eigns import picard
 from fealpy.quadrature import FEMeshIntegralAlg
 from fealpy.mesh.adaptive_tools import mark
