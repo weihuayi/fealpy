@@ -35,8 +35,11 @@ class TriangleMesh(Mesh2d):
         VTK_TRIANGLE = 5
         return VTK_TRIANGLE
 
-    def integrator(self, k):
-        return TriangleQuadrature(k)
+    def integrator(self, k, etype='cell'):
+        if etype in ['cell', 2]:
+            return TriangleQuadrature(k)
+        elif etype in ['edge', 'face', 1]:
+            return GaussLegendreQuadrature(k)
 
     def copy(self):
         return TriangleMesh(self.node.copy(), self.ds.cell.copy());
@@ -734,11 +737,14 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
-    def bc_to_point(self, bc):
+    def bc_to_point(self, bc, etype='cell', index=None):
         node = self.node
-        cell = self.ds.cell
-        p = np.einsum('...j, ijk->...ik', bc, node[cell])
-        return p 
+        entity = self.entity(etype)
+        if index is None:
+            p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        else:
+            p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
+        return p
 
 
 

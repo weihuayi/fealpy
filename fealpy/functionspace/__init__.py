@@ -1,15 +1,15 @@
-from .lagrange_fem_space import LagrangeFiniteElementSpace
-from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
-from .mixed_fem_space import RTFiniteElementSpace2d
-from .vem_space import VEMDof2d, VirtualElementSpace2d
+from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
+from .SurfaceLagrangeFiniteElementSpace import SurfaceLagrangeFiniteElementSpace
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
 from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtualElementSpace2d
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
-from .MonomialSpace2d import MonomialSpace2d
-from .PrismFiniteElementSpace import PrismFiniteElementSpace
-from .femdof import CPPFEMDof3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
-from .surface_lagrange_fem_space import SurfaceLagrangeFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
 from .StokesDivFreeNonConformingVirtualElementSpace2d import StokesDivFreeNonConformingVirtualElementSpace2d
 from .SimplexSetSpace import SimplexSetSpace
+
+from .mixed_fem_space import RTFiniteElementSpace2d
+from .vem_space import VEMDof2d, VirtualElementSpace2d
+from .MonomialSpace2d import MonomialSpace2d
+from .PrismFiniteElementSpace import PrismFiniteElementSpace
+from .femdof import CPPFEMDof3d

@@ -193,8 +193,10 @@ class Tritree(TriangleMesh):
                             '\n std size of cells: ', np.std(h[leafCellIdx])
                         )
 
-                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
-                options['numrefine'][flag] = 0
+                if options['maxsize'] is not None:
+                    flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                    options['numrefine'][flag] = 0
+
                 isMarkedCell = (options['numrefine'] < 0)
 
     def refine_1(
@@ -384,6 +386,20 @@ class Tritree(TriangleMesh):
                         axis=-1
                     ) + 1
 
+            if ('data' in options) and (options['data'] is not None):
+                if options['p'] == 1:
+                    for key, value in options['data'].items():
+                        options['data'][key] = value[isRemainNode]
+                elif options['p'] == 2:
+                    for key, data in options['data'].items():
+                        data[isMarkedParentCell, 0] = data[self.child[isMarkedParentCell, 0], 0] 
+                        data[isMarkedParentCell, 1] = data[self.child[isMarkedParentCell, 1], 0] 
+                        data[isMarkedParentCell, 2] = data[self.child[isMarkedParentCell, 2], 0] 
+                        data[isMarkedParentCell, 3] = data[self.child[isMarkedParentCell, 1], 1] 
+                        data[isMarkedParentCell, 4] = data[self.child[isMarkedParentCell, 0], 2] 
+                        data[isMarkedParentCell, 5] = data[self.child[isMarkedParentCell, 0], 1] 
+                        options['data'][key] = data[~isNeedRemovedCell]
+
             cell = cell[~isNeedRemovedCell]
             child = child[~isNeedRemovedCell]
             parent = parent[~isNeedRemovedCell]
@@ -412,19 +428,6 @@ class Tritree(TriangleMesh):
             if ('numrefine' in options) and (options['numrefine'] is not None):
                 options['numrefine'] = options['numrefine'][~isNeedRemovedCell]
 
-            if ('data' in options) and (options['data'] is not None):
-                if options['p'] == 1:
-                    for key, value in options['data'].items():
-                        options['data'][key] = value[isRemainNode]
-                elif options['p'] == 2:
-                    for key, data in options['data'].items():
-                        data[isMarkedParentCell, 0] = data[self.child[isMarkedParentCell, 0], 0] 
-                        data[isMarkedParentCell, 1] = data[self.child[isMarkedParentCell, 1], 0] 
-                        data[isMarkedParentCell, 2] = data[self.child[isMarkedParentCell, 2], 0] 
-                        data[isMarkedParentCell, 3] = data[self.child[isMarkedParentCell, 1], 1] 
-                        data[isMarkedParentCell, 4] = data[self.child[isMarkedParentCell, 0], 2] 
-                        data[isMarkedParentCell, 5] = data[self.child[isMarkedParentCell, 0], 1] 
-                        options['data'][key] = data[~isNeedRemovedCell]
 
     def adaptive_refine(self, estimator, surface=None, data=None):
         i = 0
@@ -569,8 +572,7 @@ class Tritree(TriangleMesh):
         NC = self.number_of_cells()
         edge2cell = self.ds.edge_to_cell()
         if p == 1:
-            data0 = uh[cell2dof]
-            data = np.zeros((NC, 3), dtype=self.ftype)
+            return uh
         else:
             data0 = uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]]
             data = np.zeros((NC, 6), dtype=self.ftype)
@@ -585,20 +587,19 @@ class Tritree(TriangleMesh):
         idx1 = edge2cell[I[2][2], 3]
 
         data[I[0][0]] = data0[0:N]
-
-        data[I[1][0], 3+idx0] = data0[N:N+N0, 1]
-        data[I[1][0], nex[idx0]] = data0[N:N+N0, 0]
         data[I[1][0], idx0] = data0[N:N+N0, 2]
-        data[I[1][0], 3 + pre[idx0]] = data0[N:N+N0, 4]
+        data[I[1][0], nex[idx0]] = data0[N:N+N0, 0]
         data[I[1][0], pre[idx0]] = data0[N+N0:N+2*N0, 0]
+        data[I[1][0], 3 + idx0] = data0[N:N+N0, 1]
+        data[I[1][0], 3 + pre[idx0]] = data0[N:N+N0, 4]
         data[I[1][0], 3 + nex[idx0]] = data0[N+N0:N+2*N0, 5]
 
-        data[I[2][0], 3+idx1] = data0[N+2*N0:N+2*N0+N1, 1]
-        data[I[2][0], nex[idx1]] = data0[N+2*N0:N+2*N0+N1, 0]
         data[I[2][0], idx1] = data0[N+2*N0:N+2*N0+N1, 2]
+        data[I[2][0], nex[idx1]] = data0[N+2*N0:N+2*N0+N1, 0]
+        data[I[2][0], pre[idx1]] = data0[N+2*N0+N1:, 0]
+        data[I[2][0], 3+idx1] = data0[N+2*N0:N+2*N0+N1, 1]
         data[I[2][0], 3+pre[idx1]] = data0[N+2*N0:N+2*N0+N1, 4]
-        data[I[2][0], pre[idx1]] =data0[N+2*N0+N1:, 0]
-        data[I[2][0], 3+pre[idx1]] = data0[N+2*N0+N1:, 5]
+        data[I[2][0], 3+nex[idx1]] = data0[N+2*N0+N1:, 5]
         return data
 
     def refine_marker(self, eta, theta, method):

@@ -9,37 +9,50 @@ class BoundaryCondition():
         self.neuman = neuman
         self.robin = robin
 
-    def apply_dirichlet_bc(self, A, b, uh=None, dim=None, is_dirichlet_boundary=None):
-        if uh is None:
-            uh = self.space.function(dim=dim)
-            if self.dirichlet is not None:
-                self.space.set_dirichlet_bc(uh, self.dirichlet,
-                        is_dirichlet_boundary=is_dirichlet_boundary)
-                b -= A@uh
-                bdIdx = np.zeros(gdof, dtype=np.int)
-                bdIdx[isDDof] = 1
-                Tbd = spdiags(bdIdx, 0, gdof, gdof)
-                T = spdiags(1-bdIdx, 0, gdof, gdof)
-                A = T@A@T + Tbd
-                b[isDDof] = uh[isDDof]
-                return A, b
-
     def apply_neuman_bc(self, b, dim=None, is_neuman_boundary=None):
-        space = self.space
-        TD = space.top_dimension()
-        neuman = self.neuman
-        mesh = space.mesh
-        face = mesh.entity('face')
-        bc = mesh.entity_barycenter('face')
-        node = mesh.entity('node')
-        isNFace = is_neuman_boundary(bc)
-        bdface = face[isNFace]
+        if self.neuman is not None:
+            space = self.space
+            TD = space.top_dimension()
+            mesh = space.mesh
 
-        # the unit outward normal on boundary edge
-        W = np.array([[0, -1], [1, 0]], dtype=np.int)
-        n = (node[bdEdge[:,1],] - node[bdEdge[:,0],:])@W
-        h = np.sqrt(np.sum(n**2, axis=1)) 
-        n /= h.reshape((-1,1))
+            face = mesh.entity('face')
+            face2cell = mesh.ds.face_to_cell()
+            face2dof = space.boundary_dof()
+
+            # find the index of all neuman boundary 
+            idx = mesh.ds.boundary_face_index()
+            if is_neuman_boundary is not None:
+                bc = mesh.entity_barycenter('face', index=idx)
+                flag = is_neuman_boundary(bc)
+                idx = idx[flag]
+
+            measure = mesh.entity_measure('face', index=idx)
+            qf = mesh.integrator(etype='face')
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            phi = space.face_basis(bcs)
+            p = mesh.bc_to_point(bcs, etype='face', index=idx)
+            n = mesh.face_unit_normal(index=idx)
+            val = self.neuman(p, n) # (NQ, NF, ...)
+            np.einsum('i, ', ws, val, phi, measure)
+
+    def apply_dirichlet_bc(self, A, b, uh, is_dirichlet_boundary=None):
+        if self.dirichlet is not None:
+            isDDof = self.space.set_dirichlet_bc(
+                    uh, self.dirichlet,
+                    is_dirichlet_boundary=is_dirichlet_boundary)
+            dim = 1 if len(uh.shape) == 1 else uh.shape[1]
+            isDDof = np.tile(isDDof, dim)
+
+            x = uh.reshape(-1, order='F')
+            b -= A@x
+            bdIdx = np.zeros(dim*gdof, dtype=np.int)
+            bdIdx[isDDof] = 1
+            Tbd = spdiags(bdIdx, 0, dim*gdof, dim*gdof)
+            T = spdiags(1-bdIdx, 0, dim*gdof, dim*gdof)
+            A = T@A@T + Tbd
+            b[isDDof] = x[isDDof]
+            return A, b
+
 
 class DirichletBC:
     def __init__(self, V, g0, is_dirichlet_dof=None):

@@ -196,8 +196,9 @@ class Quadtree(QuadrangleMesh):
                             '\n std size of cells: ', np.std(h[leafCellIdx])
                         )
 
-                flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
-                options['numrefine'][flag] = 0
+                if options['maxsize'] is not None:
+                    flag = (2*h > options['maxsize']) & (options['numrefine'] < 0)
+                    options['numrefine'][flag] = 0
                 isMarkedCell = (options['numrefine'] < 0)
 
     def refine_1(self, isMarkedCell=None, options={'disp': True}):

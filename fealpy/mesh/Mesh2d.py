@@ -455,6 +455,18 @@ class Mesh2dDataStructure():
             J = self.edge2cell[:, [0, 1]].flatten()
             val = np.ones(2*NE, dtype=np.bool)
             face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
+            return face2cell
+
+    def face_to_cell(self, sparse=False):
+        if sparse==False:
+            return self.edge2cell
+        else:
+            NC = self.NC
+            NE = self.NE
+            I = np.repeat(range(NF), 2)
+            J = self.edge2cell[:, [0, 1]].flatten()
+            val = np.ones(2*NE, dtype=np.bool)
+            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
             return face2cell 
 
     def node_to_node(self, return_array=False):

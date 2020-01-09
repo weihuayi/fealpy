@@ -227,9 +227,12 @@ class SurfaceLagrangeFiniteElementSpace:
         return np.zeros(shape, dtype=np.float)
 
     def to_function(self, data):
-        cell2dof = self.cell_to_dof()
-        gdof = self.number_of_global_dofs()
-        uh = self.function()
-        uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]] = data
-        return uh
-
+        p = self.p
+        if p == 1:
+            uh = self.function(array=data)
+            return uh
+        elif p == 2:
+            cell2dof = self.cell_to_dof()
+            uh = self.function()
+            uh[cell2dof] = data[:, [0, 5, 4, 1, 3, 2]]
+            return uh

@@ -41,10 +41,15 @@ class CPLFEMDof1d():
         self.multiIndex = multi_index_matrix1d(p)
         self.cell2dof = self.cell_to_dof()
 
-    def boundary_dof(self):
+    def boundary_dof(self, threshold=None):
+        node = self.mesh.entity('node')
+        idx = self.mesh.ds.boundary_node_index()
+        if threshold is not None:
+            flag = threshold(node[idx])
+            idx = idx[flag]
+
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        idx = self.mesh.ds.boundary_node_index()
         isBdDof[idx] = True
         return isBdDof
 
@@ -120,13 +125,20 @@ class CPLFEMDof2d():
     def is_on_edge_local_dof(self):
         return self.multiIndex == 0
 
-    def boundary_dof(self):
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('face', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
         edge2dof = self.edge_to_dof()
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof[edge2dof[idx]] = True
         return isBdDof
+
+    def face_to_dof(self):
+        return self.edge_to_dof()
 
     def edge_to_dof(self):
         p = self.p
@@ -316,12 +328,17 @@ class CPLFEMDof3d():
 
         return face2dof
 
-    def boundary_dof(self):
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_face_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('face', index=idx)
+            flag = threshold(bc)
+            idx = idx[flag]
+
+        face2dof = self.face_to_dof()
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        face2dof = self.face_to_dof()
-        isBdFace = self.mesh.ds.boundary_face_flag()
-        isBdDof[face2dof[isBdFace]] = True
+        isBdDof[face2dof[idx]] = True
         return isBdDof
 
     def cell_to_dof(self):

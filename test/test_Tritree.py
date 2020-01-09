@@ -13,7 +13,7 @@ class TritreeTest:
     def __init__(self):
         self.pde = SphereSinSinSinData()
         self.surface = self.pde.domain()
-        self.mesh = self.pde.init_mesh(1)
+        self.mesh = self.pde.init_mesh(4)
         node = self.mesh.entity('node')
         cell = self.mesh.entity('cell')
         self.tritree = Tritree(node, cell)
@@ -41,10 +41,10 @@ class TritreeTest:
         self.tritree.add_plot(axes)
         plt.show()
 
-    def test_interpolation_surface(self):
-        options = self.tritree.adaptive_options(maxrefine=1, p=2)
+    def test_interpolation_surface(self, p=1):
+        options = self.tritree.adaptive_options(maxrefine=1, p=p)
         mesh = self.tritree.to_conformmesh()
-        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=2)
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
         uI = space.interpolation(self.pde.solution)
         error0 = space.integralalg.L2_error(self.pde.solution, uI)
         print(error0)
@@ -58,17 +58,41 @@ class TritreeTest:
             self.tritree.uniform_refine(options=options, surface=self.surface)
 
         mesh = self.tritree.to_conformmesh(options)
-        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=2)
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
         data = options['data']['q']
         uh = space.to_function(data)
-
         error1 = space.integralalg.L2_error(self.pde.solution, uh)
         print(error1)
 
-        if 1:
+        uI = space.interpolation(self.pde.solution)
+        error2 = space.integralalg.L2_error(self.pde.solution, uI)
+        print(error2)
+
+        data = self.tritree.interpolation(uI)
+        options['data'] = {'q':data}
+        if 0:
+            eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
+            eta = eta.sum(axis=-1)
+            self.tritree.adaptive(eta, options, surface=self.surface)
+        else:
+            self.tritree.uniform_refine(options=options, surface=self.surface)
+
+        mesh = self.tritree.to_conformmesh(options)
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
+        data = options['data']['q']
+        uh = space.to_function(data)
+        error3 = space.integralalg.L2_error(self.pde.solution, uh)
+        print(error3)
+
+        if 0:
             fig = pl.figure()
             axes = a3.Axes3D(fig)
             self.tritree.add_plot(axes)
+            plt.show()
+        else:
+            fig = pl.figure()
+            axes = a3.Axes3D(fig)
+            mesh.add_plot(axes)
             plt.show()
 
     def test_interpolation_plane(self):
@@ -104,8 +128,6 @@ class TritreeTest:
         options = tritree.adaptive_options(
                 method='numrefine', data={"q":data},
                 maxrefine=1, p=2)
-        print('cell2dof:', space.cell_to_dof())
-        print('data of adaptive before:', data)
         if 1:
             #eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
             #eta = eta.sum(axis=-1)
@@ -124,16 +146,44 @@ class TritreeTest:
         data = options['data']['q']
         uh = space.to_function(data)
 
+
+        error1 = space.integralalg.L2_error(u, uh)
+
+        data = tritree.interpolation(uh)
+        isLeafCell = tritree.is_leaf_cell()
+
+        fig = plt.figure()
+        axes = fig.gca()
+        tritree.add_plot(axes)
+        tritree.find_node(axes, node=space.interpolation_points(), showindex=True)
+        tritree.find_cell(axes, index=isLeafCell, showindex=True)
+
+        options = tritree.adaptive_options(
+                method='numrefine', data={"q":data},
+                maxrefine=1, maxcoarsen=1, p=2)
+        if 1:
+            #eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
+            #eta = eta.sum(axis=-1)
+            eta = np.array([-1, -1, -1, -1, 0, 1], dtype=np.int)
+            tritree.adaptive(eta, options)
+        else:
+            tritree.uniform_refine(options=options)
+
+        mesh = tritree.to_conformmesh(options)
+        space = LagrangeFiniteElementSpace(mesh, p=2)
+        data = options['data']['q']
+        uh = space.to_function(data)
+
         fig = plt.figure()
         axes = fig.gca()
         mesh.add_plot(axes)
         mesh.find_node(axes, node=space.interpolation_points(), showindex=True)
         mesh.find_cell(axes, showindex=True)
 
-        error1 = space.integralalg.L2_error(u, uh)
-
+        error2 = space.integralalg.L2_error(u, uh)
         print(error0)
         print(error1)
+        print(error2)
         plt.show()
 
 
@@ -141,5 +191,5 @@ class TritreeTest:
 
 test = TritreeTest()
 #test.test_adaptive()
-#test.test_interpolation()
-test.test_interpolation_plane()
+#test.test_interpolation_plane()
+test.test_interpolation_surface(p=1)

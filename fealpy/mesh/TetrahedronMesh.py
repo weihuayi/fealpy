@@ -3,7 +3,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
-from ..quadrature import TetrahedronQuadrature
+from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -51,8 +51,13 @@ class TetrahedronMesh(Mesh3d):
         VTK_TETRA = 10
         return VTK_TETRA
 
-    def integrator(self, k):
-        return TetrahedronQuadrature(k)
+    def integrator(self, k, etype=3):
+        if etype in ['cell', 3]:
+            return TetrahedronQuadrature(k)
+        elif etype in ['face', 2]:
+            return TriangleQuadrature(k)
+        elif etype in ['edge', 1]:
+            return GaussLegendreQuadrature(k)
 
     def delete_cell(self, threshold):
         NN = self.number_of_nodes()
