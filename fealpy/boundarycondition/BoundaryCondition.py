@@ -2,14 +2,13 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 class BoundaryCondition():
-
     def __init__(self, space, dirichlet=None, neuman=None, robin=None):
         self.space = space
         self.dirichlet = dirichlet
         self.neuman = neuman
         self.robin = robin
 
-    def apply_neuman_bc(self, b, dim=None, is_neuman_boundary=None):
+    def apply_neuman_bc(self, b, is_neuman_boundary=None):
         if self.neuman is not None:
             space = self.space
             TD = space.top_dimension()
@@ -25,18 +24,18 @@ class BoundaryCondition():
                 bc = mesh.entity_barycenter('face', index=idx)
                 flag = is_neuman_boundary(bc)
                 idx = idx[flag]
-
             measure = mesh.entity_measure('face', index=idx)
-            qf = mesh.integrator(etype='face')
+            qf = mesh.integrator('face')
             bcs, ws = qf.get_quadrature_points_and_weights()
             phi = space.face_basis(bcs)
             p = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
             val = self.neuman(p, n) # (NQ, NF, ...)
             bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
-            b
-            np.add.at(b, (face2dof[idx], np.s_[:]), bb)
-            
+            if len(b.shape) == 1:
+                np.add.at(b, face2dof[idx], bb)
+            else:
+                np.add.at(b, (face2dof[idx], np.s_[:]), bb)
 
     def apply_dirichlet_bc(self, A, b, uh, is_dirichlet_boundary=None):
         if self.dirichlet is not None:
@@ -47,7 +46,8 @@ class BoundaryCondition():
             isDDof = np.tile(isDDof, dim)
 
             x = uh.reshape(-1, order='F')
-            b -= A@x
+            y = b.reshape(-1, order='F')
+            y -= A@x
             bdIdx = np.zeros(dim*gdof, dtype=np.int)
             bdIdx[isDDof] = 1
             Tbd = spdiags(bdIdx, 0, dim*gdof, dim*gdof)

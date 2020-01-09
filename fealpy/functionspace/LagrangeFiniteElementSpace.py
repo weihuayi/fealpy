@@ -75,6 +75,12 @@ class LagrangeFiniteElementSpace():
     def cell_to_dof(self):
         return self.dof.cell2dof
 
+    def face_to_dof(self):
+        return self.dof.face_to_dof()
+
+    def edge_to_dof(self):
+        return self.dof.edge_to_dof()
+
     def boundary_dof(self, threshhold=None):
         if self.spacetype is 'C':
             return self.dof.boundary_dof(threshold=threshold)
@@ -591,25 +597,29 @@ class LagrangeFiniteElementSpace():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
 
-    def source_vector(self, f, surface=None):
+    def source_vector(self, f, dim=None):
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         pp = self.mesh.bc_to_point(bcs)
-        if surface is not None:
-            pp, _ = surface.project(pp)
         fval = f(pp)
 
         if p > 0:
             phi = self.basis(bcs)
             # bb: (NC, ldof)
-            bb = np.einsum('m, mi, mk, i->ik',
+            bb = np.einsum('m, mi..., mk, i->ik...',
                     ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
             gdof = self.number_of_global_dofs()
+            shape = gdof if dim is None else (gdof, dim)
+            b = np.zeros(shape, dtype=self.ftype)
             b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+            if dim is None:
+                np.add.at(b, cell2dof, bb)
+            else:
+                np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
-            b = np.einsum('i, ik, k->k', ws, fval, cellmeasure)
+            b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
         return b
 
     def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
