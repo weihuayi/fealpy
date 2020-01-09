@@ -101,6 +101,8 @@ class Tritree(TriangleMesh):
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
+        elif options['method'] is 'numrefine':
+            options['numrefine'][leafCellIdx] = eta
         elif isinstance(options['method'], float):
             val = options['method']
             options['numrefine'][leafCellIdx] = np.around(
@@ -317,7 +319,8 @@ class Tritree(TriangleMesh):
                     space = SimplexSetSpace(2, ftype=self.ftype)
                     w = space.multi_index_matrix(4)/4
                     for key, data in options['data'].items():
-                        val = space.value(data[:, [0, 5, 4, 1, 3, 2]], w, p=2).T
+                        d0 = data[isMarkedCell]
+                        val = space.value(d0[:, [0, 5, 4, 1, 3, 2]], w, p=2).T
                         options['data'][key] = np.r_['0',
                                 data,
                                 val[:, [0, 3, 5, 4, 2, 1]],
@@ -502,7 +505,6 @@ class Tritree(TriangleMesh):
                     [0.0, 0.75, 0.25],
                     [0.0, 0.25, 0.75],
                     [0.5, 0.25, 0.25]], dtype=self.ftype)
-                print(w)
                 for key, data in options['data'].items():
                     i0 = edge2cell[flag0, 2]
                     i1 = edge2cell[flag1, 3]

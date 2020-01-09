@@ -229,10 +229,7 @@ class SurfaceLagrangeFiniteElementSpace:
     def to_function(self, data):
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
-        d = np.zeros((gdof, ), dtype=self.itype)
         uh = self.function()
-        np.add.at(uh, cell2dof, data[:, [0, 5, 4, 1, 3, 2]])
-        np.add.at(d, cell2dof, 1)
-        uh /= d
+        uh[cell2dof[:, [0, 3, 5, 4, 2, 1]]] = data
         return uh
 
