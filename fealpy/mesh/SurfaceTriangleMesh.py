@@ -38,6 +38,8 @@ class SurfaceTriangleMesh():
         self.space = LagrangeFiniteElementSpace(mesh, p)
         self.surface = surface
         self.ds = mesh.ds
+        if scale is not None:
+            self.mesh.node *= scale
 
         if scale is None:
             self.node, d = self.surface.project(self.space.interpolation_points())

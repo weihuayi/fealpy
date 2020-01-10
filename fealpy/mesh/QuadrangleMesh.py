@@ -129,6 +129,8 @@ class QuadrangleMesh(Mesh2d):
         return jacobi.sum(axis=1)/4
 
     def bc_to_point(self, bc):
+        bc0 = bc[0]
+        bc1 = bc[1]
         node = self.node
         cell = self.ds.cell
         p = np.einsum('...j, ijk->...ik', bc, node[cell])

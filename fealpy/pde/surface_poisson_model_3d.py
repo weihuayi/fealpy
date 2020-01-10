@@ -94,8 +94,14 @@ class SphereSinSinSinData():
 
 class HeartSurfacetData(object):
     def __init__(self):
-        from ..mesh.level_set_function import HeartSurface  
+        from fealpy.geometry import HeartSurface
         self.surface = HeartSurface() 
+
+    def init_mesh(self):
+        return self.surface.init_mesh()
+
+    def domain(self):
+        return self.surface
 
     def solution(self,p):
         """ The exact solution 

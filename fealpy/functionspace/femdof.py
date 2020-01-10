@@ -691,6 +691,34 @@ class CPPFEMDof3d():
             multiIndex = multi_index_matrix2d(p)
             return multiIndex
 
+    def local_face_to_dof(self):
+        p = self.p
+        ldof = self.number_of_local_dofs()
+        idof = p+1
+        tdof = (p+1)*(p+2)//2
+        qdof = (p+1)*(p+1)
+
+
+        idx = np.r_['0', [0, 3], 2*np.ones(p-1, dtype=np.int)]
+        f0 = np.repeat(np.cumsum(np.cumsum(idx)), range(1, p+2)) - np.arange(tdof)
+        f1 = np.arange(tdof*p, ldof)
+        f2 = np.repeat(
+                np.arange(tdof - p - 1, ldof - p, tdof).reshape(1, -1)
+                , p+1, 0) + np.arange(0, idof).reshape(-1, 1)
+        idx = np.arange(1, p+2)
+        idx[0] = 0
+        f3 = np.repeat(
+                np.arange(0, ldof-tdof+1, tdof).reshape(1, -1),
+                p+1, 0) + np.cumsum(idx)[-1::-1].reshape(-1, 1)
+        idx = np.arange(0, idof)
+        f4 = np.repeat(
+                np.arange(0, ldof-tdof+1, tdof).reshape(1, -1),
+                p+1, 0) + np.cumsum(idx).reshape(-1, 1)
+        localFace2dof = [f0.reshape(-1), f1.reshape(-1), f2.reshape(-1), f3.reshape(-1),
+                f4.reshape(-1)]
+        return localFace2dof
+
+
     def number_of_local_dofs(self):
         """
         每个单元上的自由度的个数.
@@ -722,22 +750,28 @@ class CPPFEMDof3d():
 
         return gdof
 
-    def boundary_dof(self):
-        mesh = self.mesh
-        face = mesh.entity('face')
-        pass
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('face', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
+        gdof = self.number_of_global_dofs()
+        edge2dof = self.edge_to_dof()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof[edge2dof[idx]] = True
+        return isBdDof
 
     def face_to_dof(self):
-        p = self.p
-        w0 = self.multi_index_matrix(1)
-        w1 = self.multi_index_matrix(2)
-        w = np.einsum('ij, km->ikjm', w0, w1)
-        ldof0 = len(w0)
-        ldof1 = len(w1)
         face = self.mesh.entity('face')
         isTriFace = (face[:, 2] == face[:, 3])
-        face2cell = self.mesh.face_to_cell()
-        pass
+        localFace2dof = self.local_face_to_dof()
+        face2cell = self.mesh.ds.face_to_cell()
+        NF = self.mesh.number_of_faces()
+        cell2dof = self.cell2dof
+        f = lambda i: cell2dof[face2cell[i, 0], localFace2dof[face2cell[i, 2]]]
+        face2dof = list(map(f, range(NF)))
+        return face2dof
 
     def edge_to_dof(self):
         pass

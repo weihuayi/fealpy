@@ -37,6 +37,12 @@ class PrismFiniteElementSpace():
     def cell_to_dof(self):
         return self.dof.cell2dof
 
+    def face_to_dof(self):
+        return self.dof.face_to_dof()
+
+    def edge_to_dof(self):
+        return self.dof.edge_to_dof()
+
     def boundary_dof(self):
         return self.dof.boundary_dof()
 
@@ -232,4 +238,13 @@ class PrismFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
         return b
+
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        ipoints = self.interpolation_points()
+        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
+        uh[isDDof] = g(ipoints[isDDof])
+        return isDDof
 
