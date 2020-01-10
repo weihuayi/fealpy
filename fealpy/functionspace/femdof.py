@@ -757,14 +757,12 @@ class CPPFEMDof3d():
             flag = threshold(bc)
             idx  = idx[flag]
         gdof = self.number_of_global_dofs()
-        edge2dof = self.edge_to_dof()
+        face2dof = self.face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        isBdDof[edge2dof[idx]] = True
+        isBdDof[np.r_[face2dof[idx]]] = True
         return isBdDof
 
     def face_to_dof(self):
-        face = self.mesh.entity('face')
-        isTriFace = (face[:, 2] == face[:, 3])
         localFace2dof = self.local_face_to_dof()
         face2cell = self.mesh.ds.face_to_cell()
         NF = self.mesh.number_of_faces()

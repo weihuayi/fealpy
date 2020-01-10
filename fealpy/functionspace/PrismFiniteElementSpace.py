@@ -43,8 +43,8 @@ class PrismFiniteElementSpace():
     def edge_to_dof(self):
         return self.dof.edge_to_dof()
 
-    def boundary_dof(self):
-        return self.dof.boundary_dof()
+    def boundary_dof(self, threshold=None):
+        return self.dof.boundary_dof(threshold=threshold)
 
     def geo_dimension(self):
         return self.GD
