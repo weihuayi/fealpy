@@ -51,8 +51,8 @@ class LagrangeFiniteElementSpaceTest:
         pl.show()
 
 test = LagrangeFiniteElementSpaceTest()
-#test.test_space_on_triangle()
-test.test_space_on_tet()
+test.test_space_on_triangle()
+#test.test_space_on_tet()
 
 
 

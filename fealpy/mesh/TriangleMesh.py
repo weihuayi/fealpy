@@ -2,6 +2,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
+from ..quadrature import GaussLegendreQuadrature
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])

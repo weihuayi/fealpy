@@ -81,7 +81,7 @@ class LagrangeFiniteElementSpace():
     def edge_to_dof(self):
         return self.dof.edge_to_dof()
 
-    def boundary_dof(self, threshhold=None):
+    def boundary_dof(self, threshold=None):
         if self.spacetype is 'C':
             return self.dof.boundary_dof(threshold=threshold)
         else:
@@ -613,14 +613,13 @@ class LagrangeFiniteElementSpace():
             gdof = self.number_of_global_dofs()
             shape = gdof if dim is None else (gdof, dim)
             b = np.zeros(shape, dtype=self.ftype)
-            b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
             if dim is None:
                 np.add.at(b, cell2dof, bb)
             else:
                 np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
             b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
-        return b
+        return b.reshape(-1, order='F')
 
     def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
         """

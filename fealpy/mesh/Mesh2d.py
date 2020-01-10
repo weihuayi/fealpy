@@ -543,6 +543,14 @@ class Mesh2dDataStructure():
         edge = self.edge
         return edge[self.boundary_edge_index()]
 
+    def boundary_face_flag(self):
+        edge2cell = self.edge2cell
+        return edge2cell[:, 0] == edge2cell[:, 1]
+
+    def boundary_face(self):
+        edge = self.edge
+        return edge[self.boundary_edge_index()]
+
     def boundary_cell_flag(self):
         NC = self.NC
         edge2cell = self.edge2cell
@@ -557,6 +565,11 @@ class Mesh2dDataStructure():
         return idx 
 
     def boundary_edge_index(self):
+        isBdEdge = self.boundary_edge_flag()
+        idx, = np.nonzero(isBdEdge)
+        return idx 
+
+    def boundary_face_index(self):
         isBdEdge = self.boundary_edge_flag()
         idx, = np.nonzero(isBdEdge)
         return idx 

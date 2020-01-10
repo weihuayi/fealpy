@@ -194,10 +194,14 @@ class CosCosData:
     def dirichlet(self, p):
         return self.solution(p)
 
-    def neuman(self, p):
+    def neuman(self, p, n):
         """ Neuman  boundary condition
+        p: (NQ, NE, 2)
+        n: (NE, 2)
         """
-        pass
+        grad = self.gradient(p) # (NQ, NE, 2)
+        val = np.sum(grad*n, axis=-1)
+        return val
 
     def robin(self, p):
         pass

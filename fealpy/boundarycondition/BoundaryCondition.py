@@ -11,12 +11,13 @@ class BoundaryCondition():
     def apply_neuman_bc(self, b, is_neuman_boundary=None):
         if self.neuman is not None:
             space = self.space
+            p = space.p
             TD = space.top_dimension()
             mesh = space.mesh
 
             face = mesh.entity('face')
             face2cell = mesh.ds.face_to_cell()
-            face2dof = space.boundary_dof()
+            face2dof = space.face_to_dof()
 
             # find the index of all neuman boundary 
             idx = mesh.ds.boundary_face_index()
@@ -25,17 +26,14 @@ class BoundaryCondition():
                 flag = is_neuman_boundary(bc)
                 idx = idx[flag]
             measure = mesh.entity_measure('face', index=idx)
-            qf = mesh.integrator('face')
+            qf = mesh.integrator(p+3, 'face')
             bcs, ws = qf.get_quadrature_points_and_weights()
             phi = space.face_basis(bcs)
             p = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
             val = self.neuman(p, n) # (NQ, NF, ...)
             bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
-            if len(b.shape) == 1:
-                np.add.at(b, face2dof[idx], bb)
-            else:
-                np.add.at(b, (face2dof[idx], np.s_[:]), bb)
+            np.add.at(b, face2dof[idx], bb)
 
     def apply_dirichlet_bc(self, A, b, uh, is_dirichlet_boundary=None):
         if self.dirichlet is not None:
@@ -45,9 +43,9 @@ class BoundaryCondition():
             dim = 1 if len(uh.shape) == 1 else uh.shape[1]
             isDDof = np.tile(isDDof, dim)
 
+            gdof = self.space.number_of_global_dofs()
             x = uh.reshape(-1, order='F')
-            y = b.reshape(-1, order='F')
-            y -= A@x
+            b -= A@x
             bdIdx = np.zeros(dim*gdof, dtype=np.int)
             bdIdx[isDDof] = 1
             Tbd = spdiags(bdIdx, 0, dim*gdof, dim*gdof)
