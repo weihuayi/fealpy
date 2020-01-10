@@ -12,11 +12,13 @@ class PrismFiniteElementSpace():
         self.mesh = mesh
         self.p = p
 
+        self.cellmeasure = self.mesh.entity_measure('cell')
         self.dof = CPPFEMDof3d(mesh, p)
 
         q = p+3 if q is None else q
-        self.integralalg = FEMeshIntegralAlg(self.mesh, q)
+        self.integralalg = FEMeshIntegralAlg(self.mesh, q, self.cellmeasure)
         self.integrator = self.integralalg.integrator
+
 
         self.ftype = mesh.ftype
         self.itype = mesh.itype
@@ -137,7 +139,7 @@ class PrismFiniteElementSpace():
         # J: (NQ0, NQ1, NC, 3, 3)
         # gphi: (NQ0, NQ1, ldof0, ldof1, 3)
         gphi = np.einsum('...imn, ...jln->...ijlm', J, gphi)
-        shape = gphi.shape[0:2] + (-1, 3)
+        shape = gphi.shape[0:3] + (-1, 3)
         return gphi.reshape(shape)
 
     def value(self, uh, bcs, cellidx=None):
@@ -190,10 +192,11 @@ class PrismFiniteElementSpace():
         GD = self.geo_dimension()
 
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        gphi = self.grad_basis(bcs) #(NQ0, NQ1, NC, ldof0, ldof1, GD)
+        gphi = self.grad_basis(bcs) #(NQ0, NQ1, NC, ldof0*ldof1, GD)
+        print(gphi.shape)
 
-        A = np.einsum('i, ijkm, ijpm, j->jkp',
-                ws, dgphi, gphi, self.cellmeasure,
+        A = np.einsum('..., ...jkm, ...jpm, j->jkp',
+                ws, gphi, gphi, self.cellmeasure,
                 optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()

@@ -54,15 +54,15 @@ class PrismMesh(Mesh3d):
         return VTK_PENTAGONAL_PRISM
 
     def bc_to_point(self, bc):
-        node = self.node
-        cell = self.ds.cell
+        node = self.entity('node')
+        cell = self.entity('cell') 
         NC = self.number_of_cells()
         bc0 = bc[0]
         bc1 = bc[1]
         n0 = bc0.shape[0]
         n1 = bc1.shape[0]
-        p0 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 0:3]])
-        p1 = np.einsum('mj, ijk->mik', bc0, node[cell[:, 3:]])
+        p0 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 0:3]])
+        p1 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 3:]])
         p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
         return p
 

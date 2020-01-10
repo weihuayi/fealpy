@@ -2,6 +2,7 @@
 # 
 import sys
 import numpy as np
+from scipy.sparse.linalg import spsolve
 
 from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
@@ -9,6 +10,8 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import PrismMesh
 from fealpy.functionspace import PrismFiniteElementSpace
 from fealpy.pde.poisson_2d import CosCosData
+from fealpy.boundarycondition import BoundaryCondition
+from fealpy.pde.poisson_3d import CosCosCosData
 
 
 class PrismFiniteElementSpaceTest():
@@ -39,6 +42,7 @@ class PrismFiniteElementSpaceTest():
         pcell = np.r_['1', cell, cell + NN]
 
         pmesh = PrismMesh(pnode, pcell)
+        pmesh.uniform_refine(n=n)
         return pmesh
 
     def test_cell_to_dof(self, plot=False):
@@ -79,6 +83,19 @@ class PrismFiniteElementSpaceTest():
             mesh.find_node(axes, node=ipoints[cell2dof[0]], showindex=True, color='b')
             plt.show()
 
+    def poisson_test(self, p=1):
+        pde = CosCosCosData()
+        mesh = self.plane_pmesh(n=2)
+        space = PrismFiniteElementSpace(mesh, p=p)
+        A = space.stiff_matrix()
+        b = space.source_vector(pde.source)
+        bc = BoundaryCondition(space, dirichlet=pde.dirichlet)
+        uh = space.function()
+        A, b = bc.apply_dirichlet_bc(A, b, uh)
+        uh[:] = spsolve(A, b).reshape(-1)
+        error = space.integralalg.L2_error(pde.solution, uh)
+        print(error)
+
     def basis_test(self):
         pass
 
@@ -90,5 +107,6 @@ class PrismFiniteElementSpaceTest():
 test = PrismFiniteElementSpaceTest()
 #test.test_cell_to_dof(plot=True)
 #test.test_grad_basis()
-test.face_to_dof_test(p=3, plot=True)
+#test.face_to_dof_test(p=3, plot=True)
+test.poisson_test()
 
