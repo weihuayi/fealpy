@@ -1,3 +1,4 @@
+from .SimplexSetSpace import SimplexSetSpace
 from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
 from .SurfaceLagrangeFiniteElementSpace import SurfaceLagrangeFiniteElementSpace
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
@@ -6,7 +7,6 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
 from .StokesDivFreeNonConformingVirtualElementSpace2d import StokesDivFreeNonConformingVirtualElementSpace2d
-from .SimplexSetSpace import SimplexSetSpace
 
 from .mixed_fem_space import RTFiniteElementSpace2d
 from .vem_space import VEMDof2d, VirtualElementSpace2d

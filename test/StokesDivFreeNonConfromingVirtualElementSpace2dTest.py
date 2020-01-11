@@ -168,21 +168,21 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print(error[0:-1]/error[1:])
 
     def project_test(self, p=2):
-        from fealpy.pde.Stokes_Model_2d import CosSinData
-        from fealpy.mesh.simple_mesh_generator import triangle
+        def u(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.zeros(p.shape, p.dtype)
+            val[..., 0] = y**2
+            val[..., 1] = x**2
+            return val
 
-        h = 0.1
-        pde = CosSinData()
-        domain = pde.domain()
-        mesh = triangle(domain, h, meshtype='polygon')
+        node = np.array([
+            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+        cell = np.array([0, 1, 2, 3], dtype=np.int)
+        cellLocation = np.array([0, 4], dtype=np.int)
+        mesh = PolygonMesh(node, cell, cellLocation)
         uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        pspace = ScaledMonomialSpace2d(mesh, p-1)
-        up = uspace.project(pde.velocity)
-        up = uspace.project_to_smspace(up)
-        integralalg = uspace.integralalg
-        error = integralalg.L2_error(pde.velocity, up)
-        print(error)
-
+        print(uspace.CM)
         if 0:
             fig = plt.figure()
             axes = fig.gca()
