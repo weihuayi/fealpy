@@ -125,22 +125,22 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
 
     def project(self, u):
-        p = self.p
-        cell2dof = self.cell_to_dof('cell')
+        p = self.p # p >= 2
+        cell2dof = self.cell_to_dof('cell') # 获得单元内部自由度
         uh = self.function()
-        phi0 = lambda x: self.smspace.basis(x, p=p-2)
         def u0(x, cellidx):
             return np.einsum('ij..., ijm->ijm...', u(x),
                     self.smspace.basis(x, p=p-2, cellidx=cellidx))
         area = self.smspace.cellmeasure
-        uh[cell2dof] = self.integralalg.integral(u0, celltype=True)/area[:,
-                None, None]
+        uh[cell2dof] = self.integralalg.integral(
+                u0, celltype=True)/area[:, None, None]
         def u1(x):
             return np.einsum('ij..., ijm->ijm...', u(x),
                     self.smspace.edge_basis(x, p=p-1))
-        edge2dof = self.dof.edge_to_dof()
+        edge2dof = self.dof.edge_to_dof() # 获得边界自由度
         h = self.mesh.entity_measure('edge')
-        uh[edge2dof] = self.integralalg.edge_integral(u1, edgetype=True)
+        uh[edge2dof] = self.integralalg.edge_integral(
+                u1, edgetype=True)/h[:, None, None]
         return uh
 
     def project_to_smspace(self, uh):

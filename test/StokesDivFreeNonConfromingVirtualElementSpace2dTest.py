@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# 
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import spdiags, bmat
@@ -100,7 +102,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         P = space.matrix_P()
         print(P)
 
-    def test_stokes_equaion(self, p=2, maxit=4):
+    def test_stokes_equation(self, p=2, maxit=4):
         from scipy.sparse import bmat
         from fealpy.pde.Stokes_Model_2d import CosSinData
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -165,6 +167,28 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print(error)
         print(error[0:-1]/error[1:])
 
+    def project_test(self, p=2):
+        from fealpy.pde.Stokes_Model_2d import CosSinData
+        from fealpy.mesh.simple_mesh_generator import triangle
+
+        h = 0.1
+        pde = CosSinData()
+        domain = pde.domain()
+        mesh = triangle(domain, h, meshtype='polygon')
+        uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        pspace = ScaledMonomialSpace2d(mesh, p-1)
+        up = uspace.project(pde.velocity)
+        up = uspace.project_to_smspace(up)
+        integralalg = uspace.integralalg
+        error = integralalg.L2_error(pde.velocity, up)
+        print(error)
+
+        if 0:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_cell(axes, index=np.array([51], dtype=np.int))
+            plt.show()
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_index1()
@@ -172,4 +196,4 @@ test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.test_stokes_equaion()
+test.project_test()
