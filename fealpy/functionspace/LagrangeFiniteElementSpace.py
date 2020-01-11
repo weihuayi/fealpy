@@ -619,7 +619,7 @@ class LagrangeFiniteElementSpace():
                 np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
             b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
-        return b.reshape(-1, order='F')
+        return b.T.flat
 
     def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
         """

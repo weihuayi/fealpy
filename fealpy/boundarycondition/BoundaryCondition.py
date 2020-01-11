@@ -41,10 +41,10 @@ class BoundaryCondition():
                     uh, self.dirichlet,
                     is_dirichlet_boundary=is_dirichlet_boundary)
             dim = 1 if len(uh.shape) == 1 else uh.shape[1]
-            isDDof = np.tile(isDDof, dim)
-
+            if dim > 1:
+                isDDof = np.tile(isDDof, dim)
             gdof = self.space.number_of_global_dofs()
-            x = uh.reshape(-1, order='F')
+            x = uh.T.flat # 把 uh 按列展平
             b -= A@x
             bdIdx = np.zeros(dim*gdof, dtype=np.int)
             bdIdx[isDDof] = 1
