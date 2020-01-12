@@ -54,7 +54,8 @@ class SurfaceTriangleMesh():
         self.celldata = {}
 
     def project(self, p):
-        return self.surface.project(p/self.scale)
+        p, d = self.surface.project(p/self.scale)
+        return p*self.scale, d*self.scale
 
     def integrator(self, k):
         return TriangleQuadrature(k)
