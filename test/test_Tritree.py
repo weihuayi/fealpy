@@ -6,7 +6,7 @@ import pylab as pl
 from fealpy.mesh import Tritree, TriangleMesh
 from fealpy.functionspace import SurfaceLagrangeFiniteElementSpace
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.pde.surface_poisson_model_3d import SphereSinSinSinData
+from fealpy.pde.surface_poisson_model_3d import SphereSinSinSinData, HeartSurfacetData
 from fealpy.pde.poisson_2d import CosCosData
 
 class TritreeTest:
@@ -96,7 +96,7 @@ class TritreeTest:
             plt.show()
         else:
             fig = pl.figure()
-            axes = a3.Axes3D(fig)
+            axes = a3.Axes3D(fig) 
             mesh.add_plot(axes)
             plt.show()
 
@@ -192,9 +192,64 @@ class TritreeTest:
         plt.show()
 
 
+class HeartTritreeTest:
+    def __init__(self, scale=5):
+        self.scale = scale
+        self.pde = HeartSurfacetData()
+        self.surface = self.pde.domain()
+        self.mesh = self.pde.init_mesh()
+#        self.mesh.uniform_refine(surface=self.surface)
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+        self.tritree = Tritree(node, cell)
+
+    def test_interpolation_surface(self, p=1):
+        options = self.tritree.adaptive_options(maxrefine=1, p=p)
+        mesh = self.tritree.to_conformmesh()
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p, scale=self.scale)
+        uI = space.interpolation(self.pde.solution)
+        print('1:', space.number_of_global_dofs())
+        print('2:', uI.shape)
+        error0 = space.integralalg.L2_error(self.pde.solution, uI)
+        print(error0)
+        data = self.tritree.interpolation(uI)
+        print('3', data.shape)
+        options['data'] = {'q':data}
+        if 1:
+            eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
+            eta = eta.sum(axis=-1)
+            self.tritree.adaptive(eta, options, surface=space.mesh)
+        else:
+            self.tritree.uniform_refine(options=options, surface=self.surface)
+
+        mesh = self.tritree.to_conformmesh(options)
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
+        data = options['data']['q']
+        print('data:', data.shape)
+        uh = space.to_function(data)
+        print('uh:', uh.shape)
+        error1 = space.integralalg.L2_error(self.pde.solution, uh)
+        print(error1)
+
+        uI = space.interpolation(self.pde.solution)
+        error2 = space.integralalg.L2_error(self.pde.solution, uI)
+        print(error2)
+
+        if 0:
+            fig = pl.figure()
+            axes = a3.Axes3D(fig)
+            self.tritree.add_plot(axes)
+            plt.show()
+        else:
+            fig = pl.figure()
+            axes = a3.Axes3D(fig) 
+            mesh.add_plot(axes)
+            plt.show()
 
 
-test = TritreeTest()
+
+
+test = HeartTritreeTest()
 #test.test_adaptive()
 #test.test_interpolation_plane()
-test.test_interpolation_surface(p=2)
+test.test_interpolation_surface(p=1)
