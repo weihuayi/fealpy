@@ -38,6 +38,7 @@ class SurfaceTriangleMesh():
         self.space = LagrangeFiniteElementSpace(mesh, p)
         self.surface = surface
         self.ds = mesh.ds
+        self.scale = scale
         if scale is not None:
             self.mesh.node *= scale
 
@@ -51,6 +52,9 @@ class SurfaceTriangleMesh():
         self.itype = mesh.itype
         self.nodedata = {}
         self.celldata = {}
+
+    def project(self, p):
+        return self.surface.project(p/scale)
 
     def integrator(self, k):
         return TriangleQuadrature(k)
