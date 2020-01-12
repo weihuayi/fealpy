@@ -182,7 +182,12 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        print(uspace.CM)
+        up = uspace.project(u)
+        up = uspace.project_to_smspace(up)
+        print(up)
+        integralalg = uspace.integralalg
+        error = integralalg.L2_error(u, up)
+        print(error)
         if 0:
             fig = plt.figure()
             axes = fig.gca()
