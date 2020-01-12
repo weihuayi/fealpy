@@ -46,9 +46,12 @@ class TritreeTest:
         mesh = self.tritree.to_conformmesh()
         space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
         uI = space.interpolation(self.pde.solution)
+        print('1:', space.number_of_global_dofs())
+        print('2:', uI.shape)
         error0 = space.integralalg.L2_error(self.pde.solution, uI)
         print(error0)
         data = self.tritree.interpolation(uI)
+        print('3', data.shape)
         options['data'] = {'q':data}
         if 1:
             eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
@@ -60,7 +63,9 @@ class TritreeTest:
         mesh = self.tritree.to_conformmesh(options)
         space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
         data = options['data']['q']
+        print('data:', data.shape)
         uh = space.to_function(data)
+        print('uh:', uh.shape)
         error1 = space.integralalg.L2_error(self.pde.solution, uh)
         print(error1)
 
@@ -192,4 +197,4 @@ class TritreeTest:
 test = TritreeTest()
 #test.test_adaptive()
 #test.test_interpolation_plane()
-test.test_interpolation_surface(p=1)
+test.test_interpolation_surface(p=2)
