@@ -341,7 +341,7 @@ class EllipsoidSurface:
         if meshdata is None:
             data = sio.loadmat('../fealpy/meshdata/ellipsoid.mat')
         else:
-            data = sio.load(meshdata)
+            data = sio.loadmat(meshdata)
         node = data['node']
         cell = np.array(data['elem'] - 1, dtype=np.int64)
         return TriangleMesh(node, cell)

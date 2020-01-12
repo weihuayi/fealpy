@@ -164,7 +164,7 @@ def distmesh2d(fd, h0, bbox, pfix, meshtype='tri'):
         return PolygonMesh(pnode, pcell, pcellLocation) 
 
 def unitcircledomainmesh(h0, meshtype='tri', dtype=np.float):
-    fd = lambda p: dcircle(p,(0,0),1)
+    fd = lambda p: dcircle(p, (0,0), 1)
     fh = huniform
     bbox = [-1.2, 1.2, -1.2, 1.2]
     pfix = None 
