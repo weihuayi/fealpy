@@ -167,7 +167,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print(error)
         print(error[0:-1]/error[1:])
 
-    def project_test(self, p=2):
+    def project_test(self, p=2, mtype=0):
+        from fealpy.mesh.simple_mesh_generator import triangle
+
         def u(p):
             x = p[..., 0]
             y = p[..., 1]
@@ -176,23 +178,32 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             val[..., 1] = x**2
             return val
 
-        node = np.array([
-            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
+        if mtype == 0:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3], dtype=np.int)
+            cellLocation = np.array([0, 4], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 1:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3, 0, 2], dtype=np.int)
+            cellLocation = np.array([0, 3, 6], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 2:
+            h = 0.1
+            mesh = triangle([-1, 1, -1, 1], h, meshtype='polygon')
+
         uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
-        print(up)
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
-        if 0:
+        if 1:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_cell(axes, index=np.array([51], dtype=np.int))
             plt.show()
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
@@ -201,4 +212,4 @@ test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.project_test()
+test.project_test(p=2, mtype=2)
