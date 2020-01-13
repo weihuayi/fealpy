@@ -193,7 +193,7 @@ class TritreeTest:
 
 
 class HeartTritreeTest:
-    def __init__(self, scale=5):
+    def __init__(self, scale=2):
         self.scale = scale
         self.pde = HeartSurfacetData()
         self.surface = self.pde.domain()
@@ -206,6 +206,11 @@ class HeartTritreeTest:
     def test_interpolation_surface(self, p=1):
         options = self.tritree.adaptive_options(maxrefine=1, p=p)
         mesh = self.tritree.to_conformmesh()
+
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        mesh.add_plot(axes, showaxis=True)
+
         space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p, scale=self.scale)
         uI = space.interpolation(self.pde.solution)
         print('1:', space.number_of_global_dofs())
@@ -215,15 +220,30 @@ class HeartTritreeTest:
         data = self.tritree.interpolation(uI)
         print('3', data.shape)
         options['data'] = {'q':data}
-        if 1:
+        if 0:
             eta = space.integralalg.integral(lambda x : uI.grad_value(x)**2, celltype=True, barycenter=True)
             eta = eta.sum(axis=-1)
-            self.tritree.adaptive(eta, options, surface=space.mesh)
+            self.tritree.adaptive(eta, options, surface=self.surface)
         else:
             self.tritree.uniform_refine(options=options, surface=self.surface)
 
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        self.tritree.add_plot(axes, showaxis=True)
+
         mesh = self.tritree.to_conformmesh(options)
-        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p)
+
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        mesh.add_plot(axes, showaxis=True)
+
+        space = SurfaceLagrangeFiniteElementSpace(mesh, self.surface, p=p, scale=self.scale)
+        mesh0 = space.mesh
+
+        fig = pl.figure()
+        axes = a3.Axes3D(fig)
+        mesh0.add_plot(axes, showaxis=True)
+
         data = options['data']['q']
         print('data:', data.shape)
         uh = space.to_function(data)
@@ -242,8 +262,8 @@ class HeartTritreeTest:
             plt.show()
         else:
             fig = pl.figure()
-            axes = a3.Axes3D(fig) 
-            mesh.add_plot(axes)
+            axes = a3.Axes3D(fig)
+            mesh.add_plot(axes, showaxis=True)
             plt.show()
 
 
@@ -252,4 +272,4 @@ class HeartTritreeTest:
 test = HeartTritreeTest()
 #test.test_adaptive()
 #test.test_interpolation_plane()
-test.test_interpolation_surface(p=2)
+test.test_interpolation_surface(p=1)
