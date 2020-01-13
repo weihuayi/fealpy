@@ -54,8 +54,11 @@ class SurfaceTriangleMesh():
         self.celldata = {}
 
     def project(self, p):
-        p, d = self.surface.project(p/self.scale)
-        return p*self.scale, d*self.scale
+        if self.scale is None:
+            return self.surface.project(p)
+        else:
+            p, d = self.surface.project(p/self.scale)
+            return p*self.scale, d*self.scale
 
     def integrator(self, k):
         return TriangleQuadrature(k)
@@ -137,7 +140,7 @@ class SurfaceTriangleMesh():
         else:
             bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
 
-        bcp, _ = self.surface.project(bcp)
+        bcp, _ = self.project(bcp)
         return bcp
 
     def area(self, idx=3):
