@@ -494,7 +494,7 @@ class Tritree(TriangleMesh):
         cell0 = cell[(~isLRCell) & (isLeafCell)]
         idx0 = idx[(~isLRCell) & (isLeafCell)]
         cell = np.r_['0', cell0, cell20, cell21]
-        tmesh = TriangleMesh(node, cell)
+        tmesh = TriangleMesh(node.copy(), cell)
         #现在的cell单元与原来树结构中cell的对应关系.
         self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]
         self.meshdata['brother'] = [(idx0, len(idx0)), (LCell, N0, flag0),
