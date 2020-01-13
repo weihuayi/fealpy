@@ -128,12 +128,14 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         p = self.p # p >= 2
         cell2dof = self.cell_to_dof('cell') # 获得单元内部自由度
         uh = self.function()
+
         def u0(x, cellidx):
             return np.einsum('ij..., ijm->ijm...', u(x),
                     self.smspace.basis(x, p=p-2, cellidx=cellidx))
         area = self.smspace.cellmeasure
         uh[cell2dof] = self.integralalg.integral(
                 u0, celltype=True)/area[:, None, None]
+
         def u1(x):
             return np.einsum('ij..., ijm->ijm...', u(x),
                     self.smspace.edge_basis(x, p=p-1))
@@ -400,6 +402,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         val = np.einsum('ij, ij, i, i->ji',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.add.at(R11, (idx[0][:, None], start), val)
+
         val = np.einsum('ij, ij, i, i->ji',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.subtract.at(R01, (idx[1][:, None], start), val)
@@ -467,6 +470,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(J1, (np.s_[:], idx0), val)
 
         if isInEdge.sum() > 0:
+            idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('ijk, i->jik', F1, n[:, 0])
             np.subtract.at(J0, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
             val = np.einsum('ijk, i->jik', F1, n[:, 1])

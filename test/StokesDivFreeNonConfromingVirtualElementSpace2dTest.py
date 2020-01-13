@@ -8,7 +8,7 @@ from scipy.sparse.linalg import spsolve
 from fealpy.functionspace import StokesDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.mesh.simple_mesh_generator import triangle
-from fealpy.mesh import PolygonMesh
+from fealpy.mesh import PolygonMesh, QuadrangleMesh
 from fealpy.pde.poisson_2d import CosCosData
 
 class StokesDivFreeNonConformingVirtualElementSpace2dTest:
@@ -174,8 +174,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             x = p[..., 0]
             y = p[..., 1]
             val = np.zeros(p.shape, p.dtype)
-            val[..., 0] = y**2
-            val[..., 1] = x**2
+            val[..., 0] = y**3/8
+            val[..., 1] = x**3/8
             return val
 
         if mtype == 0:
@@ -193,10 +193,18 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         elif mtype == 2:
             h = 0.1
             mesh = triangle([-1, 1, -1, 1], h, meshtype='polygon')
+        elif mtype == 3:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([[0, 1, 2, 3]], dtype=np.int)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine()
+            mesh = PolygonMesh.from_mesh(mesh)
 
         uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
+
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
@@ -212,4 +220,4 @@ test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.project_test(p=2, mtype=2)
+test.project_test(p=3, mtype=0)
