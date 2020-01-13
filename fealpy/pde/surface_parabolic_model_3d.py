@@ -57,4 +57,3 @@ class SinSinSinExpDataSphere():
         rhs = t1 + t2 + t3
         return rhs
 
-
