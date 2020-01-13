@@ -567,3 +567,90 @@ class ImplicitSurface:
             x, y, z = args
         else:
             raise ValueError("the args must be a N*3 array or x, y, z")
+
+
+class HeartSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return (x - z**2)**2 + y**2 + z**2 - 1.0
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 2*(x - z**2)
+        grad[..., 1] = 2*y
+        grad[..., 2] = -4*(x - z**2)*z + 2*z
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        t1 = -2*x**3+10*x**2*z**2+2*x**2-2*x*y**2-14*x*z**4-8*x*z**2+6*y**2*z**2+2*y**2+6*z**6+6*z**4+2*z**2
+        t2 = (4*x**2*z**2+x**2-8*x*z**4-6*x*z**2+y**2+4*z**6+5*z**4 +z**2)**(3/2)
+        div = t1/t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 2.0 
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = -4*z
+        H[..., 2, 0] = -4*z
+        H[..., 1, 1] = 2
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = -4*x + 12*z**2 + 2
+        return H
+    
+    def jacobi_matrix(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
+        return J
+
+
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/heart.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
+

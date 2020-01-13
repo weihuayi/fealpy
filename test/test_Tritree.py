@@ -252,4 +252,4 @@ class HeartTritreeTest:
 test = HeartTritreeTest()
 #test.test_adaptive()
 #test.test_interpolation_plane()
-test.test_interpolation_surface(p=1)
+test.test_interpolation_surface(p=2)
