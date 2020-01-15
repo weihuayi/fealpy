@@ -3,7 +3,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from scipy.sparse import csr_matrix
 from types import ModuleType
 
-from ..quadrature import GaussLegendreQuadrature 
+from ..quadrature import GaussLegendreQuadrature
 
 class IntervalMesh():
     def __init__(self, node, cell):
@@ -73,36 +73,71 @@ class IntervalMesh():
 
 
     def entity_measure(self, etype=1, index=None):
-        if etype in ['cell', 1]:
+        if etype in ['cell', 'face', 'edge', 1]:
             return self.cell_length(cellidx=index)
         elif etype in ['node', 0]:
             return 0
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_barycenter(self, etype=1):
+    def entity_barycenter(self, etype=1, index=None):
         node = self.node
-        cell = self.ds.cell
-        if etype in ['cell', 1]:
-            return np.sum(node[cell], axis=-1)/2
+        if etype in ['cell', 'face', 'edge', 1]:
+            cell = self.ds.cell
+            if index is None:
+                bc = np.sum(node[cell], axis=1)/cell.shape[1]
+            else:
+                bc = np.sum(node[cell[index]], axis=1)/cell.shape[1]
         elif etype in ['node', 0]:
-            return node
+            if index is None:
+                bc = node
+            else:
+                bc = node[index]
         else:
-            raise ValueError("`etype` is wrong!")
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
 
     def cell_length(self, cellidx=None):
         node = self.node
         cell = self.ds.cell
+        GD = self.geo_dimension()
         if cellidx is None:
-            return node[cell[:, 1]] - node[cell[:, 0]]
+            if GD == 1:
+                return node[cell[:, 1]] - node[cell[:, 0]]
+            else:
+                return np.sqrt(
+                        np.sum(
+                            (node[cell[:, 1]] - node[cell[:, 0]])**2, axis=-1))
         else:
-            return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
+            if GD == 1:
+                return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
+            else:
+                return np.sqrt(
+                        np.sum(
+                            (node[cell[cellidx, 1]] - node[cell[cellidx, 0]])**2,
+                            axis=-1))
 
     def bc_to_point(self, bc):
         node = self.node
         cell = self.ds.cell
         p = np.einsum('...j, ij->...i', bc, node[cell])
         return p
+
+    def cell_normal(self, index=None):
+        GD = self.geo_dimension()
+        if GD != 2:
+            raise ValueError('cell_tagent just work for 2D Case')
+        v = self.cell_tagent(index=index)
+        w = np.array([(0, -1),(1, 0)])
+        return v@w
+
+    def cell_tagent(self, index=None):
+        node = self.node
+        cell = self.ds.cell
+        if index is None:
+            v = node[cell[:, 1]] - node[cell[:, 0]]
+        else:
+            v = node[cell[index, 1]] - node[cell[index, 0]]
+        return v
 
     def uniform_refine(self, n=1):
         for i in range(n):

@@ -41,7 +41,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
         self.scale = scale
         self.p = p
-        self.mesh = surfaceTriangleMesh.SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale)
+        self.mesh = SurfaceTriangleMesh.SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale)
         self.surface = surface
 
         self.cellmeasure = self.mesh.entity_measure('cell')
