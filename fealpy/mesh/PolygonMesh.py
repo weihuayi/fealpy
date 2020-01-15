@@ -154,6 +154,37 @@ class PolygonMesh(Mesh2d):
             ps = np.einsum('ij, kjm->ikm', bcs, node[edge[edgeidx]])
         return ps
 
+    def refine(self, isMarkedCell):
+        GD = self.geo_dimension()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        NV = self.number_of_vertices_of_cells()
+
+
+        cell, cellLocation = self.entity('cell')
+        node = self.entity('node')
+        edge = self.entity('edge')
+
+
+        isMarkedEdge = np.zeros(NE, dtype=np.bool)
+        edge2cell = self.ds.edge_to_cell()
+        isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
+        isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
+
+        ec = self.entity_barycenter('edge')
+        cc = self.entity_barycenter('cell')
+        isKeepedCell = np.repeat(~isMarkedCell, NV)
+        NV0 = NV[~isMarkedCell]
+        NV1 = NV[isMarkedCell]
+
+        s0 = np.sum(NV0)
+        s1 = np.sum(NV1)
+        newCell = np.zeros(s0+4*s1, dtype=self.itype)
+        newCell[:s0] = cell
+        newCell[s0:] = 0
+
+
     def print(self):
         print("Node:\n", self.node)
         print("Cell:\n", self.ds.cell)
