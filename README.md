@@ -91,3 +91,8 @@ $ gdb python3
 
 * https://plot.ly/python/
 * http://www.math.uci.edu/~chenlong/programming.html
+
+
+## Please cite fealpy if you use it in you paper
+
+H. Wei, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, 2017-2020.
