@@ -55,7 +55,7 @@ class PrismMesh(Mesh3d):
 
     def bc_to_point(self, bc):
         node = self.entity('node')
-        cell = self.entity('cell') 
+        cell = self.entity('cell')
         NC = self.number_of_cells()
         bc0 = bc[0]
         bc1 = bc[1]
@@ -63,7 +63,7 @@ class PrismMesh(Mesh3d):
         n1 = bc1.shape[0]
         p0 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 0:3]])
         p1 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 3:]])
-        p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
+        p = np.einsum('n, mik->nmik', bc0[:, 0], p0) + np.einsum('n, mik->nmik', bc0[:, 1], p1)
         return p
 
     def cell_volume(self):

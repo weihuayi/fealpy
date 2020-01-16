@@ -751,7 +751,7 @@ class CPPFEMDof3d():
         return gdof
 
     def boundary_dof(self, threshold=None):
-        idx = self.mesh.ds.boundary_edge_index()
+        idx = self.mesh.ds.boundary_face_index()
         if threshold is not None:
             bc = self.mesh.entity_barycenter('face', index=idx)
             flag = threshold(bc)
@@ -759,7 +759,7 @@ class CPPFEMDof3d():
         gdof = self.number_of_global_dofs()
         face2dof = self.face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        isBdDof[np.r_[face2dof[idx]]] = True
+        isBdDof[np.concatenate(face2dof[idx])] = True
         return isBdDof
 
     def face_to_dof(self):
@@ -768,7 +768,7 @@ class CPPFEMDof3d():
         NF = self.mesh.number_of_faces()
         cell2dof = self.cell2dof
         f = lambda i: cell2dof[face2cell[i, 0], localFace2dof[face2cell[i, 2]]]
-        face2dof = list(map(f, range(NF)))
+        face2dof = np.array(list(map(f, range(NF))), dtype=np.ndarray)
         return face2dof
 
     def edge_to_dof(self):
