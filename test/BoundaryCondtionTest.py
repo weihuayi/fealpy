@@ -30,20 +30,14 @@ class BoundaryConditionTest:
     def poisson_fem_2d_neuman_test(self, p=1):
         pde = CosCosData()
         mesh = pde.init_mesh(n=3)
-        def is_dirichlet_boundary(p):
-            flag = np.zeros(p.shape[0:-1], dtype=np.bool)
-            flag[0] = True
-            return flag
         for i in range(4):
             space = LagrangeFiniteElementSpace(mesh, p=p)
             A = space.stiff_matrix()
             b = space.source_vector(pde.source)
             uh = space.function()
-            bc = BoundaryCondition(space, neuman=pde.neuman,
-                    dirichlet=pde.dirichlet)
+            bc = BoundaryCondition(space, neuman=pde.neuman)
             bc.apply_neuman_bc(b)
-            bc.apply_dirichlet_bc(A, b, uh,
-                    is_dirichlet_boundary=is_dirichlet_boundary)
+            c = space.integral_basis()
             uh[:] = spsolve(A, b).reshape(-1)
             error = space.integralalg.L2_error(pde.solution, uh)
             print(error)

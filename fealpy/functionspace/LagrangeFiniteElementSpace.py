@@ -19,27 +19,27 @@ class LagrangeFiniteElementSpace():
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
-        if spacetype is 'C':
-            if mesh.meshtype is 'interval':
+        if spacetype == 'C':
+            if mesh.meshtype == 'interval':
                 self.dof = CPLFEMDof1d(mesh, p)
                 self.TD = 1
-            elif mesh.meshtype is 'tri':
+            elif mesh.meshtype == 'tri':
                 self.dof = CPLFEMDof2d(mesh, p)
                 self.TD = 2
-            elif mesh.meshtype is 'stri':
+            elif mesh.meshtype == 'stri':
                 self.dof = CPLFEMDof2d(mesh, p)
                 self.TD = 2
-            elif mesh.meshtype is 'tet':
+            elif mesh.meshtype == 'tet':
                 self.dof = CPLFEMDof3d(mesh, p)
                 self.TD = 3
-        elif spacetype is 'D':
-            if mesh.meshtype is 'interval':
+        elif spacetype == 'D':
+            if mesh.meshtype == 'interval':
                 self.dof = DPLFEMDof1d(mesh, p)
                 self.TD = 1
-            elif mesh.meshtype is 'tri':
+            elif mesh.meshtype == 'tri':
                 self.dof = DPLFEMDof2d(mesh, p)
                 self.TD = 2
-            elif mesh.meshtype is 'tet':
+            elif mesh.meshtype == 'tet':
                 self.dof = DPLFEMDof3d(mesh, p)
                 self.TD = 3
 
@@ -82,7 +82,7 @@ class LagrangeFiniteElementSpace():
         return self.dof.edge_to_dof()
 
     def boundary_dof(self, threshold=None):
-        if self.spacetype is 'C':
+        if self.spacetype == 'C':
             return self.dof.boundary_dof(threshold=threshold)
         else:
             raise ValueError('This space is a discontinuous space!')
@@ -104,14 +104,14 @@ class LagrangeFiniteElementSpace():
         guh = guh.swapaxes(0, 1)
         rguh = self.function(dim=GD)
 
-        if method is 'simple':
+        if method == 'simple':
             deg = np.bincount(cell2dof.flat, minlength = gdof)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
                 np.add.at(rguh, cell2dof, guh)
 
-        elif method is 'area':
+        elif method == 'area':
             measure = self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
@@ -121,7 +121,7 @@ class LagrangeFiniteElementSpace():
             else:
                 np.add.at(rguh, cell2dof, guh)
 
-        elif method is 'distance':
+        elif method == 'distance':
             ipoints = self.interpolation_points()
             bp = self.mesh.entity_barycenter('cell')
             v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
@@ -133,7 +133,7 @@ class LagrangeFiniteElementSpace():
             else:
                 np.add.at(rguh, cell2dof, guh)
 
-        elif method is 'area_harmonic':
+        elif method == 'area_harmonic':
             measure = 1/self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
@@ -143,7 +143,7 @@ class LagrangeFiniteElementSpace():
             else:
                 np.add.at(rguh, cell2dof, guh)
 
-        elif method is 'distance_harmonic':
+        elif method == 'distance_harmonic':
             ipoints = self.interpolation_points()
             bp = self.mesh.entity_barycenter('cell')
             v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
@@ -194,7 +194,7 @@ class LagrangeFiniteElementSpace():
         bcs[idx, ..., nmap[lidx]] = bc[..., 0]
         bcs[idx, ..., pmap[lidx]] = bc[..., 1]
 
-        if direction is False:
+        if direction == False:
             bcs[idx[isInEdge], ..., nmap[lidx[isInEdge]]] = bc[..., 1]
             bcs[idx[isInEdge], ..., pmap[lidx[isInEdge]]] = bc[..., 0]
 
@@ -439,6 +439,18 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
+    def integral_basis(self):
+        """
+        """
+        cell2dof = self.cell_to_dof()
+        cc = self.integralalg.integral(self.basis, celltype=True,
+                barycenter=True)
+
+        gdof = self.number_of_global_dofs()
+        c = np.zeros(gdof, dtype=self.ftype)
+        np.add.at(c, cell2dof, cc)
+        return c
+
     def linear_elasticity_matrix(self, mu, lam):
         """
         construct the linear elasticity fem matrix
@@ -619,7 +631,7 @@ class LagrangeFiniteElementSpace():
                 np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
             b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
-        return b.T.flat
+        return b
 
     def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
         """
