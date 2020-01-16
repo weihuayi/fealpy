@@ -197,9 +197,9 @@ class PolygonMesh(Mesh2d):
             flag0 = np.repeat(isMarkedCell, NV)
             newCell[:s0] = cell[~flag0]
             newCell[s0::4] = np.repeat(range(NN+NE1, NN+NE1+NC1), NV1)
-            newcell[s0+1::4] = cell2edge[cellLocation[isMarkedCell]
-            newcell[s0+2::4] = cell2edge[cellLocation[isMarkedCell]
-            newcell[s0+3::4] = cell2edge[cellLocation[isMarkedCell]
+            newCell[s0+1::4] = cell2edge[cellLocation[isMarkedCell]]
+            newCell[s0+2::4] = cell2edge[cellLocation[isMarkedCell]]
+            newCell[s0+3::4] = cell2edge[cellLocation[isMarkedCell]]
 
             ec = self.entity_barycenter('edge')
             cc = self.entity_barycenter('cell')

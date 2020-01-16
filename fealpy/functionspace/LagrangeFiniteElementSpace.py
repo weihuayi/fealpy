@@ -443,9 +443,9 @@ class LagrangeFiniteElementSpace():
         """
         """
         cell2dof = self.cell_to_dof()
-        cc = self.integralalg.integral(self.basis, celltype=True,
-                barycenter=True)
-
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.basis(bcs)
+        cc = np.einsum('m, mk, i->ik', ws, phi, self.cellmeasure)
         gdof = self.number_of_global_dofs()
         c = np.zeros(gdof, dtype=self.ftype)
         np.add.at(c, cell2dof, cc)
