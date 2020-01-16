@@ -155,35 +155,54 @@ class PolygonMesh(Mesh2d):
         return ps
 
     def refine(self, isMarkedCell):
+
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
         NV = self.number_of_vertices_of_cells()
 
+        NC1 = isMarkedCell.sum()
+        if  NC1 > 0:
+            NC0 = NC - NC1
+            cell, cellLocation = self.entity('cell')
+            node = self.entity('node')
+            edge = self.entity('edge')
 
-        cell, cellLocation = self.entity('cell')
-        node = self.entity('node')
-        edge = self.entity('edge')
 
+            isMarkedEdge = np.zeros(NE, dtype=np.bool)
+            edge2cell = self.ds.edge_to_cell()
+            cell2edge = self.ds.cell_to_edge(sparse=False)
+            isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
+            isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
 
-        isMarkedEdge = np.zeros(NE, dtype=np.bool)
-        edge2cell = self.ds.edge_to_cell()
-        isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
-        isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
+            NV0 = NV[~isMarkedCell]
+            NV1 = NV[isMarkedCell]
 
-        ec = self.entity_barycenter('edge')
-        cc = self.entity_barycenter('cell')
-        isKeepedCell = np.repeat(~isMarkedCell, NV)
-        NV0 = NV[~isMarkedCell]
-        NV1 = NV[isMarkedCell]
+            s0 = np.sum(NV0)
+            s1 = np.sum(NV1)
 
-        s0 = np.sum(NV0)
-        s1 = np.sum(NV1)
-        newCell = np.zeros(s0+4*s1, dtype=self.itype)
-        newCell[:s0] = cell
-        newCell[s0:] = 0
+            newCellLocation = np.zeros(NC0 + s1 + 1, dtype=self.itype)
+            newCellLocation[:NC0] = cellLocation[0:-1][~isMarkedCell]
+            newCellLocation[NC0:-1] = np.arange(s0, s0+4*s1, 4)
+            newCellLocation[-1] = s0+4*s1
 
+            emap = np.zeros(NE, dtype=self.itype)
+            NE1 = isMarkedEdge.sum()
+            emap[isMarkedEdge] = range(NE1)
+            cmap = np.zeros(NC, dtype=self.itype)
+            cmap[isMarkedCell] = range(NC1)
+
+            newCell = np.zeros(s0+4*s1, dtype=self.itype)
+            flag0 = np.repeat(isMarkedCell, NV)
+            newCell[:s0] = cell[~flag0]
+            newCell[s0::4] = np.repeat(range(NN+NE1, NN+NE1+NC1), NV1))
+            newcell[s0+1::4] = cell2edge[cellLocation[isMarkedCell]
+            newcell[s0+2::4] = cell2edge[cellLocation[isMarkedCell]
+            newcell[s0+3::4] = cell2edge[cellLocation[isMarkedCell]
+
+            ec = self.entity_barycenter('edge')
+            cc = self.entity_barycenter('cell')
 
     def print(self):
         print("Node:\n", self.node)
