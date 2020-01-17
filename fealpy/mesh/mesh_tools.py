@@ -16,9 +16,8 @@ def find_node(
         showindex=False, color='r',
         markersize=20, fontsize=24, fontcolor='k'):
 
-    if len(node.shape) == 1:
-        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
-
+    if node.shape[1] == 1:
+        node = np.r_['1', node, np.zeros_like(node)]
     if (index is None) or (index is 'all'):
         index = range(node.shape[0])
     elif (type(index) is np.ndarray) & (index.dtype == np.bool):
@@ -125,9 +124,8 @@ def show_mesh_1d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    dim = mesh.geo_dimension() 
-    if dim == 1:
-        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
+    if node.shape[1] == 1:
+        node = np.r_['1', node, np.zeros_like(node)]
 
     axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
     vts = node[cell, :]

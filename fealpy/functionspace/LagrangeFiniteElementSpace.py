@@ -266,7 +266,7 @@ class LagrangeFiniteElementSpace():
         A[..., 1:, :] *= P.reshape(-1, 1)
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
+        return phi[..., np.newaxis, :] # (..., 1, ldof)
 
 
     def basis(self, bc):
@@ -275,14 +275,14 @@ class LagrangeFiniteElementSpace():
 
         Parameters
         ----------
-        bc : numpy.array
+        bc : numpy.ndarray
             the shape of `bc` can be `(tdim+1,)` or `(NQ, tdim+1)`
         Returns
         -------
-        phi : numpy.array
-            the shape of 'phi' can be `(ldof, )` or `(NQ, ldof)`
+        phi : numpy.ndarray
+            the shape of 'phi' can be `(1, ldof)` or `(NQ, 1, ldof)`
 
-        See also
+        See Also
         --------
 
         Notes
@@ -310,7 +310,7 @@ class LagrangeFiniteElementSpace():
         A[..., 1:, :] *= P.reshape(-1, 1)
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
+        return phi[..., np.newaxis, :] # (..., 1, ldof)
 
     def grad_basis(self, bc, cellidx=None):
         """
@@ -318,14 +318,14 @@ class LagrangeFiniteElementSpace():
 
         Parameters
         ----------
-        bc : numpy.array
-            the shape of `bc` can be `(tdim+1,)` or `(NQ, tdim+1)`
+        bc : numpy.ndarray
+            the shape of `bc` can be `(TD+1,)` or `(NQ, TD+1)`
 
         Returns
         -------
-        gphi : numpy.array
-            the shape of `gphi` can b `(NC, ldof, gdim)' or
-            `(NQ, NC, ldof, gdim)'
+        gphi : numpy.ndarray
+            the shape of `gphi` can b `(NC, ldof, GD)' or
+            `(NQ, NC, ldof, GD)'
 
         See also
         --------
@@ -372,18 +372,16 @@ class LagrangeFiniteElementSpace():
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         else:
             gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[cellidx, :, :])
-        return gphi
+        return gphi #(..., NC, ldof, GD)
 
     def value(self, uh, bc, cellidx=None):
         phi = self.basis(bc)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...j, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
-            val = np.einsum(s1, phi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        cellidx = cellidx if cellidx is not None else np.s_[:]
+        val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
         return val
 
     def grad_value(self, uh, bc, cellidx=None):
@@ -391,20 +389,14 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        if self.geo_dimension() == 1:
-            s1 = '...ijm, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        else:
-            s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-
-        if cellidx is None:
-            val = np.einsum(s1, gphi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        cellidx = cellidx if cellidx is not None else np.s_[:]
+        val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
         return val
 
     def div_value(self, uh, bc, cellidx=None):
         dim = len(uh.shape)
-        gdim = self.geo_dimension()
+        GD = self.geo_dimension()
         if (dim == 2) & (uh.shape[1] == gdim):
             val = self.grad_value(uh, bc, cellidx=cellidx)
             return val.trace(axis1=-2, axis2=-1)
@@ -445,7 +437,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
-        cc = np.einsum('m, mk, i->ik', ws, phi, self.cellmeasure)
+        cc = np.einsum('m, mik, i->ik', ws, phi, self.cellmeasure)
         gdof = self.number_of_global_dofs()
         c = np.zeros(gdof, dtype=self.ftype)
         np.add.at(c, cell2dof, cc)
@@ -577,9 +569,9 @@ class LagrangeFiniteElementSpace():
                 dphi = d*phi
             elif isinstance(d, np.ndarray):
                 if (len(d.shape) == 1):
-                    dphi = np.einsum('i, mj->mij', d, phi)
+                    dphi = np.einsum('i, mij->mij', d, phi)
                 elif len(d.shape) == 2:
-                    dphi = np.einsum('mi, mj->mij', d, phi)
+                    dphi = np.einsum('mi, mij->mij', d, phi)
                 else:
                     raise ValueError("The ndarray shape length should < 3!")
             else:
@@ -589,16 +581,10 @@ class LagrangeFiniteElementSpace():
         else:
             dphi = phi
 
-        if len(dphi.shape) == 2:
-            M = np.einsum(
-                    'm, mj, mk, i->ijk',
-                    ws, dphi, phi, cellmeasure,
-                    optimize=True)
-        elif len(dphi.shape) == 3:
-            M = np.einsum(
-                    'm, mij, mk, i->ijk',
-                    ws, dphi, phi, self.cellmeasure,
-                    optimize=True)
+        M = np.einsum(
+                'm, mij, mik, i->ijk',
+                ws, dphi, phi, self.cellmeasure,
+                optimize=True)
 
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
@@ -619,7 +605,7 @@ class LagrangeFiniteElementSpace():
         if p > 0:
             phi = self.basis(bcs)
             # bb: (NC, ldof)
-            bb = np.einsum('m, mi..., mk, i->ik...',
+            bb = np.einsum('m, mi..., mik, i->ik...',
                     ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
             gdof = self.number_of_global_dofs()
