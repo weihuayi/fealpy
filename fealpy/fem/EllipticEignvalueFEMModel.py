@@ -77,23 +77,21 @@ class EllipticEignvalueFEMModel:
             J += np.sum((grad - grad[cell2cell[:, i]])*n[cell2face[:, i]], axis=-1)**2
         return np.sqrt(J*measure)
 
-    def get_stiff_matrix(self, space, integrator, area):
+    def get_stiff_matrix(self, space):
         try:
-            A = space.stiff_matrix(integrator, area,
-                    cfun=self.pde.diffusion_coefficient)
+            A = space.stiff_matrix(cfun=self.pde.diffusion_coefficient)
         except AttributeError:
-            A = space.stiff_matrix(integrator, area)
+            A = space.stiff_matrix()
 
         try:
-            A += space.mass_matrix(integrator, area,
-                    cfun=self.pde.reaction_coefficient)
+            A += space.mass_matrix(cfun=self.pde.reaction_coefficient)
         except AttributeError:
             pass
 
         return A
 
-    def get_mass_matrix(self, space, integrator, area):
-        M = space.mass_matrix(integrator, area)
+    def get_mass_matrix(self, space):
+        M = space.mass_matrix()
         return M
 
     def linear_operator(self, x):
@@ -161,16 +159,14 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
 
         mesh = self.pde.init_mesh(n=self.numrefine)
-        integrator = mesh.integrator(self.q)
 
         # 1. 粗网格上求解最小特征值问题
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
         print("initial mesh:", gdof)
         uh = np.zeros(gdof, dtype=np.float)
-        area = mesh.entity_measure('cell')
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
@@ -221,10 +217,8 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = d*M@uh
             if self.sigma is None:
@@ -287,7 +281,6 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_1_0_' + str(NN) + '.mat')
 
-        integrator = mesh.integrator(self.q)
 
         space = LagrangeFiniteElementSpace(mesh, 1)
         isFreeDof = ~(space.boundary_dof())
@@ -297,8 +290,8 @@ class EllipticEignvalueFEMModel:
         IM = eye(gdof)
         for i in range(maxit+1):
             area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             uh = IM@uh
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
@@ -400,9 +393,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             b = M@np.ones(gdof)
 
             isFreeDof = ~(space.boundary_dof())
@@ -453,9 +445,8 @@ class EllipticEignvalueFEMModel:
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
 
-        area = mesh.entity_measure('cell')
-        A = self.get_stiff_matrix(space, integrator, area)
-        M = self.get_mass_matrix(space, integrator, area)
+        A = self.get_stiff_matrix(space)
+        M = self.get_mass_matrix(space)
         isFreeDof = ~(space.boundary_dof())
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
@@ -498,12 +489,10 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step))
 
         mesh = self.pde.init_mesh(n=self.numrefine)
-        integrator = mesh.integrator(self.q)
         # 1. 粗网格上求解最小特征值问题
-        area = mesh.entity_measure('cell')
         space = LagrangeFiniteElementSpace(mesh, 1)
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
 
         gdof = space.number_of_global_dofs()
@@ -566,9 +555,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
@@ -598,9 +586,8 @@ class EllipticEignvalueFEMModel:
 
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
-        area = mesh.entity_measure('cell')
-        A = self.get_stiff_matrix(space, integrator, area)
-        M = self.get_mass_matrix(space, integrator, area)
+        A = self.get_stiff_matrix(space)
+        M = self.get_mass_matrix(space)
         isFreeDof = ~(space.boundary_dof())
         uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
@@ -648,10 +635,9 @@ class EllipticEignvalueFEMModel:
         integrator = mesh.integrator(self.q)
 
         # 1. 粗网格上求解最小特征值问题
-        area = mesh.entity_measure('cell')
         space = LagrangeFiniteElementSpace(mesh, 1)
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
 
         gdof = space.number_of_global_dofs()
@@ -714,9 +700,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
