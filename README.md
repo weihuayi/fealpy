@@ -17,7 +17,6 @@ $ sudo apt install git            # The version control tool
 $ sudo apt install python3        # The python3 interpretor 
 $ sudo apt install python3-pip    # The PyPA recommended tool for installing Python packages.
 $ sudo apt install python3-tk     # Python interface to Tcl/Tk used by matplotlib 
-$ sudo apt install ipython3       # An enhanced Interactive Python  
 ```
 2. clone the latest fealpy from github:
 ```
@@ -25,21 +24,15 @@ $ git clone https://github.com/weihuayi/fealpy.git
 ```
 3. In `fealpy/`, run the following command: 
 ```
-$ sudo -H pip3 install ./
+$ python3 setup_linux.py install 
 ```
-which will copy the fealpy into `/usr/local/lib/python3.6/dist-packages/`.  Or run the following command:
+which will copy the fealpy into `~/.local/lib/python3.6/dist-packages/`.  Or run the following command:
 ```
-$ sudo -H pip3 install -e ./
+$ python3 setup_linux.py develop 
 ```
-which will create a soft link in `/usr/local/lib/python3.6/dist-packages/`.
+which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
 
 4. You can open `ipython3` from bash shell to test fealpy.
-
-5. If you want to upgrade numpy 
-
-```
-sudo -H pip3 --upgrade numpy
-```
 
 
 ## Windows: Anaconda
@@ -65,7 +58,7 @@ pip install pyamg‑4.0.0‑cp37‑cp37m‑win_amd64.whl # For 64 bit win system
 5. enter fealpy directory, run the following command:
 
 ```
-pip install -e ./
+$ python setup_linux.py develop 
 ```
 
 6. You can open IPython from the start menu of win system to test fealpy.
