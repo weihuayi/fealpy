@@ -45,9 +45,9 @@ class BoundaryCondition():
             qf = mesh.integrator(p+3, 'face')
             bcs, ws = qf.get_quadrature_points_and_weights()
             phi = space.face_basis(bcs)
-            p = mesh.bc_to_point(bcs, etype='face', index=idx)
+            pp = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
-            val = self.neuman(p, n) # (NQ, NF, ...)
+            val = self.neuman(pp, n) # (NQ, NF, ...)
             bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
             if dim == 1:
                 np.add.at(b, face2dof[idx], bb)

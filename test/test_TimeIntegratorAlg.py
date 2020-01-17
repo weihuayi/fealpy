@@ -93,7 +93,7 @@ class SurfaceParabolicFEMModel():
         for i, t in enumerate(times):
             F[:, i] = self.space.source_vector(lambda x: self.pde.source(x, t))
         return F
-    
+
     def init_delta(self, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()

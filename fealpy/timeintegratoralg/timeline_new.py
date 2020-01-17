@@ -74,7 +74,7 @@ class ChebyshevTimeLine():
         self.time = 0.5*(T0 + T1) - 0.5*(T1 - T0)*np.cos(self.theta)
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
-    
+
     def uniform_refine(self):
         self.NL = 2*(self.NL - 1) + 1
         NT = self.NL - 1
@@ -161,7 +161,6 @@ class ChebyshevTimeLine():
                 self.current += 1
             self.reset()
             data[0] += data[-1]
-        
 
 
 
