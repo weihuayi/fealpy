@@ -72,13 +72,14 @@ class LagrangeFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self):
-        return self.dof.cell2dof
+    def cell_to_dof(self, index=None):
+        index = index if index is not None else np.s_[:]
+        return self.dof.cell2dof[index]
 
-    def face_to_dof(self):
+    def face_to_dof(self, index=None):
         return self.dof.face_to_dof()
 
-    def edge_to_dof(self):
+    def edge_to_dof(self, index=None):
         return self.dof.edge_to_dof()
 
     def boundary_dof(self, threshold=None):
