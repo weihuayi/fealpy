@@ -24,15 +24,14 @@ $ git clone https://github.com/weihuayi/fealpy.git
 ```
 3. In `fealpy/`, run the following command: 
 ```
-$ python3 setup_linux.py install 
+$ python3 setup_linux.py install --prefix=~/.local/
 ```
 which will copy the fealpy into `~/.local/lib/python3.6/dist-packages/`.  Or run the following command:
 ```
-$ python3 setup_linux.py develop 
+$ python3 setup_linux.py develop --prefix=~/.local/
 ```
 which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
 
-4. You can open `ipython3` from bash shell to test fealpy.
 
 
 ## Windows: Anaconda
