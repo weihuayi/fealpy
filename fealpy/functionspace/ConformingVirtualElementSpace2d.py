@@ -58,7 +58,7 @@ class CVEMDof2d():
 
             idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
             cell2dof[idx] = edge2dof[:, 0:p]
-
+ 
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
@@ -415,7 +415,7 @@ class ConformingVirtualElementSpace2d():
                     return np.einsum(
                             'ij, ij...->ij...',
                             u(x), phi(x, cellidx=cellidx, p=p-2))
-                bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+                bb = self.integralalg.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
         else:
