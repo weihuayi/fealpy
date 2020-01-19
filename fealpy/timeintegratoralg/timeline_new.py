@@ -16,9 +16,10 @@ class UniformTimeLine():
         self.dt = (self.T1 - self.T0)/NT
         self.current = 0
 
-    def uniform_refine(self):
-        self.NL = 2*(self.NL - 1) + 1
-        self.dt = (self.T1 - self.T0)/(self.NL - 1)
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            self.NL = 2*(self.NL - 1) + 1
+            self.dt = (self.T1 - self.T0)/(self.NL - 1)
         self.current = 0
 
     def number_of_time_levels(self):
@@ -53,7 +54,6 @@ class UniformTimeLine():
         while not self.stop():
             A = dmodel.get_current_left_matrix(self)
             b = dmodel.get_current_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self)
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()

@@ -8,15 +8,16 @@ from fealpy.pde.poisson_2d import CosCosData
 from fealpy.wg.SobolevEquationWGModel2d import SobolevEquationWGModel2d
 from fealpy.boundarycondition import DirichletBC
 from fealpy.mesh.simple_mesh_generator import triangle
-from fealpy.pde.sobolev_equation_2d import SinSinExpData
+from fealpy.pde.sobolev_equation_2d import SinSinExpData, PolyExpData
 from fealpy.solver import MatlabSolver
+from fealpy.tools import show_error_table
 
 class SobolevEquationWGModel2dTest:
     def __init__(self):
-        nu = 1
+        mu = 1
         epsilon = 0.1
-        self.pde = SinSinExpData(nu, epsilon)
-        #self.solver = MatlabSolver()
+        self.pde = SinSinExpData(mu, epsilon)
+        self.solver = MatlabSolver()
 
     def test_poisson_equation(self, p=1, maxit=4):
         h = 0.1
@@ -52,31 +53,35 @@ class SobolevEquationWGModel2dTest:
         print(error[0:-1]/error[1:])
 
     def test_sobolev_equation(self, p=1, maxit=4):
-        pde = self.pde
+        mu = 1
+        epsilon = 0.1
+        pde = PolyExpData(mu, epsilon)
         domain = pde.domain()
-        timeline = pde.time_mesh(0, 1, 20)
-        error = np.zeros(maxit, dtype=np.float)
-        h = 0.1
+        h = 0.25
+        timeline = pde.time_mesh(0, 0.1, 160)
+        error = np.zeros((4, maxit), dtype=np.float)
+        errorType = ['$|| u - u_{h,i}||_{0}$',
+             '$|| p - p_{h, i}||_{0}$',
+             '$||\\nabla u - \\nabla_w u_h||_{0}$',
+             '$||\\nabla\cdot p - \\nabla_w\cdot p_h||_{0}$']
+        Ndof = np.zeros(maxit, dtype=np.int)
         for i in range(maxit):
             print(i)
             mesh = triangle(domain, h=h, meshtype='polygon')
-            dmodel = SobolevEquationWGModel2d(pde, mesh, p)
+            dmodel = SobolevEquationWGModel2d(pde, mesh, p, q=6)
             uh = dmodel.init_solution(timeline)
-            up = dmodel.projection(pde.solution, timeline)
-            fp = dmodel.projection(pde.source, timeline)
-            uh[:, 0] = up[:, 0]
+            up = dmodel.project(pde.solution, timeline)
+            ph = [0]
             solver = self.solver.divide
-            data = [uh, fp, solver]
+            data = [uh, ph, solver]
             timeline.time_integration(data, dmodel, solver)
-            error[i] = np.max(np.abs(uh - up))
-
-            timeline.uniform_refine()
+            Ndof[i] = dmodel.space.number_of_global_dofs()
+            error[0, i], error[1, i], error[2, i], error[3, i] = dmodel.error(data, timeline)
             h /= 2
-
-        print(error[:-1]/error[1:])
-        print(error)
+            timeline.uniform_refine(n=2)
+        show_error_table(Ndof, errorType, error)
 
 
 test = SobolevEquationWGModel2dTest()
-test.test_poisson_equation(p=2)
-#test.test_sobolev_equation()
+#test.test_poisson_equation(p=2)
+test.test_sobolev_equation(maxit=5)

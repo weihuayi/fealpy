@@ -181,8 +181,8 @@ class WeakGalerkinSpace2d:
     def weak_grad(self, uh):
         cell2dof, cell2dofLocation = self.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
-        R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
+        R0 = np.hsplit(self.R[0], cell2dofLocation[1:-1])
+        R1 = np.hsplit(self.R[1], cell2dofLocation[1:-1])
         ph = self.smspace.function(dim=2)
 
         f0 = lambda x: x[0]@(x[1]@uh[x[2]])
@@ -193,8 +193,8 @@ class WeakGalerkinSpace2d:
     def weak_div(self, ph):
         cell2dof, cell2dofLocation = self.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        R0 = np.hsplit(self.R0, cell2dofLocation[1:-1])
-        R1 = np.hsplit(self.R1, cell2dofLocation[1:-1])
+        R0 = np.hsplit(self.R[0], cell2dofLocation[1:-1])
+        R1 = np.hsplit(self.R[1], cell2dofLocation[1:-1])
         dh = self.smspace.function()
         f0 = lambda x: x[0]@(x[1]@ph[x[3], 0] + x[2]@ph[x[3], 1])
         dh[:] = np.concatenate(list(map(f0, zip(self.H0, R0, R1, cd))))
@@ -363,6 +363,7 @@ class WeakGalerkinSpace2d:
         h = mesh.entity_measure('edge')
         b = np.einsum('i, ij, ijk, j->jk', ws, gI, ephi, h[isBdEdge])
         uh[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
+        return isBdDof
 
     def basis(self, point, index=None):
         return self.smspace.basis(point, index=index)
