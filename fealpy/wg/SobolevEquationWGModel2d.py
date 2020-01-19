@@ -33,9 +33,10 @@ class SobolevEquationWGModel2d:
         cell2dof, cell2dofLocation = self.space.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         H0 = self.space.H0
+        R = self.space.R
         def f0(i):
-            R0 = self.R[0][cell2dofLocation[i]:cell2dofLocation[i+1]]
-            R1 = self.R[1][cell2dofLocation[i]:cell2dofLocation[i+1]]
+            R0 = R[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            R1 = R[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
             return R0.T@H0[i]@R0, R1.T@H0[i]@R1, R0.T@H0[i]@R1
 
         NC = self.mesh.number_of_cells()

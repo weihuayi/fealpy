@@ -226,11 +226,11 @@ class ConformingVirtualElementSpace2d():
         MonomialSpace2d.
         """
         space0 = F.space
-        def f(x, cellidx):
+        def f(x, index):
             return np.einsum(
                     '...im, ...in->...imn',
-                    mspace.basis(x, cellidx),
-                    smspace.basis(x, cellidx)
+                    mspace.basis(x, index),
+                    smspace.basis(x, index)
                     )
         C = self.integralalg.integral(f, celltype=True)
         H = space1.matrix_H()
@@ -327,9 +327,9 @@ class ConformingVirtualElementSpace2d():
         PI0 = self.PI0
 
         phi = self.smspace.basis
-        def u(x, cellidx):
-            val = phi(x, cellidx=cellidx)
-            wval = wh(x, cellidx=cellidx)
+        def u(x, index):
+            val = phi(x, index=index)
+            wval = wh(x, index=index)
             return np.einsum('ij, ijm, ijn->ijmn', wval, val, val)
         H = self.integralalg.integral(u, celltype=True)
 
@@ -354,8 +354,8 @@ class ConformingVirtualElementSpace2d():
     def source_vector(self, f):
         PI0 = self.PI0
         phi = self.smspace.basis
-        def u(x, cellidx):
-            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
         bb = self.integralalg.integral(u, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(PI0, bb))))
@@ -411,10 +411,10 @@ class ConformingVirtualElementSpace2d():
             uI[:NN+(p-1)*NE] = u(ipoint)
             if p > 1:
                 phi = self.smspace.basis
-                def f(x, cellidx):
+                def f(x, index):
                     return np.einsum(
                             'ij, ij...->ij...',
-                            u(x), phi(x, cellidx=cellidx, p=p-2))
+                            u(x), phi(x, index=index, p=p-2))
                 bb = self.integralalg.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
@@ -486,8 +486,8 @@ class ConformingVirtualElementSpace2d():
         qf = GaussLobattoQuadrature(p+1)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        phi0 = self.smspace.basis(ps[:-1], index=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[p:0:-1, isInEdge, :], index=edge2cell[isInEdge, 1])
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi0
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
@@ -534,8 +534,8 @@ class ConformingVirtualElementSpace2d():
             qf = GaussLobattoQuadrature(p + 1)
             bcs, ws = qf.quadpts, qf.weights
             ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-            gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
-            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+            gphi0 = self.smspace.grad_basis(ps, index=edge2cell[:, 0])
+            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], index=edge2cell[isInEdge, 1])
             nm = mesh.edge_normal()
 
             # m: the scaled basis number,

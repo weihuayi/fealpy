@@ -217,10 +217,10 @@ class WeakGalerkinSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
         phi1 = self.smspace.basis(
                 ps[:, isInEdge, :],
-                cellidx=edge2cell[isInEdge, 1]
+                index=edge2cell[isInEdge, 1]
                 )
         phi = self.edge_basis(ps)
 
@@ -246,9 +246,9 @@ class WeakGalerkinSpace2d:
             R0[:, idx] = -n[np.newaxis, :, [0]]*F1 # 这里应该加上负号
             R1[:, idx] = -n[np.newaxis, :, [1]]*F1 # 这里应该加上负号
 
-        def f(x, cellidx):
-            gphi = self.grad_basis(x, cellidx)
-            phi = self.basis(x, cellidx)
+        def f(x, index):
+            gphi = self.grad_basis(x, index)
+            phi = self.basis(x, index)
             return np.einsum(
                     '...mn, ...k->...nmk',
                     gphi, phi)
@@ -286,10 +286,10 @@ class WeakGalerkinSpace2d:
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         ps = self.mesh.edge_bc_to_point(bcs)
-        phi0 = self.basis(ps, cellidx=edge2cell[:, 0])
+        phi0 = self.basis(ps, index=edge2cell[:, 0])
         phi1 = self.basis(
                 ps[:, isInEdge, :],
-                cellidx=edge2cell[isInEdge, 1]
+                index=edge2cell[isInEdge, 1]
                 )
         phi = self.edge_basis(ps)
 
@@ -357,31 +357,31 @@ class WeakGalerkinSpace2d:
 
         qf = GaussLegendreQuadrature(self.p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
+        ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
         gI = g(ps)
-        ephi = self.edge_basis(ps, edgeidx=isBdEdge)
+        ephi = self.edge_basis(ps, index=isBdEdge)
         h = mesh.entity_measure('edge')
         b = np.einsum('i, ij, ijk, j->jk', ws, gI, ephi, h[isBdEdge])
         uh[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
 
-    def basis(self, point, cellidx=None):
-        return self.smspace.basis(point, cellidx=cellidx)
+    def basis(self, point, index=None):
+        return self.smspace.basis(point, index=index)
 
-    def grad_basis(self, point, cellidx=None):
-        return self.smspace.grad_basis(point, cellidx=cellidx)
+    def grad_basis(self, point, index=None):
+        return self.smspace.grad_basis(point, index=index)
 
-    def value(self, uh, point, cellidx=None):
+    def value(self, uh, point, index=None):
         NE = self.mesh.number_of_edges()
         p = self.p
-        return self.smspace.value(uh[NE*(p+1):, ...], point, cellidx=cellidx)
+        return self.smspace.value(uh[NE*(p+1):, ...], point, index=index)
 
-    def grad_value(self, uh, point, cellidx=None):
+    def grad_value(self, uh, point, index=None):
         NE = self.mesh.number_of_edges()
         p = self.p
-        return self.smspace.grad_value(uh[NE*(p+1):, ...], point, cellidx=cellidx)
+        return self.smspace.grad_value(uh[NE*(p+1):, ...], point, index=index)
 
-    def edge_basis(self, point, edgeidx=None):
-        return self.smspace.edge_basis(point, edgeidx=edgeidx)
+    def edge_basis(self, point, index=None):
+        return self.smspace.edge_basis(point, index=index)
 
     def lagrange_edge_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
@@ -413,8 +413,8 @@ class WeakGalerkinSpace2d:
 
     def source_vector(self, f):
         phi = self.basis
-        def u(x, cellidx):
-            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
         bb = self.integralalg.integral(u, celltype=True)
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof(doftype='cell')
@@ -445,8 +445,8 @@ class WeakGalerkinSpace2d:
 
         t = 'd'
         s = '...{}, ...m->...m{}'.format(t[:dim>1], t[:dim>1])
-        def f1(x, cellidx):
-            phi = self.basis(x, cellidx)
+        def f1(x, index):
+            phi = self.basis(x, index)
             return np.einsum(s, u(x), phi)
 
         b = self.integralalg.integral(f1, celltype=True)

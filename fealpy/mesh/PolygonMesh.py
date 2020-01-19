@@ -145,13 +145,11 @@ class PolygonMesh(Mesh2d):
         a /=2
         return a
 
-    def edge_bc_to_point(self, bcs, edgeidx=None):
+    def edge_bc_to_point(self, bcs, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
-        if edgeidx is None:
-            ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        else:
-            ps = np.einsum('ij, kjm->ikm', bcs, node[edge[edgeidx]])
+        index = index if index is not None else np.s_[:]
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
     def refine(self, isMarkedCell):
