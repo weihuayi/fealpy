@@ -9,11 +9,11 @@ class SobolevEquationWGModel2d:
     Solve Sobolev equation by weak Galerkin method.
 
     """
-    def __init__(self, pde, mesh, p, q=None):
+    def __init__(self, pde, mesh, p, q=None, dt=None):
         self.pde = pde
         self.mesh = mesh
         self.space = WeakGalerkinSpace2d(mesh, p=p, q=q)
-        self.construct_marix()
+        self.construct_marix(dt)
 
     def init_solution(self, timeline):
         NL = timeline.number_of_time_levels()
@@ -22,7 +22,7 @@ class SobolevEquationWGModel2d:
         uh[:, 0] = self.space.project(lambda x: self.pde.solution(x, 0.0))
         return uh
 
-    def construct_marix(self):
+    def construct_marix(self, dt=None):
         """
         构造 Soblove 方程对应的所有矩阵
         """
@@ -76,6 +76,16 @@ class SobolevEquationWGModel2d:
         B1 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
         self.B = bmat([[B0], [B1]], format='csr')
 
+        if dt is not None:
+            epsilon = self.pde.epsilon
+            mu = self.pde.mu
+            D = self.A1
+            G = self.A2
+            B = -dt*epsilon/mu*self.B
+            self.A = bmat([[dt*D, B], [B.T, epsilon*(1 + dt*epsilon/mu)*G]], format='csr')
+        else:
+            self.A = None
+
     def project(self, u, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
@@ -86,13 +96,7 @@ class SobolevEquationWGModel2d:
         return uh
 
     def get_current_left_matrix(self, timeline):
-        mu = self.pde.mu
-        epsilon = self.pde.epsilon
-        dt = timeline.current_time_step_length()
-        D = self.A1
-        G = self.A2
-        B = -dt*epsilon/mu*self.B
-        return bmat([[dt*D, B], [B.T, epsilon*(1 + dt*epsilon/mu)*G]], format='csr')
+        return self.A
 
     def get_current_right_vector(self, data, timeline):
         mu = self.pde.mu
@@ -103,7 +107,6 @@ class SobolevEquationWGModel2d:
         R = self.space.R
 
         uh = data[0]
-        ph = data[1]
         solver = data[2]
 
         cell2dof, cell2dofLocation = self.space.cell_to_dof(doftype='all')
@@ -122,23 +125,23 @@ class SobolevEquationWGModel2d:
         np.subtract.at(F[:, 0], cell2dof, np.concatenate(list(map(f10, range(NC)))))
         np.subtract.at(F[:, 1], cell2dof, np.concatenate(list(map(f11, range(NC)))))
         F[:, 0:2] *= dt
-        F[:, 2] = epsilon*self.A2@uh[:, i]
+        F[:, 2] = epsilon*self.A2@uh
         return F.T.flat
 
     def solve(self, data, A, b, solver, timeline):
-        uh = data[0]
-        ph = data[1]
         i = timeline.current
+        uh = self.space.function()
+        ph = self.space.function(dim=2)
         # deal with dirichlet boundary condition 
         t1 = timeline.next_time_level()
         dirichlet = lambda x: self.pde.dirichlet(x, t1)
-        isDDof = self.space.set_dirichlet_bc(uh[:, i+1], dirichlet)
+        isDDof = self.space.set_dirichlet_bc(uh, dirichlet)
         gdof = self.space.number_of_global_dofs()
         flag = np.zeros(gdof, dtype=np.bool)
         isDDof = np.r_[flag, flag, isDDof]
 
         x = np.zeros(3*gdof, dtype=self.space.ftype)
-        x[2*gdof:] = uh[:, i+1]
+        x[2*gdof:] = uh
         b -= A@x
         bdIdx = np.zeros(3*gdof, dtype=np.int)
         bdIdx[isDDof] = 1
@@ -148,44 +151,37 @@ class SobolevEquationWGModel2d:
         b[isDDof] = x[isDDof]
 
         x[:] = solver(A, b)
-        phi = self.space.function(dim=2)
-        phi[:, 0] = x[:gdof]
-        phi[:, 1] = x[gdof:2*gdof]
-        uh[:, i+1] = x[2*gdof:]
+        ph[:, 0] = x[:gdof]
+        ph[:, 1] = x[gdof:2*gdof]
+        uh[:] = x[2*gdof:]
 
-        ph.append(phi)
+        data[0] = uh
+        data[1] = ph
+        self.error(data, timeline)
+
 
     def error(self, data, timeline):
+        integralalg = self.space.integralalg
         pde = self.pde
         uh = data[0]
         ph = data[1]
+        error = data[3]
+        dt = timeline.current_time_step_length()
+        t1 = timeline.next_time_level()
 
-        integralalg = self.space.integralalg
-        NL = timeline.number_of_time_levels()
-        gdof = self.space.number_of_global_dofs()
-        times = timeline.all_time_levels()
-        error0 = 0.0
-        error1 = 0.0
-        error2 = 0.0
-        error3 = 0.0
-        for i, t in enumerate(times[:-1]):
-            uhi = uh.index(i+1)
-            dt = times[i+1] - times[i]
+        e0 = integralalg.L2_error(lambda x: pde.solution(x, t1), uh)
+        error[0] += dt*e0*e0
 
-            e0 = integralalg.L2_error(lambda x: pde.solution(x, t+dt), uhi)
-            error0 += dt*e0*e0
+        e1 = integralalg.L2_error(lambda x: pde.flux(x, t1), ph)
+        error[1] += dt*e1*e1
 
-            e1 = integralalg.L2_error(lambda x: pde.flux(x, t+dt), ph[i+1])
-            error1 += dt*e1*e1
+        guh = self.space.weak_grad(uh)
+        e2 = integralalg.L2_error(lambda x: pde.gradient(x, t1), guh)
+        error[2] += dt*e2*e2
 
-            guhi = self.space.weak_grad(uhi)
-            e2 = integralalg.L2_error(lambda x: pde.gradient(x, t+dt), guhi)
-            error2 += dt*e2*e2
-
-            dphi = self.space.weak_div(ph[i+1])
-            e3 = integralalg.L2_error(lambda x: pde.div_flux(x, t+dt), dphi)
-            error3 += dt*e3*e3
-        return np.sqrt(error0), np.sqrt(error1), np.sqrt(error2), np.sqrt(error3)
+        dph = self.space.weak_div(ph)
+        e3 = integralalg.L2_error(lambda x: pde.div_flux(x, t1), dph)
+        error[3] += dt*e3*e3
 
     def get_current_left_matrix_1(self, timeline):
         return self.A2

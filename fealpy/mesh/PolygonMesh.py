@@ -11,7 +11,7 @@ class PolygonMesh(Mesh2d):
     """
     def __init__(self, node, cell, cellLocation=None):
         self.node = node
-        if cellLocation is None: 
+        if cellLocation is None:
             if len(cell.shape)  == 2:
                 NC = cell.shape[0]
                 NV = cell.shape[1]
@@ -68,14 +68,14 @@ class PolygonMesh(Mesh2d):
         node = self.node
         dim = self.geo_dimension()
 
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             cell2node = self.ds.cell_to_node()
             NV = self.number_of_vertices_of_cells().reshape(-1,1)
             bc = cell2node*node/NV
-        elif etype in ['edge', 1]:
+        elif etype in {'edge', 1}:
             edge = self.ds.edge
             bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
-        elif etype in ['node', 1]:
+        elif etype in {'node', 1}:
             bc = node
         return bc
 
@@ -112,8 +112,8 @@ class PolygonMesh(Mesh2d):
         idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
 
         w = np.array([(0,-1),(1,0)])
-        d = node[idx1] - node[idx2] 
-        return 0.5*d@w 
+        d = node[idx1] - node[idx2]
+        return 0.5*d@w
 
     def area(self, index=None):
         #TODO: 3D Case

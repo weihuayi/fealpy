@@ -68,20 +68,24 @@ class SobolevEquationWGModel2dTest:
         for i in range(maxit):
             print(i)
             mesh = triangle(domain, h=h, meshtype='polygon')
-            dmodel = SobolevEquationWGModel2d(pde, mesh, p, q=6)
-            uh = dmodel.init_solution(timeline)
-            up = dmodel.project(pde.solution, timeline)
-            ph = [0]
+            dt = timeline.current_time_step_length()
+            dmodel = SobolevEquationWGModel2d(pde, mesh, p, q=6, dt=dt)
+
+            uh = dmodel.space.project(lambda x:pde.solution(x, 0.0))
             solver = self.solver.divide
-            data = [uh, ph, solver]
+
+            data = [uh, 0, solver, error[:, i]]
+
             timeline.time_integration(data, dmodel, solver)
+
             Ndof[i] = dmodel.space.number_of_global_dofs()
-            error[0, i], error[1, i], error[2, i], error[3, i] = dmodel.error(data, timeline)
             h /= 2
             timeline.uniform_refine(n=2)
+
+        error = np.sqrt(error)
         show_error_table(Ndof, errorType, error)
 
 
 test = SobolevEquationWGModel2dTest()
 #test.test_poisson_equation(p=2)
-test.test_sobolev_equation(maxit=5)
+test.test_sobolev_equation(maxit=3)
