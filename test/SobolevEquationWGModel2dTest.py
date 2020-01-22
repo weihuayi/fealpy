@@ -59,11 +59,13 @@ class SobolevEquationWGModel2dTest:
         domain = pde.domain()
         h = 0.25
         timeline = pde.time_mesh(0, 0.1, 160)
-        error = np.zeros((4, maxit), dtype=np.float)
         errorType = ['$|| u - u_{h,i}||_{0}$',
              '$|| p - p_{h, i}||_{0}$',
              '$||\\nabla u - \\nabla_w u_h||_{0}$',
-             '$||\\nabla\cdot p - \\nabla_w\cdot p_h||_{0}$']
+             '$||\\nabla\cdot p - \\nabla_w\cdot p_h||_{0}$',
+             '$||\\nabla u - \\nabla u_{h, i}||_{0}',
+             '$||\\nabla\cdot p - \\nabla\cdot p_{h, i}||_{0}']
+        error = np.zeros((len(errorType), maxit), dtype=np.float)
         Ndof = np.zeros(maxit, dtype=np.int)
         for i in range(maxit):
             print(i)

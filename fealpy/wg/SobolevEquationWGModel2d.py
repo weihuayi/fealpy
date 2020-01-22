@@ -183,6 +183,15 @@ class SobolevEquationWGModel2d:
         e3 = integralalg.L2_error(lambda x: pde.div_flux(x, t1), dph)
         error[3] += dt*e3*e3
 
+        e4 = integralalg.L2_error(lambda x: pde.gradient(x ,t1), uh.grad_value)
+        error[4] += dt*e4*e4
+
+        def div_value(x, index):
+            val = np.trace(ph.grad_value(x, index=index), axis1=-2, axis2=-1)
+            return val
+        e5 = integralalg.L2_error(lambda x: pde.div_flux(x ,t1), div_value)
+        error[5] += dt*e5*e5
+
     def get_current_left_matrix_1(self, timeline):
         return self.A2
 
