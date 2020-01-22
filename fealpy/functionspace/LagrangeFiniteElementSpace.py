@@ -158,7 +158,7 @@ class LagrangeFiniteElementSpace():
         rguh /= deg.reshape(-1, 1)
         return rguh
 
-    def edge_basis(self, bc, cellidx, lidx, direction=True):
+    def edge_basis(self, bc, index, lidx, direction=True):
         """
         compute the basis function values at barycentric point bc on edge
 
@@ -183,9 +183,9 @@ class LagrangeFiniteElementSpace():
         mesh = self.mesh
 
         cell2cell = mesh.ds.cell_to_cell()
-        isInEdge = (cell2cell[cellidx, lidx] != cellidx)
+        isInEdge = (cell2cell[index, lidx] != index)
 
-        NE = len(cellidx)
+        NE = len(index)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
@@ -201,8 +201,8 @@ class LagrangeFiniteElementSpace():
 
         return self.basis(bcs)
 
-    def edge_grad_basis(self, bc, cellidx, lidx, direction=True):
-        NE = len(cellidx)
+    def edge_grad_basis(self, bc, index, lidx, direction=True):
+        NE = len(index)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
         shape = (NE, ) + bc.shape[0:-1] + (3, )
@@ -249,7 +249,7 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[cellidx, :, :])
+        gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
         return gphi
 
     def face_basis(self, bc):
@@ -313,7 +313,7 @@ class LagrangeFiniteElementSpace():
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
-    def grad_basis(self, bc, cellidx=None):
+    def grad_basis(self, bc, index=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -369,37 +369,35 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        if cellidx is None:
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        else:
-            gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[cellidx, :, :])
+        index = index if index is not None else np.s_[:]
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
         return gphi #(..., NC, ldof, GD)
 
-    def value(self, uh, bc, cellidx=None):
+    def value(self, uh, bc, index=None):
         phi = self.basis(bc)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        cellidx = cellidx if cellidx is not None else np.s_[:]
-        val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+        index = index if index is not None else np.s_[:]
+        val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
-    def grad_value(self, uh, bc, cellidx=None):
-        gphi = self.grad_basis(bc, cellidx=cellidx)
+    def grad_value(self, uh, bc, index=None):
+        gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        cellidx = cellidx if cellidx is not None else np.s_[:]
-        val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+        index = index if index is not None else np.s_[:]
+        val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val
 
-    def div_value(self, uh, bc, cellidx=None):
+    def div_value(self, uh, bc, index=None):
         dim = len(uh.shape)
         GD = self.geo_dimension()
         if (dim == 2) & (uh.shape[1] == gdim):
-            val = self.grad_value(uh, bc, cellidx=cellidx)
+            val = self.grad_value(uh, bc, index=index)
             return val.trace(axis1=-2, axis2=-1)
         else:
             raise ValueError("The shape of uh should be (gdof, gdim)!")
