@@ -90,4 +90,4 @@ class SobolevEquationWGModel2dTest:
 
 test = SobolevEquationWGModel2dTest()
 #test.test_poisson_equation(p=2)
-test.test_sobolev_equation(maxit=3)
+test.test_sobolev_equation(maxit=5)
