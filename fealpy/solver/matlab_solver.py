@@ -13,7 +13,6 @@ class MatlabSolver:
         start = timer()
         x = self.matlab.mldivide(A, b.reshape(-1, 1))
         end = timer()
-        print("The time of Matlab direct solver:", end - start)
         return x.reshape(-1)
 
     def eigs(self, A, M=None, scale=None, n=1, eig_type='SM'):

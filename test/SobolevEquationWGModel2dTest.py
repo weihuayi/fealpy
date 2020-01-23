@@ -52,7 +52,7 @@ class SobolevEquationWGModel2dTest:
         print(error)
         print(error[0:-1]/error[1:])
 
-    def test_sobolev_equation(self, p=1, maxit=4):
+    def test_sobolev_equation(self, p=1, maxit=5):
         mu = 1
         epsilon = 0.1
         pde = PolyExpData(mu, epsilon)
