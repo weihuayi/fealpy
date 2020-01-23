@@ -71,7 +71,7 @@ class SobolevEquationWGModel2dTest:
             print(i)
             mesh = triangle(domain, h=h, meshtype='polygon')
             dt = timeline.current_time_step_length()
-            dmodel = SobolevEquationWGModel2d(pde, mesh, p, q=6, dt=dt)
+            dmodel = SobolevEquationWGModel2d(pde, mesh, p, q=6, dt=dt, step=50)
 
             uh = dmodel.space.project(lambda x:pde.solution(x, 0.0))
             solver = self.solver.divide

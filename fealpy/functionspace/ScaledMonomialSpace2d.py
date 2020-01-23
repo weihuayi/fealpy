@@ -180,11 +180,11 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         if point.shape[-2] == len(index):
-            return np.einsum('...ijm, ij->...im', gphi, uh[cell2dof[index]])
+            return np.einsum(s1, gphi, uh[cell2dof[index]])
         elif point.shape[0] == len(index):
-            return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
+            return np.einsum('ij, ikjm->ikm', gphi, uh[cell2dof[index]])
 
     def laplace_basis(self, point, index=None, p=None):
         if p is None:
