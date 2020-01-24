@@ -27,6 +27,7 @@ from .implicit_surface import QuarticsSurface
 from .implicit_surface import ImplicitSurface
 from .implicit_surface import ParabolicSurface
 from .implicit_surface import SaddleSurface
+from .implicit_surface import SquaredSurface
 
 # rename 
 from .implicit_surface import SphereSurface as Sphere

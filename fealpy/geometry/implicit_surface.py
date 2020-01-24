@@ -727,7 +727,86 @@ class QuarticsSurface:
         node = data['node']
         cell = np.array(data['elem'] - 1, dtype=np.int64)
         return TriangleMesh(node, cell)
- 
+
+class SquaredSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return x**8 + y**8 + z**8 - 1
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 8*x**7
+        grad[..., 1] = 8*y**7
+        grad[..., 2] = 8*z**7
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        s = 64*x**14 + 64*y**14 + 64*z**14
+        t1 =3584*(x**20 + y**20 + z**20)/s**(3/2)
+        t2 = 56*(x**6 + y**6 + z**6)/s**(1/2)
+        div = -t1 + t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 56*x**6
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = 0.0
+        H[..., 2, 0] = 0.0
+        H[..., 1, 1] = 56*y**6
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = 56*z**6
+        return H
+    
+    def jacobi_matrix(self, p):
+        pass
+    
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/squared.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
+
 
 class SaddleSurface:
     def __init__(self):
