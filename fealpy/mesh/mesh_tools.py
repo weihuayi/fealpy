@@ -130,7 +130,8 @@ def show_mesh_1d(
     axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
     vts = node[cell, :]
 
-    if dim < 3:
+    GD = mesh.geo_dimension()
+    if GD < 3:
         lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor)
         return axes.add_collection(lines)
     else:
