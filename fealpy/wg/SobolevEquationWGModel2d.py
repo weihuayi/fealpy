@@ -10,12 +10,13 @@ class SobolevEquationWGModel2d:
     Solve Sobolev equation by weak Galerkin method.
 
     """
-    def __init__(self, pde, mesh, p, q=None, dt=None, step=0):
+    def __init__(self, pde, mesh, p, q=None, dt=None, step=0, savedir=None):
         self.pde = pde
         self.mesh = mesh
         self.space = WeakGalerkinSpace2d(mesh, p=p, q=q)
         self.construct_marix(dt)
-        self.step=step
+        self.step = step
+        self.savedir = savedir
 
     def init_solution(self, timeline):
         NL = timeline.number_of_time_levels()
@@ -162,10 +163,9 @@ class SobolevEquationWGModel2d:
         self.error(data, timeline)
         if (self.step != 0) and (i%self.step == 0):
             dof = self.space.number_of_global_dofs()
-            s1 ="/home/why/result/sobolev/data_{}_{}.pkl".format(i, dof)
+            s1 =self.savedir + "data_{}_{}.pkl".format(i, dof)
             f = open(s1, 'wb')
             pickle.dump(data[0:2], f)
- 
 
     def error(self, data, timeline):
         integralalg = self.space.integralalg
