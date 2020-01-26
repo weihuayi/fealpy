@@ -96,6 +96,11 @@ class TriangleMesh(Mesh2d):
         cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
         return QuadrangleMesh(node, cell)
 
+    def egde_merge(self, h0):
+        edge = self.entity('edge')
+        h = self.entity_measure('edge')
+        isShortEdge = h < h0
+
 
     def line_walk(self, p):
         NC = self.number_of_cells()

@@ -113,11 +113,11 @@ class IntervalMesh():
         GD = self.geo_dimension()
         if GD != 2:
             raise ValueError('cell_tagent just work for 2D Case')
-        v = self.cell_tagent(index=index)
+        v = self.cell_tangent(index=index)
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
-    def cell_tagent(self, index=None):
+    def cell_tangent(self, index=None):
         node = self.node
         cell = self.ds.cell
         index = index if index is not None else np.s_[:]
