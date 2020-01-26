@@ -79,8 +79,8 @@ class Mesh2d():
         return v@w
 
     def face_unit_tagent(self, index=None):
-        edge = self.ds.edge
-        node = self.node
+        edge = self.entity('edge')
+        node = self.entity('node')
         NE = self.number_of_edges()
         index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
@@ -94,8 +94,8 @@ class Mesh2d():
         return v@w
 
     def face_tagent(self, index=None):
-        node = self.node
-        edge = self.ds.edge
+        node = self.entity('node')
+        edge = self.entity('edge')
         index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
         return v
@@ -120,8 +120,8 @@ class Mesh2d():
         return v@w
 
     def edge_unit_tagent(self, index=None):
-        edge = self.ds.edge
-        node = self.node
+        node = self.entity('node')
+        edge = self.entity('edge')
         NE = self.number_of_edges()
         index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
@@ -135,8 +135,8 @@ class Mesh2d():
         return v@w
 
     def edge_tagent(self, index=None):
-        node = self.node
-        edge = self.ds.edge
+        node = self.entity('node')
+        edge = self.entity('edge')
         index = index if index is not None else np.s_[:]
         v = node[edge[index, 1],:] - node[edge[index, 0],:]
         return v

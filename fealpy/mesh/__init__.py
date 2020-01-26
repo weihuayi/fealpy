@@ -9,6 +9,7 @@ This module provide mesh
 from .distmesh import DistMesh2d
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
+from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh

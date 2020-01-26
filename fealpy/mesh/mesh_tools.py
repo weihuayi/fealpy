@@ -172,13 +172,13 @@ def show_mesh_2d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    if mesh.meshtype is not 'polygon':
+    if mesh.meshtype not in {'polygon', 'hepolygon'}:
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = cell
         NC = mesh.number_of_cells()
         patches = [
                 Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)

@@ -64,6 +64,20 @@ class PolygonMesh(Mesh2d):
         node, cell, cellLocation = quadtree.to_pmesh()
         return cls(node, cell, cellLocation)
 
+    @classmethod
+    def from_halfedgepolygonmesh(cls, mesh):
+        pass
+
+    def entity(self, etype=2):
+        if etype in {'cell', 2}:
+            return self.ds.cell, self.ds.cellLocation
+        elif etype in {'edge', 'face', 1}:
+            return self.ds.edge
+        elif etype in {'node', 0}:
+            return self.node
+        else:
+            raise ValueError("`entitytype` is wrong!")
+
     def entity_barycenter(self, etype='cell', index=None):
         node = self.node
         dim = self.geo_dimension()
@@ -167,7 +181,6 @@ class PolygonMesh(Mesh2d):
             node = self.entity('node')
             edge = self.entity('edge')
 
-
             isMarkedEdge = np.zeros(NE, dtype=np.bool)
             edge2cell = self.ds.edge_to_cell()
             cell2edge = self.ds.cell_to_edge(sparse=False)
@@ -207,7 +220,7 @@ class PolygonMesh(Mesh2d):
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Edge2cell:\n", self.ds.edge2cell)
-        print("Cell2edge:\n", self.ds.cell_to_edge())
+        print("Cell2edge:\n", self.ds.cell_to_edge(sparse=False))
 
 
 
@@ -215,8 +228,6 @@ class PolygonMeshDataStructure():
     def __init__(self, NN, cell, cellLocation):
         self.NN = NN
         self.NC = cellLocation.shape[0] - 1
-        self.nx = int(np.sqrt(NN)-1)
-        self.ny = self.nx
 
         self.cell = cell
         self.cellLocation = cellLocation
@@ -325,13 +336,22 @@ class PolygonMeshDataStructure():
             cell2edge[cellLocation[edge2cell[:, 1]] + edge2cell[:, 3]] = range(NE)
             return cell2edge
 
-    def cell_to_edge_sign(self):
+    def cell_to_edge_sign(self, sparse=True):
         NE = self.NE
         NC = self.NC
         edge2cell = self.edge2cell
-        val = np.ones((NE,), dtype=np.bool)
-        cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool)
-        return cell2edgeSign
+        cell = self.cell
+        cellLocation = self.cellLocation
+        if sparse:
+            val = np.ones((NE,), dtype=np.bool)
+            cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool)
+            return cell2edgeSign
+        else:
+            cell2edgeSign = np.zeros(cell.shape[0], dtype=np.int)
+            isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+            cell2edgeSign[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]] = 1
+            cell2edgeSign[cellLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]] = -1
+            return cell2edgeSign
 
     def cell_to_cell(self):
         NC = self.NC
@@ -378,7 +398,7 @@ class PolygonMeshDataStructure():
     def node_to_node(self):
         NN = self.NN
         edge = self.edge
-        return node_to_node_in_edge(NN, edge)
+        return self.node_to_node_in_edge(NN, edge)
 
     def node_to_node_in_edge(self, NN, edge):
         I = edge.flatten()
@@ -410,6 +430,20 @@ class PolygonMeshDataStructure():
         val = np.ones(cell.shape[0], dtype=np.bool)
         node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
+
+    def boundary_edge_to_edge(self):
+        NN = self.NN
+        edge = self.edge
+        index = self.boundary_edge_index()
+        bdEdge = edge[index]
+        n = bdEdge.shape[0]
+        val = np.ones(n, dtype=np.bool)
+        m0 = csr_matrix((val, (range(n), bdEdge[:, 0])), shape=(n, NN), dtype=np.bool)
+        m1 = csr_matrix((val, (range(n), bdEdge[:, 1])), shape=(n, NN), dtype=np.bool)
+        _, pre = (m0*m1.T).nonzero()
+        _, nex = (m1*m0.T).nonzero()
+        return index[pre], index[nex]
+
 
     def boundary_node_flag(self):
         NN = self.NN
