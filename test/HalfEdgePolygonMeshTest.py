@@ -71,7 +71,6 @@ class HalfEdgePolygonMeshTest:
         isMarkedCell = np.zeros(5, dtype=np.bool)
         isMarkedCell[-1] = True
         mesh.refine(isMarkedCell)
-
         mesh.print()
 
         if plot:
