@@ -39,11 +39,9 @@ class HalfEdgePolygonMeshTest:
 
         mesh = PolygonMesh(node, cell, cellLocation)
         a = mesh.entity_measure('cell')
-        print(a)
 
         mesh = HalfEdgePolygonMesh.from_polygonmesh(mesh)
         a = mesh.entity_measure('cell')
-        print(a)
         mesh.print()
 
         if plot:
@@ -67,17 +65,37 @@ class HalfEdgePolygonMeshTest:
 
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgePolygonMesh.from_polygonmesh(mesh)
-
         isMarkedCell = np.zeros(5, dtype=np.bool)
         isMarkedCell[-1] = True
+        isMarkedCell[-2] = True
         mesh.refine(isMarkedCell)
-        mesh.print()
+
+
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[2] = True
+            mesh.refine(isMarkedCell)
+
+
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[1] = True
+            mesh.refine(isMarkedCell)
+
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell[13] = True
+            mesh.refine(isMarkedCell)
 
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
