@@ -1,1 +1,1 @@
-from .show import show_error_table
+from .show import show_error_table, showmultirate
