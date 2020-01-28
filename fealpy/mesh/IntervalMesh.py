@@ -7,13 +7,24 @@ from ..quadrature import GaussLegendreQuadrature
 
 class IntervalMesh():
     def __init__(self, node, cell):
-        self.node = node
+        """
 
+        Parameters
+        ----------
+        node : numpy.ndarray with shape (NN, 1)
+        cell : numpy.ndarray with shape (NC, 2)
+
+        See Also
+        --------
+        """
+        self.node = node
         self.ds = IntervalMeshDataStructure(len(node), cell)
         self.meshtype = 'interval'
 
         self.nodedata = {}
         self.celldata = {}
+        self.edgedata = self.celldata # Notice celldata, edgedata, facedta are  
+        self.facedata = self.celldata # same thing.
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -29,15 +40,15 @@ class IntervalMesh():
         return self.ds.NC
 
     def number_of_entities(self, etype):
-        if etype in ['cell', 1]:
+        if etype in {'cell', 1}:
             return self.ds.NC
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             return self.ds.NN
         else:
             raise ValueError("`dim` must be 0 or 1!")
 
     def entity(self, etype=1):
-        if etype in ['cell', 1]:
+        if etype in {'cell', 'face', 'edge', 1}:
             return self.ds.cell
         elif etype in ['node', 0]:
             return self.node
@@ -45,101 +56,75 @@ class IntervalMesh():
             raise ValueError("`entitytype` is wrong!")
 
     def grad_lambda(self):
-        node = self.node
-        cell = self.ds.cell
+        node = self.entity('node')
+        cell = self.entity('cell')
         NC = self.number_of_cells()
         v = node[cell[:, 1]] - node[cell[:, 0]]
-        dim = self.geo_dimension()
-        Dlambda = np.zeros((NC, 2, dim), dtype=np.float)
-        if dim == 1:
-            Dlambda[:, 0, 0] = -1/v
-            Dlambda[:, 1, 0] = 1/v
-        else:
-            h2 = np.sum(v**2, axis=-1)
-            v /=h2.reshape(-1, 1)
-            Dlambda[:, 0, :] = -v
-            Dlambda[:, 1, :] = v
+        GD = self.geo_dimension()
+        Dlambda = np.zeros((NC, 2, GD), dtype=np.float)
+        h2 = np.sum(v**2, axis=-1)
+        v /=h2.reshape(-1, 1)
+        Dlambda[:, 0, :] = -v
+        Dlambda[:, 1, :] = v
         return Dlambda
 
     def geo_dimension(self):
-        node = self.node
-        if len(node.shape) == 1:
-            return 1
-        else:
-            return node.shape[-1]
+        return self.node.shape[-1]
 
     def top_dimension(self):
         return 1
 
-
     def entity_measure(self, etype=1, index=None):
-        if etype in ['cell', 'face', 'edge', 1]:
-            return self.cell_length(cellidx=index)
-        elif etype in ['node', 0]:
+        if etype in {1, 'cell', 'face', 'edge'}:
+            return self.cell_length(index=index)
+        elif etype in {0, 'node'}:
             return 0
         else:
             raise ValueError("`etype` is wrong!")
 
     def entity_barycenter(self, etype=1, index=None):
-        node = self.node
-        if etype in ['cell', 'face', 'edge', 1]:
+        node = self.entity('node')
+        index = index if index is not None else np.s_[:]
+        if etype in {1, 'cell', 'face', 'edge'}:
             cell = self.ds.cell
-            if index is None:
-                bc = np.sum(node[cell], axis=1)/cell.shape[1]
-            else:
-                bc = np.sum(node[cell[index]], axis=1)/cell.shape[1]
-        elif etype in ['node', 0]:
-            if index is None:
-                bc = node
-            else:
-                bc = node[index]
+            bc = np.sum(node[cell[index]], axis=1)/cell.shape[1]
+        elif etype in {'node', 0}:
+            bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+        return bc
 
-    def cell_length(self, cellidx=None):
+    def cell_length(self, index=None):
         node = self.node
         cell = self.ds.cell
         GD = self.geo_dimension()
-        if cellidx is None:
-            if GD == 1:
-                return node[cell[:, 1]] - node[cell[:, 0]]
-            else:
-                return np.sqrt(
-                        np.sum(
-                            (node[cell[:, 1]] - node[cell[:, 0]])**2, axis=-1))
-        else:
-            if GD == 1:
-                return node[cell[cellidx, 1]] - node[cell[cellidx, 0]]
-            else:
-                return np.sqrt(
-                        np.sum(
-                            (node[cell[cellidx, 1]] - node[cell[cellidx, 0]])**2,
-                            axis=-1))
+        index = index if index is not None else np.s_[:]
+        return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2,
+                        axis=-1))
 
-    def bc_to_point(self, bc):
+    def bc_to_point(self, bc, index=None):
         node = self.node
         cell = self.ds.cell
-        p = np.einsum('...j, ij->...i', bc, node[cell])
+        index = index if index is not None else np.s_[:]
+        p = np.einsum('...j, ij->...i', bc, node[cell[index]])
         return p
 
     def cell_normal(self, index=None):
         GD = self.geo_dimension()
         if GD != 2:
             raise ValueError('cell_tagent just work for 2D Case')
-        v = self.cell_tagent(index=index)
+        v = self.cell_tangent(index=index)
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
-    def cell_tagent(self, index=None):
+    def cell_tangent(self, index=None):
         node = self.node
         cell = self.ds.cell
-        if index is None:
-            v = node[cell[:, 1]] - node[cell[:, 0]]
-        else:
-            v = node[cell[index, 1]] - node[cell[index, 0]]
+        index = index if index is not None else np.s_[:]
+        v = node[cell[index, 1]] - node[cell[index, 0]]
         return v
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, inplace=True):
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -157,28 +142,27 @@ class IntervalMesh():
             NN = self.node.shape[0]
             self.ds.reinit(NN, ncell)
 
-    def refine(self, isMarkedCell):
+    def refine(self, isMarkedCell, inplace=True):
         idx, = np.nonzero(isMarkedCell)#需要加密的单元编号
         N = len(idx)#需要加密的单元的个数
-        
+
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
-        
+
         newNode = (node[cell[idx, 0]] + node[cell[idx, 1]])/2#新增节点坐标
         self.node = np.r_['0', node, newNode]#将新的节点添加到总的节点中去，得到的node
-        
+
         ncell = np.zeros((NC + N, 2), dtype=np.int)#定义新的cell数组
         index1 = np.argsort(self.node)#node从小到大排序后的索引
-        
+
         ncell[:, 0] = index1[:-1]
         ncell[:, 1] = index1[1:]
-        
+
         index2 = np.argsort(ncell[:, 0])#将ncell按第0轴排序
         self.cell = ncell[index2]#加密后新的cell
         NN = self.node.shape[0]
         self.ds.reinit(NN, self.cell)
-
 
 
     def add_plot(self, plot,

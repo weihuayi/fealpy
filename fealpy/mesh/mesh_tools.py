@@ -16,9 +16,8 @@ def find_node(
         showindex=False, color='r',
         markersize=20, fontsize=24, fontcolor='k'):
 
-    if len(node.shape) == 1:
-        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
-
+    if node.shape[1] == 1:
+        node = np.r_['1', node, np.zeros_like(node)]
     if (index is None) or (index is 'all'):
         index = range(node.shape[0])
     elif (type(index) is np.ndarray) & (index.dtype == np.bool):
@@ -125,14 +124,14 @@ def show_mesh_1d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    dim = mesh.geo_dimension() 
-    if dim == 1:
-        node = np.r_['1', node.reshape(-1, 1), np.zeros((len(node), 1))]
+    if node.shape[1] == 1:
+        node = np.r_['1', node, np.zeros_like(node)]
 
     axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
     vts = node[cell, :]
 
-    if dim < 3:
+    GD = mesh.geo_dimension()
+    if GD < 3:
         lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor)
         return axes.add_collection(lines)
     else:
@@ -173,13 +172,13 @@ def show_mesh_2d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    if mesh.meshtype is not 'polygon':
+    if mesh.meshtype not in {'polygon', 'hepolygon'}:
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = cell
         NC = mesh.number_of_cells()
         patches = [
                 Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)

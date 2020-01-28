@@ -9,7 +9,7 @@ from .PolygonMesh import PolygonMesh
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
-from .sizing_function import huniform
+from ..geometry import huniform
 from .distmesh import DistMesh2d
 
 

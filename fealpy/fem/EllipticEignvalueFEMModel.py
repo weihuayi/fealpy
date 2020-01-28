@@ -236,14 +236,15 @@ class EllipticEignvalueFEMModel:
                 break
 
 
-        end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
 
         if self.multieigs is True:
             self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
             self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
+
+        end = timer()
+        print("smallest eigns:", d, "with time: ", end - start)
 
         uh = space.function(array=uh)
         return uh
@@ -342,14 +343,15 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_1_' + str(i+1) + '_' + str(NN) + '.mat')
 
-        end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
 
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
+
+        end = timer()
+        print("smallest eigns:", d, "with time: ", end - start)
 
         uh = space.function(array=uh)
         return uh
@@ -451,21 +453,22 @@ class EllipticEignvalueFEMModel:
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
-        uh = IM@uh
-        if self.matlab is False:
-            uh[isFreeDof], d = self.eig(A, M)
-        else:
-            uh[isFreeDof], d = self.meigs(A, M)
-        end = timer()
 
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
-
-        print("smallest eigns:", d, "with time: ", end - start)
-        return space.function(array=uh)
+        else:
+            uh = IM@uh
+            if self.matlab is False:
+                uh[isFreeDof], d = self.eig(A, M)
+            else:
+                uh[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            return space.function(array=uh)
+        end = timer()
+        print("with time: ", end - start)
 
     def alg_3_3(self, maxit=None):
         """
@@ -594,21 +597,20 @@ class EllipticEignvalueFEMModel:
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
         uh = space.function()
 
-        if self.matlab is False:
-            uh[isFreeDof], d = self.eig(A, M)
-        else:
-            uh[isFreeDof], d = self.meigs(A, M)
-
-        end = timer()
-
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
-
-        print("smallest eigns:", d, "with time: ", end - start)
-        return uh
+        else:
+            if self.matlab is False:
+                uh[isFreeDof], d = self.eig(A, M)
+            else:
+                uh[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            return uh
+        end = timer()
+        print("with time: ", end - start)
 
 
     def alg_3_4(self, maxit=None):
@@ -717,11 +719,6 @@ class EllipticEignvalueFEMModel:
             if gdof > self.maxdof:
                 break
 
-        if self.multieigs is True:
-            self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
-            self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
-            self.ml = pyamg.ruge_stuben_solver(self.A)
-            self.eigs()
 
         if self.step > 0:
             NN = mesh.number_of_nodes()
@@ -755,20 +752,27 @@ class EllipticEignvalueFEMModel:
         ## 求解特征值
         A = AA[isFreeDof, :][:, isFreeDof].tocsr()
         M = MM[isFreeDof, :][:, isFreeDof].tocsr()
-        if self.matlab is False:
-            u[isFreeDof], d = self.eig(A, M)
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
         else:
-            u[isFreeDof], d = self.meigs(A, M)
+            if self.matlab is False:
+                u[isFreeDof], d = self.eig(A, M)
+            else:
+                u[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            uh *= u[-1]
+            uh += I@u[:-1]
+
+            uh /= np.max(np.abs(uh))
+            uh = space.function(array=uh)
+            return uh
+
         end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
-
-
-        uh *= u[-1]
-        uh += I@u[:-1]
-
-        uh /= np.max(np.abs(uh))
-        uh = space.function(array=uh)
-        return uh
+        print("with time: ", end - start)
 
 
     def savemesh(self, mesh, fname):

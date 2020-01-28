@@ -6,9 +6,9 @@ This module provide mesh
 
 '''
 
-from .distmesh import DistMesh2d
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
+from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
@@ -28,8 +28,7 @@ from .QuadtreeForest import QuadtreeMesh, QuadtreeForest
 
 from .simple_mesh_generator import *
 
-from .sizing_function import huniform
-
+from .distmesh import DistMesh2d
 from .mesh_tools import *
 
 from .meshio import load_mat_mesh

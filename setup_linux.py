@@ -17,6 +17,7 @@ setup(name='fealpy',
           'PyHamcrest',
           'boost',
           'pytools',
-          'pyamg'
+          'pyamg',
+          'meshpy'
       ],
       zip_safe=False)

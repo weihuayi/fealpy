@@ -48,7 +48,7 @@ class BoundaryCondition():
             pp = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
             val = self.neuman(pp, n) # (NQ, NF, ...)
-            bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
+            bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
             if dim == 1:
                 np.add.at(b, face2dof[idx], bb)
             else:

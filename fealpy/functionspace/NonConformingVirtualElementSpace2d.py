@@ -42,7 +42,7 @@ class NCVEMDof2d():
         """
         p = self.p
         mesh = self.mesh
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
         cell2edge = mesh.ds.cell_to_edge(sparse=False)
 
         if p == 1:
@@ -207,8 +207,8 @@ class NonConformingVirtualElementSpace2d():
 
     def source_vector(self, f):
         phi = self.smspace.basis
-        def u(x, cellidx):
-            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
         bb = self.integralalg.integral(u, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(self.PI0, bb))))
@@ -261,8 +261,8 @@ class NonConformingVirtualElementSpace2d():
         if p > 1:
             phi = self.smspace.basis
 
-            def f(x, cellidx):
-                return np.einsum('ij, ij...->ij...', u(x), phi(x, cellidx=cellidx, p=p-2))
+            def f(x, index):
+                return np.einsum('ij, ij...->ij...', u(x), phi(x, index=index, p=p-2))
 
             bb = self.integralalg.integral(f,
                     celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
@@ -306,8 +306,8 @@ class NonConformingVirtualElementSpace2d():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[:, isInEdge, :], index=edge2cell[isInEdge, 1])
         H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
@@ -343,8 +343,8 @@ class NonConformingVirtualElementSpace2d():
         qf = GaussLegendreQuadrature(p)
         bcs = qf.quadpts
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[p-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[p-1::-1, isInEdge, :], index=edge2cell[isInEdge, 1])
 
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi0
@@ -391,10 +391,10 @@ class NonConformingVirtualElementSpace2d():
 
         # the normal deriveration part
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
+        gphi0 = self.smspace.grad_basis(ps, index=edge2cell[:, 0])
         gphi1 = self.smspace.grad_basis(
                 ps[-1::-1, isInEdge, :],
-                cellidx=edge2cell[isInEdge, 1])
+                index=edge2cell[isInEdge, 1])
         nm = mesh.edge_normal()
         h = np.sqrt(np.sum(nm**2, axis=-1))
         # m: the scaled basis number,
@@ -424,8 +424,8 @@ class NonConformingVirtualElementSpace2d():
         return G
 
     def matrix_G_test(self, integralalg):
-        def u(x, cellidx=None):
-            gphi = self.smspace.grad_basis(x, cellidx=cellidx)
+        def u(x, index=None):
+            gphi = self.smspace.grad_basis(x, index=index)
             return np.einsum('ijkm, ijpm->ijkp', gphi, gphi, optimize=True)
 
         G = integralalg.integral(u, celltype=True)

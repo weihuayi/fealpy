@@ -88,16 +88,14 @@ class ScaledMonomialSpace2d():
     def cell_to_dof(self, p=None):
         return self.dof.cell_to_dof(p=p)
 
-    def edge_basis(self, point, edgeidx=None, p=None):
+    def edge_basis(self, point, index=None, p=None):
         p = self.p if p is None else p
         center = self.integralalg.edgebarycenter
         h = self.integralalg.edgemeasure
         t = self.mesh.edge_unit_tagent()
 
-        if edgeidx is None:
-            val = np.sum((point - center)*t, axis=-1)/h
-        else:
-            val = np.sum((point - center[edgeidx])*t[edgeidx], axis=-1)/h[edgeidx]
+        index = index if index is not None else np.s_[:]
+        val = np.sum((point - center[index])*t[index], axis=-1)/h[index]
         phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:
             phi[..., 1] = val
@@ -106,7 +104,7 @@ class ScaledMonomialSpace2d():
             np.multiply.accumulate(phi, axis=-1, out=phi)
         return phi
 
-    def basis(self, point, cellidx=None, p=None):
+    def basis(self, point, index=None, p=None):
         """
         Compute the basis values at point
 
@@ -133,12 +131,8 @@ class ScaledMonomialSpace2d():
 
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)
-        if cellidx is None:
-            assert(point.shape[-2] == NC)
-            phi[..., 1:3] = (point - self.cellbarycenter)/h.reshape(-1, 1)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            phi[..., 1:3] = (point - self.cellbarycenter[cellidx])/h[cellidx].reshape(-1, 1)
+        index = index if index is not None else np.s_[:] 
+        phi[..., 1:3] = (point - self.cellbarycenter[index])/h[index].reshape(-1, 1)
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -148,19 +142,16 @@ class ScaledMonomialSpace2d():
 
         return phi
 
-    def value(self, uh, point, cellidx=None):
-        phi = self.basis(point, cellidx=cellidx)
+    def value(self, uh, point, index=None):
+        phi = self.basis(point, index=index)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
-            return np.einsum(s1, phi, uh[cell2dof])
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return np.einsum(s1, phi, uh[cell2dof[cellidx]])
+        index = index if index is not None else np.s_[:]
+        return np.einsum(s1, phi, uh[cell2dof[index]])
 
-    def grad_basis(self, point, cellidx=None, p=None):
+    def grad_basis(self, point, index=None, p=None):
         if p is None:
             p = self.p
         h = self.cellsize
@@ -172,31 +163,30 @@ class ScaledMonomialSpace2d():
         if p > 1:
             start = 3
             r = np.arange(1, p+1)
-            phi = self.basis(point, cellidx=cellidx)
+            phi = self.basis(point, index=index)
             for i in range(2, p+1):
                 gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
                 gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
                 start += i+1
-        if cellidx is None:
-            return gphi/h.reshape(-1, 1, 1)
-        else:
-            if point.shape[-2] == len(cellidx):
-                return gphi/h[cellidx].reshape(-1, 1, 1)
-            elif point.shape[0] == len(cellidx):
-                return gphi/h[cellidx].reshape(-1, 1, 1, 1)
+        index = index if index is not None else np.s_[:]
+        if point.shape[-2] == len(index):
+            return gphi/h[index].reshape(-1, 1, 1)
+        elif point.shape[0] == len(index):
+            return gphi/h[index].reshape(-1, 1, 1, 1)
 
-    def grad_value(self, uh, point, cellidx=None):
-        gphi = self.grad_basis(point, cellidx=cellidx)
+    def grad_value(self, uh, point, index=None):
+        gphi = self.grad_basis(point, index=index)
         cell2dof = self.dof.cell2dof
-        if cellidx is None:
-            return np.einsum('ij, ...ijm->...im', uh[cell2dof], gphi)
-        else:
-            if point.shape[-2] == len(cellidx):
-                return np.einsum('ij, ...ijm->...im', uh[cell2dof[cellidx]], gphi)
-            elif point.shape[0] == len(cellidx):
-                return np.einsum('ij, ikjm->ikm', uh[cell2dof[cellidx]], gphi)
+        index = index if index is not None else np.s_[:]
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        if point.shape[-2] == len(index):
+            return np.einsum(s1, gphi, uh[cell2dof[index]])
+        elif point.shape[0] == len(index):
+            return np.einsum('ij, ikjm->ikm', gphi, uh[cell2dof[index]])
 
-    def laplace_basis(self, point, cellidx=None, p=None):
+    def laplace_basis(self, point, index=None, p=None):
         if p is None:
             p = self.p
         area = self.cellmeasure
@@ -209,19 +199,15 @@ class ScaledMonomialSpace2d():
             start = 3
             r = np.arange(1, p+1)
             r = r[0:-1]*r[1:]
-            phi = self.basis(point, cellidx=cellidx)
+            phi = self.basis(point, index=index)
             for i in range(2, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
                 lphi[..., start+2:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 start += i+1
+        index = index if index is not None else np.s_[:]
+        return lphi/area[index].reshape(-1, 1)
 
-        if cellidx is None:
-            return lphi/area.reshape(-1, 1)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return lphi/area[cellidx].reshape(-1, 1)
-
-    def hessian_basis(self, point, cellidx=None, p=None):
+    def hessian_basis(self, point, index=None, p=None):
         """
         Compute the value of the hessian of the basis at a set of 'point'
 
@@ -247,7 +233,7 @@ class ScaledMonomialSpace2d():
             start = 3
             r = np.arange(1, p+1)
             r = r[0:-1]*r[1:]
-            phi = self.basis(point, cellidx=cellidx)
+            phi = self.basis(point, index=index)
             for i in range(2, p+1):
                 hphi[..., start:start+i-1, 0] = np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
                 hphi[..., start+2:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
@@ -256,20 +242,14 @@ class ScaledMonomialSpace2d():
                 hphi[..., start+1:start+i, 2] = np.einsum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
                 start += i+1
 
-        if cellidx is None:
-            return hphi/area.reshape(-1, 1, 1)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return hphi/area[cellidx].reshape(-1, 1, 1)
+        index = index if index is not None else np.s_[:]
+        return hphi/area[index].reshape(-1, 1, 1)
 
-    def laplace_value(self, uh, point, cellidx=None):
-        lphi = self.laplace_basis(point, cellidx=cellidx)
+    def laplace_value(self, uh, point, index=None):
+        lphi = self.laplace_basis(point, index=index)
         cell2dof = self.dof.cell2dof
-        if cellidx is None:
-            return np.einsum('ij, ...ij->...i', uh[cell2dof], lphi)
-        else:
-            assert(point.shape[-2] == len(cellidx))
-            return np.einsum('ij, ...ij->...i', uh[cell2dof[cellidx]], lphi)
+        index = index if index is not None else np.s_[:]
+        return np.einsum('ij, ...ij->...i', uh[cell2dof[index]], lphi)
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -324,8 +304,8 @@ class ScaledMonomialSpace2d():
         qf = GaussLegendreQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.basis(ps, cellidx=edge2cell[:, 0])
-        phi1 = self.basis(ps[:, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        phi0 = self.basis(ps, index=edge2cell[:, 0])
+        phi1 = self.basis(ps[:, isInEdge, :], index=edge2cell[isInEdge, 1])
         H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
@@ -359,11 +339,11 @@ class ScaledMonomialSpace2d():
         return SS
 
     def matrix_C(self, mspace):
-        def f(x, cellidx):
+        def f(x, index):
             return np.einsum(
                     '...im, ...in->...imn',
-                    self.basis(x, cellidx),
-                    mspace.basis(x, cellidx)
+                    self.basis(x, index),
+                    mspace.basis(x, index)
                     )
         C = self.integralalg.integral(f, celltype=True)
         return C

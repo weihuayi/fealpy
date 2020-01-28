@@ -37,6 +37,11 @@ class SinSinExpData:
         val = (epsilon - mu)*self.gradient(p, t)
         return val
 
+    def div_flux(self, p, t):
+        mu = self.mu
+        epsilon = self.epsilon
+        return (epsilon - mu)*self.laplace(p, t)
+
     def source(self, p, t):
         x = p[..., 0]
         y = p[..., 1]
@@ -88,12 +93,32 @@ class PolyExpData:
         val = np.zeros(p.shape, dtype=p.dtype)
         val[..., 0] = (1-2*x)*y*(1-y)*np.exp(-t)
         val[..., 1] = (1-2*y)*x*(1-x)*np.exp(-t)
+        return val
 
     def flux(self, p, t):
         mu = self.mu
         epsilon = self.epsilon
         val = (epsilon - mu)*self.gradient(p, t)
         return val
+
+    def div_flux(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+        mu = self.mu
+        epsilon = self.epsilon
+        val = 2*(epsilon - mu)*(x*(x - 1) + y*(y - 1))*np.exp(-t)
+        return val
+
+
+    def source(self, p, t):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        mu = self.mu
+        epsilon = self.epsilon
+        t0 = np.exp(-t)
+        t1 = -x*y*(-x + 1)*(-y + 1) - (epsilon - mu)*(2*x*(x - 1) + 2*y*(y - 1))
+        return t0*t1
 
     def dirichlet(self, p, t):
         return self.solution(p, t)
