@@ -601,15 +601,21 @@ class LagrangeFiniteElementSpace():
         pp = self.mesh.bc_to_point(bcs)
         fval = f(pp)
 
+        gdof = self.number_of_global_dofs()
+        shape = gdof if dim is None else (gdof, dim)
+        b = np.zeros(shape, dtype=self.ftype)
         if p > 0:
-            phi = self.basis(bcs)
-            # bb: (NC, ldof)
-            bb = np.einsum('m, mi..., mik, i->ik...',
-                    ws, fval, phi, self.cellmeasure)
+            if type(fval) in {float, int}:
+                if fval == 0.0:
+                    return b
+                else:
+                    phi = self.basis(bcs)
+                    bb = np.einsum('m, mik, i->ik...', ws, phi, self.cellmeasure)
+                    bb *= fval
+            else:
+                phi = self.basis(bcs)
+                bb = np.einsum('m, mi..., mik, i->ik...', ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
-            gdof = self.number_of_global_dofs()
-            shape = gdof if dim is None else (gdof, dim)
-            b = np.zeros(shape, dtype=self.ftype)
             if dim is None:
                 np.add.at(b, cell2dof, bb)
             else:
