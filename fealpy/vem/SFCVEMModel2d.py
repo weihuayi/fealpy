@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 import pyamg
 
-from ..functionspace.vem_space import VirtualElementSpace2d
+from ..functionspace import ConformingVirtualElementSpace2d
 from ..boundarycondition import DirichletBC
 from ..vem import doperator
 from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg, GaussLobattoQuadrature
@@ -30,56 +30,30 @@ class SFCVEMModel2d():
         Notes
         -----
         """
-        self.space = VirtualElementSpace2d(mesh, p)
+        self.space = ConformingVirtualElementSpace2d(mesh, p)
         self.mesh = self.space.mesh
         self.pde = pde
 
-        self.integrator = mesh.integrator(q)
-        self.area = self.space.smspace.area
-
+        self.area = self.space.smspace.cellmeasure
 
         self.uh = self.space.function() # the solution 
         self.lh = self.space.function() # \lambda_h 
 
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=self.space.smspace.barycenter)
+        self.integralalg = self.space.integralalg
 
-        self.mat = doperator.basic_matrix(self.space, self.area)
-
-
-    def reinit(self, mesh, p=None):
-        if p is None:
-            p = self.space.p
-        self.space = VirtualElementSpace2d(mesh, p)
-        self.mesh = self.space.mesh
-
-        self.uh = self.space.function()
-        self.lh = self.space.function()
-
-        self.area = self.space.smspace.area
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.integrator,
-                self.mesh,
-                area=self.area,
-                barycenter=self.space.smspace.barycenter)
-
-        self.mat = doperator.basic_matrix(self.space, self.area)
 
     def project_to_smspace(self, uh=None, ptype='H1'):
         if uh is None:
             uh = self.uh
         p = self.space.p
-        cell2dof, cell2dofLocation = self.space.dof.cell2dof, self.space.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.space.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.space.smspace.function()
         if ptype is 'H1':
-            S[:] = np.concatenate(list(map(g, zip(self.mat.PI1, cd))))
+            S[:] = np.concatenate(list(map(g, zip(self.space.PI1, cd))))
         elif ptype is 'L2':
-            S[:] = np.concatenate(list(map(g, zip(self.mat.PI0, cd))))
+            S[:] = np.concatenate(list(map(g, zip(self.space.PI0, cd))))
         else:
             raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
         return S
@@ -92,8 +66,9 @@ class SFCVEMModel2d():
         edge = mesh.entity('edge')
 
         fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
-        def f(x, cellidx):
-            val = (self.S.laplace_value(x, cellidx) - self.S.value(x, cellidx) + fh[cellidx])
+        def f(x, index):
+            val = (self.S.laplace_value(x, index) - self.S.value(x, index) +
+                    fh[index])
             return val**2
 
         e0 = self.area*self.integralalg.integral(f, celltype=True)
@@ -114,8 +89,8 @@ class SFCVEMModel2d():
         points = np.einsum('ij, kjm->ikm', bcs, node[edge])
 
         # 内部边上的积分
-        lgrad = self.S.grad_value(points, cellidx=edge2cell[:, 0])
-        rgrad = self.S.grad_value(points, cellidx=edge2cell[:, 1])
+        lgrad = self.S.grad_value(points, index=edge2cell[:, 0])
+        rgrad = self.S.grad_value(points, index=edge2cell[:, 1])
         e1 = np.zeros(NE, dtype=mesh.ftype)
 
         t0 = np.einsum(
@@ -132,7 +107,7 @@ class SFCVEMModel2d():
         eta = self.pde.eta
         points = ipoints[edge2dof[isContactEdge]]
         lh = self.lh[edge2dof[isContactEdge]]
-        lgrad = self.S.grad_value(points, cellidx=edge2cell[isContactEdge, 0])
+        lgrad = self.S.grad_value(points, index=edge2cell[isContactEdge, 0])
 
         t0 = np.einsum('ijm, im->ij', lgrad, n[isContactEdge]) + eta*lh
         e1[isContactEdge] += np.einsum('ij, i->i', t0**2, h[isContactEdge])
@@ -146,12 +121,11 @@ class SFCVEMModel2d():
     def high_order_term(self):
         space = self.space
         area = self.area
-        mat = self.mat
 
-        G = mat.G
-        PI0 = mat.PI0
-        PI1 = mat.PI1
-        D = mat.D
+        G = space.G
+        PI0 = space.PI0
+        PI1 = space.PI1
+        D = space.D
 
         cell2dof, cell2dofLocation = space.dof.cell2dof, space.dof.cell2dofLocation
         uh = self.uh[cell2dof]
@@ -174,18 +148,15 @@ class SFCVEMModel2d():
     def get_left_matrix(self):
         space = self.space
         area = self.area
-        A = doperator.stiff_matrix(space, area, mat=self.mat)
-        M = doperator.mass_matrix(space, area, mat=self.mat)
+        A = space.stiff_matrix()
+        M = space.mass_matrix()
         return A+M
 
     def get_right_vector(self):
+        space = self.space
         f = self.pde.source
         integral = self.integralalg.integral
-        return doperator.source_vector(
-                integral,
-                f,
-                self.space,
-                self.mat.PI0)
+        return space.source_vector(f)
 
     def get_lagrangian_multiplier_vector(self, cedge, cedge2dof):
         p = self.space.p
@@ -214,9 +185,9 @@ class SFCVEMModel2d():
         space = self.space
         mesh = self.mesh
 
-        edge = mesh.ds.edge
+        edge = mesh.entity('edge')
         edge2dof = space.dof.edge_to_dof()
-        bc = mesh.entity_barycenter(etype='edge')
+        bc = mesh.entity_barycenter('edge')
         isContactEdge = self.pde.is_contact(bc)
 
         edge = edge[isContactEdge]
@@ -246,7 +217,6 @@ class SFCVEMModel2d():
             lh[isContactDof] = np.clip(lh[isContactDof] + rho*eta*uh[isContactDof], -1, 1)
             e0 = np.max(np.abs(uh - uh0))
             e1 = np.max(np.abs(lh - lh0))
-            #print('k:', k, 'error:', e0, e1)
             if e0 < tol:
                 break
             k += 1
@@ -264,16 +234,16 @@ class SFCVEMModel2d():
 
     def L2_error(self, u):
         uh = self.S.value
-        def f(x, cellidx):
-            return (u(x, cellidx) - uh(x, cellidx))**2
+        def f(x, index):
+            return (u(x, index) - uh(x, index))**2
 
         e = self.integralalg.integral(f, celltype=True)
         return np.sqrt(e.sum())
 
     def H1_semi_error(self, gu):
         guh = self.S.grad_value
-        def f(x, cellidx):
-            return (gu(x, cellidx) - guh(x, cellidx))**2
+        def f(x, index):
+            return (gu(x, index) - guh(x, index))**2
         e = self.integralalg.integral(f, celltype=True)
         return np.sqrt(e.sum())
 

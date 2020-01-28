@@ -44,8 +44,8 @@ class PolygonMeshIntegralAlg():
         node = pmesh.node
         bc = self.cellbarycenter
 
-        edge = pmesh.ds.edge
-        edge2cell = pmesh.ds.edge2cell
+        edge = pmesh.entity('edge')
+        edge2cell = pmesh.ds.edge_to_cell()
 
         NC = pmesh.number_of_cells()
 

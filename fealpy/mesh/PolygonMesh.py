@@ -114,8 +114,7 @@ class PolygonMesh(Mesh2d):
 
     def node_normal(self):
         node = self.node
-        cell = self.ds.cell
-        cellLocation = self.ds.cellLocation
+        cell, cellLocation = self.entity('cell')
 
         idx1 = np.zeros(cell.shape[0], dtype=np.int)
         idx2 = np.zeros(cell.shape[0], dtype=np.int)

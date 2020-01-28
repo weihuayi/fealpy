@@ -331,13 +331,13 @@ class NonConformingVirtualElementSpace2d():
         p = self.p
         smldof = self.smspace.number_of_local_dofs()
         mesh = self.mesh
-        node = mesh.node
+        node = mesh.entity('node')
 
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
         qf = GaussLegendreQuadrature(p)
@@ -362,9 +362,9 @@ class NonConformingVirtualElementSpace2d():
         smldof = self.smspace.number_of_local_dofs()
 
         mesh = self.mesh
-        node = mesh.node
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
