@@ -1,6 +1,6 @@
 
 from fealpy.mesh.level_set_function import dcircle, drectangle, ddiff 
-from fealpy.mesh.level_set_function import DistDomain2d 
+from fealpy.mesh.level_set_function import DistDomain2
 from fealpy.mesh.distmesh import DistMesh2d
 from fealpy.mesh.sizing_function  import huniform
 
