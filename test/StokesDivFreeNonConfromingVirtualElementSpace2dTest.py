@@ -16,7 +16,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
     def __init__(self, p=2, h=0.2):
         self.pde = CosCosData()
 
-    def test_index1(self, p=2):
+    def index1_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -29,7 +29,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         idx = space.index1(p=3)
         print(idx)
 
-    def test_index2(self, p=2):
+    def index2_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -42,7 +42,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         idx = space.index2(p=3)
         print(idx)
 
-    def test_matrix(self, p=2):
+    def matrix_test(self, p=2):
         """
         node = np.array([
             (-1.0, -1.0),
@@ -75,7 +75,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print("L:", space.L)
         print("D:", space.D)
 
-    def test_matrix_A(self, p=2):
+    def matrix_A_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -88,8 +88,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         A = space.matrix_A()
         print(A)
 
-
-    def test_matrix_P(self, p=2):
+    def matrix_P_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -102,7 +101,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         P = space.matrix_P()
         print(P)
 
-    def test_stokes_equation(self, p=2, maxit=4):
+    def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
         from fealpy.pde.Stokes_Model_2d import CosSinData
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -167,16 +166,8 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print(error)
         print(error[0:-1]/error[1:])
 
-    def project_test(self, p=2, mtype=0):
+    def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
-
-        def u(p):
-            x = p[..., 0]
-            y = p[..., 1]
-            val = np.zeros(p.shape, p.dtype)
-            val[..., 0] = y**3/8
-            val[..., 1] = x**3/8
-            return val
 
         if mtype == 0:
             node = np.array([
@@ -204,15 +195,34 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
+        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
-        if 1:
+        if True:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
+def u2(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**2/4
+    val[..., 1] = x**2/4
+    return val
+
+def u3(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**3/8
+    val[..., 1] = x**3/8
+    return val
 
 test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_index1()
@@ -220,4 +230,5 @@ test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.project_test(p=3, mtype=0)
+test.project_test(u2, p=2, mtype=0)
+#test.project_test(u3, p=3, mtype=0)

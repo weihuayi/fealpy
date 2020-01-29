@@ -129,9 +129,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         cell2dof = self.cell_to_dof('cell') # 获得单元内部自由度
         uh = self.function()
 
-        def u0(x, cellidx):
+        def u0(x, index):
             return np.einsum('ij..., ijm->ijm...', u(x),
-                    self.smspace.basis(x, p=p-2, cellidx=cellidx))
+                    self.smspace.basis(x, p=p-2, index=index))
         area = self.smspace.cellmeasure
         uh[cell2dof] = self.integralalg.integral(
                 u0, celltype=True)/area[:, None, None]
@@ -167,23 +167,16 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ndof0 = self.smspace.number_of_local_dofs(p=p-1)
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
-            G00 = self.G[0][i]
-            G11 = self.G[1][i]
-            G01 = self.G[2][i]
-            B0 = self.B[0][i]
-            B1 = self.B[1][i]
             G = np.block([
-                [G00, G01, B0],
-                [G01.T, G11, B1],
-                [B0.T, B1.T, Z]]
+                (self.G[0][i]  , self.G[2][i]  , self.B[0][i]),
+                (self.G[2][i].T, self.G[1][i]  , self.B[1][i]),
+                (self.B[0][i].T, self.B[1][i].T, Z)]
                 )
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R =  np.block([
-                [self.R[0][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[0][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.R[1][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[1][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
+                (self.R[0][0][:, s], self.R[0][1][:, s]),
+                (self.R[1][0][:, s], self.R[1][1][:, s]),
+                (self.J[0][:, s], self.J[1][:, s])])
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -254,7 +247,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         # idx0: 关于 x 求二阶导数后不为零的基函数编号
         # idx1：关于 y 求二阶导数后不为零的基函数的编号
-        # idx2：关于 x 和 y 求混合导数扣不为零的基函数的编号
+        # idx2：关于 x 和 y 求混合导数后不为零的基函数的编号
         # idx3: 关于 x 求二阶导数后不为零的基函数的整数系数
         # idx4：关于 y 求二阶导数后不为零的基函数的整数系数
         # idx5：关于 x 和 y 求混合导数扣不为零的基函数的整数系数
@@ -338,7 +331,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         # 构造分块矩阵 R = [[R00, R01], [R10, R11]]
         idx = self.index2() # 两次求导后的非零基函数编号及求导系数
-        print(idx)
         R00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R10 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
@@ -372,7 +364,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0], p=p-1)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi0, phi, eh, eh)@self.H1
 
@@ -412,7 +404,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
 
         if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, cellidx=edge2cell[:, 1], p=p-1)
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
             F1 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi1, phi, eh, eh)@self.H1
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             h2 = idx[2].reshape(1, -1)/ch[edge2cell[:, [1]]]
@@ -533,7 +525,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi0)
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
@@ -541,7 +533,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, cellidx=edge2cell[:, 1])
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1])
             F1 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi1)
             idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             np.add.at(D, (idx1[isInEdge], np.s_[:]), F1[isInEdge])
@@ -667,9 +659,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p-2)
         Q = inv(self.CM[:, :ndof, :ndof])
         phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u(x, cellidx):
+        def u(x, index):
             return np.einsum('ij..., ijm->ijm...', f(x),
-                    self.smspace.basis(x, cellidx=cellidx, p=p-2))
+                    self.smspace.basis(x, index=index, p=p-2))
         bb = self.integralalg.integral(u, celltype=True)
         bb = Q@bb
         bb *= self.smspace.cellmeasure[:, None, None]

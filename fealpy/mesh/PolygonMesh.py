@@ -315,7 +315,7 @@ class PolygonMeshDataStructure():
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=True):
+    def cell_to_edge(self, sparse=False):
         NE = self.NE
         NC = self.NC
 
