@@ -1,4 +1,4 @@
-import matplotlib.cm as cm 
+import matplotlib.cm as cm
 import matplotlib.colors as colors
 
 def val_to_color(val, cmap='jet'):
