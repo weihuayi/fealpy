@@ -1,7 +1,5 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from ..common import ranges
-from .mesh_tools import unique_row, find_entity, show_mesh_2d
 from ..quadrature import TriangleQuadrature
 from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
@@ -20,6 +18,27 @@ class HalfEdgePolygonMesh(Mesh2d):
         self.meshtype = 'hepolygon'
         self.itype = halfedge.dtype
         self.ftype = node.dtype
+
+        self.halfedgedata = {}
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
+
+    def set_data(self, name, val, etype):
+        if etype in {'cell', 2}:
+            self.celldata[name] = val
+        elif etype in {'face', 'edge', 1}:
+            self.edgedata[name] = val
+        elif etype in {'node', 0}:
+            self.nodedata[name] = val
+        elif etype == 'mesh':
+            self.meshdata[name] = val
+        elif etype == 'halfedge':
+            self.halfedgedata[name] = val
+        else:
+            raise ValueError("`etype` is wrong!")
 
     def integrator(self, k):
         return TriangleQuadrature(k)

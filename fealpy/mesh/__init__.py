@@ -11,6 +11,7 @@ from .PolygonMesh import PolygonMesh
 from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
+from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
 from .IntervalMesh import IntervalMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh

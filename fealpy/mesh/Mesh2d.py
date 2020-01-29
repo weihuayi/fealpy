@@ -46,7 +46,7 @@ class Mesh2d():
         elif etype in {'node', 0}:
             return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`etype` is wrong!")
 
     def entity_measure(self, etype=2, index=None):
         if etype in {'cell', 2}:

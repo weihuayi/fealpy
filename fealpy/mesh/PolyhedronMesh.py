@@ -46,7 +46,7 @@ class PolyhedronMesh():
         np.add.at(F, face2cell[:, 0], 1)
         np.add.at(F, face2cell[isIntFace, 1], 1)
 
-        val = F - E + V 
+        val = F - E + V
         isBadPoly = (val != 2)
         return np.any(isBadPoly)
 

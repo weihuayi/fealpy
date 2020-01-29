@@ -17,6 +17,8 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     V = 4
     E = 6
     F = 4
+    FV = 3
+    FE = 3
 
     def __init__(self, N, cell):
         super(TetrahedronMeshDataStructure, self).__init__(N, cell)
