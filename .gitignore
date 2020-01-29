@@ -38,3 +38,4 @@ fealpy.egg-info
 dist
 *.pdf
 *.png
+*.fig
