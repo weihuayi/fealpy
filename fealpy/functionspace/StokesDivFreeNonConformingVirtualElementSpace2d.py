@@ -396,7 +396,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         a2 = area**2
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-
         val = np.einsum('ij, ij, i, i->ji',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
         np.add.at(R00, (idx[1][:, None], start), val)

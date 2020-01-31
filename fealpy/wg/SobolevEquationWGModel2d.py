@@ -85,7 +85,7 @@ class SobolevEquationWGModel2d:
             D = self.A1
             G = self.A2
             if epsilon == 0.0:
-                self.A = bmat([[D, None], [-self.B.T, G]], format='csr')
+                self.A = bmat([[D, None], [-dt*self.B.T, G]], format='csr')
             else:
                 B = -dt*epsilon/mu*self.B
                 self.A = bmat([[dt*D, B], [B.T, epsilon*(1 + dt*epsilon/mu)*G]], format='csr')
