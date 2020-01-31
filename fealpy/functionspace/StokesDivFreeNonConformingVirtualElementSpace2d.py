@@ -168,15 +168,15 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
             G = np.block([
-                (self.G[0][i]  , self.G[2][i]  , self.B[0][i]),
-                (self.G[2][i].T, self.G[1][i]  , self.B[1][i]),
-                (self.B[0][i].T, self.B[1][i].T, Z)]
+                [self.G[0][i]  , self.G[2][i]  , self.B[0][i]],
+                [self.G[2][i].T, self.G[1][i]  , self.B[1][i]],
+                [self.B[0][i].T, self.B[1][i].T, Z]]
                 )
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R =  np.block([
-                (self.R[0][0][:, s], self.R[0][1][:, s]),
-                (self.R[1][0][:, s], self.R[1][1][:, s]),
-                (self.J[0][:, s], self.J[1][:, s])])
+                [self.R[0][0][:, s], self.R[0][1][:, s]],
+                [self.R[1][0][:, s], self.R[1][1][:, s]],
+                [self.J[0][:, s], self.J[1][:, s]]])
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -328,9 +328,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         cell2dof, cell2dofLocation = self.cell_to_dof() # 标量的自由度信息
 
         CM = self.CM # 单元质量矩阵
+        print("CM.shape:", CM.shape)
 
         # 构造分块矩阵 R = [[R00, R01], [R10, R11]]
         idx = self.index2() # 两次求导后的非零基函数编号及求导系数
+        print('index2:', idx)
         R00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R10 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
@@ -348,9 +350,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         R10[idx[2][:, None, None], idx0] -= 0.5*idx[5][:, None, None]
 
 
+        # 这里错过了
         val = CM[:, :, 0].T/area[None, :]
-        R00[:, idx0] += val[..., None]
-        R11[:, idx0] += val[..., None]
+        R00[:, idx0[:, 0]] += val
+        R11[:, idx0[:, 0]] += val
 
 
         node = mesh.entity('node')
@@ -372,25 +375,32 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         h2 = idx[2].reshape(1, -1)/ch[edge2cell[:, [0]]]
         h3 = idx[3].reshape(1, -1)/ch[edge2cell[:, [0]]]
+
         val = np.einsum('ij, ijk, i->jik', h2, F0, n[:, 0])
         np.add.at(R00, (idx[0][:, None, None], idx0), val)
+
         val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 1])
         np.add.at(R00, (idx[1][:, None, None], idx0), val)
+
         val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 0])
         np.add.at(R11, (idx[0][:, None, None], idx0), val)
+
         val = np.einsum('ij, ijk, i->jik', h3, F0, n[:, 1])
         np.add.at(R11, (idx[1][:, None, None], idx0), val)
 
         val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 0])
         np.add.at(R01, (idx[1][:, None, None], idx0), val)
+
         val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 1])
         np.add.at(R10, (idx[0][:, None, None], idx0), val)
 
         a2 = area**2
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
+
         val = np.einsum('ij, ij, i, i->ji',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
         np.add.at(R00, (idx[1][:, None], start), val)
+
         val = np.einsum('ij, ij, i, i->ji',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.add.at(R11, (idx[0][:, None], start), val)
@@ -398,6 +408,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         val = np.einsum('ij, ij, i, i->ji',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.subtract.at(R01, (idx[1][:, None], start), val)
+
         val = np.einsum('ij, ij, i, i->ji',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
         np.subtract.at(R10, (idx[0][:, None], start), val)
@@ -450,10 +461,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         idx = self.index1(p=p-1)
         idx0 = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1) + np.arange(ndof-p)
+        # 这里也错过了，从 1 到 多个的时候
         val = ch[:, None]*idx[2]
-        J0[idx[0][:, None, None], idx0] -= val[None, ...]
+        J0[idx[0], idx0] -= val
         val = ch[:, None]*idx[3]
-        J1[idx[1][:, None, None], idx0] -= val[None, ...]
+        J1[idx[1], idx0] -= val
 
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         val = np.einsum('ijk, i->jik', F0, n[:, 0])

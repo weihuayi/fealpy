@@ -84,8 +84,11 @@ class SobolevEquationWGModel2d:
             mu = self.pde.mu
             D = self.A1
             G = self.A2
-            B = -dt*epsilon/mu*self.B
-            self.A = bmat([[dt*D, B], [B.T, epsilon*(1 + dt*epsilon/mu)*G]], format='csr')
+            if epsilon == 0.0:
+                self.A = bmat([[D, None], [-self.B.T, G]], format='csr')
+            else:
+                B = -dt*epsilon/mu*self.B
+                self.A = bmat([[dt*D, B], [B.T, epsilon*(1 + dt*epsilon/mu)*G]], format='csr')
         else:
             self.A = None
 
@@ -127,8 +130,11 @@ class SobolevEquationWGModel2d:
         f11 = lambda j: fh[c2d[j]]@R[1][:, cell2dofLocation[j]:cell2dofLocation[j+1]]
         np.subtract.at(F[:, 0], cell2dof, np.concatenate(list(map(f10, range(NC)))))
         np.subtract.at(F[:, 1], cell2dof, np.concatenate(list(map(f11, range(NC)))))
-        F[:, 0:2] *= dt
-        F[:, 2] = epsilon*self.A2@uh
+        if epsilon == 0.0:
+            F[:, 2] = self.A2@uh
+        else:
+            F[:, 0:2] *= dt
+            F[:, 2] = epsilon*self.A2@uh
         return F.T.flat
 
     def solve(self, data, A, b, solver, timeline):
