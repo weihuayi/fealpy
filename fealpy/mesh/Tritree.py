@@ -303,7 +303,9 @@ class Tritree(TriangleMesh):
             ec = self.entity_barycenter('edge', refineFlag)
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
+                flag = (options['numrefine'][idx] == 0)
                 num = options['numrefine'][idx] - 1
+                num[flag] = 0
                 newCellRefine = np.zeros(4*NCC)
                 newCellRefine[:NCC] = num
                 newCellRefine[NCC:2*NCC] = num
