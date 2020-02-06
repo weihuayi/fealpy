@@ -9,7 +9,7 @@ from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from ..common import ranges
 
-class SDFNCVEMDof2d():
+class DFNCVEMDof2d():
     """
     The dof manager of Stokes Div-Free Non Conforming VEM 2d space.
     """
@@ -92,7 +92,7 @@ class SDFNCVEMDof2d():
         return ldofs
 
 
-class StokesDivFreeNonConformingVirtualElementSpace2d:
+class DivFreeNonConformingVirtualElementSpace2d:
     def __init__(self, mesh, p, q=None):
         """
         Parameter
@@ -103,7 +103,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
         self.mesh = mesh
-        self.dof = SDFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
+        self.dof = DFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
         self.integralalg = self.smspace.integralalg
 
         self.CM = self.smspace.cell_mass_matrix()
@@ -328,26 +328,24 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         cell2dof, cell2dofLocation = self.cell_to_dof() # 标量的自由度信息
 
         CM = self.CM # 单元质量矩阵
-        print("CM.shape:", CM.shape)
 
         # 构造分块矩阵 R = [[R00, R01], [R10, R11]]
         idx = self.index2() # 两次求导后的非零基函数编号及求导系数
-        print('index2:', idx)
         R00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R10 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
 
         idx0 = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1) + np.arange(ndof-p)
-        R00[idx[0][:, None, None], idx0] -= idx[3][:, None, None]
-        R00[idx[1][:, None, None], idx0] -= 0.5*idx[4][:, None, None]
+        R00[idx[0], idx0] -= idx[3][None, :]
+        R00[idx[1], idx0] -= 0.5*idx[4][None, :]
 
-        R11[idx[0][:, None, None], idx0] -= 0.5*idx[3][:, None, None]
-        R11[idx[1][:, None, None], idx0] -= idx[4][:, None, None]
+        R11[idx[0], idx0] -= 0.5*idx[3][None, :]
+        R11[idx[1], idx0] -= idx[4][None, :]
 
         #here is not idx[3], 
-        R01[idx[2][:, None, None], idx0] -= 0.5*idx[5][:, None, None]
-        R10[idx[2][:, None, None], idx0] -= 0.5*idx[5][:, None, None]
+        R01[idx[2], idx0] -= 0.5*idx[5][None, :]
+        R10[idx[2], idx0] -= 0.5*idx[5][None, :]
 
 
         # 这里错过了
@@ -460,6 +458,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         idx = self.index1(p=p-1)
         idx0 = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1) + np.arange(ndof-p)
+
         # 这里也错过了，从 1 到 多个的时候
         val = ch[:, None]*idx[2]
         J0[idx[0], idx0] -= val
@@ -692,10 +691,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         qf = GaussLegendreQuadrature(self.p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
+        ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
         val = g(ps)
 
-        ephi = self.smspace.edge_basis(ps, edgeidx=isBdEdge, p=p-1)
+        ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
         b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
         gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
 
