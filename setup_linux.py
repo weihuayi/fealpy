@@ -18,6 +18,7 @@ setup(name='fealpy',
           'boost',
           'pytools',
           'pyamg',
-          'meshpy'
+          'meshpy',
+	  'transplant'
       ],
       zip_safe=False)
