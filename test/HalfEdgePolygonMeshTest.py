@@ -134,9 +134,35 @@ class HalfEdgePolygonMeshTest:
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
+    def cell_barycenter_test(self, plot=True):
+
+        node = np.array([
+            (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
+        halfedge = np.array([
+            (1, 0, 1, 3, 4, 1),
+            (2, 0, 2, 0, 5, 1),
+            (3, 0, 3, 1, 6, 1),
+            (0, 0, 0, 2, 7, 1),
+            (0, 1, 7, 5, 0, 0),
+            (1, 1, 4, 6, 1, 0),
+            (2, 1, 5, 7, 2, 0),
+            (3, 1, 6, 4, 3, 0)], dtype=np.int)
+        NC = 1
+        mesh = HalfEdgePolygonMesh(node, halfedge, NC)
+        print(mesh.cell_barycenter())
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
 
 test = HalfEdgePolygonMeshTest()
 #test.boundary_edge_to_edge_test()
 #test.from_polygonmesh_test()
 #test.refine_test()
-test.edge_to_cell_test()
+#test.edge_to_cell_test()
+test.cell_barycenter_test(plot=False)

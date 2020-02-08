@@ -154,6 +154,30 @@ class HalfEdgePolygonMesh(Mesh2d):
         a /=2
         return a[:-1]
 
+    def cell_barycenter(self):
+        GD = self.geo_dimension()
+        NC = self.number_of_cells()
+        area = self.entity_measure('cell')
+        node = self.entity('node')
+        halfedge = self.ds.halfedge
+
+        e0 = halfedge[halfedge[:, 3], 0]
+        e1 = halfedge[:, 0]
+
+        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        v= (node[e1] - node[e0])@w
+        val = np.sum(v*node[e0], axis=1)
+        ec = val.reshape(-1, 1)*(node[e1]+node[e0])/2
+
+        a = np.zeros(NC+1, dtype=self.ftype)
+        c = np.zeros((NC+1, GD), dtype=self.ftype)
+        np.add.at(a, halfedge[:, 1], val)
+        np.add.at(c, (halfedge[:, 1], np.s_[:]), ec)
+        a /=2
+        c /=3*a.reshape(-1, 1)
+        return c[:-1]
+
+
     def edge_bc_to_point(self, bcs, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
