@@ -185,6 +185,60 @@ class HalfEdgePolygonMesh(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
+    def refine_with_flag(self, isMarkedCell, data=None, rflag='rflag', dflag=False):
+        GD = self.geo_dimension()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        halfedge = self.ds.halfedge
+        rflag0 = self.halfedgedata[rflag]
+        isMainHEdge = (halfedge[:, 5] == 1)
+        isInHEdge = (halfedge[:, 1] != NC)
+
+        # 标记边
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]]
+        flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+        isMarkedHEdge[flag] = True
+
+        node = self.entity('node')
+        flag = isMainHEdge & isMarkedHEdge
+        idx = halfedge[flag, 4]
+        ec = (node[halfedge[flag, 0]] + node[halfedge[idx, 0]])/2
+        NE1 = len(ec)
+
+        halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
+        rflag1 = np.zeros(2*NE1, dtype=self.itype)
+
+        flag = isMainHEdge[isMarkedHEdge]
+        halfedge1[flag, 0] = range(NN, NN+NE1)
+        idx0 = np.argsort(idx)
+        halfedge1[~flag, 0] = halfedge1[flag, 0][idx0]
+
+        rflag1[flag] = np.maximum(rflag0[isMarkedHEdge], rflag0[halfedge[isMarkedHEdge, 3]])
+        idx = halfedge[isMarkedHEdge, 4]
+        rflag1[~flag] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]]) 
+        rflag1 += 1
+
+        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
+        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
+        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
+
+        halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
+        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+        halfedge = np.r_['0', halfedge, halfedge1]
+        halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
+        rflag0 = np.r_[rflag0, rflag1]
+
+        if dflag:
+            self.halfedgedata[rflag] = rflag0
+            self.node = np.r_['0', node, ec]
+            self.ds.reinit(NN+NE1, NC, halfedge)
+            return
+
     def refine(self, isMarkedCell, data=None, dflag=False):
         isMarkedCell = np.r_['0', isMarkedCell, False]
         GD = self.geo_dimension()

@@ -159,10 +159,42 @@ class HalfEdgePolygonMeshTest:
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
+    def refine_with_flag_test(self, plot=True):
+        node = np.array([
+            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+        cell = np.array([0, 3, 4, 4, 1, 0,
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+        mesh = PolygonMesh(node, cell, cellLocation)
+        mesh = HalfEdgePolygonMesh.from_polygonmesh(mesh)
+
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        name = 'rflag'
+        val = np.zeros(2*NE, dtype=np.int)
+
+        mesh.set_data(name, val, 'halfedge')
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell[2] = True
+        mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=True)
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
 
 test = HalfEdgePolygonMeshTest()
 #test.boundary_edge_to_edge_test()
 #test.from_polygonmesh_test()
 #test.refine_test()
 #test.edge_to_cell_test()
-test.cell_barycenter_test(plot=False)
+#test.cell_barycenter_test(plot=False)
+test.refine_with_flag_test()
