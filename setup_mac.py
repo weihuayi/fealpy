@@ -18,6 +18,6 @@ setup(name='fealpy',
           'boost',
           'pytools',
           'pyamg',
-	  'transplant'
+          'transplant'
       ],
       zip_safe=False)

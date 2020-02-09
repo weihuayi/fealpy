@@ -63,7 +63,11 @@ $ python setup_linux.py develop
 6. You can open IPython from the start menu of win system to test fealpy.
 
 ## Mac
-
+1. Download and install latest anaconda for macOS
+2. Enter fealpy directory, run the following command:
+```
+$ python3 setup_mac.py develop
+```
 
 # Debug in python 
 
