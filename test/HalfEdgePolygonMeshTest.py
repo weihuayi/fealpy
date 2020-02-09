@@ -176,18 +176,54 @@ class HalfEdgePolygonMeshTest:
 
         name = 'rflag'
         val = np.zeros(2*NE, dtype=np.int)
-
         mesh.set_data(name, val, 'halfedge')
+        
         isMarkedCell = np.zeros(NC+1, dtype=np.bool)
         isMarkedCell[2] = True
-        mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=True)
+        mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+        
+        NC = mesh.number_of_cells()
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell[6] = True
+        mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+        
 
+            
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell[3] = True
+            mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+            
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell[1] = True
+            mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+            
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell[5] = True
+            isMarkedCell[13] = True
+            mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell[0] = True
+            isMarkedCell[1] = True
+            mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
+            
+        print("rflag:\n")
+        for i, val in enumerate(mesh.halfedgedata[name]):
+            print(i, ':', val, mesh.ds.halfedge[i, 0:2])
+        
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
-            mesh.find_edge(axes, showindex=True)
+            #mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
 

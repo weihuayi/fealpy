@@ -190,34 +190,35 @@ class HalfEdgePolygonMesh(Mesh2d):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
-
+        
+        bc = self.cell_barycenter()
+        
         halfedge = self.ds.halfedge
         rflag0 = self.halfedgedata[rflag]
-        isMainHEdge = (halfedge[:, 5] == 1)
-        isInHEdge = (halfedge[:, 1] != NC)
+        isMainHEdge = (halfedge[:, 5] == 1) 
 
         # 标记边
-        isMarkedHEdge = isMarkedCell[halfedge[:, 1]]
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (rflag0 == 0) & (rflag0[halfedge[:, 3]] == 0)
         flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
         isMarkedHEdge[flag] = True
 
         node = self.entity('node')
-        flag = isMainHEdge & isMarkedHEdge
-        idx = halfedge[flag, 4]
-        ec = (node[halfedge[flag, 0]] + node[halfedge[idx, 0]])/2
+        flag0 = isMainHEdge & isMarkedHEdge
+        idx = halfedge[flag0, 4]
+        ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
 
+        #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
-        rflag1 = np.zeros(2*NE1, dtype=self.itype)
-
-        flag = isMainHEdge[isMarkedHEdge]
-        halfedge1[flag, 0] = range(NN, NN+NE1)
+        flag1 = isMainHEdge[isMarkedHEdge]
+        halfedge1[flag1, 0] = range(NN, NN+NE1)
         idx0 = np.argsort(idx)
-        halfedge1[~flag, 0] = halfedge1[flag, 0][idx0]
+        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0]
 
-        rflag1[flag] = np.maximum(rflag0[isMarkedHEdge], rflag0[halfedge[isMarkedHEdge, 3]])
-        idx = halfedge[isMarkedHEdge, 4]
-        rflag1[~flag] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]]) 
+        rflag1 = np.zeros(2*NE1, dtype=self.itype)
+        rflag1[flag1] = np.maximum(rflag0[flag0], rflag0[halfedge[flag0, 3]])
+        idx = halfedge[flag0, 4]
+        rflag1[~flag1] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]]) 
         rflag1 += 1
 
         halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
@@ -238,6 +239,86 @@ class HalfEdgePolygonMesh(Mesh2d):
             self.node = np.r_['0', node, ec]
             self.ds.reinit(NN+NE1, NC, halfedge)
             return
+        
+        if data is not None:
+            NV = self.ds.number_of_vertices_of_cells(returnall=True)
+            for key, value in data.items():
+                evalue = (value[halfedge[flag, 0]] + value[halfedge[idx, 0]])/2
+                cvalue = np.zeros(NC+1, dtype=self.ftype)
+                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
+                cvalue /= NV
+                data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
+        
+        # 细分单元
+        N = halfedge.shape[0]
+        NV = np.zeros(NC+1, dtype=self.itype)
+        np.add.at(NV, halfedge[:, 1], rflag0 == 1)
+        NHE = sum(NV[isMarkedCell])
+        halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
+        
+        NC1 = isMarkedCell.sum() # 加密的单元个数
+        
+        # 当前标签为 1 的半边
+        flag0 = (rflag0 == 1) & isMarkedCell[halfedge[:, 1]]
+        idx0, = np.nonzero(flag0)
+        nex0 = halfedge[flag0, 2]
+        pre0 = halfedge[flag0, 3]
+        
+        # 修改虚拟单元的编号
+        flag = (halfedge[:, 1] == NC)
+        halfedge[flag, 1] = NC + NHE
+        cellidx = halfedge[idx0, 1]
+        halfedge[idx0, 1] = range(NC, NC + NHE)
+        
+        idx1 = idx0.copy()
+        pre = halfedge[idx1, 3]
+        flag = (rflag0[pre] != 1)
+        while np.any(flag):
+            idx1[flag] = pre[flag]
+            rflag0[pre[flag]] = np.maximum(rflag0[pre[flag]]-1, 0)
+            pre = halfedge[idx1, 3]
+            flag = (rflag0[pre] != 1)
+            halfedge[idx1, 1] = halfedge[idx0, 1]
+        rflag0[idx0] = 0
+            
+        nex1 = halfedge[idx1, 2] # 下一个
+        pre1 = halfedge[idx1, 3] # 前一个
+
+
+        cell2newNode = np.full(NC+1, NN+NE1, dtype=self.itype)
+        cell2newNode[isMarkedCell] += range(isMarkedCell.sum()) 
+        
+
+        halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
+        halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的前一个半边的编号
+        
+        halfedge1[:NHE, 0] = cell2newNode[cellidx]
+        halfedge1[:NHE, 1] = halfedge[idx0, 1]
+        halfedge1[:NHE, 2] = halfedge[idx1, 3]
+        halfedge1[:NHE, 3] = idx0
+        halfedge1[:NHE, 4] = halfedge[nex0, 3]
+        halfedge1[:NHE, 5] = 1
+
+        halfedge1[NHE:, 0] = halfedge[pre1, 0]
+        halfedge1[NHE:, 1] = halfedge[idx1, 1]
+        halfedge1[NHE:, 2] = idx1
+        halfedge1[NHE:, 3] = halfedge[idx0, 2]
+        halfedge1[NHE:, 4] = halfedge[pre1, 2]
+        halfedge1[NHE:, 5] = 0
+
+        halfedge = np.r_['0', halfedge, halfedge1]
+
+        flag = np.zeros(NC+NHE+1, dtype=np.bool)
+        np.add.at(flag, halfedge[:, 1], True)
+        idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
+        NC = flag.sum()
+
+        idxmap[flag] = range(NC)
+        halfedge[:, 1] = idxmap[halfedge[:, 1]]
+        self.halfedgedata[rflag] = np.r_[rflag0, 
+                         np.zeros(2*NHE, dtype=self.itype)]
+        self.node = np.r_['0', node, ec, bc[isMarkedCell[:-1]]]
+        self.ds.reinit(NN+NE1+NC1, NC-1, halfedge)
 
     def refine(self, isMarkedCell, data=None, dflag=False):
         isMarkedCell = np.r_['0', isMarkedCell, False]
@@ -365,9 +446,6 @@ class HalfEdgePolygonMesh(Mesh2d):
 
         print("edge:")
         for i, val in enumerate(self.entity('edge')):
-            print(i, ":", val)
-        print("halfedge:")
-        for i, val in enumerate(self.ds.halfedge):
             print(i, ":", val)
 
 class HalfEdgePolygonMeshDataStructure():
