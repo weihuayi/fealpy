@@ -147,14 +147,21 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         p = self.p
         idof = (p-2)*(p-1)//2
         NC = self.mesh.number_of_cells()
+        NE = self.mesh.number_of_edges()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         smldof = self.smspace.number_of_local_dofs()
         sh = self.smspace.function(dim=2)
         c2d = self.smspace.cell_to_dof()
         def f(i):
             PI0 = self.PI0[i]
-            x = uh[cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]]
-            y = PI0@x.T.flat
+            idx = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
+            x0 = uh[idx]
+            x1 = uh[idx+NE*p]
+            x2 = np.zeros(idof, dtype=self.ftype)
+            if p > 2
+                start = 2*NE*p + i*idof
+                x2[:] = uh[start:start+idof]
+            y = PI0@n.r_[x0, x1, x2]
             sh[c2d[i], 0] = y[:smldof]
             sh[c2d[i], 1] = y[smldof:2*smldof]
         list(map(f, range(NC)))
@@ -329,7 +336,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         CM = self.CM # 单元质量矩阵
 
-        # 构造分块矩阵 R = [[R00, R01], [R10, R11]]
+        # 构造分块矩阵 R = [[R00, R01, R02], [R10, R11, R12]]
         idof = (p-2)*(p-1)//2
         R02 = np.zeros((NC, smldof, idof), dtype=self.ftype)
         R12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
@@ -517,6 +524,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         D0 = np.zeros((len(cell2dof), smldof), dtype=self.ftype)
         D1 = np.zeros((NC, idof, smldof), dtype=self.ftype) 
+        D2 = np.zeros((NC, idof, smldof), dtype=self.ftype)
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
