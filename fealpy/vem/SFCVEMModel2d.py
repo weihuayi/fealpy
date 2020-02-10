@@ -58,7 +58,7 @@ class SFCVEMModel2d():
             raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
         return S
 
-    def residual_estimator(self):
+    def residual_estimator(self, withpsi=False):
 
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -116,8 +116,11 @@ class SFCVEMModel2d():
 
         np.add.at(e0, edge2cell[:, 0], e1)
         np.add.at(e0, edge2cell[~isBdEdge, 1], e1[~isBdEdge])
-	psi0, psi1 = self.high_order_term(celltype=True)
-        return np.sqrt(e0 + psi0 + psi1)
+        if withpsi:
+            psi0, psi1 = self.high_order_term(celltype=True)
+            return np.sqrt(e0 + psi0 + psi1)
+        else:
+            return np.sqrt(e0)
 
     def high_order_term(self, celltype=False):
         space = self.space
@@ -136,19 +139,18 @@ class SFCVEMModel2d():
         def f0(x):
             val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
             return np.sum(val*val)
-	if celltype:
-	    psi0 = np.array(list(map(f0, zip(DD, PI1, uh))))
-	else:
+        if celltype: # H1 stability
+            psi0 = np.array(list(map(f0, zip(DD, PI1, uh))))
+        else:
             psi0 = sum(map(f0, zip(DD, PI1, uh)))
 
         def f1(x):
             val = (np.eye(x[1].shape[1]) - x[0]@x[1])@x[2]
             return x[3]*np.sum(val*val)
-	if celltype:
+        if celltype: # L2 stability
             psi1 = np.array(list(map(f1, zip(DD, PI0, uh, area))))
-	else:
-	    psi1 = sum(map(f1, zip(DD, PI0, uh, area)))
-
+        else:
+            psi1 = sum(map(f1, zip(DD, PI0, uh, area)))
         return psi0, psi1
 
 

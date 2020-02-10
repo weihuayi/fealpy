@@ -184,6 +184,25 @@ class HalfEdgePolygonMesh(Mesh2d):
         index = index if index is not None else np.s_[:]
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
+    
+    def init_rflag(self):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        halfedge = self.ds.halfedge
+        name = 'rflag'
+        rflag = np.zeros(2*NE, dtype=self.itype)
+        node = self.entity('node')
+        nex = halfedge[:, 2]
+        pre = halfedge[:, 3]
+        v0 = node[halfedge[nex, 0]] - node[halfedge[:, 0]]
+        v1 = node[halfedge[:, 0]] - node[halfedge[pre, 0]]
+        l0 = np.sqrt(np.sum(v0**2, axis=-1))
+        l1 = np.sqrt(np.sum(v1**2, axis=-1))
+        v = np.cross(v1, v0)/l0/l1
+        rflag[np.abs(v) < 0.17] = 1
+        self.halfedgedata[name] = rflag
+        
 
     def refine_with_flag(self, isMarkedCell, data=None, rflag='rflag', dflag=False):
         GD = self.geo_dimension()
@@ -207,18 +226,25 @@ class HalfEdgePolygonMesh(Mesh2d):
         idx = halfedge[flag0, 4]
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
-
+        
+        if data is not None:
+            NV = self.ds.number_of_vertices_of_cells(returnall=True)
+            for key, value in data.items():
+                evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
+                cvalue = np.zeros(NC+1, dtype=self.ftype)
+                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
+                cvalue /= NV
+                data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
         #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
         flag1 = isMainHEdge[isMarkedHEdge]
-        halfedge1[flag1, 0] = range(NN, NN+NE1)
-        idx0 = np.argsort(idx)
-        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0]
+        halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
+        idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
+        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
 
         rflag1 = np.zeros(2*NE1, dtype=self.itype)
         rflag1[flag1] = np.maximum(rflag0[flag0], rflag0[halfedge[flag0, 3]])
-        idx = halfedge[flag0, 4]
-        rflag1[~flag1] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]]) 
+        rflag1[~flag1] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]])[idx0]
         rflag1 += 1
 
         halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
@@ -240,14 +266,7 @@ class HalfEdgePolygonMesh(Mesh2d):
             self.ds.reinit(NN+NE1, NC, halfedge)
             return
         
-        if data is not None:
-            NV = self.ds.number_of_vertices_of_cells(returnall=True)
-            for key, value in data.items():
-                evalue = (value[halfedge[flag, 0]] + value[halfedge[idx, 0]])/2
-                cvalue = np.zeros(NC+1, dtype=self.ftype)
-                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
-                cvalue /= NV
-                data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
+
         
         # 细分单元
         N = halfedge.shape[0]
@@ -432,7 +451,8 @@ class HalfEdgePolygonMesh(Mesh2d):
 
     def refine_marker(self, eta, theta, method="L2"):
         NC = self.number_of_cells()
-        isMarkedCell = mark(eta, theta, method=method)
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell[:-1] = mark(eta, theta, method=method)
         return isMarkedCell
 
     def print(self):
