@@ -22,7 +22,7 @@ class RDFNCVEMDof2d():
         """
         self.p = p
         self.mesh = mesh
-        # 注意这里只包含每个单元边上的自由读 
+        # 注意这里只包含每个单元边上的自由度 
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
     def boundary_dof(self):
@@ -41,15 +41,6 @@ class RDFNCVEMDof2d():
         return edge2dof
 
     def cell_to_dof(self):
-        """
-        Construct the cell2dof array which are 1D array with a location array
-        cell2dofLocation.
-
-        The following code give the dofs of i-th cell.
-
-        cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-
-        """
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
@@ -81,7 +72,7 @@ class RDFNCVEMDof2d():
         return gdof
 
     def number_of_local_dofs(self):
-        # 这里只有单元每个边上的自由度
+        # 这里只有单元每个边上的自由度,  
         p = self.p
         mesh = self.mesh
         NCE = mesh.number_of_edges_of_cells()
@@ -158,7 +149,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             x0 = uh[idx]
             x1 = uh[idx+NE*p]
             x2 = np.zeros(idof, dtype=self.ftype)
-            if p > 2
+            if p > 2:
                 start = 2*NE*p + i*idof
                 x2[:] = uh[start:start+idof]
             y = PI0@n.r_[x0, x1, x2]
@@ -604,12 +595,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             D -= np.block([
                 [                D0, np.zeros(D0.shape)],
                 [np.zeros(D0.shape),                 D0],
-                [                D1,                 D2])@PI0
+                [                D1,                 D2]])@PI0
             n0 = S00[i].shape[0]
             A = D.T@np.block([
                 [     S00[i], S01[i],  np.zeros((n0, idof))], 
                 [   S01[i].T, S11[i],  np.zeros((n0, idof))],
-                [np.zeros((idof, n0), np.zeros((idof, n0)), S22[i]])@D
+                [np.zeros((idof, n0), np.zeros((idof, n0)), S22[i]]])@D
             J0 = self.J[0][:, s]
             J1 = self.J[1][:, s]
             J2 = self.J[2][i]
