@@ -25,9 +25,9 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        idx = space.index1(p=3)
-        print(idx)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
+        idx = space.index1(p=p)
+        print("p=", p, idx)
 
     def index2_test(self, p=2):
         node = np.array([
@@ -38,9 +38,9 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        idx = space.index2(p=3)
-        print(idx)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
+        idx = space.index2(p=p)
+        print("p=", p, idx)
 
     def matrix_test(self, p=2):
         """
@@ -225,11 +225,14 @@ def u3(p):
     return val
 
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-#test.test_index1()
-#test.test_index2()
+test.index1_test(p=1)
+test.index1_test(p=2)
+test.index1_test(p=3)
+test.index2_test(p=3)
+test.index2_test(p=4)
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
 #test.project_test(u2, p=2, mtype=3, plot=False)
 #test.project_test(u3, p=3, mtype=3, plot=False)
-test.stokes_equation_test()
+#test.stokes_equation_test()
