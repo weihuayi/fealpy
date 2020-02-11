@@ -183,7 +183,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             R =  np.block([
                 [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
                 [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]],
-                [   self.J[0][:, s],    self.J[1][:, s], self.J[2][i]]])
+                [   self.J[0][:, s],    self.J[1][:, s], self.J[2][i]+self.J[3][i]]])
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -341,6 +341,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R02 = np.zeros((NC, smldof, idof), dtype=self.ftype)
         R12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype) 
+        J3 = np.zeros((NC, ndof, idof), dtype=self.ftype)
         if p > 2:
             idx1 = self.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             idx2 = self.index2() # 两次求导后的非零基函数编号及求导系数
@@ -355,7 +356,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
             idx3 = self.index1()
             J2[:, idx3[0][idx1[1]], idx1[1]] -= ch[:, None, None]*idx3[2][idx1[1]]
-            J2[:, idx3[1][idx1[0]], idx1[0]] += ch[:, None, None]*idx3[3][idx1[0]]
+            J3[:, idx3[1][idx1[0]], idx1[0]] += ch[:, None, None]*idx3[3][idx1[0]]
 
         R00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
@@ -457,7 +458,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        # 分块矩阵 J =[J0, J1]
+        # 分块矩阵 J =[J0, J1, J2, J3, J2+J3]
         J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
 
@@ -474,7 +475,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
             np.subtract.at(J1, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
 
-        J = [J0, J1, J2]
+        J = [J0, J1, J2, J3, J2+J3]
         return R, J
 
 
@@ -552,6 +553,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
     def matrix_A(self):
 
         p = self.p
+        idof = (p-2)*(p-1)//2
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
 
@@ -563,18 +565,18 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         area = self.smspace.cellmeasure
         ch = self.smspace.cellsize
 
-        ldof = self.dof.number_of_local_dofs()
-        f0 = lambda ndof: np.zeros((ndof, ndof), dtype=self.ftype)
-        S00 = list(map(f0, ldof))
-        S11 = list(map(f0, ldof))
-        S01 = list(map(f0, ldof))
+        ldof = self.dof.number_of_local_dofs() # 这里只包含边上的自由度
+        f = lambda ndof: np.zeros((ndof, ndof), dtype=self.ftype)
+        S00 = list(map(f, ldof))
+        S11 = list(map(f, ldof))
+        S01 = list(map(f, ldof))
+        S22 = np.zeros((NC, idof, idof), dtype=self.ftype) 
 
         def f1(i):
             j = edge2cell[i, 2]
             c = eh[i]**2/ch[edge2cell[i, 0]]
             S00[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
             S11[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
-
         def f2(i):
             if isInEdge[i]:
                 j = edge2cell[i, 3]
@@ -585,81 +587,93 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         list(map(f2, range(NE)))
 
         if p > 2:
+            L = self.L[2]
             Q = self.Q
-            L = self.L
-            def f3(i):
-                L0 = L[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-                L1 = L[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-                H = inv(Q[i])/area[i]
-                S00[i] += L0.T@H@L0
-                S11[i] += L1.T@H@L1
-                S01[i] += L0.T@H@L1
-            list(map(f3, range(NC)))
+            S22 = L.swapaxes(-2, -1)@inv(Q)@L
 
-        ndof0 = p*(p+1)//2
-        ndof1 = (p+1)*(p+2)//2
-        Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
+        ndof = p*(p+1)//2
+        Z = np.zeros((ndof, ndof), dtype=self.ftype)
         ldof = self.dof.number_of_local_dofs()
         def f4(i):
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
-            D[:ldof[i], :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@PI0[:ndof1, :]
-            D[ldof[i]:, :] -= self.D[cell2dofLocation[i]:cell2dofLocation[i+1]]@PI0[ndof1:2*ndof1, :]
+            D0 = self.D[0][s, :]
+            D1 = self.D[1][i]
+            D2 = self.D[2][i]
+            D -= np.block([
+                [                D0, np.zeros(D0.shape)],
+                [np.zeros(D0.shape),                 D0],
+                [                D1,                 D2])@PI0
+            n0 = S00[i].shape[0]
+            A = D.T@np.block([
+                [     S00[i], S01[i],  np.zeros((n0, idof))], 
+                [   S01[i].T, S11[i],  np.zeros((n0, idof))],
+                [np.zeros((idof, n0), np.zeros((idof, n0)), S22[i]])@D
+            J0 = self.J[0][:, s]
+            J1 = self.J[1][:, s]
+            J2 = self.J[2][i]
+            J3 = self.J[3][i]
+            U = np.block([
+                [                J0,  np.zeros(J0.shape),    J2],
+                [                J1,                  J0, J2+J3],
+                [np.zeros(J1.shape),                  J1,    J3]])
+            H0 = np.block([
+                [self.H0[i],              Z,          Z],
+                [         Z, 0.5*self.H0[i],          Z],
+                [         Z,              Z, self.H0[i]]])
+            return A + U.T@H0@U 
 
-            A = D.T@np.block([[S00[i], S01[i]], [S01[i].T, S11[i]]])@D
-
-            J0 = self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-            J1 = self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
-            F00 = J0.T@self.H0[i]@J0
-            F11 = J1.T@self.H0[i]@J1
-            F01 = J1.T@self.H0[i]@J0
-            A00 = A[:ldof[i], :ldof[i]]
-            A11 = A[ldof[i]:, ldof[i]:]
-            A01 = A[:ldof[i], ldof[i]:]
-            return A00+F00+0.5*F11, A11+F11+0.5*F00, A01+0.5*F01
-
-        S = list(map(f4, range(NC)))
-
-        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
-        idx = list(map(np.meshgrid, cd, cd))
+        A = list(map(f4, range(NC)))
+        def f5(i):
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
+            return np.meshgrid(cd, cd)
+        idx = list(map(f5, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
-        gdof = self.number_of_global_dofs() # 注意这里是标量的自由度管理
+        gdof = self.number_of_global_dofs() 
 
-        A00 = np.concatenate(list(map(lambda x: x[0].flat, S)))
-        A00 = coo_matrix((A00, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
-
-        A11 = np.concatenate(list(map(lambda x: x[1].flat, S)))
-        A11 = coo_matrix((A11, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
-
-        A01 = np.concatenate(list(map(lambda x: x[2].flat, S)))
-        A01 = coo_matrix((A01, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
-
-        return bmat([[A00, A01], [A01.T, A11]], format='csr')
+        A = np.concatenate(list(map(lambda x: x[0].flat, A)))
+        A = csr_matrix((A, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
+        return  
 
     def matrix_P(self):
         p = self.p
+        idof = (p-2)*(p-1)//2
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
-        cd0 = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         cd1 = self.smspace.cell_to_dof(p=p-1)
-        idx = list(map(np.meshgrid, cd0, cd1))
+        def f0(i):
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
+            return np.meshgrid(cd, cd1[i])
+        idx = list(map(f0, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
+
         def f(i, k):
             J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
             return J.flatten()
         gdof0 = self.smspace.number_of_global_dofs(p=p-1)
-        gdof1 = self.number_of_global_dofs()
+        gdof1 = self.dof.number_of_global_dofs()
+
         P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
         P0 = coo_matrix((P0, (I, J)),
                 shape=(gdof0, gdof1), dtype=self.ftype)
+
         P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
         P1 = coo_matrix((P1, (I, J)),
                 shape=(gdof0, gdof1), dtype=self.ftype)
-
-        return bmat([[P0, P1]], format='csr')
+        if p == 2:
+            return bmat([[P0, P1]], format='csr')
+        else:
+            P2 = np.concatenate(list(map(lambda i: f(i, 4), range(NC))))
+            P2 = coo_matrix((P1, (I, J)),
+                    shape=(gdof0, NC*idof), dtype=self.ftype)
+            return bmat([[P0, P1, P2]], format='csr')
+            
 
     def source_vector(self, f):
         p = self.p
@@ -674,9 +688,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         bb *= self.smspace.cellmeasure[:, None, None]
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof(doftype='cell')
-        b = np.zeros((gdof, 2), dtype=self.ftype)
+        b = np.zeros(gdof, dtype=self.ftype)
         b[cell2dof, :] = bb
-        return b.T.flat
+        return b
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
         """
@@ -736,7 +750,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim in [None, 1]:
+        if dim in {None, 1}:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)
