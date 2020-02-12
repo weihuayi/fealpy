@@ -3,7 +3,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import PolygonMesh, HalfEdgePolygonMesh
+from fealpy.mesh import PolygonMesh, HalfEdgeMesh
 
 
 class HalfEdgePolygonMeshTest:

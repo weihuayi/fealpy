@@ -15,7 +15,7 @@ class HalfEdgeMesh2d(Mesh2d):
         """
         self.node = node
         self.ds = HalfEdgeMesh2dDataStructure(node.shape[0], NC, halfedge)
-        self.meshtype = 'hepolygon'
+        self.meshtype = 'halfedge'
         self.itype = halfedge.dtype
         self.ftype = node.dtype
 
@@ -25,6 +25,28 @@ class HalfEdgeMesh2d(Mesh2d):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+
+        self.init_level_info()
+
+
+    def init_level_info(self):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        self.celldata['level'] = np.zeros(NC+1, dtype=self.itype)
+        level = np.zeros(2*NE, dtype=self.itype)
+        halfedge = self.ds.halfedge
+        node = self.entity('node')
+        nex = halfedge[:, 2]
+        pre = halfedge[:, 3]
+        v0 = node[halfedge[nex, 0]] - node[halfedge[:, 0]]
+        v1 = node[halfedge[:, 0]] - node[halfedge[pre, 0]]
+        l0 = np.sqrt(np.sum(v0**2, axis=-1))
+        l1 = np.sqrt(np.sum(v1**2, axis=-1))
+        v = np.cross(v1, v0)/l0/l1
+        level[np.abs(v) < 0.17] = 1
+        self.halfedgedata['level'] = level
 
     def set_data(self, name, val, etype):
         if etype in {'cell', 2}:
@@ -185,26 +207,7 @@ class HalfEdgeMesh2d(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
     
-    def init_rflag(self):
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-        halfedge = self.ds.halfedge
-        name = 'rflag'
-        rflag = np.zeros(2*NE, dtype=self.itype)
-        node = self.entity('node')
-        nex = halfedge[:, 2]
-        pre = halfedge[:, 3]
-        v0 = node[halfedge[nex, 0]] - node[halfedge[:, 0]]
-        v1 = node[halfedge[:, 0]] - node[halfedge[pre, 0]]
-        l0 = np.sqrt(np.sum(v0**2, axis=-1))
-        l1 = np.sqrt(np.sum(v1**2, axis=-1))
-        v = np.cross(v1, v0)/l0/l1
-        rflag[np.abs(v) < 0.17] = 1
-        self.halfedgedata[name] = rflag
-        
-
-    def refine_with_flag(self, isMarkedCell, data=None, rflag='rflag', dflag=False):
+    def refine(self, isMarkedCell, data=None, dflag=False):
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -212,12 +215,16 @@ class HalfEdgeMesh2d(Mesh2d):
         
         bc = self.cell_barycenter()
         
+        clevel = self.celldata['level']
+        hlevel = self.halfedgedata['level']
+
         halfedge = self.ds.halfedge
-        rflag0 = self.halfedgedata[rflag]
         isMainHEdge = (halfedge[:, 5] == 1) 
 
         # 标记边
-        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (rflag0 == 0) & (rflag0[halfedge[:, 3]] == 0)
+        flag0 = (hlevel - clevel[halfedge[:, 1]]) == 1
+        flag1 = (hlevel[halfedge[:, 3]] - clevel[halfedge[:, 1]]) == 1
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
         flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
         isMarkedHEdge[flag] = True
 
@@ -242,10 +249,10 @@ class HalfEdgeMesh2d(Mesh2d):
         idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
         halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
 
-        rflag1 = np.zeros(2*NE1, dtype=self.itype)
-        rflag1[flag1] = np.maximum(rflag0[flag0], rflag0[halfedge[flag0, 3]])
-        rflag1[~flag1] = np.maximum(rflag0[idx], rflag0[halfedge[idx, 3]])[idx0]
-        rflag1 += 1
+        hlevel1 = np.zeros(2*NE1, dtype=self.itype)
+        hlevel1[flag1] = np.maximum(hlevel[flag0], hlevel[halfedge[flag0, 3]])
+        hlevel1[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]
+        hlevel1 += 1
 
         halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
         halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
@@ -258,45 +265,46 @@ class HalfEdgeMesh2d(Mesh2d):
 
         halfedge = np.r_['0', halfedge, halfedge1]
         halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
-        rflag0 = np.r_[rflag0, rflag1]
+        hlevel = np.r_[hlevel, hlevel1]
 
         if dflag:
-            self.halfedgedata[rflag] = rflag0
+            self.halfedgedata['level'] = hlevel 
             self.node = np.r_['0', node, ec]
             self.ds.reinit(NN+NE1, NC, halfedge)
             return
 
         # 细分单元
+        flag = (hlevel - clevel[halfedge[:, 1]]) == 1
         N = halfedge.shape[0]
         NV = np.zeros(NC+1, dtype=self.itype)
-        np.add.at(NV, halfedge[:, 1], rflag0 == 1)
+        np.add.at(NV, halfedge[:, 1], flag)
         NHE = sum(NV[isMarkedCell])
         halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
+        hlevel1 = np.zeros(2*NHE, dtype=self.itype)
         
         NC1 = isMarkedCell.sum() # 加密的单元个数
         
-        # 当前标签为 1 的半边
-        flag0 = (rflag0 == 1) & isMarkedCell[halfedge[:, 1]]
+        # 当前为标记单元的可以加密的半边
+        flag0 = flag & isMarkedCell[halfedge[:, 1]]
         idx0, = np.nonzero(flag0)
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
         
         # 修改虚拟单元的编号
-        flag = (halfedge[:, 1] == NC)
-        halfedge[flag, 1] = NC + NHE
+        halfedge[halfedge[:, 1] == NC, 1] = NC + NHE
         cellidx = halfedge[idx0, 1]
         halfedge[idx0, 1] = range(NC, NC + NHE)
+        clevel1 = np.zeros(NHE+1, dtype=self.itype)
+        clevel1[:-1] = clevel[cellidx] + 1
         
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
-        flag = (rflag0[pre] != 1)
-        while np.any(flag):
-            idx1[flag] = pre[flag]
-            rflag0[pre[flag]] = np.maximum(rflag0[pre[flag]]-1, 0)
+        flag0 = ~flag[pre]
+        while np.any(flag0):
+            idx1[flag0] = pre[flag0]
             pre = halfedge[idx1, 3]
-            flag = (rflag0[pre] != 1)
+            flag = ~flag[pre] 
             halfedge[idx1, 1] = halfedge[idx0, 1]
-        rflag0[idx0] = 0
             
         nex1 = halfedge[idx1, 2] # 下一个
         pre1 = halfedge[idx1, 3] # 前一个
@@ -305,7 +313,6 @@ class HalfEdgeMesh2d(Mesh2d):
         cell2newNode = np.full(NC+1, NN+NE1, dtype=self.itype)
         cell2newNode[isMarkedCell] += range(isMarkedCell.sum()) 
         
-
         halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
         halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的前一个半边的编号
         
@@ -315,6 +322,7 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[:NHE, 3] = idx0
         halfedge1[:NHE, 4] = halfedge[nex0, 3]
         halfedge1[:NHE, 5] = 1
+        hlevel1[:NHE] = clevel[cellidx] + 1
 
         halfedge1[NHE:, 0] = halfedge[pre1, 0]
         halfedge1[NHE:, 1] = halfedge[idx1, 1]
@@ -322,128 +330,21 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[NHE:, 3] = halfedge[idx0, 2]
         halfedge1[NHE:, 4] = halfedge[pre1, 2]
         halfedge1[NHE:, 5] = 0
+        hlevel1[NHE:] = clevel[cellidx] + 1
 
         halfedge = np.r_['0', halfedge, halfedge1]
 
+        clevel = np.r_[clevel, clevel1]
         flag = np.zeros(NC+NHE+1, dtype=np.bool)
         np.add.at(flag, halfedge[:, 1], True)
         idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
         NC = flag.sum()
-
         idxmap[flag] = range(NC)
         halfedge[:, 1] = idxmap[halfedge[:, 1]]
-        self.halfedgedata[rflag] = np.r_[rflag0, 
-                         np.zeros(2*NHE, dtype=self.itype)]
-        self.node = np.r_['0', node, ec, bc[isMarkedCell[:-1]]]
-        self.ds.reinit(NN+NE1+NC1, NC-1, halfedge)
+        clevel = clevel[flag]
 
-    def refine_old(self, isMarkedCell, data=None, dflag=False):
-        isMarkedCell = np.r_['0', isMarkedCell, False]
-        GD = self.geo_dimension()
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-
-        halfedge = self.ds.halfedge
-        isMainHEdge = (halfedge[:, 5] == 1)
-        isInHEdge = (halfedge[:, 1] != NC)
-
-
-        # 标记边
-        isMarkedHEdge = isMarkedCell[halfedge[:, 1]]
-        flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
-        isMarkedHEdge[flag] = True
-
-        node = self.entity('node')
-        flag = isMainHEdge & isMarkedHEdge
-        idx = halfedge[flag, 4]
-        ec = (node[halfedge[flag, 0]] + node[halfedge[idx, 0]])/2
-        NE1 = len(ec)
-
-        if data is not None:
-            NV = self.ds.number_of_vertices_of_cells(returnall=True)
-            for key, value in data.items():
-                evalue = (value[halfedge[flag, 0]] + value[halfedge[idx, 0]])/2
-                cvalue = np.zeros(NC+1, dtype=self.ftype)
-                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
-                cvalue /= NV
-                data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
-
-        bc = self.entity_barycenter('cell')
-        # 细分边
-        if dflag:
-            print('MarkedEdge:', halfedge[isMarkedHEdge])
-
-        halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
-        flag = isMainHEdge[isMarkedHEdge]
-        halfedge1[flag, 0] = range(NN, NN+NE1)
-        idx0 = np.argsort(idx)
-        halfedge1[~flag, 0] = halfedge1[flag, 0][idx0]
-        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
-        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
-        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
-        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
-
-        halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
-        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
-        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
-
-        halfedge = np.r_['0', halfedge, halfedge1]
-        halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
-
-        if dflag:
-            self.node = np.r_['0', node, ec]
-            self.ds.reinit(NN+NE1, NC, halfedge)
-            return
-
-        # 细分单元
-        N = halfedge.shape[0]
-        NV = self.ds.number_of_vertices_of_cells(returnall=True)
-        NHE = sum(NV[isMarkedCell])
-        halfedge2 = np.zeros((2*NHE, 6), dtype=self.itype)
-
-        NC1 = isMarkedCell.sum()
-        flag0 = (halfedge[:, 0] >= NN) & isMarkedCell[halfedge[:, 1]]
-        nex0 = halfedge[flag0, 2]
-        pre0 = halfedge[flag0, 3]
-        flag1 = (halfedge[halfedge[:, 3], 0] >= NN) & isMarkedCell[halfedge[halfedge[:, 3], 1]]
-        nex1 = halfedge[flag1, 2]
-        pre1 = halfedge[flag1, 3]
-
-        flag = (halfedge[:, 1] == NC)
-        halfedge[flag, 1] = NC + NHE
-
-        cell2newNode = np.full(NC+1, NN+NE1, dtype=self.itype)
-        cell2newNode[isMarkedCell] += range(isMarkedCell.sum()) 
-        idx = halfedge[flag0, 1] 
-        halfedge[flag0, 1] = range(NC, NC + NHE)
-        halfedge[pre0, 1] = halfedge[flag0, 1]
-        halfedge[flag0, 2] = range(N, N+NHE)
-        halfedge[flag1, 3] = range(N+NHE, N+2*NHE)
-        halfedge2[:NHE, 0] = cell2newNode[idx]
-        halfedge2[:NHE, 1] = halfedge[flag0, 1]
-        halfedge2[:NHE, 2] = halfedge[pre0, 3]
-        halfedge2[:NHE, 3], = np.nonzero(flag0)
-        halfedge2[:NHE, 4] = halfedge[nex0, 3]
-        halfedge2[:NHE, 5] = 1
-
-        halfedge2[NHE:, 0] = halfedge[pre1, 0]
-        halfedge2[NHE:, 1] = halfedge[flag1, 1]
-        halfedge2[NHE:, 2], = np.nonzero(flag1)
-        halfedge2[NHE:, 3] = halfedge[nex1, 2]
-        halfedge2[NHE:, 4] = halfedge[pre1, 2]
-        halfedge2[NHE:, 5] = 0
-
-        halfedge = np.r_['0', halfedge, halfedge2]
-
-        flag = np.zeros(NC+NHE+1, dtype=np.bool)
-        np.add.at(flag, halfedge[:, 1], True)
-        idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
-        NC = flag.sum()
-
-        idxmap[flag] = range(NC)
-        halfedge[:, 1] = idxmap[halfedge[:, 1]]
-
+        self.halfedgedata['level'] = np.r_[hlevel, hlevel1]
+        self.celldata['level'] = clevel
         self.node = np.r_['0', node, ec, bc[isMarkedCell[:-1]]]
         self.ds.reinit(NN+NE1+NC1, NC-1, halfedge)
 
