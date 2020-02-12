@@ -337,7 +337,7 @@ class HalfEdgePolygonMesh(Mesh2d):
         self.node = np.r_['0', node, ec, bc[isMarkedCell[:-1]]]
         self.ds.reinit(NN+NE1+NC1, NC-1, halfedge)
 
-    def refine(self, isMarkedCell, data=None, dflag=False):
+    def refine_old(self, isMarkedCell, data=None, dflag=False):
         isMarkedCell = np.r_['0', isMarkedCell, False]
         GD = self.geo_dimension()
         NN = self.number_of_nodes()
