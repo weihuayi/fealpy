@@ -13,8 +13,8 @@ from fealpy.pde.poisson_2d import CosCosData
 
 class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
 
-    def __init__(self, p=2, h=0.2):
-        self.pde = CosCosData()
+    def __init__(self):
+        pass
 
     def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -45,15 +45,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         cell, cellLocation = mesh.entity('cell')
         edge = mesh.entity('edge')
         cell2edge = mesh.ds.cell_to_edge()
-        uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        cell2dof, cell2dofLocation = uspace.cell_to_dof()
+        uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
-        if True:
+        if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -78,6 +77,6 @@ def u3(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
-test.project_test(u2, p=2, mtype=3, plot=False)
-test.project_test(u3, p=3, mtype=3, plot=False)
+test.project_test(u2, p=2, mtype=0, plot=False)
+#test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

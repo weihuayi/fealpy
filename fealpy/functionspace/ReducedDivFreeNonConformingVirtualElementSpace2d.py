@@ -7,6 +7,7 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from ..common import ranges
+from ..common import block
 
 class RDFNCVEMDof2d():
     """
@@ -137,8 +138,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
     def project_to_smspace(self, uh):
         p = self.p
         idof = (p-2)*(p-1)//2
-        NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         smldof = self.smspace.number_of_local_dofs()
         sh = self.smspace.function(dim=2)
@@ -152,7 +153,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             if p > 2:
                 start = 2*NE*p + i*idof
                 x2[:] = uh[start:start+idof]
-            y = PI0@n.r_[x0, x1, x2]
+            x = np.r_[x0, x1, x2]
+            y = (PI0@x).flat
             sh[c2d[i], 0] = y[:smldof]
             sh[c2d[i], 1] = y[smldof:2*smldof]
         list(map(f, range(NC)))
@@ -165,17 +167,19 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ndof0 = self.smspace.number_of_local_dofs(p=p-1)
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
-            G = np.block([
-                [self.G[0][i]  , self.G[2][i]  , self.B[0][i]],
-                [self.G[2][i].T, self.G[1][i]  , self.B[1][i]],
-                [self.B[0][i].T, self.B[1][i].T, Z]]
+            G = block([
+                [self.G[0][i]  ,   self.G[2][i], self.B[0][i]],
+                [self.G[2][i].T,   self.G[1][i], self.B[1][i]],
+                [self.B[0][i].T, self.B[1][i].T,            0]]
                 )
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            R =  np.block([
+            R = block([
                 [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
                 [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]],
-                [   self.J[0][:, s],    self.J[1][:, s], self.J[2][i]+self.J[3][i]]])
+                [   self.J[0][:, s],    self.J[1][:, s],     self.J[4][i]]])
             PI = inv(G)@R
+            print('Reduced G:\n', G)
+            print('Reduced R:\n', R)
             return PI
         PI0 = list(map(f, range(NC)))
         return PI0
@@ -472,27 +476,29 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
     def matrix_Qp_L(self):
         p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-        NV = mesh.number_of_vertices_of_cells()
-        area = self.smspace.cellmeasure
-
-
-        smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
-        ndof = (p-2)*(p-1)//2 # 标量 p - 1 次单元缩放单项项式空间的维数
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 边上的标量的自由度信息
-        CM = self.CM
-
-        idx = self.index1(p=p-2)
-        Qp = CM[:, idx[0][:, None], idx[0]] + CM[:, idx[1][:, None], idx[1]]
-
-        L0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-        L1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-        L2 = np.zeros((NC, ndof, ndof), dtype=sel.ftype)
         if p > 2:
+            mesh = self.mesh
+            NC = mesh.number_of_cells()
+            NV = mesh.number_of_vertices_of_cells()
+            area = self.smspace.cellmeasure
+
+
+            smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
+            ndof = (p-2)*(p-1)//2 # 标量 p - 1 次单元缩放单项项式空间的维数
+            cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 边上的标量的自由度信息
+            CM = self.CM
+
+            idx = self.index1(p=p-2)
+            Qp = CM[:, idx[0][:, None], idx[0]] + CM[:, idx[1][:, None], idx[1]]
+
+            L0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            L1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            L2 = np.zeros((NC, ndof, ndof), dtype=sel.ftype)
             L2[:, idx[1], idx[1]] = area[:, None]
             L2[:, idx[0], idx[0]]+= area[:, None] 
-        return Qp, [L0, L1, L2]
+            return Qp, [L0, L1, L2]
+        else:
+            return None, None
 
     def matrix_D(self):
         p = self.p
@@ -592,27 +598,26 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             D0 = self.D[0][s, :]
             D1 = self.D[1][i]
             D2 = self.D[2][i]
-            D -= np.block([
-                [                D0, np.zeros(D0.shape)],
-                [np.zeros(D0.shape),                 D0],
-                [                D1,                 D2]])@PI0
-            n0 = S00[i].shape[0]
-            A = D.T@np.block([
-                [     S00[i], S01[i],  np.zeros((n0, idof))], 
-                [   S01[i].T, S11[i],  np.zeros((n0, idof))],
-                [np.zeros((idof, n0), np.zeros((idof, n0)), S22[i]]])@D
+            D -= block([
+                [D0,  0],
+                [ 0, D0],
+                [D1, D2]])@PI0
+            A = D.T@block([
+                [  S00[i], S01[i],      0], 
+                [S01[i].T, S11[i],      0],
+                [       0,      0, S22[i]]])@D
             J0 = self.J[0][:, s]
             J1 = self.J[1][:, s]
             J2 = self.J[2][i]
             J3 = self.J[3][i]
-            U = np.block([
-                [                J0,  np.zeros(J0.shape),    J2],
-                [                J1,                  J0, J2+J3],
-                [np.zeros(J1.shape),                  J1,    J3]])
-            H0 = np.block([
-                [self.H0[i],              Z,          Z],
-                [         Z, 0.5*self.H0[i],          Z],
-                [         Z,              Z, self.H0[i]]])
+            U = block([
+                [J0,  0,    J2],
+                [J1, J0, J2+J3],
+                [ 0, J1,    J3]])
+            H0 = block([
+                [self.H0[i],              0,          0],
+                [         0, 0.5*self.H0[i],          0],
+                [         0,              0, self.H0[i]]])
             return A + U.T@H0@U 
 
         A = list(map(f4, range(NC)))

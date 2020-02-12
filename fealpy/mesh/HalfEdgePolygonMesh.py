@@ -265,9 +265,7 @@ class HalfEdgePolygonMesh(Mesh2d):
             self.node = np.r_['0', node, ec]
             self.ds.reinit(NN+NE1, NC, halfedge)
             return
-        
 
-        
         # 细分单元
         N = halfedge.shape[0]
         NV = np.zeros(NC+1, dtype=self.itype)

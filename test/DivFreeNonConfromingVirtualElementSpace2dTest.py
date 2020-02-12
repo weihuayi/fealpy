@@ -193,14 +193,13 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         edge = mesh.entity('edge')
         cell2edge = mesh.ds.cell_to_edge()
         uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        cell2dof, cell2dofLocation = uspace.cell_to_dof()
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
-        if True:
+        if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -225,14 +224,14 @@ def u3(p):
     return val
 
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-test.index1_test(p=1)
-test.index1_test(p=2)
-test.index1_test(p=3)
-test.index2_test(p=3)
-test.index2_test(p=4)
+#test.index1_test(p=1)
+#test.index1_test(p=2)
+#test.index1_test(p=3)
+#test.index2_test(p=3)
+#test.index2_test(p=4)
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-#test.project_test(u2, p=2, mtype=3, plot=False)
+test.project_test(u2, p=2, mtype=0, plot=False)
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

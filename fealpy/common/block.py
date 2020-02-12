@@ -1,3 +1,7 @@
+# https://github.com/bamos/block
+# An intelligent block matrix library for numpy, PyTorch, and beyond. Crafted 
+# by Brandon Amos with significant contributions by Eric Wong.
+
 import numpy as np
 import scipy.sparse.linalg as sla
 import scipy.sparse as sp
