@@ -1,6 +1,11 @@
+#!/usr/bin/env python3
+# 
 import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import HalfEdgeDomain
+
+from scipy.spatial import Voronoi
+from scipy.spatial import KDTree
 
 
 class HalfEdgeDomainTest:
@@ -23,11 +28,16 @@ class HalfEdgeDomainTest:
             (3, 1, 6, 4, 3, 0, 1)], dtype=np.int)
 
         domain = HalfEdgeDomain(node, halfedge, 1)
+        domain.uniform_refine()
+        print("halfedge:\n")
+        for i, val in enumerate(domain.halfedge):
+            print(i, ':', val)
 
         if plot:
-            domain.app_plot(plt)
+            domain.add_plot(plt)
             plt.show()
 
 
 
 test = HalfEdgeDomainTest()
+test.square_domain_test()
