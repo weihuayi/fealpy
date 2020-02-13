@@ -33,18 +33,17 @@ class HalfEdgeDomain():
         else:
             raise ValueError("`entitytype` is wrong!")
             
-    def uniform_refine(self, n):
+    def uniform_refine(self, n=1):
         print('refine:!')
         for i in range(n):
             node = self.node
             halfedge = self.halfedge
+            NN = self.NN
             NE = self.NE
             isMainHEdge = halfedge[:, 5] == 1
-            v0 = halfedge[halfedge[isMainHEdge, 4], 0]
-            v1 = halfedge[isMainHEdge, 0]
-            ec = (node[v0] + node[v1])/2
+            idx = halfedge[isMainHEdge, 4]
+            ec = (node[halfedge[isMainHEdge, 0]] + node[halfedge[idx, 0]])/2
             #细分边
-            idx, = np.nonzero(isMainHEdge)
             halfedge1 = np.zeros((2*NE, 7), dtype=self.itype)
             halfedge1[isMainHEdge, 0] = range(NN, NN + NE) # 新的节点编号
             idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
@@ -60,7 +59,6 @@ class HalfEdgeDomain():
             halfedge[:, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
 
             halfedge = np.r_['0', halfedge, halfedge1]
-            print(halfedge.shape)
             halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE)
             
             self.halfedge = halfedge
@@ -93,8 +91,6 @@ class HalfEdgeDomain():
     def top_dimension(self):
         return 1
 
-    def uniform_refine(self):
-        pass
 
     def number_of_nodes(self):
         return self.node.shape[0]
@@ -129,7 +125,7 @@ class HalfEdgeDomain():
     def find_node(self, axes, node=None,
             index=None, showindex=False,
             color='r', markersize=20,
-            fontsize=10, fontcolor='r'):
+            fontsize=10, fontcolor='k'):
 
         if node is None:
             node = self.node
