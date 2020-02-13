@@ -172,7 +172,7 @@ def show_mesh_2d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    if mesh.meshtype not in {'polygon', 'hepolygon'}:
+    if mesh.meshtype not in {'polygon', 'hepolygon', 'halfedge'}:
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:

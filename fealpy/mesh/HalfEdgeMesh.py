@@ -4,7 +4,7 @@ from ..quadrature import TriangleQuadrature
 from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 
-class HalfEdgeMesh2d(Mesh2d):
+class HalfEdgeMesh(Mesh2d):
     def __init__(self, node, halfedge, NC):
         """
 
@@ -35,18 +35,7 @@ class HalfEdgeMesh2d(Mesh2d):
         NC = self.number_of_cells()
 
         self.celldata['level'] = np.zeros(NC+1, dtype=self.itype)
-        level = np.zeros(2*NE, dtype=self.itype)
-        halfedge = self.ds.halfedge
-        node = self.entity('node')
-        nex = halfedge[:, 2]
-        pre = halfedge[:, 3]
-        v0 = node[halfedge[nex, 0]] - node[halfedge[:, 0]]
-        v1 = node[halfedge[:, 0]] - node[halfedge[pre, 0]]
-        l0 = np.sqrt(np.sum(v0**2, axis=-1))
-        l1 = np.sqrt(np.sum(v1**2, axis=-1))
-        v = np.cross(v1, v0)/l0/l1
-        level[np.abs(v) < 0.17] = 1
-        self.halfedgedata['level'] = level
+        self.halfedgedata['level'] = np.zeros(2*NE, dtype=self.itype)
 
     def set_data(self, name, val, etype):
         if etype in {'cell', 2}:
@@ -223,17 +212,19 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
 
         # 标记边
-        flag0 = (hlevel - clevel[halfedge[:, 1]]) == 0
-        flag1 = (hlevel[halfedge[:, 3]] - clevel[halfedge[:, 1]]) == 0
+        flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0
+        flag1 = (hlevel[halfedge[:, 3]] - clevel[halfedge[:, 1]]) <= 0
         isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
         flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
         isMarkedHEdge[flag] = True
+        print('sum', isMarkedHEdge.sum())
 
         node = self.entity('node')
         flag0 = isMainHEdge & isMarkedHEdge
         idx = halfedge[flag0, 4]
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
+        print('NE1:', NE1)
         
         if data is not None:
             NV = self.ds.number_of_vertices_of_cells(returnall=True)
@@ -251,9 +242,8 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
 
         hlevel1 = np.zeros(2*NE1, dtype=self.itype)
-        hlevel1[flag1] = np.maximum(hlevel[flag0], hlevel[halfedge[flag0, 3]])
-        hlevel1[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]
-        hlevel1 += 1
+        hlevel1[flag1] = np.maximum(hlevel[flag0], hlevel[halfedge[flag0, 3]]) + 1
+        hlevel1[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]+1
 
         halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
         halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
@@ -295,8 +285,8 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge[halfedge[:, 1] == NC, 1] = NC + NHE
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
         halfedge[idx0, 1] = range(NC, NC + NHE)
-        clevel1 = np.zeros(NHE+1, dtype=self.itype)
-        clevel1[:-1] = clevel[cellidx] + 1 # 单元层数加一
+        clevel[isMarkedCell] += 1
+        clevel1 = clevel[cellidx] # 单元层数加一
         
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
@@ -304,7 +294,7 @@ class HalfEdgeMesh2d(Mesh2d):
         while np.any(flag0):
             idx1[flag0] = pre[flag0]
             pre = halfedge[idx1, 3]
-            flag = ~flag[pre] 
+            flag0 = ~flag[pre] 
             halfedge[idx1, 1] = halfedge[idx0, 1]
             
         nex1 = halfedge[idx1, 2] # 当前半边的下一个半边
@@ -322,7 +312,7 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[:NHE, 3] = idx0
         halfedge1[:NHE, 4] = halfedge[nex0, 3]
         halfedge1[:NHE, 5] = 1
-        hlevel1[:NHE] = clevel[cellidx] + 1
+        hlevel1[:NHE] = clevel[cellidx]
 
         halfedge1[NHE:, 0] = halfedge[pre1, 0]
         halfedge1[NHE:, 1] = halfedge[idx1, 1]
@@ -330,11 +320,11 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[NHE:, 3] = halfedge[idx0, 2]
         halfedge1[NHE:, 4] = halfedge[pre1, 2]
         halfedge1[NHE:, 5] = 0
-        hlevel1[NHE:] = clevel[cellidx] + 1
+        hlevel1[NHE:] = clevel[cellidx]
 
         halfedge = np.r_['0', halfedge, halfedge1]
 
-        clevel = np.r_[clevel, clevel1]
+        clevel = np.r_[clevel[:-1], clevel1, np.array([0])]
         flag = np.zeros(NC+NHE+1, dtype=np.bool)
         np.add.at(flag, halfedge[:, 1], True)
         idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
