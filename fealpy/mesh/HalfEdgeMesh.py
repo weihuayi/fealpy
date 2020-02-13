@@ -214,16 +214,17 @@ class HalfEdgeMesh2d(Mesh2d):
         NC = self.number_of_cells()
         
         bc = self.cell_barycenter()
-        
+
+        # 单元和半边的层标记信息
         clevel = self.celldata['level']
         hlevel = self.halfedgedata['level']
 
         halfedge = self.ds.halfedge
-        isMainHEdge = (halfedge[:, 5] == 1) 
+        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
 
         # 标记边
-        flag0 = (hlevel - clevel[halfedge[:, 1]]) == 1
-        flag1 = (hlevel[halfedge[:, 3]] - clevel[halfedge[:, 1]]) == 1
+        flag0 = (hlevel - clevel[halfedge[:, 1]]) == 0
+        flag1 = (hlevel[halfedge[:, 3]] - clevel[halfedge[:, 1]]) == 0
         isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
         flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
         isMarkedHEdge[flag] = True
@@ -244,7 +245,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
         #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
-        flag1 = isMainHEdge[isMarkedHEdge]
+        flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
         halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
         idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
         halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
@@ -282,7 +283,7 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
         hlevel1 = np.zeros(2*NHE, dtype=self.itype)
         
-        NC1 = isMarkedCell.sum() # 加密的单元个数
+        NC1 = isMarkedCell.sum() # 加密单元个数
         
         # 当前为标记单元的可以加密的半边
         flag0 = flag & isMarkedCell[halfedge[:, 1]]
@@ -290,31 +291,30 @@ class HalfEdgeMesh2d(Mesh2d):
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
         
-        # 修改虚拟单元的编号
+        # 修改单元的编号
         halfedge[halfedge[:, 1] == NC, 1] = NC + NHE
-        cellidx = halfedge[idx0, 1]
+        cellidx = halfedge[idx0, 1] #需要加密的单元编号
         halfedge[idx0, 1] = range(NC, NC + NHE)
         clevel1 = np.zeros(NHE+1, dtype=self.itype)
-        clevel1[:-1] = clevel[cellidx] + 1
+        clevel1[:-1] = clevel[cellidx] + 1 # 单元层数加一
         
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
-        flag0 = ~flag[pre]
+        flag0 = ~flag[pre] # 前一个是不需要细分的半边
         while np.any(flag0):
             idx1[flag0] = pre[flag0]
             pre = halfedge[idx1, 3]
             flag = ~flag[pre] 
             halfedge[idx1, 1] = halfedge[idx0, 1]
             
-        nex1 = halfedge[idx1, 2] # 下一个
-        pre1 = halfedge[idx1, 3] # 前一个
-
+        nex1 = halfedge[idx1, 2] # 当前半边的下一个半边
+        pre1 = halfedge[idx1, 3] # 当前半边的上一个半边
 
         cell2newNode = np.full(NC+1, NN+NE1, dtype=self.itype)
         cell2newNode[isMarkedCell] += range(isMarkedCell.sum()) 
         
         halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
-        halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的前一个半边的编号
+        halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的上一个半边的编号
         
         halfedge1[:NHE, 0] = cell2newNode[cellidx]
         halfedge1[:NHE, 1] = halfedge[idx0, 1]
