@@ -34,7 +34,6 @@ class HalfEdgeDomain():
             raise ValueError("`entitytype` is wrong!")
             
     def uniform_refine(self, n):
-        print('refine:!')
         for i in range(n):
             node = self.node
             halfedge = self.halfedge

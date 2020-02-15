@@ -191,7 +191,7 @@ class ScaledMonomialSpace2d():
             p = self.p
         area = self.cellmeasure
 
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(p=p)
 
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=np.float)
@@ -202,7 +202,7 @@ class ScaledMonomialSpace2d():
             phi = self.basis(point, index=index)
             for i in range(2, p+1):
                 lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
-                lphi[..., start+2:start+i+1] += np.eisum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
+                lphi[..., start+2:start+i+1] += np.einsum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
                 start += i+1
         index = index if index is not None else np.s_[:]
         return lphi/area[index].reshape(-1, 1)
