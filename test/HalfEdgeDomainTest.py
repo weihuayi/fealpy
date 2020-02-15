@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import HalfEdgeDomain
 
-from scipy.spatial import Voronoi
+from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import KDTree
 
 
@@ -28,13 +28,25 @@ class HalfEdgeDomainTest:
             (3, 1, 6, 4, 3, 0, 1)], dtype=np.int)
 
         domain = HalfEdgeDomain(node, halfedge, 1)
-        domain.uniform_refine()
-        print("halfedge:\n")
-        for i, val in enumerate(domain.halfedge):
-            print(i, ':', val)
+        domain.uniform_refine(n=4)
+        
+        np.random.seed(0)
+        points = np.random.rand(10,2)
+        vor = Voronoi(domain.node)
+        print('region:', vor.regions)
+        print('ridge_vertices:', vor.ridge_vertices)
+        print('ridge_points:', vor.ridge_points)
+
+
 
         if plot:
-            domain.add_plot(plt)
+            fig = voronoi_plot_2d(vor)
+            axes = fig.gca()
+            domain.add_plot(axes)
+            domain.find_node(axes, node=vor.vertices, showindex=True)
+            domain.find_node(axes, node=points, color='blue', showindex=True)
+            axes.set_xlim([-0.1, 1.1])
+            axes.set_ylim([-0.1, 1.1])
             plt.show()
 
 
