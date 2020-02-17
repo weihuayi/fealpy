@@ -16,7 +16,7 @@ class SMDof2d():
         self.multiIndex = self.multi_index_matrix()
         self.cell2dof = self.cell_to_dof()
 
-    def multi_index_matrix(self):
+    def multi_index_matrix(self, p=None):
         """
         Compute the natural correspondence from the one-dimensional index
         starting from 0.
@@ -28,7 +28,7 @@ class SMDof2d():
         5<-->(0, 2), .....
 
         """
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(p=p)
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 2), dtype=np.int)
@@ -286,11 +286,28 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 
-    def mass_matrix(self):
-        return self.matrix_H()
+    def mass_matrix(self, p=None):
+        return self.matrix_H(p=p)
 
-    def matrix_H(self):
-        p = self.p
+    def stiff_matrix(self, p=None):
+        gphi = self.grad_basis
+        def f(x, index):
+            gphi = self.grad_basis(x, index=index, p=p)
+            return np.einsum('jkm, jpm->jkp', gphi, gphi)
+        A = self.integralalg.integral(f, celltype=True, q=p+3)
+        cell2dof = self.cell_to_dof(p=p)
+        ldof = self.number_of_local_dofs(p=p)
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs(p=p)
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def matrix_H(self, p=None):
+        if p is None:
+            p = self.p
         mesh = self.mesh
         node = mesh.entity('node')
 
@@ -304,8 +321,8 @@ class ScaledMonomialSpace2d():
         qf = GaussLegendreQuadrature(p + 1)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.basis(ps, index=edge2cell[:, 0])
-        phi1 = self.basis(ps[:, isInEdge, :], index=edge2cell[isInEdge, 1])
+        phi0 = self.basis(ps, index=edge2cell[:, 0], p=p)
+        phi1 = self.basis(ps[:, isInEdge, :], index=edge2cell[isInEdge, 1], p=p)
         H0 = np.einsum('i, ijk, ijm->jkm', ws, phi0, phi0)
         H1 = np.einsum('i, ijk, ijm->jkm', ws, phi1, phi1)
 
@@ -315,12 +332,12 @@ class ScaledMonomialSpace2d():
         b = node[edge[isInEdge, 0]] - self.cellbarycenter[edge2cell[isInEdge, 1]]
         H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(p=p)
         H = np.zeros((NC, ldof, ldof), dtype=np.float)
         np.add.at(H, edge2cell[:, 0], H0)
         np.add.at(H, edge2cell[isInEdge, 1], H1)
 
-        multiIndex = self.dof.multiIndex
+        multiIndex = self.dof.multi_index_matrix(p=p)
         q = np.sum(multiIndex, axis=1)
         H /= q + q.reshape(-1, 1) + 2
         return H
