@@ -211,9 +211,10 @@ class ScaledMonomialSpace2d():
     def grad_basis(self, point, index=None, p=None):
 
         p = self.p if p is None else p
-        index = index if index is not None else np.s_[:]
-
         h = self.cellsize
+        num = len(h) if index is  None else len(index)
+        index = np.s_[:] if index is None else index 
+
         ldof = self.number_of_local_dofs(p=p)
         shape = point.shape[:-1]+(ldof, 2)
         phi = self.basis(point, index=index, p=p-1)
@@ -221,11 +222,11 @@ class ScaledMonomialSpace2d():
         gphi = np.zeros(shape, dtype=np.float)
         xidx = idx['x']
         yidx = idx['y']
-        gphi[..., xidx[0], 0] = np.einsum('i, ...i->...', xidx[1], phi) 
-        gphi[..., yidx[0], 1] = np.einsum('i, ...i->...', yidx[1], phi)
-        if point.shape[-2] == len(index):
+        gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi) 
+        gphi[..., yidx[0], 1] = np.einsum('i, ...i->...i', yidx[1], phi)
+        if point.shape[-2] == num:
             return gphi/h[index].reshape(-1, 1, 1)
-        elif point.shape[0] == len(index):
+        elif point.shape[0] == num:
             return gphi/h[index].reshape(-1, 1, 1, 1)
 
     def laplace_basis(self, point, index=None, p=None):
@@ -239,8 +240,8 @@ class ScaledMonomialSpace2d():
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.index2(p=p)
-            lphi[..., idx['xx'][0]] += np.einsum('i, ...i->...', idx['xx'][1], phi)
-            lphi[..., idx['yy'][0]] += np.einsum('i, ...i->...', idx['yy'][1], phi)
+            lphi[..., idx['xx'][0]] += np.einsum('i, ...i->...i', idx['xx'][1], phi)
+            lphi[..., idx['yy'][0]] += np.einsum('i, ...i->...i', idx['yy'][1], phi)
         return lphi/area[index].reshape(-1, 1)
 
     def hessian_basis(self, point, index=None, p=None):
@@ -267,9 +268,9 @@ class ScaledMonomialSpace2d():
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
             idx = self.index2(p=p)
-            hphi[..., idx['xx'][0], 0, 0] = np.einsum('i, ...i->...', idx['xx'][1], phi)
-            hphi[..., idx['xy'][0], 0, 1] = np.einsum('i, ...i->...', idx['xy'][1], phi)
-            hphi[..., idx['yy'][0], 1, 1] = np.einsum('i, ...i->...', idx['yy'][1], phi)
+            hphi[..., idx['xx'][0], 0, 0] = np.einsum('i, ...i->...i', idx['xx'][1], phi)
+            hphi[..., idx['xy'][0], 0, 1] = np.einsum('i, ...i->...i', idx['xy'][1], phi)
+            hphi[..., idx['yy'][0], 1, 1] = np.einsum('i, ...i->...i', idx['yy'][1], phi)
             hphi[..., 1, 0] = hphi[..., 0, 1] 
         return hphi/area[index].reshape(-1, 1, 1, 1)
 
@@ -370,6 +371,15 @@ class ScaledMonomialSpace2d():
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
+
+    def source_vector(self, f, dim=None, p=None):
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index, p=None))
+        bb = self.integralalg.integral(u, celltype=True, q=p+3)
+        gdof = self.number_of_global_dofs(p=p)
+        cell2dof = self.cell_to_dof(p=p)
+        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
+        return b
 
     def matrix_H(self, p=None):
         p = self.p if p is None else p

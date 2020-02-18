@@ -464,7 +464,7 @@ class WeakGalerkinSpace2d:
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim in [None, 1]:
+        if dim in {None, 1}:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)
