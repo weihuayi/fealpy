@@ -4,6 +4,7 @@ from .function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
+from ..common import ranges
 
 
 class SMDof2d():
@@ -12,9 +13,9 @@ class SMDof2d():
     """
     def __init__(self, mesh, p):
         self.mesh = mesh
-        self.p = p
-        self.multiIndex = self.multi_index_matrix()
-        self.cell2dof = self.cell_to_dof()
+        self.p = p # 默认的空间次数
+        self.multiIndex = self.multi_index_matrix() # 默认的多重指标
+        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
 
     def multi_index_matrix(self, p=None):
         """
@@ -44,8 +45,7 @@ class SMDof2d():
         return cell2dof
 
     def number_of_local_dofs(self, p=None):
-        if p is None:
-            p = self.p
+        p = self.p if p is None else p
         return (p+1)*(p+2)//2
 
     def number_of_global_dofs(self, p=None):
@@ -61,12 +61,7 @@ class ScaledMonomialSpace2d():
         """
 
         self.mesh = mesh
-
-        if bc is None:
-            self.cellbarycenter = mesh.entity_barycenter('cell')
-        else:
-            self.cellbarycenter = bc
-
+        self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
         self.p = p
         self.cellmeasure = mesh.entity_measure('cell')
         self.cellsize = np.sqrt(self.cellmeasure)
@@ -82,6 +77,79 @@ class ScaledMonomialSpace2d():
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
+    def index1(self, p=None):
+        """
+        缩放单项式基函数求一次导数后，非零的基函数编号，及因求导出现的系数
+        """
+        p = self.p if p is None else p
+        n = (p+1)*(p+2)//2
+        idx1 = np.cumsum(np.arange(p+1))
+        idx0 = np.arange(p+1) + idx1
+
+        mask0 = np.ones(n, dtype=np.bool)
+        mask1 = np.ones(n, dtype=np.bool)
+        mask0[idx0] = False
+        mask1[idx1] = False
+
+        idx = np.arange(n)
+        idx0 = idx[mask0]
+        idx1 = idx[mask1]
+
+        idx = np.repeat(range(2, p+2), range(1, p+1))
+        idx3 = ranges(range(p+1), start=1)
+        idx2 = idx - idx3
+        # idx0: 关于 x 求一阶导数后不为零的基函数编号
+        # idx1：关于 y 求一阶导数后不为零的基函数的编号
+        # idx2: 关于 x 求一阶导数后不为零的基函数的整数系数
+        # idx3: 关于 y 求一阶导数后不为零的基函数的整数系数
+        return {'x':(idx0, idx2), 'y':(idx1, idx3)}
+
+    def index2(self, p=None):
+        """
+        缩放单项式基函数求两次导数后，非零的编号及因求导出现的系数
+        """
+        p = self.p if p is None else p
+        n = (p+1)*(p+2)//2
+        mask0 = np.ones(n, dtype=np.bool)
+        mask1 = np.ones(n, dtype=np.bool)
+        mask2 = np.ones(n, dtype=np.bool)
+
+        idx1 = np.cumsum(np.arange(p+1))
+        idx0 = np.arange(p+1) + idx1
+        mask0[idx0] = False
+        mask1[idx1] = False
+
+        mask2[idx0] = False
+        mask2[idx1] = False
+
+        idx0 = np.cumsum([1]+list(range(3, p+2)))
+        idx1 = np.cumsum([2]+list(range(2, p+1)))
+        mask0[idx0] = False
+        mask1[idx1] = False
+
+        idx = np.arange(n)
+        idx0 = idx[mask0]
+        idx1 = idx[mask1]
+        idx2 = idx[mask2]
+
+        idxa = np.repeat(range(2, p+1), range(1, p))
+        idxb = np.repeat(range(4, p+3), range(1, p))
+
+        idxc = ranges(range(p), start=1)
+        idxd = ranges(range(p), start=2)
+
+        idx3 = (idxa - idxc)*(idxb - idxd)
+        idx4 = idxc*idxd
+        idx5 = idxc*(idxa - idxc)
+
+        # idx0: 关于 x 求二阶导数后不为零的基函数编号
+        # idx1：关于 y 求二阶导数后不为零的基函数的编号
+        # idx2：关于 x 和 y 求混合导数后不为零的基函数的编号
+        # idx3: 关于 x 求二阶导数后不为零的基函数的整数系数
+        # idx4：关于 y 求二阶导数后不为零的基函数的整数系数
+        # idx5：关于 x 和 y 求混合导数扣不为零的基函数的整数系数
+        return {'xx': (idx0, idx3), 'yy': (idx1, idx4), 'xy': (idx2, idx5)}
+
     def geo_dimension(self):
         return self.GD
 
@@ -90,11 +158,10 @@ class ScaledMonomialSpace2d():
 
     def edge_basis(self, point, index=None, p=None):
         p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
         center = self.integralalg.edgebarycenter
         h = self.integralalg.edgemeasure
         t = self.mesh.edge_unit_tagent()
-
-        index = index if index is not None else np.s_[:]
         val = np.sum((point - center[index])*t[index], axis=-1)/h[index]
         phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:
@@ -119,8 +186,7 @@ class ScaledMonomialSpace2d():
             The shape of `phi` is (..., M, ldof)
 
         """
-        if p is None:
-            p = self.p
+        p = self.p if p is None else p
         h = self.cellsize
         NC = self.mesh.number_of_cells()
 
@@ -139,72 +205,42 @@ class ScaledMonomialSpace2d():
                 phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
                 phi[..., start+i] = phi[..., start-1]*phi[..., 2]
                 start += i+1
-
         return phi
 
-    def value(self, uh, point, index=None):
-        phi = self.basis(point, index=index)
-        cell2dof = self.dof.cell2dof
-        dim = len(uh.shape) - 1
-        s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        index = index if index is not None else np.s_[:]
-        return np.einsum(s1, phi, uh[cell2dof[index]])
 
     def grad_basis(self, point, index=None, p=None):
-        if p is None:
-            p = self.p
+
+        p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
+
         h = self.cellsize
         ldof = self.number_of_local_dofs(p=p)
         shape = point.shape[:-1]+(ldof, 2)
+        phi = self.basis(point, index=index, p=p-1)
+        idx = self.index1(p=p)
         gphi = np.zeros(shape, dtype=np.float)
-        gphi[..., 1, 0] = 1
-        gphi[..., 2, 1] = 1
-        if p > 1:
-            start = 3
-            r = np.arange(1, p+1)
-            phi = self.basis(point, index=index)
-            for i in range(2, p+1):
-                gphi[..., start:start+i, 0] = np.einsum('i, ...i->...i', r[i-1::-1], phi[..., start-i:start])
-                gphi[..., start+1:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i], phi[..., start-i:start])
-                start += i+1
-        index = index if index is not None else np.s_[:]
+        xidx = idx['x']
+        yidx = idx['y']
+        gphi[..., xidx[0], 0] = np.einsum('i, ...i->...', xidx[1], phi) 
+        gphi[..., yidx[0], 1] = np.einsum('i, ...i->...', yidx[1], phi)
         if point.shape[-2] == len(index):
             return gphi/h[index].reshape(-1, 1, 1)
         elif point.shape[0] == len(index):
             return gphi/h[index].reshape(-1, 1, 1, 1)
 
-    def grad_value(self, uh, point, index=None):
-        gphi = self.grad_basis(point, index=index)
-        cell2dof = self.dof.cell2dof
-        index = index if index is not None else np.s_[:]
-        dim = len(uh.shape) - 1
-        s0 = 'abcdefg'
-        if point.shape[-2] == len(index):
-            s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-            return np.einsum(s1, gphi, uh[cell2dof[index]])
-        elif point.shape[0] == len(index):
-            return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
-
     def laplace_basis(self, point, index=None, p=None):
-        if p is None:
-            p = self.p
+        p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
+
         area = self.cellmeasure
-
         ldof = self.number_of_local_dofs(p=p)
-
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
-            start = 3
-            r = np.arange(1, p+1)
-            r = r[0:-1]*r[1:]
-            phi = self.basis(point, index=index)
-            for i in range(2, p+1):
-                lphi[..., start:start+i-1] += np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
-                lphi[..., start+2:start+i+1] += np.einsum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
-                start += i+1
-        index = index if index is not None else np.s_[:]
+            phi = self.basis(point, index=index, p=p-2)
+            idx = self.index2(p=p)
+            lphi[..., idx['xx'][0]] += np.einsum('i, ...i->...', idx['xx'][1], phi)
+            lphi[..., idx['yy'][0]] += np.einsum('i, ...i->...', idx['yy'][1], phi)
         return lphi/area[index].reshape(-1, 1)
 
     def hessian_basis(self, point, index=None, p=None):
@@ -219,31 +255,44 @@ class ScaledMonomialSpace2d():
         Returns
         -------
         hphi : numpy array
-            the shape of hphi is (..., NC, ldof, 3)
+            the shape of hphi is (..., NC, ldof, 2, 2)
         """
-        if p is None:
-            p = self.p
+        p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
 
         area = self.cellmeasure
-        ldof = self.number_of_local_dofs()
-
-        shape = point.shape[:-1]+(ldof, 3)
+        ldof = self.number_of_local_dofs(p=p)
+        shape = point.shape[:-1]+(ldof, 2, 2)
         hphi = np.zeros(shape, dtype=np.float)
         if p > 1:
-            start = 3
-            r = np.arange(1, p+1)
-            r = r[0:-1]*r[1:]
-            phi = self.basis(point, index=index)
-            for i in range(2, p+1):
-                hphi[..., start:start+i-1, 0] = np.einsum('i, ...i->...i', r[i-2::-1], phi[..., start-2*i+1:start-i])
-                hphi[..., start+2:start+i+1, 1] = np.einsum('i, ...i->...i', r[0:i-1], phi[..., start-2*i+1:start-i])
-                r0 = np.arange(1, i)
-                r0 = r0*r0[-1::-1]
-                hphi[..., start+1:start+i, 2] = np.einsum('i, ...i->...i', r0, phi[..., start-2*i+1:start-i])
-                start += i+1
+            phi = self.basis(point, index=index, p=p-2)
+            idx = self.index2(p=p)
+            hphi[..., idx['xx'][0], 0, 0] = np.einsum('i, ...i->...', idx['xx'][1], phi)
+            hphi[..., idx['xy'][0], 0, 1] = np.einsum('i, ...i->...', idx['xy'][1], phi)
+            hphi[..., idx['yy'][0], 1, 1] = np.einsum('i, ...i->...', idx['yy'][1], phi)
+            hphi[..., 1, 0] = hphi[..., 0, 1] 
+        return hphi/area[index].reshape(-1, 1, 1, 1)
 
+    def value(self, uh, point, index=None):
+        phi = self.basis(point, index=index)
+        cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         index = index if index is not None else np.s_[:]
-        return hphi/area[index].reshape(-1, 1, 1)
+        return np.einsum(s1, phi, uh[cell2dof[index]])
+
+    def grad_value(self, uh, point, index=None):
+        gphi = self.grad_basis(point, index=index)
+        cell2dof = self.dof.cell2dof
+        index = index if index is not None else np.s_[:]
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        if point.shape[-2] == len(index):
+            s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+            return np.einsum(s1, gphi, uh[cell2dof[index]])
+        elif point.shape[0] == len(index):
+            return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
 
     def laplace_value(self, uh, point, index=None):
         lphi = self.laplace_basis(point, index=index)
@@ -277,6 +326,22 @@ class ScaledMonomialSpace2d():
     def edge_mass_matrix(self, p=None):
         p = self.p if p is None else p
         mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge = mesh.entity('edge')
+        eh = mesh.entity_measure('edge')
+        ldof = p + 1
+        q = np.arange(p+1)
+        Q = q.reshape(-1, 1) + q + 1
+        flag = Q%2==1
+        H = np.zeros((NE, ldof, ldof), dtype=self.ftype)
+        H[:, flag] = eh.reshape(-1, 1)
+        H[:, flag] /= Q[flag]
+        H[:, flag] /=2**(Q[flag]-1)
+        return H
+
+    def edge_mass_matrix_1(self, p=None):
+        p = self.p if p is None else p
+        mesh = self.mesh
         edge = mesh.entity('edge')
         measure = mesh.entity_measure('edge')
         qf = GaussLegendreQuadrature(p + 3)
@@ -290,10 +355,11 @@ class ScaledMonomialSpace2d():
         return self.matrix_H(p=p)
 
     def stiff_matrix(self, p=None):
-        gphi = self.grad_basis
+        p = self.p if p is None else p
         def f(x, index):
             gphi = self.grad_basis(x, index=index, p=p)
             return np.einsum('jkm, jpm->jkp', gphi, gphi)
+    
         A = self.integralalg.integral(f, celltype=True, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
         ldof = self.number_of_local_dofs(p=p)
@@ -306,8 +372,7 @@ class ScaledMonomialSpace2d():
         return A
 
     def matrix_H(self, p=None):
-        if p is None:
-            p = self.p
+        p = self.p if p is None else p
         mesh = self.mesh
         node = mesh.entity('node')
 
