@@ -187,7 +187,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         if p > 2:
             mesh = self.mesh
             NC = mesh.number_of_cells()
-            NV = mesh.number_of_vertices_of_cells()
             area = self.smspace.cellmeasure
 
             smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
@@ -203,8 +202,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             L0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             L1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             L2 = np.zeros((NC, ndof, ndof), dtype=sel.ftype)
-            L2[:, y[0], y[0]] = area[:, None]
-            L2[:, x[0], x[0]]+= area[:, None] 
+            L2[:, y[0], y[0]] += area[:, None]
+            L2[:, x[0], x[0]] += area[:, None] 
             return Q, [L0, L1, L2]
         else:
             return None, None
@@ -223,7 +222,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         area = self.smspace.cellmeasure
         ch = self.smspace.cellsize
         CM = self.CM
-
+        
+        smldof = self.smspace.number_of_local_dofs()
+        ndof = smldof - p - 1
         # 分块矩阵 G = [[G00, G01], [G10, G11]]
         G00 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
         G01 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
@@ -349,6 +350,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
             np.subtract.at(M01, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
             np.subtract.at(M11, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
+            
+            
+        print('M00:', M00)
+        print('M01:', M01)
+        print('M02:', M02)
+        print('M10:', M10)
+        print('M11:', M11)
+        print('M12:', M12)
 
         return [[M00, M01, M02], [M10, M11, M12]]
 
@@ -406,12 +415,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             R02 /= area[:, None, None]
 
         R10[xx[0], :] -= 0.5*xx[1][:, None]*self.M[1][0]
-        R10[yy[0], :] -= yy[1][:, None]*self.M[1][0]
+        R10[yy[0], :] -=     yy[1][:, None]*self.M[1][0]
         R10[xy[0], :] -= 0.5*xy[1][:, None]*self.M[0][0]
         R10 /= a
 
         R11[xx[0], :] -= 0.5*xx[1][:, None]*self.M[1][1]
-        R11[yy[0], :] -= yy[1][:, None]*self.M[1][1]
+        R11[yy[0], :] -=     yy[1][:, None]*self.M[1][1]
         R11[xy[0], :] -= 0.5*xy[1][:, None]*self.M[0][1]
         R11 /= a
 
@@ -420,6 +429,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             R12[:, yy[0], :] -=     yy[1][None, :, None]*self.M[1][2]
             R12[:, xy[0], :] -= 0.5*xy[1][None, :, None]*self.M[0][2]
             R12 /= area[:, None, None]
+            
+        print('R00\n', R00)
+        print('R01\n', R01)
+        print('R02\n', R02)
+        print('R10\n', R10)
+        print('R11\n', R11)
+        print('R12\n', R12)
 
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -516,7 +532,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             np.add.at(R10, (x[0][:, None], start[isInEdge]), val[:, isInEdge])
 
         val = CM[:, :, 0].T/area[None, :]**2
-
         def f0(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R00[:, s] += val[:, i, None]*self.M[0][0][0, s] 
@@ -524,8 +539,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         list(map(f0, range(NC)))
         if p > 2:
             R02 += np.einsum('ij, jm->jim', val, self.M[0][2][:, 0, :]) 
-
-        if p > 2:
             R12 += np.einsum('ij, jm->jim', val, self.M[1][2][:, 0, :])
         
         R = [[R00, R01, R02], [R10, R11, R12]]
@@ -542,6 +555,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         J0[y[0], :] -= y[1][:, None]*self.M[1][0]/h
         J1[x[0], :] -= x[1][:, None]*self.M[0][1]/h
         J1[y[0], :] -= y[1][:, None]*self.M[1][1]/h
+        print('J0:', J0)
+        print('J1:', J1)
 
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
         if p > 2:
@@ -553,6 +568,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(J0, (np.s_[:], idx0), val)
         val = np.einsum('ijk, i->jik', F0, n[:, 1])
         np.add.at(J1, (np.s_[:], idx0), val)
+        print('J0:', J0)
+        print('J1:', J1)
 
         if isInEdge.sum() > 0:
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
@@ -610,8 +627,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
-            D1 =  CM[:, y[0], :]/area[:, None, None]
-            D2 = -CM[:, x[0], :]/area[:, None, None]
+            D1 =  CM[:, y[0], :]/area[:, None, None] # check here
+            D2 = -CM[:, x[0], :]/area[:, None, None] # check here
 
         return D0, D1, D2
 
