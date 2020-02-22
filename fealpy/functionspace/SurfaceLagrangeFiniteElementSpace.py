@@ -122,11 +122,11 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         return self.mesh.space.basis(bc)
 
-    def grad_basis(self, bc, cellidx=None, returncond=False):
+    def grad_basis(self, bc, index=None, returncond=False):
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
-        Jp, grad = self.mesh.jacobi_matrix(bc, cellidx=cellidx)
+        Jp, grad = self.mesh.jacobi_matrix(bc, index=index)
         Gp = np.einsum('...ijk, ...imk->...ijm', Jp, Jp)
         Gp = np.linalg.inv(Gp)
         Gp_cond = np.linalg.cond(Gp)
@@ -137,8 +137,8 @@ class SurfaceLagrangeFiniteElementSpace:
         else:
             return grad
 
-    def grad_basis_on_surface(self, bc, cellidx=None):
-        Js, grad, ps = self.mesh.surface_jacobi_matrix(bc, cellidx=cellidx)
+    def grad_basis_on_surface(self, bc, index=None):
+        Js, grad, ps = self.mesh.surface_jacobi_matrix(bc, index=index)
         Gs = np.einsum('...ijk, ...imk->...ijm', Js, Js)
         Gs = np.linalg.inv(Gs)
         grad = np.einsum('...ijk, ...imk->...imj', Gs, grad)
@@ -146,49 +146,49 @@ class SurfaceLagrangeFiniteElementSpace:
         n = np.cross(Js[..., 0, :], Js[..., 1, :], axis=-1)
         return grad, ps, n
 
-    def hessian_basis(self, bc, cellidx=None):
+    def hessian_basis(self, bc, index=None):
         pass
 
-    def value(self, uh, bc, cellidx=None):
+    def value(self, uh, bc, index=None):
         phi = self.basis(bc)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        if index is None:
             val = np.einsum(s1, phi, uh[cell2dof])
         else:
-            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
-    def grad_value(self, uh, bc, cellidx=None):
-        gphi = self.grad_basis(bc, cellidx=cellidx)
+    def grad_value(self, uh, bc, index=None):
+        gphi = self.grad_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        if index is None:
             val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val
 
-    def grad_value_on_surface(self, uh, bc, cellidx=None):
-        gphi, ps, n = self.grad_basis_on_surface(bc, cellidx=cellidx)
+    def grad_value_on_surface(self, uh, bc, index=None):
+        gphi, ps, n = self.grad_basis_on_surface(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        if index is None:
             val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val, ps, n
 
-    def hessian_value(self, uh, bc, cellidx=None):
+    def hessian_value(self, uh, bc, index=None):
         pass
 
-    def div_value(self, uh, bc, cellidx=None):
+    def div_value(self, uh, bc, index=None):
         pass
 
     def number_of_global_dofs(self):
