@@ -146,7 +146,10 @@ def show_mesh_2d(
         linewidths=1, markersize=20,
         showaxis=False, showcolorbar=False, cmap='gnuplot2'):
 
-    axes.set_aspect(aspect)
+    try:
+        axes.set_aspect(aspect)
+    except NotImplementedError:
+        pass
     if showaxis is False:
         axes.set_axis_off()
     else:
