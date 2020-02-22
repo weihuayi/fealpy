@@ -154,7 +154,7 @@ class SurfaceLagrangeFiniteElementSpace:
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...j, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
             val = np.einsum(s1, phi, uh[cell2dof])
         else:
