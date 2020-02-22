@@ -93,7 +93,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
-        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, self.cellmeasure, optimize=True)
+        M = np.einsum('m, mij, mik, i->ijk', ws, phi, phi, self.cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
