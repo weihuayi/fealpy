@@ -383,10 +383,11 @@ class Tritree(TriangleMesh):
             isRemainNode[cell[~isNeedRemovedCell, :]] = True
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
-                options['numrefine'][isMarkedParentCell] = np.max(
-                        options['numrefine'][child[isMarkedParentCell]],
+                num = np.max(options['numrefine'][child[isMarkedParentCell]],
                         axis=-1
-                    ) + 1
+                    )
+                num[num < 0] += 1
+                options['numrefine'][isMarkedParentCell] = num
 
             if ('data' in options) and (options['data'] is not None):
                 if options['p'] == 1:
