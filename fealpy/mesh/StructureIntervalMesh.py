@@ -11,25 +11,29 @@ class StructureIntervalMesh(object):
     [x_0, x_1, ...., x_N]
     """
 
-    def __init__(self, I, h):
+    def __init__(self, I, nx=2, h=None):
         self.I = I
-        self.h = h
-        self.NC = int((I[1] - I[0])/h)
+        if h is None:
+            self.h = (I[1] - I[0])/nx
+            self.NC = nx
+        else:
+            self.h = h
+            self.NC = int((I[1] - I[0])/h)
         self.NN = self.NC + 1
 
         self.ds = StructureIntervalMeshDataStructure(self.NN, self.NC)
 
     def entity(self, etype):
-        if etype in ['cell', 1]:
+        if etype in {'cell', 1}:
             NN = self.NN
             NC = self.NC
             cell = np.zeros((NC, 2), dtype=np.int)
             cell[:, 0] = range(NC)
             cell[:, 1] = range(1, NN)
             return cell
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             node = np.linspace(self.I[0], self.I[1], self.NN)
-            return node
+            return node.reshape(-1, 1)
         else:
             raise ValueError("`entitytype` is wrong!")
 
@@ -50,11 +54,16 @@ class StructureIntervalMesh(object):
         A = diags([c, d, c], [-1, 0, 1])
         return A.tocsr()
 
+    def index(self):
+        NN = self.NN
+        index = [ '$x_{'+str(i)+'}$' for i in range(NN)]
+        return index
+
     def add_plot(
             self, plot,
-            nodecolor='k', cellcolor='k',
+            nodecolor='r', cellcolor='k',
             aspect='equal', linewidths=1,
-            markersize=200,  showaxis=False):
+            markersize=20,  showaxis=False):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
@@ -71,8 +80,8 @@ class StructureIntervalMesh(object):
     def find_node(
             self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=200,
-            fontsize=24, fontcolor='k'):
+            color='r', markersize=20,
+            fontsize=15, fontcolor='r', multiindex=None):
 
         if node is None:
             node = self.entity('node')
@@ -80,7 +89,7 @@ class StructureIntervalMesh(object):
                 axes, node,
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_edge(
             self, axes,

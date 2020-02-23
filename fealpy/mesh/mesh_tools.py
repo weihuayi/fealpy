@@ -14,7 +14,7 @@ from matplotlib.patches import Polygon
 def find_node(
         axes, node, index=None,
         showindex=False, color='r',
-        markersize=20, fontsize=24, fontcolor='k'):
+        markersize=20, fontsize=24, fontcolor='k', multiindex=None):
 
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
@@ -40,9 +40,27 @@ def find_node(
     if dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
-            for i in range(len(index)):
-                axes.text(bc[i, 0], bc[i, 1], str(index[i]),
-                        multialignment='center', fontsize=fontsize, color=fontcolor) 
+            if multiindex is not None:
+                if (type(multiindex) is np.ndarray):
+                    for i,idx in enumerate(multiindex):
+                        s = str(idx).replace('[', '(')
+                        s = s.replace(']', ')')
+                        s = s.replace(' ', ',')
+                        axes.text(bc[i, 0], bc[i, 1], s,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+                else:
+                    for i,idx in enumerate(multiindex):
+                        axes.text(bc[i, 0], bc[i, 1], idx,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+            else:
+                for i in range(len(index)):
+                    axes.text(bc[i, 0], bc[i, 1], str(index[i]),
+                            multialignment='center', fontsize=fontsize, 
+                            color=fontcolor) 
     else:
         axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
         if showindex:
@@ -55,7 +73,7 @@ def find_entity(
         axes, mesh, entity='node',
         index=None, showindex=False,
         color='r', markersize=20,
-        fontsize=24, fontcolor='k'):
+        fontsize=24, fontcolor='k', multiindex=None):
 
     bc = mesh.entity_barycenter(entity)
     if (index is None) or (index is 'all'):
@@ -94,9 +112,22 @@ def find_entity(
     if dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
-            for i in range(len(index)):
-                axes.text(bc[i, 0], bc[i, 1], str(index[i]),
-                        multialignment='center', fontsize=fontsize, color=fontcolor)
+            if multiindex is not None:
+                if (type(multiindex) is np.ndarray):
+                    for i,idx in enumerate(multiindex):
+                        s = str(idx).replace('[', '(')
+                        s = s.replace(']', ')')
+                        s = s.replace(' ', ',')
+                        axes.text(bc[i, 0], bc[i, 1], s,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+                else:
+                    for i,idx in enumerate(multiindex):
+                        axes.text(bc[i, 0], bc[i, 1], idx,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
     else:
         axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
         if showindex:
@@ -150,6 +181,7 @@ def show_mesh_2d(
         axes.set_aspect(aspect)
     except NotImplementedError:
         pass
+
     if showaxis is False:
         axes.set_axis_off()
     else:
