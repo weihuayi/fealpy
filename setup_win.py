@@ -17,7 +17,6 @@ setup(name='fealpy',
           'PyHamcrest',
           'boost',
           'pytools',
-          'pyamg',
-	  'transplant'
+	      'transplant'
       ],
       zip_safe=False)
