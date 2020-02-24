@@ -128,7 +128,7 @@ class HeartSurfacetData(object):
         return rhs
 
 
-    def gradient(self,p):
+    def gradient(self, p):
         """The Gradu of the exact solution on surface
         """
         x = p[..., 0]
