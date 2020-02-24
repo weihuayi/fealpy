@@ -40,9 +40,12 @@ which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
 2. Download and insall latest Git for Windows, https://gitforwindows.org/
 3. Open the git bash, add some setting into  `.bashrc_profile`.
 ```
+$ git config --global user.name "Your Name"
+$ git config --global user.email "Your Email"
 $ echo ". /c/Users/<username>/Anaconda3/etc/profile.d/conda.sh" >> .bashrc_profile
-$ echo "export PATH=$PATH:/c/Users/dell/Anaconda3:/c/Users/<username>/Anaconda3/Scripts" >> .bashrc_profile
+$ echo "export PATH=$PATH:/c/Users/<username>/Anaconda3:/c/Users/<username>/Anaconda3/Scripts" >> .bashrc_profile
 ```
+please replace the <username> as you own one.
 4. Then clone the latest fealpy
 ```
 $ cd Desktop
