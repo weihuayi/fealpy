@@ -68,6 +68,26 @@ class SurfaceLagrangeFiniteElementSpace:
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
 
+    def grad_recovery(self, uh, method='area_harmonic'):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        p = self.p
+        bc = self.dof.multiIndex/p
+        guh = uh.grad_value(bc)
+        guh = guh.swapaxes(0, 1)
+        rguh = self.function(dim=3)
+        if method == 'area_harmonic':
+            measure = 1/self.cellmeasure
+            ws = np.einsum('i, j->ij', measure, np.ones(ldof))
+            deg = np.bincount(cell2dof.flat, weights = ws.flat, minlength=gdof)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
+            np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            rguh /= deg.reshape(-1, 1)
+        else:
+            rguh = None
+        return rguh
+
     def stiff_matrix(self):
         p = self.p
         GD = self.mesh.geo_dimension()

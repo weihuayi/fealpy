@@ -133,12 +133,12 @@ class SurfaceTriangleMesh():
         return Js, grad, ps
 
     def bc_to_point(self, bc, index=None):
-        basis = self.space.basis(bc)
+        phi = self.space.basis(bc)
         cell2dof = self.space.dof.cell2dof
         if index is None:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof, :])
+            bcp = np.einsum('...ij, ijk->...ik', phi, self.node[cell2dof, :])
         else:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[index], :])
+            bcp = np.einsum('...ij, ijk->...ik', phi, self.node[cell2dof[index], :])
 
         bcp, _ = self.project(bcp)
         return bcp
