@@ -36,22 +36,25 @@ which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
 
 ## Windows: Anaconda
 
-1. Download and install latest Anaconda for Windows. https://www.anaconda.com/distribution/
+1. Download and install latest Anaconda for Windows, the default install directory is "/c/Users/<username>/Anaconda3/". https://www.anaconda.com/distribution/
 2. Download and insall latest Git for Windows, https://gitforwindows.org/
-3. Add the Anaconda directory into $PATH env variable, maybe reboot the windows.
-4. Open the git bash, clone the latest fealpy
+3. Open the git bash, add some setting into  `.bashrc_profile`.
 ```
-$ echo ". /c/Users/<uasername>/Anaconda3/etc/profile.d/conda.sh" >> .bashrc
+$ echo ". /c/Users/<username>/Anaconda3/etc/profile.d/conda.sh" >> .bashrc_profile
+$ echo "export PATH=$PATH:/c/Users/dell/Anaconda3:/c/Users/<username>/Anaconda3/Scripts" >> .bashrc_profile
+```
+4. Then clone the latest fealpy
+```
 $ cd Desktop
-$ mkdir git # create a directory named git
+$ mkdir git # create a directory named git. Of course, you can name it by another name you like.
 $ cd git # enter git directory
 $ git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
 ```
 5. enter fealpy directory, run the following command:
 ```
-> python setup_win.py develop 
-> pip　install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
-> pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
+$ python setup_win.py develop 
+$ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
+$ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
 ```
 
 ## Mac
