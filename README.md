@@ -36,36 +36,47 @@ which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
 
 ## Windows: Anaconda
 
-1. Download and install latest Anaconda for Windows, the default install directory is "/c/Users/<username>/Anaconda3/". https://www.anaconda.com/distribution/
+1. Download and install latest Anaconda for Windows. https://www.anaconda.com/distribution/
 2. Download and insall latest Git for Windows, https://gitforwindows.org/
-3. Open the git bash, add some setting into  `.bashrc_profile`.
+3. Open Anaconda Powershell Prompt (Anaconda3) from start menu, and config your name and email information for git. 
+```
+> git config --global user.name "Your Name"
+> git config --global user.email "Your Email"
+```
+4. Then clone the latest fealpy
+```
+> cd Desktop
+> mkdir git # create a directory named git. Of course, you can name it by another name you like.
+> cd git # enter git directory
+> git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
+```
+5. enter fealpy directory, run the following command:
+```
+> python setup_win.py develop 
+> pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
+> pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
+```
+
+## Mac
+1. Download and install latest Anaconda for macOS. https://www.anaconda.com/distribution/
+2. Download and insall latest Git for Windows, https://git-scm.com/download/mac.
+3. Open command terminal and config your name and email information for git. 
 ```
 $ git config --global user.name "Your Name"
 $ git config --global user.email "Your Email"
-$ echo ". /c/Users/<username>/Anaconda3/etc/profile.d/conda.sh" >> .bashrc_profile
-$ echo "export PATH=$PATH:/c/Users/<username>/Anaconda3:/c/Users/<username>/Anaconda3/Scripts" >> .bashrc_profile
 ```
-please replace the <username> as you own one.
 4. Then clone the latest fealpy
 ```
-$ cd Desktop
+$ cd ~ # enter your home directory 
 $ mkdir git # create a directory named git. Of course, you can name it by another name you like.
 $ cd git # enter git directory
 $ git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
 ```
 5. enter fealpy directory, run the following command:
 ```
-$ python setup_win.py develop 
+$ python setup_mac.py develop 
 $ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
 $ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
-```
-
-## Mac
-1. Download and install latest anaconda for macOS
-2. Enter fealpy directory, run the following command:
-```
-$ python3 setup_mac.py develop
-$ pip　install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
 ```
 
 # Debug in python 
