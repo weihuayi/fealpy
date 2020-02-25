@@ -18,7 +18,7 @@ class SympyTools():
         n = gradient/length
         div = Matrix(derive_by_array(n, var)).reshape(m, m)
         div_n = trace(div)
-        div_n = sym.simplify(div_n)
+#        div_n = sym.simplify(div_n)
         hessian = Matrix(derive_by_array(gradient, var)).reshape(m, m)
         laplace = trace(hessian)
         laplace = sym.simplify(laplace)

@@ -57,9 +57,9 @@ class FEMeshIntegralAlg():
         return
 
     def L2_error(self, u, uh, celltype=False):
-        def f(x):
-            xx = self.mesh.bc_to_point(x)
-            return (u(xx) - uh(x))**2
+        def f(bc):
+            xx = self.mesh.bc_to_point(bc)
+            return (u(xx) - uh(bc))**2
         e = self.integral(f, celltype=celltype)
         if celltype is False:
             return np.sqrt(e.sum())

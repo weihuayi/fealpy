@@ -108,7 +108,7 @@ class PrismFiniteElementSpace():
         phi0 = self.lagranian_basis(bc0, 1)
         phi1 = self.lagranian_basis(bc1, 2)
         phi = np.einsum('ij, kl->ikjl', phi0, phi1)
-        shape = phi.shape[0:2] + (-1, )
+        shape = phi.shape[0:2] + (1, -1, )
         return phi.reshape(shape) # (NQ0, NQ1, ldof0*ldof1)
 
     def grad_basis(self, bc, cellidx=None):
@@ -147,7 +147,7 @@ class PrismFiniteElementSpace():
         cell2dof = self.cell_to_dof() # (NC, ldof0*ldof1)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...i, ki{}->...k{}'.format(s0[:dim], s0[:dim])
+        s1 = '...ki, ki{}->...k{}'.format(s0[:dim], s0[:dim])
         if cellidx is None:
             uh = uh[cell2dof] # (NC, ldof0*ldof1, ...)
         else:
@@ -232,11 +232,10 @@ class PrismFiniteElementSpace():
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         pp = self.mesh.bc_to_point(bcs)
-        fval = f(pp)
-        phi = self.basis(bcs)
+        fval = f(pp) # (NQ0, NQ1, NC)
+        phi = self.basis(bcs) # (NQ0, NQ1, ldof)
         # bb: (NC, ldof)
-        bb = np.einsum('m, mi, mk, i->ik',
-                ws, fval, phi, self.cellmeasure)
+        bb = np.einsum('mn, mni, mnik, i->ik', ws, fval, phi, self.cellmeasure)
         cell2dof = self.cell_to_dof() #(NC, ldof)
         gdof = self.number_of_global_dofs()
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)

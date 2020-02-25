@@ -83,9 +83,9 @@ class PrismFiniteElementSpaceTest():
             mesh.find_node(axes, node=ipoints[cell2dof[0]], showindex=True, color='b')
             plt.show()
 
-    def poisson_test(self, p=1):
+    def poisson_test(self, p=2):
         pde = CosCosCosData()
-        mesh = self.plane_pmesh(n=2)
+        mesh = self.plane_pmesh(n=4)
         space = PrismFiniteElementSpace(mesh, p=p)
         A = space.stiff_matrix()
         b = space.source_vector(pde.source)

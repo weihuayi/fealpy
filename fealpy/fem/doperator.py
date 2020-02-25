@@ -41,14 +41,14 @@ def mass_matrix(space, qf, measure, cfun=None, barycenter=True):
     bcs, ws = qf.quadpts, qf.weights
     phi = space.basis(bcs)
     if cfun is None:
-        A = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, measure)
+        A = np.einsum('m, mij, mik, i->ijk', ws, phi, phi, measure)
     else:
         if barycenter is True:
             val = cfun(bcs)
         else:
             pp = space.mesh.bc_to_point(bcs)
             val = cfun(pp)
-        A = np.einsum('m, mi, mj, mk, i->ijk', ws, val, phi, phi, measure)
+        A = np.einsum('m, mi, mij, mik, i->ijk', ws, val, phi, phi, measure)
 
     cell2dof = space.cell_to_dof()
     ldof = space.number_of_local_dofs()

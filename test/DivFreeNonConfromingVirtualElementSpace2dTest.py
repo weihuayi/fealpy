@@ -5,18 +5,18 @@ import matplotlib.pyplot as plt
 from scipy.sparse import spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
-from fealpy.functionspace import StokesDivFreeNonConformingVirtualElementSpace2d
+from fealpy.functionspace import DivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.mesh.simple_mesh_generator import triangle
-from fealpy.mesh import PolygonMesh
+from fealpy.mesh import PolygonMesh, QuadrangleMesh
 from fealpy.pde.poisson_2d import CosCosData
 
-class StokesDivFreeNonConformingVirtualElementSpace2dTest:
+class DivFreeNonConformingVirtualElementSpace2dTest:
 
     def __init__(self, p=2, h=0.2):
         self.pde = CosCosData()
 
-    def test_index1(self, p=2):
+    def index1_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -25,11 +25,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        idx = space.index1(p=3)
-        print(idx)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
+        idx = space.index1(p=p)
+        print("p=", p, idx)
 
-    def test_index2(self, p=2):
+    def index2_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -38,11 +38,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        idx = space.index2(p=3)
-        print(idx)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
+        idx = space.index2(p=p)
+        print("p=", p, idx)
 
-    def test_matrix(self, p=2):
+    def matrix_test(self, p=2):
         """
         node = np.array([
             (-1.0, -1.0),
@@ -66,7 +66,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         print("G:", space.G)
         print("B:", space.B)
         print("R:", space.R)
@@ -75,7 +75,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         print("L:", space.L)
         print("D:", space.D)
 
-    def test_matrix_A(self, p=2):
+    def matrix_A_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -84,12 +84,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         A = space.matrix_A()
         print(A)
 
-
-    def test_matrix_P(self, p=2):
+    def matrix_P_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -98,11 +97,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
-        space = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         P = space.matrix_P()
         print(P)
 
-    def test_stokes_equation(self, p=2, maxit=4):
+    def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
         from fealpy.pde.Stokes_Model_2d import CosSinData
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -117,13 +116,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
                 fig = plt.figure()
                 axes = fig.gca()
                 mesh.add_plot(axes)
-                mesh.find_cell(axes, index=np.array([51], dtype=np.int))
                 plt.show()
 
-            uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+            uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
             pspace = ScaledMonomialSpace2d(mesh, p-1)
 
-            """
             isBdDof = uspace.boundary_dof()
 
             udof = uspace.number_of_global_dofs()
@@ -155,7 +152,6 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             uh[:, 0] = x[:udof]
             uh[:, 1] = x[udof:2*udof]
             ph[:] = x[2*udof:]
-            """
 
             up = uspace.project(pde.velocity)
             up = uspace.project_to_smspace(up)
@@ -163,42 +159,79 @@ class StokesDivFreeNonConformingVirtualElementSpace2dTest:
             error[i] = integralalg.L2_error(pde.velocity, up)
             h /= 2
 
-
         print(error)
         print(error[0:-1]/error[1:])
 
-    def project_test(self, p=2):
-        def u(p):
-            x = p[..., 0]
-            y = p[..., 1]
-            val = np.zeros(p.shape, p.dtype)
-            val[..., 0] = y**2
-            val[..., 1] = x**2
-            return val
+    def project_test(self, u, p=2, mtype=0, plot=True):
+        from fealpy.mesh.simple_mesh_generator import triangle
 
-        node = np.array([
-            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        uspace = StokesDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        if mtype == 0:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3], dtype=np.int)
+            cellLocation = np.array([0, 4], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 1:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3, 0, 2], dtype=np.int)
+            cellLocation = np.array([0, 3, 6], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 2:
+            h = 0.1
+            mesh = triangle([-1, 1, -1, 1], h, meshtype='polygon')
+        elif mtype == 3:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([[0, 1, 2, 3]], dtype=np.int)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine()
+            mesh = PolygonMesh.from_mesh(mesh)
+
+
+        cell, cellLocation = mesh.entity('cell')
+        edge = mesh.entity('edge')
+        cell2edge = mesh.ds.cell_to_edge()
+        uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
-        print(up)
+
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
-        if 0:
+        if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_cell(axes, index=np.array([51], dtype=np.int))
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
+def u2(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**2/4
+    val[..., 1] = x**2/4
+    return val
 
-test = StokesDivFreeNonConformingVirtualElementSpace2dTest()
-#test.test_index1()
-#test.test_index2()
+def u3(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**3/8
+    val[..., 1] = x**3/8
+    return val
+
+test = DivFreeNonConformingVirtualElementSpace2dTest()
+#test.index1_test(p=1)
+#test.index1_test(p=2)
+#test.index1_test(p=3)
+#test.index2_test(p=3)
+#test.index2_test(p=4)
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.project_test()
+test.project_test(u2, p=2, mtype=0, plot=True)
+#test.project_test(u3, p=3, mtype=3, plot=False)
+#test.stokes_equation_test()

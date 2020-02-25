@@ -9,14 +9,30 @@ class BoundaryCondition():
         self.robin = robin
 
     def apply_neuman_bc(self, b, is_neuman_boundary=None):
+        """
+
+        Parameters
+        ----------
+        b : array with shape (N, ) or (N, GD)
+        is_neuman_boundary : function object
+
+        Returns
+        -------
+
+        See Also
+        --------
+
+        Examples
+        --------
+
+        """
         if self.neuman is not None:
             space = self.space
             p = space.p
             TD = space.top_dimension()
             mesh = space.mesh
-
+            dim = 1 if len(b.shape) == 1 else b.shape[1]
             face = mesh.entity('face')
-            face2cell = mesh.ds.face_to_cell()
             face2dof = space.face_to_dof()
 
             # find the index of all neuman boundary 
@@ -29,17 +45,44 @@ class BoundaryCondition():
             qf = mesh.integrator(p+3, 'face')
             bcs, ws = qf.get_quadrature_points_and_weights()
             phi = space.face_basis(bcs)
-            p = mesh.bc_to_point(bcs, etype='face', index=idx)
+            pp = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
-            val = self.neuman(p, n) # (NQ, NF, ...)
-            bb = np.einsum('m, mi..., mk, i->ik...', ws, val, phi, measure)
-            np.add.at(b, face2dof[idx], bb)
+            val = self.neuman(pp, n) # (NQ, NF, ...)
+            bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+            if dim == 1:
+                np.add.at(b, face2dof[idx], bb)
+            else:
+                np.add.at(b, (face2dof[idx], np.s_[:]), bb)
+
 
     def apply_dirichlet_bc(self, A, b, uh, is_dirichlet_boundary=None):
+        """
+        apply the dirichlet boundary condition GD space.
+
+        Parameter
+        ---------
+        A : matrix with shape (GD*N, GD*N)
+        b : vector with shape (GD*N, )
+        uh: (N, GD) or (N, ) with GD = 1
+
+        Returns
+        -------
+
+        See also
+        --------
+
+        Notes
+        -----
+        The GD is the dimension of the problem space, and N is the number of
+        dofs.
+
+        Examples
+        --------
+
+        """
         if self.dirichlet is not None:
-            isDDof = self.space.set_dirichlet_bc(
-                    uh, self.dirichlet,
-                    is_dirichlet_boundary=is_dirichlet_boundary)
+            isDDof = self.space.set_dirichlet_bc(uh, self.dirichlet,
+                    is_dirichlet_boundary)
             dim = 1 if len(uh.shape) == 1 else uh.shape[1]
             if dim > 1:
                 isDDof = np.tile(isDDof, dim)

@@ -30,6 +30,7 @@ class TriangleMesh(Mesh2d):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
+        self.facedata = self.edgedata
         self.meshdata = {}
 
     def vtk_cell_type(self):
@@ -37,9 +38,9 @@ class TriangleMesh(Mesh2d):
         return VTK_TRIANGLE
 
     def integrator(self, k, etype='cell'):
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             return TriangleQuadrature(k)
-        elif etype in ['edge', 'face', 1]:
+        elif etype in {'edge', 'face', 1}:
             return GaussLegendreQuadrature(k)
 
     def copy(self):
@@ -95,6 +96,11 @@ class TriangleMesh(Mesh2d):
         cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
         return QuadrangleMesh(node, cell)
 
+    def egde_merge(self, h0):
+        edge = self.entity('edge')
+        h = self.entity_measure('edge')
+        isShortEdge = h < h0
+
 
     def line_walk(self, p):
         NC = self.number_of_cells()
@@ -126,13 +132,13 @@ class TriangleMesh(Mesh2d):
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
-        dim = self.geo_dimension()
+        GD = self.geo_dimension()
 
         v0 = node[cell[:,2],:] - node[cell[:,1],:]
         v1 = node[cell[:,0],:] - node[cell[:,2],:]
         v2 = node[cell[:,1],:] - node[cell[:,0],:]
         nv = np.cross(v2, -v1)
-        if dim == 2:
+        if GD == 2:
             area = nv/2.0
             x2 = np.sum(node**2, axis=1, keepdims=True)
             w0 = x2[cell[:,2]] + x2[cell[:,1]]
@@ -144,7 +150,7 @@ class TriangleMesh(Mesh2d):
             fe2 = w2*v2@W
             c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
             R = np.sqrt(np.sum((c-node[cell[:,0], :])**2,axis=1))
-        elif dim == 3:
+        elif GD == 3:
             length = np.sqrt(np.sum(nv**2, axis=1))
             n = nv/length.reshape((-1, 1))
             l02 = np.sum(v1**2, axis=1, keepdims=True)
@@ -649,16 +655,16 @@ class TriangleMesh(Mesh2d):
         v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
         v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
         v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
-        dim = self.geo_dimension()
+        GD = self.geo_dimension()
         nv = np.cross(v2, -v1)
-        Dlambda = np.zeros((NC, 3, dim), dtype=self.ftype)
-        if dim == 2:
+        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
             length = nv
             W = np.array([[0, 1], [-1, 0]])
             Dlambda[:,0,:] = v0@W/length.reshape((-1, 1))
             Dlambda[:,1,:] = v1@W/length.reshape((-1, 1))
             Dlambda[:,2,:] = v2@W/length.reshape((-1, 1))
-        elif dim == 3:
+        elif GD == 3:
             length = np.sqrt(np.square(nv).sum(axis=1))
             n = nv/length.reshape((-1, 1))
             Dlambda[:,0,:] = np.cross(n, v0)/length.reshape((-1,1))
@@ -666,20 +672,18 @@ class TriangleMesh(Mesh2d):
             Dlambda[:,2,:] = np.cross(n, v2)/length.reshape((-1,1))
         return Dlambda
 
-    def jacobi_matrix(self, cellidx=None):
+    def jacobi_matrix(self, index=None):
         """
         Return
         ------
-        J : numpy.array
+        J : numpy.ndarray
             `J` is the transpose o  jacobi matrix of each cell.
             The shape of `J` is  `(NC, 2, 2)` or `(NC, 2, 3)`
         """
         node = self.node
         cell = self.ds.cell
-        if cellidx is None:
-            J = node[cell[:, [1, 2]]] - node[cell[:, [0]]]
-        else:
-            J = node[cell[cellidx, [1, 2]]] - node[cell[cellidx, [0]]]
+        index = index if index is not None else np.s_[:]
+        J = node[cell[index, [1, 2]]] - node[cell[index, [0]]]
         return J
 
     def rot_lambda(self):
@@ -689,62 +693,40 @@ class TriangleMesh(Mesh2d):
         v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
         v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
         v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
-        dim = self.geo_dimension()
+        GD = self.geo_dimension()
         nv = np.cross(v2, -v1)
-        Rlambda = np.zeros((NC, 3, dim), dtype=self.ftype)
-        if dim == 2:
+        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
             length = nv
             Rlambda[:,0,:] = v0/length.reshape((-1, 1))
             Rlambda[:,1,:] = v1/length.reshape((-1, 1))
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-        elif dim == 3:
+        elif GD == 3:
             length = np.sqrt(np.square(nv).sum(axis=1))
             Rlambda[:,0,:] = v0/length.reshape((-1, 1))
             Rlambda[:,1,:] = v1/length.reshape((-1, 1))
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def area(self, index=None):
-        node = self.node
-        cell = self.ds.cell
-        dim = self.node.shape[1]
-        if index is None:
-            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
-            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
-        else:
-            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
-            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
-        nv = np.cross(v2, -v1)
-        if dim == 2:
-            a = nv/2.0
-        elif dim == 3:
-            a = np.sqrt(np.square(nv).sum(axis=1))/2.0
-        return a
-
     def cell_area(self, index=None):
         node = self.node
         cell = self.ds.cell
-        dim = self.node.shape[1]
-        if index is None:
-            v1 = node[cell[:, 1], :] - node[cell[:, 0], :]
-            v2 = node[cell[:, 2], :] - node[cell[:, 0], :]
-        else:
-            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
-            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
+        GD = self.geo_dimension()
+        index = index if index is not None else np.s_[:]
+        v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+        v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
-        if dim == 2:
+        if GD == 2:
             a = nv/2.0
-        elif dim == 3:
+        elif GD == 3:
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
     def bc_to_point(self, bc, etype='cell', index=None):
         node = self.node
         entity = self.entity(etype)
-        if index is None:
-            p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        else:
-            p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
+        index = index if index is not None else np.s_[:]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
         return p
 
 

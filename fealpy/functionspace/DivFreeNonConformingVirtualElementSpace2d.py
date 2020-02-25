@@ -9,7 +9,7 @@ from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from ..common import ranges
 
-class SDFNCVEMDof2d():
+class DFNCVEMDof2d():
     """
     The dof manager of Stokes Div-Free Non Conforming VEM 2d space.
     """
@@ -92,7 +92,7 @@ class SDFNCVEMDof2d():
         return ldofs
 
 
-class StokesDivFreeNonConformingVirtualElementSpace2d:
+class DivFreeNonConformingVirtualElementSpace2d:
     def __init__(self, mesh, p, q=None):
         """
         Parameter
@@ -103,7 +103,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
         self.mesh = mesh
-        self.dof = SDFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
+        self.dof = DFNCVEMDof2d(mesh, p) # 注意这里是标量的自由度管理
         self.integralalg = self.smspace.integralalg
 
         self.CM = self.smspace.cell_mass_matrix()
@@ -128,12 +128,14 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         p = self.p # p >= 2
         cell2dof = self.cell_to_dof('cell') # 获得单元内部自由度
         uh = self.function()
-        def u0(x, cellidx):
+
+        def u0(x, index):
             return np.einsum('ij..., ijm->ijm...', u(x),
-                    self.smspace.basis(x, p=p-2, cellidx=cellidx))
+                    self.smspace.basis(x, p=p-2, index=index))
         area = self.smspace.cellmeasure
         uh[cell2dof] = self.integralalg.integral(
                 u0, celltype=True)/area[:, None, None]
+
         def u1(x):
             return np.einsum('ij..., ijm->ijm...', u(x),
                     self.smspace.edge_basis(x, p=p-1))
@@ -165,24 +167,19 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ndof0 = self.smspace.number_of_local_dofs(p=p-1)
         Z = np.zeros((ndof0, ndof0), dtype=self.ftype)
         def f(i):
-            G00 = self.G[0][i]
-            G11 = self.G[1][i]
-            G01 = self.G[2][i]
-            B0 = self.B[0][i]
-            B1 = self.B[1][i]
             G = np.block([
-                [G00, G01, B0],
-                [G01.T, G11, B1],
-                [B0.T, B1.T, Z]]
+                [self.G[0][i]  , self.G[2][i]  , self.B[0][i]],
+                [self.G[2][i].T, self.G[1][i]  , self.B[1][i]],
+                [self.B[0][i].T, self.B[1][i].T, Z]]
                 )
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R =  np.block([
-                [self.R[0][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[0][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.R[1][0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.R[1][1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]],
-                [self.J[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]],
-                 self.J[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]]])
+                [self.R[0][0][:, s], self.R[0][1][:, s]],
+                [self.R[1][0][:, s], self.R[1][1][:, s]],
+                [self.J[0][:, s], self.J[1][:, s]]])
             PI = inv(G)@R
+            print('G:\n', G)
+            print('R:\n', R)
             return PI
         PI0 = list(map(f, range(NC)))
         return PI0
@@ -207,6 +204,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         idx = np.repeat(range(2, p+2), range(1, p+1))
         idx4 = ranges(range(p+1), start=1)
         idx3 = idx - idx4
+        # idx0: 关于 x 求一阶导数后不为零的基函数编号
+        # idx1：关于 y 求一阶导数后不为零的基函数的编号
+        # idx2: 关于 x 求一阶导数后不为零的基函数的整数系数
+        # idx3: 关于 y 求一阶导数后不为零的基函数的整数系数
         return idx0, idx1, idx3, idx4
 
     def index2(self, p=None):
@@ -246,6 +247,12 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         idx4 = idxc*idxd
         idx5 = idxc*(idxa - idxc)
 
+        # idx0: 关于 x 求二阶导数后不为零的基函数编号
+        # idx1：关于 y 求二阶导数后不为零的基函数的编号
+        # idx2：关于 x 和 y 求混合导数后不为零的基函数的编号
+        # idx3: 关于 x 求二阶导数后不为零的基函数的整数系数
+        # idx4：关于 y 求二阶导数后不为零的基函数的整数系数
+        # idx5：关于 x 和 y 求混合导数扣不为零的基函数的整数系数
         return idx0, idx1, idx2, idx3, idx4, idx5
 
     def matrix_G_B(self):
@@ -332,16 +339,21 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         R11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
 
         idx0 = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1) + np.arange(ndof-p)
-        R00[idx[0][:, None, None], idx0] -= idx[3][:, None, None]
-        R00[idx[1][:, None, None], idx0] -= 0.5*idx[4][:, None, None]
-        R01[idx[3][:, None, None], idx0] -= 0.5*idx[5][:, None, None]
-        R10[idx[3][:, None, None], idx0] -= 0.5*idx[5][:, None, None]
-        R11[idx[0][:, None, None], idx0] -= 0.5*idx[3][:, None, None]
-        R11[idx[1][:, None, None], idx0] -= idx[4][:, None, None]
+        R00[idx[0], idx0] -= idx[3][None, :]
+        R00[idx[1], idx0] -= 0.5*idx[4][None, :]
 
+        R11[idx[0], idx0] -= 0.5*idx[3][None, :]
+        R11[idx[1], idx0] -= idx[4][None, :]
+
+        #here is not idx[3], 
+        R01[idx[2], idx0] -= 0.5*idx[5][None, :]
+        R10[idx[2], idx0] -= 0.5*idx[5][None, :]
+
+
+        # 这里错过了
         val = CM[:, :, 0].T/area[None, :]
-        R00[:, idx0] += val[..., None]
-        R11[:, idx0] += val[..., None]
+        R00[:, idx0[:, 0]] += val
+        R11[:, idx0[:, 0]] += val
 
 
         node = mesh.entity('node')
@@ -351,12 +363,11 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-
         # self.H1 is the inverse of Q_{k-1}^F
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0], p=p-1)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi0, phi, eh, eh)@self.H1
 
@@ -367,8 +378,15 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         val = np.einsum('ij, ijk, i->jik', h2, F0, n[:, 0])
         np.add.at(R00, (idx[0][:, None, None], idx0), val)
+
         val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 1])
         np.add.at(R00, (idx[1][:, None, None], idx0), val)
+
+        val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 0])
+        np.add.at(R11, (idx[0][:, None, None], idx0), val)
+
+        val = np.einsum('ij, ijk, i->jik', h3, F0, n[:, 1])
+        np.add.at(R11, (idx[1][:, None, None], idx0), val)
 
         val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 0])
         np.add.at(R01, (idx[1][:, None, None], idx0), val)
@@ -376,89 +394,93 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 1])
         np.add.at(R10, (idx[0][:, None, None], idx0), val)
 
-        val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 0])
-        np.add.at(R11, (idx[0][:, None, None], idx0), val)
-        val = np.einsum('ij, ijk, i->jik', h3, F0, n[:, 1])
-        np.add.at(R11, (idx[1][:, None, None], idx0), val)
-
         a2 = area**2
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
         val = np.einsum('ij, ij, i, i->ji',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
         np.add.at(R00, (idx[1][:, None], start), val)
-        val = np.einsum('ij, ij, i, i->ji',
-            h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
-        np.subtract.at(R01, (idx[1][:, None], start), val)
-        val = np.einsum('ij, ij, i, i->ji',
-            h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
-        np.subtract.at(R01, (idx[0][:, None], start), val)
+
         val = np.einsum('ij, ij, i, i->ji',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.add.at(R11, (idx[0][:, None], start), val)
 
+        val = np.einsum('ij, ij, i, i->ji',
+            h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
+        np.subtract.at(R01, (idx[1][:, None], start), val)
+
+        val = np.einsum('ij, ij, i, i->ji',
+            h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
+        np.subtract.at(R10, (idx[0][:, None], start), val)
+
 
         if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, cellidx=edge2cell[:, 1], p=p-1)
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
             F1 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi1, phi, eh, eh)@self.H1
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             h2 = idx[2].reshape(1, -1)/ch[edge2cell[:, [1]]]
             h3 = idx[3].reshape(1, -1)/ch[edge2cell[:, [1]]]
-            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], n[:, 0])
-            np.add.at(R00, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], 0.5*n[:, 1])
-            np.add.at(R00, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], 0.5*n[:, 0])
-            np.add.at(R01, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], 0.5*n[:, 1])
-            np.add.at(R10, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], 0.5*n[:, 0])
-            np.add.at(R11, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], n[:, 1])
-            np.add.at(R11, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
-            idx1 = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
+            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], n[:, 0])
+            np.subtract.at(R00, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], 0.5*n[:, 1])
+            np.subtract.at(R00, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+
+            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], 0.5*n[:, 0])
+            np.subtract.at(R11, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], n[:, 1])
+            np.subtract.at(R11, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+
+            val = np.einsum('ij, ijk, i->jik', h3, F1[:, 0:ndof], 0.5*n[:, 0])
+            np.subtract.at(R01, (idx[1][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+            val = np.einsum('ij, ijk, i->jik', h2, F1[:, 0:ndof], 0.5*n[:, 1])
+            np.subtract.at(R10, (idx[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+
+            start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
             val = np.einsum('ij, ij, i, i->ji',
-                h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 1]], -n[:, 1])
-            np.add.at(R00, (idx[1][:, None], idx1[isInEdge]), val[:, isInEdge])
+                h3, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 1])
+            np.subtract.at(R00, (idx[1][:, None], start[isInEdge]), val[:, isInEdge])
+
             val = np.einsum('ij, ij, i, i->ji',
-                h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 1]], -n[:, 0])
-            np.subtract.at(R01, (idx[1][:, None], idx1[isInEdge]), val[:, isInEdge])
+                h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 0])
+            np.subtract.at(R11, (idx[0][:, None], start[isInEdge]), val[:, isInEdge])
+
             val = np.einsum('ij, ij, i, i->ji',
-                h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 1]], -n[:, 1])
-            np.subtract.at(R01, (idx[0][:, None], idx1[isInEdge]), val[:, isInEdge])
+                h3, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 0])
+            np.add.at(R01, (idx[1][:, None], start[isInEdge]), val[:, isInEdge])
+
             val = np.einsum('ij, ij, i, i->ji',
-                h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 1]], -n[:, 0])
-            np.add.at(R11, (idx[0][:, None], idx1[isInEdge]), val[:, isInEdge])
+                h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 1])
+            np.add.at(R10, (idx[0][:, None], start[isInEdge]), val[:, isInEdge])
+
 
         R = [[R00, R01], [R10, R11]]
 
         # 分块矩阵 J =[J0, J1]
         J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-
         idx = self.index1(p=p-1)
         idx0 = (cell2dofLocation[0:-1] + NV*p).reshape(-1, 1) + np.arange(ndof-p)
+
+        # 这里也错过了，从 1 到 多个的时候
         val = ch[:, None]*idx[2]
-        J0[idx[0][:, None, None], idx0] -= val[None, ...]
+        J0[idx[0], idx0] -= val
         val = ch[:, None]*idx[3]
-        J1[idx[1][:, None, None], idx0] -= val[None, ...]
+        J1[idx[1], idx0] -= val
 
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-
         val = np.einsum('ijk, i->jik', F0, n[:, 0])
         np.add.at(J0, (np.s_[:], idx0), val)
         val = np.einsum('ijk, i->jik', F0, n[:, 1])
         np.add.at(J1, (np.s_[:], idx0), val)
 
         if isInEdge.sum() > 0:
-            idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+            idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('ijk, i->jik', F1, n[:, 0])
-            np.subtract.at(J0, (np.s_[:], idx1[isInEdge]), val[:, isInEdge])
+            np.subtract.at(J0, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
-            np.subtract.at(J1, (np.s_[:], idx1[isInEdge]), val[:, isInEdge])
+            np.subtract.at(J1, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
 
         J = [J0, J1]
-        # U = [[J0, None]， [J1, None]， [None， J0]， [None，J1]]
         return R, J
 
 
@@ -515,7 +537,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, cellidx=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi0)
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
@@ -523,7 +545,7 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, cellidx=edge2cell[:, 1])
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1])
             F1 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi1)
             idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             np.add.at(D, (idx1[isInEdge], np.s_[:]), F1[isInEdge])
@@ -649,9 +671,9 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p-2)
         Q = inv(self.CM[:, :ndof, :ndof])
         phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u(x, cellidx):
+        def u(x, index):
             return np.einsum('ij..., ijm->ijm...', f(x),
-                    self.smspace.basis(x, cellidx=cellidx, p=p-2))
+                    self.smspace.basis(x, index=index, p=p-2))
         bb = self.integralalg.integral(u, celltype=True)
         bb = Q@bb
         bb *= self.smspace.cellmeasure[:, None, None]
@@ -671,10 +693,10 @@ class StokesDivFreeNonConformingVirtualElementSpace2d:
 
         qf = GaussLegendreQuadrature(self.p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        ps = mesh.edge_bc_to_point(bcs, edgeidx=isBdEdge)
+        ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
         val = g(ps)
 
-        ephi = self.smspace.edge_basis(ps, edgeidx=isBdEdge, p=p-1)
+        ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
         b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
         gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
 

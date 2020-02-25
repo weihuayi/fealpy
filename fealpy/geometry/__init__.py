@@ -1,6 +1,7 @@
 from .signed_distance_function import dmin, dmax, ddiff
 from .signed_distance_function import dcircle, drectangle, dpoly
 from .signed_distance_function import DistDomain2d, DistDomain3d
+from .sizing_function import huniform
 
 from .geoalg import project
 
@@ -25,6 +26,9 @@ from .implicit_surface import TorusSurface
 from .implicit_surface import OrthocircleSurface
 from .implicit_surface import QuarticsSurface
 from .implicit_surface import ImplicitSurface
+from .implicit_surface import ParabolicSurface
+from .implicit_surface import SaddleSurface
+from .implicit_surface import SquaredSurface
 
 # rename 
 from .implicit_surface import SphereSurface as Sphere

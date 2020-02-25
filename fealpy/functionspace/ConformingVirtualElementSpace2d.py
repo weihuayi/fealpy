@@ -30,7 +30,7 @@ class CVEMDof2d():
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
 
-        edge = mesh.ds.edge
+        edge = mesh.entity('edge')
         edge2dof = np.zeros((NE, p+1), dtype=np.int)
         edge2dof[:, [0, p]] = edge
         if p > 1:
@@ -40,8 +40,7 @@ class CVEMDof2d():
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        cell = mesh.ds.cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
 
         if p == 1:
             return cell, cellLocation
@@ -58,7 +57,7 @@ class CVEMDof2d():
 
             idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
             cell2dof[idx] = edge2dof[:, 0:p]
-
+ 
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p).reshape(-1, 1) + np.arange(p)
             cell2dof[idx] = edge2dof[isInEdge, p:0:-1]
@@ -226,11 +225,11 @@ class ConformingVirtualElementSpace2d():
         MonomialSpace2d.
         """
         space0 = F.space
-        def f(x, cellidx):
+        def f(x, index):
             return np.einsum(
                     '...im, ...in->...imn',
-                    mspace.basis(x, cellidx),
-                    smspace.basis(x, cellidx)
+                    mspace.basis(x, index),
+                    smspace.basis(x, index)
                     )
         C = self.integralalg.integral(f, celltype=True)
         H = space1.matrix_H()
@@ -251,7 +250,7 @@ class ConformingVirtualElementSpace2d():
         D = self.D
         PI1 = self.PI1
 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         NC = len(cell2dofLocation) - 1
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         DD = np.vsplit(D, cell2dofLocation[1:-1])
@@ -262,7 +261,7 @@ class ConformingVirtualElementSpace2d():
                 f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
                 K = list(map(f1, zip(DD, PI1)))
             else:
-                cellbarycenter = V.smspace.cellbarycenter
+                cellbarycenter = self.smspace.cellbarycenter
                 k = cfun(cellbarycenter)
                 f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
                 K = list(map(f1, zip(DD, PI1, k)))
@@ -297,7 +296,7 @@ class ConformingVirtualElementSpace2d():
         H = self.H
         C = self.C
 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         NC = len(cell2dofLocation) - 1
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         DD = np.vsplit(D, cell2dofLocation[1:-1])
@@ -327,13 +326,13 @@ class ConformingVirtualElementSpace2d():
         PI0 = self.PI0
 
         phi = self.smspace.basis
-        def u(x, cellidx):
-            val = phi(x, cellidx=cellidx)
-            wval = wh(x, cellidx=cellidx)
+        def u(x, index):
+            val = phi(x, index=index)
+            wval = wh(x, index=index)
             return np.einsum('ij, ijm, ijn->ijmn', wval, val, val)
         H = self.integralalg.integral(u, celltype=True)
 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         NC = len(cell2dofLocation) - 1
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
 
@@ -354,8 +353,8 @@ class ConformingVirtualElementSpace2d():
     def source_vector(self, f):
         PI0 = self.PI0
         phi = self.smspace.basis
-        def u(x, cellidx):
-            return np.einsum('ij, ijm->ijm', f(x), phi(x, cellidx=cellidx))
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), phi(x, index=index))
         bb = self.integralalg.integral(u, celltype=True)
         g = lambda x: x[0].T@x[1]
         bb = np.concatenate(list(map(g, zip(PI0, bb))))
@@ -411,17 +410,17 @@ class ConformingVirtualElementSpace2d():
             uI[:NN+(p-1)*NE] = u(ipoint)
             if p > 1:
                 phi = self.smspace.basis
-                def f(x, cellidx):
+                def f(x, index):
                     return np.einsum(
                             'ij, ij...->ij...',
-                            u(x), phi(x, cellidx=cellidx, p=p-2))
-                bb = self.integralalg.integral(f, celltype=True)/self.smspace.area[..., np.newaxis]
+                            u(x), phi(x, index=index, p=p-2))
+                bb = self.integralalg.integral(f, celltype=True)/self.smspace.cellmeasure[..., np.newaxis]
                 uI[NN+(p-1)*NE:] = bb.reshape(-1)
             return uI
         else:
             uh = self.smspace.interpolation(u, HB)
 
-            cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+            cell2dof, cell2dofLocation = self.cell_to_dof()
             NC = len(cell2dofLocation) - 1
             cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
             DD = np.vsplit(self.D, cell2dofLocation[1:-1])
@@ -470,24 +469,25 @@ class ConformingVirtualElementSpace2d():
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.cellsize
-        node = mesh.node
-        edge = mesh.ds.edge
-        edge2cell = mesh.ds.edge2cell
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        cell, cellLocation = mesh.entity('cell')
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
         if p == 1:
             bc = np.repeat(self.smspace.cellbarycenter, NV, axis=0)
-            D[:, 1:] = (node[mesh.ds.cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
+            D[:, 1:] = (node[cell, :] - bc)/np.repeat(h, NV).reshape(-1, 1)
             return D
 
         qf = GaussLobattoQuadrature(p+1)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps[:-1], cellidx=edge2cell[:, 0])
-        phi1 = self.smspace.basis(ps[p:0:-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+        phi0 = self.smspace.basis(ps[:-1], index=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps[p:0:-1, isInEdge, :], index=edge2cell[isInEdge, 1])
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
         D[idx, :] = phi0
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
@@ -505,7 +505,7 @@ class ConformingVirtualElementSpace2d():
         mesh = self.mesh
         NV = mesh.number_of_vertices_of_cells()
         h = self.smspace.cellsize
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         B = np.zeros((smldof, cell2dof.shape[0]), dtype=np.float)
         if p == 1:
             B[0, :] = 1/np.repeat(NV, NV)
@@ -526,16 +526,16 @@ class ConformingVirtualElementSpace2d():
                 B[idx0+2, idx1] -= r[0:i-1]
                 start += i+1
 
-            node = mesh.node
-            edge = mesh.ds.edge
-            edge2cell = mesh.ds.edge2cell
+            node = mesh.entity('node')
+            edge = mesh.entity('edge')
+            edge2cell = mesh.ds.edge_to_cell()
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
             qf = GaussLobattoQuadrature(p + 1)
             bcs, ws = qf.quadpts, qf.weights
             ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-            gphi0 = self.smspace.grad_basis(ps, cellidx=edge2cell[:, 0])
-            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], cellidx=edge2cell[isInEdge, 1])
+            gphi0 = self.smspace.grad_basis(ps, index=edge2cell[:, 0])
+            gphi1 = self.smspace.grad_basis(ps[-1::-1, isInEdge, :], index=edge2cell[isInEdge, 1])
             nm = mesh.edge_normal()
 
             # m: the scaled basis number,
@@ -563,7 +563,7 @@ class ConformingVirtualElementSpace2d():
         if p == 1:
             G = np.array([(1, 0, 0), (0, 1, 0), (0, 0, 1)])
         else:
-            cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+            cell2dof, cell2dofLocation = self.cell_to_dof()
             BB = np.hsplit(B, cell2dofLocation[1:-1])
             DD = np.vsplit(D, cell2dofLocation[1:-1])
             g = lambda x: x[0]@x[1]
@@ -590,13 +590,13 @@ class ConformingVirtualElementSpace2d():
             return list(map(l, zip(NV, self.smspace.cellmeasure, C)))
 
     def matrix_PI_0(self, H, C):
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         pi0 = lambda x: inv(x[0])@x[1]
         return list(map(pi0, zip(H, C)))
 
     def matrix_PI_1(self, G, B):
         p = self.p
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof, cell2dofLocation = self.cell_to_dof()
         if p == 1:
             return np.hsplit(B, cell2dofLocation[1:-1])
         else:

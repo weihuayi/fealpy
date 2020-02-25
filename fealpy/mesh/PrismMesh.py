@@ -30,7 +30,6 @@ class PrismMeshDataStructure(Mesh3dDataStructure):
 class PrismMesh(Mesh3d):
     def __init__(self, node, cell):
         self.node = node
-        self.cell = cell
         NN = node.shape[0]
         self.ds = PrismMeshDataStructure(NN, cell)
         self.meshtype = 'prism'
@@ -53,28 +52,30 @@ class PrismMesh(Mesh3d):
         VTK_PENTAGONAL_PRISM = 15
         return VTK_PENTAGONAL_PRISM
 
-    def bc_to_point(self, bc):
+    def bc_to_point(self, bc, index=None):
+        index = index if index is not None else np.s_[:]
         node = self.entity('node')
-        cell = self.entity('cell') 
+        cell = self.entity('cell')
         NC = self.number_of_cells()
         bc0 = bc[0]
         bc1 = bc[1]
         n0 = bc0.shape[0]
         n1 = bc1.shape[0]
-        p0 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 0:3]])
-        p1 = np.einsum('mj, ijk->mik', bc1, node[cell[:, 3:]])
-        p = np.einsum('n, mik->nmik', bc1[:, 0], p0) + np.einsum('n, mik->nmik', bc1[:, 1], p1)
+        p0 = np.einsum('mj, ijk->mik', bc1, node[cell[index, 0:3]])
+        p1 = np.einsum('mj, ijk->mik', bc1, node[cell[index, 3:]])
+        p = np.einsum('n, mik->nmik', bc0[:, 0], p0) + np.einsum('n, mik->nmik', bc0[:, 1], p1)
         return p
 
-    def cell_volume(self):
+    def cell_volume(self, index=None):
         qf = PrismQuadrature(2)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs)
+        J = self.jacobi_matrix(bcs, index=index)
         DJ = det(J) # (NQ0, NQ1, NC)
         vol = 0.5*np.einsum('ij, ijk->k', ws, DJ)
         return vol
 
-    def jacobi_matrix(self, bc):
+    def jacobi_matrix(self, bc, index=None):
+        index = index if index is not None else np.s_[:]
         bc0 = bc[0]
         bc1 = bc[1]
         node = self.entity('node')
@@ -88,14 +89,14 @@ class PrismMesh(Mesh3d):
         shape = (NQ0, NQ1, NC, 3, 3)
         J = np.zeros(shape, dtype=self.ftype)
 
-        v = node[cell[:, 3:]] - node[cell[:, 0:3]] # (NC, 3, 3)
+        v = node[cell[index, 3:]] - node[cell[index, 0:3]] # (NC, 3, 3)
         # right hand: (NQ1, NC, 3)
         # J[..., 2]: (NQ0, NQ1, NC, 3)
         J[..., 2] = np.einsum('ij, kjm->ikm', bc1, v)
 
         idx0 = np.array([[1, 4], [2, 5]], dtype=np.int)
         idx1 = np.array([[0, 3]], dtype=np.int)
-        v = node[cell[:, idx0]] - node[cell[:, idx1]]
+        v = node[cell[index, idx0]] - node[cell[index, idx1]]
         # einsum: (NQ0, NC, 3, 2) 
         # J[..., 0:2] : (NQ0, NQ1, NC, 3, 2)
         J[..., 0:2] = np.einsum('ij, knjm->ikmn', bc0, v)[:, np.newaxis]

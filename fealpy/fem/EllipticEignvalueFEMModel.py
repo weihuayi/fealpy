@@ -77,23 +77,21 @@ class EllipticEignvalueFEMModel:
             J += np.sum((grad - grad[cell2cell[:, i]])*n[cell2face[:, i]], axis=-1)**2
         return np.sqrt(J*measure)
 
-    def get_stiff_matrix(self, space, integrator, area):
+    def get_stiff_matrix(self, space):
         try:
-            A = space.stiff_matrix(integrator, area,
-                    cfun=self.pde.diffusion_coefficient)
+            A = space.stiff_matrix(cfun=self.pde.diffusion_coefficient)
         except AttributeError:
-            A = space.stiff_matrix(integrator, area)
+            A = space.stiff_matrix()
 
         try:
-            A += space.mass_matrix(integrator, area,
-                    cfun=self.pde.reaction_coefficient)
+            A += space.mass_matrix(cfun=self.pde.reaction_coefficient)
         except AttributeError:
             pass
 
         return A
 
-    def get_mass_matrix(self, space, integrator, area):
-        M = space.mass_matrix(integrator, area)
+    def get_mass_matrix(self, space):
+        M = space.mass_matrix()
         return M
 
     def linear_operator(self, x):
@@ -161,16 +159,14 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
 
         mesh = self.pde.init_mesh(n=self.numrefine)
-        integrator = mesh.integrator(self.q)
 
         # 1. 粗网格上求解最小特征值问题
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
         print("initial mesh:", gdof)
         uh = np.zeros(gdof, dtype=np.float)
-        area = mesh.entity_measure('cell')
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
         A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
         M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
@@ -221,10 +217,8 @@ class EllipticEignvalueFEMModel:
             uh = IM@uh
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
-
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = d*M@uh
             if self.sigma is None:
@@ -242,14 +236,15 @@ class EllipticEignvalueFEMModel:
                 break
 
 
-        end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
 
         if self.multieigs is True:
             self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
             self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
+
+        end = timer()
+        print("smallest eigns:", d, "with time: ", end - start)
 
         uh = space.function(array=uh)
         return uh
@@ -287,7 +282,6 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_1_0_' + str(NN) + '.mat')
 
-        integrator = mesh.integrator(self.q)
 
         space = LagrangeFiniteElementSpace(mesh, 1)
         isFreeDof = ~(space.boundary_dof())
@@ -297,8 +291,8 @@ class EllipticEignvalueFEMModel:
         IM = eye(gdof)
         for i in range(maxit+1):
             area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             uh = IM@uh
             A = A[isFreeDof, :][:, isFreeDof].tocsr()
             M = M[isFreeDof, :][:, isFreeDof].tocsr()
@@ -349,14 +343,15 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_1_' + str(i+1) + '_' + str(NN) + '.mat')
 
-        end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
 
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
+
+        end = timer()
+        print("smallest eigns:", d, "with time: ", end - start)
 
         uh = space.function(array=uh)
         return uh
@@ -400,9 +395,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             b = M@np.ones(gdof)
 
             isFreeDof = ~(space.boundary_dof())
@@ -453,28 +447,28 @@ class EllipticEignvalueFEMModel:
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
 
-        area = mesh.entity_measure('cell')
-        A = self.get_stiff_matrix(space, integrator, area)
-        M = self.get_mass_matrix(space, integrator, area)
+        A = self.get_stiff_matrix(space)
+        M = self.get_mass_matrix(space)
         isFreeDof = ~(space.boundary_dof())
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
 
-        uh = IM@uh
-        if self.matlab is False:
-            uh[isFreeDof], d = self.eig(A, M)
-        else:
-            uh[isFreeDof], d = self.meigs(A, M)
-        end = timer()
 
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
-
-        print("smallest eigns:", d, "with time: ", end - start)
-        return space.function(array=uh)
+        else:
+            uh = IM@uh
+            if self.matlab is False:
+                uh[isFreeDof], d = self.eig(A, M)
+            else:
+                uh[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            return space.function(array=uh)
+        end = timer()
+        print("with time: ", end - start)
 
     def alg_3_3(self, maxit=None):
         """
@@ -498,12 +492,10 @@ class EllipticEignvalueFEMModel:
             idx =list(range(0, self.maxit, self.step))
 
         mesh = self.pde.init_mesh(n=self.numrefine)
-        integrator = mesh.integrator(self.q)
         # 1. 粗网格上求解最小特征值问题
-        area = mesh.entity_measure('cell')
         space = LagrangeFiniteElementSpace(mesh, 1)
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
 
         gdof = space.number_of_global_dofs()
@@ -566,9 +558,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
@@ -598,30 +589,28 @@ class EllipticEignvalueFEMModel:
 
         space = LagrangeFiniteElementSpace(mesh, 1)
         gdof = space.number_of_global_dofs()
-        area = mesh.entity_measure('cell')
-        A = self.get_stiff_matrix(space, integrator, area)
-        M = self.get_mass_matrix(space, integrator, area)
+        A = self.get_stiff_matrix(space)
+        M = self.get_mass_matrix(space)
         isFreeDof = ~(space.boundary_dof())
         uh = space.function(array=uh)
         A = A[isFreeDof, :][:, isFreeDof].tocsr()
         M = M[isFreeDof, :][:, isFreeDof].tocsr()
         uh = space.function()
 
-        if self.matlab is False:
-            uh[isFreeDof], d = self.eig(A, M)
-        else:
-            uh[isFreeDof], d = self.meigs(A, M)
-
-        end = timer()
-
         if self.multieigs is True:
             self.A = A
             self.M = M
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
-
-        print("smallest eigns:", d, "with time: ", end - start)
-        return uh
+        else:
+            if self.matlab is False:
+                uh[isFreeDof], d = self.eig(A, M)
+            else:
+                uh[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            return uh
+        end = timer()
+        print("with time: ", end - start)
 
 
     def alg_3_4(self, maxit=None):
@@ -648,10 +637,9 @@ class EllipticEignvalueFEMModel:
         integrator = mesh.integrator(self.q)
 
         # 1. 粗网格上求解最小特征值问题
-        area = mesh.entity_measure('cell')
         space = LagrangeFiniteElementSpace(mesh, 1)
-        AH = self.get_stiff_matrix(space, integrator, area)
-        MH = self.get_mass_matrix(space, integrator, area)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
         isFreeHDof = ~(space.boundary_dof())
 
         gdof = space.number_of_global_dofs()
@@ -714,9 +702,8 @@ class EllipticEignvalueFEMModel:
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
 
-            area = mesh.entity_measure('cell')
-            A = self.get_stiff_matrix(space, integrator, area)
-            M = self.get_mass_matrix(space, integrator, area)
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
             isFreeDof = ~(space.boundary_dof())
             b = M@uH
 
@@ -732,11 +719,6 @@ class EllipticEignvalueFEMModel:
             if gdof > self.maxdof:
                 break
 
-        if self.multieigs is True:
-            self.A = A[isFreeDof, :][:, isFreeDof].tocsr()
-            self.M = M[isFreeDof, :][:, isFreeDof].tocsr()
-            self.ml = pyamg.ruge_stuben_solver(self.A)
-            self.eigs()
 
         if self.step > 0:
             NN = mesh.number_of_nodes()
@@ -770,20 +752,27 @@ class EllipticEignvalueFEMModel:
         ## 求解特征值
         A = AA[isFreeDof, :][:, isFreeDof].tocsr()
         M = MM[isFreeDof, :][:, isFreeDof].tocsr()
-        if self.matlab is False:
-            u[isFreeDof], d = self.eig(A, M)
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
         else:
-            u[isFreeDof], d = self.meigs(A, M)
+            if self.matlab is False:
+                u[isFreeDof], d = self.eig(A, M)
+            else:
+                u[isFreeDof], d = self.meigs(A, M)
+            print("smallest eigns:", d)
+            uh *= u[-1]
+            uh += I@u[:-1]
+
+            uh /= np.max(np.abs(uh))
+            uh = space.function(array=uh)
+            return uh
+
         end = timer()
-        print("smallest eigns:", d, "with time: ", end - start)
-
-
-        uh *= u[-1]
-        uh += I@u[:-1]
-
-        uh /= np.max(np.abs(uh))
-        uh = space.function(array=uh)
-        return uh
+        print("with time: ", end - start)
 
 
     def savemesh(self, mesh, fname):

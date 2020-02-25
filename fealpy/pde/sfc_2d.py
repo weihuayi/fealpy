@@ -6,7 +6,6 @@ import numpy as np
 from ..mesh import TriangleMesh, QuadrangleMesh
 from ..mesh.Quadtree import Quadtree
 
-
 class SFCModelData0:
     def __init__(self, eta=0.4):
         self.eta = eta 

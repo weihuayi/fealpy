@@ -26,6 +26,16 @@ class StructureQuadMesh(Mesh2d):
             self.hy = (self.box[3] - self.box[2])/ny
             self.data = {}
 
+    def multi_index(self):
+        NN = self.ds.NN
+        nx = self.ds.nx
+        ny = self.ds.ny
+        i, j = np.mgrid[0:nx+1, 0:ny+1]
+        index = np.zeros((NN, 2), dtype=self.itype)
+        index[:, 0] = i.flat
+        index[:, 1] = j.flat
+        return index
+
     @property
     def node(self):
         NN = self.ds.NN

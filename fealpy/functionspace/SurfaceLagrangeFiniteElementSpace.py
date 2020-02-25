@@ -68,6 +68,26 @@ class SurfaceLagrangeFiniteElementSpace:
     def __str__(self):
         return "Lagrange finite element space on surface triangle mesh!"
 
+    def grad_recovery(self, uh, method='area_harmonic'):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        p = self.p
+        bc = self.dof.multiIndex/p
+        guh = uh.grad_value(bc)
+        guh = guh.swapaxes(0, 1)
+        rguh = self.function(dim=3)
+        if method == 'area_harmonic':
+            measure = 1/self.cellmeasure
+            ws = np.einsum('i, j->ij', measure, np.ones(ldof))
+            deg = np.bincount(cell2dof.flat, weights = ws.flat, minlength=gdof)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
+            np.add.at(rguh, (cell2dof, np.s_[:]), guh)
+            rguh /= deg.reshape(-1, 1)
+        else:
+            rguh = None
+        return rguh
+
     def stiff_matrix(self):
         p = self.p
         GD = self.mesh.geo_dimension()
@@ -93,7 +113,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
-        M = np.einsum('m, mj, mk, i->ijk', ws, phi, phi, self.cellmeasure, optimize=True)
+        M = np.einsum('m, mij, mik, i->ijk', ws, phi, phi, self.cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         ldof = self.number_of_local_dofs()
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
@@ -122,11 +142,11 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         return self.mesh.space.basis(bc)
 
-    def grad_basis(self, bc, cellidx=None, returncond=False):
+    def grad_basis(self, bc, index=None, returncond=False):
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
-        Jp, grad = self.mesh.jacobi_matrix(bc, cellidx=cellidx)
+        Jp, grad = self.mesh.jacobi_matrix(bc, index=index)
         Gp = np.einsum('...ijk, ...imk->...ijm', Jp, Jp)
         Gp = np.linalg.inv(Gp)
         Gp_cond = np.linalg.cond(Gp)
@@ -137,8 +157,8 @@ class SurfaceLagrangeFiniteElementSpace:
         else:
             return grad
 
-    def grad_basis_on_surface(self, bc, cellidx=None):
-        Js, grad, ps = self.mesh.surface_jacobi_matrix(bc, cellidx=cellidx)
+    def grad_basis_on_surface(self, bc, index=None):
+        Js, grad, ps = self.mesh.surface_jacobi_matrix(bc, index=index)
         Gs = np.einsum('...ijk, ...imk->...ijm', Js, Js)
         Gs = np.linalg.inv(Gs)
         grad = np.einsum('...ijk, ...imk->...imj', Gs, grad)
@@ -146,49 +166,49 @@ class SurfaceLagrangeFiniteElementSpace:
         n = np.cross(Js[..., 0, :], Js[..., 1, :], axis=-1)
         return grad, ps, n
 
-    def hessian_basis(self, bc, cellidx=None):
+    def hessian_basis(self, bc, index=None):
         pass
 
-    def value(self, uh, bc, cellidx=None):
+    def value(self, uh, bc, index=None):
         phi = self.basis(bc)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...j, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        if index is None:
             val = np.einsum(s1, phi, uh[cell2dof])
         else:
-            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
-    def grad_value(self, uh, bc, cellidx=None):
-        gphi = self.grad_basis(bc, cellidx=cellidx)
+    def grad_value(self, uh, bc, index=None):
+        gphi = self.grad_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        if index is None:
             val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val
 
-    def grad_value_on_surface(self, uh, bc, cellidx=None):
-        gphi, ps, n = self.grad_basis_on_surface(bc, cellidx=cellidx)
+    def grad_value_on_surface(self, uh, bc, index=None):
+        gphi, ps, n = self.grad_basis_on_surface(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
+        if index is None:
             val = np.einsum(s1, gphi, uh[cell2dof])
         else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+            val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val, ps, n
 
-    def hessian_value(self, uh, bc, cellidx=None):
+    def hessian_value(self, uh, bc, index=None):
         pass
 
-    def div_value(self, uh, bc, cellidx=None):
+    def div_value(self, uh, bc, index=None):
         pass
 
     def number_of_global_dofs(self):

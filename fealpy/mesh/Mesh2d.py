@@ -39,44 +39,36 @@ class Mesh2d():
         return 2
 
     def entity(self, etype=2):
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             return self.ds.cell
-        elif etype in ['edge', 'face', 1]:
+        elif etype in {'edge', 'face', 1}:
             return self.ds.edge
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`etype` is wrong!")
 
     def entity_measure(self, etype=2, index=None):
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             return self.cell_area(index)
-        elif etype in ['edge', 'face', 1]:
+        elif etype in {'edge', 'face', 1}:
             return self.edge_length(index)
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             return 0
         else:
             raise ValueError("`entitytype` is wrong!")
 
     def entity_barycenter(self, etype=2, index=None):
         node = self.node
+        index = index if index is not None else np.s_[:]
         if etype in ['cell', 2]:
             cell = self.ds.cell
-            if index is None:
-                bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
-            else:
-                bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
+            bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
         elif etype in ['edge', 'face', 1]:
             edge = self.ds.edge
-            if index is None:
-                bc = np.sum(node[edge, :], axis=1)/edge.shape[1]
-            else:
-                bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
+            bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
         elif etype in ['node', 0]:
-            if index is None:
-                bc = node
-            else:
-                bc = node[index]
+            bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
@@ -87,17 +79,13 @@ class Mesh2d():
         return v@w
 
     def face_unit_tagent(self, index=None):
-        edge = self.ds.edge
-        node = self.node
+        edge = self.entity('edge')
+        node = self.entity('node')
         NE = self.number_of_edges()
-        if index is None:
-            v = node[edge[:,1],:] - node[edge[:,0],:]
-            length = np.sqrt(np.sum(v**2,axis=1))
-            v /= length.reshape(-1, 1)
-        else:
-            v = node[edge[index,1],:] - node[edge[index,0],:]
-            length = np.sqrt(np.sum(v**2, axis=1))
-            v /= length.reshape(-1, 1)
+        index = index if index is not None else np.s_[:]
+        v = node[edge[index,1],:] - node[edge[index,0],:]
+        length = np.sqrt(np.sum(v**2, axis=1))
+        v /= length.reshape(-1, 1)
         return v
 
     def face_normal(self, index=None):
@@ -106,21 +94,17 @@ class Mesh2d():
         return v@w
 
     def face_tagent(self, index=None):
-        node = self.node
-        edge = self.ds.edge
-        if index is None:
-            v = node[edge[:,1],:] - node[edge[:,0],:]
-        else:
-            v = node[edge[index,1],:] - node[edge[index,0],:]
+        node = self.entity('node')
+        edge = self.entity('edge')
+        index = index if index is not None else np.s_[:]
+        v = node[edge[index,1],:] - node[edge[index,0],:]
         return v
 
     def edge_length(self, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
-        if index is None:
-            v = node[edge[:,1],:] - node[edge[:,0],:]
-        else:
-            v = node[edge[index,1],:] - node[edge[index,0],:]
+        index = index if index is not None else np.s_[:]
+        v = node[edge[index,1],:] - node[edge[index,0],:]
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
@@ -136,17 +120,13 @@ class Mesh2d():
         return v@w
 
     def edge_unit_tagent(self, index=None):
-        edge = self.ds.edge
-        node = self.node
+        node = self.entity('node')
+        edge = self.entity('edge')
         NE = self.number_of_edges()
-        if index is None:
-            v = node[edge[:,1],:] - node[edge[:,0],:]
-            length = np.sqrt(np.sum(v**2,axis=1))
-            v /= length.reshape(-1, 1)
-        else:
-            v = node[edge[index,1],:] - node[edge[index,0],:]
-            length = np.sqrt(np.sum(v**2, axis=1))
-            v /= length.reshape(-1, 1)
+        index = index if index is not None else np.s_[:]
+        v = node[edge[index,1],:] - node[edge[index,0],:]
+        length = np.sqrt(np.sum(v**2, axis=1))
+        v /= length.reshape(-1, 1)
         return v
 
     def edge_normal(self, index=None):
@@ -155,12 +135,10 @@ class Mesh2d():
         return v@w
 
     def edge_tagent(self, index=None):
-        node = self.node
-        edge = self.ds.edge
-        if index is None:
-            v = node[edge[:,1],:] - node[edge[:,0],:]
-        else:
-            v = node[edge[index,1],:] - node[edge[index,0],:]
+        node = self.entity('node')
+        edge = self.entity('edge')
+        index = index if index is not None else np.s_[:]
+        v = node[edge[index, 1],:] - node[edge[index, 0],:]
         return v
 
     def add_plot(
@@ -184,39 +162,40 @@ class Mesh2d():
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
-            color='r', markersize=100,
-            fontsize=24, fontcolor='k'):
+            color='r', markersize=10,
+            fontsize=10, fontcolor='r', multiindex=None):
 
         if node is None:
             node = self.node
 
         if (index is None) and (showindex == True):
-            index = np.array(range(node.shape[0]))
+            NN = self.number_of_nodes()
+            index = np.array(range(NN))
 
         find_node(axes, node,
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=150, 
-            fontsize=24, fontcolor='k'):
+            color='g', markersize=20, 
+            fontsize=13, fontcolor='g', multiindex=None):
 
         find_entity(axes, self, entity='edge',
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_cell(self, axes,
             index=None, showindex=False,
-            color='y', markersize=200,
-            fontsize=24, fontcolor='k'):
+            color='y', markersize=30,
+            fontsize=15, fontcolor='k', mltiindex=None):
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def print(self):
         print("node:\n", self.node)

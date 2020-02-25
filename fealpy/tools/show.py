@@ -32,7 +32,7 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
         s = s.replace('[', '')
         s = s.replace(']', '')
         print(s, file=out, end=end)
-        print('\\\\\\hline')
+        print('\\\\\\hline', file=out)
 
         order = np.log(line[0:-1]/line[1:])/np.log(2)
         s = 'Order' + sep + '--' + sep + np.array2string(order,
@@ -41,7 +41,7 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
         s = s.replace('[', '')
         s = s.replace(']', '')
         print(s, file=out, end=end)
-        print('\\\\\\hline')
+        print('\\\\\\hline', file=out)
 
     print('\\end{tabular}', file=out, end='\n')
     print('\\end{table}', file=out, end='\n')

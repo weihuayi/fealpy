@@ -54,8 +54,11 @@ class SurfaceTriangleMesh():
         self.celldata = {}
 
     def project(self, p):
-        p, d = self.surface.project(p/self.scale)
-        return p*self.scale, d*self.scale
+        if self.scale is None:
+            return self.surface.project(p)
+        else:
+            p, d = self.surface.project(p/self.scale)
+            return p*self.scale, d*self.scale
 
     def integrator(self, k):
         return TriangleQuadrature(k)
@@ -92,16 +95,16 @@ class SurfaceTriangleMesh():
     def top_dimension(self):
         return 2
 
-    def jacobi_matrix(self, bc, cellidx=None):
+    def jacobi_matrix(self, bc, index=None):
         mesh = self.mesh
         cell2dof = self.space.dof.cell2dof
 
-        grad = self.space.grad_basis(bc, cellidx=cellidx)
+        grad = self.space.grad_basis(bc, index=index)
         # the tranpose of the jacobi matrix between S_h and K
-        Jh = mesh.jacobi_matrix(cellidx=cellidx)
+        Jh = mesh.jacobi_matrix(index=index)
 
         # the tranpose of the jacobi matrix between S_p and S_h
-        if cellidx is None:
+        if index is None:
             Jph = np.einsum(
                     'ijm, ...ijk->...imk',
                     self.node[cell2dof, :],
@@ -109,7 +112,7 @@ class SurfaceTriangleMesh():
         else:
             Jph = np.einsum(
                     'ijm, ...ijk->...imk',
-                    self.node[cell2dof[cellidx], :],
+                    self.node[cell2dof[index], :],
                     grad)
 
         # the transpose of the jacobi matrix between S_p and K
@@ -117,27 +120,27 @@ class SurfaceTriangleMesh():
         grad = np.einsum('ijk, ...imk->...imj', Jh, grad)
         return Jp, grad
 
-    def normal(self, bc, cellidx=None):
-        Js, _, ps = self.surface_jacobi_matrix(bc, cellidx=cellidx)
+    def normal(self, bc, index=None):
+        Js, _, ps = self.surface_jacobi_matrix(bc, index=index)
         n = np.cross(Js[..., 0, :], Js[..., 1, :], axis=-1)
         return n, ps
 
-    def surface_jacobi_matrix(self, bc, cellidx=None):
-        Jp, grad = self.jacobi_matrix(bc, cellidx=cellidx)
-        ps = self.bc_to_point(bc, cellidx=cellidx)
+    def surface_jacobi_matrix(self, bc, index=None):
+        Jp, grad = self.jacobi_matrix(bc, index=index)
+        ps = self.bc_to_point(bc, index=index)
         Jsp = self.surface.jacobi_matrix(ps)
         Js = np.einsum('...ijk, ...imk->...imj', Jsp, Jp)
         return Js, grad, ps
 
-    def bc_to_point(self, bc, cellidx=None):
-        basis = self.space.basis(bc)
+    def bc_to_point(self, bc, index=None):
+        phi = self.space.basis(bc)
         cell2dof = self.space.dof.cell2dof
-        if cellidx is None:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof, :])
+        if index is None:
+            bcp = np.einsum('...ij, ijk->...ik', phi, self.node[cell2dof, :])
         else:
-            bcp = np.einsum('...j, ijk->...ik', basis, self.node[cell2dof[cellidx], :])
+            bcp = np.einsum('...ij, ijk->...ik', phi, self.node[cell2dof[index], :])
 
-        bcp, _ = self.surface.project(bcp)
+        bcp, _ = self.project(bcp)
         return bcp
 
     def area(self, idx=3):

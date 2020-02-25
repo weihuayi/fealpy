@@ -1,6 +1,7 @@
 import numpy as np
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import QuadrangleQuadrature
+from ..common import hash2map
 
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
@@ -90,7 +91,22 @@ class QuadrangleMesh(Mesh2d):
             self.node = np.r_['0', self.node, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
 
-        return 
+
+    def refine_RB(self, markedCell):
+
+        hashR = np.array([
+            [1, 1, 1, 1],
+            [1, 1, 0, 0],
+            [0, 0, 1, 1]], dtype=np.int)
+        mR, vR = hash2map(np.arange(16), hashR)
+        print(mR, vR)
+        cell2edge = self.ds.cell_to_edge()
+        NE = self.number_of_edges()
+        edge2flag = np.zeros(NE, dtype=np.bool)
+        edge2flag[cell2edge[markedCell]] = True
+        print(edge2flag)
+        print(edge2flag[cell2edge])
+
 
     def angle(self):
         NC = self.number_of_cells()

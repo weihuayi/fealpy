@@ -6,11 +6,14 @@ This module provide mesh
 
 '''
 
-from .distmesh import DistMesh2d
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
+from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
+from .HalfEdgeMesh import HalfEdgeMesh
+from .HalfEdgeDomain import HalfEdgeDomain
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
+from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
 from .IntervalMesh import IntervalMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
@@ -28,8 +31,7 @@ from .QuadtreeForest import QuadtreeMesh, QuadtreeForest
 
 from .simple_mesh_generator import *
 
-from .sizing_function import huniform
-
+from .distmesh import DistMesh2d
 from .mesh_tools import *
 
 from .meshio import load_mat_mesh

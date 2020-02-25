@@ -9,7 +9,7 @@ from fealpy.mesh.Tritree import Tritree
 
 surface = SphereSurface()
 mesh = surface.init_mesh()
-mesh.uniform_refine(n=9, surface = surface)
+mesh.uniform_refine(n=7, surface = surface)
 node = mesh.entity('node')
 cell = mesh.entity('cell')
 h = mesh.entity_measure('edge')

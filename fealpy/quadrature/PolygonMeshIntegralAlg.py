@@ -44,8 +44,8 @@ class PolygonMeshIntegralAlg():
         node = pmesh.node
         bc = self.cellbarycenter
 
-        edge = pmesh.ds.edge
-        edge2cell = pmesh.ds.edge2cell
+        edge = pmesh.entity('edge')
+        edge2cell = pmesh.ds.edge_to_cell()
 
         NC = pmesh.number_of_cells()
 
@@ -82,7 +82,7 @@ class PolygonMeshIntegralAlg():
             return e.sum(axis=0)
 
     def fun_integral(self, f, celltype=False, q=None):
-        def u(x, cellidx):
+        def u(x, index):
             return f(x)
         return self.integral(u, celltype=celltype, q=q)
 
@@ -102,15 +102,15 @@ class PolygonMeshIntegralAlg():
             return e
 
     def L1_error(self, u, uh, celltype=False, q=None):
-        def f(x, cellidx):
-            return np.abs(u(x) - uh(x, cellidx))
+        def f(x, index):
+            return np.abs(u(x) - uh(x, index))
         e = self.integral(f, celltype=celltype, q=q)
         return e
 
     def L2_error(self, u, uh, celltype=False, q=None):
         #TODO: deal with u is a discrete Function 
-        def f(x, cellidx):
-            return (u(x) - uh(x, cellidx))**2
+        def f(x, index):
+            return (u(x) - uh(x, index))**2
         e = self.integral(f, celltype=celltype, q=q)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
@@ -142,7 +142,7 @@ class PolygonMeshIntegralAlg():
         return e
 
     def Lp_error(self, u, uh, p, celltype=False, q=None):
-        def f(x, cellidx):
-            return np.abs(u(x) - uh(x, cellidx))**p
+        def f(x, index):
+            return np.abs(u(x) - uh(x, index))**p
         e = self.integral(f, celltype=celltype, q=q)
         return e**(1/p)

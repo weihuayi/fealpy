@@ -303,7 +303,9 @@ class Tritree(TriangleMesh):
             ec = self.entity_barycenter('edge', refineFlag)
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
+                flag = (options['numrefine'][idx] == 0)
                 num = options['numrefine'][idx] - 1
+                num[flag] = 0
                 newCellRefine = np.zeros(4*NCC)
                 newCellRefine[:NCC] = num
                 newCellRefine[NCC:2*NCC] = num
@@ -381,10 +383,11 @@ class Tritree(TriangleMesh):
             isRemainNode[cell[~isNeedRemovedCell, :]] = True
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
-                options['numrefine'][isMarkedParentCell] = np.max(
-                        options['numrefine'][child[isMarkedParentCell]],
+                num = np.max(options['numrefine'][child[isMarkedParentCell]],
                         axis=-1
-                    ) + 1
+                    )
+                num[num < 0] += 1
+                options['numrefine'][isMarkedParentCell] = num
 
             if ('data' in options) and (options['data'] is not None):
                 if options['p'] == 1:
@@ -494,7 +497,7 @@ class Tritree(TriangleMesh):
         cell0 = cell[(~isLRCell) & (isLeafCell)]
         idx0 = idx[(~isLRCell) & (isLeafCell)]
         cell = np.r_['0', cell0, cell20, cell21]
-        tmesh = TriangleMesh(node, cell)
+        tmesh = TriangleMesh(node.copy(), cell)
         #现在的cell单元与原来树结构中cell的对应关系.
         self.celldata['idxmap'] = np.r_['0', idx0, LCell, LCell, RCell, RCell]
         self.meshdata['brother'] = [(idx0, len(idx0)), (LCell, N0, flag0),

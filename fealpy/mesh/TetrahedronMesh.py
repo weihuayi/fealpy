@@ -17,6 +17,8 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     V = 4
     E = 6
     F = 4
+    FV = 3
+    FE = 3
 
     def __init__(self, N, cell):
         super(TetrahedronMeshDataStructure, self).__init__(N, cell)
@@ -80,7 +82,7 @@ class TetrahedronMesh(Mesh3d):
         self.ds.reinit(NN, cell)
 
     def direction(self, i):
-        """ Compute the direction on every vertex of
+        """ Compute the direction on every node of
 
         0 <= i < 4
         """
@@ -95,15 +97,6 @@ class TetrahedronMesh(Mesh3d):
         l3 = np.sum(v30**2, axis=1, keepdims=True)
 
         return l1*np.cross(v20, v30) + l2*np.cross(v30, v10) + l3*np.cross(v10, v20)
-
-    def volume(self):
-        cell = self.ds.cell
-        node = self.node
-        v01 = node[cell[:,1]] - node[cell[:,0]]
-        v02 = node[cell[:,2]] - node[cell[:,0]]
-        v03 = node[cell[:,3]] - node[cell[:,0]]
-        volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
-        return volume
 
     def face_normal(self):
         face = self.ds.face
@@ -122,28 +115,31 @@ class TetrahedronMesh(Mesh3d):
         length = np.sqrt(np.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def cell_volume(self):
+    def cell_volume(self, index=None):
         cell = self.ds.cell
         node = self.node
-        v01 = node[cell[:,1]] - node[cell[:,0]]
-        v02 = node[cell[:,2]] - node[cell[:,0]]
-        v03 = node[cell[:,3]] - node[cell[:,0]]
+        index = index if index is not None else np.s_[:]
+        v01 = node[cell[index, 1]] - node[cell[index, 0]]
+        v02 = node[cell[index, 2]] - node[cell[index, 0]]
+        v03 = node[cell[index, 3]] - node[cell[index, 0]]
         volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
         return volume
 
-    def face_area(self):
+    def face_area(self, index=None):
+        index = index if index is not None else np.s_[:]
         face = self.ds.face
         node = self.node
-        v01 = node[face[:, 1], :] - node[face[:, 0], :]
-        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
         nv = np.cross(v01, v02)
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return area
 
-    def edge_length(self):
+    def edge_length(self, index=None):
+        index = index if index is not None else np.s_[:]
         edge = self.ds.edge
         node = self.node
-        v = node[edge[:, 1]] - node[edge[:, 0]]
+        v = node[edge[index, 1]] - node[edge[index, 0]]
         length = np.sqrt(np.sum(v**2, axis=-1))
         return length
 
@@ -162,11 +158,12 @@ class TetrahedronMesh(Mesh3d):
         return np.array(angle).T
 
 
-    def bc_to_point(self, bc):
+    def bc_to_point(self, bc, etype='cell', index=None):
+        index = index if index is not None else np.s_[:]
         node = self.node
-        cell = self.ds.cell
-        p = np.einsum('...j, ijk->...ik', bc, node[cell])
-        return p 
+        entity = self.entity(etype)
+        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
+        return p
 
     def circumcenter(self):
         node = self.node

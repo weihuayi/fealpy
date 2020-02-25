@@ -502,55 +502,55 @@ class OrthocircleSurface:
         return TriangleMesh(node, cell)
 
 
-class QuarticsSurface:
-    def __init__(self, r=1.05):
-        self.box = [-2, 2, -2, 2, -2, 2]
-        self.r = r
-
-    def __call__(self, *args):
-        if len(args) == 1:
-            p, = args
-            x = p[..., :, 0]
-            y = p[..., :, 1]
-            z = p[..., :, 2]
-        elif len(args) == 3:
-            x, y, z = args
-        else:
-            raise ValueError("the args must be a N*3 array or x, y, z")
-        x2 = x**2
-        y2 = y**2
-        z2 = z**2
-        r = self.r
-        return  (x2 - 1)**2 + (y2 - 1)**2 + (z2 - 1)**2 - r
-
-    def project(self, p, maxit=200, tol=1e-8):
-        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
-        return p0, d
-
-    def gradient(self, p):
-        x, y, z = p[..., :, 0], p[..., :, 1], p[..., :, 2]
-        x2, y2, z2 = x**2, y**2, z**2
-        grad = np.zeros(p.shape, dtype=p.dtype)
-        grad[..., :, 0] = 4*(x2 - 1)*x  
-        grad[..., :, 1] = 4*(y2 - 1)*x 
-        grad[..., :, 2] = 4*(z2 - 1)*x 
-        return grad
-
-    def unit_normal(self, p):
-        grad = self.gradient(p)
-        l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
-        return grad/l
-
-    def init_mesh(self, meshdata=None):
-        import scipy.io as sio
-        from fealpy.mesh import TriangleMesh
-        if meshdata is None:
-            data = sio.loadmat('../fealpy/meshdata/quartics.mat')
-        else:
-            data = sio.loadmat(meshdata)
-        node = data['node']
-        cell = np.array(data['elem'] - 1, dtype=np.int64)
-        return TriangleMesh(node, cell)
+#class QuarticsSurface:
+#    def __init__(self, r=1.05):
+#        self.box = [-2, 2, -2, 2, -2, 2]
+#        self.r = r
+#
+#    def __call__(self, *args):
+#        if len(args) == 1:
+#            p, = args
+#            x = p[..., :, 0]
+#            y = p[..., :, 1]
+#            z = p[..., :, 2]
+#        elif len(args) == 3:
+#            x, y, z = args
+#        else:
+#            raise ValueError("the args must be a N*3 array or x, y, z")
+#        x2 = x**2
+#        y2 = y**2
+#        z2 = z**2
+#        r = self.r
+#        return  (x2 - 1)**2 + (y2 - 1)**2 + (z2 - 1)**2 - r
+#
+#    def project(self, p, maxit=200, tol=1e-8):
+#        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+#        return p0, d
+#
+#    def gradient(self, p):
+#        x, y, z = p[..., :, 0], p[..., :, 1], p[..., :, 2]
+#        x2, y2, z2 = x**2, y**2, z**2
+#        grad = np.zeros(p.shape, dtype=p.dtype)
+#        grad[..., :, 0] = 4*(x2 - 1)*x  
+#        grad[..., :, 1] = 4*(y2 - 1)*x 
+#        grad[..., :, 2] = 4*(z2 - 1)*x 
+#        return grad
+#
+#    def unit_normal(self, p):
+#        grad = self.gradient(p)
+#        l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
+#        return grad/l
+#
+#    def init_mesh(self, meshdata=None):
+#        import scipy.io as sio
+#        from fealpy.mesh import TriangleMesh
+#        if meshdata is None:
+#            data = sio.loadmat('../fealpy/meshdata/quartics.mat')
+#        else:
+#            data = sio.loadmat(meshdata)
+#        node = data['node']
+#        cell = np.array(data['elem'] - 1, dtype=np.int64)
+#        return TriangleMesh(node, cell)
 
 
 class ImplicitSurface:
@@ -567,3 +567,322 @@ class ImplicitSurface:
             x, y, z = args
         else:
             raise ValueError("the args must be a N*3 array or x, y, z")
+
+
+class ParabolicSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return x**2 + y**2 - z
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 2*x
+        grad[..., 1] = 2*y
+        grad[..., 2] = -1
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        t1 = 4*(2*x**2 + 2*y**2 + 1)
+        t2 = (4*x**2 + 4*y**2 + 1)**(3/2)
+        div = t1/t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 2.0 
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = 0.0
+        H[..., 2, 0] = 0.0
+        H[..., 1, 1] = 2
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = 0.0
+        return H
+    
+    def jacobi_matrix(self, p):
+        pass
+
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/parabolic.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'], dtype=np.int64)
+        return TriangleMesh(node, cell)
+
+
+class QuarticsSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return (x**2 - 1)**2 + (y**2 - 1)**2 + (z**2 - 1)**2 - 1.05
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 4*x*(x**2 - 1)
+        grad[..., 1] = 4*y*(y**2 - 1)
+        grad[..., 2] = 4*z*(z**2 - 1)
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        x2, y2, z2 = x**2, y**2, z**2
+
+        t1 =-x2*(x2-1)**2*(3*x2-1)-y2*(y2-1)**2*(3*y2-1)-z2*(z2-1)**2*(3*z2-1) + 3*(x2*(x2-1)**2+y2*(y2-1)**2+z2*(z2-1)**2)*(x2+y2+z2-1)
+        t2 = (x2*(x2-1)**2+y2*(y2-1)**2+z2*(z2-1)**2)**(3/2)
+        div = t1/t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 12*x**2 - 4
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = 0.0
+        H[..., 2, 0] = 0.0
+        H[..., 1, 1] = 12*y**2 - 4
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = 12*z**2 - 4
+        return H
+    
+    def jacobi_matrix(self, p):
+        pass
+    
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/quartics.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
+
+class SquaredSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return x**8 + y**8 + z**8 - 1
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 8*x**7
+        grad[..., 1] = 8*y**7
+        grad[..., 2] = 8*z**7
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        s = 64*x**14 + 64*y**14 + 64*z**14
+        t1 =3584*(x**20 + y**20 + z**20)/s**(3/2)
+        t2 = 56*(x**6 + y**6 + z**6)/s**(1/2)
+        div = -t1 + t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 56*x**6
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = 0.0
+        H[..., 2, 0] = 0.0
+        H[..., 1, 1] = 56*y**6
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = 56*z**6
+        return H
+    
+    def jacobi_matrix(self, p):
+        pass
+    
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/squared.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'] - 1, dtype=np.int64)
+        return TriangleMesh(node, cell)
+
+
+class SaddleSurface:
+    def __init__(self):
+        self.box = [-2, 2, -2, 2, -2, 2]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]
+            y = p[..., 1]
+            z = p[..., 2]
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 array or x, y, z")
+
+        return x**2 - y**2 - z
+
+    def project(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 2*x
+        grad[..., 1] = -2*y
+        grad[..., 2] = -1
+        return grad
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=-1, keepdims=True))
+        n = grad/l
+        return n
+
+    def div_unit_normal(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        t1 = -8*(x**2 - y**2)
+        t2 = (4*x**2 + 4*y**2 + 1)**(3/2)
+        div = t1/t2
+        return div
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[0:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        
+        H[..., 0, 0] = 2.0 
+        H[..., 0, 1] = 0.0
+        H[..., 1, 0] = 0.0
+        H[..., 0, 2] = 0.0
+        H[..., 2, 0] = 0.0
+        H[..., 1, 1] = -2
+        H[..., 1, 2] = 0.0
+        H[..., 2, 1] = 0.0
+        H[..., 2, 2] = 0.0
+        return H
+    
+    def jacobi_matrix(self, p):
+        pass
+
+    def init_mesh(self, meshdata=None):
+        import scipy.io as sio
+        from fealpy.mesh import TriangleMesh
+        if meshdata is None:
+            data = sio.loadmat('../fealpy/meshdata/saddle.mat')
+        else:
+            data = sio.loadmat(meshdata)
+        node = data['node']
+        cell = np.array(data['elem'], dtype=np.int64)
+        return TriangleMesh(node, cell)
+   
