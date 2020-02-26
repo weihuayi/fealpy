@@ -6,12 +6,10 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import PolygonMesh, HalfEdgeMesh
 
 
-class HalfEdgePolygonMeshTest:
+class HalfEdgeMeshTest:
 
     def __init__(self):
         pass
-
-
 
     def refine_test(self, plot=True):
         node = np.array([
@@ -73,20 +71,50 @@ class HalfEdgePolygonMeshTest:
         print("cell level:\n")
         for i, val in enumerate(mesh.celldata['level']):
             print(i, ':', val)
-        
+
+        if plot:
+
+            NN = mesh.number_of_nodes()
+            nindex = np.zeros(NN, dtype=np.int)
+            halfedge = mesh.ds.halfedge
+            nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
+            cindex = mesh.get_data('cell', 'level')
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+        else:
+            return mesh
+
+    def coarsen_test(self, mesh, plot=True):
+        NC = mesh.number_of_cells()
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell[2:10] = True
+        isMarkedCell[23:26] = True
+        isMarkedCell[[28, 29]] = True
+        mesh.coarsen(isMarkedCell)
+        cell2node, cellLocation = mesh.ds.cell_to_node(sparse=False)
+        NC = mesh.number_of_cells()
+        print("cell:\n")
+        for i in range(NC):
+            print(i, ":", cell2node[cellLocation[i]:cellLocation[i+1]])
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
-            #mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
-test = HalfEdgePolygonMeshTest()
+test = HalfEdgeMeshTest()
 #test.boundary_edge_to_edge_test()
 #test.from_polygonmesh_test()
 #test.refine_test()
 #test.edge_to_cell_test()
 #test.cell_barycenter_test(plot=False)
-test.refine_test()
+mesh = test.refine_test(plot=False)
+test.coarsen_test(mesh, plot=True)

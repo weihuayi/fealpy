@@ -191,7 +191,7 @@ class Mesh2d():
     def find_cell(self, axes,
             index=None, showindex=False,
             color='y', markersize=30,
-            fontsize=15, fontcolor='k', mltiindex=None):
+            fontsize=15, fontcolor='k', multiindex=None):
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex, 
                 color=color, markersize=markersize,
