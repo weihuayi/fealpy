@@ -8,8 +8,8 @@ from fealpy.tools.show import showmultirate
 class StructureQuadMeshTest:
     def __init__(self):
         box = [0.0, 1.0, 0.0, 1.0]
-        nx = 8
-        ny = 8
+        nx = 4
+        ny = 4
         self.mesh = StructureQuadMesh(box, nx, ny)
 
     def test_cell_location(self):
