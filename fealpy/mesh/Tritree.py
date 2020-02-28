@@ -138,7 +138,7 @@ class Tritree(TriangleMesh):
                     '\n median val of eta: ', np.median(eta),
                     '\n std val of eta: ', np.std(eta)
                 )
-
+        self.add_plot(options['axes0'], linewidths=0.3)
         # refine
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
@@ -161,6 +161,8 @@ class Tritree(TriangleMesh):
                         '\n std size of cells: ', np.std(h[leafCellIdx])
                     )
             isMarkedCell = (options['numrefine'] > 0)
+
+        self.add_plot(options['axes1'], linewidths=0.3)
 
         # coarsen
         if options['maxcoarsen'] > 0:
@@ -364,18 +366,26 @@ class Tritree(TriangleMesh):
 
             isMarkedCell[isRootCell] = False
 
+            """
             isMarkedParentCell = np.zeros(NC, dtype=np.bool)
             isMarkedParentCell[parent[isMarkedCell, 0]] = True
+            """
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            flag = isNotLeafCell & isLeafCell[child[:,0]]
+            idx, = np.nonzero(flag)
+            np.logical_and.at(isMarkedParentCell, idx, isMarkedCell[child[flag, 0]])
+            np.logical_and.at(isMarkedParentCell, idx, isMarkedCell[child[flag, 1]])
+            np.logical_and.at(isMarkedParentCell, idx, isMarkedCell[child[flag, 2]])
+            np.logical_and.at(isMarkedParentCell, idx, isMarkedCell[child[flag, 3]])
 
             cell2cell = self.ds.cell_to_cell()
             while True:
                 flag = (~isMarkedParentCell[cell2cell]) & isNotLeafCell[cell2cell]
-                flag = flag.sum(axis=-1) > 1
+                flag = flag.sum(axis=-1) > 1 & isMarkedParentCell
                 if isMarkedParentCell[flag].sum() > 0:
                     isMarkedParentCell[flag] = False
                 else:
                     break
-
             isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
             isNeedRemovedCell[child[isMarkedParentCell, :]] = True
 
