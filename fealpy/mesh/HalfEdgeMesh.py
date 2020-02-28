@@ -3,6 +3,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from ..quadrature import TriangleQuadrature
 from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
+from .mesh_tools import show_halfedge_mesh
 
 class HalfEdgeMesh(Mesh2d):
     def __init__(self, node, halfedge, NC):
@@ -76,6 +77,58 @@ class HalfEdgeMesh(Mesh2d):
         return TriangleQuadrature(k)
 
     @classmethod
+    def from_mesh(cls, mesh):
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        NV = mesh.number_of_vertices_of_cells()
+
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        cell = mesh.entity('cell')
+        cell2edge = mesh.ds.cell_to_edge()
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+        sign = mesh.ds.cell_to_edge_sign()
+        cell2edgeSign = np.zeros((NC, NV), dtype=mesh.itype)
+        cell2edgeSign[~sign] = NE
+        nex, pre = mesh.ds.boundary_edge_to_edge()
+
+        halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
+
+
+        # 指向的顶点
+        halfedge[:NE, 0] = edge[:, 1]
+        halfedge[NE:, 0] = edge[:, 0]
+
+        # 指向的单元
+        halfedge[:NE, 1] = edge2cell[:, 0]
+        halfedge[NE:, 1] = edge2cell[:, 1]
+        halfedge[NE:, 1][~isInEdge] = NC
+
+        # 下一条边
+        idx = cell2edge[edge2cell[:, 0], (edge2cell[:, 2]+1)%NV]
+        idx += cell2edgeSign[edge2cell[:, 0], (edge2cell[:, 2]+1)%NV]
+        halfedge[:NE, 2] = idx
+
+        idx = cell2edge[edge2cell[isInEdge, 1], (edge2cell[isInEdge, 3]+1)%NV]
+        idx += cell2edgeSign[edge2cell[isInEdge, 1], (edge2cell[isInEdge, 3]+1)%NV]
+        halfedge[NE:, 2][isInEdge] = idx
+        halfedge[NE:, 2][~isInEdge] = NE + nex
+
+        # 前一条边 
+        halfedge[halfedge[:, 2], 3] = range(2*NE)
+
+        # 对偶半边
+        halfedge[:NE, 4] = range(NE, 2*NE)
+        halfedge[NE:, 4] = range(NE)
+
+        # 主半边
+        halfedge[:NE, 5] = 1
+
+        return cls(node, halfedge, NC)
+
+    @classmethod
     def from_polygonmesh(cls, mesh):
         NC = mesh.number_of_cells()
         NN = mesh.number_of_nodes()
@@ -134,6 +187,8 @@ class HalfEdgeMesh(Mesh2d):
             return self.ds.cell_to_node(sparse=False)
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge_to_node(sparse=False)
+        elif etype in {'halfedge'}:
+            return self.ds.halfedge
         elif etype in {'node', 0}:
             return self.node
         else:
@@ -214,8 +269,20 @@ class HalfEdgeMesh(Mesh2d):
         index = index if index is not None else np.s_[:]
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
+
+    def refine_tri(self, isMarkedCell):
+        pass
+
+    def coarsen_tri(self, isMarkedCell):
+        pass
+
+    def refine_quad(self, isMarkedCell):
+        pass
+
+    def coarsen_quad(self, isMarkedCell):
+        pass
     
-    def refine(self, isMarkedCell, data=None, dflag=False):
+    def refine_poly(self, isMarkedCell, data=None, dflag=False):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
@@ -356,7 +423,7 @@ class HalfEdgeMesh(Mesh2d):
         self.node = np.r_['0', node, ec, bc[isMarkedCell[:-1]]]
         self.ds.reinit(NN+NE1+NC1, NC-1, halfedge)
     
-    def coarsen(self, isMarkedCell, dflag=True):
+    def coarsen_poly(self, isMarkedCell, dflag=True):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
@@ -381,7 +448,7 @@ class HalfEdgeMesh(Mesh2d):
             isMarkedHEdge = isRNode[halfedge[:, 0]] | isRNode[halfedge[halfedge[:, 4], 0]]
             isMarkedCell[halfedge[isMarkedHEdge, 1]] = True
 
-            # 移除子单元后的父单元编号
+            # 粗化后单元的编号: NC:NC+nn 
             nidxmap = np.arange(NN)
             nidxmap[isRNode] = range(NC, NC+nn)
             cidxmap = np.arange(NC+1)
@@ -396,40 +463,34 @@ class HalfEdgeMesh(Mesh2d):
             clevel = np.r_[clevel[:-1], level, 0]
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
-            nex = halfedge[:, 2]
-            flag = isRNode[halfedge[nex, 0]]
+            nex = halfedge[:, 2] # 当前半边的下一个半边编号
+            flag = isRNode[halfedge[nex, 0]] # 如果下一个半边的指向的节点是要移除的节点
+            # 当前半边的下一个半边修改为:下一个半边的对偶半边的下一个半边
             halfedge[flag, 2] = halfedge[halfedge[nex[flag], 4], 2]
-            halfedge[halfedge[:, 2], 3] = range(2*NE)
+            # 下一个半边的前一个半边是当前半边
+            halfedge[halfedge[flag, 2], 3], = np.nonzero(flag) 
 
+            nidxmap = np.zeros(NN, dtype=self.itype)
             # 标记进一步要移除的半边
             idx = np.arange(2*NE)
-            flag = (halfedge[:, 5] == 1) & (~isMarkedHEdge)
-            flag = flag & (halfedge[:, 1] >= NC)
+            flag = ~isMarkedHEdge
             flag = flag & (halfedge[halfedge[halfedge[halfedge[:, 2], 4], 2], 4] == idx)
             flag = flag & (hlevel > hlevel[halfedge[:, 2]])
             flag = flag & (hlevel > hlevel[halfedge[:, 3]])
 
-            idx0, = np.nonzero(flag)
-            nex0 = halfedge[flag, 2]
-            pre0 = halfedge[flag, 3]
+            nex = halfedge[flag, 2]
+            pre = halfedge[flag, 3]
+            dua = halfedge[flag, 4]
 
-            idx1 = halfedge[nex0, 4]
-            nex1 = halfedge[idx1, 2]
-            pre1 = halfedge[idx1, 3]
+            halfedge[pre, 2] = nex
+            halfedge[nex, 3] = pre
+            halfedge[nex, 4] = dua
 
-            halfedge[pre0, 2] = nex0
-            halfedge[pre1, 2] = nex1
-
-            halfedge[nex0, 4] = nex1
-            halfedge[nex1, 4] = nex0
-
-            isMarkedHEdge[idx0] = True
-            isMarkedHEdge[idx1] = True
+            isMarkedHEdge[flag] = True
+            isRNode[halfedge[flag, 0]] = True
+            NN -= nn + flag.sum()//2
 
             # 对节点重新编号
-            isRNode[halfedge[idx0, 0]] = True
-            nidxmap = np.zeros(NN, dtype=self.itype)
-            NN -= nn + len(idx0)
             nidxmap[~isRNode] = range(NN)
             halfedge[:, 0] = nidxmap[halfedge[:, 0]]
 
@@ -461,6 +522,17 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedCell = np.zeros(NC+1, dtype=np.bool)
         isMarkedCell[:-1] = mark(eta, theta, method=method)
         return isMarkedCell
+
+    def add_halfedge_plot(self, axes,
+        index=None, showindex=False,
+        nodecolor='r', edgecolor=['r', 'k'], markersize=20,
+        fontsize=8, fontcolor='k', multiindex=None, linewidth=0.5):
+
+        show_halfedge_mesh(axes, self,
+                index=index, showindex=showindex,
+                nodecolor=nodecolor, edgecolor=edgecolor, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor, 
+                multiindex=multiindex, linewidth=linewidth)
 
     def print(self):
         cell, cellLocation = self.entity('cell')
