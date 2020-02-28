@@ -154,6 +154,7 @@ class HalfEdgeMeshTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_halfedge_plot(axes)
+            mesh.find_node(axes, showindex=True)
             plt.show()
 
 
