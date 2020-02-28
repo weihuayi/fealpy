@@ -138,7 +138,7 @@ class Tritree(TriangleMesh):
                     '\n median val of eta: ', np.median(eta),
                     '\n std val of eta: ', np.std(eta)
                 )
-        self.add_plot(options['axes0'], linewidths=0.3)
+        
         # refine
         isMarkedCell = (options['numrefine'] > 0)
         while sum(isMarkedCell) > 0:
@@ -161,8 +161,6 @@ class Tritree(TriangleMesh):
                         '\n std size of cells: ', np.std(h[leafCellIdx])
                     )
             isMarkedCell = (options['numrefine'] > 0)
-
-        self.add_plot(options['axes1'], linewidths=0.3)
 
         # coarsen
         if options['maxcoarsen'] > 0:
