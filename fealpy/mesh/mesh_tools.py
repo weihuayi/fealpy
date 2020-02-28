@@ -141,6 +141,70 @@ def find_entity(
                         multialignment='center',
                         fontsize=fontsize, color=fontcolor)
 
+def show_halfedge_mesh(axes, mesh,
+        index=None, showindex=False, aspect='equal',
+        nodecolor='r', edgecolor=['r', 'k'], 
+        markersize=20, fontsize=5, fontcolor='k', 
+        linewidth=1, multiindex=None, showaxis=False):
+
+    try:
+        axes.set_aspect(aspect)
+    except NotImplementedError:
+        pass
+
+    if showaxis is False:
+        axes.set_axis_off()
+    else:
+        axes.set_axis_on()
+    node = mesh.entity('node')
+    halfedge = mesh.entity('halfedge')
+
+    axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
+
+    p1 = node[halfedge[:, 0]]
+    p0 = node[halfedge[halfedge[:, 4], 0]]
+
+    w = np.array([(0,1),(-1,0)])
+    v = p1 - p0
+    p0 += 0.005*v@w
+    p1 += 0.005*v@w
+    ec = (p0 + p1)/2.0
+
+    v *= 0.9
+    p0 = ec - v/2.0
+    p1 = ec + v/2.0
+    
+    ec += 0.04*v@w
+
+    NE = p0.shape[0]
+    for i in range(NE):
+        if halfedge[i, 5] == 1:
+            axes.arrow(
+                p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
+                shape='right', linewidth=linewidth, 
+                color=edgecolor[0], width=0.01, head_length=0.02)
+        else:
+            axes.arrow(
+                p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
+                shape='right', linewidth=linewidth,
+                color=edgecolor[1], width=0.01, head_length=0.02)
+
+    for i in range(NE):
+        if halfedge[i, 5] == 1:
+            axes.text(
+                    ec[i, 0], ec[i, 1],
+                    str(i),
+                    multialignment='center',
+                    fontsize=fontsize, color=edgecolor[0])
+        else:
+            axes.text(
+                    ec[i, 0], ec[i, 1],
+                    str(i),
+                    multialignment='center',
+                    fontsize=fontsize, color=edgecolor[1])
+    #axes.quiver(p0[:, 0], p0[:, 1], v[:, 0], v[:, 1], 
+    #    scale_units='xy', scale=1, angles='xy', linewidth=linewidth)
+
 
 def show_mesh_1d(
         axes, mesh,

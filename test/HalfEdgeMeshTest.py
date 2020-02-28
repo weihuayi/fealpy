@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import PolygonMesh, HalfEdgeMesh
+from fealpy.mesh import TriangleMesh
 
 
 class HalfEdgeMeshTest:
@@ -11,7 +12,7 @@ class HalfEdgeMeshTest:
     def __init__(self):
         pass
 
-    def refine_test(self, plot=True):
+    def refine_poly_test(self, plot=True):
         node = np.array([
             (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
             (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
@@ -73,7 +74,6 @@ class HalfEdgeMeshTest:
             print(i, ':', val)
 
         if plot:
-
             NN = mesh.number_of_nodes()
             nindex = np.zeros(NN, dtype=np.int)
             halfedge = mesh.ds.halfedge
@@ -90,25 +90,76 @@ class HalfEdgeMeshTest:
         else:
             return mesh
 
-    def coarsen_test(self, mesh, plot=True):
+    def coarsen_poly_test(self, mesh, plot=True):
+
         NC = mesh.number_of_cells()
         isMarkedCell = np.zeros(NC+1, dtype=np.bool)
         isMarkedCell[2:10] = True
         isMarkedCell[23:26] = True
         isMarkedCell[[28, 29]] = True
         mesh.coarsen(isMarkedCell)
-        cell2node, cellLocation = mesh.ds.cell_to_node(sparse=False)
-        NC = mesh.number_of_cells()
-        print("cell:\n")
-        for i in range(NC):
-            print(i, ":", cell2node[cellLocation[i]:cellLocation[i+1]])
+
+        if True:
+            NC = mesh.number_of_cells()
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell[15:19] = True
+            isMarkedCell[9:13] = True
+            isMarkedCell[[8, 14, 13]] = True
+            mesh.coarsen(isMarkedCell)
+
         if plot:
+            NN = mesh.number_of_nodes()
+            nlevel = np.zeros(NN, dtype=np.int)
+            halfedge = mesh.ds.halfedge
+            for i, idx in enumerate(halfedge):
+                print(i, ": " , idx)
+            nlevel[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
+            clevel = mesh.get_data('cell', 'level')
+
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True, multiindex=nlevel)
+            mesh.find_cell(axes, showindex=True, multiindex=clevel)
             plt.show()
+
+    def triangle_mesh_test(self, plot=False):
+
+        node = np.array([
+            (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)
+        ])
+        cell = np.array([
+            (1, 2, 0), (3, 0, 2)
+        ])
+
+        tmesh = TriangleMesh(node, cell) 
+        mesh = HalfEdgeMesh.from_mesh(tmesh)
+        if plot:
+            halfedge = mesh.ds.halfedge
+            for i, idx in enumerate(halfedge):
+                print(i, ": " , idx)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes)
+            plt.show()
+
+
+
+
+
 
 test = HalfEdgeMeshTest()
 #test.boundary_edge_to_edge_test()
@@ -116,5 +167,6 @@ test = HalfEdgeMeshTest()
 #test.refine_test()
 #test.edge_to_cell_test()
 #test.cell_barycenter_test(plot=False)
-mesh = test.refine_test(plot=False)
-test.coarsen_test(mesh, plot=True)
+#mesh = test.refine_poly_test(plot=False)
+#test.coarsen_poly_test(mesh, plot=True)
+test.triangle_mesh_test(plot=True)

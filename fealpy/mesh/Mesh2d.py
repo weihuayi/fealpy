@@ -505,6 +505,18 @@ class Mesh2dDataStructure():
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
+    def boundary_edge_to_edge(self):
+        NN = self.NN
+        edge = self.edge
+        index = self.boundary_edge_index()
+        bdEdge = edge[index]
+        n = bdEdge.shape[0]
+        val = np.ones(n, dtype=np.bool)
+        m0 = csr_matrix((val, (range(n), bdEdge[:, 0])), shape=(n, NN), dtype=np.bool)
+        m1 = csr_matrix((val, (range(n), bdEdge[:, 1])), shape=(n, NN), dtype=np.bool)
+        _, pre = (m0*m1.T).nonzero()
+        _, nex = (m1*m0.T).nonzero()
+        return index[pre], index[nex]
 
     def boundary_node_flag(self):
         NN = self.NN
