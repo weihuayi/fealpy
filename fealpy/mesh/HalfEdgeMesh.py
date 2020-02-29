@@ -43,6 +43,7 @@ class HalfEdgeMesh(Mesh2d):
 
         self.celldata['level'] = np.zeros(NC+1, dtype=self.itype)
         self.halfedgedata['level'] = np.zeros(2*NE, dtype=self.itype)
+        self.nodedata['level'] = np.zeros(NN, dtype=self.itype)
 
     def set_data(self, name, val, etype):
         if etype in {'cell', 2}:
@@ -271,7 +272,51 @@ class HalfEdgeMesh(Mesh2d):
         return ps
 
     def refine_tri(self, isMarkedCell):
-        pass
+        """
+        这里假设所有的单元都是三角形, 标记的单元一分为 4
+        如果有一个单元有两个边被标记, 则剩下的一个边也需要被标记
+        """
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        
+        # 单元和半边的层标记信息
+        clevel = self.celldata['level']
+        nlevel = self.nodedata['level']
+
+        halfedge = self.ds.halfedge
+        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
+
+        # 标记出二分的半边
+
+        isBHEdge = (clevel[halfedge[:, 1]] == nlevel[halfedge[:, 0]])
+        isBHEdge = isBHEdge & (nlevel[halfedge[:, 0]]  > nlevel[halfedge[halfedge[:, 2], 0]])
+        isBHEdge = isBHEdge & (nlevel[halfedge[:, 0]]  > nlevel[halfedge[halfedge[:, 3], 0]])
+        isBHEdge = isBHEdge & (nlevel[halfedge[:, 0]] == clevel[halfedge[halfedge[:, 4], 1]])
+
+        """
+        halfedge[halfedge[isBHEdge, 4], 1] = halfedge[isBHEdge, 1]
+        nex = halfedge[halfedge[isBHEdge, 4], 2]
+        pre = halfedge[halfedge[isBHEdge, 4], 3]
+        halfedge[nex, 1] = halfedge[isBHEdge, 1]
+        halfedge[pre, 1] = halfedge[isBHEdge, 1]
+        halfedge[halfedge[isBHEdge, 2], 3] = pre
+        halfedge[halfedge[isBHEdge, 3], 2] = nex
+        """
+
+        # 标记出需要加密的半边
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (~isBHEdge) 
+        flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+        isMarkedHEdge[flag] = True
+
+        N = isMarkedHEdge.sum()
+
+        node = self.entity('node')
+        flag0 = isMainHEdge & isMarkedHEdge
+        idx = halfedge[flag0, 4]
+        ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
+        NE1 = len(ec)
 
     def coarsen_tri(self, isMarkedCell):
         pass
@@ -302,14 +347,12 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
         flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
         isMarkedHEdge[flag] = True
-        print('sum', isMarkedHEdge.sum())
 
         node = self.entity('node')
         flag0 = isMainHEdge & isMarkedHEdge
         idx = halfedge[flag0, 4]
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
-        print('NE1:', NE1)
         
         if data is not None:
             NV = self.ds.number_of_vertices_of_cells(returnall=True)

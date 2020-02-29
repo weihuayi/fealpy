@@ -139,6 +139,35 @@ class HalfEdgeMeshTest:
         ])
 
         tmesh = TriangleMesh(node, cell) 
+        tmesh.uniform_refine(n=1)
+        mesh = HalfEdgeMesh.from_mesh(tmesh)
+        if plot:
+            halfedge = mesh.ds.halfedge
+            for i, idx in enumerate(halfedge):
+                print(i, ": " , idx)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+    def refine_tri_test(self, plot=True):
+        node = np.array([
+            (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)
+        ])
+        cell = np.array([
+            (1, 2, 0), (3, 0, 2)
+        ])
+        tmesh = TriangleMesh(node, cell) 
+        tmesh.uniform_refine(n=1)
         mesh = HalfEdgeMesh.from_mesh(tmesh)
         if plot:
             halfedge = mesh.ds.halfedge
