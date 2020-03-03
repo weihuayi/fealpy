@@ -16,9 +16,9 @@ class CantileverBeam2d():
         return [0, self.L, -self.W/2, self.W/2]
 
     def init_mesh(self, n=1):
-        from ..mesh.simple_mesh_generator import  rectangledomainmesh
+        from fealpy.mesh.simple_mesh_generator import  rectangledomainmesh
         box = self.domain()
-        mesh = rectangledomainmesh(domain, nx=8, ny=2)
+        mesh = rectangledomainmesh(box, nx=8, ny=2)
         mesh.uniform_refine(n)
         return mesh
 
@@ -57,7 +57,7 @@ class CantileverBeam2d():
         val = np.zeros(p.shape, dtype=np.float)
         return val
 
-    def neuman(self, p):  # p 是受到面力的节点索引
+    def neuman(self, p):  # p 是受到面力的节点坐标
         """
         """
         W = self.W
@@ -66,6 +66,12 @@ class CantileverBeam2d():
         y = p[..., 1]
         val = np.zeros(p.shape, dtype=np.float)
         val[..., 1] = (y + W/2)*(y - W/2)*P
+        return val
+
+    def dirichlet(self, p):  
+        """
+        """
+        val = np.zeros(p.shape, dtype=np.float)
         return val
 
     def is_dirichlet_boundary(self, p):
