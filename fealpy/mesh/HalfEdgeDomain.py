@@ -1,51 +1,371 @@
 import numpy as np
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
+from scipy.sparse import coo_matrix, csr_matrix
 from types import ModuleType
-from ..quadrature import GaussLegendreQuadrature
+
+from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
+from .HalfEdgeMesh import HalfEdgeMesh
 
 class HalfEdgeDomain():
-    def __init__(self, node, halfedge, NC):
-        self.node = node
-        self.halfedge = halfedge
+    def __init__(self, vertices, halfedge, NS=None):
+        """
 
-        self.NN = node.shape[0]
-        self.NE = halfedge.shape[0]//2
-        self.NC = NC # number of subdomain
+        Parameters
+        ==========
+        vertices :  np.ndarray, (NV, GD)
+        halfedge :  np.ndarray, (NE, 6)
+            halfedge[i, 0] : 指向的区域顶点编号
+            halfedge[i, 1] : 左手边的子区域编号
+                 0: 表示外部无界区域
+                -n: n >= 1, 表示编号为 -n 洞
+                 n: n >= 1, 表示编号为  n 的内部子区域
+            halfedge[i, 2] : 下一个半边编号
+            halfedge[i, 3] : 前一个半边编号
+            halfedge[i, 4] : 相对的半边编号
+            halfedge[i, 5] : 主半边标记, 1 : 主半边, 0: 次半边.
+                 这里还约定, 如果两个相对的半边, 它们左手边的子区域, 
+                 如果有一个子区域的编号大于 0, 另一个小于等于 0, 则
+                 子区域编号大于 0 的半边为主半边. 如果两个相对半边的
+                 子区域编号都大于 0, 则任取一个半边作为主半边.
+        """
 
-        self.ftype  = node.dtype
-        self.itype = halfedge.dtype
-
-        self.nodedata = {}
-
-    def entity(self, etype=1):
-        if etype == 'halfedge':
-            return self.halfedge
-        elif etype in {'cell', 'edge'}:
-            NE = self.number_of_edges()
-            halfedge = self.halfedge
-            isMainHEdge = halfedge[:, 5] == 1
-            edge = np.zeros((NE, 2), dtype=self.itype)
-            edge[:, 0] = halfedge[halfedge[isMainHEdge, 4], 0]
-            edge[:, 1] = halfedge[isMainHEdge, 0]
-            return edge
-        elif etype in 'node':
-            return self.node
+        self.vertices = vertices # 区域的顶点
+        self.halfedge = halfedge #　区域的半边数据结构
+        self.GD = vertices.shape[1]
+        if NS is None:
+            self.NS = len(set(halfedge[:, 1]))
         else:
-            raise ValueError("`entitytype` is wrong!")
-            
-    def uniform_refine(self, n=1):
-        print('refine:!')
-        for i in range(n):
-            node = self.node
-            halfedge = self.halfedge
-            NN = self.NN
+            self.NS = NS # 子区域的个数
+        
+        self.NV = len(vertices) # 区域顶点的个数
+        self.NE = len(halfedge) # 区域半边的个数
+
+        self.itype = halfedge.dtype
+        self.ftype = vertices.dtype
+
+    def geo_dimension(self):
+        return self.vertices.shape[1]
+
+    def create_finite_voronoi(self, points):
+        """
+        给定一组点, 生成相应 finite  Voronoi Regions 
+        """
+        from scipy.spatial import Voronoi
+        from scipy.spatial import KDTree
+
+        itype = self.itype
+        ftype = self.ftype
+
+        NG = len(points) # 生成子的个数
+        voronoi = Voronoi(points)
+        tree = KDTree(points)
+
+        rp = voronoi.ridge_points
+        rv = np.array(voronoi.ridge_vertices)
+        nv = len(voronoi.vertices)
+
+        rp[0, 0], rp[0, 1] = rp[0, 1], rp[0, 0]
+
+        # 无限边转化为有限边
+        w = np.array([(0,-1),(1,0)])
+        isInfVertices = (rv[:, 0] == -1)
+        nn = isInfVertices.sum()
+        ve = np.zeros((nv+nn, 2), dtype=ftype)
+        ve[:nv] = voronoi.vertices
+        ve[nv:] += ve[rv[isInfVertices, 1]]
+        ve[nv:] += 2*(points[rp[isInfVertices, 1]] - points[rp[isInfVertices, 0]])@w
+        rv[isInfVertices, 0] = range(nv, nv+nn)
+
+        edge = rp[isInfVertices]
+        val = np.ones(nn, dtype=np.bool)
+        m0 = csr_matrix((val, (range(nn), edge[:, 0])), shape=(nn, NG), dtype=np.bool)
+        m1 = csr_matrix((val, (range(nn), edge[:, 1])), shape=(nn, NG), dtype=np.bool)
+        _, nex = (m0*m1.T).nonzero()
+        _, pre = (m1*m0.T).nonzero()
+
+        # 建立 generator 的邻接关系矩阵
+        neighbor  = coo_matrix((rv[:, 0] + 1, (rp[:, 0], rp[:, 1])), shape=(NG, NG))
+        neighbor += coo_matrix((rv[:, 1] + 1, (rp[:, 1], rp[:, 0])), shape=(NG, NG))
+        neighbor = neighbor.tocsr()
+
+        # 建立半边数据结构
+        ne = len(rv)
+        NE = 2*ne + 2*nn
+        mid = ne + nn
+        halfedge = np.zeros((NE, 6), dtype=itype)
+        halfedge[:ne, 0] = rv[:, 1]
+        halfedge[:ne, 1] = rp[:, 0]
+        halfedge[:ne, 4] = range(mid, mid+ne)
+        halfedge[:ne, 5] = 1
+
+        halfedge[ne:mid, 0] = np.arange(nv, nv+nn) 
+        halfedge[ne:mid, 1] = rp[isInfVertices, 0] 
+        halfedge[ne:mid, 4] = range(mid+ne, NE)
+        halfedge[ne:mid, 5] = 1
+
+        halfedge[mid:mid+ne, 0] = rv[:, 0]
+        halfedge[mid:mid+ne, 1] = rp[:, 1]
+        halfedge[mid:mid+ne, 4] = range(ne)
+
+        halfedge[mid+ne:, 0] = halfedge[ne:mid, 0][pre] 
+        halfedge[mid+ne:, 1] = NG
+        halfedge[mid+ne:, 4] = range(ne, mid)
+
+        # 建立连接关系
+        node = ve
+        NN = node.shape[0]
+        NC = NG
+        flag =  np.ones(NE, dtype=np.bool)
+        idx = np.arange(NE)
+        node2halfedge = np.zeros((NN, 3), dtype=itype)
+        node2halfedge[halfedge[:, 0], 0] = idx 
+        flag[node2halfedge[:, 0]] = False
+        node2halfedge[halfedge[flag, 0], 1] = idx[flag]
+        flag[node2halfedge[:, 1]] = False
+        node2halfedge[halfedge[flag, 0], 2] = idx[flag]
+
+        idx0 = halfedge[node2halfedge[:, 0], 4]
+        idx1 = halfedge[node2halfedge[:, 1], 4]
+        idx2 = halfedge[node2halfedge[:, 2], 4]
+
+        flag = halfedge[node2halfedge[:, 0], 1] == halfedge[idx1, 1]
+        halfedge[node2halfedge[flag, 0], 2] = idx1[flag]
+        flag = halfedge[node2halfedge[:, 1], 1] == halfedge[idx0, 1]
+        halfedge[node2halfedge[flag, 1], 2] = idx0[flag]
+
+        flag = halfedge[node2halfedge[:, 0], 1] == halfedge[idx2, 1]
+        halfedge[node2halfedge[flag, 0], 2] = idx2[flag]
+        flag = halfedge[node2halfedge[:, 2], 1] == halfedge[idx0, 1]
+        halfedge[node2halfedge[flag, 2], 2] = idx0[flag]
+
+        flag = halfedge[node2halfedge[:, 1], 1] == halfedge[idx2, 1]
+        halfedge[node2halfedge[flag, 1], 2] = idx2[flag]
+        flag = halfedge[node2halfedge[:, 2], 1] == halfedge[idx1, 1]
+        halfedge[node2halfedge[flag, 2], 2] = idx1[flag]
+
+        mesh = HalfEdgeMesh(node, halfedge, NC)
+        return mesh 
+
+
+
+    def create_voronoi_1(self, points):
+        """
+        给定一组点, 生成相应 Clipped  Voronoi Regions 
+        """
+        from scipy.spatial import Voronoi
+        from scipy.spatial import KDTree
+
+        itype = self.itype
+        ftype = self.ftype
+
+        NG = len(points) # 生成子的个数
+        voronoi = Voronoi(points)
+        tree = KDTree(points)
+
+        rp = voronoi.ridge_points
+        rv = voronoi.ridge_vertices
+        nv = len(voronoi.vertices)
+
+        # 无限边转化为有限边
+        w = np.array([(0,-1),(1,0)])
+        isInfVertices = (rv[:, 0] == -1)
+        nn = isInfVertices.sum()
+        ve = np.zeros((nv+nn, 2), dtype=ftype)
+        ve[:nv] = voronoi.vertices
+        ve[nv:] += ve[rv[isInfVertices, 1]]
+        ve[nv:] += 3*(points[rp[isInfVertices, 1]] - points[rp[isInfVertices, 0]])@w
+        rv[isInfVertices, 0] = range(nv, nv+nn)
+
+        # 建立 generator 的邻接关系矩阵
+        neighbor  = coo_matrix((rv[:, 0] + 1, (rp[0], rp[1])), shape=(NG, NG))
+        neighbor += coo_matrix((rv[:, 1] + 1, (rp[1], rp[0])), shape=(NG, NG))
+        neighbor = neighbor.tocsr()
+
+        # 分配空间
+        vertices = np.zeros((100, 2), dtype=ftype)
+        gindex = np.zeros(100, dtype=itype)
+        end = self.NV     # 初始节点的个数 
+        vertices[:end] = self.vertices
+        tmp, gindex[:end] = tree.query(vertices[:end])
+        halfedge1 = self.halfedge.copy()
+
+        # 自适应加密边界, 直到相邻边界点所属的 Voronoi Region 相同或者相邻
+        while True:
+            NE = len(halfedge1)
+            isMainHEdge = (halfedge1[:, 5] == 1)
+
+            e0 = halfedge1[halfedge1[isMainHEdge, 3], 0]
+            e1 = halfedge1[isMainHEdge, 0]
+
+            d0 = neighbor[gindex[e0], gindex[e1]]
+            d1 = neighbor[gindex[e1], gindex[e0]]
+            isNGenerator =  d0 > 0 # 相邻生成子标记
+            if np.any(isNGenerator): 
+                # 判断生成子是否真的相邻
+                p0 = vertices[e0[isNGenerator]]
+                p1 = vertices[e1[isNGenerator]]
+                v0 = ve[d0[isNGenerator]-1]
+                v1 = ve[d1[isNGenerator]-1]
+                isIntersect = self.is_intersect(p0, p1, v0, v1)
+                isNGenerator[~isIntersect] = False
+
+            isNotSGenerator = (gindex[e0] != gindex[e1])
+            isMarkedHEdge = np.zeros(NE, dtype=np.bool)
+            isMarkedHEdge[isMainHEdge][~isNGenerator & isNotSGenerator] =True
+            if np.any(isMarkedHEdge):
+                nn = isMarkedHEdge.sum()//2
+                vertices[end:end+nn], halfedge1 = self.halfedge_adaptive_refine(
+                    isMarkedHEdge, vertices=vertices, halfedge=halfedge1)
+                gindex[end:end+nn] = tree.query(vertices[end:end+nn])
+                end += nn
+            else:
+                break
+
+        # 计算边界与 Voronoi Region 的交点
+        isMainHEdge = halfedge1[:, 5] == 1
+        e0 = halfedge1[halfedge1[isMainHEdge, 3], 0]
+        e1 = halfedge1[isMainHEdge, 0]
+
+        d0 = neighbor[gindex[e0], gindex[e1]]
+        d1 = neighbor[gindex[e1], gindex[e0]]
+        isNotSGenerator = (gindex[e0] != gindex[e1])
+
+        p0 = vertices[e0[isNotSGenerator]]
+        p1 = vertices[e1[isNotSGenerator]]
+        v0 = ve[d0[isNotSGenerator]-1]
+        v1 = ve[d1[isNotSGenerator]-1]
+
+        isIntersect, ec = self.is_intersect(p0, p1, v0, v1, returnin=True)
+        NE = len(halfedge1)
+        isMarkedHEdge = np.zeros(NE, dtype=np.bool)
+        isMarkedHEdge[isMainHEdge][isNotSGenerator] =True
+        nn = isMarkedHEdge.sum()//2
+        vertices[end:end+nn], halfedge1 = self.halfedge_adaptive_refine(
+            isMarkedHEdge, vertices=vertices, halfedge=halfedge1, 
+            edgecenter=ec)
+        end += nn
+
+        # 生成半边网格, 注意这里可以暂时不需要生成:下一个和上一个半边的信息
+
+        node = np.r_['0', vertices[:end], ve]
+        halfedge = np.r_['0']
+
+        mesh = HalfEdgeMesh()
+        return mesh
+
+    def is_intersect(self, p0, p1, v0, v1, returnin=False):
+        ftype = p0.dtype
+        s = p1 - p0
+        r = v1 - v0
+        v = v0 - p1
+        n = len(s)
+
+        c0 = np.cross(r, s)
+        c1 = np.cross(v, r)
+        c2 = np.cross(v, s)
+
+        isColinear = (np.abs(c0) == 0.0) & (np.abs(c1) == 0.0)
+        isParallel = (np.abs(c0) == 0.0) & (np.abs(c1) != 0.0)
+
+        flag = (~isColinear) & (~isParallel)
+        t = np.zeros(n, dtype=ftype)
+        u = np.zeros(n, dtype=ftype)
+
+        t[flag] = c2[flag]/c0[flag]
+        u[flag] = c1[flag]/c0[flag] 
+
+        isIntersect = flag & t >= 0.0 & t <= 1.0 & u >= 0.0 & u <=1.0
+        if returnin:
+            return isIntersect, p0 + s*t.reshape(-1, 1)
+        else:
+            return isIntersect
+        
+
+    def halfedge_adaptive_refine(self, isMarkedHEdge,
+        vertices=None, halfedge=None, edgecenter=None):
+
+        inplace = True
+        itype = self.itype
+        ftype = self.ftype
+
+        if (vertices is not None) and (halfedge is not None):
+            inplace = False
+            itype = halfedge.dtype
+            ftype = vertices.dtype
+
+        if inplace:
             NE = self.NE
+            NV = self.NV
+            vertices = self.vertices
+            halfedge = self.halfedge
+        else:
+            NE = len(halfedge)
+            NV = len(vertices)
+
+        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
+        flag0 = isMainHEdge & isMarkedHEdge
+        idx = halfedge[flag0, 4]
+        if edgecenter is None:
+            ec = (vertices[halfedge[flag0, 0]] + vertices[halfedge[idx, 0]])/2
+        else:
+            ec = edgecenter
+
+        NE1 = 2*len(ec)
+
+        halfedge1 = np.zeros((NE1, 6), dtype=itype)
+        flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
+        halfedge1[flag1, 0] = range(NV, NV+NE1//2) # 新的节点编号
+        idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
+        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
+
+        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
+        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
+        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
+
+        halfedge[isMarkedHEdge, 3] = range(NE, NE + NE1)
+        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+        halfedge = np.r_['0', halfedge, halfedge1]
+        halfedge[halfedge[:, 3], 2] = range(NE+NE1)
+
+        if inplace: 
+            self.halfedge = halfedge
+            self.vertices = np.r_['0', vertices, ec] 
+            self.NV += NE1//2
+            self.NE += NE1 
+        else:
+            return ec, halfedge
+
+    def halfedge_uniform_refine(self, n=1, vertices=None, halfedge=None):
+        inplace = True
+        itype = self.itype
+        ftype = self.ftype
+
+        if (vertices is not None) and (halfedge is not None):
+            inplace = False
+            itype = halfedge.dtype
+            ftype = vertices.dtype
+
+        for i in range(n):
+
+            if inplace:
+                NE = self.NE
+                NV = self.NV
+                vertices = self.vertices
+                halfedge = self.halfedge
+            else:
+                NE = len(halfedge)
+                NV = len(vertices)
+            
+            # 求中点
             isMainHEdge = halfedge[:, 5] == 1
             idx = halfedge[isMainHEdge, 4]
-            ec = (node[halfedge[isMainHEdge, 0]] + node[halfedge[idx, 0]])/2
+            ec = (vertices[halfedge[isMainHEdge, 0]] + vertices[halfedge[idx, 0]])/2
+
             #细分边
-            halfedge1 = np.zeros((2*NE, 7), dtype=self.itype)
-            halfedge1[isMainHEdge, 0] = range(NN, NN + NE) # 新的节点编号
+            halfedge1 = np.zeros((NE, 6), dtype=itype)
+            halfedge1[isMainHEdge, 0] = range(NV, NV + NE//2) # 新的节点编号
             idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
             halfedge1[~isMainHEdge, 0] = halfedge1[isMainHEdge, 0][idx0] # 按照排序
 
@@ -54,91 +374,28 @@ class HalfEdgeDomain():
             halfedge1[:, 4] = halfedge[:, 4] # 对偶边
             halfedge1[:, 5] = halfedge[:, 5] # 主边标记
 
-            halfedge[:, 3] = range(2*NE, 2*NE+2*NE)
+            halfedge[:, 3] = range(NE, 2*NE)
             idx = halfedge[:, 4] # 原始对偶边
             halfedge[:, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
 
+            vertices = np.r_['0', vertices, ec]
             halfedge = np.r_['0', halfedge, halfedge1]
-            halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE)
-            
-            self.halfedge = halfedge
-            self.node = np.r_['0', node, ec]
-            self.NN += NE
-            self.NE *= 2
+            halfedge[halfedge[:, 3], 2] = range(2*NE)
 
-    def edge_length(self):
-        node = self.entity('node') 
-        edge = self.entity('edge')
-        v = node[edge[:, 1]] - node[edge[:, 0]]
-        return np.sqrt(np.sum(v**2, axis=-1))
+            if inplace: 
+                self.halfedge = halfedge
+                self.vertices = vertices 
+                self.NV += NE//2
+                self.NE *= 2
+            else:
+                return vertices, halfedge
 
-    def edge_normal(self, index=None):
-        v = self.edge_tangent(index=index)
-        w = np.array([(0, -1),(1, 0)])
-        return v@w
-
-    def edge_tangent(self):
-        node = self.node
-        halfedge = self.halfedge
-        e1 = halfedge[:, 0]
-        e0 = halfedge[halfedge[:, 4], 0]
-        v = node[e1] - node[e0]
-        return v
-
-    def geo_dimension(self):
-        return 2 
-
-    def top_dimension(self):
-        return 1
-
-
-    def number_of_nodes(self):
-        return self.node.shape[0]
+    def number_of_vertices(self):
+        return self.NV
     
-    def number_of_cells(self):
-        return self.NE
-    
-    def number_of_edges(self):
-        return self.NE
-
     def number_of_halfedges(self):
-        return self.halfedge.shape[0]
+        return self.NE
     
     def number_of_subdomains(self):
-        return self.NC
+        return self.NS
 
-    def add_plot(self, plot,
-            nodecolor='k', edgecolor='k',
-            aspect='equal', linewidths=1, markersize=10,
-            showaxis=False):
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
-        else:
-            axes = plot
-        return show_mesh_1d(axes, self,
-                nodecolor=nodecolor, cellcolor=edgecolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis)
-
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=20,
-            fontsize=10, fontcolor='k'):
-
-        if node is None:
-            node = self.node
-        find_node(axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-    def find_edge(self, axes,
-            index=None, showindex=False,
-            color='m', markersize=25,
-            fontsize=15, fontcolor='k'):
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)

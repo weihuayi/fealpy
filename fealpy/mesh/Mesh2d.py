@@ -169,7 +169,7 @@ class Mesh2d():
             node = self.node
 
         if (index is None) and (showindex == True):
-            NN = self.number_of_nodes()
+            NN = node.shape[0] 
             index = np.array(range(NN))
 
         find_node(axes, node,
