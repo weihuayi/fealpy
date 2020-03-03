@@ -51,8 +51,9 @@ def find_node(
                                 fontsize=fontsize, 
                                 color=fontcolor)
                 else:
+                    print(multiindex)
                     for i, idx in enumerate(multiindex):
-                        axes.text(bc[i, 0], bc[i, 1], idx,
+                        axes.text(bc[i, 0], bc[i, 1], str(idx),
                                 multialignment='center',
                                 fontsize=fontsize, 
                                 color=fontcolor) 

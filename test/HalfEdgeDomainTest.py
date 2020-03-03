@@ -2,7 +2,7 @@
 # 
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import HalfEdgeDomain
+from fealpy.mesh import HalfEdgeDomain, HalfEdgeMesh
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import KDTree
@@ -18,35 +18,37 @@ class HalfEdgeDomainTest:
         node = np.array([
             (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
         halfedge = np.array([
-            (1, 0, 1, 3, 4, 1, 1),
-            (2, 0, 2, 0, 5, 1, 1),
-            (3, 0, 3, 1, 6, 1, 1),
-            (0, 0, 0, 2, 7, 1, 1),
-            (0, 1, 7, 5, 0, 0, 1),
-            (1, 1, 4, 6, 1, 0, 1),
-            (2, 1, 5, 7, 2, 0, 1),
-            (3, 1, 6, 4, 3, 0, 1)], dtype=np.int)
+            (1, 0, 1, 3, 4, 1),
+            (2, 0, 2, 0, 5, 1),
+            (3, 0, 3, 1, 6, 1),
+            (0, 0, 0, 2, 7, 1),
+            (0, 1, 7, 5, 0, 0),
+            (1, 1, 4, 6, 1, 0),
+            (2, 1, 5, 7, 2, 0),
+            (3, 1, 6, 4, 3, 0)], dtype=np.int)
 
-        domain = HalfEdgeDomain(node, halfedge, 1)
-        domain.uniform_refine(n=4)
-        
+        domain = HalfEdgeDomain(node, halfedge, NS=1)
+        mesh = HalfEdgeMesh(node, halfedge, 1)
+
         np.random.seed(0)
         points = np.random.rand(10,2)
-        vor = Voronoi(domain.node)
-        print('region:', vor.regions)
-        print('ridge_vertices:', vor.ridge_vertices)
-        print('ridge_points:', vor.ridge_points)
+        vor = Voronoi(points)
+        rp = vor.ridge_points
+        rv = np.array(vor.ridge_vertices)
+        isInfVertices = rv[:, 0] == -1
+        print('ridge_points:\n', rp[isInfVertices])
+        print('ridge_vertices:\n', rv[isInfVertices])
 
+        mesh = domain.create_finite_voronoi(points)
 
 
         if plot:
-            fig = voronoi_plot_2d(vor)
+            fig = plt.figure()
             axes = fig.gca()
-            domain.add_plot(axes)
-            domain.find_node(axes, node=vor.vertices, showindex=True)
-            domain.find_node(axes, node=points, color='blue', showindex=True)
-            axes.set_xlim([-0.1, 1.1])
-            axes.set_ylim([-0.1, 1.1])
+            #voronoi_plot_2d(vor, ax=axes)
+            mesh.add_plot(axes)
+            mesh.find_node(axes, node=points, color='r', showindex=True)
+            mesh.find_node(axes, node=vor.vertices, color='b', showindex=True)
             plt.show()
 
 

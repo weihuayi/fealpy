@@ -5,10 +5,20 @@ from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
 
-class HalfEdgeMesh(Mesh2d):
-    def __init__(self, node, halfedge, NC):
-        """
+# fixednode: 节点是否固定标记, 在网格生成与自适应算法中不能移除
+# True: 固定
+# False: 自由
 
+# subdomain: 单元所处的子区域的标记编号
+#  0: 表示外部无界区域
+# -n: n >= 1, 表示编号为 -n 洞
+#  n: n >= 1, 表示编号为  n 的内部子区域
+
+class HalfEdgeMesh(Mesh2d):
+    def __init__(self, node, halfedge, 
+        NC=None,  fixednode=None, subdomain=None,
+        nodelevel=None, celllevel=None, halfedgelevel=None):
+        """
         Parameters
         ----------
         node : (NN, GD)
@@ -34,6 +44,21 @@ class HalfEdgeMesh(Mesh2d):
         self.meshdata = {}
 
         self.init_level_info()
+
+        if subdomain is not None:
+            self.celldata['subdomain'] = subdomain
+
+        if fixednode is not None:
+            self.nodedata['fixednode'] = fixednode
+
+        if nodelevel is not None:
+            self.nodedata['level'] = nodelevel
+
+        if celllevel is not None:
+            self.celldata['level'] = celllevel
+
+        if halfedgelevel is not None:
+            self.halfedgedata['level'] = halfedgelevel
 
 
     def init_level_info(self):
