@@ -22,7 +22,8 @@ def load_vtk_mesh(fileName):
 
 def write_vtk_mesh(mesh, fileName):
     node = mesh.entity('node')
-    if point.shape[1] == 2:
+    GD = mesh.geo_dimension()
+    if GD == 2:
         node = np.concatenate((node, np.zeros((node.shape[0], 1),
             dtype=mesh.ftype)), axis=1)
     ug = tvtk.UnstructuredGrid(points=node)
@@ -50,6 +51,15 @@ def write_vtk_mesh(mesh, fileName):
        cell = tvtk.CellArray()
        cell.set_cells(NC, cells)
     elif mesh.meshtype is 'tet':
+        cell_type = tvtk.Tetra().cell_type
+        cell = mesh.ds.cell
+        for key, value in mesh.cellData.items():
+            i = ug.cell_data.add_array(value)
+            ug.cell_data.get_array(i).name = key
+        for key, value in mesh.pointData.items():
+            i = ug.point_data.add_array(value)
+            ug.point_data.get_array(i).name = key
+    elif mesh.meshtype is 'stri':
         cell_type = tvtk.Tetra().cell_type
         cell = mesh.ds.cell
         for key, value in mesh.cellData.items():

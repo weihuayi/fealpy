@@ -48,10 +48,14 @@ class SurfaceTriangleMesh():
             self.node, d = self.surface.project(self.space.interpolation_points()/scale)
             self.node *= scale
 
+        self.meshtype = 'stri'
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.nodedata = {}
         self.celldata = {}
+
+    def vtk_cell_type(self):
+        return 69 
 
     def project(self, p):
         if self.scale is None:
@@ -64,11 +68,11 @@ class SurfaceTriangleMesh():
         return TriangleQuadrature(k)
 
     def entity(self, etype=2):
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             return self.ds.cell
-        elif etype in ['edge', 1]:
+        elif etype in {'edge', 1}:
             return self.ds.edge
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             return self.mesh.node
         else:
             raise ValueError("`entitytype` is wrong!")
