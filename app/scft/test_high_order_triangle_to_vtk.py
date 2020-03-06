@@ -16,7 +16,7 @@ femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=order)
 ldof = femspace.number_of_local_dofs()
 
 mesh = femspace.mesh
-node = mesh.entity('node')
+node = mesh.node
 NC = mesh.number_of_cells()
 idx = np.array([0, 3, 5, 1, 4, 2], dtype=np.int64)
 cell2dof = np.int64(mesh.space.cell_to_dof())
