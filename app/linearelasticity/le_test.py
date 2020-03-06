@@ -8,11 +8,11 @@ from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import BoundaryCondition
 
-
+n = int(sys.argv[1])
 pde = CantileverBeam2d()
 mu = pde.mu
 lam = pde.lam
-mesh = pde.init_mesh(n=6)
+mesh = pde.init_mesh(n=n)
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
 uh = space.function(dim=2)
