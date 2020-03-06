@@ -604,17 +604,20 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)
         b = np.zeros(shape, dtype=self.ftype)
+
         if p > 0:
             if type(fval) in {float, int}:
                 if fval == 0.0:
                     return b
                 else:
                     phi = self.basis(bcs)
-                    bb = np.einsum('m, mik, i->ik...', ws, phi, self.cellmeasure)
+                    bb = np.einsum('m, mik, i->ik...', 
+                            ws, phi, self.cellmeasure)
                     bb *= fval
             else:
                 phi = self.basis(bcs)
-                bb = np.einsum('m, mi..., mik, i->ik...', ws, fval, phi, self.cellmeasure)
+                bb = np.einsum('m, mi..., mik, i->ik...',
+                        ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
             if dim is None:
                 np.add.at(b, cell2dof, bb)
@@ -622,6 +625,7 @@ class LagrangeFiniteElementSpace():
                 np.add.at(b, (cell2dof, np.s_[:]), bb)
         else:
             b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
+
         return b
 
     def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):

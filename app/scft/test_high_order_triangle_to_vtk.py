@@ -11,6 +11,7 @@ order = 2
 surface = Sphere()
 surface.radius = 3.65 
 mesh = surface.init_mesh()
+
 mesh.uniform_refine(n=2, surface=surface)
 femspace = SurfaceLagrangeFiniteElementSpace(mesh, surface, p=order)
 ldof = femspace.number_of_local_dofs()
@@ -32,7 +33,10 @@ cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell2dof))
 uGrid =vtk.vtkUnstructuredGrid() 
 uGrid.SetPoints(points)
 uGrid.SetCells(22, cells)
+
 uGrid.GetPointData().AddArray(vnp.numpy_to_vtk(node[:, 0]))
+
+
 writer = vtk.vtkUnstructuredGridWriter()
 writer.SetFileName('test.vtk')
 writer.SetInputData(uGrid)

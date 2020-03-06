@@ -1,7 +1,7 @@
 import numpy as np
 
 class CantileverBeam2d():
-    def __init__(self, E=3*10**7, nu=0.3, P=1000, L=48, W=12):
+    def __init__(self, E=3e+7, nu=0.3, P=1000, L=48, W=12):
         self.E = E
         self.nu = nu
         self.lam = self.nu*self.E/((1+self.nu)*(1-2*self.nu))
@@ -46,11 +46,11 @@ class CantileverBeam2d():
 
         x = p[..., 0]
         y = p[..., 1]
-
-        val = np.zeros((len(x), 2, 2), dtype=np.float)
+        shape = p.shape[:-1] + (2, 2)
+        val = np.zeros(shape, dtype=np.float)
         val[..., 0, 0] = P*(L-x)*y/I
         val[..., 0, 1] = -P/(2*I)*(W**2/4 - y**2)
-        val[..., 1, 0] = -P/(2*I)*(W**2/4 - y**2)
+        val[..., 1, 0] = val[..., 0, 1] 
         return val
 
     def source(self, p):
@@ -63,18 +63,14 @@ class CantileverBeam2d():
         p: (NQ, NE, 2)
         n: (NE, 2)
         """
-        W = self.W
-        P = self.P
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape, dtype=np.float)
-        val[..., 1] = (y + W/2)*(y - W/2)*P
+        val = self.stress(p)
+        val = np.einsum('...ijk, ik->...ij', val, n)
         return val
 
     def dirichlet(self, p):  
         """
         """
-        val = np.zeros(p.shape, dtype=np.float)
+        val = self.displacement(p) 
         return val
 
     def is_dirichlet_boundary(self, p):

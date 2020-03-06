@@ -86,6 +86,7 @@ class BoundaryCondition():
             dim = 1 if len(uh.shape) == 1 else uh.shape[1]
             if dim > 1:
                 isDDof = np.tile(isDDof, dim)
+                b = b.T.flat
             gdof = self.space.number_of_global_dofs()
             x = uh.T.flat # 把 uh 按列展平
             b -= A@x

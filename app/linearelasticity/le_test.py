@@ -12,19 +12,21 @@ from fealpy.boundarycondition import BoundaryCondition
 pde = CantileverBeam2d()
 mu = pde.mu
 lam = pde.lam
-mesh = pde.init_mesh(n=2)
+mesh = pde.init_mesh(n=6)
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
 uh = space.function(dim=2)
 A = space.linear_elasticity_matrix(mu, lam)
 F = space.source_vector(pde.source, dim=2)
 bc = BoundaryCondition(space, dirichlet=pde.dirichlet,  neuman=pde.neuman)
-bc.apply_neuman_bc(b)
-A, F = bc.apppy_dirichlet_bc(A, F, uh, 
+bc.apply_neuman_bc(F)
+A, F = bc.apply_dirichlet_bc(A, F, uh, 
     is_dirichlet_boundary=pde.is_dirichlet_boundary)
 
-x = space
+uh.T.flat[:] = spsolve(A, F)
 
+error = space.integralalg.L2_error(pde.displacement, uh)
+print(error)
 
 fig = plt.figure()
 axes = fig.gca()
