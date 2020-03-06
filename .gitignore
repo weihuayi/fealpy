@@ -39,3 +39,4 @@ dist
 *.pdf
 *.png
 *.fig
+*.vtk

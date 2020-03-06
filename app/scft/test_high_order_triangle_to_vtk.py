@@ -18,7 +18,7 @@ ldof = femspace.number_of_local_dofs()
 mesh = femspace.mesh
 node = mesh.entity('node')
 NC = mesh.number_of_cells()
-idx = np.array([5, 0, 3, 2, 1, 4], dtype=np.int64)
+idx = np.array([0, 3, 5, 1, 4, 2], dtype=np.int64)
 cell2dof = np.int64(mesh.space.cell_to_dof())
 
 cell2dof = np.r_['1', ldof*np.ones((NC, 1), dtype=np.int), cell2dof[:, idx]]
@@ -31,7 +31,7 @@ cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell2dof))
 
 uGrid =vtk.vtkUnstructuredGrid() 
 uGrid.SetPoints(points)
-uGrid.SetCells(69, cells)
+uGrid.SetCells(22, cells)
 uGrid.GetPointData().AddArray(vnp.numpy_to_vtk(node[:, 0]))
 writer = vtk.vtkUnstructuredGridWriter()
 writer.SetFileName('test.vtk')
