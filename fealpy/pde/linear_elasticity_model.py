@@ -57,8 +57,11 @@ class CantileverBeam2d():
         val = np.zeros(p.shape, dtype=np.float)
         return val
 
-    def neuman(self, p):  # p 是受到面力的节点坐标
+    def neuman(self, p, n):  # p 是受到面力的节点坐标
         """
+        Neuman  boundary condition
+        p: (NQ, NE, 2)
+        n: (NE, 2)
         """
         W = self.W
         P = self.P

@@ -59,15 +59,6 @@ def write_vtk_mesh(mesh, fileName):
         for key, value in mesh.pointData.items():
             i = ug.point_data.add_array(value)
             ug.point_data.get_array(i).name = key
-    elif mesh.meshtype is 'stri':
-        cell_type = tvtk.Tetra().cell_type
-        cell = mesh.ds.cell
-        for key, value in mesh.cellData.items():
-            i = ug.cell_data.add_array(value)
-            ug.cell_data.get_array(i).name = key
-        for key, value in mesh.pointData.items():
-            i = ug.point_data.add_array(value)
-            ug.point_data.get_array(i).name = key
     ug.set_cells(cell_type, cell) 
     write_data(ug, fileName)
 
