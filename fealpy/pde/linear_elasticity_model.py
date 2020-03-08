@@ -32,11 +32,13 @@ class CantileverBeam2d():
 
         x = p[..., 0]
         y = p[..., 1]
-
         val = np.zeros(p.shape, dtype=np.float)
         val[..., 0] = P*y/(6*E*I)*((6*L-3*x)*x+(2+nu)*(y**2 - W**2/4))
         val[..., 1] = -P/(6*E*I)*(3*nu*y**2*(L-x)+(4+5*nu)*W**2*x/4+(3*L-x)*x**2)
         return val
+
+    def strain(self, p):
+        pass
 
     def stress(self, p):
         P = self.P
@@ -387,6 +389,12 @@ class HuangModel2d():
 #        val[..., 0] = -pi**3*sin(2*pi*y)*(2*cos(2*pi*x) - 1)
 #        val[..., 1] = pi**3*sin(2*pi*x)*(2*cos(2*pi*y) - 1)
 
+        return val
+
+    def dirichlet(self, p):  
+        """
+        """
+        val = self.displacement(p) 
         return val
 
 class Model2d():

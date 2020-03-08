@@ -29,10 +29,8 @@ class BoundaryCondition():
         if self.neuman is not None:
             space = self.space
             p = space.p
-            TD = space.top_dimension()
             mesh = space.mesh
             dim = 1 if len(b.shape) == 1 else b.shape[1]
-            face = mesh.entity('face')
             face2dof = space.face_to_dof()
 
             # find the index of all neuman boundary 
