@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csr_matrix, spdiags, bmat
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
 from .function import Function
@@ -442,7 +442,30 @@ class LagrangeFiniteElementSpace():
         np.add.at(c, cell2dof, cc)
         return c
 
-    def linear_elasticity_matrix(self, mu, lam):
+    def revcovery_matrix(self, rtype='simple'):
+        NC = self.mesh.number_of_cells()
+        NN = self.mesh.number_of_nodes()
+        cell = self.mesh.entity('cell')
+        GD = self.GD
+        cellmeasure = self.cellmeasure
+        gphi = self.mesh.grad_lambda()
+        G = []
+        if rtype is 'simple':
+            D = spdiags(1.0/np.bincount(cell.flat), 0, NN, NN)
+        elif rtype is 'harmonic':
+            gphi = gphi/cellmeasure.reshape(-1, 1, 1)
+            d = np.zeros(NN, dtype=np.float)
+            np.add.at(d, cell, 1/cellmeasure.reshape(-1, 1))
+            D = spdiags(1/d, 0, NN, NN)
+
+        I = np.einsum('k, ij->ijk', np.ones(GD+1), cell)
+        J = I.swapaxes(-1, -2)
+        for i in range(GD):
+            val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
+            G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
+        return G
+
+    def linear_elasticity_matrix(self, mu, lam, format='csr'):
         """
         construct the linear elasticity fem matrix
         """
@@ -486,8 +509,64 @@ class LagrangeFiniteElementSpace():
                 else:
                     C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
                     C[j][i] = C[i][j].T
-        A = bmat(C, format='csr') # format = bsr ??
-        return A
+        if format == 'csr':
+            return bmat(C, format='csr') # format = bsr ??
+        elif format == 'bsr':
+            return bmat(C, format='bsr')
+        elif format == 'list':
+            return C
+
+    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr'):
+        """
+        construct the recovery linear elasticity fem matrix
+        """
+        G = self.revcovery_matrix()
+        M = self.space.mass_matrix()
+
+        cellmeasure = self.cellmeasure
+        cell2dof = self.space.cell_to_dof()
+        GD = self.GD
+
+        qf = self.space.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.space.grad_basis(bcs)
+
+        ldof = self.space.number_of_local_dofs()
+        gdof = self.space.number_of_global_dofs()
+
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+
+        if GD == 2:
+            idx = [(0, 0), (0, 1),  (1, 1)]
+            imap = {(0, 0):0, (0, 1):1, (1, 1):2}
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+            imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
+        A = []
+        for k, (i, j) in enumerate(idx):
+            A.append(G[i].T@M@G[j])
+
+        T = csr_matrix((gdof, gdof), dtype=self.space.ftype)
+        D = csr_matrix((gdof, gdof), dtype=self.space.ftype)
+        C = []
+        for i in range(GD):
+            D += A[imap[(i, i)]]
+            C.append([T]*GD)
+        D *= mu
+        for i in range(GD):
+            for j in range(i, GD):
+                if i == j:
+                    C[i][j] = D + (mu+lam)*A[imap[(i, i)]]
+                else:
+                    C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
+                    C[j][i] = C[i][j].T
+        if format == 'csr':
+            return bmat(C, format='csr') # format = bsr ??
+        elif format == 'bsr':
+            return bmat(C, format='bsr')
+        elif format == 'list':
+            return C
 
     def stiff_matrix(self, cfun=None):
         p = self.p

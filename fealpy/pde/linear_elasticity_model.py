@@ -1,5 +1,4 @@
-port numpy as np
-
+import numpy as np
 
 class LinearElasticityTempalte():
     def __init__(self):
@@ -55,7 +54,7 @@ class BoxDomainData3d():
         self.d = np.array([0.0, 0.0, -1.0])
 
     def domain(self):
-        return [0.0, 0.0, 0.0, self.L, self.W, self.W]
+        return [0.0, self.L, 0.0, self.W, 0.0, self.W]
 
     def init_mesh(self, n=1):
         from fealpy.mesh.simple_mesh_generator import boxmesh3d
@@ -77,7 +76,7 @@ class BoxDomainData3d():
 
     def source(self, p):
         shape = len(p.shape[:-1])*(1,) + (-1, )
-        val = self.d*self.g*.self.rho
+        val = self.d*self.g*self.rho
         return val.reshape(shape) 
 
     def dirichlet(self, p):

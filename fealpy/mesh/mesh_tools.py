@@ -316,7 +316,10 @@ def show_mesh_3d(
         linewidths=0.5, markersize=0,
         showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
-    axes.set_aspect('equal')
+    try:
+        axes.set_aspect(aspect)
+    except NotImplementedError:
+        pass
     if showaxis is False:
         axes.set_axis_off()
     else:
@@ -355,7 +358,7 @@ def show_mesh_3d(
     box = np.zeros((2, 3), dtype=np.float)
     box[0, :] = np.min(node, axis=0)
     box[1, :] = np.max(node, axis=0)
-    axes.scatter(box[:, 0], box[:, 1], box[:, 2])
+    axes.scatter(box[:, 0], box[:, 1], box[:, 2], s=0)
     return h
 
 

@@ -2,7 +2,8 @@ import numpy as np
 import mpl_toolkits.mplot3d as a3
 import pylab as pl
 
-from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
+from fealpy.mesh import TetrahedronMesh
+from fealpy.mesh.simple_mesh_generator import boxmesh3d
 
 node = np.array([
     [-1,-1,-1],

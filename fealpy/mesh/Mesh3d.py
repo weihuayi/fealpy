@@ -98,43 +98,43 @@ class Mesh3d():
         return vmesh
 
     def entity(self, etype='cell'):
-        if etype in ['cell', 3]:
+        if etype in {'cell', 3}:
             return self.ds.cell
-        elif etype in ['face', 2]:
+        elif etype in {'face', 2}:
             return self.ds.face
-        elif etype in ['edge', 1]:
+        elif etype in {'edge', 1}:
             return self.ds.edge
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             return self.node
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_measure(self, etype=3):
-        if etype in ['cell', 3]:
-            return self.cell_volume()
-        elif etype in ['face', 2]:
-            return self.face_area()
-        elif etype in ['edge', 1]:
-            return self.edge_length()
-        elif etype in ['node', 0]:
-            NN = self.number_of_nodes()
-            return np.zeros(NN, dtype=self.ftype)
+    def entity_measure(self, etype=3, index=None):
+        if etype in {'cell', 3}:
+            return self.cell_volume(index=index)
+        elif etype in {'face', 2}:
+            return self.face_area(index=index)
+        elif etype in {'edge', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return np.zeros(1, dtype=self.ftype)
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def entity_barycenter(self, etype='cell'):
+    def entity_barycenter(self, etype='cell', index=None):
         node = self.node
-        if etype in ['cell', 3]:
+        index = index if index is not None else np.s_[:]
+        if etype in {'cell', 3}:
             cell = self.ds.cell
-            bc = np.sum(node[cell, :], axis=1).reshape(-1, 3)/cell.shape[1]
-        elif etype in ['face', 2]:
+            bc = np.sum(node[cell[index], :], axis=1).reshape(-1, 3)/cell.shape[1]
+        elif etype in {'face', 2}:
             face = self.ds.face
-            bc = np.sum(node[face, :], axis=1).reshape(-1, 3)/face.shape[1]
-        elif etype in ['edge', 1]:
+            bc = np.sum(node[face[index], :], axis=1).reshape(-1, 3)/face.shape[1]
+        elif etype in {'edge', 1}:
             edge = self.ds.edge
-            bc = np.sum(node[edge, :], axis=1).reshape(-1, 3)/edge.shape[1]
-        elif etype in ['node', 0]:
-            bc = node
+            bc = np.sum(node[edge[index], :], axis=1).reshape(-1, 3)/edge.shape[1]
+        elif etype in {'node', 0}:
+            bc = node[index]
         else:
             raise ValueError("`etype` is wrong!")
 

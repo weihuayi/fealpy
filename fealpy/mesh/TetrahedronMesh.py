@@ -145,7 +145,6 @@ class TetrahedronMesh(Mesh3d):
 
 
     def dihedral_angle(self):
-        NC = self.number_of_cells()
         node = self.node
         cell = self.ds.cell
         localFace = self.ds.localFace
@@ -247,7 +246,7 @@ class TetrahedronMesh(Mesh3d):
         cell = self.ds.cell
         NC = self.number_of_cells()
         Dlambda = np.zeros((NC, 4, 3), dtype=self.ftype)
-        volume = self.volume()
+        volume = self.cell_volume()
         for i in range(4):
             j,k,m = localFace[i]
             vjk = node[cell[:,k],:] - node[cell[:,j],:]

@@ -4,7 +4,9 @@ import sys
 
 import numpy as np
 from scipy.sparse.linalg import spsolve
+
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.linear_elasticity_model import  BoxDomainData3d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -24,12 +26,15 @@ space = LagrangeFiniteElementSpace(mesh, p=p)
 bc = BoundaryCondition(space, dirichlet=pde.dirichlet)
 uh = space.function(dim=3)
 A = space.linear_elasticity_matrix(mu, lam)
+B = space.linear_elasticity_matrix(mu, lam, format='list')
+print(B)
 F = space.source_vector(pde.source, dim=3)
 A, F = bc.apply_dirichlet_bc(A, F, uh, is_dirichlet_boundary=pde.is_dirichlet_boundary)
 uh.T.flat[:] = spsolve(A, F)
-error = space.integralalg.L2_error(pde.displacement, uh)
+node = mesh.node.copy()
+mesh.node = node + scale*uh
 
 fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
+axes = Axes3D(fig) 
+mesh.add_plot(axes )
 plt.show()
