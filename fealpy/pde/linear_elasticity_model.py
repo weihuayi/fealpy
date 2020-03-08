@@ -1,4 +1,4 @@
-import numpy as np
+port numpy as np
 
 
 class LinearElasticityTempalte():
@@ -37,6 +37,57 @@ class LinearElasticityTempalte():
 
     def is_neuman_boundary(self, p):
         pass
+
+class BoxDomainData3d():
+    def __init__(self):
+        self.L = 1
+        self.W = 0.2
+
+        self.mu = 1
+        self.rho = 1
+
+        delta = self.W/self.L
+        gamma = 0.4*delta**2
+        beta = 1.25
+
+        self.lam = beta
+        self.g = gamma
+        self.d = np.array([0.0, 0.0, -1.0])
+
+    def domain(self):
+        return [0.0, 0.0, 0.0, self.L, self.W, self.W]
+
+    def init_mesh(self, n=1):
+        from fealpy.mesh.simple_mesh_generator import boxmesh3d
+        domain = self.domain()
+        mesh = boxmesh3d(domain, nx=5*n, ny=1*n, nz=1*n, meshtype='tet')
+        return mesh
+
+    def displacement(self, p):
+        pass
+
+    def jacobian(self, p):
+        pass
+
+    def strain(self, p):
+        pass
+
+    def stress(self, p):
+        pass
+
+    def source(self, p):
+        shape = len(p.shape[:-1])*(1,) + (-1, )
+        val = self.d*self.g*.self.rho
+        return val.reshape(shape) 
+
+    def dirichlet(self, p):
+        shape = len(p.shape)*(1, )
+        val = np.array([0.0])
+        return val.reshape(shape)
+
+    def is_dirichlet_boundary(self, p):
+        return np.abs(p[..., 0]) < 1e-12
+
 
 class LShapeDomainData2d():
     def __init__(self, E=1e+5, nu=0.499):
