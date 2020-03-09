@@ -31,6 +31,11 @@ which will copy the fealpy into `~/.local/lib/python3.6/dist-packages/`.  Or run
 $ python3 setup_linux.py develop --prefix=~/.local/
 ```
 which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
+4. 
+```
+$ pip3 install -U vtk
+$ pip3 install -U meshio
+```
 
 
 
