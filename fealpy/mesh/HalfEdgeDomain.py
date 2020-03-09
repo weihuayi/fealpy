@@ -10,7 +10,7 @@ class HalfEdgeDomain():
         """
 
         Parameters
-        ==========
+        ---------- 
         vertices :  np.ndarray, (NV, GD)
         halfedge :  np.ndarray, (NE, 6)
             halfedge[i, 0] : 指向的区域顶点编号
