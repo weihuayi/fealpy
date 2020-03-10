@@ -615,32 +615,16 @@ class HalfEdgeMesh(Mesh2d):
             print(i, ":", val)
 
 class HalfEdgeMesh2dDataStructure():
-    def __init__(self, NN, subdomain, halfedge):
-        self.NN = NN
-        self.NE = len(halfedge)//2
-        self.NF = self.NE
-        self.subdomain = subdomain 
-
-        isInCell = subdomain > 0
-        self.NC = isInCell.sum()
-        self.idxmap = np.zeros(len(subdomain), dtype=self.itype) 
-        self.idxmap[isInCell] = range(self.NC)
-        self.halfedge = halfedge
-        self.itype = halfedge.dtype
-        
-        self.cell2hedge = np.zeros(self.NC, dtype=self.itype)
-        isInHEdge = isInCell[halfedge[:, 1]]
-        self.cell2hedge[halfedge[isInHEdge, 1]] = range(2*self.NE)
-
-    def reinit(self, NN, subdomain, halfedge):
+    def __init__(self, NN, subdomain, halfedge, NV=None):
+        self.NV = NV # None: general polygonmesh, 3: tri mesh, 4: quad mesh
         NC = len(subdomain) # 实际的单元个数, 包括外部无界区域和洞
         self.NN = NN
         self.NE = len(halfedge)//2
         self.NF = self.NE
         self.subdomain = subdomain 
 
-        self.cflag = subdomain > 0
-        self.hflag = self.cflag[halfedge[:, 1]]
+        self.cflag = subdomain > 0 # 属于区域内部的单元标记
+        self.hflag = self.cflag[halfedge[:, 1]] # 所属单元是区域内部单元的半边标记
 
         self.NC = self.cflag.sum() # 区域内单元的个数
         self.cidxmap = np.zeros(NC, dtype=self.itype) 
@@ -652,13 +636,37 @@ class HalfEdgeMesh2dDataStructure():
 
         self.itype = halfedge.dtype
 
+    def reinit(self, NN, subdomain, halfedge, NV=None):
+        self.NV = NV # None: general polygonmesh, 3: tri mesh, 4: quad mesh
+        NC = len(subdomain) # 实际的单元个数, 包括外部无界区域和洞
+        self.NN = NN
+        self.NE = len(halfedge)//2
+        self.NF = self.NE
+        self.subdomain = subdomain 
+
+        self.cflag = subdomain > 0
+        self.hflag = self.cflag[halfedge[:, 1]]
+
+        self.NC = self.cflag.sum() # 区域内单元的个数
+        self.cidxmap = -np.ones(NC, dtype=self.itype) 
+        self.cidxmap[self.cflag] = range(self.NC)
+        self.halfedge = halfedge
+        
+        self.cell2hedge = np.zeros(NC, dtype=self.itype)
+        self.cell2hedge[halfedge[:, 1]] = range(2*self.NE)
+
+        self.itype = halfedge.dtype
+
     def number_of_vertices_of_cells(self):
-        NC = self.NC
-        halfedge = self.halfedge
-        hflag = self.hflag
-        cidxmap = self.cidxmap
-        NV = np.zeros(NC, dtype=self.itype)
-        np.add.at(NV, cidxmap[halfedge[hflag, 1]], 1)
+        if self.NV is None:
+            NC = self.NC
+            halfedge = self.halfedge
+            hflag = self.hflag
+            cidxmap = self.cidxmap
+            NV = np.zeros(NC, dtype=self.itype)
+            np.add.at(NV, cidxmap[halfedge[hflag, 1]], 1)
+        else:
+            NV = self.NV
         return NV
 
     def number_of_nodes_of_cells(self):
@@ -670,26 +678,25 @@ class HalfEdgeMesh2dDataStructure():
     def number_of_faces_of_cells(self):
         return self.number_of_vertices_of_cells()
 
-    def cell_to_node(self, sparse=True):
+    def cell_to_node(self, return_sparse=True):
         NN = self.NN
-
-        subdomain = self.subdomain
+        NC = self.NC
         halfedge = self.halfedge
-        isInHEdge = isInCell[halfedge[:, 1]]
-        idxMap[isInCell] = range(NC)
+        hflag = self.hflag
+        cflag = self.cflag
 
-        if sparse:
-            val = np.ones(isInHEdge.sum(), dtype=np.bool)
-            I = halfedge[isInHEdge, 1]
-            J = halfedge[isInHEdge, 0]
+        if return_sparse:
+            val = np.ones(hflag.sum(), dtype=np.bool)
+            I = halfedge[hflag, 1]
+            J = halfedge[hflag, 0]
             cell2node = csr_matrix((val, (I.flat, J.flat)), shape=(NC, NN), dtype=np.bool)
             return cell2node
-        else:
+        elif self.NV is None: # polygon mesh
             NV = self.number_of_vertices_of_cells()
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
             cell2node = np.zeros(cellLocation[-1], dtype=self.itype)
-            current = self.cell2hedge.copy()[:NC]
+            current = self.cell2hedge[cflag]
             idx = cellLocation[:-1].copy()
             cell2node[idx] = halfedge[current, 0]
             NV0 = np.ones(NC, dtype=self.itype)
@@ -701,29 +708,52 @@ class HalfEdgeMesh2dDataStructure():
                cell2node[idx[isNotOK]] = halfedge[current[isNotOK], 0]
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation
+        elif self.NV == 3: # tri mesh
+            cell2node = np.zeros(NC, 3)
+            current = self.cell2hedge[cflag]
+            cell2node[:, 0] = halfedge[current, 0]
+            current = halfedge[current, 2]
+            cell2node[:, 1] = halfedge[current, 0]
+            current = halfedge[current, 2]
+            cell2node[:, 2] = halfedge[current, 0]
+            return cell2node
+        elif self.NV == 4: # quad mesh
+            cell2node = np.zeros(NC, 3)
+            current = self.cell2hedge[cflag]
+            cell2node[:, 0] = halfedge[current, 0]
+            current = halfedge[current, 2]
+            cell2node[:, 1] = halfedge[current, 0]
+            current = halfedge[current, 2]
+            cell2node[:, 2] = halfedge[current, 0]
+            current = halfedge[current, 2]
+            cell2node[:, 3] = halfedge[current, 0]
+            return cell2node
+        else:
+            raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         NE = self.NE
         NC = self.NC
 
         halfedge = self.halfedge
+        cflag = self.cflag
+        hflag = self.hflag
 
         J = np.zeros(2*NE, dtype=self.itype)
         isMainHEdge = (halfedge[:, 5] == 1)
         J[isMainHEdge] = range(NE)
         J[halfedge[isMainHEdge, 4]] = range(NE)
-        if sparse:
-            isInHEdge = (halfedge[:, 1] != NC)
+        if return_sparse:
             val = np.ones(2*NE, dtype=np.bool)
-            cell2edge = csr_matrix((val[isInHEdge], (halfedge[isInHEdge, 1],
-                J[isInHEdge])), shape=(NC, NE), dtype=np.bool)
+            cell2edge = csr_matrix((val[hflag], (halfedge[hflag, 1],
+                J[hflag])), shape=(NC, NE), dtype=np.bool)
             return cell2edge
-        else:
+        elif self.NV is None:
             NV = self.number_of_vertices_of_cells()
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
             cell2edge = np.zeros(cellLocation[-1], dtype=self.itype)
-            current = halfedge[self.cell2hedge[:-1], 2] # 下一个边
+            current = halfedge[self.cell2hedge[cflag], 2] # 下一个边
             idx = cellLocation[:-1]
             cell2edge[idx] = J[current]
             NV0 = np.ones(NC, dtype=self.itype)
@@ -734,21 +764,87 @@ class HalfEdgeMesh2dDataStructure():
                 NV0[isNotOK] += 1
                 cell2edge[idx[isNotOK]] = J[current[isNotOK]]
                 isNotOK = (NV0 < NV)
+            return cell2edge, cellLocation
+        elif self.NV == 3: # tri mesh
+            cell2edge = np.zeros(NC, 3)
+            current = self.cell2hedge[cflag]
+            cell2edge[:, 1] = J[current]
+            cell2edge[:, 2] = J[halfedge[current, 2]]
+            cell2edge[:, 0] = J[halfedge[current, 3]]
             return cell2edge
+        elif self.NV == 4: # quad mesh
+            cell2edge = np.zeros(NC, 4)
+            current = self.cell2hedge[cflag]
+            cell2edge[:, 3] = J[current]
+            current = halfedge[current, 2]
+            cell2edge[:, 0] = J[current] 
+            current = halfedge[current, 2]
+            cell2edge[:, 1] = J[current]
+            current = halfedge[current, 2]
+            cell2edge[:, 2] = J[current]
+            return cell2edge
+        else:
+            raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
 
-    def cell_to_face(self, sparse=True):
-        return self.cell_to_edge(sparse=sparse)
+    def cell_to_face(self, return_sparse=True):
+        return self.cell_to_edge(return_sparse=return_sparse)
 
-    def cell_to_cell(self):
+    def cell_to_cell(self, return_sparse=True):
         NC = self.NC
         halfedge = self.halfedge
-        isInHEdge = (halfedge[:, 1] != NC)
-        val = np.ones(isInHEdge.sum(), dtype=np.bool)
-        I = halfedge[isInHEdge, 1]
-        J = halfedge[halfedge[isInHEdge, 4], 1]
-        cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool)
-        cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool)
-        return cell2cell.tocsr()
+        cflag = self.cflag
+        hflag = self.hflag
+        cidxmap = self.cidxmap
+        if return_sparse:
+            flag = hflag & hflag[halfedge[:, 4]]
+            val = np.ones(flag.sum(), dtype=np.bool)
+            I = halfedge[flag, 1]
+            J = halfedge[halfedge[flag, 4], 1]
+            cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool)
+            cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool)
+            return cell2cell.tocsr()
+        elif self.NV is None:
+            NV = self.number_of_vertices_of_cells()
+            cellLocation = np.zeros(NC+1, dtype=self.itype)
+            cellLocation[1:] = np.cumsum(NV)
+            cell2cell = np.zeros(cellLocation[-1], dtype=self.itype)
+            current = halfedge[self.cell2hedge[cflag], 2] # 下一个边
+            idx = cellLocation[:-1]
+            cell2cell[idx] = cidxmap[halfedge[halfedge[current, 4], 1]]
+            NV0 = np.ones(NC, dtype=self.itype)
+            isNotOK = NV0 < NV
+            while isNotOK.sum() > 0:
+                current[isNotOK] = halfedge[current[isNotOK], 2]
+                idx[isNotOK] += 1
+                NV0[isNotOK] += 1
+                cell2cell[idx[isNotOK]] = cidxmap[halfedge[halfedge[current[isNotOK], 4], 1]]
+                isNotOK = (NV0 < NV)
+            idx = np.repeat(range(NC), NV)
+            flag = (cell2cell == -1)
+            cell2cell[flag] = idx[flag]
+            return cell2cell, cellLocation
+        elif self.NV == 3: # tri mesh
+            cell2cell = np.zeros(NC, 3)
+            current = self.cell2hedge[cflag]
+            cell2cell[:, 1] = cidxmap[halfedge[halfedge[current, 4], 1]]
+            cell2cell[:, 2] = cidxmap[halfedge[halfedge[halfedge[current, 2], 4], 1]]
+            cell2cell[:, 0] = cidxmap[halfedge[halfedge[halfedge[current, 3], 4], 1]]
+            #TODO: -1
+            return cell2cell
+        elif self.NV == 4: # quad mesh
+            cell2cell = np.zeros(NC, 4)
+            current = self.cell2hedge[cflag]
+            cell2cell[:, 3] = cidxmap[halfedge[halfedge[current, 4], 1]] 
+            current = halfedge[current, 2]
+            cell2cell[:, 0] = cidxmap[halfedge[halfedge[current, 4], 1]] 
+            current = halfedge[current, 2]
+            cell2cell[:, 1] = cidxmap[halfedge[halfedge[current, 4], 1]] 
+            current = halfedge[current, 2]
+            cell2cell[:, 2] = cidxmap[halfedge[halfedge[current, 4], 1]]
+            #TODO:-1
+            return cell2cell
+        else:
+            raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
 
     def edge_to_node(self, sparse=False):
         NN = self.NN

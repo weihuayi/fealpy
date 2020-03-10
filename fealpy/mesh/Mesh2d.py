@@ -334,7 +334,6 @@ class Mesh2dDataStructure():
         """
         NE = self.NE
         NC = self.NC
-        E = self.E
 
         edge2cell = self.edge2cell
 
@@ -361,7 +360,6 @@ class Mesh2dDataStructure():
              return_boundary = False
  
         NC = self.NC
-        E = self.E
         edge2cell = self.edge2cell
         if (return_sparse == False) & (return_array == False):
             E = self.E
