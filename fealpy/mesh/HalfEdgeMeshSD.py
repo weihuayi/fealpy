@@ -15,8 +15,8 @@ from .mesh_tools import show_halfedge_mesh
 #  n: n >= 1, 表示编号为  n 的内部子区域
 
 class HalfEdgeMesh(Mesh2d):
-    def __init__(self, node, halfedge, subdomain, NV=None):
-    """
+    def __init__(self, node, subdomain, halfedge, NV=None):
+        """
         Parameters
         ----------
         node : (NN, GD)
@@ -29,6 +29,9 @@ class HalfEdgeMesh(Mesh2d):
             halfedge[i, 5]: the main halfedge flag, 1: main halfedge; 0: non main halfedge
         subdomain : (NC, ) the sub domain flag of each cell 
         """
+
+        self.itype = halfedge.dtype
+        self.ftype = node.dtype
 
         self.node = node
         self.ds = HalfEdgeMesh2dDataStructure(node.shape[0], 
@@ -44,14 +47,11 @@ class HalfEdgeMesh(Mesh2d):
 
         self.init_level_info()
 
-        self.itype = halfedge.dtype
-        self.ftype = node.dtype
 
     def init_level_info(self):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
 
-        
         NC = self.number_of_all_cells() # 实际单元个数
         self.celldata['level'] = np.zeros(NC, dtype=self.itype)
         self.halfedgedata['level'] = np.zeros(2*NE, dtype=self.itype)
@@ -210,7 +210,7 @@ class HalfEdgeMesh(Mesh2d):
         # 标记主半边 ：1：主半边， 0：对偶半边
         halfedge[:NE, 5] = 1
 
-        subdomain = np.ones(NC+1, dtype=np.int32)
+        subdomain = np.ones(NC+1, dtype=np.int)
         subdomain[-1] = 0
         return cls(node, subdomain, halfedge)
 
@@ -394,6 +394,7 @@ class HalfEdgeMesh(Mesh2d):
 
         # 单元和半边的层标记信息
         clevel = self.celldata['level'] # 注意这里是所有的单元的层信息
+        print('clevel0:', clevel)
         hlevel = self.halfedgedata['level']
 
         halfedge = self.ds.halfedge
@@ -520,6 +521,7 @@ class HalfEdgeMesh(Mesh2d):
         halfedge = np.r_['0', halfedge, halfedge1]
 
         clevel = np.r_[clevel, clevel1]
+        print('clevel1:', clevel)
         flag = np.zeros(NC+NHE, dtype=np.bool)
         np.add.at(flag, halfedge[:, 1], True)
         idxmap = np.zeros(NC+NHE, dtype=self.itype)
@@ -543,10 +545,10 @@ class HalfEdgeMesh(Mesh2d):
         clevel = self.celldata['level']
 
         halfedge = self.ds.halfedge
-        subdomain = self.ds.subdomain
 
         # 可以移除的网格节点
-        # 可以移除点周围的单元所属子区理论上是相同, TODO: make sure about it
+        # 在理论上, 可以移除点周围的单元所属子区是相同的, TODO: make sure about it
+
         isRNode = np.ones(NN, dtype=np.bool) 
         flag = (hlevel == clevel[halfedge[:, 1]])
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
@@ -559,25 +561,37 @@ class HalfEdgeMesh(Mesh2d):
         
         if nn > 0:
             # 重新标记要移除的单元
-            subdomain = np.r_['0', subdomain, np.zeros(nn, dtype=self.itype)]
             isMarkedCell = np.zeros(NC+nn, dtype=np.bool)
             isMarkedHEdge = isRNode[halfedge[:, 0]] | isRNode[halfedge[halfedge[:, 4], 0]]
             isMarkedCell[halfedge[isMarkedHEdge, 1]] = True
+            
+            # 没有被标记的单元个数
+            nc = sum(~isMarkedCell[:NC])
 
-            # 粗化后单元的编号: NC:NC+nn 
+            # 更新粗化后单元的所属子区域的信息
+            nsd = np.zeros(NN, dtype=self.itype)
+            nsd[halfedge[:, 0]] = subdomain[halfedge[:, 1]]
+            subdomain = np.zeros(nc+nn, dtype=self.itype)
+            subdomain[:nc] = self.ds.subdomain[~isMarkedCell[:NC]]
+            subdomain[nc:] = nsd[isRNode]
+
+            # 粗化后单元的新编号: NC:NC+nn 
             nidxmap = np.arange(NN)
             nidxmap[isRNode] = range(NC, NC+nn)
-
             cidxmap = np.arange(NC)
             isRHEdge = isRNode[halfedge[:, 0]]
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
+            halfedge[:, 1] = cidxmap[halfedge[:, 1]] 
 
-            halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+            # 更新粗化后单元的层数
             nlevel = np.zeros(NN, dtype=self.itype)
             nlevel[halfedge[:, 0]] = hlevel
             level = nlevel[isRNode] - 1
             level[level < 0] = 0
-            clevel = np.r_[clevel, level]
+            clevel = np.zeros(nc+nn, dtype=self.itype)
+            clevel[:nc] = self.celldata['level'][~isMarkedCell[:NC]]
+            clevel[nc:] = level 
+
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
             nex = halfedge[:, 2] # 当前半边的下一个半边编号
@@ -587,7 +601,6 @@ class HalfEdgeMesh(Mesh2d):
             # 下一个半边的前一个半边是当前半边
             halfedge[halfedge[flag, 2], 3], = np.nonzero(flag) 
 
-            nidxmap = np.zeros(NN, dtype=self.itype)
             # 标记进一步要移除的半边
             idx = np.arange(2*NE)
             flag = ~isMarkedHEdge
@@ -608,6 +621,7 @@ class HalfEdgeMesh(Mesh2d):
             NN -= nn + flag.sum()//2
 
             # 对节点重新编号
+            nidxmap = np.zeros(NN, dtype=self.itype)
             nidxmap[~isRNode] = range(NN)
             halfedge[:, 0] = nidxmap[halfedge[:, 0]]
 
@@ -628,14 +642,24 @@ class HalfEdgeMesh(Mesh2d):
 
             # 更新层信息
             self.halfedgedata['level'] = hlevel[~isMarkedHEdge] 
-            self.celldata['level'] = clevel[~isMarkedCell]
+            self.celldata['level'] = clevel
 
             # 更新节点和半边数据结构信息
             self.node = self.node[~isRNode]
-            self.ds.reinit(NN, NC-1, halfedge)
+            self.ds.reinit(NN, subdomain, halfedge)
+
+    def mark_helper(self, idx):
+        NC = self.number_of_cells()
+        flag = np.zeros(NC, dtype=np.bool)
+        flag[idx] = True
+        nc = self.number_of_all_cells() 
+        isMarkedCell = np.zeros(nc, dtype=np.bool)
+        isMarkedCell[self.ds.cflag] = flag
+        return isMarkedCell
+
 
     def refine_marker(self, eta, theta, method="L2"):
-        NC = len(self.ds.subdomain) 
+        NC = self.number_of_all_cells() 
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[self.ds.cflag] = mark(eta, theta, method=method)
         return isMarkedCell
@@ -673,6 +697,9 @@ class HalfEdgeMesh2dDataStructure():
         self.init(NN, subdomain, halfedge, NV)
 
     def init(self, NN, subdomain, halfedge, NV=None):
+
+        self.itype = halfedge.dtype
+
         self.NN = NN
         self.NE = len(halfedge)//2
         self.NF = self.NE
@@ -701,7 +728,6 @@ class HalfEdgeMesh2dDataStructure():
             assert NV == 3 or NV == 4
             self.NV = NV
 
-        self.itype = halfedge.dtype
 
     def number_of_all_cells(self):
         return len(self.subdomain)
@@ -710,7 +736,7 @@ class HalfEdgeMesh2dDataStructure():
         NC = self.number_of_all_cells() 
         halfedge = self.halfedge
         NV = np.zeros(NC, dtype=self.itype)
-        np.add.at(NV, halfedge[:, 1]], 1)
+        np.add.at(NV, halfedge[:, 1], 1)
         return NV
 
     def number_of_vertices_of_cells(self):
