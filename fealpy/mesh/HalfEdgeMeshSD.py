@@ -462,7 +462,8 @@ class HalfEdgeMesh(Mesh2d):
         # 细分单元
         flag = (hlevel - clevel[halfedge[:, 1]]) == 1
         N = halfedge.shape[0]
-        NV = self.ds.number_of_vertices_of_all_cells()
+        NV = np.zeros(NC, dtype=self.itype)
+        np.add.at(NV, halfedge[:, 1], flag)
         NHE = sum(NV[isMarkedCell])
         halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
         hlevel1 = np.zeros(2*NHE, dtype=self.itype)
@@ -480,7 +481,6 @@ class HalfEdgeMesh(Mesh2d):
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
         halfedge[idx0, 1] = range(NC, NC + NHE)
         clevel[isMarkedCell] += 1
-        clevel = np.r_['0', clevel[~isMarkedCell], clevel[cellidx]]
         
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
@@ -516,6 +516,7 @@ class HalfEdgeMesh(Mesh2d):
         halfedge1[NHE:, 5] = 0
         hlevel1[NHE:] = clevel[cellidx]
 
+        clevel = np.r_['0', clevel[~isMarkedCell], clevel[cellidx]]
         halfedge = np.r_['0', halfedge, halfedge1]
 
         flag = np.zeros(NC+NHE, dtype=np.bool)
@@ -541,6 +542,7 @@ class HalfEdgeMesh(Mesh2d):
         clevel = self.celldata['level']
 
         halfedge = self.ds.halfedge
+        subdomain = self.ds.subdomain
 
         # 可以移除的网格节点
         # 在理论上, 可以移除点周围的单元所属子区是相同的, TODO: make sure about it
@@ -597,6 +599,7 @@ class HalfEdgeMesh(Mesh2d):
             # 下一个半边的前一个半边是当前半边
             halfedge[halfedge[flag, 2], 3], = np.nonzero(flag) 
 
+            nidxmap = np.zeros(NN, dtype=self.itype)
             # 标记进一步要移除的半边
             idx = np.arange(2*NE)
             flag = ~isMarkedHEdge
@@ -617,7 +620,6 @@ class HalfEdgeMesh(Mesh2d):
             NN -= nn + flag.sum()//2
 
             # 对节点重新编号
-            nidxmap = np.zeros(NN, dtype=self.itype)
             nidxmap[~isRNode] = range(NN)
             halfedge[:, 0] = nidxmap[halfedge[:, 0]]
 
