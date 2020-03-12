@@ -15,12 +15,16 @@ class CVEMDof2d():
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
-    def boundary_dof(self):
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('edge', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
         edge2dof = self.edge_to_dof()
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True
+        isBdDof[edge2dof[idx]] = True
         return isBdDof
 
     def edge_to_dof(self):
@@ -258,7 +262,19 @@ class ConformingVirtualElementSpace2d():
         if p == 1:
             tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
             if cfun is None:
-                f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+                def f1(x):
+                    M = np.eye(x[1].shape[1])
+                    M -= x[0]@x[1]
+                    N = x[1].shape[1]
+                    A = np.zeros((N, N))
+                    idx = np.arange(N)
+                    A[idx, idx] = 2
+                    A[idx[:-1], idx[1:]] = -1
+                    A[idx[1:], idx[:-1]] = -1
+                    A[0, -1] = -1
+                    A[-1, 0] = -1
+                    return x[1].T@tG@x[1] + M.T@A@M
+                #f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
                 K = list(map(f1, zip(DD, PI1)))
             else:
                 cellbarycenter = self.smspace.cellbarycenter
@@ -365,8 +381,8 @@ class ConformingVirtualElementSpace2d():
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
 
-    def boundary_dof(self):
-        return self.dof.boundary_dof()
+    def boundary_dof(self, threshold=None):
+        return self.dof.boundary_dof(threshold=threshold)
 
     def basis(self, bc):
         pass
@@ -395,6 +411,19 @@ class ConformingVirtualElementSpace2d():
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f
+
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        p = self.p
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        end = NN + (p - 1)*NE
+        ipoints = self.interpolation_points()
+        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
+        uh[isDDof] = g(ipoints[isDDof[:end]])
+        return isDDof
 
     def interpolation(self, u, HB=None):
         """

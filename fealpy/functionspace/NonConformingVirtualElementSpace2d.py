@@ -16,12 +16,16 @@ class NCVEMDof2d():
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
-    def boundary_dof(self):
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('edge', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
         edge2dof = self.edge_to_dof()
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True
+        isBdDof[edge2dof[idx]] = True
         return isBdDof
 
     def edge_to_dof(self):
@@ -216,11 +220,24 @@ class NonConformingVirtualElementSpace2d():
         b = np.bincount(self.dof.cell2dof, weights=bb, minlength=gdof)
         return b
 
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        p = self.p
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        end = p*NE
+        ipoints = self.interpolation_points()
+        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
+        uh[isDDof] = g(ipoints[isDDof[:end]])
+        return isDDof
+
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
 
-    def boundary_dof(self):
-        return self.dof.boundary_dof()
+    def boundary_dof(self, threshold=None):
+        return self.dof.boundary_dof(threshold=threshold)
 
     def basis(self, bc):
         pass

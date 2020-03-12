@@ -1,6 +1,5 @@
 classdef TriangleMeshDataStructure < MeshDataStructure
     properties
-
         localFace = [
             2, 3, 1
             3, 1, 2]
