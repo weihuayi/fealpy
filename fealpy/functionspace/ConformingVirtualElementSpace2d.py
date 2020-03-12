@@ -378,6 +378,47 @@ class ConformingVirtualElementSpace2d():
         b = np.bincount(self.dof.cell2dof, weights=bb, minlength=gdof)
         return b
 
+    def chen_stability_term(self):
+        area = self.smspace.cellmeasure
+
+        p = self.p
+        G = self.G
+        D = self.D
+        PI1 = self.PI1
+
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        NC = len(cell2dofLocation) - 1
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+        tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+        def f1(x):
+            M = np.eye(x[1].shape[1])
+            M -= x[0]@x[1]
+            N = x[1].shape[1]
+            A = np.zeros((N, N))
+            idx = np.arange(N)
+            A[idx, idx] = 2
+            A[idx[:-1], idx[1:]] = -1
+            A[idx[1:], idx[:-1]] = -1
+            A[0, -1] = -1
+            A[-1, 0] = -1
+            return x[1].T@tG@x[1],  M.T@A@M
+        K = list(map(f1, zip(DD, PI1)))
+        f2 = lambda x: np.repeat(x, x.shape[0])
+        f3 = lambda x: np.tile(x, x.shape[0])
+        f4 = lambda x: x[0].flatten()
+        f5 = lambda x: x[1].flatten()
+
+        I = np.concatenate(list(map(f2, cd)))
+        J = np.concatenate(list(map(f3, cd)))
+        val0 = np.concatenate(list(map(f4, K)))
+        val1 = np.concatenate(list(map(f5, K)))
+        gdof = self.number_of_global_dofs()
+        A = csr_matrix((val0, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        S = csr_matrix((val1, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        return A, S
+
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
 
