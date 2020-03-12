@@ -394,7 +394,6 @@ class HalfEdgeMesh(Mesh2d):
 
         # 单元和半边的层标记信息
         clevel = self.celldata['level'] # 注意这里是所有的单元的层信息
-        print('clevel0:', clevel)
         hlevel = self.halfedgedata['level']
 
         halfedge = self.ds.halfedge
@@ -475,14 +474,13 @@ class HalfEdgeMesh(Mesh2d):
         idx0, = np.nonzero(flag0)
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
-
-        subdomain = np.r_['0', subdomain, subdomain[halfedge[flag0, 1]]]
+        subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
         
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
         halfedge[idx0, 1] = range(NC, NC + NHE)
         clevel[isMarkedCell] += 1
-        clevel1 = clevel[cellidx] # 单元层数加一
+        clevel = np.r_['0', clevel[~isMarkedCell], clevel[cellidx]]
         
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
@@ -520,15 +518,13 @@ class HalfEdgeMesh(Mesh2d):
 
         halfedge = np.r_['0', halfedge, halfedge1]
 
-        clevel = np.r_[clevel, clevel1]
-        print('clevel1:', clevel)
         flag = np.zeros(NC+NHE, dtype=np.bool)
-        np.add.at(flag, halfedge[:, 1], True)
+        flag[halfedge[:, 1]] = True
+
         idxmap = np.zeros(NC+NHE, dtype=self.itype)
-        NC = flag.sum()
-        idxmap[flag] = range(NC)
+        nc = flag.sum()
+        idxmap[flag] = range(nc)
         halfedge[:, 1] = idxmap[halfedge[:, 1]]
-        clevel = clevel[flag]
 
         self.halfedgedata['level'] = np.r_[hlevel, hlevel1]
         self.celldata['level'] = clevel
@@ -757,12 +753,13 @@ class HalfEdgeMesh2dDataStructure():
         halfedge = self.halfedge
         hflag = self.hflag
         cflag = self.cflag
+        cidxmap = self.cidxmap
 
         if return_sparse:
             val = np.ones(hflag.sum(), dtype=np.bool)
-            I = halfedge[hflag, 1]
+            I = cidxmap[halfedge[hflag, 1]]
             J = halfedge[hflag, 0]
-            cell2node = csr_matrix((val, (I.flat, J.flat)), shape=(NC, NN), dtype=np.bool)
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
             return cell2node
         elif type(self.NV) is np.ndarray: # polygon mesh
             cellLocation = np.zeros(NC+1, dtype=self.itype)

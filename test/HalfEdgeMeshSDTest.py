@@ -34,36 +34,29 @@ class HalfEdgeMeshTest:
         
         if False:
             NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[6] = True
-            mesh.refine_poly(isMarkedCell, dflag=False)
+            isMarkedCell = mesh.mark_helper([6]) 
+            mesh.refine_poly(isMarkedCell, dflag=True)
         
         if False:
             NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[3] = True
-            mesh.refine(isMarkedCell, dflag=False)
+            isMarkedCell = mesh.mark_helper([3]) 
+            mesh.refine_poly(isMarkedCell, dflag=False)
             
         if False:
             NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[1] = True
-            isMarkedCell[5] = True
-            mesh.refine(isMarkedCell, dflag=False)
+            isMarkedCell = mesh.mark_helper([1, 5]) 
+            mesh.refine_poly(isMarkedCell, dflag=False)
             
         if False:
             NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[1] = True
-            isMarkedCell[12] = True
-            mesh.refine(isMarkedCell, dflag=False)
+            isMarkedCell = mesh.mark_helper([1, 12]) 
+            mesh.refine_poly(isMarkedCell, dflag=False)
             
         if False:
             NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
-            isMarkedCell[0] = True
-            isMarkedCell[21] = True
-            mesh.refine(isMarkedCell, dflag=False)
+            isMarkedCell = mesh.mark_helper([0, 21]) 
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
             
         print("halfedge level:\n")
         for i, val in enumerate(mesh.halfedgedata['level']):
@@ -83,9 +76,9 @@ class HalfEdgeMeshTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
+            mesh.find_node(axes, showindex=True, multiindex=nindex)
             mesh.find_edge(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True, multiindex=cindex)
             plt.show()
         else:
             return mesh
@@ -261,7 +254,6 @@ class HalfEdgeMeshTest:
 
 
 test = HalfEdgeMeshTest()
-test.refine_poly_test()
 mesh = test.refine_poly_test(plot=True)
 #test.coarsen_poly_test(mesh, plot=True)
 #test.triangle_mesh_test(plot=True)
