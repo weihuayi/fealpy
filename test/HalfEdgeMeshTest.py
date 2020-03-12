@@ -129,6 +129,41 @@ class HalfEdgeMeshTest:
             mesh.find_cell(axes, showindex=True, multiindex=cindex)
             plt.show()
 
+    def advance_trimesh_test(self, plot=True):
+        node = np.array([
+            (-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0),
+            (-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)
+        ], dtype=np.float)
+        subdomain = np.array([-1, 0, 1], dtype=np.int)
+        halfedge = np.array([
+            (0, 2,  1,  3,  8, 1), #0
+            (1, 2,  2,  0,  9, 1), #1
+            (2, 2,  3,  1, 10, 1), #2
+            (3, 2,  0,  2, 11, 1), #3
+            (4, 2,  5,  7, 12, 1), #4
+            (7, 2,  6,  4, 13, 1), #5
+            (6, 2,  7,  5, 14, 1), #6
+            (5, 2,  4,  6, 15, 1), #7
+            (3, 1, 11,  9,  0, 0), #8
+            (0, 1,  8, 10,  1, 0), #9
+            (1, 1,  9, 11,  2, 0), #10
+            (2, 1, 10,  8,  3, 0), #11
+            (5, 0, 15, 13,  4, 0), #12
+            (4, 0, 12, 14,  5, 0), #13
+            (7, 0, 13, 15,  6, 0), #14
+            (6, 0, 14, 12,  7, 0)],#15
+            dtype=np.int)
+
+        mesh = HalfEdgeMesh(node, subdomain, halfedge)
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+
     def triangle_mesh_test(self, plot=False):
 
         node = np.array([
@@ -261,7 +296,10 @@ class HalfEdgeMeshTest:
 
 
 test = HalfEdgeMeshTest()
-mesh = test.refine_poly_test(plot=False)
-test.coarsen_poly_test(mesh, plot=True)
+if False:
+    mesh = test.refine_poly_test(plot=False)
+    test.coarsen_poly_test(mesh, plot=True)
+
+test.advance_trimesh_test()
 #test.triangle_mesh_test(plot=True)
 #test.voronoi_test(plot=True)

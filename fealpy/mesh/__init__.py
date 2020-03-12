@@ -9,7 +9,7 @@ This module provide mesh
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
-from .HalfEdgeMeshSD import HalfEdgeMesh
+from .HalfEdgeMesh import HalfEdgeMesh
 from .HalfEdgeDomain import HalfEdgeDomain
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
