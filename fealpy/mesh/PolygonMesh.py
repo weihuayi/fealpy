@@ -315,7 +315,7 @@ class PolygonMeshDataStructure():
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         NE = self.NE
         NC = self.NC
 
@@ -323,7 +323,7 @@ class PolygonMeshDataStructure():
         cell = self.cell
         cellLocation = self.cellLocation
 
-        if sparse:
+        if return_sparse:
             J = np.arange(NE)
             val = np.ones((NE,), dtype=np.bool)
             cell2edge = coo_matrix((val, (edge2cell[:,0], J)), shape=(NC, NE), dtype=np.bool)
@@ -335,13 +335,13 @@ class PolygonMeshDataStructure():
             cell2edge[cellLocation[edge2cell[:, 1]] + edge2cell[:, 3]] = range(NE)
             return cell2edge
 
-    def cell_to_edge_sign(self, sparse=True):
+    def cell_to_edge_sign(self, return_sparse=True):
         NE = self.NE
         NC = self.NC
         edge2cell = self.edge2cell
         cell = self.cell
         cellLocation = self.cellLocation
-        if sparse:
+        if return_sparse:
             val = np.ones((NE,), dtype=np.bool)
             cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool)
             return cell2edgeSign
@@ -365,34 +365,34 @@ class PolygonMeshDataStructure():
                 shape=(NC,NC), dtype=np.bool)
         return cell2cell.tocsr()
 
-    def edge_to_node(self, sparse=False):
+    def edge_to_node(self, return_sparse=False):
         NN = self.NN
         NE = self.NE
 
         edge = self.edge
-        if sparse == False:
-            return edge
-        else:
+        if return_sparse:
             val = np.ones((NE,), dtype=np.bool)
             edge2node = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, NN), dtype=np.bool)
             edge2node+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, NN), dtype=np.bool)
             return edge2node.tocsr()
+        else:
+            return edge
 
     def edge_to_edge(self):
         edge2node = self.edge_to_node()
         return edge2node*edge2node.tranpose()
 
-    def edge_to_cell(self, sparse=False):
+    def edge_to_cell(self, return_sparse=False):
         NE = self.NE
         NC = self.NC
         edge2cell = self.edge2cell
-        if sparse == False:
-            return edge2cell
-        else:
+        if return_sparse:
             val = np.ones(NE, dtype=np.bool)
             edge2cell = coo_matrix((val, (range(NE), edge2cell[:,0])), shape=(NE, NC), dtype=np.bool)
             edge2cell+= coo_matrix((val, (range(NE), edge2cell[:,1])), shape=(NE, NC), dtype=np.bool)
             return edge2cell.tocsr()
+        else:
+            return edge2cell
 
     def node_to_node(self):
         NN = self.NN
@@ -420,7 +420,6 @@ class PolygonMeshDataStructure():
     def node_to_cell(self):
         NN = self.NN
         NC = self.NC
-        NE = self.NE
 
         cell = self.cell
         NV = self.number_of_vertices_of_cells()
@@ -439,9 +438,9 @@ class PolygonMeshDataStructure():
         val = np.ones(n, dtype=np.bool)
         m0 = csr_matrix((val, (range(n), bdEdge[:, 0])), shape=(n, NN), dtype=np.bool)
         m1 = csr_matrix((val, (range(n), bdEdge[:, 1])), shape=(n, NN), dtype=np.bool)
-        _, pre = (m0*m1.T).nonzero()
-        _, nex = (m1*m0.T).nonzero()
-        return index[pre], index[nex]
+        _, nex = (m0*m1.T).nonzero()
+        _, pre = (m1*m0.T).nonzero()
+        return index[nex], index[pre]
 
 
     def boundary_node_flag(self):
@@ -453,7 +452,6 @@ class PolygonMeshDataStructure():
         return isBdNode
 
     def boundary_edge_flag(self):
-        NE = self.NE
         edge2cell = self.edge2cell
         return edge2cell[:,0] == edge2cell[:,1]
 

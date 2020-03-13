@@ -14,7 +14,6 @@ class HalfEdgeDomainTest:
         pass
 
     def square_domain_test(self, plot=True):
-
         node = np.array([
             (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
         halfedge = np.array([
@@ -28,19 +27,6 @@ class HalfEdgeDomainTest:
             (3, 1, 6, 4, 3, 0)], dtype=np.int)
 
         domain = HalfEdgeDomain(node, halfedge, NS=1)
-        mesh = HalfEdgeMesh(node, halfedge, 1)
-
-        np.random.seed(0)
-        points = np.random.rand(10,2)
-        vor = Voronoi(points)
-        rp = vor.ridge_points
-        rv = np.array(vor.ridge_vertices)
-        isInfVertices = rv[:, 0] == -1
-        print('ridge_points:\n', rp[isInfVertices])
-        print('ridge_vertices:\n', rv[isInfVertices])
-
-        mesh = domain.create_finite_voronoi(points)
-
 
         if plot:
             fig = plt.figure()
@@ -51,7 +37,46 @@ class HalfEdgeDomainTest:
             mesh.find_node(axes, node=vor.vertices, color='b', showindex=True)
             plt.show()
 
+    def advance_trimesh_test(self, plot=True):
+        vertices = np.array([
+            (-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0),
+            (-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)
+            ], dtype=np.float)
+        halfedge = np.array([
+            (0, 1,  1,  3,  8, 1), #0
+            (1, 1,  2,  0,  9, 1), #1
+            (2, 1,  3,  1, 10, 1), #2
+            (3, 1,  0,  2, 11, 1), #3
+            (4, 1,  5,  7, 12, 1), #4
+            (7, 1,  6,  4, 13, 1), #5
+            (6, 1,  7,  5, 14, 1), #6
+            (5, 1,  4,  6, 15, 1), #7
+            (3, 0, 11,  9,  0, 0), #8
+            (0, 0,  8, 10,  1, 0), #9
+            (1, 0,  9, 11,  2, 0), #10
+            (2, 0, 10,  8,  3, 0), #11
+            (5, -1, 15, 13,  4, 0), #12
+            (4, -1, 12, 14,  5, 0), #13
+            (7, -1, 13, 15,  6, 0), #14
+            (6, -1, 14, 12,  7, 0)],#15
+            dtype=np.int)
+
+        domain = HalfEdgeDomain(vertices, halfedge)
+        for i in range(4):
+            isMarkedHEdge= (domain.halfedge[:, 1] == 0)
+            domain.halfedge_adaptive_refine(isMarkedHEdge)
+        
+        for i in range(6):
+            isMarkedHEdge= (domain.halfedge[:, 1] == -1)
+            domain.halfedge_adaptive_refine(isMarkedHEdge)
+
+        mesh = domain.to_halfedgemesh()
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes, markersize=1)
+            plt.show()
 
 
 test = HalfEdgeDomainTest()
-test.square_domain_test()
+test.advance_trimesh_test()

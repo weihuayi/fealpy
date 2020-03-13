@@ -157,10 +157,10 @@ def show_halfedge_mesh(axes, mesh,
         axes.set_axis_off()
     else:
         axes.set_axis_on()
+
     node = mesh.entity('node')
     halfedge = mesh.entity('halfedge')
 
-    axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
 
     p1 = node[halfedge[:, 0]]
     p0 = node[halfedge[halfedge[:, 4], 0]]
@@ -176,35 +176,37 @@ def show_halfedge_mesh(axes, mesh,
     p1 = ec + v/2.0
     
     ec += 0.04*v@w
+    h = np.sqrt(np.sum(v**2, axis=-1))
+
+    axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
 
     NE = p0.shape[0]
     for i in range(NE):
         if halfedge[i, 5] == 1:
             axes.arrow(
                 p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
-                shape='right', linewidth=linewidth, 
-                color=edgecolor[0], width=0.01, head_length=0.02)
+                shape='right', linewidth=h[i]*linewidth, 
+                color=edgecolor[0], width=0.01*h[i], head_length=0.02*h[i])
         else:
             axes.arrow(
                 p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
-                shape='right', linewidth=linewidth,
-                color=edgecolor[1], width=0.01, head_length=0.02)
+                shape='right', linewidth=h[i]*linewidth,
+                color=edgecolor[1], width=0.01*h[i], head_length=0.02*h[i])
 
-    for i in range(NE):
-        if halfedge[i, 5] == 1:
-            axes.text(
-                    ec[i, 0], ec[i, 1],
-                    str(i),
-                    multialignment='center',
-                    fontsize=fontsize, color=edgecolor[0])
-        else:
-            axes.text(
-                    ec[i, 0], ec[i, 1],
-                    str(i),
-                    multialignment='center',
-                    fontsize=fontsize, color=edgecolor[1])
-    #axes.quiver(p0[:, 0], p0[:, 1], v[:, 0], v[:, 1], 
-    #    scale_units='xy', scale=1, angles='xy', linewidth=linewidth)
+    if showindex:
+        for i in range(NE):
+            if halfedge[i, 5] == 1:
+                axes.text(
+                        ec[i, 0], ec[i, 1],
+                        str(i),
+                        multialignment='center',
+                        fontsize=fontsize, color=edgecolor[0])
+            else:
+                axes.text(
+                        ec[i, 0], ec[i, 1],
+                        str(i),
+                        multialignment='center',
+                        fontsize=fontsize, color=edgecolor[1])
 
 
 def show_mesh_1d(

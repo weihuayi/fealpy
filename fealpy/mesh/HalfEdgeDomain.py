@@ -8,7 +8,6 @@ from .HalfEdgeMesh import HalfEdgeMesh
 class HalfEdgeDomain():
     def __init__(self, vertices, halfedge, NS=None):
         """
-
         Parameters
         ---------- 
         vertices :  np.ndarray, (NV, GD)
@@ -44,6 +43,149 @@ class HalfEdgeDomain():
 
     def geo_dimension(self):
         return self.vertices.shape[1]
+
+    def top_dimension(self):
+        return 2
+
+    def to_halfedgemesh(self):
+        node = self.vertices.copy()
+        halfedge = self.halfedge.copy()
+        subdomain, _, j = np.unique(halfedge[:, 1],
+            return_index=True, return_inverse=True)
+        halfedge[:, 1] = j
+        mesh = HalfEdgeMesh(node, subdomain, halfedge)
+        return mesh
+
+    def advance_triangle_mesh(self):
+
+        # 初始网格点的数量
+        NN = self.NV
+        NE = self.NE
+
+        # 估计网格点和半边的数量, 分配空间
+        node = np.zeros((10000, 2), dtype=self.ftype)
+        halfedge = np.zeros((20000, 6), dtype=self.itype)
+
+        node[:NN] = self.vertices
+        halfedge[:NE] = self.halfedge
+        
+        
+    def halfedge_adaptive_refine(self, isMarkedHEdge,
+        vertices=None, halfedge=None, edgecenter=None):
+
+        inplace = True
+        itype = self.itype
+
+        if (vertices is not None) and (halfedge is not None):
+            inplace = False
+            itype = halfedge.dtype
+
+        if inplace:
+            NE = self.NE
+            NV = self.NV
+            vertices = self.vertices
+            halfedge = self.halfedge
+        else:
+            NE = len(halfedge)
+            NV = len(vertices)
+
+        isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
+        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
+        flag0 = isMainHEdge & isMarkedHEdge
+        idx = halfedge[flag0, 4]
+        if edgecenter is None:
+            ec = (vertices[halfedge[flag0, 0]] + vertices[halfedge[idx, 0]])/2
+        else:
+            ec = edgecenter
+
+        NE1 = 2*len(ec)
+
+        halfedge1 = np.zeros((NE1, 6), dtype=itype)
+        flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
+        halfedge1[flag1, 0] = range(NV, NV+NE1//2) # 新的节点编号
+        idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
+        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
+
+        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
+        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
+        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
+
+        halfedge[isMarkedHEdge, 3] = range(NE, NE + NE1)
+        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+        halfedge = np.r_['0', halfedge, halfedge1]
+        halfedge[halfedge[:, 3], 2] = range(NE+NE1)
+
+        if inplace: 
+            self.halfedge = halfedge
+            self.vertices = np.r_['0', vertices, ec] 
+            self.NV += NE1//2
+            self.NE += NE1 
+        else:
+            return ec, halfedge
+
+    def halfedge_uniform_refine(self, n=1, vertices=None, halfedge=None):
+        inplace = True
+        itype = self.itype
+        ftype = self.ftype
+
+        if (vertices is not None) and (halfedge is not None):
+            inplace = False
+            itype = halfedge.dtype
+            ftype = vertices.dtype
+
+        for i in range(n):
+            if inplace:
+                NE = self.NE
+                NV = self.NV
+                vertices = self.vertices
+                halfedge = self.halfedge
+            else:
+                NE = len(halfedge)
+                NV = len(vertices)
+            
+            # 求中点
+            isMainHEdge = halfedge[:, 5] == 1
+            idx = halfedge[isMainHEdge, 4]
+            ec = (vertices[halfedge[isMainHEdge, 0]] + vertices[halfedge[idx, 0]])/2
+
+            #细分边
+            halfedge1 = np.zeros((NE, 6), dtype=itype)
+            halfedge1[isMainHEdge, 0] = range(NV, NV + NE//2) # 新的节点编号
+            idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
+            halfedge1[~isMainHEdge, 0] = halfedge1[isMainHEdge, 0][idx0] # 按照排序
+
+            halfedge1[:, 1] = halfedge[:, 1]
+            halfedge1[:, 3] = halfedge[:, 3] # 前一个 
+            halfedge1[:, 4] = halfedge[:, 4] # 对偶边
+            halfedge1[:, 5] = halfedge[:, 5] # 主边标记
+
+            halfedge[:, 3] = range(NE, 2*NE)
+            idx = halfedge[:, 4] # 原始对偶边
+            halfedge[:, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+            vertices = np.r_['0', vertices, ec]
+            halfedge = np.r_['0', halfedge, halfedge1]
+            halfedge[halfedge[:, 3], 2] = range(2*NE)
+
+            if inplace: 
+                self.halfedge = halfedge
+                self.vertices = vertices 
+                self.NV += NE//2
+                self.NE *= 2
+            else:
+                return vertices, halfedge
+
+    def number_of_vertices(self):
+        return self.NV
+    
+    def number_of_halfedges(self):
+        return self.NE
+    
+    def number_of_subdomains(self):
+        return self.NS
 
     def create_finite_voronoi(self, points):
         """
@@ -278,124 +420,3 @@ class HalfEdgeDomain():
             return isIntersect, p0 + s*t.reshape(-1, 1)
         else:
             return isIntersect
-        
-
-    def halfedge_adaptive_refine(self, isMarkedHEdge,
-        vertices=None, halfedge=None, edgecenter=None):
-
-        inplace = True
-        itype = self.itype
-        ftype = self.ftype
-
-        if (vertices is not None) and (halfedge is not None):
-            inplace = False
-            itype = halfedge.dtype
-            ftype = vertices.dtype
-
-        if inplace:
-            NE = self.NE
-            NV = self.NV
-            vertices = self.vertices
-            halfedge = self.halfedge
-        else:
-            NE = len(halfedge)
-            NV = len(vertices)
-
-        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
-        flag0 = isMainHEdge & isMarkedHEdge
-        idx = halfedge[flag0, 4]
-        if edgecenter is None:
-            ec = (vertices[halfedge[flag0, 0]] + vertices[halfedge[idx, 0]])/2
-        else:
-            ec = edgecenter
-
-        NE1 = 2*len(ec)
-
-        halfedge1 = np.zeros((NE1, 6), dtype=itype)
-        flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
-        halfedge1[flag1, 0] = range(NV, NV+NE1//2) # 新的节点编号
-        idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
-        halfedge1[~flag1, 0] = halfedge1[flag1, 0][idx0] # 按照排序
-
-        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
-        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
-        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
-        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
-
-        halfedge[isMarkedHEdge, 3] = range(NE, NE + NE1)
-        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
-        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
-
-        halfedge = np.r_['0', halfedge, halfedge1]
-        halfedge[halfedge[:, 3], 2] = range(NE+NE1)
-
-        if inplace: 
-            self.halfedge = halfedge
-            self.vertices = np.r_['0', vertices, ec] 
-            self.NV += NE1//2
-            self.NE += NE1 
-        else:
-            return ec, halfedge
-
-    def halfedge_uniform_refine(self, n=1, vertices=None, halfedge=None):
-        inplace = True
-        itype = self.itype
-        ftype = self.ftype
-
-        if (vertices is not None) and (halfedge is not None):
-            inplace = False
-            itype = halfedge.dtype
-            ftype = vertices.dtype
-
-        for i in range(n):
-
-            if inplace:
-                NE = self.NE
-                NV = self.NV
-                vertices = self.vertices
-                halfedge = self.halfedge
-            else:
-                NE = len(halfedge)
-                NV = len(vertices)
-            
-            # 求中点
-            isMainHEdge = halfedge[:, 5] == 1
-            idx = halfedge[isMainHEdge, 4]
-            ec = (vertices[halfedge[isMainHEdge, 0]] + vertices[halfedge[idx, 0]])/2
-
-            #细分边
-            halfedge1 = np.zeros((NE, 6), dtype=itype)
-            halfedge1[isMainHEdge, 0] = range(NV, NV + NE//2) # 新的节点编号
-            idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
-            halfedge1[~isMainHEdge, 0] = halfedge1[isMainHEdge, 0][idx0] # 按照排序
-
-            halfedge1[:, 1] = halfedge[:, 1]
-            halfedge1[:, 3] = halfedge[:, 3] # 前一个 
-            halfedge1[:, 4] = halfedge[:, 4] # 对偶边
-            halfedge1[:, 5] = halfedge[:, 5] # 主边标记
-
-            halfedge[:, 3] = range(NE, 2*NE)
-            idx = halfedge[:, 4] # 原始对偶边
-            halfedge[:, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
-
-            vertices = np.r_['0', vertices, ec]
-            halfedge = np.r_['0', halfedge, halfedge1]
-            halfedge[halfedge[:, 3], 2] = range(2*NE)
-
-            if inplace: 
-                self.halfedge = halfedge
-                self.vertices = vertices 
-                self.NV += NE//2
-                self.NE *= 2
-            else:
-                return vertices, halfedge
-
-    def number_of_vertices(self):
-        return self.NV
-    
-    def number_of_halfedges(self):
-        return self.NE
-    
-    def number_of_subdomains(self):
-        return self.NS
-

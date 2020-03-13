@@ -15,7 +15,8 @@ from .mesh_tools import show_halfedge_mesh
 #  n: n >= 1, 表示编号为  n 的内部子区域
 
 class HalfEdgeMesh(Mesh2d):
-    def __init__(self, node, subdomain, halfedge, NV=None):
+    def __init__(self, node, subdomain, halfedge,
+        NV=None, nodedim=None):
         """
         Parameters
         ----------
@@ -44,6 +45,12 @@ class HalfEdgeMesh(Mesh2d):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+
+        # 网格节点的维数标记数组
+        # 0: 固定点
+        # 1: 边界上的点
+        # 2: 区域内部的点
+        self.node['dim'] = nodedim 
 
         self.init_level_info()
 
@@ -101,7 +108,6 @@ class HalfEdgeMesh(Mesh2d):
 
     @classmethod
     def from_mesh(cls, mesh, meshtype='polygon'):
-        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
@@ -115,7 +121,7 @@ class HalfEdgeMesh(Mesh2d):
         sign = mesh.ds.cell_to_edge_sign()
         cell2edgeSign = np.zeros((NC, NV), dtype=mesh.itype)
         cell2edgeSign[~sign] = NE
-        nex, pre = mesh.ds.boundary_edge_to_edge()
+        nex, _ = mesh.ds.boundary_edge_to_edge()
 
         halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
 
@@ -125,9 +131,9 @@ class HalfEdgeMesh(Mesh2d):
         halfedge[NE:, 0] = edge[:, 0]
 
         # 指向的单元
-        halfedge[:NE, 1] = edge2cell[:, 0]
-        halfedge[NE:, 1] = edge2cell[:, 1]
-        halfedge[NE:, 1][~isInEdge] = NC
+        halfedge[:NE, 1] = edge2cell[:, 0]+1
+        halfedge[NE:, 1] = edge2cell[:, 1]+1
+        halfedge[NE:, 1][~isInEdge] = 0 
 
         # 下一条边
         idx = cell2edge[edge2cell[:, 0], (edge2cell[:, 2]+1)%NV]
@@ -150,7 +156,7 @@ class HalfEdgeMesh(Mesh2d):
         halfedge[:NE, 5] = 1
 
         subdomain = np.ones(NC+1, dtype=halfedge.dtype)
-        subdomain[-1] = 0
+        subdomain[0] = 0
 
         if meshtype == 'polygon':
             return cls(node, subdomain, halfedge)
@@ -160,16 +166,15 @@ class HalfEdgeMesh(Mesh2d):
     @classmethod
     def from_polygonmesh(cls, mesh):
         NC = mesh.number_of_cells()
-        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NV = mesh.number_of_vertices_of_cells()
 
         node = mesh.entity('node')
         edge = mesh.entity('edge')
-        cell, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        _, cellLocation = mesh.entity('cell')
+        cell2edge = mesh.ds.cell_to_edge()
         edge2cell = mesh.ds.edge_to_cell()
-        cell2edgeSign = mesh.ds.cell_to_edge_sign(sparse=False)
+        cell2edgeSign = mesh.ds.cell_to_edge_sign()
         cell2edgeSign[cell2edgeSign==1] = 0
         cell2edgeSign[cell2edgeSign==-1] = NE
 
@@ -183,9 +188,9 @@ class HalfEdgeMesh(Mesh2d):
         halfedge[NE:, 0] = edge[:, 0]
 
         # 指向的单元
-        halfedge[:NE, 1] = edge2cell[:, 0]
-        halfedge[NE:, 1] = edge2cell[:, 1]
-        halfedge[NE:, 1][~isInEdge] = NC
+        halfedge[:NE, 1] = edge2cell[:, 0]+1
+        halfedge[NE:, 1] = edge2cell[:, 1]+1
+        halfedge[NE:, 1][~isInEdge] = 0 
 
         # 在指向单元中的下一条边
         idx = cellLocation[edge2cell[:, 0]] + (edge2cell[:, 2] + 1)%NV[edge2cell[:,  0]]
@@ -211,7 +216,7 @@ class HalfEdgeMesh(Mesh2d):
         halfedge[:NE, 5] = 1
 
         subdomain = np.ones(NC+1, dtype=np.int)
-        subdomain[-1] = 0
+        subdomain[0] = 0
         return cls(node, subdomain, halfedge)
 
     def entity(self, etype=2):
@@ -317,9 +322,6 @@ class HalfEdgeMesh(Mesh2d):
         index = index if index is not None else np.s_[:]
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
-
-    def advance_trimesh(self):
-        pass
 
     def refine_tri(self, isMarkedCell):
         """
