@@ -276,8 +276,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        NE = mesh.number_of_edges()
-        NV = mesh.number_of_vertices_of_cells()
 
         area = self.smspace.cellmeasure # 单元面积
         ch = self.smspace.cellsize # 单元尺寸 
@@ -298,9 +296,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             idx = self.smspace.index1(p=p-2)
             x = idx['x']
             y = idx['y']
-            c = np.repeat(range(2, p), range(2, p))
-            M02[:, y[0], y[0]] += area[:, None]*y[1]/c
-            M12[:, x[0], x[1]] -= area[:, None]*x[1]/c
+            c = np.repeat(range(1, p), range(1, p))
+            idx = np.arange(idof)
+            M02[:, y[0], idx] = area[:, None]*y[1]/c[y[0]]
+            M12[:, x[0], idx] = -area[:, None]*x[1]/c[x[0]]
 
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -351,14 +350,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             np.subtract.at(M01, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
             np.subtract.at(M11, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
             
-            
-        print('M00:', M00)
-        print('M01:', M01)
-        print('M02:', M02)
-        print('M10:', M10)
-        print('M11:', M11)
-        print('M12:', M12)
-
         return [[M00, M01, M02], [M10, M11, M12]]
 
     def matrix_R_J(self):
@@ -369,8 +360,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        NE = mesh.number_of_edges()
-        NV = mesh.number_of_vertices_of_cells()
 
         area = self.smspace.cellmeasure # 单元面积
         ch = self.smspace.cellsize # 单元尺寸 
@@ -430,13 +419,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             R12[:, xy[0], :] -= 0.5*xy[1][None, :, None]*self.M[0][2]
             R12 /= area[:, None, None]
             
-        print('R00\n', R00)
-        print('R01\n', R01)
-        print('R02\n', R02)
-        print('R10\n', R10)
-        print('R11\n', R11)
-        print('R12\n', R12)
-
         node = mesh.entity('node')
         edge = mesh.entity('edge')
         n = mesh.edge_unit_normal()
@@ -555,8 +537,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         J0[y[0], :] -= y[1][:, None]*self.M[1][0]/h
         J1[x[0], :] -= x[1][:, None]*self.M[0][1]/h
         J1[y[0], :] -= y[1][:, None]*self.M[1][1]/h
-        print('J0:', J0)
-        print('J1:', J1)
 
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
         if p > 2:
@@ -568,8 +548,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(J0, (np.s_[:], idx0), val)
         val = np.einsum('ijk, i->jik', F0, n[:, 1])
         np.add.at(J1, (np.s_[:], idx0), val)
-        print('J0:', J0)
-        print('J1:', J1)
 
         if isInEdge.sum() > 0:
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)

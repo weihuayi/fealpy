@@ -47,6 +47,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         cell2edge = mesh.ds.cell_to_edge()
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         print(uspace.smspace.index2(p=5))
+        print(uspace.smspace.index1(p=5))
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
 
