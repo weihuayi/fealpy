@@ -60,7 +60,7 @@ $ pip3 install -U meshio
 > python setup_win.py develop 
 > pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
 > pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
-> pip install vtk
+> conda install -c anaconda vtk 
 ```
 
 ## Mac
@@ -83,6 +83,7 @@ $ git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
 $ python setup_mac.py develop 
 $ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
 $ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
+$ conda install -c anaconda vtk
 ```
 
 # Debug in python 
