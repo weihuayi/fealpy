@@ -60,11 +60,12 @@ $ pip3 install -U meshio
 > python setup_win.py develop 
 > pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
 > pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
+> pip install vtk
 ```
 
 ## Mac
 1. Download and install latest Anaconda for macOS. https://www.anaconda.com/distribution/
-2. Download and insall latest Git for Windows, https://git-scm.com/download/mac.
+2. Download and insall latest Git for Mac, https://git-scm.com/download/mac.
 3. Open command terminal and config your name and email information for git. 
 ```
 $ git config --global user.name "Your Name"
