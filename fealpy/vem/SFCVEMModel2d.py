@@ -58,6 +58,96 @@ class SFCVEMModel2d():
             raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
         return S
 
+    def recover_estimate(self, uh=None, rtype='simple', residual=True,
+            returnsup=False):
+        """
+        estimate the recover-type error
+
+        Parameters
+        ----------
+        self : PoissonVEMModel object
+        rtype : str
+            'simple':
+            'area'
+            'inv_area'
+
+        See Also
+        --------
+
+        Notes
+        -----
+
+        """
+        space = self.space
+        mesh = space.mesh
+        NC = mesh.number_of_cells()
+        NV = mesh.number_of_vertices_of_cells()
+        cell = mesh.entity('cell')
+        barycenter = space.smspace.barycenter
+
+        h = space.smspace.h
+        area = space.smspace.area
+        ldof = space.smspace.number_of_local_dofs()
+
+        # project the vem solution into linear polynomial space
+        idx = np.repeat(range(NC), NV)
+        if uh is None:
+            S = self.space.project_to_smspace(self.uh)
+        else:
+            S = self.space.project_to_smspace(uh)
+
+        grad = S.grad_value(barycenter)
+        S0 = space.smspace.function()
+        S1 = space.smspace.function()
+        n2c = mesh.ds.node_to_cell()
+        if rtype is 'simple':
+            d = n2c.sum(axis=1)
+            ruh = np.asarray((n2c@grad)/d.reshape(-1, 1))
+        elif rtype is 'area':
+            d = n2c@area
+            ruh = np.asarray((n2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
+        elif rtype is 'inv_area':
+            d = n2c@(1/area)
+            ruh = np.asarray((n2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
+        else:
+            raise ValueError("I have note code method: {}!".format(rtype))
+
+        for i in range(ldof):
+            S0[i::ldof] = np.bincount(
+                    idx,
+                    weights=self.space.B[i, :]*ruh[cell, 0],
+                    minlength=NC)
+            S1[i::ldof] = np.bincount(
+                    idx,
+                    weights=self.space.B[i, :]*ruh[cell, 1],
+                    minlength=NC)
+
+
+        node = mesh.node
+        gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
+        gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
+        eta = k*np.bincount(idx, weights=gx**2+gy**2)/NV*area
+
+        if residual is True:
+            fh = space.integralalg.fun_integral(self.pde.source, True)/self.area
+            g0 = S0.grad_value(barycenter)
+            g1 = S1.grad_value(barycenter)
+            eta += (fh + (g0[:, 0] + g1[:, 1]))**2*area**2
+
+        if returnsup is True:
+            def f(x, cellidx):
+                g = self.pde.gradient(x)
+                val = (
+                        (g[..., 0] - S0.value(x, cellidx))**2 +
+                        (g[..., 1] - S1.value(x, cellidx))**2
+                    )
+                return val
+            e = space.integralalg.integral(f, True)
+        if returnsup is False:
+            return np.sqrt(eta)
+        else:
+            return np.sqrt(eta), np.sqrt(np.sum(e))
+
     def residual_estimator(self, withpsi=False):
 
         mesh = self.mesh

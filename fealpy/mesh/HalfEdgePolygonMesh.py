@@ -53,9 +53,9 @@ class HalfEdgePolygonMesh(Mesh2d):
         node = mesh.entity('node')
         edge = mesh.entity('edge')
         cell, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
         edge2cell = mesh.ds.edge_to_cell()
-        cell2edgeSign = mesh.ds.cell_to_edge_sign(sparse=False)
+        cell2edgeSign = mesh.ds.cell_to_edge_sign(return_sparse=False)
         cell2edgeSign[cell2edgeSign==1] = 0
         cell2edgeSign[cell2edgeSign==-1] = NE
 
