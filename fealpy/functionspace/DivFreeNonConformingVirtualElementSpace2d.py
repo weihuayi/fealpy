@@ -52,7 +52,7 @@ class DFNCVEMDof2d():
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         NC = mesh.number_of_cells()
 
@@ -178,8 +178,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [self.R[1][0][:, s], self.R[1][1][:, s]],
                 [self.J[0][:, s], self.J[1][:, s]]])
             PI = inv(G)@R
-            print('G:\n', G)
-            print('R:\n', R)
             return PI
         PI0 = list(map(f, range(NC)))
         return PI0
