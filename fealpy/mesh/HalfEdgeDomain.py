@@ -60,6 +60,7 @@ class HalfEdgeDomain():
 
         # 初始网格点的数量
         NN = self.NV
+        # 初始半边数
         NE = self.NE
 
         # 估计网格点和半边的数量, 分配空间
