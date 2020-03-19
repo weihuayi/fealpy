@@ -45,13 +45,17 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         cell, cellLocation = mesh.entity('cell')
         edge = mesh.entity('edge')
         cell2edge = mesh.ds.cell_to_edge()
+        bc = mesh.entity_barycenter('edge')
+        print("edge:", edge)
+        print("cell2edge:", cell2edge)
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
+        print("up:", up)
         up = uspace.project_to_smspace(up)
+        print("ups:", up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
-        print(error)
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -77,6 +81,6 @@ def u3(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
-test.project_test(u2, p=2, mtype=0, plot=False)
+test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
