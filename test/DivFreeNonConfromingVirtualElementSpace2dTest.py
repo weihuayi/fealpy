@@ -105,7 +105,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         from scipy.sparse import bmat
         from fealpy.pde.Stokes_Model_2d import CosSinData
         from fealpy.mesh.simple_mesh_generator import triangle
-        h = 0.1
+        h = 0.4
         pde = CosSinData()
         domain = pde.domain()
         error = np.zeros((maxit,), dtype=np.float)
@@ -234,4 +234,4 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix_P()
 #test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
-test.stokes_equation_test()
+test.stokes_equation_test(p=5)

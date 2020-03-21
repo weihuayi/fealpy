@@ -74,16 +74,16 @@ class IntervalMesh():
     def top_dimension(self):
         return 1
 
-    def entity_measure(self, etype=1, index=None):
+    def entity_measure(self, etype=1, index=None, node=None):
         if etype in {1, 'cell', 'face', 'edge'}:
-            return self.cell_length(index=index)
+            return self.cell_length(index=index, node=None)
         elif etype in {0, 'node'}:
             return 0
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_barycenter(self, etype=1, index=None):
-        node = self.entity('node')
+    def entity_barycenter(self, etype=1, index=None, node=None):
+        node = self.entity('node') if node is None else node
         index = index if index is not None else np.s_[:]
         if etype in {1, 'cell', 'face', 'edge'}:
             cell = self.ds.cell
@@ -94,31 +94,31 @@ class IntervalMesh():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-    def cell_length(self, index=None):
-        node = self.node
+    def cell_length(self, index=None, node=None):
+        node = self.node if node is None else node
         cell = self.ds.cell
         GD = self.geo_dimension()
         index = index if index is not None else np.s_[:]
         return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2,
                         axis=-1))
 
-    def bc_to_point(self, bc, index=None):
-        node = self.node
+    def bc_to_point(self, bc, index=None, node=None):
+        node = self.node if node is None else node
         cell = self.ds.cell
         index = index if index is not None else np.s_[:]
         p = np.einsum('...j, ij->...i', bc, node[cell[index]])
         return p
 
-    def cell_normal(self, index=None):
+    def cell_normal(self, index=None, node=None):
         GD = self.geo_dimension()
         if GD != 2:
             raise ValueError('cell_tagent just work for 2D Case')
-        v = self.cell_tangent(index=index)
+        v = self.cell_tangent(index=index, node=node)
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
-    def cell_tangent(self, index=None):
-        node = self.node
+    def cell_tangent(self, index=None, node=None):
+        node = self.node if node is None else node
         cell = self.ds.cell
         index = index if index is not None else np.s_[:]
         v = node[cell[index, 1]] - node[cell[index, 0]]
