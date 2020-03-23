@@ -43,5 +43,7 @@ class ClippedVoronoiTest():
             cs = [axes.add_artist(plt.Circle(x, r, facecolor='none', edgecolor='r')) for x, r in zip(node, nh)]
             plt.show()
 
+    def he_voronoi_test(plot=True):
+
 test = ClippedVoronoiTest()
 test.voronoi_test()

@@ -78,5 +78,37 @@ class HalfEdgeDomainTest:
             plt.show()
 
 
+    def voronoi_test(self, plot=True):
+        node = np.array([
+            (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
+        halfedge = np.array([
+            (1, 1, 1, 3, 4, 1),
+            (2, 1, 2, 0, 5, 1),
+            (3, 1, 3, 1, 6, 1),
+            (0, 1, 0, 2, 7, 1),
+            (0, 0, 7, 5, 0, 0),
+            (1, 0, 4, 6, 1, 0),
+            (2, 0, 5, 7, 2, 0),
+            (3, 0, 6, 4, 3, 0)], dtype=np.int)
+
+        domain = HalfEdgeDomain(node, halfedge, NS=1)
+
+        bnode, isMainHEdge = domain.voronoi_mesh(n=3)
+        mesh = domain.to_halfedgemesh()
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, color='k', showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=True)
+            #cs = [axes.add_artist(plt.Circle(x, r, facecolor='none', edgecolor='r')) for x, r in zip(node, nh)]
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes)
+            plt.show()
+
+
 test = HalfEdgeDomainTest()
-test.advance_trimesh_test()
+#test.advance_trimesh_test()
+test.voronoi_test()
