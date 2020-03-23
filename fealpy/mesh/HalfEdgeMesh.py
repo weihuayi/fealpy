@@ -50,7 +50,7 @@ class HalfEdgeMesh(Mesh2d):
         # 0: 固定点
         # 1: 边界上的点
         # 2: 区域内部的点
-        self.node['dim'] = nodedim 
+        self.nodedata['dim'] = nodedim 
 
         self.init_level_info()
 

@@ -56,6 +56,54 @@ class HalfEdgeDomain():
         mesh = HalfEdgeMesh(node, subdomain, halfedge)
         return mesh
 
+    def voronoi_mesh(self, n=4):
+        c = 3.0/4.0
+        self.halfedge_uniform_refine(n=n)
+
+        node = self.vertices
+        halfedge = self.halfedge
+
+        # 这里首先假设所有边的尺寸是一样的
+        idx0 = halfedge[halfedge[:, 3], 0]
+        idx1 = halfedge[:, 0]
+        v = node[idx1] - node[idx0]
+        h = np.sqrt(np.sum(v**2, axis=-1))
+        r0 = c*h
+        r1 = c*h
+        w = np.array([[0, 1], [-1, 0]])
+        center = (node[idx0] + node[idx1])/2
+        
+        c0 = 0.5*(r0**2 - r1**2)/h**2
+        c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
+        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
+
+        # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
+        # 这里也假设很近的点对是孤立的. 
+
+        idx2 = halfedge[:, 2]
+        v0 = bnode[idx1] - node[idx1]
+        v1 = bnode[idx2] - node[idx1]
+
+        d = np.sqrt(np.sum((v0-v1)**2, axis=-1))
+        isNearSite = d < 0.5*r1 
+        v = v0[isNearSite] + v1[isNearSite]
+        l = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
+        v /= l
+        v *= r1[isNearSite, None]
+        bnode[isNearSite] = node[idx1[isNearSite]] + v 
+
+        NB = bnode.shape[0]
+        idx = np.arange(NB)
+        print('idx2:', idx2)
+        print('idx1:', idx1)
+        print(idx2[isNearSite])
+        print(idx1[isNearSite])
+        idx[idx2[isNearSite]] = idx[idx1[isNearSite]]
+        print(idx)
+
+        isMainHEdge = halfedge[:, 5] == 1
+        return bnode, isMainHEdge
+
     def advance_triangle_mesh(self):
 
         # 初始网格点的数量
