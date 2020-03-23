@@ -24,13 +24,13 @@ $ git clone https://github.com/weihuayi/fealpy.git
 ```
 3. In `fealpy/`, run the following command: 
 ```
-$ python3 setup_linux.py install --prefix=~/.local/
+$ python3 setup_linux.py install --prefix=~/.local
 ```
-which will copy the fealpy into `~/.local/lib/python3.6/dist-packages/`.  Or run the following command:
+which will copy the fealpy into `~/.local/lib/python3.<x>/dist-packages/`.  Or run the following command:
 ```
-$ python3 setup_linux.py develop --prefix=~/.local/
+$ python3 setup_linux.py develop --prefix=~/.local
 ```
-which will create a soft link in `~/.local/lib/python3.6/dist-packages/`.
+which will create a soft link in `~/.local/lib/python3.<x>/dist-packages/`.
 4. 
 ```
 $ pip3 install -U vtk
