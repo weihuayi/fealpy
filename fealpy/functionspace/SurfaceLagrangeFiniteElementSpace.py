@@ -50,10 +50,10 @@ class SurfaceLagrangeFiniteElementSpace:
             self.dof = self.mesh.space.dof
             self.dim = 2
         else:
-            if spacetype is 'C':
+            if spacetype == 'C':
                 self.dof = CPLFEMDof2d(mesh, p)
                 self.dim = 2
-            elif spacetype is 'D':
+            elif spacetype == 'D':
                 self.dof = DPLFEMDof2d(mesh, p)
                 self.dim = 2
 
@@ -152,7 +152,7 @@ class SurfaceLagrangeFiniteElementSpace:
         Gp_cond = np.linalg.cond(Gp)
         grad = np.einsum('...ijk, ...imk->...imj', Gp, grad)
         grad = np.einsum('...ijk, ...imj->...imk', Jp, grad)
-        if returncond is True:
+        if returncond:
             return grad, Gp_cond
         else:
             return grad

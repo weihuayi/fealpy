@@ -18,10 +18,10 @@ def find_node(
 
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
-    if (index is None) or (index is 'all'):
-        index = range(node.shape[0])
-    elif (type(index) is np.ndarray) & (index.dtype == np.bool):
+    if (type(index) is np.ndarray) & (index.dtype == np.bool):
         index, = np.nonzero(index)
+    elif (index is None):
+        index = range(node.shape[0])
     elif (type(index) is list) & (type(index[0]) is np.bool):
         index, = np.nonzero(index)
     else:
@@ -77,17 +77,17 @@ def find_entity(
         fontsize=24, fontcolor='k', multiindex=None):
 
     bc = mesh.entity_barycenter(entity)
-    if (index is None) or (index is 'all'):
-        if entity is 'node':
+    if (index is None) or (index == 'all'):
+        if entity == 'node':
             N = mesh.number_of_nodes()
             index = range(N)
-        elif entity is 'edge':
+        elif entity == 'edge':
             NE = mesh.number_of_edges()
             index = range(NE)
-        elif entity is 'face':
+        elif entity == 'face':
             NF = mesh.number_of_faces()
             index = range(NF)
-        elif entity is 'cell':
+        elif entity == 'cell':
             NC = mesh.number_of_cells()
             index = range(NC)
         else:
@@ -217,7 +217,7 @@ def show_mesh_1d(
         linewidths=1, markersize=20,
         showaxis=False):
     axes.set_aspect(aspect)
-    if showaxis is False:
+    if showaxis == False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
@@ -252,7 +252,7 @@ def show_mesh_2d(
     except NotImplementedError:
         pass
 
-    if showaxis is False:
+    if showaxis == False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
@@ -322,7 +322,7 @@ def show_mesh_3d(
         axes.set_aspect(aspect)
     except NotImplementedError:
         pass
-    if showaxis is False:
+    if showaxis == False:
         axes.set_axis_off()
     else:
         axes.set_axis_on()
@@ -335,12 +335,12 @@ def show_mesh_3d(
         nodecolor = mapper.to_rgba(nodecolor)
 
     node = mesh.node
-    if shownode is True:
+    if shownode:
         axes.scatter(
                 node[:, 0], node[:, 1], node[:, 2],
                 color=nodecolor, s=markersize)
 
-    if showedge is True:
+    if showedge:
         edge = mesh.ds.edge
         vts = node[edge]
         edges = a3.art3d.Line3DCollection(

@@ -129,9 +129,9 @@ def triangle(box, h, meshtype='tri'):
     mesh = build(mesh_info, max_volume=h**2)
     node = np.array(mesh.points, dtype=np.float)
     cell = np.array(mesh.elements, dtype=np.int)
-    if meshtype is 'tri':
+    if meshtype == 'tri':
         return TriangleMesh(node, cell)
-    elif meshtype is 'polygon':
+    elif meshtype == 'polygon':
         mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
@@ -144,9 +144,9 @@ def triangle_polygon_domain(points, facets, h, meshtype='tri'):
     mesh = build(mesh_info, max_volume=h**2)
     node = np.array(mesh.points, dtype=np.float)
     cell = np.array(mesh.elements, dtype=np.int)
-    if meshtype is 'tri':
+    if meshtype == 'tri':
         return TriangleMesh(node, cell)
-    elif meshtype is 'polygon':
+    elif meshtype == 'polygon':
         mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
@@ -156,9 +156,9 @@ def distmesh2d(fd, h0, bbox, pfix, meshtype='tri'):
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)
     distmesh2d.run()
-    if meshtype is 'tri':
+    if meshtype == 'tri':
         return distmesh2d.mesh
-    elif meshtype is 'polygon':
+    elif meshtype == 'polygon':
         mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
@@ -171,9 +171,9 @@ def unitcircledomainmesh(h0, meshtype='tri', dtype=np.float):
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)
     distmesh2d.run()
-    if meshtype is 'tri':
+    if meshtype == 'tri':
         return distmesh2d.mesh
-    elif meshtype is 'polygon':
+    elif meshtype == 'polygon':
         mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
@@ -204,9 +204,9 @@ def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex'):
     cell[:, 5] = cell[:, 4] + nyz
     cell[:, 6] = cell[:, 5] + nz + 1
     cell[:, 7] = cell[:, 4] + nz + 1
-    if meshtype is 'hex':
+    if meshtype == 'hex':
         return HexahedronMesh(node, cell)
-    elif meshtype is 'tet':
+    elif meshtype == 'tet':
         localCell = np.array([
             [0, 1, 2, 6],
             [0, 5, 1, 6],

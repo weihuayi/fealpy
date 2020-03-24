@@ -450,9 +450,9 @@ class LagrangeFiniteElementSpace():
         cellmeasure = self.cellmeasure
         gphi = self.mesh.grad_lambda()
         G = []
-        if rtype is 'simple':
+        if rtype == 'simple':
             D = spdiags(1.0/np.bincount(cell.flat), 0, NN, NN)
-        elif rtype is 'harmonic':
+        elif rtype == 'harmonic':
             gphi = gphi/cellmeasure.reshape(-1, 1, 1)
             d = np.zeros(NN, dtype=np.float)
             np.add.at(d, cell, 1/cellmeasure.reshape(-1, 1))

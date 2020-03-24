@@ -705,16 +705,16 @@ class DivFreeNonConformingVirtualElementSpace2d:
         return self.dof.number_of_local_dofs()
 
     def cell_to_dof(self, doftype='all'):
-        if doftype is 'all':
+        if doftype == 'all':
             return self.dof.cell2dof, self.dof.cell2dofLocation
-        elif doftype is 'cell':
+        elif doftype == 'cell':
             p = self.p
             NE = self.mesh.number_of_edges()
             NC = self.mesh.number_of_cells()
             idof = (p-1)*p//2
             cell2dof = NE*p + np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
-        elif doftype is 'edge':
+        elif doftype == 'edge':
             return self.dof.edge_to_dof()
 
     def boundary_dof(self):

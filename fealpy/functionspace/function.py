@@ -43,7 +43,7 @@ class Function(np.ndarray):
 
     def add_plot(self, plt):
         mesh = self.space.mesh
-        if mesh.meshtype is 'tri':
+        if mesh.meshtype == 'tri':
             node = mesh.entity('node')
             cell = mesh.entity('cell')
             fig1 = plt.figure()

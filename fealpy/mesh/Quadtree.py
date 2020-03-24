@@ -26,9 +26,9 @@ class Quadtree(QuadrangleMesh):
     def leaf_cell(self, celltype='quad'):
         child = self.child
         cell = self.ds.cell[child[:, 0] == -1]
-        if celltype is 'quad':
+        if celltype == 'quad':
             return cell
-        elif celltype is 'tri':
+        elif celltype == 'tri':
             return np.r_['0', cell[:, [1, 2, 0]], cell[:, [3, 0, 2]]]
 
     def is_leaf_cell(self, idx=None):
@@ -87,24 +87,24 @@ class Quadtree(QuadrangleMesh):
         NC = self.number_of_cells()
         options['numrefine'] = np.zeros(NC, dtype=np.int8)
         theta = options['theta']
-        if options['method'] is 'mean':
+        if options['method'] == 'mean':
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.mean(eta)))
                 )
             # options['numrefine'][leafCellIdx] = eta
-        elif options['method'] is 'max':
+        elif options['method'] == 'max':
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
                 )
-        elif options['method'] is 'median':
+        elif options['method'] == 'median':
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.median(eta)))
                 )
-        elif options['method'] is 'min':
+        elif options['method'] == 'min':
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
-        elif options['method'] is 'numrefine':
+        elif options['method'] == 'numrefine':
             options['numrefine'][leafCellIdx] = eta
         elif isinstance(options['method'], float):
             val = options['method']

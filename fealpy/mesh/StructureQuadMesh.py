@@ -66,20 +66,20 @@ class StructureQuadMesh(Mesh2d):
 
     def interpolation(self, f, intertype='node'):
         node = self.node
-        if intertype is 'node':
+        if intertype == 'node':
             F = f(node)
-        elif intertype is 'edge':
+        elif intertype == 'edge':
             ec = self.entity_barycenter('edge')
             F = f(ec)
-        elif intertype is 'edgex':
+        elif intertype == 'edgex':
             isXDEdge = self.ds.x_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isXDEdge])
-        elif intertype is 'edgey':
+        elif intertype == 'edgey':
             isYDEdge = self.ds.y_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isYDEdge])
-        elif intertype is 'cell':
+        elif intertype == 'cell':
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F

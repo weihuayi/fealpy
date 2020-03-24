@@ -260,7 +260,7 @@ class TriangleMesh(Mesh2d):
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
-        if isMarkedCell is 'all':
+        if isMarkedCell == 'all':
             isMarkedCell = np.ones(NC, dtype=np.bool)
 
         cell = self.entity('cell')
@@ -410,19 +410,19 @@ class TriangleMesh(Mesh2d):
 
     def adaptive(self, eta, options):
         theta = options['theta']
-        if options['method'] is 'mean':
+        if options['method'] == 'mean':
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.mean(eta)))
                 )
-        elif options['method'] is 'max':
+        elif options['method'] == 'max':
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
                 )
-        elif options['method'] is 'median':
+        elif options['method'] == 'median':
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.median(eta)))
                 )
-        elif options['method'] is 'min':
+        elif options['method'] == 'min':
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )

@@ -11,7 +11,6 @@ setup(name='fealpy',
           'numpy',
           'scipy',
           'matplotlib',
-          'cython',
           'pybind11',
           'msgpack',
           'PyHamcrest',
@@ -19,6 +18,6 @@ setup(name='fealpy',
           'pytools',
           'pyamg',
           'meshpy',
-	      'transplant'
+          'transplant'
       ],
       zip_safe=False)
