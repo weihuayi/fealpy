@@ -11,13 +11,13 @@ setup(name='fealpy',
           'numpy',
           'scipy',
           'matplotlib',
+          'pyamg',
+          'meshpy',
+          'transplant'
           'pybind11',
           'msgpack',
           'PyHamcrest',
           'boost',
           'pytools',
-          'pyamg',
-          'meshpy',
-          'transplant'
       ],
       zip_safe=False)

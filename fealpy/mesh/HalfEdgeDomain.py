@@ -6,7 +6,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from .HalfEdgeMesh import HalfEdgeMesh
 
 class HalfEdgeDomain():
-    def __init__(self, vertices, halfedge, NS=None):
+    def __init__(self, vertices, halfedge, NS=None, fixed=None):
         """
         Parameters
         ---------- 
@@ -37,6 +37,9 @@ class HalfEdgeDomain():
         
         self.NV = len(vertices) # 区域顶点的个数
         self.NE = len(halfedge) # 区域半边的个数
+        
+        # 默认初始顶点都是固定点
+        self.fixed = np.ones(self.NV, dtype=np.bool) if fixed is None else fixed
 
         self.itype = halfedge.dtype
         self.ftype = vertices.dtype
@@ -56,23 +59,64 @@ class HalfEdgeDomain():
         mesh = HalfEdgeMesh(node, subdomain, halfedge)
         return mesh
 
-    def voronoi_mesh(self, n=4):
-        c = 3.0/4.0
-        self.halfedge_uniform_refine(n=n)
-
+    def voronoi_mesh(self, n=4, c=0.618, theta=100):
+        self.boundary_uniform_refine(n=n)
+        NN = self.NV
         node = self.vertices
         halfedge = self.halfedge
+    
 
-        # 这里首先假设所有边的尺寸是一样的
+        # 这里假设所有边的尺寸是一样的
+        # 进一步的算法改进中，这些尺寸应该是自适应的
+        # 顶点处的半径应该要平均平均一下
+        
+
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
         h = np.sqrt(np.sum(v**2, axis=-1))
-        r0 = c*h
-        r1 = c*h
+        r = np.zeros(NN, dtype=self.ftype)
+        n = np.zeros(NN, dtype=self.itype)
+        np.add.at(r, idx0, h)
+        np.add.at(r, idx1, h)
+        np.add.at(n, idx0, 1)
+        np.add.at(n, idx1, 1)
+        r /= n
+        r *= c
         w = np.array([[0, 1], [-1, 0]])
+
+        # 修正角点相邻点的半径， 如果角点的角度小于 theta 的
+        # 这里假设角点相邻的节点， 到角点的距离相等
+        isFixed = self.fixed[halfedge[:, 0]]
+        idx, = np.nonzero(isFixed)
+        pre = halfedge[idx, 3]
+        nex = halfedge[idx, 2]
+
+        p0 = node[halfedge[pre, 0]]
+        p1 = node[halfedge[idx, 0]]
+        p2 = node[halfedge[nex, 0]]
+
+        v0 = p2 - p1
+        v1 = p0 - p1
+        l0 = np.sqrt(np.sum(v0**2, axis=-1))
+        l1 = np.sqrt(np.sum(v1**2, axis=-1))
+        c = np.cross(v0, v1)/l0/l1
+        a = np.arcsin(c)
+        a[c < 0] += 2*np.pi
+        a = np.degrees(a)
+        isCorner = a < theta
+        idx = idx[isCorner]
+
+        v2 = (v0[isCorner] + v1[isCorner])/2
+        v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
+        v2 *= r[halfedge[idx, 0], None] 
+        p = node[halfedge[idx, 0]] + v2
+        r[halfedge[pre[idx], 0]] = np.sqrt(np.sum((p - p0[idx])**2, axis=-1))
+        r[halfedge[nex[idx], 0]] = np.sqrt(np.sum((p - p2[idx])**2, axis=-1))
+
         center = (node[idx0] + node[idx1])/2
-        
+        r0 = r[idx0]
+        r1 = r[idx1]
         c0 = 0.5*(r0**2 - r1**2)/h**2
         c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
         bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
@@ -81,11 +125,12 @@ class HalfEdgeDomain():
         # 这里也假设很近的点对是孤立的. 
 
         idx2 = halfedge[:, 2]
-        v0 = bnode[idx1] - node[idx1]
+        v0 = bnode - node[idx1]
         v1 = bnode[idx2] - node[idx1]
 
         d = np.sqrt(np.sum((v0-v1)**2, axis=-1))
         isNearSite = d < 0.5*r1 
+
         v = v0[isNearSite] + v1[isNearSite]
         l = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
         v /= l
@@ -94,15 +139,14 @@ class HalfEdgeDomain():
 
         NB = bnode.shape[0]
         idx = np.arange(NB)
-        print('idx2:', idx2)
-        print('idx1:', idx1)
-        print(idx2[isNearSite])
-        print(idx1[isNearSite])
-        idx[idx2[isNearSite]] = idx[idx1[isNearSite]]
-        print(idx)
+        idx[idx2[isNearSite]] = idx[isNearSite]
 
-        isMainHEdge = halfedge[:, 5] == 1
-        return bnode, isMainHEdge
+        isKeepNode = np.zeros(NB, dtype=np.bool)
+        isKeepNode[idx] = True
+        idxmap = np.zeros(NB, dtype=np.int)
+        idxmap[isKeepNode] = range(isKeepNode.sum())
+
+        return bnode[isKeepNode], idxmap[idx] 
 
     def advance_triangle_mesh(self):
 
@@ -119,7 +163,7 @@ class HalfEdgeDomain():
         halfedge[:NE] = self.halfedge
         
         
-    def halfedge_adaptive_refine(self, isMarkedHEdge,
+    def boundary_adaptive_refine(self, isMarkedHEdge,
         vertices=None, halfedge=None, edgecenter=None):
 
         inplace = True
@@ -170,12 +214,15 @@ class HalfEdgeDomain():
         if inplace: 
             self.halfedge = halfedge
             self.vertices = np.r_['0', vertices, ec] 
+            self.fixed = np.r_['0', 
+                    self.fixed,
+                    np.zeros_like(ec[:, 0], dtype=np.bool)] 
             self.NV += NE1//2
             self.NE += NE1 
         else:
             return ec, halfedge
 
-    def halfedge_uniform_refine(self, n=1, vertices=None, halfedge=None):
+    def boundary_uniform_refine(self, n=1, vertices=None, halfedge=None):
         inplace = True
         itype = self.itype
         ftype = self.ftype
@@ -222,6 +269,9 @@ class HalfEdgeDomain():
             if inplace: 
                 self.halfedge = halfedge
                 self.vertices = vertices 
+                self.fixed = np.r_['0', 
+                        self.fixed, 
+                        np.zeros_like(ec[:, 0], dtype=np.bool)]
                 self.NV += NE//2
                 self.NE *= 2
             else:

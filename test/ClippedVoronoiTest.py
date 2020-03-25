@@ -44,6 +44,7 @@ class ClippedVoronoiTest():
             plt.show()
 
     def he_voronoi_test(plot=True):
+        pass
 
 test = ClippedVoronoiTest()
 test.voronoi_test()
