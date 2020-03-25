@@ -162,8 +162,6 @@ class ConformingVirtualElementSpace2d():
             val = np.sum(uh[idx]*self.area)
             return val
 
-
-
     def project_to_smspace(self, uh):
         """
         Project a conforming vem function uh into polynomial space.

@@ -7,8 +7,7 @@ import pyamg
 
 from ..functionspace import ConformingVirtualElementSpace2d
 from ..boundarycondition import DirichletBC
-from ..vem import doperator
-from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg, GaussLobattoQuadrature
+from ..quadrature import IntervalQuadrature, GaussLobattoQuadrature
 
 
 class SFCVEMModel2d():
@@ -38,21 +37,19 @@ class SFCVEMModel2d():
 
         self.uh = self.space.function() # the solution 
         self.lh = self.space.function() # \lambda_h 
-
         self.integralalg = self.space.integralalg
 
 
     def project_to_smspace(self, uh=None, ptype='H1'):
-        if uh is None:
-            uh = self.uh
+        uh = self.uh if uh is None else uh
         p = self.space.p
         cell2dof, cell2dofLocation = self.space.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.space.smspace.function()
-        if ptype is 'H1':
+        if ptype == 'H1':
             S[:] = np.concatenate(list(map(g, zip(self.space.PI1, cd))))
-        elif ptype is 'L2':
+        elif ptype == 'L2':
             S[:] = np.concatenate(list(map(g, zip(self.space.PI0, cd))))
         else:
             raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
@@ -143,6 +140,7 @@ class SFCVEMModel2d():
                     )
                 return val
             e = space.integralalg.integral(f, True)
+
         if returnsup is False:
             return np.sqrt(eta)
         else:
