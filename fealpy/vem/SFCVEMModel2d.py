@@ -7,8 +7,7 @@ import pyamg
 
 from ..functionspace import ConformingVirtualElementSpace2d
 from ..boundarycondition import DirichletBC
-from ..vem import doperator
-from ..quadrature import IntervalQuadrature, PolygonMeshIntegralAlg, GaussLobattoQuadrature
+from ..quadrature import IntervalQuadrature, GaussLobattoQuadrature
 
 
 class SFCVEMModel2d():
@@ -38,13 +37,11 @@ class SFCVEMModel2d():
 
         self.uh = self.space.function() # the solution 
         self.lh = self.space.function() # \lambda_h 
-
         self.integralalg = self.space.integralalg
 
 
     def project_to_smspace(self, uh=None, ptype='H1'):
-        if uh is None:
-            uh = self.uh
+        uh = self.uh if uh is None else uh
         p = self.space.p
         cell2dof, cell2dofLocation = self.space.cell_to_dof()
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
@@ -121,7 +118,6 @@ class SFCVEMModel2d():
                     idx,
                     weights=self.space.B[i, :]*ruh[cell, 1],
                     minlength=NC)
-
 
         node = mesh.entity('node')
         gx = S0.value(node[cell], index=idx) - np.repeat(grad[:, 0], NV)
