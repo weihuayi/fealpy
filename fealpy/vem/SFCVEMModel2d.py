@@ -50,16 +50,15 @@ class SFCVEMModel2d():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.space.smspace.function()
-        if ptype is 'H1':
+        if ptype == 'H1':
             S[:] = np.concatenate(list(map(g, zip(self.space.PI1, cd))))
-        elif ptype is 'L2':
+        elif ptype == 'L2':
             S[:] = np.concatenate(list(map(g, zip(self.space.PI0, cd))))
         else:
             raise ValueError("ptype value should be H1 or L2! But you input %s".format(ptype))
         return S
 
-    def recover_estimate(self, uh=None, rtype='simple', residual=True,
-            returnsup=False):
+    def recover_estimator(self, rtype='area'):
         """
         estimate the recover-type error
 
@@ -78,35 +77,36 @@ class SFCVEMModel2d():
         -----
 
         """
+
+        uh = self.uh
+        lh = self.lh
+
         space = self.space
         mesh = space.mesh
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
-        cell = mesh.entity('cell')
-        barycenter = space.smspace.barycenter
+        cell, cellLocation = mesh.entity('cell')
+        barycenter = space.smspace.cellbarycenter
 
-        h = space.smspace.h
-        area = space.smspace.area
+        h = space.smspace.cellsize
+        area = space.smspace.cellmeasure
         ldof = space.smspace.number_of_local_dofs()
 
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
-        if uh is None:
-            S = self.space.project_to_smspace(self.uh)
-        else:
-            S = self.space.project_to_smspace(uh)
+        S = space.project_to_smspace(uh)
 
         grad = S.grad_value(barycenter)
         S0 = space.smspace.function()
         S1 = space.smspace.function()
         n2c = mesh.ds.node_to_cell()
-        if rtype is 'simple':
+        if rtype == 'simple':
             d = n2c.sum(axis=1)
             ruh = np.asarray((n2c@grad)/d.reshape(-1, 1))
-        elif rtype is 'area':
+        elif rtype == 'area':
             d = n2c@area
             ruh = np.asarray((n2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
-        elif rtype is 'inv_area':
+        elif rtype == 'inv_area':
             d = n2c@(1/area)
             ruh = np.asarray((n2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
         else:
@@ -123,30 +123,40 @@ class SFCVEMModel2d():
                     minlength=NC)
 
 
-        node = mesh.node
-        gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
-        gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
-        eta = k*np.bincount(idx, weights=gx**2+gy**2)/NV*area
+        node = mesh.entity('node')
+        gx = S0.value(node[cell], index=idx) - np.repeat(grad[:, 0], NV)
+        gy = S1.value(node[cell], index=idx) - np.repeat(grad[:, 1], NV)
+        eta = np.bincount(idx, weights=gx**2+gy**2)/NV*area
 
-        if residual is True:
-            fh = space.integralalg.fun_integral(self.pde.source, True)/self.area
-            g0 = S0.grad_value(barycenter)
-            g1 = S1.grad_value(barycenter)
-            eta += (fh + (g0[:, 0] + g1[:, 1]))**2*area**2
 
-        if returnsup is True:
-            def f(x, cellidx):
-                g = self.pde.gradient(x)
-                val = (
-                        (g[..., 0] - S0.value(x, cellidx))**2 +
-                        (g[..., 1] - S1.value(x, cellidx))**2
-                    )
-                return val
-            e = space.integralalg.integral(f, True)
-        if returnsup is False:
-            return np.sqrt(eta)
-        else:
-            return np.sqrt(eta), np.sqrt(np.sum(e))
+        fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
+        g0 = S0.grad_value(barycenter)
+        g1 = S1.grad_value(barycenter)
+        def residual(x, index):
+            val = -S.value(x, index)
+            val += g0[index, 0] 
+            val += g1[index, 1]
+            val += fh[index]
+            val *= val
+            return val
+        eta += space.integralalg.integral(residual, celltype=True)*area
+        
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        edge2dof = space.dof.edge_to_dof()
+        bc = mesh.entity_barycenter('edge')
+        isCEdge = self.pde.is_contact(bc)
+        h = mesh.entity_measure('edge', index=isCEdge)
+        n = mesh.edge_unit_normal(index=isCEdge)
+        g = self.pde.eta
+        val = g*lh[edge2dof[isCEdge]] # (NE, 2)
+        val += ruh[edge2dof[isCEdge], 0]*n[:, [0]] 
+        val += ruh[edge2dof[isCEdge], 1]*n[:, [1]]
+        val = np.sum(val, axis=-1)/2.0*h**2
+
+        eta[edge2cell[isCEdge, 0]] += val
+
+        return np.sqrt(eta)
 
     def residual_estimator(self, withpsi=False):
 

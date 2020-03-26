@@ -425,6 +425,9 @@ class ConformingVirtualElementSpace2d():
     def boundary_dof(self, threshold=None):
         return self.dof.boundary_dof(threshold=threshold)
 
+    def edge_basis(self, bc):
+        pass
+
     def basis(self, bc):
         pass
 

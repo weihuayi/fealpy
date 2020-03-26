@@ -27,20 +27,20 @@ def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
         AD = A
 
 #    print("The condtion number is: ", np.linalg.cond(AD.todense()))
-    if solver is 'cg':
+    if solver == 'cg':
         start = timer()
         D = AD.diagonal()
         M = spdiags(1/D, 0, AD.shape[0], AD.shape[1])
         uh[:], info = cg(AD, b, tol=1e-14, M=M)
         end = timer()
         print(info)
-    elif solver is 'amg':
+    elif solver == 'amg':
         start = timer()
         ml = pyamg.ruge_stuben_solver(AD)  
         uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
         end = timer()
         print(ml)
-    elif solver is 'direct':
+    elif solver == 'direct':
         start = timer()
         uh[:] = spsolve(AD, b)
         end = timer()
@@ -65,20 +65,20 @@ def solve(dmodel, uh, dirichlet=None, solver='direct'):
     else:
         AD = A
 
-    if solver is 'cg':
+    if solver == 'cg':
         start = timer()
         D = AD.diagonal()
         M = spdiags(1/D, 0, AD.shape[0], AD.shape[1])
         uh[:], info = cg(AD, b, tol=1e-14, M=M)
         end = timer()
         print(info)
-    elif solver is 'amg':
+    elif solver == 'amg':
         start = timer()
         ml = pyamg.ruge_stuben_solver(AD)  
         uh[:] = ml.solve(b, tol=1e-12, accel='cg').reshape(-1)
         end = timer()
         print(ml)
-    elif solver is 'direct':
+    elif solver == 'direct':
         start = timer()
         uh[:] = spsolve(AD, b)
         end = timer()
@@ -126,9 +126,9 @@ def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,
         M[idx, idx] = 1
         F[idx] = gh[idx]
 
-        if solver is 'direct':
+        if solver == 'direct':
             uh[:] = spsolve(M.tocsr(), F)
-        elif solver is 'amg':
+        elif solver == 'amg':
             ml = pyamg.ruge_stuben_solver(M.tocsr())  
             uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
         lam[:] = AD@uh - b

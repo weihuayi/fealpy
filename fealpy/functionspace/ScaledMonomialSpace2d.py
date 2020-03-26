@@ -287,12 +287,18 @@ class ScaledMonomialSpace2d():
         gphi = self.grad_basis(point, index=index)
         cell2dof = self.dof.cell2dof
         index = index if index is not None else np.s_[:]
+        if (type(index) is np.ndarray) and (index.dtype.name == 'bool'):
+            N = np.sum(index)
+        elif type(index) is slice:
+            N = len(cell2dof)
+        else:
+            N = len(index)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        if point.shape[-2] == len(index):
+        if point.shape[-2] == N:
             s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
             return np.einsum(s1, gphi, uh[cell2dof[index]])
-        elif point.shape[0] == len(index):
+        elif point.shape[0] == N:
             return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
 
     def laplace_value(self, uh, point, index=None):

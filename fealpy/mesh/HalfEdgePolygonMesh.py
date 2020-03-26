@@ -661,12 +661,13 @@ class HalfEdgePolygonMeshDataStructure():
         NN = self.NN
         NC = self.NC
         NE = self.NE
+        halfedge = self.halfedge
 
         isInHEdge = (halfedge[:, 1] != NC)
         val = np.ones(isInHEdge.sum(), dtype=np.bool)
         I = halfedge[isInHEdge, 0]
         J = halfedge[isInHEdge, 1]
-        cell2node = csr_matrix((val, (I.flat, J.flat)), shape=(NC, NN), dtype=np.bool)
+        node2cell = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NC), dtype=np.bool)
         return node2cell
 
 

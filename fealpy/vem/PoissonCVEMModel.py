@@ -90,13 +90,13 @@ class PoissonCVEMModel():
                 isSubIdx = np.repeat(isFlag, NV)
                 M = n2c[:, isFlag]
                 sa = area[isFlag]
-                if rtype is 'simple':
+                if rtype == 'simple':
                     d = n2c.sum(axis=1)
                     ruh = np.asarray((M@grad[isFlag])/d.reshape(-1, 1))
-                elif rtype is 'area':
+                elif rtype == 'area':
                     d = n2c@area
                     ruh = np.asarray((M@(grad[isFlag]*sa.reshape(-1, 1)))/d.reshape(-1, 1))
-                elif rtype is 'inv_area':
+                elif rtype == 'inv_area':
                     d = n2c@(1/area)
                     ruh = np.asarray((M@(grad[isFlag]/sa.reshape(-1, 1)))/d.reshape(-1, 1))
                 else:
@@ -113,13 +113,13 @@ class PoissonCVEMModel():
                             minlength=NC)
 
         except  AttributeError:
-            if rtype is 'simple':
+            if rtype == 'simple':
                 d = n2c.sum(axis=1)
                 ruh = np.asarray((n2c@grad)/d.reshape(-1, 1))
-            elif rtype is 'area':
+            elif rtype == 'area':
                 d = n2c@area
                 ruh = np.asarray((n2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
-            elif rtype is 'inv_area':
+            elif rtype == 'inv_area':
                 d = n2c@(1/area)
                 ruh = np.asarray((n2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
             else:
