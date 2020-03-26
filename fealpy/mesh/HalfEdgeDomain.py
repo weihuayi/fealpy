@@ -69,8 +69,6 @@ class HalfEdgeDomain():
         # 这里假设所有边的尺寸是一样的
         # 进一步的算法改进中，这些尺寸应该是自适应的
         # 顶点处的半径应该要平均平均一下
-        
-
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
@@ -105,7 +103,7 @@ class HalfEdgeDomain():
         a[c < 0] += 2*np.pi
         a = np.degrees(a)
         isCorner = a < theta
-        idx = idx[isCorner]
+        idx = idx[isCorner] # 需要特殊处理的半边编号 
 
         v2 = (v0[isCorner] + v1[isCorner])/2
         v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
@@ -114,6 +112,14 @@ class HalfEdgeDomain():
         r[halfedge[pre[idx], 0]] = np.sqrt(np.sum((p - p0[idx])**2, axis=-1))
         r[halfedge[nex[idx], 0]] = np.sqrt(np.sum((p - p2[idx])**2, axis=-1))
 
+        # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
+        # 这里也假设很近的点对是孤立的. 
+        NG = halfedge.shape[0] # 会生成 NG 个生成子, 每个半边都对应一个
+        index = np.arange(NG)
+        nex = halfedge[idx, 2]
+        index[nex] = idx
+        
+        # 计算每个半边对应的节点
         center = (node[idx0] + node[idx1])/2
         r0 = r[idx0]
         r1 = r[idx1]
@@ -121,32 +127,12 @@ class HalfEdgeDomain():
         c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
         bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
 
-        # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
-        # 这里也假设很近的点对是孤立的. 
-
-        idx2 = halfedge[:, 2]
-        v0 = bnode - node[idx1]
-        v1 = bnode[idx2] - node[idx1]
-
-        d = np.sqrt(np.sum((v0-v1)**2, axis=-1))
-        isNearSite = d < 0.5*r1 
-
-        v = v0[isNearSite] + v1[isNearSite]
-        l = np.sqrt(np.sum(v**2, axis=-1, keepdims=True))
-        v /= l
-        v *= r1[isNearSite, None]
-        bnode[isNearSite] = node[idx1[isNearSite]] + v 
-
-        NB = bnode.shape[0]
-        idx = np.arange(NB)
-        idx[idx2[isNearSite]] = idx[isNearSite]
-
-        isKeepNode = np.zeros(NB, dtype=np.bool)
-        isKeepNode[idx] = True
-        idxmap = np.zeros(NB, dtype=np.int)
+        isKeepNode = np.zeros(NG, dtype=np.bool)
+        isKeepNode[index] = True
+        idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
-        return bnode[isKeepNode], idxmap[idx] 
+        return bnode[isKeepNode], idxmap[index], node, r
 
     def advance_triangle_mesh(self):
 

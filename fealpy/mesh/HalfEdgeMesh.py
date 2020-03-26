@@ -717,8 +717,8 @@ class HalfEdgeMesh2dDataStructure():
         self.cidxmap[self.cflag] = range(self.NC)
         self.halfedge = halfedge
         
-        self.cell2hedge = np.zeros(NC, dtype=self.itype)
-        self.cell2hedge[halfedge[:, 1]] = range(2*self.NE)
+        self.cell2hedge = np.zeros(NC, dtype=self.itype)   # 存储每个单元的起始半边
+        self.cell2hedge[halfedge[:, 1]] = range(2*self.NE) # 的编号
 
         if NV is None:
             NC = self.NC

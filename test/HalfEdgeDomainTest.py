@@ -94,8 +94,8 @@ class HalfEdgeDomainTest:
 
         domain = HalfEdgeDomain(node, halfedge, NS=1)
 
-        bnode, idx = domain.voronoi_mesh(n=3)
-        vor = Voronoi(bnode)
+        bnode, idx, center, radius = domain.voronoi_mesh(n=3)
+        vor = Voronoi(bnode, incremental=True)
         mesh = domain.to_halfedgemesh()
 
         if plot:
@@ -106,15 +106,11 @@ class HalfEdgeDomainTest:
             mesh.find_node(axes, node=bnode, showindex=True)
 
             voronoi_plot_2d(vor, ax=axes)
-            #cs = [
-            # axes.add_artist(
-            #   plt.Circle(x, r, facecolor='none', edgecolor='r')) 
-            #   for x, r in zip(center, radius)]
+            cs = [
+                    axes.add_artist( plt.Circle(x, r, facecolor='none', edgecolor='r')) 
+               for x, r in zip(center, radius)]
             fig = plt.figure()
             axes = fig.gca()
-            print("halfede:")
-            for i, val in enumerate(mesh.entity('halfedge')):
-                print(i, ":", val)
             mesh.add_halfedge_plot(axes, showindex=True)
             plt.show()
 
@@ -122,3 +118,8 @@ class HalfEdgeDomainTest:
 test = HalfEdgeDomainTest()
 #test.advance_trimesh_test()
 test.voronoi_test()
+
+if False:
+    print("halfede:")
+    for i, val in enumerate(mesh.entity('halfedge')):
+        print(i, ":", val)
