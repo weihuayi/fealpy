@@ -143,26 +143,24 @@ class IntervalMesh():
             self.ds.reinit(NN, ncell)
 
     def refine(self, isMarkedCell, inplace=True):
-        idx, = np.nonzero(isMarkedCell)#需要加密的单元编号
-        N = len(idx)#需要加密的单元的个数
 
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
+        NN = self.number_of_nodes()
 
-        newNode = (node[cell[idx, 0]] + node[cell[idx, 1]])/2#新增节点坐标
-        self.node = np.r_['0', node, newNode]#将新的节点添加到总的节点中去，得到的node
+        N = isMarkedCell.sum()
+        if N > 0:
+            bc = self.entity_barycenter('cell', index=isMarkedCell)
+            self.node = np.r_['0', node, bc] #将新的节点添加到总的节点中去，得到的node
 
-        ncell = np.zeros((NC + N, 2), dtype=np.int)#定义新的cell数组
-        index1 = np.argsort(self.node)#node从小到大排序后的索引
+            newCell = np.zeros((NC+N, 2), dtype=self.itype)
+            newCell[:NC] = cell
+            newCell[:NC][isMarkedCell, 1] = range(NC, NC+N)
+            newCell[NC:, 0] = range(NC, NC+N)
+            newCell[NC:, 1] = cell[isMarkedCell, 1]
 
-        ncell[:, 0] = index1[:-1]
-        ncell[:, 1] = index1[1:]
-
-        index2 = np.argsort(ncell[:, 0])#将ncell按第0轴排序
-        self.cell = ncell[index2]#加密后新的cell
-        NN = self.node.shape[0]
-        self.ds.reinit(NN, self.cell)
+            self.ds.reinit(NN+N, newCell)
 
 
     def add_plot(self, plot,

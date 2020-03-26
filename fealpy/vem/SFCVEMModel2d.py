@@ -92,38 +92,16 @@ class SFCVEMModel2d():
         # project the vem solution into linear polynomial space
         idx = np.repeat(range(NC), NV)
         S = space.project_to_smspace(uh)
-
         grad = S.grad_value(barycenter)
-        S0 = space.smspace.function()
-        S1 = space.smspace.function()
-        n2c = mesh.ds.node_to_cell()
-        if rtype == 'simple':
-            d = n2c.sum(axis=1)
-            ruh = np.asarray((n2c@grad)/d.reshape(-1, 1))
-        elif rtype == 'area':
-            d = n2c@area
-            ruh = np.asarray((n2c@(grad*area.reshape(-1, 1)))/d.reshape(-1, 1))
-        elif rtype == 'inv_area':
-            d = n2c@(1/area)
-            ruh = np.asarray((n2c@(grad/area.reshape(-1,1)))/d.reshape(-1, 1))
-        else:
-            raise ValueError("I have note code method: {}!".format(rtype))
-
-        for i in range(ldof):
-            S0[i::ldof] = np.bincount(
-                    idx,
-                    weights=self.space.B[i, :]*ruh[cell, 0],
-                    minlength=NC)
-            S1[i::ldof] = np.bincount(
-                    idx,
-                    weights=self.space.B[i, :]*ruh[cell, 1],
-                    minlength=NC)
+        rgh = space.grad_recovery(uh)
+        gS = space.project_to_smspace(rgh)
+        S0 = gS.index(0)
+        S1 = gS.index(1)
 
         node = mesh.entity('node')
         gx = S0.value(node[cell], index=idx) - np.repeat(grad[:, 0], NV)
         gy = S1.value(node[cell], index=idx) - np.repeat(grad[:, 1], NV)
         eta = np.bincount(idx, weights=gx**2+gy**2)/NV*area
-
 
         fh = self.integralalg.fun_integral(self.pde.source, True)/self.area
         g0 = S0.grad_value(barycenter)
@@ -145,12 +123,12 @@ class SFCVEMModel2d():
         h = mesh.entity_measure('edge', index=isCEdge)
         n = mesh.edge_unit_normal(index=isCEdge)
         g = self.pde.eta
-        val = g*lh[edge2dof[isCEdge]] # (NE, 2)
-        val += ruh[edge2dof[isCEdge], 0]*n[:, [0]] 
-        val += ruh[edge2dof[isCEdge], 1]*n[:, [1]]
-        val = np.sum(val, axis=-1)/2.0*h**2
+        val = g*lh[edge2dof[isCEdge]]
+        val += rgh[edge2dof[isCEdge], 0]*n[:, [0]] 
+        val += rgh[edge2dof[isCEdge], 1]*n[:, [1]]
+        val = np.sum(val**2, axis=-1)/2.0*h**2
 
-        eta[edge2cell[isCEdge, 0]] += val
+        #np.add.at(eta, edge2cell[isCEdge, 0], val)
 
         return np.sqrt(eta)
 

@@ -1,5 +1,4 @@
 import numpy as np
-import matplotlib.plt as plt
 from types import ModuleType
 
 
@@ -43,7 +42,7 @@ class Function(np.ndarray):
         space = self.space
         return space.edge_value(self, bc)
 
-    def add_plot(self, plot):
+    def add_plot(self, plot, cmap=None):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
@@ -55,20 +54,14 @@ class Function(np.ndarray):
         if mesh.meshtype == 'tri':
             node = mesh.entity('node')
             cell = mesh.entity('cell')
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca(projection='3d')
             axes.plot_trisurf(
                     node[:, 0], node[:, 1],
-                    cell, self, cmap=plt.cm.jet, lw=0.0)
+                    cell, self, cmap=cmap, lw=0.0)
             return axes
         elif mesh.meshtype in {'polygon', 'halfedge'}:
             node = mesh.entity('node')
-            fig = plt.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca(projection='3d')
             axes.plot_trisurf(
-                    node[:, 0], node[:, 1], self, cmap=plt.cm.jet, lw=0.0)
+                    node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)
             return axes
         else:
             return None
