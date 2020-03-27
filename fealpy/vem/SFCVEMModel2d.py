@@ -115,20 +115,32 @@ class SFCVEMModel2d():
             return val
         eta += space.integralalg.integral(residual, celltype=True)*area
         
+
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
         edge2dof = space.dof.edge_to_dof()
         bc = mesh.entity_barycenter('edge')
         isCEdge = self.pde.is_contact(bc)
-        h = mesh.entity_measure('edge', index=isCEdge)
-        n = mesh.edge_unit_normal(index=isCEdge)
+        h = mesh.entity_measure('edge')
+        n = mesh.edge_unit_normal()
         g = self.pde.eta
-        val = g*lh[edge2dof[isCEdge]]
-        val += rgh[edge2dof[isCEdge], 0]*n[:, [0]] 
-        val += rgh[edge2dof[isCEdge], 1]*n[:, [1]]
-        val = np.sum(val**2, axis=-1)/2.0*h**2
+        if False:
+            val = g*lh[edge2dof[isCEdge]]
+            val += rgh[edge2dof[isCEdge], 0]*n[:, [0]] 
+            val += rgh[edge2dof[isCEdge], 1]*n[:, [1]]
+            val = np.sum(val**2, axis=-1)/2.0*h**2
+            np.add.at(eta, edge2cell[isCEdge, 0], val)
+        
+        # 接触边界上的积分 
+        ipoints = self.space.interpolation_points()
+        edge2dof = self.space.dof.edge_to_dof()
 
-        #np.add.at(eta, edge2cell[isCEdge, 0], val)
+        points = ipoints[edge2dof[isCEdge]]
+        lh = self.lh[edge2dof[isCEdge]]
+        lgrad = self.S.grad_value(points, index=edge2cell[isCEdge, 0])
+        t0 = np.einsum('ijm, im->ij', lgrad, n[isCEdge]) + g*lh
+        val = np.einsum('ij, i->i', t0**2, h[isCEdge])
+        np.add.at(eta, edge2cell[isCEdge, 0], val)
 
         return np.sqrt(eta)
 
