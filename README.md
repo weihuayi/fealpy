@@ -18,19 +18,23 @@ $ sudo apt install python3        # The python3 interpretor
 $ sudo apt install python3-pip    # The PyPA recommended tool for installing Python packages.
 $ sudo apt install python3-tk     # Python interface to Tcl/Tk used by matplotlib 
 ```
-2. clone the latest fealpy from github:
+2. clone the latest fealpy from github or gitlab:
 ```
 $ git clone https://github.com/weihuayi/fealpy.git
+```
+or
+```
+$ git clone https://gitlab.com/weihuayi/fealpy.git
 ```
 3. In `fealpy/`, run the following command: 
 ```
 $ python3 setup_linux.py install --prefix=~/.local
 ```
-which will copy the fealpy into `~/.local/lib/python3.<x>/dist-packages/`.  Or run the following command:
+which will copy the fealpy into `~/.local/lib/python3.<x>/site-packages/`.  Or run the following command:
 ```
 $ python3 setup_linux.py develop --prefix=~/.local
 ```
-which will create a soft link in `~/.local/lib/python3.<x>/dist-packages/`.
+which will create a soft link in `~/.local/lib/python3.<x>/site-packages/`.
 4. 
 ```
 $ pip3 install -U vtk
@@ -55,6 +59,10 @@ $ pip3 install -U meshio
 > cd git # enter git directory
 > git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
 ```
+or
+```
+> git clone https://gitlab.com/weihuayi/fealpy.git # clone the fealpy repo
+```
 5. enter fealpy directory, run the following command:
 ```
 > python setup_win.py develop 
@@ -62,6 +70,8 @@ $ pip3 install -U meshio
 > pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
 > conda install -c anaconda vtk 
 ```
+Notice that, the above `whl` files are build for python3.7, you can find suitable
+version for other python version.
 
 ## Mac
 1. Download and install latest Anaconda for macOS. https://www.anaconda.com/distribution/
@@ -78,11 +88,14 @@ $ mkdir git # create a directory named git. Of course, you can name it by anothe
 $ cd git # enter git directory
 $ git clone https://github.com/weihuayi/fealpy.git # clone the fealpy repo
 ```
+or
+```
+$ git clone https://gitlab.com/weihuayi/fealpy.git # clone the fealpy repo
+```
+
 5. enter fealpy directory, run the following command:
 ```
 $ python setup_mac.py develop 
-$ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
-$ pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
 $ conda install -c anaconda vtk
 ```
 

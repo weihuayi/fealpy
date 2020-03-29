@@ -13,7 +13,7 @@ setup(name='fealpy',
           'matplotlib',
           'pyamg',
           'meshpy',
-          'transplant'
+          'transplant',
           'pybind11',
           'msgpack',
           'PyHamcrest',
