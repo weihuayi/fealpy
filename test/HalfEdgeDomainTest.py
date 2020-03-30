@@ -78,21 +78,29 @@ class HalfEdgeDomainTest:
             plt.show()
 
 
-    def voronoi_test(self, plot=True):
-        node = np.array([
-            (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
-        halfedge = np.array([
-            (1, 1, 1, 3, 4, 1), # 0
-            (2, 1, 2, 0, 5, 1), # 1
-            (3, 1, 3, 1, 6, 1), # 2
-            (0, 1, 0, 2, 7, 1), # 3
-            (0, 0, 7, 5, 0, 0), # 4
-            (1, 0, 4, 6, 1, 0), # 5
-            (2, 0, 5, 7, 2, 0), # 6
-            (3, 0, 6, 4, 3, 0)],# 7
-            dtype=np.int)
+    def voronoi_test(self, domain='square', plot=True):
 
-        domain = HalfEdgeDomain(node, halfedge, NS=1)
+        if domain == 'square':
+            node = np.array([
+                (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
+            halfedge = np.array([
+                (1, 1, 1, 3, 4, 1), # 0
+                (2, 1, 2, 0, 5, 1), # 1
+                (3, 1, 3, 1, 6, 1), # 2
+                (0, 1, 0, 2, 7, 1), # 3
+                (0, 0, 7, 5, 0, 0), # 4
+                (1, 0, 4, 6, 1, 0), # 5
+                (2, 0, 5, 7, 2, 0), # 6
+                (3, 0, 6, 4, 3, 0)],# 7
+                dtype=np.int)
+            domain = HalfEdgeDomain(node, halfedge, NS=1)
+        elif domain == 'LShape':
+            node = np.array([
+                ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
+                (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
+            facet = np.array([
+                (0, 1), (1, 2), (2, 3), (3, 4), 
+                (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
 
         bnode, idx, center, radius = domain.voronoi_mesh(n=3)
         vor = Voronoi(bnode, incremental=True)
@@ -114,10 +122,24 @@ class HalfEdgeDomainTest:
             mesh.add_halfedge_plot(axes, showindex=True)
             plt.show()
 
+    def from_facets(self, plot=True):
+        vertices = np.array([
+            ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
+            (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
+        facets = np.array([
+            (0, 1), (1, 2), (2, 3), (3, 4), 
+            (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
+        subdomain = np.array([
+            (1, 0), (1, 0), (1, 0), (1, 0),
+            (1, 0), (1, 0), (1, 0), (1, 0)], dtype=np.int)
+
+        domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
+
 
 test = HalfEdgeDomainTest()
 #test.advance_trimesh_test()
-test.voronoi_test()
+#test.voronoi_test()
+test.from_facets()
 
 if False:
     print("halfede:")

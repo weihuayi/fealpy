@@ -6,7 +6,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from .HalfEdgeMesh import HalfEdgeMesh
 
 class HalfEdgeDomain():
-    def __init__(self, vertices, halfedge, NS=None, fixed=None):
+    def __init__(self, vertices, halfedge, NS=None, fixed=None, boundary=None):
         """
         Parameters
         ---------- 
@@ -41,8 +41,47 @@ class HalfEdgeDomain():
         # 默认初始顶点都是固定点
         self.fixed = np.ones(self.NV, dtype=np.bool) if fixed is None else fixed
 
+        # 边界的水平集函数描述 
+        self.boundary = boundary
+
         self.itype = halfedge.dtype
         self.ftype = vertices.dtype
+
+    @classmethod
+    def from_facets(cls, vertices, facets, subdomain):
+        """
+
+        Parameters
+        ----------
+        node :  (NN, 2)
+        facet : (NF, 2)
+        subdomain : (NF, 2)
+        """
+
+        NV = len(vertices)
+        NF = len(facets)
+
+        halfedge = np.zeros((2*NF, 6), dtype=facets.dtype)
+        halfedge[:, 0] = facets.flat
+
+        halfedge[0::2, 1] = subdomain[:, 1]
+        halfedge[1::2, 1] = subdomain[:, 0] 
+        
+        halfedge[0::2, 4] = range(1, 2*NF, 2)
+        halfedge[1::2, 4] = range(0, 2*NF, 2)
+
+        halfedge[1::2, 5] = 1
+
+        NHE = len(halfedge)
+
+        edge = np.zeros((2*NHE, 2), dtype=facets.dtype)
+        edge[:NHE] = halfedge[:, 0:2]
+        edge[NHE:] = halfedge[halfedge[:, 4], 0:2]
+
+        idx = np.lexsort((edge[:, 0], edge[:, 1]))
+        print(idx)
+        print(edge[idx])
+        return None 
 
     def geo_dimension(self):
         return self.vertices.shape[1]
@@ -505,3 +544,4 @@ class HalfEdgeDomain():
             return isIntersect, p0 + s*t.reshape(-1, 1)
         else:
             return isIntersect
+
