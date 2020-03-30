@@ -48,7 +48,7 @@ class HalfEdgeDomain():
         self.ftype = vertices.dtype
 
     @classmethod
-    def from_facets(cls, vertices, facets, subdomain):
+    def from_facets(cls, vertices, facets, subdomain, fixed=None):
         """
 
         Parameters
@@ -73,15 +73,16 @@ class HalfEdgeDomain():
         halfedge[1::2, 5] = 1
 
         NHE = len(halfedge)
-
         edge = np.zeros((2*NHE, 2), dtype=facets.dtype)
         edge[:NHE] = halfedge[:, 0:2]
-        edge[NHE:] = halfedge[halfedge[:, 4], 0:2]
+        edge[NHE:, 0] = halfedge[halfedge[:, 4], 0]
+        edge[NHE:, 1] = halfedge[:, 1]
+        idx = np.lexsort((edge[:, 0], edge[:, 1])).reshape(-1, 2)
+        idx[:, 1] -= NHE
+        halfedge[idx[:, 0], 2] = idx[:, 1]
+        halfedge[halfedge[:, 2], 3] = range(NHE)
 
-        idx = np.lexsort((edge[:, 0], edge[:, 1]))
-        print(idx)
-        print(edge[idx])
-        return None 
+        return cls(vertices, halfedge, fixed=fixed) 
 
     def geo_dimension(self):
         return self.vertices.shape[1]
@@ -98,13 +99,12 @@ class HalfEdgeDomain():
         mesh = HalfEdgeMesh(node, subdomain, halfedge)
         return mesh
 
-    def voronoi_mesh(self, n=4, c=0.618, theta=100):
+    def voronoi_mesh(self, n=0, c=0.618, theta=100):
         self.boundary_uniform_refine(n=n)
         NN = self.NV
         node = self.vertices
         halfedge = self.halfedge
     
-
         # 这里假设所有边的尺寸是一样的
         # 进一步的算法改进中，这些尺寸应该是自适应的
         # 顶点处的半径应该要平均平均一下
@@ -137,12 +137,15 @@ class HalfEdgeDomain():
         v1 = p0 - p1
         l0 = np.sqrt(np.sum(v0**2, axis=-1))
         l1 = np.sqrt(np.sum(v1**2, axis=-1))
-        c = np.cross(v0, v1)/l0/l1
-        a = np.arcsin(c)
-        a[c < 0] += 2*np.pi
+        s = np.cross(v0, v1)/l0/l1
+        c = np.sum(v0*v1, axis=-1)/l0/l1
+        a = np.arcsin(s)
+        a[s < 0] += 2*np.pi
+        a[c == -1] = np.pi
         a = np.degrees(a)
         isCorner = a < theta
         idx = idx[isCorner] # 需要特殊处理的半边编号 
+
 
         v2 = (v0[isCorner] + v1[isCorner])/2
         v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))

@@ -77,51 +77,6 @@ class HalfEdgeDomainTest:
             mesh.add_halfedge_plot(axes, markersize=1)
             plt.show()
 
-
-    def voronoi_test(self, domain='square', plot=True):
-
-        if domain == 'square':
-            node = np.array([
-                (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
-            halfedge = np.array([
-                (1, 1, 1, 3, 4, 1), # 0
-                (2, 1, 2, 0, 5, 1), # 1
-                (3, 1, 3, 1, 6, 1), # 2
-                (0, 1, 0, 2, 7, 1), # 3
-                (0, 0, 7, 5, 0, 0), # 4
-                (1, 0, 4, 6, 1, 0), # 5
-                (2, 0, 5, 7, 2, 0), # 6
-                (3, 0, 6, 4, 3, 0)],# 7
-                dtype=np.int)
-            domain = HalfEdgeDomain(node, halfedge, NS=1)
-        elif domain == 'LShape':
-            node = np.array([
-                ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
-                (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
-            facet = np.array([
-                (0, 1), (1, 2), (2, 3), (3, 4), 
-                (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
-
-        bnode, idx, center, radius = domain.voronoi_mesh(n=3)
-        vor = Voronoi(bnode, incremental=True)
-        mesh = domain.to_halfedgemesh()
-
-        if plot:
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, color='k', showindex=True)
-            mesh.find_node(axes, node=bnode, showindex=True)
-
-            voronoi_plot_2d(vor, ax=axes)
-            cs = [
-                    axes.add_artist( plt.Circle(x, r, facecolor='none', edgecolor='r')) 
-               for x, r in zip(center, radius)]
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_halfedge_plot(axes, showindex=True)
-            plt.show()
-
     def from_facets(self, plot=True):
         vertices = np.array([
             ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
@@ -134,14 +89,104 @@ class HalfEdgeDomainTest:
             (1, 0), (1, 0), (1, 0), (1, 0)], dtype=np.int)
 
         domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
+        domain.boundary_uniform_refine(n=1)
+        mesh = domain.to_halfedgemesh()
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, color='k', showindex=True)
+
+            print("halfede:")
+            for i, val in enumerate(mesh.entity('halfedge')):
+                print(i, ":", val)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, color='g', showindex=True)
+            plt.show()
+
+    def voronoi_test(self, domain='square', plot=True):
+
+        if domain == 'square':
+            vertices = np.array([
+                ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0)], dtype=np.float)
+            facets = np.array([
+                (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
+            subdomain = np.array([
+                (1, 0), (1, 0), (1, 0), (1, 0)], dtype=np.int)
+            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
+            bnode, idx, center, radius = domain.voronoi_mesh(n=2)
+        elif domain == 'LShape':
+            vertices = np.array([
+                ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
+                (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
+            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1], dtype=np.bool)
+            facets = np.array([
+                (0, 1), (1, 2), (2, 3), (3, 4), 
+                (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
+            subdomain = np.array([
+                (1, 0), (1, 0), (1, 0), (1, 0),
+                (1, 0), (1, 0), (1, 0), (1, 0)], dtype=np.int)
+
+            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain,
+                    fixed=fixed)
+            bnode, idx, center, radius = domain.voronoi_mesh(n=2)
+        elif domain == 'cirlce':
+            n = 20 
+            h = 2*np.pi/n
+            theta = np.arange(0, 2*np.pi, h)
+            vertices = np.zeros((n, 2), dtype=np.float)
+            vertices[:, 0] = np.cos(theta)
+            vertices[:, 1] = np.sin(theta)
+            fixed = np.zeros(n, dtype=np.bool)
+            facets = np.zeros((n, 2), dtype=np.int)
+            facets[:, 0] = range(0, n)
+            facets[:-1, 1] = range(1, n)
+            subdomain = np.zeros((n, 2), dtype=np.int)
+            subdomain[:, 0] = 1
+            
+
+            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain,
+                    fixed=fixed)
+            bnode, idx, center, radius = domain.voronoi_mesh(n=0)
+
+        vor = Voronoi(bnode, incremental=True)
+        mesh = domain.to_halfedgemesh()
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, color='k', showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=True)
+            voronoi_plot_2d(vor, ax=axes)
+            cs = [
+                    axes.add_artist( plt.Circle(x, r, facecolor='none', edgecolor='r')) 
+               for x, r in zip(center, radius)]
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            plt.show()
+
 
 
 test = HalfEdgeDomainTest()
 #test.advance_trimesh_test()
-#test.voronoi_test()
-test.from_facets()
+#test.from_facets()
+#test.voronoi_test(domain='square')
+#test.voronoi_test(domain='LShape')
+test.voronoi_test(domain='cirlce')
 
 if False:
     print("halfede:")
     for i, val in enumerate(mesh.entity('halfedge')):
         print(i, ":", val)
+
+    print('vertices:', vertices)
+    print('facets:', facets)
+    print('subdomain:', subdomain)
+    print('fixed:', fixed)
