@@ -58,7 +58,7 @@ class LagrangeFiniteElementSpace():
                 cellmeasure=self.cellmeasure)
         self.integrator = self.integralalg.integrator
 
-        self.mutli_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
+        self.multi_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -255,7 +255,7 @@ class LagrangeFiniteElementSpace():
     def face_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
         TD = self.TD - 1
-        multiIndex = self.mutli_index_matrix[TD-1](p)
+        multiIndex = self.multi_index_matrix[TD-1](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
