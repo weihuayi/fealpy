@@ -178,8 +178,8 @@ test = HalfEdgeDomainTest()
 #test.advance_trimesh_test()
 #test.from_facets()
 #test.voronoi_test(domain='square')
-#test.voronoi_test(domain='LShape')
-test.voronoi_test(domain='cirlce')
+test.voronoi_test(domain='LShape')
+#test.voronoi_test(domain='cirlce')
 
 if False:
     print("halfede:")

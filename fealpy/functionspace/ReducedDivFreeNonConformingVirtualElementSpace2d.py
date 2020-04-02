@@ -268,6 +268,77 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         B = [B0, B1]
         return G, B
 
+    def matrix_T(self):
+        """
+
+        $\\bfQ_0^K(\\bfM_k) : \\bfQ_0^K(\\tilde\\bPhi_k)$
+        """
+
+        p = self.p
+        mesh = self.mesh
+        ch = self.smspace.cellsize # 单元尺寸 
+
+        smldof = self.smspace.number_of_local_dofs(p=p) # 标量 p 次单元缩放空间的维数
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 标量的单元边自由度信息
+
+        T00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
+        T01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
+
+        T10 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
+        T11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
+
+        n = mesh.edge_unit_normal()
+        eh = mesh.entity_measure('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        ndof = self.smspace.number_of_local_dofs(p=p-1)
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = mesh.edge_bc_to_point(bcs) 
+        phi = self.smspace.edge_basis(ps, p=p-1)
+
+        area = self.smspace.cellmeasure # 单元面积
+        Q0 = self.CM[:, 0, :]/area[:, None] # 
+
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=1) #(NQ, NC, ldof)
+        # only need m_1 and m_2
+        phi0 = phi0[:, :, 1:3] 
+        phi0 -= Q0[None, edge2cell[:, 0], 1:3]
+
+        # self.H1 is the inverse of Q_{p-1}^F
+        # i->quadrature, j->edge, m-> basis on domain, n->basis on edge
+        F0 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
+                ws, phi0, phi, eh, eh, ch[edge2cell[:, 0]])@self.H1
+
+        idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 0, :], n[:, 0]) 
+        np.add.at(T00, (np.s_[:], idx0), val)
+        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 0]) 
+        np.add.at(T10, (np.s_[:], idx0), val)
+        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 0, :], n[:, 1]) 
+        np.add.at(T01, (np.s_[:], idx0), val)
+        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 1]) 
+        np.add.at(T11, (np.s_[:], idx0), val)
+
+        if isInEdge.sum() > 0:
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=1)
+            phi1 = phi1[:, :, 1:3] # only need m_1 and m_2
+            phi1 -= Q0[None, edge2cell[:, 1], 1:3]
+            F1 = np.einsum('i, ijm, ijn, j->jmn', 
+                    ws, phi1, phi, eh, eh, ch[edge2cell[:, 1]])@self.H1
+            idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 0]) 
+            np.subtract.at(T00, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
+            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 0]) 
+            np.subtract.at(T10, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
+            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 1]) 
+            np.subtract.at(T01, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
+            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 1]) 
+            np.subtract.at(T11, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
+            
+        return [[T00, T01], [T10, T11]]
+
     def matrix_E(self):
         """
         计算 M_{k-2} 和 \\tilde\\bPhi 的矩阵, 这是其它右端矩阵计算的基础。
@@ -515,14 +586,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('ij, ij, i, i->ji',
                 h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 1])
             np.add.at(R10, (x[0][:, None], start[isInEdge]), val[:, isInEdge])
-
-        val = CM[:, :, 0].T/area[None, :]**2
-        def f0(i):
-            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            R00[:, s] += val[:, i, None]*self.E[0][0][0, s] 
-            R11[:, s] += val[:, i, None]*self.E[1][1][0, s] 
-        list(map(f0, range(NC)))
-
+        
+        T = self.matrix_T()
+        
+        R00 += T[0][0]
+        R01 += T[0][1]
+        R10 += T[1][0]
+        R11 += T[1][1]
         if p > 2:
             R02 += np.einsum('ij, jm->jim', val, self.E[0][2][:, 0, :]) 
             R12 += np.einsum('ij, jm->jim', val, self.E[1][2][:, 0, :])
