@@ -46,16 +46,15 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         edge = mesh.entity('edge')
         cell2edge = mesh.ds.cell_to_edge()
         bc = mesh.entity_barycenter('edge')
-        print("edge:", edge)
-        print("cell2edge:", cell2edge)
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
-        print("up:", up)
+        print(up)
         up = uspace.project_to_smspace(up)
-        print("ups:", up)
+        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
+        print(error)
         if plot:
             fig = plt.figure()
             axes = fig.gca()

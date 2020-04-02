@@ -194,7 +194,9 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         cell2edge = mesh.ds.cell_to_edge()
         uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
+        print(up)
         up = uspace.project_to_smspace(up)
+        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
@@ -232,6 +234,6 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-#test.project_test(u2, p=2, mtype=0, plot=True)
+test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
-test.stokes_equation_test(p=5)
+#test.stokes_equation_test(p=5)
