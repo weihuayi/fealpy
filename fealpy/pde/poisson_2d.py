@@ -13,7 +13,7 @@ class TwoHolesData:
         pass
 
     def domain(self, domaintype='meshpy'):
-        if domaintype is 'meshpy':
+        if domaintype == 'meshpy':
             from meshpy.triangle import MeshInfo
             domain = MeshInfo()
             points = np.zeros((16, 2), dtype=np.float)
@@ -50,9 +50,9 @@ class TwoHolesData:
         mesh = build(domain, max_volume=h**2)
         node = np.array(mesh.points, dtype=np.float)
         cell = np.array(mesh.elements, dtype=np.int)
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             return TriangleMesh(node, cell)
-        elif meshtype is 'polygon':
+        elif meshtype == 'polygon':
             mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
@@ -124,12 +124,12 @@ class CosCosData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'quadtree':
+        if meshtype == 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        if meshtype is 'quad':
+        if meshtype == 'quad':
             node = np.array([
                 (0, 0),
                 (1, 0),
@@ -146,12 +146,12 @@ class CosCosData:
             mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tri':
+        elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'stri':
+        elif meshtype == 'stri':
             mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
         else:
@@ -217,17 +217,17 @@ class ffData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quadtree':
+        elif meshtype == 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tritree':
+        elif meshtype == 'tritree':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = Tritree(node, cell)
             mesh.uniform_refine(n)
@@ -277,7 +277,7 @@ class KelloggData:
             (-1, 1),
             (0, 1),
             (1, 1)], dtype=np.float)
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([
                 (1, 4, 0),
                 (3, 0, 4),
@@ -289,7 +289,7 @@ class KelloggData:
                 (5, 8, 4)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
-        elif meshtype is 'quadtree':
+        elif meshtype == 'quadtree':
             cell = np.array([
                 (0, 1, 4, 3),
                 (1, 2, 5, 4),
@@ -404,7 +404,7 @@ class LShapeRSinData:
             (-1, 1),
             (0, 1),
             (1, 1)], dtype=np.float)
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([
                 (1, 3, 0),
                 (2, 0, 3),
@@ -415,7 +415,7 @@ class LShapeRSinData:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quadtree':
+        elif meshtype == 'quadtree':
             cell = np.array([
                 (0, 1, 3, 2),
                 (2, 3, 6, 5),
@@ -423,7 +423,7 @@ class LShapeRSinData:
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tritree':
+        elif meshtype == 'tritree':
             cell = np.array([
                 (1, 3, 0),
                 (2, 0, 3),
@@ -486,7 +486,7 @@ class CrackData:
         pass
 
     def init_mesh(self, n=4, meshtype='tri'):
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             node = np.array([
                 (0, -1),
                 (-1, 0),
@@ -503,7 +503,7 @@ class CrackData:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quadtree':
+        elif meshtype == 'quadtree':
             r = 1-2**(1/2)/2
             a = 1/2 - 2**(1/2)/2
             rr = 1/2
@@ -542,7 +542,7 @@ class CrackData:
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tritree':
+        elif meshtype == 'tritree':
             node = np.array([
                 (0, -1),
                 (-1, 0),
@@ -607,17 +607,17 @@ class TwoSigularData:
             (1, 1),
             (-1, 1)], dtype=np.float)
 
-        if meshtype is 'quadtree':
+        if meshtype == 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tri':
+        elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'stri':
+        elif meshtype == 'stri':
             mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
         else:
@@ -686,17 +686,17 @@ class CornerSigularData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'quadtree':
+        if meshtype == 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tri':
+        elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'stri':
+        elif meshtype == 'stri':
             mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
         else:
@@ -755,17 +755,17 @@ class SinSinData:
             (1, -1),
             (1, 1),
             (-1, 1)], dtype=np.float)
-        if meshtype is 'quadtree':
+        if meshtype == 'quadtree':
             cell = np.array([(0, 1, 2, 3)], dtype=np.int)
             mesh = Quadtree(point, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tri':
+        elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(point, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'stri':
+        elif meshtype == 'stri':
             mesh = StructureQuadMesh([0, 1, 0, 1], nx, ny)
             return mesh
         else:

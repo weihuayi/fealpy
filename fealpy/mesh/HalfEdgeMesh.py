@@ -16,7 +16,7 @@ from .mesh_tools import show_halfedge_mesh
 
 class HalfEdgeMesh(Mesh2d):
     def __init__(self, node, subdomain, halfedge,
-        NV=None, nodedim=None):
+        NV=None, nodedof=None):
         """
         Parameters
         ----------
@@ -50,7 +50,7 @@ class HalfEdgeMesh(Mesh2d):
         # 0: 固定点
         # 1: 边界上的点
         # 2: 区域内部的点
-        self.nodedata['dim'] = nodedim 
+        self.nodedata['dof'] = nodedof
 
         self.init_level_info()
 

@@ -53,8 +53,8 @@ class HalfEdgeDomain():
 
         Parameters
         ----------
-        node :  (NN, 2)
-        facet : (NF, 2)
+        vertices :  (NN, 2)
+        facets : (NF, 2)
         subdomain : (NF, 2)
         """
 
