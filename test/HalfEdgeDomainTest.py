@@ -162,7 +162,7 @@ class HalfEdgeDomainTest:
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=True)
             mesh.find_node(axes, node=bnode, showindex=True)
-            voronoi_plot_2d(vor, ax=axes)
+            #voronoi_plot_2d(vor, ax=axes)
             cs = [
                     axes.add_artist( plt.Circle(x, r, facecolor='none', edgecolor='r')) 
                for x, r in zip(center, radius)]
@@ -176,8 +176,8 @@ class HalfEdgeDomainTest:
 
 test = HalfEdgeDomainTest()
 #test.advance_trimesh_test()
-test.from_facets()
-#test.voronoi_test(domain='square')
+#test.from_facets()
+test.voronoi_test(domain='square')
 #test.voronoi_test(domain='LShape')
 #test.voronoi_test(domain='cirlce')
 

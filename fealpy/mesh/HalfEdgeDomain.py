@@ -151,8 +151,8 @@ class HalfEdgeDomain():
         v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
         v2 *= r[halfedge[idx, 0], None] 
         p = node[halfedge[idx, 0]] + v2
-        r[halfedge[pre[idx], 0]] = np.sqrt(np.sum((p - p0[idx])**2, axis=-1))
-        r[halfedge[nex[idx], 0]] = np.sqrt(np.sum((p - p2[idx])**2, axis=-1))
+        r[halfedge[pre[isCorner], 0]] = np.sqrt(np.sum((p - p0[isCorner])**2, axis=-1))
+        r[halfedge[nex[isCorner], 0]] = np.sqrt(np.sum((p - p2[isCorner])**2, axis=-1))
 
         # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
         # 这里也假设很近的点对是孤立的. 
