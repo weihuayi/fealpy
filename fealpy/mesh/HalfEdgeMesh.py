@@ -107,7 +107,7 @@ class HalfEdgeMesh(Mesh2d):
             return GaussLegendreQuadrature(k)
 
     @classmethod
-    def from_mesh_1(cls, mesh):
+    def from_mesh(cls, mesh):
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
@@ -140,119 +140,6 @@ class HalfEdgeMesh(Mesh2d):
         subdomain = np.ones(NC+1, dtype=halfedge.dtype)
         subdomain[0] = 0
 
-        return cls(node, subdomain, halfedge)
-
-    @classmethod
-    def from_mesh(cls, mesh, meshtype='polygon'):
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
-        NV = mesh.number_of_vertices_of_cells()
-
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        cell = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge()
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
-        sign = mesh.ds.cell_to_edge_sign()
-        cell2edgeSign = np.zeros((NC, NV), dtype=mesh.itype)
-        cell2edgeSign[~sign] = NE
-        nex, _ = mesh.ds.boundary_edge_to_edge()
-
-        halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
-
-
-        # 指向的顶点
-        halfedge[:NE, 0] = edge[:, 1]
-        halfedge[NE:, 0] = edge[:, 0]
-
-        # 指向的单元
-        halfedge[:NE, 1] = edge2cell[:, 0]+1
-        halfedge[NE:, 1] = edge2cell[:, 1]+1
-        halfedge[NE:, 1][~isInEdge] = 0 
-
-        # 下一条边
-        idx = cell2edge[edge2cell[:, 0], (edge2cell[:, 2]+1)%NV]
-        idx += cell2edgeSign[edge2cell[:, 0], (edge2cell[:, 2]+1)%NV]
-        halfedge[:NE, 2] = idx
-
-        idx = cell2edge[edge2cell[isInEdge, 1], (edge2cell[isInEdge, 3]+1)%NV]
-        idx += cell2edgeSign[edge2cell[isInEdge, 1], (edge2cell[isInEdge, 3]+1)%NV]
-        halfedge[NE:, 2][isInEdge] = idx
-        halfedge[NE:, 2][~isInEdge] = NE + nex
-
-        # 前一条边 
-        halfedge[halfedge[:, 2], 3] = range(2*NE)
-
-        # 对偶半边
-        halfedge[:NE, 4] = range(NE, 2*NE)
-        halfedge[NE:, 4] = range(NE)
-
-        # 主半边
-        halfedge[:NE, 5] = 1
-
-        subdomain = np.ones(NC+1, dtype=halfedge.dtype)
-        subdomain[0] = 0
-
-        if meshtype == 'polygon':
-            return cls(node, subdomain, halfedge)
-        else:
-            return cls(node, subdomain, halfedge, NV=cell.shape[1])
-
-    @classmethod
-    def from_polygonmesh(cls, mesh):
-        NC = mesh.number_of_cells()
-        NE = mesh.number_of_edges()
-        NV = mesh.number_of_vertices_of_cells()
-
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        _, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge()
-        edge2cell = mesh.ds.edge_to_cell()
-        cell2edgeSign = mesh.ds.cell_to_edge_sign()
-        cell2edgeSign[cell2edgeSign==1] = 0
-        cell2edgeSign[cell2edgeSign==-1] = NE
-
-        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
-
-        nex, pre = mesh.ds.boundary_edge_to_edge()
-
-        halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
-        # 指向的顶点
-        halfedge[:NE, 0] = edge[:, 1]
-        halfedge[NE:, 0] = edge[:, 0]
-
-        # 指向的单元
-        halfedge[:NE, 1] = edge2cell[:, 0]+1
-        halfedge[NE:, 1] = edge2cell[:, 1]+1
-        halfedge[NE:, 1][~isInEdge] = 0 
-
-        # 在指向单元中的下一条边
-        idx = cellLocation[edge2cell[:, 0]] + (edge2cell[:, 2] + 1)%NV[edge2cell[:,  0]]
-        halfedge[:NE, 2] = cell2edge[idx] + cell2edgeSign[idx]
-
-        idx = cellLocation[edge2cell[isInEdge, 1]] + (edge2cell[isInEdge, 3] + 1)%NV[edge2cell[isInEdge,  1]]
-        halfedge[NE:, 2][isInEdge] = cell2edge[idx] + cell2edgeSign[idx]
-        halfedge[NE:, 2][~isInEdge] = NE + nex
-
-        # 在指向单元中的上一条边
-        idx = cellLocation[edge2cell[:, 0]] + (edge2cell[:, 2] - 1)%NV[edge2cell[:,  0]]
-        halfedge[:NE, 3] = cell2edge[idx] + cell2edgeSign[idx]
-
-        idx = cellLocation[edge2cell[isInEdge, 1]] + (edge2cell[isInEdge, 3] - 1)%NV[edge2cell[isInEdge,  1]]
-        halfedge[NE:, 3][isInEdge] = cell2edge[idx] + cell2edgeSign[idx]
-        halfedge[NE:, 3][~isInEdge] = NE + pre
-
-        # 相反的halfedge
-        halfedge[:NE, 4] = range(NE, 2*NE)
-        halfedge[NE:, 4] = range(NE)
-
-        # 标记主半边 ：1：主半边， 0：对偶半边
-        halfedge[:NE, 5] = 1
-
-        subdomain = np.ones(NC+1, dtype=np.int)
-        subdomain[0] = 0
         return cls(node, subdomain, halfedge)
 
     def entity(self, etype=2):
