@@ -22,7 +22,7 @@ class HalfEdgeMeshTest:
         cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
 
         mesh = PolygonMesh(node, cell, cellLocation)
-        mesh = HalfEdgeMesh.from_polygonmesh(mesh)
+        mesh = HalfEdgeMesh.from_mesh_1(mesh)
 
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
@@ -68,7 +68,8 @@ class HalfEdgeMeshTest:
             mesh.find_node(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
 
-            cindex, = np.nonzero(mesh.ds.cflag)
+            NAC = mesh.number_of_all_cells() # 包括外部区域和洞
+            cindex = range(mesh.ds.cellstart, NAC)
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -110,7 +111,8 @@ class HalfEdgeMeshTest:
             mesh.find_node(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
 
-            cindex, = np.nonzero(mesh.ds.cflag)
+            NAC = mesh.number_of_all_cells() # 包括外部区域和洞
+            cindex = range(mesh.ds.cellstart, NAC)
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -264,9 +266,13 @@ class HalfEdgeMeshTest:
 
 test = HalfEdgeMeshTest()
 if False:
+    mesh = test.refine_poly_test(plot=True)
+
+if True:
     mesh = test.refine_poly_test(plot=False)
     test.coarsen_poly_test(mesh, plot=True)
 
-test.advance_trimesh_test()
+if False:
+    test.advance_trimesh_test()
 #test.triangle_mesh_test(plot=True)
 #test.voronoi_test(plot=True)
