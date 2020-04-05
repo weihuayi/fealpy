@@ -16,7 +16,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
     def __init__(self):
         pass
 
-    def varify_matrix(self, p=2, mtype=0, plot=True):
+    def verify_matrix(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
         if mtype == 0:
             node = np.array([
@@ -42,7 +42,11 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             mesh = PolygonMesh.from_mesh(mesh)
 
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        uspace.varify_matrix()
+        uspace.verify_matrix()
+        up = uspace.project(u)
+        print(up)
+        up = uspace.project_to_smspace(up)
+        print(up)
 
     def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -75,6 +79,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         cell2edge = mesh.ds.cell_to_edge()
         bc = mesh.entity_barycenter('edge')
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        print(uspace.G)
         up = uspace.project(u)
         print(up)
         up = uspace.project_to_smspace(up)
@@ -124,7 +129,7 @@ def u3(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
-test.varify_matrix(p=2, mtype=0, plot=True)
+test.verify_matrix(u0, p=2, mtype=0, plot=True)
 #test.project_test(u0, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

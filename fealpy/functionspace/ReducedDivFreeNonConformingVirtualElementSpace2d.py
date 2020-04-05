@@ -162,11 +162,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         list(map(f, range(NC)))
         return sh
 
-    def varify_matrix(self):
+    def verify_matrix(self):
         p = self.p
         NC = self.mesh.number_of_cells()
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         def f(i):
+            up = np.array([1., 1., 1., 1., 0., 0., 0., 0., 1., 1., 1., 1., 0., 0., 0., 0.])
             G = block([
                 [self.G[0][i]  ,   self.G[2][i]],
                 [self.G[2][i].T,   self.G[1][i]]])
@@ -185,10 +186,15 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [           0, self.D[0][s]],
                 [self.D[1][i], self.D[2][i]]])
 
+            print("RDiv D:", D)
+
             A = block([
                 [  G, B],
                 [B.T, 0]])
             B = block([[R], [J]])
+
+            print("RDiv B:", B)
+            print("RDiv Bup:", B@up)
             S = inv(A)@B
             smldof = (p+1)*(p+2)//2 
             print(S[:2*smldof]@D)
@@ -641,28 +647,45 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-        J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
 
-        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
-        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
+        if False:
+            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
 
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
-        np.add.at(J0, (np.s_[:], start), val)
+            Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
+            start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
 
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
-        np.add.at(J1, (np.s_[:], start), val)
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
+            np.add.at(J0, (np.s_[:], start), val)
 
-        if isInEdge.sum() > 0:
-            start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
+            np.add.at(J1, (np.s_[:], start), val)
 
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
-            np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+            if isInEdge.sum() > 0:
+                start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
 
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
-            np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
+                np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
 
-        J = [J0, J1]
+                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
+                np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+            J = [J0, J1]
+
+        if True:
+            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
+            idx = self.smspace.index1() # 一次求导后的非零基函数编号及求导系数
+            x = idx['x']
+            y = idx['y']
+            def f(i):
+                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+                J0[x[0], s] -= x[1][:, None]*self.E[0][0][:, s] 
+                J0[y[0], s] -= y[1][:, None]*self.E[0][1][:, s]
+                J1[x[0], s] -= x[1][:, None]*self.E[1][0][:, s] 
+                J1[y[0], s] -= y[1][:, None]*self.E[1][1][:, s]
+
+
         return R, J
 
     def matrix_D(self):
