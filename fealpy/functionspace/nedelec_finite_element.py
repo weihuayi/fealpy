@@ -2,7 +2,7 @@ import numpy as np
 from .function import Function
 from .lagrange_fem_space import LagrangeFiniteElementSpace
 
-class NedelecFiniteElement():
+class NedelecFiniteElement2d():
     def __init__(self, mesh, p, flag=0):
         self.mesh = mesh
         self.p = p
