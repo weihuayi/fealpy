@@ -162,6 +162,44 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         list(map(f, range(NC)))
         return sh
 
+    def verify_matrix(self):
+        p = self.p
+        NC = self.mesh.number_of_cells()
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        def f(i):
+            up = np.array([1., 1., 1., 1., 0., 0., 0., 0., 1., 1., 1., 1., 0., 0., 0., 0.])
+            G = block([
+                [self.G[0][i]  ,   self.G[2][i]],
+                [self.G[2][i].T,   self.G[1][i]]])
+            B = block([
+                [self.B[0][i]], 
+                [self.B[1][i]]])
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            R = block([
+                [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
+                [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]]])
+            m, n = self.J[0].shape[0], self.R[0][2][i].shape[1]
+            J = block([[self.J[0][:, s], self.J[1][:, s], np.zeros((m,n))]])
+          
+            D = block([
+                [self.D[0][s],            0],
+                [           0, self.D[0][s]],
+                [self.D[1][i], self.D[2][i]]])
+
+            print("RDiv D:", D)
+
+            A = block([
+                [  G, B],
+                [B.T, 0]])
+            B = block([[R], [J]])
+
+            print("RDiv B:", B)
+            print("RDiv Bup:", B@up)
+            S = inv(A)@B
+            smldof = (p+1)*(p+2)//2 
+            print(S[:2*smldof]@D)
+        PI0 = list(map(f, range(NC)))
+
     def matrix_PI0(self):
         p = self.p
         NC = self.mesh.number_of_cells()
@@ -315,6 +353,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(T00, (np.s_[:], idx0), val)
         val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 0]) 
         np.add.at(T10, (np.s_[:], idx0), val)
+
         val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 0, :], n[:, 1]) 
         np.add.at(T01, (np.s_[:], idx0), val)
         val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 1]) 
@@ -327,11 +366,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             a = 1/area[edge2cell[:, 1]]
             F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi1, phi, eh, eh, a)
             F1 = F1@self.H1
+
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 0]) 
             np.subtract.at(T00, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
             val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 0]) 
             np.subtract.at(T10, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
+
             val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 1]) 
             np.subtract.at(T01, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
             val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 1]) 
@@ -501,50 +542,60 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         qf = GaussLegendreQuadrature(p + 3)
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.quadpts, qf.weights # bcs: (NQ, 2)
         ps = mesh.edge_bc_to_point(bcs)
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)
+        # phi0: (NQ, NE, ndof)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1) 
+        # phi: (NQ, NE, p)
         phi = self.smspace.edge_basis(ps, p=p-1)
+        # F0: (NE, ndof, p) 
         F0 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi0, phi, eh, eh)
+        # F0: (NE, ndof, p)
         F0 = F0@self.H1
 
         idx = self.smspace.index1() # 一次求导后的非零基函数编号及求导系数
         x = idx['x']
         y = idx['y']
+        # idx0: (NE, p)
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-        h2 = x[1].reshape(1, -1)/ch[edge2cell[:, [0]]]
-        h3 = y[1].reshape(1, -1)/ch[edge2cell[:, [0]]]
+        # h2: (NE, ndof)
+        h2 = x[1][None, :]/ch[edge2cell[:, [0]]]
+        h3 = y[1][None, :]/ch[edge2cell[:, [0]]]
 
-        val = np.einsum('ij, ijk, i->jik', h2, F0, n[:, 0])
+        # val: (ndof, NE, p)
+        val = np.einsum('jm, jmn, j-> mjn', h2, F0, n[:, 0])
+        # x[0]: (ndof, 1, 1)  idx0: (NE, p) --> x[0] and idx0: (ndof, NE, p)
         np.add.at(R00, (x[0][:, None, None], idx0), val)
-        val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 1])
+        val = np.einsum('jm, jmn, j-> mjn', h3, F0, 0.5*n[:, 1])
         np.add.at(R00, (y[0][:, None, None], idx0), val)
 
-        val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 0])
+        val = np.einsum('jm, jmn, j-> mjn', h2, F0, 0.5*n[:, 0])
         np.add.at(R11, (x[0][:, None, None], idx0), val)
-        val = np.einsum('ij, ijk, i->jik', h3, F0, n[:, 1])
+        val = np.einsum('jm, jmn, j-> mjn', h3, F0, n[:, 1])
         np.add.at(R11, (y[0][:, None, None], idx0), val)
 
-        val = np.einsum('ij, ijk, i->jik', h3, F0, 0.5*n[:, 0])
+        val = np.einsum('jm, jmn, j-> mjn', h3, F0, 0.5*n[:, 0])
         np.add.at(R01, (y[0][:, None, None], idx0), val)
-        val = np.einsum('ij, ijk, i->jik', h2, F0, 0.5*n[:, 1])
+        val = np.einsum('jm, jmn, j-> mjn', h2, F0, 0.5*n[:, 1])
         np.add.at(R10, (x[0][:, None, None], idx0), val)
 
         a2 = area**2
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-        val = np.einsum('ij, ij, i, i->ji',
+        # val: (ndof, NE)
+        val = np.einsum('jm, jm, j, j->mj',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
+        # y[0]: (ndof, 1)  start: (NE, ) -->  y[0] and start : (ndof, NE)
         np.add.at(R00, (y[0][:, None], start), val)
 
-        val = np.einsum('ij, ij, i, i->ji',
+        val = np.einsum('jm, jm, j, j->mj',
             h3, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.subtract.at(R01, (y[0][:, None], start), val)
 
-        val = np.einsum('ij, ij, i, i->ji',
+        val = np.einsum('jm, jm, j, j->mj',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 1])
         np.subtract.at(R10, (x[0][:, None], start), val)
 
-        val = np.einsum('ij, ij, i, i->ji',
+        val = np.einsum('jm, jm, j, j->mj',
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.add.at(R11, (x[0][:, None], start), val)
 
@@ -553,38 +604,38 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             F1 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi1, phi, eh, eh)
             F1 = F1@self.H1
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
-            h2 = x[1].reshape(1, -1)/ch[edge2cell[:, [1]]]
-            h3 = y[1].reshape(1, -1)/ch[edge2cell[:, [1]]]
+            h2 = x[1][None, :]/ch[edge2cell[:, [1]]]
+            h3 = y[1][None, :]/ch[edge2cell[:, [1]]]
 
-            val = np.einsum('ij, ijk, i->jik', h2, F1, n[:, 0])
+            val = np.einsum('jm, jmn, j-> mjn', h2, F1, n[:, 0])
             np.subtract.at(R00, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h3, F1, 0.5*n[:, 1])
+            val = np.einsum('jm, jmn, j-> mjn', h3, F1, 0.5*n[:, 1])
             np.subtract.at(R00, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
-            val = np.einsum('ij, ijk, i->jik', h2, F1, 0.5*n[:, 0])
+            val = np.einsum('jm, jmn, j-> mjn', h2, F1, 0.5*n[:, 0])
             np.subtract.at(R11, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h3, F1, n[:, 1])
+            val = np.einsum('jm, jmn, j-> mjn', h3, F1, n[:, 1])
             np.subtract.at(R11, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
-            val = np.einsum('ij, ijk, i->jik', h3, F1, 0.5*n[:, 0])
+            val = np.einsum('jm, jmn, j-> mjn', h3, F1, 0.5*n[:, 0])
             np.subtract.at(R01, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            val = np.einsum('ij, ijk, i->jik', h2, F1, 0.5*n[:, 1])
+            val = np.einsum('jm, jmn, j-> mjn', h2, F1, 0.5*n[:, 1])
             np.subtract.at(R10, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
             start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
-            val = np.einsum('ij, ij, i, i->ji',
+            val = np.einsum('jm, jm, j, j->mj',
                 h3, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 1])
             np.subtract.at(R00, (y[0][:, None], start[isInEdge]), val[:, isInEdge])
 
-            val = np.einsum('ij, ij, i, i->ji',
+            val = np.einsum('jm, jm, j, j->mj',
                 h3, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 0])
             np.add.at(R01, (y[0][:, None], start[isInEdge]), val[:, isInEdge])
 
-            val = np.einsum('ij, ij, i, i->ji',
+            val = np.einsum('jm, jm, j, j->mj',
                 h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 1])
             np.add.at(R10, (x[0][:, None], start[isInEdge]), val[:, isInEdge])
 
-            val = np.einsum('ij, ij, i, i->ji',
+            val = np.einsum('jm, jm, j, j->mj',
                 h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 0])
             np.subtract.at(R11, (x[0][:, None], start[isInEdge]), val[:, isInEdge])
 
@@ -596,21 +647,45 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-        J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
-        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
-        np.add.at(J0, (np.s_[:], start), val)
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
-        np.add.at(J1, (np.s_[:], start), val)
-        if isInEdge.sum() > 0:
-            start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
-            np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
-            np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
-        J = [J0, J1]
+
+        if False:
+            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+
+            Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
+            start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
+
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
+            np.add.at(J0, (np.s_[:], start), val)
+
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
+            np.add.at(J1, (np.s_[:], start), val)
+
+            if isInEdge.sum() > 0:
+                start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
+
+                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
+                np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+
+                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
+                np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+            J = [J0, J1]
+
+        if True:
+            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+            J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
+            idx = self.smspace.index1() # 一次求导后的非零基函数编号及求导系数
+            x = idx['x']
+            y = idx['y']
+            def f(i):
+                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+                J0[x[0], s] -= x[1][:, None]*self.E[0][0][:, s] 
+                J0[y[0], s] -= y[1][:, None]*self.E[0][1][:, s]
+                J1[x[0], s] -= x[1][:, None]*self.E[1][0][:, s] 
+                J1[y[0], s] -= y[1][:, None]*self.E[1][1][:, s]
+
+
         return R, J
 
     def matrix_D(self):
@@ -628,7 +703,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ch = self.smspace.cellsize # 单元尺寸 
         CM = self.CM
 
-        smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
+        smldof = self.smspace.number_of_local_dofs(p=p) # 标量 p 次单元缩放空间的维数
         ndof = (p-1)*p//2
         idof = (p-2)*(p-1)//2
 
@@ -642,15 +717,15 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p)
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi0)
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         np.add.at(D0, (idx0, np.s_[:]), F0)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1])
+        if np.any(isInEdge):
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p)
             F1 = self.H1@np.einsum('i, ijm, ijn->jmn', ws, phi, phi1)
             idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             np.add.at(D0, (idx1[isInEdge], np.s_[:]), F1[isInEdge])

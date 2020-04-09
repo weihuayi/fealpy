@@ -17,20 +17,20 @@ class SinSinData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quad':
+        elif meshtype == 'quad':
             nx = 4
             ny = 4
             mesh = StructureQuadMesh(self.box, nx, ny)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'Poly':
+        elif meshtype == 'Poly':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
@@ -80,20 +80,20 @@ class CosSinData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quad':
+        elif meshtype == 'quad':
             nx = 4
             ny = 4
             mesh = StructureQuadMesh(self.box, nx, ny)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'Poly':
+        elif meshtype == 'Poly':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
@@ -147,20 +147,20 @@ class PolyData:
             (1, 1),
             (0, 1)], dtype=np.float)
 
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quad':
+        elif meshtype == 'quad':
             nx = 4
             ny = 4
             mesh = StructureQuadMesh(self.box, nx, ny)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'Poly':
+        elif meshtype == 'Poly':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)

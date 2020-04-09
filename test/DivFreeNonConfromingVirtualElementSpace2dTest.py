@@ -88,18 +88,13 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         A = space.matrix_A()
         print(A)
 
-    def matrix_P_test(self, p=2):
+    def matrix_G_test(self, p=2):
         node = np.array([
-            (0.0, 0.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (0.0, 1.0)], dtype=np.float)
+            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        P = space.matrix_P()
-        print(P)
 
     def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
@@ -234,6 +229,7 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix(p=2)
 #test.test_matrix_A()
 #test.test_matrix_P()
-test.project_test(u2, p=2, mtype=0, plot=True)
+#test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
-#test.stokes_equation_test(p=5)
+#test.stokes_equation_test(p=2)
+test.matrix_G_test()

@@ -1,12 +1,13 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
+from scipy.spatial import KDTree
 from types import ModuleType
 
 from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from .HalfEdgeMesh import HalfEdgeMesh
 
 class HalfEdgeDomain():
-    def __init__(self, vertices, halfedge, NS=None, fixed=None, boundary=None):
+    def __init__(self, vertices, halfedge, fixed=None, boundary=None):
         """
         Parameters
         ---------- 
@@ -30,10 +31,13 @@ class HalfEdgeDomain():
         self.vertices = vertices # 区域的顶点
         self.halfedge = halfedge #　区域的半边数据结构
         self.GD = vertices.shape[1]
-        if NS is None:
-            self.NS = len(set(halfedge[:, 1]))
-        else:
-            self.NS = NS # 子区域的个数
+
+        self.sset = set(halfedge[:, 1])
+        self.NS = len(self.sset)
+
+        self.sarea = {}
+        for i in self.sset:
+            self.sarea[i] = self.subdomain_area(index=i)
         
         self.NV = len(vertices) # 区域顶点的个数
         self.NE = len(halfedge) # 区域半边的个数
@@ -53,8 +57,8 @@ class HalfEdgeDomain():
 
         Parameters
         ----------
-        node :  (NN, 2)
-        facet : (NF, 2)
+        vertices :  (NN, 2)
+        facets : (NF, 2)
         subdomain : (NF, 2)
         """
 
@@ -98,6 +102,25 @@ class HalfEdgeDomain():
         halfedge[:, 1] = j
         mesh = HalfEdgeMesh(node, subdomain, halfedge)
         return mesh
+
+    def number_of_subdomains(self):
+        return self.NS
+
+    def subdomain_area(self, index=1):
+        node = self.vertices
+        halfedge = self.halfedge
+        NS = self.number_of_subdomains()
+        
+        flag = halfedge[:, 1] == index 
+
+        e0 = halfedge[halfedge[flag, 3], 0]
+        e1 = halfedge[flag, 0]
+
+        w = np.array([[0, -1], [1, 0]], dtype=np.int)
+        v= (node[e1] - node[e0])@w
+        val = np.sum(v*node[e0], axis=1)
+        a = sum(val)/2
+        return a
 
     def voronoi_mesh(self, n=0, c=0.618, theta=100):
         self.boundary_uniform_refine(n=n)
@@ -151,8 +174,8 @@ class HalfEdgeDomain():
         v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
         v2 *= r[halfedge[idx, 0], None] 
         p = node[halfedge[idx, 0]] + v2
-        r[halfedge[pre[idx], 0]] = np.sqrt(np.sum((p - p0[idx])**2, axis=-1))
-        r[halfedge[nex[idx], 0]] = np.sqrt(np.sum((p - p2[idx])**2, axis=-1))
+        r[halfedge[pre[isCorner], 0]] = np.sqrt(np.sum((p - p0[isCorner])**2, axis=-1))
+        r[halfedge[nex[isCorner], 0]] = np.sqrt(np.sum((p - p2[isCorner])**2, axis=-1))
 
         # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
         # 这里也假设很近的点对是孤立的. 
@@ -173,6 +196,33 @@ class HalfEdgeDomain():
         isKeepNode[index] = True
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
+
+        bnode = bnode[isKeepNode]
+        NB = bnode.shape[0]
+        hedge2bnode = idxmap[index]
+        flag = np.zeros(NB, dtype=np.int)
+        flag[hedge2bnode] = halfedge[:, 1]
+
+        tree = KDTree(bnode)
+
+        for index in filter(lambda x: x > 0, self.sset):
+            p = bnode[flag == index]
+            xmin = min(p[:, 0])
+            xmax = max(p[:, 0])
+            ymin = min(p[:, 1])
+            ymax = max(p[:, 1])
+            
+            c = 1
+            area = self.sarea[index]
+            N = int(area/c)
+            N0 = p.shape[0]
+
+            pp = np.random.rand(N - N0, 2)
+            
+            tree.query(pp)
+
+
+
 
         return bnode[isKeepNode], idxmap[index], node, r
 

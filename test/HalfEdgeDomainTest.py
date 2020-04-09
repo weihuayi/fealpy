@@ -13,6 +13,20 @@ class HalfEdgeDomainTest:
     def __init__(self):
         pass
 
+    def subdomain_area_test(self):
+        vertices = np.array([
+            ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
+            (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
+        facets = np.array([
+            (0, 1), (1, 2), (2, 3), (3, 4), 
+            (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
+        subdomain = np.array([
+            (1, 0), (1, 0), (1, 0), (1, 0),
+            (1, 0), (1, 0), (1, 0), (1, 0)], dtype=np.int)
+        domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
+        a = domain.subdomain_area(n=1)
+        print(a)
+
     def square_domain_test(self, plot=True):
         node = np.array([
             (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float)
@@ -162,7 +176,7 @@ class HalfEdgeDomainTest:
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=True)
             mesh.find_node(axes, node=bnode, showindex=True)
-            voronoi_plot_2d(vor, ax=axes)
+            #voronoi_plot_2d(vor, ax=axes)
             cs = [
                     axes.add_artist( plt.Circle(x, r, facecolor='none', edgecolor='r')) 
                for x, r in zip(center, radius)]
@@ -175,10 +189,15 @@ class HalfEdgeDomainTest:
 
 
 test = HalfEdgeDomainTest()
+
+if True:
+    test.subdomain_area_test()
+
+if False:
 #test.advance_trimesh_test()
 #test.from_facets()
-#test.voronoi_test(domain='square')
-test.voronoi_test(domain='LShape')
+    test.voronoi_test(domain='square')
+#test.voronoi_test(domain='LShape')
 #test.voronoi_test(domain='cirlce')
 
 if False:

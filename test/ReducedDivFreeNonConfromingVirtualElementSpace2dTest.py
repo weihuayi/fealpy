@@ -16,6 +16,38 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
     def __init__(self):
         pass
 
+    def verify_matrix(self, u, p=2, mtype=0, plot=True):
+        from fealpy.mesh.simple_mesh_generator import triangle
+        if mtype == 0:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3], dtype=np.int)
+            cellLocation = np.array([0, 4], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 1:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([0, 1, 2, 3, 0, 2], dtype=np.int)
+            cellLocation = np.array([0, 3, 6], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+        elif mtype == 2:
+            h = 0.1
+            mesh = triangle([-1, 1, -1, 1], h, meshtype='polygon')
+        elif mtype == 3:
+            node = np.array([
+                (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            cell = np.array([[0, 1, 2, 3]], dtype=np.int)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine()
+            mesh = PolygonMesh.from_mesh(mesh)
+
+        uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        uspace.verify_matrix()
+        up = uspace.project(u)
+        print(up)
+        up = uspace.project_to_smspace(up)
+        print(up)
+
     def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
         if mtype == 0:
@@ -47,6 +79,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         cell2edge = mesh.ds.cell_to_edge()
         bc = mesh.entity_barycenter('edge')
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        print(uspace.G)
         up = uspace.project(u)
         print(up)
         up = uspace.project_to_smspace(up)
@@ -63,6 +96,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
+def u0(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = 1.0 
+    val[..., 1] = 1.0 
+    return val
+
+def u1(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y/2
+    val[..., 1] = x/2
+    return val
+
 def u2(p):
     x = p[..., 0]
     y = p[..., 1]
@@ -80,6 +129,7 @@ def u3(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
-test.project_test(u2, p=2, mtype=0, plot=True)
+test.verify_matrix(u0, p=2, mtype=0, plot=True)
+#test.project_test(u0, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
