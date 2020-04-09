@@ -365,14 +365,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         ndof = self.smspace.number_of_local_dofs(p=p-1)
         qf = GaussLegendreQuadrature(p + 3)
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.quadpts, qf.weights # bcs: (NQ, 2), ws: (NQ, )
         ps = mesh.edge_bc_to_point(bcs) 
         phi = self.smspace.edge_basis(ps, p=p-1)
 
         area = self.smspace.cellmeasure # 单元面积
-        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] 
+        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
 
-        # (NQ, NE, ldof)
+        # (NQ, NE, ndof)
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)
         phi0 -= Q0[None, edge2cell[:, 0], :]
         c = np.repeat(range(1, p), range(1, p))
@@ -385,7 +385,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         x = idx['x']
         y = idx['y']
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-        val = np.einsum('jmn, j->mjn', F0, n[:, 0]) # i->edge, j-> m_{k-2}^K, k-> m_{k-1}^F
+        val = np.einsum('jmn, j->mjn', F0, n[:, 0]) 
         np.add.at(E00, (np.s_[:], idx0), val[x[0]])
         np.add.at(E10, (np.s_[:], idx0), val[y[0]])
 
@@ -401,11 +401,11 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             F1 = F1@self.H1
             F1 /= c[None, :, None]
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
-            val = np.einsum('ijk, i->jik', F1, n[:, 0])
+            val = np.einsum('jmn, j->mjn', F1, n[:, 0])
             np.subtract.at(E00, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
             np.subtract.at(E10, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
 
-            val = np.einsum('ijk, i->jik', F1, n[:, 1])
+            val = np.einsum('jmn, j->mjn', F1, n[:, 1])
             np.subtract.at(E01, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
             np.subtract.at(E11, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
             
@@ -435,7 +435,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         area = self.smspace.cellmeasure # 单元面积
         ch = self.smspace.cellsize # 单元尺寸 
 
-        smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
+        smldof = self.smspace.number_of_local_dofs(p=p) # 标量 p 次单元缩放空间的维数
         ndof = smldof - p - 1 # 标量 p - 1 次单元缩放单项项式空间的维数
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 标量的单元边自由度信息
 
