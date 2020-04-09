@@ -186,18 +186,18 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [           0, self.D[0][s]],
                 [self.D[1][i], self.D[2][i]]])
 
-            print("RDiv D:", D)
+            #print("RDiv D:", D)
 
             A = block([
                 [  G, B],
                 [B.T, 0]])
             B = block([[R], [J]])
 
-            print("RDiv B:", B)
-            print("RDiv Bup:", B@up)
+            #print("RDiv B:", B)
+            #print("RDiv Bup:", B@up)
             S = inv(A)@B
             smldof = (p+1)*(p+2)//2 
-            print(S[:2*smldof]@D)
+            #print(S[:2*smldof]@D)
         PI0 = list(map(f, range(NC)))
 
     def matrix_PI0(self):
@@ -648,7 +648,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R = [[R00, R01, R02], [R10, R11, R12]]
 
 
-        if False:
+        if True:
             J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
 
@@ -671,7 +671,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
             J = [J0, J1]
 
-        if True:
+        if False:
             J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
