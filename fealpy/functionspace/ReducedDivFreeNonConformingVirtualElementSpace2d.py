@@ -412,6 +412,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         area = self.smspace.cellmeasure # 单元面积
         Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
+        print("Q0:", Q0)
 
         # (NQ, NE, ndof)
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)
