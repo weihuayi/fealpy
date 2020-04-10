@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.spatial import KDTree
 
 
 class CVTPMesher:
@@ -30,8 +31,8 @@ class CVTPMesher:
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
         h = np.sqrt(np.sum(v**2, axis=-1))
-        r = np.zeros(NN, dtype=self.ftype)
-        n = np.zeros(NN, dtype=self.itype)
+        r = np.zeros(NN, dtype=self.domain.ftype)
+        n = np.zeros(NN, dtype=self.domain.itype)
         np.add.at(r, idx0, h)
         np.add.at(r, idx1, h)
         np.add.at(n, idx0, 1)
@@ -121,7 +122,7 @@ class CVTPMesher:
             ymin = min(p[:, 1])
             ymax = max(p[:, 1])
             
-            area = self.area[index]
+            area = self.domain.area[index]
             N = int(area/c)
             N0 = p.shape[0]
             start = 0
@@ -146,3 +147,4 @@ class CVTPMesher:
     
 
     def voronoi(self, node):
+        pass
