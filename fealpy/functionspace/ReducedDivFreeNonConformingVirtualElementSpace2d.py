@@ -126,7 +126,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 u0, edgetype=True)/eh[:, None, None]
         uh[0:2*NE*p] = uh0.reshape(-1, 2).T.flat
         if p > 2:
-            idx = self.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
             def u1(x, index):
@@ -227,7 +227,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
             smldof = self.smspace.number_of_local_dofs() # 标量 p 次单元缩放空间的维数
             ndof = (p-2)*(p-1)//2 # 标量 p - 3 次单元缩放单项项式空间的维数
-            cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 边上的标量的自由度信息
+            cell2dof =  self.dof.cell2dof
+            cell2dofLocation = self.dof.cell2dofLocation # 边上的标量的自由度信息
             CM = self.CM
 
             idx = self.smspace.index1(p=p-2)
@@ -238,8 +239,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             L0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             L1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             L2 = np.zeros((NC, ndof, ndof), dtype=self.ftype)
-            L2[:, y[0], y[0]] += area[:, None]
-            L2[:, x[0], x[0]] += area[:, None] 
+            idx = np.arange(ndof)
+            L2[:, idx, idx] = area[:, None]
             return Q, [L0, L1, L2]
         else:
             return None, None
@@ -418,7 +419,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F0 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
                 ws, phi0, phi, eh, eh, ch[edge2cell[:, 0]])
         F0 = F0@self.H1
-        F0 /= c[None, :, None]
+        F0 /= c[None, None, :]
 
         idx = self.smspace.index1(p=p-1)
         x = idx['x']
@@ -435,10 +436,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         if isInEdge.sum() > 0:
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
             phi1 -= Q0[None, edge2cell[:, 1], :]
-            F1 = np.einsum('i, ijm, ijn, j->jmn', 
+            F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
                     ws, phi1, phi, eh, eh, ch[edge2cell[:, 1]])
             F1 = F1@self.H1
-            F1 /= c[None, :, None]
+            F1 /= c[None,  None, :]
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('jmn, j->mjn', F1, n[:, 0])
             np.subtract.at(E00, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
