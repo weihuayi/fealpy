@@ -538,7 +538,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
         phi = self.smspace.edge_basis(ps, p=p-1)
-        # TODO: delete self.H1
         F0 = np.einsum('i, ijm, ijn->jmn', ws, phi, phi0) 
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         np.add.at(D, (idx0, np.s_[:]), F0)
@@ -546,7 +545,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if isInEdge.sum() > 0:
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1])
-            # TODO: delete self.H1
             F1 = np.einsum('i, ijm, ijn->jmn', ws, phi, phi1)
             idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             np.add.at(D, (idx1[isInEdge], np.s_[:]), F1[isInEdge])

@@ -78,7 +78,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         bc = mesh.entity_barycenter('edge')
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
+        print(up)
         up = uspace.project_to_smspace(up)
+        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
@@ -124,11 +126,11 @@ def u3(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
-if True:
+if False:
     test.verify_matrix(u0, p=2, mtype=0, plot=True)
 
-if False:
-    test.project_test(u0, p=2, mtype=0, plot=True)
+if True:
+    test.project_test(u3, p=3, mtype=0, plot=True)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
