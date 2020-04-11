@@ -61,7 +61,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             cellLocation = np.array([0, 3, 6], dtype=np.int)
             mesh = PolygonMesh(node, cell, cellLocation)
         elif mtype == 2:
-            h = 0.1
+            h = 0.025
             mesh = triangle([-1, 1, -1, 1], h, meshtype='polygon')
         elif mtype == 3:
             node = np.array([
@@ -78,9 +78,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         bc = mesh.entity_barycenter('edge')
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
-        print(up)
         up = uspace.project_to_smspace(up)
-        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
@@ -130,7 +128,7 @@ if False:
     test.verify_matrix(u0, p=2, mtype=0, plot=True)
 
 if True:
-    test.project_test(u3, p=3, mtype=1, plot=True)
+    test.project_test(u3, p=3, mtype=1, plot=False)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

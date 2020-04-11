@@ -150,7 +150,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         def f(i):
             PI0 = self.PI0[i]
             idx = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-            print('idx:', idx)
             x0 = uh[idx]
             x1 = uh[idx+NE*p]
             x2 = np.zeros(idof, dtype=self.ftype)
@@ -158,7 +157,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 start = 2*NE*p + i*idof
                 x2[:] = uh[start:start+idof]
             x = np.r_[x0, x1, x2]
-            sio.savemat('S0.mat', {'S0':PI0[:2*smldof]})
             y = (PI0[:2*smldof]@x).flat
             sh[c2d[i], 0] = y[:smldof]
             sh[c2d[i], 1] = y[smldof::]
@@ -433,7 +431,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(E01, (np.s_[:], idx0), val[x[0]])
         np.add.at(E11, (np.s_[:], idx0), val[y[0]])
 
-        if isInEdge.sum() > 0:
+        if np.any(isInEdge):
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
             phi1 -= Q0[None, edge2cell[:, 1], :]
             F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
@@ -442,12 +440,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             F1 /= c[None,  None, :]
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('jmn, j->mjn', F1, n[:, 0])
-            np.subtract.at(E00, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
-            np.subtract.at(E10, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
+            np.subtract.at(E00, (np.s_[:], idx0[isInEdge]), val[x[0][:, None], isInEdge])
+            np.subtract.at(E10, (np.s_[:], idx0[isInEdge]), val[y[0][:, None], isInEdge])
 
             val = np.einsum('jmn, j->mjn', F1, n[:, 1])
-            np.subtract.at(E01, (np.s_[:], idx0[isInEdge]), val[x[0], isInEdge])
-            np.subtract.at(E11, (np.s_[:], idx0[isInEdge]), val[y[0], isInEdge])
+            np.subtract.at(E01, (np.s_[:], idx0[isInEdge]), val[x[0][:, None], isInEdge])
+            np.subtract.at(E11, (np.s_[:], idx0[isInEdge]), val[y[0][:, None], isInEdge])
             
         NC = mesh.number_of_cells()
         idof = (p-2)*(p-1)//2
@@ -659,7 +657,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
         np.add.at(J1, (np.s_[:], start), val)
 
-        if isInEdge.sum() > 0:
+        if np.any(isInEdge):
             start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
 
             val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
