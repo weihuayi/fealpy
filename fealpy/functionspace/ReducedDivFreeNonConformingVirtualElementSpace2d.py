@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import bmat, coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+import scipy.io as sio
 
 from .function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -197,7 +198,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             #print("RDiv Bup:", B@up)
             S = inv(A)@B
             smldof = (p+1)*(p+2)//2 
-            #print(S[:2*smldof]@D)
+            data = {"M":S[:2*smldof]@D}
+            sio.savemat("test.mat", data)
         PI0 = list(map(f, range(NC)))
 
     def matrix_PI0(self):
