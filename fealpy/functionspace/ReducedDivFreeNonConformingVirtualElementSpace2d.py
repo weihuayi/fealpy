@@ -344,7 +344,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # self.H1 is the inverse of Q_{p-1}^F
         # i->quadrature, j->edge, m-> basis on domain, n->basis on edge
-        a = 1/area[edge2cell[:, 0]]
+        a = 1/ch[edge2cell[:, 0]]
         F0 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi0, phi, eh, eh, a)
         F0 = F0@self.H1
 
@@ -363,7 +363,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=1)
             phi1 = phi1[:, :, 1:3] 
             phi1 -= Q0[None, edge2cell[:, 1], 1:3]
-            a = 1/area[edge2cell[:, 1]]
+            a = 1/ch[edge2cell[:, 1]]
             F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi1, phi, eh, eh, a)
             F1 = F1@self.H1
 
@@ -400,7 +400,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         E11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
 
         n = mesh.edge_unit_normal()
-        print('n:', n)
         eh = mesh.entity_measure('edge')
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -649,30 +648,29 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R = [[R00, R01, R02], [R10, R11, R12]]
 
 
-        if True:
-            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+        J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
+        J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
 
-            Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
-            start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
+        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
+        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
 
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
-            np.add.at(J0, (np.s_[:], start), val)
+        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
+        np.add.at(J0, (np.s_[:], start), val)
 
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
-            np.add.at(J1, (np.s_[:], start), val)
+        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
+        np.add.at(J1, (np.s_[:], start), val)
 
-            if isInEdge.sum() > 0:
-                start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
+        if isInEdge.sum() > 0:
+            start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
 
-                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
-                np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
+            np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
 
-                val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
-                np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
-            J = [J0, J1]
+            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
+            np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
+        J = [J0, J1]
 
-        if False:
+        if False:# TODO: check it
             J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
             J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
@@ -686,7 +684,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 J1[x[0], s] -= x[1][:, None]*self.E[1][0][:, s] 
                 J1[y[0], s] -= y[1][:, None]*self.E[1][1][:, s]
 
-
+        print("J:", J)
         return R, J
 
     def matrix_D(self):
