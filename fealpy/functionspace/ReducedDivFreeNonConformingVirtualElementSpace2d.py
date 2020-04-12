@@ -363,7 +363,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             a = 1/ch[edge2cell[:, 1]]
             F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi1, phi, eh, eh, a)
             F1 = F1@self.H1
-
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 0]) 
             np.subtract.at(T00, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
@@ -596,7 +595,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             h2, CM[edge2cell[:, 0], 0:ndof, 0], eh/a2[edge2cell[:, 0]], n[:, 0])
         np.add.at(R11, (x[0][:, None], start), val)
 
-        if isInEdge.sum() > 0:
+        if np.any(isInEdge):
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
             F1 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi1, phi, eh, eh)
             F1 = F1@self.H1
@@ -716,15 +715,15 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p)
         phi = self.smspace.edge_basis(ps, p=p-1)
         F0 = np.einsum('i, ijm, ijn->jmn', ws, phi, phi0)
-        idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-        np.add.at(D0, (idx0, np.s_[:]), F0)
+        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+        np.add.at(D0, (idx, np.s_[:]), F0)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if np.any(isInEdge):
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p)
-            F1 = self.H1@np.einsum('i, ijm, ijn, j->jmn', ws, phi, phi1, eh)
-            idx1 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
-            np.add.at(D0, (idx1[isInEdge], np.s_[:]), F1[isInEdge])
+            F1 = np.einsum('i, ijm, ijn->jmn', ws, phi, phi1)
+            idx = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+            np.add.at(D0, (idx[isInEdge], np.s_[:]), F1[isInEdge])
 
         if p > 2:
             idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
