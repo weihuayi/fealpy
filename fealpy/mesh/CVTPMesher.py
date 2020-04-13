@@ -90,7 +90,6 @@ class CVTPMesher:
 
         isKeepNode = np.zeros(NG, dtype=np.bool)
         isKeepNode[index] = True
-        notKeepNode=~isKeepNode
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
