@@ -94,6 +94,8 @@ class CVTPMesher:
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
         bnode = bnode[isKeepNode]
+        pf = node[halfedge[idx, 0]] -v2
+        bnode = np.append(bnode,pf,axis=0)
         hedge2bnode = idxmap[index]
         return bnode, hedge2bnode
 
