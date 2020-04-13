@@ -4,7 +4,7 @@ from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendre
 from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
-
+from ..common.Tools import hash2map
 # fixednode: 节点是否固定标记, 在网格生成与自适应算法中不能移除
 # True: 固定
 # False: 自由
@@ -297,7 +297,385 @@ class HalfEdgeMesh(Mesh2d):
         pass
 
     def refine_quad(self, isMarkedCell):
-        pass
+        NC = self.number_of_all_cells()
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NE*=2
+        subdomain = self.ds.subdomain
+        halfedge = self.ds.halfedge
+        node = self.node
+        markedge = np.zeros(NE)
+
+        nlevel = self.nodedata['level']
+        clevel = self.celldata['level']
+        marked = isMarkedCell.astype(bool)
+        marked[0] = False
+
+        #蓝色半边
+        tmp0 = halfedge[halfedge[halfedge[:, 4], 3], 4]
+        tmp1 = halfedge[halfedge[tmp0, 3], 4]
+        flag0 = nlevel[halfedge[:, 0]] > nlevel[halfedge[halfedge[:, 4], 0]]
+        flag1 = nlevel[halfedge[:, 0]] == nlevel[halfedge[halfedge[:, 2], 0]]
+        flag2 = nlevel[halfedge[:, 0]] == nlevel[halfedge[tmp0, 0]]
+        flag3 = nlevel[halfedge[:, 0]] == nlevel[halfedge[tmp1, 0]]
+        flag = flag0 & flag1 & flag2 & flag3
+        isBlueHEdge = halfedge[flag, 4]
+
+        #蓝色单元
+        isBlueCell = np.zeros(NC, dtype = bool)
+        isBlueCell[halfedge[isBlueHEdge, 1]] = True
+        isBlueCell[halfedge[halfedge[isBlueHEdge, 4], 1]] = True
+        isBlueCell[halfedge[halfedge[halfedge[isBlueHEdge, 3], 4], 1]] = True
+
+        #标记被加密的半边
+        flag[halfedge[flag,4]] = True
+        tmp = marked[halfedge[:,1]] & ~flag
+        markedge[tmp] = 1
+        markedge[halfedge[tmp, 4]] = 1
+
+        #RB加密策略
+        haR = np.array([[0,0,0,0],
+                        [1,1,1,1],
+                        [1,1,0,0],
+                        [0,0,1,1]])
+        mapR, valR = hash2map(np.arange(16), haR)#mapR行数对应单元标记情况, 如单元[1 1 0 0]是3, 对应mapR第3行
+
+        haB = np.array([[0, 0, 0, 0, 0, 0],
+                        [1, 1, 0, 0, 0, 0],
+                        [1, 1, 1, 0, 0, 1],
+                        [1, 1, 0, 1, 1, 0],
+                        [1, 1, 1, 1, 1, 1]], dtype = bool)
+        mapB, valB = hash2map(np.arange(64), haB)
+
+        #起始边
+        cell2hedge = self.ds.cell2hedge
+        cell2hedgetest = cell2hedge.copy()
+
+        redge0 = cell2hedge[~isBlueCell]
+        redge1 = halfedge[redge0, 2]
+        redge2 = halfedge[redge1, 2]
+        redge3 = halfedge[redge2, 2]
+        celltoedge = np.c_[redge0, redge1, redge2, redge3]
+
+        edge0 = halfedge[halfedge[isBlueHEdge, 4], 3]
+        edge1 = halfedge[isBlueHEdge, 2]
+        edge2 = halfedge[edge0, 3]
+        edge3 = halfedge[edge1, 2]
+        edge4 = halfedge[halfedge[halfedge[isBlueHEdge, 3], 4], 2]
+        edge5 = halfedge[edge4, 2]
+        #加密半边扩展
+        swap = np.array([0])
+        flag = np.array([], dtype = bool)
+        while len(swap) or flag.any():
+            #红色单元
+            bit = markedge[celltoedge].astype(bool)
+            dec = np.einsum('ij,j->i',bit,np.array([1, 2, 4, 8])).astype(np.int)
+            dec[0]=0
+            vaR = valR[dec]
+            idx, jdx = np.where(~bit & mapR[dec].astype(bool))
+            swap = idx.copy()
+            markedge[celltoedge[idx, jdx]] = 1
+            markedge[halfedge[markedge.astype(bool), 4]] = 1#TODO
+            #蓝色单元
+            bit = markedge[np.c_[edge0, edge1, edge2, edge3, edge4,
+                edge5]].astype(np.bool)
+            dec = np.einsum('ij,j->i',bit,np.array([1, 2, 4, 8, 16,
+                32])).astype(np.int)
+            vaB = valB[dec]
+            flag = ~bit & mapB[dec].astype(bool)
+            markedge[edge0[flag[:, 0]]] = 1
+            markedge[edge1[flag[:, 1]]] = 1
+            markedge[edge2[flag[:, 2]]] = 1
+            markedge[edge3[flag[:, 3]]] = 1
+            markedge[edge4[flag[:, 4]]] = 1
+            markedge[edge5[flag[:, 5]]] = 1
+            markedge[halfedge[markedge.astype(bool), 4]] = 1
+        markedge[halfedge[edge5[markedge[edge5].astype(bool)], 2]] = 1
+        markedge[halfedge[edge4[markedge[edge4].astype(bool)], 3]] = 1
+        markedge[halfedge[markedge.astype(bool), 4]] = 1
+        #边界上的新节点
+        isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
+        flag0 = isMainHEdge & markedge.astype(bool)# 即是主半边, 也是标记加密的半边
+        flag1 = halfedge[flag0, 4]
+        ec = (node[halfedge[flag0, 0]] + node[halfedge[flag1, 0]])/2
+        NE1 = len(ec)
+        node = np.r_[node, ec]
+
+        nlevel = np.r_[nlevel, np.zeros(NE1, dtype=np.int)]
+        nlevel[NN:] = np.maximum(nlevel[halfedge[flag0, 0]], nlevel[halfedge[flag1, 0]])+1
+        #被加密半边及加密节点编号
+        markedge[flag0] = np.arange(NN, NN+NE1)
+        markedge[flag1] = np.arange(NN, NN+NE1)
+
+        #边界上的新半边
+        halfedge1 = np.zeros([NE1*2, 6], dtype = np.int)
+        halfedge1[:NE1, 0] = np.arange(NN, NN+NE1)
+        halfedge1[NE1:, 0] = np.arange(NN, NN+NE1)
+        halfedge1[:NE1, 4] = halfedge[flag0, 4]
+        halfedge1[NE1:, 4] = halfedge[flag1, 4]
+        halfedge1[:NE1, 5] = 1
+        halfedge = np.r_[halfedge, halfedge1]
+        halfedge[halfedge[NE:, 4], 4] = np.arange(NE,
+                NE+NE1*2)
+        newhalfedge = np.zeros(markedge.shape[0], dtype = np.int)
+        newhalfedge[flag0] = markedge[flag0]-NN+NE
+        newhalfedge[flag1] = markedge[flag1]-NN+NE+NE1
+
+        #将蓝色单元变为红色单元
+        flag = markedge[edge0]!=0
+        NC1 = flag.sum()
+        flaag = np.arange(halfedge.shape[0])[halfedge[:, 1]==14]
+
+        halfedge[isBlueHEdge[flag], 0] = markedge[edge1[flag]]
+        halfedge20 = np.zeros([NC1, 6], dtype=np.int)
+        halfedge21 = np.zeros([NC1, 6], dtype=np.int)
+        halfedge20[:, 0] = markedge[edge0[flag]]
+        halfedge21[:, 0] = halfedge[halfedge[isBlueHEdge, 4], 0][flag]
+        halfedge20[:, 1] = np.arange(NC, NC+NC1)
+        halfedge21[:, 1] = halfedge[edge0[flag], 1]
+        halfedge[edge0[flag], 1] = np.arange(NC, NC+NC1)
+        halfedge[halfedge[isBlueHEdge[flag], 4], 1] = np.arange(NC, NC+NC1)
+        halfedge[newhalfedge[edge1[flag]], 1] = np.arange(NC, NC+NC1)
+        halfedge[newhalfedge[edge0[flag]], 1] = halfedge[edge2[flag], 1]
+        halfedge20[:, 2] = edge0[flag]
+        halfedge21[:, 2] = halfedge[halfedge[isBlueHEdge[flag], 4], 2]
+        halfedge20[:, 3] = halfedge[isBlueHEdge[flag], 4]
+        halfedge21[:, 3] = newhalfedge[edge0[flag]]
+        halfedge20[:, 5] = 1
+        halfedge = np.r_[halfedge, halfedge20, halfedge21]
+        halfedge[NE+NE1*2:NE+NE1*2+NC1, 4] = np.arange(NE+NE1*2+NC1, NE+NE1*2+NC1*2)
+        halfedge[NE+NE1*2+NC1:, 4] =  np.arange(NE+NE1*2, NE+NE1*2+NC1)
+        halfedge[edge0[flag], 2] = newhalfedge[edge1[flag]]
+        halfedge[newhalfedge[edge1[flag]], 2] = halfedge[isBlueHEdge, 4][flag]
+        halfedge[halfedge[isBlueHEdge[flag], 4], 2] =  np.arange(NE+NE1*2,
+                NE+NE1*2+NC1)
+        halfedge[edge2[flag], 2] = newhalfedge[edge0[flag]]
+        halfedge[newhalfedge[edge0[flag]], 2] = np.arange(NE+NE1*2+NC1,
+                NE+NE1*2+NC1*2)
+
+        flag1 = halfedge[:, 1]!=0
+        halfedge[halfedge[flag1, 2], 3] = np.arange(NE+NE1*2+NC1*2)[flag1]
+        #加密后的边去除标记
+        markedge[edge0[flag]] = 0
+        markedge[edge1[flag]] = 0
+        #新单元的层数
+        clevel1 = np.zeros(NC1)
+        clevel1 = clevel[halfedge[edge5, 1]]
+        clevel = np.r_[clevel, clevel1]
+        markedge = np.r_[markedge, np.zeros(NE1*2+NC1*2)]
+        #设置起始边
+        cell2hedgetest = np.r_[cell2hedgetest, np.zeros(NC1, dtype=np.int)]
+        cell2hedgetest[halfedge[edge2[flag], 1]] = newhalfedge[edge0[flag]]
+        cell2hedgetest[NC:] = newhalfedge[edge1[flag]]
+
+        #网格加密生成新的内部半边
+        celltoedge0 = cell2hedge
+        celltoedge0[halfedge[edge1, 1]] = edge3
+        celltoedge0[halfedge[edge2, 1]] = halfedge[edge2, 3]
+        celltoedge0[halfedge[edge4, 1]] = halfedge[edge4, 3]
+        celltoedge1 = halfedge[celltoedge0, 2]
+        celltoedge2 = halfedge[celltoedge1, 2]
+        celltoedge3 = halfedge[celltoedge2, 2]
+        celltoedge = np.c_[celltoedge0, celltoedge1, celltoedge2, celltoedge3]
+        bit = markedge[celltoedge].astype(bool)
+        valueR = np.einsum('ij, j->i', bit, np.array([1,2,4,8]))
+        valueR[0] = 0
+        red = np.where(valueR==15)[0]
+        bluer = np.where(valueR==3)[0]
+        bluel = np.where(valueR==12)[0]
+        midnode = (node[halfedge[celltoedge[valueR!=0, 0], 0]]+
+                node[halfedge[celltoedge[valueR!=0, 1], 0]]+
+                node[halfedge[celltoedge[valueR!=0, 2], 0]]+
+                node[halfedge[celltoedge[valueR!=0, 3], 0]])/4
+        node = np.r_[node, midnode]
+        nlevel = np.r_[nlevel, np.zeros(len(midnode), dtype=np.int)]
+        midnode = np.zeros(NC)
+        midnode[valueR!=0] = np.arange(NN+NE1, node.shape[0])
+
+        #新单元编号
+        dx = np.zeros(NC, dtype=np.int)
+        dx[red] = 3
+        dx[bluer] = 2
+        dx[bluel] = 2
+        dx = np.cumsum(dx)
+        clevel = np.r_[clevel, np.zeros(dx[-1], dtype=np.int)]
+        cell2hedgetest = np.r_[cell2hedgetest, np.zeros(dx[-1], dtype=np.int)]
+        dx += NC+NC1
+        #新半边编号
+        hdx = np.zeros(NC, dtype=np.int)
+        hdx[red] = 8
+        hdx[bluer] = 6
+        hdx[bluel] = 6
+        hdx = np.cumsum(hdx)
+        halfedge = np.r_[halfedge, np.zeros([hdx[-1], 6], dtype=np.int)]
+        hdx += NE + NE1*2 +NC1*2
+
+        #设置起始边
+        cell2hedgetest[red] = newhalfedge[celltoedge[red, 1]]
+        cell2hedgetest[dx[red]-3] = newhalfedge[celltoedge[red, 2]]
+        cell2hedgetest[dx[red]-2] = newhalfedge[celltoedge[red, 3]]
+        cell2hedgetest[dx[red]-1] = newhalfedge[celltoedge[red, 0]]
+        cell2hedgetest[bluer] =newhalfedge[celltoedge[bluer, 1]]
+        cell2hedgetest[dx[bluer]-2] = celltoedge[bluer, 2]
+        cell2hedgetest[dx[bluer]-1] =newhalfedge[celltoedge[bluer, 0]]
+        cell2hedgetest[bluel] = celltoedge[bluel, 0]
+        cell2hedgetest[dx[bluel]-2] = newhalfedge[celltoedge[bluel, 2]]
+        cell2hedgetest[dx[bluel]-1] =newhalfedge[celltoedge[bluel, 3]]
+
+        #红色单元
+        halfedge[celltoedge[red, 1], 1] = dx[red]-3
+        halfedge[celltoedge[red, 2], 1] = dx[red]-2
+        halfedge[celltoedge[red, 3], 1] = dx[red]-1
+        halfedge[newhalfedge[celltoedge[red, 0]], 1] = dx[red]-1
+        halfedge[newhalfedge[celltoedge[red, 1]], 1] = red #halfedge[celltoedge[red, 0], 1]
+        halfedge[newhalfedge[celltoedge[red, 2]], 1] = dx[red]-3
+        halfedge[newhalfedge[celltoedge[red, 3]], 1] = dx[red]-2
+        halfedge = halfedge.astype(np.int)
+
+        halfedge[hdx[red]-8, :] = np.c_[markedge[celltoedge[red, 0]], red,
+                celltoedge[red, 0], hdx[red]-3, hdx[red]-4,np.zeros(red.shape[0])+1]
+        halfedge[hdx[red]-7, :] = np.c_[markedge[celltoedge[red, 1]], dx[red]-3,
+                celltoedge[red, 1], hdx[red]-2, hdx[red]-3, np.zeros(red.shape[0])+1]
+        halfedge[hdx[red]-6, :] = np.c_[markedge[celltoedge[red, 2]], dx[red]-2,
+                celltoedge[red, 2], hdx[red]-1, hdx[red]-2, np.zeros(red.shape[0])+1]
+        halfedge[hdx[red]-5, :] = np.c_[markedge[celltoedge[red, 3]], dx[red]-1,
+                celltoedge[red, 3], hdx[red]-4, hdx[red]-1, np.zeros(red.shape[0])+1]
+        halfedge[hdx[red]-4, :] = np.c_[midnode[red], dx[red]-1,
+                hdx[red]-5, newhalfedge[celltoedge[red, 0]], hdx[red]-8,
+                np.zeros(red.shape[0])]
+        halfedge[hdx[red]-3, :] = np.c_[midnode[red], red,
+                hdx[red]-8, newhalfedge[celltoedge[red, 1]], hdx[red]-7,
+                np.zeros(red.shape[0])]
+        halfedge[hdx[red]-2, :] = np.c_[midnode[red], dx[red]-3,
+                hdx[red]-7, newhalfedge[celltoedge[red, 2]], hdx[red]-6,
+                np.zeros(red.shape[0])]
+        halfedge[hdx[red]-1, :] = np.c_[midnode[red], dx[red]-2,
+                hdx[red]-6, newhalfedge[celltoedge[red, 3]] , hdx[red]-5,
+                np.zeros(red.shape[0])]
+
+        halfedge[newhalfedge[celltoedge[red, 0]], 2:4] = np.c_[hdx[red]-4,
+                celltoedge[red, 3]]
+        halfedge[newhalfedge[celltoedge[red, 1]], 2:4] = np.c_[hdx[red]-3,
+                celltoedge[red, 0]]
+        halfedge[newhalfedge[celltoedge[red, 2]], 2:4] = np.c_[hdx[red]-2,
+                celltoedge[red, 1]]
+        halfedge[newhalfedge[celltoedge[red, 3]], 2:4] = np.c_[hdx[red]-1,
+                celltoedge[red, 2]]
+        halfedge[celltoedge[red, 0], 2:4] = np.c_[newhalfedge[celltoedge[red,
+            1]], hdx[red]-8]
+        halfedge[celltoedge[red, 1], 1:4] = np.c_[dx[red]-3,
+            newhalfedge[celltoedge[red,2]], hdx[red]-7]
+        halfedge[celltoedge[red, 2], 1:4] = np.c_[dx[red]-2,
+            newhalfedge[celltoedge[red,3]], hdx[red]-6]
+        halfedge[celltoedge[red, 3], 1:4] = np.c_[dx[red]-1,
+            newhalfedge[celltoedge[red,0]], hdx[red]-5]
+
+        #蓝色单元:bluer
+        halfedge[celltoedge[bluer, 1], 1] = dx[bluer]-2
+        halfedge[celltoedge[bluer, 2], 1] = dx[bluer]-2
+        halfedge[celltoedge[bluer, 3], 1] = dx[bluer]-1
+        halfedge[newhalfedge[celltoedge[bluer, 0]], 1] = dx[bluer]-1
+        halfedge[newhalfedge[celltoedge[bluer, 1]], 1] = bluer #halfedge[celltoedge[bluer, 0], 1]
+
+        halfedge[hdx[bluer]-6, :] = np.c_[markedge[celltoedge[bluer, 0]], bluer,
+                celltoedge[bluer, 0], hdx[bluer]-2, hdx[bluer]-3,
+                np.zeros(bluer.shape[0])+1]
+        halfedge[hdx[bluer]-5, :] = np.c_[markedge[celltoedge[bluer, 1]],dx[bluer]-2,
+                celltoedge[bluer, 1], hdx[bluer]-1, hdx[bluer]-2,
+                np.zeros(bluer.shape[0])+1]
+        halfedge[hdx[bluer]-4, :] = np.c_[halfedge[celltoedge[bluer, 2], 0],
+                dx[bluer]-1, celltoedge[bluer, 3], hdx[bluer]-3, hdx[bluer]-1,
+                np.zeros(bluer.shape[0])+1]
+        halfedge[hdx[bluer]-3, :] = np.c_[midnode[bluer], dx[bluer]-1,
+                hdx[bluer]-4, newhalfedge[celltoedge[bluer, 0]], hdx[bluer]-6,
+                np.zeros(bluer.shape[0])]
+        halfedge[hdx[bluer]-2, :] = np.c_[midnode[bluer], bluer,
+                hdx[bluer]-6, newhalfedge[celltoedge[bluer, 1]], hdx[bluer]-5,
+                np.zeros(bluer.shape[0])]
+        halfedge[hdx[bluer]-1, :] = np.c_[midnode[bluer], dx[bluer]-2,
+                hdx[bluer]-5, celltoedge[bluer, 2], hdx[bluer]-4,
+                np.zeros(bluer.shape[0])]
+
+        halfedge[newhalfedge[celltoedge[bluer, 0]], 2:4] = np.c_[hdx[bluer]-3,
+                celltoedge[bluer, 3]]
+        halfedge[newhalfedge[celltoedge[bluer, 1]], 2:4] = np.c_[hdx[bluer]-2,
+                celltoedge[bluer, 0]]
+        halfedge[celltoedge[bluer, 0], 2:4] = np.c_[newhalfedge[celltoedge[bluer,
+            1]], hdx[bluer]-6]
+        halfedge[celltoedge[bluer, 1], 1:4:2] = np.c_[dx[bluer]-2, hdx[bluer]-5]
+        halfedge[celltoedge[bluer, 2], 1:3] = np.c_[dx[bluer]-2, hdx[bluer]-1]
+        halfedge[celltoedge[bluer, 3], 1:4] = np.c_[dx[bluer]-1,
+            newhalfedge[celltoedge[bluer,0]], hdx[bluer]-4]
+
+        #蓝色单元:bluel
+        halfedge[celltoedge[bluel, 1], 1] = dx[bluel]-2
+        halfedge[celltoedge[bluel, 2], 1] = dx[bluel]-1
+        halfedge[newhalfedge[celltoedge[bluel, 2]], 1] = dx[bluel]-2
+        halfedge[newhalfedge[celltoedge[bluel, 3]], 1] = dx[bluel]-1
+
+        halfedge[hdx[bluel]-6, :] = np.c_[halfedge[celltoedge[bluel, 0], 0],
+                dx[bluel]-2, celltoedge[bluel, 1], hdx[bluel]-2, hdx[bluel]-3,
+                np.zeros(bluel.shape[0])+1]
+        halfedge[hdx[bluel]-5, :] = np.c_[markedge[celltoedge[bluel, 2]],
+                dx[bluel]-1, celltoedge[bluel, 2], hdx[bluel]-1, hdx[bluel]-2,
+                np.zeros(bluel.shape[0])+1]
+        halfedge[hdx[bluel]-4, :] = np.c_[markedge[celltoedge[bluel, 3]], bluel,
+                celltoedge[bluel, 3], hdx[bluel]-3, hdx[bluel]-1,
+                np.zeros(bluel.shape[0])+1]
+        halfedge[hdx[bluel]-3, :] = np.c_[midnode[bluel], bluel, hdx[bluel]-4,
+                celltoedge[bluel, 0], hdx[bluel]-6,
+                np.zeros(bluel.shape[0])]
+        halfedge[hdx[bluel]-2, :] = np.c_[midnode[bluel], dx[bluel]-2,
+                hdx[bluel]-6, newhalfedge[celltoedge[bluel, 2]], hdx[bluel]-5,
+                np.zeros(bluel.shape[0])]
+        halfedge[hdx[bluel]-1, :] = np.c_[midnode[bluel], dx[bluel]-1,
+                hdx[bluel]-5, newhalfedge[celltoedge[bluel, 3]], hdx[bluel]-4,
+                np.zeros(bluel.shape[0])]
+
+        halfedge[newhalfedge[celltoedge[bluel, 2]], 1:4] = np.c_[dx[bluel]-2,
+                hdx[bluel]-2, celltoedge[bluel, 1]]
+        halfedge[newhalfedge[celltoedge[bluel, 3]], 1:4] = np.c_[dx[bluel]-1,
+                hdx[bluel]-1, celltoedge[bluel, 2]]
+        halfedge[celltoedge[bluel, 0], 2] = hdx[bluel]-3
+        halfedge[celltoedge[bluel, 1], 1:4] = np.c_[dx[bluel]-2,
+                newhalfedge[celltoedge[bluel,2]], hdx[bluel]-6]
+        halfedge[celltoedge[bluel, 2], 1:4] = np.c_[dx[bluel]-1,
+                newhalfedge[celltoedge[bluel, 3]], hdx[bluel]-5]
+        halfedge[celltoedge[bluel, 3], 3] = hdx[bluel]-4
+
+        idx = np.where(valueR!=0)[0]
+        clevel[idx] +=1
+        clevel[dx[red]-1] = clevel[red]
+        clevel[dx[red]-2] = clevel[red]
+        clevel[dx[red]-3] = clevel[red]
+        clevel[dx[bluel]-1] = clevel[bluel]
+        clevel[dx[bluel]-2] = clevel[bluel]
+        clevel[dx[bluer]-1] = clevel[bluer]
+        clevel[dx[bluer]-2] = clevel[bluer]
+        nlevel[NN+NE1:] = clevel[idx]
+        subdomain = np.ones(dx[-1], dtype = np.int)
+        subdomain[0] = 0
+        #外部半边的顺序
+        flag = halfedge[:, 1]==0
+        NE0 = len(halfedge)
+        markedge = np.r_[markedge, np.zeros(NE0-len(markedge), dtype=np.int)]
+        flag = flag & markedge.astype(np.bool)
+        flag = np.arange(NE0)[flag]
+        halfedge[newhalfedge[flag], 2] = flag
+        halfedge[newhalfedge[flag], 3] = halfedge[flag, 3]
+        halfedge[halfedge[flag, 3], 2] = newhalfedge[flag]
+        halfedge[flag, 3] = newhalfedge[flag]
+
+        self.nodedata['level'] = nlevel
+        self.celldata['level'] = clevel
+        self.ds.halfedge = halfedge.astype(np.int)
+        self.node = node
+
+        self.ds.reinit(len(node), subdomain, halfedge.astype(np.int))
+
+        self.ds.cell2hedge = cell2hedgetest
+
+   
 
     def coarsen_quad(self, isMarkedCell):
         pass

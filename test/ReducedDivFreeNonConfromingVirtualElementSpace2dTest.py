@@ -79,6 +79,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
         up = uspace.project_to_smspace(up)
+        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
@@ -128,7 +129,7 @@ if False:
     test.verify_matrix(u0, p=2, mtype=0, plot=True)
 
 if True:
-    test.project_test(u3, p=3, mtype=1, plot=False)
+    test.project_test(u3, p=3, mtype=1, plot=True)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
