@@ -134,6 +134,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                         self.smspace.basis(x, p=p-2, index=index))
             area = self.smspace.cellmeasure
             uh1 = self.integralalg.integral(u1, celltype=True)/area[:, None, None]
+            print('uh1:', uh1.shape)
             uh[2*NE*p:] += uh1[:, y[0], 0].flat
             uh[2*NE*p:] -= uh1[:, x[0], 1].flat
         return uh
@@ -159,7 +160,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             x = np.r_[x0, x1, x2]
             y = (PI0[:2*smldof]@x).flat
             sh[c2d[i], 0] = y[:smldof]
-            sh[c2d[i], 1] = y[smldof::]
+            sh[c2d[i], 1] = y[smldof:]
         list(map(f, range(NC)))
         return sh
 
@@ -202,9 +203,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         def f(i):
             G = block([
-                [self.G[0][i]  ,   self.G[2][i], self.B[0][i]],
-                [self.G[2][i].T,   self.G[1][i], self.B[1][i]],
-                [self.B[0][i].T, self.B[1][i].T,            0]]
+                [self.G[0][i]  ,   self.G[2][i]  , self.B[0][i]],
+                [self.G[2][i].T,   self.G[1][i]  , self.B[1][i]],
+                [self.B[0][i].T,   self.B[1][i].T,            0]]
                 )
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R = block([
@@ -455,6 +456,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             x = idx['x']
             y = idx['y']
             I = np.arange(idof)
+            print('E02[:, y[0], I]:', E02[:, y[0], I].shape)
+            print('E12[:, x[0], I]:', E12[:, x[0], I].shape)
+            val = area[:, None]*y[1]/c[y[0]]
+            print('val:', val.shape)
             E02[:, y[0], I] =  area[:, None]*y[1]/c[y[0]]
             E12[:, x[0], I] = -area[:, None]*x[1]/c[x[0]]
 
@@ -522,6 +527,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R11 /= a
 
         if p > 2:
+            print('R02[:, xx[0], :]:', R02[:, xx[0], :].shape)
+            val = xx[1][None, :, None]*self.E[0][2]
+            print('val:', val.shape)
             R02[:, xx[0], :] -=     xx[1][None, :, None]*self.E[0][2]
             R02[:, yy[0], :] -= 0.5*yy[1][None, :, None]*self.E[0][2]
             R02[:, xy[0], :] -= 0.5*xy[1][None, :, None]*self.E[1][2]
