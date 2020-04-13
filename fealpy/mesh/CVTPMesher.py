@@ -94,10 +94,11 @@ class CVTPMesher:
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
         bnode = bnode[isKeepNode]
-        pf = node[halfedge[idx, 0]] -v2
-        bnode = np.append(bnode,pf,axis=0)
+        # cnode 要单独分离出来， idx 也要记录下来，后面的算法中可能要用到这些信
+        # 息
+        cnode = node[halfedge[idx, 0]] -v2
         hedge2bnode = idxmap[index]
-        return bnode, hedge2bnode
+        return bnode, cnode, hedge2bnode, idx
 
 
     def init_interior_nodes(self, bnode, hedge2bnode):
