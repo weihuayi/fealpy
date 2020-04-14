@@ -219,7 +219,9 @@ class PolygonMesh(Mesh2d):
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Edge2cell:\n", self.ds.edge2cell)
-        print("Cell2edge:\n", self.ds.cell_to_edge(sparse=False))
+        print("Cell2edge:\n", self.ds.cell_to_edge(return_sparse=False))
+        print("edge norm:\n", self.edge_unit_normal())
+        print("cell barycenter:\n", self.entity_barycenter('cell'))
 
 
 

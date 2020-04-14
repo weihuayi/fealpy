@@ -70,21 +70,31 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             mesh = QuadrangleMesh(node, cell)
             mesh.uniform_refine()
             mesh = PolygonMesh.from_mesh(mesh)
+        elif mtype == 4:
+            node = np.array([
+                (-1, -1), ( 1, -1), ( 1, 0), 
+                ( 1,  1), (-1,  1), (-1, 0)], dtype=np.float)
+            cell = np.array([0, 1, 2, 5, 2, 3, 4, 5], dtype=np.int)
+            cellLocation = np.array([0, 4, 8], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
 
 
-        cell, cellLocation = mesh.entity('cell')
-        edge = mesh.entity('edge')
-        cell2edge = mesh.ds.cell_to_edge()
-        bc = mesh.entity_barycenter('edge')
-        uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        up = uspace.project(u)
-        up = uspace.project_to_smspace(up)
-        print(up)
+        if True:
+            cell, cellLocation = mesh.entity('cell')
+            edge = mesh.entity('edge')
+            cell2edge = mesh.ds.cell_to_edge()
+            bc = mesh.entity_barycenter('edge')
+            uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+            up = uspace.project(u)
+            up = uspace.project_to_smspace(up)
+            print(up)
 
-        integralalg = uspace.integralalg
-        error = integralalg.L2_error(u, up)
-        print(error)
+            integralalg = uspace.integralalg
+            error = integralalg.L2_error(u, up)
+            print(error)
+
         if plot:
+            mesh.print()
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -124,12 +134,20 @@ def u3(p):
     val[..., 1] = x**3/8
     return val
 
+def u4(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**4/16
+    val[..., 1] = x**4/16
+    return val
+
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
 if False:
-    test.verify_matrix(u0, p=2, mtype=0, plot=True)
+    test.verify_matrix(u3, p=3, mtype=0, plot=True)
 
 if True:
-    test.project_test(u3, p=3, mtype=1, plot=True)
+    test.project_test(u3, p=3, mtype=3, plot=False)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

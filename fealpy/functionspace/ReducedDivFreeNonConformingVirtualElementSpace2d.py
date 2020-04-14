@@ -134,7 +134,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                         self.smspace.basis(x, p=p-2, index=index))
             area = self.smspace.cellmeasure
             uh1 = self.integralalg.integral(u1, celltype=True)/area[:, None, None]
-            print('uh1:', uh1.shape)
             uh[2*NE*p:] += uh1[:, y[0], 0].flat
             uh[2*NE*p:] -= uh1[:, x[0], 1].flat
         return uh
@@ -194,6 +193,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
             S = inv(A)@B
             smldof = (p+1)*(p+2)//2 
+            I = S@D
+            sio.savemat('I'+str(i)+'.mat', {'I'+str(i):I})
 
         PI0 = list(map(f, range(NC)))
 
@@ -315,7 +316,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ch = self.smspace.cellsize # 单元尺寸 
 
         smldof = self.smspace.number_of_local_dofs(p=p) # 标量 p 次单元缩放空间的维数
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 标量的单元边自由度信息
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation # 标量的单元边自由度信息
 
         T00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
         T01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
@@ -388,7 +390,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ch = self.smspace.cellsize # 单元尺寸 
 
         smldof = self.smspace.number_of_local_dofs(p=p-2) # 标量 p-2 次单元缩放空间的维数
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation # 标量的单元边自由度信息
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation # 标量的单元边自由度信息
 
         E00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
         E01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype) 
@@ -417,19 +420,19 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F0 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
                 ws, phi0, phi, eh, eh, ch[edge2cell[:, 0]])
         F0 = F0@self.H1
-        F0 /= c[None, None, :]
+        # F0 /= c[:, None, None] here is a bug
 
         idx = self.smspace.index1(p=p-1)
         x = idx['x']
         y = idx['y']
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         val = np.einsum('jmn, j->mjn', F0, n[:, 0]) 
-        np.add.at(E00, (np.s_[:], idx0), val[x[0]])
-        np.add.at(E10, (np.s_[:], idx0), val[y[0]])
+        np.add.at(E00, (np.s_[:], idx0), val[x[0]]/c[:, None, None])
+        np.add.at(E10, (np.s_[:], idx0), val[y[0]]/c[:, None, None])
 
         val = np.einsum('jmn, j->mjn', F0, n[:, 1])
-        np.add.at(E01, (np.s_[:], idx0), val[x[0]])
-        np.add.at(E11, (np.s_[:], idx0), val[y[0]])
+        np.add.at(E01, (np.s_[:], idx0), val[x[0]]/c[:, None, None])
+        np.add.at(E11, (np.s_[:], idx0), val[y[0]]/c[:, None, None])
 
         if np.any(isInEdge):
             phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
@@ -437,15 +440,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', 
                     ws, phi1, phi, eh, eh, ch[edge2cell[:, 1]])
             F1 = F1@self.H1
-            F1 /= c[None,  None, :]
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('jmn, j->mjn', F1, n[:, 0])
-            np.subtract.at(E00, (np.s_[:], idx0[isInEdge]), val[x[0][:, None], isInEdge])
-            np.subtract.at(E10, (np.s_[:], idx0[isInEdge]), val[y[0][:, None], isInEdge])
+            np.subtract.at(E00, 
+                    (np.s_[:], idx0[isInEdge]), 
+                    val[x[0][:, None], isInEdge]/c[:, None, None])
+            np.subtract.at(E10, 
+                    (np.s_[:], idx0[isInEdge]), 
+                    val[y[0][:, None], isInEdge]/c[:, None, None])
 
             val = np.einsum('jmn, j->mjn', F1, n[:, 1])
-            np.subtract.at(E01, (np.s_[:], idx0[isInEdge]), val[x[0][:, None], isInEdge])
-            np.subtract.at(E11, (np.s_[:], idx0[isInEdge]), val[y[0][:, None], isInEdge])
+            np.subtract.at(E01, 
+                    (np.s_[:], idx0[isInEdge]), 
+                    val[x[0][:, None], isInEdge]/c[:, None, None])
+            np.subtract.at(E11, 
+                    (np.s_[:], idx0[isInEdge]), 
+                    val[y[0][:, None], isInEdge]/c[:, None, None])
             
         NC = mesh.number_of_cells()
         idof = (p-2)*(p-1)//2
@@ -456,10 +466,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             x = idx['x']
             y = idx['y']
             I = np.arange(idof)
-            print('E02[:, y[0], I]:', E02[:, y[0], I].shape)
-            print('E12[:, x[0], I]:', E12[:, x[0], I].shape)
-            val = area[:, None]*y[1]/c[y[0]]
-            print('val:', val.shape)
             E02[:, y[0], I] =  area[:, None]*y[1]/c[y[0]]
             E12[:, x[0], I] = -area[:, None]*x[1]/c[x[0]]
 
@@ -527,9 +533,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R11 /= a
 
         if p > 2:
-            print('R02[:, xx[0], :]:', R02[:, xx[0], :].shape)
-            val = xx[1][None, :, None]*self.E[0][2]
-            print('val:', val.shape)
             R02[:, xx[0], :] -=     xx[1][None, :, None]*self.E[0][2]
             R02[:, yy[0], :] -= 0.5*yy[1][None, :, None]*self.E[0][2]
             R02[:, xy[0], :] -= 0.5*xy[1][None, :, None]*self.E[1][2]
@@ -674,20 +677,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
         J = [J0, J1]
 
-        if False:# TODO: check it
-            J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-            J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
-            J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
-            idx = self.smspace.index1() # 一次求导后的非零基函数编号及求导系数
-            x = idx['x']
-            y = idx['y']
-            def f(i):
-                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-                J0[x[0], s] -= x[1][:, None]*self.E[0][0][:, s] 
-                J0[y[0], s] -= y[1][:, None]*self.E[0][1][:, s]
-                J1[x[0], s] -= x[1][:, None]*self.E[1][0][:, s] 
-                J1[y[0], s] -= y[1][:, None]*self.E[1][1][:, s]
-
         return R, J
 
     def matrix_D(self):
@@ -746,7 +735,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         p = self.p
         idof = (p-2)*(p-1)//2
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
 
         mesh = self.mesh
@@ -769,12 +759,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             c = eh[i]**2/ch[edge2cell[i, 0]]
             S00[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
             S11[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+
         def f2(i):
             if isInEdge[i]:
                 j = edge2cell[i, 3]
                 c = eh[i]**2/ch[edge2cell[i, 1]]
                 S00[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
                 S11[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
+
         list(map(f1, range(NE)))
         list(map(f2, range(NE)))
 
