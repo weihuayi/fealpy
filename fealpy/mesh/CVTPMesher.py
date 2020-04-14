@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.spatial import KDTree
 
+from scipy.spatial import Voronoi
+
 
 class CVTPMesher:
     def __init__(self, domain):
@@ -136,7 +138,7 @@ class CVTPMesher:
                 pp *= np.array([xmax-xmin,ymax-ymin])
                 pp += np.array([xmin,ymin])
                 d, idx = tree.query(pp)
-                flag0 = d > (h[0]/2)
+                flag0 = d > (0.7*h[0])
                 flag1 = (bnode2subdomain[idx] == index)
                 pp = pp[flag0 & flag1]# 筛选出符合要求的点
                 end = start + pp.shape[0]
@@ -147,7 +149,45 @@ class CVTPMesher:
                     start = end
 
         return newNode 
-    
+
+    def Lloyd(self, bnode, newNode):
+        
+        NB = bnode.shape[0]
+        node = np.append(bnode,newNode,axis = 0)
+        vor = Voronoi(node)
+        
+        points = vor.points
+        vertices = vor.vertices
+        ridge_points = vor.ridge_points
+        ridge_vertices = np.array(vor.ridge_vertices)
+        point_region = np.array(vor.point_region)
+        regions = np.array(vor.regions)
+
+        NP =points.shape[0]
+        pflag = np.ones(NP,dtype = np.bool)
+        pflag[:NB] = False# 前NB个点为外部和边界处的生成点
+
+        interior_points = points[pflag]# 内部的voronoi生成点
+        ipoint2region = point_region[pflag]
+        interior_region = regions[ipoint2region]# 内部voronoi域
+
+        optimize_points = np.zeros((interior_region.shape[0],2),dtype=np.float)
+
+        for i in range(len(interior_region)):
+            optimize_points[i] =  np.sum(vertices[interior_region[i]],axis=0)/len(interior_region[i])
+        e = interior_points-optimize_points
+        e = np.sum(np.sqrt(np.sum(e**2,axis = 1)))# 误差函数
+
+        points = np.append(bnode ,optimize_points, axis = 0)
+        vor = Voronoi(points)
+        
+        return vor, bnode, optimize_points, e
 
     def voronoi(self, node):
         pass
+
+
+        
+
+
+        
