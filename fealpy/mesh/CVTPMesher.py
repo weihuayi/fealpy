@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.spatial import KDTree
 
-
 class CVTPMesher:
     def __init__(self, domain):
         """
