@@ -731,6 +731,93 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         return D0, D1, D2
 
+    def matrix_U(self):
+        """
+        [[U00 U01 U02]
+         [U10 U11 U12]
+         [U20 U21 U22]]
+        """
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.nuber_of_cells()
+
+        smldof = self.smspace.number_of_local_dofs(p=p-1) # 标量 p-1 次单元缩放空间的维数
+        idof = (p-2)*(p-1)//2
+        
+        cell2dof = self.dof.cell2dof 
+        cell2dofLocation = self.dof.cell2dofLocation # 标量的自由度信息
+
+        U00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U02 = np.zeros((NC, smldof, idof), dtype=self.ftype)
+
+        U10 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
+
+        U20 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U21 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
+        U22 = np.zeros((NC, smldof, idof), dtype=self.ftype)
+
+        idx = self.smspace.index1(p=p-1) # 一次求导后的非零基函数编号及求导系数
+        x = idx['x']
+        y = idx['y']
+        ch = self.smspace.cellsize # 单元尺寸 
+        ldofs = self.dof.number_of_local_dofs() # 这里只包含边上的自由度
+        h = np.repeat(ch, ldofs)
+
+        U00[x[0]] -= x[1][:, None]*self.E[0][0]/h
+        U01[x[0]] -= x[1][:, None]*self.E[0][1]/h
+
+        U10[y[0]] -= y[1][:, None]*self.E[0][0]/h
+        U10[x[0]] -= x[1][:, None]*self.E[1][0]/h
+        U11[y[0]] -= y[1][:, None]*self.E[0][1]/h
+        U11[x[0]] -= x[1][:, None]*self.E[1][1]/h
+    
+        U20[y[0]] -= y[1][:, None]*self.E[1][0]/h
+        U21[y[0]] -= y[1][:, None]*self.E[1][1]/h
+
+        if p > 2:
+            U02[:, x[0], :] -= x[1][None, :, None]*self.E[0][2]/ch[:, None, None]
+
+            U12[:, y[0], :] -= y[1][None, :, None]*self.E[0][2]/ch[:, None, None]
+            U12[:, x[0], :] -= x[1][None, :, None]*self.E[1][2]/ch[:, None, None]
+
+            U22[:, y[0], :] -= y[1][None, :, None]*self.E[1][2]/ch[:, None, None]
+
+        n = mesh.edge_unit_normal()
+        eh = mesh.entity_measure('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights # bcs: (NQ, 2)
+        ps = mesh.edge_bc_to_point(bcs)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1) 
+        phi = self.smspace.edge_basis(ps, p=p-1)
+        F0 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi0, phi, eh, eh)
+        F0 = F0@self.H1
+
+        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+        val = np.einsum('jmn, j-> mjn', F0, n[:, 0])
+        np.add.at(U00, (np.s_[:], idx), val)
+        np.add.at(U11, (np.s_[:], idx), val)
+        val = np.einsum('jmn, j-> mjn', F0, n[:, 1])
+        np.add.at(U10, (np.s_[:], idx), val)
+        np.add.at(U21, (np.s_[:], idx), val)
+        if np.any(isInEdge):
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1) 
+            F1 = np.einsum('i, ijm, ijn, j, j->jmn', ws, phi1, phi, eh, eh)
+            F1 = F1@self.H1
+            idx = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+            val = np.einsum('jmn, j-> mjn', F1, n[:, 0])
+            np.subtract.at(U00, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
+            np.subtract.at(U11, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
+            val = np.einsum('jmn, j-> mjn', F1, n[:, 1])
+            np.subtract.at(U01, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
+            np.subtract.at(U21, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
+
+        return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
+
     def matrix_A(self):
 
         p = self.p
