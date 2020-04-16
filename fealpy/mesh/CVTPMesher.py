@@ -159,12 +159,9 @@ class CVTPMesher:
        
         NB = len(inode) 
         NC = len(cnode)
-
         NN = NB + NC
-        
         for index, point in  inode.items():
             NN += len(point)
-
         points = np.zeros((NN, 2), dtype=bnode.dtype)
         vor = Voronoi(points)
         
