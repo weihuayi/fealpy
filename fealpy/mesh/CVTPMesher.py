@@ -12,7 +12,7 @@ class CVTPMesher:
         """
         self.domain = domain
 
-    def meshing(self, refine=0, c=0.618, theta=100):
+    def uniform_meshing(self, refine=0, c=0.618, theta=100):
 
         self.boundary_meshing(refine=refine, c=c, theta=theta)
         self.init_interior_nodes()
@@ -98,7 +98,7 @@ class CVTPMesher:
         self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
         self.chedge = idx # the index of halfedge point on corner point
 
-    def init_interior_nodes(self):
+    def uniform_init_interior_nodes(self):
         
         node = self.domain.vertices
         halfedge = self.domain.halfedge
@@ -120,7 +120,7 @@ class CVTPMesher:
             bd = self.bnode
         tree = KDTree(bd)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
-        iNode = {}
+        self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.domain.subdomain):
             p = self.bnode[bnode2subdomain == index]
             xmin = min(p[:, 0])
@@ -148,17 +148,26 @@ class CVTPMesher:
                     break
                 else:
                     start = end
-            iNode[index] = newNode
+            self.inode[index] = newNode
 
-        return iNode # the interior node on each subdomain
 
     def Lloyd(self):
+
+        bnode = self.bnode
+        cnode = self.cnode
+        inode = self.inode
+       
+        NB = len(inode) 
+        NC = len(cnode)
+
+        NN = NB + NC
         
-        NB = bnode.shape[0]
-        node = np.append(bnode,newNode,axis = 0)
-        vor = Voronoi(node)
+        for index, point in  inode.items():
+            NN += len(point)
+
+        points = np.zeros((NN, 2), dtype=bnode.dtype)
+        vor = Voronoi(points)
         
-        points = vor.points
         vertices = vor.vertices
         ridge_points = vor.ridge_points
         ridge_vertices = np.array(vor.ridge_vertices)
