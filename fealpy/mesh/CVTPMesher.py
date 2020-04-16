@@ -13,7 +13,6 @@ class CVTPMesher:
         self.domain = domain
 
     def uniform_meshing(self, refine=0, c=0.618, theta=100):
-
         self.boundary_meshing(refine=refine, c=c, theta=theta)
         self.init_interior_nodes()
         
@@ -150,49 +149,56 @@ class CVTPMesher:
                     start = end
             self.inode[index] = newNode
 
-
-    def Lloyd(self):
-
+    def voronoi(self):
         bnode = self.bnode
         cnode = self.cnode
         inode = self.inode
        
-        NB = len(inode) 
+        NB = len(bnode) 
         NC = len(cnode)
         NN = NB + NC
-        for index, point in  inode.items():
+        for index, point in inode.items(): # inode is a dict
             NN += len(point)
+
         points = np.zeros((NN, 2), dtype=bnode.dtype)
+        points[:NB] = bnode
+        points[NB:NB+NC] = cnode
+        start = NB + NC
+        for index, point in inode.items():
+            N = len(point)
+            points[start:start+N] = point
+            start += N
+
+        # construct voronoi diagram
         vor = Voronoi(points)
-        
+
+        return vor, start
+
+    def Lloyd(self, vor, start):
+
         vertices = vor.vertices
-        ridge_points = vor.ridge_points
-        ridge_vertices = np.array(vor.ridge_vertices)
-        point_region = np.array(vor.point_region)
-        regions = np.array(vor.regions)
+        rp = vor.ridge_points
+        rv = np.array(vor.ridge_vertices)
+        isKeeped = (rp[:, 0] >= start) & (rp[:, 1] >= start) 
 
-        NP =points.shape[0]
-        pflag = np.ones(NP,dtype = np.bool)
-        pflag[:NB] = False# 前NB个点为外部和边界处的生成点
+        rp = rp[isKeeped]
+        rv = rp[isKeeped]
 
-        interior_points = points[pflag]# 内部的voronoi生成点
-        ipoint2region = point_region[pflag]
-        interior_region = regions[ipoint2region]# 内部voronoi域
+        npoints = np.zeros((NN, 2), dtype=bnode.dtype)
+        valence = np.zeros(NN, dtype=np.int)
 
-        optimize_points = np.zeros((interior_region.shape[0],2),dtype=np.float)
-
-        for i in range(len(interior_region)):
-            optimize_points[i] =  np.sum(vertices[interior_region[i]],axis=0)/len(interior_region[i])
-        e = interior_points-optimize_points
-        e = np.sum(np.sqrt(np.sum(e**2,axis = 1)))# 误差函数
-
-        points = np.append(bnode ,optimize_points, axis = 0)
-        vor = Voronoi(points)
+        center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
+        np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
+        np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
+        np.add.at(valence, rp[:, 0], 1)
+        np.add.at(valence, rp[:, 1], 1)
+        npoints[start:] /= valence[:, None]
         
-        return vor, bnode, optimize_points, e
+        vor.points[start:, :] = npoints[start:, :]
+        vor = Voronoi(vor.points)
+        return vor
+        
 
-    def voronoi(self, node):
-        pass
 
 
         
