@@ -13,8 +13,8 @@ class CVTPMesher:
         self.domain = domain
 
     def uniform_meshing(self, refine=0, c=0.618, theta=100):
-        self.boundary_meshing(refine=refine, c=c, theta=theta)
-        self.init_interior_nodes()
+        self.uniform_boundary_meshing(n=refine, c=c, theta=theta)
+        self.uniform_init_interior_nodes()
         
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
@@ -105,7 +105,7 @@ class CVTPMesher:
         NB = len(self.bnode)
         NC = len(self.cnode)
 
-        bnode2subdomain = np.zeros(NB, dtype=np.int)
+        bnode2subdomain = np.zeros(NB+NC, dtype=np.int)
         bnode2subdomain[self.hedge2bnode] = halfedge[:, 1]
 
         idx0 = halfedge[halfedge[:, 3], 0]
@@ -121,7 +121,7 @@ class CVTPMesher:
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.domain.subdomain):
-            p = self.bnode[bnode2subdomain == index]
+            p = bd[bnode2subdomain == index]
             xmin = min(p[:, 0])
             xmax = max(p[:, 0])
             ymin = min(p[:, 1])
@@ -159,7 +159,7 @@ class CVTPMesher:
         NN = NB + NC
         for index, point in inode.items(): # inode is a dict
             NN += len(point)
-
+        self.NN = NN
         points = np.zeros((NN, 2), dtype=bnode.dtype)
         points[:NB] = bnode
         points[NB:NB+NC] = cnode
@@ -171,20 +171,22 @@ class CVTPMesher:
 
         # construct voronoi diagram
         vor = Voronoi(points)
+        start = NB+NC
 
         return vor, start
 
     def Lloyd(self, vor, start):
 
         vertices = vor.vertices
+        NN = self.NN
         rp = vor.ridge_points
         rv = np.array(vor.ridge_vertices)
-        isKeeped = (rp[:, 0] >= start) & (rp[:, 1] >= start) 
+        isKeeped = (rp[:, 0] >= start) | (rp[:, 1] >= start) 
 
         rp = rp[isKeeped]
-        rv = rp[isKeeped]
+        rv = rv[isKeeped]
 
-        npoints = np.zeros((NN, 2), dtype=bnode.dtype)
+        npoints = np.zeros((NN, 2), dtype=self.bnode.dtype)
         valence = np.zeros(NN, dtype=np.int)
 
         center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
@@ -192,7 +194,7 @@ class CVTPMesher:
         np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
         np.add.at(valence, rp[:, 0], 1)
         np.add.at(valence, rp[:, 1], 1)
-        npoints[start:] /= valence[:, None]
+        npoints[start:] /= valence[start:, None]
         
         vor.points[start:, :] = npoints[start:, :]
         vor = Voronoi(vor.points)
