@@ -8,7 +8,7 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from ..common import ranges
-from ..common import block
+from ..common import block, block_diag
 
 class RDFNCVEMDof2d():
     """
@@ -820,38 +820,36 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
     def matrix_A(self):
 
-        p = self.p
-        idof = (p-2)*(p-1)//2
+        p = self.p # 空间次数
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
-        NC = self.mesh.number_of_cells()
-
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        eh = mesh.entity_measure('edge')
-        area = self.smspace.cellmeasure
-        ch = self.smspace.cellsize
+        NC = self.mesh.number_of_cells()
+        cell, cellLocation = mesh.entity('cell')
+        cell2edge = mesh.ds.cell_to_edge()
 
-        ndof = p*(p+1)//2
-        Z = np.zeros((ndof, ndof), dtype=self.ftype)
-        ldof = self.dof.number_of_local_dofs()
-        def f4(i):
-            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+        eh = mesh.entity_measure('edge')
+        ch = self.smspace.cellsize
+        area = self.smspace.cellmeasure
+
+        def f1(i):
+            s0 = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
-            D0 = self.D[0][s, :]
+            D0 = self.D[0][s0, :]
             D1 = self.D[1][i]
             D2 = self.D[2][i]
             D -= block([
                 [D0,  0],
                 [ 0, D0],
                 [D1, D2]])@PI0
-            A = D.T@block([
-                [  S00[i], S01[i],      0], 
-                [S01[i].T, S11[i],      0],
-                [       0,      0, S22[i]]])@D
+
+            s1 = slice(cellLocation[i], cellLocation[i+1]) 
+            A = list(self.H1[cell2edge[s1]]*eh[cell2eddge[s1]][:, None, None]**2/ch[i])
+            if p > 2:
+                A.append(inv(self.Q[i])*area[i])
+            A = D.T@block_diag(A)@D
             U = block([
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
@@ -862,8 +860,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [         0,              0, self.H0[i]]])
             return A + U.T@H0@U 
 
-        A = list(map(f4, range(NC)))
-        def f5(i):
+        A = list(map(f1, range(NC)))
+
+        def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
             return np.meshgrid(cd, cd)
