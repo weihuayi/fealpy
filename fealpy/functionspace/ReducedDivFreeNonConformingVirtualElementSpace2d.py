@@ -834,34 +834,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         area = self.smspace.cellmeasure
         ch = self.smspace.cellsize
 
-        ldof = self.dof.number_of_local_dofs() # 这里只包含边上的自由度
-        f = lambda ndof: np.zeros((ndof, ndof), dtype=self.ftype)
-        S00 = list(map(f, ldof))
-        S11 = list(map(f, ldof))
-        S01 = list(map(f, ldof))
-        S22 = np.zeros((NC, idof, idof), dtype=self.ftype) 
-
-        def f1(i):
-            j = edge2cell[i, 2]
-            c = eh[i]**2/ch[edge2cell[i, 0]]
-            S00[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
-            S11[edge2cell[i, 0]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
-
-        def f2(i):
-            if isInEdge[i]:
-                j = edge2cell[i, 3]
-                c = eh[i]**2/ch[edge2cell[i, 1]]
-                S00[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
-                S11[edge2cell[i, 1]][p*j:p*(j+1), p*j:p*(j+1)] += self.H1[i]*c
-
-        list(map(f1, range(NE)))
-        list(map(f2, range(NE)))
-
-        if p > 2:
-            L = self.L[2]
-            Q = self.Q
-            S22 = L.swapaxes(-2, -1)@inv(Q)@L
-
         ndof = p*(p+1)//2
         Z = np.zeros((ndof, ndof), dtype=self.ftype)
         ldof = self.dof.number_of_local_dofs()
@@ -880,14 +852,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [  S00[i], S01[i],      0], 
                 [S01[i].T, S11[i],      0],
                 [       0,      0, S22[i]]])@D
-            J0 = self.J[0][:, s]
-            J1 = self.J[1][:, s]
-            J2 = self.J[2][i]
-            J3 = self.J[3][i]
             U = block([
-                [J0,  0,    J2],
-                [J1, J0, J2+J3],
-                [ 0, J1,    J3]])
+                [self.U[0][0], self.U[0][1], self.U[0][2]],
+                [self.U[0][0], self.U[0][1], self.U[0][2]],
+                [self.U[0][0], self.U[0][1], self.U[0][2]])
             H0 = block([
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
