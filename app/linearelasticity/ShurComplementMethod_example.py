@@ -14,6 +14,7 @@ from fealpy.graph import metis
 
 
 n = int(sys.argv[1])
+m = int(sys.argv[2])
 
 p=1
 
@@ -31,10 +32,11 @@ uh[:] = spsolve(A, F)
 
 error = space.integralalg.L2_error(pde.solution, uh)
 
-edgecuts, parts = metis.part_mesh(mesh, nparts=2, entity='cell', contig=True)
+edgecuts, parts = metis.part_mesh(mesh, nparts=m, entity='cell', contig=True)
 print(parts)
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
+#mesh.find_node(axes, color=parts)
 mesh.find_cell(axes, color=parts)
 plt.show()

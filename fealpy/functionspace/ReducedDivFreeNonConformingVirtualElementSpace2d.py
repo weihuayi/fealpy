@@ -850,10 +850,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             if p > 2:
                 A.append(inv(self.Q[i])*area[i])
             A = D.T@block_diag(A)@D
+            """
             U = block([
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
                 [self.U[0][0], self.U[0][1], self.U[0][2]])
+                """
             H0 = block([
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
