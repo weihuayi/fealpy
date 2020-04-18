@@ -881,11 +881,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         idof = (p-2)*(p-1)//2
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
-        cd1 = self.smspace.cell_to_dof(p=p-1)
+        cd = self.smspace.cell_to_dof(p=p-1)
         def f0(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
-            return np.meshgrid(cd, cd1[i])
+            return np.meshgrid(cell2dof[s], cd[i])
         idx = list(map(f0, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
@@ -893,23 +892,20 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         def f(i, k):
             J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
             return J.flatten()
+
         gdof0 = self.smspace.number_of_global_dofs(p=p-1)
         gdof1 = self.dof.number_of_global_dofs()
 
         P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
-        P0 = coo_matrix((P0, (I, J)),
-                shape=(gdof0, gdof1), dtype=self.ftype)
-
         P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
-        P1 = coo_matrix((P1, (I, J)),
+
+        P0 = csr_matrix((P0, (I, J)),
                 shape=(gdof0, gdof1), dtype=self.ftype)
-        if p == 2:
-            return bmat([[P0, P1]], format='csr')
-        else:
-            P2 = np.concatenate(list(map(lambda i: f(i, 4), range(NC))))
-            P2 = coo_matrix((P1, (I, J)),
-                    shape=(gdof0, NC*idof), dtype=self.ftype)
-            return bmat([[P0, P1, P2]], format='csr')
+        P1 = csr_matrix((P1, (I, J)),
+                shape=(gdof0, gdof1), dtype=self.ftype)
+        P2 = csr_matrix((gdof0, NC*idof), dtype=self.ftype)
+
+        return bmat([[P0, P1, P2]], format='csr')
             
 
     def source_vector(self, f):
