@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# 
 import numpy as np
 
 class StructureMeshND:
@@ -10,7 +12,7 @@ class StructureMeshND:
         self.itype = np.int32
 
     @property
-    def node(self):
+    def node(self, flat=False):
         N = self.N
         GD = self.GD
         box = self.box
@@ -20,17 +22,23 @@ class StructureMeshND:
                     for start, stop in zip(box[0::2], box[1::2])
                     )
                 ]
-        return node
 
-    def ps_coefficients(self):
+        if flat:
+            return node.reshape(-1).reshape(((N+1)*(N+1), GD), order='F')
+        else:
+            return node
+
+    def ps_coefficients(self, flat=False):
         N = self.N
         GD = self.GD
         box = self.box
         n = N//2
         k = np.mgrid[tuple(slice(-n, n+1) for i in range(GD))]
-        return k
+        if flat:
+            return k.reshape(-1).reshape(((N+1)*(N+1), GD), order='F')
+        else:
+            return k
 
-    def ps_coefficients_square(self):
-        GD = self.GD
-        k = self.ps_coefficients()
+    def ps_coefficients_square(self, flat=False):
+        k = self.ps_coefficients(flat=flat)
         return np.sum(k**2, axis=0)
