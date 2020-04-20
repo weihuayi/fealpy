@@ -148,8 +148,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             uh[:, 1] = x[udof:2*udof]
             ph[:] = x[2*udof:]
 
-            up = uspace.project(pde.velocity)
-            up = uspace.project_to_smspace(up)
+            up = uspace.project_to_smspace(uh)
             integralalg = uspace.integralalg
             error[i] = integralalg.L2_error(pde.velocity, up)
             h /= 2
@@ -231,5 +230,5 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.test_matrix_P()
 #test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u3, p=3, mtype=3, plot=False)
-#test.stokes_equation_test(p=2)
-test.matrix_G_test()
+test.stokes_equation_test(p=2)
+#test.matrix_G_test()

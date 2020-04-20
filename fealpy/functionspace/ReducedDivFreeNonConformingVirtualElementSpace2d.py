@@ -829,6 +829,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         cell, cellLocation = mesh.entity('cell')
         cell2edge = mesh.ds.cell_to_edge()
 
+        smldof = self.smspace.number_of_local_dofs(p=p)
+
         eh = mesh.entity_measure('edge')
         ch = self.smspace.cellsize
         area = self.smspace.cellmeasure
@@ -838,29 +840,23 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
             D0 = self.D[0][s0, :]
-            D1 = self.D[1][i]
-            D2 = self.D[2][i]
-            D -= block([
-                [D0,  0],
-                [ 0, D0],
-                [D1, D2]])@PI0
+            D -= block_diag([D0, D0])@PI0[:2*smldof]
 
             s1 = slice(cellLocation[i], cellLocation[i+1]) 
-            A = list(self.H1[cell2edge[s1]]*eh[cell2eddge[s1]][:, None, None]**2/ch[i])
+            S = list(self.H1[cell2edge[s1]]*eh[cell2edge[s1]][:, None, None]**2/ch[i])
             if p > 2:
-                A.append(inv(self.Q[i])*area[i])
-            A = D.T@block_diag(A)@D
-            """
+                S.append(inv(self.Q[i])*area[i])
+            print(block_diag(S).shape)
+            S = D.T@block_diag(S)@D
             U = block([
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
                 [self.U[0][0], self.U[0][1], self.U[0][2]],
-                [self.U[0][0], self.U[0][1], self.U[0][2]])
-                """
+                [self.U[0][0], self.U[0][1], self.U[0][2]]])
             H0 = block([
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
                 [         0,              0, self.H0[i]]])
-            return A + U.T@H0@U 
+            return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
 
@@ -879,11 +875,18 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         return  
 
     def matrix_P(self):
+        """
+        Notes
+        -----
+
+        (div v_h, q_0)
+        """
         p = self.p
         idof = (p-2)*(p-1)//2
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation =  self.dof.cell2dofLocation
         NC = self.mesh.number_of_cells()
-        cd = self.smspace.cell_to_dof(p=p-1)
+        cd = self.smspace.cell_to_dof(p=0)
         def f0(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             return np.meshgrid(cell2dof[s], cd[i])
@@ -892,11 +895,11 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
         def f(i, k):
-            J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
-            return J.flatten()
+            J = self.J[k][0, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return J
 
-        gdof0 = self.smspace.number_of_global_dofs(p=p-1)
-        gdof1 = self.dof.number_of_global_dofs()
+        gdof0 = self.smspace.number_of_global_dofs(p=0)
+        gdof1 = self.number_of_global_dofs()
 
         P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
         P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
@@ -915,16 +918,36 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p-2)
         Q = inv(self.CM[:, :ndof, :ndof])
         phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u(x, index):
-            return np.einsum('ij..., ijm->ijm...', f(x),
-                    self.smspace.basis(x, index=index, p=p-2))
-        bb = self.integralalg.integral(u, celltype=True)
-        bb = Q@bb
-        bb *= self.smspace.cellmeasure[:, None, None]
+        def u0(x, index):
+            return np.einsum('ijm, ijn->ijmn', 
+                    self.smspace.basis(x, index=index, p=p-2), f(x))
+        bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+        bb = Q@bb # (NC, ndof, 2)
+
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+
+        eb = np.zeros((2, len(cell2dof), 2), dtype=self.ftype)
+        def u1(i):
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            eb[0, s, 0] = bb[i, :, 0]@self.E[0][0][:, s] 
+            eb[0, s, 1] = bb[i, :, 1]@self.E[1][0][:, s]
+            eb[1, s, 0] = bb[i, :, 0]@self.E[0][1][:, s]
+            eb[1, s, 1] = bb[i, :, 1]@self.E[1][1][:, s]
+        map(u1, range(NC))
+
         gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof(doftype='cell')
-        b = np.zeros(gdof, dtype=self.ftype)
-        b[cell2dof, :] = bb
+        b = np.zeros((gdof, 2), dtype=self.ftype)
+
+        np.add.at(b, (cell2dof, np.s_[:]), eb[0])
+        np.add.at(b[NE*p:, :], (cell2dof, np.s_[:]), eb[1])
+        if p > 2:
+            c2d = self.cell_to_dof('cell')
+            idof = (p-2)*(p-1)//2
+            b[c2d, 0] = bb.swapaxes(-1, -2)@self.E[0][2]
+            b[c2d, 1] = bb.swapaxes(-1, -2)@self.E[1][2]
         return b
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
@@ -932,17 +955,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         """
         p = self.p
         mesh = self.mesh
+
+        NE = mesh.number_of_edges()
+
         isBdEdge = mesh.ds.boundary_edge_flag()
         edge2dof = self.dof.edge_to_dof()
 
-        qf = GaussLegendreQuadrature(self.p + 3)
+        qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
         val = g(ps)
 
         ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
         b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
-        gh[edge2dof[isBdEdge]] = self.H1[isBdEdge]@b
+        T = self.H1[isBdEdge]@b
+        gh[edge2dof[isBdEdge]] = T[:, :, 0] 
+        gh[NE*p:][edge2dof[isBdEdge]] = T[:, :, 1] 
 
     def number_of_global_dofs(self):
         mesh = self.mesh

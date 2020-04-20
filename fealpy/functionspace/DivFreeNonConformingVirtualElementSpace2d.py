@@ -172,7 +172,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [self.G[2][i].T, self.G[1][i]  , self.B[1][i]],
                 [self.B[0][i].T, self.B[1][i].T, Z]]
                 )
-            print("Div G:", G)
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             R =  np.block([
                 [self.R[0][0][:, s], self.R[0][1][:, s]],

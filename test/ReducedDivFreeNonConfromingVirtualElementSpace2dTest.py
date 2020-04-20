@@ -102,6 +102,64 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
+
+    def stokes_equation_test(self, p=2, maxit=4):
+        from scipy.sparse import bmat
+        from fealpy.pde.Stokes_Model_2d import CosSinData
+        from fealpy.mesh.simple_mesh_generator import triangle
+        h = 0.4
+        pde = CosSinData()
+        domain = pde.domain()
+        error = np.zeros((maxit,), dtype=np.float)
+        for i in range(maxit):
+            mesh = triangle(domain, h, meshtype='polygon')
+
+            if 0:
+                fig = plt.figure()
+                axes = fig.gca()
+                mesh.add_plot(axes)
+                plt.show()
+
+            uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
+            pspace = ScaledMonomialSpace2d(mesh, 0)
+
+            isBdDof = uspace.boundary_dof()
+
+            udof = uspace.number_of_global_dofs()
+            pdof = pspace.number_of_global_dofs()
+
+            uh = uspace.function()
+            ph = pspace.function()
+            uspace.set_dirichlet_bc(uh, pde.dirichlet)
+
+            A = uspace.matrix_A()
+            P = uspace.matrix_P()
+            F = uspace.source_vector(pde.source)
+
+            AA = bmat([[A, P.T], [P, None]], format='csr')
+            FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
+            x = np.block([uh, ph])
+            isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
+
+            gdof = udof + pdof
+            FF -= AA@x
+            bdIdx = np.zeros(gdof, dtype=np.int)
+            bdIdx[isBdDof] = 1
+            Tbd = spdiags(bdIdx, 0, gdof, gdof)
+            T = spdiags(1-bdIdx, 0, gdof, gdof)
+            AA = T@AA@T + Tbd
+            FF[isBdDof] = x[isBdDof]
+            x[:] = spsolve(AA, FF)
+            uh[:] = x[:udof]
+            ph[:] = x[udof:]
+
+            up = uspace.project_to_smspace(uh)
+            integralalg = uspace.integralalg
+            error[i] = integralalg.L2_error(pde.velocity, up)
+            h /= 2
+
+        print(error)
+        print(error[0:-1]/error[1:])
 def u0(p):
     x = p[..., 0]
     y = p[..., 1]
@@ -143,11 +201,15 @@ def u4(p):
     return val
 
 test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
+
 if False:
     test.verify_matrix(u3, p=3, mtype=0, plot=True)
 
-if True:
+if False:
     test.project_test(u3, p=3, mtype=3, plot=False)
+
+if True:
+    test.stokes_equation_test(p=2)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
