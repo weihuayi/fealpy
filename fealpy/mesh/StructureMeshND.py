@@ -36,10 +36,9 @@ class StructureMeshND:
         N = self.N
         GD = self.GD
         xi = self.freq()
-        F = f(self.node)[
+        F = f(self.node)
         F = np.fft.fft(F)
         U = F/cfun(xi)
-        print('U1:', U1)
         U1 = np.fft.ifft(U1).real
 
 

@@ -105,7 +105,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         domain = pde.domain()
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
-            mesh = triangle(domain, h, meshtype='polygon')
+            mesh = pde.init_mesh(n=i+2, meshtype='poly') 
 
             if 0:
                 fig = plt.figure()

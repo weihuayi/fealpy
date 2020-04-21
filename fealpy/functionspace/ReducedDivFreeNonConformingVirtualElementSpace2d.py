@@ -841,8 +841,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
             D0 = self.D[0][s0, :]
-            print(D0.shape)
-            D -= block_diag([D0, D0])@PI0[:2*smldof]
+            D1 = self.D[1][i]
+            D2 = self.D[2][i]
+            D -= block([
+                [D0,  0],
+                [ 0, D0],
+                [D1, D2]])@PI0[:2*smldof]
 
             s1 = slice(cellLocation[i], cellLocation[i+1]) 
             S = list(self.H1[cell2edge[s1]]*eh[cell2edge[s1]][:, None, None]**2/ch[i])
@@ -897,14 +901,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
-        def f(i, k):
-            J = self.J[k][0, cell2dofLocation[i]:cell2dofLocation[i+1]]
-            return J
-
         gdof0 = self.smspace.number_of_global_dofs(p=0)
-
-        P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
-        P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
+        if False:
+            def f1(i, k):
+                J = self.J[k][0, cell2dofLocation[i]:cell2dofLocation[i+1]]
+                return J
+            P0 = np.concatenate(list(map(lambda i: f1(i, 0), range(NC))))
+            P1 = np.concatenate(list(map(lambda i: f1(i, 1), range(NC))))
 
         P0 = csr_matrix((P0, (I, J)),
                 shape=(gdof0, NE*p), dtype=self.ftype)
@@ -945,7 +948,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.add.at(b[NE*p:], cell2dof, eb[1])
         if p > 2:
             c2d = self.cell_to_dof('cell')
-            b[c2d] += bb[:, :, 0]@self.E[0][2] + b[:, :, 1]@self.E[1][2]
+            b[c2d] += np.sum(bb[:, :, [0]]*self.E[0][2], axis=1)
+            b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
         return b 
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):

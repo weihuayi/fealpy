@@ -114,6 +114,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         for i in range(maxit):
             mesh = pde.init_mesh(n=i+2, meshtype='poly') 
 
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
+            idof = (p-2)*(p-1)//2
+
+
+
             if True:
                 fig = plt.figure()
                 axes = fig.gca()
@@ -138,7 +144,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             AA = bmat([[A, P.T], [P, None]], format='csr')
             FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
             x = np.block([uh, ph])
-            isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
+            isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+pdof, dtype=np.bool)])
 
             gdof = udof + pdof
             FF -= AA@x
@@ -210,7 +216,7 @@ if False:
     test.project_test(u4, p=4, mtype=3, plot=False)
 
 if True:
-    test.stokes_equation_test(p=3)
+    test.stokes_equation_test(p=4)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
