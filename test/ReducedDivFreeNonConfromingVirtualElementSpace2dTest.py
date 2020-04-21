@@ -216,7 +216,7 @@ if False:
     test.project_test(u4, p=4, mtype=3, plot=False)
 
 if True:
-    test.stokes_equation_test(p=4)
+    test.stokes_equation_test(p=2)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()

@@ -814,7 +814,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             np.subtract.at(U00, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
             np.subtract.at(U11, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
             val = np.einsum('jmn, j-> mjn', F1, n[:, 1])
-            np.subtract.at(U01, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
+            np.subtract.at(U10, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
             np.subtract.at(U21, (np.s_[:], idx[isInEdge]), val[:, isInEdge, :])
 
         return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
@@ -849,15 +849,15 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [D1, D2]])@PI0[:2*smldof]
 
             s1 = slice(cellLocation[i], cellLocation[i+1]) 
-            S = list(self.H1[cell2edge[s1]]*eh[cell2edge[s1]][:, None, None]**2/ch[i])
+            S = list(self.H1[cell2edge[s1]]*eh[cell2edge[s1]][:, None, None])
             S += S
             if p > 2:
                 S.append(inv(self.Q[i])*area[i])
             S = D.T@block_diag(S)@D
             U = block([
                 [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]],
-                [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]],
-                [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]]])
+                [self.U[1][0][:, s0], self.U[1][1][:, s0], self.U[1][2][i]],
+                [self.U[2][0][:, s0], self.U[2][1][:, s0], self.U[2][2][i]]])
             H0 = block([
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
@@ -870,6 +870,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
             return np.meshgrid(cd, cd)
+        
         idx = list(map(f2, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
@@ -902,6 +903,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
         gdof0 = self.smspace.number_of_global_dofs(p=0)
+
         if False:
             def f1(i, k):
                 J = self.J[k][0, cell2dofLocation[i]:cell2dofLocation[i+1]]
@@ -909,9 +911,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             P0 = np.concatenate(list(map(lambda i: f1(i, 0), range(NC))))
             P1 = np.concatenate(list(map(lambda i: f1(i, 1), range(NC))))
 
-        P0 = csr_matrix((P0, (I, J)),
+        P0 = csr_matrix((self.J[0][0], (I, J)),
                 shape=(gdof0, NE*p), dtype=self.ftype)
-        P1 = csr_matrix((P1, (I, J)),
+        P1 = csr_matrix((self.J[1][0], (I, J)),
                 shape=(gdof0, NE*p), dtype=self.ftype)
         P2 = csr_matrix((gdof0, NC*idof), dtype=self.ftype)
 
