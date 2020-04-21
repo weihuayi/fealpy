@@ -93,7 +93,7 @@ class CosSinData:
             mesh = StructureQuadMesh(self.box, nx, ny)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype == 'Poly':
+        elif meshtype == 'poly':
             cell = np.array([
                 (1, 2, 0),
                 (3, 0, 2)], dtype=np.int)
@@ -127,10 +127,10 @@ class CosSinData:
         sin = np.sin
         cos = np.cos
         val = np.zeros(p.shape, dtype=np.float)
-        val[..., 0] = -3*cos(x)*cos(x)*sin(y)*cos(y) \
-                 + sin(x)*sin(x)*sin(y)*cos(y) - cos(x) + sin(y)
-        val[..., 1] = 3*sin(x)*cos(x)*cos(y)*cos(y) \
-                 - cos(x)*sin(x)*sin(y)*sin(y) - sin(x) + cos(y)
+        val[..., 0] += -3*cos(x)*cos(x)*sin(y)*cos(y)
+        val[..., 0] += sin(x)*sin(x)*sin(y)*cos(y) - cos(x) + sin(y)
+        val[..., 1] += 3*sin(x)*cos(x)*cos(y)*cos(y)
+        val[..., 1] += - cos(x)*sin(x)*sin(y)*sin(y) - sin(x) + cos(y)
         return val
 
     def dirichlet(self, p):

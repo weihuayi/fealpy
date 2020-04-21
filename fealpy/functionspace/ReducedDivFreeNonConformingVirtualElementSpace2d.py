@@ -24,7 +24,7 @@ class RDFNCVEMDof2d():
         """
         self.p = p
         self.mesh = mesh
-        # 注意这里只包含每个单元边上的自由度 
+        # 注意这里只包含每个单元边上的标量自由度 
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
 
     def boundary_dof(self):
@@ -110,6 +110,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         self.Q, self.L = self.matrix_Q_L()
         self.G, self.B = self.matrix_G_B()
         self.E = self.matrix_E()
+        self.U = self.matrix_U()
         self.R, self.J = self.matrix_R_J()
         self.D = self.matrix_D()
         self.PI0 = self.matrix_PI0()
@@ -739,7 +740,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         """
         p = self.p
         mesh = self.mesh
-        NC = mesh.nuber_of_cells()
+        NC = mesh.number_of_cells()
 
         smldof = self.smspace.number_of_local_dofs(p=p-1) # 标量 p-1 次单元缩放空间的维数
         idof = (p-2)*(p-1)//2
@@ -840,18 +841,19 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
             D0 = self.D[0][s0, :]
+            print(D0.shape)
             D -= block_diag([D0, D0])@PI0[:2*smldof]
 
             s1 = slice(cellLocation[i], cellLocation[i+1]) 
             S = list(self.H1[cell2edge[s1]]*eh[cell2edge[s1]][:, None, None]**2/ch[i])
+            S += S
             if p > 2:
                 S.append(inv(self.Q[i])*area[i])
-            print(block_diag(S).shape)
             S = D.T@block_diag(S)@D
             U = block([
-                [self.U[0][0], self.U[0][1], self.U[0][2]],
-                [self.U[0][0], self.U[0][1], self.U[0][2]],
-                [self.U[0][0], self.U[0][1], self.U[0][2]]])
+                [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]],
+                [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]],
+                [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]]])
             H0 = block([
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
@@ -859,20 +861,20 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
-
+        idof = (p-2)*(p-1)//2
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
             return np.meshgrid(cd, cd)
-        idx = list(map(f5, range(NC)))
+        idx = list(map(f2, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
         gdof = self.number_of_global_dofs() 
 
-        A = np.concatenate(list(map(lambda x: x[0].flat, A)))
+        A = np.concatenate(list(map(lambda x: x.flat, A)))
         A = csr_matrix((A, (I, J)), shape=(gdof, gdof), dtype=self.ftype)
-        return  
+        return  A
 
     def matrix_P(self):
         """
@@ -885,6 +887,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         idof = (p-2)*(p-1)//2
         cell2dof = self.dof.cell2dof
         cell2dofLocation =  self.dof.cell2dofLocation
+        NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
         cd = self.smspace.cell_to_dof(p=0)
         def f0(i):
@@ -899,15 +902,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             return J
 
         gdof0 = self.smspace.number_of_global_dofs(p=0)
-        gdof1 = self.number_of_global_dofs()
 
         P0 = np.concatenate(list(map(lambda i: f(i, 0), range(NC))))
         P1 = np.concatenate(list(map(lambda i: f(i, 1), range(NC))))
 
         P0 = csr_matrix((P0, (I, J)),
-                shape=(gdof0, gdof1), dtype=self.ftype)
+                shape=(gdof0, NE*p), dtype=self.ftype)
         P1 = csr_matrix((P1, (I, J)),
-                shape=(gdof0, gdof1), dtype=self.ftype)
+                shape=(gdof0, NE*p), dtype=self.ftype)
         P2 = csr_matrix((gdof0, NC*idof), dtype=self.ftype)
 
         return bmat([[P0, P1, P2]], format='csr')
@@ -929,26 +931,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
 
-        eb = np.zeros((2, len(cell2dof), 2), dtype=self.ftype)
+        eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
         def u1(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            eb[0, s, 0] = bb[i, :, 0]@self.E[0][0][:, s] 
-            eb[0, s, 1] = bb[i, :, 1]@self.E[1][0][:, s]
-            eb[1, s, 0] = bb[i, :, 0]@self.E[0][1][:, s]
-            eb[1, s, 1] = bb[i, :, 1]@self.E[1][1][:, s]
+            eb[0, s] = bb[i, :, 0]@self.E[0][0][:, s] + bb[i, :, 1]@self.E[1][0][:, s]
+            eb[1, s] = bb[i, :, 0]@self.E[0][1][:, s] + bb[i, :, 1]@self.E[1][1][:, s]
         map(u1, range(NC))
 
         gdof = self.number_of_global_dofs()
-        b = np.zeros((gdof, 2), dtype=self.ftype)
+        b = np.zeros((gdof, ), dtype=self.ftype)
 
-        np.add.at(b, (cell2dof, np.s_[:]), eb[0])
-        np.add.at(b[NE*p:, :], (cell2dof, np.s_[:]), eb[1])
+        np.add.at(b, cell2dof, eb[0])
+        np.add.at(b[NE*p:], cell2dof, eb[1])
         if p > 2:
             c2d = self.cell_to_dof('cell')
-            idof = (p-2)*(p-1)//2
-            b[c2d, 0] = bb.swapaxes(-1, -2)@self.E[0][2]
-            b[c2d, 1] = bb.swapaxes(-1, -2)@self.E[1][2]
-        return b
+            b[c2d] += bb[:, :, 0]@self.E[0][2] + b[:, :, 1]@self.E[1][2]
+        return b 
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
         """

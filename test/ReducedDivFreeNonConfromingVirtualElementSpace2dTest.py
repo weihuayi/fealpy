@@ -112,13 +112,12 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
         domain = pde.domain()
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
-            mesh = triangle(domain, h, meshtype='polygon')
+            mesh = pde.init_mesh(n=i+2, meshtype='poly') 
 
-            if 0:
+            if True:
                 fig = plt.figure()
                 axes = fig.gca()
                 mesh.add_plot(axes)
-                plt.show()
 
             uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p)
             pspace = ScaledMonomialSpace2d(mesh, 0)
@@ -160,6 +159,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
 
         print(error)
         print(error[0:-1]/error[1:])
+        plt.show()
+
 def u0(p):
     x = p[..., 0]
     y = p[..., 1]
@@ -206,10 +207,10 @@ if False:
     test.verify_matrix(u3, p=3, mtype=0, plot=True)
 
 if False:
-    test.project_test(u3, p=3, mtype=3, plot=False)
+    test.project_test(u4, p=4, mtype=3, plot=False)
 
 if True:
-    test.stokes_equation_test(p=2)
+    test.stokes_equation_test(p=3)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)
 #test.stokes_equation_test()
