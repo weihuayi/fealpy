@@ -16,7 +16,7 @@ def f(p):
     x = p[0]
     y = p[1]
     pi = np.pi
-    return 2*pi**2*np.sin(pi*x)*np.sin(pi*y)
+    return (2*pi**2+1)*np.sin(pi*x)*np.sin(pi*y)
 
 box = [0, 2*np.pi, 0, 2*np.pi]
 N = 4
@@ -30,12 +30,13 @@ F2 = np.fft.ifft2(F1).real
 print('F0:\n', F0)
 print('F2:\n', F2)
 
-#k2 = mesh.ps_coefficients_square()
-#U = F/k2
-#U[N, N] = 0
-#U = np.fft.ifft2(U)
-#print('U:\n', U)
-#print('k2:\n', k2)
+u = u(node)
+k2 = mesh.ps_coefficients_square()
+U = F/(k2+1)
+U = np.fft.ifft2(U).real
+print('u:\n', u)
+print('U:\n', U)
+print('k2:\n', k2+1)
 
 
 
