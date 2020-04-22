@@ -96,9 +96,6 @@ if True:
 
 
 
-
-
-
 if False:
     k = mesh.ps_coefficients()
     print('k:', k)

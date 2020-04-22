@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-# 
 import numpy as np
 from numpy.linalg import inv
 
@@ -27,7 +25,7 @@ class StructureMeshND:
         node = self.node
         return u(node)
 
-    def reciprocal_lattice(self, sparse=True):
+    def reciprocal_lattice(self, project_matrix=None, sparse=True):
         """
         返回倒易空间的网格
         """
@@ -37,7 +35,6 @@ class StructureMeshND:
 
         f = np.fft.fftfreq(N)*N
         f = np.meshgrid(*(GD*(f,)), sparse=sparse)
-
         rBox = 2*np.pi*inv(box).T
         xi = []
         for i in range(GD):
