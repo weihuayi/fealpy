@@ -6,39 +6,96 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import StructureMeshND
 from fealpy.mesh import StructureQuadMesh
 
-def u(p):
-    x = p[0]
-    return np.sin(x) 
 
-def f(p):
-    x = p[0]
-    return 2*np.sin(x) 
+class StructureMeshNDTest():
+    def __init__(self):
+        pass
 
-box = [0, 2*np.pi]
-N = 10 
-mesh = StructureMeshND(box, N)
-node = mesh.node
+    def linear_equation_fft_solver_1d_test(self, N):
+        def u(p):
+            x = p[0]
+            return np.sin(x) 
 
-xi = np.fft.fftfreq(N)*N
-print('xi:\n', xi)
+        def f(p):
+            x = p[0]
+            return 2*np.sin(x) 
 
-F0 = f(node)
-print('F0:', F0)
+        box = np.array([[2*np.pi]]) 
+        mesh = StructureMeshND(box, N)
+        U = mesh.linear_equation_fft_solver(f)
+        error = mesh.error(u, U)
+        print(error)
 
-F1 = np.fft.fft(F0)
-print('F1:', F1)
+    def linear_equation_fft_solver_2d_test(self, N):
+        def u(p):
+            x = p[0]
+            y = p[1]
+            return np.sin(x)*np.sin(y)
+
+        def f(p):
+            x = p[0]
+            y = p[1]
+            return 3*np.sin(x)*np.sin(y) 
+
+        box = np.array([
+            [2*np.pi, 0],
+            [0, 2*np.pi]]) 
+        mesh = StructureMeshND(box, 6)
+        xi = mesh.reciprocal_lattice(sparse=False)
+        U = mesh.linear_equation_fft_solver(f)
+        error = mesh.error(u, U)
+        print(error)
+
+    def linear_equation_fft_solver_3d_test(self, N):
+        def u(p):
+            x = p[0]
+            y = p[1]
+            z = p[2]
+            return np.sin(x)*np.sin(y)*np.sin(z)
+
+        def f(p):
+            x = p[0]
+            y = p[1]
+            z = p[2]
+            return 4*np.sin(x)*np.sin(y)*np.sin(z)
+
+        box = np.array([
+            [2*np.pi, 0, 0],
+            [0, 2*np.pi, 0],
+            [0, 0, 2*np.pi]]) 
+        mesh = StructureMeshND(box, 6)
+        xi = mesh.reciprocal_lattice(sparse=False)
+        U = mesh.linear_equation_fft_solver(f)
+        error = mesh.error(u, U)
+        print(error)
+
+    def box_test(self, N):
+
+        box = np.array([
+            [2*np.pi, 0],
+            [0, 2*np.pi]])
+        mesh = StructureMeshND(box, N)
+        node = mesh.node
+        print(node)
+        
 
 
-U1 = F1/(1+xi**2)
-print('U1:', U1)
-U1 = np.fft.ifft(U1).real
-print('U1:', U1)
+test = StructureMeshNDTest()
 
-U0 = u(node)
-print('U0:', U0)
+if True:
+    test.linear_equation_fft_solver_1d_test(10)
 
-error = np.sqrt(np.sum((U0 - U1)**2)/N)
-print(error)
+if True:
+    test.linear_equation_fft_solver_2d_test(6)
+
+if True:
+    test.linear_equation_fft_solver_3d_test(6)
+
+if True:
+    test.box_test(4)
+
+
+
 
 
 
