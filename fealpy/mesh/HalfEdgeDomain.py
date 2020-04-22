@@ -122,7 +122,6 @@ class HalfEdgeDomain():
         a = sum(val)/2
         return a
 
-
     def advance_triangle_mesh(self):
 
         # 初始网格点的数量
@@ -136,7 +135,9 @@ class HalfEdgeDomain():
 
         node[:NN] = self.vertices
         halfedge[:NE] = self.halfedge
-        
+
+    def boundary_refine_critiria(self, maxh=0.1, delaunay=True):
+        pass
         
     def boundary_adaptive_refine(self, isMarkedHEdge,
         vertices=None, halfedge=None, edgecenter=None):
