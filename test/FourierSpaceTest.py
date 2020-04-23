@@ -3,11 +3,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import StructureMeshND
+from fealpy.functionspace import FourierSpace 
 from fealpy.mesh import StructureQuadMesh
 
 
-class StructureMeshNDTest():
+class FourierSpaceTest():
     def __init__(self):
         pass
 
@@ -21,7 +21,7 @@ class StructureMeshNDTest():
             return 2*np.sin(x) 
 
         box = np.array([[2*np.pi]]) 
-        mesh = StructureMeshND(box, N)
+        mesh = FourierSpace(box, N)
         U = mesh.linear_equation_fft_solver(f)
         error = mesh.error(u, U)
         print(error)
@@ -40,7 +40,7 @@ class StructureMeshNDTest():
         box = np.array([
             [2*np.pi, 0],
             [0, 2*np.pi]]) 
-        mesh = StructureMeshND(box, 6)
+        mesh = FourierSpace(box, 6)
         xi = mesh.reciprocal_lattice(sparse=False)
         U = mesh.linear_equation_fft_solver(f)
         error = mesh.error(u, U)
@@ -63,7 +63,7 @@ class StructureMeshNDTest():
             [2*np.pi, 0, 0],
             [0, 2*np.pi, 0],
             [0, 0, 2*np.pi]]) 
-        mesh = StructureMeshND(box, 6)
+        mesh = FourierSpace(box, 6)
         xi = mesh.reciprocal_lattice(sparse=False)
         U = mesh.linear_equation_fft_solver(f)
         error = mesh.error(u, U)
@@ -74,13 +74,13 @@ class StructureMeshNDTest():
         box = np.array([
             [2*np.pi, 0],
             [0, 2*np.pi]])
-        mesh = StructureMeshND(box, N)
+        mesh = FourierSpace(box, N)
         node = mesh.node
         print(node)
         
 
 
-test = StructureMeshNDTest()
+test = FourierSpaceTest()
 
 if True:
     test.linear_equation_fft_solver_1d_test(10)
@@ -97,11 +97,6 @@ if True:
 
 
 if False:
-    k = mesh.ps_coefficients()
-    print('k:', k)
-
-    k2 = mesh.ps_coefficients_square()
-    print('k2:', k2)
     qmesh = StructureQuadMesh(box, N, N)
     mi = qmesh.multi_index()
     fig = plt.figure()

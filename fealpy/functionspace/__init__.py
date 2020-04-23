@@ -9,6 +9,8 @@ from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
 from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
 from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
 
+from .FourierSpace import FourierSpace
+
 from .mixed_fem_space import RTFiniteElementSpace2d
 from .vem_space import VEMDof2d, VirtualElementSpace2d
 from .MonomialSpace2d import MonomialSpace2d

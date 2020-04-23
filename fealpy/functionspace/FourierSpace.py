@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 
-class StructureMeshND:
+class FourierSpace:
     def __init__(self, box, N):
         self.box = box
         self.N = N
