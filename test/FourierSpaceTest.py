@@ -21,9 +21,9 @@ class FourierSpaceTest():
             return 2*np.sin(x) 
 
         box = np.array([[2*np.pi]]) 
-        mesh = FourierSpace(box, N)
-        U = mesh.linear_equation_fft_solver(f)
-        error = mesh.error(u, U)
+        space = FourierSpace(box, N)
+        U = space.linear_equation_fft_solver(f)
+        error = space.error(u, U)
         print(error)
 
     def linear_equation_fft_solver_2d_test(self, N):
@@ -40,10 +40,10 @@ class FourierSpaceTest():
         box = np.array([
             [2*np.pi, 0],
             [0, 2*np.pi]]) 
-        mesh = FourierSpace(box, 6)
-        xi = mesh.reciprocal_lattice(sparse=False)
-        U = mesh.linear_equation_fft_solver(f)
-        error = mesh.error(u, U)
+        space = FourierSpace(box, 6)
+        xi = space.reciprocal_lattice(sparse=False)
+        U = space.linear_equation_fft_solver(f)
+        error = space.error(u, U)
         print(error)
 
     def linear_equation_fft_solver_3d_test(self, N):
@@ -63,20 +63,37 @@ class FourierSpaceTest():
             [2*np.pi, 0, 0],
             [0, 2*np.pi, 0],
             [0, 0, 2*np.pi]]) 
-        mesh = FourierSpace(box, 6)
-        xi = mesh.reciprocal_lattice(sparse=False)
-        U = mesh.linear_equation_fft_solver(f)
-        error = mesh.error(u, U)
+        space = FourierSpace(box, 6)
+        xi = space.reciprocal_lattice(sparse=False)
+        U = space.linear_equation_fft_solver(f)
+        error = space.error(u, U)
         print(error)
 
-    def box_test(self, N):
-
+    def parabolic_equation_solver_test(self, NS, NT):
+        from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
         box = np.array([
             [2*np.pi, 0],
             [0, 2*np.pi]])
-        mesh = FourierSpace(box, N)
-        node = mesh.node
-        print(node)
+        space = FourierSpace(box, NS)
+        timeline = UniformTimeLine(0, 1, NT)
+        NL = timeline.number_of_time_levels()
+        q = space.function(dim=NL)
+        w = space.function()
+        w[:] = 0
+        q[0] = 1
+        k, k2 = space.reciprocal_lattice(return_square=True)
+        dt = timeline.current_time_step_length()
+        E0 = np.exp(-dt/2*w)
+        E1 = np.exp(-dt*k2)
+        for i in range(1, NL):
+            q0 = q[i-1]
+            q1 = np.fft.fftn(E0*q0)
+            q1 *= E1
+            q[i] = np.fft.ifftn(q1).real
+            q[i] *= E0
+
+        print(q)
+
         
 
 
@@ -92,9 +109,7 @@ if True:
     test.linear_equation_fft_solver_3d_test(6)
 
 if True:
-    test.box_test(4)
-
-
+    test.parabolic_equation_solver_test(4, 10)
 
 if False:
     qmesh = StructureQuadMesh(box, N, N)

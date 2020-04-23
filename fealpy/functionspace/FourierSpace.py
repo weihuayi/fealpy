@@ -10,24 +10,24 @@ class FourierSpace:
         self.ftype = np.float
         self.itype = np.int32
 
-    @property
-    def node(self):
+    def interpolation_points(self):
         N = self.N
         GD = self.GD
         box = self.box
         index = np.ogrid[GD*(slice(0, 1, 1/N), )]
-        node = []
+        points = []
         for i in range(GD):
-            node.append(sum(map(lambda x: x[0]*x[1], zip(box[i], index))))
-        return node
+            points.append(sum(map(lambda x: x[0]*x[1], zip(box[i], index))))
+        return points
 
     def interpolation(self, u):
-        node = self.node
-        return u(node)
+        p = self.interpolation_points()
+        return u(p)
 
-    def reciprocal_lattice(self, project_matrix=None, sparse=True):
+    def reciprocal_lattice(self, project_matrix=None, sparse=True,
+            return_square=False):
         """
-        返回倒易空间的网格
+        倒易空间的网格
         """
         N = self.N
         GD = self.GD
@@ -36,10 +36,18 @@ class FourierSpace:
         f = np.fft.fftfreq(N)*N
         f = np.meshgrid(*(GD*(f,)), sparse=sparse)
         rBox = 2*np.pi*inv(box).T
-        xi = []
-        for i in range(GD):
-            xi.append(sum(map(lambda x: x[0]*x[1], zip(rBox[i], f))))
-        return xi
+        n = GD
+        if project_matrix is not None:
+            n = project_matrix.shape[0]
+            rBox = project_matrix@rBox
+        k = []
+        for i in range(n):
+            k.append(sum(map(lambda x: x[0]*x[1], zip(rBox[i], f))))
+
+        if return_square:
+            return k, sum(map(lambda x: x**2, k))
+        else:
+            return k
 
     def linear_equation_fft_solver(self, f, 
             cfun=lambda x: 1 + sum(map(lambda y: y**2, x))):
@@ -51,6 +59,16 @@ class FourierSpace:
         U = F/cfun(xi)
         U = np.fft.ifftn(U).real
         return U
+
+    def function(self, dim=None):
+        N = self.N
+        GD = self.GD
+        box = self.box
+        shape = GD*(N, )
+        if dim is not None:
+            shape = (dim, ) + shape
+        f = np.zeros(shape, dtype=self.ftype)
+        return f
 
     def error(self, u, U):
         N = self.N
