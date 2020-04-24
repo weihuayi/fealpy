@@ -92,8 +92,9 @@ class CVTPMesher:
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
-        self.bnode = bnode[isKeepNode] # 
-        self.cnode = node[halfedge[idx, 0]] - v2 #
+        self.bnode = bnode[isKeepNode] #
+        idxflag = halfedge[idx,1]<=0
+        self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
         self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
         self.chedge = idx # the index of halfedge point on corner point
 
