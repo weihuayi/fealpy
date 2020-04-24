@@ -720,6 +720,11 @@ class HuangModel2d():
         val = self.displacement(p) 
         return val
 
+    def is_dirichlet_boundary(self, p):
+        eps = 1e-14
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+
+
 class Model2d():
     def __init__(self, lam=1.0, mu=0.5):
         self.lam = lam
