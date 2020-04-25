@@ -6,12 +6,16 @@ import matplotlib.pyplot as plt
 from fealpy.functionspace import FourierSpace 
 from fealpy.mesh import StructureQuadMesh
 
-
 class FourierSpaceTest():
     def __init__(self):
         pass
 
     def linear_equation_fft_solver_1d_test(self, N):
+        """
+        -\Delta u + u = f
+
+        u(x) = sin(x) [0, 2*\pi)
+        """
         def u(p):
             x = p[0]
             return np.sin(x) 
@@ -27,6 +31,11 @@ class FourierSpaceTest():
         print(error)
 
     def linear_equation_fft_solver_2d_test(self, N):
+        """
+        -\Delta u + u = f
+
+        u(x, y) = sin(x)*sin(y) [0, 2*\pi)^2
+        """
         def u(p):
             x = p[0]
             y = p[1]
@@ -41,12 +50,16 @@ class FourierSpaceTest():
             [2*np.pi, 0],
             [0, 2*np.pi]]) 
         space = FourierSpace(box, 6)
-        xi = space.reciprocal_lattice(sparse=False)
         U = space.linear_equation_fft_solver(f)
         error = space.error(u, U)
         print(error)
 
     def linear_equation_fft_solver_3d_test(self, N):
+        """
+        -\Delta u + u = f
+
+        u(x, y, z) = sin(x)*sin(y)*sin(z) [0, 2*\pi)^3
+        """
         def u(p):
             x = p[0]
             y = p[1]
@@ -64,13 +77,21 @@ class FourierSpaceTest():
             [0, 2*np.pi, 0],
             [0, 0, 2*np.pi]]) 
         space = FourierSpace(box, 6)
-        xi = space.reciprocal_lattice(sparse=False)
         U = space.linear_equation_fft_solver(f)
         error = space.error(u, U)
         print(error)
 
     def parabolic_equation_solver_test(self, NS, NT):
+        """
+        u_t = \Delta u + w*u
+
+        w = 1
+        u(x, 0) = 1
+
+        周期边界条件
+        """
         from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+
         box = np.array([
             [2*np.pi, 0],
             [0, 2*np.pi]])
@@ -79,7 +100,7 @@ class FourierSpaceTest():
         NL = timeline.number_of_time_levels()
         q = space.function(dim=NL)
         w = space.function()
-        w[:] = 0
+        w[:] = 1
         q[0] = 1
         k, k2 = space.reciprocal_lattice(return_square=True)
         dt = timeline.current_time_step_length()
