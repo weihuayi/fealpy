@@ -363,7 +363,6 @@ class HalfEdgeDomain():
         return mesh 
 
 
-
     def create_voronoi_1(self, points):
         """
         给定一组点, 生成相应 Clipped  Voronoi Regions 
