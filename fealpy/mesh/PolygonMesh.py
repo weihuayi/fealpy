@@ -165,6 +165,16 @@ class PolygonMesh(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
+    def tri_refine(self):
+        """
+        add barycenter and connect them the vertices
+        """
+
+        bc = self.entity_barycenter('cell')
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell2edge = self.ds.cell_to_edge()
+
     def refine(self, isMarkedCell):
 
         GD = self.geo_dimension()

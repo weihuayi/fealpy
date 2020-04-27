@@ -12,8 +12,6 @@ from fealpy.solver.eigns import picard
 from fealpy.quadrature import FEMeshIntegralAlg
 from fealpy.mesh.adaptive_tools import mark
 
-import transplant
-
 
 class EllipticEignvalueFEMModel:
     def __init__(self, pde, theta=0.2, maxit=50, step=0, maxdof=1e5, n=3, p=1, q=3,
@@ -30,10 +28,7 @@ class EllipticEignvalueFEMModel:
         self.numrefine = n
         self.resultdir = resultdir
         self.picard = False
-        if matlab is True:
-            self.matlab = transplant.Matlab()
-        else:
-            self.matlab = False
+        self.matlab = matlab
 
     def residual_estimate(self, uh):
         mesh = uh.space.mesh
@@ -466,9 +461,9 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof], d = self.meigs(A, M)
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
             return space.function(array=uh)
-        end = timer()
-        print("with time: ", end - start)
 
     def alg_3_3(self, maxit=None):
         """
@@ -608,9 +603,9 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof], d = self.meigs(A, M)
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
             return uh
-        end = timer()
-        print("with time: ", end - start)
 
 
     def alg_3_4(self, maxit=None):
@@ -764,6 +759,8 @@ class EllipticEignvalueFEMModel:
             else:
                 u[isFreeDof], d = self.meigs(A, M)
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
             uh *= u[-1]
             uh += I@u[:-1]
 
@@ -771,8 +768,6 @@ class EllipticEignvalueFEMModel:
             uh = space.function(array=uh)
             return uh
 
-        end = timer()
-        print("with time: ", end - start)
 
 
     def savemesh(self, mesh, fname):

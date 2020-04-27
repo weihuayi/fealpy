@@ -1,13 +1,14 @@
 import numpy as np
 from timeit import default_timer as timer
-import transplant
 
 class MatlabSolver:
-    def __init__(self, matlab=None):
-        if matlab is None:
-            self.matlab = transplant.Matlab()
-        else:
-            self.matlab = matlab
+    def __init__(self, matlab):
+        """
+        Parameters
+        ----------
+        matlab : tranplant instance
+        """
+        self.matlab = matlab
 
     def divide(self, A, b):
         start = timer()

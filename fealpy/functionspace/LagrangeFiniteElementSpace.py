@@ -658,7 +658,6 @@ class LagrangeFiniteElementSpace():
                         )
         else:
             dphi = phi
-
         M = np.einsum(
                 'm, mij, mik, i->ijk',
                 ws, dphi, phi, self.cellmeasure,
