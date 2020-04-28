@@ -169,11 +169,19 @@ class PolygonMesh(Mesh2d):
         """
         add barycenter and connect them the vertices
         """
-
+        NN = self.number_of_nodes()
         bc = self.entity_barycenter('cell')
         node = self.entity('node')
         edge = self.entity('edge')
         cell2edge = self.ds.cell_to_edge()
+
+        NV = self.number_of_vertices_of_cells()
+        NC = len(cell2edge)
+        node = np.r_['0', self.node, bc]
+        cell = np.zeros((NC, 3), dtype=self.itype)
+        cell[:, 0] = np.repeat(range(NN, NN + len(bc)), NV)
+        cell[:, 1:] = edge[cell2edge]
+        return node, cell
 
     def refine(self, isMarkedCell):
 
