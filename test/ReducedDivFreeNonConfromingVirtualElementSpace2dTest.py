@@ -93,6 +93,11 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             error = integralalg.L2_error(u, up)
             print(error)
 
+            A = uspace.matrix_A()
+            P = uspace.matrix_P()
+            print(A.toarray())
+            print(P.toarray())
+
         if plot:
             mesh.print()
             fig = plt.figure()
@@ -212,10 +217,10 @@ test = ReducedDivFreeNonConformingVirtualElementSpace2dTest()
 if False:
     test.verify_matrix(u3, p=3, mtype=0, plot=True)
 
-if False:
-    test.project_test(u4, p=4, mtype=3, plot=False)
-
 if True:
+    test.project_test(u2, p=2, mtype=0, plot=False)
+
+if False:
     test.stokes_equation_test(p=2)
 
 #test.project_test(u3, p=3, mtype=3, plot=False)

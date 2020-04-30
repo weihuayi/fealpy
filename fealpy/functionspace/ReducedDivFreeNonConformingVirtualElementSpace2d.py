@@ -862,7 +862,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
                 [         0,              0, self.H0[i]]])
-            return S + U.T@H0@U 
+            return U.T@H0@U 
 
         A = list(map(f1, range(NC)))
         idof = (p-2)*(p-1)//2
