@@ -307,6 +307,10 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
         return np.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
 
+    def hessian_value(self, uh, point, index=None):
+        #TODO:
+        pass
+
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f

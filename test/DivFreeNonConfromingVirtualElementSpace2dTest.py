@@ -102,7 +102,6 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         from fealpy.mesh.simple_mesh_generator import triangle
         h = 0.4
         pde = CosSinData()
-        domain = pde.domain()
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
             mesh = pde.init_mesh(n=i+2, meshtype='poly') 

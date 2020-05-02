@@ -862,7 +862,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 [self.H0[i],              0,          0],
                 [         0, 0.5*self.H0[i],          0],
                 [         0,              0, self.H0[i]]])
-            return U.T@H0@U 
+            return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
         idof = (p-2)*(p-1)//2
@@ -922,37 +922,59 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
     def source_vector(self, f):
         p = self.p
-        ndof = self.smspace.number_of_local_dofs(p=p-2)
-        Q = inv(self.CM[:, :ndof, :ndof])
-        phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u0(x, index):
-            return np.einsum('ijm, ijn->ijmn', 
-                    self.smspace.basis(x, index=index, p=p-2), f(x))
-        bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
-        bb = Q@bb # (NC, ndof, 2)
-
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
-        cell2dof = self.dof.cell2dof
-        cell2dofLocation = self.dof.cell2dofLocation
+        if p == 2:
+            ndof = self.smspace.number_of_local_dofs(p=p)
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            cell2dof = self.dof.cell2dof
+            cell2dofLocation = self.dof.cell2dofLocation
+            eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
+            def u1(i):
+                PI0 = self.PI0[i]
+                n = PI0.shape[1]//2
+                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+                eb[0, s] = bb[i, :, 0]@PI0[:ndof, :n] + bb[i, :, 1]@PI0[ndof:2*ndof, :n]
+                eb[1, s] = bb[i, :, 0]@PI0[:ndof, n:] + bb[i, :, 1]@PI0[ndof:2*ndof, n:]
+            list(map(u1, range(NC)))
+            gdof = self.number_of_global_dofs()
+            b = np.zeros((gdof, ), dtype=self.ftype)
+            np.add.at(b, cell2dof, eb[0])
+            np.add.at(b[NE*p:], cell2dof, eb[1])
+            return b
+        else:
+            ndof = self.smspace.number_of_local_dofs(p=p-2)
+            Q = inv(self.CM[:, :ndof, :ndof])
+            phi = lambda x: self.smspace.basis(x, p=p-2)
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p-2), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            bb = Q@bb # (NC, ndof, 2)
 
-        eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
-        def u1(i):
-            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            eb[0, s] = bb[i, :, 0]@self.E[0][0][:, s] + bb[i, :, 1]@self.E[1][0][:, s]
-            eb[1, s] = bb[i, :, 0]@self.E[0][1][:, s] + bb[i, :, 1]@self.E[1][1][:, s]
-        map(u1, range(NC))
+            NE = self.mesh.number_of_edges()
+            NC = self.mesh.number_of_cells()
+            cell2dof = self.dof.cell2dof
+            cell2dofLocation = self.dof.cell2dofLocation
 
-        gdof = self.number_of_global_dofs()
-        b = np.zeros((gdof, ), dtype=self.ftype)
+            eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
+            def u1(i):
+                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+                eb[0, s] = bb[i, :, 0]@self.E[0][0][:, s] + bb[i, :, 1]@self.E[1][0][:, s]
+                eb[1, s] = bb[i, :, 0]@self.E[0][1][:, s] + bb[i, :, 1]@self.E[1][1][:, s]
+            list(map(u1, range(NC)))
+            gdof = self.number_of_global_dofs()
+            b = np.zeros((gdof, ), dtype=self.ftype)
 
-        np.add.at(b, cell2dof, eb[0])
-        np.add.at(b[NE*p:], cell2dof, eb[1])
-        if p > 2:
+            np.add.at(b, cell2dof, eb[0])
+            np.add.at(b[NE*p:], cell2dof, eb[1])
             c2d = self.cell_to_dof('cell')
             b[c2d] += np.sum(bb[:, :, [0]]*self.E[0][2], axis=1)
             b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
-        return b 
+            return b 
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
         """
@@ -962,6 +984,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         NE = mesh.number_of_edges()
 
+        h = mesh.entity_measure('edge')
         isBdEdge = mesh.ds.boundary_edge_flag()
         edge2dof = self.dof.edge_to_dof()
 
@@ -971,7 +994,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         val = g(ps)
 
         ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
-        b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
+        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi, h[isBdEdge])
         T = self.H1[isBdEdge]@b
         gh[edge2dof[isBdEdge]] = T[:, :, 0] 
         gh[NE*p:][edge2dof[isBdEdge]] = T[:, :, 1] 
