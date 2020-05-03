@@ -20,6 +20,7 @@ from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.pde.stokes_model_2d import StokesModelData_0, StokesModelData_1
 from fealpy.pde.stokes_model_2d import StokesModelData_2, StokesModelData_3
 from fealpy.pde.stokes_model_2d import StokesModelData_4, StokesModelData_5
+from fealpy.pde.stokes_model_2d import StokesModelData_6
 
 ## error anlysis tool
 from fealpy.tools import showmultirate
@@ -40,6 +41,8 @@ elif m == 4:
     pde = StokesModelData_4()
 elif m == 5:
     pde = StokesModelData_5()
+elif m == 6:
+    pde = StokesModelData_6()
 
 errorType = ['$||  u - \Pi  u_h||_0$',
              '$|| p - p_h||_0$',
@@ -101,8 +104,9 @@ for i in range(maxit):
         val = up.grad_value(x, index)
         return (val + val.swapaxes(-1, -2))/2
 
-    iph = integralalg.integral(ph)
-    print(iph)
+    area = mesh.entity_measure('cell')
+    iph = sum(ph*area)/sum(area)
+    print("1:", iph)
     def pressure(x, index):
         return ph.value(x, index) - iph
 

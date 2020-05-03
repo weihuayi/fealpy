@@ -533,9 +533,107 @@ class StokesModelData_5:
     def dirichlet(self, p):
         return self.velocity(p)
 
+class StokesModelData_6:
+    def __init__(self, nu=1):
+        self.nu = 1
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (-1, -1),
+            ( 0, -1),
+            (-1,  0),
+            ( 0,  0),
+            ( 1,  0),
+            (-1,  1),
+            ( 0,  1),
+            ( 1,  1)], dtype=np.float)
+        if meshtype == 'tri':
+            cell = np.array([
+                (2, 0, 3),
+                (1, 3, 0),
+                (5, 2, 6),
+                (3, 6, 2),
+                (6, 3, 7),
+                (4, 7, 3)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'quad':
+            cell = np.array([
+                (0, 1, 3, 2),
+                (2, 3, 6, 5),
+                (3, 4, 7, 6)], dtype=np.int)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'poly':
+            cell = np.array([
+                (2, 0, 3),
+                (1, 3, 0),
+                (5, 2, 6),
+                (3, 6, 2),
+                (6, 3, 7),
+                (4, 7, 3)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            nmesh = TriangleMeshWithInfinityNode(mesh)
+            pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
+            pmesh = PolygonMesh(pnode, pcell, pcellLocation)
+            return pmesh
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 2*(x**3 - x)**2*(3*y**2 - 1)*(y**3 - y) 
+        val[..., 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(y**3 - y)**2 
+        return val
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = 0 
+        return val
+
+    def strain(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape + (2, ), dtype=np.float)
+        val[..., 0, 0] = 2*(6*x**2 - 2)*(x**3 - x)*(3*y**2 - 1)*(y**3 - y)   
+        val[..., 0, 1] += 3*x*(-2*x**3 + 2*x)*(y**3 - y)**2 
+        val[..., 0, 1] += 6*y*(x**3 - x)**2*(y**3 - y) 
+        val[..., 0, 1] += (2 - 6*x**2)*(3*x**2 - 1)*(y**3 - y)**2/2 
+        val[..., 0, 1] += (x**3 - x)**2*(3*y**2 - 1)**2 
+        val[..., 1, 0] = val[..., 0, 1] 
+        val[..., 1, 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(6*y**2 - 2)*(y**3 - y)  
+        return val
+
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+
+        val[..., 0] -= 3*x*(-2*x**3 + 2*x)*(6*y**2 - 2)*(y**3 - y) 
+        val[..., 0] -= 12*x*(x**3 - x)*(6*y**2 - 2)*(y**3 - y) 
+        val[..., 0] -= 18*y*(x**3 - x)**2*(3*y**2 - 1) 
+        val[..., 0] -= (2 - 6*x**2)*(3*x**2 - 1)*(6*y**2 - 2)*(y**3 - y)/2 
+        val[..., 0] -= (3*x**2 - 1)*(6*x**2 - 2)*(6*y**2 - 2)*(y**3 - y) 
+        val[..., 0] -= 6*(x**3 - x)**2*(y**3 - y) 
+        val[..., 1] -= 6*x*(2 - 6*x**2)*(y**3 - y)**2 
+        val[..., 1] += 6*x*(3*x**2 - 1)*(y**3 - y)**2 
+        val[..., 1] -= 12*y*(3*x**2 - 1)*(-2*x**3 + 2*x)*(y**3 - y) 
+        val[..., 1] -= 6*y*(6*x**2 - 2)*(x**3 - x)*(y**3 - y) 
+        val[..., 1] -= (3*x**2 - 1)*(-2*x**3 + 2*x)*(3*y**2 - 1)*(6*y**2 - 2) 
+        val[..., 1] -= (6*x**2 - 2)*(x**3 - x)*(3*y**2 - 1)**2 
+        val[..., 1] -= 3*(-2*x**3 + 2*x)*(y**3 - y)**2
+        return val
+
+    def dirichlet(self, p):
+        return self.velocity(p)
+
+
 ## 下面的例子还没有测试
 
-class StokesModelData_6:
+class StokesModelData_7:
     """
     u(x, y) = (y**3, x**3)
     p(x, y) = x**2 - 1/3
