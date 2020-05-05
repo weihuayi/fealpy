@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import spdiags, bmat
 from scipy.sparse.linalg import spsolve
+import scipy.io as sio
 
 from fealpy.functionspace import ReducedDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
@@ -93,6 +94,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             error = integralalg.L2_error(u, up)
             print(error)
 
+            A = uspace.matrix_A()
+            P = uspace.matrix_P()
+
+            sio.savemat('A.mat', {"A":A.toarray(), "P":P.toarray()})
+
+
+
         if plot:
             mesh.print()
             fig = plt.figure()
@@ -103,22 +111,27 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
-    def stokes_equation_test(self, p=2, maxit=4):
+    def stokes_equation_test(self, p=2, maxit=4, mtype=1):
         from scipy.sparse import bmat
-        from fealpy.pde.Stokes_Model_2d import CosSinData
+        from fealpy.pde.Stokes_Model_2d import CosSinData, PolyY2X2Data
         from fealpy.mesh.simple_mesh_generator import triangle
         h = 0.4
-        pde = CosSinData()
-        domain = pde.domain()
+        #pde = CosSinData()
+        pde = PolyY2X2Data()
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
-            mesh = pde.init_mesh(n=i+2, meshtype='poly') 
+            if mtype == 0:
+                node = np.array([
+                    (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+                cell = np.array([0, 1, 2, 3], dtype=np.int)
+                cellLocation = np.array([0, 4], dtype=np.int)
+                mesh = PolygonMesh(node, cell, cellLocation)
+            else:
+                mesh = pde.init_mesh(n=i+2, meshtype='poly') 
 
             NE = mesh.number_of_edges()
             NC = mesh.number_of_cells()
             idof = (p-2)*(p-1)//2
-
-
 
             if True:
                 fig = plt.figure()
@@ -213,7 +226,7 @@ if False:
     test.verify_matrix(u3, p=3, mtype=0, plot=True)
 
 if False:
-    test.project_test(u4, p=4, mtype=3, plot=False)
+    test.project_test(u2, p=2, mtype=0, plot=False)
 
 if True:
     test.stokes_equation_test(p=2)
