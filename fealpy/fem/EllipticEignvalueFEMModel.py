@@ -131,6 +131,7 @@ class EllipticEignvalueFEMModel:
 
     def meigs(self, A, M):
         u, d, flag = self.matlab._call('eigs', [A + 100*M, M, 1, 'SM'])
+        print("matlab eigs convergence:", flag)
         return u.reshape(-1), d - 100
 
     def alg_0(self, maxit=None):

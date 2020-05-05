@@ -5,9 +5,7 @@ from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
 from ..common.Tools import hash2map
-# fixednode: 节点是否固定标记, 在网格生成与自适应算法中不能移除
-# True: 固定
-# False: 自由
+
 
 # subdomain: 单元所处的子区域的标记编号
 #  0: 表示外部无界区域
@@ -24,8 +22,8 @@ class HalfEdgeMesh(Mesh2d):
         halfedge : (2*NE, 6), 
             halfedge[i, 0]: the index of the vertex the i-th halfedge point to
             halfedge[i, 1]: the index of the cell the i-th halfedge blong to
-            halfedge[i, 2]: the index of the next halfedge of th i-th halfedge 
-            halfedge[i, 3]: the index of the previous halfedge of the i-th halfedge
+            halfedge[i, 2]: the index of the **next** halfedge of th i-th halfedge 
+            halfedge[i, 3]: the index of the **previous** halfedge of the i-th halfedge
             halfedge[i, 4]: the index of the opposit halfedge of the i-th halfedge
             halfedge[i, 5]: the main halfedge flag, 1: main halfedge; 0: non main halfedge
         subdomain : (NC, ) the sub domain flag of each cell blong to
@@ -680,7 +678,7 @@ class HalfEdgeMesh(Mesh2d):
     def coarsen_quad(self, isMarkedCell):
         pass
     
-    def refine_poly(self, isMarkedCell, data=None, dflag=False, inplace=True):
+    def refine_poly(self, isMarkedCell, data=None, inplace=True, dflag=False):
         """
 
         Parameters

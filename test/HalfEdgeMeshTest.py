@@ -24,6 +24,12 @@ class HalfEdgeMeshTest:
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh.from_mesh(mesh)
 
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         
@@ -91,8 +97,10 @@ class HalfEdgeMeshTest:
             return mesh
 
     def coarsen_poly_test(self, mesh, plot=True):
-        isMarkedCell = mesh.mark_helper([26, 27, 28, 29, 17, 18, 19, 20, 2, 3])
-        mesh.coarsen_poly(isMarkedCell)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([26, 27, 28, 29, 17, 18, 19, 20, 2, 3])
+            mesh.coarsen_poly(isMarkedCell)
 
         if True:
             isMarkedCell = mesh.mark_helper(
