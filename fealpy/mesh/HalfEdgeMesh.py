@@ -687,7 +687,7 @@ class HalfEdgeMesh(Mesh2d):
             len(isMarkedCell) == len(self.ds.subdomain)
         """
 
-        NC = self.number_of_all_cells() 
+        NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
 
         NN = self.number_of_nodes()
@@ -965,7 +965,110 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[self.ds.cellstart:] = mark(eta, theta, method=method)
         return isMarkedCell
+    
+    def adaptive_options(
+            self,
+            method='mean',
+            maxrefine=3,
+            maxcoarsen=3,
+            theta=1.0,
+            maxsize=1e-2,
+            minsize=1e-12,
+            data=None,
+            HB=True,
+            imatrix=False,
+            disp=True
+            ):
 
+        options = {
+                'method': method,
+                'maxrefine': maxrefine,
+                'maxcoarsen': maxcoarsen,
+                'theta': theta,
+                'maxsize': maxsize,
+                'minsize': minsize,
+                'data': data,
+                'HB': HB,
+                'imatrix': imatrix,
+                'disp': disp
+            }
+        return options
+
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            self.refine_poly()
+
+    def adaptive(self, eta, options):
+
+        if options['HB'] is True:
+            HB = np.zeros((len(eta), 2), dtype=np.int)
+            HB[:, 0] = np.arange(len(eta))
+            HB[:, 1] = np.arange(len(eta))
+            options['HB'] = HB
+
+        NC = self.number_of_cells()
+        nc = self.number_of_all_cells() 
+        isMarkedCell = np.zeros(nc, dtype=np.bool)
+ 
+        options['numrefine'] = np.zeros(NC, dtype=np.int8)
+        theta = options['theta']
+        if options['method'] == 'mean':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.mean(eta)))
+                )
+            # options['numrefine'][leafCellIdx] = eta
+        elif options['method'] == 'max':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.max(eta)))
+                )
+        elif options['method'] == 'median':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.median(eta)))
+                )
+        elif options['method'] == 'min':
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/(theta*np.min(eta)))
+                )
+        elif options['method'] == 'numrefine':
+            options['numrefine'] = eta
+        elif isinstance(options['method'], float):
+            val = options['method']
+            options['numrefine'][leafCellIdx] = np.around(
+                    np.log2(eta/val)
+                )
+        else:
+            raise ValueError(
+                    "I don't know anyting about method %s!".format(
+                        options['method']))
+
+        flag = options['numrefine'] > options['maxrefine']
+        options['numrefine'][flag] = options['maxrefine']
+        flag = options['numrefine'] < -options['maxcoarsen']
+        options['numrefine'][flag] = -options['maxcoarsen']
+        
+        # refine
+        isMarkedCell[self.ds.cellstart:] = (options['numrefine'] > 0)
+        i=0
+
+        while sum(isMarkedCell) > 0:
+            self.refine_poly(isMarkedCell)
+            flag = options['numrefine'] 
+            ###ToDo
+            isMarkedCell[self.ds.cellstart:] = (options['numrefine'] > 0)
+
+         
+        # coarsen
+        if options['maxcoarsen'] > 0:
+            isMarkedCell[self.ds.cellstart:] = (options['numrefine'] < 0)
+            while sum(isMarkedCell) > 0:
+                NN0 = self.number_of_cells()
+                self.coarsen_poly(isMarkedCell)
+                NN = self.number_of_cells()
+                if NN == NN0:
+                    break
+                isMarkedCell[self.ds.cellstart:] = (options['numrefine'] < 0)
+
+ 
     def add_halfedge_plot(self, axes,
         index=None, showindex=False,
         nodecolor='r', edgecolor=['r', 'k'], markersize=20,
