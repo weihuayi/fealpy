@@ -1,7 +1,7 @@
 import numpy as np
 from meshpy.triangle import MeshInfo, build
 import matplotlib.pyplot as plt
-from fealpy.mesh.TriangleMesh import TriangleMesh 
+from fealpy.mesh import TriangleMesh 
 from scipy.optimize import minimize
 
 from TriRadiusRatioQuality import TriRadiusRatioQuality
