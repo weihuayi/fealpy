@@ -16,85 +16,6 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
     def __init__(self, p=2, h=0.2):
         self.pde = CosCosData()
 
-    def index1_test(self, p=2):
-        node = np.array([
-            (0.0, 0.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (0.0, 1.0)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
-        idx = space.index1(p=p)
-        print("p=", p, idx)
-
-    def index2_test(self, p=2):
-        node = np.array([
-            (0.0, 0.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (0.0, 1.0)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, 3)
-        idx = space.index2(p=p)
-        print("p=", p, idx)
-
-    def matrix_test(self, p=2):
-        """
-        node = np.array([
-            (-1.0, -1.0),
-            ( 0.0, -1.0),
-            ( 1.0, -1.0),
-            (-1.0, 0.0),
-            ( 1.0, 0.0),
-            (-1.0, 1.0),
-            ( 0.0, 1.0),
-            ( 1.0, 1.0)], dtype=np.float)
-        cell = np.array([0, 1, 2, 4, 7, 6, 5, 3], dtype=np.int)
-        cellLocation = np.array([0, 8], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        """
-
-        node = np.array([
-            (0.0, 0.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (0.0, 1.0)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        print("G:", space.G)
-        print("B:", space.B)
-        print("R:", space.R)
-        print("J:", space.J)
-        print("Q:", space.Q)
-        print("L:", space.L)
-        print("D:", space.D)
-
-    def matrix_A_test(self, p=2):
-        node = np.array([
-            (0.0, 0.0),
-            (1.0, 0.0),
-            (1.0, 1.0),
-            (0.0, 1.0)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        A = space.matrix_A()
-        print(A)
-
-    def matrix_G_test(self, p=2):
-        node = np.array([
-            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
-        cell = np.array([0, 1, 2, 3], dtype=np.int)
-        cellLocation = np.array([0, 4], dtype=np.int)
-        mesh = PolygonMesh(node, cell, cellLocation)
-        space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
 
     def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
@@ -187,9 +108,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         cell2edge = mesh.ds.cell_to_edge()
         uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         up = uspace.project(u)
-        print(up)
         up = uspace.project_to_smspace(up)
-        print(up)
 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
@@ -219,15 +138,5 @@ def u3(p):
     return val
 
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-#test.index1_test(p=1)
-#test.index1_test(p=2)
-#test.index1_test(p=3)
-#test.index2_test(p=3)
-#test.index2_test(p=4)
-#test.test_matrix(p=2)
-#test.test_matrix_A()
-#test.test_matrix_P()
-#test.project_test(u2, p=2, mtype=0, plot=True)
-#test.project_test(u3, p=3, mtype=3, plot=False)
-test.stokes_equation_test(p=2)
-#test.matrix_G_test()
+test.project_test(u2, p=2, mtype=0, plot=True)
+test.project_test(u3, p=3, mtype=0, plot=False)

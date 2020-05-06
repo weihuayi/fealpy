@@ -108,16 +108,16 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         self.Q, self.L = self.matrix_Q_L()
         self.G, self.B = self.matrix_G_B()
-        self.E = self.matrix_E()
+        self.R = self.matrix_R()
+        self.J = self.matrix_J()
         self.U = self.matrix_U()
-        self.R, self.J = self.matrix_R_J()
         self.D = self.matrix_D()
         self.PI0 = self.matrix_PI0()
 
     def project(self, u):
         p = self.p # p >= 2
         NE = self.mesh.number_of_edges()
-        NC = self.mesh.nubmer_of_cells()
+        NC = self.mesh.number_of_cells()
         uh = self.function()
         def u0(x):
             return np.einsum('ij..., ijm->ijm...', u(x),
@@ -128,11 +128,12 @@ class DivFreeNonConformingVirtualElementSpace2d:
         uh[0:2*NE*p] = uh0.reshape(-1, 2).T.flat
 
         c2d = self.cell_to_dof('cell') # 单元与内部自由度的对应关系
-        idof0 = p*(p+1)//2 - 1 # G_{k-2}^\nabla 梯度空间对应自由度 
+        idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla 梯度空间对应的自由度个数
         def u1(x, index):
             return np.einsum('ijn, ijmn->ijm', u(x), 
                     self.smspace.grad_basis(x, p=p-1, index=index)[:, :, 1:, :])
         ch = self.smspace.cellsize
+        val = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         uh[c2d[:, 0:idof0]] = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         if p > 2:
             # G_{k-2}^\perp 空间对应的自由度
@@ -140,21 +141,22 @@ class DivFreeNonConformingVirtualElementSpace2d:
             x = idx['x']
             y = idx['y']
             def u2(x, index):
-                return np.einsum('ijn, ijm->ijmn', u(x),
+                return np.einsum('ij..., ijm->ijm...', u(x),
                         self.smspace.basis(x, p=p-2, index=index))
             area = self.smspace.cellmeasure
-            uh1 = self.integralalg.integral(u1, celltype=True)/area[:, None, None]
-            uh[c2d[:, idof0:]] += uh1[:, y[0], 0]
-            uh[c2d[:, idof0:]] -= uh1[:, x[0], 1]
+            uh2 = self.integralalg.integral(u2, celltype=True)/area[:, None, None]
+            uh[c2d[:, idof0:]] += uh2[:, y[0], 0]
+            uh[c2d[:, idof0:]] -= uh2[:, x[0], 1]
         return uh
 
     def project_to_smspace(self, uh):
         p = self.p
-        idof = (p-2)*(p-1)//2
+        idof = p*(p-1) 
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
-        smldof = self.smspace.number_of_local_dofs()
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+        smldof = self.smspace.number_of_local_dofs(p=p)
         sh = self.smspace.function(dim=2)
         c2d = self.smspace.cell_to_dof()
         def f(i):
@@ -176,7 +178,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
     def matrix_PI0(self):
         p = self.p
         NC = self.mesh.number_of_cells()
-        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
         def f(i):
             G = block([
                 [self.G[0][i]  ,   self.G[2][i]  , self.B[0][i]],
@@ -187,7 +190,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             R = block([
                 [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
                 [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]],
-                [   self.J[0][:, s],    self.J[1][:, s],     0]])
+                [   self.J[0][:, s],    self.J[1][:, s],    self.J[2][i]]])
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -280,7 +283,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         B = [B0, B1]
         return G, B
 
-    def matrix_R_J(self):
+    def matrix_R(self):
         """
         计算单元投投影算子的右端矩阵
         """
@@ -455,21 +458,47 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R12[:, :, 1] += CM[:, :, 0]/area[:, None]
         R = [[R00, R01, R02], [R10, R11, R12]]
 
+        return R
+
+    def matrix_J(self):
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+
+        area = self.smspace.cellmeasure # 单元面积
+        ch = self.smspace.cellsize # 单元尺寸 
+
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation # 标量的单元边自由度信息
+
+        CM = self.CM # 单元质量矩阵
+
+        c = 1.0/np.repeat(range(1, p), range(1, p))
+        idof = p*(p-1)
+        idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla
 
         ndof = (p+1)*p//2
-        idx1 = self.smspace.index1(p=p-1)
-        x = idx1['x']
-        y = idx1['y']
+        idx0 = self.smspace.index1(p=p-1)
+        x0 = idx0['x']
+        y0 = idx0['y']
         J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
 
-        J2[:, x[0], x[0] - 1] -= ch[:, None]*c
-        J2[:, y[0], y[0] - 1] -= ch[:, None]*c
+        J2[:, x0[0], x0[0] - 1] -= ch[:, None]*c
+        J2[:, y0[0], y0[0] - 1] -= ch[:, None]*c
         if p > 2:
             idx = np.arange(idof0, idof)
-            J2[:, x[0][y[0]], idx] -= ch[:, None]*c[y[0]]
-            J2[:, y[0][x[0]], idx] += ch[:, None]*c[x[0]]
+            idx1 = self.smspace.index1(p=p-2)
+            x1 = idx1['x']
+            y1 = idx1['y']
+            J2[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
+            J2[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
+
+        n = mesh.edge_unit_normal()
+        eh = mesh.entity_measure('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
         start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
@@ -489,8 +518,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
             np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
         J = [J0, J1, J2]
-
-        return R, J
+        return J
 
     def matrix_D(self):
         p = self.p
@@ -513,10 +541,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
         cell2dofLocation = self.dof.cell2dofLocation # 标量的自由度信息
 
         idof = p*(p-1) # 内部自由度的个数
-        idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla
+        # G_{k-2}^\nabla 空间自由度的个数, 注意它的基函数 $h_K\nabla \bfm_{k-1}$
+        idof0 = (p+1)*p//2 - 1 
 
         D0 = np.zeros((len(cell2dof), smldof), dtype=self.ftype)
-        D1 = np.zeros((NC, 2, idof, smldof), dtype=self.ftype)
 
         qf = GaussLegendreQuadrature(p)
         bcs, ws = qf.quadpts, qf.weights
@@ -534,6 +562,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             idx = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             np.add.at(D0, (idx[isInEdge], np.s_[:]), F1[isInEdge])
 
+        D1 = np.zeros((NC, 2, idof, smldof), dtype=self.ftype)
         def u0(x, index):
             return np.einsum('ijmk, ijn->ijkmn', 
                     self.smspace.grad_basis(x, p=p-1, index=index)[:, :, 1:, :],
@@ -543,10 +572,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
-            D1 =  CM[:, y[0], :]/area[:, None, None] # check here
-            D2 = -CM[:, x[0], :]/area[:, None, None] # check here
+            D1[:, 0, idof0:, :] =  CM[:, y[0], :]/area[:, None, None] # check here
+            D1[:, 1, idof0:, :] = -CM[:, x[0], :]/area[:, None, None] # check here
 
-        return D0, D1, D2
+        return D0, D1
 
     def matrix_U(self):
         """
@@ -558,11 +587,14 @@ class DivFreeNonConformingVirtualElementSpace2d:
         mesh = self.mesh
         NC = mesh.number_of_cells()
 
+        ch = self.smspace.cellsize # 单元尺寸 
+
         smldof = self.smspace.number_of_local_dofs(p=p-1) # 标量 p-1 次单元缩放空间的维数
-        idof = (p-2)*(p-1)//2
+        idof = p*(p-1)
+        idof0 = (p+1)*p//2-1
         
         cell2dof = self.dof.cell2dof 
-        cell2dofLocation = self.dof.cell2dofLocation # 标量的自由度信息
+        cell2dofLocation = self.dof.cell2dofLocation # 多边形边上的标量自由度信息
 
         U00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         U01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
@@ -576,31 +608,27 @@ class DivFreeNonConformingVirtualElementSpace2d:
         U21 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         U22 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx = self.smspace.index1(p=p-1) # 一次求导后的非零基函数编号及求导系数
-        x = idx['x']
-        y = idx['y']
-        ch = self.smspace.cellsize # 单元尺寸 
-        ldofs = self.dof.number_of_local_dofs() # 这里只包含边上的自由度
-        h = np.repeat(ch, ldofs)
+        idx0 = self.smspace.index1(p=p-1) # 一次求导后的非零基函数编号及求导系数
+        x0 = idx0['x']
+        y0 = idx0['y']
+        c = 1.0/np.repeat(range(1, p), range(1, p))
 
-        U00[x[0]] -= x[1][:, None]*self.E[0][0]/h
-        U01[x[0]] -= x[1][:, None]*self.E[0][1]/h
-
-        U10[y[0]] -= y[1][:, None]*self.E[0][0]/h
-        U10[x[0]] -= x[1][:, None]*self.E[1][0]/h
-        U11[y[0]] -= y[1][:, None]*self.E[0][1]/h
-        U11[x[0]] -= x[1][:, None]*self.E[1][1]/h
-    
-        U20[y[0]] -= y[1][:, None]*self.E[1][0]/h
-        U21[y[0]] -= y[1][:, None]*self.E[1][1]/h
+        U02[:, x0[0], x0[0] - 1] -= ch[:, None]*c
+        U12[:, y0[0], y0[0] - 1] -= ch[:, None]*c
+        U12[:, x0[0], x0[0] - 1] -= ch[:, None]*c 
+        U22[:, y0[0], y0[0] - 1] -= ch[:, None]*c
 
         if p > 2:
-            U02[:, x[0], :] -= x[1][None, :, None]*self.E[0][2]/ch[:, None, None]
+            idx = np.arange(idof0, idof)
+            idx1 = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            x1 = idx1['x']
+            y1 = idx1['y']
+            U02[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
 
-            U12[:, y[0], :] -= y[1][None, :, None]*self.E[0][2]/ch[:, None, None]
-            U12[:, x[0], :] -= x[1][None, :, None]*self.E[1][2]/ch[:, None, None]
+            U12[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
+            U12[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
 
-            U22[:, y[0], :] -= y[1][None, :, None]*self.E[1][2]/ch[:, None, None]
+            U22[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
 
         n = mesh.edge_unit_normal()
         eh = mesh.entity_measure('edge')
@@ -657,8 +685,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
             PI0 = self.PI0[i]
             D = np.eye(PI0.shape[1])
             D0 = self.D[0][s0, :]
-            D1 = self.D[1][i]
-            D2 = self.D[2][i]
+            D1 = self.D[1][i, 0]
+            D2 = self.D[1][i, 1]
             D -= block([
                 [D0,  0],
                 [ 0, D0],
@@ -681,7 +709,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
-        idof = (p-2)*(p-1)//2
+        idof = p*(p-1)
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
@@ -798,8 +826,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         NC = mesh.number_of_cells()
         p = self.p
         gdof = 2*NE*p
-        if p > 2:
-            gdof += NC*p*(p-1)
+        gdof += NC*p*(p-1)
         return gdof
 
     def number_of_local_dofs(self):
