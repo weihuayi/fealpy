@@ -18,10 +18,10 @@ def find_node(
 
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
-    if (type(index) is np.ndarray) & (index.dtype == np.bool):
-        index, = np.nonzero(index)
-    elif (index is None):
+    if (index is None) or (index == 'all'):
         index = range(node.shape[0])
+    elif (type(index) is np.ndarray) & (index.dtype == np.bool):
+        index, = np.nonzero(index)
     elif (type(index) is list) & (type(index[0]) is np.bool):
         index, = np.nonzero(index)
     else:
