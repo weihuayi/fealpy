@@ -678,7 +678,7 @@ class HalfEdgeMesh(Mesh2d):
     def coarsen_quad(self, isMarkedCell):
         pass
     
-    def refine_poly(self, isMarkedCell, data=None, inplace=True, dflag=False):
+    def refine_poly(self, isMarkedCell=None, options={'disp': True}):
         """
 
         Parameters
@@ -686,6 +686,7 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedCell : np.ndarray, bool,
             len(isMarkedCell) == len(self.ds.subdomain)
         """
+
 
         NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
@@ -769,6 +770,13 @@ class HalfEdgeMesh(Mesh2d):
         NV = np.zeros(NC, dtype=self.itype)
         np.add.at(NV, halfedge[:, 1], flag)
         NHE = sum(NV[isMarkedCell])
+
+        if ('numrefine' in options) and (options['numrefine'] is not None):
+            num = options['numrefine'][isMarkedCell] - 1
+            num[num < 0] = 0
+            num = np.repeat(num, NV[isMarkedCell])
+            options['numrefine'] = np.r_[options['numrefine'][~isMarkedCell], num]
+
         halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
         hlevel1 = np.zeros(2*NHE, dtype=self.itype)
         
@@ -781,6 +789,7 @@ class HalfEdgeMesh(Mesh2d):
         pre0 = halfedge[flag0, 3]
         subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
         
+
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
         halfedge[idx0, 1] = range(NC, NC + NHE)
@@ -1006,34 +1015,32 @@ class HalfEdgeMesh(Mesh2d):
             HB[:, 1] = np.arange(len(eta))
             options['HB'] = HB
 
-        NC = self.number_of_cells()
-        nc = self.number_of_all_cells() 
-        isMarkedCell = np.zeros(nc, dtype=np.bool)
- 
+        NC = self.number_of_all_cells() 
         options['numrefine'] = np.zeros(NC, dtype=np.int8)
         theta = options['theta']
+        cellstart = self.ds.cellstart
         if options['method'] == 'mean':
-            options['numrefine'][leafCellIdx] = np.around(
+            options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.mean(eta)))
                 )
             # options['numrefine'][leafCellIdx] = eta
         elif options['method'] == 'max':
-            options['numrefine'][leafCellIdx] = np.around(
+            options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
                 )
         elif options['method'] == 'median':
-            options['numrefine'][leafCellIdx] = np.around(
+            options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.median(eta)))
                 )
         elif options['method'] == 'min':
-            options['numrefine'][leafCellIdx] = np.around(
+            options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
         elif options['method'] == 'numrefine':
-            options['numrefine'] = eta
+            options['numrefine'][cellstart:] = eta
         elif isinstance(options['method'], float):
             val = options['method']
-            options['numrefine'][leafCellIdx] = np.around(
+            options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/val)
                 )
         else:
@@ -1047,14 +1054,11 @@ class HalfEdgeMesh(Mesh2d):
         options['numrefine'][flag] = -options['maxcoarsen']
         
         # refine
-        isMarkedCell[self.ds.cellstart:] = (options['numrefine'] > 0)
-        i=0
-
-        while sum(isMarkedCell) > 0:
+        isMarkedCell = (options['numrefine'] > 0)
+        while np.any(isMarkedCell):
             self.refine_poly(isMarkedCell)
             flag = options['numrefine'] 
-            ###ToDo
-            isMarkedCell[self.ds.cellstart:] = (options['numrefine'] > 0)
+            isMarkedCell[cellstart:] = (options['numrefine'] > 0)
 
          
         # coarsen
