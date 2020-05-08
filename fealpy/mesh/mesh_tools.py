@@ -18,7 +18,7 @@ def find_node(
 
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
-    if (index is None) or (index == 'all'):
+    if index is None:
         index = range(node.shape[0])
     elif (type(index) is np.ndarray) & (index.dtype == np.bool):
         index, = np.nonzero(index)
@@ -77,7 +77,7 @@ def find_entity(
         fontsize=24, fontcolor='k', multiindex=None):
 
     bc = mesh.entity_barycenter(entity)
-    if (index is None) or (index == 'all'):
+    if index is None:
         if entity == 'node':
             N = mesh.number_of_nodes()
             index = range(N)

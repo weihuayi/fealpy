@@ -108,8 +108,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         self.Q, self.L = self.matrix_Q_L()
         self.G, self.B = self.matrix_G_B()
-        self.R = self.matrix_R()
-        self.J = self.matrix_J()
+        self.R, self.J = self.matrix_R_J()
         self.U = self.matrix_U()
         self.D = self.matrix_D()
         self.PI0 = self.matrix_PI0()
@@ -133,7 +132,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return np.einsum('ijn, ijmn->ijm', u(x), 
                     self.smspace.grad_basis(x, p=p-1, index=index)[:, :, 1:, :])
         ch = self.smspace.cellsize
-        val = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         uh[c2d[:, 0:idof0]] = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         if p > 2:
             # G_{k-2}^\perp 空间对应的自由度
@@ -161,6 +159,16 @@ class DivFreeNonConformingVirtualElementSpace2d:
         c2d = self.smspace.cell_to_dof()
         def f(i):
             PI0 = self.PI0[i]
+            D0 = self.D[0][s0, :]
+            D1 = self.D[1][i, 0]
+            D2 = self.D[1][i, 1]
+
+            s0 = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            D = block([
+                [D0,  0],
+                [ 0, D0],
+                [D1, D2]])
+
             idx = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
             x0 = uh[idx]
             x1 = uh[idx+NE*p]
@@ -283,7 +291,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         B = [B0, B1]
         return G, B
 
-    def matrix_R(self):
+    def matrix_R_J(self):
         """
         计算单元投投影算子的右端矩阵
         """
@@ -339,15 +347,15 @@ class DivFreeNonConformingVirtualElementSpace2d:
         if p > 2:
             idx = np.arange(idof0, idof)
             idx0 = self.smspace.index1(p=p-2)
-            x = idx0['x']
-            y = idx0['y']
-            R02[:, xx[0][y[0]], idx] -= c[y[0]] 
-            R02[:, yy[0][y[0]], idx] -= 0.5*c[y[0]]
-            R02[:, xy[0][x[0]], idx] += 0.5*c[x[0]]
+            x0 = idx0['x']
+            y0 = idx0['y']
+            R02[:, xx[0][y0[0]], idx] -= c[y0[0]] 
+            R02[:, yy[0][y0[0]], idx] -= 0.5*c[y0[0]]
+            R02[:, xy[0][x0[0]], idx] += 0.5*c[x0[0]]
             
-            R12[:, yy[0][x[0]], idx] += c[x[0]] 
-            R12[:, yy[0][x[0]], idx] += 0.5*c[x[0]]
-            R12[:, xy[0][y[0]], idx] -= 0.5*c[y[0]]
+            R12[:, yy[0][x0[0]], idx] += c[x0[0]] 
+            R12[:, xx[0][x0[0]], idx] += 0.5*c[x0[0]]
+            R12[:, xy[0][y0[0]], idx] -= 0.5*c[y0[0]]
 
 
         n = mesh.edge_unit_normal()
@@ -458,26 +466,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R12[:, :, 1] += CM[:, :, 0]/area[:, None]
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        return R
-
-    def matrix_J(self):
-        p = self.p
-        mesh = self.mesh
-        NC = mesh.number_of_cells()
-
-        area = self.smspace.cellmeasure # 单元面积
-        ch = self.smspace.cellsize # 单元尺寸 
-
-        cell2dof = self.dof.cell2dof
-        cell2dofLocation = self.dof.cell2dofLocation # 标量的单元边自由度信息
-
-        CM = self.CM # 单元质量矩阵
-
-        c = 1.0/np.repeat(range(1, p), range(1, p))
-        idof = p*(p-1)
-        idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla
-
-        ndof = (p+1)*p//2
         idx0 = self.smspace.index1(p=p-1)
         x0 = idx0['x']
         y0 = idx0['y']
@@ -495,30 +483,22 @@ class DivFreeNonConformingVirtualElementSpace2d:
             J2[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
             J2[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
 
-        n = mesh.edge_unit_normal()
-        eh = mesh.entity_measure('edge')
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
+        val = np.einsum('ijk, i->jik', F0, n[:, 0])
+        np.add.at(J0, (np.s_[:], idx0), val)
+        val = np.einsum('ijk, i->jik', F0, n[:, 1])
+        np.add.at(J1, (np.s_[:], idx0), val)
 
-        Q0 = self.CM[:, 0, 0:ndof]/area[:, None] # (NC, ndof)
-        start = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p
+        if isInEdge.sum() > 0:
+            idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
+            val = np.einsum('ijk, i->jik', F1, n[:, 0])
+            np.subtract.at(J0, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
+            val = np.einsum('ijk, i->jik', F1, n[:, 1])
+            np.subtract.at(J1, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
 
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 0])
-        np.add.at(J0, (np.s_[:], start), val)
-
-        val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 0]], eh, n[:, 1])
-        np.add.at(J1, (np.s_[:], start), val)
-
-        if np.any(isInEdge):
-            start = cell2dofLocation[edge2cell[:, 1]] + edge2cell[:, 3]*p
-
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 0])
-            np.subtract.at(J0, (np.s_[:], start[isInEdge]), val[:, isInEdge])
-
-            val = np.einsum('jm, j, j->mj', Q0[edge2cell[:, 1]], eh, n[:, 1])
-            np.subtract.at(J1, (np.s_[:], start[isInEdge]), val[:, isInEdge])
         J = [J0, J1, J2]
-        return J
+
+        return R, J
 
     def matrix_D(self):
         p = self.p
@@ -590,7 +570,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         ch = self.smspace.cellsize # 单元尺寸 
 
         smldof = self.smspace.number_of_local_dofs(p=p-1) # 标量 p-1 次单元缩放空间的维数
-        idof = p*(p-1)
+        idof = p*(p-1)  
         idof0 = (p+1)*p//2-1
         
         cell2dof = self.dof.cell2dof 
@@ -614,8 +594,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
         c = 1.0/np.repeat(range(1, p), range(1, p))
 
         U02[:, x0[0], x0[0] - 1] -= ch[:, None]*c
-        U12[:, y0[0], y0[0] - 1] -= ch[:, None]*c
-        U12[:, x0[0], x0[0] - 1] -= ch[:, None]*c 
+
+        U12[:, y0[0], x0[0] - 1] -= ch[:, None]*c
+        U12[:, x0[0], y0[0] - 1] -= ch[:, None]*c 
+
         U22[:, y0[0], y0[0] - 1] -= ch[:, None]*c
 
         if p > 2:
@@ -625,8 +607,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
             y1 = idx1['y']
             U02[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
 
-            U12[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
-            U12[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
+            U12[:, y0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
+            U12[:, x0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
 
             U22[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
 
