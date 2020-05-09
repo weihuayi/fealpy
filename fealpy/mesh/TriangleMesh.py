@@ -254,13 +254,13 @@ class TriangleMesh(Mesh2d):
         for i in range(n):
             self.bisect()
 
-    def bisect(self, isMarkedCell='all', returnim=False, refine=None):
+    def bisect(self, isMarkedCell=None, returnim=False, refine=None):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
 
-        if isMarkedCell == 'all':
+        if isMarkedCell is None:
             isMarkedCell = np.ones(NC, dtype=np.bool)
 
         cell = self.entity('cell')

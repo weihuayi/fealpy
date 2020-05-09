@@ -329,15 +329,16 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
         return cell2edgeSign
 
-    def cell_to_face(self, sparse=False):
+    def cell_to_face(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE
         NC = self.NC
 
+        E = self.E
         edge2cell = self.edge2cell
 
-        if sparse == False:
+        if return_sparse == False:
             cell2edge = np.zeros((NC, E), dtype=self.itype)
             cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
             cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
