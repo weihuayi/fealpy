@@ -4,6 +4,23 @@ from fealpy.functionspace import FourierSpace
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
 from ParabolicFourierSolver import ParabolicFourieeSolver
 
+init_value = {
+        "bcc":
+        np.array([
+            [ 1,	 1,	 0,     0.3],
+            [-1,	 1,	 0,	0.3],
+            [-1,	-1,	 0,	0.3],
+            [ 1,	-1,	 0,	0.3],
+            [ 0,	 1,	 1,	0.3],
+            [ 0,	-1,	 1,	0.3],
+            [ 0,	-1,	-1,	0.3],
+            [ 0,	 1,	-1,	0.3],
+            [ 1,	 0,	 1,	0.3],
+            [-1,	 0,	 1,	0.3],
+            [-1,	 0,	-1,	0.3],
+            [ 1,	 0,	-1,	0.3]], dtype=np.float)
+        }
+
 def model_options(
         nspecies = 3,
         nblend = 1,
@@ -17,7 +34,7 @@ def model_options(
         chiAB = 0.25,
         chiAC = 0.25,
         chiBC = 0.25,
-        dim = 2,
+        box = np.diag(dim*[2*np.pi]),
         NS = 16,
         maxdt = 0.01,
         bA = 1,
@@ -37,9 +54,10 @@ def model_options(
                 'chiAB': chiAB,
                 'chiAC': chiAC,
                 'chiBC': chiBC,
-                'dim': dim,
+                'box': box,
+                'dim': len(box),
                 'NS' : NS,
-                'maxdt' : = maxdt,
+                'maxdt': = maxdt,
                 'bA': bA,
                 'bB': bB,
                 'bC': bC
@@ -87,14 +105,17 @@ class SCFTA1BA2CLinearModel():
 
         self.rho = self.space.function(dim=options['nspecies'])
         self.grad = self.space.function(dim=options['nspecies']+1)
-        self.Q = np.zeros(options['nblend'], dtype=np.float)
         self.w = self.space.function(dim=options['nspecies']+1)
+        self.Q = np.zeros(options['nblend'], dtype=np.float)
 
-    def __call__(self, w, returngrad=True):
+    def init_field(self):
+        pass
+
+    def __call__(self, w):
         """
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
-
+        self.compute_wplus(w)
         # solver the forward and backward equation
         self.compute_propagator(w)
         # compute single chain partition function Q
@@ -103,6 +124,41 @@ class SCFTA1BA2CLinearModel():
         self.compute_density()
         # compute energy function and its gradient
         self.compute_energe()
+
+    def update_field(self, w):
+        alpha = 0.01
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
+        
+        w[1] *= 1+alpha
+        w[1] -= alpha*chiABN*self.rho[1]
+        w[1] -= alpha*chiACN*self.rho[2]
+        w[1] -= alpha*w[0]
+
+        w[2] *= 1+alpha
+        w[2] -= alpha*chiABN*self.rho[0]
+        w[2] -= alpha*chiBCN*self.rho[2]
+        w[2] -= alpha*w[0]
+
+        w[3] *= 1+alpha
+        w[3] -= alpha*chiACN*self.rho[0]
+        w[3] -= alpha*chiBCN*self.rho[1]
+        w[3] -= alpha*w[0]
+        return w
+        
+
+    def compute_wplus(self, w):
+        chiAB = options['chiAB']
+        chiBC = options['chiBC']
+        chiAC = options['chiAC']
+
+        XA = chiBC*(chiAB + chiAC - chiBC)
+        XB = chiAC*(chiBC + chiAB - chiAC)
+        XC = chiAB*(chiAC + chiBC - chiAB)
+
+        w[0] = XA*w[1] + XB*w[2] + XC*w[3]
+        w[0]/= XA + XB + XC
 
 
     def compute_energe(self, w):
@@ -122,6 +178,15 @@ class SCFTA1BA2CLinearModel():
         self.H = np.real(E.flat[0])
         self.H -= np.log(self.Q[0])
 
+    def compute_gradient(self, w):
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
+        rho = self.rho
+        self.grad[0] = rho[0] + rho[1] + rho[2] - 1
+        self.grad[1] = w[1] - chiABN*rho[1] - chiACN*rho[2] - w[0]
+        self.grad[2] = w[2] - chiABN*rho[0] - chiBCN*rho[2] - w[0]
+        self.grad[3] = w[3] - chiACN*rho[0] - chiBCN*rho[1] - w[0]
 
     def compute_propagator(self, w):
 
@@ -170,3 +235,15 @@ class SCFTA1BA2CLinearModel():
         f += np.sum(q, axis=0)
         f *= dt
         return f
+
+
+if __name__ == "__main__":
+
+    rho = init_value['bcc']
+    h = np.sqrt(2)
+    box = np.array([[h, 0, 0], [0, h, 0], [0, 0, h]], dtype=np.float)
+    options = model_options(box=box)
+    model = SCFTA1BA2CLinearModel(options=options)
+    for i in range(1000):
+        pass
+

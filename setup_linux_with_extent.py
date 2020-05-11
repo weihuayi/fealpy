@@ -1,3 +1,4 @@
+import os
 from setuptools import Extension, setup
 
 class get_pybind_include:
@@ -20,10 +21,11 @@ ext_modules = [
         ],
         language="C++",
         include_dirs=[
+            os.environ.get("EIGEN_INCLUDE_DIR", "/usr/include/eigen3/"),
             get_pybind_include(),
             get_pybind_include(user=True)
         ],
-        libraries=["stdc++"],
+        libraries=["stdc++", "gmp", "mpfr"],
     )
 ]
 

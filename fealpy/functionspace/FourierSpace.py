@@ -20,6 +20,10 @@ class FourierSpace:
             points.append(sum(map(lambda x: x[0]*x[1], zip(box[i], index))))
         return points
 
+    def fourier_interpolation(self, data):
+
+        idx = data[:, :3]
+
     def interpolation(self, u):
         p = self.interpolation_points()
         return u(p)
