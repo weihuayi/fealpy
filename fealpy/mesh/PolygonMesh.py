@@ -200,7 +200,7 @@ class PolygonMesh(Mesh2d):
 
             isMarkedEdge = np.zeros(NE, dtype=np.bool)
             edge2cell = self.ds.edge_to_cell()
-            cell2edge = self.ds.cell_to_edge(sparse=False)
+            cell2edge = self.ds.cell_to_edge(return_sparse=False)
             isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
             isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
 
