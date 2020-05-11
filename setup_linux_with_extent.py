@@ -25,7 +25,7 @@ ext_modules = [
             get_pybind_include(),
             get_pybind_include(user=True)
         ],
-        libraries=["stdc++", "gmp", "mpfr"],
+        libraries=["stdc++", "gmp", "mpfr", "CGAL"],
     )
 ]
 
@@ -42,6 +42,7 @@ if __name__ == "__main__":
               'numpy',
               'scipy',
               'matplotlib',
+              'pybind11',
               'pyamg',
               'meshpy',
               'meshio'

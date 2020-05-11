@@ -1,6 +1,5 @@
 find_package(pybind11 REQUIRED)
 
-set(CGAL_DIR "~/.local")
 find_package(CGAL REQUIRED)
 include(${CGAL_USE_FILE})
 
