@@ -237,11 +237,11 @@ class PolyhedronMeshDataStructure():
         face2node = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
         return face2node
 
-    def face_to_edge(self, sparse=False):
+    def face_to_edge(self, return_sparse=False):
         NF = self.NF
         NE = self.NE
         face2edge = self.face2edge
-        if sparse == False:
+        if return_sparse == False:
             return face2edge
         else:
             face = self.face
@@ -255,11 +255,11 @@ class PolyhedronMeshDataStructure():
     def face_to_face(self):
         pass
 
-    def face_to_cell(self, sparse=False):
+    def face_to_cell(self, return_sparse=False):
         NF = self.NF
         NC = self.NC
         face2cell = self.face2cell
-        if sparse == False:
+        if return_sparse == False:
             return face2cell
         else:
             face = self.face
@@ -268,11 +268,11 @@ class PolyhedronMeshDataStructure():
             face2cell+= coo_matrix((val, (range(NF), face2cell[:, 1])), shape=(NF, NC), dtype=np.bool)
             return face2cell.tocsr()
 
-    def edge_to_node(self, sparse=False):
+    def edge_to_node(self, return_sparse=False):
         N = self.N
         NE = self.NE
         edge = self.edge
-        if sparse == False:
+        if return_sparse == False:
             return edge
         else:
             val = np.ones(NE, dtype=np.bool)
