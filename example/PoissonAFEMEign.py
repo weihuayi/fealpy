@@ -83,7 +83,7 @@ if True:
             pde,
             theta=theta,
             maxit=maxit,
-            maxdof=1e5,
+            maxdof=2e5,
             step=step,
             n=8,  # 初始网格加密次数
             p=1,  # 线性元
@@ -94,9 +94,9 @@ if True:
             matlab=transplant.Matlab())
 
 #u0 = model.alg_0()
-#u1 = model.alg_3_1()
-#u2 = model.alg_3_2()
-#u3 = model.alg_3_3()
+u1 = model.alg_3_1()
+u2 = model.alg_3_2()
+u3 = model.alg_3_3()
 u4 = model.alg_3_4()
 #model.savesolution(u0, 'u0.mat')
 #model.savesolution(u1, 'u1.mat')
