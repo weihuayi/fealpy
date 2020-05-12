@@ -1088,7 +1088,7 @@ class HalfEdgeMesh(Mesh2d):
         cell, cellLocation = self.entity('cell')
         print("cell:\n", cell)
         print("cellLocation:\n", cellLocation)
-        print("cell2edge:\n", self.ds.cell_to_edge(sparse=False))
+        print("cell2edge:\n", self.ds.cell_to_edge(return_sparse=False))
         print("cell2hedge:\n")
         for i, val in enumerate(self.ds.cell2hedge[:-1]):
             print(i, ':', val)
@@ -1445,7 +1445,7 @@ class HalfEdgeMesh2dDataStructure():
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
         return node2node
 
-    def node_to_cell(self, sparse=True):
+    def node_to_cell(self, return_sparse=True):
         NN = self.NN
         NC = self.NC
         halfedge =  self.halfedge

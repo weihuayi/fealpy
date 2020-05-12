@@ -322,10 +322,10 @@ class Mesh3dDataStructure():
                 ), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
-        if sparse is False:
+        if return_sparse is False:
             return self.cell2edge
         else:
             NC = self.NC
@@ -351,11 +351,11 @@ class Mesh3dDataStructure():
             cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
         return cell2edgeSign
 
-    def cell_to_face(self, sparse=False):
+    def cell_to_face(self, return_sparse=False):
         NC = self.NC
         NF = self.NF
         face2cell = self.face2cell
-        if sparse is False:
+        if return_sparse is False:
             F = self.F
             cell2face = np.zeros((NC, F), dtype=self.itype)
             cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
