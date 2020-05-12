@@ -21,8 +21,11 @@ class FourierSpace:
         return points
 
     def fourier_interpolation(self, data):
-
-        idx = data[:, :3]
+        idx = np.asarray(data[:, :self.GD], dtype=np.int)
+        idx[idx<0] += self.N
+        F = self.function()
+        F[tuple(idx.T)] = data[:, self.GD]
+        return np.fft.ifftn(F).real
 
     def interpolation(self, u):
         p = self.interpolation_points()

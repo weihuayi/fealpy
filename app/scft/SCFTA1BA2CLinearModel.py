@@ -1,8 +1,80 @@
 
 import numpy as np
+import matplotlib.pyplot as plt
+
 from fealpy.functionspace import FourierSpace
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
-from ParabolicFourierSolver import ParabolicFourieeSolver
+
+class ParabolicFourierSolver():
+    def __init__(self, space, timeline):
+        self.space = space 
+        self.k, self.k2 = self.space.reciprocal_lattice(return_square=True)
+        self.timeline = timeline 
+        dt = self.timeline.current_time_step_length()
+        self.E1 = np.exp(-dt*self.k2)
+        self.E3 = np.exp(-dt/2*self.k2)
+
+    def initialize(self, q, w):
+        """
+        Parameters
+        ----------
+
+        q : 
+        w :
+
+        Note
+        ----
+        """
+
+        self.E0 = np.exp(-dt/2*w)
+        self.E2 = np.exp(-dt/4*w)
+
+        NL = self.timeline.number_of_time_levels()
+
+        E0 = self.E0
+        E1 = self.E1
+
+        E2 = self.E2
+        E3 = self.E3 
+
+        for i in range(1, 4):
+            q0 = q[i-1]
+            q1 = np.fft.fftn(E0*q0)
+            q1 *= E1
+            q[i] = np.fft.ifftn(q1).real
+            q[i] *= E0
+
+        q0 = q[0]
+        for i in range(1, 4):
+            q1 = np.fft.fftn(E2*q0)
+            q1 *= E3
+            q1 = np.fft.ifftn(q1).real
+            q1 *= E2
+
+            q1 = np.fft.fftn(E2*q1)
+            q1 *= E3
+            q1 = np.fft.ifftn(q1).real
+            q1 *= E2
+            q[i] *= -1/3
+            q[i] += 4*q1/3
+
+    def solve(self, q): 
+        NL = self.timeline.number_of_time_levels()
+        dt = self.timeline.current_time_step_length()
+        E0 = self.E0
+        E1 = self.E1
+        w = self.w
+        k2 = self.k2
+
+        for i in range(4, NL):
+            q0 = 4*q[i-1] - 3*q[i-2] + 4*q[i-3]/3 - q[i-4]/4
+            q1 = 4*q[i-1] - 6*q[i-2] + 4*q[i-3] - q[i-4]
+            q1 *= w
+            q1 *= dt
+            q0 -= q1
+            q1 = np.fft.fftn(q0)
+            q1 /= 25/12 + dt*k2
+            q[i] = np.fft.ifftn(q1).real
 
 init_value = {
         "bcc":
@@ -18,7 +90,15 @@ init_value = {
             [ 1,	 0,	 1,	0.3],
             [-1,	 0,	 1,	0.3],
             [-1,	 0,	-1,	0.3],
-            [ 1,	 0,	-1,	0.3]], dtype=np.float)
+            [ 1,	 0,	-1,	0.3]], dtype=np.float),
+        "cam6fold":
+        np.array([
+               [ 30,     0,	0.3],
+               [ 15,    26,	0.3],
+               [-15,    26,	0.3],
+               [-30,     0,	0.3],
+               [-15,   -26,	0.3],
+               [ 15,   -26,	0.3]], dtype=np.float)
         }
 
 def model_options(
@@ -30,11 +110,10 @@ def model_options(
         fA2 = 0.25,
         fB = 0.25,
         fC = 0.25,
-        maxdt = 0.01,
         chiAB = 0.25,
         chiAC = 0.25,
         chiBC = 0.25,
-        box = np.diag(dim*[2*np.pi]),
+        box = np.diag(2*[2*np.pi]),
         NS = 16,
         maxdt = 0.01,
         bA = 1,
@@ -50,14 +129,13 @@ def model_options(
                 'fA2': fA2,
                 'fB': fB,
                 'fC': fC,
-                'maxit': maxdt,
                 'chiAB': chiAB,
                 'chiAC': chiAC,
                 'chiBC': chiBC,
                 'box': box,
                 'dim': len(box),
                 'NS' : NS,
-                'maxdt': = maxdt,
+                'maxdt': maxdt,
                 'bA': bA,
                 'bB': bB,
                 'bC': bC
@@ -239,11 +317,15 @@ class SCFTA1BA2CLinearModel():
 
 if __name__ == "__main__":
 
-    rho = init_value['bcc']
-    h = np.sqrt(2)
-    box = np.array([[h, 0, 0], [0, h, 0], [0, 0, h]], dtype=np.float)
-    options = model_options(box=box)
+    rho = init_value['cam6fold']
+    h = 30 
+    box = np.array([[h, 0], [0, h]], dtype=np.float)
+    options = model_options(box=box, NS=256)
     model = SCFTA1BA2CLinearModel(options=options)
-    for i in range(1000):
-        pass
+    rho = model.space.fourier_interpolation(rho)
+
+    fig = plt.figure()
+    axes = fig.gca()
+    axes.imshow(rho)
+    plt.show()
 

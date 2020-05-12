@@ -117,9 +117,10 @@ class EllipticEignvalueFEMModel:
     def psolve(self, A, b, M):
         if self.sigma is None:
             self.ml = pyamg.ruge_stuben_solver(A)
+            return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
         else:
-            self.ml = pyamg.ruge_stuben_solver(A + self.sigma*M)
-        return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+            self.ml = pyamg.ruge_stuben_solver(A+self.sigma*M)
+            return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
 
     def deig(self, A, M):
         vals, vecs = eigs(A, k=1, M=M, which='SM')
@@ -405,6 +406,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A, b[isFreeDof])
 
+
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
@@ -567,6 +569,7 @@ class EllipticEignvalueFEMModel:
                         M[isFreeDof, :][:, isFreeDof].tocsr())
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+
 
         # 3. 在最细网格上求解一次最小特征值问题 
 
@@ -755,10 +758,13 @@ class EllipticEignvalueFEMModel:
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
         else:
-            if self.matlab is False:
-                u[isFreeDof], d = self.eig(A, M)
-            else:
-                u[isFreeDof], d = self.meigs(A, M)
+            if False:
+                if self.matlab is False:
+                    u[isFreeDof], d = self.eig(A, M)
+                else:
+                    u[isFreeDof], d = self.meigs(A, M)
+
+            u[isFreeDof], d = self.eig(A, M)
             print("smallest eigns:", d)
             end = timer()
             print("with time: ", end - start)
