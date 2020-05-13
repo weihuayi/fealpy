@@ -758,13 +758,11 @@ class EllipticEignvalueFEMModel:
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
         else:
-            if False:
-                if self.matlab is False:
-                    u[isFreeDof], d = self.eig(A, M)
-                else:
-                    u[isFreeDof], d = self.meigs(A, M)
+            if self.matlab is False:
+                u[isFreeDof], d = self.eig(A, M)
+            else:
+                u[isFreeDof], d = self.meigs(A, M)
 
-            u[isFreeDof], d = self.eig(A, M)
             print("smallest eigns:", d)
             end = timer()
             print("with time: ", end - start)

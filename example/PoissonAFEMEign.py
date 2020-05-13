@@ -85,11 +85,11 @@ if True:
             maxit=maxit,
             maxdof=2e5,
             step=step,
-            n=8,  # 初始网格加密次数
+            n=7,  # 初始网格加密次数
             p=1,  # 线性元
-            q=5,  # 积分精度
+            q=3,  # 积分精度
             resultdir=location,
-            sigma=10000,
+            sigma=100,
             multieigs=False,
             matlab=transplant.Matlab())
 
