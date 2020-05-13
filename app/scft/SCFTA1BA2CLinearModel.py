@@ -26,6 +26,8 @@ class ParabolicFourierSolver():
         ----
         """
 
+        self.w = w
+        dt = self.timeline.current_time_step_length()
         self.E0 = np.exp(-dt/2*w)
         self.E2 = np.exp(-dt/4*w)
 
@@ -106,16 +108,16 @@ def model_options(
         nblend = 1,
         nblock = 4,
         ndeg = 100,
-        fA1 = 0.25,
-        fA2 = 0.25,
-        fB = 0.25,
-        fC = 0.25,
-        chiAB = 0.25,
-        chiAC = 0.25,
-        chiBC = 0.25,
+        fA1 = 0.3,
+        fA2 = 0.05,
+        fB = 0.6,
+        fC = 0.05,
+        chiAB = 0.30,
+        chiAC = 0.16,
+        chiBC = 0.16,
         box = np.diag(2*[2*np.pi]),
-        NS = 16,
-        maxdt = 0.01,
+        NS = 256,
+        maxdt = 0.005,
         bA = 1,
         bB = 1,
         bC = 1):
@@ -170,13 +172,13 @@ class SCFTA1BA2CLinearModel():
                     ParabolicFourierSolver(self.space, self.timelines[i])
                     )
 
-        TNL = 0 # total number of time levels
+        self.TNL = 0 # total number of time levels
         for i in range(4):
-            TNL += self.timelines[i].number_of_time_levels()
-        TNL -= options['nblock'] - 1
+            self.TNL += self.timelines[i].number_of_time_levels()
+        self.TNL -= options['nblock'] - 1
 
-        self.qf = self.space.function(dim=TNL) # forward  propagator 
-        self.qb = self.space.function(dim=TNL) # backward propagator
+        self.qf = self.space.function(dim=self.TNL) # forward  propagator 
+        self.qb = self.space.function(dim=self.TNL) # backward propagator
 
         self.qf[0] = 1
         self.qb[0] = 1
@@ -186,47 +188,55 @@ class SCFTA1BA2CLinearModel():
         self.w = self.space.function(dim=options['nspecies']+1)
         self.Q = np.zeros(options['nblend'], dtype=np.float)
 
-    def init_field(self):
-        pass
+    def init_field(self, rho):
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
 
-    def __call__(self, w):
+        self.w[1] = chiABN*rho[1] + chiACN*rho[2]
+        self.w[2] = chiABN*rho[0] + chiBCN*rho[2]
+        self.w[3] = chiACN*rho[0] + chiBCN*rho[1]
+
+    def compute(self):
         """
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
-        self.compute_wplus(w)
+        self.compute_wplus()
         # solver the forward and backward equation
-        self.compute_propagator(w)
+        self.compute_propagator()
         # compute single chain partition function Q
         self.compute_single_Q()
+        print("Q:", self.Q)
         # compute density
         self.compute_density()
         # compute energy function and its gradient
         self.compute_energe()
 
-    def update_field(self, w):
-        alpha = 0.01
+    def update_field(self, alpha=0.01):
+        w = self.w
+        rho = self.rho
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
         
         w[1] *= 1+alpha
-        w[1] -= alpha*chiABN*self.rho[1]
-        w[1] -= alpha*chiACN*self.rho[2]
+        w[1] -= alpha*chiABN*rho[1]
+        w[1] -= alpha*chiACN*rho[2]
         w[1] -= alpha*w[0]
 
         w[2] *= 1+alpha
-        w[2] -= alpha*chiABN*self.rho[0]
-        w[2] -= alpha*chiBCN*self.rho[2]
+        w[2] -= alpha*chiABN*rho[0]
+        w[2] -= alpha*chiBCN*rho[2]
         w[2] -= alpha*w[0]
 
         w[3] *= 1+alpha
-        w[3] -= alpha*chiACN*self.rho[0]
-        w[3] -= alpha*chiBCN*self.rho[1]
+        w[3] -= alpha*chiACN*rho[0]
+        w[3] -= alpha*chiBCN*rho[1]
         w[3] -= alpha*w[0]
-        return w
         
 
-    def compute_wplus(self, w):
+    def compute_wplus(self):
+        w = self.w
         chiAB = options['chiAB']
         chiBC = options['chiBC']
         chiAC = options['chiAC']
@@ -239,10 +249,11 @@ class SCFTA1BA2CLinearModel():
         w[0]/= XA + XB + XC
 
 
-    def compute_energe(self, w):
+    def compute_energe(self):
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
+        w = self.w
         rho = self.rho
 
         E = chiABN*rho[0]*rho[1] 
@@ -256,7 +267,8 @@ class SCFTA1BA2CLinearModel():
         self.H = np.real(E.flat[0])
         self.H -= np.log(self.Q[0])
 
-    def compute_gradient(self, w):
+    def compute_gradient(self):
+        w = self.w
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
@@ -266,8 +278,9 @@ class SCFTA1BA2CLinearModel():
         self.grad[2] = w[2] - chiABN*rho[0] - chiBCN*rho[2] - w[0]
         self.grad[3] = w[3] - chiACN*rho[0] - chiBCN*rho[1] - w[0]
 
-    def compute_propagator(self, w):
+    def compute_propagator(self):
 
+        w = self.w
         qf = self.qf
         qb = self.qb
 
@@ -276,6 +289,7 @@ class SCFTA1BA2CLinearModel():
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
             self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
+            self.pdesolvers[i].solve(self.qf[start:start + NL])
             start += NL - 1
 
         start = 0
@@ -283,13 +297,27 @@ class SCFTA1BA2CLinearModel():
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
             self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
+            self.pdesolvers[i].solve(self.qb[start:start + NL])
             start += NL - 1
 
 
-    def compute_single_Q(self):
-        q = self.qf[-1]
+    def compute_single_Q(self, index=-1):
+        q = self.qf[index]
         q = np.fft.fftn(q)
         self.Q[0] = np.real(q.flat[0])
+        return self.Q[0]
+
+    def test_compute_single_Q(self, index, rdir):
+        q = np.zeros(self.TNL)
+        for i in range(self.TNL):
+            q[i] = self.compute_single_Q(index=i)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        axes.plot(range(self.TNL), q)
+        fig.savefig(rdir + 'Q_' + str(index) +'.pdf')
+        plt.close()
+
 
 
     def compute_density(self):
@@ -302,7 +330,6 @@ class SCFTA1BA2CLinearModel():
             dt = self.timelines[i].current_time_step_length()
             rho.append(self.integral_time(q[start:start+NL], dt))
             start += NL - 1
-
         self.rho[0] = rho[0] + rho[2]
         self.rho[1] = rho[1]
         self.rho[2] = rho[3]
@@ -316,16 +343,26 @@ class SCFTA1BA2CLinearModel():
 
 
 if __name__ == "__main__":
-
+    import sys 
+    rdir = sys.argv[1]
     rho = init_value['cam6fold']
     h = 30 
     box = np.array([[h, 0], [0, h]], dtype=np.float)
     options = model_options(box=box, NS=256)
     model = SCFTA1BA2CLinearModel(options=options)
-    rho = model.space.fourier_interpolation(rho)
+    rho = [model.space.fourier_interpolation(rho), 0, 0]
 
-    fig = plt.figure()
-    axes = fig.gca()
-    axes.imshow(rho)
-    plt.show()
+    model.init_field(rho)
+    for i in range(5000):
+        print("step:", i)
+        model.compute()
+        #model.test_compute_single_Q(i, rdir)
+        model.update_field()
 
+        if i%10 == 0:
+            fig = plt.figure()
+            axes = fig.gca()
+            im = axes.imshow(model.rho[0])
+            fig.colorbar(im, ax=axes)
+            fig.savefig(rdir + 'test_' + str(i) +'.pdf')
+            plt.close()

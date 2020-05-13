@@ -83,9 +83,9 @@ if True:
             pde,
             theta=theta,
             maxit=maxit,
-            maxdof=2e5,
+            maxdof=5e5,
             step=step,
-            n=7,  # 初始网格加密次数
+            n=8,  # 初始网格加密次数
             p=1,  # 线性元
             q=3,  # 积分精度
             resultdir=location,
