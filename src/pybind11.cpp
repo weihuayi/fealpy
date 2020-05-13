@@ -71,6 +71,7 @@ void generate_surface_mesh()
             const int index3 = V[face->vertex(tr.vertex_triple_index(index, 2))];
         }
     }
+
     std::cout << "Final number of points: " << tr.number_of_vertices() << "\n";
 }
 

@@ -100,7 +100,11 @@ init_value = {
                [-15,    26,	0.3],
                [-30,     0,	0.3],
                [-15,   -26,	0.3],
-               [ 15,   -26,	0.3]], dtype=np.float)
+               [ 15,   -26,	0.3]], dtype=np.float),
+        "LAM":
+	 np.array([
+             [ 3, 0,  0.058],
+             [-3, 0,  0.058]], dtype=np.float)
         }
 
 def model_options(
@@ -108,13 +112,13 @@ def model_options(
         nblend = 1,
         nblock = 4,
         ndeg = 100,
-        fA1 = 0.3,
-        fA2 = 0.05,
-        fB = 0.6,
-        fC = 0.05,
+        fA1 = 0.25,
+        fA2 = 0.25,
+        fB = 0.25,
+        fC = 0.25,
         chiAB = 0.30,
-        chiAC = 0.16,
-        chiBC = 0.16,
+        chiAC = 0.30,
+        chiBC = 0.30,
         box = np.diag(2*[2*np.pi]),
         NS = 256,
         maxdt = 0.005,
@@ -345,18 +349,18 @@ class SCFTA1BA2CLinearModel():
 if __name__ == "__main__":
     import sys 
     rdir = sys.argv[1]
-    rho = init_value['cam6fold']
-    h = 30 
-    box = np.array([[h, 0], [0, h]], dtype=np.float)
-    options = model_options(box=box, NS=256)
+    rho = init_value['LAM']
+    box = np.array([[6*np.pi, 0], [0, 6*np.pi]], dtype=np.float)
+    options = model_options(box=box, NS=128)
     model = SCFTA1BA2CLinearModel(options=options)
     rho = [model.space.fourier_interpolation(rho), 0, 0]
-
     model.init_field(rho)
     for i in range(5000):
         print("step:", i)
         model.compute()
         #model.test_compute_single_Q(i, rdir)
+        g = np.linalg.norm(model.grad, axis=(1, 2))
+        print("l2 norm of grad:", g)
         model.update_field()
 
         if i%10 == 0:
@@ -364,5 +368,5 @@ if __name__ == "__main__":
             axes = fig.gca()
             im = axes.imshow(model.rho[0])
             fig.colorbar(im, ax=axes)
-            fig.savefig(rdir + 'test_' + str(i) +'.pdf')
+            fig.savefig(rdir + 'test_' + str(i) +'.png')
             plt.close()
