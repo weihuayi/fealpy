@@ -87,7 +87,7 @@ if True:
             step=step,
             n=8,  # 初始网格加密次数
             p=1,  # 线性元
-            q=3,  # 积分精度
+            q=7,  # 积分精度
             resultdir=location,
             sigma=100,
             multieigs=False,
