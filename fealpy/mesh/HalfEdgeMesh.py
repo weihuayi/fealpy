@@ -678,7 +678,7 @@ class HalfEdgeMesh(Mesh2d):
     def coarsen_quad(self, isMarkedCell):
         pass
     
-    def refine_poly(self, isMarkedCell=None, options={'disp': True}):
+    def refine_poly(self, isMarkedCell=None, options={'disp': True}, dflag=False):
         """
 
         Parameters
@@ -686,7 +686,6 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedCell : np.ndarray, bool,
             len(isMarkedCell) == len(self.ds.subdomain)
         """
-
 
         NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
@@ -724,15 +723,15 @@ class HalfEdgeMesh(Mesh2d):
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
         
-        if data is not None:
+        if options['data'] is not None:
             NV = self.ds.number_of_vertices_of_all_cells()
-            for key, value in data.items():
+            for key, value in options['data'].items():
                 # 定义在节点的数据进行简单插值
                 evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
                 cvalue = np.zeros(NC, dtype=self.ftype)
                 np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
                 cvalue /= NV
-                data[key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
+                options['data'][key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
 
         #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
@@ -845,7 +844,7 @@ class HalfEdgeMesh(Mesh2d):
         self.node = np.r_['0', node, ec, bc[isMarkedCell]]
         self.ds.reinit(NN+NE1+NC1, subdomain, halfedge)
     
-    def coarsen_poly(self, isMarkedCell, dflag=True):
+    def coarsen_poly(self, isMarkedCell, options={'disp': True}):
 
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
@@ -1056,21 +1055,20 @@ class HalfEdgeMesh(Mesh2d):
         # refine
         isMarkedCell = (options['numrefine'] > 0)
         while np.any(isMarkedCell):
-            self.refine_poly(isMarkedCell)
-            flag = options['numrefine'] 
-            isMarkedCell[cellstart:] = (options['numrefine'] > 0)
+            self.refine_poly(isMarkedCell,options)
+            isMarkedCell = (options['numrefine'] > 0)
 
          
         # coarsen
         if options['maxcoarsen'] > 0:
-            isMarkedCell[self.ds.cellstart:] = (options['numrefine'] < 0)
+            isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
-                self.coarsen_poly(isMarkedCell)
+                self.coarsen_poly(isMarkedCell,options)
                 NN = self.number_of_cells()
                 if NN == NN0:
                     break
-                isMarkedCell[self.ds.cellstart:] = (options['numrefine'] < 0)
+                isMarkedCell = (options['numrefine'] < 0)
 
  
     def add_halfedge_plot(self, axes,
@@ -1088,7 +1086,7 @@ class HalfEdgeMesh(Mesh2d):
         cell, cellLocation = self.entity('cell')
         print("cell:\n", cell)
         print("cellLocation:\n", cellLocation)
-        print("cell2edge:\n", self.ds.cell_to_edge(return_sparse=False))
+        print("cell2edge:\n", self.ds.cell_to_edge(sparse=False))
         print("cell2hedge:\n")
         for i, val in enumerate(self.ds.cell2hedge[:-1]):
             print(i, ':', val)
@@ -1445,7 +1443,7 @@ class HalfEdgeMesh2dDataStructure():
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
         return node2node
 
-    def node_to_cell(self, return_sparse=True):
+    def node_to_cell(self, sparse=True):
         NN = self.NN
         NC = self.NC
         halfedge =  self.halfedge
