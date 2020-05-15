@@ -21,7 +21,7 @@ from .StructureHexMesh import StructureHexMesh
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
 from .CVTPMesher import CVTPMesher
-from .StructureMeshND import StructureMeshND
+from .ATriMesher import ATriMesher
 from .MeshZoo import MeshZoo
 
 from .Tritree import Tritree

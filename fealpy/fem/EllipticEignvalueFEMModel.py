@@ -12,8 +12,6 @@ from fealpy.solver.eigns import picard
 from fealpy.quadrature import FEMeshIntegralAlg
 from fealpy.mesh.adaptive_tools import mark
 
-import transplant
-
 
 class EllipticEignvalueFEMModel:
     def __init__(self, pde, theta=0.2, maxit=50, step=0, maxdof=1e5, n=3, p=1, q=3,
@@ -30,10 +28,7 @@ class EllipticEignvalueFEMModel:
         self.numrefine = n
         self.resultdir = resultdir
         self.picard = False
-        if matlab is True:
-            self.matlab = transplant.Matlab()
-        else:
-            self.matlab = False
+        self.matlab = matlab
 
     def residual_estimate(self, uh):
         mesh = uh.space.mesh
@@ -122,9 +117,10 @@ class EllipticEignvalueFEMModel:
     def psolve(self, A, b, M):
         if self.sigma is None:
             self.ml = pyamg.ruge_stuben_solver(A)
+            return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
         else:
-            self.ml = pyamg.ruge_stuben_solver(A + self.sigma*M)
-        return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
+            self.ml = pyamg.ruge_stuben_solver(A+self.sigma*M)
+            return self.ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
 
     def deig(self, A, M):
         vals, vecs = eigs(A, k=1, M=M, which='SM')
@@ -136,6 +132,7 @@ class EllipticEignvalueFEMModel:
 
     def meigs(self, A, M):
         u, d, flag = self.matlab._call('eigs', [A + 100*M, M, 1, 'SM'])
+        print("matlab eigs convergence:", flag)
         return u.reshape(-1), d - 100
 
     def alg_0(self, maxit=None):
@@ -409,6 +406,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A, b[isFreeDof])
 
+
             eta = self.residual_estimate(uh)
             markedCell = mark(eta, self.theta)
             IM = mesh.bisect(markedCell, returnim=True)
@@ -466,9 +464,9 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof], d = self.meigs(A, M)
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
             return space.function(array=uh)
-        end = timer()
-        print("with time: ", end - start)
 
     def alg_3_3(self, maxit=None):
         """
@@ -572,6 +570,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
 
+
         # 3. 在最细网格上求解一次最小特征值问题 
 
         if self.step > 0:
@@ -608,9 +607,13 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof], d = self.meigs(A, M)
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
+
+            if True:
+                pass
             return uh
-        end = timer()
-        print("with time: ", end - start)
+
 
 
     def alg_3_4(self, maxit=None):
@@ -763,7 +766,10 @@ class EllipticEignvalueFEMModel:
                 u[isFreeDof], d = self.eig(A, M)
             else:
                 u[isFreeDof], d = self.meigs(A, M)
+
             print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
             uh *= u[-1]
             uh += I@u[:-1]
 
@@ -771,8 +777,6 @@ class EllipticEignvalueFEMModel:
             uh = space.function(array=uh)
             return uh
 
-        end = timer()
-        print("with time: ", end - start)
 
 
     def savemesh(self, mesh, fname):

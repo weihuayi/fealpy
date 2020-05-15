@@ -12,7 +12,6 @@ setup(name='fealpy',
           'scipy',
           'matplotlib',
           'pyamg',
-          'meshpy',
-          'transplant'
+          'meshpy'
       ],
       zip_safe=False)

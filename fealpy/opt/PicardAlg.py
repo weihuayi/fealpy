@@ -1,16 +1,9 @@
+
 import numpy as np
 from numpy.linalg import norm
 import matplotlib.pyplot as plt
 
-"""
-Reference
----------
-https://en.wikipedia.org/wiki/Gradient_descent
-"""
-
-
-
-class GradientDescentAlg:
+class PicardAlg:
     def __init__(self, problem, options=None):
         self.problem = problem
         self.options = options
@@ -97,20 +90,3 @@ class GradientDescentAlg:
             self.fun.output('', queue=queue, stop=True)
 
         return self.x, self.f, self.g, self.diff
-
-    def line_search(self):
-        pass
-
-    def show_linear_search(self, tag, x0,  d, fun, a, b):
-        t = np.linspace(a, b, 40)
-        N = t.shape[0]
-        f = np.zeros(N)
-        for i in range(N):
-            f[i], g = fun(x0 + t[i]*d)
-
-        fig = plt.figure()
-        axes = fig.gca()
-        axes.plot(t, f)
-        plt.savefig(str(tag) + '.png')
-        plt.close()
-

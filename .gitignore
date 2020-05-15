@@ -40,3 +40,4 @@ dist
 *.png
 *.fig
 *.vtk
+*.so

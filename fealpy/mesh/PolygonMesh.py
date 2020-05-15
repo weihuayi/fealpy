@@ -165,6 +165,24 @@ class PolygonMesh(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
+    def tri_refine(self):
+        """
+        add barycenter and connect them the vertices
+        """
+        NN = self.number_of_nodes()
+        bc = self.entity_barycenter('cell')
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell2edge = self.ds.cell_to_edge()
+
+        NV = self.number_of_vertices_of_cells()
+        NC = len(cell2edge)
+        node = np.r_['0', self.node, bc]
+        cell = np.zeros((NC, 3), dtype=self.itype)
+        cell[:, 0] = np.repeat(range(NN, NN + len(bc)), NV)
+        cell[:, 1:] = edge[cell2edge]
+        return node, cell
+
     def refine(self, isMarkedCell):
 
         GD = self.geo_dimension()
@@ -182,7 +200,7 @@ class PolygonMesh(Mesh2d):
 
             isMarkedEdge = np.zeros(NE, dtype=np.bool)
             edge2cell = self.ds.edge_to_cell()
-            cell2edge = self.ds.cell_to_edge(sparse=False)
+            cell2edge = self.ds.cell_to_edge(return_sparse=False)
             isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
             isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
 
@@ -219,7 +237,9 @@ class PolygonMesh(Mesh2d):
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Edge2cell:\n", self.ds.edge2cell)
-        print("Cell2edge:\n", self.ds.cell_to_edge(sparse=False))
+        print("Cell2edge:\n", self.ds.cell_to_edge(return_sparse=False))
+        print("edge norm:\n", self.edge_unit_normal())
+        print("cell barycenter:\n", self.entity_barycenter('cell'))
 
 
 

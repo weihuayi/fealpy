@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.spatial import KDTree
 
+from scipy.spatial import Voronoi
 
 class CVTPMesher:
     def __init__(self, domain):
@@ -11,14 +12,12 @@ class CVTPMesher:
         """
         self.domain = domain
 
-    def meshing(self, refine=0, c=0.618, theta=100):
-
-        bnode, hedge2bnode = self.boundary_meshing(
-                refine=refine, c=c, theta=theta)
-        newNode = self.init_interior_nodes(bnode, hedge2bnode)
+    def uniform_meshing(self, refine=0, c=0.618, theta=100):
+        self.uniform_boundary_meshing(n=refine, c=c, theta=theta)
+        self.uniform_init_interior_nodes()
         
 
-    def boundary_meshing(self, n=0, c=0.618, theta=100):
+    def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
         self.domain.boundary_uniform_refine(n=n)
         NN = self.domain.NV
         node = self.domain.vertices
@@ -93,30 +92,37 @@ class CVTPMesher:
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
-        bnode = bnode[isKeepNode]
-        hedge2bnode = idxmap[index]
-        return bnode, hedge2bnode
+        self.bnode = bnode[isKeepNode] #
+        idxflag = halfedge[idx,1]<=0
+        self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
+        self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
+        self.chedge = idx # the index of halfedge point on corner point
 
-
-    def init_interior_nodes(self, bnode, hedge2bnode):
+    def uniform_init_interior_nodes(self):
         
         node = self.domain.vertices
         halfedge = self.domain.halfedge
 
-        NB = bnode.shape[0]
-        bnode2subdomain = np.zeros(NB, dtype=np.int)
-        bnode2subdomain[hedge2bnode] = halfedge[:, 1]
+        NB = len(self.bnode)
+        NC = len(self.cnode)
+
+        bnode2subdomain = np.zeros(NB+NC, dtype=np.int)
+        bnode2subdomain[self.hedge2bnode] = halfedge[:, 1]
 
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
         h = np.sqrt(np.sum(v**2, axis=-1))
 
-        tree = KDTree(bnode)
+        if NC > 0:
+            bd = np.r_[self.bnode, self.cnode]
+        else:
+            bd = self.bnode
+        tree = KDTree(bd)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
-
+        self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.domain.subdomain):
-            p = bnode[bnode2subdomain == index]
+            p = bd[bnode2subdomain == index]
             xmin = min(p[:, 0])
             xmax = max(p[:, 0])
             ymin = min(p[:, 1])
@@ -133,7 +139,7 @@ class CVTPMesher:
                 pp *= np.array([xmax-xmin,ymax-ymin])
                 pp += np.array([xmin,ymin])
                 d, idx = tree.query(pp)
-                flag0 = d > (h[0]/2)
+                flag0 = d > (0.7*h[0])
                 flag1 = (bnode2subdomain[idx] == index)
                 pp = pp[flag0 & flag1]# 筛选出符合要求的点
                 end = start + pp.shape[0]
@@ -142,9 +148,63 @@ class CVTPMesher:
                     break
                 else:
                     start = end
+            self.inode[index] = newNode
 
-        return newNode 
-    
+    def voronoi(self):
+        bnode = self.bnode
+        cnode = self.cnode
+        inode = self.inode
+       
+        NB = len(bnode) 
+        NC = len(cnode)
+        NN = NB + NC
+        for index, point in inode.items(): # inode is a dict
+            NN += len(point)
+        self.NN = NN
+        points = np.zeros((NN, 2), dtype=bnode.dtype)
+        points[:NB] = bnode
+        points[NB:NB+NC] = cnode
+        start = NB + NC
+        for index, point in inode.items():
+            N = len(point)
+            points[start:start+N] = point
+            start += N
 
-    def voronoi(self, node):
-        pass
+        # construct voronoi diagram
+        vor = Voronoi(points)
+        start = NB+NC
+
+        return vor, start
+
+    def Lloyd(self, vor, start):
+
+        vertices = vor.vertices
+        NN = self.NN
+        rp = vor.ridge_points
+        rv = np.array(vor.ridge_vertices)
+        isKeeped = (rp[:, 0] >= start) | (rp[:, 1] >= start) 
+
+        rp = rp[isKeeped]
+        rv = rv[isKeeped]
+
+        npoints = np.zeros((NN, 2), dtype=self.bnode.dtype)
+        valence = np.zeros(NN, dtype=np.int)
+
+        center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
+        np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
+        np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
+        np.add.at(valence, rp[:, 0], 1)
+        np.add.at(valence, rp[:, 1], 1)
+        npoints[start:] /= valence[start:, None]
+        
+        vor.points[start:, :] = npoints[start:, :]
+        vor = Voronoi(vor.points)
+        return vor
+        
+
+
+
+        
+
+
+        

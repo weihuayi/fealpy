@@ -10,13 +10,6 @@ setup(name='fealpy',
       install_requires=[
           'numpy',
           'scipy',
-          'matplotlib',
-          'cython',
-          'pybind11',
-          'msgpack',
-          'PyHamcrest',
-          'boost',
-          'pytools',
-	      'transplant'
+          'matplotlib'
       ],
       zip_safe=False)

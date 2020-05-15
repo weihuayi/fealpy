@@ -1,13 +1,9 @@
 import numpy as np
 from timeit import default_timer as timer
-import transplant
 
 class MatlabShow:
     def __init__(self, matlab=None):
-        if matlab is None:
-            self.matlab = transplant.Matlab()
-        else:
-            self.matlab = matlab
+        self.matlab = matlab
 
     def show_solution(self, mesh, uh, fname='test.fig'):
         NC = mesh.number_of_cells()

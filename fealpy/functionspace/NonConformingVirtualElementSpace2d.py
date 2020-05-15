@@ -47,7 +47,7 @@ class NCVEMDof2d():
         p = self.p
         mesh = self.mesh
         cell, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         if p == 1:
             return cell2edge, cellLocation

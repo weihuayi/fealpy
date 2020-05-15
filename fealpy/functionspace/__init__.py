@@ -6,8 +6,10 @@ from .NonConformingVirtualElementSpace2d import NCVEMDof2d, NonConformingVirtual
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
-from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
+from .DivFreeNonConformingVirtualElementSpace2d_new import DivFreeNonConformingVirtualElementSpace2d
 from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
+
+from .FourierSpace import FourierSpace
 
 from .mixed_fem_space import RTFiniteElementSpace2d
 from .vem_space import VEMDof2d, VirtualElementSpace2d

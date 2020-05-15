@@ -521,18 +521,18 @@ class LagrangeFiniteElementSpace():
         construct the recovery linear elasticity fem matrix
         """
         G = self.revcovery_matrix()
-        M = self.space.mass_matrix()
+        M = self.mass_matrix()
 
         cellmeasure = self.cellmeasure
-        cell2dof = self.space.cell_to_dof()
+        cell2dof = self.cell_to_dof()
         GD = self.GD
 
-        qf = self.space.integrator
+        qf = self.integrator
         bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.space.grad_basis(bcs)
+        grad = self.grad_basis(bcs)
 
-        ldof = self.space.number_of_local_dofs()
-        gdof = self.space.number_of_global_dofs()
+        ldof = self.number_of_local_dofs()
+        gdof = self.number_of_global_dofs()
 
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
@@ -547,8 +547,8 @@ class LagrangeFiniteElementSpace():
         for k, (i, j) in enumerate(idx):
             A.append(G[i].T@M@G[j])
 
-        T = csr_matrix((gdof, gdof), dtype=self.space.ftype)
-        D = csr_matrix((gdof, gdof), dtype=self.space.ftype)
+        T = csr_matrix((gdof, gdof), dtype=self.ftype)
+        D = csr_matrix((gdof, gdof), dtype=self.ftype)
         C = []
         for i in range(GD):
             D += A[imap[(i, i)]]
@@ -658,7 +658,6 @@ class LagrangeFiniteElementSpace():
                         )
         else:
             dphi = phi
-
         M = np.einsum(
                 'm, mij, mik, i->ijk',
                 ws, dphi, phi, self.cellmeasure,
