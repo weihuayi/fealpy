@@ -32,10 +32,9 @@ class HalfEdgeMeshTest:
 
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        
+
         if True:
             isMarkedCell = mesh.mark_helper([2])
-            print('Mark:',isMarkedCell)
             mesh.refine_poly(isMarkedCell, dflag=False)
         
         if True:
@@ -50,11 +49,11 @@ class HalfEdgeMeshTest:
             isMarkedCell = mesh.mark_helper([1, 5]) 
             mesh.refine_poly(isMarkedCell, dflag=False)
             
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([1, 12]) 
             mesh.refine_poly(isMarkedCell, dflag=False)
             
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([0, 21]) 
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -288,12 +287,18 @@ class HalfEdgeMeshTest:
         mesh.find_cell(axes, showindex=True)
 
         NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
+        nC = mesh.number_of_cells()
         
         aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-        eta = 2*np.ones(NC,dtype=int)
+        #eta = 2*np.ones(nC,dtype=int)
+        eta = [0,0,1,1,1]
 
         mesh.adaptive(eta, aopts)
+
+        #eta = [1,0,0,-1,-1,-1,0,0,0,0]
+        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
+
+        #mesh.adaptive(eta, aopts) 
         if plot:
 
             fig = plt.figure()
