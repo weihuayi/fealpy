@@ -609,7 +609,11 @@ class EllipticEignvalueFEMModel:
             print("smallest eigns:", d)
             end = timer()
             print("with time: ", end - start)
+
+            if True:
+                pass
             return uh
+
 
 
     def alg_3_4(self, maxit=None):

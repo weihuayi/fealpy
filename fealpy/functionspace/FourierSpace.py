@@ -10,6 +10,10 @@ class FourierSpace:
         self.ftype = np.float
         self.itype = np.int32
 
+    def number_of_dofs(self):
+        return self.N**self.GD
+
+
     def interpolation_points(self):
         N = self.N
         GD = self.GD
@@ -26,6 +30,11 @@ class FourierSpace:
         F = self.function()
         F[tuple(idx.T)] = data[:, self.GD]
         return np.fft.ifftn(F).real
+
+    def function_norm(self, u):
+        dof = self.number_of_dofs()
+        val = np.sqrt(np.sum(np.fft.fftn(u))**2/dof).real
+        return val
 
     def interpolation(self, u):
         p = self.interpolation_points()

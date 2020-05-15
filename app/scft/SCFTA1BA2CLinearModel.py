@@ -5,78 +5,8 @@ import matplotlib.pyplot as plt
 from fealpy.functionspace import FourierSpace
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
 
-class ParabolicFourierSolver():
-    def __init__(self, space, timeline):
-        self.space = space 
-        self.k, self.k2 = self.space.reciprocal_lattice(return_square=True)
-        self.timeline = timeline 
-        dt = self.timeline.current_time_step_length()
-        self.E1 = np.exp(-dt*self.k2)
-        self.E3 = np.exp(-dt/2*self.k2)
+from ParabolicFourierSolver import ParabolicFourierSolver
 
-    def initialize(self, q, w):
-        """
-        Parameters
-        ----------
-
-        q : 
-        w :
-
-        Note
-        ----
-        """
-
-        self.w = w
-        dt = self.timeline.current_time_step_length()
-        self.E0 = np.exp(-dt/2*w)
-        self.E2 = np.exp(-dt/4*w)
-
-        NL = self.timeline.number_of_time_levels()
-
-        E0 = self.E0
-        E1 = self.E1
-
-        E2 = self.E2
-        E3 = self.E3 
-
-        for i in range(1, 4):
-            q0 = q[i-1]
-            q1 = np.fft.fftn(E0*q0)
-            q1 *= E1
-            q[i] = np.fft.ifftn(q1).real
-            q[i] *= E0
-
-        q0 = q[0]
-        for i in range(1, 4):
-            q1 = np.fft.fftn(E2*q0)
-            q1 *= E3
-            q1 = np.fft.ifftn(q1).real
-            q1 *= E2
-
-            q1 = np.fft.fftn(E2*q1)
-            q1 *= E3
-            q1 = np.fft.ifftn(q1).real
-            q1 *= E2
-            q[i] *= -1/3
-            q[i] += 4*q1/3
-
-    def solve(self, q): 
-        NL = self.timeline.number_of_time_levels()
-        dt = self.timeline.current_time_step_length()
-        E0 = self.E0
-        E1 = self.E1
-        w = self.w
-        k2 = self.k2
-
-        for i in range(4, NL):
-            q0 = 4*q[i-1] - 3*q[i-2] + 4*q[i-3]/3 - q[i-4]/4
-            q1 = 4*q[i-1] - 6*q[i-2] + 4*q[i-3] - q[i-4]
-            q1 *= w
-            q1 *= dt
-            q0 -= q1
-            q1 = np.fft.fftn(q0)
-            q1 /= 25/12 + dt*k2
-            q[i] = np.fft.ifftn(q1).real
 
 init_value = {
         "bcc":
@@ -155,7 +85,7 @@ class SCFTA1BA2CLinearModel():
             options = pscftmodel_options()
         self.options = options
         dim = options['dim']
-        box = np.diag(dim*[2*np.pi])
+        box = options['box'] 
         self.space = FourierSpace(box,  options['NS'])
 
         fA1 = options['fA1']
@@ -215,6 +145,7 @@ class SCFTA1BA2CLinearModel():
         self.compute_density()
         # compute energy function and its gradient
         self.compute_energe()
+        self.compute_gradient()
 
     def update_field(self, alpha=0.01):
         w = self.w
@@ -223,20 +154,20 @@ class SCFTA1BA2CLinearModel():
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
         
-        w[1] *= 1+alpha
-        w[1] -= alpha*chiABN*rho[1]
-        w[1] -= alpha*chiACN*rho[2]
-        w[1] -= alpha*w[0]
+        w[1] *= 1 - alpha
+        w[1] += alpha*chiABN*rho[1]
+        w[1] += alpha*chiACN*rho[2]
+        w[1] += alpha*w[0]
 
-        w[2] *= 1+alpha
-        w[2] -= alpha*chiABN*rho[0]
-        w[2] -= alpha*chiBCN*rho[2]
-        w[2] -= alpha*w[0]
+        w[2] *= 1 - alpha
+        w[2] += alpha*chiABN*rho[0]
+        w[2] += alpha*chiBCN*rho[2]
+        w[2] += alpha*w[0]
 
-        w[3] *= 1+alpha
-        w[3] -= alpha*chiACN*rho[0]
-        w[3] -= alpha*chiBCN*rho[1]
-        w[3] -= alpha*w[0]
+        w[3] *= 1 - alpha
+        w[3] += alpha*chiACN*rho[0]
+        w[3] += alpha*chiBCN*rho[1]
+        w[3] += alpha*w[0]
         
 
     def compute_wplus(self):
@@ -273,10 +204,10 @@ class SCFTA1BA2CLinearModel():
 
     def compute_gradient(self):
         w = self.w
+        rho = self.rho
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
-        rho = self.rho
         self.grad[0] = rho[0] + rho[1] + rho[2] - 1
         self.grad[1] = w[1] - chiABN*rho[1] - chiACN*rho[2] - w[0]
         self.grad[2] = w[2] - chiABN*rho[0] - chiBCN*rho[2] - w[0]
@@ -304,11 +235,12 @@ class SCFTA1BA2CLinearModel():
             self.pdesolvers[i].solve(self.qb[start:start + NL])
             start += NL - 1
 
-
     def compute_single_Q(self, index=-1):
+        dof = self.space.number_of_dofs()
         q = self.qf[index]
         q = np.fft.fftn(q)
         self.Q[0] = np.real(q.flat[0])
+        self.Q[0] /= dof
         return self.Q[0]
 
     def test_compute_single_Q(self, index, rdir):
@@ -319,10 +251,8 @@ class SCFTA1BA2CLinearModel():
         fig = plt.figure()
         axes = fig.gca()
         axes.plot(range(self.TNL), q)
-        fig.savefig(rdir + 'Q_' + str(index) +'.pdf')
+        fig.savefig(rdir + 'Q_' + str(index) +'.png')
         plt.close()
-
-
 
     def compute_density(self):
         q = self.qf*self.qb[-1::-1]
@@ -351,22 +281,32 @@ if __name__ == "__main__":
     rdir = sys.argv[1]
     rho = init_value['LAM']
     box = np.array([[6*np.pi, 0], [0, 6*np.pi]], dtype=np.float)
-    options = model_options(box=box, NS=128)
+    options = model_options(box=box, NS=256)
     model = SCFTA1BA2CLinearModel(options=options)
     rho = [model.space.fourier_interpolation(rho), 0, 0]
     model.init_field(rho)
-    for i in range(5000):
-        print("step:", i)
-        model.compute()
-        #model.test_compute_single_Q(i, rdir)
-        g = np.linalg.norm(model.grad, axis=(1, 2))
-        print("l2 norm of grad:", g)
-        model.update_field()
 
-        if i%10 == 0:
-            fig = plt.figure()
-            axes = fig.gca()
-            im = axes.imshow(model.rho[0])
-            fig.colorbar(im, ax=axes)
-            fig.savefig(rdir + 'test_' + str(i) +'.png')
-            plt.close()
+    if False:
+        print("w:", model.w)
+        fig = plt.figure()
+        axes = fig.gca()
+        im = axes.imshow(rho[0])
+        fig.colorbar(im, ax=axes)
+        plt.show()
+
+    if True:
+        for i in range(5000):
+            print("step:", i)
+            model.compute()
+            #model.test_compute_single_Q(i, rdir)
+            ng = list(map(model.space.function_norm, model.grad))
+            print("l2 norm of grad:", ng)
+            model.update_field()
+
+            if i%10 == 0:
+                fig = plt.figure()
+                axes = fig.gca()
+                im = axes.imshow(model.rho[0])
+                fig.colorbar(im, ax=axes)
+                fig.savefig(rdir + 'test_' + str(i) +'.png')
+                plt.close()

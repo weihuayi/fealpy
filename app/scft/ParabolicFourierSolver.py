@@ -1,4 +1,3 @@
-
 import numpy as np
 
 class ParabolicFourierSolver():
@@ -22,6 +21,8 @@ class ParabolicFourierSolver():
         ----
         """
 
+        self.w = w
+        dt = self.timeline.current_time_step_length()
         self.E0 = np.exp(-dt/2*w)
         self.E2 = np.exp(-dt/4*w)
 
@@ -71,3 +72,19 @@ class ParabolicFourierSolver():
             q1 = np.fft.fftn(q0)
             q1 /= 25/12 + dt*k2
             q[i] = np.fft.ifftn(q1).real
+
+
+if __name__ == "__main__":
+    from fealpy.functionspace import FourierSpace
+    from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+
+    box = np.diag(2*[6*np.pi])
+    timeline = UniformTimeLine(0, 0.3, 0.01)
+    space = FourierSpace(box, 16)
+    solver = ParabolicFourierSolver(space, timeline)
+    NL = timelines.number_of_time_levels()
+    q = space.function(dim=NL) 
+    w = 0
+    solver.initialize(q, w)
+    solver.solve(q)
+
