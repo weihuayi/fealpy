@@ -369,7 +369,7 @@ class ScaledMonomialSpace2d():
         p = self.p if p is None else p
         def f(x, index):
             gphi = self.grad_basis(x, index=index, p=p)
-            return np.einsum('jkm, jpm->jkp', gphi, gphi)
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
     
         A = self.integralalg.integral(f, celltype=True, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
