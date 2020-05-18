@@ -12,7 +12,7 @@ class RTDof2d:
     def cell_to_dof(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        NE = mesh.
+        NE = mesh.number_of_edges()
         ldof = self.number_of_local_dofs(p=p)
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
@@ -33,9 +33,24 @@ class RTDof2d:
 
 class RaviartThomasFiniteElementSpace2d:
     def __init__(self, mesh, p):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh
+        p : the space order
+
+        Note
+        ----
+
+        RT_p : [P_{p-1}]^d(T) + [m_1, m_2]^T P_{p-1}(T)
+        """
         self.mesh = mesh
-        self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.smspace = ScaledMonomialSpace2d(mesh, p-1)
+        self.bcoefs = self.basis_coefficients()
         self.p = p
+
+    def basis_coefficients(self):
+        pass
 
     def basis(self, bc):
         mesh = self.mesh

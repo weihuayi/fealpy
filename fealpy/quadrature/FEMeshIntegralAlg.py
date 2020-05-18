@@ -10,11 +10,12 @@ class FEMeshIntegralAlg():
 
     def integral(self, u, celltype=False, barycenter=True):
         qf = self.integrator
-        bcs, ws = qf.quadpts, qf.weights
+        bcs = qf.quadpts # 积分点 (NQ, 3)
+        ws = qf.weights # 积分点对应的权重 (NQ, )
         if barycenter:
             val = u(bcs)
         else:
-            ps = self.mesh.bc_to_point(bcs)
+            ps = self.mesh.bc_to_point(bcs) # (NQ, NC, 2)
             val = u(ps)
         dim = len(ws.shape)
         s0 = 'abcde'

@@ -20,6 +20,7 @@ class TriangleMesh(Mesh2d):
         self.node = node
         N = node.shape[0]
         self.ds = TriangleMeshDataStructure(N, cell)
+
         if node.shape[1] == 2:
             self.meshtype = 'tri'
         elif node.shape[1] == 3:
@@ -724,8 +725,15 @@ class TriangleMesh(Mesh2d):
         return a
 
     def bc_to_point(self, bc, etype='cell', index=None):
+        """
+
+        Parameter
+        ---------
+        bc : (3, ) or (NQ, 3)
+        etype : 'cell' or 'edge'
+        """
         node = self.node
-        entity = self.entity(etype)
+        entity = self.entity(etype) # default  cell
         index = index if index is not None else np.s_[:]
         p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
         return p

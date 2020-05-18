@@ -52,7 +52,7 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        q = q if q is not None else p+3
+        q = q if q is not None else p+3 
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
