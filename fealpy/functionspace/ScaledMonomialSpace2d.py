@@ -389,10 +389,11 @@ class ScaledMonomialSpace2d():
             phi1 = self.basis(ps, index=edge2cell[:, 0])
             phi2 = self.basis(ps, index=edge2cell[:, 1])
 
-            LH = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
-            RH = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
-            return LH, RH 
+            LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
+            RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
+            return LM, RM 
         else:
+            print("Here has not been implement!")
 
     def stiff_matrix(self, p=None):
         p = self.p if p is None else p
