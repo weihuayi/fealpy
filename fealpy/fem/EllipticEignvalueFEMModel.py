@@ -547,11 +547,12 @@ class EllipticEignvalueFEMModel:
                 self.savemesh(mesh,
                         self.resultdir + 'mesh_3_3_' + str(i+1) + '_' + str(NN) +'.mat')
             final = i+1
-            if NN > self.maxdof:
-                break
 
             I = IM@I
             uH = IM@uH
+
+            if NN > self.maxdof:
+                break
 
             space = LagrangeFiniteElementSpace(mesh, 1)
             gdof = space.number_of_global_dofs()
@@ -592,26 +593,50 @@ class EllipticEignvalueFEMModel:
         M = self.get_mass_matrix(space)
         isFreeDof = ~(space.boundary_dof())
         uh = space.function(array=uh)
-        A = A[isFreeDof, :][:, isFreeDof].tocsr()
-        M = M[isFreeDof, :][:, isFreeDof].tocsr()
+        Ah = A[isFreeDof, :][:, isFreeDof].tocsr()
+        Mh = M[isFreeDof, :][:, isFreeDof].tocsr()
         uh = space.function()
 
         if self.multieigs is True:
-            self.A = A
-            self.M = M
+            self.A = Ah
+            self.M = Mh
             self.ml = pyamg.ruge_stuben_solver(self.A)
             self.eigs()
         else:
             if self.matlab is False:
-                uh[isFreeDof], d = self.eig(A, M)
+                uh[isFreeDof], d = self.eig(Ah, Mh)
             else:
-                uh[isFreeDof], d = self.meigs(A, M)
+                uh[isFreeDof], d = self.meigs(Ah, Mh)
             print("smallest eigns:", d)
             end = timer()
             print("with time: ", end - start)
 
-            if True:
-                pass
+            if False:
+                w0 = uh@A
+                w1 = w0@uh
+                w2 = w0@I
+                AA = bmat([[AH, w2.reshape(-1, 1)], [w2, w1]], format='csr')
+
+                w0 = uh@M
+                w1 = w0@uh
+                w2 = w0@I
+                MM = bmat([[MH, w2.reshape(-1, 1)], [w2, w1]], format='csr')
+
+                isFreeDof = np.r_[isFreeHDof, True]
+
+                u = np.zeros(len(isFreeDof))
+
+                ## 求解特征值
+                A = AA[isFreeDof, :][:, isFreeDof].tocsr()
+                M = MM[isFreeDof, :][:, isFreeDof].tocsr()
+
+                if self.matlab is False:
+                    u[isFreeDof], d = self.eig(A, M)
+                else:
+                    u[isFreeDof], d = self.meigs(A, M)
+
+                print("new smallest eigns:", d)
+
             return uh
 
 
