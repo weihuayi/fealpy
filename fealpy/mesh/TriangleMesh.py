@@ -738,6 +738,13 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
         return p
 
+    def edge_bc_to_point(self, bcs, index=None):
+        node = self.entity('node')
+        edge = self.entity('edge')
+        index = index if index is not None else np.s_[:]
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
+        return ps
+
 
 
 class TriangleMeshWithInfinityNode:
@@ -851,3 +858,4 @@ class TriangleMeshWithInfinityNode:
             currentIdx += 1
 
         return pnode, pcell, pcellLocation
+

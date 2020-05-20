@@ -108,7 +108,7 @@ class HalfEdgeMesh(Mesh2d):
     def from_mesh(cls, mesh):
 
         mtype = mesh.meshtype
-        if mtype ~= 'halfedge':
+        if mtype != 'halfedge':
             NE = mesh.number_of_edges()
             NC = mesh.number_of_cells()
 

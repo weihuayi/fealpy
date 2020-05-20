@@ -1,11 +1,18 @@
 import numpy as np
 
+from .GaussLobattoQuadrature import GaussLobattoQuadrature
+from .GaussLegendreQuadrature import GaussLegendreQuadrature
+
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
         self.integrator = mesh.integrator(q)
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
+
+        self.edgemeasure = mesh.entity_measure('edge')
+        self.edgebarycenter = mesh.entity_barycenter('edge')
+        self.edgeintegrator = GaussLegendreQuadrature(q)
 
 
     def integral(self, u, celltype=False, barycenter=True):
