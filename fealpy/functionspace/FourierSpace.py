@@ -29,11 +29,10 @@ class FourierSpace:
         idx[idx<0] += self.N
         F = self.function()
         F[tuple(idx.T)] = data[:, self.GD]
-        return np.fft.ifftn(F).real
+        return np.fft.fftn(F).real
 
     def function_norm(self, u):
-        dof = self.number_of_dofs()
-        val = np.sqrt(np.sum(np.fft.fftn(u))**2/dof).real
+        val = np.sqrt(np.sum(np.fft.ifftn(u))**2).real
         return val
 
     def interpolation(self, u):
@@ -71,9 +70,9 @@ class FourierSpace:
         GD = self.GD
         xi = self.reciprocal_lattice()
         F = self.interpolation(f) 
-        F = np.fft.fftn(F)
+        F = np.fft.ifftn(F)
         U = F/cfun(xi)
-        U = np.fft.ifftn(U).real
+        U = np.fft.fftn(U).real
         return U
 
     def function(self, dim=None):

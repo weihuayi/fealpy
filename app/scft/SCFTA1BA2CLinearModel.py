@@ -51,7 +51,7 @@ def model_options(
         chiBC = 0.30,
         box = np.diag(2*[2*np.pi]),
         NS = 256,
-        maxdt = 0.005,
+        maxdt = 0.01,
         bA = 1,
         bB = 1,
         bC = 1):
@@ -95,10 +95,11 @@ class SCFTA1BA2CLinearModel():
         maxdt = options['maxdt']
 
         self.timelines = []
-        self.timelines.append(UniformTimeLine(0, fA1, int(fA1//maxdt)))
-        self.timelines.append(UniformTimeLine(0, fB, int(fB//maxdt)))
-        self.timelines.append(UniformTimeLine(0, fA2, int(fA2//maxdt)))
-        self.timelines.append(UniformTimeLine(0, fC, int(fC//maxdt)))
+        self.timelines.append(UniformTimeLine(0, fA1, int(np.ceil(fA1/maxdt))))
+        self.timelines.append(UniformTimeLine(0, fB,  int(np.ceil(fB/maxdt))))
+        self.timelines.append(UniformTimeLine(0, fA2, int(np.ceil(fA2/maxdt))))
+        self.timelines.append(UniformTimeLine(0, fC,  int(np.ceil(fC/maxdt))))
+
 
         self.pdesolvers = []
         for i in range(4):
@@ -108,6 +109,7 @@ class SCFTA1BA2CLinearModel():
 
         self.TNL = 0 # total number of time levels
         for i in range(4):
+            NL = self.timelines[i].number_of_time_levels()
             self.TNL += self.timelines[i].number_of_time_levels()
         self.TNL -= options['nblock'] - 1
 
@@ -198,7 +200,7 @@ class SCFTA1BA2CLinearModel():
         E -= w[2]*rho[1]
         E -= w[3]*rho[2]
         E -= w[0]*(1 - rho.sum(axis=0))
-        E = np.fft.fftn(E)
+        E = np.fft.ifftn(E)
         self.H = np.real(E.flat[0])
         self.H -= np.log(self.Q[0])
 
@@ -236,11 +238,9 @@ class SCFTA1BA2CLinearModel():
             start += NL - 1
 
     def compute_single_Q(self, index=-1):
-        dof = self.space.number_of_dofs()
         q = self.qf[index]
-        q = np.fft.fftn(q)
+        q = np.fft.ifftn(q)
         self.Q[0] = np.real(q.flat[0])
-        self.Q[0] /= dof
         return self.Q[0]
 
     def test_compute_single_Q(self, index, rdir):
