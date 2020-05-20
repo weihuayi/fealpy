@@ -2,16 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.quadrature import TriangleQuadrature
 from fealpy.functionspace import ConformingVirtualElementSpace2d
-from fealpy.vem.integral_alg import PolygonMeshIntegralAlg
 from fealpy.mesh.mesh_tools import show_mesh_2d
 
-from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine, UniformTimeLine
-from fealpy.solver import MatlabSolver
-from scipy.sparse.linalg import spsolve
-import pyamg
 from timeit import default_timer as timer
 
-def scftmodel_options(
+def scftmodel2d_options(
         nspecies = 2,
         nblend = 1,
         nblock = 2,
@@ -47,81 +42,7 @@ def scftmodel_options(
     options['chiN'] = options['chiAB']*options['ndeg']
     return options
 
-class PDESolver():
-    def __init__(self, A, M, nupdate=0, method ='CN'):
-        self.method = method
-        self.solver = MatlabSolver()
-
-        self.A = A
-        self.M = M
-
-        self.nupdate = nupdate
-
-    def get_current_linear_system(self, u0, dt, F):
-        M = self.M
-        S = self.A
-        #F = self.F
-        if self.method is 'FM':
-                b = -dt*(S + F)@u0 + M@u0
-                A = M
-                return A, b
-        if self.method is 'BM':
-                b = M@u0
-                A = M + dt*(S + F)
-                return A, b
-        if self.method is 'CN':
-                b = -0.5*dt*(S + F)@u0 + M@u0
-                A = M + 0.5*dt*(S + F)
-                return A, b
-
-    def get_current_left_matrix(self, dt,F):
-        M = self.M
-        S = self.A
-        #F = self.F
-        return M + 0.5*dt*(S + F)
-
-    def get_current_right_vector(self, u0, dt, F):
-        M = self.M
-        S = self.A
-        #F = self.F
-        return -0.5*dt*(S@u0 + F@u0) + M@u0
-
-    def run(self, timeline, uh, F):
-        #self.solver =[]
-        while not timeline.stop():
-            current = timeline.current
-            dt  = timeline.get_current_time_step_length()
-            A = self.get_current_left_matrix(dt,F)
-            #ml = pyamg.ruge_stuben_solver(A)
-            #self.solver.append(ml)
-
-            b = self.get_current_right_vector(uh[:, current], dt,F)
-            #uh[:, current+1] = ml.solve(b, tol=1e-12, accel='cg').reshape((-1,))
-            #uh[:, current+1] = spsolve(A,b).reshape((-1,))
-            uh[:, current+1] = self.solver.divide(A,b)
-            timeline.current += 1
-        timeline.reset()
-
-        for i in range(self.nupdate):
-            q = -self.A@uh - F@uh
-            intq = timeline.time_integral(q)
-            r = uh[:, [0]] + spsolve(self.M,intq) - uh
-            d = timeline.diff(r)
-            delta = np.zeros(uh.shape, dtype=np.float)
-            while not timeline.stop():
-                current = timeline.current
-                dt = timeline.get_current_time_step_length()
-                A = self.get_current_left_matrix(dt,F)
-                b = self.get_current_right_vector(delta[:, current], dt, F) + dt*self.M@d[:, current+1]
-                #delta[:, current+1] = self.solver[current].solve(b, tol=1e-12, accel='cg').reshape((-1,))
-                #delta[:, current+1] = spsolve(A,b).reshape((-1,))
-                delta[:, current+1] = self.solver.divide(A,b)
-                timeline.current += 1
-            timeline.reset()
-            uh += delta
-
-
-class SCFTVEMModel():
+class SCFTVEMModel2d():
     def __init__(self, mesh, options=None):
         if options == None:
             options = scftmodel_options()

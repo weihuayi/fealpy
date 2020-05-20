@@ -106,39 +106,48 @@ class HalfEdgeMesh(Mesh2d):
 
     @classmethod
     def from_mesh(cls, mesh):
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
 
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
-        
+        mtype = mesh.meshtype
+        if mtype ~= 'halfedge':
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
 
-        halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
-        halfedge[:, 0] = edge.flat
+            node = mesh.entity('node')
+            edge = mesh.entity('edge')
+            edge2cell = mesh.ds.edge_to_cell()
+            isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+            
 
-        halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
-        halfedge[1::2, 1] = edge2cell[:, 0] + 1
+            halfedge = np.zeros((2*NE, 6), dtype=mesh.itype)
+            halfedge[:, 0] = edge.flat
 
-        halfedge[0::2, 4] = range(1, 2*NE, 2)
-        halfedge[1::2, 4] = range(0, 2*NE, 2)
-        halfedge[1::2, 5]  = 1
+            halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
+            halfedge[1::2, 1] = edge2cell[:, 0] + 1
 
-        NHE = len(halfedge)
-        edge = np.zeros((2*NHE, 2), dtype=halfedge.dtype)
-        edge[:NHE] = halfedge[:, 0:2]
-        edge[NHE:, 0] = halfedge[halfedge[:, 4], 0]
-        edge[NHE:, 1] = halfedge[:, 1]
-        idx = np.lexsort((edge[:, 0], edge[:, 1])).reshape(-1, 2)
-        idx[:, 1] -= NHE
-        halfedge[idx[:, 0], 2] = idx[:, 1]
-        halfedge[halfedge[:, 2], 3] = range(NHE)
+            halfedge[0::2, 4] = range(1, 2*NE, 2)
+            halfedge[1::2, 4] = range(0, 2*NE, 2)
+            halfedge[1::2, 5]  = 1
 
-        subdomain = np.ones(NC+1, dtype=halfedge.dtype)
-        subdomain[0] = 0
+            NHE = len(halfedge)
+            edge = np.zeros((2*NHE, 2), dtype=halfedge.dtype)
+            edge[:NHE] = halfedge[:, 0:2]
+            edge[NHE:, 0] = halfedge[halfedge[:, 4], 0]
+            edge[NHE:, 1] = halfedge[:, 1]
+            idx = np.lexsort((edge[:, 0], edge[:, 1])).reshape(-1, 2)
+            idx[:, 1] -= NHE
+            halfedge[idx[:, 0], 2] = idx[:, 1]
+            halfedge[halfedge[:, 2], 3] = range(NHE)
 
-        return cls(node, subdomain, halfedge)
+            subdomain = np.ones(NC+1, dtype=halfedge.dtype)
+            subdomain[0] = 0
+
+            return cls(node, subdomain, halfedge)
+        else:
+            newMesh =  cls(mesh.node, mesh.subdomain, mesh.ds.halfedge.copy())
+            newMesh.celldata['level'][:] = mesh.celldata['level']
+            newMesh.nodedata['level'][:] = mesh.nodedata['level']
+            newMesh.halfedge['level'][:] = mesh.halfedgedata['level']
+            return newMesh
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
@@ -1361,7 +1370,7 @@ class HalfEdgeMesh(Mesh2d):
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[self.ds.cellstart:] = mark(eta, theta, method=method)
         return isMarkedCell
-    
+
     def adaptive_options(
             self,
             method='mean',
