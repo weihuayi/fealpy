@@ -72,7 +72,7 @@ class ScaledMonomialSpace2d():
         q = q if q is not None else p+3
 
         mtype = mesh.meshtype
-        if mtype == 'poly':
+        if mtype == 'polygon':
             self.integralalg = PolygonMeshIntegralAlg(
                     self.mesh, q,
                     cellmeasure=self.cellmeasure,
