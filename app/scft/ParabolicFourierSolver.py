@@ -36,21 +36,21 @@ class ParabolicFourierSolver():
 
         for i in range(1, 4):
             q0 = q[i-1]
-            q1 = np.fft.fftn(E0*q0)
+            q1 = np.fft.ifftn(E0*q0)
             q1 *= E1
-            q[i] = np.fft.ifftn(q1).real
+            q[i] = np.fft.fftn(q1).real
             q[i] *= E0
 
         q0 = q[0]
         for i in range(1, 4):
-            q1 = np.fft.fftn(E2*q0)
+            q1 = np.fft.ifftn(E2*q0)
             q1 *= E3
-            q1 = np.fft.ifftn(q1).real
+            q1 = np.fft.fftn(q1).real
             q1 *= E2
 
-            q1 = np.fft.fftn(E2*q1)
+            q1 = np.fft.ifftn(E2*q1)
             q1 *= E3
-            q1 = np.fft.ifftn(q1).real
+            q1 = np.fft.fftn(q1).real
             q1 *= E2
             q[i] *= -1/3
             q[i] += 4*q1/3
@@ -69,9 +69,9 @@ class ParabolicFourierSolver():
             q1 *= w
             q1 *= dt
             q0 -= q1
-            q1 = np.fft.fftn(q0)
+            q1 = np.fft.ifftn(q0)
             q1 /= 25/12 + dt*k2
-            q[i] = np.fft.ifftn(q1).real
+            q[i] = np.fft.fftn(q1).real
 
 
 if __name__ == "__main__":

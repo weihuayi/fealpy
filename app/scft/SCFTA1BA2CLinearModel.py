@@ -42,16 +42,16 @@ def model_options(
         nblend = 1,
         nblock = 4,
         ndeg = 100,
-        fA1 = 0.25,
-        fA2 = 0.25,
-        fB = 0.25,
-        fC = 0.25,
+        fA1 = 0.45,
+        fB = 0.45,
+        fA2 = 0.05,
+        fC = 0.05,
         chiAB = 0.30,
-        chiAC = 0.30,
-        chiBC = 0.30,
+        chiAC = 0.10,
+        chiBC = 0.10,
         box = np.diag(2*[2*np.pi]),
         NS = 256,
-        maxdt = 0.01,
+        maxdt = 0.005,
         bA = 1,
         bB = 1,
         bC = 1):
@@ -295,7 +295,7 @@ if __name__ == "__main__":
         plt.show()
 
     if True:
-        for i in range(5000):
+        for i in range(20):
             print("step:", i)
             model.compute()
             #model.test_compute_single_Q(i, rdir)
@@ -303,10 +303,17 @@ if __name__ == "__main__":
             print("l2 norm of grad:", ng)
             model.update_field()
 
-            if i%10 == 0:
-                fig = plt.figure()
-                axes = fig.gca()
-                im = axes.imshow(model.rho[0])
+            fig = plt.figure()
+            for j in range(4):
+                axes = fig.add_subplot(2, 2, j+1)
+                im = axes.imshow(model.w[j])
                 fig.colorbar(im, ax=axes)
-                fig.savefig(rdir + 'test_' + str(i) +'.png')
-                plt.close()
+            fig.savefig(rdir + 'w_' + str(i) +'.png')
+
+            fig = plt.figure()
+            for j in range(3):
+                axes = fig.add_subplot(1, 3, j+1)
+                im = axes.imshow(model.rho[j])
+                fig.colorbar(im, ax=axes)
+            fig.savefig(rdir + 'rho_' + str(i) +'.png')
+            plt.show()

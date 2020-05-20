@@ -121,7 +121,7 @@ class FourierSpaceTest():
 test = FourierSpaceTest()
 
 if True:
-    test.linear_equation_fft_solver_1d_test(10)
+    test.linear_equation_fft_solver_1d_test(6)
 
 if True:
     test.linear_equation_fft_solver_2d_test(6)
