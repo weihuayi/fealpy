@@ -4,18 +4,66 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 class RTDof2d:
     def __init__(self, mesh, p):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh object
+        p : the space order, p>=1
+
+        Notes
+        -----
+        Here `p` begin from 1, RT_1 is the lowest degree elements (which is
+        traditionally called the RT_0 element).
+
+        Reference
+        ---------
+        """
         self.mesh = mesh
-        self.p = p # 默认的空间次数
+        self.p = p # 默认的空间次数 p >= 1
         self.multiIndex = self.multi_index_matrix() # 默认的多重指标
         self.cell2dof = self.cell_to_dof() # 默认的自由度数组
 
-    def cell_to_dof(self):
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('edge', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdDof[edge2dof[idx]] = True
+        return isBdDof
+
+    def edge_to_dof(self):
+        p = self.p
         mesh = self.mesh
-        NC = mesh.number_of_cells()
-        NE = mesh.
-        ldof = self.number_of_local_dofs(p=p)
-        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
-        return cell2dof
+        NE = mesh.number_of_edges()
+        edge2dof = np.arange(NE*p).reshape(NE, p)
+        return edge2dof
+
+    def cell_to_dof(self):
+        """
+        """
+        p = self.p
+        mesh = self.mesh
+        cell2edge = mesh.ds.cell_to_edge()
+
+        if p == 1:
+            return cell2edge
+        else:
+            NC = mesh.number_of_cells()
+            ldof = self.number_of_local_dofs()
+            cell2dof = np.zeros((NC, ldof), dtype=np.int)
+
+            edge2dof = self.edge_to_dof()
+            edge2cell = mesh.ds.edge_to_cell()
+            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*p + np.arange(p)] = edge2dof
+            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*p + np.arange(p)] = edge2dof
+            if p > 2:
+                idof = (p-1)*p
+                cell2dof[:, 3*p:] = NE*p + np.arange(NC*idof).reshape(NC, idof)
+            return cell2dof
 
     def number_of_local_dofs(self):
         p = self.p
@@ -33,9 +81,25 @@ class RTDof2d:
 
 class RaviartThomasFiniteElementSpace2d:
     def __init__(self, mesh, p):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh
+        p : the space order
+
+        Note
+        ----
+        RT_p : [P_{p-1}]^d(T) + [m_1, m_2]^T P_{p-1}(T)
+
+        """
         self.mesh = mesh
-        self.smspace = ScaledMonomialSpace2d(mesh, p)
         self.p = p
+        self.smspace = ScaledMonomialSpace2d(mesh, p)
+        self.bcoefs = self.basis_coefficients()
+
+    def basis_coefficients(self):
+        M = self.smspace.CM
+        LM, RM = self.smspace.edge_cell_mass_matrix()
 
     def basis(self, bc):
         mesh = self.mesh

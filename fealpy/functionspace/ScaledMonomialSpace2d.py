@@ -4,6 +4,7 @@ from .function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
+from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
 
@@ -69,10 +70,18 @@ class ScaledMonomialSpace2d():
         self.GD = 2
 
         q = q if q is not None else p+3
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.mesh, q,
-                cellmeasure=self.cellmeasure,
-                cellbarycenter=self.cellbarycenter)
+
+        mtype = mesh.meshtype
+        if mtype == 'poly':
+            self.integralalg = PolygonMeshIntegralAlg(
+                    self.mesh, q,
+                    cellmeasure=self.cellmeasure,
+                    cellbarycenter=self.cellbarycenter)
+        elif mtype == 'tri':
+            self.integralalg = FEMeshIntegralAlg(
+                    self.mesh, q,
+                    cellmeasure=self.cellmeasure)
+        self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
@@ -365,12 +374,32 @@ class ScaledMonomialSpace2d():
     def mass_matrix(self, p=None):
         return self.matrix_H(p=p)
 
+    def edge_cell_mass_matrix(self, p=None): 
+        p = self.p if p is None else p
+        mesh = self.mesh
+        mtype = mesh.meshtype
+        if mtype == 'tri':
+            edge = mesh.entity('edge')
+            edge2cell = mesh.ds.edge_to_cell()
+            measure = mesh.entity_measure('edge')
+            qf = GaussLegendreQuadrature(p + 3)
+            bcs, ws = qf.quadpts, qf.weights
+            ps = self.mesh.edge_bc_to_point(bcs)
+            phi0 = self.edge_basis(ps, p=p)
+            phi1 = self.basis(ps, index=edge2cell[:, 0])
+            phi2 = self.basis(ps, index=edge2cell[:, 1])
+
+            LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
+            RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
+            return LM, RM 
+        else:
+            print("Here has not been implement!")
+
     def stiff_matrix(self, p=None):
         p = self.p if p is None else p
         def f(x, index):
             gphi = self.grad_basis(x, index=index, p=p)
-            return np.einsum('jkm, jpm->jkp', gphi, gphi)
-    
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
         A = self.integralalg.integral(f, celltype=True, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
         ldof = self.number_of_local_dofs(p=p)
