@@ -22,7 +22,7 @@ from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
 from .CVTPMesher import CVTPMesher
 from .ATriMesher import ATriMesher
-from .MeshZoo import MeshZoo
+from .MeshFactory import MeshFactory
 
 from .Tritree import Tritree
 from .Quadtree import Quadtree
@@ -36,3 +36,5 @@ from .distmesh import DistMesh2d
 from .mesh_tools import *
 
 from .meshio import load_mat_mesh
+
+

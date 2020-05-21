@@ -3,7 +3,18 @@ from .simple_mesh_generator import rectangledomainmesh
 from .simple_mesh_generator import triangle
 from .TriangleMesh import TriangleMesh
 
-class MeshZoo():
+class MeshFactory():
+    def __init__(self):
+        pass
+
+    def one_triangle_mesh(self):
+        node = np.array([
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.5, np.sqrt(3)/2]], dtype=np.float)
+        cell = np.array([[0, 1, 2]], dtype=np.int)
+        return TriangleMesh(node, cell)
+
     #Fishbone
     def regular(self, box, n=10):
         return rectangledomainmesh(box, nx=n, ny=n, meshtype='tri')

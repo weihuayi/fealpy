@@ -2,6 +2,7 @@ import numpy as np
 from numpy.linalg import inv, pinv
 from .function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .femdof import multi_index_matrix2d
 
 class RTDof2d:
     def __init__(self, mesh, p):
@@ -9,18 +10,16 @@ class RTDof2d:
         Parameters
         ----------
         mesh : TriangleMesh object
-        p : the space order, p>=1
+        p : the space order, p>=0
 
         Notes
         -----
-        Here `p` begin from 1, RT_1 is the lowest degree elements (which is
-        traditionally called the RT_0 element).
 
         Reference
         ---------
         """
         self.mesh = mesh
-        self.p = p # 默认的空间次数 p >= 1
+        self.p = p # 默认的空间次数 p >= 0
         self.cell2dof = self.cell_to_dof() # 默认的自由度数组
 
     def boundary_dof(self, threshold=None):
@@ -36,47 +35,50 @@ class RTDof2d:
         return isBdDof
 
     def edge_to_dof(self):
-        p = self.p
+        edof = self.p + 1
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        edge2dof = np.arange(NE*p).reshape(NE, p)
+        edge2dof = np.arange(NE*dof).reshape(NE, dof)
         return edge2dof
 
     def cell_to_dof(self):
         """
         """
-        p = self.p
+        p = self.p 
         mesh = self.mesh
         cell2edge = mesh.ds.cell_to_edge()
 
-        if p == 1:
+        if p == 0:
             return cell2edge
         else:
+            edof = p + 1
             NC = mesh.number_of_cells()
             ldof = self.number_of_local_dofs()
             cell2dof = np.zeros((NC, ldof), dtype=np.int)
 
             edge2dof = self.edge_to_dof()
             edge2cell = mesh.ds.edge_to_cell()
-            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*p + np.arange(p)] = edge2dof
-            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*p + np.arange(p)] = edge2dof
-            if p > 2:
-                idof = (p-1)*p
-                cell2dof[:, 3*p:] = NE*p + np.arange(NC*idof).reshape(NC, idof)
+            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
+            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
+            if p > 1:
+                idof = (p+1)*p
+                cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
 
     def number_of_local_dofs(self):
         p = self.p
-        return p*(p+2) 
+        return (p+1)*(p+3) 
 
     def number_of_global_dofs(self):
         p = self.p
+        
+        edof = p + 1
         ldof = self.number_of_local_dofs(p=p)
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
-        gdof = NE*p
-        if p > 1:
-            gdof += NC*(p-1)*p
+        gdof = NE*edof
+        if p > 0:
+            gdof += NC*(p+1)*p
         return gdof 
 
 class RaviartThomasFiniteElementSpace2d:
@@ -85,14 +87,11 @@ class RaviartThomasFiniteElementSpace2d:
         Parameters
         ----------
         mesh : TriangleMesh
-        p : the space order
+        p : the space order, p>=0
 
         Note
         ----
-        RT_p : [P_{p-1}]^d(T) + [m_1, m_2]^T P_{p-1}(T)
-
-        (p+1)*p + (p+1)*p/2 = p**2 + p + p**2/2 + p/2 = 3/2*p**2 + 3/2*p
-        = 3*(p+1)*p/2
+        RT_p : [P_{p-1}]^d(T) + [m_1, m_2]^T \\bar P_{p-1}(T)
 
         """
         self.mesh = mesh
@@ -109,67 +108,71 @@ class RaviartThomasFiniteElementSpace2d:
 
         self.bcoefs = self.basis_coefficients()
 
+    def cell_to_edge_sign(self):
+        mesh = self.mesh
+        edge2cell = mesh.ds.edge2cell
+        NC = mesh.number_of_cells()
+        cell2edgeSign = -np.ones((NC, 3), dtype=np.int)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = 1
+        return cell2edgeSign
 
     def basis_coefficients(self):
         """
 
         Notes
         -----
-        3*p + p*(p - 1) = 3*p + p**2 - p = p*(p+2) 
+        3*(p+1) + 2*(p+1)*p/2 = (p+1)*(p+3) 
         """
         p = self.p
+        ldof = self.number_of_local_dofs()
+        ndof = self.smspace.number_of_local_dofs()
+        edof = p + 1
+
         mesh = self.mesh
         NC = mesh.number_of_cells()
 
-        LM, RM = self.smspace.edge_cell_mass_matrix(p=p)
+        LM, RM = self.smspace.edge_cell_mass_matrix()
 
-        A = np.zeros((NC, p*(p+2), 3*(p+1)*p//2), dtype=self.ftype)
+        A = np.zeros((NC, ldof, ldof), dtype=self.ftype)
 
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
         n = mesh.edge_unit_normal() 
 
-        idx = self.smspace.index1(p=p)
-        x = idx['x']
-        y = idx['y']
-
-        ndof = (p+1)*p//2
-        idx2 = np.arange(ndof)[None, None, :]
+        idx2 = np.arange(edof)[None, None, :]
 
         idx0 = edge2cell[:, [0]][:, None, None]
-        idx1 = (edge2cell[:, [2]]*p + np.arange(p))[:, :, None]
+        idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
+        x = np.arange(ndof, ndof+edof)
+        y = np.arange(ndof+1, ndof+edof+1)
+
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, 2*ndof + idx2] = n[:, 0, None, None]*LM[:, :,  x[0]] + n[:, 1, None, None]*LM[:, :, y[0]]
+        A[idx0, idx1, 2*ndof + idx2] = n[:, 0, None, None]*LM[:, :,  x] + n[:, 1, None, None]*LM[:, :, y]
 
         idx0 = edge2cell[:, [1]][:, None, None]
-        idx1 = (edge2cell[:, [3]]*p + np.arange(p))[:, :, None]
+        idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*RM[:, :, :ndof]
         A[idx0, idx1, 2*ndof + idx2] = n[:, 0, None, None]*RM[:, :,  x[0]] + n[:, 1, None, None]*RM[:, :, y[0]]
 
-        if p == 1:
-            return inv(A)
-        else:
-            M = self.smspace.mass_matrix(p=p-1)
-            idx = self.smspace.index1(p=p-1)
+        if p > 0:
+            M = self.smspace.mass_matrix()
+            idx = self.smspace.index1()
             x = idx['x']
             y = idx['y']
-            idof = p*(p-1)//2
+            idof = (p+1)*p//2
             start = 3*p
-            idx1 = np.arange(3*p, 3*p+idof)[:, None]
+            idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
             A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
             A[:, idx1, 2*ndof + np.arange(ndof)] = M[:,  x[0], :]
 
-            idx1 = np.arange(3*p+idof, 3*p+2*idof)[:, None]
+            idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
             A[:, idx1, 2*ndof + np.arange(ndof)] = M[:,  y[0], :]
-            
-            B = A.swapaxes(-1, -2)
-            B = B@inv(A@B)
-            return B
         
+        return inv(A)
     def basis(self, bc):
         """
         compute the basis function values at barycentric point bc
@@ -197,36 +200,49 @@ class RaviartThomasFiniteElementSpace2d:
         ndof = (p+1)*p//2
         ldof = self.number_of_local_dofs()
 
-        idx = self.smspace.index1(p=p)
-        x = idx['x']
-        y = idx['y']
+        mesh = self.mesh
 
-        c = self.bcoefs # (NC, 3*ndof, ldof) 
-        ps = self.mesh.bc_to_point(bc)
-        shape = ps.shape[:-1] + (ldof, 2)
-        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
-        val = self.smspace.basis(ps) # (NQ, NC, ndof)
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[...,  x[0]], c[:, 2:ndof:3*ndof, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[...,  y[0]], c[:, 2:ndof:3*ndof, :])
+        if p == 1:
+            NC = mesh.number_of_cells()
+            Rlambda = mesh.rot_lambda()
+            cell2edgeSign = self.cell_to_edge_sign()
+            shape = bc.shape[:-1] + (NC, ldof, 2)
+            phi = np.zeros(shape, dtype=np.float)
+            phi[..., 0, :] = bc[..., 1, None, None]*Rlambda[:, 2, :] - bc[..., 2, None, None]*Rlambda[:, 1, :]
+            phi[..., 1, :] = bc[..., 2, None, None]*Rlambda[:, 0, :] - bc[..., 0, None, None]*Rlambda[:, 2, :]
+            phi[..., 2, :] = bc[..., 0, None, None]*Rlambda[:, 1, :] - bc[..., 1, None, None]*Rlambda[:, 0, :]
+            phi *= cell2edgeSign.reshape(-1, 3, 1)
+        else:
+            idx = self.smspace.index1(p=p)
+            x = idx['x']
+            y = idx['y']
+            c = self.bcoefs # (NC, 3*ndof, ldof) 
+            ps = mesh.bc_to_point(bc)
+            shape = ps.shape[:-1] + (ldof, 2)
+            phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
+            val = self.smspace.basis(ps) # (NQ, NC, ndof)
+            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
+            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
+            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[...,  x[0]], c[:, 2:ndof:3*ndof, :])
+            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[...,  y[0]], c[:, 2:ndof:3*ndof, :])
         return phi
 
 
     def grad_basis(self, bc):
-        mesh = self.mesh
         p = self.p
-
         ldof = self.number_of_local_dofs()
-        NC = mesh.number_of_cells()
-        shape = (NC, ldof, 2, 2)
-        gradPhi = np.zeros(shape, dtype=np.float)
 
-        cell2edgeSign = self.cell_to_edge_sign()
-        W = np.array([[0, 1], [-1, 0]], dtype=np.float)
-        Rlambda= mesh.rot_lambda()
-        Dlambda = mesh.grad_lambda()
-        if p == 0:
+        mesh = self.mesh
+        if p == 1:
+            NC = mesh.number_of_cells()
+            shape = (NC, ldof, 2, 2)
+            gradPhi = np.zeros(shape, dtype=np.float)
+
+            cell2edgeSign = self.cell_to_edge_sign()
+            W = np.array([[0, 1], [-1, 0]], dtype=np.float)
+            Rlambda= mesh.rot_lambda()
+            Dlambda = mesh.grad_lambda()
+
             A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
             B = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 2, :]) 
             gradPhi[:, 0, :, :] = A - B
@@ -240,34 +256,40 @@ class RaviartThomasFiniteElementSpace2d:
             gradPhi[:, 2, :, :] = A - B
 
             gradPhi *= cell2edgeSign.reshape(-1, 3, 1, 1)
+            if len(bc.shape) > 1:
+                return gradPhi[None, ...]
+            else:
+                return gradPhi
         else:
-            #TODO:raise a error
             print("error")
+            return None
 
-        return gradPhi 
 
     def div_basis(self, bc):
-        mesh = self.mesh
         p = self.p
-
         ldof = self.number_of_local_dofs()
-        NC = mesh.number_of_cells()
-        divPhi = np.zeros((NC, ldof), dtype=np.float)
-        cell2edgeSign = self.cell_to_edge_sign()
-        W = np.array([[0, 1], [-1, 0]], dtype=np.float)
 
-        Rlambda = mesh.rot_lambda()
-        Dlambda = mesh.grad_lambda()
-        if p == 0:
+        if p == 1:
+            mesh = self.mesh
+            NC = mesh.number_of_cells()
+            divPhi = np.zeros((NC, ldof), dtype=np.float)
+            cell2edgeSign = self.cell_to_edge_sign()
+            W = np.array([[0, 1], [-1, 0]], dtype=np.float)
+
+            Rlambda = mesh.rot_lambda()
+            Dlambda = mesh.grad_lambda()
             divPhi[:, 0] = np.sum(Dlambda[:, 1, :]*Rlambda[:, 2, :], axis=1) - np.sum(Dlambda[:, 2, :]*Rlambda[:, 1, :], axis=1)
             divPhi[:, 1] = np.sum(Dlambda[:, 2, :]*Rlambda[:, 0, :], axis=1) - np.sum(Dlambda[:, 0, :]*Rlambda[:, 2, :], axis=1)
             divPhi[:, 2] = np.sum(Dlambda[:, 0, :]*Rlambda[:, 1, :], axis=1) - np.sum(Dlambda[:, 1, :]*Rlambda[:, 0, :], axis=1)
             divPhi *= cell2edgeSign
+            if len(bc.shape) > 1:
+                return divPhi[None, ...]
+            else:
+                return divPhi
         else:
-            #TODO:raise a error
             print("error")
+            return None 
 
-        return divPhi
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -338,3 +360,26 @@ class RaviartThomasFiniteElementSpace2d:
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
+
+    def show_basis(self, fig, index=0, box=None):
+        """
+        Plot quvier graph for every basis in a fig object
+        """
+
+        p = self.p
+        mesh = self.mesh
+
+        ldof = self.number_of_local_dofs()
+
+        bcs = multi_index_matrix2d(4)/4
+        ps = mesh.bc_to_point(bcs)
+        phi = self.basis(bcs)
+
+        for i in range(ldof):
+            axes = fig.add_subplot(1, ldof, i+1)
+            mesh.add_plot(axes, box=box)
+            node = ps[:, index, :]
+            uv = phi[:, index, i, :]
+            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], 
+                    units='xy')
+
