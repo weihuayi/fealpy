@@ -4,6 +4,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.functionspace.femdof import multi_index_matrix2d
@@ -13,37 +14,19 @@ from fealpy.functionspace.femdof import multi_index_matrix2d
 class RaviartThomasFiniteElementSpace2dTest:
 
     def __init__(self):
-        pass
+        self.meshfactory = MeshFactory()
 
-    def space_test(self):
-        pde = CosCosData()
-        mesh = pde.init_mesh(n=0, meshtype='tri')
-        space = RaviartThomasFiniteElementSpace2d(mesh, p=2, q=2)
-        bcs = multi_index_matrix2d(3)/3
-        ps = mesh.bc_to_point(bcs)
-        phi = space.basis(bcs)
-        print(phi.shape)
-
-        if True:
-            fig = plt.figure()
-
-            axes = fig.add_subplot(1, 2, 1)
-            mesh.add_plot(axes)
-            node = ps[:, 0, :]
-            uv = phi[:, 0, 1, :]
-            mesh.find_node(axes, node=node, showindex=True)
-            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], units='xy')
-
-            axes = fig.add_subplot(1, 2, 2)
-            mesh.add_plot(axes)
-            node = ps[:, 1, :]
-            uv = phi[:, 1, 1, :]
-            mesh.find_node(axes, node=ps[:, 1, :], showindex=True)
-            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1], units='xy')
-            plt.show()
+    def show_basis_test(self):
+        h = 0.5
+        box = [-h, 1+h, -h, np.sqrt(3)/2+h]
+        mesh = self.meshfactory.one_triangle_mesh()
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=0, q=2)
+        fig = plt.figure()
+        space.show_basis(fig, box=box)
+        plt.show()
 
 
 test = RaviartThomasFiniteElementSpace2dTest()
-test.space_test()
+test.show_basis_test()
 
     

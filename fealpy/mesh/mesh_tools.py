@@ -245,7 +245,7 @@ def show_mesh_2d(
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmap='gnuplot2'):
+        showaxis=False, showcolorbar=False, cmap='gnuplot2', box=None):
 
     try:
         axes.set_aspect(aspect)
@@ -294,13 +294,14 @@ def show_mesh_2d(
     poly.set_linewidth(linewidths)
     poly.set_facecolors(cellcolor)
 
-    if mesh.geo_dimension() == 2:
-        box = np.zeros(4, dtype=np.float)
-    else:
-        box = np.zeros(6, dtype=np.float)
+    if box is None:
+        if mesh.geo_dimension() == 2:
+            box = np.zeros(4, dtype=np.float)
+        else:
+            box = np.zeros(6, dtype=np.float)
 
-    box[0::2] = np.min(node, axis=0)
-    box[1::2] = np.max(node, axis=0)
+        box[0::2] = np.min(node, axis=0)
+        box[1::2] = np.max(node, axis=0)
 
     axes.set_xlim(box[0:2])
     axes.set_ylim(box[2:4])
