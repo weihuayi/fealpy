@@ -198,6 +198,7 @@ class HalfEdgeMeshTest:
             mesh.find_node(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
+
     def refine_quad(p=1):
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -475,7 +476,10 @@ class HalfEdgeMeshTest:
 
 test = HalfEdgeMeshTest()
 #test.refine_triangle_rbTest(8, plot=True, rb=True)
-test.refine_triangle_rbTest(8, plot=True, rb=0)
+
+if sys.argv[1] == 'refine_tri_rb':
+    test.refine_triangle_rbTest(8, plot=True, rb=1)
+
 if sys.argv[1] == 'refine_poly':
     mesh = test.refine_poly_test(plot=True)
 

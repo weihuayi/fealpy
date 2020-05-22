@@ -10,6 +10,7 @@ from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
 from .HalfEdgeMesh import HalfEdgeMesh
+from .HalfEdgeMeshNew import HalfEdgeMeshNew
 from .HalfEdgeDomain import HalfEdgeDomain
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
