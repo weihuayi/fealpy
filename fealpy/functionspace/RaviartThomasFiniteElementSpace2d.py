@@ -38,7 +38,7 @@ class RTDof2d:
         edof = self.p + 1
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        edge2dof = np.arange(NE*dof).reshape(NE, dof)
+        edge2dof = np.arange(NE*edof).reshape(NE, edof)
         return edge2dof
 
     def cell_to_dof(self):
@@ -132,30 +132,28 @@ class RaviartThomasFiniteElementSpace2d:
         NC = mesh.number_of_cells()
 
         LM, RM = self.smspace.edge_cell_mass_matrix()
-
         A = np.zeros((NC, ldof, ldof), dtype=self.ftype)
 
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
         n = mesh.edge_unit_normal() 
 
-        idx2 = np.arange(edof)[None, None, :]
+        idx2 = np.arange(ndof)[None, None, :]
+        idx3 = np.arange(2*ndof, 2*ndof+edof)[None, None, :]
 
         idx0 = edge2cell[:, [0]][:, None, None]
         idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
-        x = np.arange(ndof, ndof+edof)
-        y = np.arange(ndof+1, ndof+edof+1)
 
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, 2*ndof + idx2] = n[:, 0, None, None]*LM[:, :,  x] + n[:, 1, None, None]*LM[:, :, y]
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*LM[:, :, ndof+1:]
 
         idx0 = edge2cell[:, [1]][:, None, None]
         idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*RM[:, :, :ndof]
-        A[idx0, idx1, 2*ndof + idx2] = n[:, 0, None, None]*RM[:, :,  x[0]] + n[:, 1, None, None]*RM[:, :, y[0]]
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*RM[:, :, ndof+1:]
 
         if p > 0:
             M = self.smspace.mass_matrix()
@@ -163,16 +161,20 @@ class RaviartThomasFiniteElementSpace2d:
             x = idx['x']
             y = idx['y']
             idof = (p+1)*p//2
-            start = 3*p
             idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
             A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof + np.arange(ndof)] = M[:,  x[0], :]
+            A[:, idx1, 2*ndof:] = M[:,  x[0], ndof-edof:]
 
             idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof + np.arange(ndof)] = M[:,  y[0], :]
+            A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
+
+        print(n)
+        print(edge)
+        print(A)
         
         return inv(A)
+
     def basis(self, bc):
         """
         compute the basis function values at barycentric point bc
@@ -197,12 +199,11 @@ class RaviartThomasFiniteElementSpace2d:
 
         """
         p = self.p
-        ndof = (p+1)*p//2
         ldof = self.number_of_local_dofs()
 
         mesh = self.mesh
 
-        if p == 1:
+        if False:
             NC = mesh.number_of_cells()
             Rlambda = mesh.rot_lambda()
             cell2edgeSign = self.cell_to_edge_sign()
@@ -213,18 +214,21 @@ class RaviartThomasFiniteElementSpace2d:
             phi[..., 2, :] = bc[..., 0, None, None]*Rlambda[:, 1, :] - bc[..., 1, None, None]*Rlambda[:, 0, :]
             phi *= cell2edgeSign.reshape(-1, 3, 1)
         else:
-            idx = self.smspace.index1(p=p)
-            x = idx['x']
-            y = idx['y']
-            c = self.bcoefs # (NC, 3*ndof, ldof) 
             ps = mesh.bc_to_point(bc)
+            val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
+            edof = p + 1
+            ndof = (p+2)*(p+1)//2
+
             shape = ps.shape[:-1] + (ldof, 2)
             phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
-            val = self.smspace.basis(ps) # (NQ, NC, ndof)
+
+            c = self.bcoefs # (NC, ldof, ldof) 
+            x = np.arange(ndof, ndof+edof)
+            y = x + 1
             phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
             phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[...,  x[0]], c[:, 2:ndof:3*ndof, :])
-            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[...,  y[0]], c[:, 2:ndof:3*ndof, :])
+            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2:ndof:, :])
+            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2:ndof:, :])
         return phi
 
 

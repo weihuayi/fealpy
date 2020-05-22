@@ -7,11 +7,17 @@ class MeshFactory():
     def __init__(self):
         pass
 
-    def one_triangle_mesh(self):
-        node = np.array([
-            [0.0, 0.0],
-            [1.0, 0.0],
-            [0.5, np.sqrt(3)/2]], dtype=np.float)
+    def one_triangle_mesh(self, ttype='iso'):
+        if ttype == 'equ':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, np.sqrt(3)/2]], dtype=np.float)
+        elif ttype == 'iso':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.0]], dtype=np.float)
         cell = np.array([[0, 1, 2]], dtype=np.int)
         return TriangleMesh(node, cell)
 

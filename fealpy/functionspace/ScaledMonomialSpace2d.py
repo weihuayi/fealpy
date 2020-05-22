@@ -377,23 +377,23 @@ class ScaledMonomialSpace2d():
     def edge_cell_mass_matrix(self, p=None): 
         p = self.p if p is None else p
         mesh = self.mesh
-        mtype = mesh.meshtype
-        if mtype == 'tri':
-            edge = mesh.entity('edge')
-            edge2cell = mesh.ds.edge_to_cell()
-            measure = mesh.entity_measure('edge')
-            qf = GaussLegendreQuadrature(p + 3)
-            bcs, ws = qf.quadpts, qf.weights
-            ps = self.mesh.edge_bc_to_point(bcs)
-            phi0 = self.edge_basis(ps, p=p)
-            phi1 = self.basis(ps, index=edge2cell[:, 0], p=p+1)
-            phi2 = self.basis(ps, index=edge2cell[:, 1], p=p+1)
 
-            LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
-            RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
-            return LM, RM 
-        else:
-            print("Here has not been implement!")
+        edge = mesh.entity('edge')
+        measure = mesh.entity_measure('edge')
+
+        edge2cell = mesh.ds.edge_to_cell()
+
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs)
+
+        phi0 = self.edge_basis(ps, p=p)
+        phi1 = self.basis(ps, index=edge2cell[:, 0], p=p+1)
+        phi2 = self.basis(ps, index=edge2cell[:, 1], p=p+1)
+
+        LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
+        RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
+        return LM, RM 
 
     def stiff_matrix(self, p=None):
         p = self.p if p is None else p
