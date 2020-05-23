@@ -25,10 +25,16 @@ class FourierSpace:
         return points
 
     def fourier_interpolation(self, data):
-        idx = np.asarray(data[:, :self.GD], dtype=np.int)
+        """
+
+        Parameters
+        ----------
+        data: data[0], data[1]
+        """
+        idx = data[0]
         idx[idx<0] += self.N
-        F = self.function()
-        F[tuple(idx.T)] = data[:, self.GD]
+        F = self.function(dtype=data[1].dtype)
+        F[tuple(idx.T)] = data[1]
         return np.fft.fftn(F).real
 
     def function_norm(self, u):
@@ -75,14 +81,15 @@ class FourierSpace:
         U = np.fft.fftn(U).real
         return U
 
-    def function(self, dim=None):
+    def function(self, dim=None, dtype=None):
+        dtype = self.ftype if dtype is None else dtype
         N = self.N
         GD = self.GD
         box = self.box
         shape = GD*(N, )
         if dim is not None:
             shape = (dim, ) + shape
-        f = np.zeros(shape, dtype=self.ftype)
+        f = np.zeros(shape, dtype=dtype)
         return f
 
     def error(self, u, U):

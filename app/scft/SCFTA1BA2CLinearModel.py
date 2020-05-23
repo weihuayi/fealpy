@@ -1,6 +1,6 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
+import math
 
 from fealpy.functionspace import FourierSpace
 from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
@@ -9,32 +9,154 @@ from ParabolicFourierSolver import ParabolicFourierSolver
 
 
 init_value = {
-        "bcc":
+        "bcc":( 
         np.array([
-            [ 1,	 1,	 0,     0.3],
-            [-1,	 1,	 0,	0.3],
-            [-1,	-1,	 0,	0.3],
-            [ 1,	-1,	 0,	0.3],
-            [ 0,	 1,	 1,	0.3],
-            [ 0,	-1,	 1,	0.3],
-            [ 0,	-1,	-1,	0.3],
-            [ 0,	 1,	-1,	0.3],
-            [ 1,	 0,	 1,	0.3],
-            [-1,	 0,	 1,	0.3],
-            [-1,	 0,	-1,	0.3],
-            [ 1,	 0,	-1,	0.3]], dtype=np.float),
-        "cam6fold":
+            [ 1,	 1,	 0],
+            [-1,	 1,	 0],
+            [-1,	-1,	 0],
+            [ 1,	-1,	 0],
+            [ 0,	 1,	 1],
+            [ 0,	-1,	 1],
+            [ 0,	-1,	-1],
+            [ 0,	 1,	-1],
+            [ 1,	 0,	 1],
+            [-1,	 0,	 1],
+            [-1,	 0,	-1],
+            [ 1,	 0,	-1]], dtype=np.int),
+            np.array(12*[0.3], dtype=np.float)
+            ),
+        "cam6fold":(
         np.array([
-               [ 30,     0,	0.3],
-               [ 15,    26,	0.3],
-               [-15,    26,	0.3],
-               [-30,     0,	0.3],
-               [-15,   -26,	0.3],
-               [ 15,   -26,	0.3]], dtype=np.float),
-        "LAM":
-	 np.array([
-             [ 3, 0,  0.058],
-             [-3, 0,  0.058]], dtype=np.float)
+               [ 30,     0],
+               [ 15,    26],
+               [-15,    26],
+               [-30,     0],
+               [-15,   -26],
+               [ 15,   -26]], dtype=np.int),
+        np.array(6*[0.3], dtype=np.float)
+        ),
+        "LAM":(
+	 np.array([[3, 0], [-3, 0]], dtype=np.int),
+         np.array([0.058, 0.058], dtype=np.float)
+         ),
+        "C42C":( 
+        np.array([
+            [0,	0],
+            [0,	1],
+            [1,	0],
+            [-1,0],
+            [-1,1],
+            [1,	1],
+            [0,	2],
+            [2,	0],
+            [-2,0],
+            [-1,2],
+            [-2,1],
+            [1,	2],
+            [2,	1],
+            [-4,0],
+            [4,	0],
+            [0,	4],
+            [-1,4],
+            [4,	1],
+            [-4,1],
+            [1,	4],
+            [3,	2],
+            [-2,3],
+            [2,	3],
+            [-3,2] ], dtype=np.int),
+        np.array([0.14	+ 0j, 0.108189 -7.29663e-06j, 0.108189 +1.53758e-06j,
+            0.108189-1.53758e-06j, 0.08244-6.80474e-06j, 0.0824395-4.42577e-06j,
+            0.0424291-5.64406e-06j, 0.0424288+1.16854e-06j,0.0424288-1.16854e-06j,
+            0.0294126-4.4255e-06j, 0.0294126-2.9508e-06j,
+            0.0294122-3.50997e-06j, 0.0294118-1.27548e-06j,
+            -0.0152264+9.79735e-07j,-0.0152264-9.79735e-07j,
+            -0.0152264+4.23116e-06j, -0.0132502+3.87451e-06j,
+            -0.0132501+4.84293e-08j,-0.0132499+1.67138e-06j, 
+            -0.0132499+3.42747e-06j, -0.0108379+9.19385e-07j,
+            -0.0108377+2.42641e-06j,-0.0108376+1.8744e-06j,
+            -0.0108375+1.74526e-06j], dtype=np.complex)
+        ),
+        "C42A":( 
+            np.array([
+            [0,	0],
+            [0,	1],
+            [-1,0],
+            [1,	0],
+            [-2,0],
+            [2,	0],
+            [0,	2],
+            [-2,2],
+            [2,	2],
+            [3,	1],
+            [-3,1],
+            [1,	3],
+            [-1,3],
+            [-1,2],
+            [-2,1],
+            [1,	2],
+            [2,	1],
+            [3,	0],
+            [-3,0],
+            [0,	3],
+            [3,	2],
+            [-2,3],
+            [2,	3],
+            [-3,2],
+            [-3,3],
+            [3,	3]], dtype=np.int),
+           np.array([
+            0.74+0j	, -0.108419+6.99793e-06j, -0.108419+2.03331e-06j,
+            -0.108419-2.03331e-06j, -0.103226+4.69495e-06j,
+            -0.103226-4.69495e-06j, -0.103226+1.29991e-05j,
+            -0.0414937+7.42252e-06j, -0.0414933+2.78787e-06j,
+            0.0370139+5.85495e-07j, 0.0370132-4.82466e-06j,
+            0.037013-6.22156e-06j, 0.037013-7.95719e-06j,
+            -0.0336456+6.20032e-06j, -0.0336454+2.31633e-06j,
+            -0.0336451+3.80009e-06j, -0.0336449+1.74535e-06j,
+            0.0193733+8.87915e-07j, 0.0193733-8.87915e-07j,
+            0.0193731-4.28944e-06j, 0.0150872-1.38969e-06j,
+            0.0150872-4.13871e-06j, 0.0150869-2.1522e-06j ,
+            0.0150866-2.01848e-06j, 0.0130143-2.98794e-06j,
+            0.0130142-1.88253e-06j], dtype=np.complex)
+           ),
+        "C42B":( 
+            np.array([
+            [0,	0],
+            [1,	1],
+            [-1,1],
+            [2,	0],
+            [-2,0],
+            [0,	2],
+            [2,	2],
+            [-2,2],
+            [3,	1],
+            [-3,1],
+            [1,	3],
+            [-1,3],
+            [0,	3],
+            [-3,0],
+            [3,	0],
+            [1,	4],
+            [4,	1],
+            [-1,4],
+            [-4,1],
+            [4,	0],
+            [-4,0],
+            [0,	4] ], dtype=np.int),
+            np.array([0.12+0j,
+            -0.0828233+2.55012e-06j, -0.0828232	+7.3354e-06j ,
+            0.0598827+3.53369e-06j, 0.0598827-3.53369e-06j,
+            0.0598822-7.23639e-06j, 0.0381595-2.37293e-06j,
+            0.0381593-6.67865e-06j, -0.0283762-6.53894e-07j,
+            -0.028376+3.96855e-06j, -0.0283757+4.53605e-06j,
+            -0.0283756+5.98718e-06j, -0.0130638+2.83679e-06j,
+            -0.0130637+5.26915e-07j, -0.0130637-5.26915e-07j,
+            0.00877437-1.77675e-06j, 0.00877434+4.90981e-07j,
+            0.00877431-2.64002e-06j, 0.00877415-1.45146e-06j,
+            0.00860457+8.42015e-07j, 0.00860457-8.42015e-07j,
+            0.00860409-2.26706e-06j], dtype=np.complex)
+            )
         }
 
 def model_options(
@@ -42,16 +164,16 @@ def model_options(
         nblend = 1,
         nblock = 4,
         ndeg = 100,
-        fA1 = 0.45,
-        fB = 0.45,
-        fA2 = 0.05,
-        fC = 0.05,
-        chiAB = 0.30,
-        chiAC = 0.10,
-        chiBC = 0.10,
+        fA1 = 0.25,
+        fB = 0.25,
+        fA2 = 0.25,
+        fC = 0.25,
+        chiAB = 0.80,
+        chiAC = 0.80,
+        chiBC = 0.80,
         box = np.diag(2*[2*np.pi]),
         NS = 256,
-        maxdt = 0.005,
+        maxdt = 0.001,
         bA = 1,
         bB = 1,
         bC = 1):
@@ -149,7 +271,7 @@ class SCFTA1BA2CLinearModel():
         self.compute_energe()
         self.compute_gradient()
 
-    def update_field(self, alpha=0.01):
+    def update_field(self, alpha=0.005):
         w = self.w
         rho = self.rho
         chiABN = options['chiAB']*options['ndeg']
@@ -223,11 +345,25 @@ class SCFTA1BA2CLinearModel():
 
         start = 0
         F = [w[1], w[2], w[1], w[3]]
+
+        np.set_printoptions(precision=15, suppress=True) 
+#         print('w', w[3])
+#         input("input")
+        
+
+        print(self.qf.dtype)
+        print(self.qb.dtype)
+
+        for i in range(4):
+            print(F[i].dtype)
+
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
             self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
             self.pdesolvers[i].solve(self.qf[start:start + NL])
             start += NL - 1
+#         print("qf", self.qf[-1])
+#         input("input")
 
         start = 0
         F = [w[3], w[1], w[2], w[1]]
@@ -269,33 +405,38 @@ class SCFTA1BA2CLinearModel():
         self.rho[2] = rho[3]
         self.rho /= self.Q[0]
 
+#         print("densityA", rho[0])
+#         print("densityB", rho[1])
+#         print("densityC", rho[2])
+# 
     def integral_time(self, q, dt):
         f = -0.625*(q[0] + q[-1]) + 1/6*(q[1] + q[-2]) - 1/24*(q[2] + q[-3])
         f += np.sum(q, axis=0)
         f *= dt
         return f
 
-
 if __name__ == "__main__":
     import sys 
     rdir = sys.argv[1]
-    rho = init_value['LAM']
-    box = np.array([[6*np.pi, 0], [0, 6*np.pi]], dtype=np.float)
-    options = model_options(box=box, NS=256)
+    rhoA = init_value['C42A']
+    rhoB = init_value['C42B']
+    rhoC = init_value['C42C']
+    box = np.array([[4.1, 0], [0, 4.1]], dtype=np.float)
+    fC  = 0.14
+    fA2 = 0.29
+    fB  = 0.118
+    fA1 = 1-fA2-fB-fC
+    options = model_options(box=box, NS=64, fA1=fA1, fB=fB, fA2=fA2, fC=fC)
     model = SCFTA1BA2CLinearModel(options=options)
-    rho = [model.space.fourier_interpolation(rho), 0, 0]
+    rho = [ model.space.fourier_interpolation(rhoA), 
+            model.space.fourier_interpolation(rhoB), 
+            model.space.fourier_interpolation(rhoC) 
+            ]
     model.init_field(rho)
 
-    if False:
-        print("w:", model.w)
-        fig = plt.figure()
-        axes = fig.gca()
-        im = axes.imshow(rho[0])
-        fig.colorbar(im, ax=axes)
-        plt.show()
 
     if True:
-        for i in range(20):
+        for i in range(1):
             print("step:", i)
             model.compute()
             #model.test_compute_single_Q(i, rdir)
@@ -316,4 +457,4 @@ if __name__ == "__main__":
                 im = axes.imshow(model.rho[j])
                 fig.colorbar(im, ax=axes)
             fig.savefig(rdir + 'rho_' + str(i) +'.png')
-            plt.show()
+            plt.close()
