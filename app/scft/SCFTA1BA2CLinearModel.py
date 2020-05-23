@@ -271,9 +271,7 @@ class SCFTA1BA2CLinearModel():
         self.compute_energe()
         self.compute_gradient()
 
-        input("input ")
-
-    def update_field(self, alpha=0.01):
+    def update_field(self, alpha=0.005):
         w = self.w
         rho = self.rho
         chiABN = options['chiAB']*options['ndeg']
@@ -353,6 +351,11 @@ class SCFTA1BA2CLinearModel():
 #         input("input")
         
 
+        print(self.qf.dtype)
+        print(self.qb.dtype)
+
+        for i in range(4):
+            print(F[i].dtype)
 
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
@@ -433,7 +436,7 @@ if __name__ == "__main__":
 
 
     if True:
-        for i in range(50):
+        for i in range(1):
             print("step:", i)
             model.compute()
             #model.test_compute_single_Q(i, rdir)
