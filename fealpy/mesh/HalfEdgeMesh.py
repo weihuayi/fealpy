@@ -269,7 +269,7 @@ class HalfEdgeMesh(Mesh2d):
             # 标记加密的半边的相对半边也需要标记 
             flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
             isMarkedHEdge[flag] = True
-        elif method = 'quad':
+        elif method == 'quad':
             pass
         elif method == 'rg':
             pass

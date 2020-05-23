@@ -21,6 +21,10 @@ class ParabolicFourierSolver():
         ----
         """
 
+#         print("w", w)
+#         input("input")
+        
+
         self.w = w
         dt = self.timeline.current_time_step_length()
         self.E0 = np.exp(-dt/2*w)
@@ -41,8 +45,8 @@ class ParabolicFourierSolver():
             q[i] = np.fft.fftn(q1).real
             q[i] *= E0
 
-        q0 = q[0]
         for i in range(1, 4):
+            q0 = q[i-1]
             q1 = np.fft.ifftn(E2*q0)
             q1 *= E3
             q1 = np.fft.fftn(q1).real
