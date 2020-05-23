@@ -1,13 +1,26 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from ..quadrature import TriangleQuadrature
-from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 
 
-class HalfFacePolyhedronMesh():
+class HalfFaceMesh():
 
-    def __init__(self, node, halfedge, halfface, NC):
+    def __init__(self, node, halfedge, halfface, subdomain):
+        """
+        Parameters
+        ----------
+            halfedge:
+                halfedge[i, 0] : index of the node pointed by i-th halfedge
+                halfedge[i, 1] : index of the face enclosed by i-th halfedge
+                halfedge[i, 2] : index of the next halfedge of i-th halfedge
+                halfedge[i, 3] : index of the prev halfedge of i-th halfedge
+                halfedge[i, 4] : index of the dual halfedge of i-th halfedge 
+                halfedge[i, 5] : 
+            halfface:
+                halfface[:, 0] : start halfedge 
+                halfface[:, 1] : cell
+                halfface[:, 2] : dual
+            subdomain: (NC, )the sub domain flag of each cell blong to
+        """
         pass
 
     @classmethod

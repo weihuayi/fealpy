@@ -1,4 +1,6 @@
 from setuptools import setup
+import os
+
 setup(name='fealpy',
       version='1.0',
       description='FEALPy: Finite Element Analysis Library in Python',
