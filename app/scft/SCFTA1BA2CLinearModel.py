@@ -420,9 +420,9 @@ if __name__ == "__main__":
     rhoC = init_value['C42C']
     box = np.array([[4.1, 0], [0, 4.1]], dtype=np.float)
     fC  = 0.14
-    fA1 = 0.29
+    fA2 = 0.29
     fB  = 0.118
-    fA2 = 1-fA1-fB-fC
+    fA1 = 1-fA2-fB-fC
     options = model_options(box=box, NS=64, fA1=fA1, fB=fB, fA2=fA2, fC=fC)
     model = SCFTA1BA2CLinearModel(options=options)
     rho = [ model.space.fourier_interpolation(rhoA), 

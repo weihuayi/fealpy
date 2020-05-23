@@ -31,18 +31,13 @@ $ git clone https://gitlab.com/weihuayi/fealpy.git
 ```
 3. In `fealpy/`, run the following command: 
 ```
-$ python3 setup_linux.py install --prefix=~/.local
+$ sudo python3 setup_linux.py install 
 ```
-which will copy the fealpy into `~/.local/lib/python3.<x>/site-packages/`.  Or run the following command:
+which will copy the fealpy into `/usr/local/lib/python3.<x>/site-packages/`.  Or run the following command:
 ```
-$ python3 setup_linux.py develop --prefix=~/.local
+$ sudo python3 setup_linux.py develop 
 ```
-which will create a soft link in `~/.local/lib/python3.<x>/site-packages/`.
-4. 
-```
-$ pip3 install -U vtk
-$ pip3 install -U meshio
-```
+which will create a soft link in `/usr/local/lib/python3.<x>/site-packages/`.
 
 
 
