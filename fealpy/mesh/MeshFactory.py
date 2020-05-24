@@ -2,10 +2,27 @@ import numpy as np
 from .simple_mesh_generator import rectangledomainmesh  
 from .simple_mesh_generator import triangle
 from .TriangleMesh import TriangleMesh
+from .TetrahedronMesh import TetrahedronMesh
 
 class MeshFactory():
     def __init__(self):
         pass
+
+    def one_tet_mesh(self, ttype='equ'):
+        if ttype == 'equ':
+            node = np.array([
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.5, np.sqrt(3)/2, 0.0],
+                [0.5, np.sqrt(3)/6, np.sqrt(2/3)]], dtype=np.float)
+        elif ttype == 'iso':
+            node = np.array([
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0]], dtype=np.float)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int)
+        return TetrahedronMesh(node, cell)
 
     def one_triangle_mesh(self, ttype='iso'):
         if ttype == 'equ':
