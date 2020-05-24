@@ -12,9 +12,8 @@ from ..common.Tools import hash2map
 # -n: n >= 1, 表示编号为 -n 洞
 #  n: n >= 1, 表示编号为  n 的内部子区域
 
-class HalfEdgeMeshNew(Mesh2d):
-    def __init__(self, node, halfedge, subdomain,
-        NV=None, nodedof=None):
+class HalfEdgeMesh2d(Mesh2d):
+    def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None):
         """
         Parameters
         ----------
@@ -22,8 +21,9 @@ class HalfEdgeMeshNew(Mesh2d):
         halfedge : (2*NE, 4), 
             halfedge[i, 0]: the index of the vertex the i-th halfedge point to
             halfedge[i, 1]: the index of the cell the i-th halfedge blong to
-            halfedge[i, 2]: the index of the opposit halfedge of the i-th halfedge
-            halfedge[i, 3]: the main halfedge flag, 1: main halfedge; 0: non main halfedge
+            halfedge[i, 2]: the index of the next halfedge of i-th haledge 
+            halfedge[i, 3]: the index of the prev halfedge of i-th haledge 
+            halfedge[i, 4]: the index of the opposit halfedge of the i-th halfedge
         subdomain : (NC, ) the sub domain flag of each cell blong to
         """
 
