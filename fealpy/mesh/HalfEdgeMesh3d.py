@@ -3,7 +3,7 @@ from .adaptive_tools import mark
 
 
 class HalfEdgeMesh3d():
-    def __init__(self, node, halfedge, subdomain, NE=None, NF=None):
+    def __init__(self, node, halfedge, subdomain, NE=None, NF=None, nodedof=None):
         """
         Parameters
         ----------
@@ -34,7 +34,7 @@ class HalfEdgeMesh3d():
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
-        self.facedata = self.edgedata
+        self.facedata = {} 
         self.meshdata = {}
 
         # 网格节点的自由度标记数组
@@ -42,7 +42,6 @@ class HalfEdgeMesh3d():
         # 1: 边界上的点
         # 2: 区域内部的点
         self.nodedata['dof'] = nodedof
-
         self.init_level_info()
 
     @classmethod
@@ -87,8 +86,8 @@ class HalfEdgeMesh3d():
         hidx0 = halfedge[0::2, 5].reshape(-1, FE)
         hidx1 = halfedge[1::2, 5].reshape(-1, FE)
         
-        nex = np.r_[range(1, FE), 0]
         # next
+        nex = np.r_[range(1, FE), 0]
         halfedge[0::2, 3] = hidx0[:, nex].flat 
         halfedge[1::2, 3] = hidx1[:, nex].flat 
         # prev
@@ -124,14 +123,14 @@ class HalfEdgeMesh3dDataStructure():
         else:
             self.NN = NN
 
-        if NE is None:
-            edge = np.zeros((NHE, 3), dtype=facets.dtype)
-            edge[:, 0] = halfedge[:, 0]
-            edge[:, 1] = halfedge[halfedge[:, 5], 0]
-            edge.sort(axis=-1)
-            self.h
-        else:
-            self.NE = NE
+        edge = np.zeros((NHE, 3), dtype=facets.dtype)
+        edge[:, 0] = halfedge[:, 0]
+        edge[:, 1] = halfedge[halfedge[:, 5], 0]
+        edge.sort(axis=-1)
+        self.hedge = np.unique(edge, axis=0) # hedge[i] is the index of one halfedge of i-th edge
+        self.NE = len(self.hedge)
+        if NE is not None:
+            assert NE == self.NE
 
         if NF is None:
             self.NF = max(halfedge[:, 1])
@@ -140,8 +139,11 @@ class HalfEdgeMesh3dDataStructure():
 
         self.NC = len(subdomain) 
         self.halfedge = halfedge
+        self.NHE = len(self.halfedge)
         self.itype = halfedge.dtype
 
         self.hcell = np.zeros(self.NC, dtype=self.itype) # hcell[i] is the index of one face of i-th cell
         self.hface = np.zeros(self.NF, dtype=self.itype) # hface[i] is the index of one halfedge of i-th face 
-        self.hedge = hedge # hedge[i] is the index of one halfedge of i-th edge
+
+        self.hcell[halfedge[:, 2]] = range(self.NHE)
+        self.hface[halfedge[:, 1]] = range(self.NHE)
