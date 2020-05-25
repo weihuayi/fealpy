@@ -106,6 +106,13 @@ def find_entity(
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
 
+    if entity == 'edge':
+        node = mesh.entity('node')
+        e = mesh.entity(entity)
+        vts = node[e[index], :]
+        lines = LineCollection(vts, linewidths=2, colors='r')
+        axes.add_collection(lines)
+
     dim = mesh.geo_dimension()
     bc = bc[index]
     if dim == 2:

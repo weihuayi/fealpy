@@ -33,7 +33,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.node = node
         self.ds = HalfEdgeMesh2dDataStructure(node.shape[0], 
                 subdomain, halfedge, NV=NV)
-        self.meshtype = 'halfedge'
+        self.meshtype = 'halfedge2d'
 
         self.halfedgedata = {}
         self.celldata = {}

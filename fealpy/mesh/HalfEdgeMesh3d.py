@@ -3,7 +3,7 @@ from .adaptive_tools import mark
 
 
 class HalfEdgeMesh3d():
-    def __init__(self, node, halfedge, subdomain):
+    def __init__(self, node, halfedge, subdomain, NE=None, NF=None):
         """
         Parameters
         ----------
@@ -22,7 +22,28 @@ class HalfEdgeMesh3d():
                     and the halfedge[i, 5]-th and i-th halfedge are in the same cell.
             subdomain: (NC, )the sub domain flag of each cell blong to
         """
-        pass
+        self.itype = halfedge.dtype
+        self.ftype = node.dtype
+
+        self.node = node
+        NN = node.shape[0]
+        self.ds = HalfEdgeMesh3dDataStructure(halfedge, subdomain, NN=NN, NE=NE, NF=NF)
+        self.meshtype = 'halfedge3d'
+
+        self.halfedgedata = {}
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
+
+        # 网格节点的自由度标记数组
+        # 0: 固定点
+        # 1: 边界上的点
+        # 2: 区域内部的点
+        self.nodedata['dof'] = nodedof
+
+        self.init_level_info()
 
     @classmethod
     def from_mesh(self, mesh):
@@ -74,26 +95,39 @@ class HalfEdgeMesh3d():
         halfedge[halfedge[:, 3], 4] = range(NHE) 
 
         # dual halfedge in the same cell
-        edge = np.zeros((2*NHE, 3), dtype=facets.dtype)
-        edge[:NHE] = halfedge[:, 0:2]
-        edge[NHE:, 0] = halfedge[halfedge[:, 4], 0]
-        edge[NHE:, 1] = halfedge[:, 1]
-        idx = np.lexsort((edge[:, 0], edge[:, 1])).reshape(-1, 2)
-        idx[:, 1] -= NHE
-        halfedge[idx[:, 0], 2] = idx[:, 1]
-        halfedge[halfedge[:, 2], 3] = range(NHE)
+        edge = np.zeros((NHE, 3), dtype=facets.dtype)
+        edge[:, 0] = halfedge[:, 0]
+        edge[:, 1] = halfedge[halfedge[:, 4], 0]
+        edge[:, 2] = halfedge[:, 2] # cell blong to
 
-        halfedge[0::2, 6] = 0
-        halfedge[1::2, 6] = 0
+        flag = (edge[:, 0] > edge[:, 1])
+        idx = edge[flag, 0]
+        edge[flag, 0] = edge[flag, 1]
+        edge[flag, 1] = idx
+        idx = np.lexsort((edge[:, 0], edge[:, 1], edge[:, 2)).reshape(-1, 2)
+        halfedge[idx[:, 0], 6] = idx[:, 1]
+        halfedge[idx[:, 1], 6] = idx[:, 0] 
+
+        subdomain = np.zeros(NC+1, dtype=mesh.itype)
+        if 'subdomain' in mesh.celldata:
+            subdomain[1:] = mesh.celldata['subdomain'] 
+        else:
+
+        return cls(node, halfedge, subdomain, NE=NE, NF=NF) 
+
 
 
 
 class HalfEdgeMesh3dDataStructure():
-    def __init__(self, NN, NE, NF, NC, halfedge, hedge):
-        self.reinit(NN, NE, NF, NC, halfedge, edge)
+    def __init__(self, NN, halfedge, subdomain, NN=None, NE=None, NF=None):
+        self.reinit(NN, halfedge, subdomain, NN=NN, NE=NE, NF=NF)
 
-    def reinit(self, NN, NE, NF, NC, halfedge, edge):
-        self.NN = NN
+    def reinit(self, halfedge, subdomain, NN=None, NE=None, NF=None):
+        if NN is None:
+            self.NN = max(halfedge[:, 0])
+        else:
+            self.NN = NN
+
         self.NE = NE
         self.NC = NC
         self.NF = NF 

@@ -38,10 +38,10 @@ class MeshFactory():
         cell = np.array([[0, 1, 2]], dtype=np.int)
         return TriangleMesh(node, cell)
 
-    #Fishbone
     def regular(self, box, n=10):
         return rectangledomainmesh(box, nx=n, ny=n, meshtype='tri')
 
+    #Fishbone
     def fishbone(self, box, n=10):
         qmesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
