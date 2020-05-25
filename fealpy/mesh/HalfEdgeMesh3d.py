@@ -98,12 +98,9 @@ class HalfEdgeMesh3d():
         edge = np.zeros((NHE, 3), dtype=facets.dtype)
         edge[:, 0] = halfedge[:, 0]
         edge[:, 1] = halfedge[halfedge[:, 4], 0]
-        edge[:, 2] = halfedge[:, 2] # cell blong to
+        edge[:, 2] = halfedge[:, 2] 
+        edge[:, 0:2].sort(axis=-1)
 
-        flag = (edge[:, 0] > edge[:, 1])
-        idx = edge[flag, 0]
-        edge[flag, 0] = edge[flag, 1]
-        edge[flag, 1] = idx
         idx = np.lexsort((edge[:, 0], edge[:, 1], edge[:, 2)).reshape(-1, 2)
         halfedge[idx[:, 0], 6] = idx[:, 1]
         halfedge[idx[:, 1], 6] = idx[:, 0] 
@@ -112,15 +109,14 @@ class HalfEdgeMesh3d():
         if 'subdomain' in mesh.celldata:
             subdomain[1:] = mesh.celldata['subdomain'] 
         else:
+            subdomain[1:] = 1
 
         return cls(node, halfedge, subdomain, NE=NE, NF=NF) 
 
 
-
-
 class HalfEdgeMesh3dDataStructure():
-    def __init__(self, NN, halfedge, subdomain, NN=None, NE=None, NF=None):
-        self.reinit(NN, halfedge, subdomain, NN=NN, NE=NE, NF=NF)
+    def __init__(self, halfedge, subdomain, NN=None, NE=None, NF=None):
+        self.reinit(halfedge, subdomain, NN=NN, NE=NE, NF=NF)
 
     def reinit(self, halfedge, subdomain, NN=None, NE=None, NF=None):
         if NN is None:
@@ -128,12 +124,24 @@ class HalfEdgeMesh3dDataStructure():
         else:
             self.NN = NN
 
-        self.NE = NE
-        self.NC = NC
-        self.NF = NF 
+        if NE is None:
+            edge = np.zeros((NHE, 3), dtype=facets.dtype)
+            edge[:, 0] = halfedge[:, 0]
+            edge[:, 1] = halfedge[halfedge[:, 5], 0]
+            edge.sort(axis=-1)
+            self.h
+        else:
+            self.NE = NE
+
+        if NF is None:
+            self.NF = max(halfedge[:, 1])
+        else:
+            self.NF = NF
+
+        self.NC = len(subdomain) 
         self.halfedge = halfedge
         self.itype = halfedge.dtype
 
-        self.hcell = np.zeros(NC, dtype=self.itype) # hcell[i] is the index of one face of i-th cell
-        self.hface = np.zeros(NF, dtype=self.itype) # hface[i] is the index of one halfedge of i-th face 
+        self.hcell = np.zeros(self.NC, dtype=self.itype) # hcell[i] is the index of one face of i-th cell
+        self.hface = np.zeros(self.NF, dtype=self.itype) # hface[i] is the index of one halfedge of i-th face 
         self.hedge = hedge # hedge[i] is the index of one halfedge of i-th edge
