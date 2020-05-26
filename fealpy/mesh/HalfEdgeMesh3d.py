@@ -100,7 +100,7 @@ class HalfEdgeMesh3d():
         edge[:, 2] = halfedge[:, 2] 
         edge[:, 0:2].sort(axis=-1)
 
-        idx = np.lexsort((edge[:, 0], edge[:, 1], edge[:, 2)).reshape(-1, 2)
+        idx = np.lexsort((edge[:, 0], edge[:, 1], edge[:, 2])).reshape(-1, 2)
         halfedge[idx[:, 0], 6] = idx[:, 1]
         halfedge[idx[:, 1], 6] = idx[:, 0] 
 

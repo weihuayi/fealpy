@@ -96,7 +96,7 @@ class TwoHolesData:
     def dirichlet(self, p):
         return 0.0
 
-    def neuman(self, p):
+    def neumann(self, p):
         """ Neuman  boundary condition
         """
         pass

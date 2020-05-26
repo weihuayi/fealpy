@@ -38,6 +38,33 @@ class Mesh2d():
     def top_dimension(self):
         return 2
 
+    def set_boundary_condition(self, btype='Dirichlet', threshhold=None):
+        """
+        Set boundary condtion into self.meshdata
+
+        Parameters
+        ----------
+        btype: string, 'Dirichlet', 'Neumann', 'Robin', or 'Fracture' 
+        threshhold: calllable object or a np.ndarray 
+        """
+        
+        NE = self.number_of_edges()
+        edge = self.entity('edge')
+        bc = self.entity_barycenter('edge')
+        if callable(threshhold):
+            idx = threshhold(bc)
+            print(btype, idx)
+            if idx.dtype is np.bool:
+                idx, = idx.nonzero()
+        elif threshhold is np.ndarray:
+            idx = bc
+            if idx.dtype is np.bool:
+                idx, = idx.nonzero()
+        else:
+            idx = self.ds.boundary_edge_index()
+
+        self.meshdata[btype] = idx
+
     def entity(self, etype=2):
         if etype in {'cell', 2}:
             return self.ds.cell
@@ -180,12 +207,12 @@ class Mesh2d():
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=20, 
+            color='g', markersize=20, ecolor='r',
             fontsize=13, fontcolor='g', multiindex=None):
 
         find_entity(axes, self, entity='edge',
                 index=index, showindex=showindex, 
-                color=color, markersize=markersize,
+                color=color, markersize=markersize, ecolor=ecolor,
                 fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_cell(self, axes,
