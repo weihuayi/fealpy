@@ -40,6 +40,7 @@ class Mesh2d():
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
+            print('a')
             return self.ds.cell
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge

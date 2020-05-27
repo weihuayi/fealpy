@@ -36,32 +36,32 @@ class HalfEdgeMeshTest:
         if True:
             isMarkedCell = mesh.mark_helper([2])
             mesh.refine_poly(isMarkedCell, dflag=False)
-        
+
         if True:
-            isMarkedCell = mesh.mark_helper([6]) 
-            mesh.refine_poly(isMarkedCell, dflag=False)
-        
-        if True:
-            isMarkedCell = mesh.mark_helper([3]) 
-            mesh.refine_poly(isMarkedCell, dflag=False)
-            
-        if True:
-            isMarkedCell = mesh.mark_helper([1, 5]) 
-            mesh.refine_poly(isMarkedCell, dflag=False)
-            
-        if False:
-            isMarkedCell = mesh.mark_helper([1, 12]) 
-            mesh.refine_poly(isMarkedCell, dflag=False)
-            
-        if False:
-            isMarkedCell = mesh.mark_helper([0, 21]) 
+            isMarkedCell = mesh.mark_helper([6])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-            
+        if True:
+            isMarkedCell = mesh.mark_helper([3])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if True:
+            isMarkedCell = mesh.mark_helper([1, 5])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([1, 12])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([0, 21])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+
         print("halfedge level:\n")
         for i, val in enumerate(mesh.halfedgedata['level']):
             print(i, ':', val, mesh.ds.halfedge[i, 0:2])
-            
+
         print("cell level:\n")
         for i, val in enumerate(mesh.celldata['level']):
             print(i, ':', val)
@@ -150,7 +150,7 @@ class HalfEdgeMeshTest:
             (1, 2, 0), (3, 0, 2)
         ])
 
-        tmesh = TriangleMesh(node, cell) 
+        tmesh = TriangleMesh(node, cell)
         tmesh.uniform_refine(n=1)
         mesh = HalfEdgeMesh.from_mesh(tmesh)
         if plot:
@@ -178,7 +178,7 @@ class HalfEdgeMeshTest:
         cell = np.array([
             (1, 2, 0), (3, 0, 2)
         ])
-        tmesh = TriangleMesh(node, cell) 
+        tmesh = TriangleMesh(node, cell)
         tmesh.uniform_refine(n=1)
         mesh = HalfEdgeMesh.from_mesh(tmesh)
         if plot:
@@ -273,7 +273,7 @@ class HalfEdgeMeshTest:
         from scipy.spatial import Delaunay
         from scipy.spatial import Voronoi, voronoi_plot_2d
         from scipy.spatial import KDTree
-        
+
         points = np.random.rand(10, 2)
         print(points)
 
@@ -336,7 +336,7 @@ class HalfEdgeMeshTest:
             mesh.find_node(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
-            
+
     def adaptive_poly_test(self, plot=True):
         node = np.array([
             (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
@@ -347,6 +347,7 @@ class HalfEdgeMeshTest:
         cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
 
         mesh = PolygonMesh(node, cell, cellLocation)
+        print(mesh.meshtype)
         mesh = HalfEdgeMesh.from_mesh(mesh)
 
         fig = plt.figure()
@@ -357,12 +358,21 @@ class HalfEdgeMeshTest:
 
         NE = mesh.number_of_edges()
         nC = mesh.number_of_cells()
-        
+
         aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
         #eta = 2*np.ones(nC,dtype=int)
         eta = [0,0,1,1,1]
 
         mesh.adaptive(eta, aopts)
+        print(mesh.meshtype)
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        mesh.from_mesh(mesh)
+        print(mesh.meshtype)
 
         #eta = [1,0,0,-1,-1,-1,0,0,0,0]
         #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
