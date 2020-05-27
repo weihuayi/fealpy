@@ -1,13 +1,17 @@
 import numpy as np
 
 class ParabolicFourierSolver():
-    def __init__(self, space, timeline):
+    def __init__(self, space, timeline, plan):
         self.space = space 
+        self.plan = plan
         self.k, self.k2 = self.space.reciprocal_lattice(return_square=True)
         self.timeline = timeline 
         dt = self.timeline.current_time_step_length()
         self.E1 = np.exp(-dt*self.k2)
         self.E3 = np.exp(-dt/2*self.k2)
+
+        print("E1", self.E1.dtype)
+        print("E3", self.E3.dtype)
 
     def initialize(self, q, w):
         """
@@ -26,6 +30,9 @@ class ParabolicFourierSolver():
         self.E0 = np.exp(-dt/2*w)
         self.E2 = np.exp(-dt/4*w)
 
+        print("E0", self.E0.dtype)
+        print("E2", self.E2.dtype)
+
         NL = self.timeline.number_of_time_levels()
 
         E0 = self.E0
@@ -41,8 +48,8 @@ class ParabolicFourierSolver():
             q[i] = np.fft.fftn(q1).real
             q[i] *= E0
 
-        q0 = q[0]
         for i in range(1, 4):
+            q0 = q[i-1]
             q1 = np.fft.ifftn(E2*q0)
             q1 *= E3
             q1 = np.fft.fftn(q1).real
@@ -77,11 +84,19 @@ class ParabolicFourierSolver():
 if __name__ == "__main__":
     from fealpy.functionspace import FourierSpace
     from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+    import pyfftw
+
+    dim = 2
+    NS = 16
+    a = pyfftw.empty_aligned((NS, NS), dtype='complex128')
+    b = pyfftw.empty_aligned((NS, NS), dtype='complex128')
+    axes = tuple(range(2))
+    plan = pyfftw.FFTW(a, b, axes=axes)
 
     box = np.diag(2*[6*np.pi])
     timeline = UniformTimeLine(0, 0.3, 0.01)
     space = FourierSpace(box, 16)
-    solver = ParabolicFourierSolver(space, timeline)
+    solver = ParabolicFourierSolver(space, timeline, plan)
     NL = timelines.number_of_time_levels()
     q = space.function(dim=NL) 
     w = 0

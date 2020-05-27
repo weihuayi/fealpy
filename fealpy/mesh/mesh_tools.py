@@ -73,7 +73,7 @@ def find_node(
 def find_entity(
         axes, mesh, entity='node',
         index=None, showindex=False,
-        color='r', markersize=20,
+        color='r', markersize=20, ecolor='r',
         fontsize=24, fontcolor='k', multiindex=None):
 
     bc = mesh.entity_barycenter(entity)
@@ -92,8 +92,9 @@ def find_entity(
             index = range(NC)
         else:
             pass #TODO: raise a error
-    elif (type(index) is np.ndarray) & (index.dtype == np.bool):
-        index, = np.nonzero(index)
+    elif (type(index) is np.ndarray) :
+        if index.dtype == np.bool:
+            index, = np.nonzero(index)
     elif (type(index) is list) & (type(index[0]) is np.bool):
         index, = np.nonzero(index)
     else:
@@ -105,6 +106,13 @@ def find_entity(
         norm = colors.Normalize(vmin=umin, vmax=umax)
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
+
+    if entity == 'edge':
+        node = mesh.entity('node')
+        e = mesh.entity(entity)
+        vts = node[e[index], :]
+        lines = LineCollection(vts, linewidths=2, colors=ecolor)
+        axes.add_collection(lines)
 
     dim = mesh.geo_dimension()
     bc = bc[index]

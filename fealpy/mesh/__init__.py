@@ -10,11 +10,10 @@ from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
 from .HalfEdgeMesh import HalfEdgeMesh
-from .HalfEdgeMeshNew import HalfEdgeMeshNew
 from .HalfEdgeDomain import HalfEdgeDomain
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
-from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
+#from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
 from .IntervalMesh import IntervalMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
@@ -38,4 +37,6 @@ from .mesh_tools import *
 
 from .meshio import load_mat_mesh
 
+from .HalfEdgeMesh2d import HalfEdgeMesh2d
+from .HalfEdgeMesh3d import HalfEdgeMesh3d
 

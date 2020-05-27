@@ -28,13 +28,16 @@ class LinearElasticityTempalte():
     def dirichlet(self, p):
         pass
 
-    def neuman(self, p):
+    def neumann(self, p):
         pass
 
     def is_dirichlet_boundary(self, p):
         pass
 
     def is_neuman_boundary(self, p):
+        pass
+
+    def is_fracture_boundary(self, p):
         pass
 
 class BoxDomainData3d():

@@ -2,19 +2,19 @@ import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 class BoundaryCondition():
-    def __init__(self, space, dirichlet=None, neuman=None, robin=None):
+    def __init__(self, space, dirichlet=None, neumann=None, robin=None):
         self.space = space
         self.dirichlet = dirichlet
-        self.neuman = neuman
+        self.neumann = neumann
         self.robin = robin
 
-    def apply_neuman_bc(self, b, is_neuman_boundary=None):
+    def apply_neumann_bc(self, b, is_neumann_boundary=None):
         """
 
         Parameters
         ----------
         b : array with shape (N, ) or (N, GD)
-        is_neuman_boundary : function object
+        is_neumann_boundary : function object
 
         Returns
         -------
@@ -26,18 +26,18 @@ class BoundaryCondition():
         --------
 
         """
-        if self.neuman is not None:
+        if self.neumann is not None:
             space = self.space
             p = space.p
             mesh = space.mesh
             dim = 1 if len(b.shape) == 1 else b.shape[1]
             face2dof = space.face_to_dof()
 
-            # find the index of all neuman boundary 
+            # find the index of all neumann boundary 
             idx = mesh.ds.boundary_face_index()
-            if is_neuman_boundary is not None:
+            if is_neumann_boundary is not None:
                 bc = mesh.entity_barycenter('face', index=idx)
-                flag = is_neuman_boundary(bc)
+                flag = is_neumann_boundary(bc)
                 idx = idx[flag]
             measure = mesh.entity_measure('face', index=idx)
             qf = mesh.integrator(p+3, 'face')
@@ -45,7 +45,7 @@ class BoundaryCondition():
             phi = space.face_basis(bcs)
             pp = mesh.bc_to_point(bcs, etype='face', index=idx)
             n = mesh.face_unit_normal(index=idx)
-            val = self.neuman(pp, n) # (NQ, NF, ...)
+            val = self.neumann(pp, n) # (NQ, NF, ...)
             bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
             if dim == 1:
                 np.add.at(b, face2dof[idx], bb)

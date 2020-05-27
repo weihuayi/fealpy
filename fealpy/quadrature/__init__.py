@@ -8,4 +8,5 @@ from .HexahedronQuadrature import HexahedronQuadrature
 from .PrismQuadrature import PrismQuadrature
 from .FEMeshIntegralAlg import FEMeshIntegralAlg
 from .PolygonMeshIntegralAlg import PolygonMeshIntegralAlg
+from .PolyhedronMeshIntegralAlg import PolyhedronMeshIntegralAlg
 

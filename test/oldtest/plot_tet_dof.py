@@ -30,7 +30,7 @@ lines = a3.art3d.Line3DCollection(point[edge1], color='gray', linewidths=2,
         alpha=0.5)
 axes.add_collection3d(lines)
 #mesh.add_plot(axes,  alpha=0.3)
-mesh.find_point(axes, showindex=True, color='k', fontsize=20, markersize=100)
+mesh.find_node(axes, showindex=True, color='k', fontsize=20, markersize=100)
 
 
 V = LagrangeFiniteElementSpace(mesh, degree)
@@ -70,6 +70,6 @@ faces = a3.art3d.Poly3DCollection(ipoints[face], facecolor='w', edgecolor='k',
 axes.add_collection3d(faces)
 
 
-mesh.find_point(axes, point=ipoints, showindex=True, fontsize=20, color='r',
+mesh.find_node(axes, node=ipoints, showindex=True, fontsize=20, color='r',
         markersize=100)
 plt.show()
