@@ -15,33 +15,37 @@ from ..quadrature import FEMeshIntegralAlg
 
 
 class LagrangeFiniteElementSpace():
-    def __init__(self, mesh, p=1, spacetype='C', q=None):
+    def __init__(self, mesh, p=1, spacetype='C', q=None, dof=None):
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
-        if spacetype == 'C':
-            if mesh.meshtype == 'interval':
-                self.dof = CPLFEMDof1d(mesh, p)
-                self.TD = 1
-            elif mesh.meshtype == 'tri':
-                self.dof = CPLFEMDof2d(mesh, p)
-                self.TD = 2
-            elif mesh.meshtype == 'stri':
-                self.dof = CPLFEMDof2d(mesh, p)
-                self.TD = 2
-            elif mesh.meshtype == 'tet':
-                self.dof = CPLFEMDof3d(mesh, p)
-                self.TD = 3
-        elif spacetype == 'D':
-            if mesh.meshtype == 'interval':
-                self.dof = DPLFEMDof1d(mesh, p)
-                self.TD = 1
-            elif mesh.meshtype == 'tri':
-                self.dof = DPLFEMDof2d(mesh, p)
-                self.TD = 2
-            elif mesh.meshtype == 'tet':
-                self.dof = DPLFEMDof3d(mesh, p)
-                self.TD = 3
+        if dof is None:
+            if spacetype == 'C':
+                if mesh.meshtype == 'interval':
+                    self.dof = CPLFEMDof1d(mesh, p)
+                    self.TD = 1
+                elif mesh.meshtype == 'tri':
+                    self.dof = CPLFEMDof2d(mesh, p)
+                    self.TD = 2
+                elif mesh.meshtype == 'stri':
+                    self.dof = CPLFEMDof2d(mesh, p)
+                    self.TD = 2
+                elif mesh.meshtype == 'tet':
+                    self.dof = CPLFEMDof3d(mesh, p)
+                    self.TD = 3
+            elif spacetype == 'D':
+                if mesh.meshtype == 'interval':
+                    self.dof = DPLFEMDof1d(mesh, p)
+                    self.TD = 1
+                elif mesh.meshtype == 'tri':
+                    self.dof = DPLFEMDof2d(mesh, p)
+                    self.TD = 2
+                elif mesh.meshtype == 'tet':
+                    self.dof = DPLFEMDof3d(mesh, p)
+                    self.TD = 3
+        else:
+            self.dof = dof
+            self.TD = mesh.top_dimension() 
 
         if len(mesh.node.shape) == 1:
             self.GD = 1
