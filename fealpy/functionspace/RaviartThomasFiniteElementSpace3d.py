@@ -161,3 +161,11 @@ class RaviartThomasFiniteElementSpace3d:
         else:
             #TODO: raise a error
             print("error!")
+
+    # helper function for understand RT finite element  
+    def show_face_frame(self, axes, index):
+        pass
+
+    def show_basis(self, axes, index):
+        pass
+
