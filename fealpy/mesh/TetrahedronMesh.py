@@ -36,8 +36,8 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
 class TetrahedronMesh(Mesh3d):
     def __init__(self, node, cell):
         self.node = node
-        N = node.shape[0]
-        self.ds = TetrahedronMeshDataStructure(N, cell)
+        NN = node.shape[0]
+        self.ds = TetrahedronMeshDataStructure(NN, cell)
 
         self.meshtype = 'tet'
 
@@ -48,17 +48,18 @@ class TetrahedronMesh(Mesh3d):
         self.edgedata = {}
         self.facedata = {}
         self.nodedata = {}
+        self.meshdata = {}
 
     def vtk_cell_type(self):
         VTK_TETRA = 10
         return VTK_TETRA
 
     def integrator(self, k, etype=3):
-        if etype in ['cell', 3]:
+        if etype in {'cell', 3}:
             return TetrahedronQuadrature(k)
-        elif etype in ['face', 2]:
+        elif etype in {'face', 2}:
             return TriangleQuadrature(k)
-        elif etype in ['edge', 1]:
+        elif etype in {'edge', 1}:
             return GaussLegendreQuadrature(k)
 
     def delete_cell(self, threshold):

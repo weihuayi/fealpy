@@ -3,17 +3,17 @@ from .GaussLobattoQuadrature import GaussLobattoQuadrature
 from .GaussLegendreQuadrature import GaussLegendreQuadrature
 
 class PolygonMeshIntegralAlg():
-    def __init__(self, pmesh, q, cellmeasure=None, cellbarycenter=None):
-        self.pmesh = pmesh
+    def __init__(self, mesh, q, cellmeasure=None, cellbarycenter=None):
+        self.mesh = mesh
 
         self.cellmeasure = cellmeasure if cellmeasure is not None \
-                else pmesh.entity_measure('cell')
+                else mesh.entity_measure('cell')
         self.cellbarycenter = cellbarycenter if cellbarycenter is not None \
-                else pmesh.entity_barycenter('cell')
-        self.cellintegrator = pmesh.integrator(q)
+                else mesh.entity_barycenter('cell')
+        self.cellintegrator = mesh.integrator(q)
 
-        self.edgemeasure = pmesh.entity_measure('edge')
-        self.edgebarycenter = pmesh.entity_barycenter('edge')
+        self.edgemeasure = mesh.entity_measure('edge')
+        self.edgebarycenter = mesh.entity_barycenter('edge')
         self.edgeintegrator = GaussLegendreQuadrature(q)
 
     def triangle_measure(self, tri):
@@ -23,7 +23,7 @@ class PolygonMeshIntegralAlg():
         return area
 
     def edge_integral(self, u, edgetype=False, q=None):
-        mesh = self.pmesh
+        mesh = self.mesh
         NE = mesh.number_of_edges()
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -40,16 +40,16 @@ class PolygonMeshIntegralAlg():
         return e
 
     def integral(self, u, celltype=False, q=None):
-        pmesh = self.pmesh
-        node = pmesh.node
+        mesh = self.mesh
+        node = mesh.node
         bc = self.cellbarycenter
 
-        edge = pmesh.entity('edge')
-        edge2cell = pmesh.ds.edge_to_cell()
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
 
-        NC = pmesh.number_of_cells()
+        NC = mesh.number_of_cells()
 
-        qf = self.cellintegrator if q is None else self.pmesh.integrator(q)
+        qf = self.cellintegrator if q is None else self.mesh.integrator(q)
         bcs, ws = qf.quadpts, qf.weights
 
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
@@ -123,7 +123,7 @@ class PolygonMeshIntegralAlg():
         return np.sqrt(e)
 
     def edge_L2_error(self, u, uh, celltype=False, q=None):
-        mesh = self.pmesh
+        mesh = self.mesh
         NE = mesh.number_of_edges()
         node = mesh.entity('node')
         edge = mesh.entity('edge')
