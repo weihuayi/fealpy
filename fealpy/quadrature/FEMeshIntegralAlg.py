@@ -11,7 +11,7 @@ class FEMeshIntegralAlg():
         self.edgebarycenter = mesh.entity_barycenter('edge')
         self.edgeintegrator = mesh.integrator(q, 'edge')
 
-        GD = mesh.geom_dimension()
+        GD = mesh.geo_dimension()
         if GD == 3:
             self.facemeasure = mesh.entity_measure('face')
             self.facebarycenter = mesh.entity_measure('face')

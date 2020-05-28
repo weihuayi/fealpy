@@ -143,7 +143,7 @@ class RTDof2d:
 
     def number_of_local_dofs(self, etype='cell'):
         p = self.p
-        if etype = 'cell':
+        if etype == 'cell':
             return (p+1)*(p+3) 
         elif etype =='edge':
             return p+1

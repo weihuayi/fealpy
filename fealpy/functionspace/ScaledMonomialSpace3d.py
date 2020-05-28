@@ -1,8 +1,5 @@
 import numpy as np
-from numpy.linalg import inv
 from .function import Function
-from ..quadrature import GaussLobattoQuadrature
-from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolyhedronMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
@@ -58,12 +55,10 @@ class ScaledMonomialSpace3d():
         if mtype in {'polyhedron'}:
             self.integralalg = PolyhedronMeshIntegralAlg(
                     self.mesh, q,
-                    cellmeasure=self.cellmeasure,
                     cellbarycenter=self.cellbarycenter)
         elif mtype in  {'tet'}:
             self.integralalg = FEMeshIntegralAlg(
-                    self.mesh, q,
-                    cellmeasure=self.cellmeasure)
+                    self.mesh, q)
         self.integrator = self.integralalg.integrator
 
         self.cellmeasure = self.integralalg.cellmeasure 
@@ -74,10 +69,14 @@ class ScaledMonomialSpace3d():
         self.facesize = self.facemeasure**(1/2)
         self.edgesize = self.edgemeasure
 
-        # get the axis frame on the face by svd
+        # get the face frame by svd
         n = mesh.face_unit_normal()
-        _, _, frame = np.linalg.svd(n[:, np.newaxis, :]) 
-        frame[:, 0, :] = n
+        a, _, self.faceframe = np.linalg.svd(n[:, np.newaxis, :]) 
+        # make the frame satisfies right-hand rule and the first vector equal to
+        # n
+        a = a.reshape(-1)
+        self.faceframe[a == 1, 2, :] *= -1
+        self.faceframe[a ==-1] *=-1
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
@@ -161,16 +160,18 @@ class ScaledMonomialSpace3d():
         """
         p = self.p if p is None else p
         h = self.facesize
-
+        bc = self.facebarycenter
+        frame = self.faceframe
+        
         fdof = self.number_of_local_dofs(p=p, etype='face')
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
-
-        shape = point.shape[:-1]+(ldof,)
-        phi = np.ones(shape, dtype=np.float)  # (..., NF, ldof)
+        shape = point.shape[:-1]+(fdof,)
+        phi = np.ones(shape, dtype=np.float)  # (..., NF, fdof)
         index = index if index is not None else np.s_[:] 
-        phi[..., 1:3] = (point - self.facebarycenter[index])/h[index].reshape(-1, 1)
+        p2 = (point - self.facebarycenter[index])/h[index].reshape(-1, 1)
+        phi[..., 1:2] = np.einsum('...k, jk->...j', p2, frame[:, 1:, :])  
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -187,3 +188,19 @@ class ScaledMonomialSpace3d():
 
     def face_mass_matrix(self):
         pass
+
+    def show_frame(self, axes, index=1):
+        n = np.array([[1.0, 2.0, 1.0], [-1.0, 2.0, 1.0]], dtype=np.float)/np.sqrt(6)
+        a, b, frame = np.linalg.svd(n[:, None, :])
+        print(a, a.shape)
+        print(frame, frame.shape)
+        a = a.reshape(-1)
+        frame[a == 1, 2, :] *= -1
+        frame[a ==-1] *=-1
+
+        c = ['r', 'g', 'b']
+        for i in range(3):
+            axes.quiver(
+                    0.0, 0.0, 0.0, 
+                    frame[index, i, 0], frame[index, i, 1], frame[index, i, 2],
+                    length=0.1, normalize=True, color=c[i])
