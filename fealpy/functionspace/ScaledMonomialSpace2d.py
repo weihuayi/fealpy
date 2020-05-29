@@ -201,8 +201,8 @@ class ScaledMonomialSpace2d():
 
         ldof = self.number_of_local_dofs(p=p)
         if p == 0:
-            shape = point.shape[:-1] + (1, )
-            return np.ones(shape, dtype=np.float)
+            shape = len(point.shape)*(1, )
+            return np.array([1.0], dtype=self.ftype).reshape(shape)
 
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)

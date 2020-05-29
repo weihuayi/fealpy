@@ -8,7 +8,7 @@ class MeshFactory():
     def __init__(self):
         pass
 
-    def one_tet_mesh(self, ttype='equ'):
+    def one_tetrahedron_mesh(self, ttype='equ'):
         if ttype == 'equ':
             node = np.array([
                 [0.0, 0.0, 0.0],

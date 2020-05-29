@@ -9,14 +9,14 @@ from fealpy.mesh.TriangleMesh import TriangleMesh
 
 
 degree = 4
-point = np.array([
+node = np.array([
     [0, 0, 0],
     [1, 0, 0],
     [1/2, np.sqrt(3)/2, 0],
     [1/2, np.sqrt(3)/6, np.sqrt(6)/3]], dtype=np.float)
 cell = np.array([[0, 1, 2, 3]], dtype=np.int)
 
-mesh = TetrahedronMesh(point, cell)
+mesh = TetrahedronMesh(node, cell)
 
 fig = plt.figure()
 axes = fig.gca(projection='3d')

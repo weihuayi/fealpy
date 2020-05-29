@@ -24,15 +24,60 @@ class ScaledMonomialSpace3dTest:
     def show_frame_test(self):
         fig = plt.figure()
         axes = fig.gca(projection='3d')
-
         mfactory = MeshFactory()
-        mesh = mfactory.one_tet_mesh()
+        mesh = mfactory.one_tetrahedron_mesh()
         space = ScaledMonomialSpace3d(mesh, p=1)
         space.show_frame(axes)
         plt.show()
+
+    def show_cell_basis_index_test(self):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tettrahedron_mesh()
+        space = ScaledMonomialSpace3d(mesh, p=3)
+        space.show_cell_basis_index(p=3)
+
+    def show_face_basis_index_test(self):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tetrahedron_mesh()
+        space = ScaledMonomialSpace3d(mesh, p=3)
+        space.show_face_basis_index(p=3)
+
+    def face_basis_test(self):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tetrahedron_mesh(ttype='iso')
+        space = ScaledMonomialSpace3d(mesh, p=1)
+
+        face = mesh.entity('face')
+        print(face)
+        print('frame:', space.faceframe)
+        bc = np.array([[1/3, 1/3, 1/3]])
+        bc = np.array([[1, 0, 0]])
+        point = mesh.bc_to_point(bc, 'face')
+        print(point.shape)
+        phi = space.face_basis(point)
+        print(phi)
+
+    def cell_basis_test(self):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tetrahedron_mesh(ttype='iso')
+        space = ScaledMonomialSpace3d(mesh, p=2)
+
+        bc = np.array([[1, 0, 0, 0]])
+        point = mesh.bc_to_point(bc, 'cell')
+        print(point.shape)
+        print(space.cellsize)
+        phi = space.basis(point)
+        print(phi)
+
+
+
 
 
 
 test = ScaledMonomialSpace3dTest()
 #test.one_tet_mesh_test(p=1)
-test.show_frame_test()
+#test.show_frame_test() 
+#test.show_cell_basis_index_test()
+#test.show_face_basis_index_test()
+#test.face_basis_test()
+test.cell_basis_test()
