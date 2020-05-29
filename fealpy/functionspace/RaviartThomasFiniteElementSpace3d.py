@@ -1,6 +1,7 @@
 import numpy as np
 
 from .function import Function
+from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 
 class RTDof3d:
     def __init__(self, mesh, p):
@@ -19,6 +20,7 @@ class RTDof3d:
         self.mesh = mesh
         self.p = p # 默认的空间次数 p >= 0
         self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+
 
     def boundary_dof(self, threshold=None):
         idx = self.mesh.ds.boundary_face_index()
@@ -84,19 +86,96 @@ class RTDof3d:
         return gdof 
 
 class RaviartThomasFiniteElementSpace3d:
-    def __init__(self, mesh, p=0, q=None):
-        self.p = p
+    def __init__(self, mesh, p=0, q=None, dof=None):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh
+        p : the space order, p>=0
+        q : the index of quadrature fromula
+        dof : the object for degree of freedom
+
+        Note
+        ----
+        RT_p : [P_{p-1}]^d(T) + [m_1, m_2, m_3]^T \\bar P_{p-1}(T)
+
+        """
         self.mesh = mesh
+        self.p = p
+        self.smspace = ScaledMonomialSpace3d(mesh, p, q=q)
 
-        self.itype = mesh.itype
-        self.ftype = mesh.ftype
+        if dof is None:
+            self.dof = RTDof3d(mesh, p)
+        else:
+            self.dof = dof
 
-        q = q if q is not None else p+3 
-        self.integralalg = FEMeshIntegralAlg(
-                self.mesh, q,
-                cellmeasure=self.cellmeasure)
-        self.integrator = self.integralalg.integrator
+        self.integralalg = self.smspace.integralalg
+        self.integrator = self.smspace.integrator
 
+        self.itype = self.mesh.itype
+        self.ftype = self.mesh.ftype
+
+        self.bcoefs = self.basis_coefficients()
+
+    def basis_coefficients(self):
+        """
+
+        Notes
+        -----
+        3(p+1)(p+2)(p+3)/6 + (p+1)(p+2)/2 = (p+1)(p+2)(p+4)/2
+        """
+        p = self.p
+        ldof = self.number_of_local_dofs()
+        cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
+        fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
+
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+
+        LM, RM = self.smspace.face_cell_mass_matrix()
+        A = np.zeros((NC, ldof, ldof), dtype=self.ftype)
+
+        face = mesh.entity('face')
+        face2cell = mesh.ds.face_to_cell()
+        n = mesh.face_unit_normal() 
+
+        idx2 = np.arange(cdof)[None, None, :]
+        idx3 = np.arange(3*cdof, 3*cdof+fdof)[None, None, :]
+
+        idx0 = face2cell[:, [0]][:, None, None]
+        idx1 = (face2cell[:, [2]]*fdof + np.arange(fdof))[:, :, None]
+
+        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
+        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
+        A[idx0, idx1, 2*ndof + idx2] = n[:, 2, None, None]*LM[:, :, :ndof]
+        #TODO:
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  ndof:ndof+fdof] + n[:, 1, None, None]*LM[:, :, ndof+1:]
+
+        idx0 = face2cell[:, [1]][:, None, None]
+        idx1 = (face2cell[:, [3]]*fdof + np.arange(fdof))[:, :, None]
+
+        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
+        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*RM[:, :, :ndof]
+        A[idx0, idx1, 2*ndof + idx2] = n[:, 2, None, None]*RM[:, :, :ndof]
+        #TODO:
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*RM[:, :, ndof+1:]
+
+        if p > 0:
+            M = self.smspace.mass_matrix()
+            idx = self.smspace.index1()
+            x = idx['x']
+            y = idx['y']
+            idof = (p+1)*p//2
+            idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
+            A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
+            A[:, idx1, 2*ndof:] = M[:,  x[0], ndof-edof:]
+
+            idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
+            A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
+            A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
+
+        return inv(A)
+        pass
 
     def basis(self, bc):
         mesh = self.mesh

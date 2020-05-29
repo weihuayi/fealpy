@@ -21,6 +21,13 @@ class SMDof3d():
         cell2dof = np.arange(NC*cdof).reshape(NC, cdof)
         return cell2dof
 
+    def face_to_dof(self, p=None):
+        mesh = self.mesh
+        NF = mesh.number_of_faces()
+        fdof = self.number_of_local_dofs(p=p, etype='face')
+        face2dof = np.arange(NF*fdof).reshape(NF, fdof)
+        return face2dof
+
     def number_of_local_dofs(self, p=None, etype='cell'):
         p = self.p if p is None else p
         if etype in {'cell', 3}:
@@ -97,6 +104,9 @@ class ScaledMonomialSpace3d():
 
     def cell_to_dof(self, p=None):
         return self.dof.cell_to_dof(p=p)
+
+    def face_to_dof(self, p=None):
+        return self.dof.face_to_dof(p=p)
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -206,6 +216,9 @@ class ScaledMonomialSpace3d():
         return phi
 
     def grad_basis(self, point, index=None, p=None):
+        pass
+
+    def mass_matrix(self):
         pass
 
     def cell_mass_matrix(self):
