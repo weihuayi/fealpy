@@ -2,7 +2,9 @@ import numpy as np
 from .function import Function
 from ..quadrature import PolyhedronMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
-from ..common import ranges
+
+from .femdof import multi_index_matrix3d
+from .femdof import multi_index_matrix2d
 
 
 class SMDof3d():
@@ -128,6 +130,60 @@ class ScaledMonomialSpace3d():
     def number_of_global_dofs(self, p=None):
         return self.dof.number_of_global_dofs(p=p)
 
+    def diff_index_1(self, p=None):
+        """
+        计算关于 x, y, z 分别求一次导数后, 非零的基函数的编号及系数
+        Notes
+        -----
+
+        """
+        p = self.p if p is None else p
+        index = multi_index_matrix3d(p)
+        
+        x, = np.nonzero(index[:, 1] > 0)
+        y, = np.nonzero(index[:, 2] > 0)
+        z, = np.nonzero(index[:, 3] > 0)
+
+        return {'x':(x, index[x, 1]), 
+                'y':(y, index[y, 2]),
+                'z':(z, index[z, 3])
+                }
+
+    def diff_index_2(self, p=None):
+        """
+        计算基函数求二阶导数后的非零项
+        
+        Notes
+        -----
+        """
+        p = self.p if p is None else p
+        index = multi_index_matrix3d(p)
+        
+        xx, = np.nonzero(index[:, 1] > 1)
+        yy, = np.nonzero(index[:, 2] > 1)
+        zz, = np.nonzero(index[:, 3] > 1)
+
+        xy, = np.nonzero((index[:, 1] > 0) & (index[:, 2] > 0))
+        xz, = np.nonzero((index[:, 1] > 0) & (index[:, 3] > 0))
+        yz, = np.nonzero((index[:, 2] > 0) & (index[:, 3] > 0))
+
+        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
+                'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
+                'zz':(zz, index[zz, 3]*(index[zz, 3]-1)),
+                'xy':(xy, index[xx, 1]*index[xx, 2]),
+                'xz':(xz, index[xz, 1]*index[xz, 3]),
+                'yz':(yz, index[yz, 2]*index[yz, 3])
+                }
+
+    def face_index_1(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        x, = np.nonzero(index[:, 0] > 0)
+        y, = np.nonzero(index[:, 1] > 0)
+        z, = np.nonzero(index[:, 2] > 0)
+        return {'x': x, 'y':y, 'z':z}
+
+
     def basis(self, point, index=None, p=None):
         """
         Compute the basis values at point in cell
@@ -216,22 +272,165 @@ class ScaledMonomialSpace3d():
         return phi
 
     def grad_basis(self, point, index=None, p=None):
+        p = self.p if p is None else p
+        h = self.cellsize
+        num = len(h) if index is  None else len(index)
+        index = np.s_[:] if index is None else index 
+
+        ldof = self.number_of_local_dofs(p=p)
+        shape = point.shape[:-1]+(ldof, 3)
+        phi = self.basis(point, index=index, p=p-1)
+        idx = self.diff_index_1(p=p)
+        gphi = np.zeros(shape, dtype=np.float)
+        x = idx['x']
+        y = idx['y']
+        z = idx['z']
+        gphi[..., x[0], 0] = np.einsum('i, ...i->...i', x[1], phi) 
+        gphi[..., y[0], 1] = np.einsum('i, ...i->...i', y[1], phi)
+        gphi[..., z[0], 2] = np.einsum('i, ...i->...i', z[1], phi)
+
+        if point.shape[-2] == num:
+            return gphi/h[index].reshape(-1, 1, 1)
+        elif point.shape[0] == num:
+            return gphi/h[index].reshape(-1, 1, 1, 1)
+
+    def laplace_basis(self, point, index=None, p=None):
+        p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
+        area = self.cellmeasure
+        ldof = self.number_of_local_dofs(p=p)
+        shape = point.shape[:-1]+(ldof,)
+        lphi = np.zeros(shape, dtype=np.float)
+        if p > 1:
+            phi = self.basis(point, index=index, p=p-2)
+            idx = self.diff_index_2(p=p)
+            xx = idx['xx']
+            yy = idx['yy']
+            zz = idx['zz']
+            lphi[..., xx[0]] += np.einsum('i, ...i->...i', xx[1], phi)
+            lphi[..., yy[0]] += np.einsum('i, ...i->...i', yy[1], phi)
+        return lphi/area[index].reshape(-1, 1)
+
+    def hessian_basis(self, point, index=None, p=None):
+        """
+        Compute the value of the hessian of the basis at a set of 'point'
+
+        Parameters
+        ----------
+        point : numpy array
+            The shape of point is (..., NC, 2)
+
+        Returns
+        -------
+        hphi : numpy array
+            the shape of hphi is (..., NC, ldof, 2, 2)
+        """
+        p = self.p if p is None else p
+        index = index if index is not None else np.s_[:]
+
+        area = self.cellmeasure
+        ldof = self.number_of_local_dofs(p=p)
+        shape = point.shape[:-1]+(ldof, 3, 3)
+        hphi = np.zeros(shape, dtype=np.float)
+        if p > 1:
+            phi = self.basis(point, index=index, p=p-2)
+            idx = self.index2(p=p)
+            xx = idx['xx']
+            yy = idx['yy']
+            zz = idx['zz']
+            xy = idx['xy']
+            xz = idx['xz']
+            yz = idx['yz']
+            hphi[..., xx[0], 0, 0] = np.einsum('i, ...i->...i', xx[1], phi)
+            hphi[..., xy[0], 0, 1] = np.einsum('i, ...i->...i', xy[1], phi)
+            hphi[..., xz[0], 0, 2] = np.einsum('i, ...i->...i', xz[1], phi)
+            hphi[..., yy[0], 1, 1] = np.einsum('i, ...i->...i', yy[1], phi)
+            hphi[..., yz[0], 1, 2] = np.einsum('i, ...i->...i', yz[1], phi)
+            hphi[..., zz[0], 2, 2] = np.einsum('i, ...i->...i', zz[1], phi)
+            hphi[..., 1, 0] = hphi[..., 0, 1] 
+        return hphi/area[index].reshape(-1, 1, 1, 1)
+
+    def value(self, uh, point, index=None):
+        phi = self.basis(point, index=index)
+        cell2dof = self.dof.cell2dof
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        index = index if index is not None else np.s_[:]
+        return np.einsum(s1, phi, uh[cell2dof[index]])
+
+    def grad_value(self, uh, point, index=None):
+        gphi = self.grad_basis(point, index=index)
+        cell2dof = self.dof.cell2dof
+        index = index if index is not None else np.s_[:]
+        if (type(index) is np.ndarray) and (index.dtype.name == 'bool'):
+            N = np.sum(index)
+        elif type(index) is slice:
+            N = len(cell2dof)
+        else:
+            N = len(index)
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        if point.shape[-2] == N:
+            s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+            return np.einsum(s1, gphi, uh[cell2dof[index]])
+        elif point.shape[0] == N:
+            return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
+
+    def laplace_value(self, uh, point, index=None):
+        lphi = self.laplace_basis(point, index=index)
+        cell2dof = self.dof.cell2dof
+        index = index if index is not None else np.s_[:]
+        return np.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
+
+    def hessian_value(self, uh, point, index=None):
+        #TODO:
         pass
 
-    def mass_matrix(self):
-        pass
+    def mass_matrix(self, p=None):
+        return self.cell_mass_matrix(p=p)
 
-    def cell_mass_matrix(self):
-        pass
+    def cell_mass_matrix(self, p=None):
+        """
+        """
+        p = self.p if p is None else p
+        def f(x, index=None):
+            phi = self.basis(x, index=index, p=p)
+            return np.einsum('ijkm, ijpm->ijkp', phi, phi)
+        M = self.integralalg.cell_integral(f, celltype=True, q=p+3)
+        return M 
 
-    def face_mass_matrix(self):
-        pass
+    def face_mass_matrix(self, p=None):
+        p = self.p if p is None else p
+        def f(x, index=None):
+            phi = self.face_basis(x, index=index, p=p)
+            return np.einsum('ijkm, ijpm->ijkp', phi, phi)
+        M = self.integralalg.face_integral(f, celltype=True, q=p+3)
+        return M
+    
+    def face_cell_mass_matrix(self, p=None):
+        p = self.p if p is None else p
+        mesh = self.mesh
+
+        face = mesh.entity('face')
+        measure = mesh.entity_measure('face')
+
+        face2cell = mesh.ds.face_to_cell()
+
+        qf = mesh.integrator(p+3, 'face') 
+        bcs, ws = qf.quadpts, qf.weights
+        ps = mesh.bc_to_point(bcs, 'face')
+        phi0 = self.face_basis(ps, p=p)
+        phi1 = self.basis(ps, index=face2cell[:, 0], p=p+1)
+        phi2 = self.basis(ps, index=face2cell[:, 1], p=p+1)
+
+        LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
+        RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
+        return LM, RM 
 
     def show_frame(self, axes, index=1):
         n = np.array([[1.0, 2.0, 1.0], [-1.0, 2.0, 1.0]], dtype=np.float)/np.sqrt(6)
         a, b, frame = np.linalg.svd(n[:, None, :])
-        print(a, a.shape)
-        print(frame, frame.shape)
         a = a.reshape(-1)
         frame[a == 1, 2, :] *= -1
         frame[a ==-1] *=-1
@@ -247,20 +446,26 @@ class ScaledMonomialSpace3d():
         import matplotlib.pyplot as plt
         import mpl_toolkits.mplot3d as a3
         from scipy.spatial import Delaunay
+        import sympy as sp
+        from sympy.abc import x, y, z
+
 
         from .femdof import multi_index_matrix3d
         from ..mesh import MeshFactory
         from ..mesh import TetrahedronMesh
 
         mfactory = MeshFactory()
-        bc = multi_index_matrix3d(p)/p
+        index = multi_index_matrix3d(p)
+        phi = x**index[:, 1]*y**index[:, 2]*z**index[:, 3]
+        phi = ['$'+x+'$' for x in map(sp.latex, phi)]
+        bc = index/p
 
         mesh0 = mfactory.one_tetrahedron_mesh(ttype='equ') # 正四面体
         node0 = mesh0.entity('node')
 
         # plot
         fig = plt.figure()
-        axes = fig.add_subplot(121, projection='3d')
+        axes = fig.add_subplot(131, projection='3d')
         axes.set_axis_off()
 
         edge0 = np.array([(0, 1), (0, 3), (1, 2), (1, 3), (2, 3)], dtype=np.int)
@@ -271,12 +476,11 @@ class ScaledMonomialSpace3d():
         lines = a3.art3d.Line3DCollection(node0[edge1], color='gray', linewidths=2,
                 alpha=0.5)
         axes.add_collection3d(lines)
-
         mesh0.find_node(axes, showindex=True, color='k', fontsize=15,
-                markersize=50)
+                markersize=10)
+
 
         node1 = mesh0.bc_to_point(bc).reshape(-1, 3)
-
         idx = np.arange(1, p+2)
         idx = np.cumsum(np.cumsum(idx))
 
@@ -290,7 +494,7 @@ class ScaledMonomialSpace3d():
             isFace[flag] = True
         face = face[isFace]
 
-        axes = fig.add_subplot(122, projection='3d')
+        axes = fig.add_subplot(132, projection='3d')
         axes.set_axis_off()
 
         lines = a3.art3d.Line3DCollection(node0[edge0], color='k', linewidths=2)
@@ -299,12 +503,26 @@ class ScaledMonomialSpace3d():
         lines = a3.art3d.Line3DCollection(node0[edge1], color='gray', linewidths=2,
                 alpha=0.5)
         axes.add_collection3d(lines)
-
         faces = a3.art3d.Poly3DCollection(node1[face], facecolor='w', edgecolor='k',
                 linewidths=1, linestyle=':', alpha=0.3)
         axes.add_collection3d(faces)
         mesh1.find_node(axes, showindex=True, color='r', fontsize=15,
-                markersize=50)
+                markersize=10)
+
+        axes = fig.add_subplot(133, projection='3d')
+        axes.set_axis_off()
+        lines = a3.art3d.Line3DCollection(node0[edge0], color='k', linewidths=2)
+        axes.add_collection3d(lines)
+
+        lines = a3.art3d.Line3DCollection(node0[edge1], color='gray', linewidths=2,
+                alpha=0.5)
+        axes.add_collection3d(lines)
+        faces = a3.art3d.Poly3DCollection(node1[face], facecolor='w', edgecolor='k',
+                linewidths=1, linestyle=':', alpha=0.3)
+        axes.add_collection3d(faces)
+        mesh1.find_node(axes, showindex=True, color='r', fontsize=15,
+                markersize=10, multiindex=phi)
+
         plt.show()
 
     def show_face_basis_index(self, p=1):

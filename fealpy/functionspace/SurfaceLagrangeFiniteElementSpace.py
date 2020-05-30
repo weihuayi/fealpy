@@ -124,11 +124,16 @@ class SurfaceLagrangeFiniteElementSpace:
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
 
-    def source_vector(self, f):
+    def source_vector(self, f, barrycenter=False):
         p = self.p
+        # bcs : (NQ, 3)
+        # ws : (NQ, )
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        pp = self.mesh.bc_to_point(bcs)
-        fval = f(pp)
+        if barrycenter:
+            fval = f(bcs)
+        else:
+            pp = self.mesh.bc_to_point(bcs)
+            fval = f(pp)
         phi = self.basis(bcs)
         bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, self.cellmeasure)
         cell2dof = self.dof.cell2dof

@@ -21,7 +21,7 @@ class FEMeshIntegralAlg():
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
 
-    def matrix_integral(self, basis0, basis1):
+    def matrix_integral(self, basis0, basis1=None, cell_to_dof=None):
         pass
 
     def edge_integral(self, u, edgetype=False, q=None, barycenter=False):

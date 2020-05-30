@@ -126,6 +126,7 @@ class RaviartThomasFiniteElementSpace3d:
         """
         p = self.p
         ldof = self.number_of_local_dofs()
+        
         cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
         fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
 
@@ -145,20 +146,28 @@ class RaviartThomasFiniteElementSpace3d:
         idx0 = face2cell[:, [0]][:, None, None]
         idx1 = (face2cell[:, [2]]*fdof + np.arange(fdof))[:, :, None]
 
-        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, 2*ndof + idx2] = n[:, 2, None, None]*LM[:, :, :ndof]
-        #TODO:
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  ndof:ndof+fdof] + n[:, 1, None, None]*LM[:, :, ndof+1:]
+        A[idx0, idx1, 0*cdof + idx2] = n[:, 0, None, None]*LM[:, :, :cdof]
+        A[idx0, idx1, 1*cdof + idx2] = n[:, 1, None, None]*LM[:, :, :cdof]
+        A[idx0, idx1, 2*cdof + idx2] = n[:, 2, None, None]*LM[:, :, :cdof]
+
+        idx = self.smspace.face_index_1()
+        x = idx['x']
+        y = idx['y']
+        z = idx['z']
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  cdof+x] + \
+                n[:, 1, None, None]*LM[:, :, cdof+y] + \
+                n[:, 2, None, None]*LM[:, :, cdof+z]
 
         idx0 = face2cell[:, [1]][:, None, None]
         idx1 = (face2cell[:, [3]]*fdof + np.arange(fdof))[:, :, None]
 
-        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
-        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*RM[:, :, :ndof]
-        A[idx0, idx1, 2*ndof + idx2] = n[:, 2, None, None]*RM[:, :, :ndof]
+        A[idx0, idx1, 0*cdof + idx2] = n[:, 0, None, None]*RM[:, :, :cdof]
+        A[idx0, idx1, 1*cdof + idx2] = n[:, 1, None, None]*RM[:, :, :cdof]
+        A[idx0, idx1, 2*cdof + idx2] = n[:, 2, None, None]*RM[:, :, :cdof]
         #TODO:
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*RM[:, :, ndof+1:]
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  cdof+x] + \
+                n[:, 1, None, None]*RM[:, :, cdof+y] + \
+                n[:, 2, None, None]*RM[:, :, cdof+z]
 
         if p > 0:
             M = self.smspace.mass_matrix()

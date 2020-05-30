@@ -51,7 +51,6 @@ def find_node(
                                 fontsize=fontsize, 
                                 color=fontcolor)
                 else:
-                    print(multiindex)
                     for i, idx in enumerate(multiindex):
                         axes.text(bc[i, 0], bc[i, 1], str(idx),
                                 multialignment='center',
@@ -65,9 +64,26 @@ def find_node(
     else:
         axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
         if showindex:
-            for i in range(len(index)):
-                axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]),
-                         multialignment='center', fontsize=fontsize, color=fontcolor) 
+            if multiindex is not None:
+                if (type(multiindex) is np.ndarray) and (len(multiindex.shape) > 1):
+                    for i, idx in enumerate(multiindex):
+                        s = str(idx).replace('[', '(')
+                        s = s.replace(']', ')')
+                        s = s.replace(' ', ',')
+                        axes.text(bc[i, 0], bc[i, 1], bc[i, 2], s,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor)
+                else:
+                    for i, idx in enumerate(multiindex):
+                        axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(idx),
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+            else:
+                for i in range(len(index)):
+                    axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]),
+                             multialignment='center', fontsize=fontsize, color=fontcolor) 
 
 
 def find_entity(

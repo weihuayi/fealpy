@@ -12,7 +12,7 @@ class ScaledMonomialSpace3dTest:
         pass
     def one_tet_mesh_test(self, p, plot=True):
         mfactory = MeshFactory()
-        mesh = mfactory.one_tet_mesh()
+        mesh = mfactory.one_tetrahedron_mesh()
         space = ScaledMonomialSpace3d(mesh, p=p)
         if plot:
             fig = plt.figure()
@@ -20,6 +20,22 @@ class ScaledMonomialSpace3dTest:
             mesh.add_plot(axes)
             axes.set_axis_off()
             plt.show()
+
+    def diff_index_test(self, p=3):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tetrahedron_mesh()
+        space = ScaledMonomialSpace3d(mesh, p=p)
+        index = space.diff_index_1()
+        print(index)
+        index = space.diff_index_2()
+        print(index)
+
+    def face_index_test(self, p=3):
+        mfactory = MeshFactory()
+        mesh = mfactory.one_tetrahedron_mesh()
+        space = ScaledMonomialSpace3d(mesh, p=p)
+        space.face_diff_index_1()
+
 
     def show_frame_test(self):
         fig = plt.figure()
@@ -32,7 +48,7 @@ class ScaledMonomialSpace3dTest:
 
     def show_cell_basis_index_test(self):
         mfactory = MeshFactory()
-        mesh = mfactory.one_tettrahedron_mesh()
+        mesh = mfactory.one_tetrahedron_mesh()
         space = ScaledMonomialSpace3d(mesh, p=3)
         space.show_cell_basis_index(p=3)
 
@@ -77,7 +93,9 @@ class ScaledMonomialSpace3dTest:
 test = ScaledMonomialSpace3dTest()
 #test.one_tet_mesh_test(p=1)
 #test.show_frame_test() 
-#test.show_cell_basis_index_test()
 #test.show_face_basis_index_test()
 #test.face_basis_test()
-test.cell_basis_test()
+#test.cell_basis_test()
+#test.diff_index_test(p=3)
+#test.show_cell_basis_index_test()
+test.face_index_test()
