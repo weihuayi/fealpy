@@ -164,38 +164,60 @@ class RaviartThomasFiniteElementSpace3d:
         A[idx0, idx1, 0*cdof + idx2] = n[:, 0, None, None]*RM[:, :, :cdof]
         A[idx0, idx1, 1*cdof + idx2] = n[:, 1, None, None]*RM[:, :, :cdof]
         A[idx0, idx1, 2*cdof + idx2] = n[:, 2, None, None]*RM[:, :, :cdof]
-        #TODO:
         A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  cdof+x] + \
                 n[:, 1, None, None]*RM[:, :, cdof+y] + \
                 n[:, 2, None, None]*RM[:, :, cdof+z]
 
         if p > 0:
-            M = self.smspace.mass_matrix()
-            idx = self.smspace.index1()
+            M = self.smspace.cell_mass_matrix()
+            idx = self.smspace.diff_index_1()
             x = idx['x']
             y = idx['y']
-            idof = (p+1)*p//2
-            idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
-            A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  x[0], ndof-edof:]
+            z = idx['z']
 
-            idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
-            A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
+            idof = ldof - 4*fdof 
+            idx1 = np.arange(4*fdof+0*idof, 4*fdof+1*idof)[:, None]
+            A[:, idx1, 0*cdof + np.arange(cdof)] = M[:, :idof, :]
+            A[:, idx1, 3*cdof:] = M[:,  x[0], cdof-fdof:]
+
+            idx1 = np.arange(4*fdof+1*idof, 4*fdof+2*idof)[:, None]
+            A[:, idx1, 1*cdof + np.arange(cdof)] = M[:, :idof, :]
+            A[:, idx1, 3*cdof:] = M[:,  y[0], cdof-fdof:]
+
+            idx1 = np.arange(4*fdof+2*idof, 4*fdof+3*idof)[:, None]
+            A[:, idx1, 2*cdof + np.arange(cdof)] = M[:, :idof, :]
+            A[:, idx1, 3*cdof:] = M[:,  z[0], cdof-fdof:]
 
         return inv(A)
-        pass
 
     def basis(self, bc):
-        mesh = self.mesh
-        dim = mesh.geom_dimension()
-
+        """
+        """
         ldof = self.number_of_local_dofs()
+        
+        cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
+        fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
 
-        p = self.p
-        phi = np.zeors((NC, ldof, dim), dtype=self.dtype)
+        ps = mesh.bc_to_point(bc)
+        shape = ps.shape[:-1] + (ldof, 3)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 3)
 
+        c = self.bcoefs # (NC, ldof, ldof) 
+        x = np.arange(ndof, ndof+edof)
+        y = x + 1
 
+        val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
+        idx = self.smspace.face_index_1(p=p+1)
+        x = idx['x']
+        y = idx['y']
+        z = idx['z']
+    
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
+        phi[..., 2] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 2*cdof:3*cdof, :])
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 3*cdof:, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 3*cdof:, :])
+        phi[..., 2] += np.einsum('ijm, jmn->ijn', val[..., z], c[:, 3*cdof:, :])
         return phi
 
     def grad_basis(self, bc):
@@ -251,9 +273,30 @@ class RaviartThomasFiniteElementSpace3d:
             print("error!")
 
     # helper function for understand RT finite element  
+
     def show_face_frame(self, axes, index):
         pass
 
-    def show_basis(self, axes, index):
-        pass
+    def show_basis(self, fig, index):
+        """
+        Plot quvier graph for every basis in a fig object
+        """
+        from .femdof import multi_index_matrix3d
 
+        p = self.p
+        mesh = self.mesh
+
+        ldof = self.number_of_local_dofs()
+
+        bcs = multi_index_matrix3d(10)/10
+        ps = mesh.bc_to_point(bcs)
+        phi = self.basis(bcs)
+        for i in range(ldof):
+            axes = fig.add_subplot(1, ldof, i+1, projection='3d')
+            mesh.add_plot(axes, box=box)
+            node = ps[:, index, :]
+            v = phi[:, index, i, :]
+            axes.quiver(
+                    node[:, 0], node[:, 1], node[:, 2], 
+                    v[:, 0], v[:, 1], v[:, 2], length=0.1
+                    )

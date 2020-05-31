@@ -414,7 +414,6 @@ class ScaledMonomialSpace3d():
 
         face = mesh.entity('face')
         measure = mesh.entity_measure('face')
-
         face2cell = mesh.ds.face_to_cell()
 
         qf = mesh.integrator(p+3, 'face') 
