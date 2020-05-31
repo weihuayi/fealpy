@@ -269,12 +269,13 @@ class RaviartThomasFiniteElementSpace3d:
         elif p == 2:
             m = 6
             n = 6
-
         for i in range(ldof):
             axes = fig.add_subplot(m, n, i+1, projection='3d')
             mesh.add_plot(axes)
             node = ps[:, index, :]
             v = phi[:, index, i, :]
+            l = np.max(np.sqrt(np.sum(v**2, axis=-1)))
+            v /=l
             axes.quiver(
                     node[:, 0], node[:, 1], node[:, 2], 
-                    v[:, 0], v[:, 1], v[:, 2], length=0.05)
+                    v[:, 0], v[:, 1], v[:, 2], length=1)

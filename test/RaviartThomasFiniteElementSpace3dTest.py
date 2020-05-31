@@ -18,7 +18,7 @@ class RaviartThomasFiniteElementSpace3dTest:
         self.meshfactory = MeshFactory()
 
     def show_basis_test(self, p=0):
-        mesh = self.meshfactory.one_tetrahedron_mesh(ttype='iso')
+        mesh = self.meshfactory.one_tetrahedron_mesh(ttype='equ')
         space = RaviartThomasFiniteElementSpace3d(mesh, p=p, q=2)
         fig = plt.figure()
         space.show_basis(fig)
@@ -26,4 +26,4 @@ class RaviartThomasFiniteElementSpace3dTest:
 
 
 test = RaviartThomasFiniteElementSpace3dTest()
-test.show_basis_test(p=1)
+test.show_basis_test(p=0)
