@@ -7,6 +7,7 @@ from ..quadrature import PolygonMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
+from .femdof import multi_index_matrix2d
 
 class SMDof2d():
     """
@@ -85,6 +86,31 @@ class ScaledMonomialSpace2d():
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
+
+    def diff_index_1(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        x, = np.nonzero(index[:, 1] > 0)
+        y, = np.nonzero(index[:, 2] > 0)
+
+        return {'x':(x, index[x, 1]), 
+                'y':(y, index[y, 2]),
+                }
+
+    def diff_index_2(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        xx, = np.nonzero(index[:, 1] > 1)
+        yy, = np.nonzero(index[:, 2] > 1)
+
+        xy, = np.nonzero((index[:, 1] > 0) & (index[:, 2] > 0))
+
+        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
+                'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
+                'xy':(xy, index[xy, 1]*index[xy, 2]),
+                }
 
     def index1(self, p=None):
         """
@@ -170,7 +196,7 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
         center = self.integralalg.edgebarycenter
         h = self.integralalg.edgemeasure
-        t = self.mesh.edge_unit_tagent()
+        t = self.mesh.edge_unit_tangent()
         val = np.sum((point - center[index])*t[index], axis=-1)/h[index]
         phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:

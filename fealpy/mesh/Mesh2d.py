@@ -101,11 +101,11 @@ class Mesh2d():
         return bc
 
     def face_unit_normal(self, index=None):
-        v = self.face_unit_tagent(index=index)
+        v = self.face_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def face_unit_tagent(self, index=None):
+    def face_unit_tangent(self, index=None):
         edge = self.entity('edge')
         node = self.entity('node')
         NE = self.number_of_edges()
@@ -116,11 +116,11 @@ class Mesh2d():
         return v
 
     def face_normal(self, index=None):
-        v = self.face_tagent(index=index)
+        v = self.face_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def face_tagent(self, index=None):
+    def face_tangent(self, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
         index = index if index is not None else np.s_[:]
@@ -136,17 +136,17 @@ class Mesh2d():
         return length
 
     def edge_frame(self, index=None):
-        t = self.edge_unit_tagent(index=index)
+        t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
     def edge_unit_normal(self, index=None):
         #TODO: 3D Case
-        v = self.edge_unit_tagent(index=index)
+        v = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_unit_tagent(self, index=None):
+    def edge_unit_tangent(self, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
         NE = self.number_of_edges()
@@ -157,11 +157,11 @@ class Mesh2d():
         return v
 
     def edge_normal(self, index=None):
-        v = self.edge_tagent(index=index)
+        v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_tagent(self, index=None):
+    def edge_tangent(self, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
         index = index if index is not None else np.s_[:]

@@ -14,7 +14,7 @@ class ScaledMonomialSpace2dTest:
     def __init__(self):
         pass
 
-    def index1_test(self, p=2):
+    def diff_index_1_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -24,10 +24,13 @@ class ScaledMonomialSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = ScaledMonomialSpace2d(mesh, 1)
+        print("diff index 1:")
         idx = space.index1(p=p)
         print("p=", p, "\n", idx)
+        idx = space.diff_index_1(p=p)
+        print("p=", p, "\n", idx)
 
-    def index2_test(self, p=2):
+    def diff_index_2_test(self, p=2):
         node = np.array([
             (0.0, 0.0),
             (1.0, 0.0),
@@ -37,7 +40,10 @@ class ScaledMonomialSpace2dTest:
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
         space = ScaledMonomialSpace2d(mesh, 3)
+        print("diff index 2:")
         idx = space.index2(p=p)
+        print("p=", p, "\n", idx)
+        idx = space.diff_index_2(p=p)
         print("p=", p, "\n", idx)
 
     def edge_mass_matrix_test(self, p=2):
@@ -79,12 +85,12 @@ class ScaledMonomialSpace2dTest:
 
 
 test = ScaledMonomialSpace2dTest()
-test.index1_test(p=1)
-test.index1_test(p=2)
-test.index1_test(p=3)
+test.diff_index_1_test(p=1)
+test.diff_index_1_test(p=2)
+test.diff_index_1_test(p=3)
 
-test.index2_test(p=3)
-test.index2_test(p=4)
+test.diff_index_2_test(p=3)
+test.diff_index_2_test(p=4)
 
-test.edge_mass_matrix_test(p=3)
-test.project_test()
+#test.edge_mass_matrix_test(p=3)
+#test.project_test()
