@@ -69,8 +69,11 @@ class CPLFEMDof1d():
             cell2dof[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
             return cell2dof
 
-    def number_of_local_dofs(self):
-        return self.p + 1
+    def number_of_local_dofs(self, etype='cell'):
+        if etype in {'cell', 1}:
+            return self.p + 1
+        elif etype in {'face', 'edge', 'node', 0}:
+            return 1
 
     def number_of_global_dofs(self):
         p = self.p
@@ -242,9 +245,14 @@ class CPLFEMDof2d():
             gdof += (ldof - 3*p)*NC
         return gdof
 
-    def number_of_local_dofs(self):
+    def number_of_local_dofs(self, etype='cell'):
         p = self.p
-        return (p+1)*(p+2)//2
+        if etype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif etype in {'face', 'edge',  1}:
+            return self.p + 1
+        elif etype in {'node', 0}:
+            return 1
 
 class CPLFEMDof3d():
     def __init__(self, mesh, p):
@@ -513,10 +521,16 @@ class CPLFEMDof3d():
         return gdof
 
 
-    def number_of_local_dofs(self):
+    def number_of_local_dofs(self, etype='cell'):
         p = self.p
-        ldof = (p+1)*(p+2)*(p+3)//6
-        return ldof
+        if etype in {'cell', 3}:
+            return (p+1)*(p+2)*(p+3)//6
+        elif etype in {'face', 2}:
+            return (p+1)*(p+2)//2
+        elif etype in {'edge', 1}:
+            return p + 1
+        elif etype in {'node', 0}:
+            return 1
 
     def interpolation_points(self):
         p = self.p

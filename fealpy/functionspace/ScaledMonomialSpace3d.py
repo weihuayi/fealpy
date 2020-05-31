@@ -2,9 +2,7 @@ import numpy as np
 from .function import Function
 from ..quadrature import PolyhedronMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
-
-from .femdof import multi_index_matrix3d
-from .femdof import multi_index_matrix2d
+from .femdof import multi_index_matrix2d, multi_index_matrix3d
 
 
 class SMDof3d():
@@ -176,6 +174,11 @@ class ScaledMonomialSpace3d():
                 }
 
     def face_index_1(self, p=None):
+        """
+        Parameters
+        ----------
+        p : >= 1
+        """
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
         x, = np.nonzero(index[:, 0] > 0)
@@ -393,11 +396,7 @@ class ScaledMonomialSpace3d():
     def cell_mass_matrix(self, p=None):
         """
         """
-        p = self.p if p is None else p
-        def f(x, index=None):
-            phi = self.basis(x, index=index, p=p)
-            return np.einsum('ijkm, ijpm->ijkp', phi, phi)
-        M = self.integralalg.cell_integral(f, celltype=True, q=p+3)
+        M = self.integralalg.cell_matrix_integral(self.basis, barycenter=False)
         return M 
 
     def face_mass_matrix(self, p=None):

@@ -8,6 +8,69 @@ class BoundaryCondition():
         self.neumann = neumann
         self.robin = robin
 
+    def apply_robin_bc(self, A, b, is_robin_boundary=None):
+        """
+        apply the Robin boundary condition GD space.
+
+        Parameter
+        ---------
+        A : matrix with shape (GD*N, GD*N)
+        b : vector with shape (GD*N, )
+
+        Returns
+        -------
+
+        See also
+        --------
+
+        Notes
+        -----
+        The GD is the dimension of the problem space, and N is the number of
+        dofs.
+
+        Examples
+        --------
+
+        """
+        if self.robin is not None:
+            space = self.space
+            p = space.p
+            mesh = space.mesh
+            dim = 1 if len(b.shape) == 1 else b.shape[1]
+            face2dof = space.face_to_dof()
+
+            # find the index of all robin boundary 
+            idx = mesh.ds.boundary_face_index()
+            if is_robin_boundary is not None:
+                bc = mesh.entity_barycenter('face', index=idx)
+                flag = is_neumann_boundary(bc)
+                idx = idx[flag]
+
+            measure = mesh.entity_measure('face', index=idx)
+            qf = mesh.integrator(p+3, 'face')
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            phi = space.face_basis(bcs)
+            pp = mesh.bc_to_point(bcs, etype='face', index=idx)
+            n = mesh.face_unit_normal(index=idx)
+            val, kappa = self.robin(pp, n) # (NQ, NF, ...)
+            bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+            if dim == 1:
+                np.add.at(b, face2dof[idx], bb)
+            else:
+                np.add.at(b, (face2dof[idx], np.s_[:]), bb)
+
+            FM = np.einsum('m, mi, mij, mik, i->ijk', kappa, ws, phi, phi, measure)
+
+            fdof = space.number_of_local_dofs(etype='face')
+            I = np.einsum('k, ij->ijk', np.ones(fdof), face2dof)
+            J = I.swapaxes(-1, -2)
+            gdof = self.number_of_global_dofs()
+
+            # Construct the stiffness matrix
+            A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+
+
+
     def apply_neumann_bc(self, b, is_neumann_boundary=None):
         """
 

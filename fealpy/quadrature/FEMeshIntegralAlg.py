@@ -21,8 +21,26 @@ class FEMeshIntegralAlg():
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
 
-    def matrix_integral(self, basis0, basis1=None, cell_to_dof=None):
-        pass
+    def cell_matrix_integral(self, basis0, basis1=None, barycenter=False, cell_to_dof=None, q=None):
+
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.quadpts, qf.weights
+
+        if barycenter is False:
+            bcs  =  mesh.bc_to_point(bcs)
+
+        phi0 = basis0(bcs)
+        if basis1 is None:
+            phi1 = phi0
+        else:
+            phi1 = basis1(bcs)
+
+        M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
+                self.cellmeasure, optimize=True)
+
+        return M
+
 
     def edge_integral(self, u, edgetype=False, q=None, barycenter=False):
         mesh = self.mesh
