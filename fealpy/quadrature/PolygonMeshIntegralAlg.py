@@ -6,15 +6,20 @@ class PolygonMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None, cellbarycenter=None):
         self.mesh = mesh
 
-        self.cellmeasure = cellmeasure if cellmeasure is not None \
-                else mesh.entity_measure('cell')
+        self.integrator = mesh.integrator(q)
+        self.cellintegrator = self.integrator 
         self.cellbarycenter = cellbarycenter if cellbarycenter is not None \
                 else mesh.entity_barycenter('cell')
-        self.cellintegrator = mesh.integrator(q)
+        self.cellmeasure = cellmeasure if cellmeasure is not None \
+                else mesh.entity_measure('cell')
 
         self.edgemeasure = mesh.entity_measure('edge')
         self.edgebarycenter = mesh.entity_barycenter('edge')
         self.edgeintegrator = GaussLegendreQuadrature(q)
+
+        self.facemeasure = self.edgemeasure
+        self.facebarycenter = self.edgebarycenter
+        self.faceintegrator = self.edgeintegrator
 
     def triangle_measure(self, tri):
         v1 = tri[1] - tri[0]

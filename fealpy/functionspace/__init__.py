@@ -12,6 +12,8 @@ from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonC
 
 from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
 from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
+
+from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
 from .FourierSpace import FourierSpace
 
 #from .mixed_fem_space import RTFiniteElementSpace2d

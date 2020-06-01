@@ -168,7 +168,7 @@ class ScaledMonomialSpace3d():
         return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
                 'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
                 'zz':(zz, index[zz, 3]*(index[zz, 3]-1)),
-                'xy':(xy, index[xx, 1]*index[xx, 2]),
+                'xy':(xy, index[xy, 1]*index[xy, 2]),
                 'xz':(xz, index[xz, 1]*index[xz, 3]),
                 'yz':(yz, index[yz, 2]*index[yz, 3])
                 }

@@ -127,6 +127,7 @@ class RTDof2d:
             cell2edge = mesh.ds.cell_to_edge()
             return cell2edge
         else:
+            NE = mesh.number_of_edges()
             NC = mesh.number_of_cells()
             edof = self.number_of_local_dofs('edge') 
             cdof = self.number_of_local_dofs('cell')
@@ -136,9 +137,8 @@ class RTDof2d:
             edge2cell = mesh.ds.edge_to_cell()
             cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
             cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
-            if p > 1:
-                idof = cdof - 3*edof 
-                cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
+            idof = cdof - 3*edof 
+            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
 
     def number_of_local_dofs(self, etype='cell'):
@@ -458,8 +458,18 @@ class RaviartThomasFiniteElementSpace2d:
         bcs = multi_index_matrix2d(10)/10
         ps = mesh.bc_to_point(bcs)
         phi = self.basis(bcs)
+
+        if p == 0:
+            m = 1
+            n = 3
+        elif p == 1:
+            m = 4 
+            n = 2 
+        elif p == 2:
+            m = 5 
+            n = 3 
         for i in range(ldof):
-            axes = fig.add_subplot(1, ldof, i+1)
+            axes = fig.add_subplot(m, n, i+1)
             mesh.add_plot(axes, box=box)
             node = ps[:, index, :]
             uv = phi[:, index, i, :]

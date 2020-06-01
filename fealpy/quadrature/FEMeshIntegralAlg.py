@@ -4,6 +4,9 @@ class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
         self.integrator = mesh.integrator(q, 'cell')
+
+        self.cellintegrator = self.integrator
+        self.cellbarycenter =  mesh.entity_barycenter('cell')
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
 
