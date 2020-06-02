@@ -116,6 +116,7 @@ class ScaledMonomialSpace2d():
         """
         缩放单项式基函数求一次导数后，非零的基函数编号，及因求导出现的系数
         """
+        
         p = self.p if p is None else p
         n = (p+1)*(p+2)//2
         idx1 = np.cumsum(np.arange(p+1))

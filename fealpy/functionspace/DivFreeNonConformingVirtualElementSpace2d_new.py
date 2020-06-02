@@ -135,7 +135,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         uh[c2d[:, 0:idof0]] = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         if p > 2:
             # G_{k-2}^\perp 空间对应的自由度
-            idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            idx = self.smspace.diff_index_1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
             def u2(x, index):
@@ -217,7 +217,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             cell2dofLocation = self.dof.cell2dofLocation # 边上的标量的自由度信息
             CM = self.CM
 
-            idx = self.smspace.index1(p=p-2)
+            idx = self.smspace.diff_index_1(p=p-2)
             x = idx['x']
             y = idx['y']
             Q = CM[:, x[0][:, None], x[0]] + CM[:, y[0][:, None], y[0]]
@@ -253,7 +253,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         G01 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
         G11 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
 
-        idx = self.smspace.index1()
+        idx = self.smspace.diff_index_1()
         x = idx['x']
         y = idx['y']
         L = x[1][None, ...]/ch[..., None]
@@ -327,10 +327,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx1 = self.smspace.index1(p=p-1)
+        idx1 = self.smspace.diff_index_1(p=p-1)
         x = idx1['x']
         y = idx1['y']
-        idx2 = self.smspace.index2(p=p)
+        idx2 = self.smspace.diff_index_2(p=p)
         xx = idx2['xx']
         yy = idx2['yy']
         xy = idx2['xy']
@@ -346,7 +346,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         if p > 2:
             idx = np.arange(idof0, idof)
-            idx0 = self.smspace.index1(p=p-2)
+            idx0 = self.smspace.diff_index_1(p=p-2)
             x0 = idx0['x']
             y0 = idx0['y']
             R02[:, xx[0][y0[0]], idx] -= c[y0[0]] 
@@ -375,7 +375,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         # F0: (NE, ndof, p)
         F0 = F0@self.H1
 
-        idx = self.smspace.index1(p=p) # 一次求导后的非零基函数编号及求导系数
+        idx = self.smspace.diff_index_1(p=p) # 一次求导后的非零基函数编号及求导系数
         x = idx['x']
         y = idx['y']
         # idx0: (NE, p)
@@ -466,7 +466,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R12[:, :, 1] += CM[:, :, 0]/area[:, None]
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        idx0 = self.smspace.index1(p=p-1)
+        idx0 = self.smspace.diff_index_1(p=p-1)
         x0 = idx0['x']
         y0 = idx0['y']
         J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
@@ -477,7 +477,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         J2[:, y0[0], y0[0] - 1] -= ch[:, None]*c
         if p > 2:
             idx = np.arange(idof0, idof)
-            idx1 = self.smspace.index1(p=p-2)
+            idx1 = self.smspace.diff_index_1(p=p-2)
             x1 = idx1['x']
             y1 = idx1['y']
             J2[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
@@ -549,7 +549,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
                     self.smspace.basis(x, p=p, index=index))
         D1[:, :, :idof0, :] = self.integralalg.integral(u0, celltype=True)/ch[:, None, None, None]
         if p > 2:
-            idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            idx = self.smspace.diff_index_1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
             D1[:, 0, idof0:, :] =  CM[:, y[0], :]/area[:, None, None] # check here
@@ -588,7 +588,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         U21 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         U22 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx0 = self.smspace.index1(p=p-1) # 一次求导后的非零基函数编号及求导系数
+        idx0 = self.smspace.diff_index_1(p=p-1) # 一次求导后的非零基函数编号及求导系数
         x0 = idx0['x']
         y0 = idx0['y']
         c = 1.0/np.repeat(range(1, p), range(1, p))
@@ -602,7 +602,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         if p > 2:
             idx = np.arange(idof0, idof)
-            idx1 = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            idx1 = self.smspace.diff_index_1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x1 = idx1['x']
             y1 = idx1['y']
             U02[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]

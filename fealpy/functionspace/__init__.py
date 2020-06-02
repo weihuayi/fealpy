@@ -7,6 +7,7 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
+
 from .DivFreeNonConformingVirtualElementSpace2d_new import DivFreeNonConformingVirtualElementSpace2d
 from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
 
