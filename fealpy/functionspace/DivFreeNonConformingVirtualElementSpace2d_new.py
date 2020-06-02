@@ -187,13 +187,14 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [ 0, D0],
                 [D1, D2]])
 
+            sio.savemat('test1.mat', {'pC':PI0[0:2*smldof]@D})
+
             idx = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
             x0 = uh[idx]
             x1 = uh[idx+NE*p]
             x2 = np.zeros(idof, dtype=self.ftype)
-            if p > 2:
-                start = 2*NE*p + i*idof
-                x2[:] = uh[start:start+idof]
+            start = 2*NE*p + i*idof
+            x2[:] = uh[start:start+idof]
             x = np.r_[x0, x1, x2]
             y = (PI0[:2*smldof]@x).flat
             sh[c2d[i], 0] = y[:smldof]
@@ -354,26 +355,29 @@ class DivFreeNonConformingVirtualElementSpace2d:
         xy = idx2['xy']
         c = 1.0/np.repeat(range(1, p), range(1, p))
 
-        R02[:, xx[0], x[0]-1] -= c
-        R02[:, yy[0], x[0]-1] -= 0.5*c
-        R02[:, xy[0], y[0]-1] -= 0.5*c
+        R02[:, xx[0], x[0]-1] -= xx[1]*c
+        R02[:, yy[0], x[0]-1] -= 0.5*yy[1]*c
+        R02[:, xy[0], y[0]-1] -= 0.5*xy[1]*c
 
-        R12[:, yy[0], y[0]-1] -= c
-        R12[:, xx[0], y[0]-1] -= 0.5*c
-        R12[:, xy[0], x[0]-1] -= 0.5*c
+        R12[:, yy[0], y[0]-1] -= yy[1]*c
+        R12[:, xx[0], y[0]-1] -= 0.5*xx[1]*c
+        R12[:, xy[0], x[0]-1] -= 0.5*xy[1]*c
+
+        print('R02:', R02[0])
+        print('R12:', R12[0])
 
         if p > 2:
             idx = np.arange(idof0, idof)
             idx0 = self.smspace.diff_index_1(p=p-2)
             x0 = idx0['x']
             y0 = idx0['y']
-            R02[:, xx[0][y0[0]], idx] -= c[y0[0]] 
-            R02[:, yy[0][y0[0]], idx] -= 0.5*c[y0[0]]
-            R02[:, xy[0][x0[0]], idx] += 0.5*c[x0[0]]
+            R02[:, xx[0][y0[0]], idx] -= xx[1][y0[0]]*c[y0[0]] 
+            R02[:, yy[0][y0[0]], idx] -= 0.5*yy[1][y0[0]]*c[y0[0]]
+            R02[:, xy[0][x0[0]], idx] += 0.5*xy[1][x0[0]]*c[x0[0]]
             
-            R12[:, yy[0][x0[0]], idx] += c[x0[0]] 
-            R12[:, xx[0][x0[0]], idx] += 0.5*c[x0[0]]
-            R12[:, xy[0][y0[0]], idx] -= 0.5*c[y0[0]]
+            R12[:, yy[0][x0[0]], idx] += yy[1][x0[0]]*c[x0[0]] 
+            R12[:, xx[0][x0[0]], idx] += 0.5*xx[1][x0[0]]*c[x0[0]]
+            R12[:, xy[0][y0[0]], idx] -= 0.5*xy[1][y0[0]]*c[y0[0]]
 
 
         n = mesh.edge_unit_normal()
@@ -479,9 +483,16 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 h2, CM[edge2cell[:, 1], 0:ndof, 0], eh/a2[edge2cell[:, 1]], n[:, 0])
             np.subtract.at(R11, (x[0][:, None], start[isInEdge]), val[:, isInEdge])
 
+        print("R02+:", CM[:, :, 0]/area[:, None])
+        print("R12+:", CM[:, :, 0]/area[:, None])
 
         R02[:, :, 0] += CM[:, :, 0]/area[:, None]
         R12[:, :, 1] += CM[:, :, 0]/area[:, None]
+
+        print('R02:', R02[0])
+        print('R12:', R12[0])
+
+        
         R = [[R00, R01, R02], [R10, R11, R12]]
 
         idx0 = self.smspace.diff_index_1(p=p-1)
@@ -491,18 +502,15 @@ class DivFreeNonConformingVirtualElementSpace2d:
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
 
-        print('c:', c)
-        print('x0[0]:', x0[0] - 1)
-        J2[:, x0[0], x0[0] - 1] -= ch[:, None]*c
-        J2[:, y0[0], y0[0] - 1] -= ch[:, None]*c
-        print('J2:', J2)
+        J2[:, x0[0], x0[0] - 1] -= ch[:, None]*x0[1]*c
+        J2[:, y0[0], y0[0] - 1] -= ch[:, None]*y0[1]*c
         if p > 2:
             idx = np.arange(idof0, idof)
             idx1 = self.smspace.diff_index_1(p=p-2)
             x1 = idx1['x']
             y1 = idx1['y']
-            J2[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
-            J2[:, y0[0][x1[0]], idx] += ch[:, None]*c[x1[0]]
+            J2[:, x0[0][y1[0]], idx] -= ch[:, None]*x0[1][y1[0]]*c[y1[0]]
+            J2[:, y0[0][x1[0]], idx] += ch[:, None]*y0[1][x1[0]]*c[x1[0]]
 
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
         val = np.einsum('ijk, i->jik', F0, n[:, 0])

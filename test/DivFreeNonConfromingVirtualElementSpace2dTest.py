@@ -107,9 +107,10 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         edge = mesh.entity('edge')
         cell2edge = mesh.ds.cell_to_edge()
         uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-        up = uspace.project(u)
-        print('up:', up)
-        up = uspace.project_to_smspace(up)
+        uv = uspace.project(u)
+        print(uv)
+        up = uspace.project_to_smspace(uv)
+        print(up)
         integralalg = uspace.integralalg
         error = integralalg.L2_error(u, up)
         print(error)
@@ -137,6 +138,14 @@ def u3(p):
     val[..., 1] = x**3/8
     return val
 
+def u4(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**4/16
+    val[..., 1] = x**4/16
+    return val
+
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-test.project_test(u2, p=2, mtype=0, plot=True)
-#test.project_test(u3, p=3, mtype=0, plot=False)
+#test.project_test(u2, p=2, mtype=0, plot=True)
+test.project_test(u4, p=4, mtype=0, plot=False)
