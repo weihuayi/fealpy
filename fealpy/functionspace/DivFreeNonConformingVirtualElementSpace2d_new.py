@@ -113,6 +113,24 @@ class DivFreeNonConformingVirtualElementSpace2d:
         self.D = self.matrix_D()
         self.PI0 = self.matrix_PI0()
 
+        self.debug = True
+        if self.debug:
+            R0 = np.r_['1', self.R[0][0], self.R[0][1], self.R[0][2][0]]
+            R1 = np.r_['1', self.R[1][0], self.R[1][1], self.R[1][2][0]]
+            J = np.r_['1', self.J[0], self.J[1], self.J[2][0]]
+            data = {"pG11":self.G[0][0],
+                    "pG22":self.G[1][0],
+                    "pG12":self.G[2][0],
+                    "pB1":self.B[0][0],
+                    "pB2":self.B[1][0],
+                    "pR0":R0,
+                    "pR1":R1,
+                    "pJ":J}
+
+            sio.savemat('test.mat', data)
+
+
+
     def project(self, u):
         p = self.p # p >= 2
         NE = self.mesh.number_of_edges()
@@ -159,11 +177,11 @@ class DivFreeNonConformingVirtualElementSpace2d:
         c2d = self.smspace.cell_to_dof()
         def f(i):
             PI0 = self.PI0[i]
+            s0 = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             D0 = self.D[0][s0, :]
             D1 = self.D[1][i, 0]
             D2 = self.D[1][i, 1]
 
-            s0 = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             D = block([
                 [D0,  0],
                 [ 0, D0],
@@ -327,10 +345,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx1 = self.smspace.index1(p=p-1)
+        idx1 = self.smspace.diff_index_1(p=p-1)
         x = idx1['x']
         y = idx1['y']
-        idx2 = self.smspace.index2(p=p)
+        idx2 = self.smspace.diff_index_2(p=p)
         xx = idx2['xx']
         yy = idx2['yy']
         xy = idx2['xy']
@@ -346,7 +364,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         if p > 2:
             idx = np.arange(idof0, idof)
-            idx0 = self.smspace.index1(p=p-2)
+            idx0 = self.smspace.diiff_index_1(p=p-2)
             x0 = idx0['x']
             y0 = idx0['y']
             R02[:, xx[0][y0[0]], idx] -= c[y0[0]] 
@@ -375,7 +393,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         # F0: (NE, ndof, p)
         F0 = F0@self.H1
 
-        idx = self.smspace.index1(p=p) # 一次求导后的非零基函数编号及求导系数
+        idx = self.smspace.diff_index_1(p=p) # 一次求导后的非零基函数编号及求导系数
         x = idx['x']
         y = idx['y']
         # idx0: (NE, p)
@@ -466,18 +484,21 @@ class DivFreeNonConformingVirtualElementSpace2d:
         R12[:, :, 1] += CM[:, :, 0]/area[:, None]
         R = [[R00, R01, R02], [R10, R11, R12]]
 
-        idx0 = self.smspace.index1(p=p-1)
+        idx0 = self.smspace.diff_index_1(p=p-1)
         x0 = idx0['x']
         y0 = idx0['y']
         J0 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J1 = np.zeros((ndof, len(cell2dof)), dtype=self.ftype)
         J2 = np.zeros((NC, ndof, idof), dtype=self.ftype)
 
+        print('c:', c)
+        print('x0[0]:', x0[0] - 1)
         J2[:, x0[0], x0[0] - 1] -= ch[:, None]*c
         J2[:, y0[0], y0[0] - 1] -= ch[:, None]*c
+        print('J2:', J2)
         if p > 2:
             idx = np.arange(idof0, idof)
-            idx1 = self.smspace.index1(p=p-2)
+            idx1 = self.smspace.diff_index_1(p=p-2)
             x1 = idx1['x']
             y1 = idx1['y']
             J2[:, x0[0][y1[0]], idx] -= ch[:, None]*c[y1[0]]
