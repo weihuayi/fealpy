@@ -37,6 +37,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             pspace = ScaledMonomialSpace2d(mesh, p-1)
 
             isBdDof = uspace.boundary_dof()
+            print('isBddof:', isBdDof.shape)
 
             udof = uspace.number_of_global_dofs()
             pdof = pspace.number_of_global_dofs()
@@ -48,11 +49,12 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             A = uspace.matrix_A()
             P = uspace.matrix_P()
             F = uspace.source_vector(pde.source)
+            print('F:', F.shape)
 
 
             AA = bmat([[A, P.T], [P, None]], format='csr')
             FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
-            x = np.block([uh.T.flat, ph])
+            x = np.block([uh, ph])
             isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
 
             gdof = 2*udof + pdof

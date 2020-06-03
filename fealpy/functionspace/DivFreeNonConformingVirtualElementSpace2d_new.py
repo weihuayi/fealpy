@@ -744,12 +744,12 @@ class DivFreeNonConformingVirtualElementSpace2d:
         (div v_h, q_0)
         """
         p = self.p
-        idof = (p-2)*(p-1)//2
-        cell2dof = self.dof.cell2dof
-        cell2dofLocation =  self.dof.cell2dofLocation
+        idof = p*(p-1)
+        gdof = self.smspace.number_of_global_dofs(p=p-1)
+        cell2dof, cell2dofLocation = self.cell_to_dof(doftype='all')
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
-        cd = self.smspace.cell_to_dof(p=0)
+        cd = self.smspace.cell_to_dof(p=p-1)
         def f0(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             return np.meshgrid(cell2dof[s], cd[i])
@@ -757,57 +757,74 @@ class DivFreeNonConformingVirtualElementSpace2d:
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
-        gdof0 = self.smspace.number_of_global_dofs(p=0)
 
-        if False:
-            def f1(i, k):
-                J = self.J[k][0, cell2dofLocation[i]:cell2dofLocation[i+1]]
-                return J
-            P0 = np.concatenate(list(map(lambda i: f1(i, 0), range(NC))))
-            P1 = np.concatenate(list(map(lambda i: f1(i, 1), range(NC))))
-
-        P0 = csr_matrix((self.J[0][0], (I, J)),
-                shape=(gdof0, NE*p), dtype=self.ftype)
-        P1 = csr_matrix((self.J[1][0], (I, J)),
-                shape=(gdof0, NE*p), dtype=self.ftype)
-        P2 = csr_matrix((gdof0, NC*idof), dtype=self.ftype)
+        def f1(i, k):
+            J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return J.flatten()
+        J0 = np.concatenate(list(map(lambda x: f1(x, 0), range(NC))))
+        J1 = np.concatenate(list(map(lambda x: f1(x, 1), range(NC))))
+        P0 = csr_matrix((J0, (I, J)),
+                shape=(gdof, NE*p), dtype=self.ftype)
+        P1 = csr_matrix((J1, (I, J)),
+                shape=(gdof, NE*p), dtype=self.ftype)
+        cell2dof = np.arange(NC*idof).reshape(NC, idof)
+        def f2(i):
+            return np.meshgrid(cell2dof[i], cd[i])
+        idx = list(map(f2, range(NC)))
+        I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
+        J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
+        P2 = csr_matrix((self.J[2].flat, (I, J)), 
+                shape=(gdof, NC*idof), dtype=self.ftype)
 
         return bmat([[P0, P1, P2]], format='csr')
             
 
     def source_vector(self, f):
         p = self.p
-        ndof = self.smspace.number_of_local_dofs(p=p-2)
-        Q = inv(self.CM[:, :ndof, :ndof])
-        phi = lambda x: self.smspace.basis(x, p=p-2)
-        def u0(x, index):
-            return np.einsum('ijm, ijn->ijmn', 
-                    self.smspace.basis(x, index=index, p=p-2), f(x))
-        bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
-        bb = Q@bb # (NC, ndof, 2)
+        if p == 2:
+            ndof = self.smspace.number_of_local_dofs(p=p)
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            cell2dof = self.dof.cell2dof
+            cell2dofLocation = self.dof.cell2dofLocation
+            eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
+            def u1(i):
+                PI0 = self.PI0[i]
+                n = PI0.shape[1]//2
+                s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+                eb[0, s] = bb[i, :, 0]@PI0[:ndof, :n] + bb[i, :, 1]@PI0[ndof:2*ndof, :n]
+                eb[1, s] = bb[i, :, 0]@PI0[:ndof, n:] + bb[i, :, 1]@PI0[ndof:2*ndof, n:]
+            list(map(u1, range(NC)))
+            gdof = self.number_of_global_dofs()
+            b = np.zeros((gdof, ), dtype=self.ftype)
+            np.add.at(b, cell2dof, eb[0])
+            np.add.at(b[NE*p:], cell2dof, eb[1])
+            return b
+        else:
+            area = self.smspace.cellmeasure
+            ndof = self.smspace.number_of_local_dofs(p=p-2)
+            Q = inv(self.CM[:, :ndof, :ndof])
+            phi = lambda x: self.smspace.basis(x, p=p-2)
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p-2), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            bb = Q@bb # (NC, ndof, 2)
 
-        NE = self.mesh.number_of_edges()
-        NC = self.mesh.number_of_cells()
-        cell2dof = self.dof.cell2dof
-        cell2dofLocation = self.dof.cell2dofLocation
-
-        eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
-        def u1(i):
-            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            eb[0, s] = bb[i, :, 0]@self.E[0][0][:, s] + bb[i, :, 1]@self.E[1][0][:, s]
-            eb[1, s] = bb[i, :, 0]@self.E[0][1][:, s] + bb[i, :, 1]@self.E[1][1][:, s]
-        map(u1, range(NC))
-
-        gdof = self.number_of_global_dofs()
-        b = np.zeros((gdof, ), dtype=self.ftype)
-
-        np.add.at(b, cell2dof, eb[0])
-        np.add.at(b[NE*p:], cell2dof, eb[1])
-        if p > 2:
+            idx0 = self.smspace.diff_index_1(p=p-2)
+            x0 = idx0['x']
+            y0 = idx0['y']
+            idx1 = self.smspace.diff_index_1(p=p-1)
+            x1 = idx1['x']
+            y1 = idx1['y']
+            c = 1.0/np.repeat(range(1, p), range(1, p))
             c2d = self.cell_to_dof('cell')
-            b[c2d] += np.sum(bb[:, :, [0]]*self.E[0][2], axis=1)
-            b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
-        return b 
+            b[c2d] += np.einsum('', bb, area[:, None]*c)
+            b[c2d] += np.einsum('', bb, area[:, None]*c)
+
+            return b 
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
         """
