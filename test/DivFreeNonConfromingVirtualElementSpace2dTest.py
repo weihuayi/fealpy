@@ -37,7 +37,6 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             pspace = ScaledMonomialSpace2d(mesh, p-1)
 
             isBdDof = uspace.boundary_dof()
-            print('isBddof:', isBdDof.shape)
 
             udof = uspace.number_of_global_dofs()
             pdof = pspace.number_of_global_dofs()
@@ -49,15 +48,14 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             A = uspace.matrix_A()
             P = uspace.matrix_P()
             F = uspace.source_vector(pde.source)
-            print('F:', F.shape)
 
 
             AA = bmat([[A, P.T], [P, None]], format='csr')
             FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
             x = np.block([uh, ph])
-            isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
+            isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool)]
+            gdof = udof + pdof
 
-            gdof = 2*udof + pdof
             FF -= AA@x
             bdIdx = np.zeros(gdof, dtype=np.int)
             bdIdx[isBdDof] = 1
@@ -66,9 +64,8 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             AA = T@AA@T + Tbd
             FF[isBdDof] = x[isBdDof]
             x[:] = spsolve(AA, FF)
-            uh[:, 0] = x[:udof]
-            uh[:, 1] = x[udof:2*udof]
-            ph[:] = x[2*udof:]
+            uh[:] = x[:udof]
+            ph[:] = x[udof:]
 
             up = uspace.project_to_smspace(uh)
             integralalg = uspace.integralalg
@@ -157,6 +154,6 @@ def u5(p):
     return val
 
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-#test.project_test(u2, p=2, mtype=0, plot=True)
+test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u5, p=5, mtype=3, plot=False)
-test.stokes_equation_test()
+#test.stokes_equation_test()

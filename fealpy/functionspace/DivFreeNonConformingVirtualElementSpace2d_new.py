@@ -125,7 +125,9 @@ class DivFreeNonConformingVirtualElementSpace2d:
                     "pB2":self.B[1][0],
                     "pR0":R0,
                     "pR1":R1,
-                    "pJ":J}
+                    "pJ":J, 
+                    "pA": self.matrix_A(),
+                    "pP": self.matrix_P()}
 
             sio.savemat('test.mat', data)
 
@@ -704,10 +706,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
             S.append(Z0)
             if p > 2:
                 S.append(inv(self.Q[i])*area[i])
-            if i == 0:
-                print(PI0[:2*smldof].shape)
-                print(block_diag(S).shape)
-                print(D.shape)
             S = D.T@block_diag(S)@D
             U = block([
                 [self.U[0][0][:, s0], self.U[0][1][:, s0], self.U[0][2][i]],
@@ -781,26 +779,34 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
     def source_vector(self, f):
         p = self.p
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
         if p == 2:
             ndof = self.smspace.number_of_local_dofs(p=p)
+            idof = p*(p-1)
             def u0(x, index):
                 return np.einsum('ijm, ijn->ijmn', 
                         self.smspace.basis(x, index=index, p=p), f(x))
             bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
-            cell2dof = self.dof.cell2dof
+            cell2dof = self.dof.cell2dof # 这里只有边上的自由度
             cell2dofLocation = self.dof.cell2dofLocation
             eb = np.zeros((2, len(cell2dof)), dtype=self.ftype)
+            cb = np.zeros((NC, idof), dtype=self.ftype)
             def u1(i):
                 PI0 = self.PI0[i]
-                n = PI0.shape[1]//2
+                n = cell2dofLocation[i+1] - cell2dofLocation[i] 
                 s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
                 eb[0, s] = bb[i, :, 0]@PI0[:ndof, :n] + bb[i, :, 1]@PI0[ndof:2*ndof, :n]
-                eb[1, s] = bb[i, :, 0]@PI0[:ndof, n:] + bb[i, :, 1]@PI0[ndof:2*ndof, n:]
+                eb[1, s] = bb[i, :, 0]@PI0[:ndof, n:2*n] + bb[i, :, 1]@PI0[ndof:2*ndof, n:2*n]
+                cb[i, :] = bb[i, :, 0]@PI0[:ndof, 2*n:] + bb[i, :, 1]@PI0[ndof:2*ndof, 2*n:]
             list(map(u1, range(NC)))
             gdof = self.number_of_global_dofs()
             b = np.zeros((gdof, ), dtype=self.ftype)
             np.add.at(b, cell2dof, eb[0])
             np.add.at(b[NE*p:], cell2dof, eb[1])
+            c2d = self.cell_to_dof(doftype='cell')
+            np.add.at(b, c2d, cb)
             return b
         else:
             area = self.smspace.cellmeasure
@@ -821,9 +827,18 @@ class DivFreeNonConformingVirtualElementSpace2d:
             y1 = idx1['y']
             c = 1.0/np.repeat(range(1, p), range(1, p))
             c2d = self.cell_to_dof('cell')
-            b[c2d] += np.einsum('', bb, area[:, None]*c)
-            b[c2d] += np.einsum('', bb, area[:, None]*c)
 
+            idof0 = (p+1)*p//2 - 1 
+
+            gdof = self.number_of_global_dofs()
+            b = np.zeros(gdof, dtype=self.ftype)
+            idx = np.arange(idof0)
+            b[c2d[:, idx[x1[0]-1]]] += bb[:, x1[0]-1, 0]*area[:, None]*c 
+            b[c2d[:, idx[y1[0]-1]]] += bb[:, y1[0]-1, 1]*area[:, None]*c 
+
+            idx = np.arange(idof0, p*(p-1))
+            b[c2d[:, idx[y0[0]]]] += bb[:, y0[0], 0]*area[:, None]*y0[1]*c[y0[0]]
+            b[c2d[:, idx[x0[0]]]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
             return b 
 
     def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
@@ -880,7 +895,15 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return self.dof.edge_to_dof()
 
     def boundary_dof(self):
-        return self.dof.boundary_dof()
+        p = self.p
+        NE = self.mesh.number_of_edges()
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.dof.edge_to_dof()
+        isBdEdge = self.mesh.ds.boundary_edge_flag()
+        isBdDof[edge2dof[isBdEdge]] = True
+        isBdDof[NE*p+edge2dof[isBdEdge]] = True
+        return isBdDof
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
