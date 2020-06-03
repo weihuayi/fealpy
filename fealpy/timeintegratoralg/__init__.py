@@ -1,3 +1,3 @@
 
 from .timeline import UniformTimeLine
-from .titmeline import ChebyshevTimeLine
+from .timeline import ChebyshevTimeLine

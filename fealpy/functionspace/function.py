@@ -63,5 +63,9 @@ class Function(np.ndarray):
             axes.plot_trisurf(
                     node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)
             return axes
+
+        elif mesh.meshtype in {'stri'}:
+            bc = np.array([1/3, 1/3, 1/3])
+            mesh.add_plot(axes, cellcolor=self(bc), showcolorbar=True)
         else:
             return None

@@ -124,18 +124,18 @@ class SurfaceLagrangeFiniteElementSpace:
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
 
-    def source_vector(self, f, barrycenter=False):
+    def source_vector(self, f, barycenter=False):
         p = self.p
         # bcs : (NQ, 3)
         # ws : (NQ, )
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        if barrycenter:
+        if barycenter:
             fval = f(bcs)
         else:
             pp = self.mesh.bc_to_point(bcs)
             fval = f(pp)
         phi = self.basis(bcs)
-        bb = np.einsum('i, ik, i..., k->k...', ws, fval, phi, self.cellmeasure)
+        bb = np.einsum('m, mi, mik, i->ik', ws, fval, phi, self.cellmeasure)
         cell2dof = self.dof.cell2dof
         gdof = self.number_of_global_dofs()
         b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
@@ -176,6 +176,7 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def value(self, uh, bc, index=None):
         phi = self.basis(bc)
+        print('phi', phi.shape)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'

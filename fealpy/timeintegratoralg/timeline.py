@@ -52,7 +52,7 @@ class UniformTimeLine():
     def time_integration(self, data, dmodel, solver):
         self.reset()
         while not self.stop():
-            A = dmodel.get_current_left_matrix(self)
+            A = dmodel.get_current_left_matrix(data, self)
             b = dmodel.get_current_right_vector(data, self)
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
