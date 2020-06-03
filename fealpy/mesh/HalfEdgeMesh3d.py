@@ -42,10 +42,9 @@ class HalfEdgeMesh3d():
         # 1: 边界上的点
         # 2: 区域内部的点
         self.nodedata['dof'] = nodedof
-        self.init_level_info()
 
     @classmethod
-    def from_mesh(self, mesh):
+    def from_mesh(cls, mesh):
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NF = mesh.number_of_faces()
@@ -94,7 +93,7 @@ class HalfEdgeMesh3d():
         halfedge[halfedge[:, 3], 4] = range(NHE) 
 
         # dual halfedge in the same cell
-        edge = np.zeros((NHE, 3), dtype=facets.dtype)
+        edge = np.zeros((NHE, 3), dtype=mesh.itype)
         edge[:, 0] = halfedge[:, 0]
         edge[:, 1] = halfedge[halfedge[:, 4], 0]
         edge[:, 2] = halfedge[:, 2] 
@@ -113,6 +112,16 @@ class HalfEdgeMesh3d():
         return cls(node, halfedge, subdomain, NE=NE, NF=NF) 
 
 
+    def print(self):
+
+        print("halfedge:\n", self.ds.halfedge)
+        for i, val in enumerate(self.ds.halfedge):
+            print(i, ":", val)
+        print("hcell:\n", self.ds.hcell)
+        print("hface:\n", self.ds.hface)
+        print("hedge:\n", self.ds.hedge)
+
+
 class HalfEdgeMesh3dDataStructure():
     def __init__(self, halfedge, subdomain, NN=None, NE=None, NF=None):
         self.reinit(halfedge, subdomain, NN=NN, NE=NE, NF=NF)
@@ -123,11 +132,12 @@ class HalfEdgeMesh3dDataStructure():
         else:
             self.NN = NN
 
-        edge = np.zeros((NHE, 3), dtype=facets.dtype)
+        NHE = len(halfedge)
+        edge = np.zeros((NHE, 3), dtype=halfedge.dtype)
         edge[:, 0] = halfedge[:, 0]
         edge[:, 1] = halfedge[halfedge[:, 5], 0]
         edge.sort(axis=-1)
-        self.hedge = np.unique(edge, axis=0) # hedge[i] is the index of one halfedge of i-th edge
+        _, self.hedge = np.unique(edge, return_index=True, axis=0) # hedge[i] is the index of one halfedge of i-th edge
         self.NE = len(self.hedge)
         if NE is not None:
             assert NE == self.NE
