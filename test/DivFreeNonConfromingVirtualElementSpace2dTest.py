@@ -19,10 +19,10 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
     def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
-        from fealpy.pde.Stokes_Model_2d import CosSinData
+        from fealpy.pde.stokes_model_2d import StokesModelData_0 
         from fealpy.mesh.simple_mesh_generator import triangle
         h = 0.4
-        pde = CosSinData()
+        pde = StokesModelData_0() 
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
             mesh = pde.init_mesh(n=i+2, meshtype='poly') 
@@ -146,6 +146,15 @@ def u4(p):
     val[..., 1] = x**4/16
     return val
 
+def u5(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    val = np.zeros(p.shape, p.dtype)
+    val[..., 0] = y**5/32
+    val[..., 1] = x**5/32
+    return val
+
 test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.project_test(u2, p=2, mtype=0, plot=True)
-test.project_test(u4, p=4, mtype=0, plot=False)
+#test.project_test(u5, p=5, mtype=3, plot=False)
+test.stokes_equation_test()
