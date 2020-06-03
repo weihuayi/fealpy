@@ -4,7 +4,7 @@ import numpy as np
 import sys
 import matplotlib.pyplot as plt
 import time
-from fealpy.mesh import HalfEdgeMesh
+from fealpy.mesh import HalfEdgeMesh,Quadtree
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
 
@@ -265,8 +265,41 @@ class HalfEdgeMeshTest:
             mesh.find_cell(axes, showindex=True, multiindex=cindex)
             plt.show()
 
+    def quadtree_test(self, plot=True):
+        cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = Quadtree(node, cell)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        NE = mesh.number_of_edges()
+        nC = mesh.number_of_cells()
+
+        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
+        #eta = 2*np.ones(nC,dtype=int)
+        eta = [1,1]
+
+        mesh.adaptive(eta, aopts)
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
 
 
+        eta = [0,0,-1,-1,-1,-1,-1,-1]
+        mesh.adaptive(eta, aopts)
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        plt.show()
 
 
     def voronoi_test(self, plot=False):
@@ -502,6 +535,10 @@ if sys.argv[1] == 'advance_trimesh':
 
 if sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly_test(plot=True)
+
+if sys.argv[1] == 'quadtree_test':
+    mesh = test.quadtree_test()
+
 
 #test.triangle_mesh_test(plot=True)
 #test.voronoi_test(plot=True)

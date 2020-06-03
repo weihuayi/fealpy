@@ -1200,6 +1200,25 @@ class HalfEdgeMesh(Mesh2d):
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
 
+        nC = self.number_of_cells()
+        NV1 = self.number_of_vertices_of_cells()
+        if ('HB' in options) and (options['HB'] is not None):
+             isNonMarkedCell = ~isMarkedCell
+
+             flag0 = isNonMarkedCell[self.ds.cellstart:]
+
+             flag1 = isMarkedCell[self.ds.cellstart:]
+
+             NHB0 = flag0.sum()
+             NHB1 = NV1[flag1].sum()
+             NHB = NHB0 + NHB1
+             HB = np.zeros((NHB, 2), dtype=np.int)
+             HB[:, 0] = range(NHB)
+             HB[0:NHB0, 1] = options['HB'][flag0, 1]
+             HB[NHB0:,  1] = cellidx -1
+             options['HB'] = HB
+
+
         if ('numrefine' in options) and (options['numrefine'] is not None):
             num = options['numrefine'][cellidx] - 1
             num[num < 0] = 0
@@ -1257,6 +1276,8 @@ class HalfEdgeMesh(Mesh2d):
         self.celldata['level'] = clevel
         self.node = np.r_['0', node, ec, bc[isMarkedCell]]
         self.ds.reinit(NN+NE1+NC1, subdomain, halfedge)
+
+
 
     def coarsen_poly(self, isMarkedCell, options={'disp': True}):
 
@@ -1371,6 +1392,17 @@ class HalfEdgeMesh(Mesh2d):
             # 更新节点和半边数据结构信息
             self.node = self.node[~isRNode]
             self.ds.reinit(NN, subdomain, halfedge)
+            ###TODO
+            if ('HB' in options) and (options['HB'] is not None):
+                # 粗化要更新 HB[:, 0]
+                leafIdx = self.leaf_cell_index()
+                idx0 = leafIdx[options['HB'][:, 0]] # 叶子单元在所有单元中对应的编号
+                idx0 = cellIdxMap[idx0] # 在保留单元中的编号
+                isLeafCell = (child[:, 0] == -1) # 新网格的叶子单元
+                idxMap = np.zeros(NNC, dtype=self.itype)
+                idxMap[isLeafCell] = range(isLeafCell.sum())
+                options['HB'][:, 0] = idxMap[idx0]
+
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()
@@ -1383,7 +1415,7 @@ class HalfEdgeMesh(Mesh2d):
 
 
     def refine_marker(self, eta, theta, method="L2"):
-        NC = self.number_of_all_cells() 
+        NC = self.number_of_all_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool)
         isMarkedCell[self.ds.cellstart:] = mark(eta, theta, method=method)
         return isMarkedCell
@@ -1428,7 +1460,7 @@ class HalfEdgeMesh(Mesh2d):
             HB[:, 1] = np.arange(len(eta))
             options['HB'] = HB
 
-        NC = self.number_of_all_cells() 
+        NC = self.number_of_all_cells()
         options['numrefine'] = np.zeros(NC, dtype=np.int8)
         theta = options['theta']
         cellstart = self.ds.cellstart
@@ -1465,14 +1497,15 @@ class HalfEdgeMesh(Mesh2d):
         options['numrefine'][flag] = options['maxrefine']
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
-        
+
         # refine
         isMarkedCell = (options['numrefine'] > 0)
+
         while np.any(isMarkedCell):
             self.refine_poly(isMarkedCell,options)
             isMarkedCell = (options['numrefine'] > 0)
 
-         
+
         # coarsen
         if options['maxcoarsen'] > 0:
             isMarkedCell = (options['numrefine'] < 0)
@@ -1484,7 +1517,7 @@ class HalfEdgeMesh(Mesh2d):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
- 
+
     def add_halfedge_plot(self, axes,
         index=None, showindex=False,
         nodecolor='r', edgecolor=['r', 'k'], markersize=20,
@@ -1493,7 +1526,7 @@ class HalfEdgeMesh(Mesh2d):
         show_halfedge_mesh(axes, self,
                 index=index, showindex=showindex,
                 nodecolor=nodecolor, edgecolor=edgecolor, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor, 
+                fontsize=fontsize, fontcolor=fontcolor,
                 multiindex=multiindex, linewidth=linewidth)
 
     def print(self):
@@ -1524,12 +1557,12 @@ class HalfEdgeMesh2dDataStructure():
         self.NN = NN
         self.NE = len(halfedge)//2
         self.NF = self.NE
-        self.subdomain = subdomain 
+        self.subdomain = subdomain
 
         # 区域内部的单元标记, 这里默认排前面的都是洞, 或者外部无界区域.
         idx, = np.nonzero(subdomain == 0)
         if len(idx) == 0:
-            self.cellstart = 0 
+            self.cellstart = 0
         elif len(idx) == 1:
             self.cellstart = idx[0] + 1
         else:
@@ -1542,7 +1575,7 @@ class HalfEdgeMesh2dDataStructure():
         self.cidxmap = -np.ones(NC, dtype=self.itype) # 单元指标映射数组
         self.cidxmap[self.cellstart:] = range(self.NC)
         self.halfedge = halfedge
-        
+
         self.cell2hedge = np.zeros(NC, dtype=self.itype)   # 存储每个单元的起始半边
         self.cell2hedge[halfedge[:, 1]] = range(2*self.NE) # 的编号
 
@@ -1562,7 +1595,7 @@ class HalfEdgeMesh2dDataStructure():
         return len(self.subdomain)
 
     def number_of_vertices_of_all_cells(self):
-        NC = self.number_of_all_cells() 
+        NC = self.number_of_all_cells()
         halfedge = self.halfedge
         NV = np.zeros(NC, dtype=self.itype)
         np.add.at(NV, halfedge[:, 1], 1)
