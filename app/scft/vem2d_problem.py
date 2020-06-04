@@ -1,5 +1,5 @@
 import numpy as np
-from SCFTVEMModel import SCFTVEMModel, scftmodel_options
+from SCFTVEMModel2d import SCFTVEMModel2d, scftmodel2d_options
 from fealpy.functionspace.vem_space import VirtualElementSpace2d
 from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
 from fealpy.mesh import Quadtree

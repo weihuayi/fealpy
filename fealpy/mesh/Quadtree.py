@@ -1,4 +1,3 @@
-
 import numpy as np
 from scipy.sparse import coo_matrix
 from .QuadrangleMesh import QuadrangleMesh
@@ -104,7 +103,7 @@ class Quadtree(QuadrangleMesh):
             options['numrefine'][leafCellIdx] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
-        elif options['method'][leafCellIdx]== 'numrefine':
+        elif options['method'] == 'numrefine':
             options['numrefine'][leafCellIdx]= eta
         elif isinstance(options['method'], float):
             val = options['method']
@@ -226,7 +225,6 @@ class Quadtree(QuadrangleMesh):
                 HB[NHB0:,  1] = np.repeat(options['HB'][flag1, 1], 4)
                 options['HB'] = HB
             idx, = np.nonzero(isMarkedCell)
-
         if len(idx) > 0:
             # Prepare data
             N = self.number_of_nodes()

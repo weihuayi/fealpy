@@ -82,7 +82,12 @@ class ScaledMonomialSpace2d():
             self.integralalg = FEMeshIntegralAlg(
                     self.mesh, q,
                     cellmeasure=self.cellmeasure)
-        self.integrator = self.integralalg.integrator
+
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.mesh, q,
+                cellmeasure=self.cellmeasure,
+                cellbarycenter=self.cellbarycenter)
+        #self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
