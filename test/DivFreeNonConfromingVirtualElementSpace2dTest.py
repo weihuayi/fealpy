@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import spdiags, bmat
 from scipy.sparse.linalg import spsolve
+import scipy.io as sio
 
 from fealpy.functionspace import DivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
@@ -74,6 +75,56 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
         print(error)
         print(error[0:-1]/error[1:])
+
+    def one_cell_test(self, p=2):
+        from fealpy.pde.stokes_model_2d import StokesModelData_7
+        pde = StokesModelData_7()
+        node = np.array([
+            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+        cell = np.array([0, 1, 2, 3], dtype=np.int)
+        cellLocation = np.array([0, 4], dtype=np.int)
+        mesh = PolygonMesh(node, cell, cellLocation)
+
+        uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
+        pspace = ScaledMonomialSpace2d(mesh, p-1)
+
+        isBdDof = uspace.boundary_dof()
+
+        udof = uspace.number_of_global_dofs()
+        pdof = pspace.number_of_global_dofs()
+
+        uh = uspace.function()
+        ph = pspace.function()
+        uspace.set_dirichlet_bc(uh, pde.dirichlet)
+
+        A = uspace.matrix_A()
+        P = uspace.matrix_P()
+        F = uspace.source_vector(pde.source)
+
+        AA = bmat([[A, P.T], [P, None]], format='csr')
+        FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
+        x = np.block([uh, ph])
+        isBdDof = np.r_['0', isBdDof, np.ones(pdof, dtype=np.bool)]
+        gdof = udof + pdof
+
+        FF -= AA@x
+        bdIdx = np.zeros(gdof, dtype=np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, gdof, gdof)
+        T = spdiags(1-bdIdx, 0, gdof, gdof)
+        AA = T@AA@T + Tbd
+        FF[isBdDof] = x[isBdDof]
+        x[:] = spsolve(AA, FF)
+        uh[:] = x[:udof]
+        ph[:] = x[udof:]
+        
+        print(uh)
+        up = uspace.project_to_smspace(uh)
+        print('up:', up) 
+        integralalg = uspace.integralalg
+        error = integralalg.L2_error(pde.velocity, up)
+        print(error)
+
 
     def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
@@ -154,6 +205,7 @@ def u5(p):
     return val
 
 test = DivFreeNonConformingVirtualElementSpace2dTest()
-test.project_test(u2, p=2, mtype=0, plot=True)
+#test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u5, p=5, mtype=3, plot=False)
 #test.stokes_equation_test()
+test.one_cell_test()

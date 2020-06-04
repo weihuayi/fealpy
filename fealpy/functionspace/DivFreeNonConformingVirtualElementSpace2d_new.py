@@ -755,7 +755,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
         J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
 
-
         def f1(i, k):
             J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
             return J.flatten()
@@ -786,6 +785,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             ndof = self.smspace.number_of_local_dofs(p=p)
             idof = p*(p-1)
             def u0(x, index):
+                print(f(x).shape)
                 return np.einsum('ijm, ijn->ijmn', 
                         self.smspace.basis(x, index=index, p=p), f(x))
             bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
