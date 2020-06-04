@@ -269,12 +269,13 @@ class HalfEdgeMeshTest:
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = Quadtree(node, cell)
+        pmesh = mesh.to_pmesh()
 
         fig = plt.figure()
         axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
+        pmesh.add_plot(axes)
+        #pmesh.find_node(axes, showindex=True)
+        pmesh.find_cell(axes, showindex=True)
 
         NE = mesh.number_of_edges()
         nC = mesh.number_of_cells()
@@ -284,20 +285,23 @@ class HalfEdgeMeshTest:
         eta = [1,1]
 
         mesh.adaptive(eta, aopts)
+        pmesh = mesh.to_pmesh()
         fig = plt.figure()
         axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-
+        pmesh.add_plot(axes)
+        #pmesh.find_node(axes, showindex=True)
+        pmesh.find_cell(axes, showindex=True)
+        print(aopts['HB'])
 
         eta = [0,0,-1,-1,-1,-1,-1,-1]
         mesh.adaptive(eta, aopts)
+        pmesh = mesh.to_pmesh()
         fig = plt.figure()
         axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
+        pmesh.add_plot(axes)
+        #pmesh.find_node(axes, showindex=True)
+        pmesh.find_cell(axes, showindex=True)
+        print(aopts['HB'])
 
         plt.show()
 

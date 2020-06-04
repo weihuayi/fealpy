@@ -1,8 +1,9 @@
 import numpy as np
+import scipy.fft as spfft 
 from numpy.linalg import inv
 
 class FourierSpace:
-    def __init__(self, box, N):
+    def __init__(self, box, N, dft=None):
         self.box = box
         self.N = N
         self.GD = box.shape[0] 
@@ -10,9 +11,17 @@ class FourierSpace:
         self.ftype = np.float
         self.itype = np.int32
 
+        if dft is None:
+            self.fftn = spfft.fftn
+            self.ifftn = spfft.ifftn
+            self.fftfreq = spfft.fftfreq  
+        else:
+            self.fftn = dft.fftn
+            self.ifftn = dft.ifftn
+            self.fftfreq = dft.fftfreq  
+
     def number_of_dofs(self):
         return self.N**self.GD
-
 
     def interpolation_points(self):
         N = self.N
@@ -35,10 +44,10 @@ class FourierSpace:
         idx[idx<0] += self.N
         F = self.function(dtype=data[1].dtype)
         F[tuple(idx.T)] = data[1]
-        return np.fft.fftn(F).real
+        return self.fftn(F).real
 
     def function_norm(self, u):
-        val = np.sqrt(np.sum(np.fft.ifftn(u))**2).real
+        val = np.sqrt(np.sum(self.ifftn(u))**2).real
         return val
 
     def interpolation(self, u):
@@ -54,7 +63,7 @@ class FourierSpace:
         GD = self.GD
         box = self.box
 
-        f = np.fft.fftfreq(N)*N
+        f = self.fftfreq(N)*N
         f = np.meshgrid(*(GD*(f,)), sparse=sparse)
         rBox = 2*np.pi*inv(box).T
         n = GD
@@ -76,9 +85,9 @@ class FourierSpace:
         GD = self.GD
         xi = self.reciprocal_lattice()
         F = self.interpolation(f) 
-        F = np.fft.ifftn(F)
+        F = self.ifftn(F)
         U = F/cfun(xi)
-        U = np.fft.fftn(U).real
+        U = self.fftn(U).real
         return U
 
     def function(self, dim=None, dtype=None):
