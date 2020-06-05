@@ -905,12 +905,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
         isBdDof[NE*p+edge2dof[isBdEdge]] = True
         return isBdDof
 
-    def function(self, dim=None, array=None, variable='velocity'):
-
-        if variable == 'velocity':
-            f = Function(self, dim=dim, array=array)
-        elif variable == 'pressure':
-            f = self.smspace.function
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
         return f
 
     def array(self, dim=None):

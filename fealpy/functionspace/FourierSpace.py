@@ -1,5 +1,5 @@
 import numpy as np
-import scipy.fft as spfft 
+import scipy.fftpack as spfft 
 from numpy.linalg import inv
 
 class FourierSpace:
