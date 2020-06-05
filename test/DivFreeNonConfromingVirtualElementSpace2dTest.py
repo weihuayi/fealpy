@@ -20,10 +20,10 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
     def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
-        from fealpy.pde.stokes_model_2d import StokesModelData_0 
+        from fealpy.pde.stokes_model_2d import StokesModelData_7 
         from fealpy.mesh.simple_mesh_generator import triangle
         h = 0.4
-        pde = StokesModelData_0() 
+        pde = StokesModelData_7() 
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
             mesh = pde.init_mesh(n=i+2, meshtype='poly') 
@@ -53,9 +53,9 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             F = uspace.source_vector(pde.source)
 
 
-            AA = bmat([[A, P.T, None], [P, None, C.T], [None, C, None]], format='csr')
+            AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
             FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
-            x = np.block([uh, ph])
+            x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
             isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
             gdof = udof + pdof + 1
 
@@ -219,4 +219,4 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u5, p=5, mtype=3, plot=False)
 #test.stokes_equation_test()
-test.one_cell_test()
+test.one_cell_test(p=3)
