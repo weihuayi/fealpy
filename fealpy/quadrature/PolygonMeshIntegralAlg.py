@@ -27,7 +27,11 @@ class PolygonMeshIntegralAlg():
         area = np.cross(v1, v2)/2
         return area
 
-    def edge_integral(self, u, edgetype=False, q=None):
+    def edge_integral(self, u, edgetype=False, q=None, index=None):
+        """
+
+
+        """
         mesh = self.mesh
         NE = mesh.number_of_edges()
         node = mesh.entity('node')
@@ -36,13 +40,17 @@ class PolygonMeshIntegralAlg():
         qf = self.edgeintegrator
         bcs, ws = qf.quadpts, qf.weights
 
-        ps = mesh.edge_bc_to_point(bcs)
-        val = u(ps)
+        index = index if index is not None else np.s_[:]
+        ps = mesh.edge_bc_to_point(bcs, index=index)
+        val = u(ps) # TODO: 这里默认为空间坐标, 是否存在重心坐标的形式?
         if edgetype is True:
-            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure)
+            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure[index])
         else:
-            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
+            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure[index])
         return e
+
+    def face_integral(self, u, facetype=False, q=None, index=None):
+        return self.edge_integral(u, facetype, q, index)
 
     def integral(self, u, celltype=False, q=None):
         mesh = self.mesh

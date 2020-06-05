@@ -785,7 +785,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
             ndof = self.smspace.number_of_local_dofs(p=p)
             idof = p*(p-1)
             def u0(x, index):
-                print(f(x).shape)
                 return np.einsum('ijm, ijn->ijmn', 
                         self.smspace.basis(x, index=index, p=p), f(x))
             bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
@@ -841,7 +840,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             b[c2d[:, idx[x0[0]]]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
             return b 
 
-    def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
+    def set_dirichlet_bc(self, uh, gd, is_dirichlet_edge=None):
         """
         """
         p = self.p
@@ -855,13 +854,14 @@ class DivFreeNonConformingVirtualElementSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
-        val = g(ps)
+        val = gd(ps)
 
         ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
         b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
-        T = self.H1[isBdEdge]@b
-        gh[edge2dof[isBdEdge]] = T[:, :, 0] 
-        gh[NE*p:][edge2dof[isBdEdge]] = T[:, :, 1] 
+        # T = self.H1[isBdEdge]@b # 这里是一个 bug, 为什么要做一个 L2 投影呢? 直
+        # 接算自由度的值即可
+        uh[edge2dof[isBdEdge]] = b[:, :, 0] 
+        uh[NE*p:][edge2dof[isBdEdge]] = b[:, :, 1] 
 
     def number_of_global_dofs(self):
         mesh = self.mesh
@@ -905,8 +905,12 @@ class DivFreeNonConformingVirtualElementSpace2d:
         isBdDof[NE*p+edge2dof[isBdEdge]] = True
         return isBdDof
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+    def function(self, dim=None, array=None, variable='velocity'):
+
+        if variable == 'velocity':
+            f = Function(self, dim=dim, array=array)
+        elif variable == 'pressure':
+            f = self.smspace.function
         return f
 
     def array(self, dim=None):

@@ -697,7 +697,7 @@ class StokesModelData_7:
         x = p[..., 0]
         y = p[..., 1]
         shape = len(x.shape)*(1, ) + (2, )
-        val = np.ones(shape, dtype=np.float)
+        val = -np.ones(shape, dtype=np.float)
         return val
 
     def dirichlet(self, p):

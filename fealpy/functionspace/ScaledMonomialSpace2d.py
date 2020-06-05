@@ -92,6 +92,7 @@ class ScaledMonomialSpace2d():
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
+
     def diff_index_1(self, p=None):
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)

@@ -101,30 +101,39 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         P = uspace.matrix_P()
         F = uspace.source_vector(pde.source)
 
-        AA = bmat([[A, P.T], [P, None]], format='csr')
-        FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
-        x = np.block([uh, ph])
-        isBdDof = np.r_['0', isBdDof, np.ones(pdof, dtype=np.bool)]
-        gdof = udof + pdof
+
+        AA = bmat([[A, P[1:].T], [P[1:], None]], format='csr')
+        FF = np.block([F, np.zeros(pdof-1, dtype=uspace.ftype)])
+        x = np.block([uh, ph[1:]])
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof-1, dtype=np.bool)]
+        gdof = udof + pdof - 1
 
         FF -= AA@x
+
+        sio.savemat('onecell.mat', {"pA": A, "pB": P, "pF": F})
+
         bdIdx = np.zeros(gdof, dtype=np.int)
         bdIdx[isBdDof] = 1
         Tbd = spdiags(bdIdx, 0, gdof, gdof)
         T = spdiags(1-bdIdx, 0, gdof, gdof)
         AA = T@AA@T + Tbd
         FF[isBdDof] = x[isBdDof]
+        print('FF:', FF)
         x[:] = spsolve(AA, FF)
         uh[:] = x[:udof]
-        ph[:] = x[udof:]
+        ph[1:] = x[udof:]
         
-        print(uh)
+        print('uh:', uh)
         up = uspace.project_to_smspace(uh)
         print('up:', up) 
         integralalg = uspace.integralalg
         error = integralalg.L2_error(pde.velocity, up)
         print(error)
 
+        uv = uspace.project(pde.velocity)
+        print('uproject:', uv)
+        up = uspace.project_to_smspace(uv)
+        print('up', up)
 
     def project_test(self, u, p=2, mtype=0, plot=True):
         from fealpy.mesh.simple_mesh_generator import triangle
