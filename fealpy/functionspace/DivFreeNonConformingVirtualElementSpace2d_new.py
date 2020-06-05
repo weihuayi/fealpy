@@ -671,7 +671,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
         return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
 
     def matrix_A(self):
-
+        """
+        """
         p = self.p # 空间次数
         idof0 = (p+1)*p//2-1
         cell2dof = self.dof.cell2dof
@@ -828,16 +829,24 @@ class DivFreeNonConformingVirtualElementSpace2d:
             c2d = self.cell_to_dof('cell')
 
             idof0 = (p+1)*p//2 - 1 
-
             gdof = self.number_of_global_dofs()
             b = np.zeros(gdof, dtype=self.ftype)
             idx = np.arange(idof0)
-            b[c2d[:, idx[x1[0]-1]]] += bb[:, x1[0]-1, 0]*area[:, None]*c 
-            b[c2d[:, idx[y1[0]-1]]] += bb[:, y1[0]-1, 1]*area[:, None]*c 
+            print('idx0:', idx)
+            print('idx:', idx)
+            print('x0:', x0)
+            print('y0:', y0)
+            print('x1:', x1)
+            print('y1:', y1)
+            print('c2d:', c2d.shape)
+            print('bb:', bb.shape)
+            b[c2d[:, idx[x1[0]-1]]] += bb[:, :, 0]*area[:, None]*c 
+            b[c2d[:, idx[y1[0]-1]]] += bb[:, :, 1]*area[:, None]*c 
 
             idx = np.arange(idof0, p*(p-1))
-            b[c2d[:, idx[y0[0]]]] += bb[:, y0[0], 0]*area[:, None]*y0[1]*c[y0[0]]
-            b[c2d[:, idx[x0[0]]]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
+            print('idx1:', idx)
+            b[c2d[:, idx]] += bb[:, y0[0], 0]*area[:, None]*y0[1]*c[y0[0]]
+            b[c2d[:, idx]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
             return b 
 
     def set_dirichlet_bc(self, uh, gd, is_dirichlet_edge=None):
@@ -905,12 +914,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
         isBdDof[NE*p+edge2dof[isBdEdge]] = True
         return isBdDof
 
-    def function(self, dim=None, array=None, variable='velocity'):
-
-        if variable == 'velocity':
-            f = Function(self, dim=dim, array=array)
-        elif variable == 'pressure':
-            f = self.smspace.function
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
         return f
 
     def array(self, dim=None):

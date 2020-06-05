@@ -20,10 +20,10 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
     def stokes_equation_test(self, p=2, maxit=4):
         from scipy.sparse import bmat
-        from fealpy.pde.stokes_model_2d import StokesModelData_0 
+        from fealpy.pde.stokes_model_2d import StokesModelData_7 
         from fealpy.mesh.simple_mesh_generator import triangle
         h = 0.4
-        pde = StokesModelData_0() 
+        pde = StokesModelData_7() 
         error = np.zeros((maxit,), dtype=np.float)
         for i in range(maxit):
             mesh = pde.init_mesh(n=i+2, meshtype='poly') 
@@ -36,6 +36,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
             uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
             pspace = ScaledMonomialSpace2d(mesh, p-1)
+            ldof = pspace.number_of_local_dofs()
 
             isBdDof = uspace.boundary_dof()
 
@@ -48,14 +49,15 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
             A = uspace.matrix_A()
             P = uspace.matrix_P()
+            C = uspace.CM[:, 0, :ldof].reshape(-1)
             F = uspace.source_vector(pde.source)
 
 
-            AA = bmat([[A, P.T], [P, None]], format='csr')
-            FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
-            x = np.block([uh, ph])
-            isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool)]
-            gdof = udof + pdof
+            AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
+            FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
+            x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
+            isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
+            gdof = udof + pdof + 1
 
             FF -= AA@x
             bdIdx = np.zeros(gdof, dtype=np.int)
@@ -66,7 +68,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             FF[isBdDof] = x[isBdDof]
             x[:] = spsolve(AA, FF)
             uh[:] = x[:udof]
-            ph[:] = x[udof:]
+            ph[:] = x[udof:-1]
 
             up = uspace.project_to_smspace(uh)
             integralalg = uspace.integralalg
@@ -217,4 +219,4 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.project_test(u2, p=2, mtype=0, plot=True)
 #test.project_test(u5, p=5, mtype=3, plot=False)
 #test.stokes_equation_test()
-test.one_cell_test()
+test.one_cell_test(p=3)
