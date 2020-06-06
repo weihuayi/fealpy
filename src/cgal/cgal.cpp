@@ -90,7 +90,8 @@ int add(int i, int j)
     return i + j;
 }
 
-PYBIND11_MODULE(fealpy_extent, m){
+PYBIND11_MODULE(cgal, m){
+    //m.attr("__name__") = "fealpy.cgal";
     m.doc() = "This is a module extent of fealpy package!";
     m.def("add", &add,  "A function which adds two numbers");
     m.def("generate_surface_mesh", 
