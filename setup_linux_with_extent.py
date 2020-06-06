@@ -15,9 +15,9 @@ class get_pybind_include:
 
 ext_modules = [
     Extension(
-        "fealpy_extent",
+        "fealpy.cgal",
         [
-            "src/pybind11.cpp",
+            "src/cgal/cgal.cpp",
         ],
         language="C++",
         include_dirs=[
@@ -37,7 +37,7 @@ if __name__ == "__main__":
           author='Huayi Wei',
           author_email='weihuayi@xtu.edu.cn',
           license='GNU',
-          packages=['fealpy'],
+          packages=['fealpy', 'fealpy.cgal'],
           install_requires=[
               'numpy',
               'scipy',
