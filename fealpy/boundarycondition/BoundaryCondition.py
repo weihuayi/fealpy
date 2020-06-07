@@ -43,7 +43,7 @@ class BoundaryCondition():
             idx = mesh.ds.boundary_face_index()
             if is_robin_boundary is not None:
                 bc = mesh.entity_barycenter('face', index=idx)
-                flag = is_neumann_boundary(bc)
+                flag = is_robin_boundary(bc)
                 idx = idx[flag]
 
             measure = mesh.entity_measure('face', index=idx)
@@ -59,15 +59,14 @@ class BoundaryCondition():
             else:
                 np.add.at(b, (face2dof[idx], np.s_[:]), bb)
 
-            FM = np.einsum('m, mi, mij, mik, i->ijk', kappa, ws, phi, phi, measure)
+            FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
             fdof = space.number_of_local_dofs(etype='face')
-            I = np.einsum('k, ij->ijk', np.ones(fdof), face2dof)
+            I = np.einsum('k, ij->ijk', np.ones(fdof), face2dof[idx])
             J = I.swapaxes(-1, -2)
-            gdof = self.number_of_global_dofs()
 
             # Construct the stiffness matrix
-            A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
 
 

@@ -53,7 +53,6 @@ class Mesh2d():
         bc = self.entity_barycenter('edge')
         if callable(threshhold):
             idx = threshhold(bc)
-            print(btype, idx)
             if idx.dtype is np.bool:
                 idx, = idx.nonzero()
         elif threshhold is np.ndarray:
@@ -67,7 +66,6 @@ class Mesh2d():
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
-            print('a')
             return self.ds.cell
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge
