@@ -22,7 +22,7 @@ class CosData:
         """
         x = p[..., 0]
         val = np.cos(np.pi*x)
-        return u
+        return val 
 
     def gradient(self, p):
         """ The gradient of the exact solution
@@ -32,7 +32,8 @@ class CosData:
         p : numpy.ndarray
             (..., 1)
         """
-        val = -np.pi*np.sin(pi*p)
+        pi = np.pi
+        val = -pi*np.sin(pi*p)
         return val
 
     def source(self, p):
