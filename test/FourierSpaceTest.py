@@ -90,7 +90,7 @@ class FourierSpaceTest():
 
         周期边界条件
         """
-        from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+        from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
         box = np.array([
             [2*np.pi, 0],
