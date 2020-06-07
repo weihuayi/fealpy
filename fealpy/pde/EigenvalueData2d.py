@@ -209,7 +209,7 @@ class EigenCrack:
         pass
 
     def init_mesh(self, n=4, meshtype='tri'):
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             node = np.array([
                 (0, -1),
                 (-1, 0),
@@ -226,7 +226,7 @@ class EigenCrack:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'quadtree':
+        elif meshtype == 'quadtree':
             r = 1-2**(1/2)/2
             a = 1/2 - 2**(1/2)/2
             rr = 1/2
@@ -265,7 +265,7 @@ class EigenCrack:
             mesh = Quadtree(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype is 'tritree':
+        elif meshtype == 'tritree':
             node = np.array([
                 (0, -1),
                 (-1, 0),
