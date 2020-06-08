@@ -186,10 +186,10 @@ def show_halfedge_mesh(axes, mesh,
     h = np.sqrt(np.sum(v**2, axis=-1))
 
     axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
-
+    hedge = mesh.ds.hedge
     NE = p0.shape[0]
     for i in range(NE):
-        if halfedge[i, 5] == 1:
+        if i in hedge:
             axes.arrow(
                 p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
                 shape='right', linewidth=h[i]*linewidth, 
@@ -202,7 +202,8 @@ def show_halfedge_mesh(axes, mesh,
 
     if showindex:
         for i in range(NE):
-            if  halfedge[:, 5]==1:
+            hedge=mesh.ds.hedge
+            if np.isin(i, hedge):
                 axes.text(
                         ec[i, 0], ec[i, 1],
                         str(i),

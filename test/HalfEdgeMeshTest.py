@@ -475,7 +475,7 @@ class HalfEdgeMeshTest:
 
 
 test = HalfEdgeMeshTest()
-#test.refine_triangle_rbTest(8, plot=True, rb=True)
+test.refine_triangle_rbTest(8, plot=True, rb=True)
 
 if sys.argv[1] == 'refine_tri_rb':
     test.refine_triangle_rbTest(8, plot=True, rb=1)
