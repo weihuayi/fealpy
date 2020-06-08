@@ -30,7 +30,7 @@ class IntervalMesh():
         self.ftype = node.dtype
 
 
-    def integrator(self, k):
+    def integrator(self, k, etype='cell'):
         return GaussLegendreQuadrature(k)
 
     def number_of_nodes(self):
@@ -106,7 +106,7 @@ class IntervalMesh():
         node = self.node if node is None else node
         cell = self.ds.cell
         index = index if index is not None else np.s_[:]
-        p = np.einsum('...j, ij->...i', bc, node[cell[index]])
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
         return p
 
     def cell_normal(self, index=None, node=None):

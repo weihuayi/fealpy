@@ -55,7 +55,7 @@ class CosCosData:
             mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
             return mesh
-        elif meshtype == 'stri':
+        elif meshtype == 'squad':
             mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
         else:
@@ -64,12 +64,21 @@ class CosCosData:
 
     def solution(self, p):
         """ The exact solution 
+        Parameters
+        ---------
+        p : 
+
+
+        Examples
+        -------
+        p = np.array([0, 1], dtype=np.float)
+        p = np.array([[0, 1], [0.5, 0.5]], dtype=np.float)
         """
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
         val = np.cos(pi*x)*np.cos(pi*y)
-        return val
+        return val # val.shape == x.shape
 
 
     def source(self, p):
@@ -93,7 +102,7 @@ class CosCosData:
         val = np.zeros(p.shape, dtype=np.float)
         val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
         val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
-        return val
+        return val # val.shape == p.shape
 
     def dirichlet(self, p):
         return self.solution(p)
@@ -108,6 +117,7 @@ class CosCosData:
         p: (NQ, NE, 2)
         n: (NE, 2)
 
+        grad*n : (NQ, NE, 2)
         """
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
