@@ -51,7 +51,7 @@ class HuZhangFiniteElementSpace():
             NF = mesh.number_of_faces()
             self.TF = np.zeros((NF, 6, 6), dtype=np.float)
             n = mesh.face_unit_normal()
-            _, _, frame = np.linalg.svd(n[:, np.newaxis, :]) # get the axis frame on the edge by svd
+            _, _, frame = np.linalg.svd(n[:, np.newaxis, :]) # get the axis frame on the face by svd
             frame[:, 0, :] = n 
             for i, (j, k) in enumerate(idx):
                 self.TF[:, i] = (frame[:, j, idx[:, 0]]*frame[:, k, idx[:, 1]] + frame[:, j, idx[:, 1]]*frame[:, k, idx[:, 0]])/2

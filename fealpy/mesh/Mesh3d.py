@@ -176,7 +176,7 @@ class Mesh3d():
             node=None,
             index=None, showindex=False,
             color='r', markersize=40,
-            fontsize=24, fontcolor='k'):
+            fontsize=24, fontcolor='k', multiindex=None):
 
         if node is None:
             node = self.node
@@ -184,7 +184,7 @@ class Mesh3d():
                 axes, node,
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_edge(
             self, axes,

@@ -11,6 +11,7 @@ class ATriMesher:
         domain : HalEdgeDomain
         """
         self.domain = domain
+        self.mesh = domain.to_halfedgemesh()
 
     def uniform_boundary_meshing(self, refine=4, maxh=0.1):
         self.domain.boundary_uniform_refine(n=refine)

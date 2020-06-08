@@ -1,15 +1,14 @@
 import numpy as np
-from numpy.linalg import inv, pinv
+from numpy.linalg import inv
 from .function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
-from .femdof import multi_index_matrix2d
 
-class RTDof2d:
+class RTDofFracture2d:
     def __init__(self, mesh, p):
         """
         Parameters
         ----------
-        mesh : TriangleMesh object
+        mesh : TriangleMesh object with fracture edges
         p : the space order, p>=0
 
         Notes
@@ -81,13 +80,97 @@ class RTDof2d:
             gdof += NC*(p+1)*p
         return gdof 
 
+
+class RTDof2d:
+    def __init__(self, mesh, p):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh object
+        p : the space order, p>=0
+
+        Notes
+        -----
+
+        Reference
+        ---------
+        """
+        self.mesh = mesh
+        self.p = p # 默认的空间次数 p >= 0
+        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+
+    def boundary_dof(self, threshold=None):
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None:
+            bc = self.mesh.entity_barycenter('edge', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdDof[edge2dof[idx]] = True
+        return isBdDof
+
+    def edge_to_dof(self):
+        edof = self.number_of_local_dofs('edge')
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        edge2dof = np.arange(NE*edof).reshape(NE, edof)
+        return edge2dof
+
+    def cell_to_dof(self):
+        """
+        """
+        p = self.p 
+        mesh = self.mesh
+        if p == 0:
+            cell2edge = mesh.ds.cell_to_edge()
+            return cell2edge
+        else:
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
+            edof = self.number_of_local_dofs('edge') 
+            cdof = self.number_of_local_dofs('cell')
+            cell2dof = np.zeros((NC, cdof), dtype=np.int)
+
+            edge2dof = self.edge_to_dof()
+            edge2cell = mesh.ds.edge_to_cell()
+            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
+            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
+            idof = cdof - 3*edof 
+            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
+            return cell2dof
+
+    def number_of_local_dofs(self, etype='cell'):
+        p = self.p
+        if etype == 'cell':
+            return (p+1)*(p+3) 
+        elif etype =='edge':
+            return p+1
+
+    def number_of_global_dofs(self):
+        p = self.p
+        
+        edof = self.number_of_local_dofs('edge') 
+        cdof = self.number_of_local_dofs(p=p)
+        idof = cdof - 3*edof
+
+        NE = self.mesh.number_of_edges()
+        gdof = NE*edof
+        if p > 0:
+            NC = self.mesh.number_of_cells()
+            gdof += NC*(p+1)*p
+        return gdof 
+
 class RaviartThomasFiniteElementSpace2d:
-    def __init__(self, mesh, p, q=None):
+    def __init__(self, mesh, p, q=None, dof=None):
         """
         Parameters
         ----------
         mesh : TriangleMesh
         p : the space order, p>=0
+        q : the index of quadrature fromula
+        dof : the object for degree of freedom
 
         Note
         ----
@@ -98,7 +181,10 @@ class RaviartThomasFiniteElementSpace2d:
         self.p = p
         self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
 
-        self.dof = RTDof2d(mesh, p)
+        if dof is None:
+            self.dof = RTDof2d(mesh, p)
+        else:
+            self.dof = dof
 
         self.integralalg = self.smspace.integralalg
         self.integrator = self.smspace.integrator
@@ -169,10 +255,6 @@ class RaviartThomasFiniteElementSpace2d:
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
             A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
 
-        print(n)
-        print(edge)
-        print(A)
-        
         return inv(A)
 
     def basis(self, bc):
@@ -203,7 +285,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
 
-        if False:
+        if False :
             NC = mesh.number_of_cells()
             Rlambda = mesh.rot_lambda()
             cell2edgeSign = self.cell_to_edge_sign()
@@ -227,8 +309,8 @@ class RaviartThomasFiniteElementSpace2d:
             y = x + 1
             phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
             phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2:ndof:, :])
-            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2:ndof:, :])
+            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
+            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
         return phi
 
 
@@ -237,7 +319,7 @@ class RaviartThomasFiniteElementSpace2d:
         ldof = self.number_of_local_dofs()
 
         mesh = self.mesh
-        if p == 1:
+        if False:
             NC = mesh.number_of_cells()
             shape = (NC, ldof, 2, 2)
             gradPhi = np.zeros(shape, dtype=np.float)
@@ -265,15 +347,13 @@ class RaviartThomasFiniteElementSpace2d:
             else:
                 return gradPhi
         else:
-            print("error")
-            return None
-
+            raise ValueError('the case for p > 0 has not been implemented!')
 
     def div_basis(self, bc):
         p = self.p
         ldof = self.number_of_local_dofs()
 
-        if p == 1:
+        if False:
             mesh = self.mesh
             NC = mesh.number_of_cells()
             divPhi = np.zeros((NC, ldof), dtype=np.float)
@@ -291,8 +371,7 @@ class RaviartThomasFiniteElementSpace2d:
             else:
                 return divPhi
         else:
-            print("error")
-            return None 
+            raise ValueError('the case for p > 0 has not been implemented!')
 
 
     def cell_to_dof(self):
@@ -369,18 +448,28 @@ class RaviartThomasFiniteElementSpace2d:
         """
         Plot quvier graph for every basis in a fig object
         """
+        from .femdof import multi_index_matrix2d
 
         p = self.p
         mesh = self.mesh
 
         ldof = self.number_of_local_dofs()
 
-        bcs = multi_index_matrix2d(4)/4
+        bcs = multi_index_matrix2d(10)/10
         ps = mesh.bc_to_point(bcs)
         phi = self.basis(bcs)
 
+        if p == 0:
+            m = 1
+            n = 3
+        elif p == 1:
+            m = 4 
+            n = 2 
+        elif p == 2:
+            m = 5 
+            n = 3 
         for i in range(ldof):
-            axes = fig.add_subplot(1, ldof, i+1)
+            axes = fig.add_subplot(m, n, i+1)
             mesh.add_plot(axes, box=box)
             node = ps[:, index, :]
             uv = phi[:, index, i, :]

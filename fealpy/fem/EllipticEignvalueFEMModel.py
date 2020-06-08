@@ -639,8 +639,6 @@ class EllipticEignvalueFEMModel:
 
             return uh
 
-
-
     def alg_3_4(self, maxit=None):
         """
         1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
@@ -801,6 +799,475 @@ class EllipticEignvalueFEMModel:
             uh /= np.max(np.abs(uh))
             uh = space.function(array=uh)
             return uh
+
+    def alg_3_5(self, maxit=None):
+        """
+        1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
+        2. 自适应求解  - \Delta u_h = u_H
+            *  u_H 插值到下一层网格上做为新 u_H
+        3. 在最细网格上求解一次最小特征值问题
+
+        自适应 maxit, picard:2
+        """
+        print("算法 3.5")
+
+        if maxit is None:
+            maxit = self.maxit
+
+        start = timer()
+
+        if self.step == 0:
+            idx = []
+        else:
+            idx =list(range(0, self.maxit, self.step))
+
+        mesh = self.pde.init_mesh(n=self.numrefine)
+        # 1. 粗网格上求解最小特征值问题
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
+        isFreeHDof = ~(space.boundary_dof())
+
+        gdof = space.number_of_global_dofs()
+        uH = np.zeros(gdof, dtype=mesh.ftype)
+        print("initial mesh :", gdof)
+
+        A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
+        M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
+        if self.matlab is False:
+            uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
+
+        uh = space.function()
+        uh[:] = uH
+
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_5_0_' + str(NN) + '.pdf')
+            plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_3_5_0_' + str(NN) + '.mat')
+
+        # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
+
+        I = eye(gdof)
+        final = 0
+        while True:
+            eta = self.residual_estimate(uh)
+            markedCell = mark(eta, self.theta)
+            IM = mesh.bisect(markedCell, returnim=True)
+            print(final+1, "refine :", mesh.number_of_nodes())
+            if (self.step > 0) and (final in idx):
+                NN = mesh.number_of_nodes()
+                fig = plt.figure()
+                fig.set_facecolor('white')
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
+                mesh.add_plot(axes, cellcolor='w')
+                fig.savefig(self.resultdir + 'mesh_3_5_' + str(final+1) + '_' + str(NN) +'.pdf')
+                plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_3_5_' + str(final+1) + '_' + str(NN) +'.mat')
+
+            I = IM@I
+            uH = IM@uH
+
+            space = LagrangeFiniteElementSpace(mesh, 1)
+            gdof = space.number_of_global_dofs()
+
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
+            isFreeDof = ~(space.boundary_dof())
+            b = M@uH
+
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
+            else:
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+            final += 1
+            if gdof > 1e+4:
+                break
+
+        # 1. 自适应粗网格上求解最小特征值问题
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
+        isFreeHDof = ~(space.boundary_dof())
+
+        gdof = space.number_of_global_dofs()
+        print("initial mesh :", gdof)
+
+        uH = np.zeros(gdof, dtype=np.float)
+
+        A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
+        M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
+
+        if self.matlab is False:
+            uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
+
+        uh = space.function()
+        uh[:] = uH
+
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_5_' + str(final) + '_' + str(NN) + 'H.pdf')
+            plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_3_5_' + str(final) + '_' + str(NN) + 'H.mat')
+
+        I = eye(gdof)
+        for i in range(final, maxit-1):
+            eta = self.residual_estimate(uh)
+            markedCell = mark(eta, self.theta)
+            IM = mesh.bisect(markedCell, returnim=True)
+            NN = mesh.number_of_nodes()
+            print(i+1, "refine : ", NN)
+            if (self.step > 0) and (i in idx):
+                NN = mesh.number_of_nodes()
+                fig = plt.figure()
+                fig.set_facecolor('white')
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
+                mesh.add_plot(axes, cellcolor='w')
+                fig.savefig(self.resultdir + 'mesh_3_5_' + str(i+1) + '_' + str(NN) +'.pdf')
+                plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_3_3_' + str(i+1) + '_' + str(NN) +'.mat')
+            final = i+1
+
+            I = IM@I
+            uH = IM@uH
+
+            if NN > self.maxdof:
+                break
+
+            space = LagrangeFiniteElementSpace(mesh, 1)
+            gdof = space.number_of_global_dofs()
+
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
+            isFreeDof = ~(space.boundary_dof())
+            b = M@uH
+
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
+            else:
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+
+
+        # 3. 在最细网格上求解一次最小特征值问题 
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_5_' + str(final) + '_' + str(NN) +'f.pdf')
+            plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_3_5_' + str(final) + '_' + str(NN) +'f.mat')
+
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        gdof = space.number_of_global_dofs()
+        A = self.get_stiff_matrix(space)
+        M = self.get_mass_matrix(space)
+        isFreeDof = ~(space.boundary_dof())
+        uh = space.function(array=uh)
+        Ah = A[isFreeDof, :][:, isFreeDof].tocsr()
+        Mh = M[isFreeDof, :][:, isFreeDof].tocsr()
+        uh = space.function()
+
+        if self.multieigs is True:
+            self.A = Ah
+            self.M = Mh
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
+        else:
+            if self.matlab is False:
+                uh[isFreeDof], d = self.eig(Ah, Mh)
+            else:
+                uh[isFreeDof], d = self.meigs(Ah, Mh)
+            print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
+
+            return uh
+
+    def alg_3_6(self, maxit=None):
+        """
+        1. 最粗网格上求解最小特征特征值问题，得到最小特征值 d_H 和特征向量 u_H
+        2. 自适应求解  - \Delta u_h = u_H
+            *  u_H 插值到下一层网格上做为新 u_H
+        3. 最新网格层上求出的 uh 做为一个基函数，加入到最粗网格的有限元空间中，
+           求解最小特征值问题。
+
+        自适应 maxit， picard:2
+        """
+        print("算法 3.6")
+        if maxit is None:
+            maxit = self.maxit
+
+        start = timer()
+        if self.step == 0:
+            idx = []
+        else:
+            idx =list(range(0, self.maxit, self.step)) + [self.maxit-1]
+
+        mesh = self.pde.init_mesh(n=self.numrefine)
+        integrator = mesh.integrator(self.q)
+
+        # 1. 粗网格上求解最小特征值问题
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
+        isFreeHDof = ~(space.boundary_dof())
+
+        gdof = space.number_of_global_dofs()
+        print("initial mesh :", gdof)
+
+        uH = np.zeros(gdof, dtype=np.float)
+
+        A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
+        M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
+
+        if self.matlab is False:
+            uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
+
+        uh = space.function()
+        uh[:] = uH
+
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_6_0_' + str(NN) + '.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_6_0_' + str(NN) + '.mat')
+
+
+        # 2. 以 u_H 为右端项自适应求解 -\Deta u = u_H
+        I = eye(gdof)
+        final = 0
+
+        while True:
+            eta = self.residual_estimate(uh)
+            markedCell = mark(eta, self.theta)
+            IM = mesh.bisect(markedCell, returnim=True)
+            print(final+1, "refine :", mesh.number_of_nodes())
+            if (self.step > 0) and (final in idx):
+                NN = mesh.number_of_nodes()
+                fig = plt.figure()
+                fig.set_facecolor('white')
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
+                mesh.add_plot(axes, cellcolor='w')
+                fig.savefig(self.resultdir + 'mesh_3_6_' + str(i+1) + '_' + str(NN) +'.pdf')
+                plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_3_6_' + str(i+1) + '_' + str(NN) +'.mat')
+
+            I = IM@I
+            uH = IM@uH
+
+            space = LagrangeFiniteElementSpace(mesh, 1)
+            gdof = space.number_of_global_dofs()
+
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
+            isFreeDof = ~(space.boundary_dof())
+            b = M@uH
+
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
+            else:
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+            final += 1
+            if gdof > 1e+4:
+                break
+
+        # 1. 自适应粗网格上求解最小特征值问题
+        space = LagrangeFiniteElementSpace(mesh, 1)
+        AH = self.get_stiff_matrix(space)
+        MH = self.get_mass_matrix(space)
+        isFreeHDof = ~(space.boundary_dof())
+
+        gdof = space.number_of_global_dofs()
+        print("initial mesh :", gdof)
+
+        uH = np.zeros(gdof, dtype=np.float)
+
+        A = AH[isFreeHDof, :][:, isFreeHDof].tocsr()
+        M = MH[isFreeHDof, :][:, isFreeHDof].tocsr()
+
+        if self.matlab is False:
+            uH[isFreeHDof], d = self.eig(A, M)
+        else:
+            uH[isFreeHDof], d = self.meigs(A, M)
+
+        uh = space.function()
+        uh[:] = uH
+
+        GD = mesh.geo_dimension()
+        if (self.step > 0) and (0 in idx):
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_6_' + str(final) + '_' + str(NN) + 'H.pdf')
+            plt.close()
+            self.savemesh(mesh, self.resultdir + 'mesh_3_6_' + str(final) + '_' + str(NN) + 'H.mat')
+
+        I = eye(gdof)
+        for i in range(final, maxit):
+            eta = self.residual_estimate(uh)
+            markedCell = mark(eta, self.theta)
+            IM = mesh.bisect(markedCell, returnim=True)
+            print(i+1, "refine :", mesh.number_of_nodes())
+            if (self.step > 0) and (i in idx):
+                NN = mesh.number_of_nodes()
+                fig = plt.figure()
+                fig.set_facecolor('white')
+                if GD == 2:
+                    axes = fig.gca()
+                else:
+                    axes = Axes3D(fig)
+                mesh.add_plot(axes, cellcolor='w')
+                fig.savefig(self.resultdir + 'mesh_3_4_' + str(i+1) + '_' + str(NN) +'.pdf')
+                plt.close()
+                self.savemesh(mesh,
+                        self.resultdir + 'mesh_3_4_' + str(i+1) + '_' + str(NN) +'.mat')
+
+            I = IM@I
+            uH = IM@uH
+
+            space = LagrangeFiniteElementSpace(mesh, 1)
+            gdof = space.number_of_global_dofs()
+
+            A = self.get_stiff_matrix(space)
+            M = self.get_mass_matrix(space)
+            isFreeDof = ~(space.boundary_dof())
+            b = M@uH
+
+            uh = space.function()
+            if self.matlab is False:
+                uh[isFreeDof] = self.psolve(
+                        A[isFreeDof, :][:, isFreeDof].tocsr(),
+                        b[isFreeDof],
+                        M[isFreeDof, :][:, isFreeDof].tocsr())
+            else:
+                uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
+            final = i+1
+            if gdof > self.maxdof:
+                break
+
+        if self.step > 0:
+            NN = mesh.number_of_nodes()
+            fig = plt.figure()
+            fig.set_facecolor('white')
+            if GD == 2:
+                axes = fig.gca()
+            else:
+                axes = Axes3D(fig)
+            mesh.add_plot(axes, cellcolor='w')
+            fig.savefig(self.resultdir + 'mesh_3_6_' + str(final) + '_' +
+                    str(NN) +'f.pdf')
+            plt.close()
+            self.savemesh(mesh,
+                    self.resultdir + 'mesh_3_6_' + str(final) + '_' + str(NN)
+                    +'f.mat')
+
+        # 3. 把 uh 加入粗网格空间, 组装刚度和质量矩阵
+        w0 = uh@A
+        w1 = w0@uh
+        w2 = w0@I
+        AA = bmat([[AH, w2.reshape(-1, 1)], [w2, w1]], format='csr')
+
+        w0 = uh@M
+        w1 = w0@uh
+        w2 = w0@I
+        MM = bmat([[MH, w2.reshape(-1, 1)], [w2, w1]], format='csr')
+
+        isFreeDof = np.r_[isFreeHDof, True]
+
+        u = np.zeros(len(isFreeDof))
+
+        ## 求解特征值
+        A = AA[isFreeDof, :][:, isFreeDof].tocsr()
+        M = MM[isFreeDof, :][:, isFreeDof].tocsr()
+
+        if self.multieigs is True:
+            self.A = A
+            self.M = M
+            self.ml = pyamg.ruge_stuben_solver(self.A)
+            self.eigs()
+        else:
+            if self.matlab is False:
+                u[isFreeDof], d = self.eig(A, M)
+            else:
+                u[isFreeDof], d = self.meigs(A, M)
+
+            print("smallest eigns:", d)
+            end = timer()
+            print("with time: ", end - start)
+            uh *= u[-1]
+            uh += I@u[:-1]
+
+            uh /= np.max(np.abs(uh))
+            uh = space.function(array=uh)
+            return uh
+
+
 
 
 

@@ -25,13 +25,11 @@ class ParabolicFourierSolver():
         ----
         """
 
+        space = self.space
         self.w = w
         dt = self.timeline.current_time_step_length()
         self.E0 = np.exp(-dt/2*w)
         self.E2 = np.exp(-dt/4*w)
-
-        print("E0", self.E0.dtype)
-        print("E2", self.E2.dtype)
 
         NL = self.timeline.number_of_time_levels()
 
@@ -43,26 +41,27 @@ class ParabolicFourierSolver():
 
         for i in range(1, 4):
             q0 = q[i-1]
-            q1 = np.fft.ifftn(E0*q0)
+            q1 = space.ifftn(E0*q0)
             q1 *= E1
-            q[i] = np.fft.fftn(q1).real
+            q[i] = space.fftn(q1).real
             q[i] *= E0
 
         for i in range(1, 4):
             q0 = q[i-1]
-            q1 = np.fft.ifftn(E2*q0)
+            q1 = space.ifftn(E2*q0)
             q1 *= E3
-            q1 = np.fft.fftn(q1).real
+            q1 = space.fftn(q1).real
             q1 *= E2
 
-            q1 = np.fft.ifftn(E2*q1)
+            q1 = space.ifftn(E2*q1)
             q1 *= E3
-            q1 = np.fft.fftn(q1).real
+            q1 = space.fftn(q1).real
             q1 *= E2
             q[i] *= -1/3
             q[i] += 4*q1/3
 
     def solve(self, q): 
+        space = self.space
         NL = self.timeline.number_of_time_levels()
         dt = self.timeline.current_time_step_length()
         E0 = self.E0
@@ -76,9 +75,9 @@ class ParabolicFourierSolver():
             q1 *= w
             q1 *= dt
             q0 -= q1
-            q1 = np.fft.ifftn(q0)
+            q1 = space.ifftn(q0)
             q1 /= 25/12 + dt*k2
-            q[i] = np.fft.fftn(q1).real
+            q[i] = space.fftn(q1).real
 
 
 if __name__ == "__main__":

@@ -1,19 +1,108 @@
 import numpy as np
 
-from .GaussLobattoQuadrature import GaussLobattoQuadrature
-from .GaussLegendreQuadrature import GaussLegendreQuadrature
-
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
-        self.integrator = mesh.integrator(q)
+        self.integrator = mesh.integrator(q, 'cell')
+
+        self.cellintegrator = self.integrator
+        self.cellbarycenter =  mesh.entity_barycenter('cell')
         self.cellmeasure = cellmeasure if cellmeasure is not None \
                 else mesh.entity_measure('cell')
 
         self.edgemeasure = mesh.entity_measure('edge')
         self.edgebarycenter = mesh.entity_barycenter('edge')
-        self.edgeintegrator = GaussLegendreQuadrature(q)
+        self.edgeintegrator = mesh.integrator(q, 'edge')
 
+        GD = mesh.geo_dimension()
+        if GD == 3:
+            self.facemeasure = mesh.entity_measure('face')
+            self.facebarycenter = mesh.entity_measure('face')
+            self.faceintegrator = mesh.integrator(q, 'face') 
+        else:
+            self.facemeasure = self.edgemeasure
+            self.facebarycenter = self.edgebarycenter
+            self.faceintegrator = self.edgeintegrator
+
+    def cell_matrix_integral(self, basis0, basis1=None, barycenter=False, cell_to_dof=None, q=None):
+
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.quadpts, qf.weights
+
+        if barycenter is False:
+            bcs  =  mesh.bc_to_point(bcs)
+
+        phi0 = basis0(bcs)
+        if basis1 is None:
+            phi1 = phi0
+        else:
+            phi1 = basis1(bcs)
+
+        M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
+                self.cellmeasure, optimize=True)
+
+        return M
+
+
+    def edge_integral(self, u, edgetype=False, q=None, barycenter=False):
+        mesh = self.mesh
+
+        qf = self.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.quadpts, qf.weights
+
+        if barycenter:
+            val = u(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs, etype='edge')
+            val = u(ps)
+
+        if edgetype is True:
+            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure)
+        else:
+            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
+        return e
+
+    def face_integral(self, u, facetype=False, q=None, barycenter=False):
+        mesh = self.mesh
+
+        qf = self.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.quadpts, qf.weights
+
+        if barycenter:
+            val = u(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs, etype='face')
+            val = u(ps)
+
+        dim = len(ws.shape)
+        s0 = 'abcde'
+        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+        if facetype is True:
+            e = np.einsum(s1, ws, val, self.facemeasure)
+        else:
+            e = np.einsum(s1, ws, val, self.facemeasure)
+        return e
+
+    def cell_integral(self, u, celltype=False, q=None, barycenter=False):
+        mesh = self.mesh
+
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.quadpts, qf.weights
+
+        if barycenter:
+            val = u(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs, etype='cell')
+            val = u(ps)
+        dim = len(ws.shape)
+        s0 = 'abcde'
+        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+        if celltype is True:
+            e = np.einsum(s1, ws, val, self.cellmeasure)
+        else:
+            e = np.einsum(s1, ws, val, self.cellmeasure)
+        return e
 
     def integral(self, u, celltype=False, barycenter=True):
         qf = self.integrator
@@ -36,7 +125,6 @@ class FEMeshIntegralAlg():
     def L2_norm(self, uh, celltype=False):
         def f(x):
             return uh(x)**2
-
         e = self.integral(f, celltype=celltype)
         if celltype is False:
             return np.sqrt(e.sum())

@@ -76,3 +76,10 @@ if __name__ == "__main__":
     nu = 1
     model = StokesModel2d(nu, u, p)
     model.show()
+
+    print("Model 7:")
+    u = Matrix([y**2, x**2])
+    p = 0 
+    nu = 1
+    model = StokesModel2d(nu, u, p)
+    model.show()

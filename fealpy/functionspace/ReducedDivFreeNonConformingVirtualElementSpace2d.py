@@ -976,28 +976,28 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
             return b 
 
-    def set_dirichlet_bc(self, gh, g, is_dirichlet_edge=None):
+    def set_dirichlet_bc(self, uh, gd, is_dirichlet_edge=None):
         """
+        
         """
         p = self.p
         mesh = self.mesh
 
         NE = mesh.number_of_edges()
 
-        h = mesh.entity_measure('edge')
         isBdEdge = mesh.ds.boundary_edge_flag()
         edge2dof = self.dof.edge_to_dof()
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
-        val = g(ps)
+        val = gd(ps)
 
         ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
-        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi, h[isBdEdge])
-        T = self.H1[isBdEdge]@b
-        gh[edge2dof[isBdEdge]] = T[:, :, 0] 
-        gh[NE*p:][edge2dof[isBdEdge]] = T[:, :, 1] 
+        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi)
+        # T = self.H1[isBdEdge]@b #TODO: 检查这里的问题
+        uh[edge2dof[isBdEdge]] = b[:, :, 0] 
+        uh[NE*p:][edge2dof[isBdEdge]] = b[:, :, 1] 
 
     def number_of_global_dofs(self):
         mesh = self.mesh

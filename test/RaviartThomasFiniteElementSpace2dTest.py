@@ -19,8 +19,8 @@ class RaviartThomasFiniteElementSpace2dTest:
     def show_basis_test(self):
         h = 0.5
         box = [-h, 1+h, -h, np.sqrt(3)/2+h]
-        mesh = self.meshfactory.one_triangle_mesh()
-        space = RaviartThomasFiniteElementSpace2d(mesh, p=0, q=2)
+        mesh = self.meshfactory.one_triangle_mesh('equ')
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=2, q=2)
         fig = plt.figure()
         space.show_basis(fig, box=box)
         plt.show()

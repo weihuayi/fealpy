@@ -7,6 +7,7 @@ from ..quadrature import PolygonMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
+from .femdof import multi_index_matrix2d
 
 class SMDof2d():
     """
@@ -81,15 +82,47 @@ class ScaledMonomialSpace2d():
             self.integralalg = FEMeshIntegralAlg(
                     self.mesh, q,
                     cellmeasure=self.cellmeasure)
-        self.integrator = self.integralalg.integrator
+
+        self.integralalg = PolygonMeshIntegralAlg(
+                self.mesh, q,
+                cellmeasure=self.cellmeasure,
+                cellbarycenter=self.cellbarycenter)
+        #self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
+
+
+    def diff_index_1(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        x, = np.nonzero(index[:, 1] > 0)
+        y, = np.nonzero(index[:, 2] > 0)
+
+        return {'x':(x, index[x, 1]), 
+                'y':(y, index[y, 2]),
+                }
+
+    def diff_index_2(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        xx, = np.nonzero(index[:, 1] > 1)
+        yy, = np.nonzero(index[:, 2] > 1)
+
+        xy, = np.nonzero((index[:, 1] > 0) & (index[:, 2] > 0))
+
+        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
+                'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
+                'xy':(xy, index[xy, 1]*index[xy, 2]),
+                }
 
     def index1(self, p=None):
         """
         缩放单项式基函数求一次导数后，非零的基函数编号，及因求导出现的系数
         """
+        
         p = self.p if p is None else p
         n = (p+1)*(p+2)//2
         idx1 = np.cumsum(np.arange(p+1))
@@ -170,7 +203,7 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
         center = self.integralalg.edgebarycenter
         h = self.integralalg.edgemeasure
-        t = self.mesh.edge_unit_tagent()
+        t = self.mesh.edge_unit_tangent()
         val = np.sum((point - center[index])*t[index], axis=-1)/h[index]
         phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:
@@ -201,8 +234,8 @@ class ScaledMonomialSpace2d():
 
         ldof = self.number_of_local_dofs(p=p)
         if p == 0:
-            shape = point.shape[:-1] + (1, )
-            return np.ones(shape, dtype=np.float)
+            shape = len(point.shape)*(1, )
+            return np.array([1.0], dtype=self.ftype).reshape(shape)
 
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)
@@ -326,7 +359,7 @@ class ScaledMonomialSpace2d():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim in [None, 1]:
+        if dim in {None, 1}:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)

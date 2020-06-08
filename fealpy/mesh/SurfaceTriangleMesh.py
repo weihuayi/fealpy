@@ -64,7 +64,7 @@ class SurfaceTriangleMesh():
             p, d = self.surface.project(p/self.scale)
             return p*self.scale, d*self.scale
 
-    def integrator(self, k):
+    def integrator(self, k, etype='cell'):
         return TriangleQuadrature(k)
 
     def entity(self, etype=2):
@@ -79,10 +79,16 @@ class SurfaceTriangleMesh():
 
     def entity_measure(self, etype=2):
         p = self.p
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             return self.area(idx=p+1)
+        elif etype in {'edge', 'face', 1}:
+            return self.mesh.entity_measure('edge') 
         else:
             raise ValueError("`entitytype` is wrong!")
+
+    def entity_barycenter(self, etype=2):
+        p = self.p
+        return self.mesh.entity_barycenter(etype=etype)
 
     def number_of_nodes(self):
         return self.node.shape[0]

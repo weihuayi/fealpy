@@ -630,10 +630,82 @@ class StokesModelData_6:
     def dirichlet(self, p):
         return self.velocity(p)
 
+class StokesModelData_7:
+    def __init__(self, nu=1):
+        self.nu = 1
+        self.box = [-1, 1, -1, 1]
+
+    def domain(self):
+        return self.box
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1)], dtype=np.float)
+
+        if meshtype == 'tri':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'quad':
+            nx = 2
+            ny = 2
+            mesh = StructureQuadMesh(self.box, nx, ny)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'poly':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            nmesh = TriangleMeshWithInfinityNode(mesh)
+            pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
+            pmesh = PolygonMesh(pnode, pcell, pcellLocation)
+            return pmesh
+
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = y**2
+        val[..., 1] = x**2 
+        return val
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        shape = len(x.shape)*(1, )
+        val = np.zeros(shape, dtype=np.float)
+        return val
+
+    def strain(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape + (2, ), dtype=np.float)
+        val[..., 0, 1] = x + y 
+        val[..., 1, 0] = val[..., 0, 1] 
+        return val
+
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        shape = len(x.shape)*(1, ) + (2, )
+        val = -np.ones(shape, dtype=np.float)
+        return val
+
+    def dirichlet(self, p):
+        return self.velocity(p)
 
 ## 下面的例子还没有测试
 
-class StokesModelData_7:
+class StokesModelData_8:
     """
     u(x, y) = (y**3, x**3)
     p(x, y) = x**2 - 1/3
@@ -1010,7 +1082,6 @@ class PolyData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
-
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1035,6 +1106,8 @@ class PolyData:
 
     def dirichlet(self, p):
         return self.solution(p)
+
+
 class SinSinData:
     def __init__(self, box, alpha, nu):
         self.alpha = alpha

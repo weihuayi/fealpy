@@ -15,9 +15,9 @@ class get_pybind_include:
 
 ext_modules = [
     Extension(
-        "fealpy_extent",
+        "fealpy.extent.cgal",
         [
-            "src/pybind11.cpp",
+            "src/cgal/pybind11.cpp",
         ],
         language="C++",
         include_dirs=[
@@ -26,6 +26,29 @@ ext_modules = [
             get_pybind_include(user=True)
         ],
         libraries=["stdc++", "gmp", "mpfr", "CGAL"],
+    ),
+    Extension(
+        "fealpy.extent.detri2",
+        [
+            "src/detri2/pybind11.cpp",
+            "src/detri2/detri2.cpp",
+            "src/detri2/flips.cpp",
+            "src/detri2/pred3d.cpp",
+            "src/detri2/io.cpp",
+            "src/detri2/sort.cpp",
+            "src/detri2/delaunay.cpp",
+            "src/detri2/constrained.cpp",
+            "src/detri2/refine.cpp",
+            "src/detri2/voronoi.cpp",
+            "src/detri2/adapt.cpp",
+            "src/detri2/metric.cpp",
+        ],
+        language="C++",
+        include_dirs=[
+            get_pybind_include(),
+            get_pybind_include(user=True)
+        ],
+        libraries=["gmp", "gmpxx"],
     )
 ]
 
