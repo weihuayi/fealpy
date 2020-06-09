@@ -38,7 +38,7 @@ from .mesh_tools import *
 from .meshio import load_mat_mesh
 
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
-from .HalfEdgeMesh3d import HalfEdgeMesh3d
+#from .HalfEdgeMesh3d import HalfEdgeMesh3d
 
 from .PolyFileReader import PolyFileReader
 from .InpFileReader import InpFileReader

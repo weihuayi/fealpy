@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
 # 
+import sys
+
 import numpy as np
-import matplotlib.pyplot as plt
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import bmat
+
+import matplotlib.pyplot as plt
+
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -13,7 +17,7 @@ class BoundaryConditionTest:
     def __init__(self):
         pass
 
-    def poisson_fem_2d_test(self, p=1):
+    def poisson_fem_2d_dirichlet(self, p=1):
         pde = CosCosData()
         mesh = pde.init_mesh(n=3)
         for i in range(4):
@@ -28,7 +32,7 @@ class BoundaryConditionTest:
             print(error)
             mesh.uniform_refine()
 
-    def poisson_fem_2d_neuman_test(self, p=1):
+    def poisson_fem_2d_neuman(self, p=1):
         pde = CosCosData()
         mesh = pde.init_mesh(n=2)
         for i in range(4):
@@ -36,8 +40,8 @@ class BoundaryConditionTest:
             A = space.stiff_matrix()
             b = space.source_vector(pde.source)
             uh = space.function()
-            bc = BoundaryCondition(space, neuman=pde.neuman)
-            bc.apply_neuman_bc(b)
+            bc = BoundaryCondition(space, neumann=pde.neumann)
+            bc.apply_neumann_bc(b)
             c = space.integral_basis()
             AD = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             bb = np.r_[b, 0]
@@ -55,5 +59,10 @@ class BoundaryConditionTest:
 
 
 test = BoundaryConditionTest()
-#test.poisson_fem_2d_test(p=2)
-test.poisson_fem_2d_neuman_test(p=3)
+p = int(sys.argv[2])
+if sys.argv[1] == 'dirichlet':
+    test.poisson_fem_2d_dirichlet(p=p)
+
+if sys.argv[1] == 'neumann':
+    test.poisson_fem_2d_neuman(p=p)
+

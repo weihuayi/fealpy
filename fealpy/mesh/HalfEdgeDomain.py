@@ -74,8 +74,6 @@ class HalfEdgeDomain():
         halfedge[0::2, 4] = range(1, 2*NF, 2)
         halfedge[1::2, 4] = range(0, 2*NF, 2)
 
-        halfedge[1::2, 5] = 1
-
         NHE = len(halfedge)
         edge = np.zeros((2*NHE, 2), dtype=facets.dtype)
         edge[:NHE] = halfedge[:, 0:2]

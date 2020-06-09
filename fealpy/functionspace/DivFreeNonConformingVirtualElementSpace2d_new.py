@@ -723,7 +723,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
-            print(cd)
             return np.meshgrid(cd, cd)
         
         idx = list(map(f2, range(NC)))
@@ -759,7 +758,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         def f1(i, k):
             J = self.J[k][cell2dofLocation[i]:cell2dofLocation[i+1]]
-            return J.flatten()
+            return J.flat
         J0 = np.concatenate(list(map(lambda x: f1(x, 0), range(NC))))
         J1 = np.concatenate(list(map(lambda x: f1(x, 1), range(NC))))
         P0 = csr_matrix((J0, (I, J)),
@@ -768,6 +767,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 shape=(gdof, NE*p), dtype=self.ftype)
         cell2dof = np.arange(NC*idof).reshape(NC, idof)
         def f2(i):
+            print('cd[', i, ']:', cd[i])
+            print('cell2dof[', i, ']:', cell2dof[i])
             return np.meshgrid(cell2dof[i], cd[i])
         idx = list(map(f2, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))

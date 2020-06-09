@@ -205,8 +205,9 @@ def show_halfedge_mesh(axes, mesh,
     axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
 
     NE = p0.shape[0]
+    isMainHEdge = mesh.ds.main_halfedge_flag()
     for i in range(NE):
-        if halfedge[i, 5] == 1:
+        if isMainHEdge[i]:
             axes.arrow(
                 p0[i, 0], p0[i, 1], v[i, 0], v[i, 1], 
                 shape='right', linewidth=h[i]*linewidth, 
@@ -219,7 +220,7 @@ def show_halfedge_mesh(axes, mesh,
 
     if showindex:
         for i in range(NE):
-            if halfedge[i, 5] == 1:
+            if  isMainHEdge[i]:
                 axes.text(
                         ec[i, 0], ec[i, 1],
                         str(i),
@@ -301,7 +302,7 @@ def show_mesh_2d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
-    if mesh.meshtype not in {'polygon', 'hepolygon', 'halfedge'}:
+    if mesh.meshtype not in {'polygon', 'hepolygon', 'halfedge', 'halfedge2d'}:
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:

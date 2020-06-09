@@ -107,7 +107,7 @@ class CosCosData:
     def dirichlet(self, p):
         return self.solution(p)
 
-    def neuman(self, p, n):
+    def neumann(self, p, n):
         """ 
         Neuman  boundary condition
 
