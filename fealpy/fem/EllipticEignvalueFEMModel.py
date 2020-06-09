@@ -279,7 +279,6 @@ class EllipticEignvalueFEMModel:
             self.savemesh(mesh,
                     self.resultdir + 'mesh_3_1_0_' + str(NN) + '.mat')
 
-
         space = LagrangeFiniteElementSpace(mesh, 1)
         isFreeDof = ~(space.boundary_dof())
         gdof = space.number_of_global_dofs()
