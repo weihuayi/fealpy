@@ -683,7 +683,7 @@ int Triangulation::flip_check(TriEdge *te)
     */
     if (!pb->is_fixed()) {
       //assert(!is_ridge_vertex(pb)); // Only for debug
-      if (is_ridge_vertex(pb)) {
+      if (is_fixed_vertex(pb)) {
         printf("Failed:  vertex %d is a ridge vertex, but it is not fixed.\n", pb->idx);
         assert(0);
       }
@@ -710,7 +710,7 @@ int Triangulation::flip_check(TriEdge *te)
     */
     if (!pa->is_fixed()) {
       //assert(!is_ridge_vertex(pa)); // only for debug
-      if (is_ridge_vertex(pa)) {
+      if (is_fixed_vertex(pa)) {
         printf("Failed:  vertex %d is a ridge vertex, but it is not fixed.\n", pa->idx);
         assert(0);
       }
@@ -980,6 +980,15 @@ int Triangulation::flip(TriEdge tt[4], Vertex** ppt, int& fflag, arraypool* fque
     for (int i = 0; i < c; i++) {
       tt[i].set_edge_infect();
       * (TriEdge *) fqueue->alloc() = tt[i];
+    }
+    if ((fflag == FLIP_13) || (fflag == FLIP_24)) {
+      // Add the edges at this new point. It might be redundant.
+      TriEdge N = (*ppt)->adj;
+      do {
+        N.set_edge_infect();
+        * (TriEdge *) fqueue->alloc() = N;
+        N = N.eprev_esym();
+      } while (N.tri != (*ppt)->adj.tri);
     }
   }
 

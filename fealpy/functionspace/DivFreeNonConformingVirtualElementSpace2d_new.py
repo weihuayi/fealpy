@@ -674,7 +674,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         """
         """
         p = self.p # 空间次数
-        idof0 = (p+1)*p//2-1
+        idof0 = (p+1)*p//2-1 # k-1 次多项式空间的梯度空间
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
         mesh = self.mesh
@@ -719,10 +719,11 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
-        idof = p*(p-1)
+        idof = p*(p-1) #
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
             cd = np.r_[cell2dof[s], NE*p + cell2dof[s], 2*NE*p + np.arange(i*idof, (i+1)*idof)]
+            print(cd)
             return np.meshgrid(cd, cd)
         
         idx = list(map(f2, range(NC)))

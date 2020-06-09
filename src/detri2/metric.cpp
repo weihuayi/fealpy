@@ -23,9 +23,17 @@ REAL Triangulation::get_innerproduct(Vertex *v1, Vertex *v2)
 {
   REAL product = 0.;
 
-  REAL vx = v2->crd[0] - v1->crd[0];
-  REAL vy = v2->crd[1] - v1->crd[1];
-  product = (vx * vx + vy * vy);
+  if (op_metric == METRIC_Euclidean_no_weight) {
+    REAL vx = v2->crd[0] - v1->crd[0];
+    REAL vy = v2->crd[1] - v1->crd[1];
+    product = (vx * vx + vy * vy);
+  } else if (op_metric == METRIC_Euclidean) {
+    REAL vx = v2->crd[0] - v1->crd[0];
+    REAL vy = v2->crd[1] - v1->crd[1];
+    product = _a11*vx*vx + 2.*_a21*vx*vy + _a22*vy*vy;
+  } else {
+    assert(0); // not implemented yet
+  }
 
   /*
   if (op_metric == METRIC_Euclidean) {
@@ -316,21 +324,21 @@ REAL detri2::get_MatVVP2x2(double a11, double a21, double a22,
 
 REAL detri2::get_rotation_angle(double vec[2])
 {
-    REAL theta;
+    REAL theta = 0.;
 
     if (fabs(vec[0]) > 1.e-8) {
       theta = atan(fabs(vec[1]/vec[0]));
       if (vec[0] > 0.) {
         if (vec[1] >= 0.) {
-          theta += 0.;
+          //theta += 0.;
         } else {
-          theta += (PI / 2. * 3.);
+          theta = 2.* PI-theta;
         }
       } else {
         if (vec[1] >= 0) {
-          theta += (PI / 2.);
+          theta = PI - theta;
         } else {
-          theta += PI;
+          theta = PI + theta;
         }
       }
     } else {

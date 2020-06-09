@@ -9,6 +9,36 @@
 using  namespace detri2;
 
 //==============================================================================
+
+int Triangulation::search_point(Vertex *pt, TriEdge &E, int encflag)
+{
+  int loc = locate_point(pt, E, encflag);
+  
+  if (!E.tri->is_hulltri()) {
+    return loc; //LOC_IN_OUTSIDE;
+  }
+
+  // Loop through the set of hull faces, search it from them.
+  int i;
+  for (i = 0; i < tr_tris->used_items; i++) {
+    E.tri = (Triang *) tr_tris->get(i);
+    if (!E.tri->is_hulltri()) continue;
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      if (E.apex() == tr_infvrt) break;
+    }
+    assert(E.ver < 3);
+    E = E.esym(); // get the triangle inside the domain.
+    assert(!E.tri->is_hulltri());
+    loc = locate_point(pt, E, encflag);
+    if (!E.tri->is_hulltri()) {
+      return loc; //LOC_IN_OUTSIDE;
+    }
+  }
+
+  return LOC_IN_OUTSIDE;
+}
+
+//==============================================================================
 // see doc/voronoi-edge-boundary-cut-2018-11-1.pdf
 
 int Triangulation::get_boundary_cut_dualedge(Vertex& In_pt, Vertex& Out_pt, TriEdge& S)
@@ -117,12 +147,24 @@ int Triangulation::get_hulltri_orthocenter(Triang* hulltri)
     printf(" [%d]: %g,%g,%g, r(%g)\n", v2->idx, Vx, Vy, V_weight, sqrt(fabs(V_weight)));
   }
 
+  if (op_db_verbose > 3) {
+    // debug only
+    if (((v1->idx == 318) && (v2->idx == 324)) ||
+        ((v1->idx == 324) && (v2->idx == 318))) {
+      printf("debug\n");
+    }
+  }
+  
   get_bissector(Ux, Uy, U_weight,
                 Vx, Vy, V_weight,
                 &E.tri->cct[0], &E.tri->cct[1], &E.tri->cct[2],
                 _a11, _a21, _a22);
 
   if (OMT_domain) {
+    // we must initalise it (it may be set by previous iterations).
+    hulltri->clear_dual_in_exterior();
+    hulltri->clear_dual_on_bdry();
+    
     // The bisector lies exactly in the edge [v1, v2].
     // We move it along the edge normal towards exterior of the triangulaiton.
     TriEdge N = E.esym();
@@ -195,8 +237,8 @@ int Triangulation::get_hulltri_orthocenter(Triang* hulltri)
         if (op_db_verbose > 2) {
           printf("  N.tri->on (cct) background tri: [%d,%d,%d]\n", S.org()->idx, S.dest()->idx, S.apex()->idx);
         }
-        //int loc = OMT_domain->locate_point(&In_pt, S, 0, 0);
-        int loc = OMT_domain->locate_point(&In_pt, S, 0);
+        //int loc = OMT_domain->locate_point(&In_pt, S, 0);
+        int loc = OMT_domain->search_point(&In_pt, S, 0);
         if (op_db_verbose > 2) {
           printf("  In_pt on background tri: [%d,%d,%d]\n", S.org()->idx, S.dest()->idx, S.apex()->idx);
         }
@@ -351,6 +393,40 @@ int Triangulation::get_hulltri_orthocenter(Triang* hulltri)
   return 1;
 }
 
+// debug only
+bool is_triangle(Triang* tri, int i, int j, int k)
+{
+  if (tri->vrt[0]->idx == i) {
+    if ((tri->vrt[1]->idx == j) &&
+        (tri->vrt[2]->idx == k)) {
+      return true;
+    }
+    if ((tri->vrt[1]->idx == k) &&
+        (tri->vrt[2]->idx == j)) {
+      return true;
+    }
+  } else if (tri->vrt[0]->idx == j) {
+    if ((tri->vrt[1]->idx == i) &&
+        (tri->vrt[2]->idx == k)) {
+      return true;
+    }
+    if ((tri->vrt[1]->idx == k) &&
+        (tri->vrt[2]->idx == i)) {
+      return true;
+    }
+  } else if (tri->vrt[0]->idx == k) {
+    if ((tri->vrt[1]->idx == i) &&
+        (tri->vrt[2]->idx == j)) {
+      return true;
+    }
+    if ((tri->vrt[1]->idx == j) &&
+        (tri->vrt[2]->idx == i)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 // "tri" must be not a hulltri and exterior
 int Triangulation::get_tri_orthocenter(Triang* tri)
 {
@@ -382,15 +458,27 @@ int Triangulation::get_tri_orthocenter(Triang* tri)
     printf(" [%d]: %g,%g,%g\n", v3->idx, Wx, Wy, W_weight);
   }
 
+  if (op_db_verbose > 3) {
+    // debug only
+    if (is_triangle(tri, 318, 324, 390)) {
+      printf("debug\n");
+    }
+  }
+  
   get_orthocenter(Ux, Uy, U_weight,
                   Vx, Vy, V_weight,
                   Wx, Wy, W_weight,
                   &tri->cct[0], &tri->cct[1], &tri->cct[2],
                   _a11, _a21, _a22);
-
+    
   if (OMT_domain != NULL) {
     // Determine if this vertex is inside or outside of the OMT domain (or the subdomain
     //   which contains this triangle -- check segments).
+    
+    // Must initialise these flags (may be set due to previous iterations).
+    tri->clear_dual_in_exterior();
+    tri->clear_dual_on_bdry();
+    
     Vertex Mass_pt, pt;
     Mass_pt.crd[0] = (Ux + Vx + Wx) / 3.;
     Mass_pt.crd[1] = (Uy + Vy + Wy) / 3.;
@@ -399,7 +487,8 @@ int Triangulation::get_tri_orthocenter(Triang* tri)
     // First search the mass center of "tri" in OMT_domain.
     // It must be inside the domain.
     //int loc = OMT_domain->locate_point(&Mass_pt, tri->on, 0, 0); // encflag = 0
-    int loc = OMT_domain->locate_point(&Mass_pt, tri->on, 0); // encflag = 0
+    //int loc = OMT_domain->locate_point(&Mass_pt, tri->on, 0); // encflag = 0
+    int loc = OMT_domain->search_point(&Mass_pt, tri->on, 0);
     assert(!tri->on.tri->is_hulltri()); 
     // Locate the orthocenter of "tri" from this triangle (containing its mass center). 
     //loc = OMT_domain->locate_point(&pt, tri->on, 0, 1); // encflag = 1 (stop at first segment).
@@ -665,7 +754,9 @@ int Triangulation::get_powercell(Vertex *mesh_vertex, Vertex** pptlist, int* ptn
           // Start searching corner vertices from startEdge towards endEdge.
           // (see Page 2 for an example.)
           searchEdge = startEdge;
-          while (searchEdge.tri != endEdge.tri) {
+          //while ((searchEdge.tri != endEdge.tri)) {
+          while ( !((searchEdge.org() == endEdge.org()) &&
+                    (searchEdge.dest() == endEdge.dest())) ) {
             // Found a corner vertex.
             Vertex *pt = &(ptlist[ptcount]);
             pt->init();
@@ -681,6 +772,10 @@ int Triangulation::get_powercell(Vertex *mesh_vertex, Vertex** pptlist, int* ptn
             ptcount++;
             // Go to the next boundary edge (around dest()).
             TriEdge workedge = searchEdge.enext();
+            if ((workedge.org() == endEdge.org()) &&
+                (workedge.dest() == endEdge.dest())) {
+              break; // the walk is finished.
+            }
             while (true) {
               searchEdge = workedge.esym_enext(); // CW
               if (searchEdge.is_segment()) break;
@@ -785,7 +880,9 @@ int Triangulation::get_powercell(Vertex *mesh_vertex, Vertex** pptlist, int* ptn
           //===================== Subroutine start =================================
           // Start searching corner vertices from startEdge towards endEdge.
           searchEdge = startEdge;
-          while (searchEdge.tri != endEdge.tri) {
+          //while (searchEdge.tri != endEdge.tri) {
+          while ( !((searchEdge.org() == endEdge.org()) &&
+                    (searchEdge.dest() == endEdge.dest())) ) {
             // Found a corner vertex.
             Vertex *pt = &(ptlist[ptcount]);
             pt->init();
@@ -801,6 +898,10 @@ int Triangulation::get_powercell(Vertex *mesh_vertex, Vertex** pptlist, int* ptn
             ptcount++;
             // Go to the next boundary edge (around dest()).
             TriEdge workedge = searchEdge.enext();
+            if ((workedge.org() == endEdge.org()) &&
+                (workedge.dest() == endEdge.dest())) {
+              break; // the walk is finished.
+            }
             while (true) {
               searchEdge = workedge.esym_enext(); // CW
               if (searchEdge.is_segment()) break;
@@ -920,13 +1021,18 @@ int Triangulation::get_mass_center(Vertex* ptlist, int ptnum, REAL mc[2])
 
 //==============================================================================
 
-void Triangulation::save_voronoi()
+void Triangulation::save_voronoi(int ucd)
 {
   // We need a background grid to cut the exterior Voronoi cells.
   bool clean_omt_domain = false;
   if (OMT_domain == NULL) {
     OMT_domain = this; // Use the current triangulation.
     clean_omt_domain = true;
+  }
+
+  if (ct_exteriors > 0) {
+    // removing exterior triangles before caculating Voronoi cells.
+    remove_exteriors();
   }
 
   // Calculate Voronoi vertices for triangles.
@@ -1024,12 +1130,13 @@ void Triangulation::save_voronoi()
   Triangulation *Voro = new Triangulation();
 
   // debug only.
-  strcpy(Voro->io_outfilename, "/Users/si/tmp/voro");
+  strcpy(Voro->io_outfilename, "voro"); // /Users/si/tmp/voro
 
   Voro->ct_in_vrts = vert_list->objects;
   Voro->in_vrts = new Vertex[vert_list->objects];
   Voro->io_xmin = Voro->io_ymin =  1.e+30;
   Voro->io_xmax = Voro->io_ymin = -1.e+30;
+
   for (i = 0; i < vert_list->objects; i++) {
     Vertex *p = (Vertex *) vert_list->get(i);
     Vertex *v = & (Voro->in_vrts[i]);
@@ -1039,7 +1146,7 @@ void Triangulation::save_voronoi()
     Voro->ct_unused_vrts++;
     v->crd[0] = p->crd[0];
     v->crd[1] = p->crd[1];
-    v->crd[2] = p->crd[0]*p->crd[0] + p->crd[1]*p->crd[1];
+    v->crd[2] = 0.; // p->crd[0]*p->crd[0] + p->crd[1]*p->crd[1];
     p->Pair = v; // remember this vertex.
     Voro->io_xmin = p->crd[0] < Voro->io_xmin ? p->crd[0] : Voro->io_xmin;
     Voro->io_xmax = p->crd[0] > Voro->io_xmax ? p->crd[0] : Voro->io_xmax;
@@ -1060,10 +1167,10 @@ void Triangulation::save_voronoi()
   assert(Voro->ct_segments == 0);
 
   Voro->incremental_delaunay();
-  Voro->save_triangulation(); // debug only.
+  //Voro->save_triangulation(); // debug only.
 
   Voro->recover_segments();
-  Voro->save_triangulation(); // debug only.
+  //Voro->save_triangulation(); // debug only.
 
   if (clean_omt_domain) {
     OMT_domain = NULL;
@@ -1129,6 +1236,42 @@ void Triangulation::save_voronoi()
   }
 
   fclose(outfile);
+
+  if (ucd > 0) { // -Iv -Iu
+    // Save the skeleton of the Voronoi diagram for Paraview.
+    sprintf(filename, "%s_voro.inp", io_outfilename);
+    printf("Writing Voronoi diagram to %s\n", filename);
+    outfile = fopen(filename, "w");
+    
+    fprintf(outfile, "%d %d %d 0 0\n", nv, ne, 0);
+    
+    idx = 1; // UCD index starts from 1.
+    for (i = 0; i < Voro->ct_in_vrts; i++) {
+      Vertex *v = &(Voro->in_vrts[i]);
+      if (v->typ == UNUSEDVERTEX) continue;
+      fprintf(outfile, "%d  %g %g 0\n", idx, v->crd[0], v->crd[1]);
+      v->idx = idx;
+      idx++;
+    }
+    
+    idx = 1;
+    for (i = 0; i < Voro->tr_segs->used_items; i++) {
+      Triang *seg = (Triang *) Voro->tr_segs->get(i);
+      if (seg->tag == 0) continue;
+      Vertex *v1 = seg->vrt[0];
+      Vertex *v2 = seg->vrt[1];
+      if (seg->vrt[0]->typ == UNUSEDVERTEX) {
+        v1 = seg->vrt[0]->Pair;
+      }
+      if (seg->vrt[1]->typ == UNUSEDVERTEX) {
+        v2 = seg->vrt[1]->Pair;
+      }
+      fprintf(outfile, "%d %d line %d %d\n", idx, seg->tag, v1->idx, v2->idx);
+      idx++;
+    }
+    
+    fclose(outfile);
+  } // if (ucd > 0)
 
   delete vert_list;
   delete edge_list;

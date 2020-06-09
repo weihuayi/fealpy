@@ -10,6 +10,879 @@ using  namespace detri2;
 
 //==============================================================================
 
+int Triangulation::check_delaunay()
+{
+  TriEdge E, N;
+  bool is_regular;
+  int ncount = 0;
+  int i;
+
+  printf("Check mesh for weighted Delaunay (op_metric = %d)\n", op_metric);
+
+  // Collect all edges of the triangulation.
+  for (i = 0; i < tr_tris->used_items; i++) {
+    E.tri = (Triang *) tr_tris->get(i);
+    if (E.tri->is_deleted()) continue;
+    if (E.tri->is_hulltri()) continue;
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      N = E.esym();  // N.apex() might be tr_infvrt.
+      if (N.apex() != tr_infvrt) {
+        if (E.apex()->idx > N.apex()->idx) {
+          is_regular = (!regular_test(E.org(), E.dest(), E.apex(), N.apex()));
+          if (!is_regular) {
+            printf("  !! Found a non-regular edge (%d,%d) - %d,%d\n",
+                   E.org()->idx, E.dest()->idx, E.apex()->idx, N.apex()->idx);
+            ncount++;
+          }
+        }
+      }
+    }
+  }
+
+  if (ncount == 0) {
+    printf("The mesh is weighted Delaunay.\n");
+  } else {
+    printf("Found %d non-weighted Delaunay edges\n", ncount);
+  }
+
+  return ncount == 0;
+}
+
+//==============================================================================
+
+void Triangulation::dump_missing_pt_triangles(Vertex *pt, arraypool *tris)
+{
+  arraypool *vrts = new arraypool(sizeof(Vertex*), 10);
+
+  TriEdge E, N;
+  int i, j;
+  
+  /*
+  //int loc =
+  E.tri = NULL;
+  locate_point(pt, E, 0);
+
+  E.tri->set_infect();
+  * ((Triang **) tris->alloc()) = E.tri;
+
+  for (i = 0; i < 3; i++) {
+    Vertex *v = E.tri->vrt[i];
+    if (!v->is_infected()) {
+      v->set_infect();
+      * ((Vertex **) vrts->alloc()) = v;
+    }
+    N = v->adj;
+    do {
+      if (!N.tri->is_infected()) {
+        N.tri->set_infect();
+        * ((Triang **) tris->alloc()) = N.tri;
+        // Add the other endpoint.
+        Vertex *e2 = N.dest();
+        if (!e2->is_infected()) {
+          e2->set_infect();
+          * ((Vertex **) vrts->alloc()) = e2;
+        }
+      }
+      N = N.eprev_esym(); // CCW
+    } while (N.tri != v->adj.tri);
+  }
+  */
+
+  // Get all vertices.
+  for (i = 0; i < tris->objects; i++) {
+    E.tri = * ((Triang**) tris->get(i));
+    for (j = 0; j < 3; j++) {
+      Vertex *v = E.tri->vrt[j];
+      if (!v->is_infected()) {
+        v->set_infect();
+        * ((Vertex **) vrts->alloc()) = v;
+      }
+    }
+  }
+
+  // Save files.
+  printf("Save %d vertices to file dump.node dump.weight\n", vrts->objects+1);
+  FILE *fout = fopen("dump.node", "w");
+  fprintf(fout, "%d 2 0 0\n", vrts->objects+1);
+  for (i = 0; i < vrts->objects; i++) {
+    Vertex *v = * ((Vertex **) vrts->get(i));
+    v->clear_infect();
+    v->tag = i+1; // Save the index of this vertex.
+    fprintf(fout, "%d  %g %g\n", i+1, v->crd[0], v->crd[1]);
+  }
+  fprintf(fout, "%d  %g %g\n", i+1, pt->crd[0], pt->crd[1]);
+  fclose(fout);
+
+  fout = fopen("dump.weight", "w");
+  fprintf(fout, "%d\n", vrts->objects+1);
+  for (i = 0; i < vrts->objects; i++) {
+    Vertex *v = * ((Vertex **) vrts->get(i));
+    //v->clear_infect();
+    v->tag = i+1; // Save the index of this vertex.
+    fprintf(fout, "%d  %g\n", i+1, v->wei);
+  }
+  fprintf(fout, "%d  %g\n", i+1, 0.0);
+  fclose(fout);
+
+  printf("Save %d triangles to file dump.ele\n", tris->objects);
+  fout = fopen("dump.ele", "w");
+  fprintf(fout, "%d  3  0\n", tris->objects);
+  for (i = 0; i < tris->objects; i++) {
+    Triang *tri = * ((Triang **) tris->get(i));
+    //tri->clear_infect();
+    fprintf(fout, "%d  %d %d %d\n", i+1,
+            tri->vrt[0]->tag, tri->vrt[1]->tag, tri->vrt[2]->tag);
+  }
+  fclose(fout);
+
+  delete vrts;
+}
+
+void Triangulation::save_uninserted_points(arraypool* unins)
+{
+  printf("Save %d uninserted point to file: uninserted.node\n", unins->objects);
+  
+  FILE *fout = fopen("uninserted.node", "w");
+  fprintf(fout, "%d 2 0 0\n", unins->objects);
+  for (int i = 0; i < unins->objects; i++) {
+    Vertex *v = * ((Vertex **) unins->get(i));
+    fprintf(fout, "%d  %g %g\n", i+1, v->crd[0], v->crd[1]);
+  }
+  fclose(fout);
+  
+  fout = fopen("uninserted.weight", "w");
+  fprintf(fout, "%d\n", unins->objects);
+  for (int i = 0; i < unins->objects; i++) {
+    Vertex *v = * ((Vertex **) unins->get(i));
+    fprintf(fout, "%d  %.17f\n", i+1, v->wei);
+  }
+  fclose(fout);
+}
+
+int Triangulation::insert_missing_weighted_point_old(Vertex *pt)
+{
+    printf("Inserting missing point: %d\n", pt->idx);
+    assert(pt->typ == UNUSEDVERTEX);
+    //if (0) {
+    //  dump_missing_pt_triangles(pt); // for debugging
+    //}
+
+    // Find the triangle containing pt.
+    TriEdge E, tt[4];
+    Vertex *v1, *v2, *v3;
+    REAL cx, cy, wc, hei[4], h_low, h_high, h_new;
+    bool is_regular;
+    int i;
+
+    int loc = locate_point(pt, E, 0);
+    
+    // Round the location if it is too close to an edge.
+    /*
+    if (loc == LOC_IN_TRI) {
+      Vertex *v1 = E.org();
+      Vertex *v2 = E.dest();
+      Vertex *v3 = E.apex();
+      double a1 = get_tri_area(pt, v1, v2);
+      double a2 = get_tri_area(pt, v2, v3);
+      double a3 = get_tri_area(pt, v3, v1);
+      double triarea = a1 + a2 + a3;
+      // Round the areas
+      if (fabs(a1 / triarea - 1.0) < 1e-5) a1 = 0.0;
+      if (fabs(a2 / triarea - 1.0) < 1e-5) a2 = 0.0;
+      if (fabs(a3 / triarea - 1.0) < 1e-5) a3 = 0.0;
+      if (a1 == 0) {
+        if (a2 == 0) {
+          if (a3 > 0) {
+            E = E.enext(); // E.enextself(); // On vertex E.dest().
+            loc = LOC_ON_VERT;
+          } else if (a3 == 0) {
+            // Could not distinguish the case.
+            assert(0);
+          }
+        } else if (a3 == 0) {
+          loc = LOC_ON_VERT; // return 3; // On vertex E.org().
+        } else {
+          loc = LOC_ON_EDGE; // return 2; // On edge.
+        }
+      } else if (a2 == 0) {
+        if (a3 == 0) {
+          E = E.eprev(); // E.enext2self(); // On vertex E.apex().
+          loc = LOC_ON_VERT; // return 3;
+        } else {
+          E = E.enext(); //E.enextself(); // On edge.
+          loc = LOC_ON_EDGE; // return 2;
+        }
+      } else if (a3 == 0) {
+        E = E.eprev(); // E.enext2self(); // On edge.
+        loc = LOC_ON_EDGE; // return 2;
+      }
+    }
+    */
+
+    if (loc == LOC_IN_TRI) {
+      v1 = E.org();
+      v2 = E.dest();
+      v3 = E.apex();
+      get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                      v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                      v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                      &cx, &cy, &wc,  // Cx, Cy, radius^2
+                      1, 0, 1); // double a11, double a21, double a22
+      h_high = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+
+      h_low = -1.e+30;
+      for (i = 0; i < 3; i++) {
+        tt[i] = E.esym();
+        if (tt[i].apex() != tr_infvrt) {
+          if (0) {
+            // Do regular test (debug only).
+            is_regular = (!regular_test(E.org(), E.dest(), E.apex(), tt[i].apex()));
+            if (!is_regular) {
+              printf("Found a non-regular edge (%d,%d) - %d,%d\n",
+                     E.org()->idx, E.dest()->idx, E.apex()->idx, tt[i].apex()->idx);
+            }
+          }
+          // Do regular test (debug only).
+          // Get the lifted plane passing through lifted tt[i].
+          v1 = tt[i].org();
+          v2 = tt[i].dest();
+          v3 = tt[i].apex();
+          get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                          v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                          v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                          &cx, &cy, &wc,  // Cx, Cy, radius^2
+                          1, 0, 1); // double a11, double a21, double a22
+          hei[i] = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+          if (h_low < hei[i]) h_low = hei[i];
+        } else {
+          hei[i] = -1.e+30;
+        }
+        E = E.enext();
+      } // i
+
+      if ((h_low > -1.e+30) && (h_low < h_high)) {
+        // set the new height for the point.
+        h_new = 0.5 * (h_low + h_high);
+
+        // Calculate the new weight for the point.
+        pt->wei = pt->crd[0]*pt->crd[0] + pt->crd[1]*pt->crd[1] - h_new;
+
+        // Make sure that the new inserted point will result a new weighted
+        //   Delaunay triangulation.
+        // validate the weight.
+        for (i = 0; i < 3; i++) {
+          if (tt[i].apex() != tr_infvrt) {
+            is_regular = (!regular_test(tt[i].org(), tt[i].dest(), tt[i].apex(), pt));
+            if (!is_regular) break;
+          }
+        }
+
+        if (i == 3) {
+          v1 = E.org();
+          v2 = E.dest();
+          v3 = E.apex();
+          is_regular = (!regular_test(pt, v1, v2, v3)); // edge [pt, v1]
+          if (is_regular) {
+            tt[0] = E;
+            flip13(pt, tt);
+            assert(pt->typ != UNUSEDVERTEX);
+            return 1;
+          }
+        }
+      } /*
+      else if (h_low == h_high) {
+        // This means the inserting vertex lies nearly on an edge.
+        printf("debug...\n");
+        // Find the collinear edge.
+        for (i = 0; i < 3; i++) {
+          if (hei[i] == h_high) {
+            break;
+          }
+          E = E.enext();
+        }
+        loc = LOC_ON_EDGE;
+      }
+      */
+    } // if (loc == LOC_IN_TRI)
+    
+    if (loc == LOC_ON_EDGE) {
+      //assert(0); // to do...
+      TriEdge N = E.esym();
+      tt[0] = E.enext_esym();
+      tt[1] = E.eprev_esym();
+      tt[2] = N.enext_esym();
+      tt[3] = N.eprev_esym();
+      
+      v1 = E.org();
+      v2 = E.dest();
+      v3 = E.apex();
+      get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                      v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                      v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                      &cx, &cy, &wc,  // Cx, Cy, radius^2
+                      1, 0, 1); // double a11, double a21, double a22
+      h_high = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+
+      h_low = -1.e+30;
+      for (i = 0; i < 4; i++) {
+        if (tt[i].apex() != tr_infvrt) {
+          if (0) {
+            // Do regular test (debug only).
+            is_regular = (!regular_test(E.org(), E.dest(), E.apex(), tt[i].apex()));
+            if (!is_regular) {
+              printf("Found a non-regular edge (%d,%d) - %d,%d\n",
+                     E.org()->idx, E.dest()->idx, E.apex()->idx, tt[i].apex()->idx);
+            }
+          }
+          // Do regular test (debug only).
+          // Get the lifted plane passing through lifted tt[i].
+          v1 = tt[i].org();
+          v2 = tt[i].dest();
+          v3 = tt[i].apex();
+          get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                          v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                          v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                          &cx, &cy, &wc,  // Cx, Cy, radius^2
+                          1, 0, 1); // double a11, double a21, double a22
+          hei[i] = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+          if (h_low < hei[i]) h_low = hei[i];
+        } else {
+          hei[i] = -1.e+30;
+        }
+      } // i
+      
+      if ((h_low > -1.e+30) && (h_low < h_high)) {
+        // set the new height for the point.
+        h_new = 0.5 * (h_low + h_high);
+
+        // Calculate the new weight for the point.
+        pt->wei = pt->crd[0]*pt->crd[0] + pt->crd[1]*pt->crd[1] - h_new;
+
+        // validate the weight.
+        for (i = 0; i < 4; i++) {
+          if (tt[i].apex() != tr_infvrt) {
+            is_regular = (!regular_test(tt[i].org(), tt[i].dest(), tt[i].apex(), pt));
+            if (!is_regular) break;
+          }
+        }
+
+        if (i == 4) {
+          tt[0] = E;
+          //flip13(pt, tt);
+          flip24(pt, tt);
+          assert(pt->typ != UNUSEDVERTEX);
+          return 1;
+        }
+      }
+    }
+    
+    if (loc == LOC_ON_VERT) {
+      assert(0); // not possible.
+    }
+
+    return 0;
+}
+
+bool Triangulation::insert_missing_weighted_point(Vertex *pt)
+{
+  if (op_db_verbose > 1) {
+    printf("  Inserting missing point: %d\n", pt->idx);
+  }
+  assert(pt->typ == UNUSEDVERTEX);
+
+  // Find the triangle containing pt.
+  TriEdge E;
+  int loc = locate_point(pt, E, 0);
+  if (loc == LOC_IN_OUTSIDE) {
+    return false;
+  }
+
+  Vertex *v1, *v2, *v3;
+  REAL cx, cy, wc;
+  REAL hei, h_low, h_high, h_new;
+  bool is_regular;
+
+  v1 = E.tri->vrt[0];
+  v2 = E.tri->vrt[1];
+  v3 = E.tri->vrt[2];
+  get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                  v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                  v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                  &cx, &cy, &wc,  // Cx, Cy, radius^2
+                  1, 0, 1); // double a11, double a21, double a22
+  h_high = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+  
+  // Assign a temp weight to pt.
+  //pt->wei = pt->crd[0]*pt->crd[0] + pt->crd[1]*pt->crd[1] - h_high;
+
+  // Grow a (star-shaped) cavity containing pt.
+  arraypool *cave_tris = new arraypool(sizeof(Triang*), 10);
+  arraypool *cave_bdedges = new arraypool(sizeof(TriEdge), 10);
+
+  E.tri->set_infect();
+  * ((Triang**) cave_tris->alloc()) = E.tri;
+
+  TriEdge N;
+  REAL s1, s2;
+  int i;
+  for (i = 0; i < cave_tris->objects; i++) {
+    E.tri = * ((Triang**) cave_tris->get(i));
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      N = E.esym();
+      //if (N.tri->is_hulltri() ||
+      //    N.tri->is_infected()) continue;
+      if (N.tri->is_infected()) continue;
+      bool is_bdedge = true;
+      if (!N.tri->is_hulltri()) {
+        s1 = Orient2d(pt, N.apex(), E.org());
+        s2 = Orient2d(pt, N.apex(), E.dest());
+        if (s1 > 0) {
+          if (s2 > 0) {
+            // Found a boundary edge.
+          } else if (s2 < 0) {
+            // Check this case, is it possible?
+          }
+        } else if (s1 < 0) {
+          if (s2 > 0) {
+            // Enlarge the cavity by adding the adjacent triangle.
+            N.tri->set_infect();
+            * ((Triang**) cave_tris->alloc()) = N.tri;
+            is_bdedge = false;
+          } else if (s2 < 0) {
+            // Check this case, is it possible?
+          }
+        }
+      } // if (!N.tri->is_hulltri())
+      if (is_bdedge) {
+        * ((TriEdge *) cave_bdedges->alloc()) = E;
+      }
+    }
+  }
+
+  if (op_db_verbose > 1) {
+    printf("  Found %d triangles, %d boundary edges.\n",
+           cave_tris->objects, cave_bdedges->objects);
+    if (op_db_verbose > 2) {
+      dump_missing_pt_triangles(pt, cave_tris);
+    }
+  }
+
+  h_low = -1.e+30;
+  for (i = 0; i < cave_bdedges->objects; i++) {
+    E = * ((TriEdge *) cave_bdedges->get(i));
+    assert(E.tri->is_infected());
+    N = E.esym();
+    assert(!N.tri->is_infected());
+    if (N.apex() != tr_infvrt) {
+      v1 = N.tri->vrt[0];
+      v2 = N.tri->vrt[1];
+      v3 = N.tri->vrt[2];
+      get_orthocenter(v1->crd[0], v1->crd[1], v1->wei,     // Ux, Uy, U_weight
+                      v2->crd[0], v2->crd[1], v2->wei,     // Vx, Vy, V_weight
+                      v3->crd[0], v3->crd[1], v3->wei,     // Wx, Wy, W_weight
+                      &cx, &cy, &wc,  // Cx, Cy, radius^2
+                      1, 0, 1); // double a11, double a21, double a22
+      hei = 2.*cx*pt->crd[0] + 2.*cy*pt->crd[1] - (cx*cx + cy*cy) + wc;
+      if (h_low < hei) h_low = hei;
+    }
+  }
+
+  // Uninfect triangles.
+  for (i = 0; i < cave_tris->objects; i++) {
+    E.tri = * ((Triang **) cave_tris->get(i));
+    E.tri->clear_infect();
+  }
+
+  if ((h_low > -1.e+30) && (h_low < h_high)) {
+    // set the new height for the point.
+    //h_new = 0.5 * (h_low + h_high);
+  } else {
+    // Failed to find a new weight for this point.
+    delete cave_tris;
+    delete cave_bdedges;
+    return false;
+  }
+
+  // set the new height for the point.
+  h_new = 0.5 * (h_low + h_high);
+  // Calculate the new weight for the point.
+  pt->wei = pt->crd[0]*pt->crd[0] + pt->crd[1]*pt->crd[1] - h_new;
+
+  // Find the cavity with respect to the weighted point pt.
+  E.tri = * ((Triang**) cave_tris->get(0));
+
+  cave_tris->clean();
+  cave_bdedges->clean();
+  
+  E.tri->set_infect();
+  * ((Triang**) cave_tris->alloc()) = E.tri;
+
+  for (i = 0; i < cave_tris->objects; i++) {
+    E.tri = * ((Triang**) cave_tris->get(i));
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      N = E.esym();
+      //if (N.tri->is_hulltri() ||
+      //    N.tri->is_infected()) continue;
+      if (N.tri->is_infected()) continue;
+      if (!N.tri->is_hulltri()) {
+        is_regular = (!regular_test(N.org(), N.dest(), N.apex(), pt));
+      } else {
+        is_regular = true;
+      }
+      if (!is_regular) {
+        // Enlarge the cavity by adding the adjacent triangle.
+        N.tri->set_infect();
+        * ((Triang**) cave_tris->alloc()) = N.tri;
+      } else {
+        // Found a boundary edge.
+        * ((TriEdge *) cave_bdedges->alloc()) = E;
+      }
+    }
+  }
+
+  if (op_db_verbose > 1) {
+    printf("  Found %d triangles, %d boundary edges.\n",
+           cave_tris->objects, cave_bdedges->objects);
+    if (op_db_verbose > 2) {
+      dump_missing_pt_triangles(pt, cave_tris);
+    }
+  }
+
+  // Save the new triangles.
+  arraypool *cave_newtris = new arraypool(sizeof(Triang*), 10);
+  bool success = false;
+  int count_nonreg = 0;
+
+  TriEdge Enew;
+  // Create new triangles and fill the cavity.
+  for (i = 0; i < cave_bdedges->objects; i++) {
+    E = * ((TriEdge *) cave_bdedges->get(i));
+    N = E.esym();
+    if (N.apex() != tr_infvrt) {
+      is_regular = (!regular_test(N.org(), N.dest(), N.apex(), pt));
+      if (!is_regular) break;
+    }
+    // Check if the new triangle is not inverted.
+    s1 = Orient2d(E.org(), E.dest(), pt);
+    if (s1 <= 0) {
+      break; // not valid.
+    }
+    Enew.tri = (Triang *) tr_tris->alloc();
+    Enew.tri->init();
+    Enew.set_vertices(E.org(), E.dest(), pt);
+    Enew.connect(N);
+    // Update vertex-to-adj map.
+    E.org()->adj  = Enew;
+    E.dest()->adj = Enew.enext();
+    * ((Triang **) cave_newtris->alloc()) = Enew.tri;
+  }
+
+  // Remember a triangle for the new point.
+  pt->adj = Enew.eprev();
+
+  if (i == cave_bdedges->objects) {
+    // Connect the internal edges.
+    TriEdge tt[2];
+    for (i = 0; i < cave_bdedges->objects; i++) {
+      E = * ((TriEdge *) cave_bdedges->get(i));
+      assert(E.tri->is_infected()); // E.tri is an old triangle
+      N = E.esym();
+      Enew = N.esym(); // Enew is a new triangle in cavity.
+      assert(!Enew.tri->is_infected());
+      tt[0] = Enew.enext();
+      assert(tt[0].dest() == pt);
+      if (!tt[0].is_connected()) {
+        tt[1] = N.eprev();
+        assert(tt[1].dest() == tt[0].org());
+        while (tt[1].org() != pt) {
+          tt[1] = tt[1].esym_eprev();
+        }
+        assert(!tt[1].is_connected());
+        // Do regular check
+        is_regular = (!regular_test(tt[0].org(), tt[0].dest(), tt[0].apex(),
+                                    tt[1].apex()));
+        if (!is_regular) {
+          count_nonreg++; //break;
+        }
+        tt[0].connect(tt[1]);
+      }
+      tt[0] = Enew.eprev();
+      assert(tt[0].org() == pt);
+      if (!tt[0].is_connected()) {
+        tt[1] = N.enext();
+        assert(tt[1].org() == tt[0].dest());
+        while (tt[1].dest() != pt) {
+          tt[1] = tt[1].esym_enext();
+        }
+        assert(!tt[1].is_connected());
+        // Do regular check
+        is_regular = (!regular_test(tt[0].org(), tt[0].dest(), tt[0].apex(),
+                                    tt[1].apex()));
+        if (!is_regular) {
+          count_nonreg++; //break;
+        }
+        tt[0].connect(tt[1]);
+      }
+    } // i
+    
+    if (count_nonreg == 0) {
+      success = true;
+    }
+  }
+
+  if (success) {
+    //if (pt->typ == UNUSEDVERTEX) {
+      // This is needed by incremental_delaunay().
+      pt->typ = FREEVERTEX;
+      ct_unused_vrts--;
+    //}
+    // Remove old triangles in the cavity.
+    for (i = 0; i < cave_tris->objects; i++) {
+      E.tri = * ((Triang **) cave_tris->get(i));
+      E.tri->set_deleted();
+      tr_tris->dealloc(E.tri);
+    }
+  } else {
+    // Failed to insert this vertex. Restore old connections.
+    for (i = 0; i < cave_bdedges->objects; i++) {
+      E = * ((TriEdge *) cave_bdedges->get(i));
+      assert(E.tri->is_infected()); // E.tri is an old triangle
+      N = E.esym();
+      N.connect(E);
+      // Update vertex-to-adj map.
+      E.org()->adj  = E;
+      E.dest()->adj = E.enext();
+    }
+    // Uninfect triangles.
+    for (i = 0; i < cave_tris->objects; i++) {
+      E.tri = * ((Triang **) cave_tris->get(i));
+      E.tri->clear_infect();
+    }
+    // Delete new triangles.
+    for (i = 0; i < cave_newtris->objects; i++) {
+      E.tri = * ((Triang **) cave_newtris->get(i));
+      E.tri->set_deleted();
+      tr_tris->dealloc(E.tri);
+    }
+  }
+
+  delete cave_tris;
+  delete cave_bdedges;
+  delete cave_newtris;
+  return success;
+}
+
+//==============================================================================
+
+void Triangulation::flip_recover_delaunay()
+{
+  // Get the number of mesh edges.
+  int ne = (3 * (tr_tris->objects - ct_hullsize) + ct_hullsize) / 2;
+  int est_size = ne;
+  int log2objperblk = 0;
+  while (est_size >>= 1) log2objperblk++;
+  if (log2objperblk < 10) log2objperblk = 10; // At least 1024.
+
+  arraypool *flipstack  = new arraypool(sizeof(TriEdge), log2objperblk);
+  arraypool *fqueue = new arraypool(sizeof(TriEdge), 4); // for flip()
+  arraypool *unflip_queue = new arraypool(sizeof(TriEdge), 10);
+  arraypool *missing_points = new arraypool(sizeof(Vertex*), 10);
+  arraypool *uninserted_points = new arraypool(sizeof(Vertex*), 10);
+
+  op_metric = METRIC_Euclidean; // for regular test.
+
+  printf("\nRecovering weighted Delaunay triangulation...");
+
+  TriEdge E, N, tt[4];
+  Vertex *delpt = NULL;
+  int fflag = FLIP_UNKNOWN;
+
+  bool is_regular;
+  int flip_count = 0, total_flip_count = 0;
+  int iter = 0;
+  int i;
+
+  // Collect all edges of the triangulation.
+  for (i = 0; i < tr_tris->used_items; i++) {
+    E.tri = (Triang *) tr_tris->get(i);
+    if (E.tri->is_deleted()) continue;
+    if (E.tri->is_hulltri()) continue;
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      N = E.esym(); 
+      if (!E.is_edge_infected() && !N.is_edge_infected()) {
+        // Push this edge into stack
+        E.set_edge_infect(); // to indicate that this edge is in stack.
+        * ((TriEdge *) flipstack->alloc()) = E;
+      }
+    }
+  }
+  assert(flipstack->objects == ne);
+
+  // Loop until all edges are locally Delaunay.
+  while (flipstack->objects > 0) {
+
+    iter++;
+    flip_count = 0;
+
+    // This list must be empty.
+    assert(unflip_queue->objects == 0);
+
+    while (flipstack->objects > 0) {
+      // Pop an edge from stack (from the bottom of the list).
+      flipstack->objects--;
+      E = * ((TriEdge *) flipstack->get(flipstack->objects));
+
+      if (E.tri->is_deleted()) continue;
+      if (!E.is_edge_infected()) continue; // is it still in queue?
+      E.clear_edge_infect();
+
+      N = E.esym();
+      if (E.tri->is_hulltri() || N.tri->is_hulltri()) continue;
+
+      // Test whether the edge {E.org(), E.dest()} is locally Delaunay or not.
+      //   ori < 0 means this edge is regular.
+      is_regular = (!regular_test(E.org(), E.dest(), E.apex(), N.apex()));
+
+      if (!is_regular) { // if (ori < 0)
+        tt[0] = E;
+        delpt = NULL;
+        fflag = FLIP_UNKNOWN;
+        if (flip(tt, &delpt, fflag, fqueue)) {
+          flip_count++;
+          if (delpt != NULL) {
+            assert(delpt->typ == UNUSEDVERTEX);
+            // Save a missing vertex (must adjsut its weight).
+            * ((Vertex **) missing_points->alloc()) = delpt;
+          }
+          // Push new edges to flipstack.
+          for (i = 0; i < fqueue->objects; i++) {
+            E = * ((TriEdge *) fqueue->get(i));
+            assert(E.is_edge_infected());
+            N = E.esym();
+            if (!N.is_edge_infected()) {
+              * ((TriEdge *) flipstack->alloc()) = E;
+            } else {
+              E.clear_edge_infect();
+            }
+          }
+          fqueue->clean();
+        } else {
+          // Save an unflippable edge.
+          * ((TriEdge *) unflip_queue->alloc()) = E;
+        }
+      }
+    } // i
+
+    printf("  (iter=%d) flipped %d edges.\n", iter, flip_count);
+    total_flip_count += flip_count;
+
+    flipstack->clean();
+    if (unflip_queue->objects > 0) {
+      for (i = 0; i < unflip_queue->objects; i++) {
+        E = * ((TriEdge *) unflip_queue->get(i));
+        if (!E.tri->is_deleted()) {
+          if (!E.is_edge_infected()) {
+            N = E.esym();
+            if (!N.is_edge_infected()) {
+              // Push this edge into stack
+              E.set_edge_infect(); // to indicate that this edge is in stack.
+              * ((TriEdge *) flipstack->alloc()) = E;
+            }
+          }
+        }
+      }
+      unflip_queue->clean();
+    } // if (num_unflip_edges > 0)
+
+    if ((flip_count == 0) && (flipstack->objects > 0)) {
+      printf("  Removing a vertex.\n");
+      while (true) {
+        // Randomly select an edge. Remove a vertex.
+        int ridx = rand() % flipstack->objects;
+        E = * ((TriEdge *) flipstack->get(ridx));
+        N = E.esym();
+        assert(!N.tri->is_hulltri());
+        is_regular = (!regular_test(E.org(), E.dest(), E.apex(), N.apex()));
+        if (!is_regular) {
+          tt[0] = E;
+          fflag = flip_check(&(tt[0]));
+          if (fflag == FLIP_31_NM) {
+            // Remove tt[0].org();
+            delpt = tt[0].org();
+            if (remove_point(delpt, fqueue)) {
+              assert(delpt->typ == UNUSEDVERTEX);
+              // Save a missing vertex (must adjsut its weight).
+              * ((Vertex **) missing_points->alloc()) = delpt;
+              // Push new edges onto flipstack.
+              for (i = 0; i < fqueue->objects; i++) {
+                E = * ((TriEdge *) fqueue->get(i));
+                // This edge might be flipped.
+                if (E.tri->is_deleted()) continue;
+                if (!E.is_edge_infected()) continue;
+                N = E.esym();
+                if (!N.is_edge_infected()) {
+                  * ((TriEdge *) flipstack->alloc()) = E;
+                } else {
+                  E.clear_edge_infect();
+                }
+              }
+              fqueue->clean();
+              break;
+            }
+          }
+        }
+      } // while (true)
+    }
+  } // while (flipstack->objects > 0)
+
+  //check_mesh(0, 0);
+
+  if (missing_points->objects > 0) {
+    // There are missing vertices. Adjust the weights one by one.
+    printf("\nInserting %d missing points.\n", missing_points->objects);
+    
+    i = 0;
+    while (missing_points->objects > 0) {
+      // Randomly select a point to insert.
+      int rndidx = (rand() % missing_points->objects);
+      Vertex *mispt = * ((Vertex **) missing_points->get(rndidx));
+      // Fill the place by the last point.
+      int lastidx = missing_points->objects - 1;
+      Vertex *lastpt = * ((Vertex **) missing_points->get(lastidx));
+      * ((Vertex **) missing_points->get(rndidx)) = lastpt;
+      missing_points->objects--;
+
+      printf("  (i=%d) Insert point %d\n", i+1, mispt->idx);
+      if (!insert_missing_weighted_point(mispt)) {
+        printf("  !! Warning: failed to insert point %d.\n", mispt->idx);
+        * ((Vertex **) uninserted_points->alloc()) = mispt;
+      }
+      
+      //if (!check_delaunay()) {
+      //  printf("debug i=%d.\n", i);
+      //}
+      //if (check_mesh(0, 0) > 0) {
+      //  printf("debug i=%d.\n", i);
+      //}
+      i++;
+    }
+  }
+
+  if (uninserted_points->objects > 0) {
+    printf("Warning: %d points are missing.\n", uninserted_points->objects);
+    save_uninserted_points(uninserted_points);
+  }
+
+  // Clean up memory.
+  delete flipstack;
+  delete fqueue;
+  delete unflip_queue;
+  delete missing_points;
+  delete uninserted_points;
+}
+
+//==============================================================================
+
 REAL Triangulation::get_element_gradient(Triang* tri)
 {// get fx, fy, saved in cct[0], [1]
   // The formulas are in Lu-femag2d-2008-09-05.pdf (page 6)
@@ -259,93 +1132,62 @@ void Triangulation::dump_edge_energy_jump()
 }
 
 //==============================================================================
-/*
-// Input:
-//   E is a convex hull egde, v lies outside the convex hull and is visible by E.
-// Output:
-//   E returns a convex hull edge which contains the projection of v.
-
-int  locate_hull_edge(Vertex *v, TriEdge &E) // for vertex interpolation
-{
-  REAL proj_v[2];
-
-  
-
-  return LOC_ON_EDGE;
-}
-*/
-//==============================================================================
 // P1 interpolation of vertex mesh size.
 
-int Triangulation::set_vertex_metric(Vertex *v, TriEdge &E)
+int Triangulation::set_vertex_metric(Vertex *v, TriEdge &E, int &iloc)
 {
-  if (E.tri == NULL) {
-    // Locate the vertex first.
-    //assert(0); // to do...
-    return 0;
+  if (OMT_domain != NULL) {
+    iloc = OMT_domain->locate_point(v, v->on_dm, 0);
+    E = v->on_dm;
+  } else {
+    if (iloc == LOC_UNKNOWN) {
+      iloc = locate_point(v, E, 0);
+    }
   }
-
-  assert(!E.tri->is_deleted());
-  assert(!E.tri->is_hulltri());
-
-  Vertex *pa = E.org();
-  Vertex *pb = E.dest();
-  Vertex *pc = E.apex();
-  double A  = get_tri_area(pa, pb, pc);
-  double Wa = get_tri_area( v, pb, pc);
-  double Wb = get_tri_area(pa,  v, pc);
-  double Wc = get_tri_area(pa, pb,  v);
-  if ((pa->val > 0) && (pb->val > 0) && (pc->val > 0)) {
-    v->val = (pa->val * Wa + pb->val * Wb + pc->val * Wc) / A;
+  
+  if (iloc == LOC_IN_OUTSIDE) {
+    return 0; // assert(0); // The background mesh does not cover the mesh domain.
+  } else if (iloc == LOC_ON_VERT) {
+    v->val = E.org()->val;
+    //for (int i = 0; i < 3; i++) {
+    //  v->mtr[i] = E.org()->mtr[i];
+    //}
+  } else if (iloc == LOC_ON_EDGE) {
+    // Linear interpolation on edge E.
+    Vertex *pa = E.org();
+    Vertex *pb = E.dest();
+    double L  = get_distance(pa, pb);
+    double Wa = get_distance( v, pb);
+    double Wb = get_distance(pa,  v);
+    if ((pa->val > 0) && (pb->val > 0)) {
+      v->val = (pa->val * Wa + pb->val * Wb) / L;
+    }
+    //for (int i = 0; i < 3; i++) {
+    //  v->mtr[i] = (pa->mtr[i] * Wa + pb->mtr[i] * Wb) / L;
+    //}
+  } else if (iloc == LOC_IN_TRI) {
+    Vertex *pa = E.org();
+    Vertex *pb = E.dest();
+    Vertex *pc = E.apex();
+    double A  = get_tri_area(pa, pb, pc);
+    double Wa = get_tri_area( v, pb, pc);
+    double Wb = get_tri_area(pa,  v, pc);
+    double Wc = get_tri_area(pa, pb,  v);
+    if ((pa->val > 0) && (pb->val > 0) && (pc->val > 0)) {
+      v->val = (pa->val * Wa + pb->val * Wb + pc->val * Wc) / A;
+    }
+    //for (int i = 0; i < 3; i++) {
+    //  v->mtr[i] = (pa->mtr[i] * Wa + pb->mtr[i] * Wb + pc->mtr[i] * Wc) / A;
+    //}
+  } else {
+    assert(0); // Unknown case.
   }
-
+   
   return 1;
 
   //======================================================
   // skipped
-  // Set vertex metric.
-  if (OMT_domain) {
-    int loc = OMT_domain->locate_point(v, v->on_dm, 0);
-    TriEdge E = v->on_dm;
-
-    if (loc == LOC_IN_OUTSIDE) {
-      return 0; // assert(0); // The background mesh does not cover the mesh domain.
-    } else if (loc == LOC_ON_VERT) {
-      v->val = E.org()->val;
-      //for (int i = 0; i < 3; i++) {
-      //  v->mtr[i] = E.org()->mtr[i];
-      //}
-    } else if (loc == LOC_ON_EDGE) {
-      // Linear interpolation on edge E.
-      Vertex *pa = E.org();
-      Vertex *pb = E.dest();
-      double L  = get_distance(pa, pb);
-      double Wa = get_distance( v, pb);
-      double Wb = get_distance(pa,  v);
-      if ((pa->val > 0) && (pb->val > 0)) {
-        v->val = (pa->val * Wa + pb->val * Wb) / L;
-      }
-      //for (int i = 0; i < 3; i++) {
-      //  v->mtr[i] = (pa->mtr[i] * Wa + pb->mtr[i] * Wb) / L;
-      //}
-    } else if (loc == LOC_IN_TRI) {
-      Vertex *pa = E.org();
-      Vertex *pb = E.dest();
-      Vertex *pc = E.apex();
-      double A  = get_tri_area(pa, pb, pc);
-      double Wa = get_tri_area( v, pb, pc);
-      double Wb = get_tri_area(pa,  v, pc);
-      double Wc = get_tri_area(pa, pb,  v);
-      if ((pa->val > 0) && (pb->val > 0) && (pc->val > 0)) {
-        v->val = (pa->val * Wa + pb->val * Wb + pc->val * Wc) / A;
-      }
-      //for (int i = 0; i < 3; i++) {
-      //  v->mtr[i] = (pa->mtr[i] * Wa + pb->mtr[i] * Wb + pc->mtr[i] * Wc) / A;
-      //}
-    } else {
-      assert(0); // Unknown case.
-    }
-  }
+  
   /*
   else {
     if (SizeFunc) {
@@ -368,9 +1210,9 @@ int Triangulation::set_vertex_metric(Vertex *v, TriEdge &E)
   } else if (op_metric == METRIC_HDE) {
     v->crd[2] = v->mtr[0] * op_hde_s1; // function value is the height
   }
-  */
-
+   
   return 1;
+  */
 }
 
 //==============================================================================
@@ -430,18 +1272,21 @@ int Triangulation::set_vertex_metrics()
   */
   
   TriEdge E;
+  int iloc;
 
   for (int i = 0; i < ct_in_vrts; i++) {
     if (in_vrts[i].typ == UNUSEDVERTEX) continue;
     E.tri = NULL;
-    set_vertex_metric(&in_vrts[i], E);
+    iloc = LOC_UNKNOWN;
+    set_vertex_metric(&in_vrts[i], E, iloc);
   }
   if (tr_steiners != NULL) {
     for (int i = 0; i < tr_steiners->used_items; i++) {
       Vertex *v = (Vertex *) tr_steiners->get(i);
       if (v->is_deleted()) continue;
       E.tri = NULL;
-      set_vertex_metric(v, E);
+      iloc = LOC_UNKNOWN;
+      set_vertex_metric(v, E, iloc);
     }
   }
 
@@ -718,7 +1563,12 @@ int Triangulation::get_powercell_mass_centers(Vertex *massptlist)
   if (op_db_verbose > 1) {
     printf("  Calculating %d orthocenters\n", tr_tris->objects + ct_hullsize);
   }
-  assert(OMT_domain != NULL);
+  
+  bool clear_omt_domain = false;
+  if (OMT_domain == NULL) {
+    OMT_domain = this;
+    clear_omt_domain = true;
+  }
 
   int i, idx;
   idx = io_firstindex;
@@ -790,6 +1640,10 @@ int Triangulation::get_powercell_mass_centers(Vertex *massptlist)
         delete [] ptlist;
       } // if (Tr->get_powercell
     }
+  }
+
+  if (clear_omt_domain) {
+    OMT_domain = NULL;
   }
 
   return mcount;
@@ -1024,6 +1878,12 @@ int Triangulation::get_distmesh_points(Vertex *moveptlist)
 
 int Triangulation::smooth_vertices()
 {
+  op_metric = METRIC_Euclidean_no_weight;
+
+  if ((ct_exteriors > 0) && !op_convex) { // no -c
+    remove_exteriors();
+  }
+  
   int ptcount = ct_in_vrts;
   if (tr_steiners) {
     ptcount += tr_steiners->objects;
@@ -1032,13 +1892,13 @@ int Triangulation::smooth_vertices()
   int mcount = 0; // count the number of moved vertices.
 
   if (op_smooth_criterion == SMOOTH_LAPLACIAN) {
-    printf("\nUsing Lapacian smoother\n");
+    //printf("\nUsing Lapacian smoother\n");
     mcount = get_laplacian_centers(massptlist);
   } else if (op_smooth_criterion == SMOOTH_CVT) {
-    printf("\nUsing CVT smoother\n");
+    //printf("\nUsing CVT smoother\n");
     mcount = get_powercell_mass_centers(massptlist);
   } else if (op_smooth_criterion == SMOOTH_DISTMESH) {
-    printf("\nUsing DISTMESH smoother\n");
+    //printf("\nUsing DISTMESH smoother\n");
     mcount = get_distmesh_points(massptlist);
   } else {
     printf("Smooth option not available yet.\n");
@@ -1094,7 +1954,7 @@ int Triangulation::smooth_vertices()
       }
       mesh_vert->crd[0] = x;
       mesh_vert->crd[1] = y;
-      mesh_vert->crd[2] = x*x + y*y - mesh_vert->wei;
+      mesh_vert->crd[2] = 0.; //x*x + y*y - mesh_vert->wei;
 
       if (op_metric > 0) {
         //set_vertex_metric(mesh_vert);
@@ -1184,9 +2044,9 @@ int Triangulation::smooth_vertices()
     newpt->on_dm = mcpt->on_dm;
     //newpt->Pair = mcpt->Pair;
 
-    if (op_metric > 0) {
-      //set_vertex_metric(newpt);
-    }
+    //if (op_metric > 0) {
+    //  //set_vertex_metric(newpt);
+    //}
 
     TriEdge tt[4];
     E.tri = NULL;

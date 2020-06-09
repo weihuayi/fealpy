@@ -9,6 +9,115 @@
 using  namespace detri2;
 
 //==============================================================================
+// S is a segment. S.org() is a SEGMENTVERTEX.
+// Return true if S.org() is an acute vertex.
+
+bool Triangulation::is_acute_vertex(TriEdge& S)
+{
+  assert(S.is_segment());
+  double theta, sum_angle, minang = 2.*PI;
+  //double min_radius = 1.e+30;
+  //Vertex *chkpt = S.org();
+
+  if (!S.tri->is_hulltri()) {
+    // Search for the next segment at its CCW direction of S.
+    sum_angle = 0.;
+    TriEdge E = S;
+    do {
+      theta = get_angle(E.org(), E.dest(), E.apex());
+      sum_angle += theta;
+      E = E.eprev_esym();
+      if (E.is_segment()) {
+        // Calculate the min_radius.
+        //REAL len = get_distance(E.org(), E.dest());
+        //if (len < min_radius) min_radius = len;
+        break;
+      }
+    } while (E.tri != S.tri);
+    
+    if (sum_angle < minang) {
+      minang = sum_angle;
+    }
+  }
+  
+  TriEdge Sn = S.esym();
+  if (!Sn.tri->is_hulltri()) {
+    // Search for the next segment at its CW direction of S.
+    sum_angle = 0.;
+    TriEdge E = Sn;
+    do {
+      theta = get_angle(E.dest(), E.apex(), E.org());
+      sum_angle += theta;
+      E = E.enext_esym();
+      if (E.is_segment()) {
+        // Calculate the min_radius.
+        //REAL len = get_distance(E.org(), E.dest());
+        //if (len < min_radius) min_radius = len;
+        break;
+      }
+    } while (E.tri != Sn.tri);
+    
+    if (sum_angle < minang) {
+      minang = sum_angle;
+    }
+  }
+
+  REAL ang = minang / PI * 180.;
+
+  if (ang < 60.) {
+    // This is an acute vertex. Set its mesh size (min_radius).
+    
+    return true;
+  }
+
+  return false;
+}
+
+void Triangulation::mark_acute_vertices()
+{
+  TriEdge E, N;
+  int i, j;
+  int count = 0;
+
+  if (op_db_verbose) {
+    printf("  Mark all acute vertices.\n");
+  }
+
+  for (i = 0; i < tr_tris->used_items; i++) {
+    E.tri = (Triang *) tr_tris->get(i);
+    if (E.tri->is_deleted() ||
+        E.tri->is_hulltri()) continue;
+    for (E.ver = 0; E.ver < 3; E.ver++) {
+      N = E.esym(); // N.tri might be a hulltri.
+      if (E.apex()->idx > N.apex()->idx) {
+        if (E.is_segment()) {
+          TriEdge S = E;
+          for (j = 0; j < 2; j++) {
+            if (S.org()->typ == SEGMENTVERTEX) {
+              // It is an input vertex.
+              if (!S.org()->is_acute()) {
+                //if (S.org()->idx == 131) {
+                //  printf("debug\n");
+                //}
+                if (is_acute_vertex(S)) {
+                  S.org()->set_acute();
+                  count++;
+                }
+              }
+            }
+            S = S.esym();
+          } // j
+        }
+      }
+    } // E.ver
+  } // i
+  
+  if (op_db_verbose) {
+    printf("  Marked %d acute vertices.\n", count);
+  }
+}
+
+//==============================================================================
 
 // If 'pt' is given, only check if S is encroached by pt.
 // Otherwise, check the apex of S.
@@ -18,6 +127,12 @@ int Triangulation::check_segment(Vertex *pt, TriEdge &S, arraypool *encsegs)
   assert(S.is_segment());
   Vertex *e1 = S.org();
   Vertex *e2 = S.dest();
+
+  // debug only.
+  //if ((e1 == NULL) || (e2 == NULL)) {
+  //  printf("debug.\n");
+  //  return 0;
+  //}
 
   if (pt != NULL) {
     // A mesh vertex is given.
@@ -81,6 +196,7 @@ int Triangulation::check_segment(Vertex *pt, TriEdge &S, arraypool *encsegs)
       pE->vrt[0] = e1;
       pE->vrt[1] = e2;
       pE->vrt[2] = NULL; // Don't save a rejected vertex.
+      pE->set_infect();  // split due to mesh size
       return 1; // split this segment.
     }
   }
@@ -93,6 +209,7 @@ int Triangulation::check_segment(Vertex *pt, TriEdge &S, arraypool *encsegs)
       pE->vrt[0] = e1;
       pE->vrt[1] = e2;
       pE->vrt[2] = NULL; // Don't save a rejected vertex.
+      pE->set_infect();  // split due to mesh size
       return 1; // split this segment.
     }
   }
@@ -115,19 +232,20 @@ int Triangulation::check_segment(Vertex *pt, TriEdge &S, arraypool *encsegs)
 
 //==============================================================================
 
-int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, arraypool *fqueue,
-                                 arraypool *encsegs, arraypool *enctris)
+int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, bool mtrflag,
+  arraypool *fqueue, arraypool *encsegs, arraypool *enctris)
 {
   if (op_db_verbose > 2) {
     printf("    Split encroached segment [%d, %d]\n", S.org()->idx, S.dest()->idx);
   }
 
-  //if (!S.is_segment()) {
-    // report a bug
-    //strcpy(io_outfilename, "/Users/si/tmp/dump-bug");
-    //save_triangulation();
-  //  assert(0);
-  //}
+  if ((encpt == NULL) && !mtrflag) {
+    // Do not split this segment if one of its endpoints is acute.
+    if (S.org()->is_acute() ||
+        S.dest()->is_acute()) {
+      return 0;
+    }
+  }
 
   bool isseg = true;
   int stag = 0; REAL val = 0.;
@@ -143,54 +261,100 @@ int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, arraypool *fqueu
   Vertex *newvrt = (Vertex *) tr_steiners->alloc();
   newvrt->init();
 
+  // For debugging only
+  newvrt->idx = io_firstindex + (ct_in_vrts + tr_steiners->objects - 1);
+
   // Default split it at the middle.
   Vertex *e1 = S.org();
   Vertex *e2 = S.dest();
-  newvrt->crd[0] = 0.5 * (e1->crd[0] + e2->crd[0]);
-  newvrt->crd[1] = 0.5 * (e1->crd[1] + e2->crd[1]);
-
-  if ((encpt != NULL) && (op_metric <= 1)) {
-    if (!encpt->is_deleted()) {
-      if ((encpt->on_bd.tri != NULL) && (seg != encpt->on_bd.tri)) {
-        // Check if these two segments shara a common vertex.
-        if ((seg->vrt[0] == encpt->on_bd.tri->vrt[0]) ||
-            (seg->vrt[0] == encpt->on_bd.tri->vrt[1])) {
-          // Shared at seg->vrt[0]
-          REAL split = get_distance(seg->vrt[0], encpt) /
-                       get_distance(seg->vrt[0], seg->vrt[1]);
-          newvrt->crd[0] = seg->vrt[0]->crd[0] +
-            split * (seg->vrt[1]->crd[0] - seg->vrt[0]->crd[0]);
-          newvrt->crd[1] = seg->vrt[0]->crd[1] +
-            split * (seg->vrt[1]->crd[1] - seg->vrt[0]->crd[1]);
-        } else if ((seg->vrt[1] == encpt->on_bd.tri->vrt[0]) ||
-                   (seg->vrt[1] == encpt->on_bd.tri->vrt[1])) {
-          // Shared at seg->vrt[1]
-          REAL split = get_distance(seg->vrt[1], encpt) /
-                       get_distance(seg->vrt[0], seg->vrt[1]);
-          newvrt->crd[0] = seg->vrt[1]->crd[0] +
-            split * (seg->vrt[0]->crd[0] - seg->vrt[1]->crd[0]);
-          newvrt->crd[1] = seg->vrt[1]->crd[1] +
-            split * (seg->vrt[0]->crd[1] - seg->vrt[1]->crd[1]);
+  
+  if (encpt != NULL) {
+    REAL L  = get_distance(e1, e2);
+    REAL L1 = get_distance(e1, encpt);
+    REAL L2 = get_distance(e2, encpt);
+    REAL A  = get_tri_area(e1, e2, encpt);
+    // The projection distance from encpt onto {e1, e2}.
+    REAL h  = 2.0 * A / L;
+    REAL split;
+    if (e1->is_acute()) {
+      if (e2->is_acute()) {
+        // Choose the base point bteween e1 or e2.
+        if (L1 < L2) {
+          // Cut {e1, e2} using the length {e1, encpt} (L1)
+          // Make sure the rest of edge is not too short.
+          if ((L - L1) < h) {
+            split = 0.5;
+          } else {
+            split = L1 / L;
+          }
+          newvrt->crd[0] = e1->crd[0] + split * (e2->crd[0] - e1->crd[0]);
+          newvrt->crd[1] = e1->crd[1] + split * (e2->crd[1] - e1->crd[1]);
+        } else {
+          // Cut {e1, e2} using the length {e2, encpt} (L2)
+          // Make sure the rest of edge is not too short.
+          if ((L - L2) < h) {
+            split = 0.5;
+          } else {
+            split = L2 / L;
+          }
+          newvrt->crd[0] = e2->crd[0] + split * (e1->crd[0] - e2->crd[0]);
+          newvrt->crd[1] = e2->crd[1] + split * (e1->crd[1] - e2->crd[1]);
         }
+      } else {
+        // Cut {e1, e2} using the length {e1, encpt} (L1)
+        // Make sure the rest of edge is not too short.
+        if ((L - L1) < h) {
+          split = 0.5;
+        } else {
+          split = L1 / L;
+        }
+        newvrt->crd[0] = e1->crd[0] + split * (e2->crd[0] - e1->crd[0]);
+        newvrt->crd[1] = e1->crd[1] + split * (e2->crd[1] - e1->crd[1]);
       }
-    } // if (!encpt->is_deleted())
+    } else if (e2->is_acute()) {
+      // Cut {e1, e2} using the length {e2, encpt} (L2)
+      // Make sure the rest of edge is not too short.
+      if ((L - L2) < h) {
+        split = 0.5;
+      } else {
+        split = L2 / L;
+      }
+      newvrt->crd[0] = e2->crd[0] + split * (e1->crd[0] - e2->crd[0]);
+      newvrt->crd[1] = e2->crd[1] + split * (e1->crd[1] - e2->crd[1]);
+    } else {
+      // neither e1 nor e2 is acute. Project encpt onto {e1, e2}.
+      REAL L3 = sqrt(L1*L1 - h*h); // Using Pythagorean theorem
+      split = L3 / L;
+      newvrt->crd[0] = e1->crd[0] + split * (e2->crd[0] - e1->crd[0]);
+      newvrt->crd[1] = e1->crd[1] + split * (e2->crd[1] - e1->crd[1]);
+      // Shift to middle if it is too close to e2.
+      REAL res = get_distance(newvrt, e2);
+      if (res < h) {
+        split = 0.5;
+        newvrt->crd[0] = e1->crd[0] + split * (e2->crd[0] - e1->crd[0]);
+        newvrt->crd[1] = e1->crd[1] + split * (e2->crd[1] - e1->crd[1]);
+      }
+    }
+  } else {
+    newvrt->crd[0] = 0.5 * (e1->crd[0] + e2->crd[0]);
+    newvrt->crd[1] = 0.5 * (e1->crd[1] + e2->crd[1]);
   }
 
-  REAL x = newvrt->crd[0];
-  REAL y = newvrt->crd[1];
-  newvrt->crd[2] = x*x + y*y;
-  //newvrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
-  //if (op_metric != METRIC_Euclidean) {
-  //  newvrt->crd[2] = newvrt->crd[0]*newvrt->crd[0]+newvrt->crd[1]*newvrt->crd[1];
-  //} else {
-    //newvrt->on_dm = e1->on_dm; // for searching in OMT_domain (may not be used).
-    TriEdge G = S;
-    if (G.tri->is_hulltri()) G = G.esym();
-    set_vertex_metric(newvrt, G);
-  //}
+  // set metric for the new vertex.
+  newvrt->on_dm = e1->on_dm; // for searching in OMT_domain (may not be used).
+  TriEdge G = S;
+  if (G.tri->is_hulltri()) G = G.esym();
+  int iloc = LOC_ON_EDGE;
+  set_vertex_metric(newvrt, G, iloc);
+
   newvrt->idx = io_firstindex + (ct_in_vrts + tr_steiners->objects - 1);
   newvrt->tag = stag; //seg->tag;
   newvrt->typ = STEINERVERTEX;
+
+  //if (newvrt->idx == 324) {
+  //  printf("debug... idx==324\n");
+  //  save_triangulation();
+  //}
 
   //int stag = seg->tag; // done above
   if (isseg) {
@@ -214,28 +378,17 @@ int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, arraypool *fqueu
     assert(S.org() == e1);
     assert(S.dest() == newvrt);
     insert_segment(S, stag, val, NULL);
-    if (encsegs != NULL) {
-      check_segment(NULL, S, encsegs);
-    }
 
     S = tt[0].eprev(); // [newpt, e2, d]
     assert(S.org() == newvrt);
     assert(S.dest() == e2);
     insert_segment(S, stag, val, NULL);
-    if (encsegs != NULL) {
-      check_segment(NULL, S, encsegs);
-    }
   }
 
   // For Delaunay refinement, we fix the segmment Steiner vertex
   //   to prevent to remove them, this will cause endless loop.
   assert(!newvrt->is_fixed());
   //newvrt->set_fix();
-
-  // Debug split_enc_segment() only
-  //if (check_mesh(0,0) > 0) {
-  //  assert(0);
-  //}
 
   lawson_flip(newvrt, 0, fqueue); // hullflag = 0
 
@@ -249,12 +402,31 @@ int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, arraypool *fqueu
       }
       E = E.eprev_esym(); // CCW.
     } while (E.tri != newvrt->adj.tri);
-  }
+    
+    // The two subsegments need to be checked.
+    if (get_edge(newvrt, e1, E)) {
+      check_segment(NULL, E, encsegs);
+    } else {
+      assert(0); // a subsegment is missing.
+    }
+    
+    if (get_edge(newvrt, e2, E)) {
+      check_segment(NULL, E, encsegs);
+    } else {
+      assert(0); // a subsegment is missing.
+    }
+  } // if (encsegs != NULL)
 
   if (enctris != NULL) {
     // Add the triangles in the star of newvrt into list.
     enq_vertex_star(newvrt, enctris);
   }
+  
+  //if (newvrt->idx == 237) {
+  //  //===== debug only ================
+  //  save_triangulation();
+  //  //===== debug only ================
+  //}
 
   return 1;
 }
@@ -264,15 +436,17 @@ int Triangulation::split_enc_segment(TriEdge &S, Vertex *encpt, arraypool *fqueu
 int Triangulation::repair_encsegments(arraypool *encsegs, arraypool *enctris)
 {
   arraypool *fqueue = new arraypool(sizeof(TriEdge), 8);
+  bool smtrflag;
   TriEdge E;
 
   while (encsegs->objects > 0) {
     for (int i = 0; i < encsegs->used_items; i++) {
       Triang *pE = (Triang *) encsegs->get(i);
       if (pE->is_deleted()) continue;
-      if (op_no_bisect == 0) { // no -Y option
+      if (!op_no_bisect) { // no -Y option
         if (get_edge(pE->vrt[0], pE->vrt[1], E)) {
-          split_enc_segment(E, pE->vrt[2], fqueue, encsegs, enctris);
+          smtrflag = pE->is_infected(); // mesh size
+          split_enc_segment(E, pE->vrt[2], smtrflag, fqueue, encsegs, enctris);
         }
       }
       pE->set_deleted();
@@ -287,9 +461,11 @@ int Triangulation::repair_encsegments(arraypool *encsegs, arraypool *enctris)
 }
 
 //==============================================================================
+// Queue a triangle to refine.
+// If "mtrflag" is true, the reason to refine this triangle is due to mesh size
+//   requirement. Otherwise, it is a bad quality triangle.
 
-//void Triangulation::enq_triangle(Triang* tri, REAL cct[3], arraypool* enctris)
-void Triangulation::enq_triangle(Triang* tri, arraypool* enctris)
+void Triangulation::enq_triangle(Triang* tri, bool mtrflag, arraypool* enctris)
 {
   Triang *paryEle = (Triang *) enctris->alloc();
   paryEle->init(); // Initialize
@@ -300,6 +476,9 @@ void Triangulation::enq_triangle(Triang* tri, arraypool* enctris)
   //for (int j = 0; j < 3; j++) {
   //  paryEle->cct[j] = cct[j];
   //}
+  if (mtrflag) {
+    paryEle->set_infect();
+  }
 }
 
 void Triangulation::enq_vertex_star(Vertex *pt, arraypool* enctris)
@@ -346,21 +525,21 @@ int Triangulation::check_triangle(Triang *tri, arraypool* enctris)
   // (2) metric (mesh size) has priority than mesh quality
   if (op_maxarea > 0) {
     if (area > op_maxarea) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
 
   if (tri->val > 0) {
     if (area > tri->val) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
 
   if (op_target_length > 0) {
     if ((a > op_target_length) || (b > op_target_length) || (c > op_target_length)) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
@@ -368,19 +547,19 @@ int Triangulation::check_triangle(Triang *tri, arraypool* enctris)
   // Check mesh size at vertex.
   if (E.org()->val > 0) { // A
     if ((a > tri->vrt[0]->val) || (c > E.org()->val)) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
   if (E.dest()->val > 0) { // B
     if ((a > E.dest()->val) || (b > E.dest()->val)) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
   if (E.apex()->val > 0) { // C
     if ((c > E.apex()->val) || (b > E.apex()->val)) {
-      enq_triangle(tri, enctris);
+      enq_triangle(tri, true, enctris);
       return 1;
     }
   }
@@ -422,7 +601,7 @@ int Triangulation::check_triangle(Triang *tri, arraypool* enctris)
       TriEdge N1 = E;
       TriEdge N2 = E.eprev();
       if (!(N1.is_segment() && N2.is_segment())) {
-        enq_triangle(tri, enctris);
+        enq_triangle(tri, false, enctris);
         return 1;
       }
     }
@@ -518,7 +697,9 @@ int Triangulation::repair_triangles(arraypool *enctris)
   arraypool *encsegs = new arraypool(sizeof(Triang), 8);
   arraypool *fqueue = new arraypool(sizeof(TriEdge), 8);
   TriEdge E, S, tt[4];
-  REAL x, y;
+  double v1[2], v2[2];
+  double costh = 0;
+  //REAL x, y;
 
   while (enctris->objects > 0) {
     for (int i = 0; i < enctris->used_items; i++) {
@@ -526,12 +707,13 @@ int Triangulation::repair_triangles(arraypool *enctris)
       if (qtri->is_deleted()) continue;
       if (get_triangle(qtri->vrt[0], qtri->vrt[1], qtri->vrt[2], E)) {
         // Try to split it.
+        bool mtrflag = qtri->is_infected();
         get_tri_circumcenter(qtri, qtri->cct);
         Vertex *newvrt = (Vertex *) tr_steiners->alloc();
         newvrt->init();
-        x = newvrt->crd[0] = qtri->cct[0];
-        y = newvrt->crd[1] = qtri->cct[1];
-        newvrt->crd[2] = x*x + y*y;
+        newvrt->crd[0] = qtri->cct[0];
+        newvrt->crd[1] = qtri->cct[1];
+        //newvrt->crd[2] = 0.; // x*x + y*y;
         //newvrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
         //if (op_metric <= 1) {
         //  newvrt->crd[2] = qtri->cct[0]*qtri->cct[0]+qtri->cct[1]*qtri->cct[1];
@@ -541,10 +723,10 @@ int Triangulation::repair_triangles(arraypool *enctris)
         //}
         newvrt->idx = io_firstindex + (ct_in_vrts + tr_steiners->objects - 1);
         newvrt->typ = STEINERVERTEX;
-        int liftflag = 0;
-        if (op_metric == METRIC_HDE) {
-          liftflag = 1;
-        }
+        //int liftflag = 0;
+        //if (op_metric == METRIC_HDE) {
+        //  liftflag = 1;
+        //}
         //loc = locate_point(newvrt, E, 0, 1); // encflag = 1
         //int loc = locate_point(newvrt, E, 1, liftflag); // encflag = 1
         int loc = locate_point(newvrt, E, 1); // encflag = 1
@@ -554,13 +736,16 @@ int Triangulation::repair_triangles(arraypool *enctris)
           pE->init();
           pE->vrt[0] = E.org();
           pE->vrt[1] = E.dest();
-          //pE->vrt[2] = NULL;
+          pE->vrt[2] = NULL;
+          if (mtrflag) pE->set_infect(); // due to mesh size.
           newvrt->set_deleted();
           tr_steiners->dealloc(newvrt);
         } else if (loc != LOC_IN_OUTSIDE) {          
           // Insert the vertex.
           assert(!E.tri->is_hulltri());
-          set_vertex_metric(newvrt, E); // interpolate mesh size for the new vertex.
+          newvrt->on_dm = E.tri->vrt[0]->on_dm; // For locating the vertex.
+          int iloc = loc;
+          set_vertex_metric(newvrt, E, iloc); // interpolate mesh size for the new vertex.
           tt[0] = E;
           if (loc == LOC_IN_TRI) {
             int fflag = FLIP_13;
@@ -572,12 +757,25 @@ int Triangulation::repair_triangles(arraypool *enctris)
             assert(0); // on vertex? Must be a bug
           }
           lawson_flip(newvrt, 0, fqueue);
-          // Check if this vertex encroach other segments.
+          // Check if this vertex encroaches upon other segments.
           E = newvrt->adj;
           do {
             S = E.enext(); // its oppsite edge.
             if (S.is_segment()) {
-              check_segment(newvrt, S, encsegs);
+              //check_segment(newvrt, S, encsegs);
+              v1[0] =  S.org()->crd[0] - newvrt->crd[0];
+              v1[1] =  S.org()->crd[1] - newvrt->crd[1];
+              v2[0] = S.dest()->crd[0] - newvrt->crd[0];
+              v2[1] = S.dest()->crd[1] - newvrt->crd[1];
+              costh = v1[0] * v2[0] + v1[1] * v2[1];
+              if (costh < 0.) {
+                Triang *pE = (Triang *) encsegs->alloc();
+                pE->init();
+                pE->vrt[0] = S.org();
+                pE->vrt[1] = S.dest();
+                pE->vrt[2] = NULL;
+                if (mtrflag) pE->set_infect(); // due to mesh size.
+              }
             }
             E = E.eprev_esym();
           } while (E.tri != newvrt->adj.tri);
@@ -588,7 +786,6 @@ int Triangulation::repair_triangles(arraypool *enctris)
           }
         }
         if (encsegs->objects > 0) {
-          // [2019-11-03] segments might not be split if -Y option is used.
           repair_encsegments(encsegs, enctris);
         } else {
           // A Steiner vertex is inserted.
@@ -623,6 +820,8 @@ int Triangulation::delaunay_refinement()
   if (tr_steiners == NULL) {
     tr_steiners = new arraypool(sizeof(Vertex), 13); // 2^13 = 8192
   }
+
+  mark_acute_vertices();
 
   //mesh_phase = 4;
 

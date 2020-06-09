@@ -35,6 +35,8 @@ int Triangulation::parse_commands(int argc, char* argv[])
         op_no_bisect = 1;
       } else if (argv[i][j] == 'F') {
         op_no_incremental_flip = 1;
+      } else if (argv[i][j] == 'c') {
+        op_convex = 1;
       } else if (argv[i][j] == 'q') {
         op_quality = 1;
         if (((argv[i][j + 1] >= '0') && (argv[i][j + 1] <= '9')) ||
@@ -49,6 +51,27 @@ int Triangulation::parse_commands(int argc, char* argv[])
           }
           workstring[k] = '\0';
           op_minangle = atof(workstring);
+        } else if (argv[i][j + 1] == 'S') { // -qS#
+          // Set smoothing options.
+          j++;
+          if (argv[i][j + 1] == '0') { // -qS0
+            op_use_smoothing = 0; j++; // Do not use smoothing
+          } else if ((argv[i][j + 1] > '0') && (argv[i][j + 1] <= '3')) { // -qS#
+            op_smooth_criterion = argv[i][j + 1] - '0';
+            j++;
+          }
+        } else if (argv[i][j + 1] == 'S') { // -qI#
+          j++;  // set smoothing iterations.
+          k = 0;
+          while (((argv[i][j + 1] >= '0') && (argv[i][j + 1] <= '9')) ||
+                 (argv[i][j + 1] == '.') || (argv[i][j + 1] == 'e') ||
+                 (argv[i][j + 1] == '-') || (argv[i][j + 1] == '+')) {
+            j++;
+            workstring[k] = argv[i][j];
+            k++;
+          }
+          workstring[k] = '\0';
+          op_smooth_iter = atoi(workstring);
         }
       } else if (argv[i][j] == 'L') {
         if (((argv[i][j + 1] >= '0') && (argv[i][j + 1] <= '9')) ||
@@ -82,7 +105,8 @@ int Triangulation::parse_commands(int argc, char* argv[])
         //op_coarse_mesh = 1;
       } else if (argv[i][j] == 'm') {
         /* [2019-02-06] no use
-        op_metric = METRIC_Euclidean;
+        //op_metric = METRIC_Euclidean;
+        */
         if (argc >= (i+2)) {
           if (argv[i+1][0] != '-') {
             // It is a filename following by -m
@@ -92,7 +116,6 @@ int Triangulation::parse_commands(int argc, char* argv[])
             break; // j
           }
         }
-        */
       } else if (argv[i][j] == 'S') { 
         // Sorting options.
         if (argv[i][j+1] == 'N') { // -SN
@@ -219,8 +242,10 @@ int Triangulation::parse_commands(int argc, char* argv[])
           io_out_voronoi = 1; j++;
         } else if (argv[i][j+1] == 'e') { // -Ie
           io_outedges = 1; j++;
+        } else if (argv[i][j+1] == 'u') { // -Iu
+          io_out_ucd = 1; j++;
         } else if (argv[i][j+1] == 'J') { // -IJ
-          io_no_unused = 1; j++;
+          io_keep_unused = 1; j++;
         } else if (argv[i][j+1] == 'd') { // -Id
           io_dump_to_ucd = 1; j++;
         } else if (argv[i][j+1] == 'l') { // -Il
@@ -341,7 +366,7 @@ int Triangulation::read_point_array()
     double *pt = (double *) ptary->get(i);
     x = vrt->crd[0] = pt[0];
     y = vrt->crd[1] = pt[1];
-    vrt->crd[2] = x*x + y*y; // height
+    vrt->crd[2] = 0.; //vrt->crd[2] = x*x + y*y; // height
     vrt->wei = 0.0;
 
     // Determine the smallest and largest x, and y coordinates.
@@ -436,7 +461,7 @@ int Triangulation::read_nodes()
   in_vrts = new Vertex[pnum];
 
   printf("Reading %d points from file %s\n", pnum, filename);
-  REAL x, y;
+  REAL x, y, h;
 
   for (i = 0; i < pnum; i++) {
     while (fgets(line, 1024, infile)) {
@@ -462,14 +487,13 @@ int Triangulation::read_nodes()
     x = vrt->crd[0] = atof(pstr);
     pstr = strtok(NULL, delim);
     y = vrt->crd[1] = atof(pstr);
+    vrt->crd[2] = 0.; //vrt->crd[2] = x*x + y*y; // lift
     if (dim == 3) {
+      // Height is given. Weight is calculated from it.
       pstr = strtok(NULL, delim);
-      vrt->crd[2] = atof(pstr); // height
-      vrt->wei = x*x + y*y - vrt->crd[2];
-      //vrt->wei = op_lambda1 * x*x + op_lambda2 * y*y - vrt->crd[2];
+      h = atof(pstr); // height
+      vrt->wei = x*x + y*y - h;
     } else {
-      vrt->crd[2] = x*x + y*y; // height
-      //vrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
       vrt->wei = 0.0;
     }
     if (pstr != NULL) {
@@ -487,15 +511,19 @@ int Triangulation::read_nodes()
     }
   } // i
 
+  if (i < pnum) {
+    printf("Missing %d points from file %s.\n", pnum - i, filename);
+    fclose(infile);
+    return 0;
+  }
+
   double dx = io_xmax - io_xmin;
   double dy = io_ymax - io_ymin;
   io_diagonal2 = dx*dx + dy*dy;
   io_diagonal = sqrt(io_diagonal2);
 
-  if (i < pnum) {
-    printf("Missing %d points from file %s.\n", pnum - i, filename);
-    fclose(infile);
-    return 0;
+  if (dim == 3) {
+    io_with_wei = 1;
   }
 
   fclose(infile);
@@ -550,14 +578,20 @@ int Triangulation::read_weights()
         REAL w = atof(pstr);        
         in_vrts[i].wei = w;
         // Re-calculate the height of this vertex.
-        REAL x = in_vrts[i].crd[0];
-        REAL y = in_vrts[i].crd[1];
-        in_vrts[i].crd[2] = x*x + y*y - w;
+        //REAL x = in_vrts[i].crd[0];
+        //REAL y = in_vrts[i].crd[1];
+        //in_vrts[i].crd[2] = x*x + y*y - w;
         //in_vrts[i].crd[2] = op_lambda1 * x*x + op_lambda2 * y*y - w;
       }
 
       if (i < wnum) {
         printf("Missing %d point weights from file %s.\n", wnum - i, filename);
+        // Clean weights.
+        for (int j = 0; j < ct_in_vrts; j++) {
+          in_vrts[j].wei = 0.;
+        }
+      } else {
+        io_with_wei = 1;
       }
     } else {
       printf("Wrong number %d (should be %d) of point weights\n", wnum, ct_in_vrts);
@@ -762,7 +796,7 @@ int Triangulation::read_poly()
     in_vrts = new Vertex[pnum];
   
     printf("Reading %d points from file %s\n", pnum, filename);
-    REAL x, y, w;
+    REAL x, y, h;
   
     for (i = 0; i < pnum; i++) {
       while (fgets(line, 1024, infile)) {
@@ -788,18 +822,12 @@ int Triangulation::read_poly()
       x = vrt->crd[0] = atof(pstr);
       pstr = strtok(NULL, delim);
       y = vrt->crd[1] = atof(pstr);
-      //pstr = strtok(NULL, delim);
-      //z = vrt->crd[2] = atof(pstr);
-      //vrt->crd[3] = x*x + y*y + z*z; // height
+      vrt->crd[2] = 0.0; //vrt->crd[2] = x*x + y*y; // lift
       if (dim == 3) {
         pstr = strtok(NULL, delim);
-        vrt->crd[2] = atof(pstr); // height is the z-coordinate
-        w = x*x + y*y - vrt->crd[2]; // calculate the weight
-        //w = op_lambda1 * x*x + op_lambda2 * y*y - vrt->crd[2];
-        vrt->wei = w;
+        h = atof(pstr); // height is the z-coordinate
+        vrt->wei = x*x + y*y - h; // calculate the weight
       } else {
-        vrt->crd[2] = x*x + y*y; // height
-        //vrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
         vrt->wei = 0.0;
       }
       if (pstr != NULL) {
@@ -817,15 +845,19 @@ int Triangulation::read_poly()
       }
     } // i
 
-    double dx = io_xmax - io_xmin;
-    double dy = io_ymax - io_ymin;
-    io_diagonal2 = dx*dx + dy*dy;
-    io_diagonal = sqrt(io_diagonal2);
-
     if (i < pnum) {
       printf("Missing %d points from file %s.\n", pnum - i, filename);
       fclose(infile);
       return 0;
+    }
+
+    double dx = io_xmax - io_xmin;
+    double dy = io_ymax - io_ymin;
+    io_diagonal2 = dx*dx + dy*dy;
+    io_diagonal = sqrt(io_diagonal2);    
+
+    if (dim == 3) {
+      io_with_wei = 1;
     }
 
     exactinit(0, 0, 0, 0, io_xmax - io_xmin, io_ymax - io_ymax, 0.0);
@@ -977,9 +1009,9 @@ int Triangulation::read_poly()
     //fclose(infile);
   } // if (!smesh)
 
-  printf("debugging: io.cpp read_poly()  read holes\n");
+  //printf("debugging: io.cpp read_poly()  read holes\n");
 
-  // Read the number of use-deined holes.
+  // Read the number of user-defined holes.
   int rnum = 0;
   while (fgets(line, 1024, infile)) {
     //printf("%s", line);
@@ -1021,7 +1053,7 @@ int Triangulation::read_poly()
     } // i
   } // rnum > 0
 
-  printf("debugging: io.cpp read_poly()  read regions\n");
+  //printf("debugging: io.cpp read_poly()  read regions\n");
 
   // Read the number of user-defined subdomains.
   rnum = 0;
@@ -1080,18 +1112,6 @@ int Triangulation::read_poly()
   } // if (rnum > 0)
 
   fclose(infile);
-
-  printf("debugging: io.cpp read_poly()  done!\n");
-
-  // Read point weights.
-  read_weights();
-  // Read point metrics (.mtr)
-  read_metric();
-  // Read triangle areas (.area)
-  read_area();
-  
-  read_sol();
-  read_grd();
 
   return 1;
 }
@@ -1187,11 +1207,7 @@ int Triangulation::read_inria_mesh()
             x = vrt->crd[0] = atof(pstr);
             pstr = strtok(NULL, delim);
             y = vrt->crd[1] = atof(pstr);
-            //pstr = strtok(NULL, delim);
-            //z = vrt->crd[2] = atof(pstr);
-            //vrt->crd[3] = x*x + y*y + z*z; // height
-            vrt->crd[2] = x*x + y*y; // height
-            //vrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
+            vrt->crd[2] = 0.; // vrt->crd[2] = x*x + y*y; // lift
             vrt->wei = 0.0; // no weight
             //if (pstr != NULL) {
             //  vrt->tag = atoi(pstr);
@@ -1208,16 +1224,16 @@ int Triangulation::read_inria_mesh()
             }
           } // i
 
-          double dx = io_xmax - io_xmin;
-          double dy = io_ymax - io_ymin;
-          io_diagonal2 = dx*dx + dy*dy;
-          io_diagonal = sqrt(io_diagonal2);
-        
           if (i < pnum) {
             printf("Missing %d points from file %s.\n", pnum - i, filename);
             fclose(infile);
             return 0;
           }
+
+          double dx = io_xmax - io_xmin;
+          double dy = io_ymax - io_ymin;
+          io_diagonal2 = dx*dx + dy*dy;
+          io_diagonal = sqrt(io_diagonal2);                  
 
           exactinit(0, 0, 0, 0, io_xmax - io_xmin, io_ymax - io_ymax, 0.0);    
         } // pnum > 0
@@ -1369,16 +1385,6 @@ int Triangulation::read_inria_mesh()
     assert((trinum == 0) && (snum == 0)); // These numbers are read after pnum.
     return 0;
   }
-
-  // Read point weights.
-  read_weights();
-  // Read point metrics (.mtr)
-  read_metric();
-  // Read triangle areas (.area)
-  read_area();
-
-  read_sol(); // .sol file
-  read_grd(); // .grd file
 
   return 1;
 }
@@ -1553,8 +1559,7 @@ int Triangulation::read_poly_mesh()
     sscanf(line, "%f %f", &x, &y);
     vrt->crd[0] = (REAL) x;
     vrt->crd[1] = (REAL) y;
-    vrt->crd[2] = (REAL) (x*x + y*y); // height
-    //vrt->crd[2] = op_lambda1 * x*x + op_lambda2 * y*y;
+    vrt->crd[2] = 0.; //vrt->crd[2] = (REAL) (x*x + y*y); // lift
     vrt->wei = 0.0;
     vrt->idx = idx;
     idx++;
@@ -1603,51 +1608,14 @@ int Triangulation::read_poly_mesh()
 }
 
 //==============================================================================
-// Read the following files as long as they are provided:
-//   .node, .edge, .ele, .region, .weight, ...
 
-int Triangulation::read_mesh()
+int Triangulation::read_edge()
 {
-  if (io_poly) {
-    if (!read_poly()) {
-      printf("Fail to read %s.poly (or smesh) file.\n", io_infilename);
-      return 0;
-    }
-    return 1;
-  } else if (io_inria_mesh) {
-    if (!read_inria_mesh()) {
-      if (!read_poly_mesh()) {
-        printf("Fail to read %s.mesh file.\n", io_infilename);
-        return 0;
-      }
-    }
-    return 1;
-  } else if (io_voronoi) {
-    if (!read_poly_mesh()) { // the same format as .mesh
-      printf("Fail to read %s.voro file.\n", io_infilename);
-      return 0;
-    }
-    return 1;
-  } else if (io_point_array) {
-    if (!read_point_array()) {
-      printf("Fail to read %s.txt file.\n", io_infilename);
-      return 0;
-    }
-    return 1;
-  }
-
-  // Read mesh file(s)
   char filename[256];
   FILE *infile = NULL;
   char line[1024], *pstr;
   char delim[] = " ,\t";
   int i;
-
-  // Try to read .node file.
-  if (!read_nodes()) {
-    printf("Fail to read %s.node file.\n", io_infilename);
-    return 0;
-  }
 
   // Try to read a .edge file (if it exists).
   strcpy(filename, io_infilename);
@@ -1712,8 +1680,19 @@ int Triangulation::read_mesh()
     } // snum > 0
     fclose(infile);
   } // Read segments.
+  return 1;
+}
 
-  // Try to read a .ele file (if it exists).
+//==============================================================================
+
+int Triangulation::read_ele()
+{
+  char filename[256];
+  FILE *infile = NULL;
+  char line[1024], *pstr;
+  char delim[] = " ,\t";
+  int i;
+
   strcpy(filename, io_infilename);
   strcat(filename, ".ele");
   infile = fopen(filename, "r");
@@ -1795,8 +1774,19 @@ int Triangulation::read_mesh()
     } // if (trinum > 0)
     fclose(infile);
   } // Read triangles.
+  return 1;
+}
 
-  // Try to read a .region file (if it exists).
+//==============================================================================
+
+int Triangulation::read_region()
+{
+  char filename[256];
+  FILE *infile = NULL;
+  char line[1024], *pstr;
+  char delim[] = " ,\t";
+  int i;
+
   strcpy(filename, io_infilename);
   strcat(filename, ".region");
   infile = fopen(filename, "r");
@@ -1844,6 +1834,56 @@ int Triangulation::read_mesh()
     } // rnum > 0
     fclose(infile);
   } // Read .region file.
+  return 1;
+}
+
+//==============================================================================
+// Read the following files as long as they are provided:
+//   .node, .edge, .ele, .region, .weight, ...
+
+int Triangulation::read_mesh()
+{
+  if (io_point_array) {
+    if (!read_point_array()) {
+      printf("Fail to read %s.txt file.\n", io_infilename);
+      return 0;
+    }
+    return 1;
+  }
+
+  if (io_poly) {
+    if (!read_poly()) {
+      printf("Fail to read %s.poly (or smesh) file.\n", io_infilename);
+      return 0;
+    }
+    //return 1;
+  } else if (io_inria_mesh) {
+    if (!read_inria_mesh()) {
+      if (!read_poly_mesh()) {
+        printf("Fail to read %s.mesh file.\n", io_infilename);
+        return 0;
+      }
+    }
+    //return 1;
+  } else if (io_voronoi) {
+    if (!read_poly_mesh()) { // the same format as .mesh
+      printf("Fail to read %s.voro file.\n", io_infilename);
+      return 0;
+    }
+    //return 1;
+  } else {
+    // Try to read .node file.
+    if (!read_nodes()) {
+      printf("Fail to read %s.node file.\n", io_infilename);
+      return 0;
+    }
+    // Try to read a .edge file.
+    read_edge();
+    // Try to read a .ele file.
+    read_ele();
+    // Try to read a .region file.
+    read_region();
+  }
 
   // Read point weights.
   read_weights();
@@ -1851,6 +1891,9 @@ int Triangulation::read_mesh()
   read_metric();
   // Read triangle areas (.area)
   read_area();
+
+  read_sol();
+  read_grd();
 
   return 1;
 }
@@ -1968,7 +2011,9 @@ void Triangulation::save_nodes(int Steiner_only)
   if (Steiner_only > 0) {
     nv -= ct_in_vrts;
   } else {
-    nv -= ct_unused_vrts;
+    if (!io_keep_unused) { // no -IJ
+      nv -= ct_unused_vrts;
+    }
   }
   printf("Writing %d nodes to file %s.\n", nv, filename);
   fprintf(outfile, "%d 2 0 0\n", nv);
@@ -1976,12 +2021,12 @@ void Triangulation::save_nodes(int Steiner_only)
   idx = io_firstindex;
   if (!(Steiner_only > 0)) {
     for (i = 0; i < ct_in_vrts; i++) {
-      //if (io_no_unused) { // -IJ
+      if (!io_keep_unused) { // no -IJ
         if (in_vrts[i].typ == UNUSEDVERTEX) continue;
-      //}
+      }
       double x = in_vrts[i].crd[0];
       double y = in_vrts[i].crd[1];
-      fprintf(outfile, "%d %g %g\n", idx, x, y);
+      fprintf(outfile, "%d %.17g %.17g\n", idx, x, y);
       in_vrts[i].idx = idx;
       idx++;
     }
@@ -1993,7 +2038,7 @@ void Triangulation::save_nodes(int Steiner_only)
       double x = vrt->crd[0];
       double y = vrt->crd[1];
       //double h = vrt->crd[2];
-      fprintf(outfile, "%d %g %g\n", idx, x, y);
+      fprintf(outfile, "%d %.17g %.17g\n", idx, x, y);
       vrt->idx = idx;
       idx++;
     }
@@ -2015,7 +2060,9 @@ void Triangulation::save_weights(int Steiner_only)
   if (Steiner_only > 0) {
     nv -= ct_in_vrts;
   } else {
-    nv -= ct_unused_vrts;
+    if (!io_keep_unused) { // no -IJ
+      nv -= ct_unused_vrts;
+    }
   }
   printf("Writing %d weights to file %s.\n", nv, wfilename);
   fprintf(woutfile, "%d\n", nv);
@@ -2023,10 +2070,10 @@ void Triangulation::save_weights(int Steiner_only)
   int idx = io_firstindex;
   if (!(Steiner_only > 0)) {
     for (i = 0; i < ct_in_vrts; i++) {
-      //if (io_no_unused) { // -IJ
+      if (!io_keep_unused) { // no -IJ
         if (in_vrts[i].typ == UNUSEDVERTEX) continue;
-      //}
-      fprintf(woutfile, "%d %g\n", idx, in_vrts[i].wei);
+      }
+      fprintf(woutfile, "%d %.17g\n", idx, in_vrts[i].wei);
       idx++;
     }
   }
@@ -2034,10 +2081,76 @@ void Triangulation::save_weights(int Steiner_only)
     for (i = 0; i < tr_steiners->used_items; i++) {
       Vertex *vrt = (Vertex *) tr_steiners->get(i);
       if (vrt->is_deleted()) continue;
-      fprintf(woutfile, "%d %g\n", idx, vrt->wei);
+      fprintf(woutfile, "%d %.17g\n", idx, vrt->wei);
       idx++;
     }
   }
+  fclose(woutfile);
+}
+
+//==============================================================================
+
+// Calculate linear transformation weights (in io.cpp).
+// Wc is the weight of the circumcenetr (Cx, Cy).
+void Triangulation::linear_transform(int Steiner_only, double Cx, double Cy, double Wc)
+{
+  //int Steiner_only = 0; // 1;
+  save_nodes(Steiner_only); // save a .node file.
+
+  char wfilename[256];
+  strcpy(wfilename, io_outfilename);
+  strcat(wfilename, ".weight");
+  FILE *woutfile = fopen(wfilename, "w");
+
+  int nv = ct_in_vrts + (tr_steiners != NULL ? tr_steiners->objects : 0);
+  if (Steiner_only > 0) {
+    nv -= ct_in_vrts;
+  } else {
+    if (!io_keep_unused) { // no -IJ
+      nv -= ct_unused_vrts;
+    }
+  }
+  printf("Writing %d weights to file %s.\n", nv, wfilename);
+  fprintf(woutfile, "%d\n", nv);
+
+  double hc = (Cx * Cx + Cy * Cy) - Wc; // the height
+
+  int i;
+  int idx = io_firstindex;
+  if (!(Steiner_only > 0)) {
+    for (i = 0; i < ct_in_vrts; i++) {
+      if (!io_keep_unused) { // no -IJ
+        if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+      }
+      double x = in_vrts[i].crd[0];
+      double y = in_vrts[i].crd[1];
+      double w = in_vrts[i].wei;
+      //fprintf(outfile, "%d %g %g\n", idx, x, y);
+      double f = 2.* Cx * x + 2. * Cy * y - hc; // function value at (x,y)
+      double h = (x*x + y*y - w) - f; // new height at (x, y)
+      double w1 = x*x + y*y - h; // new weight
+      fprintf(woutfile, "%d %g\n", idx, w1);
+      in_vrts[i].idx = idx;
+      idx++;
+    }
+  }
+  if (tr_steiners != NULL) {
+    for (i = 0; i < tr_steiners->used_items; i++) {
+      Vertex *vrt = (Vertex *) tr_steiners->get(i);
+      if (vrt->is_deleted()) continue;
+      double x = vrt->crd[0];
+      double y = vrt->crd[1];
+      double w = in_vrts[i].wei;
+      double f = 2.* Cx * x + 2. * Cy * y - hc; // function value at (x,y)
+      double h = (x*x + y*y - w) - f; // new height at (x, y)
+      double w1 = x*x + y*y - h; // new weight
+      //fprintf(outfile, "%d %g %g\n", idx, x, y);
+      fprintf(woutfile, "%d %g\n", idx, w1);
+      vrt->idx = idx;
+      idx++;
+    }
+  }
+
   fclose(woutfile);
 }
 
@@ -2055,7 +2168,9 @@ void Triangulation::save_metric(int Steiner_only)
   if (Steiner_only > 0) {
     nv -= ct_in_vrts;
   } else {
-    nv -= ct_unused_vrts;
+    if (!io_keep_unused) { // no -IJ
+      nv -= ct_unused_vrts;
+    }
   }
   int mtrsize = 1;
   if (op_metric == METRIC_Riemannian) {
@@ -2069,9 +2184,9 @@ void Triangulation::save_metric(int Steiner_only)
   int idx = io_firstindex;
   if (!(Steiner_only > 0)) {
     for (i = 0; i < ct_in_vrts; i++) {
-      //if (io_no_unused) { // -IJ
+      if (!io_keep_unused) { // no -IJ
         if (in_vrts[i].typ == UNUSEDVERTEX) continue;
-      //}
+      }
       if (mtrsize == 1) {
         fprintf(woutfile, "%d %g\n", idx, in_vrts[i].val);
       } else if (mtrsize == 3) {
@@ -2213,7 +2328,9 @@ void Triangulation::save_poly(int Steiner_only)
   if (Steiner_only > 0) {
     nv -= ct_in_vrts;
   } else {
-    nv -= ct_unused_vrts;
+    if (!io_keep_unused) { // no -IJ
+      nv -= ct_unused_vrts;
+    }
   }
   int nseg = (tr_segs != NULL ? tr_segs->objects : 0);
   printf("Writing %d vertices, %d segments, %d subdomains to file %s.\n",
@@ -2223,7 +2340,9 @@ void Triangulation::save_poly(int Steiner_only)
   int i, idx=io_firstindex;
   if (!(Steiner_only > 0)) {
     for (i = 0; i < ct_in_vrts; i++) {
-      if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+      if (!io_keep_unused) { // no -IJ
+        if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+      }
       fprintf(outfile, "%d %g %g\n", idx, in_vrts[i].crd[0], in_vrts[i].crd[1]);
       in_vrts[i].idx = idx;
       idx++;
@@ -2278,12 +2397,16 @@ void Triangulation::save_smesh()
   int ntri = (int) tr_tris->objects - ct_hullsize; // - ct_exteriors;
   printf("Writing %d triangles to file %s.\n", ntri, filename);
   int nv = ct_in_vrts + (tr_steiners != NULL ? tr_steiners->objects : 0);
-  //nv -= ct_unused_vrts;
+  if (!io_keep_unused) { // no -IJ
+    nv -= ct_unused_vrts;
+  }
 
   fprintf(outfile, "%d 3 0 0\n", nv);
   int i, idx=io_firstindex;
   for (i = 0; i < ct_in_vrts; i++) {
-    //if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+    if (!io_keep_unused) { // no -IJ
+      if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+    }
     REAL val = in_vrts[i].crd[2]; // default
     if (op_metric == METRIC_Euclidean) {
       val = in_vrts[i].val;
@@ -2339,8 +2462,9 @@ void Triangulation::save_inria_mesh()
   FILE *outfile = fopen(filename, "w");
 
   int nv = ct_in_vrts + (tr_steiners != NULL ? tr_steiners->objects : 0);
-  //if (io_no_unused)
-  nv -= ct_unused_vrts;
+  if (!io_keep_unused) { // no -IJ
+    nv -= ct_unused_vrts;
+  }
   printf("Writing %d nodes to file %s.\n", nv, filename);
 
   fprintf(outfile, "MeshVersionFormatted 1\n");
@@ -2354,9 +2478,9 @@ void Triangulation::save_inria_mesh()
 
   idx = io_firstindex;
   for (i = 0; i < ct_in_vrts; i++) {
-    //if (io_no_unused) { // -IJ
+    if (!io_keep_unused) { // no -IJ
       if (in_vrts[i].typ == UNUSEDVERTEX) continue;
-    //}
+    }
     int tag = 0;
     //if ((in_vrts[i].typ == RIDGEVERTEX) || (in_vrts[i].typ == SEGMENTVERTEX)) {
     if (in_vrts[i].typ == SEGMENTVERTEX) {
@@ -2461,13 +2585,17 @@ void Triangulation::save_to_ucd(int meshidx, int save_val)
   int ntri = (int) tr_tris->objects - ct_hullsize - ct_exteriors;
   printf("Writing %d triangles to file %s.\n", ntri, filename);
   int nv = ct_in_vrts + (tr_steiners != NULL ? tr_steiners->objects : 0);
-  //nv -= ct_unused_vrts;
+  if (!io_keep_unused) { // no -IJ
+    nv -= ct_unused_vrts;
+  }
 
   fprintf(outfile, "%d %d %d 0 0\n", nv, ntri, save_val);
 
   int i, idx=1; // UCD index starts from 1.
   for (i = 0; i < ct_in_vrts; i++) {
-    //if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+    if (!io_keep_unused) { // no -IJ
+      if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+    }
     fprintf(outfile, "%d %g %g 0\n", idx, in_vrts[i].crd[0], in_vrts[i].crd[1]);
     in_vrts[i].idx = idx;
     idx++;
@@ -2535,7 +2663,9 @@ void Triangulation::save_to_ucd(int meshidx, int save_val)
 
     idx=1; // UCD index starts from 1.
     for (i = 0; i < ct_in_vrts; i++) {
-      //if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+      if (!io_keep_unused) { // no -IJ
+        if (in_vrts[i].typ == UNUSEDVERTEX) continue;
+      }
       fprintf(outfile, "%d %g %g %g\n", idx, in_vrts[i].crd[0], in_vrts[i].crd[1], in_vrts[i].crd[2]);
       in_vrts[i].idx = idx;
       idx++;
@@ -2568,4 +2698,43 @@ void Triangulation::save_to_ucd(int meshidx, int save_val)
 
     fclose(outfile);
   }
+}
+
+//==============================================================================
+
+void Triangulation::save_neighbors()
+{
+  int i, idx;
+  char filename[256];
+
+  // Index all triangles (hull triangles all have index -1).
+  idx = io_firstindex;
+  for (i = 0; i < tr_tris->used_items; i++) {
+    Triang* tri = (Triang *) tr_tris->get(i);
+    if (tri->is_deleted()) continue;
+    if (tri->is_hulltri()) {
+      tri->idx = -1;
+    } else {
+      tri->idx = idx;
+      idx++;
+    }
+  }
+
+  strcpy(filename, io_outfilename);
+  strcat(filename, ".neigh");
+  FILE *outfile = fopen(filename, "w");
+  int nt = tr_tris->objects - ct_hullsize; // - ct_exteriors;
+  printf("Writing %d triangle neighbors to file %s.\n", nt, filename);
+  fprintf(outfile, "%d\n", nt);
+  //idx = io_firstindex;
+  for (i = 0; i < tr_tris->used_items; i++) {
+    Triang* tri = (Triang *) tr_tris->get(i);
+    //if (tri->is_deleted() || tri->is_hulltri() || tri->is_exterior()) continue;
+    if (tri->is_deleted() || tri->is_hulltri()) continue;
+    fprintf(outfile, "%d  %d %d %d\n", idx,
+            tri->nei[0].tri->idx, tri->nei[1].tri->idx, tri->nei[2].tri->idx);
+    //tri->idx = idx;
+    //idx++;
+  }
+  fclose(outfile);
 }

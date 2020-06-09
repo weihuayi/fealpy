@@ -8,8 +8,10 @@
 using  namespace detri2;
 
 //==============================================================================
+// Decide the given vertex (an input or a Steiner point) is free to be
+//   rmeoved or not.
 
-bool Triangulation::is_ridge_vertex(Vertex *v)
+bool Triangulation::is_fixed_vertex(Vertex *v)
 {
   // Count how many segments at this vertex (from the link list).
   // Debug: check the correctness of the link list.
@@ -234,7 +236,7 @@ int Triangulation::remove_segment(Triang* seg)
     }
     
     if (v->is_fixed()) {
-      if (!is_ridge_vertex(v)) {
+      if (!is_fixed_vertex(v)) {
         v->clear_fix();
       }
     }
@@ -287,7 +289,7 @@ int Triangulation::insert_segment(TriEdge E, int stag, REAL val, Triang** pseg)
     // If the vertex is not fixed, it might become fixed (e.g., insert_segment case).
     //if (!seg->vrt[j]->is_fixed()) {
       // Check if it becomes a ridge vertex (un-removable).
-      if (is_ridge_vertex(seg->vrt[j])) {
+      if (is_fixed_vertex(seg->vrt[j])) {
         seg->vrt[j]->set_fix();
       } else {
         seg->vrt[j]->clear_fix();
@@ -533,69 +535,114 @@ int Triangulation::detect_intersection(Vertex *e1, Vertex *e2, TriEdge &S)
 
 int Triangulation::recover_edge(Vertex *e1, Vertex *e2, TriEdge &E, arraypool* fqueue)
 {
-  E = e1->adj;
-  int loc = find_direction(E, e2);
+  bool bflip_random = false;
+  int  randidx = 0;
+  int  flipcount = 0; // count the number of flips.
 
-  if (loc == 1) {
-    // [e1,e2] intersects the edge [E.org(),E.dest()].
-    if (E.is_segment()) {
-      return INTERSECT_SEGMENT;
-    }
-  } else if (loc == 2) {
-    // [e1,e2] is collinear with the vertex E.dest().
-    if (E.dest() == e2) {
-      return INTERSECT_SHARE_EDGE; // Found the edge.
-    } else {
-      E = E.enext();
-      return INTERSECT_VERTEX;
-    }
-  } else {
-    assert(0); // not possible.
-  }
-
-  // [e1,e2] intersects the edge [E.org(),E.dest()].
-  // Try to flip it.
   while (true) {
-    // Check if the edge [E.org(),E.dest()] admits a 2-2 flip.
-    Vertex *pc = E.apex();
-    Vertex *pd = (E.esym()).apex();
-    REAL s1 = Orient2d(pc, pd, E.dest());
-    REAL s2 = Orient2d(pd, pc, E.org());
-    if ((s1 > 0) && (s2 > 0)) {
-      break; // Found a 2-2 flip on edge [E.org(),E.dest()].
-    }
-    // Search a flippable crossing edge by line walk towards e2.
-    E = E.esym();
-    assert(!E.tri->is_hulltri());
-    printf("  E [%d, %d %d]\n", E.org()->idx, E.dest()->idx, E.apex()->idx);
-    // E is [v1, v2, v3], where [v1, v2] intersects [e1, e2].
-    // Check [e1, e2] intersects which edge [v2,v3] or [v3,v1].
-    // Since we already know that [e1,e2] intersects [v1,v2],
-    // we only need to test: v3 lies on which side of [e1, e2].
-    REAL ss = Orient2d(e1, e2, E.apex());
-    printf("  ss[e1(%d), e2(%d) %d] = %g\n", e1->idx, e2->idx, E.apex()->idx, ss);
-    if (ss > 0) {
-      E = E.enext(); // [v2,v3]
-    } else if (ss < 0) {
-      E = E.eprev(); // [v3,v1]
-    } else { // ss == 0
-      assert(E.apex() != e2);
-      E = E.eprev(); // v3 is collinear with [e1,e2].
-      return INTERSECT_VERTEX;
-    }
-    if (E.is_segment()) {
-      return INTERSECT_SEGMENT; // cross a segment.
-    }
-  }
+    int count = 0; // count the number of flippable crossing edges.
 
-  // Flip the crossing edge.
-  TriEdge tt[4];
-  tt[0] = E;
-  int fflag = FLIP_22;
-  flip(tt, NULL, fflag, fqueue);
+    E = e1->adj;
+    int loc = find_direction(E, e2);
 
-  // Continue to recover the edge (switch e1<->e2).
-  return recover_edge(e2, e1, E, fqueue);
+    if (loc == 1) {
+      // [e1,e2] intersects the edge [E.org(),E.dest()].
+      if (E.is_segment()) {
+        return INTERSECT_SEGMENT;
+      }
+    } else if (loc == 2) {
+      // [e1,e2] is collinear with the vertex E.dest().
+      if (E.dest() == e2) {
+        return INTERSECT_SHARE_EDGE; // Found the edge.
+      } else {
+        E = E.enext();
+        return INTERSECT_VERTEX;
+      }
+    } else {
+      assert(0); // not possible.
+    }
+
+    // [e1,e2] intersects the edge [E.org(),E.dest()].
+    // Search a flippable crossing edge such that the new edge is not a crossing edge.
+    bool bflip = false;
+    while (true) {
+      // Check if the edge [E.org(),E.dest()] admits a 2-2 flip.
+      Vertex *pc = E.apex();
+      Vertex *pd = (E.esym()).apex();
+      REAL s1 = Orient2d(pc, pd, E.dest());
+      REAL s2 = Orient2d(pd, pc, E.org());
+      if ((s1 > 0) && (s2 > 0)) {
+        // Found a 2-2 flip on edge [E.org(),E.dest()].
+        if (bflip_random && (count == randidx)) {
+          bflip = true; break; // do flip
+        }
+        count++;
+        // Check if the new edge is also a crossing edge.
+        // pc, pd might be e1, e2.
+        REAL s3 = Orient2d(pc, pd, e1);
+        REAL s4 = Orient2d(pc, pd, e2);
+        if (s3 > 0) {
+          if (s4 >= 0) {
+            bflip = true; break; // do flip
+          }
+        } else if (s3 < 0) {
+          if (s4 <= 0) {
+            bflip = true; break; // do flip
+          }
+        } else { // s3 == 0
+          bflip = true; break; // do flip.
+        }
+      }
+      // Search a flippable crossing edge by line walk towards e2.
+      E = E.esym();
+      assert(!E.tri->is_hulltri());
+      if (E.apex() == e2) {
+        break; // Failed to find a flippable edge.
+      }
+      printf("  E [%d, %d %d]\n", E.org()->idx, E.dest()->idx, E.apex()->idx);
+      // E is [v1, v2, v3], where [v1, v2] intersects [e1, e2].
+      // Check [e1, e2] intersects which edge [v2,v3] or [v3,v1].
+      // Since we already know that [e1,e2] intersects [v1,v2],
+      // we only need to test: v3 lies on which side of [e1, e2].
+      REAL ss = Orient2d(e1, e2, E.apex());
+      printf("  ss[e1(%d), e2(%d) %d] = %g\n", e1->idx, e2->idx, E.apex()->idx, ss);
+      if (ss > 0) {
+        E = E.enext(); // [v2,v3]
+      } else if (ss < 0) {
+        E = E.eprev(); // [v3,v1]
+      } else { // ss == 0
+        assert(E.apex() != e2);
+        E = E.eprev(); // v3 is collinear with [e1,e2].
+        return INTERSECT_VERTEX;
+      }
+      if (E.is_segment()) {
+        return INTERSECT_SEGMENT; // cross a segment.
+      }
+    }
+
+    // Flip a flippable crossing edge.
+    if (bflip) {
+      TriEdge tt[4];
+      tt[0] = E;
+      int fflag = FLIP_22;
+      flip(tt, NULL, fflag, fqueue);
+      flipcount++;
+      // Disable random flip option.
+      bflip_random = false;
+      randidx = 0;
+      // Continue to recover the edge (switch e1<->e2).
+      //continue; // return recover_edge(e2, e1, E, fqueue);
+    } else {
+      // No crossing edge can be flipped (without creating a crossing edge).
+      // Randomly select one to flip.
+      assert(count > 0);
+      randidx = rand() % count;
+      bflip_random = true;
+    }
+  } // while (true)
+
+  assert(0); // not possible.
+  return INTERSECT_SHARE_EDGE;
 }
 
 //==============================================================================
@@ -798,7 +845,7 @@ int Triangulation::recover_segments()
           seg->vrt[j]->on_bd = TriEdge(seg, j);
           seg->vrt[j]->on_bd.tri->nei[j] = pseg;
           // Check if it becomes a ridge vertex (un-removable).
-          if (is_ridge_vertex(seg->vrt[j])) {
+          if (is_fixed_vertex(seg->vrt[j])) {
             seg->vrt[j]->set_fix();
           } else {
             seg->vrt[j]->clear_fix();
@@ -858,7 +905,7 @@ int Triangulation::set_ridgevertices()
     Vertex *v = &(in_vrts[i]);
     if (v->typ == UNUSEDVERTEX) continue;
     //if (!v->is_fixed()) {
-      if (is_ridge_vertex(v)) {
+      if (is_fixed_vertex(v)) {
         v->set_fix();
         rcount++;
       }
@@ -921,7 +968,7 @@ int Triangulation::set_ridgevertices()
       Vertex *v = (Vertex *) tr_steiners->get(i);
       if (v->is_deleted()) continue;
       //if (!v->is_fixed()) {
-        if (is_ridge_vertex(v)) {
+        if (is_fixed_vertex(v)) {
           v->set_fix();
           rcount++;
         }

@@ -49,6 +49,7 @@ namespace detri2 {
 #define INTERSECT_SEGMENT        4   // intersecting another segment
 
 // Type of metrics
+#define METRIC_Euclidean_no_weight     0
 #define METRIC_Euclidean    1
 #define METRIC_Riemannian   2
 #define METRIC_HDE          3
@@ -123,13 +124,13 @@ class VertexData;
 class Vertex
 {
  public:
-  REAL       crd[3], wei; // x, y, height, weight (height = x^2+y^2 - w).  
+  REAL       crd[3], wei; // x, y, height, weight (height = x^2+y^2 - wei).
   REAL       val;    // mesh size (or density)
   REAL       fval;   // function value (or nodal FEM solution)
   REAL       grd[2]; // gradient of a function (not normalised)
-  REAL       mtr[3]; // metric tensor (a11,a21,a22), or function values (f,fx,fy)
-  int        idx;    // Its index (0 or 1-based).
-  int        tag;    // Boundary marker.
+  REAL       mtr[3]; // metric tensor (a11,a21,a22)
+  int        idx;    // vertex index (0 or 1-based).
+  int        tag;    // Boundary tag.
   char       typ;    // Vertex type.
   char       flags;  // flags of infected, etc.
   TriEdge    adj;    // Adjacent (or dual) triangle.
@@ -159,6 +160,11 @@ class Vertex
   bool is_fixed() {return flags & 2;} // bit 1 (1 bit)
   void set_fix() {flags |= 2;}
   void clear_fix() {flags &= _clear_bit_masks[1];}
+
+  // for mesh refinement.
+  bool is_acute() {return flags & 4;} // bit 1 (1 bit)
+  void set_acute() {flags |= 4;}
+  void clear_acute() {flags &= _clear_bit_masks[2];}
 
   bool is_deleted() {return typ == DEADVERTEX;}
   void set_deleted() {typ = DEADVERTEX;}
@@ -218,6 +224,10 @@ class Triang
   void print(int deatil = 0); // debug
 };
 
+// A Segment is just a degenerated Triang (vrt[2] == NULL)
+
+typedef Triang Segment;
+
 //==============================================================================
 // Resizeable arrays
 
@@ -267,20 +277,23 @@ REAL Orient4d(Vertex *pa, Vertex *pb, Vertex *pc, Vertex *pd, Vertex *pe);
 //extern int metric_use_gmp; // an option set by op_use_gmp (must initialise it)
 
 REAL get_MatVVP2x2(double a11, double a21, double a22,
-                   double *lambda1, double *lambda2, double vec1[2], double vec2[2]);
+                   double *lambda1, double *lambda2,
+                   double vec1[2], double vec2[2]);
 REAL get_rotation_angle(double vec1[2]);
 
 int  line_line_intersection(double X0, double Y0, double X1, double Y1,
                             double X2, double Y2, double X3, double Y3,
                             double *t1, double *t2);
+
 int  get_orthocenter(REAL, REAL, REAL,     // Ux, Uy, U_weight
                      REAL, REAL, REAL,     // Vx, Vy, V_weight
                      REAL, REAL, REAL,     // Wx, Wy, W_weight
-                     REAL*, REAL*, REAL*,  // Cx, Cy, radius^2
+                     REAL*, REAL*, REAL*,  // Cx, Cy, C_weight (= radius^2)
                      double a11, double a21, double a22);
+
 int  get_bissector(REAL, REAL, REAL,       // Ux, Uy, U_weight
                    REAL, REAL, REAL,       // Vx, Vy, V_weight
-                   REAL*, REAL*, REAL*,    // Cx, Cy, radius^2
+                   REAL*, REAL*, REAL*,    // Cx, Cy, C_weight (= radius^2)
                    double a11, double a21, double a22);
 
 //==============================================================================
@@ -325,12 +338,13 @@ class Triangulation
   int  io_firstindex;  // 0, -I0 or -I1
   int  io_poly;        // read .poly or .smesh
   int  io_inria_mesh;
-  int  io_with_metric, io_with_sol, io_with_grd;
   int  io_voronoi;
   int  io_point_array;
-  int  io_no_unused;     // 0, -IJ do not output unused vertices
+  int  io_with_metric, io_with_sol, io_with_grd, io_with_wei;
+  int  io_keep_unused;   // 0, -IJ output unused input vertices
   int  io_outedges;      // 0, -Ie output all edges of the mesh
   int  io_out_voronoi;   // 0, -Iv output the power diagram
+  int  io_out_ucd;       // 0, -Iu save a .inp file for Paraview
   int  io_dump_to_ucd;   // 0, -Id save intermediate meshes
   int  io_dump_lift_map; // 0, -Il save the lifting map
   char io_commandline[1024];
@@ -341,7 +355,7 @@ class Triangulation
   REAL io_metric_min, io_metric_max;
   REAL io_diagonal, io_diagonal2;
   REAL io_tol_rel_gap;  // -T#, relative tolerance (io_diagonal) for distinct vertices (1e-3).
-  REAL io_tol_minangle; // -T,# minimum collinear angle (default < 0.1 degree)
+  REAL io_tol_minangle; // -T,# minimum collinear angle (default < 0.01 degree)
 
   // Algorithm options and parameters (op_).
   int  op_dt_nearest; // -u, 1 or -1 (farthest dt)
@@ -357,12 +371,13 @@ class Triangulation
 
   // Mesh adaptation options/parameters.
   int  op_metric; // 1 (Euclidean), 2 (Riemannian constant), 3 (HDE)
-  int  op_round_flip; // default = 0, needed by aniso and HDE mesh adaptation 
+  int  op_round_flip; // default = 0, needed by aniso and HDE mesh adaptation
+  int  op_max_iter; // 3
   int  op_use_coarsening; // default = 1
   int  op_use_splitting;  // default = 1
   int  op_use_smoothing;  // default = 0
-  int  op_max_iter; // 3
   int  op_smooth_criterion; // 1 (Laplacian)
+  int  op_smooth_iter;  // 3
   int  op_ada_use_intpoints; // default = 2
   int  op_save_inter_meshes;
   REAL op_minlen; // -L#
@@ -424,7 +439,10 @@ class Triangulation
 
   // Input / Output (io.cpp)
   int  parse_commands(int argc, char* argv[]);
-  int  read_nodes();
+  int  read_nodes();  
+  int  read_edge();
+  int  read_ele();
+  int  read_region();
   int  read_weights();
   int  read_metric();
   int  read_sol();
@@ -439,13 +457,14 @@ class Triangulation
   void save_nodes(int Steiner_only);
   void save_weights(int Steiner_only);
   void save_metric(int Steiner_only);
+  void save_poly(int Steiner_only);
   void save_triangulation();
   void save_edges();
-  void save_poly(int Steiner_only);
   void save_smesh();
   void save_inria_mesh();
   void save_to_ucd(int meshidx, int save_val);
-  void save_voronoi();
+  void save_voronoi(int ucd = 0);
+  void save_neighbors();
 
   // Metrics (metric.cpp)  
   REAL get_innerproduct(Vertex *v1, Vertex *v2);
@@ -469,7 +488,6 @@ class Triangulation
 
   // (Weighted) Delaunay triangulation (delaunay.cpp)
   int  locate_point(Vertex *pt, TriEdge &E, int encflag);
-  bool insert_point(Vertex *pt, TriEdge &E, int& loc, bool bwflag);
   bool regular_test(Vertex* pa, Vertex* pb, Vertex* pc, Vertex* pd);
   int  lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue);
   int  sort_vertices(Vertex* vrtarray, int, Vertex**& permutarray);
@@ -477,7 +495,7 @@ class Triangulation
   int  incremental_delaunay();
 
   // Constrained Delaunay triangulation (constrained.cpp)
-  bool is_ridge_vertex(Vertex *pt);
+  bool is_fixed_vertex(Vertex *pt);
   int  get_edge(Vertex *e1, Vertex *e2, TriEdge& E);
   int  remove_segment(Triang* seg);
   int  insert_segment(TriEdge E, int stag, REAL val, Triang** pseg);
@@ -491,6 +509,7 @@ class Triangulation
   int  reconstruct_mesh(int);
 
   // Power Voronoi diagram (voronoi.cpp)
+  int  search_point(Vertex *pt, TriEdge &E, int encflag);
   int  get_boundary_cut_dualedge(Vertex& In_pt, Vertex& Out_pt, TriEdge& S);
   int  get_hulltri_orthocenter(Triang* hulltri);
   int  get_tri_orthocenter(Triang* tri);
@@ -498,10 +517,12 @@ class Triangulation
   int  get_mass_center(Vertex* ptlist, int ptnum, REAL mc[2]);
 
   // Delaunay refinement (adding Steiner points) (refine.cpp)
+  bool is_acute_vertex(TriEdge& S);
+  void mark_acute_vertices();
   int  check_segment(Vertex *pt, TriEdge &S, arraypool *encsegs);
-  int  split_enc_segment(TriEdge &S, Vertex *encpt, arraypool*, arraypool*, arraypool*);
+  int  split_enc_segment(TriEdge &S, Vertex *encpt, bool mtrflag, arraypool*, arraypool*, arraypool*);
   int  repair_encsegments(arraypool *encsegs, arraypool *enctris);
-  void enq_triangle(Triang* tri, arraypool* enctris);
+  void enq_triangle(Triang* tri, bool mtrflag, arraypool* enctris);
   void enq_vertex_star(Vertex *pt, arraypool* enctris);
   int  check_triangle(Triang *tri, arraypool* enctris);
   int  get_triangle(Vertex *e1, Vertex *e2, Vertex *e3, TriEdge& E);
@@ -517,7 +538,7 @@ class Triangulation
 
   // Mesh adaptation (adapt.cpp)
   int  locate_hull_edge(Vertex *v, TriEdge &E); // for vertex interpolation.
-  int  set_vertex_metric(Vertex *v, TriEdge &E); // interpolate vertex values.
+  int  set_vertex_metric(Vertex *v, TriEdge &E, int &iloc); // interpolate vertex values.
   int  set_vertex_metrics();
   REAL get_vertex_min_edge_length(Vertex *pt); 
   int  remove_point(Vertex *pt, arraypool* fqueue);
@@ -536,6 +557,17 @@ class Triangulation
   TriEdge db_seg(int v1, int v2);
   TriEdge db_tri(int v1, int v2, int v3);
   void dump_vertex_star(int v);
+
+  // Calculate linear transformation weights (in io.cpp).
+  void linear_transform(int Steiner_only, double Cx, double Cy, double Wc);
+
+  // flip recover (weighted) Delaunay (adapt.cpp).
+  int  check_delaunay(); // debug
+  void dump_missing_pt_triangles(Vertex *pt, arraypool *tris); // debug
+  void save_uninserted_points(arraypool*); // output only
+  int  insert_missing_weighted_point_old(Vertex *pt);
+  bool insert_missing_weighted_point(Vertex *pt);
+  void flip_recover_delaunay();
 };
 
 } // namespace detri2

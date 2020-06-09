@@ -201,75 +201,47 @@ int Triangulation::locate_point(Vertex *pt, TriEdge &E, int encflag)
 }
 
 //==============================================================================
-// Insert a vertex using Bowyer-Watson algorithm
-// if `bwflag' is true, use Bowyer-Watson algorithm to enlarge cavity.
-
-bool Triangulation::insert_point(Vertex *pt, TriEdge &E, int& loc, bool bwflag)
-{
-  if (loc == LOC_UNKNOWN) {
-    loc = locate_point(pt, E, 0);
-  }
-
-  return true;
-}
-
-//==============================================================================
 // Given two triangles [a,b,c] and [b,a,d], check if the edge [a,b]
 //   is locally regular, i.e., locally Delaunay in Euclidean metric.
 // Return true if it is non-regular, otherwise, return false which means that
 //   it is regular or degenerate (co-hyperplane).
 
-#define _set_height(pa) \
+#define _set_height_Euclidean_no_weight(pa) \
+    x = (pa)->crd[0]; \
+    y = (pa)->crd[1]; \
+    (pa)->crd[2] = x*x + y*y\
+
+#define _set_height_Euclidean(pa) \
     x = (pa)->crd[0]; \
     y = (pa)->crd[1]; \
     (pa)->crd[2] = _a11*x*x + 2.*_a21*x*y + _a22*y*y - (pa)->wei\
 
 bool Triangulation::regular_test(Vertex* pa, Vertex* pb, Vertex* pc, Vertex* pd)
 {
-  if (op_metric <= METRIC_Euclidean) {
-    //printf("  O3d: (%d, %d, %d, %d)\n", tt[0].org()->idx, tt[0].dest()->idx, tt[0].apex()->idx, tt[1].apex()->idx);
-    //return (Orient3d(pa, pb, pc, pd) * op_dt_nearest) > 0;
-    // bakup heights
-    double ha = pa->crd[2];
-    double hb = pb->crd[2];
-    double hc = pc->crd[2];
-    double hd = pd->crd[2];
-    // calculate heights
-    double x, y;
-    _set_height(pa);
-    _set_height(pb);
-    _set_height(pc);
-    _set_height(pd);
+  // calculate heights
+  double x, y;
+  if (op_metric == METRIC_Euclidean_no_weight) {
+    // Used by Detri2 GUI _geom vertex sets
+    _set_height_Euclidean_no_weight(pa);
+    _set_height_Euclidean_no_weight(pb);
+    _set_height_Euclidean_no_weight(pc);
+    _set_height_Euclidean_no_weight(pd);
     double s = (Orient3d(pa, pb, pc, pd) * op_dt_nearest);
-    // Retstor heights
-    pa->crd[2] = ha;
-    pb->crd[2] = hb;
-    pc->crd[2] = hc;
-    pd->crd[2] = hd;
+    return s > 0;
+  } else if (op_metric == METRIC_Euclidean) {
+    _set_height_Euclidean(pa);
+    _set_height_Euclidean(pb);
+    _set_height_Euclidean(pc);
+    _set_height_Euclidean(pd);
+    double s = (Orient3d(pa, pb, pc, pd) * op_dt_nearest);
     return s > 0;
   } else if (op_metric == METRIC_Riemannian) {
-    // bakup heights
-    double ha = pa->crd[2];
-    double hb = pb->crd[2];
-    double hc = pc->crd[2];
-    double hd = pd->crd[2];
-    // calculate heights
-    double x, y;
-    _set_height(pa);
-    _set_height(pb);
-    _set_height(pc);
-    _set_height(pd);
-    double s = (Orient3d(pa, pb, pc, pd) * op_dt_nearest);
-    // Retstor heights
-    pa->crd[2] = ha;
-    pb->crd[2] = hb;
-    pc->crd[2] = hc;
-    pd->crd[2] = hd;
-    return s > 0;
+    assert(0); // not supported yet.
   } else {
     assert(0); // not supported yet.
   }
-
+  
+  /*
   REAL l_ab = get_distance(pa, pb);
   REAL l_cd = get_distance(pc, pd);
   REAL l_bc = get_distance(pb, pc);
@@ -308,6 +280,7 @@ bool Triangulation::regular_test(Vertex* pa, Vertex* pb, Vertex* pc, Vertex* pd)
   } else {
     return false; // 0.0; // is regular
   }
+  */
 }
 
 //==============================================================================
@@ -320,6 +293,7 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
   bool ori;
   int ishullflip;
   int fcount = 0;
+  int removed_vertex_count = 0;
 
   if (fqueue == NULL) {
     tmpfqueue = new arraypool(sizeof(TriEdge), 10);
@@ -343,14 +317,20 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
         if (E.tri->is_deleted()) continue;
         if (!E.tri->is_hulltri()) {
           for (E.ver = 0; E.ver < 3; E.ver++) {
-            if (!E.esym().tri->is_infected()) {
+            //if (!E.esym().tri->is_infected()) {
+            //  E.set_edge_infect();
+            //  * (TriEdge *) fqueue->alloc() = E;
+            //}
+            N = E.esym(); // N.tri might be a hulltri, N.apex()->idx = -1
+            if (E.apex()->idx > N.apex()->idx) {
               E.set_edge_infect();
               * (TriEdge *) fqueue->alloc() = E;
             }
           }
-          E.tri->set_infect();
+          //E.tri->set_infect();
         }
       }
+      /*
       // Uninfect all triangles.
       for (int i = 0; i < tr_tris->used_items; i++) {
         E.tri = (Triang *) tr_tris->get(i);
@@ -359,6 +339,7 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
           E.tri->clear_infect();
         }
       }
+      */
     }
   }
 
@@ -371,9 +352,9 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
     if (pte->tri->is_deleted()) continue;
     if (!pte->is_edge_infected()) continue; // is it still in queue?
     pte->clear_edge_infect();
-    if (pt != NULL) {
-      if (pte->apex() != pt) continue;
-    }
+    //if (pt != NULL) {
+    //  if (pte->apex() != pt) continue;
+    //}
     // Check if this edge is locally regular.
     ori = false; ishullflip = 0;
     tt[0] = *pte;
@@ -418,7 +399,11 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
         continue; // Ignore this flip.
       }
       int fflag = FLIP_UNKNOWN;
+      delpt = NULL;
       if (flip(tt, &delpt, fflag, fqueue)) {
+        if (delpt != NULL) {
+          removed_vertex_count++;
+        }
         fcount++;
       }
     }
@@ -426,6 +411,9 @@ int Triangulation::lawson_flip(Vertex *pt, int hullflag, arraypool *fqueue)
 
   if (op_db_verbose > 2) {
     printf("    Flipped %d edges.\n", fcount);
+    if (removed_vertex_count > 0) {
+      printf("    Removed %d vertices.\n", removed_vertex_count);
+    }
   }
   
   if (tmpfqueue != NULL) {
@@ -550,6 +538,12 @@ int Triangulation::incremental_delaunay()
     printf("Incremental Delaunay construction...\n");
   }
 
+  if (io_with_wei) { // .weight
+    op_metric = METRIC_Euclidean;
+  } else {
+    op_metric = METRIC_Euclidean_no_weight;
+  }
+
   Vertex** vrtarray = NULL;
   int arysize = ct_in_vrts;
 
@@ -571,12 +565,12 @@ int Triangulation::incremental_delaunay()
     loc = locate_point(vrtarray[i], E, 0); // encflag = 0
     if (loc != LOC_ON_VERT) { // ON_VERTEX
       REAL ori = 1.0;
-      if (loc == LOC_IN_TRI) { //if ((loc == 1) && !E.tri->is_hulltri()) {
-        // Make sure this vertex is regular w.r.t. E.
-        // An interior edge.
-        ori = Orient3d(E.org(), E.dest(), E.apex(), vrtarray[i])
-            * op_dt_nearest;
-      }
+      //if (loc == LOC_IN_TRI) { //if ((loc == 1) && !E.tri->is_hulltri()) {
+      //  // Make sure this vertex is regular w.r.t. E.
+      //  // An interior edge.
+      //  ori = Orient3d(E.org(), E.dest(), E.apex(), vrtarray[i])
+      //      * op_dt_nearest;
+      //}
       if (ori > 0) {
         // Insert vertex
         tt[0] = E;

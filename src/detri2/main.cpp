@@ -12,6 +12,104 @@ using  namespace detri2;
 #ifndef TRILIBRARY
 
 //==============================================================================
+int read_delta_weights(const char* io_infilename, double **weights)
+{
+  char filename[256];
+  FILE *infile = NULL;
+  char line[1024], *pstr;
+  char delim[] = " ,\t";
+  int i;
+
+  // Try to read a .weight file (if it exists).
+  strcpy(filename, io_infilename);
+  //strcat(filename, ".weight");
+  infile = fopen(filename, "r");
+  if (infile != NULL) {
+    // Read the number of segments.
+    int wnum = 0;
+    while (fgets(line, 1024, infile)) {
+      //printf("%s", line);
+      pstr = strtok(line, delim);
+      if ((pstr != NULL) && (pstr[0] != '\r') && (pstr[0] != '\n') &&
+          (pstr[0] != '#')) break;
+    }
+    if (pstr != NULL) {
+      wnum = atoi(pstr);
+    }
+    //if (wnum == ct_in_vrts) {
+      (*weights) = new double[wnum];
+      // The number of points and weights must be equal.
+      printf("Reading point weights from file %s\n", filename);
+      for (i = 0; i < wnum; i++) {
+        while (fgets(line, 1024, infile)) {
+          //printf("%s", line);
+          pstr = strtok(line, delim);
+          if ((pstr != NULL) && (pstr[0] != '\r') && (pstr[0] != '\n') &&
+              (pstr[0] != '#')) break;
+        }
+        //if (feof(infile)) break;
+        //seg->idx = atoi(pstr); // i
+        pstr = strtok(NULL, delim);
+        REAL w = atof(pstr);        
+        (*weights)[i] = w;
+      }
+    
+    fclose(infile);
+    return 1;
+  } // Read point weights
+  else {
+    return 0;
+  }
+}
+
+int recover_weighted_Delaunay(int argc, char* argv[])
+{
+  Triangulation *Tr = new Triangulation();
+
+  Tr->parse_commands(argc, argv);
+
+  // Read a (weighted) Delaunay triangulation.
+  if (!Tr->read_mesh()) {
+    printf("Failed to read input file %s.\n", Tr->io_infilename);
+    delete Tr;
+    return 0;
+  }
+
+  // Reconstruct the mesh (do not check_delaunay and flip).
+  Tr->reconstruct_mesh(0);
+
+  Tr->io_keep_unused = 1; // Save all points (include unused vertices).
+  // for challenging_data_set
+  //Tr->io_noindices = 1;
+  //Tr->io_firstindex = 1;
+
+  // Read the updated weights from file delta.weight
+  double *dweights = NULL;
+  if (!read_delta_weights("delta.weight", &dweights)) {
+    printf("Failed to read delta weights from file delta.weight.\n");
+    return 0;
+  }
+
+  // Update weights.
+  int i;
+  for (i = 0; i < Tr->ct_in_vrts; i++) {
+    Vertex *v = &(Tr->in_vrts[i]);
+    v->wei += dweights[i];
+  }
+  delete [] dweights;
+
+  // Reacover weighted Delaunay.
+  Tr->flip_recover_delaunay();
+
+  // Output the updated weighted Delaunay triangulation.
+  Tr->save_triangulation();
+  Tr->save_weights(0);
+
+  delete Tr;
+  return 1;
+}
+
+//==============================================================================
 
 int merge_two_triangulations(int argc, char* argv[])
 {
@@ -996,12 +1094,11 @@ int generate_mesh(int argc, char* argv[])
       return 0;
     }
   } else {
-    Tr->reconstruct_mesh(1);
+    Tr->reconstruct_mesh(0);
   }
 
   // Mesh refinement and adaptation.
-  //if (Tr->tr_segs != NULL) {
-  if (Tr->op_quality || (Tr->op_metric > 0)) {
+  if (Tr->op_quality) { // -q
     if (Tr->io_omtfilename[0] != '\0') {
       // A background mesh is supplied.
       Tr->OMT_domain = new Triangulation();
@@ -1011,28 +1108,50 @@ int generate_mesh(int argc, char* argv[])
       myargv[1] = Tr->io_omtfilename;
       Tr->OMT_domain->parse_commands(myargc, myargv);
       Tr->OMT_domain->read_mesh();
-      Tr->OMT_domain->reconstruct_mesh(0);
-      Tr->op_metric = METRIC_Euclidean;
+      // Check if this background mesh contains metrics
+      if (Tr->OMT_domain->io_with_metric) {
+        Tr->OMT_domain->reconstruct_mesh(0);
+        Tr->set_vertex_metrics();
+      } else {
+        printf("Warning: Background mesh contains no metric, ignored.\n");
+        delete Tr->OMT_domain;
+        Tr->OMT_domain = NULL;
+      }
     } else {
       assert(Tr->OMT_domain == NULL);
     }
   
-    if (Tr->op_metric) {
-      Tr->set_vertex_metrics();
+    Tr->op_metric = METRIC_Euclidean_no_weight;
+    
+    if ((Tr->io_with_metric) ||
+        (Tr->OMT_domain != NULL) ||     // -m filename
+        (Tr->op_target_length > 0.)) {  // -ML=#
       Tr->coarsen_mesh();
     }
   
     Tr->delaunay_refinement();
+    
+    if (Tr->op_use_smoothing) { // -qS1 (Laplacian) -qS2 ()CVT
+      for (int i = 0; i < Tr->op_smooth_iter; i++) { // -qI#
+        Tr->smooth_vertices();
+      }
+    }
   }
 
   // Mesh export (to files).
   if (Tr->tr_tris != NULL) {
-    if (Tr->ct_exteriors > 0) { 
+    if ((Tr->ct_exteriors > 0) && !Tr->op_convex) { // no -c
       Tr->remove_exteriors();
     }
     Tr->save_triangulation();
     if (Tr->io_outedges) {
       Tr->save_edges();
+    }
+    if (Tr->io_out_ucd) { // -Iu
+      Tr->save_to_ucd(0, 0);
+    }
+    if (Tr->io_out_voronoi) { // -Iv
+      Tr->save_voronoi(Tr->io_out_ucd);
     }
   }
 
@@ -1406,7 +1525,7 @@ int save_solution_to_paraview(int argc, char *argv[])
     return 0;
   }
 
-  if (Tr->io_with_solution == 0) {
+  if (Tr->io_with_sol == 0) {
     printf("Failed to read solution with the mesh %s.\n", argv[1]);
     delete Tr;
     return 0;
@@ -1702,14 +1821,15 @@ int anisotropic_CVT(int argc, char* argv[])
 
 int main(int argc, char* argv[])
 {
+  //return recover_weighted_Delaunay(argc, argv);
+
   //anisotropic_CVT(argc, argv);
-  //generate_mesh(argc, argv);
+  return generate_mesh(argc, argv);
   //save_inp_to_smesh(argc, argv);
   //merge_two_triangulations(argc, argv);
   
-  int status = adapt_mesh(argc, argv);
+  //int status = adapt_mesh(argc, argv);
   //int status = interpolate_solutions(argc, argv);
   //int status = save_solution_to_paraview(argc, argv);
-  
-  return status;
+  //return status;
 }

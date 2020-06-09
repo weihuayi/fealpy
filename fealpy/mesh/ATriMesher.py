@@ -11,7 +11,20 @@ class ATriMesher:
         domain : HalEdgeDomain
         """
         self.domain = domain
-        self.mesh = domain.to_halfedgemesh()
+
+
+        self.maxNN = 100000  
+        self.maxNE = 100000
+        self.maxNC = 100000
+        self.GD = 2
+        self.node = np.zeros((self.maxNN, self.GD), dtype=np.float)
+        self.halfedge = np.zeros((2*self.maxNE, ), dtype=np.int)
+
+        self.node = domain.vertices.copy()
+        self.halfedge = domain.halfedge.copy()
+        self.subdomain, _, j = np.unique(halfedge[:, 1],
+            return_index=True, return_inverse=True)
+        self.halfedge[:, 1] = j
 
     def uniform_boundary_meshing(self, refine=4, maxh=0.1):
         self.domain.boundary_uniform_refine(n=refine)

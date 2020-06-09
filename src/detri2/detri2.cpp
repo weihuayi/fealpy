@@ -156,6 +156,7 @@ void Vertex::print()
   printf("Vertex %d: typ(%s)", idx, vertextypename[(int) typ]);
   if (is_infected()) printf(" (infected)");
   if (is_fixed()) printf(" (fixed)");
+  if (is_acute()) printf(" (acute)");
   if (is_deleted()) printf(" (deleted)");
   printf("\n");
   printf("  (%g,%g) h(%g) w(%g)\n", crd[0], crd[1], crd[2],
@@ -929,7 +930,7 @@ void Triangulation::reset_options()
   op_dt_nearest = 1; // comput nearest DT
   op_no_incremental_flip = 0;
   op_no_gabriel = 0;
-  op_no_bisect = 0;
+  op_no_bisect = 0; // -Y
   op_poly = 0;
   op_convex = 0;
   op_quality = 0;
@@ -944,13 +945,14 @@ void Triangulation::reset_options()
   _a21 = 0.0;
   _a22 = 1.0;
 
-  op_metric = 0;
+  op_metric = METRIC_Euclidean_no_weight; // =0
   op_round_flip = 0;
+  op_max_iter = 3;
   op_use_coarsening = 1;
   op_use_splitting = 1;
-  op_use_smoothing = 0;
-  op_max_iter = 3;
+  op_use_smoothing = 1; // default
   op_smooth_criterion = 1;
+  op_smooth_iter = 3;
   op_ada_use_intpoints = 2;
   op_save_inter_meshes = 0;
   op_minlen = 0.0;
@@ -988,12 +990,13 @@ void Triangulation::reset_options()
   io_firstindex = 0;
   io_poly = 0;
   io_inria_mesh = 0;
-  io_with_metric = io_with_sol = io_with_grd = 0;
+  io_with_metric = io_with_sol = io_with_grd = io_with_wei = 0;
   io_voronoi = 0;
   io_point_array = 0;
-  io_no_unused = 0;
+  io_keep_unused = 0;
   io_outedges = 0;
   io_out_voronoi = 0;
+  io_out_ucd = 0;
   io_dump_to_ucd = 0;
   io_dump_lift_map = 0;
   io_commandline[0] = '\0';
@@ -1004,7 +1007,7 @@ void Triangulation::reset_options()
   io_metric_min = io_metric_max = 0.;
   io_diagonal = io_diagonal2 = 0.0;
   io_tol_rel_gap = 1.e-3;
-  io_tol_minangle = 0.1 * PI / 180.0; // Radian
+  io_tol_minangle = 0.01 * PI / 180.0; // Radian
 
   ct_in_vrts = ct_in_tris = ct_in_sdms = 0;
   ct_hullsize = ct_exteriors = 0;
