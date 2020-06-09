@@ -17,15 +17,10 @@ class DynamicArray(object):
 
     class __metaclass__(type):
         def __init__(cls, name, parents, attrs):
-
             def make_delegate(name):
-
                 def delegate(self, *args, **kwargs):
                     return getattr(self._data[:self._size], name)
-
                 return delegate
-
             type.__init__(cls, name, parents, attrs)
-
             for method_name in cls.MAGIC_METHODS:
                 setattr(cls, method_name, property(make_delegate(method_name)))
