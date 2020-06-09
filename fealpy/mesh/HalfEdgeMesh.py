@@ -1952,3 +1952,6 @@ class HalfEdgeMesh2dDataStructure():
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
         return idx
+
+    def main_halfedge_flag(self):
+        return halfedge[:, 5] == 1
