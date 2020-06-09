@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # 
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.sparse import spdiags, bmat
@@ -123,6 +124,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         x[:] = spsolve(AA, FF)
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
+        print('ph:', ph)
 
         print('uh:', uh)
         up = uspace.project_to_smspace(uh)
@@ -136,6 +138,8 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         up = uspace.project_to_smspace(uv)
         print('up', up)
 
+        error = integralalg.L2_error(pde.velocity, up)
+        print(error)
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -189,6 +193,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         x[:] = spsolve(AA, FF)
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
+        print('ph:', ph)
 
         print('uh:', uh)
         up = uspace.project_to_smspace(uh)
@@ -201,6 +206,9 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         print('uproject:', uv)
         up = uspace.project_to_smspace(uv)
         print('up', up)
+
+        error = integralalg.L2_error(pde.velocity, up)
+        print(error)
 
     def one_cell_test(self, p=2):
         from fealpy.pde.stokes_model_2d import StokesModelData_7
@@ -344,4 +352,8 @@ test = DivFreeNonConformingVirtualElementSpace2dTest()
 #test.project_test(u5, p=5, mtype=3, plot=False)
 #test.stokes_equation_test()
 #test.one_cell_test_0()
-test.two_cell_test()
+
+if sys.argv[1] == "two":
+    test.two_cell_test()
+elif sys.argv[1] == "one":
+    test.one_cell_test_0()
