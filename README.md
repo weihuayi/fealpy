@@ -64,9 +64,9 @@ or
 5. enter fealpy directory, run the following command:
 ```
 > python setup_win.py develop 
-> pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/MeshPy-2018.2.1-cp37-cp37m-win_amd64.whl
-> pip install https://download.lfd.uci.edu/pythonlibs/s2jqpv5t/pyamg-4.0.0-cp37-cp37m-win_amd64.whl
-> conda install -c anaconda vtk 
+> conda install -c conda-forge meshpy 
+> conda install -c conda-forge pyamg
+> conda install -c conda-forge vtk
 ```
 Notice that, the above `whl` files are build for python3.7, you can find suitable
 version for other python version.
