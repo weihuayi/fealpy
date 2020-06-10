@@ -898,7 +898,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
             final += 1
-            if gdof > 1e+4:
+            if gdof > 3e+4:
                 break
 
         # 1. 自适应粗网格上求解最小特征值问题
@@ -1103,10 +1103,10 @@ class EllipticEignvalueFEMModel:
                 else:
                     axes = Axes3D(fig)
                 mesh.add_plot(axes, cellcolor='w')
-                fig.savefig(self.resultdir + 'mesh_3_6_' + str(i+1) + '_' + str(NN) +'.pdf')
+                fig.savefig(self.resultdir + 'mesh_3_6_' + str(final+1) + '_' + str(NN) +'.pdf')
                 plt.close()
                 self.savemesh(mesh,
-                        self.resultdir + 'mesh_3_6_' + str(i+1) + '_' + str(NN) +'.mat')
+                        self.resultdir + 'mesh_3_6_' + str(final+1) + '_' + str(NN) +'.mat')
 
             I = IM@I
             uH = IM@uH
@@ -1128,7 +1128,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
             final += 1
-            if gdof > 1e+4:
+            if gdof > 3e+4:
                 break
 
         # 1. 自适应粗网格上求解最小特征值问题
