@@ -80,7 +80,6 @@ class RTDofFracture2d:
             gdof += NC*(p+1)*p
         return gdof 
 
-
 class RTDof2d:
     def __init__(self, mesh, p):
         """

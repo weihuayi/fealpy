@@ -4,7 +4,7 @@ from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 from ..common import ranges
 from types import ModuleType
 
-class Mesh2d():
+class Mesh2d(object):
     """ The base class of TriangleMesh and QuadrangleMesh
         The class is just a abstract class, and you can not use it directly.
     """

@@ -5,6 +5,7 @@ from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
 from ..common.Tools import hash2map
+from ..common import DynamicArray
 
 
 class HalfEdgeMesh2d(Mesh2d):
