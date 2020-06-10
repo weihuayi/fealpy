@@ -7,7 +7,7 @@ package to support our teach and research work.
 
 We still have lot work to do. 
 
-关于 FEALPy 的帮助与安装信息请查看：
+关于 FEALPy 的中文帮助与安装信息请查看：
 [FEALPy 帮助与安装](https://www.weihuayi.cn/fealpy/fealpy.html)
 
 # Install
