@@ -16,7 +16,7 @@ class RaviartThomasFiniteElementSpace2dTest:
     def __init__(self):
         self.meshfactory = MeshFactory()
 
-    def show_basis_test(self):
+    def show_basis(self):
         h = 0.5
         box = [-h, 1+h, -h, np.sqrt(3)/2+h]
         mesh = self.meshfactory.one_triangle_mesh('equ')
@@ -25,8 +25,18 @@ class RaviartThomasFiniteElementSpace2dTest:
         space.show_basis(fig, box=box)
         plt.show()
 
+    def solve_poisson_2d(self):
+
+        pde = CosCosData()
+        mesh = pde.init_mesh(n=3, methtype='tri')
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+
+
 
 test = RaviartThomasFiniteElementSpace2dTest()
-test.show_basis_test()
+
+
+if sys.argv[1] == "show_basis":
+    test.show_basis_test()
 
     

@@ -283,95 +283,48 @@ class RaviartThomasFiniteElementSpace2d:
         ldof = self.number_of_local_dofs()
 
         mesh = self.mesh
+        ps = mesh.bc_to_point(bc)
+        val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
+        edof = p + 1
+        ndof = (p+2)*(p+1)//2
 
-        if False :
-            NC = mesh.number_of_cells()
-            Rlambda = mesh.rot_lambda()
-            cell2edgeSign = self.cell_to_edge_sign()
-            shape = bc.shape[:-1] + (NC, ldof, 2)
-            phi = np.zeros(shape, dtype=np.float)
-            phi[..., 0, :] = bc[..., 1, None, None]*Rlambda[:, 2, :] - bc[..., 2, None, None]*Rlambda[:, 1, :]
-            phi[..., 1, :] = bc[..., 2, None, None]*Rlambda[:, 0, :] - bc[..., 0, None, None]*Rlambda[:, 2, :]
-            phi[..., 2, :] = bc[..., 0, None, None]*Rlambda[:, 1, :] - bc[..., 1, None, None]*Rlambda[:, 0, :]
-            phi *= cell2edgeSign.reshape(-1, 3, 1)
-        else:
-            ps = mesh.bc_to_point(bc)
-            val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
-            edof = p + 1
-            ndof = (p+2)*(p+1)//2
+        shape = ps.shape[:-1] + (ldof, 2)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
 
-            shape = ps.shape[:-1] + (ldof, 2)
-            phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
-
-            c = self.bcoefs # (NC, ldof, ldof) 
-            x = np.arange(ndof, ndof+edof)
-            y = x + 1
-            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
-            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-            phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
-            phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
+        c = self.bcoefs # (NC, ldof, ldof) 
+        x = np.arange(ndof, ndof+edof)
+        y = x + 1
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
         return phi
-
-
-    def grad_basis(self, bc):
-        p = self.p
-        ldof = self.number_of_local_dofs()
-
-        mesh = self.mesh
-        if False:
-            NC = mesh.number_of_cells()
-            shape = (NC, ldof, 2, 2)
-            gradPhi = np.zeros(shape, dtype=np.float)
-
-            cell2edgeSign = self.cell_to_edge_sign()
-            W = np.array([[0, 1], [-1, 0]], dtype=np.float)
-            Rlambda= mesh.rot_lambda()
-            Dlambda = mesh.grad_lambda()
-
-            A = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 1, :])
-            B = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 2, :]) 
-            gradPhi[:, 0, :, :] = A - B
-
-            A = np.einsum('...i, ...j->...ij', Rlambda[:, 0, :], Dlambda[:, 2, :])
-            B = np.einsum('...i, ...j->...ij', Rlambda[:, 2, :], Dlambda[:, 0, :])
-            gradPhi[:, 1, :, :] = A - B
-
-            A = np.einsum('...i, ...j->...ij', Rlambda[:, 1, :], Dlambda[:, 0, :])
-            B = np.einsum('...i, ...j->...ij', Rlambda[:, 0, :], Dlambda[:, 1, :])
-            gradPhi[:, 2, :, :] = A - B
-
-            gradPhi *= cell2edgeSign.reshape(-1, 3, 1, 1)
-            if len(bc.shape) > 1:
-                return gradPhi[None, ...]
-            else:
-                return gradPhi
-        else:
-            raise ValueError('the case for p > 0 has not been implemented!')
 
     def div_basis(self, bc):
         p = self.p
         ldof = self.number_of_local_dofs()
 
-        if False:
-            mesh = self.mesh
-            NC = mesh.number_of_cells()
-            divPhi = np.zeros((NC, ldof), dtype=np.float)
-            cell2edgeSign = self.cell_to_edge_sign()
-            W = np.array([[0, 1], [-1, 0]], dtype=np.float)
+        mesh = self.mesh
+        ps = mesh.bc_to_point(bc)
+        val = self.smspace.grad_basis(ps, p=p+1) # (NQ, NC, ndof)
+        edof = p + 1
+        ndof = (p+2)*(p+1)//2
 
-            Rlambda = mesh.rot_lambda()
-            Dlambda = mesh.grad_lambda()
-            divPhi[:, 0] = np.sum(Dlambda[:, 1, :]*Rlambda[:, 2, :], axis=1) - np.sum(Dlambda[:, 2, :]*Rlambda[:, 1, :], axis=1)
-            divPhi[:, 1] = np.sum(Dlambda[:, 2, :]*Rlambda[:, 0, :], axis=1) - np.sum(Dlambda[:, 0, :]*Rlambda[:, 2, :], axis=1)
-            divPhi[:, 2] = np.sum(Dlambda[:, 0, :]*Rlambda[:, 1, :], axis=1) - np.sum(Dlambda[:, 1, :]*Rlambda[:, 0, :], axis=1)
-            divPhi *= cell2edgeSign
-            if len(bc.shape) > 1:
-                return divPhi[None, ...]
-            else:
-                return divPhi
-        else:
-            raise ValueError('the case for p > 0 has not been implemented!')
+        shape = ps.shape[:-1] + (ldof, )
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
+        c = self.bcoefs # (NC, ldof, ldof) 
+        x = np.arange(ndof, ndof+edof)
+        y = x + 1
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :ndof, 0], c[:, 0*ndof:1*ndof, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :ndof, 1], c[:, 1*ndof:2*ndof, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., x, 0], c[:, 2*ndof:, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., y, 1], c[:, 2*ndof:, :])
+        return phi
 
+    def grad_basis(self, bc):
+        p = self.p
+        ldof = self.number_of_local_dofs()
+        mesh = self.mesh
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -432,6 +385,20 @@ class RaviartThomasFiniteElementSpace2d:
             return Function(self, array=uh)
         else:
             return uh
+
+    def mass_matrix(self):
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        M = self.integralalg.construct_matrix(self.basis, cell2dof=cell2dof,
+                gdof=gdof)
+
+        return M
+
+    def div_matrix(self):
+        gdof0 = self.number_of_global_dofs()
+        celldof0 = self.cell_to_dof()
+        M = self.integralalg.construct_matrix()
+        pass
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()

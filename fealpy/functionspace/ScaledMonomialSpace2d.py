@@ -252,7 +252,7 @@ class ScaledMonomialSpace2d():
 
     def grad_basis(self, point, index=None, p=None):
 
-        p = self.p if p is None else p
+        p = p or self.p 
         h = self.cellsize
         num = len(h) if index is  None else len(index)
         index = np.s_[:] if index is None else index 

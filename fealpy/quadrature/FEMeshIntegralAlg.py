@@ -24,23 +24,37 @@ class FEMeshIntegralAlg():
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
 
-    def cell_matrix_integral(self, basis0, basis1=None, barycenter=False, cell_to_dof=None, q=None):
+    def construct_matrix(self, basis0, basis1=None,  
+            cell2dof0=None, gdof0=None, 
+            cell2dof1=None, gdof1=None, 
+            barycenter=True, q=None):
 
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.quadpts, qf.weights
 
-        if barycenter is False:
-            bcs  =  mesh.bc_to_point(bcs)
-
         phi0 = basis0(bcs)
-        if basis1 is None:
-            phi1 = phi0
-        else:
-            phi1 = basis1(bcs)
+        phi1 = phi0 if basis1 is None else basis1(bcs)
 
         M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                 self.cellmeasure, optimize=True)
+
+        if cell2dof0 is not None: # construct the global matrix
+            gdof0 = gdof0 or cell2dof0.max()
+            ldof0 = cell2dof0.shape[1] 
+
+            if cell2dof1 is not None:
+                gdof1 = gdof1 or cell2dof1.max()
+                ldof1 = cell2dof1.shape[1]
+                I = np.einsum('k, ij->ijk', np.ones(ldof1), cell2dof0)
+                J = np.einsum('k, ij->ikj', np.ones(ldof0), cell2dof1)
+            else:
+                gdof1 = gdof0
+                ldof1 = ldof0
+                I = np.einsum('k, ij->ijk', np.ones(ldof0), cell2dof0)
+                J = I.swapaxes(-1, -2)
+
+            M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
         return M
 

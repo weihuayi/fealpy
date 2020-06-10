@@ -92,7 +92,6 @@ class CosCosData:
         val = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)
         return val
 
-
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -103,6 +102,9 @@ class CosCosData:
         val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
         val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return val # val.shape == p.shape
+
+    def flux(self, p):
+        return -self.gradient(p)
 
     def dirichlet(self, p):
         return self.solution(p)
@@ -124,7 +126,6 @@ class CosCosData:
         return val
 
     def robin(self, p, n):
-
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
         shape = len(val.shape)*(1, )
