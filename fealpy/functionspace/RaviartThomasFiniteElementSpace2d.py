@@ -391,14 +391,13 @@ class RaviartThomasFiniteElementSpace2d:
         cell2dof = self.cell_to_dof()
         M = self.integralalg.construct_matrix(self.basis, cell2dof=cell2dof,
                 gdof=gdof)
-
         return M
 
     def div_matrix(self):
         gdof0 = self.number_of_global_dofs()
         celldof0 = self.cell_to_dof()
+        basis0 = self.div_basis
         M = self.integralalg.construct_matrix()
-        pass
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
