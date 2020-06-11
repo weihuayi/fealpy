@@ -25,11 +25,18 @@ class RaviartThomasFiniteElementSpace2dTest:
         space.show_basis(fig, box=box)
         plt.show()
 
+    def interpolation(self):
+        pde = CosCosData()
+        mesh = pde.init_mesh(n=3, methtype='tri')
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+
     def solve_poisson_2d(self):
 
         pde = CosCosData()
         mesh = pde.init_mesh(n=3, methtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+        A = space.mass_matrix()
+        B = space.div_matrix()
 
 
 

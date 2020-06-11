@@ -199,12 +199,17 @@ class ScaledMonomialSpace2d():
         return self.dof.cell_to_dof(p=p)
 
     def edge_basis(self, point, index=None, p=None):
-        p = self.p if p is None else p
-        index = index if index is not None else np.s_[:]
-        center = self.integralalg.edgebarycenter
-        h = self.integralalg.edgemeasure
-        t = self.mesh.edge_unit_tangent()
-        val = np.sum((point - center[index])*t[index], axis=-1)/h[index]
+        p = p or self.p 
+
+        if p == 0:
+            shape = len(point.shape)*(1, )
+            return np.array([1.0], dtype=self.ftype).reshape(shape)
+
+        index = index or np.s_[:]
+        ec = self.integralalg.edgebarycenter
+        eh = self.integralalg.edgemeasure
+        et = self.mesh.edge_unit_tangent()
+        val = np.sum((point - ec[index])*et[index], axis=-1)/eh[index]
         phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
         if p == 1:
             phi[..., 1] = val
@@ -228,7 +233,7 @@ class ScaledMonomialSpace2d():
             The shape of `phi` is (..., M, ldof)
 
         """
-        p = self.p if p is None else p
+        p = p or self.p 
         h = self.cellsize
         NC = self.mesh.number_of_cells()
 

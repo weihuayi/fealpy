@@ -3,83 +3,6 @@ from numpy.linalg import inv
 from .function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
-class RTDofFracture2d:
-    def __init__(self, mesh, p):
-        """
-        Parameters
-        ----------
-        mesh : TriangleMesh object with fracture edges
-        p : the space order, p>=0
-
-        Notes
-        -----
-
-        Reference
-        ---------
-        """
-        self.mesh = mesh
-        self.p = p # 默认的空间次数 p >= 0
-        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
-
-    def boundary_dof(self, threshold=None):
-        idx = self.mesh.ds.boundary_edge_index()
-        if threshold is not None:
-            bc = self.mesh.entity_barycenter('edge', index=idx)
-            flag = threshold(bc)
-            idx  = idx[flag]
-        gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
-        edge2dof = self.edge_to_dof()
-        isBdDof[edge2dof[idx]] = True
-        return isBdDof
-
-    def edge_to_dof(self):
-        edof = self.p + 1
-        mesh = self.mesh
-        NE = mesh.number_of_edges()
-        edge2dof = np.arange(NE*edof).reshape(NE, edof)
-        return edge2dof
-
-    def cell_to_dof(self):
-        """
-        """
-        p = self.p 
-        mesh = self.mesh
-        cell2edge = mesh.ds.cell_to_edge()
-
-        if p == 0:
-            return cell2edge
-        else:
-            edof = p + 1
-            NC = mesh.number_of_cells()
-            ldof = self.number_of_local_dofs()
-            cell2dof = np.zeros((NC, ldof), dtype=np.int)
-
-            edge2dof = self.edge_to_dof()
-            edge2cell = mesh.ds.edge_to_cell()
-            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
-            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
-            if p > 1:
-                idof = (p+1)*p
-                cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
-            return cell2dof
-
-    def number_of_local_dofs(self):
-        p = self.p
-        return (p+1)*(p+3) 
-
-    def number_of_global_dofs(self):
-        p = self.p
-        
-        edof = p + 1
-        ldof = self.number_of_local_dofs(p=p)
-        NC = self.mesh.number_of_cells()
-        NE = self.mesh.number_of_edges()
-        gdof = NE*edof
-        if p > 0:
-            gdof += NC*(p+1)*p
-        return gdof 
-
 class RTDof2d:
     def __init__(self, mesh, p):
         """
@@ -111,9 +34,9 @@ class RTDof2d:
         return isBdDof
 
     def edge_to_dof(self):
-        edof = self.number_of_local_dofs('edge')
         mesh = self.mesh
         NE = mesh.number_of_edges()
+        edof = self.number_of_local_dofs('edge')
         edge2dof = np.arange(NE*edof).reshape(NE, edof)
         return edge2dof
 
@@ -140,25 +63,27 @@ class RTDof2d:
             cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
 
-    def number_of_local_dofs(self, etype='cell'):
+    def number_of_local_dofs(self, doftype='all'):
         p = self.p
-        if etype == 'cell':
+        if doftype == 'all': # number of all dofs on a cell 
             return (p+1)*(p+3) 
-        elif etype =='edge':
+        elif doftype == 'cell': # number of dofs inside the cell 
+            return p*(p+1) 
+        elif doftype in {'face', 'edge'}: # number of dofs on a edge 
             return p+1
+        elif doftype == 'node': # number of dofs on a node
+            retrun 0
 
     def number_of_global_dofs(self):
         p = self.p
-        
-        edof = self.number_of_local_dofs('edge') 
-        cdof = self.number_of_local_dofs(p=p)
-        idof = cdof - 3*edof
 
         NE = self.mesh.number_of_edges()
+        edof = self.number_of_local_dofs('edge') 
         gdof = NE*edof
         if p > 0:
             NC = self.mesh.number_of_cells()
-            gdof += NC*(p+1)*p
+            cdof = self.number_of_local_dofs('cell')
+            gdof += NC*cdof
         return gdof 
 
 class RaviartThomasFiniteElementSpace2d:
@@ -173,7 +98,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         Note
         ----
-        RT_p : [P_{p-1}]^d(T) + [m_1, m_2]^T \\bar P_{p-1}(T)
+        RT_p : [P_{p}]^d(T) + [m_1, m_2]^T \\bar P_{p}(T)
 
         """
         self.mesh = mesh
@@ -193,14 +118,6 @@ class RaviartThomasFiniteElementSpace2d:
 
         self.bcoefs = self.basis_coefficients()
 
-    def cell_to_edge_sign(self):
-        mesh = self.mesh
-        edge2cell = mesh.ds.edge2cell
-        NC = mesh.number_of_cells()
-        cell2edgeSign = -np.ones((NC, 3), dtype=np.int)
-        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = 1
-        return cell2edgeSign
-
     def basis_coefficients(self):
         """
 
@@ -210,8 +127,7 @@ class RaviartThomasFiniteElementSpace2d:
         """
         p = self.p
         ldof = self.number_of_local_dofs()
-        ndof = self.smspace.number_of_local_dofs()
-        edof = p + 1
+        ndof = self.smspace.number_of_local_dofs() 
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -322,9 +238,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     def grad_basis(self, bc):
-        p = self.p
-        ldof = self.number_of_local_dofs()
-        mesh = self.mesh
+        pass
 
     def cell_to_dof(self):
         return self.dof.cell2dof
@@ -332,59 +246,58 @@ class RaviartThomasFiniteElementSpace2d:
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
-    def number_of_local_dofs(self):
-        return self.dof.number_of_local_dofs()
+    def number_of_local_dofs(self, doftype='all'):
+        return self.dof.number_of_local_dofs(doftype)
 
-    def value(self, uh, bc, cellidx=None):
+    def value(self, uh, bc, index=None):
         phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
-            val = np.einsum(s1, phi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, phi, uh[cell2dof[cellidx]])
+        val = np.einsum(s1, phi, uh[cell2dof])
         return val
 
-    def grad_value(self, uh, bc, cellidx=None):
-        gphi = self.grad_basis(bc, cellidx=cellidx)
-        cell2dof = self.dof.cell2dof
+    def div_value(self, uh, bc, index=None):
+        dphi = self.div_basis(bc)
+        cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ijmn, ij{}->...i{}mn'.format(s0[:dim], s0[:dim])
-        if cellidx is None:
-            val = np.einsum(s1, gphi, uh[cell2dof])
-        else:
-            val = np.einsum(s1, gphi, uh[cell2dof[cellidx]])
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, dphi, uh[cell2dof])
         return val
 
-    def div_value(self, uh, bc, cellidx=None):
-        val = self.grad_value(uh, bc, cellidx=None)
-        return val.trace(axis1=-2, axis2=-1)
+    def grad_value(self, uh, bc, index=None):
+        pass
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f
 
-    def interpolation(self, u, returnfun=False):
+    def interpolation(self, u):
+        p = self.p
         mesh = self.mesh
-        node = mesh.entity('node')
-        edge = mesh.entity('edge')
-        NE = mesh.number_of_edges()
-        n = mesh.edge_unit_normal()
-        l = mesh.entity_measure('edge')
+        uh = self.function()
+        edge2dof = self.dof.edge_to_dof() 
 
-        qf = IntervalQuadrature(3)
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        points = np.einsum('kj, ijm->kim', bcs, node[edge])
-        val = u(points)
-        uh = np.einsum('k, kim, im, i->i', ws, val, n, l)
+        en = mesh.edge_unit_normal()
+        def f0(bc):
+            ps = mesh.bc_to_point(bc, etype='edge')
+            return np.einsum('ijk, jk, ijm->ijm', u(ps), en, self.smspace.edge_basis(ps))
+        uh[edge2dof] = self.integralalg.edge_integral(f0, edgetype=True)
 
-        if returnfun is True:
-            return Function(self, array=uh)
-        else:
-            return uh
+        if p >= 1:
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
+            edof = self.number_of_local_dofs('edge')
+            idof = self.number_of_local_dofs('cell') # dofs inside the cell 
+            cell2dof = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
+            def f1(bc):
+                ps = mesh.bc_to_point(bc, etype='cell')
+                return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
+            uh[cell2dof] = self.integralalg.cell_integral(f1, celltype=True, barycenter=True)
+
+        return uh
 
     def mass_matrix(self):
         gdof = self.number_of_global_dofs()
@@ -394,10 +307,17 @@ class RaviartThomasFiniteElementSpace2d:
         return M
 
     def div_matrix(self):
+        p = self.p
         gdof0 = self.number_of_global_dofs()
-        celldof0 = self.cell_to_dof()
+        cell2dof0 = self.cell_to_dof()
+        gdof1 = self.smspace.number_of_global_dofs()
+        cell2dof1 = self.smspace.cell_to_dof()
         basis0 = self.div_basis
-        M = self.integralalg.construct_matrix()
+        basis1 = lambda bc : self.smspace.basis(self.mesh.bc_to_point(bc), p=p)
+        M = self.integralalg.construct_matrix(basis0, basis1=basis1, 
+                cell2dof0=cell2dof0, gdof0=gdof0,
+                cell2dof1=cell2dof1, gdof1=gdof1)
+        return M
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
