@@ -394,7 +394,7 @@ class ScaledMonomialSpace2d():
         return H
 
     def edge_mass_matrix_1(self, p=None):
-        p = self.p if p is None else p
+        p = p or self.p
         mesh = self.mesh
         edge = mesh.entity('edge')
         measure = mesh.entity_measure('edge')
@@ -441,9 +441,32 @@ class ScaledMonomialSpace2d():
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs(p=p)
 
+
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
+
+    def penalty_matrix(self, p=None):
+        p = p or self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+        eh = mesh.entity_measure('edge')
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs)
+
+        ldof = self.number_of_local_dofs()
+        shape = ps.shape[:-1] + (2*ldof, )
+        phi = np.zeros(shape, dtype=self.ftype)
+        phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi[:, isInEdge, ldof:] = -self.basis(ps, index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
+        H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, eh, optimize=True)
+        cell2dof = self.cell_to_dof()
+
+
+
 
     def source_vector(self, f, dim=None, p=None):
         def u(x, index):

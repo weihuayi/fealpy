@@ -898,7 +898,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
             final += 1
-            if gdof > 3e+4:
+            if gdof > 5e+4:
                 break
 
         # 1. 自适应粗网格上求解最小特征值问题
@@ -1128,7 +1128,7 @@ class EllipticEignvalueFEMModel:
             else:
                 uh[isFreeDof] = self.msolve(A[isFreeDof, :][:, isFreeDof].tocsr(), b[isFreeDof])
             final += 1
-            if gdof > 3e+4:
+            if gdof > 5e+4:
                 break
 
         # 1. 自适应粗网格上求解最小特征值问题

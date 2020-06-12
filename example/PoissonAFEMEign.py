@@ -83,9 +83,9 @@ if True:
             pde,
             theta=theta,
             maxit=maxit,
-            maxdof=3e5,
+            maxdof=4e5,
             step=step,
-            n=4,  # 初始网格加密次数
+            n=7,  # 初始网格加密次数
             p=1,  # 线性元
             q=5,  # 积分精度
             resultdir=location,
@@ -96,20 +96,20 @@ if True:
 #u0 = model.alg_0()
 #model.savesolution(u0, 'u0.mat')
 
-#u1 = model.alg_3_1()
-#model.savesolution(u1, 'u1.mat')
+u1 = model.alg_3_1()
+model.savesolution(u1, 'u1.mat')
 
-#u2 = model.alg_3_2()
-#model.savesolution(u2, 'u2.mat')
+u2 = model.alg_3_2()
+model.savesolution(u2, 'u2.mat')
 
-#u3 = model.alg_3_3()
-#model.savesolution(u3, 'u3.mat')
+u3 = model.alg_3_3()
+model.savesolution(u3, 'u3.mat')
 
-#u4 = model.alg_3_4()
-#model.savesolution(u4, 'u4.mat')
+u4 = model.alg_3_4()
+model.savesolution(u4, 'u4.mat')
 
-#u5 = model.alg_3_5()
-#model.savesolution(u5, 'u5.mat')
+u5 = model.alg_3_5()
+model.savesolution(u5, 'u5.mat')
 
 u6 = model.alg_3_6()
 model.savesolution(u6, 'u6.mat')

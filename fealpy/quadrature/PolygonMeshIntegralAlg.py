@@ -40,7 +40,7 @@ class PolygonMeshIntegralAlg():
         qf = self.edgeintegrator
         bcs, ws = qf.quadpts, qf.weights
 
-        index = index if index is not None else np.s_[:]
+        index = index or np.s_[:]
         ps = mesh.edge_bc_to_point(bcs, index=index)
         val = u(ps) # TODO: 这里默认为空间坐标, 是否存在重心坐标的形式?
         if edgetype is True:

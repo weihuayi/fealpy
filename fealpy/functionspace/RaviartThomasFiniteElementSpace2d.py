@@ -166,11 +166,11 @@ class RaviartThomasFiniteElementSpace2d:
             idof = (p+1)*p//2
             idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
             A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  x[0], ndof-edof:]
+            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  x[0], ndof-edof:]
 
             idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
+            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  y[0], ndof-edof:]
 
         return inv(A)
 
