@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 
-
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -16,19 +16,22 @@ class RaviartThomasFiniteElementSpace2dTest:
     def __init__(self):
         self.meshfactory = MeshFactory()
 
-    def show_basis(self):
+    def show_basis(self, p=0):
         h = 0.5
         box = [-h, 1+h, -h, np.sqrt(3)/2+h]
         mesh = self.meshfactory.one_triangle_mesh('equ')
-        space = RaviartThomasFiniteElementSpace2d(mesh, p=2, q=2)
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
         fig = plt.figure()
         space.show_basis(fig, box=box)
         plt.show()
 
-    def interpolation(self):
+    def interpolation(self, n=3, plot=True):
         pde = CosCosData()
-        mesh = pde.init_mesh(n=3, methtype='tri')
+        mesh = pde.init_mesh(n=n, meshtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+        uI = space.interpolation(pde.flux)
+        error = space.integralalg.L2_error(pde.flux, uI)
+        print(error)
 
     def solve_poisson_2d(self):
 
@@ -44,6 +47,10 @@ test = RaviartThomasFiniteElementSpace2dTest()
 
 
 if sys.argv[1] == "show_basis":
-    test.show_basis_test()
+    p = int(sys.argv[2])
+    test.show_basis(p=p)
+elif sys.argv[1] == "interpolation":
+    n = int(sys.argv[2])
+    test.interpolation(n=n)
 
     

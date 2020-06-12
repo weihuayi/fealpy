@@ -59,7 +59,7 @@ class FEMeshIntegralAlg():
         return M
 
 
-    def edge_integral(self, u, edgetype=False, q=None, barycenter=False):
+    def edge_integral(self, u, edgetype=False, q=None, barycenter=True):
         mesh = self.mesh
 
         qf = self.edgeintegrator if q is None else mesh.integrator(q, 'edge')
@@ -77,7 +77,7 @@ class FEMeshIntegralAlg():
             e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
         return e
 
-    def face_integral(self, u, facetype=False, q=None, barycenter=False):
+    def face_integral(self, u, facetype=False, q=None, barycenter=True):
         mesh = self.mesh
 
         qf = self.faceintegrator if q is None else mesh.integrator(q, 'face')
@@ -98,7 +98,7 @@ class FEMeshIntegralAlg():
             e = np.einsum(s1, ws, val, self.facemeasure)
         return e
 
-    def cell_integral(self, u, celltype=False, q=None, barycenter=False):
+    def cell_integral(self, u, celltype=False, q=None, barycenter=True):
         mesh = self.mesh
 
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')

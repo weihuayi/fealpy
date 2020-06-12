@@ -28,7 +28,7 @@ class RTDof2d:
             flag = threshold(bc)
             idx  = idx[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdDof[edge2dof[idx]] = True
         return isBdDof
@@ -51,16 +51,16 @@ class RTDof2d:
         else:
             NE = mesh.number_of_edges()
             NC = mesh.number_of_cells()
-            edof = self.number_of_local_dofs('edge') 
-            cdof = self.number_of_local_dofs('cell')
-            cell2dof = np.zeros((NC, cdof), dtype=np.int)
+            ldof = self.number_of_local_dofs('all')  # 单元上的所有自由度
+            cdof = self.number_of_local_dofs('cell') # 单元内部的自由度
+            edof = self.number_of_local_dofs('edge') # 边内部的自由度
+            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
             edge2dof = self.edge_to_dof()
             edge2cell = mesh.ds.edge_to_cell()
             cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
             cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
-            idof = cdof - 3*edof 
-            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
+            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*cdof).reshape(NC, cdof)
             return cell2dof
 
     def number_of_local_dofs(self, doftype='all'):
@@ -72,7 +72,7 @@ class RTDof2d:
         elif doftype in {'face', 'edge'}: # number of dofs on a edge 
             return p+1
         elif doftype == 'node': # number of dofs on a node
-            retrun 0
+            return 0
 
     def number_of_global_dofs(self):
         p = self.p
@@ -126,8 +126,10 @@ class RaviartThomasFiniteElementSpace2d:
         3*(p+1) + 2*(p+1)*p/2 = (p+1)*(p+3) 
         """
         p = self.p
-        ldof = self.number_of_local_dofs()
-        ndof = self.smspace.number_of_local_dofs() 
+        ldof = self.number_of_local_dofs('all')  # 单元上全部自由度的个数
+        edof = self.number_of_local_dofs('edge') # 每条边内部自由度个数
+        cdof = self.number_of_local_dofs('cell') # 每个单元内部自由度个数
+        ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -158,7 +160,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         if p > 0:
             M = self.smspace.mass_matrix()
-            idx = self.smspace.index1()
+            idx = self.smspace.diff_index_1()
             x = idx['x']
             y = idx['y']
             idof = (p+1)*p//2
@@ -196,13 +198,13 @@ class RaviartThomasFiniteElementSpace2d:
 
         """
         p = self.p
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs('all')
+        edof = self.number_of_local_dofs('edge') 
+        ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
         ps = mesh.bc_to_point(bc)
         val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
-        edof = p + 1
-        ndof = (p+2)*(p+1)//2
 
         shape = ps.shape[:-1] + (ldof, 2)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
@@ -218,13 +220,13 @@ class RaviartThomasFiniteElementSpace2d:
 
     def div_basis(self, bc):
         p = self.p
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs('all')
+        edof = self.number_of_local_dofs('edge') 
+        ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
         ps = mesh.bc_to_point(bc)
         val = self.smspace.grad_basis(ps, p=p+1) # (NQ, NC, ndof)
-        edof = p + 1
-        ndof = (p+2)*(p+1)//2
 
         shape = ps.shape[:-1] + (ldof, )
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
@@ -277,9 +279,9 @@ class RaviartThomasFiniteElementSpace2d:
     def interpolation(self, u):
         p = self.p
         mesh = self.mesh
+
         uh = self.function()
         edge2dof = self.dof.edge_to_dof() 
-
         en = mesh.edge_unit_normal()
         def f0(bc):
             ps = mesh.bc_to_point(bc, etype='edge')
@@ -295,8 +297,7 @@ class RaviartThomasFiniteElementSpace2d:
             def f1(bc):
                 ps = mesh.bc_to_point(bc, etype='cell')
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
-            uh[cell2dof] = self.integralalg.cell_integral(f1, celltype=True, barycenter=True)
-
+            uh[cell2dof] = self.integralalg.cell_integral(f1, celltype=True).flat
         return uh
 
     def mass_matrix(self):

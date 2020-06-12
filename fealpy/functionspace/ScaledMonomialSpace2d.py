@@ -73,7 +73,7 @@ class ScaledMonomialSpace2d():
         q = q if q is not None else p+3
 
         mtype = mesh.meshtype
-        if mtype == 'polygon':
+        if mtype in {'polygon', 'halfedge', 'halfedge2d'}:
             self.integralalg = PolygonMeshIntegralAlg(
                     self.mesh, q,
                     cellmeasure=self.cellmeasure,
@@ -83,11 +83,7 @@ class ScaledMonomialSpace2d():
                     self.mesh, q,
                     cellmeasure=self.cellmeasure)
 
-        self.integralalg = PolygonMeshIntegralAlg(
-                self.mesh, q,
-                cellmeasure=self.cellmeasure,
-                cellbarycenter=self.cellbarycenter)
-        #self.integrator = self.integralalg.integrator
+        self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
