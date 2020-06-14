@@ -58,6 +58,51 @@ class FEMeshIntegralAlg():
 
         return M
 
+    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None, barycenter=False):
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        if barycenter:
+            val = f(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs, etype='cell')
+            val = f(ps)
+        phi = basis(bcs)
+        bb = np.einsum('m, mi..., mik, i->ik...',
+                ws, fval, phi, self.cellmeasure)
+        gdof = gdof or cell2dof.max()
+        shape = (gdof, ) if dim is None else (gdof, dim)
+        b = np.zeros(shape, dtype=phi.dtype)
+        if dim is None:
+            np.add.at(b, cell2dof, bb)
+        else:
+            np.add.at(b, (cell2dof, np.s_[:]), bb)
+        return b
+
+    def construct_boundary_vector(self, u, basis, face2dof, threshold=None):
+        mesh = self.mesh
+        measure = self.facemeasure
+
+        qf = self.edgeintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+        ps = mesh.bc_to_point(bcs, etype='face', index=index)
+        en = mesh.edge_unit_normal(index=index)
+        val = u(ps)
+
+        face2cell = mesh.ds.face_to_cell()
+        index = face2cell[index, 0]
+        phi = basis(ps, barycenter=False, index=index)
+
 
     def edge_integral(self, u, edgetype=False, q=None, barycenter=True):
         mesh = self.mesh

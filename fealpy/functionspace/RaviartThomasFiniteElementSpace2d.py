@@ -22,8 +22,24 @@ class RTDof2d:
         self.cell2dof = self.cell_to_dof() # 默认的自由度数组
 
     def boundary_dof(self, threshold=None):
+        """
+        """
         idx = self.mesh.ds.boundary_edge_index()
-        if threshold is not None:
+        if threshold is not None: #TODO: threshold 可以是一个指标数组
+            bc = self.mesh.entity_barycenter('edge', index=idx)
+            flag = threshold(bc)
+            idx  = idx[flag]
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+        edge2dof = self.edge_to_dof()
+        isBdDof[edge2dof[idx]] = True
+        return isBdDof
+
+    def is_boundary_dof(self, threshold=None):
+        """
+        """
+        idx = self.mesh.ds.boundary_edge_index()
+        if threshold is not None: #TODO: threshold 可以是一个指标数组
             bc = self.mesh.entity_barycenter('edge', index=idx)
             flag = threshold(bc)
             idx  = idx[flag]
@@ -176,7 +192,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         return inv(A)
 
-    def basis(self, bc):
+    def basis(self, bc, barycenter=True, index=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -205,13 +221,18 @@ class RaviartThomasFiniteElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
-        ps = mesh.bc_to_point(bc)
-        val = self.smspace.basis(ps, p=p+1) # (NQ, NC, ndof)
+        if barycenter:
+            ps = mesh.bc_to_point(bc)
+        else:
+            ps = bc
+
+        val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
 
         shape = ps.shape[:-1] + (ldof, 2)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
 
-        c = self.bcoefs # (NC, ldof, ldof) 
+        index = index if index is not None else np.s_[:]
+        c = self.bcoefs[index] # (NC, ldof, ldof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
         phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
@@ -220,19 +241,23 @@ class RaviartThomasFiniteElementSpace2d:
         phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
         return phi
 
-    def div_basis(self, bc):
+    def div_basis(self, bc, barycenter=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
         edof = self.number_of_local_dofs('edge') 
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
-        ps = mesh.bc_to_point(bc)
-        val = self.smspace.grad_basis(ps, p=p+1) # (NQ, NC, ndof)
+        if barycenter:
+            ps = mesh.bc_to_point(bc)
+        else:
+            ps = bc
+        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
 
         shape = ps.shape[:-1] + (ldof, )
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
-        c = self.bcoefs # (NC, ldof, ldof) 
+        index = index if index is not None else np.s_[:]
+        c = self.bcoefs[index] # (NC, ldof, ldof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
         phi[:] += np.einsum('ijm, jmn->ijn', val[..., :ndof, 0], c[:, 0*ndof:1*ndof, :])
@@ -278,6 +303,9 @@ class RaviartThomasFiniteElementSpace2d:
         f = Function(self, dim=dim, array=array)
         return f
 
+    def project(self, u):
+        return self.interpolation(u)
+
     def interpolation(self, u):
         p = self.p
         mesh = self.mesh
@@ -319,10 +347,36 @@ class RaviartThomasFiniteElementSpace2d:
         cell2dof1 = self.smspace.cell_to_dof()
         basis0 = self.div_basis
         basis1 = lambda bc : self.smspace.basis(self.mesh.bc_to_point(bc), p=p)
-        M = self.integralalg.construct_matrix(basis0, basis1=basis1, 
+
+        D = self.integralalg.construct_matrix(basis0, basis1=basis1, 
                 cell2dof0=cell2dof0, gdof0=gdof0,
                 cell2dof1=cell2dof1, gdof1=gdof1)
-        return M
+        return D 
+
+    def source_vector(self, f, dim=None, barycenter=False):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        b = self.integralalg.construct_vector(f, self.basis, cell2dof, 
+                gdof=gdof, dim=dim, barycenter=barycenter) 
+        return b
+
+    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        p = self.p
+        mesh = self.mesh
+        edge2dof = self.dof.edge_to_dof() 
+        en = mesh.edge_unit_normal()
+        def f0(bc):
+            ps = mesh.bc_to_point(bc, etype='edge')
+            return np.einsum('ijk, jk, ijm->ijm', u(ps), en, self.smspace.edge_basis(ps))
+
+        uh[edge2dof] = self.integralalg.edge_integral(f0, edgetype=True)
+        ipoints = self.interpolation_points()
+        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
+        uh[isDDof] = g(ipoints[isDDof])
+        return isDDof
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()

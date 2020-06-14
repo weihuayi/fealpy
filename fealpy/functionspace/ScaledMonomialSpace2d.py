@@ -201,7 +201,7 @@ class ScaledMonomialSpace2d():
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
 
-        index = index or np.s_[:]
+        index = index if index is not None else np.s_[:]
         ec = self.integralalg.edgebarycenter
         eh = self.integralalg.edgemeasure
         et = self.mesh.edge_unit_tangent()

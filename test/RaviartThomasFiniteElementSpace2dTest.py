@@ -62,6 +62,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
         A = space.mass_matrix()
         B = space.div_matrix()
+        F = space.source_vector(pde.f)
 
 
 
