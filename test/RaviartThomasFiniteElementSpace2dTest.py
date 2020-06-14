@@ -67,7 +67,6 @@ class RaviartThomasFiniteElementSpace2dTest:
 
 test = RaviartThomasFiniteElementSpace2dTest()
 
-
 if sys.argv[1] == "show_basis":
     p = int(sys.argv[2])
     test.show_basis(p=p)

@@ -158,6 +158,13 @@ class PolygonMesh(Mesh2d):
         a /=2
         return a
 
+    def bc_to_point(self, bcs, index=None):
+        node = self.entity('node')
+        edge = self.entity('edge')
+        index = index if index is not None else np.s_[:]
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
+        return ps
+
     def edge_bc_to_point(self, bcs, index=None):
         node = self.entity('node')
         edge = self.entity('edge')
