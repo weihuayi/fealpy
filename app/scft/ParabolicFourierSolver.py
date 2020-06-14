@@ -1,7 +1,7 @@
 import numpy as np
 
 class ParabolicFourierSolver():
-    def __init__(self, space, timeline, plan):
+    def __init__(self, space, timeline, plan=None):
         self.space = space 
         self.plan = plan
         self.k, self.k2 = self.space.reciprocal_lattice(return_square=True)
