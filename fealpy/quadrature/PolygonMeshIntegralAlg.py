@@ -52,6 +52,9 @@ class PolygonMeshIntegralAlg():
     def face_integral(self, u, facetype=False, q=None, index=None):
         return self.edge_integral(u, facetype, q, index)
 
+    def cell_integral(self, u, celltype=False, q=None):
+        return self.integral(u, celltype=celltype, q=q)
+
     def integral(self, u, celltype=False, q=None):
         mesh = self.mesh
         node = mesh.node

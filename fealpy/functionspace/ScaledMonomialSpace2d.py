@@ -229,7 +229,7 @@ class ScaledMonomialSpace2d():
             The shape of `phi` is (..., M, ldof)
 
         """
-        p = p or self.p 
+        p = self.p if p is None else p 
         h = self.cellsize
         NC = self.mesh.number_of_cells()
 
@@ -252,8 +252,12 @@ class ScaledMonomialSpace2d():
 
 
     def grad_basis(self, point, index=None, p=None):
+        """
 
-        p = p or self.p 
+        p >= 0
+        """
+
+        p = self.p if p is None else p 
         h = self.cellsize
         num = len(h) if index is  None else len(index)
         index = np.s_[:] if index is None else index 
@@ -424,7 +428,6 @@ class ScaledMonomialSpace2d():
         phi0 = self.edge_basis(ps, p=p)
         phi1 = self.basis(ps, index=edge2cell[:, 0], p=p+1)
         phi2 = self.basis(ps, index=edge2cell[:, 1], p=p+1)
-
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 

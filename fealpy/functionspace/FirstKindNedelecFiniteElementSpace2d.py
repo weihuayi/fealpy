@@ -141,14 +141,14 @@ class FirstKindNedelecFiniteElementSpace2d:
         idx2 = np.arange(ndof)[None, None, :]
         idx3 = np.arange(2*ndof, 2*ndof+edof)[None, None, :]
 
-        idx0 = edge2cell[:, [0]][:, None, None]
+        idx0 = edge2cell[:, 0][:, None, None]
         idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = t[:, 0, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = t[:, 1, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, idx3] = t[:, 0, None, None]*LM[:, :, ndof+1:] - t[:, 1, None, None]*LM[:, :,  ndof:ndof+edof] 
 
-        idx0 = edge2cell[:, [1]][:, None, None]
+        idx0 = edge2cell[:, 1][:, None, None]
         idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = t[:, 0, None, None]*RM[:, :, :ndof]

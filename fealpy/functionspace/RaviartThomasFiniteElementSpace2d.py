@@ -133,7 +133,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
-
+        
         LM, RM = self.smspace.edge_cell_mass_matrix()
         A = np.zeros((NC, ldof, ldof), dtype=self.ftype)
 
@@ -144,14 +144,16 @@ class RaviartThomasFiniteElementSpace2d:
         idx2 = np.arange(ndof)[None, None, :]
         idx3 = np.arange(2*ndof, 2*ndof+edof)[None, None, :]
 
-        idx0 = edge2cell[:, [0]][:, None, None]
+        # idx0 = edge2cell[:, [0]][:, None, None] this is a bug!!!
+        idx0 = edge2cell[:, 0][:, None, None]
         idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
         A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*LM[:, :, ndof+1:]
 
-        idx0 = edge2cell[:, [1]][:, None, None]
+        # idx0 = edge2cell[:, [1]][:, None, None] this is a bug!!!
+        idx0 = edge2cell[:, 1][:, None, None]
         idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
 
         A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
@@ -166,11 +168,13 @@ class RaviartThomasFiniteElementSpace2d:
             idof = (p+1)*p//2
             idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
             A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  x[0], ndof-edof:]
+            print("A:", A[:, idx1, 2*ndof + np.arange(edof)].shape)
+            print("M:",  M[:,  x[0], ndof-edof:].shape)
+            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  x[0], ndof-edof:]
 
             idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof:] = M[:,  y[0], ndof-edof:]
+            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  y[0], ndof-edof:]
 
         return inv(A)
 
@@ -297,7 +301,9 @@ class RaviartThomasFiniteElementSpace2d:
             def f1(bc):
                 ps = mesh.bc_to_point(bc, etype='cell')
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
-            uh[cell2dof] = self.integralalg.cell_integral(f1, celltype=True).flat
+            val = self.integralalg.cell_integral(f1, celltype=True)
+            uh[cell2dof[:, 0:idof//2]] = val[:, 0, :] 
+            uh[cell2dof[:, idof//2:]] = val[:, 1, :]
         return uh
 
     def mass_matrix(self):

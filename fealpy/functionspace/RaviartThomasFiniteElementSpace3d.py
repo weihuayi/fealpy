@@ -147,7 +147,7 @@ class RaviartThomasFiniteElementSpace3d:
         idx2 = np.arange(cdof)[None, None, :]
         idx3 = np.arange(3*cdof, 3*cdof+fdof)[None, None, :]
 
-        idx0 = face2cell[:, [0]][:, None, None]
+        idx0 = face2cell[:, 0][:, None, None]
         idx1 = (face2cell[:, [2]]*fdof + np.arange(fdof))[:, :, None]
 
         A[idx0, idx1, 0*cdof + idx2] = n[:, 0, None, None]*LM[:, :, :cdof]
@@ -162,7 +162,7 @@ class RaviartThomasFiniteElementSpace3d:
                 n[:, 1, None, None]*LM[:, :, cdof+y] + \
                 n[:, 2, None, None]*LM[:, :, cdof+z]
 
-        idx0 = face2cell[:, [1]][:, None, None]
+        idx0 = face2cell[:, 1][:, None, None]
         idx1 = (face2cell[:, [3]]*fdof + np.arange(fdof))[:, :, None]
 
         A[idx0, idx1, 0*cdof + idx2] = n[:, 0, None, None]*RM[:, :, :cdof]
