@@ -2,6 +2,8 @@
 # 
 import sys
 import numpy as np
+from scipy.sparse import bmat
+from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh, MeshFactory
@@ -56,13 +58,32 @@ class RaviartThomasFiniteElementSpace2dTest:
             mesh.add_plot(axes, box=box)
             plt.show()
 
-    def solve_poisson_2d(self):
+    def solve_poisson_2d(self, n=3, p=0):
         pde = CosCosData()
-        mesh = pde.init_mesh(n=3, methtype='tri')
-        space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+        mesh = pde.init_mesh(n=n, meshtype='tri')
+        space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+
+        gdof = space.number_of_global_dofs()
+
+
+        vh = space.function()
+        uh = space.smspace.function()
+
         A = space.mass_matrix()
         B = space.div_matrix()
-        F = space.source_vector(pde.f)
+        F0 = space.neumann_boundary_vector(pde.dirichlet)
+        F1 = space.source_vector(pde.f)
+
+        AA = bmat([[A, -B], [-B.T, None]], format='csr')
+        FF = np.r_['0', F0, F1]
+
+        x = spsolve(AA, FF)
+
+        vh[:] = x[:gdof]
+        uh[:] = x[gdof:]
+
+        error = space.integralalg.L2_error(pde.flux, vh)
+        print(error)
 
 
 
@@ -75,5 +96,10 @@ elif sys.argv[1] == "interpolation":
     n = int(sys.argv[2])
     p = int(sys.argv[3])
     test.interpolation(n=n, p=p)
+elif sys.argv[1] == "solve_poisson_2d":
+    n = int(sys.argv[2])
+    p = int(sys.argv[3])
+    test.solve_poisson_2d(n=n, p=p)
+
 
     

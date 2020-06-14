@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import math
 
 from fealpy.functionspace import FourierSpace
-from fealpy.timeintegratoralg.timeline_new import UniformTimeLine
+from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
 from ParabolicFourierSolver import ParabolicFourierSolver
 
@@ -247,6 +247,7 @@ class SCFTA1BA2CLinearModel():
         self.Q = np.zeros(options['nblend'], dtype=np.float)
 
     def init_field(self, rho):
+        options = self.options
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
@@ -274,6 +275,7 @@ class SCFTA1BA2CLinearModel():
     def update_field(self, alpha=0.005):
         w = self.w
         rho = self.rho
+        options = self.options
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
@@ -296,6 +298,7 @@ class SCFTA1BA2CLinearModel():
 
     def compute_wplus(self):
         w = self.w
+        options = self.options
         chiAB = options['chiAB']
         chiBC = options['chiBC']
         chiAC = options['chiAC']
@@ -309,6 +312,7 @@ class SCFTA1BA2CLinearModel():
 
 
     def compute_energe(self):
+        options = self.options
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
@@ -329,6 +333,7 @@ class SCFTA1BA2CLinearModel():
     def compute_gradient(self):
         w = self.w
         rho = self.rho
+        options = self.options
         chiABN = options['chiAB']*options['ndeg']
         chiBCN = options['chiBC']*options['ndeg']
         chiACN = options['chiAC']*options['ndeg']
@@ -339,6 +344,7 @@ class SCFTA1BA2CLinearModel():
 
     def compute_propagator(self):
 
+        options = self.options
         w = self.w
         qf = self.qf
         qb = self.qb
@@ -391,6 +397,7 @@ class SCFTA1BA2CLinearModel():
         plt.close()
 
     def compute_density(self):
+        options = self.options
         q = self.qf*self.qb[-1::-1]
 
         start = 0

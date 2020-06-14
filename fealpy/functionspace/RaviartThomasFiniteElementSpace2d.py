@@ -192,7 +192,40 @@ class RaviartThomasFiniteElementSpace2d:
 
         return inv(A)
 
-    def basis(self, bc, barycenter=True, index=None):
+    def edge_basis(self, bc, index=None, barycenter=True):
+
+        p = self.p
+        mesh = self.mesh
+        edge2cell = mesh.ds.edge_to_cell()
+
+        ldof = self.number_of_local_dofs('all')
+        edof = self.number_of_local_dofs('edge') 
+        ndof = self.smspace.number_of_local_dofs(p=p) 
+
+        index = index if index is not None else np.s_[:]
+        if barycenter:
+            ps = mesh.bc_to_point(bc, etype='edge', index=index)
+        else:
+            ps = bc
+
+        index = edge2cell[index, 0] # NE
+        val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NE, ndof)
+
+        shape = ps.shape[:-1] + (ldof, 2)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, ldof, 2)
+
+        idx0 = edge2cell[index, 0][:, None]
+        idx1 = edge2cell[index, [2]]*edof + np.arange(edof)
+        c = self.bcoefs[idx0, :, idx1] # (NE, ldof, edof) 
+        x = np.arange(ndof, ndof+edof)
+        y = x + 1
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
+        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
+        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
+        return phi
+
+    def basis(self, bc, index=None, barycenter=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -221,8 +254,9 @@ class RaviartThomasFiniteElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
+        index = index if index is not None else np.s_[:]
         if barycenter:
-            ps = mesh.bc_to_point(bc)
+            ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
             ps = bc
 
@@ -231,7 +265,6 @@ class RaviartThomasFiniteElementSpace2d:
         shape = ps.shape[:-1] + (ldof, 2)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
 
-        index = index if index is not None else np.s_[:]
         c = self.bcoefs[index] # (NC, ldof, ldof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
@@ -241,22 +274,22 @@ class RaviartThomasFiniteElementSpace2d:
         phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
         return phi
 
-    def div_basis(self, bc, barycenter=True):
+    def div_basis(self, bc, index=None, barycenter=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
         edof = self.number_of_local_dofs('edge') 
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
+        index = index if index is not None else np.s_[:]
         if barycenter:
-            ps = mesh.bc_to_point(bc)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
         val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
 
         shape = ps.shape[:-1] + (ldof, )
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
-        index = index if index is not None else np.s_[:]
         c = self.bcoefs[index] # (NC, ldof, ldof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
@@ -335,8 +368,8 @@ class RaviartThomasFiniteElementSpace2d:
     def mass_matrix(self):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof=cell2dof,
-                gdof=gdof)
+        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
+                gdof0=gdof)
         return M
 
     def div_matrix(self):
@@ -360,22 +393,68 @@ class RaviartThomasFiniteElementSpace2d:
                 gdof=gdof, dim=dim, barycenter=barycenter) 
         return b
 
-    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+    def neumann_boundary_vector(self, g, threshold=None, q=None):
+        p = self.p
+        mesh = self.mesh
+        edge2cell = mesh.ds.edge_to_cell()
+        edge2dof = self.dof.edge_to_dof() 
+
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        en = mesh.edge_unit_normal(index=index)
+        val = -g(ps)
+        phi = self.basis(ps, index=edge2cell[index, 0], barycenter=False) 
+        measure = self.integralalg.edgemeasure[index]
+
+        gdof = self.number_of_global_dofs()
+        F = np.zeros(gdof, dtype=self.ftype)
+        bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
+        print('bb:', bb.shape)
+        print('edge2dof[index]:', edge2dof[index].shape)
+        np.add.at(F, edge2dof[index], bb)
+        return F
+
+    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
-        初始化解 uh  的第一类边界条件。
         """
         p = self.p
         mesh = self.mesh
         edge2dof = self.dof.edge_to_dof() 
-        en = mesh.edge_unit_normal()
-        def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
-            return np.einsum('ijk, jk, ijm->ijm', u(ps), en, self.smspace.edge_basis(ps))
 
-        uh[edge2dof] = self.integralalg.edge_integral(f0, edgetype=True)
-        ipoints = self.interpolation_points()
-        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
-        uh[isDDof] = g(ipoints[isDDof])
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        en = mesh.edge_unit_normal(index=index)
+        val = -g(ps, en)
+        phi = self.smspace.edge_basis(ps, index=index)
+
+        measure = self.integralalg.edgemeasure[index]
+        gdof = self.number_of_global_dofs()
+        uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi,
+                measure, optimize=True)
+        isDDof = np.zeros(gdof, dtype=np.bool_) 
+        isDDof[edge2dof[index]] = True
         return isDDof
 
     def array(self, dim=None):

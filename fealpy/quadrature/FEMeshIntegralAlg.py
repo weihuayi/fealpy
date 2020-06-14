@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
@@ -79,29 +80,6 @@ class FEMeshIntegralAlg():
         else:
             np.add.at(b, (cell2dof, np.s_[:]), bb)
         return b
-
-    def construct_boundary_vector(self, u, basis, face2dof, threshold=None):
-        mesh = self.mesh
-        measure = self.facemeasure
-
-        qf = self.edgeintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('face', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        ps = mesh.bc_to_point(bcs, etype='face', index=index)
-        en = mesh.edge_unit_normal(index=index)
-        val = u(ps)
-
-        face2cell = mesh.ds.face_to_cell()
-        index = face2cell[index, 0]
-        phi = basis(ps, barycenter=False, index=index)
 
 
     def edge_integral(self, u, edgetype=False, q=None, barycenter=True):
