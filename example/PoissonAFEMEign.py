@@ -83,7 +83,7 @@ if True:
             pde,
             theta=theta,
             maxit=maxit,
-            maxdof=4e5,
+            maxdof=3e5,
             step=step,
             n=7,  # 初始网格加密次数
             p=1,  # 线性元
