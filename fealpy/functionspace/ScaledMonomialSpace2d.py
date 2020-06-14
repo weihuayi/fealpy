@@ -195,8 +195,7 @@ class ScaledMonomialSpace2d():
         return self.dof.cell_to_dof(p=p)
 
     def edge_basis(self, point, index=None, p=None):
-        p = p or self.p 
-
+        p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
@@ -259,8 +258,9 @@ class ScaledMonomialSpace2d():
 
         p = self.p if p is None else p 
         h = self.cellsize
-        num = len(h) if index is  None else len(index)
         index = np.s_[:] if index is None else index 
+
+        num = len(h) if type(index) is slice else len(index)
 
         ldof = self.number_of_local_dofs(p=p)
         shape = point.shape[:-1]+(ldof, 2)
@@ -398,7 +398,7 @@ class ScaledMonomialSpace2d():
         return H
 
     def edge_mass_matrix_1(self, p=None):
-        p = p or self.p
+        p = self.p if p is None else p
         mesh = self.mesh
         edge = mesh.entity('edge')
         measure = mesh.entity_measure('edge')
