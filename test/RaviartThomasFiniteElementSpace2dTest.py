@@ -72,7 +72,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         A = space.mass_matrix()
         B = space.div_matrix()
         F0 = space.neumann_boundary_vector(pde.dirichlet)
-        F1 = space.source_vector(pde.f)
+        F1 = space.source_vector(pde.source)
 
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
         FF = np.r_['0', F0, F1]

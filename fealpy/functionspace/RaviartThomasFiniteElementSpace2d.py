@@ -208,15 +208,16 @@ class RaviartThomasFiniteElementSpace2d:
         else:
             ps = bc
 
-        index = edge2cell[index, 0] # NE
+        index = edge2cell[index, 0] # the index of left cell of each edge 
         val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NE, ndof)
 
-        shape = ps.shape[:-1] + (ldof, 2)
-        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, ldof, 2)
+        shape = ps.shape[:-1] + (edof, 2)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
-        idx0 = edge2cell[index, 0][:, None]
-        idx1 = edge2cell[index, [2]]*edof + np.arange(edof)
-        c = self.bcoefs[idx0, :, idx1] # (NE, ldof, edof) 
+        idx0 = edge2cell[index, 0][:, None, None]
+        idx1 = np.arange(ldof).reshape(1, ldof, 1)
+        idx2 = (edge2cell[index[:, None], [2]]*edof + np.arange(edof))[:, None, :]
+        c = self.bcoefs[idx0, idx1, idx2] # (NE, ldof, edof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
         phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
@@ -387,13 +388,21 @@ class RaviartThomasFiniteElementSpace2d:
         return D 
 
     def source_vector(self, f, dim=None, barycenter=False):
-        cell2dof = self.cell_to_dof()
-        gdof = self.number_of_global_dofs()
-        b = self.integralalg.construct_vector(f, self.basis, cell2dof, 
+        cell2dof = self.smspace.cell_to_dof()
+        gdof = self.smspace.number_of_global_dofs()
+        b = self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
                 gdof=gdof, dim=dim, barycenter=barycenter) 
         return b
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
+        """
+        Note
+        ----
+
+        For mixed finite element method, the Dirichlet boundary condition of
+        Poisson problem become Neumann boundary condition, and the Neumann
+        boundary condtion become Dirichlet boundary condition.
+        """
         p = self.p
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
@@ -411,17 +420,16 @@ class RaviartThomasFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        phi = self.edge_basis(bcs, index=index) 
         en = mesh.edge_unit_normal(index=index)
+
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = -g(ps)
-        phi = self.basis(ps, index=edge2cell[index, 0], barycenter=False) 
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
         F = np.zeros(gdof, dtype=self.ftype)
         bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
-        print('bb:', bb.shape)
-        print('edge2dof[index]:', edge2dof[index].shape)
         np.add.at(F, edge2dof[index], bb)
         return F
 

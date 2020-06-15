@@ -59,7 +59,8 @@ class FEMeshIntegralAlg():
 
         return M
 
-    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None, barycenter=False):
+    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None,
+            barycenter=False, q=None):
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -69,9 +70,9 @@ class FEMeshIntegralAlg():
         else:
             ps = mesh.bc_to_point(bcs, etype='cell')
             val = f(ps)
-        phi = basis(bcs)
+            phi = basis(ps)
         bb = np.einsum('m, mi..., mik, i->ik...',
-                ws, fval, phi, self.cellmeasure)
+                ws, val, phi, self.cellmeasure)
         gdof = gdof or cell2dof.max()
         shape = (gdof, ) if dim is None else (gdof, dim)
         b = np.zeros(shape, dtype=phi.dtype)
