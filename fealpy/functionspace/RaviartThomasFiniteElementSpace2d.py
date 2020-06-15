@@ -189,6 +189,7 @@ class RaviartThomasFiniteElementSpace2d:
             idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
             A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  y[0], ndof-edof:]
+        print(A)
 
         return inv(A)
 
