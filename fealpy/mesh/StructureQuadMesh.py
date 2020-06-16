@@ -429,6 +429,18 @@ class StructureQuadMeshDataStructure:
         self.NC = nx*ny
         self.itype = itype
  
+    def number_of_nodes_of_cells(self):
+        return self.V
+
+    def number_of_edges_of_cells(self):
+        return self.E
+
+    def number_of_faces_of_cells(self):
+        return self.E
+
+    def number_of_vertices_of_cells(self):
+        return self.V
+
     @property
     def cell(self):
 
