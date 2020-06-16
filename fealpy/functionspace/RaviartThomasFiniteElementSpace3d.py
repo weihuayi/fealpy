@@ -70,12 +70,14 @@ class RTDof3d:
             cell2dof[:, 4*fdof:] = NF*fdof+ np.arange(NC*idof).reshape(NC, idof)
             return cell2dof
 
-    def number_of_local_dofs(self, etype='cell'):
+    def number_of_local_dofs(self, doftype='cell'):
         p = self.p
-        if etype == 'cell':
+        if doftype in {'cell', 3}:
             return (p+1)*(p+2)*(p+4)//2 
-        elif etype == 'face':
+        elif doftype in {'face', 2}:
             return (p+1)*(p+2)//2
+        else:
+            return 0 
 
     def number_of_global_dofs(self):
         p = self.p
@@ -131,8 +133,8 @@ class RaviartThomasFiniteElementSpace3d:
         p = self.p
         ldof = self.number_of_local_dofs()
         
-        cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
-        fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        fdof = self.smspace.number_of_local_dofs(p=p, doftype='face') 
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -182,28 +184,30 @@ class RaviartThomasFiniteElementSpace3d:
             idof = p*(p+1)*(p+2)//6 
             idx1 = np.arange(4*fdof+0*idof, 4*fdof+1*idof)[:, None]
             A[:, idx1, 0*cdof + np.arange(cdof)] = M[:, :idof, :]
-            A[:, idx1, 3*cdof:] = M[:,  x[0], cdof-fdof:]
+            A[:, idx1, 3*cdof + np.arange(fdof)] = M[:,  x[0], cdof-fdof:]
 
             idx1 = np.arange(4*fdof+1*idof, 4*fdof+2*idof)[:, None]
             A[:, idx1, 1*cdof + np.arange(cdof)] = M[:, :idof, :]
-            A[:, idx1, 3*cdof:] = M[:,  y[0], cdof-fdof:]
+            A[:, idx1, 3*cdof + np.arange(fdof)] = M[:,  y[0], cdof-fdof:]
 
             idx1 = np.arange(4*fdof+2*idof, 4*fdof+3*idof)[:, None]
             A[:, idx1, 2*cdof + np.arange(cdof)] = M[:, :idof, :]
-            A[:, idx1, 3*cdof:] = M[:,  z[0], cdof-fdof:]
+            A[:, idx1, 3*cdof + np.arange(fdof)] = M[:,  z[0], cdof-fdof:]
 
         return inv(A)
 
-    def basis(self, bc):
+    def face_basis(self, bc, index=None, barycenter=True):
+        pass
+
+    def basis(self, bc, index=None, barycenter=True):
         """
         """
         p = self.p
         mesh = self.mesh
 
         ldof = self.number_of_local_dofs()
-        
-        cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
-        fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        fdof = self.smspace.number_of_local_dofs(p=p, doftype='face') 
 
         ps = mesh.bc_to_point(bc)
         shape = ps.shape[:-1] + (ldof, 3)
@@ -225,10 +229,39 @@ class RaviartThomasFiniteElementSpace3d:
         phi[..., 2] += np.einsum('ijm, jmn->ijn', val[..., cdof+z], c[:, 3*cdof:, :])
         return phi
 
-    def grad_basis(self, bc):
-        pass
+    def div_basis(self, bc, index=None, barycenter=True):
+        p = self.p
 
-    def div_basis(self, bc):
+        ldof = self.number_of_local_dofs('all')
+        cdof = self.smspace.number_of_local_dofs(p=p, etype='cell')
+        fdof = self.smspace.number_of_local_dofs(p=p, etype='face') 
+
+        mesh = self.mesh
+        index = index if index is not None else np.s_[:]
+        if barycenter:
+            ps = mesh.bc_to_point(bc, index=index)
+        else:
+            ps = bc
+        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
+
+        shape = ps.shape[:-1] + (ldof, )
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
+        c = self.bcoefs[index] # (NC, ldof, ldof) 
+        idx = self.smspace.face_index_1(p=p+1)
+        x = idx['x']
+        y = idx['y']
+        z = idx['z']
+
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, 0], c[:, 0*cdof:1*cdof, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, 1], c[:, 1*cdof:2*cdof, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, 2], c[:, 2*cdof:3*cdof, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+x, 0], c[:, 3*cdof:, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+y, 1], c[:, 3*cdof:, :])
+        phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+z, 2], c[:, 3*cdof:, :])
+
+        return phi
+
+    def grad_basis(self, bc):
         pass
 
     def cell_to_dof(self):
@@ -240,11 +273,6 @@ class RaviartThomasFiniteElementSpace3d:
 
     def number_of_local_dofs(self):
         return self.dof.number_of_local_dofs()
-
-    # helper function for understand RT finite element  
-
-    def show_face_frame(self, axes, index):
-        pass
 
     def show_basis(self, fig, index=0):
         """

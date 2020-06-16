@@ -17,30 +17,35 @@ class SMDof3d():
     def cell_to_dof(self, p=None):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        cdof = self.number_of_local_dofs(p=p, etype='cell')
+        cdof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = np.arange(NC*cdof).reshape(NC, cdof)
         return cell2dof
 
     def face_to_dof(self, p=None):
         mesh = self.mesh
         NF = mesh.number_of_faces()
-        fdof = self.number_of_local_dofs(p=p, etype='face')
+        fdof = self.number_of_local_dofs(p=p, doftype='face')
         face2dof = np.arange(NF*fdof).reshape(NF, fdof)
         return face2dof
 
-    def number_of_local_dofs(self, p=None, etype='cell'):
+    def number_of_local_dofs(self, p=None, doftype='cell'):
         p = self.p if p is None else p
-        if etype in {'cell', 3}:
+        if doftype in {'cell', 3}:
             return (p+1)*(p+2)*(p+3)//6
-        elif etype in {'face', 2}:
+        elif doftype in {'face', 2}:
             return (p+1)*(p+2)//2
-        elif etype in {'edge', 1}:
+        elif doftype in {'edge', 1}:
             return p+1
+        elif doftype in {'node', 0}:
+            return 0
 
-    def number_of_global_dofs(self, p=None, etype='cell'):
-        NC = self.mesh.number_of_cells()
-        ldof = self.number_of_local_dofs(p=p, etype=etype)
-        return NC*ldof
+    def number_of_global_dofs(self, p=None, doftype='cell'):
+        ldof = self.number_of_local_dofs(p=p, doftype=doftype)
+        if doftype in {'cell', 3}:
+            N = self.mesh.number_of_cells()
+        elif doftype in {'face', 2}:
+            N = self.mesh.number_of_faces()
+        return N*ldof
 
 
 class ScaledMonomialSpace3d():
@@ -122,8 +127,8 @@ class ScaledMonomialSpace3d():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
 
-    def number_of_local_dofs(self, p=None, etype='cell'):
-        return self.dof.number_of_local_dofs(p=p, etype=etype)
+    def number_of_local_dofs(self, p=None, doftype='cell'):
+        return self.dof.number_of_local_dofs(p=p, doftype=doftype)
 
     def number_of_global_dofs(self, p=None):
         return self.dof.number_of_global_dofs(p=p)
@@ -207,7 +212,7 @@ class ScaledMonomialSpace3d():
         """
         p = self.p if p is None else p
         h = self.cellsize
-        cdof = self.number_of_local_dofs(p=p, etype='cell')
+        cdof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
@@ -215,6 +220,7 @@ class ScaledMonomialSpace3d():
         shape = point.shape[:-1]+(cdof,)
         phi = np.ones(shape, dtype=self.ftype)  # (..., M, ldof)
         index = index if index is not None else np.s_[:] 
+        print('point:', point.shape)
         phi[..., 1:4] = (point - self.cellbarycenter[index])/h[index].reshape(-1, 1)
         if p > 1:
             start = 4
@@ -256,7 +262,7 @@ class ScaledMonomialSpace3d():
         bc = self.facebarycenter
         frame = self.faceframe
         
-        fdof = self.number_of_local_dofs(p=p, etype='face')
+        fdof = self.number_of_local_dofs(p=p, doftype='face')
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
@@ -396,7 +402,7 @@ class ScaledMonomialSpace3d():
     def cell_mass_matrix(self, p=None):
         """
         """
-        M = self.integralalg.cell_matrix_integral(self.basis, barycenter=False)
+        M = self.integralalg.construct_matrix(self.basis, barycenter=False)
         return M 
 
     def face_mass_matrix(self, p=None):

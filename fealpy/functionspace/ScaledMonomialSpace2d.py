@@ -50,10 +50,22 @@ class SMDof2d():
         p = self.p if p is None else p
         return (p+1)*(p+2)//2
 
-    def number_of_global_dofs(self, p=None):
-        ldof = self.number_of_local_dofs(p=p)
-        NC = self.mesh.number_of_cells()
-        return NC*ldof
+    def number_of_local_dofs(self, p=None, doftype='cell'):
+        p = self.p if p is None else p
+        if doftype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif doftype in {'face', 'edge', 1}:
+            return (p+1)
+        elif doftype in {'node', 0}:
+            return 0 
+
+    def number_of_global_dofs(self, p=None, doftype='cell'):
+        ldof = self.number_of_local_dofs(p=p, doftype=doftype)
+        if doftype in {'cell', 2}:
+            N = self.mesh.number_of_cells()
+        elif doftype in {'face', 'edge', 1}:
+            N = self.mesh.number_of_edges()
+        return N*ldof
 
 
 class ScaledMonomialSpace2d():

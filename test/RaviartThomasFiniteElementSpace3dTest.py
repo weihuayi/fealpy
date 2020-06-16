@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 
-
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -17,7 +17,7 @@ class RaviartThomasFiniteElementSpace3dTest:
     def __init__(self):
         self.meshfactory = MeshFactory()
 
-    def show_basis_test(self, p=0):
+    def show_basis(self, p=0):
         mesh = self.meshfactory.one_tetrahedron_mesh(ttype='equ')
         space = RaviartThomasFiniteElementSpace3d(mesh, p=p, q=2)
         fig = plt.figure()
@@ -26,4 +26,7 @@ class RaviartThomasFiniteElementSpace3dTest:
 
 
 test = RaviartThomasFiniteElementSpace3dTest()
-test.show_basis_test(p=0)
+
+if sys.argv[1] == "show_basis":
+    p = int(sys.argv[2])
+    test.show_basis(p=p)

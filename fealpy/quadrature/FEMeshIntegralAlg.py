@@ -32,10 +32,15 @@ class FEMeshIntegralAlg():
 
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        phi0 = basis0(bcs)
-        phi1 = phi0 if basis1 is None else basis1(bcs)
+        if barycenter:
+            phi0 = basis0(bcs)
+            phi1 = phi0 if basis1 is None else basis1(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs)
+            phi0 = basis0(ps)
+            phi1 = phi0 if basis1 is None else basis1(ps)
 
         M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                 self.cellmeasure, optimize=True)

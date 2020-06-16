@@ -83,22 +83,22 @@ class RTDof2d:
         p = self.p
         if doftype == 'all': # number of all dofs on a cell 
             return (p+1)*(p+3) 
-        elif doftype == 'cell': # number of dofs inside the cell 
+        elif doftype in {'cell', 2}: # number of dofs inside the cell 
             return p*(p+1) 
-        elif doftype in {'face', 'edge'}: # number of dofs on a edge 
+        elif doftype in {'face', 'edge', 1}: # number of dofs on a edge 
             return p+1
-        elif doftype == 'node': # number of dofs on a node
+        elif doftype in {'node', 0}: # number of dofs on a node
             return 0
 
     def number_of_global_dofs(self):
         p = self.p
 
         NE = self.mesh.number_of_edges()
-        edof = self.number_of_local_dofs('edge') 
+        edof = self.number_of_local_dofs(doftype='edge') 
         gdof = NE*edof
         if p > 0:
             NC = self.mesh.number_of_cells()
-            cdof = self.number_of_local_dofs('cell')
+            cdof = self.number_of_local_dofs(doftype='cell')
             gdof += NC*cdof
         return gdof 
 
@@ -189,9 +189,11 @@ class RaviartThomasFiniteElementSpace2d:
             idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
             A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
             A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  y[0], ndof-edof:]
-        print(A)
-
         return inv(A)
+
+    def face_basis(self, bc, index=None, barycenter=True):
+        return self.edge_basis(bc, index, barycenter)
+
 
     def edge_basis(self, bc, index=None, barycenter=True):
         """
@@ -205,21 +207,20 @@ class RaviartThomasFiniteElementSpace2d:
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         index = index if index is not None else np.s_[:]
+
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
 
-        index = edge2cell[index, 0] # the index of left cell of each edge 
-        val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NE, ndof)
+        val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
 
         shape = ps.shape[:-1] + (edof, 2)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
-        idx0 = edge2cell[index, 0][:, None, None]
-        idx1 = np.arange(ldof).reshape(1, ldof, 1)
-        idx2 = (edge2cell[index[:, None], [2]]*edof + np.arange(edof))[:, None, :]
-        c = self.bcoefs[idx0, idx1, idx2] # (NE, ldof, edof) 
+        idx0 = edge2cell[index, 0][:, None]
+        idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         x = np.arange(ndof, ndof+edof)
         y = x + 1
         phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
@@ -279,6 +280,7 @@ class RaviartThomasFiniteElementSpace2d:
 
     def div_basis(self, bc, index=None, barycenter=True):
         p = self.p
+
         ldof = self.number_of_local_dofs('all')
         edof = self.number_of_local_dofs('edge') 
         ndof = self.smspace.number_of_local_dofs(p=p) 
@@ -392,7 +394,7 @@ class RaviartThomasFiniteElementSpace2d:
     def source_vector(self, f, dim=None, barycenter=False):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
+        b = -self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
                 gdof=gdof, dim=dim, barycenter=barycenter) 
         return b
 
@@ -424,22 +426,17 @@ class RaviartThomasFiniteElementSpace2d:
                 bc = self.mesh.entity_barycenter('edge', index=index)
                 flag = threshold(bc)
                 index = index[flag]
-
-        print(index)
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        phi = self.basis(ps, index=edge2cell[index, 0], barycenter=False) 
-        #phi = self.edge_basis(bcs, index=index) 
         en = mesh.edge_unit_normal(index=index)
+        phi = self.edge_basis(bcs, index=index) 
 
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = -g(ps)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
         F = np.zeros(gdof, dtype=self.ftype)
         bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
-        idx0 = np.arange(len(index))[:, None]
-        idx1 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
-        np.add.at(F, edge2dof[index], bb[idx0, idx1])
+        np.add.at(F, edge2dof[index], bb)
         return F 
 
     def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
