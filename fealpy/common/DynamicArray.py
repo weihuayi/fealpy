@@ -25,28 +25,29 @@ class DynamicArray(object):
             for method_name in cls.MAGIC_METHODS:
                 setattr(cls, method_name, property(make_delegate(method_name)))
 
-    def __init__(self, array_or_shape=(None,), dtype=None, capacity=10,
+    def __init__(self, array_or_shape=(None,), dtype=None, capacity=10, val=0,
                  allow_views_on_resize=False):
 
         if isinstance(array_or_shape, tuple):
-            if not len(array_or_shape) or array_or_shape[0] is not None:
-                raise ValueError('The shape argument must be a non-empty tuple '
-                                 'and have None as the first dimension')
             self._shape = array_or_shape
             self._dtype = dtype
-            self._size = 0
-            self._capacity = capacity
+            self._size = 0 if array_or_shape[0] is None else array_or_shape[0]
+            self._capacity = max(self._size, capacity)
+            self.ndim = len(self._shape)
         elif isinstance(array_or_shape, np.ndarray):
             self._shape = (None,) + array_or_shape.shape[1:]
             self._dtype = dtype or array_or_shape.dtype
             self._size = array_or_shape.shape[0]
             self._capacity = max(self._size, capacity)
+            self.ndim = len(self._shape)
 
         self._data = np.empty((self._capacity,) + self._get_trailing_dimensions(),
                               dtype=self._dtype)
 
         if isinstance(array_or_shape, np.ndarray):
             self[:] = array_or_shape
+        else:
+            self[:] = val
         self._allow_views_on_resize = allow_views_on_resize
 
     def _get_trailing_dimensions(self):

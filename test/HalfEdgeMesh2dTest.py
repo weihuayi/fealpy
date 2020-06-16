@@ -19,15 +19,14 @@ class HalfEdgeMesh2dTest:
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
         mesh = TriangleMesh(node, cell)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
-        halfedge = mesh.ds.halfedge
-        print(halfedge)
-        print(mesh.ds.hcell)
-        print(mesh.ds.hedge)
+        mesh.print()
 
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
 
     def from_edges(self, plot=True):
@@ -44,6 +43,7 @@ class HalfEdgeMesh2dTest:
             axes = fig.gca()
             mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
 
     def tiling_test(self, plot=True):
@@ -56,8 +56,8 @@ class HalfEdgeMesh2dTest:
 
 test = HalfEdgeMesh2dTest()
 
-if sys.argv[1] == "ds":
-    test.data_structure_test()
+if sys.argv[1] == "data_structure":
+    test.data_structure()
 elif sys.argv[1] == 'from_edges':
     test.from_edges()
 

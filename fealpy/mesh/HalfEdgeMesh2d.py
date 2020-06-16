@@ -11,6 +11,9 @@ from ..common import DynamicArray
 class HalfEdgeMesh2d(Mesh2d):
     def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None):
         """
+        这是一个用半边数据结构存储网格拓扑关系的类。半边数据结构表示的网格更适和
+        网格的自适应算法的实现。
+
         Parameters
         ----------
         node : (NN, GD)
@@ -25,6 +28,15 @@ class HalfEdgeMesh2d(Mesh2d):
              0: 表示外部无界区域
             -n: n >= 1, 表示编号为 -n 洞
              n: n >= 1, 表示编号为  n 的内部子区域
+
+        Notes
+        -----
+        这个类的核心数组都是动态数组， 可以根据网格实体数组的变化动态增加长度，
+        理论上可有效减少内存开辟的次数。
+
+        Reference
+        ---------
+        [1] https://github.com/maciejkula/dynarray/blob/master/dynarray/dynamic_array.py
 
         """
 
@@ -135,14 +147,24 @@ class HalfEdgeMesh2d(Mesh2d):
 
         return cls(node, halfedge, cell2subdomain) 
 
+    @classmethod
+    def from_poly(self):
+        """
+
+        Reference
+        ---------
+        [.poly files] https://www.cs.cmu.edu/~quake/triangle.poly.html
+        """
+        pass
+
     def init_level_info(self):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
 
         NC = self.number_of_all_cells() # 实际单元个数
-        self.celldata['level'] = np.zeros(NC, dtype=self.itype)
-        self.halfedgedata['level'] = np.zeros(2*NE, dtype=self.itype)
-        self.nodedata['level'] = np.zeros(NN, dtype=self.itype)
+        self.halfedgedata['level'] = DynamicArray((2*NE, ), val=0, dtype=np.uint8)
+        self.celldata['level'] = DynamicArray((NC, ), val=0, dtype=np.uint8) 
+        self.nodedata['level'] = DynamicArray((NN, ), val=0, dtype=np.uint8)
 
     def number_of_all_cells(self):
         return self.ds.number_of_all_cells()
@@ -193,9 +215,9 @@ class HalfEdgeMesh2d(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge_to_node()
         elif etype in {'halfedge'}:
-            return self.ds.halfedge
+            return self.ds.halfedge # DynamicArray
         elif etype in {'node', 0}:
-            return self.node
+            return self.node # DynamicArrray
         else:
             raise ValueError("`entitytype` is wrong!")
 
@@ -203,9 +225,13 @@ class HalfEdgeMesh2d(Mesh2d):
         node = self.node
         dim = self.geo_dimension()
         if etype in {'cell', 2}:
+            # 这里是单元顶点坐标的平均位置
             cell2node = self.ds.cell_to_node(return_sparse=True)
-            NV = self.ds.number_of_vertices_of_cells().reshape(-1,1)
-            bc = cell2node*node/NV
+            if self.ds.NV is None:
+                NV = self.ds.number_of_vertices_of_cells()
+                bc = cell2node@node/NV[:, None]
+            else:
+                bc = cell2node@node/NV
         elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge_to_node()
             bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
@@ -215,41 +241,57 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def node_normal(self):
         node = self.node
-        cell, cellLocation = self.entity('cell') # TODO: for tri and quad case
-        idx1 = np.zeros(cell.shape[0], dtype=np.int)
-        idx2 = np.zeros(cell.shape[0], dtype=np.int)
+        cell = self.entity('cell') 
+        if isinstance(cell, tuple):
+            cell, cellLocation = cell
+            idx1 = np.zeros(cell.shape[0], dtype=np.int)
+            idx2 = np.zeros(cell.shape[0], dtype=np.int)
 
-        idx1[0:-1] = cell[1:]
-        idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
-        idx2[1:] = cell[0:-1]
-        idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
-        w = np.array([(0,-1),(1,0)])
-        d = node[idx1] - node[idx2]
-        return 0.5*d@w
+            idx1[0:-1] = cell[1:]
+            idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]
+            idx2[1:] = cell[0:-1]
+            idx2[cellLocation[:-1]] = cell[cellLocation[1:]-1]
+            w = np.array([(0,-1),(1,0)])
+            d = node[idx1] - node[idx2]
+            return 0.5*d@w
+        else:
+            assert self.ds.NV == 3 or self.ds.NV == 4
+            # TODO: for tri and quad case
 
     def cell_area(self, index=None):
         NC = self.number_of_cells()
         node = self.entity('node')
-        halfedge = self.ds.halfedge
-        hflag = self.ds.hflag
-        cidxmap = self.ds.cidxmap
+
+        halfedge = self.ds.halfedge # DynamicArray
+        hflag = self.ds.subdomain[halfedge[:, 1]] > 0
+        cstart = self.ds.cstart
 
         e0 = halfedge[halfedge[hflag, 3], 0]
         e1 = halfedge[hflag, 0]
 
         w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v= (node[e1] - node[e0])@w
+        v = (node[e1] - node[e0])@w
         val = np.sum(v*node[e0], axis=1)
 
         a = np.zeros(NC, dtype=self.ftype)
-        np.add.at(a, cidxmap[halfedge[hflag, 1]], val)
+        np.add.at(a, halfedge[hflag, 1] - cstart, val)
         a /=2
         return a
 
     def cell_barycenter(self, return_all=False):
+        """
+        这里是单元的物理重心。
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+
+        """
         GD = self.geo_dimension()
-        node = self.entity('node')
-        halfedge = self.ds.halfedge
+        node = self.entity('node') # DynamicArray
+        halfedge = self.ds.halfedge # DynamicArray
         if return_all:
             NC = self.number_of_all_cells()
             e0 = halfedge[halfedge[:, 3], 0]
@@ -268,8 +310,8 @@ class HalfEdgeMesh2d(Mesh2d):
             return c
         else:
             NC = self.number_of_cells()
-            hflag = self.ds.hflag
-            cidxmap = self.ds.cidxmap
+            hflag = self.ds.subdomain[halfedge[:, 1]] > 0
+            cstart = self.ds.cellstart
             e0 = halfedge[halfedge[hflag, 3], 0]
             e1 = halfedge[hflag, 0]
             w = np.array([[0, -1], [1, 0]], dtype=np.int)
@@ -278,13 +320,30 @@ class HalfEdgeMesh2d(Mesh2d):
             ec = val.reshape(-1, 1)*(node[e1]+node[e0])/2
             a = np.zeros(NC, dtype=self.ftype)
             c = np.zeros((NC, GD), dtype=self.ftype)
-            np.add.at(a, cidxmap[halfedge[hflag, 1]], val)
-            np.add.at(c, (cidxmap[halfedge[hflag, 1]], np.s_[:]), ec)
+            np.add.at(a, halfedge[hflag, 1] - cstart, val)
+            np.add.at(c, (halfedge[hflag, 1] - cstart, np.s_[:]), ec)
             a /=2
             c /=3*a.reshape(-1, 1)
             return c
 
+    def bc_to_point(self, bc, etype='cell', index=None):
+        """
+
+        Parameters
+        ----------
+        bc : (3, ) or (NQ, 3)
+        etype : 'cell' or 'edge'
+        """
+        assert self.ds.NV == 3
+        node = self.entity('node')
+        entity = self.entity(etype) # default  cell
+        index = index if index is not None else np.s_[:]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
+        return p
+
     def edge_bc_to_point(self, bcs, index=None):
+        """
+        """
         node = self.entity('node')
         edge = self.entity('edge')
         index = index if index is not None else np.s_[:]
@@ -347,7 +406,7 @@ class HalfEdgeMesh2dDataStructure():
         NC = len(subdomain) # 实际单元个数, 包括外部无界区域和洞
         self.halfedge = DynamicArray(halfedge)
         
-        self.hcell = DynamicArray((NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
+        self.hcell = DynamicArray( (NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
 
         self.hcell[halfedge[:, 1]] = range(2*self.NE) # 的编号
         flag = halfedge[:, 4] - np.arange(2*self.NE) > 0
@@ -698,8 +757,8 @@ class HalfEdgeMesh2dDataStructure():
 
     def boundary_node_flag(self):
         NN = self.NN
-        halfedge =  self.halfedge
-        subdomain = self.subdomain
+        halfedge =  self.halfedge # DynamicArray
+        subdomain = self.subdomain # DynamicArray
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
         isBdNode = np.zeros(NN, dtype=np.bool)
@@ -713,8 +772,8 @@ class HalfEdgeMesh2dDataStructure():
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
         J = np.zeros(2*NE, dtype=self.itype)
-        isMainHEdge = (halfedge[:, 5] == 1)
-        J[isMainHEdge] = range(NE)
+        J[hedge] = range(NE)
+        J[halfedge[hedge, 4]] = range(NE)
         return J[isBdHEdge] 
 
     def boundary_edge(self):
@@ -722,13 +781,26 @@ class HalfEdgeMesh2dDataStructure():
         return edge[self.boundary_edge_index()]
 
     def boundary_cell_flag(self):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+
+        Reference
+        ---------
+        """
         NC = self.NC
-        halfedge =  self.halfedge
-        hflag = self.hflag
+        cstart = self.cellstart
+        halfedge =  self.halfedge # DynamicArray
+        subdomain = self.subdomain # DynamicArray
+        hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
 
         isBdCell = np.zeros(NC, dtype=np.bool)
-        idx = cidxmap[halfedge[isBdHEdge, 1]]
+        idx = halfedge[isBdHEdge, 1] - cstart
         isBdCell[idx] = True
         return isBdCell
 
