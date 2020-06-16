@@ -194,7 +194,8 @@ class RaviartThomasFiniteElementSpace2d:
         return inv(A)
 
     def edge_basis(self, bc, index=None, barycenter=True):
-
+        """
+        """
         p = self.p
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
@@ -397,15 +398,18 @@ class RaviartThomasFiniteElementSpace2d:
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
         """
-        Note
-        ----
+        Parameters
+        ----------
 
-        For mixed finite element method, the Dirichlet boundary condition of
-        Poisson problem become Neumann boundary condition, and the Neumann
-        boundary condtion become Dirichlet boundary condition.
+        Notes
+        ----
+            For mixed finite element method, the Dirichlet boundary condition of
+            Poisson problem become Neumann boundary condition, and the Neumann
+            boundary condtion become Dirichlet boundary condition.
         """
         p = self.p
         mesh = self.mesh
+        edof = self.number_of_local_dofs('edge') 
         edge2cell = mesh.ds.edge_to_cell()
         edge2dof = self.dof.edge_to_dof() 
 
@@ -421,18 +425,22 @@ class RaviartThomasFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        phi = self.edge_basis(bcs, index=index) 
+        print(index)
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        phi = self.basis(ps, index=edge2cell[index, 0], barycenter=False) 
+        #phi = self.edge_basis(bcs, index=index) 
         en = mesh.edge_unit_normal(index=index)
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = -g(ps)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
         F = np.zeros(gdof, dtype=self.ftype)
         bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
-        np.add.at(F, edge2dof[index], bb)
-        return F
+        idx0 = np.arange(len(index))[:, None]
+        idx1 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        np.add.at(F, edge2dof[index], bb[idx0, idx1])
+        return F 
 
     def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
