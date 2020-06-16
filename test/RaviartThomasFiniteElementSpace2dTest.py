@@ -85,6 +85,23 @@ class RaviartThomasFiniteElementSpace2dTest:
         error = space.integralalg.L2_error(pde.flux, vh)
         print(error)
 
+    def sympy_compute(self, plot=True):
+        import sympy as sp
+        from sympy.abc import x, y, z
+
+        if plot:
+            pde = CosCosData()
+            mesh = pde.init_mesh(n=0, meshtype='tri')
+            n = mesh.edge_unit_normal()
+            print("n:\n", n)
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
 
 
 test = RaviartThomasFiniteElementSpace2dTest()
@@ -92,6 +109,8 @@ test = RaviartThomasFiniteElementSpace2dTest()
 if sys.argv[1] == "show_basis":
     p = int(sys.argv[2])
     test.show_basis(p=p)
+elif sys.argv[1] == "sympy_compute":
+    test.sympy_compute()
 elif sys.argv[1] == "interpolation":
     n = int(sys.argv[2])
     p = int(sys.argv[3])
@@ -100,6 +119,7 @@ elif sys.argv[1] == "solve_poisson_2d":
     n = int(sys.argv[2])
     p = int(sys.argv[3])
     test.solve_poisson_2d(n=n, p=p)
+
 
 
     
