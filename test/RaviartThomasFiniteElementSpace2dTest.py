@@ -2,7 +2,7 @@
 # 
 import sys
 import numpy as np
-from scipy.sparse import bmat
+from scipy.sparse import bmat, spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
@@ -63,27 +63,37 @@ class RaviartThomasFiniteElementSpace2dTest:
         mesh = pde.init_mesh(n=n, meshtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
 
-        gdof = space.number_of_global_dofs()
+        udof = space.number_of_global_dofs()
+        pdof = space.smspace.number_of_global_dofs()
+        gdof = udof + pdof
 
-
-        vh = space.function()
-        uh = space.smspace.function()
-
+        uh = space.function()
+        ph = space.smspace.function()
+        isBdDof = space.set_dirichlet_bc(uh, pde.neumann)
         A = space.mass_matrix()
         B = space.div_matrix()
 
-        F0 = space.neumann_boundary_vector(pde.dirichlet)
+        #F0 = space.neumann_boundary_vector(pde.dirichlet)
         F1 = space.source_vector(pde.source)
 
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
-        FF = np.r_['0', F0, F1]
+        FF = np.r_['0', np.zeros(udof), F1]
 
-        x = spsolve(AA, FF)
+        x = np.r_['0', uh, ph] 
+        isBdDof = np.r_['0', isBdDof, np.zeros(len(F1), dtype=np.bool_)]
+        
+        FF -= AA@x
+        bdIdx = np.zeros(gdof, dtype=np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, gdof, gdof)
+        T = spdiags(1-bdIdx, 0, gdof, gdof)
+        AA = T@AA@T + Tbd
+        FF[isBdDof] = x[isBdDof]
+        x[:] = spsolve(AA, FF)
+        uh[:] = x[:udof]
+        ph[:] = x[udof:]
 
-        vh[:] = x[:gdof]
-        uh[:] = x[gdof:]
-
-        error = space.integralalg.L2_error(pde.flux, vh)
+        error = space.integralalg.L2_error(pde.flux, uh)
         print(error)
 
         if plot:
@@ -91,9 +101,9 @@ class RaviartThomasFiniteElementSpace2dTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes, box=box)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_edge(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
+            #mesh.find_node(axes, showindex=True)
+            #mesh.find_edge(axes, showindex=True)
+            #mesh.find_cell(axes, showindex=True)
             #node = ps.reshape(-1, 2)
             #uv = phi.reshape(-1, 2)
             #axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
