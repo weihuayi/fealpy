@@ -291,6 +291,48 @@ class HalfEdgeMesh2d(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
+    def refine_halfedge(self, isMarkedHEdge):
+        halfedge = self.ds.halfedge
+        nlevel = self.nodedata['level']
+        clevel = self.celldata['level']
+
+        hedge = self.ds.hedge
+
+        # 即是主半边, 也是标记加密的半边
+        node = self.entity('node')
+        flag0 = isMarkedHEdge[hedge]
+        idx = halfedge[hedge[flag0], 4]
+        ec = (node[halfedge[hedge[flag0], 0]] + node[halfedge[idx, 0]])/2
+        NE1 = len(ec)
+
+        #细分边
+        halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
+        flag1 = np.cumsum(isMarkedHEdge)[hedge[flag0]] # 标记加密边中的主半边
+        halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
+        halfedge1[halfedge1[flag1, 4], 0] = range(NN, NN+NE1)
+
+        hlevel1 = np.zeros(2*NE1, dtype=self.itype)
+        hlevel1[flag1] = np.maximum(nlevel[flag0], nlevel[halfedge[flag0, 3]]) + 1
+        hlevel1[~flag1] = np.maximum(nlevel[idx], nlevel[halfedge[idx, 3]])[idx0]+1
+
+        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
+        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
+        halfedge1[:, 5] = halfedge[isMarkedHEdge, 5] # 主边标记
+
+        halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
+        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+        halfedge = np.r_['0', halfedge, halfedge1]
+        halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
+        nlevel = np.r_[nlevel, nlevel1]
+
+        self.nodedata['level'] = nlevel
+        self.node = np.r_['0', node, ec]
+        self.ds.reinit(NN+NE1,  subdomain, halfedge)
+
+
     def add_halfedge_plot(self, axes,
         index=None, showindex=False,
         nodecolor='r', edgecolor=['r', 'k'], markersize=20,
