@@ -405,7 +405,6 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
 
         #hedge.extend(flag1+NE*2)
-        print('hhh', halfedge1)
         halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
         idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
         halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
