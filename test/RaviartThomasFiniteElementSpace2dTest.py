@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.pde.poisson_2d import CosCosData
+from fealpy.pde.poisson_2d import CosCosData, X2Y2Data
 from fealpy.functionspace.femdof import multi_index_matrix2d
 
 
@@ -58,8 +58,8 @@ class RaviartThomasFiniteElementSpace2dTest:
             mesh.add_plot(axes, box=box)
             plt.show()
 
-    def solve_poisson_2d(self, n=3, p=0):
-        pde = CosCosData()
+    def solve_poisson_2d(self, n=3, p=0, plot=True):
+        pde = X2Y2Data()
         mesh = pde.init_mesh(n=n, meshtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
 
@@ -71,6 +71,7 @@ class RaviartThomasFiniteElementSpace2dTest:
 
         A = space.mass_matrix()
         B = space.div_matrix()
+
         F0 = space.neumann_boundary_vector(pde.dirichlet)
         F1 = space.source_vector(pde.source)
 
@@ -84,6 +85,19 @@ class RaviartThomasFiniteElementSpace2dTest:
 
         error = space.integralalg.L2_error(pde.flux, vh)
         print(error)
+
+        if plot:
+            box = [-0.5, 1.5, -0.5, 1.5]
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes, box=box)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            #node = ps.reshape(-1, 2)
+            #uv = phi.reshape(-1, 2)
+            #axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
+            plt.show()
 
     def sympy_compute(self, plot=True):
         import sympy as sp
