@@ -232,19 +232,7 @@ init_value = {
             [0,-3],
             [-3,0],
             [3,	0]], dtype=np.int),
-#            [1,	4],
-#            [-1,-4],
-#            [4,	1],
-#            [-4,-1],
-#            [-1,4],
-#            [1,-4],
-#            [-4,1],
-#            [4,-1],
-#            [4,	0],
-#            [-4,0],
-#            [0,	4],
-#            [0,-4]
-            np.array([0.12+0j,
+           np.array([0.12+0j,
             -0.0828233+2.55012e-06j, -0.0828233-2.55012e-06j,
             -0.0828232+7.3354e-06j, -0.0828232-7.3354e-06j ,
             0.0598827+3.53369e-06j, 0.0598827-3.53369e-06j,
@@ -257,12 +245,6 @@ init_value = {
             -0.0283756+5.98718e-06j, -0.0283756-5.98718e-06j,
             -0.0130638+2.83679e-06j, -0.0130638-2.83679e-06j,
             -0.0130637+5.26915e-07j, -0.0130637-5.26915e-07j
-            #0.00877437-1.77675e-06j, 0.00877437+1.77675e-06j,
-            #0.00877434+4.90981e-07j, 0.00877434-4.90981e-07j,
-            #0.00877431-2.64002e-06j, 0.00877431+2.64002e-06j,
-            #0.00877415-1.45146e-06j, 0.00877415+1.45146e-06j,
-            #0.00860457+8.42015e-07j, 0.00860457-8.42015e-07j,
-            #0.00860409-2.26706e-06j, 0.00860409+2.26706e-06j
             ], dtype=np.complex)
             )
         }
@@ -459,7 +441,6 @@ class SCFTA1BA2CLinearModel():
 
         start = 0
         F = [w[1], w[2], w[1], w[3]]
-        print('1',F[1])
 
         np.set_printoptions(precision=15, suppress=True) 
 #         input("input")
@@ -473,24 +454,22 @@ class SCFTA1BA2CLinearModel():
 
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
-            self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
-            self.pdesolvers[i].solve(self.qf[start:start + NL])
-            #self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
-
+            #self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
+            #self.pdesolvers[i].solve(self.qf[start:start + NL])
+            self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
             start += NL - 1
         print("qf", self.qf[-1])
 #         input("input")
 
         start = 0
         F = [w[3], w[1], w[2], w[1]]
-        print('2',F[2])
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
-            self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
-            self.pdesolvers[i].solve(self.qb[start:start + NL])
-            #self.pdesolvers[i].BDF4(self.qb[start:start + NL], F[i])
+            #self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
+            #self.pdesolvers[i].solve(self.qb[start:start + NL])
+            self.pdesolvers[i].BDF4(self.qb[start:start + NL], F[i])
             start += NL - 1
-        print("qb", self.qb[430])
+        #print("qb", self.qb[-1])
 
 
     def compute_single_Q(self, index=-1):
@@ -513,13 +492,11 @@ class SCFTA1BA2CLinearModel():
     def compute_density(self):
         options = self.options
         q = self.qf*self.qb[-1::-1]
-        print('q',q[0])
 
         start = 0
         rho = []
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
-            print(NL)
             dt = self.timelines[i].current_time_step_length()
             rho.append(self.integral_time(q[start:start+NL], dt))
             start += NL - 1
