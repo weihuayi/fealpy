@@ -280,6 +280,25 @@ class ScaledMonomialSpace3d():
                 start += i+1
         return phi
 
+    def edge_basis(self, point, index=None, p=None):
+        p = self.p if p is None else p
+        if p == 0:
+            shape = len(point.shape)*(1, )
+            return np.array([1.0], dtype=self.ftype).reshape(shape)
+
+        index = index if index is not None else np.s_[:]
+        ec = self.integralalg.edgebarycenter
+        eh = self.integralalg.edgemeasure
+        et = self.mesh.edge_unit_tangent()
+        val = np.sum((point - ec[index])*et[index], axis=-1)/eh[index]
+        phi = np.ones(val.shape + (p+1,), dtype=self.ftype)
+        if p == 1:
+            phi[..., 1] = val
+        else:
+            phi[..., 1:] = val[..., np.newaxis]
+            np.multiply.accumulate(phi, axis=-1, out=phi)
+        return phi
+
     def grad_basis(self, point, index=None, p=None):
         p = self.p if p is None else p
         h = self.cellsize

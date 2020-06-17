@@ -32,7 +32,6 @@ class RaviartThomasFiniteElementSpace2dTest:
         space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
         fig = plt.figure()
         space.show_basis(fig, box=box)
-        print(space.bcoefs)
 
         cell = np.array([[3, 0, 2]], dtype=np.int)
         mesh = TriangleMesh(node, cell)

@@ -142,12 +142,16 @@ class RaviartThomasFiniteElementSpace2d:
         3*(p+1) + 2*(p+1)*p/2 = (p+1)*(p+3) 
         """
         p = self.p
-        ldof = self.number_of_local_dofs('all')  # 单元上全部自由度的个数
-        edof = self.number_of_local_dofs('edge') # 每条边内部自由度个数
-        cdof = self.number_of_local_dofs('cell') # 每个单元内部自由度个数
+        # 单元上全部自由度的个数
+        ldof = self.number_of_local_dofs(doftype='all')  
+
+        cdof = self.smspace.number_of_local_dofs(doftype='cell')
+        edof = self.smspace.number_of_local_dofs(doftype='edge')
+
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
+        GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
         
         LM, RM = self.smspace.edge_cell_mass_matrix()
@@ -157,38 +161,34 @@ class RaviartThomasFiniteElementSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
         n = mesh.edge_unit_normal() 
 
-        idx2 = np.arange(ndof)[None, None, :]
-        idx3 = np.arange(2*ndof, 2*ndof+edof)[None, None, :]
+        idx = self.smspace.edge_index_1(p=p+1)
+        x = idx['x']
+        y = idx['y']
+        idx2 = np.arange(cdof)[None, None, :]
+        idx3 = np.arange(GD*cdof, GD*cdof+edof)[None, None, :]
 
         # idx0 = edge2cell[:, [0]][:, None, None] this is a bug!!!
         idx0 = edge2cell[:, 0][:, None, None]
         idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
-
-        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*LM[:, :, :ndof]
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*LM[:, :, ndof+1:]
+        for i in range(GD):
+            A[idx0, idx1, i*cdof + idx2] = n[:, i, None, None]*LM[:, :, :cdof]
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  cdof+x] + n[:, 1, None, None]*LM[:, :, cdof+y]
 
         # idx0 = edge2cell[:, [1]][:, None, None] this is a bug!!!
         idx0 = edge2cell[:, 1][:, None, None]
         idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
-
-        A[idx0, idx1, 0*ndof + idx2] = n[:, 0, None, None]*RM[:, :, :ndof]
-        A[idx0, idx1, 1*ndof + idx2] = n[:, 1, None, None]*RM[:, :, :ndof]
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  ndof:ndof+edof] + n[:, 1, None, None]*RM[:, :, ndof+1:]
+        for i in range(GD):
+            A[idx0, idx1, i*cdof + idx2] = n[:, i, None, None]*RM[:, :, :cdof]
+        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  cdof+x] + n[:, 1, None, None]*RM[:, :, cdof+y]
 
         if p > 0:
             M = self.smspace.mass_matrix()
             idx = self.smspace.diff_index_1()
-            x = idx['x']
-            y = idx['y']
-            idof = (p+1)*p//2
-            idx1 = np.arange(3*edof, 3*edof+idof)[:, None]
-            A[:, idx1, 0*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  x[0], ndof-edof:]
-
-            idx1 = np.arange(3*edof+idof, 3*edof+2*idof)[:, None]
-            A[:, idx1, 1*ndof + np.arange(ndof)] = M[:, :idof, :]
-            A[:, idx1, 2*ndof + np.arange(edof)] = M[:,  y[0], ndof-edof:]
+            idof = self.smspace.number_of_local_dofs(p=p-1, doftype='cell') 
+            for i, key in enumerate(idx.keys()):
+                index = np.arange((GD+1)*edof + i*idof, (GD+1)*edof+ (i+1)*idof)[:, None]
+                A[:, index, i*cdof + np.arange(cdof)] = M[:, :idof, :]
+                A[:, index, GD*cdof + np.arange(edof)] = M[:,  idx[key][0], cdof-edof:]
         return inv(A)
 
     def face_basis(self, bc, index=None, barycenter=True):
@@ -199,34 +199,33 @@ class RaviartThomasFiniteElementSpace2d:
         """
         """
         p = self.p
+
+        ldof = self.number_of_local_dofs(doftype='all')
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
+
         mesh = self.mesh
+        GD = mesh.geo_dimension()
         edge2cell = mesh.ds.edge_to_cell()
 
-        ldof = self.number_of_local_dofs('all')
-        edof = self.number_of_local_dofs('edge') 
-        ndof = self.smspace.number_of_local_dofs(p=p) 
-
         index = index if index is not None else np.s_[:]
-
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
-
         val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
 
-        shape = ps.shape[:-1] + (edof, 2)
+        shape = ps.shape[:-1] + (edof, GD)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
         idx0 = edge2cell[index, 0][:, None]
         idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
-        x = np.arange(ndof, ndof+edof)
-        y = x + 1
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
+        idx = self.smspace.edge_index_1(p=p+1)
+
+        for i, key in enumerate(idx.keys()):
+            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
+            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
     def basis(self, bc, index=None, barycenter=True):
@@ -253,39 +252,42 @@ class RaviartThomasFiniteElementSpace2d:
 
         """
         p = self.p
-        ldof = self.number_of_local_dofs('all')
-        edof = self.number_of_local_dofs('edge') 
-        ndof = self.smspace.number_of_local_dofs(p=p) 
+
+        # 每个单元上的全部自由度个数
+        ldof = self.number_of_local_dofs(doftype='all') 
+
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
 
         mesh = self.mesh
+        GD = mesh.geo_dimension()
+
         index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
             ps = bc
-
         val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
 
-        shape = ps.shape[:-1] + (ldof, 2)
+        shape = ps.shape[:-1] + (ldof, GD)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
 
         c = self.bcoefs[index] # (NC, ldof, ldof) 
-        x = np.arange(ndof, ndof+edof)
-        y = x + 1
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 0*ndof:1*ndof, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :ndof], c[:, 1*ndof:2*ndof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., x], c[:, 2*ndof:, :])
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., y], c[:, 2*ndof:, :])
+        idx = self.smspace.edge_index_1(p=p+1)
+
+        for i, key in enumerate(idx.keys()):
+            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
+            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
     def div_basis(self, bc, index=None, barycenter=True):
         p = self.p
-
         ldof = self.number_of_local_dofs('all')
-        edof = self.number_of_local_dofs('edge') 
-        ndof = self.smspace.number_of_local_dofs(p=p) 
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
 
         mesh = self.mesh
+        GD = mesh.geo_dimension()
         index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, index=index)
@@ -295,13 +297,13 @@ class RaviartThomasFiniteElementSpace2d:
 
         shape = ps.shape[:-1] + (ldof, )
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
+
         c = self.bcoefs[index] # (NC, ldof, ldof) 
-        x = np.arange(ndof, ndof+edof)
-        y = x + 1
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :ndof, 0], c[:, 0*ndof:1*ndof, :])
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :ndof, 1], c[:, 1*ndof:2*ndof, :])
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., x, 0], c[:, 2*ndof:, :])
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., y, 1], c[:, 2*ndof:, :])
+        idx = self.smspace.face_index_1(p=p+1)
+
+        for i, key in enumerate(idx.keys()):
+            phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, i], c[:, i*cdof:(i+1)*cdof, :])
+            phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key], i], c[:, GD*cdof:, :])
         return phi
 
     def grad_basis(self, bc):
@@ -411,7 +413,7 @@ class RaviartThomasFiniteElementSpace2d:
         """
         p = self.p
         mesh = self.mesh
-        edof = self.number_of_local_dofs('edge') 
+        edof = self.smspace.number_of_local_dofs(doftype='edge') 
         edge2cell = mesh.ds.edge_to_cell()
         edge2dof = self.dof.edge_to_dof() 
 
