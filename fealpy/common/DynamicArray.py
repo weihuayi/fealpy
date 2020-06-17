@@ -25,28 +25,44 @@ class DynamicArray(object):
             for method_name in cls.MAGIC_METHODS:
                 setattr(cls, method_name, property(make_delegate(method_name)))
 
-    def __init__(self, array_or_shape=(None,), dtype=None, capacity=10, val=0):
+    def __init__(self, data, dtype=None, capacity=1000):
 
-        if isinstance(array_or_shape, tuple):
-            self.shape = array_or_shape
-            self.dtype = dtype
-            self.size = 0 if array_or_shape[0] is None else array_or_shape[0]
-            self.capacity = max(self._size, capacity)
-            self.ndim = len(self._shape)
-        elif isinstance(array_or_shape, np.ndarray):
-            self.shape = (None,) + array_or_shape.shape[1:]
-            self.dtype = dtype or array_or_shape.dtype
-            self.size = array_or_shape.shape[0]
-            self.capacity = max(self._size, capacity)
-            self.ndim = len(self._shape)
+        if isinstance(data, int): 
+            self.shape = (data, )
+            self.dtype = dtype or np.int_
+            self.size = data 
+            self.capacity = max(self.size, capacity)
+            self.ndim = len(self.shape)
+            self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
+                                  dtype=self.dtype)
+        elif isinstance(data, tuple):
+            self.shape = data 
+            self.dtype = dtype or np.int_
+            self.size = data[0] 
+            self.capacity = max(self.size, capacity)
+            self.ndim = len(self.shape)
+            self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
+                                  dtype=self.dtype)
+        elif isinstance(data, list):
+            self.shape = (len(data), len(data[0])) if isinstance(data[0], list) else (len(data), )
+            self.dtype = dtype or np.int_
+            self.size = len(data) 
+            self.capacity = max(self.size, capacity)
+            self.ndim = len(self.shape)
+            self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
+                                  dtype=self.dtype)
+            self.data[:self.size] = data
 
-        self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
-                              dtype=self.dtype)
+        elif isinstance(data, np.ndarray):
+            self.shape = data.shape
+            self.dtype = dtype or data.dtype
+            self.size = self.shape[0]
+            self.capacity = max(self.size, capacity)
+            self.ndim = len(self.shape)
+            self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
+                                  dtype=self.dtype)
+            self.data[:self.size] = data
 
-        if isinstance(array_or_shape, np.ndarray):
-            self[:] = array_or_shape
-        else:
-            self[:] = val
 
     def _get_trailing_dimensions(self):
         return self.shape[1:]
@@ -102,7 +118,7 @@ class DynamicArray(object):
         required_size = self.size + values.shape[0]
 
         if required_size >= self.capacity:
-            self._grow(max(self.capacity * 2,
+            self.grow(max(self.capacity * 2,
                            required_size))
 
         self.data[self.size:required_size] = values
@@ -113,10 +129,6 @@ class DynamicArray(object):
         Reduce the array's capacity to its size.
         """
         self.grow(self.size)
-
-    @property
-    def shape(self):
-        return (self.size,) + self._get_trailing_dimensions()
 
     def __len__(self):
         return self.shape[0]
