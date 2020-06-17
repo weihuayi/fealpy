@@ -10,8 +10,8 @@ class ParabolicFourierSolver():
         self.E1 = np.exp(-dt*self.k2)
         self.E3 = np.exp(-dt/2*self.k2)
 
-        print("E1", self.E1.dtype)
-        print("E3", self.E3.dtype)
+        #print("E1", self.E1.dtype)
+        #print("E3", self.E3.dtype)
 
     def initialize(self, q, w):
         """
@@ -59,7 +59,51 @@ class ParabolicFourierSolver():
             q1 *= E2
             q[i] *= -1/3
             q[i] += 4*q1/3
+            
+    def split(self, q, w, dt, T):
+        space = self.space
+        self.w = w
+        self.E1 = np.exp(-dt*self.k2)
+        self.E0 = np.exp(-dt/2*w)
 
+        E0 = self.E0
+        E1 = self.E1
+
+        for i in range(1, T):
+            q0 = q[i-1]
+            q1 = space.ifftn(E0*q0)
+            q1 *= E1
+            q[i] = space.fftn(q1).real
+            q[i] *= E0
+        return q
+    
+    def interpolation(self, q, w):
+        dt = self.timeline.current_time_step_length()
+        q1 = self.split(q, w, dt, 4)
+        qhalf = self.split(q, w, 0.5*dt, 7)
+        for i in (1,4):
+            q[i] = -1/3*q1[i] + 4/3*qhalf[2*i]
+        return q
+    
+    def BDF4(self, q, w):
+        space = self.space
+        NL = self.timeline.number_of_time_levels()
+        dt = self.timeline.current_time_step_length()
+        k2 = self.k2
+        q1 = self.interpolation(q, w)
+        q[1:4] = q1[1:4]
+
+        for i in range(4, NL):
+            q0 = 4*q[i-1] - 3*q[i-2] + 4*q[i-3]/3 - q[i-4]/4
+            q1 = 4*q[i-1] - 6*q[i-2] + 4*q[i-3] - q[i-4]
+            q1 *= w
+            q1 *= dt
+            q0 -= q1
+            q1 = space.ifftn(q0)
+            q1 /= 25/12 + dt*k2
+            q[i] = space.fftn(q1).real
+
+    
     def solve(self, q): 
         space = self.space
         NL = self.timeline.number_of_time_levels()

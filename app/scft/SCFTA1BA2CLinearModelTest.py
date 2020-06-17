@@ -39,9 +39,18 @@ class SCFTA1BA2CLinearModelTest():
 
 
     def run(self, rdir):
-        rhoA = init_value['C42A']
-        rhoB = init_value['C42B']
-        rhoC = init_value['C42C']
+        #rhoA = init_value['C42A']
+        #rhoB = init_value['C42B']
+        #rhoC = init_value['C42C']
+        rhoB = init_value['LAM']
+        rhoA = (
+                np.array([[0, 0], [0, 0]], dtype=np.int),
+                np.array([0, 0], dtype=np.float)
+                )
+        rhoC = (
+                np.array([[0, 0], [0, 0]], dtype=np.int),
+                np.array([0, 0], dtype=np.float)
+                )
         box = np.array([[4.1, 0], [0, 4.1]], dtype=np.float)
         fC  = 0.14
         fA2 = 0.29
@@ -60,10 +69,12 @@ class SCFTA1BA2CLinearModelTest():
             for i in range(1):
                 print("step:", i)
                 model.compute()
+                print(model.H)
+                print(model.rho[0])
                 #model.test_compute_single_Q(i, rdir)
                 ng = list(map(model.space.function_norm, model.grad))
                 print("l2 norm of grad:", ng)
-                model.update_field()
+                model.update_field(alpha = 0.01)
 
                 fig = plt.figure()
                 for j in range(4):
@@ -85,5 +96,6 @@ test = SCFTA1BA2CLinearModelTest()
 if sys.argv[1] == "init_value":
     test.init_value()
 elif sys.argv[1] == "run":
-    test.run()
+    test.run(rdir='./results')
+
 
