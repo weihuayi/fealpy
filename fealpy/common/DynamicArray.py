@@ -40,7 +40,6 @@ class DynamicArray(object):
             self._size = array_or_shape.shape[0]
             self._capacity = max(self._size, capacity)
             self.ndim = len(self._shape)
-
         self._data = np.empty((self._capacity,) + self._get_trailing_dimensions(),
                               dtype=self._dtype)
 

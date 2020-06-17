@@ -43,7 +43,9 @@ class HalfEdgeMesh2d(Mesh2d):
         self.itype = halfedge.dtype
         self.ftype = node.dtype
 
-        self.node = DynamicArray(node)
+        self.node = DynamicArray(node, dtype = self.ftype)
+        halfedge = DynamicArray(halfedge, dtype=self.itype)
+        subdomain = DynamicArray(subdomain, dtype=self.itype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, 
                 subdomain, NN = node.shape[0], NV=NV)
         self.meshtype = 'halfedge2d'
@@ -350,6 +352,72 @@ class HalfEdgeMesh2d(Mesh2d):
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
 
+    def mark_halfedge(self, isMarkedCell, method='poly'):
+        clevel = self.celldata['level'] # 注意这里是所有的单元的层信息
+        nlevel = self.nodedata['level']
+        halfedge = self.ds.halfedge
+        if method == 'poly':
+            # 当前半边的层标记小于等于所属单元的层标记
+            flag0 = (nlevel[halfedge[:, 0]] - clevel[halfedge[:, 1]]) <= 0 
+            # 前一半边的层标记小于等于所属单元的层标记 
+            pre = halfedge[:, 3]
+            flag1 = (nlevel[halfedge[pre, 0]] - clevel[halfedge[:, 1]]) <= 0
+            # 标记加密的半边
+            isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
+            # 标记加密的半边的相对半边也需要标记 
+            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+            isMarkedHEdge[flag] = True
+        elif method == 'quad':
+            pass
+        elif method == 'rg':
+            pass
+        elif method == 'rgb':
+            pass
+        return isMarkedHEdge
+
+    def refine_halfedge(self, isMarkedHEdge):
+        halfedge = self.ds.halfedge
+        nlevel = self.nodedata['level']
+        clevel = self.celldata['level']
+        NE = len(halfedge)//2
+        hedge = self.ds.hedge
+
+        # 即是主半边, 也是标记加密的半边
+        node = self.entity('node')
+        NN = len(node)
+        flag0 = hedge[isMarkedHEdge[hedge]]
+        idx = halfedge[flag0, 4]
+        ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
+        NE1 = len(ec)
+
+        #细分边
+        halfedge1 = np.zeros((2*NE1, 5), dtype=self.itype)
+        flag1 = np.cumsum(isMarkedHEdge)[flag0]-1 # 标记加密边中的主半边, flag1是加密的主半边 flag0 在所有需要加密的边中的编号
+        flag2 = np.cumsum(isMarkedHEdge)[idx]-1
+        halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
+        halfedge1[flag2, 0] = range(NN, NN+NE1)
+        nlevel1 = np.zeros(NE1, dtype=self.itype)
+        nlevel1 = np.maximum(nlevel[halfedge[flag0, 0]], 
+                nlevel[halfedge[halfedge[flag0, 3], 0]]) + 1
+
+        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
+        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
+
+        #hedge.extend(flag1+NE*2)
+        halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
+        idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
+
+        halfedge.extend(halfedge1)
+        halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
+        nlevel = np.r_[nlevel, nlevel1]
+
+        self.nodedata['level'] = nlevel
+        self.node.extend(ec)
+        self.ds.reinit(halfedge, self.ds.subdomain, NN=NN+NE1)
+
+
     def add_halfedge_plot(self, axes,
         index=None, showindex=False,
         nodecolor='r', edgecolor=['r', 'k'], markersize=20,
@@ -385,12 +453,13 @@ class HalfEdgeMesh2dDataStructure():
         ----
         self.halfedge, self.subdomain, self.hcell, self.hedge are DynamicArray
         """
-        self.itype = halfedge.dtype
+        self.itype = halfedge._dtype
+        self.halfedge = halfedge
 
         self.NN = NN
         self.NE = len(halfedge)//2
         self.NF = self.NE
-        self.subdomain = DynamicArray(subdomain)
+        self.subdomain = subdomain
 
         # 区域内部的单元标记, 这里默认排前面的都是洞, 或者外部无界区域.
         idx, = np.nonzero(subdomain == 0)
@@ -404,8 +473,7 @@ class HalfEdgeMesh2dDataStructure():
         self.NC = len(subdomain) - self.cellstart # 区域内单元的个数
 
         NC = len(subdomain) # 实际单元个数, 包括外部无界区域和洞
-        self.halfedge = DynamicArray(halfedge)
-        
+
         self.hcell = DynamicArray( (NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
 
         self.hcell[halfedge[:, 1]] = range(2*self.NE) # 的编号

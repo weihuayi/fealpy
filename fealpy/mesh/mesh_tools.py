@@ -185,7 +185,6 @@ def show_halfedge_mesh(axes, mesh,
     node = mesh.entity('node')
     halfedge = mesh.entity('halfedge')
 
-
     p1 = node[halfedge[:, 0]]
     p0 = node[halfedge[halfedge[:, 4], 0]]
 
