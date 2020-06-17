@@ -31,7 +31,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         Notes
         -----
-        这个类的核心数组都是动态数组， 可以根据网格实体数组的变化动态增加长度，
+        这个类的核心数组都是动态数组， 可以根据网格实体数目的变化动态增加长度，
         理论上可有效减少内存开辟的次数。
 
         Reference
@@ -44,8 +44,6 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ftype = node.dtype
 
         self.node = DynamicArray(node, dtype = self.ftype)
-        halfedge = DynamicArray(halfedge, dtype=self.itype)
-        subdomain = DynamicArray(subdomain, dtype=self.itype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, 
                 subdomain, NN = node.shape[0], NV=NV)
         self.meshtype = 'halfedge2d'
@@ -224,8 +222,8 @@ class HalfEdgeMesh2d(Mesh2d):
             raise ValueError("`entitytype` is wrong!")
 
     def entity_barycenter(self, etype='cell', index=None):
-        node = self.node
-        dim = self.geo_dimension()
+        node = self.entity('node')
+        GD = self.geo_dimension()
         if etype in {'cell', 2}:
             # 这里是单元顶点坐标的平均位置
             cell2node = self.ds.cell_to_node(return_sparse=True)
@@ -236,8 +234,8 @@ class HalfEdgeMesh2d(Mesh2d):
                 bc = cell2node@node/NV
         elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge_to_node()
-            bc = np.sum(node[edge, :], axis=1).reshape(-1, dim)/edge.shape[1]
-        elif etype in {'node', 1}:
+            bc = np.sum(node[edge, :], axis=1).reshape(-1, GD)/edge.shape[1]
+        elif etype in {'node', 0}:
             bc = node
         return bc
 
@@ -293,7 +291,7 @@ class HalfEdgeMesh2d(Mesh2d):
         """
         GD = self.geo_dimension()
         node = self.entity('node') # DynamicArray
-        halfedge = self.ds.halfedge # DynamicArray
+        halfedge = self.entity('halfedge') # DynamicArray
         if return_all:
             NC = self.number_of_all_cells()
             e0 = halfedge[halfedge[:, 3], 0]
@@ -355,13 +353,14 @@ class HalfEdgeMesh2d(Mesh2d):
     def mark_halfedge(self, isMarkedCell, method='poly'):
         clevel = self.celldata['level'] # 注意这里是所有的单元的层信息
         nlevel = self.nodedata['level']
-        halfedge = self.ds.halfedge
+        hlevel = self.halfedgedata['level']
+        halfedge = self.entity('halfedge')
         if method == 'poly':
             # 当前半边的层标记小于等于所属单元的层标记
-            flag0 = (nlevel[halfedge[:, 0]] - clevel[halfedge[:, 1]]) <= 0 
+            flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0 
             # 前一半边的层标记小于等于所属单元的层标记 
             pre = halfedge[:, 3]
-            flag1 = (nlevel[halfedge[pre, 0]] - clevel[halfedge[:, 1]]) <= 0
+            flag1 = (hlevel[pre] - clevel[halfedge[:, 1]]) <= 0
             # 标记加密的半边
             isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
             # 标记加密的半边的相对半边也需要标记 
@@ -376,15 +375,19 @@ class HalfEdgeMesh2d(Mesh2d):
         return isMarkedHEdge
 
     def refine_halfedge(self, isMarkedHEdge):
-        halfedge = self.ds.halfedge
+
+        halfedge = self.entity('halfedge')
         nlevel = self.nodedata['level']
         clevel = self.celldata['level']
-        NE = len(halfedge)//2
-        hedge = self.ds.hedge
+        hlevel = self.halfedgedata['level'] 
+        NE = self.number_of_edges() 
+
+        hedge = self.ds.hedge # 每个边对应的主半边
 
         # 即是主半边, 也是标记加密的半边
         node = self.entity('node')
-        NN = len(node)
+        NN = self.number_of_nodes() 
+
         flag0 = hedge[isMarkedHEdge[hedge]]
         idx = halfedge[flag0, 4]
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
@@ -453,13 +456,15 @@ class HalfEdgeMesh2dDataStructure():
         ----
         self.halfedge, self.subdomain, self.hcell, self.hedge are DynamicArray
         """
-        self.itype = halfedge._dtype
-        self.halfedge = halfedge
+
+        self.itype = halfedge.dtype
+
+        self.halfedge = DynamicArray(halfedge, dtype=self.itype)
+        self.subdomain = DynamicArray(subdomain, dtype=self.itype)
 
         self.NN = NN
         self.NE = len(halfedge)//2
         self.NF = self.NE
-        self.subdomain = subdomain
 
         # 区域内部的单元标记, 这里默认排前面的都是洞, 或者外部无界区域.
         idx, = np.nonzero(subdomain == 0)
