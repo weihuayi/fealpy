@@ -20,7 +20,6 @@ class DynamicArrayTest():
     def index(self):
         a = np.arange(10*3).reshape(10, 3)
         b = DynamicArray(a, capacity=100)
-
         print(b[7:])
 
 

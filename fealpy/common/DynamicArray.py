@@ -31,7 +31,7 @@ class DynamicArray(object):
             for method_name in cls.MAGIC_METHODS:
                 setattr(cls, method_name, property(make_delegate(method_name)))
 
-    def __init__(self, data, dtype=None, capacity=1000):
+    def __init__(self, data, dtype=None, capacity=1000, val=0):
 
         if isinstance(data, int): 
             self.shape = (data, )
@@ -41,6 +41,7 @@ class DynamicArray(object):
             self.ndim = len(self.shape)
             self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
                                   dtype=self.dtype)
+            self[:] = val
         elif isinstance(data, tuple):
             self.shape = data 
             self.dtype = dtype or np.int_
@@ -49,6 +50,8 @@ class DynamicArray(object):
             self.ndim = len(self.shape)
             self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
                                   dtype=self.dtype)
+            self[:] = val
+
         elif isinstance(data, list):
             self.shape = (len(data), len(data[0])) if hasattr(data[0], '__len__') else (len(data), )
             self.dtype = dtype or np.int_
@@ -78,15 +81,16 @@ class DynamicArray(object):
     def __setitem__(self, idx, value):
         self.data[:self.size][idx] = value
 
-    def resize(self, new_size):
-        self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())
-        self.capacity = new_size
 
     def _as_dtype(self, value):
         if hasattr(value, 'dtype') and value.dtype == self.dtype:
             return value
         else:
             return np.array(value, dtype=self.dtype)
+
+    def resize(self, new_size):
+        self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())
+        self.capacity = new_size
 
     def increase_size(self, s):
         """
