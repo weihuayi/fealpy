@@ -14,20 +14,19 @@ class HalfEdgeMesh2dTest:
     def __init__(self):
         pass
 
-    def data_structure_test(self, plot=True):
+    def data_structure(self, plot=True):
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
         mesh = TriangleMesh(node, cell)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
-        halfedge = mesh.ds.halfedge
-        print(halfedge)
-        print(mesh.ds.hcell)
-        print(mesh.ds.hedge)
+        mesh.print()
 
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
 
     def from_edges(self, plot=True):
@@ -43,18 +42,43 @@ class HalfEdgeMesh2dTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
 
     def tiling_test(self, plot=True):
         pass
 
+    def dynamic_array(self):
+        pass
+
+    def refine_halfedge(self, plot=True):
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+        isMarkedCell = np.array([0, 1, 0, 0, 0], dtype=np.bool_)
+        isMarkedHEdge = mesh.mark_halfedge(isMarkedCell)
+        mesh.refine_halfedge(isMarkedHEdge)
+        mesh.print()
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+
 
 
 test = HalfEdgeMesh2dTest()
 
-if sys.argv[1] == "ds":
-    test.data_structure_test()
-
-if sys.argv[1] == 'from_edges':
+if sys.argv[1] == "data_structure":
+    test.data_structure()
+elif sys.argv[1] == 'from_edges':
     test.from_edges()
+elif sys.argv[1] == 'refine_halfedge':
+    test.refine_halfedge()
 

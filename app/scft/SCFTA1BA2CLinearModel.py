@@ -37,7 +37,7 @@ init_value = {
         ),
         "LAM":(
 	 np.array([[3, 0], [-3, 0]], dtype=np.int),
-         np.array([0.058, 0.058], dtype=np.float)
+         np.array([0.058+0.2j, 0.058+0.2j], dtype=np.complex)
          ),
         "C42C":( 
         np.array([
@@ -350,7 +350,6 @@ class SCFTA1BA2CLinearModel():
         """
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
-        self.compute_wplus()
         # solver the forward and backward equation
         self.compute_propagator()
         # compute single chain partition function Q
@@ -359,10 +358,14 @@ class SCFTA1BA2CLinearModel():
         # compute density
         self.compute_density()
         # compute energy function and its gradient
+        #self.update_field()
+        self.update_field_new()
+        
+        self.compute_wplus()
         self.compute_energe()
         self.compute_gradient()
 
-    def update_field(self, alpha=0.005):
+    def update_field(self, alpha=0.01):
         w = self.w
         rho = self.rho
         options = self.options
@@ -385,6 +388,28 @@ class SCFTA1BA2CLinearModel():
         w[3] += alpha*chiBCN*rho[1]
         w[3] += alpha*w[0]
         
+    def update_field_new(self, alpha=0.01):
+        w = self.w
+        rho = self.rho
+        options = self.options
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
+        
+        w1 = chiABN*rho[1] + chiACN*rho[2] + w[0] - w[1]
+        w1 = np.fft.fftn(w1)
+        w1[0,0] = 0
+        w[1] = np.fft.ifftn(np.fft.fftn(w[1])+alpha*w1).real
+        
+        w2 = chiABN*rho[0] + chiBCN*rho[2] + w[0] - w[2]
+        w2 = np.fft.fftn(w2)
+        w2[0,0] = 0
+        w[2] = np.fft.ifftn(np.fft.fftn(w[2])+alpha*w2).real
+        
+        w3 = chiACN*rho[0] + chiBCN*rho[1] + w[0] - w[3]
+        w3 = np.fft.fftn(w3)
+        w3[0,0] = 0
+        w[3] = np.fft.ifftn(np.fft.fftn(w[3])+alpha*w3).real
 
     def compute_wplus(self):
         w = self.w
@@ -408,14 +433,13 @@ class SCFTA1BA2CLinearModel():
         chiACN = options['chiAC']*options['ndeg']
         w = self.w
         rho = self.rho
-
         E = chiABN*rho[0]*rho[1] 
         E += chiBCN*rho[1]*rho[2]
         E += chiACN*rho[0]*rho[2]
         E -= w[1]*rho[0]
         E -= w[2]*rho[1]
         E -= w[3]*rho[2]
-        E -= w[0]*(1 - rho.sum(axis=0))
+        #E -= w[0]*(1 - rho.sum(axis=0))
         E = np.fft.ifftn(E)
         self.H = np.real(E.flat[0])
         self.H -= np.log(self.Q[0])
@@ -458,12 +482,11 @@ class SCFTA1BA2CLinearModel():
             #self.pdesolvers[i].solve(self.qf[start:start + NL])
             self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
             start += NL - 1
-        print("qf", self.qf[-1])
+        #print("qf", self.qf[-1])
 #         input("input")
 
         start = 0
-        F = [w[3], w[1], w[2], w[1]]
-        for i in range(options['nblock']):
+        for i in range(options['nblock']-1, -1,-1):
             NL = self.timelines[i].number_of_time_levels()
             #self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
             #self.pdesolvers[i].solve(self.qb[start:start + NL])
@@ -505,10 +528,10 @@ class SCFTA1BA2CLinearModel():
         self.rho[2] = rho[3]
         self.rho /= self.Q[0]
 
-#         print("densityA", rho[0])
-#         print("densityB", rho[1])
-#         print("densityC", rho[2])
-# 
+        #print("densityA", self.rho[0])
+        #print("densityB", self.rho[1])
+        #print("densityC", self.rho[2])
+ 
     def integral_time(self, q, dt):
         f = -0.625*(q[0] + q[-1]) + 1/6*(q[1] + q[-2]) - 1/24*(q[2] + q[-3])
         f += np.sum(q, axis=0)
@@ -542,7 +565,7 @@ if __name__ == "__main__":
             #model.test_compute_single_Q(i, rdir)
             ng = list(map(model.space.function_norm, model.grad))
             print("l2 norm of grad:", ng)
-            model.update_field()
+            #model.update_field()
 
             fig = plt.figure()
             for j in range(4):

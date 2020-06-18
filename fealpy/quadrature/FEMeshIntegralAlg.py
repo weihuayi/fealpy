@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
@@ -31,10 +32,15 @@ class FEMeshIntegralAlg():
 
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        phi0 = basis0(bcs)
-        phi1 = phi0 if basis1 is None else basis1(bcs)
+        if barycenter:
+            phi0 = basis0(bcs)
+            phi1 = phi0 if basis1 is None else basis1(bcs)
+        else:
+            ps = mesh.bc_to_point(bcs)
+            phi0 = basis0(ps)
+            phi1 = phi0 if basis1 is None else basis1(ps)
 
         M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                 self.cellmeasure, optimize=True)
@@ -58,7 +64,8 @@ class FEMeshIntegralAlg():
 
         return M
 
-    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None, barycenter=False):
+    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None,
+            barycenter=False, q=None):
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -68,9 +75,9 @@ class FEMeshIntegralAlg():
         else:
             ps = mesh.bc_to_point(bcs, etype='cell')
             val = f(ps)
-        phi = basis(bcs)
+            phi = basis(ps)
         bb = np.einsum('m, mi..., mik, i->ik...',
-                ws, fval, phi, self.cellmeasure)
+                ws, val, phi, self.cellmeasure)
         gdof = gdof or cell2dof.max()
         shape = (gdof, ) if dim is None else (gdof, dim)
         b = np.zeros(shape, dtype=phi.dtype)
@@ -79,29 +86,6 @@ class FEMeshIntegralAlg():
         else:
             np.add.at(b, (cell2dof, np.s_[:]), bb)
         return b
-
-    def construct_boundary_vector(self, u, basis, face2dof, threshold=None):
-        mesh = self.mesh
-        measure = self.facemeasure
-
-        qf = self.edgeintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('face', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        ps = mesh.bc_to_point(bcs, etype='face', index=index)
-        en = mesh.edge_unit_normal(index=index)
-        val = u(ps)
-
-        face2cell = mesh.ds.face_to_cell()
-        index = face2cell[index, 0]
-        phi = basis(ps, barycenter=False, index=index)
 
 
     def edge_integral(self, u, edgetype=False, q=None, barycenter=True):

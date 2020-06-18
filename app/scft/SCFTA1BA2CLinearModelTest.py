@@ -66,13 +66,14 @@ class SCFTA1BA2CLinearModelTest():
 
 
         if True:
-            for i in range(1):
+            for i in range(500):
                 print("step:", i)
                 model.compute()
+                print(model.H)
                 #model.test_compute_single_Q(i, rdir)
                 ng = list(map(model.space.function_norm, model.grad))
                 print("l2 norm of grad:", ng)
-                model.update_field(alpha = 0.01)
+                #model.update_field(alpha = 0.01)
 
                 fig = plt.figure()
                 for j in range(4):
@@ -94,6 +95,6 @@ test = SCFTA1BA2CLinearModelTest()
 if sys.argv[1] == "init_value":
     test.init_value()
 elif sys.argv[1] == "run":
-    test.run(rdir='./results')
+    test.run(rdir='./results/')
 
 

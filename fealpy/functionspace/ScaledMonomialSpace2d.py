@@ -7,7 +7,7 @@ from ..quadrature import PolygonMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
-from .femdof import multi_index_matrix2d
+from .femdof import multi_index_matrix2d, multi_index_matrix1d
 
 class SMDof2d():
     """
@@ -31,7 +31,7 @@ class SMDof2d():
         5<-->(0, 2), .....
 
         """
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 2), dtype=np.int)
@@ -42,18 +42,26 @@ class SMDof2d():
     def cell_to_dof(self, p=None):
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
         return cell2dof
 
-    def number_of_local_dofs(self, p=None):
+    def number_of_local_dofs(self, p=None, doftype='cell'):
         p = self.p if p is None else p
-        return (p+1)*(p+2)//2
+        if doftype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif doftype in {'face', 'edge', 1}:
+            return (p+1)
+        elif doftype in {'node', 0}:
+            return 0 
 
-    def number_of_global_dofs(self, p=None):
-        ldof = self.number_of_local_dofs(p=p)
-        NC = self.mesh.number_of_cells()
-        return NC*ldof
+    def number_of_global_dofs(self, p=None, doftype='cell'):
+        ldof = self.number_of_local_dofs(p=p, doftype=doftype)
+        if doftype in {'cell', 2}:
+            N = self.mesh.number_of_cells()
+        elif doftype in {'face', 'edge', 1}:
+            N = self.mesh.number_of_edges()
+        return N*ldof
 
 
 class ScaledMonomialSpace2d():
@@ -113,6 +121,30 @@ class ScaledMonomialSpace2d():
                 'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
                 'xy':(xy, index[xy, 1]*index[xy, 2]),
                 }
+
+    def face_index_1(self, p=None):
+        """
+        Parameters
+        ----------
+        p : >= 1
+        """
+        p = self.p if p is None else p
+        index = multi_index_matrix1d(p)
+        x, = np.nonzero(index[:, 0] > 0)
+        y, = np.nonzero(index[:, 1] > 0)
+        return {'x': x, 'y':y}
+
+    def edge_index_1(self, p=None):
+        """
+        Parameters
+        ----------
+        p : >= 1
+        """
+        p = self.p if p is None else p
+        index = multi_index_matrix1d(p)
+        x, = np.nonzero(index[:, 0] > 0)
+        y, = np.nonzero(index[:, 1] > 0)
+        return {'x': x, 'y':y}
 
     def index1(self, p=None):
         """
@@ -195,8 +227,7 @@ class ScaledMonomialSpace2d():
         return self.dof.cell_to_dof(p=p)
 
     def edge_basis(self, point, index=None, p=None):
-        p = p or self.p 
-
+        p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
@@ -233,7 +264,7 @@ class ScaledMonomialSpace2d():
         h = self.cellsize
         NC = self.mesh.number_of_cells()
 
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
@@ -259,10 +290,11 @@ class ScaledMonomialSpace2d():
 
         p = self.p if p is None else p 
         h = self.cellsize
-        num = len(h) if index is  None else len(index)
         index = np.s_[:] if index is None else index 
 
-        ldof = self.number_of_local_dofs(p=p)
+        num = len(h) if type(index) is slice else len(index)
+
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2)
         phi = self.basis(point, index=index, p=p-1)
         idx = self.index1(p=p)
@@ -281,7 +313,7 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
 
         area = self.cellmeasure
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof,)
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
@@ -309,7 +341,7 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
 
         area = self.cellmeasure
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2, 2)
         hphi = np.zeros(shape, dtype=np.float)
         if p > 1:
@@ -372,14 +404,17 @@ class ScaledMonomialSpace2d():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
 
-    def number_of_local_dofs(self, p=None):
-        return self.dof.number_of_local_dofs(p=p)
+    def number_of_local_dofs(self, p=None, doftype='cell'):
+        return self.dof.number_of_local_dofs(p=p, doftype=doftype)
 
     def number_of_global_dofs(self, p=None):
         return self.dof.number_of_global_dofs(p=p)
 
-    def cell_mass_matrix(self):
-        return self.matrix_H()
+    def mass_matrix(self, p=None):
+        return self.matrix_H(p=p)
+
+    def cell_mass_matrix(self, p=None):
+        return self.matrix_H(p=p)
 
     def edge_mass_matrix(self, p=None):
         p = self.p if p is None else p
@@ -398,7 +433,7 @@ class ScaledMonomialSpace2d():
         return H
 
     def edge_mass_matrix_1(self, p=None):
-        p = p or self.p
+        p = self.p if p is None else p
         mesh = self.mesh
         edge = mesh.entity('edge')
         measure = mesh.entity_measure('edge')
@@ -439,7 +474,7 @@ class ScaledMonomialSpace2d():
             return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
         A = self.integralalg.integral(f, celltype=True, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs(p=p)
@@ -460,7 +495,7 @@ class ScaledMonomialSpace2d():
         bcs, ws = qf.quadpts, qf.weights
         ps = self.mesh.edge_bc_to_point(bcs)
 
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(doftype='cell')
         shape = ps.shape[:-1] + (2*ldof, )
         phi = np.zeros(shape, dtype=self.ftype)
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
@@ -506,7 +541,7 @@ class ScaledMonomialSpace2d():
         b = node[edge[isInEdge, 0]] - self.cellbarycenter[edge2cell[isInEdge, 1]]
         H1 = np.einsum('ij, ij, ikm->ikm', b, -nm[isInEdge], H1)
 
-        ldof = self.number_of_local_dofs(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
         H = np.zeros((NC, ldof, ldof), dtype=np.float)
         np.add.at(H, edge2cell[:, 0], H0)
         np.add.at(H, edge2cell[isInEdge, 1], H1)
@@ -544,7 +579,7 @@ class ScaledMonomialSpace2d():
          interpolation sh in space into self space.
         """
         p = self.p
-        ldofs = self.number_of_local_dofs()
+        ldofs = self.number_of_local_dofs(doftype='cell')
         mesh = self.mesh
         NC = mesh.number_of_cells()
 
