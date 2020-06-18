@@ -410,8 +410,6 @@ class ScaledMonomialSpace2d():
     def number_of_global_dofs(self, p=None):
         return self.dof.number_of_global_dofs(p=p)
 
-    def mass_matrix(self, p=None):
-        return self.matrix_H(p=p)
 
     def cell_mass_matrix(self, p=None):
         return self.matrix_H(p=p)
@@ -443,9 +441,6 @@ class ScaledMonomialSpace2d():
         phi = self.edge_basis(ps, p=p)
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
-
-    def mass_matrix(self, p=None):
-        return self.matrix_H(p=p)
 
     def edge_cell_mass_matrix(self, p=None): 
         p = self.p if p is None else p
@@ -483,6 +478,16 @@ class ScaledMonomialSpace2d():
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
+
+    def mass_matrix(self, p=None):
+        M = self.cell_mass_matrix(p=p) # 单元质量矩阵
+        cell2dof = self.cell_to_dof(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs(p=p)
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
 
     def penalty_matrix(self, p=None):
         p = p or self.p
