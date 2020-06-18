@@ -266,7 +266,9 @@ def model_options(
         maxdt = 0.001,
         bA = 1,
         bB = 1,
-        bC = 1):
+        bC = 1,
+        Maxit = 1000,
+        tol = 1e-6):
         # the parameter for scft model
         options = {
                 'nspecies': nspecies,
@@ -286,7 +288,9 @@ def model_options(
                 'maxdt': maxdt,
                 'bA': bA,
                 'bB': bB,
-                'bC': bC
+                'bC': bC,
+                'Maxit':Maxit,
+                'tol':tol
                 }
         return options
 
