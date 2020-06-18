@@ -63,7 +63,6 @@ class DynamicArray(object):
                                   dtype=self.dtype)
             self.data[:self.size] = data
 
-
     def _get_trailing_dimensions(self):
         return self.shape[1:]
 
@@ -73,8 +72,8 @@ class DynamicArray(object):
     def __setitem__(self, idx, value):
         self.data[:self.size][idx] = value
 
-    def grow(self, new_size):
-        self.data.resize(((new_size,) + self._get_trailing_dimensions()))
+    def resize(self, new_size):
+        self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())
         self.capacity = new_size
 
     def _as_dtype(self, value):
@@ -83,43 +82,47 @@ class DynamicArray(object):
         else:
             return np.array(value, dtype=self.dtype)
 
-    def append(self, value):
-        """
-        Append a row to the array.
-        The row's shape has to match the array's trailing dimensions.
+    def increase_size(self, s):
         """
 
-        value = self._as_dtype(value)
+        Notes
+        -----
+            增加存储, 并返回增加部分的数组, 这里返回的是数组的视图.
+        """
+        required_size = self.size + s 
+        if required_size >= self.capacity:
+            self.resize(max(2*self.capacity, required_size))
 
-        if value.shape != self._get_trailing_dimensions():
+        data = self.data[self.size:required_size]
+        self.size = required_size
+        return data 
 
-            value_unit_shaped = value.shape == (1,) or len(value.shape) == 0
-            self_unit_shaped = self.shape == (1,) or len(self._get_trailing_dimensions()) == 0
+    def decrease_size(self, s):
+        """
 
-            if value_unit_shaped and self_unit_shaped:
-                pass
-            else:
-                raise ValueError('Input shape {} incompatible with '
-                                 'array shape {}'.format(value.shape,
-                                                         self._get_trailing_dimensions()))
-        if self.size == self.capacity:
-            self._grow(max(1, self.capacity * 2))
-        self.data[self.size] = value
-        self.size += 1
+        Notes
+        -----
+            减少存储, 并返回减少部分的数组, 这里返回的是数组的视图.
+            TODO: 引入缩减内存的机制.
+        """
+        assert s <= self.size
+        required_size = self.size - s
+        data = self.data[required_size:self.size]
+        self.size = required_size
+        return data
 
     def extend(self, values):
         """
-        Extend the array with a set of rows.
-        The rows' dimensions must match the trailing dimensions
-        of the array.
+
+        Notes
+        -----
         """
         values = self._as_dtype(values)
 
         required_size = self.size + values.shape[0]
 
         if required_size >= self.capacity:
-            self.grow(max(self.capacity * 2,
-                           required_size))
+            self.resize(max(2*self.capacity, required_size))
 
         self.data[self.size:required_size] = values
         self.size = required_size
@@ -128,7 +131,7 @@ class DynamicArray(object):
         """
         Reduce the array's capacity to its size.
         """
-        self.grow(self.size)
+        self.resize(self.size)
 
     def __len__(self):
         return self.shape[0]
@@ -137,4 +140,4 @@ class DynamicArray(object):
         return (self.data[:self.size].__repr__()
                 .replace('array',
                          'DynamicArray(size={}, capacity={})'
-                         .format(self._size, self._capacity)))
+                         .format(self.size, self.capacity)))
