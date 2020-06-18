@@ -1,28 +1,30 @@
 import sympy as sp
 from sympy.abc import x, y
+
 from ..functionspace.femdof import multi_index_matrix1d
 from ..functionspace.femdof import multi_index_matrix2d
 from ..functionspace.femdof import multi_index_matrix3d
 
 
 class MonomialSpace2d:
-    def __init__(self, p, domain=[-1, 1, -1, 1]):
+    def __init__(self, p, domain=sp.Matrix([-1, 1, -1, 1])):
         self.p = p
-        self.domain = [-1, 1, -1, 1]
+        self.domain = domain 
+        self.barycenter =  sp.Matrix([(domain[0] + domain[1])/2, (domain[2] + domain[3])/2])
         self.x, self.y = sp.symbols('x, y', real=True)
-        self.h = 2
+        self.h = domain[1] - domain[0] 
         self.phi = self.basis()
 
     def number_of_dofs(self, p=None):
         p = self.p if p is None else p
         return (p+1)*(p+2)//2
 
-    def basis(self):
-        dofs = self.number_of_dofs()
+    def basis(self, p=None):
+        p = self.p if p is None else p
+        dofs = self.number_of_dofs(p=p)
         phi = sp.ones(1, dofs)
-        p = self.p
-        phi[1] = self.x/self.h
-        phi[2] = self.y/self.h
+        phi[1] = (self.x - self.barycenter[0])/self.h
+        phi[2] = (self.y - self.barycenter[1])/self.h
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -32,17 +34,65 @@ class MonomialSpace2d:
                 start += i+1
         return phi
 
-    def integrate(self):
-        phi = self.phi
-        n = self.number_of_dofs()
+    def mass_matrix(self, p=None):
+        p = self.p if p is None else p
+        dofs = self.number_of_dofs(p=p)
+        domain = self.domain
+        phi = self.basis(p=p)
+        n = self.number_of_dofs(p=p)
         H = sp.zeros(n, n)
         for i in range(n):
             for j in range(i, n):
-                H[j, i] = H[i, j] = sp.integrate(phi[i]*phi[j], (self.x, -1, 1), (self.y, -1, 1))
+                H[j, i] = H[i, j] = sp.integrate(phi[i]*phi[j], (self.x,
+                    domain[0], domain[1]), (self.y, domain[2], domain[3]))
         return H
 
-    def jacobian(self):
-        return self.phi.jacobian([self.x, self.y])
+    def basis_jacobian(self, p=None):
+        phi = self.basis(p=p)
+        return phi.jacobian([self.x, self.y])
+
+    def vector_basis(self, p=None):
+        phi = self.basis(p=p)
+        zero = sp.ZeroMatrix(1, phi.cols) 
+        return sp.BlockMatrix([[phi, zero], [zero, phi]])
+
+    def sym_grad_vector_basis(self, p=None):
+        phi = self.basis(p=p)
+        zero = sp.ZeroMatrix(1, phi.cols) 
+        A00 = sp.BlockMatrix([[phi.diff(self.x), zero]])
+        A11 = sp.BlockMatrix([[zero, phi.diff(self.y)]])
+        A01 = sp.BlockMatrix([[phi.diff(self.y)/2, phi.diff(self.x)/2]])
+        return A00, A11, A01 
+
+    def div_sym_grad_vector_basis(self, p=None):
+        phi = self.basis(p=p)
+        xx = phi.diff(self.x, 2)
+        yy = phi.diff(self.y, 2)
+        xy = phi.diff(self.x).diff(self.y)
+        return sp.BlockMatrix([[xx + yy/2, xy/2], [xy/2, xx/2 + yy]])
+
+    def grad_space_basis(self, p=None):
+        p = self.p if p is None else p
+        phi = self.basis(p=p+1)
+        M = self.h*phi.jacobian()
+        return M
+
+    def perp_grad_space_basis(self, p=None):
+        p = self.p if p is None else p
+        if p > 1:
+            phi = self.basis(p=p-1)
+            return sp.BlockMatrix([phi[2]*phi, -phi[1]*phi])
+        else:
+            return sp.ZeroMatrix(2, 1)
+
+    def curl_vector_basis(self, p=None):
+        phi = self.basis(p=p)
+        return sp.BlockMatrix([[phi.diff(self.y), -phi.diff(self.x)]])
+
+    def div_vector_basis(self, p=None):
+        phi = self.basis(p=p)
+        return sp.BlockMatrix([[phi.diff(self.x), phi.diff(self.y)]])
+
 
     def construct_G(self):
         phi = self.phi

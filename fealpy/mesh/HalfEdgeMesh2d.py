@@ -43,7 +43,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.itype = halfedge.dtype
         self.ftype = node.dtype
 
-        self.node = DynamicArray(node, dtype = self.ftype)
+        self.node = DynamicArray(node, dtype = node.dtype)
         self.ds = HalfEdgeMesh2dDataStructure(halfedge, 
                 subdomain, NN = node.shape[0], NV=NV)
         self.meshtype = 'halfedge2d'
@@ -376,25 +376,33 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def refine_halfedge(self, isMarkedHEdge):
 
-        halfedge = self.entity('halfedge')
-        nlevel = self.nodedata['level']
-        clevel = self.celldata['level']
-        hlevel = self.halfedgedata['level'] 
+        NN = self.number_of_nodes() 
         NE = self.number_of_edges() 
 
-        hedge = self.ds.hedge # 每个边对应的主半边
+        clevel = self.celldata['level']
+        hlevel = self.halfedgedata['level'] 
+
+        halfedge = self.entity('halfedge')
+        node = self.entity('node')
+        hedge = self.ds.hedge
+        hcell = self.ds.hcell
+        subdomain = self.ds.subdomain
+
+        isMainHEdge = self.ds.main_halfedge_flag()
+
 
         # 即是主半边, 也是标记加密的半边
-        node = self.entity('node')
-        NN = self.number_of_nodes() 
-
-        flag0 = hedge[isMarkedHEdge[hedge]]
+        flag0 = isMarkedHEdge & isMainHEdge
         idx = halfedge[flag0, 4]
-        ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
-        NE1 = len(ec)
+
+        NE1 = flag0.sum()
+        newNode = node.increase_size(NE1)
+        newNode[:] = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
 
         #细分边
-        halfedge1 = np.zeros((2*NE1, 5), dtype=self.itype)
+        newHalfedge = halfedge.increase_size(2*NE1)
+        newHlevel = hlevel.increase_size(2*NE1)
+
         flag1 = np.cumsum(isMarkedHEdge)[flag0]-1 # 标记加密边中的主半边, flag1是加密的主半边 flag0 在所有需要加密的边中的编号
         flag2 = np.cumsum(isMarkedHEdge)[idx]-1
         halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
@@ -416,9 +424,6 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
         nlevel = np.r_[nlevel, nlevel1]
 
-        self.nodedata['level'] = nlevel
-        self.node.extend(ec)
-        self.ds.reinit(halfedge, self.ds.subdomain, NN=NN+NE1)
 
 
     def add_halfedge_plot(self, axes,
