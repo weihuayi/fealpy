@@ -1,5 +1,11 @@
+"""
+Notes
+-----
+
+References
+[1] https://github.com/maciejkula/dynarray.git
+"""
 import numpy as np
-# https://github.com/maciejkula/dynarray.git
 
 class DynamicArray(object):
     MAGIC_METHODS = ('__radd__',
@@ -44,7 +50,7 @@ class DynamicArray(object):
             self.data = np.empty((self.capacity,) + self._get_trailing_dimensions(),
                                   dtype=self.dtype)
         elif isinstance(data, list):
-            self.shape = (len(data), len(data[0])) if isinstance(data[0], list) else (len(data), )
+            self.shape = (len(data), len(data[0])) if hasattr(data[0], '__len__') else (len(data), )
             self.dtype = dtype or np.int_
             self.size = len(data) 
             self.capacity = max(self.size, capacity)
