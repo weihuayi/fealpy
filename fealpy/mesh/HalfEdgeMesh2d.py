@@ -468,14 +468,10 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # 细分单元
         flag = (hlevel[:] - clevel[halfedge[:, 1]]) == 1
-        N = halfedge.shape[0]
+        N = halfedge.size
         NV = np.zeros(NC, dtype=self.itype)
         np.add.at(NV, halfedge[:, 1], flag)
         NHE = sum(NV[isMarkedCell])
-
-
-        halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
-        hlevel1 = np.zeros(2*NHE, dtype=self.itype)
 
         NC1 = isMarkedCell.sum() # 加密单元个数
 
@@ -484,7 +480,8 @@ class HalfEdgeMesh2d(Mesh2d):
         idx0, = np.nonzero(flag0)
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
-        subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
+        subdomain.extend(subdomain[~isMarkedCell])
+        subdomain.extend(subdomain[halfedge[flag0, 1]])
 
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
@@ -538,7 +535,6 @@ class HalfEdgeMesh2d(Mesh2d):
         newHlevel = hlevel.increase_size(2*NHE)
         newHedge = hedge.increase_size(NHE)
         newHedge[:] = np.arange(NE*2+NE1*2, NE*2+NE1*2+NHE)
-
 
         newHalfedge[:NHE, 0] = cell2newNode[cellidx]
         newHalfedge[:NHE, 1] = halfedge[idx0, 1]

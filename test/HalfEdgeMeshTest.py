@@ -65,7 +65,7 @@ class HalfEdgeMeshTest:
         print("cell level:\n")
         for i, val in enumerate(mesh.celldata['level']):
             print(i, ':', val)
-
+        print(mesh.ds.halfedge)
         if plot:
 
             fig = plt.figure()
@@ -80,6 +80,7 @@ class HalfEdgeMeshTest:
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
+            mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_cell(axes, showindex=True, multiindex=cindex)
 
             NN = mesh.number_of_nodes()
