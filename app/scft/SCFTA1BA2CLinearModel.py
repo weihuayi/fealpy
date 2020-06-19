@@ -267,8 +267,8 @@ def model_options(
         bA = 1,
         bB = 1,
         bC = 1,
-        Maxit = 1000,
-        tol = 1e-6):
+        Maxit = 5000,
+        tol = 1e-7):
         # the parameter for scft model
         options = {
                 'nspecies': nspecies,
@@ -535,12 +535,25 @@ class SCFTA1BA2CLinearModel():
         #print("densityA", self.rho[0])
         #print("densityB", self.rho[1])
         #print("densityC", self.rho[2])
- 
+
     def integral_time(self, q, dt):
         f = -0.625*(q[0] + q[-1]) + 1/6*(q[1] + q[-2]) - 1/24*(q[2] + q[-3])
         f += np.sum(q, axis=0)
         f *= dt
         return f
+
+    def save_data(self, fname='rho.mat'):
+        import scipy.io as sio
+
+        rhoA = self.rho[0]
+        rhoB = self.rho[1]
+        rhoC = self.rho[2]
+        data = {
+                'rhoA':rhoA,
+                'rhoB':rhoB,
+                'rhoC':rhoC
+                }
+        sio.savemat(fname, data)
 
 if __name__ == "__main__":
     import sys 

@@ -56,7 +56,7 @@ class SCFTA1BA2CLinearModelTest():
         fA2 = 0.29
         fB  = 0.118
         fA1 = 1-fA2-fB-fC
-        options = model_options(box=box, NS=8, fA1=fA1, fB=fB, fA2=fA2, fC=fC)
+        options = model_options(box=box, NS=64, fA1=fA1, fB=fB, fA2=fA2, fC=fC)
         model = SCFTA1BA2CLinearModel(options=options)
         rho = [ model.space.fourier_interpolation(rhoA),
                 model.space.fourier_interpolation(rhoB),
@@ -70,12 +70,16 @@ class SCFTA1BA2CLinearModelTest():
             for i in range(maxit):
                 print("step:", i)
                 model.compute()
-                H_diff = H - model.H
+                print('H:',H)
+                H_diff = np.abs(H - model.H)
+                print('Hmodel:', model.H)
+                print('Hdiff:',H_diff)
                 H = model.H
                 ng = list(map(model.space.function_norm, model.grad))
                 print("l2 norm of grad:", ng)
                 if H_diff < options['tol']:
                     break
+            model.save_data()
 
 
 test = SCFTA1BA2CLinearModelTest()
