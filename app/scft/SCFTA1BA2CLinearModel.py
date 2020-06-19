@@ -37,125 +37,215 @@ init_value = {
         ),
         "LAM":(
 	 np.array([[3, 0], [-3, 0]], dtype=np.int),
-         np.array([0.058, 0.058], dtype=np.float)
+         np.array([0.058+0.2j, 0.058+0.2j], dtype=np.complex)
          ),
         "C42C":( 
         np.array([
             [0,	0],
             [0,	1],
+            [0,-1],
             [1,	0],
             [-1,0],
             [-1,1],
+            [1,-1],
             [1,	1],
+            [-1,-1],
             [0,	2],
+            [0,-2],
             [2,	0],
             [-2,0],
             [-1,2],
+            [1,-2],
             [-2,1],
+            [2,-1],
             [1,	2],
+            [-1,-2],
             [2,	1],
+            [-2,-1],
             [-4,0],
             [4,	0],
             [0,	4],
+            [0,-4],
             [-1,4],
+            [1,-4],
             [4,	1],
+            [-4,-1],
             [-4,1],
+            [4,-1],
             [1,	4],
+            [-1,-4],
             [3,	2],
+            [-3,-2],
             [-2,3],
+            [2,-3],
             [2,	3],
-            [-3,2] ], dtype=np.int),
-        np.array([0.14	+ 0j, 0.108189 -7.29663e-06j, 0.108189 +1.53758e-06j,
-            0.108189-1.53758e-06j, 0.08244-6.80474e-06j, 0.0824395-4.42577e-06j,
-            0.0424291-5.64406e-06j, 0.0424288+1.16854e-06j,0.0424288-1.16854e-06j,
-            0.0294126-4.4255e-06j, 0.0294126-2.9508e-06j,
-            0.0294122-3.50997e-06j, 0.0294118-1.27548e-06j,
-            -0.0152264+9.79735e-07j,-0.0152264-9.79735e-07j,
-            -0.0152264+4.23116e-06j, -0.0132502+3.87451e-06j,
-            -0.0132501+4.84293e-08j,-0.0132499+1.67138e-06j, 
-            -0.0132499+3.42747e-06j, -0.0108379+9.19385e-07j,
-            -0.0108377+2.42641e-06j,-0.0108376+1.8744e-06j,
-            -0.0108375+1.74526e-06j], dtype=np.complex)
+            [-2,-3],
+            [-3,2],
+            [3,-2]], dtype=np.int),
+        np.array([0.14	+ 0j, 
+            0.108189 -7.29663e-06j, 0.108189 +7.29663e-06j,
+            0.108189 +1.53758e-06j, 0.108189 -1.53758e-06j,
+            0.08244-6.80474e-06j, 0.08244+6.80474e-06j,
+            0.0824395-4.42577e-06j, 0.0824395+4.42577e-06j,
+            0.0424291-5.64406e-06j, 0.0424291+5.64406e-06j, 
+            0.0424288+1.16854e-06j, 0.0424288-1.16854e-06j,
+            0.0294126-4.4255e-06j, 0.0294126+4.4255e-06j,
+            0.0294126-2.9508e-06j, 0.0294126+2.9508e-06j,
+            0.0294122-3.50997e-06j, 0.0294122+3.50997e-06j,
+            0.0294118-1.27548e-06j, 0.0294118+1.27548e-06j,
+            -0.0152264+9.79735e-07j, -0.0152264-9.79735e-07j,
+            -0.0152264+4.23116e-06j, -0.0152264-4.23116e-06j, 
+            -0.0132502+3.87451e-06j, -0.0132502-3.87451e-06j,
+            -0.0132501+4.84293e-08j, -0.0132501-4.84293e-08j,
+            -0.0132499+1.67138e-06j, -0.0132499-1.67138e-06j, 
+            -0.0132499+3.42747e-06j, -0.0132499-3.42747e-06j, 
+            -0.0108379+9.19385e-07j, -0.0108379-9.19385e-07j,
+            -0.0108377+2.42641e-06j, -0.0108377-2.42641e-06j,
+            -0.0108376+1.8744e-06j, -0.0108376-1.8744e-06j,
+            -0.0108375+1.74526e-06j,-0.0108375-1.74526e-06j], dtype=np.complex)
         ),
         "C42A":( 
             np.array([
             [0,	0],
             [0,	1],
+            [0,-1],
             [-1,0],
             [1,	0],
             [-2,0],
             [2,	0],
             [0,	2],
+            [0,-2],
             [-2,2],
+            [2,-2],
             [2,	2],
+            [-2,-2],
             [3,	1],
+            [-3,-1],
             [-3,1],
+            [3,-1],
             [1,	3],
+            [-1,-3],
             [-1,3],
+            [1,-3],
             [-1,2],
+            [1,-2],
             [-2,1],
+            [2,-1],
             [1,	2],
+            [-1,-2],
             [2,	1],
+            [-2,-1],
             [3,	0],
             [-3,0],
             [0,	3],
+            [0,-3],
             [3,	2],
+            [-3,-2],
             [-2,3],
+            [2,-3],
             [2,	3],
+            [-2,-3],
             [-3,2],
+            [3,-2],
             [-3,3],
-            [3,	3]], dtype=np.int),
+            [3,-3],
+            [3,	3],
+            [-3,-3],
+            [-1,-1],
+            [-1,1],
+            [1,-1],
+            [1,1],
+            [4,-3],
+            [4,-2],
+            [4,-1],
+            [4,0],
+            [4,1],
+            [4,2],
+            [4,3],
+            [4,4],
+            [-3,4],
+            [-2,4],
+            [-1,4],
+            [0,4],
+            [1,4],
+            [2,4],
+            [3,4]], dtype=np.int),
            np.array([
-            0.74+0j	, -0.108419+6.99793e-06j, -0.108419+2.03331e-06j,
-            -0.108419-2.03331e-06j, -0.103226+4.69495e-06j,
-            -0.103226-4.69495e-06j, -0.103226+1.29991e-05j,
-            -0.0414937+7.42252e-06j, -0.0414933+2.78787e-06j,
-            0.0370139+5.85495e-07j, 0.0370132-4.82466e-06j,
-            0.037013-6.22156e-06j, 0.037013-7.95719e-06j,
-            -0.0336456+6.20032e-06j, -0.0336454+2.31633e-06j,
-            -0.0336451+3.80009e-06j, -0.0336449+1.74535e-06j,
+            0.74+0j	, 
+            -0.108419+6.99793e-06j, -0.108419-6.99793e-06j,
+            -0.108419+2.03331e-06j, -0.108419-2.03331e-06j,
+            -0.103226+4.69495e-06j, -0.103226-4.69495e-06j,
+            -0.103226+1.29991e-05j, -0.103226-1.29991e-05j,
+            -0.0414937+7.42252e-06j, -0.0414937-7.42252e-06j,
+            -0.0414933+2.78787e-06j, -0.0414933-2.78787e-06j,
+            0.0370139+5.85495e-07j, 0.0370139-5.85495e-07j, 
+            0.0370132-4.82466e-06j, 0.0370132+4.82466e-06j,
+            0.037013-6.22156e-06j, 0.037013+6.22156e-06j,
+            0.037013-7.95719e-06j, 0.037013+7.95719e-06j,
+            -0.0336456+6.20032e-06j, -0.0336456-6.20032e-06j, 
+            -0.0336454+2.31633e-06j, -0.0336454-2.31633e-06j,
+            -0.0336451+3.80009e-06j, -0.0336451-3.80009e-06j, 
+            -0.0336449+1.74535e-06j, -0.0336449-1.74535e-06j,
             0.0193733+8.87915e-07j, 0.0193733-8.87915e-07j,
-            0.0193731-4.28944e-06j, 0.0150872-1.38969e-06j,
-            0.0150872-4.13871e-06j, 0.0150869-2.1522e-06j ,
-            0.0150866-2.01848e-06j, 0.0130143-2.98794e-06j,
-            0.0130142-1.88253e-06j], dtype=np.complex)
+            0.0193731-4.28944e-06j, 0.0193731+4.28944e-06j, 
+            0.0150872-1.38969e-06j, 0.0150872+1.38969e-06j,
+            0.0150872-4.13871e-06j, 0.0150872+4.13871e-06j,
+            0.0150869-2.1522e-06j , 0.0150869+2.1522e-06j ,
+            0.0150866-2.01848e-06j, 0.0150866+2.01848e-06j,
+            0.0130143-2.98794e-06j, 0.0130143+2.98794e-06j,
+            0.0130142-1.88253e-06j, 0.0130142+1.88253e-06j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j,0+0j,
+            0+0j], dtype=np.complex)
            ),
-        "C42B":( 
+       "C42B":( 
             np.array([
             [0,	0],
             [1,	1],
+            [-1,-1],
             [-1,1],
+            [1,-1],
             [2,	0],
             [-2,0],
             [0,	2],
+            [0,-2],
             [2,	2],
+            [-2,-2],
             [-2,2],
+            [2,-2],
             [3,	1],
+            [-3,-1],
             [-3,1],
+            [3,-1],
             [1,	3],
+            [-1,-3],
             [-1,3],
+            [1,-3],
             [0,	3],
+            [0,-3],
             [-3,0],
-            [3,	0],
-            [1,	4],
-            [4,	1],
-            [-1,4],
-            [-4,1],
-            [4,	0],
-            [-4,0],
-            [0,	4] ], dtype=np.int),
-            np.array([0.12+0j,
-            -0.0828233+2.55012e-06j, -0.0828232	+7.3354e-06j ,
+            [3,	0]], dtype=np.int),
+           np.array([0.12+0j,
+            -0.0828233+2.55012e-06j, -0.0828233-2.55012e-06j,
+            -0.0828232+7.3354e-06j, -0.0828232-7.3354e-06j ,
             0.0598827+3.53369e-06j, 0.0598827-3.53369e-06j,
-            0.0598822-7.23639e-06j, 0.0381595-2.37293e-06j,
-            0.0381593-6.67865e-06j, -0.0283762-6.53894e-07j,
-            -0.028376+3.96855e-06j, -0.0283757+4.53605e-06j,
-            -0.0283756+5.98718e-06j, -0.0130638+2.83679e-06j,
-            -0.0130637+5.26915e-07j, -0.0130637-5.26915e-07j,
-            0.00877437-1.77675e-06j, 0.00877434+4.90981e-07j,
-            0.00877431-2.64002e-06j, 0.00877415-1.45146e-06j,
-            0.00860457+8.42015e-07j, 0.00860457-8.42015e-07j,
-            0.00860409-2.26706e-06j], dtype=np.complex)
+            0.0598822-7.23639e-06j, 0.0598822+7.23639e-06j,
+            0.0381595-2.37293e-06j, 0.0381595+2.37293e-06j,
+            0.0381593-6.67865e-06j, 0.0381593+6.67865e-06j,
+            -0.0283762-6.53894e-07j,-0.0283762+6.53894e-07j,
+            -0.028376+3.96855e-06j, -0.028376-3.96855e-06j,
+            -0.0283757+4.53605e-06j,-0.0283757-4.53605e-06j,
+            -0.0283756+5.98718e-06j, -0.0283756-5.98718e-06j,
+            -0.0130638+2.83679e-06j, -0.0130638-2.83679e-06j,
+            -0.0130637+5.26915e-07j, -0.0130637-5.26915e-07j
+            ], dtype=np.complex)
             )
         }
 
@@ -176,7 +266,9 @@ def model_options(
         maxdt = 0.001,
         bA = 1,
         bB = 1,
-        bC = 1):
+        bC = 1,
+        Maxit = 5000,
+        tol = 1e-7):
         # the parameter for scft model
         options = {
                 'nspecies': nspecies,
@@ -196,7 +288,9 @@ def model_options(
                 'maxdt': maxdt,
                 'bA': bA,
                 'bB': bB,
-                'bC': bC
+                'bC': bC,
+                'Maxit':Maxit,
+                'tol':tol
                 }
         return options
 
@@ -260,7 +354,6 @@ class SCFTA1BA2CLinearModel():
         """
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
-        self.compute_wplus()
         # solver the forward and backward equation
         self.compute_propagator()
         # compute single chain partition function Q
@@ -269,10 +362,14 @@ class SCFTA1BA2CLinearModel():
         # compute density
         self.compute_density()
         # compute energy function and its gradient
+        #self.update_field()
+        self.update_field_new()
+        
+        self.compute_wplus()
         self.compute_energe()
         self.compute_gradient()
 
-    def update_field(self, alpha=0.005):
+    def update_field(self, alpha=0.01):
         w = self.w
         rho = self.rho
         options = self.options
@@ -295,6 +392,28 @@ class SCFTA1BA2CLinearModel():
         w[3] += alpha*chiBCN*rho[1]
         w[3] += alpha*w[0]
         
+    def update_field_new(self, alpha=0.01):
+        w = self.w
+        rho = self.rho
+        options = self.options
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
+        
+        w1 = chiABN*rho[1] + chiACN*rho[2] + w[0] - w[1]
+        w1 = np.fft.fftn(w1)
+        w1[0,0] = 0
+        w[1] = np.fft.ifftn(np.fft.fftn(w[1])+alpha*w1).real
+        
+        w2 = chiABN*rho[0] + chiBCN*rho[2] + w[0] - w[2]
+        w2 = np.fft.fftn(w2)
+        w2[0,0] = 0
+        w[2] = np.fft.ifftn(np.fft.fftn(w[2])+alpha*w2).real
+        
+        w3 = chiACN*rho[0] + chiBCN*rho[1] + w[0] - w[3]
+        w3 = np.fft.fftn(w3)
+        w3[0,0] = 0
+        w[3] = np.fft.ifftn(np.fft.fftn(w[3])+alpha*w3).real
 
     def compute_wplus(self):
         w = self.w
@@ -318,14 +437,13 @@ class SCFTA1BA2CLinearModel():
         chiACN = options['chiAC']*options['ndeg']
         w = self.w
         rho = self.rho
-
         E = chiABN*rho[0]*rho[1] 
         E += chiBCN*rho[1]*rho[2]
         E += chiACN*rho[0]*rho[2]
         E -= w[1]*rho[0]
         E -= w[2]*rho[1]
         E -= w[3]*rho[2]
-        E -= w[0]*(1 - rho.sum(axis=0))
+        #E -= w[0]*(1 - rho.sum(axis=0))
         E = np.fft.ifftn(E)
         self.H = np.real(E.flat[0])
         self.H -= np.log(self.Q[0])
@@ -353,31 +471,33 @@ class SCFTA1BA2CLinearModel():
         F = [w[1], w[2], w[1], w[3]]
 
         np.set_printoptions(precision=15, suppress=True) 
-#         print('w', w[3])
 #         input("input")
         
 
-        print(self.qf.dtype)
-        print(self.qb.dtype)
+        #print(self.qf.dtype)
+        #print(self.qb.dtype)
 
-        for i in range(4):
-            print(F[i].dtype)
+        #for i in range(4):
+        #    print(F[i].dtype)
 
         for i in range(options['nblock']):
             NL = self.timelines[i].number_of_time_levels()
-            self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
-            self.pdesolvers[i].solve(self.qf[start:start + NL])
+            #self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
+            #self.pdesolvers[i].solve(self.qf[start:start + NL])
+            self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
             start += NL - 1
-#         print("qf", self.qf[-1])
+        #print("qf", self.qf[-1])
 #         input("input")
 
         start = 0
-        F = [w[3], w[1], w[2], w[1]]
-        for i in range(options['nblock']):
+        for i in range(options['nblock']-1, -1,-1):
             NL = self.timelines[i].number_of_time_levels()
-            self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
-            self.pdesolvers[i].solve(self.qb[start:start + NL])
+            #self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
+            #self.pdesolvers[i].solve(self.qb[start:start + NL])
+            self.pdesolvers[i].BDF4(self.qb[start:start + NL], F[i])
             start += NL - 1
+        #print("qb", self.qb[-1])
+
 
     def compute_single_Q(self, index=-1):
         q = self.qf[index]
@@ -412,15 +532,28 @@ class SCFTA1BA2CLinearModel():
         self.rho[2] = rho[3]
         self.rho /= self.Q[0]
 
-#         print("densityA", rho[0])
-#         print("densityB", rho[1])
-#         print("densityC", rho[2])
-# 
+        #print("densityA", self.rho[0])
+        #print("densityB", self.rho[1])
+        #print("densityC", self.rho[2])
+
     def integral_time(self, q, dt):
         f = -0.625*(q[0] + q[-1]) + 1/6*(q[1] + q[-2]) - 1/24*(q[2] + q[-3])
         f += np.sum(q, axis=0)
         f *= dt
         return f
+
+    def save_data(self, fname='rho.mat'):
+        import scipy.io as sio
+
+        rhoA = self.rho[0]
+        rhoB = self.rho[1]
+        rhoC = self.rho[2]
+        data = {
+                'rhoA':rhoA,
+                'rhoB':rhoB,
+                'rhoC':rhoC
+                }
+        sio.savemat(fname, data)
 
 if __name__ == "__main__":
     import sys 
@@ -449,7 +582,7 @@ if __name__ == "__main__":
             #model.test_compute_single_Q(i, rdir)
             ng = list(map(model.space.function_norm, model.grad))
             print("l2 norm of grad:", ng)
-            model.update_field()
+            #model.update_field()
 
             fig = plt.figure()
             for j in range(4):
