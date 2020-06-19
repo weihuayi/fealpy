@@ -362,37 +362,25 @@ class SCFTA1BA2CLinearModel():
         # compute density
         self.compute_density()
         # compute energy function and its gradient
-        #self.update_field()
-        self.update_field_new()
+        self.update_field()
         
         self.compute_wplus()
         self.compute_energe()
         self.compute_gradient()
 
     def update_field(self, alpha=0.01):
-        w = self.w
-        rho = self.rho
-        options = self.options
-        chiABN = options['chiAB']*options['ndeg']
-        chiBCN = options['chiBC']*options['ndeg']
-        chiACN = options['chiAC']*options['ndeg']
-        
-        w[1] *= 1 - alpha
-        w[1] += alpha*chiABN*rho[1]
-        w[1] += alpha*chiACN*rho[2]
-        w[1] += alpha*w[0]
+        """
+        Parameters
+        ----------
 
-        w[2] *= 1 - alpha
-        w[2] += alpha*chiABN*rho[0]
-        w[2] += alpha*chiBCN*rho[2]
-        w[2] += alpha*w[0]
 
-        w[3] *= 1 - alpha
-        w[3] += alpha*chiACN*rho[0]
-        w[3] += alpha*chiBCN*rho[1]
-        w[3] += alpha*w[0]
-        
-    def update_field_new(self, alpha=0.01):
+        References
+        ----------
+
+        Notes
+        -----
+
+        """
         w = self.w
         rho = self.rho
         options = self.options
