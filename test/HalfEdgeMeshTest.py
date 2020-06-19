@@ -37,15 +37,15 @@ class HalfEdgeMeshTest:
             isMarkedCell = mesh.mark_helper([2])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([6])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -522,13 +522,13 @@ class HalfEdgeMeshTest:
 
 
 test = HalfEdgeMeshTest()
-test.refine_triangle_rbTest(8, plot=True, rb=True)
+#test.refine_triangle_rbTest(8, plot=True, rb=True)
 
 if sys.argv[1] == 'refine_tri_rb':
     test.refine_triangle_rbTest(8, plot=True, rb=1)
 
 if sys.argv[1] == 'refine_poly':
-    mesh = test.refine_poly_test(plot=True)
+    test.refine_poly_test(plot=True)
 
 if sys.argv[1] == 'coarsen_poly':
     mesh = test.refine_poly_test(plot=False)

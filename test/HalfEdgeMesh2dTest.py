@@ -67,8 +67,96 @@ class HalfEdgeMesh2dTest:
             axes = fig.gca()
             mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
+            #mesh.find_cell(axes, showindex=True)
             plt.show()
+    def refine_poly(self, plot=True):
+        node = np.array([
+            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+        cell = np.array([0, 3, 4, 4, 1, 0,
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+        mesh = PolygonMesh(node, cell, cellLocation)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        if 1:
+            isMarkedCell = mesh.mark_helper([2])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([6])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([3])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([1, 5])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([1, 12])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+        if False:
+            isMarkedCell = mesh.mark_helper([0, 21])
+            mesh.refine_poly(isMarkedCell, dflag=False)
+
+
+        print("halfedge level:\n")
+        for i, val in enumerate(mesh.halfedgedata['level']):
+            print(i, ':', val, mesh.ds.halfedge[i, 0:2])
+
+        print("cell level:\n")
+        for i, val in enumerate(mesh.celldata['level']):
+            print(i, ':', val)
+
+        mesh.print()
+        if plot:
+
+            fig = plt.figure()
+            axes = fig.gca()
+            #mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.add_halfedge_plot(axes, showindex=True)
+            #mesh.find_cell(axes, showindex=True)
+
+            if 0:
+                NAC = mesh.number_of_all_cells() # 包括外部区域和洞
+                cindex = range(mesh.ds.cellstart, NAC)
+                fig = plt.figure()
+                axes = fig.gca()
+                #mesh.add_plot(axes)
+                mesh.add_halfedge_plot(axes, showindex=True)
+                mesh.find_node(axes, showindex=True)
+                #mesh.find_cell(axes, showindex=True, multiindex=cindex)
+
+                NN = mesh.number_of_nodes()
+                nindex = np.zeros(NN, dtype=np.int)
+                halfedge = mesh.ds.halfedge
+                nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
+                cindex = mesh.get_data('cell', 'level')
+                fig = plt.figure()
+                axes = fig.gca()
+                #mesh.add_plot(axes)
+                mesh.find_node(axes, showindex=True, multiindex=nindex)
+                #mesh.find_cell(axes, showindex=True, multiindex=cindex)
+            plt.show()
+        else:
+            return mesh
+
 
 
 
@@ -81,4 +169,6 @@ elif sys.argv[1] == 'from_edges':
     test.from_edges()
 elif sys.argv[1] == 'refine_halfedge':
     test.refine_halfedge()
+elif sys.argv[1] == 'refine_poly':
+    test.refine_poly()
 

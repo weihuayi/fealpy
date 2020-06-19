@@ -1092,7 +1092,8 @@ class HalfEdgeMesh(Mesh2d):
     def coarsen_quad(self, isMarkedCell):
         pass
 
-    def refine_poly(self, isMarkedCell=None, options={'disp': True}, dflag=False):
+    def refine_poly(self, isMarkedCell=None,
+            options={'disp': True, 'data':None}, dflag=False):
         """
 
         Parameters

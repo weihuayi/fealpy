@@ -376,11 +376,11 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def refine_halfedge(self, isMarkedHEdge):
 
-        NN = self.number_of_nodes() 
-        NE = self.number_of_edges() 
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
 
         clevel = self.celldata['level']
-        hlevel = self.halfedgedata['level'] 
+        hlevel = self.halfedgedata['level']
 
         halfedge = self.entity('halfedge')
         node = self.entity('node')
@@ -402,27 +402,181 @@ class HalfEdgeMesh2d(Mesh2d):
         #细分边
         newHalfedge = halfedge.increase_size(2*NE1)
         newHlevel = hlevel.increase_size(2*NE1)
+        newHedge = hedge.increase_size(NE1)
 
-        flag1 = np.cumsum(isMarkedHEdge)[flag0]-1 # 标记加密边中的主半边, flag1是加密的主半边 flag0 在所有需要加密的边中的编号
-        flag2 = np.cumsum(isMarkedHEdge)[idx]-1
-        halfedge1[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
-        halfedge1[flag2, 0] = range(NN, NN+NE1)
-        nlevel1 = np.zeros(NE1, dtype=self.itype)
-        nlevel1 = np.maximum(nlevel[halfedge[flag0, 0]], 
-                nlevel[halfedge[halfedge[flag0, 3], 0]]) + 1
+        flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
+        newHedge[:] = np.arange(NE*2, NE*2+NE1*2)[flag1]
+        newHalfedge[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
+        idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
+        newHalfedge[~flag1, 0] = newHalfedge[flag1, 0][idx0] # 按照排序
+        newHlevel[flag1] = np.maximum(hlevel[:NE*2][flag0],
+                hlevel[halfedge[:NE*2][flag0, 3]]) + 1
+        newHlevel[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]+1
 
-        halfedge1[:, 1] = halfedge[isMarkedHEdge, 1]
-        halfedge1[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
-        halfedge1[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
-
-        #hedge.extend(flag1+NE*2)
+        isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NE1*2, dtype = np.bool_)]
+        newHalfedge[:, 1] = halfedge[isMarkedHEdge, 1]
+        newHalfedge[:, 3] = halfedge[isMarkedHEdge, 3] # 前一个 
+        newHalfedge[:, 4] = halfedge[isMarkedHEdge, 4] # 对偶边
         halfedge[isMarkedHEdge, 3] = range(2*NE, 2*NE + 2*NE1)
         idx = halfedge[isMarkedHEdge, 4] # 原始对偶边
-        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
 
-        halfedge.extend(halfedge1)
+        halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
         halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
-        nlevel = np.r_[nlevel, nlevel1]
+        self.ds.NE = NE + NE1
+        return NE1
+
+    def refine_poly(self, isMarkedCell=None, options={'disp': True}, dflag=False):
+        """
+
+        Parameters
+        ----------
+        isMarkedCell : np.ndarray, bool,
+            len(isMarkedCell) == len(self.ds.subdomain)
+        """
+
+        NC = self.number_of_all_cells()
+        assert len(isMarkedCell) == NC
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+
+        bc = self.cell_barycenter(return_all=True) # 返回所有单元的重心, 包括外
+                                                   # 部无界区域和区域中的洞区域
+
+        # 标记边, 加密半边
+        isMarkedHEdge = self.mark_halfedge(isMarkedCell)
+        NE1 = self.refine_halfedge(isMarkedHEdge)
+
+        #获取信息
+        clevel = self.celldata['level']
+        hlevel = self.halfedgedata['level']
+
+        halfedge = self.entity('halfedge')
+        node = self.entity('node')
+        hedge = self.ds.hedge
+        hcell = self.ds.hcell
+        subdomain = self.ds.subdomain
+
+        isMainHEdge = self.ds.main_halfedge_flag()
+
+
+        if dflag:
+            self.halfedgedata['level'] = hlevel
+            self.node = np.r_['0', node, ec]
+            self.ds.reinit(NN+NE1,  subdomain, halfedge)
+            return
+
+        # 细分单元
+        flag = (hlevel[:] - clevel[halfedge[:, 1]]) == 1
+        N = halfedge.shape[0]
+        NV = np.zeros(NC, dtype=self.itype)
+        np.add.at(NV, halfedge[:, 1], flag)
+        NHE = sum(NV[isMarkedCell])
+
+
+        halfedge1 = np.zeros((2*NHE, 6), dtype=self.itype)
+        hlevel1 = np.zeros(2*NHE, dtype=self.itype)
+
+        NC1 = isMarkedCell.sum() # 加密单元个数
+
+        # 当前为标记单元的可以加密的半边
+        flag0 = flag & isMarkedCell[halfedge[:, 1]]
+        idx0, = np.nonzero(flag0)
+        nex0 = halfedge[flag0, 2]
+        pre0 = halfedge[flag0, 3]
+        subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
+
+        # 修改单元的编号
+        cellidx = halfedge[idx0, 1] #需要加密的单元编号
+
+        nC = self.number_of_cells()
+        NV1 = self.number_of_vertices_of_cells()
+        if ('HB' in options) and (options['HB'] is not None):
+             isNonMarkedCell = ~isMarkedCell
+
+             flag0 = isNonMarkedCell[self.ds.cellstart:]
+
+             flag1 = isMarkedCell[self.ds.cellstart:]
+
+             NHB0 = flag0.sum()
+             NHB1 = NV1[flag1].sum()
+             NHB = NHB0 + NHB1
+             HB = np.zeros((NHB, 2), dtype=np.int)
+             HB[:, 0] = range(NHB)
+             HB[0:NHB0, 1] = options['HB'][flag0, 1]
+             HB[NHB0:,  1] = cellidx -1
+             options['HB'] = HB
+
+
+        if ('numrefine' in options) and (options['numrefine'] is not None):
+            num = options['numrefine'][cellidx] - 1
+            num[num < 0] = 0
+            options['numrefine'] = np.r_[options['numrefine'][~isMarkedCell], num]
+
+        halfedge[idx0, 1] = range(NC, NC + NHE)
+        clevel[isMarkedCell] += 1
+
+        idx1 = idx0.copy()
+        pre = halfedge[idx1, 3]
+        flag0 = ~flag[pre] # 前一个是不需要细分的半边
+        while np.any(flag0):
+            idx1[flag0] = pre[flag0]
+            pre = halfedge[idx1, 3]
+            flag0 = ~flag[pre]
+            halfedge[idx1, 1] = halfedge[idx0, 1]
+
+        nex1 = halfedge[idx1, 2] # 当前半边的下一个半边
+        pre1 = halfedge[idx1, 3] # 当前半边的上一个半边
+
+        cell2newNode = np.full(NC, NN+NE1, dtype=self.itype)
+        cell2newNode[isMarkedCell] += range(isMarkedCell.sum())
+
+        halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
+        halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的上一个半边的编号
+
+        newHalfedge = halfedge.increase_size(2*NHE)
+        newHlevel = hlevel.increase_size(2*NHE)
+        newHedge = hedge.increase_size(NHE)
+        newHedge[:] = np.arange(NE*2+NE1*2, NE*2+NE1*2+NHE)
+
+
+        newHalfedge[:NHE, 0] = cell2newNode[cellidx]
+        newHalfedge[:NHE, 1] = halfedge[idx0, 1]
+        newHalfedge[:NHE, 2] = halfedge[idx1, 3]
+        newHalfedge[:NHE, 3] = idx0
+        newHalfedge[:NHE, 4] = halfedge[nex0, 3]
+        newHlevel[:NHE] = clevel[cellidx]
+
+        newHalfedge[NHE:, 0] = halfedge[pre1, 0]
+        newHalfedge[NHE:, 1] = halfedge[idx1, 1]
+        newHalfedge[NHE:, 2] = idx1
+        newHalfedge[NHE:, 3] = halfedge[idx0, 2]
+        newHalfedge[NHE:, 4] = halfedge[pre1, 2]
+        newHlevel[NHE:] = clevel[cellidx]
+
+        clevel.extend(clevel[~isMarkedCell])
+        clevel.extend(clevel[cellidx])
+
+        flag = np.zeros(NC+NHE, dtype=np.bool)
+        flag[halfedge[:, 1]] = True
+
+        idxmap = np.zeros(NC+NHE, dtype=self.itype)
+        nc = flag.sum()
+        idxmap[flag] = range(nc)
+        halfedge[:, 1] = idxmap[halfedge[:, 1]]
+
+        self.node.extend(bc[isMarkedCell])
+        self.ds.NE += NHE
+
+    def mark_helper(self, idx):
+        NC = self.number_of_cells()
+        flag = np.zeros(NC, dtype=np.bool)
+        flag[idx] = True
+        nc = self.number_of_all_cells()
+        isMarkedCell = np.zeros(nc, dtype=np.bool)
+        isMarkedCell[self.ds.cellstart:] = flag
+        return isMarkedCell
+
 
 
 
@@ -898,6 +1052,8 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
+        print('312312', self.NE)
+        print('312312', self.hedge)
         isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
-        isMainHEdge[self.hedge] = True
+        isMainHEdge[self.hedge[:]] = True
         return isMainHEdge 
