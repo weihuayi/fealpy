@@ -93,6 +93,11 @@ class MonomialSpace2d:
         phi = self.basis(p=p)
         return sp.BlockMatrix([[phi.diff(self.x), phi.diff(self.y)]])
 
+    def split_vector_basis(self, p=None):
+        p = self.p if p is None else p
+        m = multi_index_matrix2d(p)
+        print(m)
+
 
     def construct_G(self):
         phi = self.phi

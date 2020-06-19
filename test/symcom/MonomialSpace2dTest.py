@@ -46,6 +46,12 @@ class MonomialSpace2dTest():
         print('J1:', J1)
         print(space1.vector_basis())
         print(space1.curl_vector_basis())
+
+    def split_vector_basis(self, p=3):
+        domain = sp.Matrix([-1, 1, -1, 1])
+        space0 = MonomialSpace2d(p, domain=domain)
+        space0.split_vector_basis(p=p) 
+
         
 test = MonomialSpace2dTest()
 
@@ -57,6 +63,10 @@ elif sys.argv[1] == 'mass_matrix':
     test.mass_matrix(p=p)
 elif sys.argv[1] == 'basis_jacobian':
     p = int(sys.argv[2])
+    test.basis_jacobian(p=p)
+elif sys.argv[1] == 'split':
+    p = int(sys.argv[2])
+    test.split_vector_basis(p=p)
     test.basis_jacobian(p=p)
 
 

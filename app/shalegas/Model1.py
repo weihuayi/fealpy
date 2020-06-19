@@ -7,7 +7,13 @@ Notes
     1. 混合物的摩尔浓度 c 的计算公式为
         c = p/(ZRT), 
         Z^3 - (1 - B)Z^2 + (A - 3B^2 -2B)Z - (AB - B^2 -B^3) = 0
+        A = aP/(R^2T^2)
+        B = bP/(RT)
         其中:
+
+        a = 3
+        b = 1/3
+
         p 是压力 
         Z 是压缩系数 
         R 是气体常数
@@ -33,6 +39,7 @@ Notes
 
 References
 ----------
+[1] https://www.sciencedirect.com/science/article/abs/pii/S0378381217301851
 """
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -60,17 +67,26 @@ class Model1():
                 'porosity': 0.2,
                 'injecttion_rate': 0.1,
                 'compressibility': (0.001, 0.001, 0.001),
-                'pmv': (1.0, 1.0, 1.0)}
+                'pmv': (1.0, 1.0, 1.0),
+                'dt': self.timeline.dt}
 
+        
         c = self.options['viscosity']/self.options['permeability']
         self.A = c*self.space0.mass_matrix()
         self.B = self.space0.div_matrix()
-        self.M = self.space0.smspace.mass_matrix() #  
 
-    def get_current_pv_matrix(self, q=None):
+        phi = self.options['porosity']
+        self.M = phi/dt*self.space0.smspace.mass_matrix() #  
+        self.MC = self.space1.cell_mass_matrix()/dt
+
+    def get_current_pv_matrix(self, data):
         """
         (c_h[i] v_h\cdot n, w_h)_{\partial K}
         """
+
+        vh = data[0]
+        ph = data[1]
+        ch = data[2]
 
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
@@ -84,8 +100,8 @@ class Model1():
         en = mesh.edge_unit_normal() # (NE, 2)
 
         # 组分浓度在积分点上的值, 这里有 3 个组分
-        lval = self.ch(ps, index=edge2cell[:, 0]) # (NQ, NE, 3) 
-        rval = self.ch(ps, index=edge2cell[:, 1]) # (NQ, NE, 3)
+        lval = ch(ps, index=edge2cell[:, 0]) # (NQ, NE, 3) 
+        rval = ch(ps, index=edge2cell[:, 1]) # (NQ, NE, 3)
         rval[:, isBdEdge] = 0.0 # 边界值设为 0, 这样后面不产生贡献.
 
         # 速度在积分点上的基函数值
@@ -113,14 +129,28 @@ class Model1():
         return P.tocsr()
 
     def get_current_left_matrix(self, data, timeline):
-        pass
+
+        vh = data[0]
+        ph = data[1]
+        ch = data[2]
+        options  = self.options
+
+        A = self.A
+        B = self.B
+        P = self.get_current_pv_matrix()
+        M = self.M
+        AA = bmat([[A, -B], [P, M]], format='csr')
+        return AA
 
     def get_current_right_vector(self, data, timeline):
-        pass
+        vh = data[0]
+        ph = data[1]
+        ch = data[2]
+        options  = self.options
+        return self.M@ph
 
     def solve(self, data, A, b, solver, timeline):
         pass
-
 
 
 
