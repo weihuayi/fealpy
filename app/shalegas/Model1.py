@@ -105,18 +105,18 @@ class Model1():
         rval[:, isBdEdge] = 0.0 # 边界值设为 0, 这样后面不产生贡献.
 
         # 速度在积分点上的基函数值
-        gdof1 = self.space0.number_of_global_dofs()
         phi = self.space0.edge_basis(ps) # (NQ, NE, 1, 2)
 
         # 压力测试函数空间基函数的值
         lphi = self.space0.smspace.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, 3)
         rphi = self.space0.smspace.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, 3)
-        gdof0 = self.space0.smspace.number_of_global_dofs()
         measure = self.integralalg.edgemeasure
 
         LM = np.einsum('i, ijk, ijl, ijmn, jn, j->jlm', ws, lval, lphi, phi, en, measure)
-        RM = np.einsum('i, ijk, ijl, ijmn, jn, j->jlm', ws, rval, rphi, phi, en, measure)
+        RM = np.einsum('i, ijk, ijl, ijmn, jn, j->jlm', ws, rval, rphi, phi, -en, measure)
 
+        gdof0 = self.space0.smspace.number_of_global_dofs()
+        gdof1 = self.space0.number_of_global_dofs()
         cell2dof = cell.space1.cell_to_dof()
         I = np.broadcast_to(edge2dof[:, :, None], LM.shape)
 
@@ -127,6 +127,42 @@ class Model1():
         P += coo_matrix((RM.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
         return P.tocsr()
+
+    def get_current_density_vector(self, data, timeline):
+        vh = data[0]
+        ph = data[1]
+        ch = data[2]
+        options  = self.options
+
+        mesh = self.mesh
+
+        # 0. 单元内的浓度方程积分
+        qf = self.integralalg.cellintegrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
+        measure = self.integralalg.cellmeasure
+
+        cval = ch.value(ps) # (NQ, NC, 3) 3 个组分的值
+        vval = vh.value(bcs) # (NQ, NC, 2) 向量的值
+        gphi = self.space1.grad_basis(ps) # (NQ, NC, 3, 2)
+
+        # bb: (NC, 3, 3)
+        bb = np.einsum('i, ijk, ijmn, ijln, j->jkl', ws, cval, vval, gphi, measure)
+
+        # 1.  
+
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        ps = mesh.bc_to_point(bcs, etype='edge')
+        en = mesh.edge_unit_normal() # (NE, 2)
+        
+        lphi = np.space1.basis(ps, index=edge2cell[:, 0]) # (NQ, NC, 3)
+        rphi = np.space1.basis(ps, index=edge2cell[:, 1]) # (NQ, NC, 3)
+
+        M = np.einsum('', ws, lphi, rphi
+        
+        
 
     def get_current_left_matrix(self, data, timeline):
 
