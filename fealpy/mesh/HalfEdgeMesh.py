@@ -1197,7 +1197,6 @@ class HalfEdgeMesh(Mesh2d):
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
         subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
-
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
 

@@ -362,7 +362,7 @@ class HalfEdgeMesh2d(Mesh2d):
             pre = halfedge[:, 3]
             flag1 = (hlevel[pre] - clevel[halfedge[:, 1]]) <= 0
             # 标记加密的半边
-            isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1 
+            isMarkedHEdge = isMarkedCell[halfedge[:, 1]]|flag0|flag1 
             # 标记加密的半边的相对半边也需要标记 
             flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
             isMarkedHEdge[flag] = True
@@ -433,7 +433,6 @@ class HalfEdgeMesh2d(Mesh2d):
         isMarkedCell : np.ndarray, bool,
             len(isMarkedCell) == len(self.ds.subdomain)
         """
-
         NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
 
@@ -480,8 +479,9 @@ class HalfEdgeMesh2d(Mesh2d):
         idx0, = np.nonzero(flag0)
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
-        subdomain.extend(subdomain[~isMarkedCell])
+        subdomain = DynamicArray(subdomain[~isMarkedCell])
         subdomain.extend(subdomain[halfedge[flag0, 1]])
+        self.ds.subdomain = subdomain
 
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
@@ -550,8 +550,8 @@ class HalfEdgeMesh2d(Mesh2d):
         newHalfedge[NHE:, 4] = halfedge[pre1, 2]
         newHlevel[NHE:] = clevel[cellidx]
 
-        clevel.extend(clevel[~isMarkedCell])
-        clevel.extend(clevel[cellidx])
+        clevel = DynamicArray(np.r_[clevel[~isMarkedCell], clevel[cellidx]])
+        self.celldata['level'] = clevel
 
         flag = np.zeros(NC+NHE, dtype=np.bool)
         flag[halfedge[:, 1]] = True
@@ -562,6 +562,8 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge[:, 1] = idxmap[halfedge[:, 1]]
 
         self.node.extend(bc[isMarkedCell])
+        self.ds.NN = self.node.size
+        self.ds.NC = (subdomain[:]>0).sum()
         self.ds.NE += NHE
 
     def mark_helper(self, idx):
@@ -1048,8 +1050,6 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
-        print('312312', self.NE)
-        print('312312', self.hedge)
         isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
-        isMainHEdge[self.hedge[:]] = True
-        return isMainHEdge 
+        isMainHEdge[self.hedge] = True
+        return isMainHEdge

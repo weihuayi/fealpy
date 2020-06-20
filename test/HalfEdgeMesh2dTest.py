@@ -102,7 +102,7 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if False:
+        if 1:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -131,7 +131,7 @@ class HalfEdgeMesh2dTest:
             #mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
             mesh.add_halfedge_plot(axes, showindex=True)
-            #mesh.find_cell(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
 
             if 0:
                 NAC = mesh.number_of_all_cells() # 包括外部区域和洞
@@ -141,7 +141,7 @@ class HalfEdgeMesh2dTest:
                 #mesh.add_plot(axes)
                 mesh.add_halfedge_plot(axes, showindex=True)
                 mesh.find_node(axes, showindex=True)
-                #mesh.find_cell(axes, showindex=True, multiindex=cindex)
+                mesh.find_cell(axes, showindex=True, multiindex=cindex)
 
                 NN = mesh.number_of_nodes()
                 nindex = np.zeros(NN, dtype=np.int)

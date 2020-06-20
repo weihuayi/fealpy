@@ -99,13 +99,19 @@ class DynamicArray(object):
         -----
             增加存储, 并返回增加部分的数组, 这里返回的是数组的视图.
         """
-        required_size = self.size + s 
+        required_size = self.size + s
         if required_size >= self.capacity:
             self.resize(max(2*self.capacity, required_size))
 
         data = self.data[self.size:required_size]
         self.size = required_size
-        return data 
+
+        if len(self.shape)==1:
+            self.shape = (self.size,)
+        else:
+            self.shape = (self.size, self.shape[1])
+
+        return data
 
     def decrease_size(self, s):
         """
@@ -119,6 +125,13 @@ class DynamicArray(object):
         required_size = self.size - s
         data = self.data[required_size:self.size]
         self.size = required_size
+
+        if len(self.shape)==1:
+            self.shape = (self.size,)
+        else:
+            self.shape = (self.size, self.shape[1])
+
+
         return data
 
     def extend(self, values):
@@ -136,6 +149,10 @@ class DynamicArray(object):
 
         self.data[self.size:required_size] = values
         self.size = required_size
+        if len(self.shape)==1:
+            self.shape = (self.size,)
+        else:
+            self.shape = (self.size, values.shape[1])
 
     def shrink(self):
         """
