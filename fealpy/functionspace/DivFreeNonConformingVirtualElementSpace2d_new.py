@@ -719,6 +719,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
+        
+        data = {'B0': A[0], 'B1': A[1]}
+        sio.savemat('B0.mat', data)
+
         idof = p*(p-1) #
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
@@ -767,8 +771,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 shape=(gdof, NE*p), dtype=self.ftype)
         cell2dof = np.arange(NC*idof).reshape(NC, idof)
         def f2(i):
-            print('cd[', i, ']:', cd[i])
-            print('cell2dof[', i, ']:', cell2dof[i])
             return np.meshgrid(cell2dof[i], cd[i])
         idx = list(map(f2, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
@@ -834,19 +836,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             gdof = self.number_of_global_dofs()
             b = np.zeros(gdof, dtype=self.ftype)
             idx = np.arange(idof0)
-            print('idx0:', idx)
-            print('idx:', idx)
-            print('x0:', x0)
-            print('y0:', y0)
-            print('x1:', x1)
-            print('y1:', y1)
-            print('c2d:', c2d.shape)
-            print('bb:', bb.shape)
             b[c2d[:, idx[x1[0]-1]]] += bb[:, :, 0]*area[:, None]*c 
             b[c2d[:, idx[y1[0]-1]]] += bb[:, :, 1]*area[:, None]*c 
 
             idx = np.arange(idof0, p*(p-1))
-            print('idx1:', idx)
             b[c2d[:, idx]] += bb[:, y0[0], 0]*area[:, None]*y0[1]*c[y0[0]]
             b[c2d[:, idx]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
             return b 

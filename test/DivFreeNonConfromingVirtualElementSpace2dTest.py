@@ -101,7 +101,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         uh = uspace.function()
         ph = pspace.function()
         uspace.set_dirichlet_bc(uh, pde.dirichlet)
-
+        
         A = uspace.matrix_A()
         P = uspace.matrix_P()
         C = uspace.CM[:, 0, :ldof].reshape(-1)
@@ -152,8 +152,11 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
     def one_cell_test_0(self, p=2):
         from fealpy.pde.stokes_model_2d import StokesModelData_7
         pde = StokesModelData_7()
+        #node = np.array([
+        #    (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+
         node = np.array([
-            (-1, -1), (1, -1), (1, 1), (-1, 1)], dtype=np.float)
+            (1, -1), (3, -1), (3, 1), (1, 1)], dtype=np.float)
         cell = np.array([0, 1, 2, 3], dtype=np.int)
         cellLocation = np.array([0, 4], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
@@ -169,13 +172,13 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
         uh = uspace.function()
         ph = pspace.function()
+
         uspace.set_dirichlet_bc(uh, pde.dirichlet)
 
         A = uspace.matrix_A()
         P = uspace.matrix_P()
         C = uspace.CM[:, 0, :ldof].reshape(-1)
         F = uspace.source_vector(pde.source)
-
 
         AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
         FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
@@ -209,6 +212,13 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
 
         error = integralalg.L2_error(pde.velocity, up)
         print(error)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_edge(axes, showindex=True)
+        plt.show()
 
     def one_cell_test(self, p=2):
         from fealpy.pde.stokes_model_2d import StokesModelData_7
