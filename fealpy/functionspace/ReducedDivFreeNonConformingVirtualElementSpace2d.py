@@ -144,7 +144,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         Parameters
         ----------
+        cspace: 
         uh : 
+
         Notes
         -----
         把缩减虚单元空间中的函数投影回完全的虚单元空间, 其中边界和梯度正交空
@@ -172,38 +174,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # self.H1 is the inverse of Q_{p-1}^F
         # i->quadrature, j->edge, m-> basis on domain, n->basis on edge
-        a = 1/ch[edge2cell[:, 0]]
-        F0 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi0, phi, eh/ch[edge2cell[:, 0])
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, eh/ch[edge2cell[:, 0])
         F0 = F0@self.H1
 
-        idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
-        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 0, :], n[:, 0]) 
-        np.add.at(T00, (np.s_[:], idx0), val)
-        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 0]) 
-        np.add.at(T10, (np.s_[:], idx0), val)
-
-        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 0, :], n[:, 1]) 
-        np.add.at(T01, (np.s_[:], idx0), val)
-        val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 0]], F0[:, 1, :], n[:, 1]) 
-        np.add.at(T11, (np.s_[:], idx0), val)
-
         if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=1)
-            phi1 = phi1[:, :, 1:3] 
-            phi1 -= Q0[None, edge2cell[:, 1], 1:3]
-            a = 1/ch[edge2cell[:, 1]]
-            F1 = np.einsum('i, ijm, ijn, j, j, j->jmn', ws, phi1, phi, eh, eh, a)
+            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
+            phi1 -= Q0[None, edge2cell[:, 1]]
+            F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi, eh, a/ch[edge2cell[:, 1]])
             F1 = F1@self.H1
-            idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
-            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 0]) 
-            np.subtract.at(T00, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
-            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 0]) 
-            np.subtract.at(T10, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
-
-            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 0, :], n[:, 1]) 
-            np.subtract.at(T01, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
-            val = np.einsum('jm, jn, j->mjn', Q0[edge2cell[:, 1]], F1[:, 1, :], n[:, 1]) 
-            np.subtract.at(T11, (np.s_[:], idx0[isInEdge]), val[:, isInEdge, :])
 
     def project_to_smspace(self, uh):
         p = self.p
