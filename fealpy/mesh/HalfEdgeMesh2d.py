@@ -425,7 +425,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.NE = NE + NE1
         return NE1
 
-    def refine_poly(self, isMarkedCell=None, options={'disp': True}, dflag=False):
+    def refine_poly(self, isMarkedCell=None, options={'disp': True}):
         """
 
         Parameters
@@ -459,12 +459,6 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
 
 
-        if dflag:
-            self.halfedgedata['level'] = hlevel
-            self.node = np.r_['0', node, ec]
-            self.ds.reinit(NN+NE1,  subdomain, halfedge)
-            return
-
         # 细分单元
         flag = (hlevel[:] - clevel[halfedge[:, 1]]) == 1
         N = halfedge.size
@@ -490,11 +484,8 @@ class HalfEdgeMesh2d(Mesh2d):
         NV1 = self.number_of_vertices_of_cells()
         if ('HB' in options) and (options['HB'] is not None):
              isNonMarkedCell = ~isMarkedCell
-
              flag0 = isNonMarkedCell[self.ds.cellstart:]
-
              flag1 = isMarkedCell[self.ds.cellstart:]
-
              NHB0 = flag0.sum()
              NHB1 = NV1[flag1].sum()
              NHB = NHB0 + NHB1

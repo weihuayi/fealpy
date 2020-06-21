@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 ## mesh
 from fealpy.mesh import PolygonMesh
 ## space
+from fealpy.functionspace import DivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ReducedDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 
@@ -61,7 +62,7 @@ for i in range(maxit):
     idof = (p-2)*(p-1)//2
 
     dof[i] = NC
-
+    space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
     uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
     pspace = ScaledMonomialSpace2d(mesh, 0)
 

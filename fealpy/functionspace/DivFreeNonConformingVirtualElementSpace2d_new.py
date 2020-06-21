@@ -435,25 +435,17 @@ class DivFreeNonConformingVirtualElementSpace2d:
             h2 = x[1][None, :]/ch[edge2cell[:, [1]]]
             h3 = y[1][None, :]/ch[edge2cell[:, [1]]]
 
-            print('idx0:', idx0)
-
-            print('R00:', R00)
             val = np.einsum('jm, jmn, j-> mjn', h2, F1, n[:, 0])
             np.subtract.at(R00, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            print('R00:', R00)
             val = np.einsum('jm, jmn, j-> mjn', h3, F1, 0.5*n[:, 1])
             np.subtract.at(R00, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            print('R00:', R00)
 
 
-            print('R11:', R11)
             val = np.einsum('jm, jmn, j-> mjn', h2, F1, 0.5*n[:, 0])
             np.subtract.at(R11, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
-            print('R11:', R11)
             val = np.einsum('jm, jmn, j-> mjn', h3, F1, n[:, 1])
             np.subtract.at(R11, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
-            print('R11:', R11)
 
             val = np.einsum('jm, jmn, j-> mjn', h3, F1, 0.5*n[:, 0])
             np.subtract.at(R01, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
@@ -507,17 +499,12 @@ class DivFreeNonConformingVirtualElementSpace2d:
         np.add.at(J1, (np.s_[:], idx0), val)
 
         if isInEdge.sum() > 0:
-            print('J0:', J0)
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('ijk, i->jik', F1, n[:, 0])
             np.subtract.at(J0, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
-            print('val:', val[:, isInEdge])
-            print('J0:', J0)
 
-            print('J1:', J1)
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
             np.subtract.at(J1, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
-            print('J1:', J1)
 
         J = [J0, J1, J2]
 

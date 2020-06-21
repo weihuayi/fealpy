@@ -89,8 +89,6 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         cellLocation = np.array([0, 4, 8], dtype=np.int)
         mesh = PolygonMesh(node, cell, cellLocation)
 
-        mesh.print()
-
         uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
         cell2dof = uspace.cell_to_dof()
         pspace = ScaledMonomialSpace2d(mesh, p-1)

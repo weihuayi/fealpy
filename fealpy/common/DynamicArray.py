@@ -92,6 +92,13 @@ class DynamicArray(object):
         self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())
         self.capacity = new_size
 
+    def adjust_size(self, isMarkedItem, s=None):
+        """
+            remove some element with `idx`, and increase size 
+        """
+
+        d = isMarkedCell.sum()
+
     def increase_size(self, s):
         """
 
@@ -106,10 +113,7 @@ class DynamicArray(object):
         data = self.data[self.size:required_size]
         self.size = required_size
 
-        if len(self.shape)==1:
-            self.shape = (self.size,)
-        else:
-            self.shape = (self.size, self.shape[1])
+        self.shape = (self.size, self._get_trailing_dimensions())
 
         return data
 
@@ -126,11 +130,7 @@ class DynamicArray(object):
         data = self.data[required_size:self.size]
         self.size = required_size
 
-        if len(self.shape)==1:
-            self.shape = (self.size,)
-        else:
-            self.shape = (self.size, self.shape[1])
-
+        self.shape = (self.size, self._get_trailing_dimensions())
 
         return data
 
