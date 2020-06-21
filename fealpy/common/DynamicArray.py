@@ -113,7 +113,7 @@ class DynamicArray(object):
         data = self.data[self.size:required_size]
         self.size = required_size
 
-        self.shape = (self.size, self._get_trailing_dimensions())
+        self.shape = (self.size,) + self._get_trailing_dimensions()
 
         return data
 
@@ -130,7 +130,7 @@ class DynamicArray(object):
         data = self.data[required_size:self.size]
         self.size = required_size
 
-        self.shape = (self.size, self._get_trailing_dimensions())
+        self.shape = (self.size, ) + self._get_trailing_dimensions()
 
         return data
 
