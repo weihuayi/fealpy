@@ -1092,7 +1092,8 @@ class HalfEdgeMesh(Mesh2d):
     def coarsen_quad(self, isMarkedCell):
         pass
 
-    def refine_poly(self, isMarkedCell=None, options={'disp': True}, dflag=False):
+    def refine_poly(self, isMarkedCell=None,
+            options={'disp': True, 'data':None}, dflag=False):
         """
 
         Parameters
@@ -1196,7 +1197,6 @@ class HalfEdgeMesh(Mesh2d):
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
         subdomain = np.r_['0', subdomain[~isMarkedCell], subdomain[halfedge[flag0, 1]]]
-
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
 
@@ -1241,7 +1241,6 @@ class HalfEdgeMesh(Mesh2d):
 
         cell2newNode = np.full(NC, NN+NE1, dtype=self.itype)
         cell2newNode[isMarkedCell] += range(isMarkedCell.sum())
-
         halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
         halfedge[idx1, 3] = range(N+NHE, N+2*NHE) # idx1 的上一个半边的编号
 
@@ -1954,4 +1953,4 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
-        return halfedge[:, 5] == 1
+        return self.halfedge[:, 5] == 1
