@@ -101,7 +101,7 @@ class DynamicArray(object):
         self.data[:d] = self.data[:self.size][~isMarkedItem]
         required_size = d+s
 
-        if required_size>self.size:
+        if required_size>self.capacity:
             self.resize(max(2*self.capacity, required_size))
 
         data = self.data[d:required_size]

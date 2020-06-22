@@ -432,7 +432,11 @@ class HalfEdgeMesh2d(Mesh2d):
         ----------
         isMarkedCell : np.ndarray, bool,
             len(isMarkedCell) == len(self.ds.subdomain)
+
+        Notes
+        -----
         """
+
         NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
 
