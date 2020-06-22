@@ -1138,15 +1138,15 @@ class HalfEdgeMesh(Mesh2d):
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
 
-        #if options['data'] is not None:
-        #    NV = self.ds.number_of_vertices_of_all_cells()
-        #    for key, value in options['data'].items():
-        #        # 定义在节点的数据进行简单插值
-        #        evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
-        #        cvalue = np.zeros(NC, dtype=self.ftype)
-        #        np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
-        #        cvalue /= NV
-        #        options['data'][key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
+        if options['data'] is not None:
+            NV = self.ds.number_of_vertices_of_all_cells()
+            for key, value in options['data'].items():
+                # 定义在节点的数据进行简单插值
+                evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
+                cvalue = np.zeros(NC, dtype=self.ftype)
+                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
+                cvalue /= NV
+                options['data'][key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
 
         #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)

@@ -45,11 +45,7 @@ class HalfEdgeMeshTest:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-<<<<<<< HEAD
         if False:
-=======
-        if 1:
->>>>>>> upstream/master
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -66,17 +62,10 @@ class HalfEdgeMeshTest:
         #for i, val in enumerate(mesh.halfedgedata['level']):
         #    print(i, ':', val, mesh.ds.halfedge[i, 0:2])
 
-<<<<<<< HEAD
         #print("cell level:\n")
         #for i, val in enumerate(mesh.celldata['level']):
         #    print(i, ':', val)
 
-=======
-        print("cell level:\n")
-        for i, val in enumerate(mesh.celldata['level']):
-            print(i, ':', val)
-        print(mesh.ds.halfedge)
->>>>>>> upstream/master
         if plot:
 
             fig = plt.figure()
