@@ -161,17 +161,18 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         cell2dofLocation = self.dof.cell2dofLocation
 
         idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla 梯度空间对应的自由度个数
-        c2d = cuh.space.cell_to_dof(doftype='cell')
-        cuh[:2*NE*p] = uh[:2*NE*p] 
-        cuh[c2d[:, idof0:]].flat = uh[2*NE*p:] 
+        c2d = cuh.space.cell_to_dof(doftype='cell') # 完全向量虚单元空间单元内部自由度全局编号
+        cuh[:2*NE*p] = uh[:2*NE*p] # 边上自由度直接赋值 
+        cuh[c2d[:, idof0:]].flat = uh[2*NE*p:]  # 单元内部梯度正交空间对应的自由度全局编号
 
+        # 下面处理梯度空间对应虚单元自由度
         n = mesh.edge_unit_normal()
         eh = mesh.entity_measure('edge')
         edge2cell = mesh.ds.edge_to_cell()
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
 
         area = self.smspace.cellmeasure # 单元面积
-        Q0 = self.CM[:, 0, :]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
+        Q0 = self.CM[:, 0, 1:idof0+1]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
@@ -179,34 +180,35 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         phi = self.smspace.edge_basis(ps, p=p-1)
 
         # left element
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1) #(NQ, NC, 3)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)[..., 1:idof0+1]
         phi0 -= Q0[None, edge2cell[:, 0]]
         h = 1/ch[edge2cell[:, 0]]
-        h *= eh
-        h *= eh
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
-        F0 = F0@self.H1
+        h *= eh # 积分的尺度
+        h *= eh # 自由定义的尺度
+        F = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
+        F = F@self.H1
 
         edge2dof = self.dof.edge_to_dof()
-        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
-                uh[edge2dof], n[:, 0])
-        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
-                uh[NE*p:][edge2dof], n[:, 1])
+        val = np.einsum('jmn, jn, j->jm', F, uh[edge2dof], n[:, 0])
+        np.add.at(cuh, c2d[edge2cell[:, 0], :idof0], val)
+        val = np.einsum('jmn, jn, j->jm', F, uh[NE*p:][edge2dof], n[:, 1])
+        np.add.at(cuh, c2d[edge2cell[:, 0], :idof0], val)
 
         # right element
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)[..., 1:idof0+1]
         phi0 -= Q0[None, edge2cell[:, 1]]
         h = 1/ch[edge2cell[:, 1]]
         h *= eh
         h *= eh
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
-        F0 = F1@self.H1
-        F0[isBdEdge] = 0.0 # 注意边界边的右边单元的贡献要设为 0
+        F = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
+        F = F@self.H1
+        F[isBdEdge] = 0.0 # 注意边界边的右边单元的贡献要设为 0
 
-        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
-                uh[edge2dof], n[:, 0])
-        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
-                uh[NE*p:][edge2dof], n[:, 1])
+        val = np.einsum('jmn, jn, j->jm', F, uh[edge2dof], n[:, 0])
+        np.subtract.at(cuh, c2d[edge2cell[:, 1], :idof0], val)
+        val = np.einsum('jmn, jn, j->jm', F, uh[NE*p:][edge2dof], n[:, 1])
+        np.subtract.at(cuh, c2d[edge2cell[:, 1], :idof0], val)
+
 
     def project_to_smspace(self, uh):
         p = self.p
@@ -1063,7 +1065,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         val = gd(ps)
 
         ephi = self.smspace.edge_basis(ps, index=isBdEdge, p=p-1)
-        b = np.einsum('i, ij..., ijk, j->jk...', ws, val, ephi)
+        b = np.einsum('i, ij..., ijk->jk...', ws, val, ephi)
         # T = self.H1[isBdEdge]@b #TODO: 检查这里的问题
         uh[edge2dof[isBdEdge]] = b[:, :, 0] 
         uh[NE*p:][edge2dof[isBdEdge]] = b[:, :, 1] 

@@ -47,9 +47,10 @@ elif m == 6:
 
 errorType = ['$||  u - \Pi  u_h||_0$',
              '$|| p - p_h||_0$',
-             '$|| \\varepsilon(u) - \\varepsilon(\Pi u_h) ||_0$'
+             '$|| \\varepsilon(u) - \\varepsilon(\Pi u_h) ||_0$',
+             '$|| cu - \Pi cu_h||_0$'
              ]
-errorMatrix = np.zeros((3, maxit), dtype=np.float)
+errorMatrix = np.zeros((4, maxit), dtype=np.float)
 dof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
@@ -62,8 +63,12 @@ for i in range(maxit):
     idof = (p-2)*(p-1)//2
 
     dof[i] = NC
-    space = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
+    # 完全向量虚单元空间
+    cspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
+    cuh = cspace.function()
+    # 缩减向量虚单元空间 
     uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
+    # 分片常数压力空间
     pspace = ScaledMonomialSpace2d(mesh, 0)
 
     isBdDof = uspace.boundary_dof()
@@ -98,6 +103,9 @@ for i in range(maxit):
     uh[:] = x[:udof]
     ph[:] = x[udof:]
 
+    uspace.project_to_complete_space(uh, cuh)
+    cup = cspace.project_to_smspace(cuh)
+
     up = uspace.project_to_smspace(uh)
     integralalg = uspace.integralalg
 
@@ -107,13 +115,13 @@ for i in range(maxit):
 
     area = mesh.entity_measure('cell')
     iph = sum(ph*area)/sum(area)
-    print("1:", iph)
     def pressure(x, index):
         return ph.value(x, index) - iph
 
     errorMatrix[0, i] = integralalg.L2_error(pde.velocity, up)
     errorMatrix[1, i] = integralalg.L2_error(pde.pressure, pressure)
     errorMatrix[2, i] = integralalg.L2_error(pde.strain, strain)
+    errorMatrix[3, i] = integralalg.L2_error(pde.velocity, cup)
 
 fig = plt.figure()
 axes = fig.gca()

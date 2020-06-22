@@ -170,7 +170,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [ 0, D0],
                 [D1, D2]])
 
-            sio.savemat('test1.mat', {'pC':PI0[0:2*smldof]@D})
 
             idx = cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
             x0 = uh[idx]
@@ -201,8 +200,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
                 [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]],
                 [   self.J[0][:, s],    self.J[1][:, s],    self.J[2][i]]])
-            data = {'TR'+str(i): R}
-            sio.savemat('TR'+str(i)+'.mat', data)
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -656,7 +653,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
 
-    def matrix_A(self):
+    def matrix_A(self, celltype=False):
         """
         """
         p = self.p # 空间次数
@@ -705,14 +702,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
-        
-        if len(A) == 2:
-            data = {'B0': A[0], 'B1': A[1]}
-            sio.savemat('B0.mat', data)
-        else:
-            data = {'A0': A[0]}
-            sio.savemat('A0.mat', data)
 
+        if celltype:
+            return A
+        
         idof = p*(p-1) #
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
@@ -771,7 +764,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         return bmat([[P0, P1, P2]], format='csr')
             
 
-    def source_vector(self, f):
+    def source_vector(self, f, celltype=False):
         p = self.p
         mesh = self.mesh
         NE = mesh.number_of_edges()
