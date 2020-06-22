@@ -653,7 +653,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
 
         return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
 
-    def matrix_A(self, celltype=False):
+    def matrix_A(self):
+        return self.stiff_matrix()
+
+    def stiff_matrix(self, celltype=False):
         """
         """
         p = self.p # 空间次数
@@ -723,6 +726,9 @@ class DivFreeNonConformingVirtualElementSpace2d:
         return  A
 
     def matrix_P(self):
+        return self.div_matrix()
+
+    def div_matrix(self):
         """
         Notes
         -----
@@ -764,7 +770,49 @@ class DivFreeNonConformingVirtualElementSpace2d:
         return bmat([[P0, P1, P2]], format='csr')
             
 
-    def source_vector(self, f, celltype=False):
+    def cell_grad_source_vector(self, f):
+        """
+
+        Notes
+        -----
+            计算单元载荷向量, 这里只计算梯度空间对应的部分
+        """
+        p = self.p
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        if p == 2:
+            ndof = self.smspace.number_of_local_dofs(p=p)
+            cell2dof = self.dof.cell2dof 
+            cell2dofLocation = self.dof.cell2dofLocation
+            idof = p*(p-1)
+            idof0 = (p+1)*p//2 - 1
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            b = np.zeros((NC, idof0), dtype=self.ftype)
+            def u1(i):
+                PI0 = self.PI0[i]
+                n = cell2dofLocation[i+1] - cell2dofLocation[i] 
+                b[i, :] = bb[i, :, 0]@PI0[:ndof, 2*n:2*n+idof0] + bb[i, :,
+                        1]@PI0[ndof:2*ndof, 2*n:2*n+idof0]
+            list(map(u1, range(NC)))
+            return b # (NC, idof0)
+        else:
+            area = self.smspace.cellmeasure
+            ndof = self.smspace.number_of_local_dofs(p=p-2)
+            Q = inv(self.CM[:, :ndof, :ndof])
+            phi = lambda x: self.smspace.basis(x, p=p-2)
+            def u0(x, index):
+                return np.einsum('ijm, ijn->ijmn', 
+                        self.smspace.basis(x, index=index, p=p-2), f(x))
+            bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
+            bb = Q@bb # (NC, ndof, 2)
+            b = (bb[:, :, 0] + bb[:, :, 1])*area[:, None]/c 
+            return b # (NC, idof0)
+
+    def source_vector(self, f):
         p = self.p
         mesh = self.mesh
         NE = mesh.number_of_edges()
@@ -815,6 +863,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             c = 1.0/np.repeat(range(1, p), range(1, p))
             c2d = self.cell_to_dof('cell')
 
+            # TODO: check here, something is wrong!
             idof0 = (p+1)*p//2 - 1 
             gdof = self.number_of_global_dofs()
             b = np.zeros(gdof, dtype=self.ftype)

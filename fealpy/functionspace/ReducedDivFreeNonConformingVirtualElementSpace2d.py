@@ -139,7 +139,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             uh[2*NE*p:] -= uh1[:, x[0], 1].flat
         return uh
 
-    def project_to_complete_space(self, uh, cuh):
+    def project_to_complete_space(self, f, uh, ph, cuh, cph):
         """
 
         Parameters
@@ -155,15 +155,21 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         p = self.p
         mesh = self.mesh
         NE = mesh.number_of_edges()
+        NC = mesh.nubmer_of_cells()
         ch = self.smspace.cellsize # 单元尺寸 
 
         cell2dof = self.dof.cell2dof # 这里只是边上的标量自由度管理
         cell2dofLocation = self.dof.cell2dofLocation
 
+        idof = p*(p-1)
         idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla 梯度空间对应的自由度个数
+
         c2d = cuh.space.cell_to_dof(doftype='cell') # 完全向量虚单元空间单元内部自由度全局编号
         cuh[:2*NE*p] = uh[:2*NE*p] # 边上自由度直接赋值 
-        cuh[c2d[:, idof0:]].flat = uh[2*NE*p:]  # 单元内部梯度正交空间对应的自由度全局编号
+
+        # 下面代码 cuh[c2d[:, idof0:]] 返回的是 copy 
+        # cuh[c2d[:, idof0:]].flat[:] = uh[2*NE*p:] # 这里是 Bug
+        cuh[c2d[:, idof0:]] = uh[2*NE*p:].reshape(-1, idof-idof0)  # 单元内部梯度正交空间对应的自由度全局编号
 
         # 下面处理梯度空间对应虚单元自由度
         n = mesh.edge_unit_normal()
@@ -175,9 +181,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         Q0 = self.CM[:, 0, 1:idof0+1]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
 
         qf = GaussLegendreQuadrature(p + 3)
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.edge_bc_to_point(bcs) 
         phi = self.smspace.edge_basis(ps, p=p-1)
+
 
         # left element
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1)[..., 1:idof0+1]
@@ -208,6 +215,19 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         np.subtract.at(cuh, c2d[edge2cell[:, 1], :idof0], val)
         val = np.einsum('jmn, jn, j->jm', F, uh[NE*p:][edge2dof], n[:, 1])
         np.subtract.at(cuh, c2d[edge2cell[:, 1], :idof0], val)
+
+
+        A = cuh.space.stiff_matrix(celltype=True)
+        P = cuh.space.J[2]
+        F = cuh.space.cell_grad_source_vector(f)
+
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+        th = np.zeros((NC, idof0), dtype=self.ftype)
+
+        def f0(i):
+            s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+
 
 
     def project_to_smspace(self, uh):
@@ -891,7 +911,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         return [[U00, U01, U02], [U10, U11, U12], [U20, U21, U22]]
 
     def matrix_A(self):
+        return self.stiff_matrix()
 
+    def stiff_matrix(self):
         p = self.p # 空间次数
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
@@ -953,6 +975,9 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         return  A
 
     def matrix_P(self):
+        return self.div_matrix()
+
+    def div_matrix(self):
         """
         Notes
         -----

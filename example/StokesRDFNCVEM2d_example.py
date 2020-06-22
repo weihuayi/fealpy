@@ -63,10 +63,14 @@ for i in range(maxit):
     idof = (p-2)*(p-1)//2
 
     dof[i] = NC
-    # 完全向量虚单元空间
-    cspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p)
-    cuh = cspace.function()
-    # 缩减向量虚单元空间 
+
+    # 完全非协调向量虚单元空间
+    cuspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
+    cpspace = ScaledMonomialSpace2d(mesh, p-1)
+    cuh = cuspace.function()
+    cph = cpspace.function()
+
+    # 缩减非协调向量虚单元空间 
     uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
     # 分片常数压力空间
     pspace = ScaledMonomialSpace2d(mesh, 0)
@@ -103,10 +107,10 @@ for i in range(maxit):
     uh[:] = x[:udof]
     ph[:] = x[udof:]
 
-    uspace.project_to_complete_space(uh, cuh)
+    uspace.project_to_complete_space(uh, ph, cuh, cph)
     cup = cspace.project_to_smspace(cuh)
-
     up = uspace.project_to_smspace(uh)
+
     integralalg = uspace.integralalg
 
     def strain(x, index):
