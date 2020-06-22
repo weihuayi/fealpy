@@ -139,13 +139,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             uh[2*NE*p:] -= uh1[:, x[0], 1].flat
         return uh
 
-    def project_to_complete_space(self, cspace, uh):
+    def project_to_complete_space(self, uh, cuh):
         """
 
         Parameters
         ----------
-        cspace: 
         uh : 
+        cuh : 
 
         Notes
         -----
@@ -154,34 +154,53 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         """
         p = self.p
         mesh = self.mesh
+        NE = mesh.number_of_edges()
         ch = self.smspace.cellsize # 单元尺寸 
+
+        cell2dof = self.dof.cell2dof # 这里只是边上的标量自由度管理
+        cell2dofLocation = self.dof.cell2dofLocation
+
+        idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla 梯度空间对应的自由度个数
+        c2d = cuh.space.cell_to_dof(doftype='cell')
+        cuh[:2*NE*p] = uh[:2*NE*p] 
+        cuh[c2d[:, idof0:]].flat = uh[2*NE*p:] 
 
         n = mesh.edge_unit_normal()
         eh = mesh.entity_measure('edge')
         edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+
+        area = self.smspace.cellmeasure # 单元面积
+        Q0 = self.CM[:, 0, :]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs) 
         phi = self.smspace.edge_basis(ps, p=p-1)
 
-        area = self.smspace.cellmeasure # 单元面积
-        Q0 = self.CM[:, 0, :]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
-
+        # left element
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 0], p=p-1) #(NQ, NC, 3)
         phi0 -= Q0[None, edge2cell[:, 0]]
-
-        # self.H1 is the inverse of Q_{p-1}^F
-        # i->quadrature, j->edge, m-> basis on domain, n->basis on edge
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, eh/ch[edge2cell[:, 0])
+        h = 1/ch[edge2cell[:, 0]]
+        h *= eh
+        h *= eh
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
         F0 = F0@self.H1
 
-        if isInEdge.sum() > 0:
-            phi1 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
-            phi1 -= Q0[None, edge2cell[:, 1]]
-            F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi, eh, a/ch[edge2cell[:, 1]])
-            F1 = F1@self.H1
+        edge2dof = self.dof.edge_to_dof()
+        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn->jm', F0, uh[edge2dof])
+
+        
+
+        # right element
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
+        phi0 -= Q0[None, edge2cell[:, 1]]
+        h = 1/ch[edge2cell[:, 1]]
+        h *= eh
+        h *= eh
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
+        F0 = F1@self.H1
+        F0[isBdEdge] = 0.0 # 注意边界边的右边单元的贡献要设为 0
 
     def project_to_smspace(self, uh):
         p = self.p
