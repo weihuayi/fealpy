@@ -50,8 +50,24 @@ class MonomialSpace2dTest():
     def split_vector_basis(self, p=3):
         domain = sp.Matrix([-1, 1, -1, 1])
         space0 = MonomialSpace2d(p, domain=domain)
-        space0.split_vector_basis(p=p) 
+        phi = space0.basis(p=p)
+        a, b = space0.split_vector_basis(p=p) 
+        print('phi:', phi)
+        print('a:', a)
+        print('b:', b)
 
+    def matrix_E(self, p=2):
+        domain = sp.Matrix([-1, 1, -1, 1])
+        space0 = MonomialSpace2d(p, domain=domain)
+        E = space0.matrix_E(p=p)
+        print(E)
+
+    def matrix_Q_L(self, p=2):
+        domain = sp.Matrix([-1, 1, -1, 1])
+        space0 = MonomialSpace2d(p, domain=domain)
+        Q, L = space0.matrix_Q_L(p=p)
+        print("Q:", Q)
+        print("L:", L)
         
 test = MonomialSpace2dTest()
 
@@ -67,6 +83,11 @@ elif sys.argv[1] == 'basis_jacobian':
 elif sys.argv[1] == 'split':
     p = int(sys.argv[2])
     test.split_vector_basis(p=p)
-    test.basis_jacobian(p=p)
+elif sys.argv[1] == 'E':
+    p = int(sys.argv[2])
+    test.matrix_E(p=p)
+elif sys.argv[1] == 'QL':
+    p = int(sys.argv[2])
+    test.matrix_Q_L(p=p)
 
 

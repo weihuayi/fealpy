@@ -113,26 +113,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
         self.D = self.matrix_D()
         self.PI0 = self.matrix_PI0()
 
-        self.debug = True
-        if self.debug:
-            R0 = np.r_['1', self.R[0][0], self.R[0][1], self.R[0][2][0]]
-            R1 = np.r_['1', self.R[1][0], self.R[1][1], self.R[1][2][0]]
-            J = np.r_['1', self.J[0], self.J[1], self.J[2][0]]
-            data = {"pG11":self.G[0][0],
-                    "pG22":self.G[1][0],
-                    "pG12":self.G[2][0],
-                    "pB1":self.B[0][0],
-                    "pB2":self.B[1][0],
-                    "pR0":R0,
-                    "pR1":R1,
-                    "pJ":J, 
-                    "pA": self.matrix_A(),
-                    "pP": self.matrix_P()}
-
-            sio.savemat('test.mat', data)
-
-
-
     def project(self, u):
         p = self.p # p >= 2
         NE = self.mesh.number_of_edges()
@@ -221,6 +201,8 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 [self.R[0][0][:, s], self.R[0][1][:, s], self.R[0][2][i]],
                 [self.R[1][0][:, s], self.R[1][1][:, s], self.R[1][2][i]],
                 [   self.J[0][:, s],    self.J[1][:, s],    self.J[2][i]]])
+            data = {'TR'+str(i): R}
+            sio.savemat('TR'+str(i)+'.mat', data)
             PI = inv(G)@R
             return PI
         PI0 = list(map(f, range(NC)))
@@ -341,6 +323,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         idof = p*(p-1) # 内部自由度的个数
         idof0 = (p+1)*p//2 - 1 # G_{k-2}^\nabla
 
+
         R00 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R01 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R02 = np.zeros((NC, smldof, idof), dtype=self.ftype)
@@ -457,8 +440,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             val = np.einsum('jm, jmn, j-> mjn', h3, F1, 0.5*n[:, 1])
             np.subtract.at(R00, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
+
             val = np.einsum('jm, jmn, j-> mjn', h2, F1, 0.5*n[:, 0])
             np.subtract.at(R11, (x[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
+
             val = np.einsum('jm, jmn, j-> mjn', h3, F1, n[:, 1])
             np.subtract.at(R11, (y[0][:, None, None], idx0[isInEdge]), val[:, isInEdge])
 
@@ -517,6 +502,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             idx0 = cell2dofLocation[edge2cell[:, [1]]] + edge2cell[:, [3]]*p + np.arange(p)
             val = np.einsum('ijk, i->jik', F1, n[:, 0])
             np.subtract.at(J0, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
+
             val = np.einsum('ijk, i->jik', F1, n[:, 1])
             np.subtract.at(J1, (np.s_[:], idx0[isInEdge]), val[:, isInEdge])
 
@@ -719,6 +705,14 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return S + U.T@H0@U 
 
         A = list(map(f1, range(NC)))
+        
+        if len(A) == 2:
+            data = {'B0': A[0], 'B1': A[1]}
+            sio.savemat('B0.mat', data)
+        else:
+            data = {'A0': A[0]}
+            sio.savemat('A0.mat', data)
+
         idof = p*(p-1) #
         def f2(i):
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
@@ -767,8 +761,6 @@ class DivFreeNonConformingVirtualElementSpace2d:
                 shape=(gdof, NE*p), dtype=self.ftype)
         cell2dof = np.arange(NC*idof).reshape(NC, idof)
         def f2(i):
-            print('cd[', i, ']:', cd[i])
-            print('cell2dof[', i, ']:', cell2dof[i])
             return np.meshgrid(cell2dof[i], cd[i])
         idx = list(map(f2, range(NC)))
         I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
@@ -834,19 +826,10 @@ class DivFreeNonConformingVirtualElementSpace2d:
             gdof = self.number_of_global_dofs()
             b = np.zeros(gdof, dtype=self.ftype)
             idx = np.arange(idof0)
-            print('idx0:', idx)
-            print('idx:', idx)
-            print('x0:', x0)
-            print('y0:', y0)
-            print('x1:', x1)
-            print('y1:', y1)
-            print('c2d:', c2d.shape)
-            print('bb:', bb.shape)
             b[c2d[:, idx[x1[0]-1]]] += bb[:, :, 0]*area[:, None]*c 
             b[c2d[:, idx[y1[0]-1]]] += bb[:, :, 1]*area[:, None]*c 
 
             idx = np.arange(idof0, p*(p-1))
-            print('idx1:', idx)
             b[c2d[:, idx]] += bb[:, y0[0], 0]*area[:, None]*y0[1]*c[y0[0]]
             b[c2d[:, idx]] -= bb[:, x0[0], 1]*area[:, None]*x0[1]*c[x0[0]]
             return b 

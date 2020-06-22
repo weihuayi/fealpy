@@ -1,3 +1,4 @@
+import numpy as np
 import sympy as sp
 from sympy.abc import x, y
 
@@ -19,6 +20,31 @@ class MonomialSpace2d:
         p = self.p if p is None else p
         return (p+1)*(p+2)//2
 
+    def diff_index_1(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        x, = np.nonzero(index[:, 1] > 0)
+        y, = np.nonzero(index[:, 2] > 0)
+
+        return {'x':(x, index[x, 1]), 
+                'y':(y, index[y, 2]),
+                }
+
+    def diff_index_2(self, p=None):
+        p = self.p if p is None else p
+        index = multi_index_matrix2d(p)
+        
+        xx, = np.nonzero(index[:, 1] > 1)
+        yy, = np.nonzero(index[:, 2] > 1)
+
+        xy, = np.nonzero((index[:, 1] > 0) & (index[:, 2] > 0))
+
+        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
+                'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
+                'xy':(xy, index[xy, 1]*index[xy, 2]),
+                }
+
     def basis(self, p=None):
         p = self.p if p is None else p
         dofs = self.number_of_dofs(p=p)
@@ -36,16 +62,64 @@ class MonomialSpace2d:
 
     def mass_matrix(self, p=None):
         p = self.p if p is None else p
-        dofs = self.number_of_dofs(p=p)
         domain = self.domain
         phi = self.basis(p=p)
-        n = self.number_of_dofs(p=p)
-        H = sp.zeros(n, n)
-        for i in range(n):
-            for j in range(i, n):
+        ldof = self.number_of_dofs(p=p)
+        H = sp.zeros(ldof, ldof)
+        for i in range(ldof):
+            for j in range(i, ldof):
                 H[j, i] = H[i, j] = sp.integrate(phi[i]*phi[j], (self.x,
                     domain[0], domain[1]), (self.y, domain[2], domain[3]))
         return H
+
+    def matrix_Q_L(self, p=None):
+        p = self.p if p is None else p
+        domain = self.domain
+        if p > 2:
+            phi = self.basis(p=p)
+            ldof = self.number_of_dofs(p=p-3)
+            Q = sp.zeros(ldof, ldof)
+            L = sp.zeros(ldof, ldof)
+            f = phi[1]**2 + phi[2]**2
+            for i in range(ldof):
+                L[i, i] = self.h**2
+                for j in range(i, ldof):
+                    Q[j, i] = Q[i, j] = sp.integrate(f*phi[i]*phi[j], (self.x,
+                        domain[0], domain[1]), (self.y, domain[2], domain[3]))
+
+            return Q, L
+        else:
+            return None, None
+
+    def matrix_E(self, p=None):
+        p = self.p if p is None else p # p >=2 
+        c = np.repeat(np.arange(1, p), np.arange(1, p))
+        ldof0 = self.number_of_dofs(p=p-2) 
+        E00 = sp.zeros(ldof0, ldof0)
+        E10 = sp.zeros(ldof0, ldof0)
+
+        for i in range(ldof0):
+            E00[i, i] = self.h**2/c[i]
+            E10[i, i] = self.h**2/c[i]
+
+        if p == 2:
+            return sp.BlockMatrix([[E00], [E10]])
+        else:
+            ldof1 = self.number_of_dofs(p=p-3)
+            E01 = sp.zeros(ldof0, ldof1)
+            E11 = sp.zeros(ldof0, ldof1)
+
+            idx = self.diff_index_1(p=p-2)
+            x = idx['x']
+            y = idx['y']
+            for i in range(ldof1):
+                E01[y[0][i], i] = sp.Rational(y[1][i]*self.h**2, c[y[0][i]])
+                E11[x[0][i], i] = sp.Rational(-x[1][i]*self.h**2, c[x[0][i]])
+            return sp.BlockMatrix([[E00, E01], [E10, E11]])
+
+    def grad_basis(self, p=None):
+        phi = self.basis(p=p)
+        return phi.jacobian([self.x, self.y]).T
 
     def basis_jacobian(self, p=None):
         phi = self.basis(p=p)
@@ -74,7 +148,7 @@ class MonomialSpace2d:
     def grad_space_basis(self, p=None):
         p = self.p if p is None else p
         phi = self.basis(p=p+1)
-        M = self.h*phi.jacobian()
+        M = self.h*phi.jacobian([self.x, self.y]).T
         return M
 
     def perp_grad_space_basis(self, p=None):
@@ -95,8 +169,31 @@ class MonomialSpace2d:
 
     def split_vector_basis(self, p=None):
         p = self.p if p is None else p
-        m = multi_index_matrix2d(p)
-        print(m)
+        idx = self.diff_index_1(p=p+1)
+        x = idx['x'][0]
+        y = idx['y'][0]
+    
+        phi = self.basis(p=1)
+        gphi0 = self.grad_space_basis(p=p+1)
+
+        gphi1 = self.grad_basis(p=p)
+
+        v = sp.Matrix([[phi[2]], [-phi[1]]])
+
+        ldof = (p+1)*(p+2)//2
+        a = sp.zeros(2, ldof)
+        b = sp.zeros(2, ldof)
+
+        c = np.repeat(np.arange(1, p+2), np.arange(1, p+2))
+        
+        for i in range(ldof):
+            a[:, i] = gphi0[:, x[i]] + self.h*v*gphi1[1, i]
+            b[:, i] = gphi0[:, y[i]] - self.h*v*gphi1[0, i]
+            a[:, i] /= c[i]
+            b[:, i] /= c[i]
+        return a, b
+
+
 
 
     def construct_G(self):
