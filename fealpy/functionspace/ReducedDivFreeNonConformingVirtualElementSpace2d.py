@@ -149,7 +149,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         Notes
         -----
-        把缩减虚单元空间中的函数投影回完全的虚单元空间, 其中边界和梯度正交空
+            把缩减虚单元空间中的函数投影回完全的虚单元空间, 其中边界和梯度正交空
         间的自由度直接设置, 但梯度空间的自由度要重新计算.
         """
         p = self.p
@@ -188,9 +188,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F0 = F0@self.H1
 
         edge2dof = self.dof.edge_to_dof()
-        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn->jm', F0, uh[edge2dof])
-
-        
+        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
+                uh[edge2dof], n[:, 0])
+        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
+                uh[NE*p:][edge2dof], n[:, 1])
 
         # right element
         phi0 = self.smspace.basis(ps, index=edge2cell[:, 1], p=p-1)
@@ -201,6 +202,11 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)
         F0 = F1@self.H1
         F0[isBdEdge] = 0.0 # 注意边界边的右边单元的贡献要设为 0
+
+        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
+                uh[edge2dof], n[:, 0])
+        cuh[c2d[:, :idof0]][edge2cell[:, 0]] += np.einsum('jmn, jn, j->jm', F0,
+                uh[NE*p:][edge2dof], n[:, 1])
 
     def project_to_smspace(self, uh):
         p = self.p
