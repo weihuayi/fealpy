@@ -218,15 +218,19 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
 
         A = cuh.space.stiff_matrix(celltype=True)
-        P = cuh.space.J[2]
-        F = cuh.space.cell_grad_source_vector(f)
+        P = cuh.space.J[2] # (NC, ?)
+        F = cuh.space.cell_grad_source_vector(f) # (NC, ldof0)
 
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
         th = np.zeros((NC, idof0), dtype=self.ftype)
+        c2d = self.cell_to_dof(doftype='cell')
 
         def f0(i):
+            n = cell2dofLocation[i+1] - cell2dofLocation[i]
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
+            x = np.r_['0', uh[cell2dof[s]], uh[NE*p:][cell2dof[s]], uh[c2d[i, :]]] 
+            A[2*n:2*n+ldof0, :]@x + P[i]
 
 
 
