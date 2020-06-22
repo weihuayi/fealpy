@@ -92,7 +92,7 @@ class HalfEdgeMesh2dTest:
 
         if 1:
             isMarkedCell = mesh.mark_helper([2])
-            mesh.refine_poly(isMarkedCell, dflag=False)
+            mesh.refine_poly(isMarkedCell)
 
         if False:
             isMarkedCell = mesh.mark_helper([6])
@@ -104,7 +104,7 @@ class HalfEdgeMesh2dTest:
 
         if 1:
             isMarkedCell = mesh.mark_helper([1, 5])
-            mesh.refine_poly(isMarkedCell, dflag=False)
+            mesh.refine_poly(isMarkedCell)
 
         if False:
             isMarkedCell = mesh.mark_helper([1, 12])
