@@ -391,6 +391,7 @@ class Quadtree(QuadrangleMesh):
                 leafIdx = self.leaf_cell_index()
                 idx0 = leafIdx[options['HB'][:, 0]] # 叶子单元在所有单元中对应的编号
                 idx0 = cellIdxMap[idx0] # 在保留单元中的编号
+                print(idx0)
                 isLeafCell = (child[:, 0] == -1) # 新网格的叶子单元
                 idxMap = np.zeros(NNC, dtype=self.itype)
                 idxMap[isLeafCell] = range(isLeafCell.sum())

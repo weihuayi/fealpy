@@ -34,18 +34,18 @@ class HalfEdgeMeshTest:
         NC = mesh.number_of_cells()
 
         if True:
-            isMarkedCell = mesh.mark_helper([2])
+            isMarkedCell = mesh.mark_helper([2,3,4])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([6])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -58,13 +58,13 @@ class HalfEdgeMeshTest:
             mesh.refine_poly(isMarkedCell, dflag=False)
 
 
-        print("halfedge level:\n")
-        for i, val in enumerate(mesh.halfedgedata['level']):
-            print(i, ':', val, mesh.ds.halfedge[i, 0:2])
+        #print("halfedge level:\n")
+        #for i, val in enumerate(mesh.halfedgedata['level']):
+        #    print(i, ':', val, mesh.ds.halfedge[i, 0:2])
 
-        print("cell level:\n")
-        for i, val in enumerate(mesh.celldata['level']):
-            print(i, ':', val)
+        #print("cell level:\n")
+        #for i, val in enumerate(mesh.celldata['level']):
+        #    print(i, ':', val)
 
         if plot:
 
@@ -102,15 +102,23 @@ class HalfEdgeMeshTest:
             isMarkedCell = mesh.mark_helper([26, 27, 28, 29, 17, 18, 19, 20, 2, 3])
             mesh.coarsen_poly(isMarkedCell)
 
-        if True:
+        if False:
             isMarkedCell = mesh.mark_helper(
                     [16, 17, 18, 23, 14, 10, 12, 15, 0, 1])
             mesh.coarsen_poly(isMarkedCell)
 
         if True:
             isMarkedCell = mesh.mark_helper(
-                    [12, 13, 14, 2, 3, 4, 5])
+                    [7,9,11,13])
             mesh.coarsen_poly(isMarkedCell)
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
 
         if plot:
             fig = plt.figure()
@@ -139,6 +147,92 @@ class HalfEdgeMeshTest:
             mesh.find_cell(axes, showindex=True, multiindex=cindex)
             plt.show()
 
+    def adaptive_poly_test(self, plot=True):
+
+        """"
+        initial mesh
+        """
+        node = np.array([
+            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+        cell = np.array([0, 3, 4, 4, 1, 0,
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+        mesh = PolygonMesh(node, cell, cellLocation)
+        mesh = HalfEdgeMesh.from_mesh(mesh)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        NE = mesh.number_of_edges()
+        nC = mesh.number_of_cells()
+
+        """
+        refined mesh
+        """
+        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
+        eta = [0,0,1,1,1]
+
+        mesh.adaptive(eta, aopts)
+        print('r',aopts['HB'])
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        plt.show()
+
+        mesh.from_mesh(mesh)
+        """
+        coarsened mesh
+        """
+        eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
+        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
+
+        mesh.adaptive(eta, aopts)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        plt.show()
+
+        if plot:
+
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+
+            NAC = mesh.number_of_all_cells() # 包括外部区域和洞
+            cindex = range(mesh.ds.cellstart, NAC)
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True, multiindex=cindex)
+
+            NN = mesh.number_of_nodes()
+            nindex = np.zeros(NN, dtype=np.int)
+            halfedge = mesh.ds.halfedge
+            nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
+            cindex = mesh.get_data('cell', 'level')
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True, multiindex=nindex)
+            mesh.find_cell(axes, showindex=True, multiindex=cindex)
+            plt.show()
+        else:
+            return mesh
 
 
     def triangle_mesh_test(self, plot=False):
@@ -274,34 +368,41 @@ class HalfEdgeMeshTest:
         fig = plt.figure()
         axes = fig.gca()
         pmesh.add_plot(axes)
-        #pmesh.find_node(axes, showindex=True)
+        pmesh.find_node(axes, showindex=True)
         pmesh.find_cell(axes, showindex=True)
 
         NE = mesh.number_of_edges()
         nC = mesh.number_of_cells()
 
-        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
+        aopts =mesh.adaptive_options(method='numrefine',maxcoarsen=3,maxsize=10,HB=True)
         #eta = 2*np.ones(nC,dtype=int)
-        eta = [1,1]
+        eta = [1,2]
 
         mesh.adaptive(eta, aopts)
         pmesh = mesh.to_pmesh()
+
         fig = plt.figure()
         axes = fig.gca()
         pmesh.add_plot(axes)
         #pmesh.find_node(axes, showindex=True)
         pmesh.find_cell(axes, showindex=True)
-        print(aopts['HB'])
+        plt.show()
+        print('refine:', aopts['HB'])
 
-        eta = [0,0,-1,-1,-1,-1,-1,-1]
+        eta = np.zeros(20,np.int)
+        eta[4] = -1
+        eta[5] = -1
+        eta[6] = -1
+        eta[7] = -1
         mesh.adaptive(eta, aopts)
         pmesh = mesh.to_pmesh()
+
         fig = plt.figure()
         axes = fig.gca()
         pmesh.add_plot(axes)
         #pmesh.find_node(axes, showindex=True)
         pmesh.find_cell(axes, showindex=True)
-        print(aopts['HB'])
+        print('coarsen:', aopts['HB'])
 
         plt.show()
 
@@ -374,76 +475,6 @@ class HalfEdgeMeshTest:
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
-    def adaptive_poly_test(self, plot=True):
-        node = np.array([
-            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
-            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
-            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
-        cell = np.array([0, 3, 4, 4, 1, 0,
-            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
-        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
-
-        mesh = PolygonMesh(node, cell, cellLocation)
-        print(mesh.meshtype)
-        mesh = HalfEdgeMesh.from_mesh(mesh)
-
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-
-        NE = mesh.number_of_edges()
-        nC = mesh.number_of_cells()
-
-        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-        #eta = 2*np.ones(nC,dtype=int)
-        eta = [0,0,1,1,1]
-
-        mesh.adaptive(eta, aopts)
-        print(mesh.meshtype)
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-
-        mesh.from_mesh(mesh)
-        print(mesh.meshtype)
-
-        #eta = [1,0,0,-1,-1,-1,0,0,0,0]
-        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
-
-        #mesh.adaptive(eta, aopts) 
-        if plot:
-
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-
-            NAC = mesh.number_of_all_cells() # 包括外部区域和洞
-            cindex = range(mesh.ds.cellstart, NAC)
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True, multiindex=cindex)
-
-            NN = mesh.number_of_nodes()
-            nindex = np.zeros(NN, dtype=np.int)
-            halfedge = mesh.ds.halfedge
-            nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
-            cindex = mesh.get_data('cell', 'level')
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True, multiindex=nindex)
-            mesh.find_cell(axes, showindex=True, multiindex=cindex)
-            plt.show()
-        else:
-            return mesh
 
     def refine_triangle_rbTest(self, l, plot=True, rb=True):
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
@@ -522,7 +553,7 @@ class HalfEdgeMeshTest:
 
 
 test = HalfEdgeMeshTest()
-test.refine_triangle_rbTest(8, plot=True, rb=True)
+#test.refine_triangle_rbTest(8, plot=True, rb=True)
 
 if sys.argv[1] == 'refine_tri_rb':
     test.refine_triangle_rbTest(8, plot=True, rb=1)
@@ -532,7 +563,15 @@ if sys.argv[1] == 'refine_poly':
 
 if sys.argv[1] == 'coarsen_poly':
     mesh = test.refine_poly_test(plot=False)
-    test.coarsen_poly_test(mesh, plot=True)
+
+#    fig = plt.figure()
+#    axes = fig.gca()
+#    mesh.add_plot(axes)
+#    mesh.find_node(axes, showindex=True)
+#    mesh.find_cell(axes, showindex=True)
+#    plt.show()
+
+    test.coarsen_poly_test(mesh, plot=False)
 
 if sys.argv[1] == 'advance_trimesh':
     test.advance_trimesh_test()

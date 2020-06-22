@@ -1137,15 +1137,15 @@ class HalfEdgeMesh(Mesh2d):
         ec = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
         NE1 = len(ec)
 
-        if options['data'] is not None:
-            NV = self.ds.number_of_vertices_of_all_cells()
-            for key, value in options['data'].items():
-                # 定义在节点的数据进行简单插值
-                evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
-                cvalue = np.zeros(NC, dtype=self.ftype)
-                np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
-                cvalue /= NV
-                options['data'][key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
+        #if options['data'] is not None:
+        #    NV = self.ds.number_of_vertices_of_all_cells()
+        #    for key, value in options['data'].items():
+        #        # 定义在节点的数据进行简单插值
+        #        evalue = (value[halfedge[flag0, 0]] + value[halfedge[idx, 0]])/2
+        #        cvalue = np.zeros(NC, dtype=self.ftype)
+        #        np.add.at(cvalue, halfedge[:, 1], value[halfedge[:, 0]])
+        #        cvalue /= NV
+        #        options['data'][key] = np.concatenate((value, evalue, cvalue[isMarkedCell]), axis=0)
 
         #细分边
         halfedge1 = np.zeros((2*NE1, 6), dtype=self.itype)
@@ -1237,7 +1237,8 @@ class HalfEdgeMesh(Mesh2d):
             halfedge[idx1, 1] = halfedge[idx0, 1]
 
         nex1 = halfedge[idx1, 2] # 当前半边的下一个半边
-        pre1 = halfedge[idx1, 3] # 当前半边的上一个半边
+        pre1 = halfedge[idx1, 3]
+ # 当前半边的上一个半边
 
         cell2newNode = np.full(NC, NN+NE1, dtype=self.itype)
         cell2newNode[isMarkedCell] += range(isMarkedCell.sum())
@@ -1336,6 +1337,9 @@ class HalfEdgeMesh(Mesh2d):
             clevel = np.zeros(nc+nn, dtype=self.itype)
             clevel[:nc] = self.celldata['level'][~isMarkedCell[:NC]]
             clevel[nc:] = level
+            print('c',clevel)
+            print('n',nlevel)
+
 
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
@@ -1395,13 +1399,10 @@ class HalfEdgeMesh(Mesh2d):
             ###TODO
             if ('HB' in options) and (options['HB'] is not None):
                 # 粗化要更新 HB[:, 0]
-                leafIdx = self.leaf_cell_index()
-                idx0 = leafIdx[options['HB'][:, 0]] # 叶子单元在所有单元中对应的编号
-                idx0 = cellIdxMap[idx0] # 在保留单元中的编号
-                isLeafCell = (child[:, 0] == -1) # 新网格的叶子单元
-                idxMap = np.zeros(NNC, dtype=self.itype)
-                idxMap[isLeafCell] = range(isLeafCell.sum())
-                options['HB'][:, 0] = idxMap[idx0]
+                NHB = self.number_of_cells()
+                HB = np.zeros((NHB, 2), dtype=np.int)
+                HB[:, 0] = range(NHB)
+                print('HB:', options['HB'])
 
 
     def mark_helper(self, idx):
@@ -1468,7 +1469,6 @@ class HalfEdgeMesh(Mesh2d):
             options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.mean(eta)))
                 )
-            # options['numrefine'][leafCellIdx] = eta
         elif options['method'] == 'max':
             options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
