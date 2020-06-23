@@ -25,42 +25,62 @@ class FEMeshIntegralAlg():
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
 
-    def construct_matrix(self, basis0, basis1=None,  
+    def construct_matrix(self, basis0, 
+            basis1=None,  cfun=None,
             cell2dof0=None, gdof0=None, 
             cell2dof1=None, gdof1=None, 
             barycenter=True, q=None):
+        """
+
+        Parameters
+        ---------
+
+        cfun: 
+
+        Notes
+        -----
+
+        给定两个空间的基函数, 组装对应的离散算子. 
+        
+        cfun 是算子的系数函数, 它返回的值是一个张量, 由 phi0 来决定. 如果 phi0
+        是标量函数  
+        """
 
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
+        ps = mesh.bc_to_point(bcs)
         if barycenter:
-            phi0 = basis0(bcs)
+            phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
             phi1 = phi0 if basis1 is None else basis1(bcs)
         else:
-            ps = mesh.bc_to_point(bcs)
             phi0 = basis0(ps)
             phi1 = phi0 if basis1 is None else basis1(ps)
 
-        M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
-                self.cellmeasure, optimize=True)
+        if cfun is None:
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
+                    self.cellmeasure, optimize=True)
+        else: # TODO: make here work
+            c = cfun(ps)
+            M = np.einsum('i, ijk, ijk..., ijm..., j->jkm', ws, c, phi0, phi1,
+                    self.cellmeasure, optimize=True)
 
-        if cell2dof0 is not None: # construct the global matrix
-            gdof0 = gdof0 or cell2dof0.max()
-            ldof0 = cell2dof0.shape[1] 
 
-            if cell2dof1 is not None:
-                gdof1 = gdof1 or cell2dof1.max()
-                ldof1 = cell2dof1.shape[1]
-                I = np.einsum('k, ij->ijk', np.ones(ldof1), cell2dof0)
-                J = np.einsum('k, ij->ikj', np.ones(ldof0), cell2dof1)
-            else:
-                gdof1 = gdof0
-                ldof1 = ldof0
-                I = np.einsum('k, ij->ijk', np.ones(ldof0), cell2dof0)
-                J = I.swapaxes(-1, -2)
+        if cell2dof0 is None: # just construct cell matrix
+            return M
 
-            M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+        gdof0 = gdof0 or cell2dof0.max()
+        if cell2dof1 is None:
+            gdof1 = gdof0
+            cell2dof1 = cell2dof0
+        else:
+            gdof1 = gdof1 or cell2dof1.max()
+
+        I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof1[:, None, :], shpae=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
         return M
 

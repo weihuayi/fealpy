@@ -432,7 +432,11 @@ class HalfEdgeMesh2d(Mesh2d):
         ----------
         isMarkedCell : np.ndarray, bool,
             len(isMarkedCell) == len(self.ds.subdomain)
+
+        Notes
+        -----
         """
+
         NC = self.number_of_all_cells()
         assert len(isMarkedCell) == NC
 
@@ -473,9 +477,10 @@ class HalfEdgeMesh2d(Mesh2d):
         idx0, = np.nonzero(flag0)
         nex0 = halfedge[flag0, 2]
         pre0 = halfedge[flag0, 3]
-        subdomain = DynamicArray(subdomain[~isMarkedCell])
-        subdomain.extend(subdomain[halfedge[flag0, 1]])
-        self.ds.subdomain = subdomain
+
+        newSubdomain = subdomain.adjust_size(isMarkedCell, flag0.sum())
+        newSubdomain[:] = subdomain[halfedge[flag0, 1]]
+
 
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
@@ -541,8 +546,10 @@ class HalfEdgeMesh2d(Mesh2d):
         newHalfedge[NHE:, 4] = halfedge[pre1, 2]
         newHlevel[NHE:] = clevel[cellidx]
 
-        clevel = DynamicArray(np.r_[clevel[~isMarkedCell], clevel[cellidx]])
-        self.celldata['level'] = clevel
+        tmp = clevel[cellidx]
+        newClevel = clevel.adjust_size(isMarkedCell, len(cellidx))
+        newClevel[:] = tmp
+
 
         flag = np.zeros(NC+NHE, dtype=np.bool)
         flag[halfedge[:, 1]] = True
