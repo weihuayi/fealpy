@@ -26,6 +26,14 @@ class Function(np.ndarray):
         space = self.space
         return space.grad_value(self, bc, index=index)
 
+    def curl_value(self, bc, index=None):
+        space = self.space
+        return space.curl_value(self, bc, index=index)
+
+    def rot_value(self, bc, index=None):
+        space = self.space
+        return space.rot_value(self, bc, index=index)
+
     def laplace_value(self, bc, index=None):
         space = self.space
         return space.laplace_value(self, bc, index=index)

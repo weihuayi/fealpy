@@ -147,7 +147,6 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         cdof = self.smspace.number_of_local_dofs(doftype='cell')
         edof = self.smspace.number_of_local_dofs(doftype='edge')
-
         ndof = self.smspace.number_of_local_dofs(p=p) 
 
         mesh = self.mesh
@@ -185,12 +184,17 @@ class FirstKindNedelecFiniteElementSpace2d:
             M = self.smspace.mass_matrix()
             idx = self.smspace.diff_index_1()
             idof = self.smspace.number_of_local_dofs(p=p-1, doftype='cell') 
-            keys = ['y', 'x']
-            sign = [1, -1]
-            for i, key in enumerate(keys):
-                index = np.arange((GD+1)*edof + i*idof, (GD+1)*edof+ (i+1)*idof)[:, None]
-                A[:, index, i*cdof + np.arange(cdof)] = M[:, :idof, :]
-                A[:, index, GD*cdof + np.arange(edof)] = sign[i]*M[:,  idx[key][0], cdof-edof:]
+            x = idx['x']
+            y = idx['y']
+
+            index = np.arange((GD+1)*edof + 0*idof, (GD+1)*edof+ 1*idof)[:, None]
+            A[:, index, 0*cdof + np.arange(cdof)] = M[:, :idof, :]
+            A[:, index, GD*cdof + np.arange(edof)] = M[:,  y[0], cdof-edof:]
+
+            index = np.arange((GD+1)*edof + 1*idof, (GD+1)*edof+ 2*idof)[:, None]
+            A[:, index, 1*cdof + np.arange(cdof)] = M[:, :idof, :]
+            A[:, index, GD*cdof + np.arange(edof)] = -M[:,  x[0], cdof-edof:]
+
         return inv(A)
 
     def face_basis(self, bc, index=None, barycenter=True):
@@ -294,6 +298,19 @@ class FirstKindNedelecFiniteElementSpace2d:
         return self.curl_basis(bc, index, barycenter)
 
     def curl_basis(self, bc, index=None, barycenter=True):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        curl [v_0, v_1] = \partial v_1/\partial x - \partial v_0/\partial y
+
+        curl [[ m_k, 0], [0, m_k]] 
+        = [-\partial m_k/\partial y,  \partial m_k/\partial x] 
+
+        """
         p = self.p
         ldof = self.number_of_local_dofs('all')
         cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
@@ -402,6 +419,9 @@ class FirstKindNedelecFiniteElementSpace2d:
     def curl_matrix(self):#TODO: check here
         """
 
+        Notes:
+
+        组装 (\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
         """
         p = self.p
         gdof0 = self.number_of_global_dofs()
@@ -419,7 +439,7 @@ class FirstKindNedelecFiniteElementSpace2d:
     def source_vector(self, f, dim=None, barycenter=False):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
+        b = self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
                 gdof=gdof, dim=dim, barycenter=barycenter) 
         return b
 
