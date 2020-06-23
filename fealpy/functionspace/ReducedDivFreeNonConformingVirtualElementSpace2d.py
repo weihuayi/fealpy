@@ -155,7 +155,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         p = self.p
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        NC = mesh.nubmer_of_cells()
+        NC = mesh.number_of_cells()
         ch = self.smspace.cellsize # 单元尺寸 
 
         cell2dof = self.dof.cell2dof # 这里只是边上的标量自由度管理
@@ -169,7 +169,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # 下面代码 cuh[c2d[:, idof0:]] 返回的是 copy 
         # cuh[c2d[:, idof0:]].flat[:] = uh[2*NE*p:] # 这里是 Bug
-        cuh[c2d[:, idof0:]] = uh[2*NE*p:].reshape(-1, idof-idof0)  # 单元内部梯度正交空间对应的自由度全局编号
+        if p > 2:
+            cuh[c2d[:, idof0:]] = uh[2*NE*p:].reshape(-1, idof-idof0)  # 单元内部梯度正交空间对应的自由度全局编号
 
         # 下面处理梯度空间对应虚单元自由度
         n = mesh.edge_unit_normal()
@@ -178,7 +179,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
 
         area = self.smspace.cellmeasure # 单元面积
-        Q0 = self.CM[:, 0, 1:idof0+1]/area[:, None] # (NC, smdof) \bfQ_0^K(\bfm_k)
+        Q0 = self.CM[:, 0, 1:idof0+1]/area[:, None]
 
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -218,19 +219,25 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
 
         A = cuh.space.stiff_matrix(celltype=True)
-        P = cuh.space.J[2] # (NC, ?)
         F = cuh.space.cell_grad_source_vector(f) # (NC, ldof0)
+        c2d = cuh.space.cell_to_dof(doftype='cell')
 
         cell2dof = self.dof.cell2dof
         cell2dofLocation = self.dof.cell2dofLocation
-        th = np.zeros((NC, idof0), dtype=self.ftype)
-        c2d = self.cell_to_dof(doftype='cell')
+
+        val = cph.reshape((NC, (p+1)*p//2))
 
         def f0(i):
             n = cell2dofLocation[i+1] - cell2dofLocation[i]
             s = slice(cell2dofLocation[i], cell2dofLocation[i+1])
-            x = np.r_['0', uh[cell2dof[s]], uh[NE*p:][cell2dof[s]], uh[c2d[i, :]]] 
-            A[2*n:2*n+ldof0, :]@x + P[i]
+            x = np.r_['0', cuh[cell2dof[s]], cuh[NE*p:][cell2dof[s]], cuh[c2d[i, :]]] 
+            val[i, 1:] = A[i][2*n:2*n+idof0, :]@x 
+            val[i, 1:] -= F[i]
+            val[i, 1:] /= ch[i]
+            val[i, 0] = ph[i]  
+            val[i, 0] -= sum(val[i, 1:]*Q0[i, :])
+
+        list(map(f0, range(NC)))
 
 
 

@@ -45,12 +45,13 @@ elif m == 5:
 elif m == 6:
     pde = StokesModelData_6()
 
-errorType = ['$||  u - \Pi  u_h||_0$',
+errorType = ['$|| u - \Pi \\tilde u_h||_0$',
+             '$|| p - \\tilde p_h||_0$',
+             '$|| \\varepsilon(u) - \\varepsilon(\Pi \\tilde u_h) ||_0$',
+             '$|| u - \Pi u_h||_0$',
              '$|| p - p_h||_0$',
-             '$|| \\varepsilon(u) - \\varepsilon(\Pi u_h) ||_0$',
-             '$|| cu - \Pi cu_h||_0$'
              ]
-errorMatrix = np.zeros((4, maxit), dtype=np.float)
+errorMatrix = np.zeros((5, maxit), dtype=np.float)
 dof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
@@ -65,35 +66,34 @@ for i in range(maxit):
     dof[i] = NC
 
     # 完全非协调向量虚单元空间
-    cuspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
-    cpspace = ScaledMonomialSpace2d(mesh, p-1)
-    cuh = cuspace.function()
-    cph = cpspace.function()
-
-    # 缩减非协调向量虚单元空间 
-    uspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
-    # 分片常数压力空间
-    pspace = ScaledMonomialSpace2d(mesh, 0)
-
-    isBdDof = uspace.boundary_dof()
-
-    udof = uspace.number_of_global_dofs()
-    pdof = pspace.number_of_global_dofs()
-
+    uspace = DivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
+    pspace = ScaledMonomialSpace2d(mesh, p-1)
     uh = uspace.function()
     ph = pspace.function()
 
-    A = uspace.matrix_A()
-    P = uspace.matrix_P()
-    F = uspace.source_vector(pde.source)
+    # 缩减非协调向量虚单元空间 
+    tuspace = ReducedDivFreeNonConformingVirtualElementSpace2d(mesh, p, q=6)
+    # 分片常数压力空间
+    tpspace = ScaledMonomialSpace2d(mesh, 0)
 
+    isBdDof = tuspace.boundary_dof()
+
+    tudof = tuspace.number_of_global_dofs()
+    tpdof = tpspace.number_of_global_dofs()
+
+    tuh = tuspace.function()
+    tph = tpspace.function()
+
+    A = tuspace.stiff_matrix()
+    P = tuspace.div_matrix()
+    F = tuspace.source_vector(pde.source)
     AA = bmat([[A, P.T], [P, None]], format='csr')
-    FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
+    FF = np.block([F, np.zeros(tpdof, dtype=tuspace.ftype)])
 
-    uspace.set_dirichlet_bc(uh, pde.dirichlet)
-    x = np.block([uh, ph])
-    isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+pdof, dtype=np.bool)])
-    gdof = udof + pdof
+    tuspace.set_dirichlet_bc(tuh, pde.dirichlet)
+    x = np.block([tuh, tph])
+    isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+tpdof, dtype=np.bool)])
+    gdof = tudof + tpdof
     FF -= AA@x
     bdIdx = np.zeros(gdof, dtype=np.int)
     bdIdx[isBdDof] = 1
@@ -104,28 +104,35 @@ for i in range(maxit):
     FF[isBdDof] = x[isBdDof]
 
     x[:] = spsolve(AA, FF)
-    uh[:] = x[:udof]
-    ph[:] = x[udof:]
+    tuh[:] = x[:tudof]
+    tph[:] = x[tudof:]
 
-    uspace.project_to_complete_space(uh, ph, cuh, cph)
-    cup = cspace.project_to_smspace(cuh)
+    tuspace.project_to_complete_space(pde.source, tuh, tph, uh, ph)
     up = uspace.project_to_smspace(uh)
+    tup = tuspace.project_to_smspace(tuh)
 
     integralalg = uspace.integralalg
+    area = sum(mesh.entity_measure('cell'))
 
     def strain(x, index):
-        val = up.grad_value(x, index)
+        val = tup.grad_value(x, index)
         return (val + val.swapaxes(-1, -2))/2
 
-    area = mesh.entity_measure('cell')
-    iph = sum(ph*area)/sum(area)
+
+    errorMatrix[0, i] = integralalg.L2_error(pde.velocity, tup)
+
+    iph = integralalg.integral(tph)/area
+    def tpressure(x, index):
+        return tph.value(x, index) - iph
+    errorMatrix[1, i] = integralalg.L2_error(pde.pressure, tpressure)
+
+    errorMatrix[2, i] = integralalg.L2_error(pde.strain, strain)
+    errorMatrix[3, i] = integralalg.L2_error(pde.velocity, up)
+
+    iph = integralalg.integral(ph)/area
     def pressure(x, index):
         return ph.value(x, index) - iph
-
-    errorMatrix[0, i] = integralalg.L2_error(pde.velocity, up)
-    errorMatrix[1, i] = integralalg.L2_error(pde.pressure, pressure)
-    errorMatrix[2, i] = integralalg.L2_error(pde.strain, strain)
-    errorMatrix[3, i] = integralalg.L2_error(pde.velocity, cup)
+    errorMatrix[4, i] = integralalg.L2_error(pde.pressure, pressure)
 
 fig = plt.figure()
 axes = fig.gca()

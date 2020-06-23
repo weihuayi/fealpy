@@ -802,6 +802,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         else:
             area = self.smspace.cellmeasure
             ndof = self.smspace.number_of_local_dofs(p=p-2)
+            idof0 = (p+1)*p//2 - 1
             Q = inv(self.CM[:, :ndof, :ndof])
             phi = lambda x: self.smspace.basis(x, p=p-2)
             def u0(x, index):
@@ -809,6 +810,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
                         self.smspace.basis(x, index=index, p=p-2), f(x))
             bb = self.integralalg.integral(u0, celltype=True) # (NC, ndof, 2)
             bb = Q@bb # (NC, ndof, 2)
+            c = np.repeat(range(1, p), range(1, p))
             b = (bb[:, :, 0] + bb[:, :, 1])*area[:, None]/c 
             return b # (NC, idof0)
 
