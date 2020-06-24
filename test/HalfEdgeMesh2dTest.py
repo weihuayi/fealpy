@@ -114,7 +114,8 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([0, 21])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-
+        clevel = mesh.celldata['level']
+ 
         print("halfedge level:\n")
         for i, val in enumerate(mesh.halfedgedata['level']):
             print(i, ':', val, mesh.ds.halfedge[i, 0:2])
@@ -219,10 +220,11 @@ class HalfEdgeMesh2dTest:
 
             fig = plt.figure()
             axes = fig.gca()
-            mesh.add_plot(axes)
+            mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-
+            #mesh.find_cell(axes, showindex=True)
+            plt.show()
+        if 0:
             NAC = mesh.number_of_all_cells() # 包括外部区域和洞
             cindex = range(mesh.ds.cellstart, NAC)
             fig = plt.figure()
@@ -256,6 +258,6 @@ elif sys.argv[1] == 'refine_halfedge':
 elif sys.argv[1] == 'refine_poly':
     test.refine_poly()
 elif sys.argv[1] == 'adaptive_poly':
-    mesh = test.adaptive_poly(plot=False)
+    mesh = test.adaptive_poly()
 
 
