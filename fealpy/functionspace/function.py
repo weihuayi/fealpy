@@ -66,7 +66,7 @@ class Function(np.ndarray):
                     node[:, 0], node[:, 1],
                     cell, self, cmap=cmap, lw=0.0)
             return axes
-        elif mesh.meshtype in {'polygon', 'halfedge'}:
+        elif mesh.meshtype in {'polygon', 'halfedge', 'halfedge2d'}:
             node = mesh.entity('node')
             axes.plot_trisurf(
                     node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)

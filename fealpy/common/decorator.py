@@ -4,9 +4,8 @@ import warnings
 
 def deprecate(func):
     def dwarning(*args, **kwargs):
-
         return func(*args, **kwargs)
-    return add_attribute 
+    return dwarning 
 
 def cartesian(func):
     @wraps(func)
