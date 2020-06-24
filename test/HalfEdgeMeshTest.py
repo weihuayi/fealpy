@@ -29,12 +29,13 @@ class HalfEdgeMeshTest:
         mesh.add_plot(axes)
         mesh.find_node(axes, showindex=True)
         mesh.find_cell(axes, showindex=True)
-
+        clevel = mesh.celldata['level']
+        print(clevel)
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
         if True:
-            isMarkedCell = mesh.mark_helper([2,3,4])
+            isMarkedCell = mesh.mark_helper([2])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
         if False:
@@ -45,7 +46,7 @@ class HalfEdgeMeshTest:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if False:
+        if 1:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
@@ -56,7 +57,9 @@ class HalfEdgeMeshTest:
         if False:
             isMarkedCell = mesh.mark_helper([0, 21])
             mesh.refine_poly(isMarkedCell, dflag=False)
-
+        clevel = mesh.celldata['level']
+        print(clevel)
+ 
 
         #print("halfedge level:\n")
         #for i, val in enumerate(mesh.halfedgedata['level']):

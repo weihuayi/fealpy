@@ -162,9 +162,9 @@ class HalfEdgeMesh2d(Mesh2d):
         NE = self.number_of_edges()
 
         NC = self.number_of_all_cells() # 实际单元个数
-        self.halfedgedata['level'] = DynamicArray((2*NE, ), val=0, dtype=np.uint8)
-        self.celldata['level'] = DynamicArray((NC, ), val=0, dtype=np.uint8) 
-        self.nodedata['level'] = DynamicArray((NN, ), val=0, dtype=np.uint8)
+        self.halfedgedata['level'] = DynamicArray((2*NE, ), val=0,dtype=np.int_)
+        self.celldata['level'] = DynamicArray((NC, ), val=0, dtype=np.int_) 
+        self.nodedata['level'] = DynamicArray((NN, ), val=0, dtype=np.int_)
 
     def number_of_all_cells(self):
         return self.ds.number_of_all_cells()
@@ -357,12 +357,12 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge = self.entity('halfedge')
         if method == 'poly':
             # 当前半边的层标记小于等于所属单元的层标记
-            flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0 
+            flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0
             # 前一半边的层标记小于等于所属单元的层标记 
             pre = halfedge[:, 3]
             flag1 = (hlevel[pre] - clevel[halfedge[:, 1]]) <= 0
             # 标记加密的半边
-            isMarkedHEdge = isMarkedCell[halfedge[:, 1]]|flag0|flag1 
+            isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & flag0 & flag1
             # 标记加密的半边的相对半边也需要标记 
             flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
             isMarkedHEdge[flag] = True
@@ -598,9 +598,8 @@ class HalfEdgeMesh2d(Mesh2d):
             # 更新粗化后单元的所属子区域的信息
             nsd = np.zeros(NN, dtype=self.itype)
             nsd[halfedge[:, 0]] = subdomain[halfedge[:, 1]]
-            subdomain = np.zeros(nc+nn, dtype=self.itype)
-            subdomain[:nc] = self.ds.subdomain[~isMarkedCell[:NC]]
-            subdomain[nc:] = nsd[isRNode]
+
+            subdomain.adjust_size(isMarkedCell[:NC], nsd[isRNode])
 
             # 粗化后单元的新编号: NC:NC+nn 
             ###TODO
@@ -614,14 +613,14 @@ class HalfEdgeMesh2d(Mesh2d):
             HB0[halfedge[isRHEdge, 1], 1] =  nidxmap[halfedge[isRHEdge, 0]]
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+
             # 更新粗化后单元的层数
             nlevel = np.zeros(NN, dtype=self.itype)
             nlevel[halfedge[:, 0]] = hlevel
             level = nlevel[isRNode] - 1
             level[level < 0] = 0
-            clevel = np.zeros(nc+nn, dtype=self.itype)
-            clevel[:nc] = self.celldata['level'][~isMarkedCell[:NC]]
-            clevel[nc:] = level
+
+            clevel.adjust_size(isMarkedCell[:NC], level)
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
             nex = halfedge[:, 2] # 当前半边的下一个半边编号
@@ -659,7 +658,7 @@ class HalfEdgeMesh2d(Mesh2d):
             ne = sum(~isMarkedHEdge)
             eidxmap = np.arange(2*NE)
             eidxmap[~isMarkedHEdge] = range(ne)
-            halfedge = halfedge[~isMarkedHEdge]
+            halfedge.adjust_size(isMarkedHEdge)
             halfedge[:, 2:5] = eidxmap[halfedge[:, 2:5]]
 
             # 对单元重新编号
@@ -669,13 +668,13 @@ class HalfEdgeMesh2d(Mesh2d):
             NC = sum(isKeepedCell)
             cidxmap[isKeepedCell] = range(NC)
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
-            # 更新层信息
-            self.halfedgedata['level'] = hlevel[~isMarkedHEdge]
-            self.celldata['level'] = clevel
 
-            # 更新节点和半边数据结构信息
-            self.node = self.node[~isRNode]
-            self.ds.reinit(halfedge,subdomain,NN)
+            # 更新层信息
+            hlevel.adjust_size(isMarkedHEdge)
+
+            # 更新节点
+            self.node.adjust_size(isRNode)
+
             ###TODO
             if ('HB' in options) and (options['HB'] is not None):
                 #　粗化和加密网格的对应关系
