@@ -917,9 +917,9 @@ class HalfEdgeMesh2dDataStructure():
             NV0 = np.ones(NC, dtype=self.itype)
             isNotOK = NV0 < NV
             while np.any(isNotOK):
-               cell2node[idx[isNotOK]] = halfedge[current[isNotOK], 0]
                idx[isNotOK] += 1
                NV0[isNotOK] += 1
+               cell2node[idx[isNotOK]] = halfedge[current[isNotOK], 0]
                current[isNotOK] = halfedge[current[isNotOK], 2]
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation

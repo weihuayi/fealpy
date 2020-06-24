@@ -52,6 +52,33 @@ class HalfEdgeMesh2dTest:
     def dynamic_array(self):
         pass
 
+    def cell_to_node(self):
+        node = np.array([
+            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+        cell = np.array([0, 3, 4, 4, 1, 0,
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+        print('node:', node)
+        print('cell:', cell)
+        print('cellLocation:', cellLocation)
+        mesh = PolygonMesh(node, cell, cellLocation)
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.print()
+        cell, cellLocation = mesh.entity('cell')
+        print('cell:', cell)
+        print('cellLocation:', cellLocation)
+        plt.show()
+
     def refine_halfedge(self, plot=True):
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
@@ -69,6 +96,7 @@ class HalfEdgeMesh2dTest:
             mesh.find_node(axes, showindex=True)
             #mesh.find_cell(axes, showindex=True)
             plt.show()
+
     def refine_poly(self, plot=True):
         node = np.array([
             (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
@@ -259,5 +287,7 @@ elif sys.argv[1] == 'refine_poly':
     test.refine_poly()
 elif sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly()
+elif sys.argv[1] == 'cell_to_node':
+    mesh = test.cell_to_node()
 
 
