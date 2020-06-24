@@ -507,6 +507,8 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge[idx0, 1] = range(NC, NC + NHE)
         clevel[isMarkedCell] += 1
 
+        hcell.adjust_size(isMarkedCell, idx0)
+
         idx1 = idx0.copy()
         pre = halfedge[idx1, 3]
         flag0 = ~flag[pre] # 前一个是不需要细分的半边
@@ -547,7 +549,6 @@ class HalfEdgeMesh2d(Mesh2d):
         tmp = clevel[cellidx]
         clevel.adjust_size(isMarkedCell, clevel[cellidx])
 
-
         flag = np.zeros(NC+NHE, dtype=np.bool)
         flag[halfedge[:, 1]] = True
 
@@ -566,11 +567,14 @@ class HalfEdgeMesh2d(Mesh2d):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
+        hcell = self.ds.hcell
+        hedge = self.ds.hedge
         hlevel = self.halfedgedata['level']
         clevel = self.celldata['level']
 
         halfedge = self.ds.halfedge
         subdomain = self.ds.subdomain
+        isMainHEdge = self.ds.main_halfedge_flag()
 
         # 可以移除的网格节点
         # 在理论上, 可以移除点周围的单元所属子区是相同的, TODO: make sure about it
@@ -614,6 +618,8 @@ class HalfEdgeMesh2d(Mesh2d):
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
 
+
+
             # 更新粗化后单元的层数
             nlevel = np.zeros(NN, dtype=self.itype)
             nlevel[halfedge[:, 0]] = hlevel
@@ -650,6 +656,20 @@ class HalfEdgeMesh2d(Mesh2d):
             isRNode[halfedge[flag, 0]] = True
             NN -= nn + flag.sum()//2
 
+            #起始边半边
+            halfedgeNewCell = halfedge[:, 1]>=NC
+            hdxmap = np.arange(NE*2) - np.cumsum(isMarkedHEdge)
+            hcell[:] = hdxmap[hcell]
+            newHcell = hcell.adjust_size(isMarkedCell[:NC], int(nn))
+            newHcell[halfedge[halfedgeNewCell, 1]-NC] = hdxmap[np.arange(NE*2)[halfedgeNewCell]]
+
+
+            #重新编号主半边
+            NRH = isMarkedHEdge.sum()
+            hedge.decrease_size(NRH//2)
+            hedge[:], = np.where(isMainHEdge[~isMarkedHEdge])
+
+
             # 对节点重新编号
             nidxmap[~isRNode] = range(NN)
             halfedge[:, 0] = nidxmap[halfedge[:, 0]]
@@ -658,7 +678,6 @@ class HalfEdgeMesh2d(Mesh2d):
             ne = sum(~isMarkedHEdge)
             eidxmap = np.arange(2*NE)
             eidxmap[~isMarkedHEdge] = range(ne)
-            halfedge.adjust_size(isMarkedHEdge)
             halfedge[:, 2:5] = eidxmap[halfedge[:, 2:5]]
 
             # 对单元重新编号
@@ -668,12 +687,16 @@ class HalfEdgeMesh2d(Mesh2d):
             NC = sum(isKeepedCell)
             cidxmap[isKeepedCell] = range(NC)
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+            halfedge.adjust_size(isMarkedHEdge)
 
             # 更新层信息
             hlevel.adjust_size(isMarkedHEdge)
 
             # 更新节点
             self.node.adjust_size(isRNode)
+            self.ds.NC = NC-nn
+            self.ds.NE = halfedge.shape[0]//2
+            self.ds.NN = self.node.size
 
             ###TODO
             if ('HB' in options) and (options['HB'] is not None):
