@@ -143,7 +143,7 @@ class HalfEdgeMesh2dTest:
             mesh.refine_poly(isMarkedCell, dflag=False)
 
         clevel = mesh.celldata['level']
- 
+
         print("halfedge level:\n")
         for i, val in enumerate(mesh.halfedgedata['level']):
             print(i, ':', val, mesh.ds.halfedge[i, 0:2])
@@ -157,7 +157,7 @@ class HalfEdgeMesh2dTest:
 
             fig = plt.figure()
             axes = fig.gca()
-            #mesh.add_plot(axes)
+            mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
             mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
@@ -236,7 +236,7 @@ class HalfEdgeMesh2dTest:
 
         mesh.adaptive(eta, aopts)
         print('c',aopts['HB'])
-
+        print(mesh.ds.hcell)
         #fig = plt.figure()
         #axes = fig.gca()
         #mesh.add_plot(axes)
@@ -248,6 +248,7 @@ class HalfEdgeMesh2dTest:
 
             fig = plt.figure()
             axes = fig.gca()
+            mesh.add_plot(axes)
             mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_node(axes, showindex=True)
             #mesh.find_cell(axes, showindex=True)
