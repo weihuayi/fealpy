@@ -63,6 +63,20 @@ class StructureQuadMesh(Mesh2d):
     def geo_dimension(self):
         return self.node.shape[1]
 
+    def cell_area(self, index=None):
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        v = self.edge_normal()
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+
+        a = np.zeros(NC, dtype=self.ftype)
+        np.add.at(a, edge2cell[:, 0], val)
+        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
+        a /=2
+        return a
 
     def interpolation(self, f, intertype='node'):
         node = self.node

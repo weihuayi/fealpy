@@ -168,6 +168,8 @@ class FEMeshIntegralAlg():
         return e
 
     def integral(self, u, celltype=False, barycenter=True):
+        """
+        """
         qf = self.integrator
         bcs = qf.quadpts # 积分点 (NQ, 3)
         ws = qf.weights # 积分点对应的权重 (NQ, )
