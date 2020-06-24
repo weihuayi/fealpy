@@ -102,7 +102,6 @@ class DynamicArray(object):
 
         d = (~isMarkedItem).sum()
         self.data[:d] = self.data[:self.size][~isMarkedItem]
-
         if isinstance(s, int):
             required_size = d+s
 
