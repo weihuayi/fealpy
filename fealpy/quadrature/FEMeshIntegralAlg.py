@@ -26,7 +26,7 @@ class FEMeshIntegralAlg():
             self.faceintegrator = self.edgeintegrator
 
     def construct_matrix(self, basis0, 
-            basis1=None,  cfun=None,
+            basis1=None,  c=None, 
             cell2dof0=None, gdof0=None, 
             cell2dof1=None, gdof1=None, 
             barycenter=True, q=None):
@@ -35,15 +35,14 @@ class FEMeshIntegralAlg():
         Parameters
         ---------
 
-        cfun: 
+        c: 
 
         Notes
         -----
 
         给定两个空间的基函数, 组装对应的离散算子. 
         
-        cfun 是算子的系数函数, 它返回的值是一个张量, 由 phi0 来决定. 如果 phi0
-        是标量函数  
+        c 是算子的系数, 它可以是一个常数
         """
 
         mesh = self.mesh
@@ -58,14 +57,15 @@ class FEMeshIntegralAlg():
             phi0 = basis0(ps)
             phi1 = phi0 if basis1 is None else basis1(ps)
 
-        if cfun is None:
+        if c is None:
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                     self.cellmeasure, optimize=True)
         else: # TODO: make here work
-            c = cfun(ps)
-            M = np.einsum('i, ijk, ijk..., ijm..., j->jkm', ws, c, phi0, phi1,
-                    self.cellmeasure, optimize=True)
-
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+                        self.cellmeasure, optimize=True)
+            elif callable(c):
+                pass
 
         if cell2dof0 is None: # just construct cell matrix
             return M

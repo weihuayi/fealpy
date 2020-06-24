@@ -372,7 +372,7 @@ class RaviartThomasFiniteElementSpace2d:
             uh[cell2dof[:, idof//2:]] = val[:, 1, :]
         return uh
 
-    def mass_matrix(self):
+    def stiff_matrix(self):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
