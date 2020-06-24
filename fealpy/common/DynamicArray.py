@@ -94,7 +94,10 @@ class DynamicArray(object):
 
     def adjust_size(self, isMarkedItem, s=0):
         """
-            remove some element with `idx`, and increase size 
+
+        Notes
+        -----
+        调整存储, 标记的单元移除掉, 并在尾部增加新的元素.
         """
 
         d = (~isMarkedItem).sum()
