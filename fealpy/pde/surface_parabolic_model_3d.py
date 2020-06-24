@@ -1,6 +1,6 @@
 import numpy as np
-from ..timeintegratoralg.timeline import UniformTimeLine
-from ..timeintegratoralg.timeline import ChebyshevTimeLine
+from ..timeintegratoralg.timeline_new import UniformTimeLine
+from ..timeintegratoralg.timeline_new import ChebyshevTimeLine
 
 
 class SinSinSinExpDataSphere():
