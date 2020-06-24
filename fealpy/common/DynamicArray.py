@@ -99,17 +99,29 @@ class DynamicArray(object):
 
         d = (~isMarkedItem).sum()
         self.data[:d] = self.data[:self.size][~isMarkedItem]
-        required_size = d+s
 
-        if required_size>self.capacity:
-            self.resize(max(2*self.capacity, required_size))
+        if isinstance(s, int):
+            required_size = d+s
 
-        data = self.data[d:required_size]
+            if required_size>self.capacity:
+                self.resize(max(2*self.capacity, required_size))
 
-        self.size = required_size
-        self.shape = (self.size,) + self._get_trailing_dimensions()
-        return data
+            data = self.data[d:required_size]
 
+            self.size = required_size
+            self.shape = (self.size,) + self._get_trailing_dimensions()
+            return data
+
+        if isinstance(s, np.ndarray):
+            required_size = d+s.shape[0]
+
+            if required_size>self.capacity:
+                self.resize(max(2*self.capacity, required_size))
+
+            self.data[d:required_size] = s
+
+            self.size = required_size
+            self.shape = (self.size,) + self._get_trailing_dimensions()
 
     def increase_size(self, s):
         """
