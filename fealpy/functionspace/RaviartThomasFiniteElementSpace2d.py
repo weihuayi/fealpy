@@ -27,15 +27,18 @@ class RTDof2d:
     def boundary_dof(self, threshold=None):
         """
         """
-        idx = self.mesh.ds.boundary_edge_index()
-        if threshold is not None: #TODO: threshold 可以是一个指标数组
-            bc = self.mesh.entity_barycenter('edge', index=idx)
-            flag = threshold(bc)
-            idx  = idx[flag]
+        edge2dof = self.edge_to_dof()
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool_)
-        edge2dof = self.edge_to_dof()
-        isBdDof[edge2dof[idx]] = True
+        isBdDof[edge2dof[index]] = True
         return isBdDof
 
     def is_boundary_dof(self, threshold=None):

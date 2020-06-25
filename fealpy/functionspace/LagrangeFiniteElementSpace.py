@@ -2,7 +2,9 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
-from .function import Function
+from ..decorator import barycentric
+
+from .Function import Function
 
 from .femdof import multi_index_matrix1d
 from .femdof import multi_index_matrix2d
@@ -162,6 +164,7 @@ class LagrangeFiniteElementSpace():
         rguh /= deg.reshape(-1, 1)
         return rguh
 
+    @barycentric
     def edge_basis(self, bc, index, lidx, direction=True):
         """
         compute the basis function values at barycentric point bc on edge
@@ -205,6 +208,7 @@ class LagrangeFiniteElementSpace():
 
         return self.basis(bcs)
 
+    @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
         NE = len(index)
         nmap = np.array([1, 2, 0])
@@ -256,6 +260,7 @@ class LagrangeFiniteElementSpace():
         gphi = np.einsum('k...ij, kjm->k...im', R, Dlambda[index, :, :])
         return gphi
 
+    @barycentric
     def face_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
         TD = self.TD - 1
@@ -274,6 +279,7 @@ class LagrangeFiniteElementSpace():
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
 
+    @barycentric
     def basis(self, bc):
         """
         compute the basis function values at barycentric point bc
@@ -317,6 +323,7 @@ class LagrangeFiniteElementSpace():
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
+    @barycentric
     def grad_basis(self, bc, index=None):
         """
         compute the basis function values at barycentric point bc
@@ -377,6 +384,7 @@ class LagrangeFiniteElementSpace():
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
         return gphi #(..., NC, ldof, GD)
 
+    @barycentric
     def value(self, uh, bc, index=None):
         phi = self.basis(bc)
         cell2dof = self.dof.cell2dof
@@ -387,6 +395,7 @@ class LagrangeFiniteElementSpace():
         val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
+    @barycentric
     def grad_value(self, uh, bc, index=None):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof
@@ -397,6 +406,7 @@ class LagrangeFiniteElementSpace():
         val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val
 
+    @barycentric
     def div_value(self, uh, bc, index=None):
         dim = len(uh.shape)
         GD = self.geo_dimension()
@@ -710,10 +720,11 @@ class LagrangeFiniteElementSpace():
 
         return b
 
-    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+    def set_dirichlet_bc(self, uh, g, threshold=None, q=None, is_dirichlet_boundary=None):
         """
         初始化解 uh  的第一类边界条件。
         """
+
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
         uh[isDDof] = g(ipoints[isDDof])
