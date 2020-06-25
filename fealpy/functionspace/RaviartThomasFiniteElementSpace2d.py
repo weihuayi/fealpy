@@ -1,7 +1,10 @@
 import numpy as np
 from numpy.linalg import inv
-from .function import Function
+
+from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+
+from ..decorator import barycentric # 导入默认的坐标类型, 这个空间是重心坐标
 
 class RTDof2d:
     def __init__(self, mesh, p):
@@ -182,7 +185,7 @@ class RaviartThomasFiniteElementSpace2d:
         A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  cdof+x] + n[:, 1, None, None]*RM[:, :, cdof+y]
 
         if p > 0:
-            M = self.smspace.mass_matrix()
+            M = self.smspace.cell_mass_matrix()
             idx = self.smspace.diff_index_1()
             idof = self.smspace.number_of_local_dofs(p=p-1, doftype='cell') 
             for i, key in enumerate(idx.keys()):
@@ -191,10 +194,12 @@ class RaviartThomasFiniteElementSpace2d:
                 A[:, index, GD*cdof + np.arange(edof)] = M[:,  idx[key][0], cdof-edof:]
         return inv(A)
 
+    @barycentric
     def face_basis(self, bc, index=None, barycenter=True):
         return self.edge_basis(bc, index, barycenter)
 
 
+    @barycentric
     def edge_basis(self, bc, index=None, barycenter=True):
         """
         """
@@ -228,6 +233,7 @@ class RaviartThomasFiniteElementSpace2d:
             phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def basis(self, bc, index=None, barycenter=True):
         """
         compute the basis function values at barycentric point bc
@@ -280,6 +286,7 @@ class RaviartThomasFiniteElementSpace2d:
             phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def div_basis(self, bc, index=None, barycenter=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
@@ -306,6 +313,7 @@ class RaviartThomasFiniteElementSpace2d:
             phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key], i], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def grad_basis(self, bc):
         pass
 
@@ -318,6 +326,7 @@ class RaviartThomasFiniteElementSpace2d:
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype)
 
+    @barycentric
     def value(self, uh, bc, index=None):
         phi = self.basis(bc)
         cell2dof = self.cell_to_dof()
@@ -327,6 +336,7 @@ class RaviartThomasFiniteElementSpace2d:
         val = np.einsum(s1, phi, uh[cell2dof])
         return val
 
+    @barycentric
     def div_value(self, uh, bc, index=None):
         dphi = self.div_basis(bc)
         cell2dof = self.cell_to_dof()
@@ -336,6 +346,7 @@ class RaviartThomasFiniteElementSpace2d:
         val = np.einsum(s1, dphi, uh[cell2dof])
         return val
 
+    @barycentric
     def grad_value(self, uh, bc, index=None):
         pass
 

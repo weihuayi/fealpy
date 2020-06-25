@@ -1,5 +1,6 @@
 import numpy as np
 
+from ..decorator import cartesian, barycentric
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Quadtree import Quadtree
 from ..mesh.QuadrangleMesh import QuadrangleMesh
@@ -62,6 +63,7 @@ class CosCosData:
             raise ValueError("".format)
 
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         Parameters
@@ -81,6 +83,7 @@ class CosCosData:
         return val # val.shape == x.shape
 
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -92,6 +95,7 @@ class CosCosData:
         val = 2*pi*pi*np.cos(pi*x)*np.cos(pi*y)
         return val
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -103,12 +107,15 @@ class CosCosData:
         val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
         return val # val.shape == p.shape
 
+    @cartesian
     def flux(self, p):
         return -self.gradient(p)
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
+    @cartesian
     def neumann(self, p, n):
         """ 
         Neuman  boundary condition
@@ -125,6 +132,7 @@ class CosCosData:
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
         return val
 
+    @cartesian
     def robin(self, p, n):
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)

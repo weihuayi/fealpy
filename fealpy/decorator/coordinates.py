@@ -1,11 +1,11 @@
+"""
+
+Notes
+-----
+在这个模块中, 我们引入了 coordinates 装饰子,  可以给装饰对象函数加一个 coordtype 的
+属性. 其它程序在调用该函数时, 可以用来决定传入参数的坐标类型.
+"""
 from functools import wraps
-import warnings
-
-
-def deprecate(func):
-    def dwarning(*args, **kwargs):
-        return func(*args, **kwargs)
-    return dwarning 
 
 def cartesian(func):
     @wraps(func)
@@ -41,4 +41,3 @@ def cylindrical(func):
         return func(*args, **kwargs)
     add_attribute.__dict__['coordtype'] = 'cylindrical' 
     return add_attribute 
-

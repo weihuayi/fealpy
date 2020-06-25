@@ -29,7 +29,7 @@ class FEMeshIntegralAlg():
             basis1=None,  c=None, 
             cell2dof0=None, gdof0=None, 
             cell2dof1=None, gdof1=None, 
-            barycenter=True, q=None):
+            q=None):
         """
 
         Parameters
@@ -50,12 +50,18 @@ class FEMeshIntegralAlg():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
-        if barycenter:
+        if basis0.coordtype == 'barycentric':
             phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
-            phi1 = phi0 if basis1 is None else basis1(bcs)
-        else:
+        elif basis0.coordtype == 'cartesian'
             phi0 = basis0(ps)
-            phi1 = phi0 if basis1 is None else basis1(ps)
+
+        if basis1 is not None:
+            if basis1.coordtype == 'barycentric':
+                phi1 = basis1(bcs) # (NQ, NC, ldof, ...)
+            elif basis1.coordtype == 'cartesian'
+                phi1 = basis1(ps)
+        else:
+            phi1 = phi0
 
         if c is None:
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
