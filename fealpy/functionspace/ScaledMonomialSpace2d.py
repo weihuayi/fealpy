@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
-from .function import Function
+from .Function import Function
+from ..decorator import cartesian
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
@@ -226,6 +227,7 @@ class ScaledMonomialSpace2d():
     def cell_to_dof(self, p=None):
         return self.dof.cell_to_dof(p=p)
 
+    @cartesian
     def edge_basis(self, point, index=None, p=None):
         p = self.p if p is None else p
         if p == 0:
@@ -245,6 +247,7 @@ class ScaledMonomialSpace2d():
             np.multiply.accumulate(phi, axis=-1, out=phi)
         return phi
 
+    @cartesian
     def basis(self, point, index=None, p=None):
         """
         Compute the basis values at point
@@ -281,7 +284,7 @@ class ScaledMonomialSpace2d():
                 start += i+1
         return phi
 
-
+    @cartesian
     def grad_basis(self, point, index=None, p=None):
         """
 
@@ -308,6 +311,7 @@ class ScaledMonomialSpace2d():
         elif point.shape[0] == num:
             return gphi/h[index].reshape(-1, 1, 1, 1)
 
+    @cartesian
     def laplace_basis(self, point, index=None, p=None):
         p = self.p if p is None else p
         index = index if index is not None else np.s_[:]
@@ -323,6 +327,7 @@ class ScaledMonomialSpace2d():
             lphi[..., idx['yy'][0]] += np.einsum('i, ...i->...i', idx['yy'][1], phi)
         return lphi/area[index].reshape(-1, 1)
 
+    @cartesian
     def hessian_basis(self, point, index=None, p=None):
         """
         Compute the value of the hessian of the basis at a set of 'point'
@@ -353,6 +358,7 @@ class ScaledMonomialSpace2d():
             hphi[..., 1, 0] = hphi[..., 0, 1] 
         return hphi/area[index].reshape(-1, 1, 1, 1)
 
+    @cartesian
     def value(self, uh, point, index=None):
         phi = self.basis(point, index=index)
         cell2dof = self.dof.cell2dof
@@ -362,6 +368,7 @@ class ScaledMonomialSpace2d():
         index = index if index is not None else np.s_[:]
         return np.einsum(s1, phi, uh[cell2dof[index]])
 
+    @cartesian
     def grad_value(self, uh, point, index=None):
         gphi = self.grad_basis(point, index=index)
         cell2dof = self.dof.cell2dof
@@ -380,12 +387,14 @@ class ScaledMonomialSpace2d():
         elif point.shape[0] == N:
             return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
 
+    @cartesian
     def laplace_value(self, uh, point, index=None):
         lphi = self.laplace_basis(point, index=index)
         cell2dof = self.dof.cell2dof
         index = index if index is not None else np.s_[:]
         return np.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
 
+    @cartesian
     def hessian_value(self, uh, point, index=None):
         #TODO:
         pass

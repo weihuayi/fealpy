@@ -404,11 +404,11 @@ class RaviartThomasFiniteElementSpace2d:
                 cell2dof1=cell2dof1, gdof1=gdof1)
         return D 
 
-    def source_vector(self, f, dim=None, barycenter=False):
+    def source_vector(self, f, dim=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
-                gdof=gdof, dim=dim, barycenter=barycenter) 
+        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
+                gdof=gdof) 
         return b
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
