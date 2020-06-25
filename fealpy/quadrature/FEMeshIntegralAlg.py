@@ -1,6 +1,18 @@
 import numpy as np
 from scipy.sparse import csr_matrix
 
+def broadcast(c, phi):
+    """
+    Notes
+    -----
+
+    把 c 的形状广播为与 phi 相关的形状
+
+    phi: ijk....
+    c : 
+    """
+
+
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
@@ -41,8 +53,6 @@ class FEMeshIntegralAlg():
         -----
 
         给定两个空间的基函数, 组装对应的离散算子. 
-        
-        c 是算子的系数, 它可以是一个常数
         """
 
         mesh = self.mesh
@@ -71,7 +81,25 @@ class FEMeshIntegralAlg():
                 M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
                         self.cellmeasure, optimize=True)
             elif callable(c):
-                pass
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    c = c(ps)
+
+                if isinstance(c, (int, float)):
+                    M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+                            self.cellmeasure, optimize=True)
+                elif isinstance(c, np.ndarray):
+                    # user should make `c` have the correct shape
+                    if len(c.shape) == 2:
+                        M = np.einsum('i, ij, ijk..., ijm..., j->jkm', ws, c, phi0, phi1,
+                                self.cellmeasure, optimize=True)
+                    elif len(c.shape) == 3:
+                        M = np.einsum('i, ijk..., ijk..., ijm..., j->jkm', ws, c[:, :, None, :], phi0, phi1,
+                                self.cellmeasure, optimize=True)
+                    elif len(c.shape) == 4:
+                        M = np.einsum('i, ijkab, ijkb, ijma, j->jkm', ws, c[:, :, None, :, :], phi0, phi1,
+                                self.cellmeasure, optimize=True)
 
         if cell2dof0 is None: # just construct cell matrix
             return M
@@ -90,27 +118,111 @@ class FEMeshIntegralAlg():
 
         return M
 
-    def construct_vector(self, f, basis, cell2dof, gdof=None, dim=None,
-            barycenter=False, q=None):
+    def construct_vector_s_s(self, f, basis, cell2dof, gdof=None, q=None):
+        """
+        Notes
+        -----
+        f 是标量函数
+        basis 是标量函数
+        """
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
 
-        if barycenter:
-            val = f(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='cell')
-            val = f(ps)
+        if basis.coordtype == 'barycentric':
+            phi = basis(bcs)
+        elif c.coordtype == 'cartesian':
             phi = basis(ps)
-        bb = np.einsum('m, mi..., mik, i->ik...',
-                ws, val, phi, self.cellmeasure)
-        gdof = gdof or cell2dof.max()
-        shape = (gdof, ) if dim is None else (gdof, dim)
-        b = np.zeros(shape, dtype=phi.dtype)
-        if dim is None:
-            np.add.at(b, cell2dof, bb)
+
+        if callable(f):
+            if f.coordtype == 'barycentric':
+                val = f(bcs)
+            elif f.coordtype == 'cartesian':
+                val = f(ps)
         else:
-            np.add.at(b, (cell2dof, np.s_[:]), bb)
+            val = f
+
+        #TODO: consider more case
+        bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
+
+        gdof = gdof or cell2dof.max()
+        shape = (gdof, )
+        b = np.zeros(shape, dtype=phi.dtype)
+        np.add.at(b, cell2dof, bb)
+        return b
+
+    def construct_vector_v_v(self, f, basis, cell2dof, gdof=None, q=None):
+        """
+        Notes
+        -----
+        f 是向量函数
+        basis 是向量函数
+        """
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
+
+        if basis.coordtype == 'barycentric':
+            phi = basis(bcs)
+        elif c.coordtype == 'cartesian':
+            phi = basis(ps)
+
+        if callable(f):
+            if f.coordtype == 'barycentric':
+                val = f(bcs)
+            elif f.coordtype == 'cartesian':
+                val = f(ps)
+
+            if len(val.shape) == 1: # (GD, )
+                val = val[None, None, :]
+        elif isinstance(f, np.ndarray):
+            val = f[None, None, :]
+
+        bb = np.einsum('i, ij..., ijk..., j->jk',
+                ws, val, phi, self.cellmeasure)
+
+        gdof = gdof or cell2dof.max()
+        shape = (gdof, val.shape[-1])
+        b = np.zeros(shape, dtype=phi.dtype)
+        np.add.at(b, (cell2dof, np.s_[:]), bb)
+        return b
+
+    def construct_vector_v_s(self, f, basis, cell2dof, gdof=None, q=None):
+        """
+
+        Notes
+        -----
+        f 是向量函数
+        basis 是标量函数
+        """
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
+
+        if basis.coordtype == 'barycentric':
+            phi = basis(bcs)
+        elif c.coordtype == 'cartesian':
+            phi = basis(ps)
+
+        if callable(f):
+            if f.coordtype == 'barycentric':
+                val = f(bcs)
+            elif f.coordtype == 'cartesian':
+                val = f(ps)
+            bb = np.einsum('i, ij, ijk, j->jk',
+                    ws, val, phi, self.cellmeasure)
+        elif isinstance(f, (int, float)):
+            bb = np.einsum('m, mik, i->ik',
+                    f*ws, phi, self.cellmeasure)
+
+        gdof = gdof or cell2dof.max()
+        shape = (gdof, val.shape[-1])
+        b = np.zeros(shape, dtype=phi.dtype)
+        np.add.at(b, (cell2dof, np.s_[:]), bb)
+
         return b
 
 
