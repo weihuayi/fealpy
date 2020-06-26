@@ -10,7 +10,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.boundarycondition import DirichletBC 
+from fealpy.boundarycondition import NeumannBC 
 
 from fealpy.tools.show import showmultirate
 
@@ -28,20 +28,21 @@ NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
     space = LagrangeFiniteElementSpace(mesh, p=p)
-
     NDof[i] = space.number_of_global_dofs()
-    bc = DirichletBC(space, pde.dirichlet) 
 
     uh = space.function()
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
 
-    A, F = bc.apply(A, F, uh)
+    bc = NeumannBC(space, pde.neumann) 
+    A, F = bc.apply(F, A=A) # Here is the case for pure Neumann bc, we also need modify A
+    # bc.apply(F) # Not pure Neumann bc case
+    uh[:] = spsolve(A, F)[:-1] # we add a addtional dof
 
-    #uh[:] = spsolve(A, F).reshape(-1)
-
-    ml = pyamg.ruge_stuben_solver(A)  
-    uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+    # Here can not work 
+    #ml = pyamg.ruge_stuben_solver(A)  
+    #x = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+    #uh[:] = x[-1]
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)

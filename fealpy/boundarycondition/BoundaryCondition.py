@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
 
 
 class DirichletBC():
@@ -8,7 +8,7 @@ class DirichletBC():
         self.gD = gD
         self.threshold = threshold
 
-    def apply(self, uh, A, F):
+    def apply(self, A, F, uh):
         space = self.space
         gD = self.gD
         threshold = self.threshold
@@ -68,11 +68,17 @@ class NeumannBC():
         self.gN = gN
         self.threshold = threshold
 
-    def apply(self, F, threshold=None, q=None):
+    def apply(self, F, A=None, threshold=None, q=None):
         space = self.space
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
         space.set_neumann_bc(F, gN, threshold=threshold, q=q)
+        
+        if A is not None: # pure Neumann condtion
+            c = space.integral_basis()
+            A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
+            F = np.r_[F, 0]
+            return A, F
 
 class RobinBC():
     def __init__(self, space, gR, threshold=None):
@@ -82,9 +88,10 @@ class RobinBC():
 
     def apply(self, A, F, threshold=None, q=None):
         space = self.space
-        gN = self.gN
+        gR = self.gR
         threshold = self.threshold if threshold is None else threshold
-        space.set_robin_bc(A, F, gN, threshold=threshold, q=q)
+        space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
+        return A, F
 
 class BoundaryCondition():
     def __init__(self, space, dirichlet=None, neumann=None, robin=None):

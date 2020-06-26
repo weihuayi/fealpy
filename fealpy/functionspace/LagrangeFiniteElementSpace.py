@@ -436,7 +436,7 @@ class LagrangeFiniteElementSpace():
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
-        if dim in [None, 1]:
+        if dim in {None, 1}:
             shape = gdof
         elif type(dim) is int:
             shape = (gdof, dim)
@@ -802,27 +802,24 @@ class LagrangeFiniteElementSpace():
 
         measure = mesh.entity_measure('face', index=index)
 
-        phi = space.face_basis(bcs)
+        phi = self.face_basis(bcs)
         pp = mesh.bc_to_point(bcs, etype='face', index=index)
         n = mesh.face_unit_normal(index=index)
 
-        val, kappa = self.robin(pp, n) # (NQ, NF, ...)
+        val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
         if dim == 1:
-            np.add.at(F, face2dof[index], bb)
+            np.add.at(F, face2dof, bb)
         else:
-            np.add.at(F, (face2dof[index], np.s_[:]), bb)
+            np.add.at(F, (face2dof, np.s_[:]), bb)
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
-        face2dof = face2dof[index]
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
-        J = np.broadcast_to(face2dof[:, None, :], shpae=FM.shape)
+        J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-
-
 
 
     def to_function(self, data):

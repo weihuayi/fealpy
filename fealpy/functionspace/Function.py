@@ -57,13 +57,13 @@ class Function(np.ndarray):
 
         mesh = self.space.mesh
         if mesh.meshtype == 'tri':
+            space = self.space
+            ipoints = space.interpolation_points()
             node = mesh.entity('node')
             cell = mesh.entity('cell')
-            print(self.shape)
-            print(cell.max())
             axes.plot_trisurf(
-                    node[:, 0], node[:, 1],
-                    cell, self, cmap=cmap, lw=0.0)
+                    ipoints[:, 0], ipoints[:, 1],
+                    self, cmap=cmap, lw=0.0)
             return axes
         elif mesh.meshtype in {'polygon', 'halfedge', 'halfedge2d'}:
             node = mesh.entity('node')
