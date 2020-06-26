@@ -112,7 +112,7 @@ class FEMeshIntegralAlg():
             gdof1 = gdof1 or cell2dof1.max()
 
         I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell2dof1[:, None, :], shpae=M.shape)
+        J = np.broadcast_to(cell2dof1[:, None, :], shape=M.shape)
 
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
