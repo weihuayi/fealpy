@@ -1,8 +1,10 @@
 import numpy as np
 from numpy.linalg import inv
 
-from .function import Function
+from .Function import Function
 from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
+
+from ..decorator import barycentric # 导入默认的坐标类型, 这个空间是重心坐标
 
 class RTDof3d:
     def __init__(self, mesh, p):
@@ -184,6 +186,7 @@ class RaviartThomasFiniteElementSpace3d:
                 A[:, index, GD*cdof + np.arange(fdof)] = M[:,  idx[key][0], cdof-fdof:]
         return inv(A)
 
+    @barycentric
     def face_basis(self, bc, index=None, barycenter=True):
         """
 
@@ -226,6 +229,7 @@ class RaviartThomasFiniteElementSpace3d:
             phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def basis(self, bc, index=None, barycenter=True):
         """
 
@@ -262,6 +266,7 @@ class RaviartThomasFiniteElementSpace3d:
             phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def div_basis(self, bc, index=None, barycenter=True):
         p = self.p
 
@@ -290,8 +295,37 @@ class RaviartThomasFiniteElementSpace3d:
             phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key], i], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def grad_basis(self, bc):
         pass
+
+    def stiff_matrix(self):
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
+                gdof0=gdof)
+        return M
+
+    def div_matrix(self):
+        p = self.p
+        gdof0 = self.number_of_global_dofs()
+        cell2dof0 = self.cell_to_dof()
+        gdof1 = self.smspace.number_of_global_dofs()
+        cell2dof1 = self.smspace.cell_to_dof()
+        basis0 = self.div_basis
+        basis1 = lambda bc : self.smspace.basis(self.mesh.bc_to_point(bc), p=p)
+
+        D = self.integralalg.construct_matrix(basis0, basis1=basis1, 
+                cell2dof0=cell2dof0, gdof0=gdof0,
+                cell2dof1=cell2dof1, gdof1=gdof1)
+        return D 
+
+    def source_vector(self, f, dim=None):
+        cell2dof = self.smspace.cell_to_dof()
+        gdof = self.smspace.number_of_global_dofs()
+        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
+                gdof=gdof) 
+        return b
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
         """
