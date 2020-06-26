@@ -400,7 +400,7 @@ class RaviartThomasFiniteElementSpace2d:
         gdof1 = self.smspace.number_of_global_dofs()
         cell2dof1 = self.smspace.cell_to_dof()
         basis0 = self.div_basis
-        basis1 = lambda bc : self.smspace.basis(self.mesh.bc_to_point(bc), p=p)
+        basis1 = self.smspace.basis
 
         D = self.integralalg.construct_matrix(basis0, basis1=basis1, 
                 cell2dof0=cell2dof0, gdof0=gdof0,
