@@ -1,5 +1,7 @@
 import numpy as np
 
+from ..decorator  import cartesian 
+
 class LinearElasticityTempalte():
     def __init__(self):
         pass
@@ -10,33 +12,43 @@ class LinearElasticityTempalte():
     def init_mesh(self):
         pass
 
+    @cartesian
     def displacement(self, p):
         pass
 
+    @cartesian
     def jacobian(self, p):
         pass
 
+    @cartesian
     def strain(self, p):
         pass
 
+    @cartesian
     def stress(self, p):
         pass
 
+    @cartesian
     def source(self, p):
         pass
 
+    @cartesian
     def dirichlet(self, p):
         pass
 
+    @cartesian
     def neumann(self, p):
         pass
 
+    @cartesian
     def is_dirichlet_boundary(self, p):
         pass
 
+    @cartesian
     def is_neuman_boundary(self, p):
         pass
 
+    @cartesian
     def is_fracture_boundary(self, p):
         pass
 
@@ -240,7 +252,7 @@ class LShapeDomainData2d():
         val = self.displacement(p)
         return val
 
-    def neuman(self, p, n):
+    def neumann(self, p, n):
         val = np.zeros_like(p)
         return val
 
@@ -302,7 +314,7 @@ class CookMembraneData():
         val = np.zeros(p.shape, dtype=p.dtype)
         return val 
 
-    def neuman(self, p, n):  # p 是受到面力的节点坐标
+    def neumann(self, p, n):  # p 是受到面力的节点坐标
         """
         Neuman  boundary condition
         p: (NQ, NE, 2)
@@ -322,7 +334,7 @@ class CookMembraneData():
         x = p[..., 0]
         return  np.abs(x) < 1e-12
 
-    def is_neuman_boundary(self, p):
+    def is_neumann_boundary(self, p):
         x = p[..., 0]
         return np.abs(x - 48) < 1e-12
 
@@ -385,7 +397,7 @@ class CantileverBeam2d():
         val = np.zeros(p.shape, dtype=p.dtype)
         return val
 
-    def neuman(self, p, n):  # p 是受到面力的节点坐标
+    def neumann(self, p, n):  # p 是受到面力的节点坐标
         """
         Neuman  boundary condition
         p: (NQ, NE, 2)
@@ -404,7 +416,7 @@ class CantileverBeam2d():
     def is_dirichlet_boundary(self, p):
         return  np.abs(p[..., 0]) < 1e-12
 
-    def is_neuman_boundary(self, p):
+    def is_neumann_boundary(self, p):
         return np.abs(p[..., 0] - self.L) < 1e-12
 
 
@@ -746,6 +758,7 @@ class Model2d():
         mesh.uniform_refine(n)
         return mesh 
 
+    @cartesian
     def displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -755,6 +768,7 @@ class Model2d():
         val[..., 1] = np.sin(pi*x)*np.sin(pi*y)
         return val
 
+    @cartesian
     def grad_displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -772,6 +786,7 @@ class Model2d():
         val[..., 1, 1] = pi*sin(pi*x)*cos(pi*y)
         return val
 
+    @cartesian
     def stress(self, p):
         lam = self.lam
         mu = self.mu
@@ -782,6 +797,7 @@ class Model2d():
         return val
         
 
+    @cartesian
     def compliance_tensor(self, phi):
         lam = self.lam
         mu = self.mu
@@ -791,9 +807,11 @@ class Model2d():
         aphi /= 2*mu
         return aphi
 
+    @cartesian
     def div_stress(self, p):
         return -self.source(p)
 
+    @cartesian
     def source(self, p):
         lam = self.lam
         mu = self.mu
@@ -820,3 +838,88 @@ class Model2d():
         val[..., 1] -= 2*mu*(-e*t0*x*y/2 + e*t0*x/2 - e*t0*y/2 + e*t0/2 - e*x*y*(-x + 1)/2 + e*x*y*(-y + 1)/2 + e*x*y/2 - e*x*(-y + 1)/2 - e*y*(-x + 1)/2 - pi**2*ss/2)
         return val
 
+    @cartesian
+    def dirichlet(self, p):
+        return self.displacement(p)
+
+class Hole2d():
+    def __init__(self, lam=1.0, mu=0.5):
+        self.lam = lam
+        self.mu = mu
+
+    def init_mesh(self, n=2):
+        from ..mesh import TriangleMesh
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+
+        NN = mesh.number_of_nodes()
+        node = np.zeros((NN+3, 2), dtype=np.float64)
+        node[:NN] = mesh.entity('node')
+        node[NN:] = node[[5], :]
+        cell = mesh.entity('cell')
+
+        cell[13][cell[13] == 5] = NN
+        cell[18][cell[18] == 5] = NN
+
+        cell[19][cell[19] == 5] = NN+1
+        cell[12][cell[12] == 5] = NN+1
+
+        cell[6][cell[6] == 5] = NN+2
+
+        return  TriangleMesh(node, cell)
+
+        return mesh 
+
+    @cartesian
+    def dirichlet(self, p):
+        val = np.zeros(p.shape, dtype=p.dtype)
+        return val
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        return  np.abs(p[..., 0]) < -2 + 1e-12
+
+    @cartesian
+    def neumann(self, p, n):
+        val = np.zeros_like(p)
+        val[..., 1] = -1
+        return val
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        return  np.abs(p[..., 0]) > 2 + 1e-12
+
+    @cartesian
+    def source(self, p):
+        NN = int(len(p)/2)
+        val = np.zeros_like(p)
+        val[5, 1] = 1
+        val[NN, 1] = 1
+        val[NN+1, 1] = 1
+        val[NN+2, 1] = 1
+        return val
+
+    @cartesian
+    def displacement(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float) 
+        
+        lam = self.lam
+        mu = self.mu
+        nu = lam/(2*(lam + mu))
+        
+        P = 100
+        L = 4
+        W = 4
+        I = W**3/12
+        val[..., 0] = P*y/(6*E*I)*((6*L-3*x)*x+(2+nu)*(y**2 - W**2/4))
+        val[..., 1] = -P/(6*E*I)*(3*nu*y**2*(L-x)+(4+5*nu)*W**2*x/4+(3*L-x)*x**2)
+        return val

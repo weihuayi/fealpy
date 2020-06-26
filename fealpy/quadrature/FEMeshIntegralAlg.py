@@ -62,13 +62,13 @@ class FEMeshIntegralAlg():
         ps = mesh.bc_to_point(bcs)
         if basis0.coordtype == 'barycentric':
             phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
-        elif basis0.coordtype == 'cartesian'
+        elif basis0.coordtype == 'cartesian':
             phi0 = basis0(ps)
 
         if basis1 is not None:
             if basis1.coordtype == 'barycentric':
                 phi1 = basis1(bcs) # (NQ, NC, ldof, ...)
-            elif basis1.coordtype == 'cartesian'
+            elif basis1.coordtype == 'cartesian':
                 phi1 = basis1(ps)
         else:
             phi1 = phi0

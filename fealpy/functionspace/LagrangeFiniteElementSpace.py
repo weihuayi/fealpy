@@ -720,13 +720,13 @@ class LagrangeFiniteElementSpace():
 
         return b
 
-    def set_dirichlet_bc(self, uh, g, threshold=None, q=None, is_dirichlet_boundary=None):
+    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
         初始化解 uh  的第一类边界条件。
         """
 
         ipoints = self.interpolation_points()
-        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
+        isDDof = self.boundary_dof(threshold=threshold)
         uh[isDDof] = g(ipoints[isDDof])
         return isDDof
 
