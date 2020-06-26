@@ -299,6 +299,24 @@ class RaviartThomasFiniteElementSpace3d:
     def grad_basis(self, bc):
         pass
 
+    def function(self, dim=None, array=None):
+        f = Function(self, dim=dim, array=array)
+        return f
+
+
+    def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        if dim in [None, 1]:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=self.ftype)
+
+
+
+
     def stiff_matrix(self):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()

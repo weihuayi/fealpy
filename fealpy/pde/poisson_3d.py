@@ -1,4 +1,7 @@
 import numpy as np
+
+from ..decorator  import cartesian 
+
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
 
 
@@ -28,6 +31,7 @@ class CosCosCosData:
         mesh.uniform_refine(n)
         return mesh
 
+    @cartesian
     def solution(self, p):
         """ the exact solution
         """
@@ -37,6 +41,7 @@ class CosCosCosData:
         u = np.cos(np.pi*x)*np.cos(np.pi*y)*np.cos(np.pi*z)
         return u
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -52,6 +57,11 @@ class CosCosCosData:
         val[..., 2] = -pi*cos(pi*x)*cos(pi*y)*sin(pi*z)
         return val
 
+    @cartesian
+    def flux(self, p):
+        return -self.gradient(p)
+
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -59,6 +69,71 @@ class CosCosCosData:
         val = 3*np.pi**2*np.cos(np.pi*x)*np.cos(np.pi*y)*np.cos(np.pi*z)
         return val
 
+    @cartesian
+    def dirichlet(self, p):
+        """Dilichlet boundary condition
+        """
+        return self.solution(p)
+
+
+class X2Y2Z2Data:
+    def __init__(self):
+        pass
+
+    def init_mesh(self, n=1, meshtype='tet'):
+        node = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1]], dtype=np.float)
+
+        cell = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
+        mesh = TetrahedronMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
+    @cartesian
+    def solution(self, p):
+        """ the exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        u = x**2*y**2*z**2
+        return u
+
+    @cartesian
+    def gradient(self, p):
+        """ The gradient of the exact solution
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        val = np.zeros(p.shape, dtype=p.dtype)
+        val[..., 0] = 2*x*y**2*z**2
+        val[..., 1] = 2*x**2*y*z**2
+        val[..., 2] = 2*x**2*y**2*z
+        return val
+
+    @cartesian
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        val = -(2*y**2*z**2 + 2*x**2*z**2 + 2*x**2*y**2)
+        return val
+
+    @cartesian
     def dirichlet(self, p):
         """Dilichlet boundary condition
         """
