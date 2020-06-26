@@ -59,6 +59,8 @@ class Function(np.ndarray):
         if mesh.meshtype == 'tri':
             node = mesh.entity('node')
             cell = mesh.entity('cell')
+            print(self.shape)
+            print(cell.max())
             axes.plot_trisurf(
                     node[:, 0], node[:, 1],
                     cell, self, cmap=cmap, lw=0.0)

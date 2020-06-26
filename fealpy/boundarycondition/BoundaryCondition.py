@@ -1,6 +1,91 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
+
+class DirichletBC():
+    def __init__(self, space, gD, threshold=None):
+        self.space = space
+        self.gD = gD
+        self.threshold = threshold
+
+    def apply(self, uh, A, F):
+        space = self.space
+        gD = self.gD
+        threshold = self.threshold
+
+        gdof = space.number_of_global_dofs()
+        isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
+        dim = A.shape[0]//gdof 
+        if dim > 1:
+            isDDof = np.tile(isDDof, dim)
+            F = F.T.flat
+        x = uh.T.flat # 把 uh 按列展平
+        F -= A@x
+        bdIdx = np.zeros(A.shape[0], dtype=np.int)
+        bdIdx[isDDof] = 1
+        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        A = T@A@T + Tbd
+        F[isDDof] = x[isDDof]
+        return A, F 
+
+    def apply_on_matrix(self, A):
+        space = self.space
+        threshold = self.threshold
+        gdof = space.number_of_global_dofs()
+
+        isDDof = space.boundary_dof(threshold=threshold)
+        dim = A.shape[0]//gdof
+        if dim > 1:
+            isDDof = np.tile(isDDof, dim)
+
+        bdIdx = np.zeros((A.shape[0], ), np.int)
+        bdIdx[isDDof] = 1
+        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        A = T@A@T + Tbd
+        return A
+
+    def apply_on_vector(self, A, F):
+        space = self.space
+        threshold = self.threshold
+
+        gdof = space.number_of_global_dofs()
+        dim = A.shape[0]//gdof
+        uh = space.function(dim=dim)
+        isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
+        if dim > 1:
+            isDDof = np.tile(isDDof, dim)
+            F = F.T.flat
+        x = uh.T.flat # 把 uh 按列展平
+        F -= A@x
+        F[isBdDof] = x[isBdDof] 
+        return F 
+
+class NeumannBC():
+    def __init__(self, space, gN, threshold=None):
+        self.space = space
+        self.gN = gN
+        self.threshold = threshold
+
+    def apply(self, F, threshold=None, q=None):
+        space = self.space
+        gN = self.gN
+        threshold = self.threshold if threshold is None else threshold
+        space.set_neumann_bc(F, gN, threshold=threshold, q=q)
+
+class RobinBC():
+    def __init__(self, space, gR, threshold=None):
+        self.space = space
+        self.gR = gR
+        self.threshold = threshold
+
+    def apply(self, A, F, threshold=None, q=None):
+        space = self.space
+        gN = self.gN
+        threshold = self.threshold if threshold is None else threshold
+        space.set_robin_bc(A, F, gN, threshold=threshold, q=q)
+
 class BoundaryCondition():
     def __init__(self, space, dirichlet=None, neumann=None, robin=None):
         self.space = space
@@ -157,77 +242,5 @@ class BoundaryCondition():
             A = T@A@T + Tbd
             b[isDDof] = x[isDDof]
             return A, b
-
-
-class DirichletBC:
-    def __init__(self, V, g0, is_dirichlet_dof=None):
-        self.V = V
-        self.g0 = g0
-
-        if is_dirichlet_dof == None:
-            isBdDof = V.boundary_dof()
-        else:
-            ipoints = V.interpolation_points()
-            isBdDof = is_dirichlet_dof(ipoints)
-
-        self.isBdDof = isBdDof
-
-    def apply(self, A, b):
-        """ Modify matrix A and b
-        """
-        g0 = self.g0
-        V = self.V
-        isBdDof = self.isBdDof
-
-        gdof = V.number_of_global_dofs()
-        x = np.zeros((gdof,), dtype=np.float)
-        ipoints = V.interpolation_points()
-        # the length of ipoints and isBdDof maybe different
-        idx, = np.nonzero(isBdDof)
-        x[isBdDof] = g0(ipoints[idx])
-        b -= A@x
-        bdIdx = np.zeros(gdof, dtype=np.int)
-        bdIdx[isBdDof] = 1
-        Tbd = spdiags(bdIdx, 0, gdof, gdof)
-        T = spdiags(1-bdIdx, 0, gdof, gdof)
-        A = T@A@T + Tbd
-
-        b[isBdDof] = x[isBdDof]
-        return A, b
-
-    def apply_on_matrix(self, A):
-
-        V = self.V
-        isBdDof = self.isBdDof
-        gdof = V.number_of_global_dofs()
-
-        bdIdx = np.zeros((A.shape[0], ), np.int)
-        bdIdx[isBdDof] = 1
-        Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-        T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-        A = T@A@T + Tbd
-
-        return A
-
-    def apply_on_vector(self, b, A):
-        
-        g0 = self.g0
-        V = self.V
-        isBdDof = self.isBdDof
-
-        gdof = V.number_of_global_dofs()
-        x = np.zeros((gdof,), dtype=np.float)
-
-        ipoints = V.interpolation_points()
-        x[isBdDof] = g0(ipoints[isBdDof,:])
-        b -= A@x
-
-        b[isBdDof] = x[isBdDof] 
-
-        return b
-
-
-
-        
 
 

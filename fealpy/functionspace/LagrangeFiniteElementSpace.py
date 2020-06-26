@@ -720,6 +720,57 @@ class LagrangeFiniteElementSpace():
 
         return b
 
+    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+
+        ipoints = self.interpolation_points()
+        isDDof = self.boundary_dof(threshold=threshold)
+        uh[isDDof] = gD(ipoints[isDDof])
+        return isDDof
+
+    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷矩阵 F 中
+
+        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
+        """
+        p = self.p
+        mesh = self.mesh
+
+        dim = 1 if len(F.shape)==1 else F.shape[1]
+       
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.face_to_dof()[index]
+        n = mesh.face_unit_normal(index=index)
+        measure = mesh.entity_measure('face', index=index)
+
+        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = self.face_basis(bcs)
+
+        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
 
@@ -771,57 +822,8 @@ class LagrangeFiniteElementSpace():
 
         A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
-    def set_neumann_bc(self, F, gN, threshold=None, q=None):
-
-        """
-
-        Notes
-        -----
-        设置 Neumann 边界条件到载荷矩阵 F 中
-
-        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
-        """
-        p = self.p
-        mesh = self.mesh
-
-        dim = 1 if len(F.shape)==1 else F.shape[1]
-       
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_face_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('face', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-
-        face2dof = self.face_to_dof()[index]
-        n = mesh.face_unit_normal(index=index)
-        measure = mesh.entity_measure('face', index=index)
-
-        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        phi = self.face_basis(bcs)
-
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
-        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
-
-        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
-        if dim == 1:
-            np.add.at(F, face2dof, bb)
-        else:
-            np.add.at(F, (face2dof, np.s_[:]), bb)
 
 
-    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
-        """
-        初始化解 uh  的第一类边界条件。
-        """
-
-        ipoints = self.interpolation_points()
-        isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = gD(ipoints[isDDof])
-        return isDDof
 
     def to_function(self, data):
         p = self.p
