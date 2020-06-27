@@ -148,7 +148,7 @@ x[:] = spsolve(AA, FF)
 uh[:] = x[:udof]
 ph[:] = x[udof:]
 
-box = [-0.5, 1.5, -0.5, 1.5]
+box = [0, 1, 0, 1]
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes, box=box)
