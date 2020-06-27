@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.pde.poisson_2d import CosCosData, X2Y2Data, CrackCosCosData
+from fealpy.pde.poisson_2d import CosCosData, X2Y2Data
 from fealpy.functionspace.femdof import multi_index_matrix2d
 
 
@@ -86,7 +86,6 @@ class RaviartThomasFiniteElementSpace2dTest:
 
     def solve_poisson_2d(self, n=3, p=0, plot=True):
         pde = CosCosData()
-#        pde = CrackCosCosData()
 
         mesh = pde.init_mesh(n=n, meshtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
@@ -102,7 +101,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         F1 = space.source_vector(pde.source)
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
-        if False:
+        if True:
             F0 = space.set_neumann_bc(pde.dirichlet)
             FF = np.r_['0', F0, F1]
             x = spsolve(AA, FF).reshape(-1)
@@ -116,7 +115,7 @@ class RaviartThomasFiniteElementSpace2dTest:
             error1 = space.integralalg.integral(f)
             print(error0, error1)
         else:
-            isBdDof = space.set_dirichlet_bc(uh, pde.neumann)#, threshold=pde.is_neumann_bc)
+            isBdDof = space.set_dirichlet_bc(uh, pde.neumann)
             x = np.r_['0', uh, ph] 
             isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool_)]
             
@@ -141,24 +140,18 @@ class RaviartThomasFiniteElementSpace2dTest:
             error1 = space.integralalg.integral(f)
             print(error0, error1)
 
-#        qf = mesh.integrator(p+4, 'edge')
-#        bcs, ws = qf.get_quadrature_points_and_weights()
-#
-#        index = mesh.ds.boundary_edge_index()
-#        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-#        box = [-0.5, 1.5, -0.5, 1.5]
-#        fig = plt.figure()
-#        axes = fig.gca()
-#        mesh.add_plot(axes, box=box)
-#        #mesh.find_node(axes, showindex=True)
-#        #mesh.find_edge(axes, showindex=True)
-#        #mesh.find_cell(axes, showindex=True)
-#        node = ps.reshape(-1, 2)
-#        uv = uh.reshape(-1, 2)
-#        print(node.shape)
-#        print(uv.shape)
-#        axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
-#        plt.show()
+        if plot:
+            box = [-0.5, 1.5, -0.5, 1.5]
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes, box=box)
+            #mesh.find_node(axes, showindex=True)
+            #mesh.find_edge(axes, showindex=True)
+            #mesh.find_cell(axes, showindex=True)
+            node = ps.reshape(-1, 2)
+            uv = uh.reshape(-1, 2)
+            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
+            plt.show()
 
     def sympy_compute(self, plot=True):
         import sympy as sp

@@ -3,7 +3,7 @@ from numpy.linalg import inv
 from scipy.sparse import bmat, coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 import scipy.io as sio
 
-from .function import Function
+from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg

@@ -477,7 +477,6 @@ class RaviartThomasFiniteElementSpace2d:
 
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
-        print('val', val.shape)
         uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi, measure, optimize=True)
         isDDof = np.zeros(gdof, dtype=np.bool_) 
         isDDof[edge2dof[index]] = True
