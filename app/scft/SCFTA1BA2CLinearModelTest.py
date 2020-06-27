@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 #
 
-import sys 
+import sys
 import math
+import time
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -86,6 +87,9 @@ test = SCFTA1BA2CLinearModelTest()
 if sys.argv[1] == "init_value":
     test.init_value()
 elif sys.argv[1] == "run":
+    start =time.clock()
     test.run(rdir='./results/')
+    end =time.clock()
+    print('Running time: %s Seconds'%(end-start))
 
 

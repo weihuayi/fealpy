@@ -355,18 +355,45 @@ class SCFTA1BA2CLinearModel():
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
         # solver the forward and backward equation
+        import time
+        start1 =time.clock()
         self.compute_propagator()
-        # compute single chain partition function Q
+        end =time.clock()
+        print('Running timeq: %s Seconds'%(end-start1))
+        start1 =time.clock()
         self.compute_single_Q()
-        print("Q:", self.Q)
+        end =time.clock()
+        print('Running timeQ: %s Seconds'%(end-start1))
+# compute single chain partition function Q
         # compute density
+        print("Q:", self.Q)
+
+        start1 =time.clock()
         self.compute_density()
+        end =time.clock()
+        print('Running time phi: %s Seconds'%(end-start1))
+
         # compute energy function and its gradient
+        start1 =time.clock()
         self.update_field()
-        
+        end =time.clock()
+        print('Running time_field: %s Seconds'%(end-start1))
+
+        start1 =time.clock()
         self.compute_wplus()
+        end =time.clock()
+        print('Running time w+: %s Seconds'%(end-start1))
+
+        start1 =time.clock()
         self.compute_energe()
+        end =time.clock()
+        print('Running time H: %s Seconds'%(end-start1))
+
+        start1 =time.clock()
         self.compute_gradient()
+        end =time.clock()
+        print('Running time grad: %s Seconds'%(end-start1))
+
 
     def update_field(self, alpha=0.01):
         """
@@ -460,7 +487,6 @@ class SCFTA1BA2CLinearModel():
 
         np.set_printoptions(precision=15, suppress=True) 
 #         input("input")
-        
 
         #print(self.qf.dtype)
         #print(self.qb.dtype)
@@ -472,7 +498,11 @@ class SCFTA1BA2CLinearModel():
             NL = self.timelines[i].number_of_time_levels()
             #self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
             #self.pdesolvers[i].solve(self.qf[start:start + NL])
+            import time
+            start1 =time.clock()
             self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
+            end =time.clock()
+            print('Running time: %s Seconds'%(end-start1))
             start += NL - 1
         #print("qf", self.qf[-1])
 #         input("input")
