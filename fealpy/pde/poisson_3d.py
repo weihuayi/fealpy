@@ -126,6 +126,10 @@ class X2Y2Z2Data:
         return val
 
     @cartesian
+    def flux(self, p):
+        return -self.gradient(p)
+
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]

@@ -390,7 +390,7 @@ class RaviartThomasFiniteElementSpace3d:
                 gdof=gdof) 
         return b
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
+    def set_neumann_bc(self, g, threshold=None, q=None):
         """
         Parameters
         ----------

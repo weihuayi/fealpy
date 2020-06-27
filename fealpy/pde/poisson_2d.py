@@ -141,6 +141,108 @@ class CosCosData:
         val += self.solution(p) 
         return val, kappa
 
+class CrackCosCosData:
+    """
+    -\Delta u = f
+    u = cos(pi*x)*cos(pi*y)
+    """
+    def __init__(self):
+        pass
+
+    def domain(self):
+        return np.array([0, 1, 0, 1])
+
+    def init_mesh(self, n=0, meshtype='tri'):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(2)
+
+        NN = mesh.number_of_nodes()
+        node = np.zeros((NN+3, 2), dtype=np.float64)
+        node[:NN] = mesh.entity('node')
+        node[NN:] = node[[5], :]
+        cell = mesh.entity('cell')
+
+        cell[13][cell[13] == 5] = NN
+        cell[18][cell[18] == 5] = NN
+
+        cell[19][cell[19] == 5] = NN+1
+        cell[12][cell[12] == 5] = NN+1
+
+        cell[6][cell[6] == 5] = NN+2
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
+
+    @cartesian
+    def solution(self, p):
+        return 0.0
+
+
+    @cartesian
+    def source(self, p):
+        val = np.array([0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape)
+
+    @cartesian
+    def gradient(self, p):
+        """ The gradient of the exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        return val # val.shape == p.shape
+
+    @cartesian
+    def flux(self, p):
+        return -self.gradient(p)
+
+    @cartesian
+    def dirichlet(self, p):
+        val = np.array([0.0, 0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, ) + (2, )
+        return val.reshape(shape)
+
+    @cartesian
+    def neumann(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape[:-1])
+        flag0 = np.abs(x) < 1e-13
+        val[flag0] = -500
+        flag1 = np.abs(x-1) < 1e-13
+        val[flag1] = 500
+        print('val', val)
+        return val
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = np.abs(x) < 1e-13
+        return flag
+
+    @cartesian
+    def is_neumann_bc(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = (np.abs(x - 0) < 1e-13) | (np.abs(x - 1) < 1e-13)
+        return flag
+
+
 class X2Y2Data:
     """
     -\Delta u = f

@@ -146,9 +146,10 @@ class CrackBoxDomain2DData():
 
     @cartesian
     def neumann(self, p, n):
-        val = np.array([500, 0.0], dtype=np.float64)
+        val0 = np.array([500, 0.0], dtype=np.float64)
         shape = len(p.shape[:-1])*(1, ) + (2, )
-        return val.reshape(shape)
+        val1 = np.array([-500, 0.0], dtype=np.float64)
+        return val0.reshape(shape), val1.reshape(shape)
 
     @cartesian
     def is_dirichlet_boundary(self, p):

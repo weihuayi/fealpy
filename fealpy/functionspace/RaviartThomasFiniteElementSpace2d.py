@@ -198,12 +198,12 @@ class RaviartThomasFiniteElementSpace2d:
         return inv(A)
 
     @barycentric
-    def face_basis(self, bc, index=None, barycenter=True):
+    def face_basis(self, bc, index=np.s_[:], barycenter=True):
         return self.edge_basis(bc, index, barycenter)
 
 
     @barycentric
-    def edge_basis(self, bc, index=None, barycenter=True):
+    def edge_basis(self, bc, index=np.s_[:], barycenter=True):
         """
         """
         p = self.p
@@ -216,7 +216,6 @@ class RaviartThomasFiniteElementSpace2d:
         GD = mesh.geo_dimension()
         edge2cell = mesh.ds.edge_to_cell()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
@@ -237,7 +236,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=None, barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycenter=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -271,7 +270,6 @@ class RaviartThomasFiniteElementSpace2d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
@@ -290,7 +288,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def div_basis(self, bc, index=None, barycenter=True):
+    def div_basis(self, bc, index=np.s_[:], barycenter=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
         cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
@@ -298,7 +296,6 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, index=index)
         else:
@@ -330,23 +327,23 @@ class RaviartThomasFiniteElementSpace2d:
         return self.dof.number_of_local_dofs(doftype)
 
     @barycentric
-    def value(self, uh, bc, index=None):
+    def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[cell2dof]) # index? 
         return val
 
     @barycentric
-    def div_value(self, uh, bc, index=None):
+    def div_value(self, uh, bc, index=np.s_[:]):
         dphi = self.div_basis(bc)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, dphi, uh[cell2dof])
+        val = np.einsum(s1, dphi, uh[cell2dof])# index ?
         return val
 
     @barycentric
@@ -410,11 +407,10 @@ class RaviartThomasFiniteElementSpace2d:
     def source_vector(self, f, dim=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
-                gdof=gdof) 
+        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
         return b
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
+    def set_neumann_bc(self, g, threshold=None, q=None):
         """
         Parameters
         ----------
@@ -481,8 +477,8 @@ class RaviartThomasFiniteElementSpace2d:
 
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
-        uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi,
-                measure, optimize=True)
+        print('val', val.shape)
+        uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi, measure, optimize=True)
         isDDof = np.zeros(gdof, dtype=np.bool_) 
         isDDof[edge2dof[index]] = True
         return isDDof

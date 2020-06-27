@@ -128,6 +128,7 @@ class FEMeshIntegralAlg():
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
+        print('ps', ps.shape)
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
@@ -144,6 +145,7 @@ class FEMeshIntegralAlg():
             val = f
 
         #TODO: consider more case
+        print('val', val.shape)
         bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
 
         gdof = gdof or cell2dof.max()
