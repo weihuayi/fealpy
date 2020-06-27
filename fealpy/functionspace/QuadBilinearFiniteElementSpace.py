@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
-from .function import Function
+from .Function import Function
 from ..quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg
 
 class QuadBilinearFiniteElementSpace():

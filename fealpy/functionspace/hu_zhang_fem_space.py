@@ -1,5 +1,5 @@
 import numpy as np
-from .function import Function
+from .Function import Function
 from .lagrange_fem_space import LagrangeFiniteElementSpace
 
 class HuZhangFiniteElementSpace2d():

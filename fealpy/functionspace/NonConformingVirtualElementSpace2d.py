@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from .function import Function
+from .Function import Function
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d

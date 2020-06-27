@@ -1,7 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csr_matrix, spdiags
-from .function import Function
+from .Function import Function
 from ..quadrature import FEMeshIntegralAlg
 from timeit import default_timer as timer
 from .femdof import CPPFEMDof3d

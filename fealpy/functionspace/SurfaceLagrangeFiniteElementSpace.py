@@ -6,7 +6,7 @@ from ..mesh import SurfaceTriangleMesh
 from ..quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg
 
 from .femdof import CPLFEMDof2d, DPLFEMDof2d
-from .function import Function
+from .Function import Function
 
 
 class SurfaceLagrangeFiniteElementSpace:
