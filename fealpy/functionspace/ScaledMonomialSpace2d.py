@@ -228,13 +228,12 @@ class ScaledMonomialSpace2d():
         return self.dof.cell_to_dof(p=p)
 
     @cartesian
-    def edge_basis(self, point, index=None, p=None):
+    def edge_basis(self, point, index=np.s_[:], p=None):
         p = self.p if p is None else p
         if p == 0:
             shape = len(point.shape)*(1, )
             return np.array([1.0], dtype=self.ftype).reshape(shape)
 
-        index = index if index is not None else np.s_[:]
         ec = self.integralalg.edgebarycenter
         eh = self.integralalg.edgemeasure
         et = self.mesh.edge_unit_tangent()
@@ -248,7 +247,7 @@ class ScaledMonomialSpace2d():
         return phi
 
     @cartesian
-    def basis(self, point, index=None, p=None):
+    def basis(self, point, index=np.s_[:], p=None):
         """
         Compute the basis values at point
 
@@ -274,7 +273,6 @@ class ScaledMonomialSpace2d():
 
         shape = point.shape[:-1]+(ldof,)
         phi = np.ones(shape, dtype=np.float)  # (..., M, ldof)
-        index = index if index is not None else np.s_[:] 
         phi[..., 1:3] = (point - self.cellbarycenter[index])/h[index].reshape(-1, 1)
         if p > 1:
             start = 3
@@ -285,7 +283,7 @@ class ScaledMonomialSpace2d():
         return phi
 
     @cartesian
-    def grad_basis(self, point, index=None, p=None):
+    def grad_basis(self, point, index=np.s_[:], p=None):
         """
 
         p >= 0
@@ -293,7 +291,6 @@ class ScaledMonomialSpace2d():
 
         p = self.p if p is None else p 
         h = self.cellsize
-        index = np.s_[:] if index is None else index 
 
         num = len(h) if type(index) is slice else len(index)
 
@@ -312,9 +309,8 @@ class ScaledMonomialSpace2d():
             return gphi/h[index].reshape(-1, 1, 1, 1)
 
     @cartesian
-    def laplace_basis(self, point, index=None, p=None):
+    def laplace_basis(self, point, index=np.s_[:], p=None):
         p = self.p if p is None else p
-        index = index if index is not None else np.s_[:]
 
         area = self.cellmeasure
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
@@ -328,7 +324,7 @@ class ScaledMonomialSpace2d():
         return lphi/area[index].reshape(-1, 1)
 
     @cartesian
-    def hessian_basis(self, point, index=None, p=None):
+    def hessian_basis(self, point, index=np.s_[:], p=None):
         """
         Compute the value of the hessian of the basis at a set of 'point'
 
@@ -343,7 +339,6 @@ class ScaledMonomialSpace2d():
             the shape of hphi is (..., NC, ldof, 2, 2)
         """
         p = self.p if p is None else p
-        index = index if index is not None else np.s_[:]
 
         area = self.cellmeasure
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
@@ -359,20 +354,18 @@ class ScaledMonomialSpace2d():
         return hphi/area[index].reshape(-1, 1, 1, 1)
 
     @cartesian
-    def value(self, uh, point, index=None):
+    def value(self, uh, point, index=np.s_[:]):
         phi = self.basis(point, index=index)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        index = index if index is not None else np.s_[:]
         return np.einsum(s1, phi, uh[cell2dof[index]])
 
     @cartesian
-    def grad_value(self, uh, point, index=None):
+    def grad_value(self, uh, point, index=np.s_[:]):
         gphi = self.grad_basis(point, index=index)
         cell2dof = self.dof.cell2dof
-        index = index if index is not None else np.s_[:]
         if (type(index) is np.ndarray) and (index.dtype.name == 'bool'):
             N = np.sum(index)
         elif type(index) is slice:
@@ -388,14 +381,13 @@ class ScaledMonomialSpace2d():
             return np.einsum('ikjm, ij->ikm', gphi, uh[cell2dof[index]])
 
     @cartesian
-    def laplace_value(self, uh, point, index=None):
+    def laplace_value(self, uh, point, index=np.s_[:]):
         lphi = self.laplace_basis(point, index=index)
         cell2dof = self.dof.cell2dof
-        index = index if index is not None else np.s_[:]
         return np.einsum('...ij, ij->...i', lphi, uh[cell2dof[index]])
 
     @cartesian
-    def hessian_value(self, uh, point, index=None):
+    def hessian_value(self, uh, point, index=np.s_[:]):
         #TODO:
         pass
 

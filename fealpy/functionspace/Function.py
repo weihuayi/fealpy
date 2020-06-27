@@ -26,11 +26,7 @@ class Function(np.ndarray):
     def index(self, i):
         return Function(self.space, array=self[:, i])
 
-    def __call__(self, bc, index=None):
-        space = self.space
-        return space.value(self, bc, index=index)
-
-    def value(self, bc, index=None):
+    def __call__(self, bc, index=np.s_[:]):
         space = self.space
         return space.value(self, bc, index=index)
 

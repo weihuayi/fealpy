@@ -20,8 +20,7 @@ class FEMeshIntegralAlg():
 
         self.cellintegrator = self.integrator
         self.cellbarycenter =  mesh.entity_barycenter('cell')
-        self.cellmeasure = cellmeasure if cellmeasure is not None \
-                else mesh.entity_measure('cell')
+        self.cellmeasure = cellmeasure if cellmeasure is not None else mesh.entity_measure('cell')
 
         self.edgemeasure = mesh.entity_measure('edge')
         self.edgebarycenter = mesh.entity_barycenter('edge')
@@ -132,7 +131,7 @@ class FEMeshIntegralAlg():
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
-        elif c.coordtype == 'cartesian':
+        elif basis.coordtype == 'cartesian':
             phi = basis(ps)
 
         if callable(f):
@@ -141,6 +140,7 @@ class FEMeshIntegralAlg():
             elif f.coordtype == 'cartesian':
                 val = f(ps)
         else:
+            #TODO: f 可以是多种形式的, 函数, 数组 
             val = f
 
         #TODO: consider more case

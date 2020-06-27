@@ -187,7 +187,7 @@ class RaviartThomasFiniteElementSpace3d:
         return inv(A)
 
     @barycentric
-    def face_basis(self, bc, index=None, barycenter=True):
+    def face_basis(self, bc, index=np.s_[:], barycenter=True):
         """
 
         Paramerters
@@ -209,7 +209,6 @@ class RaviartThomasFiniteElementSpace3d:
         GD = mesh.geo_dimension()
         face2cell = mesh.ds.face_to_cell()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='face', index=index)
         else:
@@ -230,7 +229,7 @@ class RaviartThomasFiniteElementSpace3d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=None, barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycenter=True):
         """
 
         Notes
@@ -247,7 +246,6 @@ class RaviartThomasFiniteElementSpace3d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
 
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
@@ -267,7 +265,7 @@ class RaviartThomasFiniteElementSpace3d:
         return phi
 
     @barycentric
-    def div_basis(self, bc, index=None, barycenter=True):
+    def div_basis(self, bc, index=np.s_[:], barycenter=True):
         p = self.p
 
         ldof = self.number_of_local_dofs(doftype='all')
@@ -277,7 +275,6 @@ class RaviartThomasFiniteElementSpace3d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, index=index)
         else:
@@ -298,6 +295,57 @@ class RaviartThomasFiniteElementSpace3d:
     @barycentric
     def grad_basis(self, bc):
         pass
+
+    @barycentric
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[cell2dof]) # TODO: index
+        return val
+
+    @barycentric
+    def div_value(self, uh, bc, index=np.s_[:]):
+        dphi = self.div_basis(bc, index=index)
+        cell2dof = self.cell_to_dof()
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, dphi, uh[cell2dof]) # TODO: index
+        return val
+
+    def project(self, u):
+        return self.interpolation(u)
+
+    def interpolation(self, u):
+        p = self.p
+        mesh = self.mesh
+
+        uh = self.function()
+        face2dof = self.dof.face_to_dof() 
+        n = mesh.face_unit_normal()
+        def f0(bc):
+            ps = mesh.bc_to_point(bc, etype='face')
+            return np.einsum('ijk, jk, ijm->ijm', u(ps), n, self.smspace.face_basis(ps))
+        uh[face2dof] = self.integralalg.face_integral(f0, edgetype=True)
+
+        if p >= 1:
+            NF = mesh.number_of_faces()
+            NC = mesh.number_of_cells()
+            fdof = self.number_of_local_dofs('face')
+            idof = self.number_of_local_dofs('cell') # dofs inside the cell 
+            cell2dof = NF*fdof+ np.arange(NC*idof).reshape(NC, idof)
+            def f1(bc):
+                ps = mesh.bc_to_point(bc, etype='cell')
+                return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
+            val = self.integralalg.cell_integral(f1, celltype=True)
+            idof = idof//3 
+            uh[cell2dof[:, 0*idof:1*idof]] = val[:, 0, :] 
+            uh[cell2dof[:, 1*idof:2*idof]] = val[:, 1, :]
+            uh[cell2dof[:, 2*idof:3*idof]] = val[:, 2, :]
+        return uh
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)

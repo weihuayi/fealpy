@@ -324,7 +324,7 @@ class LagrangeFiniteElementSpace():
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
     @barycentric
-    def grad_basis(self, bc, index=None):
+    def grad_basis(self, bc, index=np.s_[:]):
         """
         compute the basis function values at barycentric point bc
 
@@ -380,34 +380,31 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        index = index if index is not None else np.s_[:]
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
         return gphi #(..., NC, ldof, GD)
 
     @barycentric
-    def value(self, uh, bc, index=None):
+    def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        index = index if index is not None else np.s_[:]
         val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
     @barycentric
-    def grad_value(self, uh, bc, index=None):
+    def grad_value(self, uh, bc, index=np.s_[:]):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        index = index if index is not None else np.s_[:]
         val = np.einsum(s1, gphi, uh[cell2dof[index]])
         return val
 
     @barycentric
-    def div_value(self, uh, bc, index=None):
+    def div_value(self, uh, bc, index=np.s_[:]):
         dim = len(uh.shape)
         GD = self.geo_dimension()
         if (dim == 2) & (uh.shape[1] == gdim):

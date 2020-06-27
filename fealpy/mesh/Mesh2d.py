@@ -74,7 +74,7 @@ class Mesh2d(object):
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_measure(self, etype=2, index=None):
+    def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
             return self.cell_area(index)
         elif etype in {'edge', 'face', 1}:
@@ -84,9 +84,8 @@ class Mesh2d(object):
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def entity_barycenter(self, etype=2, index=None):
+    def entity_barycenter(self, etype=2, index=np.s_[:]):
         node = self.node
-        index = index if index is not None else np.s_[:]
         if etype in ['cell', 2]:
             cell = self.ds.cell
             bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
@@ -99,71 +98,66 @@ class Mesh2d(object):
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-    def face_unit_normal(self, index=None):
+    def face_unit_normal(self, index=np.s_[:]):
         v = self.face_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def face_unit_tangent(self, index=None):
+    def face_unit_tangent(self, index=np.s_[:]):
         edge = self.entity('edge')
         node = self.entity('node')
         NE = self.number_of_edges()
-        index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
         length = np.sqrt(np.sum(v**2, axis=1))
         v /= length.reshape(-1, 1)
         return v
 
-    def face_normal(self, index=None):
+    def face_normal(self, index=np.s_[:]):
         v = self.face_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def face_tangent(self, index=None):
+    def face_tangent(self, index=np.s_[:]):
         node = self.entity('node')
         edge = self.entity('edge')
-        index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
         return v
 
-    def edge_length(self, index=None):
+    def edge_length(self, index=np.s_[:]):
         node = self.entity('node')
         edge = self.entity('edge')
-        index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
-    def edge_frame(self, index=None):
+    def edge_frame(self, index=np.s_[:]):
         t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         n = t@w
         return n, t
-    def edge_unit_normal(self, index=None):
+    def edge_unit_normal(self, index=np.s_[:]):
         #TODO: 3D Case
         v = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_unit_tangent(self, index=None):
+    def edge_unit_tangent(self, index=np.s_[:]):
         node = self.entity('node')
         edge = self.entity('edge')
         NE = self.number_of_edges()
-        index = index if index is not None else np.s_[:]
         v = node[edge[index,1],:] - node[edge[index,0],:]
         length = np.sqrt(np.sum(v**2, axis=1))
         v /= length.reshape(-1, 1)
         return v
 
-    def edge_normal(self, index=None):
+    def edge_normal(self, index=np.s_[:]):
         v = self.edge_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
         return v@w
 
-    def edge_tangent(self, index=None):
+    def edge_tangent(self, index=np.s_[:]):
         node = self.entity('node')
         edge = self.entity('edge')
-        index = index if index is not None else np.s_[:]
         v = node[edge[index, 1],:] - node[edge[index, 0],:]
         return v
 

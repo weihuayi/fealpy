@@ -109,7 +109,7 @@ class Mesh3d():
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_measure(self, etype=3, index=None):
+    def entity_measure(self, etype=3, index=np.s_[:]):
         if etype in {'cell', 3}:
             return self.cell_volume(index=index)
         elif etype in {'face', 2}:
@@ -121,9 +121,8 @@ class Mesh3d():
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def entity_barycenter(self, etype='cell', index=None):
+    def entity_barycenter(self, etype='cell', index=np.s_[:]):
         node = self.node
-        index = index if index is not None else np.s_[:]
         if etype in {'cell', 3}:
             cell = self.ds.cell
             bc = np.sum(node[cell[index], :], axis=1).reshape(-1, 3)/cell.shape[1]

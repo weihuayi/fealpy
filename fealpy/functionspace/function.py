@@ -14,39 +14,39 @@ class Function(np.ndarray):
     def index(self, i):
         return Function(self.space, array=self[:, i])
 
-    def __call__(self, bc, index=None):
+    def __call__(self, bc, index=np.s_[:]):
         space = self.space
         return space.value(self, bc, index=index)
 
-    def value(self, bc, index=None):
+    def value(self, bc, index=np.s_[:]):
         space = self.space
         return space.value(self, bc, index=index)
 
-    def grad_value(self, bc, index=None):
+    def grad_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.grad_value(self, bc, index=index)
 
-    def curl_value(self, bc, index=None):
+    def curl_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.curl_value(self, bc, index=index)
 
-    def rot_value(self, bc, index=None):
+    def rot_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.rot_value(self, bc, index=index)
 
-    def laplace_value(self, bc, index=None):
+    def laplace_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.laplace_value(self, bc, index=index)
 
-    def div_value(self, bc, index=None):
+    def div_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.div_value(self, bc, index=index)
 
-    def hessian_value(self, bc, index=None):
+    def hessian_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.hessian_value(self, bc, index=index)
 
-    def edge_value(self, bc, index=None):
+    def edge_value(self, bc, index=np.s_[:]):
         space = self.space
         return space.edge_value(self, bc)
 

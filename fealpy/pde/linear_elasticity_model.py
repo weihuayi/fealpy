@@ -875,8 +875,6 @@ class Hole2d():
 
         return  TriangleMesh(node, cell)
 
-        return mesh 
-
     @cartesian
     def dirichlet(self, p):
         val = np.zeros(p.shape, dtype=p.dtype)

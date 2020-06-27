@@ -2,13 +2,15 @@
 # 
 import sys
 import numpy as np
+from scipy.sparse import bmat
+from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 import pylab as pl
 from mpl_toolkits.mplot3d import Axes3D
 
+from fealpy.pde.poisson_3d import CosCosCosData, X2Y2Z2Data
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
-from fealpy.pde.poisson_3d import CosCosCosData, X2Y2Z2Data
 from fealpy.functionspace.femdof import multi_index_matrix2d
 
 
@@ -33,17 +35,19 @@ class RaviartThomasFiniteElementSpace3dTest:
 
         return C
 
-    def solve_poisson_3d(self, n=3, p=1, plot=True):
+    def solve_poisson_3d(self, n=0, p=0, plot=True):
         pde = CosCosCosData()
         mesh = pde.init_mesh(n=n, meshtype='tet')
-        space = RaviartThomasFiniteElementSpace3d(mesh, p=p)
+        space = RaviartThomasFiniteElementSpace3d(mesh, p=p, q=p+4)
 
         udof = space.number_of_global_dofs()
         pdof = space.smspace.number_of_global_dofs()
         gdof = udof + pdof
 
         uh = space.function()
+        print('uh:', uh.shape)
         ph = space.smspace.function()
+        print('ph:', ph.shape)
         A = space.stiff_matrix()
         B = space.div_matrix()
         F1 = space.source_vector(pde.source)

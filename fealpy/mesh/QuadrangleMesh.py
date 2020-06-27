@@ -46,10 +46,10 @@ class QuadrangleMesh(Mesh2d):
         return QuadrangleQuadrature(k)
 
 
-    def area(self, index=None):
+    def area(self, index=np.s_[:]):
         return self.cell_area(index=index)
 
-    def cell_area(self, index=None):
+    def cell_area(self, index=np.s_[:]):
         NC = self.number_of_cells()
         node = self.entity('node')
         edge = self.entity('edge')

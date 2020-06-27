@@ -99,35 +99,34 @@ class TetrahedronMesh(Mesh3d):
 
         return l1*np.cross(v20, v30) + l2*np.cross(v30, v10) + l3*np.cross(v10, v20)
 
-    def face_normal(self):
+    def face_normal(self, index=np.s_[:]):
         face = self.ds.face
         node = self.node
-        v01 = node[face[:, 1], :] - node[face[:, 0], :]
-        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
         nv = np.cross(v01, v02)
         return nv
 
-    def face_unit_normal(self):
+    def face_unit_normal(self, index=np.s_[:]):
         face = self.ds.face
         node = self.node
-        v01 = node[face[:, 1], :] - node[face[:, 0], :]
-        v02 = node[face[:, 2], :] - node[face[:, 0], :]
+
+        v01 = node[face[index, 1], :] - node[face[index, 0], :]
+        v02 = node[face[index, 2], :] - node[face[index, 0], :]
         nv = np.cross(v01, v02)
         length = np.sqrt(np.square(nv).sum(axis=1))
         return nv/length.reshape(-1, 1)
 
-    def cell_volume(self, index=None):
+    def cell_volume(self, index=np.s_[:]):
         cell = self.ds.cell
         node = self.node
-        index = index if index is not None else np.s_[:]
         v01 = node[cell[index, 1]] - node[cell[index, 0]]
         v02 = node[cell[index, 2]] - node[cell[index, 0]]
         v03 = node[cell[index, 3]] - node[cell[index, 0]]
         volume = np.sum(v03*np.cross(v01, v02), axis=1)/6.0
         return volume
 
-    def face_area(self, index=None):
-        index = index if index is not None else np.s_[:]
+    def face_area(self, index=np.s_[:]):
         face = self.ds.face
         node = self.node
         v01 = node[face[index, 1], :] - node[face[index, 0], :]
@@ -136,8 +135,7 @@ class TetrahedronMesh(Mesh3d):
         area = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return area
 
-    def edge_length(self, index=None):
-        index = index if index is not None else np.s_[:]
+    def edge_length(self, index=np.s_[:]):
         edge = self.ds.edge
         node = self.node
         v = node[edge[index, 1]] - node[edge[index, 0]]
@@ -158,8 +156,7 @@ class TetrahedronMesh(Mesh3d):
         return np.array(angle).T
 
 
-    def bc_to_point(self, bc, etype='cell', index=None):
-        index = index if index is not None else np.s_[:]
+    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
         node = self.node
         entity = self.entity(etype)
         p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
