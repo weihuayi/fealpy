@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.decorator import cartesian
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
+from fealpy.writer import MeshWriter
 
 from pde_data import  CornerData3D
 
@@ -60,6 +61,17 @@ FF[isBdDof] = x[isBdDof]
 x[:] = spsolve(AA, FF)
 uh[:] = x[:udof]
 ph[:] = x[udof:-1]
+
+
+bc = np.array([1/4, 1/4, 1/4, 1/4], dtype=np.float64)
+ps = mesh.bc_to_point(bc)
+V = uh.value(bc)
+
+mesh.celldata['ph0'] = ph.copy()
+mesh.celldata['V0'] = V
+
+writer = MeshWriter(mesh)
+writer.write('test.vtk')
 
 if m in {3}:
     bc = mesh.entity_barycenter('face')

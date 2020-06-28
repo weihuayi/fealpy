@@ -28,6 +28,7 @@ class MeshWriter:
             node = np.concatenate((node, np.zeros((node.shape[0], 2), dtype=mesh.ftype)), axis=1)
         elif GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=mesh.ftype)), axis=1)
+
         points = vtk.vtkPoints()
         points.SetData(vnp.numpy_to_vtk(node))
 
@@ -42,19 +43,25 @@ class MeshWriter:
             isIdx[np.add.accumulate(NV+1)[:-1]] = False
             cell[~isIdx] = NV
             cell[isIdx] = mcell
-        else:
+
         cells = vtk.vtkCellArray()
         cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
 
         self.mesh =vtk.vtkUnstructuredGrid() 
         self.mesh.SetPoints(points)
-        self.mesh.SetCells(celltype, cells)
+        self.mesh.SetCells(cellType, cells)
 
         pdata = self.mesh.GetPointData()
         for key, val in mesh.nodedata.items():
             d = vnp.numpy_to_vtk(val)
             d.SetName(key)
             pdata.AddArray(d)
+
+        cdata = self.mesh.GetCellData()
+        for key, val in mesh.celldata.items():
+            d = vnp.numpy_to_vtk(val)
+            d.SetName(key)
+            cdata.AddArray(d)
 
         self.simulation = simulation
         if self.simulation is not None:
