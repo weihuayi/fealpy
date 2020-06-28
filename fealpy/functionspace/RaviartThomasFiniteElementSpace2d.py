@@ -285,8 +285,8 @@ class RaviartThomasFiniteElementSpace2d:
         idx = self.smspace.edge_index_1(p=p+1)
 
         for i, key in enumerate(idx.keys()):
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
     @barycentric

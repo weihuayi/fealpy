@@ -288,7 +288,7 @@ def show_mesh_2d(
         mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         nodecolor = mapper.to_rgba(nodecolor)
 
-    if (type(cellcolor) is np.ndarray) & np.isreal(cellcolor[0]):
+    if isinstance(cellcolor, np.ndarray) & np.isreal(cellcolor[0]):
         cmax = cellcolor.max()
         cmin = cellcolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
