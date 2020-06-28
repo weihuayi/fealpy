@@ -52,15 +52,17 @@ class TriangleMesh(Mesh2d):
         NN = self.number_of_nodes()
 
         cell = self.entity('cell')
-        bc = mesh.entity_barycenter('cell')
+        node = self.entity('node')
+
+        bc = self.entity_barycenter('cell')
         isKeepCell = ~threshold(bc)
         cell = cell[isKeepCell]
 
-        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
         isValidNode[cell] = True
         node = node[isValidNode]
 
-        idxMap = np.zeros(NN, dtype=mesh.itype)
+        idxMap = np.zeros(NN, dtype=self.itype)
         idxMap[isValidNode] = range(isValidNode.sum())
         cell = idxMap[cell]
         self.node = node
