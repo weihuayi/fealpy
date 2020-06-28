@@ -238,17 +238,17 @@ class CrossCrackBoxDomain2DData():
     @cartesian
     def neumann(self, p, n):
 
-        if False:
+        if True:
             x = p[..., 0]
             y = p[..., 1]
             val = np.zeros_like(p)
+
             flag0 = np.abs(x-1) < 1e-13 
             val[:, 0][flag0] = 500
 
-            flag1 = (np.abs(x - 0.5) < 1e-13) | (np.abs(y - 0.5) < 1e-13)
+            flag1 = (x > 0.25) & (x < 0.75) & (np.abs(y-0.5) < 1e-13)
+            val[:, 1][flag1] = -np.arra*n[None, ...]
 
-            val[flag1, 0] = -500*n[None, :, 0]
-            val[flag1, 1] = -500*n[None, :, 1]
             return val.reshape(shape)
 
         if False:
@@ -273,6 +273,8 @@ class CrossCrackBoxDomain2DData():
     @cartesian
     def is_fracture_boundary(self, p):
         pass
+
+
 n = int(sys.argv[1])
 p = int(sys.argv[2])
 scale = float(sys.argv[3])
@@ -280,12 +282,17 @@ scale = float(sys.argv[3])
 
 
 # pde = BoxDomain2DData()
-pde = CrackBoxDomain2DData()
+#pde = CrackBoxDomain2DData()
 pde = CrossCrackBoxDomain2DData()
 
 mu = pde.mu
 lam = pde.lam
 mesh = pde.init_mesh(n=n)
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
+
 space = LagrangeFiniteElementSpace(mesh, p=p)
 bc0 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
 bc1 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
@@ -297,13 +304,14 @@ bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
 uh.T.flat[:] = spsolve(A, F)
 
-scale = np.arange(1.0, scale, 0.1)
-node = mesh.entity('node')
-fname = 'test'
-for val in scale:
-    mesh.node = node + val*uh
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh.add_plot(axes)
-    plt.savefig(fname + str(val) + '.png')
+if False:
+    scale = np.arange(1.0, scale, 0.1)
+    node = mesh.entity('node')
+    fname = 'test'
+    for val in scale:
+        mesh.node = node + val*uh
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        plt.savefig(fname + str(val) + '.png')
     plt.close()

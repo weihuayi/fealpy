@@ -1,7 +1,107 @@
 import numpy as np
 
 from fealpy.decorator import cartesian
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TetrahedronMesh
+
+class CornerData3D:
+    def __init__(self):
+        pass
+
+    def domain(self):
+        return np.array([0, 1, 0, 1, 0, 1])
+
+    def init_mesh(self, n=9, meshtype='tet'):
+        node = np.array([
+            [-1, -1, -1],
+            [1, -1, -1],
+            [1, 1, -1],
+            [-1, 1, -1],
+            [-1, -1, 1],
+            [1, -1, 1],
+            [1, 1, 1],
+            [-1, 1, 1]], dtype=np.float)
+
+        cell = np.array([
+            [0, 1, 2, 6],
+            [0, 5, 1, 6],
+            [0, 4, 5, 6],
+            [0, 7, 4, 6],
+            [0, 3, 7, 6],
+            [0, 2, 3, 6]], dtype=np.int)
+        mesh = TetrahedronMesh(node, cell)
+        for i in range(n):
+            mesh.bisect()
+
+        NN = mesh.number_of_nodes()
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        bc = mesh.entity_barycenter('cell')
+        isDelCell = ((bc[:, 0] > 0) & (bc[:, 1] < 0))
+        cell = cell[~isDelCell]
+        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+
+        idxMap = np.zeros(NN, dtype=mesh.itype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+        mesh = TetrahedronMesh(node, cell)
+        return mesh
+
+    @cartesian
+    def pressure(self, p):
+        pass
+
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def gradient(self, p):
+        pass
+
+    @cartesian
+    def flux(self, p):
+        pass
+
+    @cartesian
+    def dirichlet(self, p):
+        pass
+
+    @cartesian
+    def neumann(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (x < -0.75) & (y < -0.75) & (np.abs(z-1) < 1e-13)
+        val[flag0] = 10
+        flag1 = (x > 0.75) & (y > 0.75) & (np.abs(z-1) < 1e-13)
+        val[flag1] = -10
+        return val
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        pass
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        flag0 = (x < -0.75) & (y < -0.75) & (np.abs(z-1) < 1e-13)
+        flag1 = (x > 0.75) & (y > 0.75) & (np.abs(z-1) < 1e-13)
+        return flag0 | flag1
+
+    @cartesian
+    def is_fracture_boundary(self, p):
+        pass
 
 class LeftRightData:
     def __init__(self):
