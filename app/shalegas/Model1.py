@@ -160,8 +160,7 @@ class Model1():
         lphi = np.space1.basis(ps, index=edge2cell[:, 0]) # (NQ, NC, 3)
         rphi = np.space1.basis(ps, index=edge2cell[:, 1]) # (NQ, NC, 3)
 
-        M = np.einsum('', ws, lphi, rphi
-        
+        M = np.einsum('', ws, lphi, rphi)
         
 
     def get_current_left_matrix(self, data, timeline):
