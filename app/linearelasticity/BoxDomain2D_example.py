@@ -148,8 +148,8 @@ class CrackBoxDomain2DData():
     def neumann(self, p, n):
         val0 = np.array([500, 0.0], dtype=np.float64)
         shape = len(p.shape[:-1])*(1, ) + (2, )
-        val1 = np.array([-500, 0.0], dtype=np.float64)
-        return val0.reshape(shape), val1.reshape(shape)
+        #val1 = np.array([-500, 0.0], dtype=np.float64)
+        return val0.reshape(shape)
 
     @cartesian
     def is_dirichlet_boundary(self, p):
@@ -237,17 +237,24 @@ class CrossCrackBoxDomain2DData():
 
     @cartesian
     def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        flag0 = np.abs(x-1) < 1e-13 
-        flag1 = (np.abs(x - 0.5) < 1e-13) | (np.abs(y - 0.5) < 1e-13)
 
-        val = np.zeros_like(p)
-        val[flag0, 0] = -500
-        print(val[flag1, 0].shape)
-        val[flag1, 0] = -500*n[None, :, 0]
-        val[flag1, 1] = -500*n[None, :, 1]
-        return val.reshape(shape)
+        if False:
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.zeros_like(p)
+            flag0 = np.abs(x-1) < 1e-13 
+            val[:, 0][flag0] = 500
+
+            flag1 = (np.abs(x - 0.5) < 1e-13) | (np.abs(y - 0.5) < 1e-13)
+
+            val[flag1, 0] = -500*n[None, :, 0]
+            val[flag1, 1] = -500*n[None, :, 1]
+            return val.reshape(shape)
+
+        if False:
+            val0 = np.array([500, 0.0], dtype=np.float64)
+            shape = len(p.shape[:-1])*(1, ) + (2, )
+            return val0.reshape(shape)
 
     @cartesian
     def is_dirichlet_boundary(self, p):
@@ -273,7 +280,7 @@ scale = float(sys.argv[3])
 
 
 # pde = BoxDomain2DData()
-# pde = CrackBoxDomain2DData()
+pde = CrackBoxDomain2DData()
 pde = CrossCrackBoxDomain2DData()
 
 mu = pde.mu
@@ -289,10 +296,14 @@ F = space.source_vector(pde.source, dim=2)
 bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
 uh.T.flat[:] = spsolve(A, F)
-node = mesh.node.copy()
-mesh.node = node + scale*uh
 
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-plt.show()
+scale = np.arange(1.0, scale, 0.1)
+node = mesh.entity('node')
+fname = 'test'
+for val in scale:
+    mesh.node = node + val*uh
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    plt.savefig(fname + str(val) + '.png')
+    plt.close()
