@@ -12,105 +12,43 @@ from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace.femdof import multi_index_matrix2d
 
-
-class LeftRightData:
-    def __init__(self):
-        pass
-
-    def domain(self):
-        return np.array([0, 1, 0, 1])
-
-    def init_mesh(self, n=4, meshtype='tri'):
-        """ generate the initial mesh
-        """
-        node = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float)
-
-        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-        mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n)
-        return mesh
+from pde_data import  LeftRightData, CornerData, HoleData, CrackData
 
 
-    @cartesian
-    def pressure(self, p):
-        pass
+m = int(sys.argv[1])
+n = int(sys.argv[2])
+p = int(sys.argv[3])
 
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
+if m == 0:
+    pde = LeftRightData()
+elif m == 1:
+    pde = CornerData()
+elif m == 2:
+    pde = HoleData()
+elif m == 3:
+    pde = CrackData()
 
-    @cartesian
-    def gradient(self, p):
-        pass
-
-    @cartesian
-    def flux(self, p):
-        pass
-
-    @cartesian
-    def dirichlet(self, p):
-        pass
-
-    @cartesian
-    def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = np.abs(x) < 1e-13
-        val[flag0] = 10
-        flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -10
-        return val
-
-    @cartesian
-    def is_dirichlet_boundary(self, p):
-        pass
-
-    @cartesian
-    def is_neumann_boundary(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
-        return flag
-
-    @cartesian
-    def is_fracture_boundary(self, p):
-        pass
-
-
-n = int(sys.argv[1])
-p = int(sys.argv[2])
-
-pde = LeftRightData()
 mesh = pde.init_mesh(n=n, meshtype='tri')
 space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
 
 udof = space.number_of_global_dofs()
 pdof = space.smspace.number_of_global_dofs()
-gdof = udof + pdof
+gdof = udof + pdof + 1
 
 uh = space.function()
 ph = space.smspace.function()
 A = space.stiff_matrix()
 B = space.div_matrix()
+C = space.smspace.cell_mass_matrix()[:, 0, :].reshape(-1)
 F1 = space.source_vector(pde.source)
-AA = bmat([[A, -B], [-B.T, None]], format='csr')
+
+AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
 
 isBdDof = space.set_dirichlet_bc(uh, pde.neumann)
-x = np.r_['0', uh, ph] 
-isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool_)]
 
-FF = np.r_['0', np.zeros(udof, dtype=np.float64), F1]
+x = np.r_['0', uh, ph, 0] 
+isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
+FF = np.r_['0', np.zeros(udof, dtype=np.float64), F1, 0]
 
 FF -= AA@x
 bdIdx = np.zeros(gdof, dtype=np.int)
@@ -121,14 +59,20 @@ AA = T@AA@T + Tbd
 FF[isBdDof] = x[isBdDof]
 x[:] = spsolve(AA, FF)
 uh[:] = x[:udof]
-ph[:] = x[udof:]
+ph[:] = x[udof:-1]
 
-area = mesh.entity_measure('cell')
-x[udof:] -= sum(x[udof:]*area)/sum(area)
+if m in {3}:
+    bc = mesh.entity_barycenter('edge')
+    isFEdge = pde.is_fracture_boundary(bc) 
+
 
 fig = plt.figure()
 axes = fig.gca()
-mesh.add_plot(axes, cellcolor=x[udof:], showcolorbar=True)
+mesh.add_plot(axes, cellcolor=x[udof:-1], showcolorbar=True)
+
+if m in {3}:
+    mesh.find_edge(axes, index=isFEdge, color='r')
+
 node = mesh.entity('node')
 bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = mesh.bc_to_point(bc)
