@@ -6,6 +6,9 @@ from fealpy.mesh.mesh_tools import show_mesh_2d
 
 from timeit import default_timer as timer
 
+from fealpy.timeintegratoralg.timeline_old import ChebyshevTimeLine
+from ParabolicVEMSolver2d import ParabolicVEMSolver2d
+
 def scftmodel2d_options(
         nspecies = 2,
         nblend = 1,
@@ -74,7 +77,7 @@ class SCFTVEMModel2d():
         nupdate = options['nupdate']
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.solver = PDESolver(self.A, self.M, nupdate)
+        self.solver = ParabolicVEMSolver2d(self.A, self.M, nupdate)
 
         self.eta_ref = 0
 
@@ -181,7 +184,7 @@ class SCFTVEMModel2d():
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
 
-        self.solver = PDESolver(self.A, self.M, nupdate)
+        self.solver = ParabolicVEMSolver2d(self.A, self.M, nupdate)
 
         self.eta_ref= 0
 

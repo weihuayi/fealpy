@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
-from .function import Function
+from .Function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
@@ -44,7 +44,6 @@ class CVEMDof2d():
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        print(mesh.entity('cell'))
         cell, cellLocation = mesh.entity('cell')
 
         if p == 1:

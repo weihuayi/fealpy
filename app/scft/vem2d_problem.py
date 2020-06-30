@@ -2,7 +2,7 @@ import numpy as np
 from SCFTVEMModel2d import SCFTVEMModel2d, scftmodel2d_options
 from fealpy.functionspace.vem_space import VirtualElementSpace2d
 from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
-from fealpy.mesh import Quadtree
+from fealpy.mesh import Quadtree,PolygonMesh,HalfEdgeMesh2d
 
 __doc__ = """
 该文件包含了所有用来测试的问题模型
@@ -21,6 +21,23 @@ def init_mesh(n=4, h=10):
     cell = np.array([(0, 1, 2, 3)], dtype=np.int)
     mesh = Quadtree(node, cell)
     mesh.uniform_refine(n)
+    return mesh
+
+def halfedgemesh(n=4):
+    """
+    半边数据结构的网格
+    """
+    node = np.array([
+        (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+        (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+        (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+    cell = np.array([0, 3, 4, 4, 1, 0,
+        1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+    cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+    mesh = PolygonMesh(node, cell, cellLocation)
+    #mesh = HalfEdgeMesh2d.from_mesh(mesh)
+    #mesh.uniform_refine(n)
     return mesh
 
 def quadmesh(n=10, L=12):

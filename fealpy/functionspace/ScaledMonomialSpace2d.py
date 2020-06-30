@@ -101,24 +101,24 @@ class ScaledMonomialSpace2d():
     def diff_index_1(self, p=None):
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
-        
+
         x, = np.nonzero(index[:, 1] > 0)
         y, = np.nonzero(index[:, 2] > 0)
 
-        return {'x':(x, index[x, 1]), 
+        return {'x':(x, index[x, 1]),
                 'y':(y, index[y, 2]),
                 }
 
     def diff_index_2(self, p=None):
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
-        
+
         xx, = np.nonzero(index[:, 1] > 1)
         yy, = np.nonzero(index[:, 2] > 1)
 
         xy, = np.nonzero((index[:, 1] > 0) & (index[:, 2] > 0))
 
-        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)), 
+        return {'xx':(xx, index[xx, 1]*(index[xx, 1]-1)),
                 'yy':(yy, index[yy, 2]*(index[yy, 2]-1)),
                 'xy':(xy, index[xy, 1]*index[xy, 2]),
                 }
