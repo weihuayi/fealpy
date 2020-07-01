@@ -23,6 +23,9 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     def __init__(self, N, cell):
         super(TetrahedronMeshDataStructure, self).__init__(N, cell)
 
+    def number_of_vertices_of_cells(self):
+        return self.V
+
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
         edge = self.edge

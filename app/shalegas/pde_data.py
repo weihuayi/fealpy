@@ -81,9 +81,9 @@ class CornerData3D:
         z = p[..., 2]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = (x < -0.75) & (y < -0.75) & (np.abs(z-1) < 1e-13)
-        val[flag0] = 10
+        val[flag0] = 1
         flag1 = (x > 0.75) & (y > 0.75) & (np.abs(z-1) < 1e-13)
-        val[flag1] = -10
+        val[flag1] = -1
         return val
 
     @cartesian
