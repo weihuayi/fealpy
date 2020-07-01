@@ -137,26 +137,27 @@ class ChebyshevTimeLine():
         return intq
 
     def time_integration(self, data, dmodel, solver, nupdate=1):
-        self.reset()
+        timeline = self
+        timeline.reset()
         while not self.stop():
-            A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_current_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self)
-            dmodel.solve(data, A, b, solver, self)
+            A = dmodel.get_current_left_matrix(data, timeline)
+            b = dmodel.get_current_right_vector(data, timeline)
+            A, b = dmodel.apply_boundary_condition(data, A, b, timeline)
+            dmodel.solve(data, A, b, solver, timeline)
             self.current += 1
         self.reset()
-        Q = dmodel.residual_integration(data, self) # here self is the current timeline object
+        Q = dmodel.residual_integration(data, timeline) # here self is the current timeline object
         if type(data) is not list:
             data = [data, Q]
         else:
             data += [Q]
-        data += [dmodel.error_integration(data, self)]
-        data += [dmodel.init_delta(self)]
+        data += [dmodel.error_integration(data, timeline)]
+        data += [dmodel.init_delta(timeline)]
         for i in range(nupdate):
             while not self.stop():
-                A = dmodel.get_current_left_matrix(self)
+                A = dmodel.get_current_left_matrix(data, timeline)
                 b = dmodel.get_error_right_vector(data, self)
-                A, b = dmodel.apply_boundary_condition(A, b, self, sdc=True)
+                A, b = dmodel.apply_boundary_condition(data, A, b, self, sdc=True)
                 dmodel.solve(data[-1], A, b, solver, self)
                 self.current += 1
             self.reset()
