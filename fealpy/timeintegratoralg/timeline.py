@@ -145,7 +145,7 @@ class ChebyshevTimeLine():
             dmodel.solve(data, A, b, solver, self)
             self.current += 1
         self.reset()
-        Q = dmodel.residual_integration(data, self)
+        Q = dmodel.residual_integration(data, self) # here self is the current timeline object
         if type(data) is not list:
             data = [data, Q]
         else:
