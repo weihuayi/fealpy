@@ -260,8 +260,8 @@ class RaviartThomasFiniteElementSpace3d:
         idx = self.smspace.face_index_1(p=p+1)
 
         for i, key in enumerate(idx.keys()):
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
     @barycentric
@@ -288,8 +288,8 @@ class RaviartThomasFiniteElementSpace3d:
         idx = self.smspace.face_index_1(p=p+1)
 
         for i, key in enumerate(idx.keys()):
-            phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, i], c[:, i*cdof:(i+1)*cdof, :])
-            phi[:] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key], i], c[:, GD*cdof:, :])
+            phi[:] += np.einsum('...jm, jmn->...jn', val[..., :cdof, i], c[:, i*cdof:(i+1)*cdof, :])
+            phi[:] += np.einsum('...jm, jmn->...jn', val[..., cdof+idx[key], i], c[:, GD*cdof:, :])
         return phi
 
     @barycentric

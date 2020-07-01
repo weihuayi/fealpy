@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
-from .function import Function
+from .Function import Function
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg

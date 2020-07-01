@@ -1,6 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
-from .function import Function
+from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 class FKNDof2d:

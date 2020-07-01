@@ -198,12 +198,12 @@ class RaviartThomasFiniteElementSpace2d:
         return inv(A)
 
     @barycentric
-    def face_basis(self, bc, index=None, barycenter=True):
+    def face_basis(self, bc, index=np.s_[:], barycenter=True):
         return self.edge_basis(bc, index, barycenter)
 
 
     @barycentric
-    def edge_basis(self, bc, index=None, barycenter=True):
+    def edge_basis(self, bc, index=np.s_[:], barycenter=True):
         """
         """
         p = self.p
@@ -216,7 +216,6 @@ class RaviartThomasFiniteElementSpace2d:
         GD = mesh.geo_dimension()
         edge2cell = mesh.ds.edge_to_cell()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
@@ -237,7 +236,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=None, barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycenter=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -271,7 +270,6 @@ class RaviartThomasFiniteElementSpace2d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
@@ -285,12 +283,12 @@ class RaviartThomasFiniteElementSpace2d:
         idx = self.smspace.edge_index_1(p=p+1)
 
         for i, key in enumerate(idx.keys()):
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
-            phi[..., i] += np.einsum('ijm, jmn->ijn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, i*cdof:(i+1)*cdof, :])
+            phi[..., i] += np.einsum('...jm, jmn->...jn', val[..., cdof+idx[key]], c[:, GD*cdof:, :])
         return phi
 
     @barycentric
-    def div_basis(self, bc, index=None, barycenter=True):
+    def div_basis(self, bc, index=np.s_[:], barycenter=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
         cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
@@ -298,7 +296,6 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, index=index)
         else:
@@ -330,8 +327,8 @@ class RaviartThomasFiniteElementSpace2d:
         return self.dof.number_of_local_dofs(doftype)
 
     @barycentric
-    def value(self, uh, bc, index=None):
-        phi = self.basis(bc)
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -340,8 +337,8 @@ class RaviartThomasFiniteElementSpace2d:
         return val
 
     @barycentric
-    def div_value(self, uh, bc, index=None):
-        dphi = self.div_basis(bc)
+    def div_value(self, uh, bc, index=np.s_[:]):
+        dphi = self.div_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -350,8 +347,12 @@ class RaviartThomasFiniteElementSpace2d:
         return val
 
     @barycentric
-    def grad_value(self, uh, bc, index=None):
+    def grad_value(self, uh, bc, index=np.s_[:]):
         pass
+
+    @barycentric
+    def edge_value(self, uh, bc, index=np.s_[:]):
+        phi = self.edge_basis(bc, index=index)
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -413,6 +414,37 @@ class RaviartThomasFiniteElementSpace2d:
         b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
                 gdof=gdof) 
         return b
+
+    def convection_vector(self, ch, vh, q=None):
+        """
+
+        Parameters
+        ----------
+        c: current concentration
+        v: current flow field
+        Notes
+        -----
+
+        (ch*vh, \\nabla p_h)_K - (ch*vh \\cdot n, p_h)_{\\partial K}
+        """
+
+        mesh = self.mesh
+        qf = self.integralalg.cellintegrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        measure = self.integralalg.cellmeasure
+        ps = mesh.bc_to_point(bcs)
+        val = vh.value(bcs)
+        val *= ch.value(ps)[..., None]
+        gphi = self.smspace.grad_value(ps) 
+
+        F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
+
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        en = mesh.edge_unit_normal()
+        measure = self.integralalg.edgemeasure
+        
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
         """

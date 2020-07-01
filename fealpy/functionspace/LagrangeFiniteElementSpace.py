@@ -810,6 +810,11 @@ class LagrangeFiniteElementSpace():
             np.add.at(F, face2dof, bb)
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
+            
+        gdof = self.number_of_global_dofs()
+        FF = np.zeros(gdof, dtype=self.ftype)
+        np.add.at(FF, face2dof, bb)
+
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
