@@ -34,15 +34,19 @@ class MeshWriter:
 
         cell = mesh.entity('cell')
         cellType = mesh.vtk_cell_type()
+        NV = mesh.ds.number_of_vertices_of_cells()
         if isinstance(cell, tuple): # Polygon Mesh
             mcell, mcellLocation = cell
-            NV = mesh.ds.number_of_vertices_of_cells()
-            cell = np.zeros(len(mcell) + NC, dtype=np.int_)
-            isIdx = np.ones(len(mcell) + NC, dtype=np.bool_)
-            isIdx[0] = False
-            isIdx[np.add.accumulate(NV+1)[:-1]] = False
-            cell[~isIdx] = NV
-            cell[isIdx] = mcell
+        else:
+            mcell = cell
+            NV = np.repeat(NV, NC)
+
+        cell = np.zeros(len(mcell.reshape(-1)) + NC, dtype=np.int_)
+        isIdx = np.ones(len(mcell.reshape(-1)) + NC, dtype=np.bool_)
+        isIdx[0] = False
+        isIdx[np.add.accumulate(NV+1)[:-1]] = False
+        cell[~isIdx] = NV
+        cell[isIdx] = mcell.flat
 
         cells = vtk.vtkCellArray()
         cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
@@ -50,7 +54,7 @@ class MeshWriter:
         self.mesh =vtk.vtkUnstructuredGrid() 
         self.mesh.SetPoints(points)
         self.mesh.SetCells(cellType, cells)
-
+        
         pdata = self.mesh.GetPointData()
         for key, val in mesh.nodedata.items():
             d = vnp.numpy_to_vtk(val)
@@ -74,7 +78,7 @@ class MeshWriter:
 
 
     def write(self, fname='test.vtk'):
-        writer = vtk.vtkUnstructuredGridWriter()
+        writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
         writer.SetInputData(self.mesh)
         writer.Write()
@@ -92,7 +96,7 @@ class MeshWriter:
         while True:
             if not self.queue.empty():
                 data = self.queue.get()
-                if data is not -1:
+                if data != -1:
                     for key, val in data.items():
                         d = vnp.numpy_to_vtk(val)
                         d.SetName(key)
