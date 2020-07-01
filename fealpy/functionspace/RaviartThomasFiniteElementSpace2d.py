@@ -205,6 +205,10 @@ class RaviartThomasFiniteElementSpace2d:
     @barycentric
     def edge_basis(self, bc, index=np.s_[:], barycenter=True):
         """
+
+        Notes
+        -----
+        计算每条边左边单元上的基函数， 在该边上的取值
         """
         p = self.p
 
@@ -353,6 +357,12 @@ class RaviartThomasFiniteElementSpace2d:
     @barycentric
     def edge_value(self, uh, bc, index=np.s_[:]):
         phi = self.edge_basis(bc, index=index)
+        edge2dof = self.dof.edge_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
 
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
@@ -429,13 +439,16 @@ class RaviartThomasFiniteElementSpace2d:
         """
 
         mesh = self.mesh
+        edge2cell = mesh.ds.edge_to_cell()
+        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+
         qf = self.integralalg.cellintegrator
         bcs, ws = qf.get_quadrature_points_and_weights()
         measure = self.integralalg.cellmeasure
         ps = mesh.bc_to_point(bcs)
         val = vh.value(bcs)
         val *= ch.value(ps)[..., None]
-        gphi = self.smspace.grad_value(ps) 
+        gphi = self.smspace.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
 
@@ -444,7 +457,28 @@ class RaviartThomasFiniteElementSpace2d:
 
         en = mesh.edge_unit_normal()
         measure = self.integralalg.edgemeasure
+        edge2dof = self.dof.edge_to_dof() 
+        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en)
+        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        val1 = ch.value(ps, index=edge2cell[:, 0]) # (NQ, NE)
+        val2 = ch.value(ps, index=edge2cell[:, 1]) # (NQ, NE)
+        val2[:, isBdEdge] = 0.0
         
+        flag = val0 >= 0.0 # 对于左边单元来说，是流出项
+                           # 对于右边单元来说，是流入项
+
+        val = np.zeros_like(val0)  
+        val[flag] = val0[flag]*val1[flag] 
+        val[~flag] = val0[~flag]*val2[~flag]
+        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
+        b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
+        np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
+
+        b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
+        np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
+
+        # 边界条件处理
+
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
         """
