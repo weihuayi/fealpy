@@ -414,6 +414,32 @@ class RaviartThomasFiniteElementSpace2d:
                 gdof=gdof) 
         return b
 
+    def convection_vector(self, ch, vh):
+        """
+
+        Parameters
+        ----------
+        c: current concentration
+        v: current flow field
+        Notes
+        -----
+
+        (ch*vh, \\nabla p_h)_K - (ch*vh \\cdot n, p_h)_{\\partial K}
+        """
+
+        mesh = self.mesh
+        bcs, ws = self.integralalg.cellintegrator.get_quadrature_points_and_weights()
+        measure = self.integralalg.cellmeasure
+        ps = mesh.bc_to_point(bcs)
+        val = vh.value(bcs)
+        val *= ch.value(ps)[..., None]
+        gphi = self.smspace.grad_value(ps) 
+
+        F = np.einsum('i, ijm, ijkm, j->', ws, val, gphi, measure)
+
+        
+
+
     def neumann_boundary_vector(self, g, threshold=None, q=None):
         """
         Parameters
