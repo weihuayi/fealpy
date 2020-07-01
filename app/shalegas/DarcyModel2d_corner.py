@@ -11,7 +11,7 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace.femdof import multi_index_matrix2d
-
+from pde_data import LeftRightData
 
 
 
@@ -60,6 +60,7 @@ mesh.add_plot(axes, cellcolor=x[udof:], showcolorbar=True)
 node = mesh.entity('node')
 bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
 ps = mesh.bc_to_point(bc)
+print('uh', type(uh))
 V = uh.value(bc)
 axes.quiver(ps[:, 0], ps[:, 1], V[:, 0], V[:, 1], angles='xy', units='xy')
 axes.set_axis_on()
