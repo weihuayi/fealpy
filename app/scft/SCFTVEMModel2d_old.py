@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+from fealpy.quadrature import TriangleQuadrature
 from fealpy.functionspace import ConformingVirtualElementSpace2d
 from fealpy.mesh.mesh_tools import show_mesh_2d
 
 from timeit import default_timer as timer
 
-from fealpy.timeintegratoralg.timeline_new import ChebyshevTimeLine
+from fealpy.timeintegratoralg.timeline_old import ChebyshevTimeLine
 from ParabolicVEMSolver2d import ParabolicVEMSolver2d
 
 def scftmodel2d_options(
@@ -20,7 +20,8 @@ def scftmodel2d_options(
         T0 = 4,
         T1 = 16,
         nupdate = 1,
-        order = 1):
+        order = 1,
+        integrator = TriangleQuadrature(3)):
     """
     Get the options used in model.
     """
@@ -37,7 +38,8 @@ def scftmodel2d_options(
             'T0'          :T0,
             'T1'          :T1,
             'nupdate'     :nupdate,
-            'order'       :order
+            'order'       :order,
+            'integrator'  :integrator
             }
 
     options['chiN'] = options['chiAB']*options['ndeg']
@@ -63,8 +65,8 @@ class SCFTVEMModel2d():
         gdof = self.vemspace.number_of_global_dofs()
         self.gof = gdof
 
-        self.q0 = np.ones((gdof, N), dtype=self.mesh.ftype)
-        self.q1 = np.ones((gdof, N), dtype=self.mesh.ftype)
+        self.q0 = np.zeros((gdof, N), dtype=self.mesh.ftype)
+        self.q1 = np.zeros((gdof, N), dtype=self.mesh.ftype)
 
         self.rho = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.grad = np.zeros((gdof, 2), dtype=self.mesh.ftype)
@@ -72,10 +74,10 @@ class SCFTVEMModel2d():
         self.sQ1 = np.zeros((N, 1), dtype=self.mesh.ftype)
 
         self.sQ = 0.0
-        self.nupdate = options['nupdate']
+        nupdate = options['nupdate']
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
+        self.solver = ParabolicVEMSolver2d(self.A, self.M, nupdate)
 
         self.eta_ref = 0
 
@@ -169,20 +171,20 @@ class SCFTVEMModel2d():
         gdof = self.vemspace.number_of_global_dofs()
         self.gdof = gdof
 
-        self.q0 = np.ones((gdof, N), dtype=self.mesh.ftype)
-        self.q1 = np.ones((gdof, N), dtype=self.mesh.ftype)
+        self.q0 = np.zeros((gdof, N), dtype=self.mesh.ftype)
+        self.q1 = np.zeros((gdof, N), dtype=self.mesh.ftype)
 
         self.rho = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.grad = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.w = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.sQ = np.zeros((N, 1), dtype=self.mesh.ftype)
 
-        self.nupdate = options['nupdate']
+        nupdate = options['nupdate']
 
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
 
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
+        self.solver = ParabolicVEMSolver2d(self.A, self.M, nupdate)
 
         self.eta_ref= 0
 
@@ -280,8 +282,8 @@ class SCFTVEMModel2d():
         print('第'+str(self.count)+'次迭代的etaref:', self.eta_ref)
 
     def compute_propagator(self):
-        n0 = self.timeline0.NL
-        n1 = self.timeline1.NL
+        n0 = self.timeline0.NT
+        n1 = self.timeline1.NT
 
         #w = self.vemspace.function(array = self.w[:, 0]).value
         w = self.w[:,0]
@@ -293,10 +295,12 @@ class SCFTVEMModel2d():
         S = self.vemspace.project_to_smspace(w)
         F1 = self.vemspace.cross_mass_matrix(S.value)
 
-        self.timeline0.time_integration(self.q0[:, 0:n0], F0, self.smodel, self.nupdate)
-        self.timeline1.time_integration(self.q0[:, n0-1], F1, self.smodel, self.nupdate)
-        self.timeline1.time_integration(self.q0[:, 0:n1], F1, self.smodel, self.nupdate)
-        self.timeline0.time_integration(self.q0[:, n1-1], F0, self.smodel, self.nupdate)
+        self.q0[:, 0] = 1.0
+        self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
+        self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
+        self.q1[:, 0] = 1.0
+        self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
+        self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
 
     def compute_density_2(self):
         q = self.q0*self.q1[:, -1::-1]

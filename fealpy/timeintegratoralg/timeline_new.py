@@ -116,6 +116,9 @@ class ChebyshevTimeLine():
         return d
 
     def dct_time_integral(self, q, return_all=True):
+        """
+        q is integrand
+        """
         N = self.NL - 1
         theta = self.theta
         a = dct(q, type=1)/N
@@ -136,37 +139,48 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, solver, nupdate=1):
+    def time_integration(self, data, F, dmodel, nupdate=1):
         self.reset()
         while not self.stop():
             """
             get a initial solution by CN
             """
-            A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_current_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self)
-            dmodel.solve(data, A, b, solver, self)
+            print(self.current)
+            dt = self.current_time_step_length()
+            A = dmodel.get_current_left_matrix(dt, F)
+            b = dmodel.get_current_right_vector(data[..., self.current], dt, F)
+            A, b = dmodel.apply_boundary_condition(A, b)
+            print(self.current, data.shape)
+            dmodel.solve(data[..., self.current+1], A, b)
+            print(self.current, data.shape)
             self.current += 1
         self.reset()
-        Q = dmodel.residual_integration(data, self)
-        if type(data) is not list:
-            data = [data, Q]
-        else:
-            data += [Q]
-        data += [dmodel.error_integration(data, self)]
-        data += [dmodel.init_delta(self)]
-        """
-        spectral deferred correction
-        """
         for i in range(nupdate):
+            r = residual_integration(data, self)
+
+            q = -dmodel.A@data - F@data
+            r = dmodel.M@data + self.dct_time_integral(q) -dmodel.M@data
+            if type(data) is not list:
+                data = [data, r]
+            else:
+                data += [r]
+            data += [self.diff(r)]
+            init_error = np.zeros(data[0].shape, dtype=np.float)
+            data += [init_error]
+            """
+            spectral deferred correction
+            """
             while not self.stop():
-                A = dmodel.get_current_left_matrix(self)
-                b = dmodel.get_error_right_vector(data, self)
-                A, b = dmodel.apply_boundary_condition(A, b, self, sdc=True)
-                dmodel.solve(data[-1], A, b, solver, self)
+                dt = self.current
+                A = dmodel.get_current_left_matrix(dt, F)
+                b = dmodel.get_error_right_vector(data[-1][:,self.current], dt,
+                        F, data[2][:,self.current+1])
+                A, b = dmodel.apply_boundary_condition(A, b)
+                dmodel.solve(data[-1], A, b)
                 self.current += 1
             self.reset()
             data[0] += data[-1]
+            data = data[0]
 
 
 
