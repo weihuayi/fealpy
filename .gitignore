@@ -41,3 +41,5 @@ dist
 *.fig
 *.vtk
 *.so
+*.swn
+*.swo
