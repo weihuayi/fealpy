@@ -4,7 +4,8 @@ from numpy.linalg import inv
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
-from ..decorator import barycentric # 导入默认的坐标类型, 这个空间是重心坐标
+# 导入默认的坐标类型, 这个空间基函数的相关计算，输入参数是重心坐标 
+from ..decorator import barycentric 
 
 class RTDof2d:
     def __init__(self, mesh, p):
@@ -425,17 +426,25 @@ class RaviartThomasFiniteElementSpace2d:
                 gdof=gdof) 
         return b
 
-    def convection_vector(self, ch, vh, q=None):
+    def convection_vector(self, t, g, ch, vh, threshold=None, q=None):
         """
 
         Parameters
         ----------
-        c: current concentration
-        v: current flow field
+        t: current time level
+        g: boundary condition, g(x, t) = ch*vh \\cdot n 
+        ch: current concentration
+        vh: current flow field
+
         Notes
         -----
-
         (ch*vh, \\nabla p_h)_K - (ch*vh \\cdot n, p_h)_{\\partial K}
+
+        注意单元内部浓度的变化要考虑从单元边界是流入， 还是流出， 流入导致单
+        元内部物质浓度增加，流出导致物质浓度减少。
+
+        Riemann Solvers
+        Toro E. Riemann Solvers and Numerical Methods for Fluid dynamics. Springer: Berlin, 1997.
         """
 
         mesh = self.mesh
@@ -446,8 +455,8 @@ class RaviartThomasFiniteElementSpace2d:
         bcs, ws = qf.get_quadrature_points_and_weights()
         measure = self.integralalg.cellmeasure
         ps = mesh.bc_to_point(bcs)
-        val = vh.value(bcs)
-        val *= ch.value(ps)[..., None]
+        val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
+        val *= ch(ps)[..., None]
         gphi = self.smspace.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
@@ -455,18 +464,30 @@ class RaviartThomasFiniteElementSpace2d:
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        en = mesh.edge_unit_normal()
-        measure = self.integralalg.edgemeasure
+        en = mesh.edge_unit_normal() # 边界单位外法线
+        measure = self.integralalg.edgemeasure # 边界长度
         edge2dof = self.dof.edge_to_dof() 
         val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en)
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        val1 = ch.value(ps, index=edge2cell[:, 0]) # (NQ, NE)
-        val2 = ch.value(ps, index=edge2cell[:, 1]) # (NQ, NE)
-        val2[:, isBdEdge] = 0.0
-        
+        ps = mesh.bc_to_point(bcs, etype='edge')
+        val1 = ch(ps, index=edge2cell[:, 0]) # (NQ, NE)
+        val2 = ch(ps, index=edge2cell[:, 1]) # (NQ, NE)
+
+
+        # 边界条件处理
+        val2[:, isBdEdge] = 0.0 # 首先把边界的贡献都设为 0 
+        if type(threshold) is np.ndarray: # 下面考虑非零的的贡献
+            index = threshold # 这里要求是边界边的编号
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+        gval = g(ps[:, index], t)
+        val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi[:, edge2cell[index, 0]], measure[index])
+
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项
-
         val = np.zeros_like(val0)  
         val[flag] = val0[flag]*val1[flag] 
         val[~flag] = val0[~flag]*val2[~flag]
@@ -477,7 +498,6 @@ class RaviartThomasFiniteElementSpace2d:
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
 
-        # 边界条件处理
 
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
