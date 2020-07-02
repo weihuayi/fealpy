@@ -109,6 +109,7 @@ class ParabolicFourierSolver():
             q1 *= w
             q1 *= dt
             q0 -= q1
+
             q1 = space.ifftn(q0)
             q1 /= 25/12 + dt*k2
             q[i] = space.fftn(q1).real

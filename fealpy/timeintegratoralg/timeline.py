@@ -116,53 +116,76 @@ class ChebyshevTimeLine():
         return d
 
     def dct_time_integral(self, q, return_all=True):
+        """
+        q is integrand
+        """
         N = self.NL - 1
         theta = self.theta
         a = dct(q, type=1)/N
         if return_all:
             A = np.zeros(a.shape, dtype=np.float)
-            A[:, 0] = (
-                    a[:, 0] + 0.5*a[:, 1] +
-                    np.sum(2*a[:, 2:N]/(1 - np.arange(2, N)**2), axis=-1) +
-                    a[:, -1]/(1 - N**2)
+            A[..., 0] = (
+                    a[..., 0] + 0.5*a[..., 1] +
+                    np.sum(2*a[..., 2:N]/(1 - np.arange(2, N)**2), axis=-1) +
+                    a[..., -1]/(1 - N**2)
                     )
-            A[:, 1:N-1] = 0.5*(a[:, 2:N] - a[:, 0:N-2])/np.arange(1, N-1)
-            A[:, N-1] = 0.5/(N-1)*(0.5*a[:, N] - a[:, N-2])
-            A[:, N] = -0.5/N*a[:, N-1]
-            intq = idct(A, type=1)/2 - 0.25*a[:, [-1]]/(N+1)*theta
+            A[..., 1:N-1] = 0.5*(a[..., 2:N] - a[..., 0:N-2])/np.arange(1, N-1)
+            A[..., N-1] = 0.5/(N-1)*(0.5*a[..., N] - a[..., N-2])
+            A[..., N] = -0.5/N*a[..., N-1]
+            intq = idct(A, type=1)/2 - 0.25*a[..., [-1]]/(N+1)*theta
         else:
-            intq = a[:, 0] + np.sum(2*a[:, 2:N:2]/(1 - np.arange(2, N, 2)**2), axis=-1) + a[:, -1]/(1 - N**2)
+            intq = a[..., 0] + np.sum(2*a[..., 2:N:2]/(1 - np.arange(2, N,
+                2)**2), axis=-1) + a[..., -1]/(1 - N**2)
 
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, solver, nupdate=1):
-        self.reset()
-        while not self.stop():
-            A = dmodel.get_current_left_matrix(self)
-            b = dmodel.get_current_right_vector(data, self)
-            A, b = dmodel.apply_boundary_condition(A, b, self)
-            dmodel.solve(data, A, b, solver, self)
-            self.current += 1
-        self.reset()
-        Q = dmodel.residual_integration(data, self)
-        if type(data) is not list:
-            data = [data, Q]
+    def time_integration(self, data, dmodel, nupdate=1, F = None):
+        """
+        F is the cross matrix, sometimes without F
+        """
+        if F is None:
+            F = np.zeros(dmodel.A.shape, dtype=np.float)
+            #F = np.zeros(self.NL, dtype=np.float)
         else:
-            data += [Q]
-        data += [dmodel.error_integration(data, self)]
-        data += [dmodel.init_delta(self)]
+            F = F
+
+        timeline = self
+        timeline.reset()
+        while not timeline.stop():
+            """
+            get a initial solution by CN
+            """
+            dt = timeline.current_time_step_length()
+            A = dmodel.get_current_left_matrix(dt, F)
+            b = dmodel.get_current_right_vector(data[..., timeline.current], dt, F)
+            A, b = dmodel.apply_boundary_condition(A, b)
+            data[..., timeline.current+1] = dmodel.solve(A, b)
+            timeline.current += 1
+        timeline.reset()
         for i in range(nupdate):
+            r = dmodel.residual_integration(data, timeline, F)
+            if type(data) is not list:
+                data = [data, r]
+            else:
+                data += [r]
+            data += [timeline.diff(r)]
+            init_error = np.zeros(data[0].shape, dtype=np.float)
+            data += [init_error]
+            """
+            spectral deferred correction
+            """
             while not self.stop():
-                A = dmodel.get_current_left_matrix(self)
-                b = dmodel.get_error_right_vector(data, self)
-                A, b = dmodel.apply_boundary_condition(A, b, self, sdc=True)
-                dmodel.solve(data[-1], A, b, solver, self)
+                dt = timeline.current_time_step_length()
+                A = dmodel.get_current_left_matrix(dt, F)
+                b =dmodel.get_error_right_vector(data[-1][...,timeline.current],
+                        dt, data[2][...,timeline.current+1], F)
+                A, b = dmodel.apply_boundary_condition(A, b)
+                data[-1][...,timeline.current+1] = dmodel.solve(A, b)
                 self.current += 1
             self.reset()
             data[0] += data[-1]
-
-
+            data = data[0]
 
 
 

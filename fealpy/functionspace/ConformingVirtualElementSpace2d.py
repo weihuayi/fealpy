@@ -44,7 +44,6 @@ class CVEMDof2d():
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        print(mesh.entity('cell'))
         cell, cellLocation = mesh.entity('cell')
 
         if p == 1:

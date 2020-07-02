@@ -18,5 +18,6 @@ setup(name='fealpy',
           'boost',
           'pytools',
           'pyamg',
+          'pyfftw'
       ],
       zip_safe=False)

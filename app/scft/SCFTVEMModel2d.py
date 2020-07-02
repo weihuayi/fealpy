@@ -1,10 +1,13 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.quadrature import TriangleQuadrature
+
 from fealpy.functionspace import ConformingVirtualElementSpace2d
 from fealpy.mesh.mesh_tools import show_mesh_2d
 
 from timeit import default_timer as timer
+
+from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine
+from ParabolicVEMSolver2d import ParabolicVEMSolver2d
 
 def scftmodel2d_options(
         nspecies = 2,
@@ -17,8 +20,7 @@ def scftmodel2d_options(
         T0 = 4,
         T1 = 16,
         nupdate = 1,
-        order = 1,
-        integrator = TriangleQuadrature(3)):
+        order = 1):
     """
     Get the options used in model.
     """
@@ -35,8 +37,7 @@ def scftmodel2d_options(
             'T0'          :T0,
             'T1'          :T1,
             'nupdate'     :nupdate,
-            'order'       :order,
-            'integrator'  :integrator
+            'order'       :order
             }
 
     options['chiN'] = options['chiAB']*options['ndeg']
@@ -62,8 +63,8 @@ class SCFTVEMModel2d():
         gdof = self.vemspace.number_of_global_dofs()
         self.gof = gdof
 
-        self.q0 = np.zeros((gdof, N), dtype=self.mesh.ftype)
-        self.q1 = np.zeros((gdof, N), dtype=self.mesh.ftype)
+        self.q0 = np.ones((gdof, N), dtype=self.mesh.ftype)
+        self.q1 = np.ones((gdof, N), dtype=self.mesh.ftype)
 
         self.rho = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.grad = np.zeros((gdof, 2), dtype=self.mesh.ftype)
@@ -71,10 +72,10 @@ class SCFTVEMModel2d():
         self.sQ1 = np.zeros((N, 1), dtype=self.mesh.ftype)
 
         self.sQ = 0.0
-        nupdate = options['nupdate']
+        self.nupdate = options['nupdate']
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.solver = PDESolver(self.A, self.M, nupdate)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
 
         self.eta_ref = 0
 
@@ -82,7 +83,7 @@ class SCFTVEMModel2d():
         vemspace = self.vemspace
         NC = self.mesh.number_of_cells()
         NV = self.mesh.number_of_vertices_of_cells()
-        cell = self.mesh.ds.cell
+        cell, cellLocation = self.mesh.entity('cell')
         B = vemspace.matrix_B()
 
         barycenter = vemspace.smspace.barycenter
@@ -112,8 +113,8 @@ class SCFTVEMModel2d():
         #recovery grad
         gu = self.vemspace.grad_recovery(u[:,0])
         S = self.vemspace.project_to_smspace(gu)
-        def f0(x, cellidx):
-            val = S.value(x, cellidx)
+        def f0(x, index):
+            val = S.value(x, index)
             return np.sum(val**2, axis=-1)
         eta0 = self.vemspace.integralalg.integral(f0, celltype=True)
         gu = self.vemspace.grad_recovery(u[:,1])
@@ -122,8 +123,8 @@ class SCFTVEMModel2d():
 
         #grad
         S0 = self.vemspace.project_to_smspace(u[:,0])
-        def f1(x, cellidx):
-            val = S0.grad_value(x, cellidx) - S.value(x, cellidx)
+        def f1(x, index):
+            val = S0.grad_value(x, index) - S.value(x, index)
             return np.sum(val**2, axis=-1)
         eta1 = self.vemspace.integralalg.integral(f1, celltype=True)
 
@@ -168,20 +169,20 @@ class SCFTVEMModel2d():
         gdof = self.vemspace.number_of_global_dofs()
         self.gdof = gdof
 
-        self.q0 = np.zeros((gdof, N), dtype=self.mesh.ftype)
-        self.q1 = np.zeros((gdof, N), dtype=self.mesh.ftype)
+        self.q0 = np.ones((gdof, N), dtype=self.mesh.ftype)
+        self.q1 = np.ones((gdof, N), dtype=self.mesh.ftype)
 
         self.rho = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.grad = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.w = np.zeros((gdof, 2), dtype=self.mesh.ftype)
         self.sQ = np.zeros((N, 1), dtype=self.mesh.ftype)
 
-        nupdate = options['nupdate']
+        self.nupdate = options['nupdate']
 
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
 
-        self.solver = PDESolver(self.A, self.M, nupdate)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
 
         self.eta_ref= 0
 
@@ -246,7 +247,7 @@ class SCFTVEMModel2d():
         #u1 = self.vemspace.function(array = mu[:, 1]).value
         u1 = mu[:,1]
         S = self.vemspace.project_to_smspace(u1)
-        u = lambda x, cellidx : S.value(x, cellidx=cellidx)**2
+        u = lambda x, index : S.value(x, index=index)**2
 
         mu2_int = self.vemspace.integralalg.integral(u)
 
@@ -279,8 +280,8 @@ class SCFTVEMModel2d():
         print('第'+str(self.count)+'次迭代的etaref:', self.eta_ref)
 
     def compute_propagator(self):
-        n0 = self.timeline0.NT
-        n1 = self.timeline1.NT
+        n0 = self.timeline0.NL
+        n1 = self.timeline1.NL
 
         #w = self.vemspace.function(array = self.w[:, 0]).value
         w = self.w[:,0]
@@ -292,12 +293,14 @@ class SCFTVEMModel2d():
         S = self.vemspace.project_to_smspace(w)
         F1 = self.vemspace.cross_mass_matrix(S.value)
 
-        self.q0[:, 0] = 1.0
-        self.solver.run(self.timeline0, self.q0[:, 0:n0], F0)
-        self.solver.run(self.timeline1, self.q0[:, n0-1:], F1)
-        self.q1[:, 0] = 1.0
-        self.solver.run(self.timeline1, self.q1[:, 0:n1], F1)
-        self.solver.run(self.timeline0, self.q1[:, n1-1:], F0)
+        self.timeline0.time_integration(self.q0[:, 0:n0], self.smodel,
+                self.nupdate, F0)
+        self.timeline1.time_integration(self.q0[:, n0-1:], self.smodel,
+                self.nupdate, F1)
+        self.timeline1.time_integration(self.q0[:, 0:n1], self.smodel,
+                self.nupdate, F1)
+        self.timeline0.time_integration(self.q0[:, n1-1:], self.smodel,
+                self.nupdate, F0)
 
     def compute_density_2(self):
         q = self.q0*self.q1[:, -1::-1]
@@ -327,9 +330,11 @@ class SCFTVEMModel2d():
 
     def compute_density1(self):
         q = self.q0*self.q1[:, -1::-1]
-        n0 = self.timeline0.NT
-        self.rho[:, 0] = self.timeline0.new_time_integral(q[:, 0:n0])/self.sQ
-        self.rho[:, 1] = self.timeline1.new_time_integral(q[:, n0-1:])/self.sQ
+        n0 = self.timeline0.NL
+        self.rho[:, 0] = self.timeline0.dct_time_integral(q[:, 0:n0],
+                return_all=False)/self.sQ
+        self.rho[:, 1] = self.timeline1.dct_time_integral(q[:,
+            n0-1:],return_all=False)/self.sQ
 
     def compute_hamiltonian(self):
         wA = self.w[:,0]
@@ -370,8 +375,7 @@ class SCFTVEMModel2d():
 
         mesh = self.mesh
         node = mesh.node
-        cell = mesh.ds.cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
         Q = self.sQ1
         H = self.H
         q = self.q0

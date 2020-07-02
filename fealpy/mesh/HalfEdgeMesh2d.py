@@ -44,7 +44,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ftype = node.dtype
 
         self.node = DynamicArray(node, dtype = node.dtype)
-        self.ds = HalfEdgeMesh2dDataStructure(halfedge, 
+        self.ds = HalfEdgeMesh2dDataStructure(halfedge,
                 subdomain, NN = node.shape[0], NV=NV)
         self.meshtype = 'halfedge2d'
 
@@ -241,7 +241,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def node_normal(self):
         node = self.node
-        cell = self.entity('cell') 
+        cell = self.entity('cell')
         if isinstance(cell, tuple):
             cell, cellLocation = cell
             idx1 = np.zeros(cell.shape[0], dtype=np.int)
@@ -264,7 +264,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         halfedge = self.ds.halfedge # DynamicArray
         hflag = self.ds.subdomain[halfedge[:, 1]] > 0
-        cstart = self.ds.cstart
+        cstart = self.ds.cellstart
 
         e0 = halfedge[halfedge[hflag, 3], 0]
         e1 = halfedge[hflag, 0]
@@ -803,6 +803,9 @@ class HalfEdgeMesh2d(Mesh2d):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
+    def uniform_refine(self, n=1):
+        for i in range(n):
+            self.refine_poly()
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()

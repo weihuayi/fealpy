@@ -14,6 +14,7 @@ setup(name='fealpy',
           'scipy',
           'matplotlib',
           'pyamg',
-          'meshpy'
+          'meshpy',
+          'pyfftw'
       ],
       zip_safe=False)
