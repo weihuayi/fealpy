@@ -12,6 +12,7 @@ from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
 from fealpy.tools.show import showmultirate
+from fealpy.tools.show import show_error_table
 
 p = int(sys.argv[1])
 n = int(sys.argv[2])
@@ -58,5 +59,6 @@ for i in range(maxit):
 
 
 
+show_error_table(NDof, errorType, errorMatrix)
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()

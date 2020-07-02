@@ -182,8 +182,6 @@ class FEMeshIntegralAlg():
 
         bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
 
-        print('bb:', bb.shape)
-        print('cell2dof:', cell2dof.shape)
         gdof = gdof or cell2dof.max()
         b = np.zeros(gdof, dtype=phi.dtype)
         np.add.at(b, cell2dof, bb)
