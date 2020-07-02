@@ -1,5 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
+
+from ..decorator import barycentric
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
@@ -134,6 +136,9 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         self.bcoefs = self.basis_coefficients()
 
+    def boundary_dof(self):
+        return self.dof.boundary_dof()
+
     def basis_coefficients(self):
         """
 
@@ -197,10 +202,12 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         return inv(A)
 
+    @barycentric
     def face_basis(self, bc, index=None, barycenter=True):
         return self.edge_basis(bc, index, barycenter)
 
 
+    @barycentric
     def edge_basis(self, bc, index=None, barycenter=True):
         """
         """
@@ -238,7 +245,8 @@ class FirstKindNedelecFiniteElementSpace2d:
         phi[..., 1] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x], c[:, GD*cdof:, :])
         return phi
 
-    def basis(self, bc, index=None, barycenter=True):
+    @barycentric
+    def basis(self, bc, index=np.s_[:], barycenter=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -272,7 +280,6 @@ class FirstKindNedelecFiniteElementSpace2d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
@@ -287,17 +294,19 @@ class FirstKindNedelecFiniteElementSpace2d:
         x = idx['x']
         y = idx['y']
 
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., cdof+y], c[:, GD*cdof:, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y], c[:, GD*cdof:, :])
 
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x], c[:, GD*cdof:, :])
+        phi[..., 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x], c[:, GD*cdof:, :])
         return phi
 
-    def rot_basis(self, bc, index=None, barycenter=True):
+    @barycentric
+    def rot_basis(self, bc, index=np.s_[:], barycenter=True):
         return self.curl_basis(bc, index, barycenter)
 
-    def curl_basis(self, bc, index=None, barycenter=True):
+    @barycentric
+    def curl_basis(self, bc, index=np.s_[:], barycenter=True):
         """
 
         Parameters
@@ -340,6 +349,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         phi[:] -= np.einsum('ijm, jmn->ijn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
         return phi
 
+    @barycentric
     def grad_basis(self, bc):
         pass
 
@@ -352,28 +362,32 @@ class FirstKindNedelecFiniteElementSpace2d:
     def number_of_local_dofs(self, doftype='all'):
         return self.dof.number_of_local_dofs(doftype)
 
-    def value(self, uh, bc, index=None):
-        phi = self.basis(bc)
+    @barycentric
+    def value(self, uh, bc, index=np.s_[:], barycenter=True):
+        phi = self.basis(bc, index=index, barycenter=barycenter)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
-    def rot_value(self, uh, bc, index=None):
-        return self.curl_value(uh, bc, index)
+    @barycentric
+    def rot_value(self, uh, bc, index=np.s_[:], barycenter=True):
+        return self.curl_value(uh, bc, index, barycenter=barycenter)
 
-    def curl_value(self, uh, bc, index=None):
-        cphi = self.curl_basis(bc)
+    @barycentric
+    def curl_value(self, uh, bc, index=np.s_[:], barycenter=True):
+        cphi = self.curl_basis(bc, index=index, barycenter=barycenter)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, cphi, uh[cell2dof])
+        val = np.einsum(s1, cphi, uh[cell2dof[index]])
         return val
 
-    def grad_value(self, uh, bc, index=None):
+    @barycentric
+    def grad_value(self, uh, bc, index=np.s_[:]):
         pass
 
     def function(self, dim=None, array=None):
@@ -412,11 +426,10 @@ class FirstKindNedelecFiniteElementSpace2d:
     def mass_matrix(self):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
-                gdof0=gdof)
+        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof, gdof0=gdof)
         return M
 
-    def curl_matrix(self):#TODO: check here
+    def curl_matrix(self):
         """
 
         Notes:
@@ -424,23 +437,15 @@ class FirstKindNedelecFiniteElementSpace2d:
         组装 (\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
         """
         p = self.p
-        gdof0 = self.number_of_global_dofs()
-        cell2dof0 = self.cell_to_dof()
-        gdof1 = self.smspace.number_of_global_dofs()
-        cell2dof1 = self.smspace.cell_to_dof()
-        basis0 = self.div_basis
-        basis1 = lambda bc : self.smspace.basis(self.mesh.bc_to_point(bc), p=p)
-
-        D = self.integralalg.construct_matrix(basis0, basis1=basis1, 
-                cell2dof0=cell2dof0, gdof0=gdof0,
-                cell2dof1=cell2dof1, gdof1=gdof1)
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        D = self.integralalg.construct_matrix(self.curl_basis, cell2dof0=cell2dof, gdof0=gdof)
         return D 
 
-    def source_vector(self, f, dim=None, barycenter=False):
-        cell2dof = self.smspace.cell_to_dof()
-        gdof = self.smspace.number_of_global_dofs()
-        b = self.integralalg.construct_vector(f, self.smspace.basis, cell2dof, 
-                gdof=gdof, dim=dim, barycenter=barycenter) 
+    def source_vector(self, f):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
     def neumann_boundary_vector(self, g, threshold=None, q=None):
@@ -505,7 +510,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
-        val = -g(ps, en)
+        val = g(ps, en)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]
