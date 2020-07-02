@@ -52,7 +52,6 @@ for i in range(maxit):
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.curl, uh.curl_value)
-    errorMatrix[2, i] = space.integralalg.L2_error(pde.solution, ruh)
 
     if i < maxit-1:
         mesh.uniform_refine()
