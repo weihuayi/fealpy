@@ -124,65 +124,68 @@ class ChebyshevTimeLine():
         a = dct(q, type=1)/N
         if return_all:
             A = np.zeros(a.shape, dtype=np.float)
-            A[:, 0] = (
-                    a[:, 0] + 0.5*a[:, 1] +
-                    np.sum(2*a[:, 2:N]/(1 - np.arange(2, N)**2), axis=-1) +
-                    a[:, -1]/(1 - N**2)
+            A[..., 0] = (
+                    a[..., 0] + 0.5*a[..., 1] +
+                    np.sum(2*a[..., 2:N]/(1 - np.arange(2, N)**2), axis=-1) +
+                    a[..., -1]/(1 - N**2)
                     )
-            A[:, 1:N-1] = 0.5*(a[:, 2:N] - a[:, 0:N-2])/np.arange(1, N-1)
-            A[:, N-1] = 0.5/(N-1)*(0.5*a[:, N] - a[:, N-2])
-            A[:, N] = -0.5/N*a[:, N-1]
-            intq = idct(A, type=1)/2 - 0.25*a[:, [-1]]/(N+1)*theta
+            A[..., 1:N-1] = 0.5*(a[..., 2:N] - a[..., 0:N-2])/np.arange(1, N-1)
+            A[..., N-1] = 0.5/(N-1)*(0.5*a[..., N] - a[..., N-2])
+            A[..., N] = -0.5/N*a[..., N-1]
+            intq = idct(A, type=1)/2 - 0.25*a[..., [-1]]/(N+1)*theta
         else:
-            intq = a[:, 0] + np.sum(2*a[:, 2:N:2]/(1 - np.arange(2, N, 2)**2), axis=-1) + a[:, -1]/(1 - N**2)
+            intq = a[..., 0] + np.sum(2*a[..., 2:N:2]/(1 - np.arange(2, N,
+                2)**2), axis=-1) + a[..., -1]/(1 - N**2)
 
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, F, dmodel, nupdate=1):
-        self.reset()
-        while not self.stop():
+    def time_integration(self, data, dmodel, nupdate=1, F = None):
+        """
+        F is the cross matrix, sometimes without F
+        """
+        if F is None:
+            F = np.zeros(dmodel.A.shape, dtype=np.float)
+            #F = np.zeros(self.NL, dtype=np.float)
+        else:
+            F = F
+
+        timeline = self
+        timeline.reset()
+        while not timeline.stop():
             """
             get a initial solution by CN
             """
-            print(self.current)
-            dt = self.current_time_step_length()
+            dt = timeline.current_time_step_length()
             A = dmodel.get_current_left_matrix(dt, F)
-            b = dmodel.get_current_right_vector(data[..., self.current], dt, F)
+            b = dmodel.get_current_right_vector(data[..., timeline.current], dt, F)
             A, b = dmodel.apply_boundary_condition(A, b)
-            print(self.current, data.shape)
-            dmodel.solve(data[..., self.current+1], A, b)
-            print(self.current, data.shape)
-            self.current += 1
-        self.reset()
+            data[..., timeline.current+1] = dmodel.solve(A, b)
+            timeline.current += 1
+        timeline.reset()
         for i in range(nupdate):
-            r = residual_integration(data, self)
-
-            q = -dmodel.A@data - F@data
-            r = dmodel.M@data + self.dct_time_integral(q) -dmodel.M@data
+            r = dmodel.residual_integration(data, timeline, F)
             if type(data) is not list:
                 data = [data, r]
             else:
                 data += [r]
-            data += [self.diff(r)]
+            data += [timeline.diff(r)]
             init_error = np.zeros(data[0].shape, dtype=np.float)
             data += [init_error]
             """
             spectral deferred correction
             """
             while not self.stop():
-                dt = self.current
+                dt = timeline.current_time_step_length()
                 A = dmodel.get_current_left_matrix(dt, F)
-                b = dmodel.get_error_right_vector(data[-1][:,self.current], dt,
-                        F, data[2][:,self.current+1])
+                b =dmodel.get_error_right_vector(data[-1][...,timeline.current],
+                        dt, data[2][...,timeline.current+1], F)
                 A, b = dmodel.apply_boundary_condition(A, b)
-                dmodel.solve(data[-1], A, b)
+                data[-1][...,timeline.current+1] = dmodel.solve(A, b)
                 self.current += 1
             self.reset()
             data[0] += data[-1]
             data = data[0]
-
-
 
 
 

@@ -47,7 +47,7 @@ class ParabolicVEMSolver2d():
         #F = self.F
         return -0.5*dt*(S@u0 + F@u0) + M@u0
 
-    def get_error_right_vector(self, data, dt, F, diff):
+    def get_error_right_vector(self, data, dt, diff,F):
         b = self.get_current_right_vector(data, dt, F) + dt*self.M@diff
         return b
 
@@ -55,7 +55,12 @@ class ParabolicVEMSolver2d():
     def apply_boundary_condition(self, A, b):
         return A,b
 
-    def solve(self, data, A, b):
+    def residual_integration(self, data, timeline, F):
+        q = -self.A@data - F@data
+        r = self.M[0,...]@data[...,0] + timeline.dct_time_integral(q) - self.M@data
+        return r
+
+    def solve(self, A, b):
         data = spsolve(A,b).reshape((-1,))
         #data = self.solver.divide(A, b)
 

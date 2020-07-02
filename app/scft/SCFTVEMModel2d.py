@@ -6,7 +6,7 @@ from fealpy.mesh.mesh_tools import show_mesh_2d
 
 from timeit import default_timer as timer
 
-from fealpy.timeintegratoralg.timeline_new import ChebyshevTimeLine
+from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine
 from ParabolicVEMSolver2d import ParabolicVEMSolver2d
 
 def scftmodel2d_options(
@@ -293,10 +293,14 @@ class SCFTVEMModel2d():
         S = self.vemspace.project_to_smspace(w)
         F1 = self.vemspace.cross_mass_matrix(S.value)
 
-        self.timeline0.time_integration(self.q0[:, 0:n0], F0, self.smodel, self.nupdate)
-        self.timeline1.time_integration(self.q0[:, n0-1], F1, self.smodel, self.nupdate)
-        self.timeline1.time_integration(self.q0[:, 0:n1], F1, self.smodel, self.nupdate)
-        self.timeline0.time_integration(self.q0[:, n1-1], F0, self.smodel, self.nupdate)
+        self.timeline0.time_integration(self.q0[:, 0:n0], self.smodel,
+                self.nupdate, F0)
+        self.timeline1.time_integration(self.q0[:, n0-1:], self.smodel,
+                self.nupdate, F1)
+        self.timeline1.time_integration(self.q0[:, 0:n1], self.smodel,
+                self.nupdate, F1)
+        self.timeline0.time_integration(self.q0[:, n1-1:], self.smodel,
+                self.nupdate, F0)
 
     def compute_density_2(self):
         q = self.q0*self.q1[:, -1::-1]
@@ -326,9 +330,11 @@ class SCFTVEMModel2d():
 
     def compute_density1(self):
         q = self.q0*self.q1[:, -1::-1]
-        n0 = self.timeline0.NT
-        self.rho[:, 0] = self.timeline0.new_time_integral(q[:, 0:n0])/self.sQ
-        self.rho[:, 1] = self.timeline1.new_time_integral(q[:, n0-1:])/self.sQ
+        n0 = self.timeline0.NL
+        self.rho[:, 0] = self.timeline0.dct_time_integral(q[:, 0:n0],
+                return_all=False)/self.sQ
+        self.rho[:, 1] = self.timeline1.dct_time_integral(q[:,
+            n0-1:],return_all=False)/self.sQ
 
     def compute_hamiltonian(self):
         wA = self.w[:,0]

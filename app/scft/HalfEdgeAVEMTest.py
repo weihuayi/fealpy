@@ -89,8 +89,8 @@ moptions = scftmodel2d_options(
         fA = 0.2,
         chiAB = 0.25,
         dim = 2,
-        T0 = 20,
-        T1 = 80,
+        T0 = 10,
+        T1 = 40,
         nupdate = 1,
         order = 2)
 
