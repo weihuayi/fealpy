@@ -180,13 +180,13 @@ class FEMeshIntegralAlg():
         elif isinstance(f, np.ndarray):
             val = f[None, None, :]
 
-        bb = np.einsum('i, ij..., ijk..., j->jk',
-                ws, val, phi, self.cellmeasure)
+        bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
 
+        print('bb:', bb.shape)
+        print('cell2dof:', cell2dof.shape)
         gdof = gdof or cell2dof.max()
-        shape = (gdof, val.shape[-1])
-        b = np.zeros(shape, dtype=phi.dtype)
-        np.add.at(b, (cell2dof, np.s_[:]), bb)
+        b = np.zeros(gdof, dtype=phi.dtype)
+        np.add.at(b, cell2dof, bb)
         return b
 
     def construct_vector_v_s(self, f, basis, cell2dof, gdof=None, q=None):

@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 from numpy.linalg import inv
 from .Function import Function
 from ..decorator import cartesian
