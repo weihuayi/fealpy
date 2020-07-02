@@ -364,8 +364,8 @@ class FirstKindNedelecFiniteElementSpace2d:
         return self.dof.number_of_local_dofs(doftype)
 
     @barycentric
-    def value(self, uh, bc, index=np.s_[:]):
-        phi = self.basis(bc)
+    def value(self, uh, bc, index=np.s_[:], barycenter=True):
+        phi = self.basis(bc, barycenter=barycenter)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -374,12 +374,12 @@ class FirstKindNedelecFiniteElementSpace2d:
         return val
 
     @barycentric
-    def rot_value(self, uh, bc, index=np.s_[:]):
-        return self.curl_value(uh, bc, index)
+    def rot_value(self, uh, bc, index=np.s_[:], barycenter=True):
+        return self.curl_value(uh, bc, index, barycenter=True)
 
     @barycentric
-    def curl_value(self, uh, bc, index=np.s_[:]):
-        cphi = self.curl_basis(bc)
+    def curl_value(self, uh, bc, index=np.s_[:], barycenter=True):
+        cphi = self.curl_basis(bc, barycenter=True)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
