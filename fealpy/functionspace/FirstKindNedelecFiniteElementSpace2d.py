@@ -246,7 +246,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=None, barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycenter=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -280,7 +280,6 @@ class FirstKindNedelecFiniteElementSpace2d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        index = index if index is not None else np.s_[:]
         if barycenter:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
@@ -295,11 +294,11 @@ class FirstKindNedelecFiniteElementSpace2d:
         x = idx['x']
         y = idx['y']
 
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., cdof+y], c[:, GD*cdof:, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y], c[:, GD*cdof:, :])
 
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x], c[:, GD*cdof:, :])
+        phi[..., 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x], c[:, GD*cdof:, :])
         return phi
 
     @barycentric
@@ -365,26 +364,26 @@ class FirstKindNedelecFiniteElementSpace2d:
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:], barycenter=True):
-        phi = self.basis(bc, barycenter=barycenter)
+        phi = self.basis(bc, index=index, barycenter=barycenter)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
     @barycentric
     def rot_value(self, uh, bc, index=np.s_[:], barycenter=True):
-        return self.curl_value(uh, bc, index, barycenter=True)
+        return self.curl_value(uh, bc, index, barycenter=barycenter)
 
     @barycentric
     def curl_value(self, uh, bc, index=np.s_[:], barycenter=True):
-        cphi = self.curl_basis(bc, barycenter=True)
+        cphi = self.curl_basis(bc, index=index, barycenter=barycenter)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, cphi, uh[cell2dof])
+        val = np.einsum(s1, cphi, uh[cell2dof[index]])
         return val
 
     @barycentric
