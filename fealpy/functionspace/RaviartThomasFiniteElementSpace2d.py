@@ -461,30 +461,32 @@ class RaviartThomasFiniteElementSpace2d:
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
 
+        # 边界积分
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        en = mesh.edge_unit_normal() # 边界单位外法线
+        # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
+        en = mesh.edge_unit_normal() 
         measure = self.integralalg.edgemeasure # 边界长度
         edge2dof = self.dof.edge_to_dof() 
-        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en)
+        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内 积
         ps = mesh.bc_to_point(bcs, etype='edge')
-        val1 = ch(ps, index=edge2cell[:, 0]) # (NQ, NE)
-        val2 = ch(ps, index=edge2cell[:, 1]) # (NQ, NE)
-
+        val1 = ch(ps, index=edge2cell[:, 0]) # 边的左边单元在这条边上的浓度值
+        val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这边边上的浓度值 
 
         # 边界条件处理
         val2[:, isBdEdge] = 0.0 # 首先把边界的贡献都设为 0 
-        if type(threshold) is np.ndarray: # 下面考虑非零的的贡献
-            index = threshold # 这里要求是边界边的编号
+        if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
+            index = threshold # 这里假设 threshold 是边界边编号数组
         else:
             index = self.mesh.ds.boundary_edge_index()
             if threshold is not None:
                 bc = self.mesh.entity_barycenter('edge', index=index)
                 flag = threshold(bc)
                 index = index[flag]
-        gval = g(ps[:, index], t)
-        val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi[:, edge2cell[index, 0]], measure[index])
+        gval = g(ps[:, index], t) # 这里假设 g 是一个函数， TODO：其它情形？
+        phi = self.smspace.basis(ps, index=edge2cell[index, 0]) # 边左边单元的
+        val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi, measure[index])
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项
@@ -495,8 +497,11 @@ class RaviartThomasFiniteElementSpace2d:
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
 
+        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
+
+        return F
 
 
 

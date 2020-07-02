@@ -83,7 +83,7 @@ class SCFTVEMModel2d():
         vemspace = self.vemspace
         NC = self.mesh.number_of_cells()
         NV = self.mesh.number_of_vertices_of_cells()
-        cell = self.mesh.ds.cell
+        cell, cellLocation = self.mesh.entity('cell')
         B = vemspace.matrix_B()
 
         barycenter = vemspace.smspace.barycenter
@@ -113,8 +113,8 @@ class SCFTVEMModel2d():
         #recovery grad
         gu = self.vemspace.grad_recovery(u[:,0])
         S = self.vemspace.project_to_smspace(gu)
-        def f0(x, cellidx):
-            val = S.value(x, cellidx)
+        def f0(x, index):
+            val = S.value(x, index)
             return np.sum(val**2, axis=-1)
         eta0 = self.vemspace.integralalg.integral(f0, celltype=True)
         gu = self.vemspace.grad_recovery(u[:,1])
@@ -123,8 +123,8 @@ class SCFTVEMModel2d():
 
         #grad
         S0 = self.vemspace.project_to_smspace(u[:,0])
-        def f1(x, cellidx):
-            val = S0.grad_value(x, cellidx) - S.value(x, cellidx)
+        def f1(x, index):
+            val = S0.grad_value(x, index) - S.value(x, index)
             return np.sum(val**2, axis=-1)
         eta1 = self.vemspace.integralalg.integral(f1, celltype=True)
 
@@ -247,7 +247,7 @@ class SCFTVEMModel2d():
         #u1 = self.vemspace.function(array = mu[:, 1]).value
         u1 = mu[:,1]
         S = self.vemspace.project_to_smspace(u1)
-        u = lambda x, cellidx : S.value(x, cellidx=cellidx)**2
+        u = lambda x, index : S.value(x, index=index)**2
 
         mu2_int = self.vemspace.integralalg.integral(u)
 
@@ -375,8 +375,7 @@ class SCFTVEMModel2d():
 
         mesh = self.mesh
         node = mesh.node
-        cell = mesh.ds.cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
         Q = self.sQ1
         H = self.H
         q = self.q0

@@ -1,6 +1,7 @@
 import numpy as np
-import scipy.fftpack as spfft
 from numpy.linalg import inv
+
+import scipy.fftpack as spfft
 import pyfftw
 
 class FourierSpace:
@@ -14,13 +15,11 @@ class FourierSpace:
 
         if dft is None:
             ncpt = np.array([N,N])
-            print(ncpt)
-            a = pyfftw.empty_aligned(ncpt, dtype='complex128')
+            a = pyfftw.empty_aligned(ncpt, dtype=np.complex128)
             self.fftn = pyfftw.builders.fftn(a)
-            b = pyfftw.empty_aligned(ncpt, dtype='complex128')
+            b = pyfftw.empty_aligned(ncpt, dtype=np.complex128)
             self.ifftn = pyfftw.builders.ifftn(b)
-            self.fftfreq = spfft.fftfreq
-            print('Here')
+            self.fftfreq = spfft.fftfreq # TODO:change to pyfftw
         elif dft is "scipy":
             self.fftn = spfft.fftn
             self.ifftn = spfft.ifftn
@@ -29,26 +28,6 @@ class FourierSpace:
             self.fftn = dft.fftn
             self.ifftn = dft.ifftn
             self.fftfreq = dft.fftfreq
-
-
- #       if dft is None:
- #           self.fftn = spfft.fftn
- #           self.ifftn = spfft.ifftn
- #           self.fftfreq = spfft.fftfreq
- #       elif dft is "scipy":
- #           ncpt = np.array([N,N])
- #           print(ncpt)
- #           a = pyfftw.empty_aligned(ncpt, dtype='complex128')
- #           self.fftn = pyfftw.builders.fftn(a)
- #           b = pyfftw.empty_aligned(ncpt, dtype='complex128')
- #           self.ifftn = pyfftw.builders.ifftn(b)
- #           self.fftfreq = spfft.fftfreq
- #       else:
- #           self.fftn = dft.fftn
- #           self.ifftn = dft.ifftn
- #           self.fftfreq = dft.fftfreq
-
-
 
     def number_of_dofs(self):
         return self.N**self.GD
@@ -77,8 +56,7 @@ class FourierSpace:
         F[tuple(idx.T)] = data[1]
         Err = self.fftn(F).real-np.fft.fftn(F).real
         e = np.max(np.abs(Err))
-        return np.fft.fftn(F).real
-        #return self.fftn(F).real
+        return np.fft.fftn(F).real #TODO: check here
 
     def fourier_interpolation1(self, data):
         """
