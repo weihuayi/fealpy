@@ -251,18 +251,19 @@ init_value = {
 
 def model_options(
         nspecies = 3,
-        nblend = 1,
-        nblock = 4,
+        nblend = 2, #???
+        nABblend = 1,
+        nCblend = 1,
+        nblock = 3,
         ndeg = 100,
-        fA1 = 0.25,
-        fB = 0.25,
-        fA2 = 0.25,
-        fC = 0.25,
-        chiAB = 0.80,
-        chiAC = 0.80,
-        chiBC = 0.80,
+        fA = 0.5,
+        fB = 0.5,
+        fC = 0.1,
+        chiAB = 0.24,
+        chiAC = 0.24,
+        chiBC = 0.24,
         box = np.diag(2*[2*np.pi]),
-        NS = 256,
+        NS = 8,
         maxdt = 0.001,
         bA = 1,
         bB = 1,
@@ -273,10 +274,11 @@ def model_options(
         options = {
                 'nspecies': nspecies,
                 'nblend': nblend,
+                'nABblend': nABblend,
+                'nCblend': nCblend,
                 'nblock': nblock,
                 'ndeg': ndeg,
-                'fA1': fA1,
-                'fA2': fA2,
+                'fA': fA,
                 'fB': fB,
                 'fC': fC,
                 'chiAB': chiAB,
@@ -295,7 +297,7 @@ def model_options(
         return options
 
 
-class SCFTA1BA2CLinearModel():
+class SCFTAB_CBlendModel():
     def __init__(self, options=None):
         if options == None:
             options = pscftmodel_options()
@@ -304,41 +306,56 @@ class SCFTA1BA2CLinearModel():
         box = options['box'] 
         self.space = FourierSpace(box,  options['NS'])
 
-        fA1 = options['fA1']
+        fA = options['fA']
         fB  = options['fB']
-        fA2 = options['fA2']
         fC  = options['fC']
+
         maxdt = options['maxdt']
 
         self.timelines = []
-        self.timelines.append(UniformTimeLine(0, fA1, int(np.ceil(fA1/maxdt))))
+        self.timelines.append(UniformTimeLine(0, fA, int(np.ceil(fA/maxdt))))
         self.timelines.append(UniformTimeLine(0, fB,  int(np.ceil(fB/maxdt))))
-        self.timelines.append(UniformTimeLine(0, fA2, int(np.ceil(fA2/maxdt))))
         self.timelines.append(UniformTimeLine(0, fC,  int(np.ceil(fC/maxdt))))
 
 
         self.pdesolvers = []
-        for i in range(4):
+        for i in range(3):
             self.pdesolvers.append(
                     ParabolicFourierSolver(self.space, self.timelines[i])
                     )
 
+#        for i in range(1):
+#            self.pdesolvers.append(
+#                    ParabolicFourierSolver(self.space, self.timelines[i])
+#                    )
+
         self.TNL = 0 # total number of time levels
-        for i in range(4):
+        self.ABNL = 0 # AB number of time levels
+        self.CNL = self.timelines[2].number_of_time_levels()  # C number of time levels
+        for i in range(3):
             NL = self.timelines[i].number_of_time_levels()
             self.TNL += self.timelines[i].number_of_time_levels()
         self.TNL -= options['nblock'] - 1
 
-        self.qf = self.space.function(dim=self.TNL) # forward  propagator 
-        self.qb = self.space.function(dim=self.TNL) # backward propagator
+        for i in range(2):
+            self.ABNL += self.timelines[i].number_of_time_levels()
+        self.ABNL -= 1
+#????
+
+        self.qf = self.space.function(dim=self.ABNL) # forward  propagator of AB
+        self.cqf = self.space.function(dim=self.CNL) # forward  propagator of C
+        self.qb = self.space.function(dim=self.ABNL) # backward propagator of AB
+        self.cqb = self.space.function(dim=self.CNL) # backward propagator of C
 
         self.qf[0] = 1
+        self.cqf[0] = 1
         self.qb[0] = 1
+        self.cqb[0] = 1
 
         self.rho = self.space.function(dim=options['nspecies'])
-        self.grad = self.space.function(dim=options['nspecies']+1)
-        self.w = self.space.function(dim=options['nspecies']+1)
-        self.Q = np.zeros(options['nblend'], dtype=np.float)
+        self.grad = self.space.function(dim=options['nspecies'] + 1)
+        self.w = self.space.function(dim=options['nspecies'] + 1)
+        self.Q = np.zeros(options['nblend'], dtype=np.float) # QAB and QC
 
     def init_field(self, rho):
         options = self.options
@@ -354,61 +371,60 @@ class SCFTA1BA2CLinearModel():
         """
         目标函数，给定外场，计算哈密尔顿量及其梯度
         """
-        print('a')
         # solver the forward and backward equation
-        import time
-        start1 =time.clock()
         self.compute_propagator()
-        end =time.clock()
-        print('Running timeq: %s Seconds'%(end-start1))
-        start1 =time.clock()
+#        print("cqf:", self.cqf[-1])
+#        print("qb", self.qb[-1])
+        # compute single chain partition function Q
         self.compute_single_Q()
-        end =time.clock()
-        print('Running timeQ: %s Seconds'%(end-start1))
-# compute single chain partition function Q
-        # compute density
         print("Q:", self.Q)
-
-        start1 =time.clock()
+        # compute density
         self.compute_density()
-        end =time.clock()
-        print('Running time phi: %s Seconds'%(end-start1))
-
+#        rho = self.rho
+#        print('rhoA', rho[0])
+#        print('rhoB', rho[1])
+#        print('rhoC', rho[2])
         # compute energy function and its gradient
-        start1 =time.clock()
-        self.update_field()
-        end =time.clock()
-        print('Running time_field: %s Seconds'%(end-start1))
+        #self.update_field()
+        self.update_field_new()
+        
+#        w =self.w
+        #print('w+', w[0])
+#        print('wA', w[1])
+#        print('WB', w[2])
+#        print('WC', w[3])
 
-        start1 =time.clock()
         self.compute_wplus()
-        end =time.clock()
-        print('Running time w+: %s Seconds'%(end-start1))
-
-        start1 =time.clock()
+        w = self.w
+        #print('w+', w[0])
         self.compute_energe()
-        end =time.clock()
-        print('Running time H: %s Seconds'%(end-start1))
-
-        start1 =time.clock()
+        print('H',self.H)
         self.compute_gradient()
-        end =time.clock()
-        print('Running time grad: %s Seconds'%(end-start1))
-
 
     def update_field(self, alpha=0.01):
-        """
-        Parameters
-        ----------
+        w = self.w
+        rho = self.rho
+        options = self.options
+        chiABN = options['chiAB']*options['ndeg']
+        chiBCN = options['chiBC']*options['ndeg']
+        chiACN = options['chiAC']*options['ndeg']
+        
+        w[1] *= 1 - alpha
+        w[1] += alpha*chiABN*rho[1]
+        w[1] += alpha*chiACN*rho[2]
+        w[1] += alpha*w[0]
 
+        w[2] *= 1 - alpha
+        w[2] += alpha*chiABN*rho[0]
+        w[2] += alpha*chiBCN*rho[2]
+        w[2] += alpha*w[0]
 
-        References
-        ----------
-
-        Notes
-        -----
-
-        """
+        w[3] *= 1 - alpha
+        w[3] += alpha*chiACN*rho[0]
+        w[3] += alpha*chiBCN*rho[1]
+        w[3] += alpha*w[0]
+        
+    def update_field_new(self, alpha=0.01):
         w = self.w
         rho = self.rho
         options = self.options
@@ -438,12 +454,16 @@ class SCFTA1BA2CLinearModel():
         chiBC = options['chiBC']
         chiAC = options['chiAC']
 
+        Ndeg = options['ndeg']
+
         XA = chiBC*(chiAB + chiAC - chiBC)
         XB = chiAC*(chiBC + chiAB - chiAC)
         XC = chiAB*(chiAC + chiBC - chiAB)
 
         w[0] = XA*w[1] + XB*w[2] + XC*w[3]
         w[0]/= XA + XB + XC
+
+        w[0] -= 2*Ndeg*chiAB*chiBC*chiAC/(XA + XB + XC)
 
 
     def compute_energe(self):
@@ -453,6 +473,9 @@ class SCFTA1BA2CLinearModel():
         chiACN = options['chiAC']*options['ndeg']
         w = self.w
         rho = self.rho
+        nAB = options['nABblend']
+        nC = options['nCblend']
+        fC = options['fC']
         E = chiABN*rho[0]*rho[1] 
         E += chiBCN*rho[1]*rho[2]
         E += chiACN*rho[0]*rho[2]
@@ -462,7 +485,8 @@ class SCFTA1BA2CLinearModel():
         #E -= w[0]*(1 - rho.sum(axis=0))
         E = np.fft.ifftn(E)
         self.H = np.real(E.flat[0])
-        self.H -= np.log(self.Q[0])
+        self.H -= np.log(self.Q[0])*nAB/(nAB + fC*nC)
+        self.H -= np.log(self.Q[1])*nC/(nAB + fC*nC)
 
     def compute_gradient(self):
         w = self.w
@@ -481,13 +505,16 @@ class SCFTA1BA2CLinearModel():
         options = self.options
         w = self.w
         qf = self.qf
+        cqf = self.cqf
         qb = self.qb
+        cqb = self.cqb
 
         start = 0
-        F = [w[1], w[2], w[1], w[3]]
+        F = [w[1], w[2], w[3]]
 
         np.set_printoptions(precision=15, suppress=True) 
 #         input("input")
+        
 
         #print(self.qf.dtype)
         #print(self.qb.dtype)
@@ -495,34 +522,46 @@ class SCFTA1BA2CLinearModel():
         #for i in range(4):
         #    print(F[i].dtype)
 
-        for i in range(options['nblock']):
+#-------------------------------------?????????????????????????
+        for i in range(2):
             NL = self.timelines[i].number_of_time_levels()
             #self.pdesolvers[i].initialize(self.qf[start:start + NL], F[i])
             #self.pdesolvers[i].solve(self.qf[start:start + NL])
-            import time
-            start1 =time.clock()
             self.pdesolvers[i].BDF4(self.qf[start:start + NL], F[i])
-            end =time.clock()
-            print('Running time: %s Seconds'%(end-start1))
             start += NL - 1
-        print("qf", self.qf[-1])
+        start = 0
+        NL = self.timelines[2].number_of_time_levels()
+        self.pdesolvers[2].BDF4(self.cqf[start:start + NL], F[2])
+        #print("qf", self.qf[-1])
 #         input("input")
+         
 
         start = 0
-        for i in range(options['nblock']-1, -1,-1):
+        for i in range(1, -1, -1):
             NL = self.timelines[i].number_of_time_levels()
             #self.pdesolvers[i].initialize(self.qb[start:start + NL], F[i])
             #self.pdesolvers[i].solve(self.qb[start:start + NL])
             self.pdesolvers[i].BDF4(self.qb[start:start + NL], F[i])
             start += NL - 1
+        start = 0
+        self.cqb = self.cqf
+        #NL = self.timelines[3].number_of_time_levels()
+        #self.pdesolvers[i].BDF4(self.cqb[start:start + NL], F[2])
+
         #print("qb", self.qb[-1])
 
 
+#-----------------------------------------???????????????????????????
     def compute_single_Q(self, index=-1):
         q = self.qf[index]
         q = np.fft.ifftn(q)
+        cq = self.cqf[index]
+        cq = np.fft.ifftn(cq)
+        self.Q[1] = np.real(cq.flat[0])
         self.Q[0] = np.real(q.flat[0])
-        return self.Q[0]
+        #?????????----------------------------------------------------return
+        #return self.Q[0]
+        return self.Q
 
     def test_compute_single_Q(self, index, rdir):
         q = np.zeros(self.TNL)
@@ -538,18 +577,34 @@ class SCFTA1BA2CLinearModel():
     def compute_density(self):
         options = self.options
         q = self.qf*self.qb[-1::-1]
+        cq = self.cqf*self.cqb[-1::-1]
 
         start = 0
         rho = []
-        for i in range(options['nblock']):
+
+        nAB = options['nABblend']
+        nC = options['nCblend']
+        fC = options['fC']
+
+        #-----------------?????????????????????the same as q
+        for i in range(2):
             NL = self.timelines[i].number_of_time_levels()
             dt = self.timelines[i].current_time_step_length()
             rho.append(self.integral_time(q[start:start+NL], dt))
             start += NL - 1
-        self.rho[0] = rho[0] + rho[2]
-        self.rho[1] = rho[1]
-        self.rho[2] = rho[3]
-        self.rho /= self.Q[0]
+        start = 0
+        NL = self.timelines[2].number_of_time_levels()
+        dt = self.timelines[2].current_time_step_length()
+        rho.append(self.integral_time(cq[start:start+NL], dt))
+
+
+        self.rho[0] = rho[0]*nAB/(nAB + fC*nC)
+        self.rho[1] = rho[1]*nAB/(nAB + fC*nC)
+        self.rho[2] = rho[2]*nC/(nAB + fC*nC)
+        #self.rho /= self.Q[0]
+        self.rho[0] /= self.Q[0]
+        self.rho[1] /= self.Q[0]
+        self.rho[2] /= self.Q[1]
 
         #print("densityA", self.rho[0])
         #print("densityB", self.rho[1])
@@ -581,11 +636,10 @@ if __name__ == "__main__":
     rhoB = init_value['C42B']
     rhoC = init_value['C42C']
     box = np.array([[4.1, 0], [0, 4.1]], dtype=np.float)
-    fC  = 0.14
-    fA2 = 0.29
-    fB  = 0.118
-    fA1 = 1-fA2-fB-fC
-    options = model_options(box=box, NS=64, fA1=fA1, fB=fB, fA2=fA2, fC=fC)
+    fC  = 0.1
+    fA = 0.5
+    fB  = 0.5
+    options = model_options(box=box, NS=64, fA=fA, fB=fB, fC=fC)
     model = SCFTA1BA2CLinearModel(options=options)
     rho = [ model.space.fourier_interpolation(rhoA), 
             model.space.fourier_interpolation(rhoB), 

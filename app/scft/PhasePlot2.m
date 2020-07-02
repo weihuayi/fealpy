@@ -59,7 +59,7 @@ for fA = fALft:1:fARgt
             load('rho.mat');
 %             [Line, Column] = size(DataA);
 %             x = load('Lx.[80.00.80.00.80.00].[0.1400.0.2900.0.1180.0.4520]-[64*64].dat');
-            x = linspace(0,4.1,64);y = linspace(0,4.1,64);
+            x = linspace(0,4.0,64);y = linspace(0,4,64);
 %             x=x(1:end-1);
 %             x=x(1:end-1);
 %             y = load('Ly.[80.00.80.00.80.00].[0.1400.0.2900.0.1180.0.4520]-[64*64].dat');

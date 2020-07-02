@@ -1,6 +1,7 @@
 import numpy as np
-import scipy.fftpack as spfft 
+import scipy.fftpack as spfft
 from numpy.linalg import inv
+import pyfftw
 
 class FourierSpace:
     def __init__(self, box, N, dft=None):
@@ -12,13 +13,42 @@ class FourierSpace:
         self.itype = np.int32
 
         if dft is None:
+            ncpt = np.array([N,N])
+            print(ncpt)
+            a = pyfftw.empty_aligned(ncpt, dtype='complex128')
+            self.fftn = pyfftw.builders.fftn(a)
+            b = pyfftw.empty_aligned(ncpt, dtype='complex128')
+            self.ifftn = pyfftw.builders.ifftn(b)
+            self.fftfreq = spfft.fftfreq
+            print('Here')
+        elif dft is "scipy":
             self.fftn = spfft.fftn
             self.ifftn = spfft.ifftn
-            self.fftfreq = spfft.fftfreq  
+            self.fftfreq = spfft.fftfreq
         else:
             self.fftn = dft.fftn
             self.ifftn = dft.ifftn
-            self.fftfreq = dft.fftfreq  
+            self.fftfreq = dft.fftfreq
+
+
+ #       if dft is None:
+ #           self.fftn = spfft.fftn
+ #           self.ifftn = spfft.ifftn
+ #           self.fftfreq = spfft.fftfreq
+ #       elif dft is "scipy":
+ #           ncpt = np.array([N,N])
+ #           print(ncpt)
+ #           a = pyfftw.empty_aligned(ncpt, dtype='complex128')
+ #           self.fftn = pyfftw.builders.fftn(a)
+ #           b = pyfftw.empty_aligned(ncpt, dtype='complex128')
+ #           self.ifftn = pyfftw.builders.ifftn(b)
+ #           self.fftfreq = spfft.fftfreq
+ #       else:
+ #           self.fftn = dft.fftn
+ #           self.ifftn = dft.ifftn
+ #           self.fftfreq = dft.fftfreq
+
+
 
     def number_of_dofs(self):
         return self.N**self.GD
@@ -43,8 +73,31 @@ class FourierSpace:
         idx = data[0]
         idx[idx<0] += self.N
         F = self.function(dtype=data[1].dtype)
+
         F[tuple(idx.T)] = data[1]
+        Err = self.fftn(F).real-np.fft.fftn(F).real
+        e = np.max(np.abs(Err))
+        return np.fft.fftn(F).real
+        #return self.fftn(F).real
+
+    def fourier_interpolation1(self, data):
+        """
+
+        Parameters
+        ----------
+        data: data[0], data[1]
+        """
+        idx = data[0]
+        idx[idx<0] += self.N
+        F = self.function(dtype=data[1].dtype)
+
+        F[tuple(idx.T)] = data[1]
+        Err = self.fftn(F).real-np.fft.fftn(F).real
+        e = np.max(np.abs(Err))
+        #return np.fft.fftn(F).real
         return self.fftn(F).real
+
+
 
     def function_norm(self, u):
         val = np.sqrt(np.sum(self.ifftn(u))**2).real
