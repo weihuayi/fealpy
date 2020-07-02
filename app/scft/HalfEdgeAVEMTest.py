@@ -25,7 +25,7 @@ class HalfEdgeAVEMTest():
         options = self.optoptions
         model = problem['objective']
         mesh = problem['mesh']
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        #mesh = HalfEdgeMesh2d.from_mesh(mesh)
 
         #fig = plt.figure()
         #axes = fig.gca()
@@ -95,7 +95,7 @@ moptions = scftmodel2d_options(
         order = 2)
 
 
-mesh = halfedgemesh(n=1)
+mesh = halfedgemesh(h=4,n=6)
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
         optoptions=options)
 Halftest.run()

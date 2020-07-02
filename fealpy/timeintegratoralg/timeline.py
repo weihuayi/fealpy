@@ -140,16 +140,7 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, nupdate=1, F = None):
-        """
-        F is the cross matrix, sometimes without F
-        """
-        if F is None:
-            F = np.zeros(dmodel.A.shape, dtype=np.float)
-            #F = np.zeros(self.NL, dtype=np.float)
-        else:
-            F = F
-
+    def time_integration(self, data, dmodel, nupdate=1):
         timeline = self
         timeline.reset()
         while not timeline.stop():
@@ -157,14 +148,14 @@ class ChebyshevTimeLine():
             get a initial solution by CN
             """
             dt = timeline.current_time_step_length()
-            A = dmodel.get_current_left_matrix(dt, F)
-            b = dmodel.get_current_right_vector(data[..., timeline.current], dt, F)
+            A = dmodel.get_current_left_matrix(dt)
+            b = dmodel.get_current_right_vector(data[..., timeline.current], dt)
             A, b = dmodel.apply_boundary_condition(A, b)
             data[..., timeline.current+1] = dmodel.solve(A, b)
             timeline.current += 1
         timeline.reset()
         for i in range(nupdate):
-            r = dmodel.residual_integration(data, timeline, F)
+            r = dmodel.residual_integration(data, timeline)
             if type(data) is not list:
                 data = [data, r]
             else:
@@ -177,9 +168,9 @@ class ChebyshevTimeLine():
             """
             while not self.stop():
                 dt = timeline.current_time_step_length()
-                A = dmodel.get_current_left_matrix(dt, F)
+                A = dmodel.get_current_left_matrix(dt)
                 b =dmodel.get_error_right_vector(data[-1][...,timeline.current],
-                        dt, data[2][...,timeline.current+1], F)
+                        dt, data[2][...,timeline.current+1])
                 A, b = dmodel.apply_boundary_condition(A, b)
                 data[-1][...,timeline.current+1] = dmodel.solve(A, b)
                 self.current += 1

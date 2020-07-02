@@ -23,11 +23,11 @@ def init_mesh(n=4, h=10):
     mesh.uniform_refine(n)
     return mesh
 
-def halfedgemesh(n=4):
+def halfedgemesh(h=4,n=4):
     """
     半边数据结构的网格
     """
-    node = np.array([
+    node = h*np.array([
         (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
         (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
         (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
@@ -36,7 +36,7 @@ def halfedgemesh(n=4):
     cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
 
     mesh = PolygonMesh(node, cell, cellLocation)
-    #mesh = HalfEdgeMesh2d.from_mesh(mesh)
+    mesh = HalfEdgeMesh2d.from_mesh(mesh)
     #mesh.uniform_refine(n)
     return mesh
 

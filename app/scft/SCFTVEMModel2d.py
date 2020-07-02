@@ -75,7 +75,8 @@ class SCFTVEMModel2d():
         self.nupdate = options['nupdate']
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
+        self.F = np.zeros(self.A.shape, dtype = np.float)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M, self.F)
 
         self.eta_ref = 0
 
@@ -181,8 +182,9 @@ class SCFTVEMModel2d():
 
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
+        self.F = np.zeros(self.A.shape, dtype = np.float)
 
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M, self.F)
 
         self.eta_ref= 0
 
@@ -255,8 +257,8 @@ class SCFTVEMModel2d():
         self.H = -mu1_int + mu2_int/chiN
         self.H = self.H/self.totalArea - np.log(self.sQ)
 
-        self.save_data(fname='./data/test'+str(self.count)+'.mat')
-        self.show_solution(self.count)
+        #self.save_data(fname='./data/test'+str(self.count)+'.mat')
+        #self.show_solution(self.count)
         self.count +=1
         self.grad[:, 0] = self.rho[:, 0]  + self.rho[:, 1] - 1.0
         self.grad[:, 1] = 2.0*mu[:, 1]/chiN - self.rho[:, 0] + self.rho[:, 1]
@@ -287,20 +289,22 @@ class SCFTVEMModel2d():
         w = self.w[:,0]
         S = self.vemspace.project_to_smspace(w)#TODO
         F0 = self.vemspace.cross_mass_matrix(S.value)
+        self.smodel.F = F0
+        self.timeline0.time_integration(self.q0[:, 0:n0], self.smodel,
+                self.nupdate)
+        self.timeline0.time_integration(self.q0[:, n1-1:], self.smodel,
+                self.nupdate)
 
         #w = self.vemspace.function(array = self.w[:, 1]).value
         w = self.w[:, 1]
         S = self.vemspace.project_to_smspace(w)
         F1 = self.vemspace.cross_mass_matrix(S.value)
+        self.smodel.F = F1
 
-        self.timeline0.time_integration(self.q0[:, 0:n0], self.smodel,
-                self.nupdate, F0)
         self.timeline1.time_integration(self.q0[:, n0-1:], self.smodel,
-                self.nupdate, F1)
+                self.nupdate)
         self.timeline1.time_integration(self.q0[:, 0:n1], self.smodel,
-                self.nupdate, F1)
-        self.timeline0.time_integration(self.q0[:, n1-1:], self.smodel,
-                self.nupdate, F0)
+                self.nupdate)
 
     def compute_density_2(self):
         q = self.q0*self.q1[:, -1::-1]

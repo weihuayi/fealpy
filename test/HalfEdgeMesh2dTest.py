@@ -108,17 +108,19 @@ class HalfEdgeMesh2dTest:
 
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.uniform_refine(n=2)
+        print(mesh.number_of_nodes)
 
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
+        #fig = plt.figure()
+        #axes = fig.gca()
+        #mesh.add_plot(axes)
+        #mesh.find_node(axes, showindex=True)
+        #mesh.find_cell(axes, showindex=True)
 
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        if 1:
+        if 0:
             isMarkedCell = mesh.mark_helper([2])
             mesh.refine_poly(isMarkedCell)
 
@@ -130,7 +132,7 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if 1:
+        if 0:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell)
 
@@ -215,7 +217,7 @@ class HalfEdgeMesh2dTest:
         refined mesh
         """
         aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-        eta = [0,0,1,1,1]
+        eta = [2,2,2,2,2]
 
         mesh.adaptive(eta, aopts)
         print('r',aopts['HB'])
@@ -227,16 +229,16 @@ class HalfEdgeMesh2dTest:
         #mesh.find_cell(axes, showindex=True)
         #plt.show()
 
-        mesh.from_mesh(mesh)
+#        mesh.from_mesh(mesh)
         """
         coarsened mesh
         """
-        eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
-        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
-
-        mesh.adaptive(eta, aopts)
-        print('c',aopts['HB'])
-        print(mesh.ds.hcell)
+#        eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
+#        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
+#
+#        mesh.adaptive(eta, aopts)
+#        print('c',aopts['HB'])
+#        print(mesh.ds.hcell)
         #fig = plt.figure()
         #axes = fig.gca()
         #mesh.add_plot(axes)
@@ -285,7 +287,7 @@ elif sys.argv[1] == 'from_edges':
 elif sys.argv[1] == 'refine_halfedge':
     test.refine_halfedge()
 elif sys.argv[1] == 'refine_poly':
-    test.refine_poly()
+    test.refine_poly(plot=False)
 elif sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly()
 elif sys.argv[1] == 'cell_to_node':
