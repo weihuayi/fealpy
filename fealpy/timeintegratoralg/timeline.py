@@ -50,13 +50,14 @@ class UniformTimeLine():
         self.current = 0
 
     def time_integration(self, data, dmodel, solver):
-        self.reset()
+        timeline = self
+        timeline.reset()
         while not self.stop():
-            A = dmodel.get_current_left_matrix(data, self)
-            b = dmodel.get_current_right_vector(data, self)
-            dmodel.solve(data, A, b, solver, self)
-            self.current += 1
-        self.reset()
+            A = dmodel.get_current_left_matrix(data, timeline)
+            b = dmodel.get_current_right_vector(data, timeline)
+            dmodel.solve(data, A, b, solver, timeline)
+            timeline.current += 1
+        timeline.reset()
 
 class ChebyshevTimeLine():
     def __init__(self, T0, T1, NT):
