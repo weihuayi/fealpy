@@ -39,6 +39,9 @@ class TriangleMesh(Mesh2d):
         VTK_TRIANGLE = 5
         return VTK_TRIANGLE
 
+    def to_vtk(self):
+        pass
+
     def integrator(self, k, etype='cell'):
         if etype in {'cell', 2}:
             return TriangleQuadrature(k)

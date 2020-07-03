@@ -146,7 +146,6 @@ class ConcentrationDG():
 
         F = self.H@F[:, :, None]
         F *= dt
-
         return F.flat
 
     def solve(self, data, A, b, solver, timeline):
