@@ -333,11 +333,7 @@ class RaviartThomasFiniteElementSpace2d:
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
-<<<<<<< HEAD
-        phi = self.basis(bc)
-=======
         phi = self.basis(bc, index=index)
->>>>>>> upstream/master
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -347,11 +343,7 @@ class RaviartThomasFiniteElementSpace2d:
 
     @barycentric
     def div_value(self, uh, bc, index=np.s_[:]):
-<<<<<<< HEAD
-        dphi = self.div_basis(bc)
-=======
         dphi = self.div_basis(bc, index=index)
->>>>>>> upstream/master
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -433,9 +425,7 @@ class RaviartThomasFiniteElementSpace2d:
         b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
         return b
 
-<<<<<<< HEAD
-    def set_neumann_bc(self, g, threshold=None, q=None):
-=======
+
     def convection_vector(self, t, g, ch, vh, threshold=None, q=None):
         """
 
@@ -515,8 +505,7 @@ class RaviartThomasFiniteElementSpace2d:
 
 
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
->>>>>>> upstream/master
+    def set_neumann_bc(self, g, threshold=None, q=None):
         """
         Parameters
         ----------
