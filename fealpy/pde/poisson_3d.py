@@ -75,6 +75,15 @@ class CosCosCosData:
         """
         return self.solution(p)
 
+    @cartesian
+    def robin(self, p, n):
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1)
+        shape = len(val.shape)*(1, )
+        kappa = np.array([1.0], dtype=np.float).reshape(shape)
+        val += self.solution(p) 
+        return val, kappa
+
 
 class X2Y2Z2Data:
     def __init__(self):

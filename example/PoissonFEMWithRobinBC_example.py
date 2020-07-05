@@ -1,24 +1,31 @@
 #!/usr/bin/env python3
 # 
 
-import sys 
+import sys
+
 import numpy as np
 from scipy.sparse.linalg import spsolve
-import pyamg
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import pyamg
 
-from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import RobinBC 
 
 from fealpy.tools.show import showmultirate
 
-p = int(sys.argv[1])
-maxit = int(sys.argv[2])
 
-pde = CosCosData()
-mesh = pde.init_mesh(n=4)
+p = int(sys.argv[1])
+n = int(sys.argv[2])
+maxit = int(sys.argv[3])
+d = int(sys.argv[4])
+
+if d == 2:
+    from fealpy.pde.poisson_2d import CosCosData as PDE
+elif d == 3:
+    from fealpy.pde.poisson_3d import CosCosCosData as PDE
+
+pde = PDE()
+mesh = pde.init_mesh(n=n)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
@@ -28,16 +35,20 @@ NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
     space = LagrangeFiniteElementSpace(mesh, p=p)
+
     NDof[i] = space.number_of_global_dofs()
 
-    uI = space.interpolation(pde.solution)
     uh = space.function()
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
 
-    bc = RobinBC(space, pde.robin) 
-    bc.apply(A, F) # Here is the case for pure Robin bc
-    uh[:] = spsolve(A, F) # we add a addtional dof
+    bc = RobinBC(space, pde.robin)
+    A, F = bc.apply(A, F)
+
+    #uh[:] = spsolve(A, F).reshape(-1)
+
+    ml = pyamg.ruge_stuben_solver(A)  
+    uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)
@@ -45,15 +56,12 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine()
 
-
-
-fig = plt.figure()
-axes = fig.gca(projection='3d')
-uh.add_plot(axes, cmap='rainbow')
-
-fig = plt.figure()
-axes = fig.gca(projection='3d')
-uI.add_plot(axes, cmap='rainbow')
+if d == 2:
+    fig = plt.figure()
+    axes = fig.gca(projection='3d')
+    uh.add_plot(axes, cmap='rainbow')
+elif d == 3:
+    print('The 3d function plot is not been implemented!")
 
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 

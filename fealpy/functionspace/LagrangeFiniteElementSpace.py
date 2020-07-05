@@ -810,7 +810,6 @@ class LagrangeFiniteElementSpace():
             np.add.at(F, face2dof, bb)
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
-            
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
