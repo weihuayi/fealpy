@@ -238,6 +238,18 @@ class CrossCrackBoxDomain2DData():
     @cartesian
     def neumann(self, p, n):
 
+
+        if False:
+            x = p[..., 0]
+            y = p[..., 1]
+            val = np.zeros_like(p)
+            flag0 = np.abs(x-1) < 1e-13 
+            val[:, 0][flag0] = 500
+
+            flag1 = (np.abs(x - 0.5) < 1e-13) | (np.abs(y - 0.5) < 1e-13)
+
+            val[flag1, 0] = -500*n[None, :, 0]
+            val[flag1, 1] = -500*n[None, :, 1]
         if True:
             x = p[..., 0]
             y = p[..., 1]
@@ -248,6 +260,7 @@ class CrossCrackBoxDomain2DData():
 
             flag1 = (x > 0.25) & (x < 0.75) & (np.abs(y-0.5) < 1e-13)
             val[:, 1][flag1] = -np.arra*n[None, ...]
+
 
             return val.reshape(shape)
 
@@ -304,14 +317,14 @@ bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
 uh.T.flat[:] = spsolve(A, F)
 
-if False:
-    scale = np.arange(1.0, scale, 0.1)
-    node = mesh.entity('node')
-    fname = 'test'
-    for val in scale:
-        mesh.node = node + val*uh
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        plt.savefig(fname + str(val) + '.png')
-    plt.close()
+scale = np.arange(1.0, scale, 0.1)
+node = mesh.entity('node')
+fname = 'test'
+for val in scale:
+    mesh.node = node + val*uh
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    plt.savefig(fname + str(val) + '.png')
+
+plt.close()

@@ -45,15 +45,13 @@ class RaviartThomasFiniteElementSpace3dTest:
         gdof = udof + pdof
 
         uh = space.function()
-        print('uh:', uh.shape)
         ph = space.smspace.function()
-        print('ph:', ph.shape)
         A = space.stiff_matrix()
         B = space.div_matrix()
         F1 = space.source_vector(pde.source)
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
-        F0 = space.neumann_boundary_vector(pde.dirichlet)
+        F0 = space.set_neumann_bc(pde.dirichlet)
         FF = np.r_['0', F0, F1]
         x = spsolve(AA, FF).reshape(-1)
         uh[:] = x[:udof]

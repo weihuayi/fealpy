@@ -11,7 +11,7 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace.femdof import multi_index_matrix2d
-
+from pde_data import LeftRightData
 
 
 

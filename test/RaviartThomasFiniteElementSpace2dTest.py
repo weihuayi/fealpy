@@ -86,6 +86,7 @@ class RaviartThomasFiniteElementSpace2dTest:
 
     def solve_poisson_2d(self, n=3, p=0, plot=True):
         pde = CosCosData()
+
         mesh = pde.init_mesh(n=n, meshtype='tri')
         space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
 
@@ -101,7 +102,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
         if True:
-            F0 = space.neumann_boundary_vector(pde.dirichlet)
+            F0 = space.set_neumann_bc(pde.dirichlet)
             FF = np.r_['0', F0, F1]
             x = spsolve(AA, FF).reshape(-1)
             uh[:] = x[:udof]
@@ -147,9 +148,9 @@ class RaviartThomasFiniteElementSpace2dTest:
             #mesh.find_node(axes, showindex=True)
             #mesh.find_edge(axes, showindex=True)
             #mesh.find_cell(axes, showindex=True)
-            #node = ps.reshape(-1, 2)
-            #uv = phi.reshape(-1, 2)
-            #axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
+            node = ps.reshape(-1, 2)
+            uv = uh.reshape(-1, 2)
+            axes.quiver(node[:, 0], node[:, 1], uv[:, 0], uv[:, 1])
             plt.show()
 
     def sympy_compute(self, plot=True):

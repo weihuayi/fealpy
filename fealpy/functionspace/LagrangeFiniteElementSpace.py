@@ -811,10 +811,6 @@ class LagrangeFiniteElementSpace():
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
             
-        gdof = self.number_of_global_dofs()
-        FF = np.zeros(gdof, dtype=self.ftype)
-        np.add.at(FF, face2dof, bb)
-
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
@@ -822,6 +818,8 @@ class LagrangeFiniteElementSpace():
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+
+        return A, F
 
 
     def to_function(self, data):
