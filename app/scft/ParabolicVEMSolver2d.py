@@ -9,53 +9,38 @@ class ParabolicVEMSolver2d():
     q_t = \Delta q - w*q
     q[0] = 1
     """
-    def __init__(self, A, M, nupdate=0, method ='CN'):
+    def __init__(self, A, M, F, nupdate=0, method ='CN'):
         self.method = method
         self.solver = MatlabSolver
 
         self.A = A
         self.M = M
+        self.F = F
 
         self.nupdate = nupdate
 
-    def get_current_linear_system(self, u0, dt, F):
+    def get_current_left_matrix(self, dt):
         M = self.M
         S = self.A
-        #F = self.F
-        if self.method is 'FM':
-                b = -dt*(S + F)@u0 + M@u0
-                A = M
-                return A, b
-        if self.method is 'BM':
-                b = M@u0
-                A = M + dt*(S + F)
-                return A, b
-        if self.method is 'CN':
-                b = -0.5*dt*(S + F)@u0 + M@u0
-                A = M + 0.5*dt*(S + F)
-                return A, b
-
-    def get_current_left_matrix(self, dt,F):
-        M = self.M
-        S = self.A
-        #F = self.F
+        F = self.F
         return M + 0.5*dt*(S + F)
 
-    def get_current_right_vector(self, u0, dt, F):
+    def get_current_right_vector(self, u0, dt):
         M = self.M
         S = self.A
-        #F = self.F
+        F = self.F
         return -0.5*dt*(S@u0 + F@u0) + M@u0
 
-    def get_error_right_vector(self, data, dt, diff,F):
-        b = self.get_current_right_vector(data, dt, F) + dt*self.M@diff
+    def get_error_right_vector(self, data, dt, diff):
+        b = self.get_current_right_vector(data, dt) + dt*self.M@diff
         return b
 
 
     def apply_boundary_condition(self, A, b):
         return A,b
 
-    def residual_integration(self, data, timeline, F):
+    def residual_integration(self, data, timeline):
+        F = self.F
         q = -self.A@data - F@data
         r = self.M[0,...]@data[...,0] + timeline.dct_time_integral(q) - self.M@data
         return r
@@ -64,8 +49,9 @@ class ParabolicVEMSolver2d():
         data = spsolve(A,b).reshape((-1,))
         #data = self.solver.divide(A, b)
 
-    def run(self, timeline, uh, F):
+    def run(self, timeline, uh):
         #self.solver =[]
+        F = self.F
         while not timeline.stop():
             current = timeline.current
             #dt  = timeline.current_time_step_length()

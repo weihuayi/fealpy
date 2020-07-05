@@ -436,19 +436,23 @@ class HalfEdgeMesh2d(Mesh2d):
         Notes
         -----
         """
+        nC = self.number_of_all_cells()
+        #assert len(isMarkedCell) == NC
 
-        NC = self.number_of_all_cells()
-        assert len(isMarkedCell) == NC
-
-        NN = self.number_of_nodes()
-        NE = self.number_of_edges()
+        nN = self.number_of_nodes()
+        nE = self.number_of_edges()
 
         bc = self.cell_barycenter(return_all=True) # 返回所有单元的重心, 包括外
-                                                   # 部无界区域和区域中的洞区域
+
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(nC, dtype=np.bool_)
+            isMarkedHEdge = np.ones(nE*2,dtype=np.bool_)
+        else:
+            isMarkedHEdge = self.mark_halfedge(isMarkedCell)
+                                           # 部无界区域和区域中的洞区域
 
         # 标记边, 加密半边
-        isMarkedHEdge = self.mark_halfedge(isMarkedCell)
-        NE1 = self.refine_halfedge(isMarkedHEdge)
+        nE1 = self.refine_halfedge(isMarkedHEdge)
 
         #获取信息
         clevel = self.celldata['level']
@@ -466,7 +470,7 @@ class HalfEdgeMesh2d(Mesh2d):
         # 细分单元
         flag = (hlevel[:] - clevel[halfedge[:, 1]]) == 1
         N = halfedge.size
-        NV = np.zeros(NC, dtype=self.itype)
+        NV = np.zeros(nC, dtype=self.itype)
         np.add.at(NV, halfedge[:, 1], flag)
         NHE = sum(NV[isMarkedCell])
 
@@ -483,7 +487,7 @@ class HalfEdgeMesh2d(Mesh2d):
         # 修改单元的编号
         cellidx = halfedge[idx0, 1] #需要加密的单元编号
 
-        nC = self.number_of_cells()
+        #nC = self.number_of_all_cells()
         cellstart = self.ds.cellstart
         NV1 = self.number_of_vertices_of_cells()
         if ('HB' in options) and (options['HB'] is not None):
@@ -504,7 +508,7 @@ class HalfEdgeMesh2d(Mesh2d):
             num[num < 0] = 0
             options['numrefine'] = np.r_[options['numrefine'][~isMarkedCell], num]
 
-        halfedge[idx0, 1] = range(NC, NC + NHE)
+        halfedge[idx0, 1] = range(nC, nC + NHE)
         clevel[isMarkedCell] += 1
 
         hcell.adjust_size(isMarkedCell, idx0)
@@ -521,7 +525,7 @@ class HalfEdgeMesh2d(Mesh2d):
         nex1 = halfedge[idx1, 2] # 当前半边的下一个半边
         pre1 = halfedge[idx1, 3] # 当前半边的上一个半边
 
-        cell2newNode = np.full(NC, NN+NE1, dtype=self.itype)
+        cell2newNode = np.full(nC, nN+nE1, dtype=self.itype)
         cell2newNode[isMarkedCell] += range(isMarkedCell.sum())
 
         halfedge[idx0, 2] = range(N, N+NHE) # idx0 的下一个半边的编号
@@ -530,7 +534,7 @@ class HalfEdgeMesh2d(Mesh2d):
         newHalfedge = halfedge.increase_size(2*NHE)
         newHlevel = hlevel.increase_size(2*NHE)
         newHedge = hedge.increase_size(NHE)
-        newHedge[:] = np.arange(NE*2+NE1*2, NE*2+NE1*2+NHE)
+        newHedge[:] = np.arange(nE*2+nE1*2, nE*2+nE1*2+NHE)
 
         newHalfedge[:NHE, 0] = cell2newNode[cellidx]
         newHalfedge[:NHE, 1] = halfedge[idx0, 1]
@@ -549,10 +553,10 @@ class HalfEdgeMesh2d(Mesh2d):
         tmp = clevel[cellidx]
         clevel.adjust_size(isMarkedCell, clevel[cellidx])
 
-        flag = np.zeros(NC+NHE, dtype=np.bool)
+        flag = np.zeros(nC+NHE, dtype=np.bool)
         flag[halfedge[:, 1]] = True
 
-        idxmap = np.zeros(NC+NHE, dtype=self.itype)
+        idxmap = np.zeros(nC+NHE, dtype=self.itype)
         nc = flag.sum()
         idxmap[flag] = range(nc)
         halfedge[:, 1] = idxmap[halfedge[:, 1]]
@@ -805,7 +809,9 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def uniform_refine(self, n=1):
         for i in range(n):
-            self.refine_poly()
+            nC = self.number_of_all_cells()
+            isMarkedCell = np.ones(nC, dtype=np.bool_)
+            self.refine_poly(isMarkedCell)
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()
@@ -815,9 +821,6 @@ class HalfEdgeMesh2d(Mesh2d):
         isMarkedCell = np.zeros(nc, dtype=np.bool)
         isMarkedCell[self.ds.cellstart:] = flag
         return isMarkedCell
-
-
-
 
     def add_halfedge_plot(self, axes,
         index=None, showindex=False,
