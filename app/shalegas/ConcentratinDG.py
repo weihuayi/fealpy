@@ -16,7 +16,7 @@ import matplotlib.pyplot as plt
 
 
 from fealpy.decorator import cartesian
-from fealpy.mesh import TriangleMesh, MeshFactory
+from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.timeintegralalg import UniformTimeLine 
 
@@ -70,14 +70,16 @@ class ConcentrationData:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.5 
+        val[flag0] = 1
+        flag1 = np.abs(x-1) < 1e-13
+        val[flag1] = -1
         return val
 
     @cartesian
     def is_neumann_boundary(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        flag = np.abs(x) < 1e-13
+        flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
         return flag
 
 class ConcentrationDG():
@@ -133,19 +135,32 @@ class ConcentrationDG():
         return 1.0 
 
     def get_current_right_vector(self, data, timeline):
-        ch = data
+        cdata = self.cdata
+        ch = data[0]
+        uh = data[1]
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
-        F = self.space.convection_vector(nt, 
+        # 这里没有考虑源项，F 只考虑了单元内的流入和流出
+        F = self.space.convection_vector(nt, cdata.neumann, ch, uh,
+                threshold=cdata.is_neumann_boundary) 
+
+        F = self.H@F[:, :, None]
+        F *= dt
+        return F.flat
 
     def solve(self, data, A, b, solver, timeline):
-        pass
-        
-
-
-# 给定初始的浓度 c， 边界浓度的注入， 模拟在 c 在流场中的变化 
-# 浓度用间断元表示
+        ch = data[0]
+        ch += b
 
 
 
+if __name__ == '__main__':
 
+    mf = MeshFactory()
+    mesh = mf.regular([0, 1, 0, 1], n=10)
+    vdata = VelocityData()
+    cdata = ConcentrationData()
+    model = ConcentrationDG(vdata, cdata, mesh)
+    timeline = UniformTimeLine(0, 1, 100)
+    data = (model.ch, model.uh)
+    timeline.time_integration(data, model)
