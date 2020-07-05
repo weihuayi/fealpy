@@ -61,7 +61,7 @@ if d == 2:
     axes = fig.gca(projection='3d')
     uh.add_plot(axes, cmap='rainbow')
 elif d == 3:
-    print('The 3d function plot is not been implemented!")
+    print('The 3d function plot is not been implemented!')
 
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 
