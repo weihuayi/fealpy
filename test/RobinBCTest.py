@@ -6,6 +6,8 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import bmat
 
+
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
 
@@ -66,7 +68,6 @@ class XYData:
             return mesh
         else:
             raise ValueError("".format)
-
 
     @cartesian
     def solution(self, p):
@@ -150,16 +151,27 @@ class RobinBCTest():
     def solve_poisson_robin(self, p=1, n=1, plot=True):
 
         pde = XYData()
-        mesh = pde.init_mesh(n=1)
+        mesh = pde.init_mesh(n=n)
 
+        node = mesh.node
+        cell = mesh.entity("cell")
+        name = 'RobinBCTest.mat'
         space = LagrangeFiniteElementSpace(mesh, p=p)
         A = space.stiff_matrix()
         F = space.source_vector(pde.source)
+#        print(A.toarray())
 
-        space.set_robin_bc(A, F, pde.robin)
+#        A, F = space.set_robin_bc(A, F, pde.robin)
+ 
+        uh = space.function()
+        #bc = BoundaryCondition(space, robin=pde.robin)
+        A, b = space.set_robin_bc(A, F, pde.robin)
+        uh[:] = spsolve(A, b).reshape(-1)
+        error = space.integralalg.L2_error(pde.solution, uh)
+        print(error)
 
-        print('A:', A.toarray())
-        print('F:', F)
+#        print('A:', A.toarray())
+#        print('F:', F)
 
 
         if plot:
