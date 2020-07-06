@@ -491,6 +491,7 @@ class LagrangeFiniteElementSpace():
         ldof = self.number_of_local_dofs()
         gdof = self.number_of_global_dofs()
 
+        #TODO: make it more efficient
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
 
