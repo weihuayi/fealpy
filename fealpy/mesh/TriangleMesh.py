@@ -40,7 +40,33 @@ class TriangleMesh(Mesh2d):
         return VTK_TRIANGLE
 
     def to_vtk(self):
-        pass
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:  
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        node = self.entity('node')
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=mesh.ftype)), axis=1)
+
+        mcell = self.entity('cell')
+        NV = np.repeat(NV, NC)
+
+        cell = np.zeros(len(mcell.reshape(-1)) + NC, dtype=np.int_)
+        isIdx = np.ones(len(mcell.reshape(-1)) + NC, dtype=np.bool_)
+        isIdx[0] = False
+        isIdx[np.add.accumulate(NV+1)[:-1]] = False
+        cell[~isIdx] = NV
+        cell[isIdx] = mcell.flat
+        return node, cell
 
     def integrator(self, k, etype='cell'):
         if etype in {'cell', 2}:

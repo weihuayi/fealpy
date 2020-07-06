@@ -2,7 +2,7 @@ import numpy as np
 from scipy.fftpack import dct, idct
 
 class UniformTimeLine():
-    def __init__(self, T0, T1, NT):
+    def __init__(self, T0, T1, NT, options={'output':False}):
         """
         Parameter
         ---------
@@ -15,6 +15,7 @@ class UniformTimeLine():
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
         self.current = 0
+        self.options = self.options
 
     def uniform_refine(self, n=1):
         for i in range(n):
@@ -49,14 +50,25 @@ class UniformTimeLine():
     def reset(self):
         self.current = 0
 
-    def time_integration(self, data, dmodel, solver):
+    def time_integration(self, data, dmodel, queue=None):
+        options = self.options
         timeline = self
         timeline.reset()
+
+        if options['Output']:
+            dmodel.output(data, str(timeline.current).zfill(10), queue)
+
         while not self.stop():
             A = dmodel.get_current_left_matrix(data, timeline)
             b = dmodel.get_current_right_vector(data, timeline)
-            dmodel.solve(data, A, b, solver, timeline)
+            dmodel.solve(data, A, b, timeline)
             timeline.current += 1
+            if options['Output']:
+                dmodel.output(data, str(timeline.current).zfill(6), queue)
+
+        if options['Output']: 
+            dmodel.output(data, queue, stop)
+
         timeline.reset()
 
 class ChebyshevTimeLine():
