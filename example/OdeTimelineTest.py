@@ -67,12 +67,14 @@ nupdate = int(sys.argv[1])
 eold = np.inf
 for i in range(maxit):
     T=2*T
-    timeline = ChebyshevTimeLine(0,1,T)
+    #timeline = ChebyshevTimeLine(0,1,T)
+    timeline = UniformTimeLine(0,1,T)
     smodel = OdeSolver()
     t = timeline.time
     ue = smodel.u_exact(t)
     u_init = np.ones(T+1)
-    timeline.time_integration(u_init, smodel, nupdate=nupdate)
+    #timeline.time_integration(u_init, smodel, nupdate=nupdate)
+    timeline.time_integration(u_init, smodel)
     e = np.max(abs(u_init - ue))
     order = np.log2(eold/e)
     eold = e

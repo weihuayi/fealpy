@@ -14,6 +14,7 @@ class UniformTimeLine():
         self.T1 = T1
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
+        self.time = np.linspace(T0,T1,self.NL)
         self.current = 0
         self.options = options
 
