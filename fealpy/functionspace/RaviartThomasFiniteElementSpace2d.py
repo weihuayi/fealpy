@@ -457,6 +457,8 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
         val *= ch(ps)[..., None]
+        print('ps:', ps.shape)
+        print('measure:', measure.shape)
         gphi = self.smspace.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
@@ -578,6 +580,16 @@ class RaviartThomasFiniteElementSpace2d:
         return isDDof
 
     def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
+
+    def dof_array(self, dim=None):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof

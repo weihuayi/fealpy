@@ -406,6 +406,16 @@ class ScaledMonomialSpace2d():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=np.float)
 
+    def dof_array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        if dim in {None, 1}:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
+
     def number_of_local_dofs(self, p=None, doftype='cell'):
         return self.dof.number_of_local_dofs(p=p, doftype=doftype)
 

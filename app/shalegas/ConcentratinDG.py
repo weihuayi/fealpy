@@ -10,6 +10,7 @@ Notes
 """
 import sys
 import numpy as np
+from numpy.linalg import inv
 from scipy.sparse import bmat, spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
@@ -18,7 +19,7 @@ import matplotlib.pyplot as plt
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.timeintegralalg import UniformTimeLine 
+from fealpy.timeintegratoralg import UniformTimeLine 
 
 """
 该模型例子，在给定流场的情况下， 用间断有限元模拟物质浓度的变化过程。
@@ -89,10 +90,11 @@ class ConcentrationDG():
         self.mesh = mesh
         self.space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
 
-        self.uh = self.space.function() # 速度场函数
-        self.ph = self.space.smspace.function() # 压力场函数
-        self.ch = self.space.smspace.function() # 浓度场函数
-        self.M = 0.2*self.space.smspace.cell_mass_matrix() 
+        self.uh = self.space.function() # 速度场自由度数组
+        self.ph = self.space.smspace.function() # 压力场自由度数组
+        self.ch = self.space.smspace.function() # 浓度场自由度数组
+
+        self.M = self.space.smspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
 
@@ -109,7 +111,7 @@ class ConcentrationDG():
 
         A = space.stiff_matrix()
         B = space.div_matrix()
-        C = M[:, 0, :].reshape(-1)
+        C = self.M[:, 0, :].reshape(-1)
         F1 = space.source_vector(vdata.source)
 
         AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
@@ -131,9 +133,6 @@ class ConcentrationDG():
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
 
-    def get_current_left_matrix(self, data, timeline):
-        return 1.0 
-
     def get_current_right_vector(self, data, timeline):
         cdata = self.cdata
         ch = data[0]
@@ -144,18 +143,27 @@ class ConcentrationDG():
         F = self.space.convection_vector(nt, cdata.neumann, ch, uh,
                 threshold=cdata.is_neumann_boundary) 
 
-        F = self.H@F[:, :, None]
+        F = self.H@(F[:, :, None]/0.2)
         F *= dt
         return F.flat
 
-    def solve(self, data, A, b, solver, timeline):
+    def solve(self, data, timeline):
+        F = self.get_current_right_vector(data, timeline)
         ch = data[0]
-        ch += b
+        ch += F 
+
+    def output(self, data, nameflag, queue, stop=False):
+        ch = data[0]
+        if stop:
+            queue.put(-1)
+        else:
+            queue.put({'c'+nameflag: ('celldata', ch)})
 
 
 
 if __name__ == '__main__':
 
+    from fealpy.writer import MeshWriter
     mf = MeshFactory()
     mesh = mf.regular([0, 1, 0, 1], n=10)
     vdata = VelocityData()
@@ -163,4 +171,9 @@ if __name__ == '__main__':
     model = ConcentrationDG(vdata, cdata, mesh)
     timeline = UniformTimeLine(0, 1, 100)
     data = (model.ch, model.uh)
-    timeline.time_integration(data, model)
+
+    writer = MeshWriter(mesh, 
+            simulation=timeline.time_integration, 
+            args=(data, model)
+            )
+    writer.run()
