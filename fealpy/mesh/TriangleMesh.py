@@ -53,9 +53,12 @@ class TriangleMesh(Mesh2d):
         -----
         把网格转化为 VTK 的格式
         """
+        NC = self.number_of_cells()
+        NV = self.number_of_vertices_of_cells()
         node = self.entity('node')
+        GD = self.geo_dimension()
         if GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=mesh.ftype)), axis=1)
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
         mcell = self.entity('cell')
         NV = np.repeat(NV, NC)

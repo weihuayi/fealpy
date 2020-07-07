@@ -52,7 +52,7 @@ class MeshWriter:
         if self.simulation is not None:
             self.queue = multiprocessing.Queue()
             self.process = multiprocessing.Process(None, simulation,
-                    args=(self.queue, ))
+                    args= args + (self.queue, ))
         else:
             self.queue = None
             self.process = None
@@ -73,19 +73,24 @@ class MeshWriter:
         """
         self.process.start()
         pdata = self.mesh.GetPointData()
+        cdata = self.mesh.GetCellData()
         while True:
             if not self.queue.empty():
                 data = self.queue.get()
                 if data != -1:
                     for key, val in data.items():
-                        d = vnp.numpy_to_vtk(val)
+                        datatype, data = val
+                        d = vnp.numpy_to_vtk(data)
                         d.SetName(key)
-                        pdata.AddArray(d)
+                        if datatype == 'celldata':
+                            cdata.AddArray(d)
+                        elif datatype == 'pointdata':
+                            pdata.AddArray(d)
                 else:
                     print('exit program!')
                     self.process.join()
                     break
-        writer = vtk.vtkUnstructuredGridWriter()
+        writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
         writer.SetInputData(self.mesh)
         writer.Write()
