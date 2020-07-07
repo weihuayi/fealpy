@@ -66,7 +66,7 @@ class UniformTimeLine():
             dmodel.solve(data, timeline) 
             timeline.current += 1
             if options['Output']:
-                dmodel.output(data, str(timeline.current).zfill(6), queue)
+                dmodel.output(data, str(timeline.current).zfill(10), queue)
         if options['Output']: 
             dmodel.output(data, '', queue, stop=True)
         timeline.reset()

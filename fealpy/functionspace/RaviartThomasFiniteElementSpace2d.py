@@ -231,7 +231,7 @@ class RaviartThomasFiniteElementSpace2d:
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
         idx0 = edge2cell[index, 0][:, None]
-        idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         idx = self.smspace.edge_index_1(p=p+1)
 
@@ -471,9 +471,10 @@ class RaviartThomasFiniteElementSpace2d:
         measure = self.integralalg.edgemeasure # 边界长度
         edge2dof = self.dof.edge_to_dof() 
         val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内 积
+
         ps = mesh.bc_to_point(bcs, etype='edge')
         val1 = ch(ps, index=edge2cell[:, 0]) # 边的左边单元在这条边上的浓度值
-        val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这边边上的浓度值 
+        val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这条边上的浓度值 
 
         # 边界条件处理
         val2[:, isBdEdge] = 0.0 # 首先把边界的贡献都设为 0 
@@ -485,22 +486,22 @@ class RaviartThomasFiniteElementSpace2d:
                 bc = self.mesh.entity_barycenter('edge', index=index)
                 flag = threshold(bc)
                 index = index[flag]
-        gval = g(ps[:, index], t) # 这里假设 g 是一个函数， TODO：其它情形？
-        phi = ch.space.basis(ps, index=edge2cell[index, 0]) # 边左边单元的
-        val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi, measure[index])
+        val2[:, index] = g(ps[:, index], en[index]) # 这里假设 g 是一个函数， TODO：其它情形？
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项
         val = np.zeros_like(val0)  
         val[flag] = val0[flag]*val1[flag] 
         val[~flag] = val0[~flag]*val2[~flag]
+
         phi = ch.space.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
 
-        phi = ch.space.basis(ps, index=edge2cell[:, 0])
+        phi = ch.space.basis(ps, index=edge2cell[:, 1])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
-        np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
+        isInEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+        np.add.at(F, (edge2cell[isInEdge, 1], np.s_[:]), b[isInEdge])  
         return F
 
 

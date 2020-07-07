@@ -57,13 +57,13 @@ class MeshWriter:
             self.queue = None
             self.process = None
 
-    def write(self, fname='test.vtk'):
+    def write(self, pdata, cdata, fname='test.vtu'):
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
         writer.SetInputData(self.mesh)
         writer.Write()
 
-    def run(self, fname='test.vtk'):
+    def run(self, fname='test.vtu'):
         """
 
         Notes
