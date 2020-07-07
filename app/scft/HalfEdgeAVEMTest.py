@@ -107,11 +107,11 @@ moptions = scftmodel2d_options(
         dim = 2,
         T0 = 80,
         T1 = 320,
-        nupdate = 0,
+        nupdate = 1,
         order = 1)
 
 
-mesh = halfedgemesh(h=5,n=5)
+mesh = halfedgemesh(h=5,n=0)
 print('NN', mesh.number_of_nodes())
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=4, moptions=moptions,
         optoptions=options)

@@ -45,29 +45,28 @@ class ParabolicVEMSolver2d():
         r = self.M[0,...]@data[...,0] + timeline.dct_time_integral(q) - self.M@data
         return r
 
-    def run(self, data, timeline):
-        timeline.reset()
-        while not timeline.stop():
-            """
-            get a initial solution by CN
-            """
-            dt = timeline.current_time_step_length()
-            A = self.get_current_left_matrix(dt)
-            b = self.get_current_right_vector(data, dt)
-            A, b = self.apply_boundary_condition(A, b)
-            dmodel.solve(A, b)
-            timeline.current += 1
-        timeline.reset()
+    def solve(self, data, timeline):
+        current = timeline.current
+        dt = timeline.current_time_step_length()
+        A = self.get_current_left_matrix(dt)
+        b = self.get_current_right_vector(data[:,current], dt)
+        A, b = self.apply_boundary_condition(A, b)
+        data[:,current+1] = spsolve(A,b).reshape((-1,))
 
-    def solve(self, data, A, b)
-        data = spsolve(A,b).reshape((-1,))
+    def new_solve(self, data, timeline):
+        current = timeline.current
+        dt = timeline.current_time_step_length()
+        A = self.get_current_left_matrix(dt)
+        b = self.get_error_right_vector(data[-1], dt, data[2][:,current+1])
+        A, b = self.apply_boundary_condition(A, b)
+        data[-1]= spsolve(A,b).reshape((-1,))
+        data[0][:,current+1] += data[-1]
 
-    def run1(self, timeline, uh):
+    def run(self, timeline, uh):
         #self.solver =[]
         F = self.F
         while not timeline.stop():
             current = timeline.current
-            #dt  = timeline.current_time_step_length()
             dt = timeline.get_current_time_step_length()
             A = self.get_current_left_matrix(dt,F)
             #ml = pyamg.ruge_stuben_solver(A) # 多重网格计算 2 次元有问题

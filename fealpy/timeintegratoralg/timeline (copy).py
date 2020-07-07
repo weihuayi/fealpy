@@ -159,26 +159,56 @@ class ChebyshevTimeLine():
         Notes
         -----
 
-        data 是要求解的量
+        data 是一个列表
         """
         timeline = self
         timeline.reset()
         while not timeline.stop():
             """
-            get a initial solution by a given method, such as CN
+            get a initial solution by CN
             """
-            dmodel.solve(data, timeline)
+            dt = timeline.current_time_step_length()
+            A = dmodel.get_current_left_matrix(dt)
+            b = dmodel.get_current_right_vector(data[..., timeline.current], dt)
+            A, b = dmodel.apply_boundary_condition(A, b)
+            data[..., timeline.current+1] = dmodel.solve(A, b)
             timeline.current += 1
         timeline.reset()
         for i in range(nupdate):
             r = dmodel.residual_integration(data, timeline)
-            error = np.zeros(data.shape[0], dtype=np.float)
-            data0 = [data, r, timeline.diff(r), error]
+            if type(data) is not list:
+                data = [data, r]
+            else:
+                data += [r]
+            data += [timeline.diff(r)]
+            init_error = np.zeros(data[0].shape, dtype=np.float)
+            data += [init_error]
             """
             spectral deferred correction
             """
             while not self.stop():
-                dmodel.new_solve(data0, timeline)
+                dt = timeline.current_time_step_length()
+                A = dmodel.get_current_left_matrix(dt)
+                b =dmodel.get_error_right_vector(data[-1][...,timeline.current],
+                        dt, data[2][...,timeline.current+1])
+                A, b = dmodel.apply_boundary_condition(A, b)
+                data[-1][...,timeline.current+1] = dmodel.solve(A, b)
                 self.current += 1
-            data = data0[0]
             self.reset()
+            data[0] += data[-1]
+            data = data[0]
+
+
+""""
+error = np.zeros()
+data0 = [data, error, r[], diff[]]
+error_solve()
+data[:, current+1] + = error
+""""
+
+
+
+
+
+
+

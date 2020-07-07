@@ -36,11 +36,22 @@ class OdeSolver():
         r = data[0] + timeline.dct_time_integral(q) - data
         return r
 
-    def solve(self, A, b):
-        data = b/A
-        return data
+    def solve(self, data, timeline):
+        current = timeline.current
+        dt = timeline.current_time_step_length()
+        A = self.get_current_left_matrix(dt)
+        b = self.get_current_right_vector(data[current], dt)
+        A,b = self.apply_boundary_condition(A,b)
+        data[current+1] = b/A
 
-
+    def new_solve(self, data, timeline):
+        current = timeline.current
+        dt = timeline.current_time_step_length()
+        A = self.get_current_left_matrix(dt)
+        b = self.get_error_right_vector(data[-1][current], dt, data[2][current+1])
+        A, b = self.apply_boundary_condition(A, b)
+        data[-1][current+1]=b/A
+        data[0][current+1] += data[-1][current+1]
 
 T=5
 maxit = 5
