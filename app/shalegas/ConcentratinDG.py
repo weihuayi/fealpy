@@ -73,15 +73,13 @@ class ConcentrationData:
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
         val[flag0] = 1
-        flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -1
         return val
 
     @cartesian
     def is_neumann_boundary(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
+        flag = (np.abs(x) < 1e-13)
         return flag
 
 class ConcentrationDG():
@@ -112,14 +110,14 @@ class ConcentrationDG():
         gdof = udof + pdof + 1
 
         M = uspace.smspace.cell_mass_matrix()
-        A = space.stiff_matrix()
-        B = space.div_matrix()
-        C = self.M[:, 0, :].reshape(-1)
-        F1 = space.source_vector(vdata.source)
+        A = uspace.stiff_matrix()
+        B = uspace.div_matrix()
+        C = M[:, 0, :].reshape(-1)
+        F1 = uspace.source_vector(vdata.source)
 
         AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
 
-        isBdDof = space.set_dirichlet_bc(uh, vdata.neumann)
+        isBdDof = uspace.set_dirichlet_bc(uh, vdata.neumann)
 
         x = np.r_['0', uh, ph, 0] 
         isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
@@ -143,7 +141,7 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F = self.space.convection_vector(nt, cdata.neumann, ch, uh,
+        F = self.uspace.convection_vector(nt, cdata.neumann, ch, uh,
                 threshold=cdata.is_neumann_boundary) 
 
         F = self.H@(F[:, :, None]/0.2)
@@ -158,6 +156,11 @@ class ConcentrationDG():
     def output(self, data, nameflag, queue, stop=False):
         ch = data[0]
         if stop:
+            uh = data[1]
+            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            V = uh.value(bc)
+            V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
+            queue.put({'velocity':('celldata', V)})
             queue.put(-1)
         else:
             queue.put({'c'+nameflag: ('celldata', ch)})
@@ -172,7 +175,8 @@ if __name__ == '__main__':
     vdata = VelocityData()
     cdata = ConcentrationData()
     model = ConcentrationDG(vdata, cdata, mesh)
-    timeline = UniformTimeLine(0, 1, 100)
+    options = {'Output': True}
+    timeline = UniformTimeLine(0, 1, 100, options)
     data = (model.ch, model.uh)
 
     writer = MeshWriter(mesh, 

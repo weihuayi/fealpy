@@ -14,7 +14,6 @@ class UniformTimeLine():
         self.T1 = T1
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
-        self.time = np.linspace(T0,T1,self.NL)
         self.current = 0
         self.options = options
 
@@ -64,16 +63,16 @@ class UniformTimeLine():
         while not self.stop():
             # 基于当前时间层的解，求解下一个时间层的解
             # dmodel 只需要提供一层时间的求解就可以了
-            dmodel.solve(data, timeline)
+            dmodel.solve(data, timeline) 
             timeline.current += 1
             if options['Output']:
-                dmodel.output(data, str(timeline.current).zfill(10), queue)
-        if options['Output']:
+                dmodel.output(data, str(timeline.current).zfill(6), queue)
+        if options['Output']: 
             dmodel.output(data, '', queue, stop=True)
         timeline.reset()
 
 class ChebyshevTimeLine():
-    def __init__(self, T0, T1, NT, options={'Output':False}):
+    def __init__(self, T0, T1, NT):
         """
         Parameter
         ---------
@@ -88,7 +87,6 @@ class ChebyshevTimeLine():
         self.time = 0.5*(T0 + T1) - 0.5*(T1 - T0)*np.cos(self.theta)
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
-        self.options = options
 
     def uniform_refine(self):
         self.NL = 2*(self.NL - 1) + 1
@@ -155,41 +153,47 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, nupdate=1, queue=None):
+    def time_integration(self, data, dmodel, nupdate=1):
         """
 
         Notes
         -----
 
-        data 是要求解的量
+        data 是一个列表
         """
-        options = self.options
         timeline = self
         timeline.reset()
-
-        if options['Output']:
-            dmodel.output(data, str(timeline.current).zfill(10), queue)
-
         while not timeline.stop():
             """
-            get a initial solution by a given method, such as CN
+            get a initial solution by CN
             """
-            dmodel.solve(data, timeline)
+            dt = timeline.current_time_step_length()
+            A = dmodel.get_current_left_matrix(dt)
+            b = dmodel.get_current_right_vector(data[..., timeline.current], dt)
+            A, b = dmodel.apply_boundary_condition(A, b)
+            data[..., timeline.current+1] = dmodel.solve(A, b)
             timeline.current += 1
         timeline.reset()
         for i in range(nupdate):
             r = dmodel.residual_integration(data, timeline)
-            error = np.zeros(data.shape[0], dtype=np.float)
-            data0 = [data, r, timeline.diff(r), error]
+            if type(data) is not list:
+                data = [data, r]
+            else:
+                data += [r]
+            data += [timeline.diff(r)]
+            init_error = np.zeros(data[0].shape, dtype=np.float)
+            data += [init_error]
             """
             spectral deferred correction
             """
             while not self.stop():
-                dmodel.new_solve(data0, timeline)
+                dt = timeline.current_time_step_length()
+                A = dmodel.get_current_left_matrix(dt)
+                b =dmodel.get_error_right_vector(data[-1][...,timeline.current],
+                        dt, data[2][...,timeline.current+1])
+                A, b = dmodel.apply_boundary_condition(A, b)
+                data[-1][...,timeline.current+1] = dmodel.solve(A, b)
                 self.current += 1
-                if options['Output']:
-                    dmodel.output(data0[0], str(timeline.current).zfill(6), queue)
-            data = data0[0]
-            if options['Output']:
-                dmodel.output(data, '', queue, stop=True)
             self.reset()
+            data[0] += data[-1]
+            data = data[0]
