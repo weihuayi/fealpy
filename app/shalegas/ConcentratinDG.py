@@ -154,7 +154,6 @@ class ConcentrationDG():
         ch += F 
 
     def output(self, data, nameflag, queue, stop=False):
-        print(nameflag)
         ch = data[0]
         if stop:
             uh = data[1]
