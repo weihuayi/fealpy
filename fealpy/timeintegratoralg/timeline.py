@@ -177,6 +177,7 @@ class ChebyshevTimeLine():
             dmodel.solve(data, timeline)
             timeline.current += 1
         timeline.reset()
+
         for i in range(nupdate):
             r = dmodel.residual_integration(data, timeline)
             error = np.zeros(data.shape[0], dtype=np.float)
