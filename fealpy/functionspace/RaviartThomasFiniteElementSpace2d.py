@@ -457,9 +457,8 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
         val *= ch(ps)[..., None]
-        print('ps:', ps.shape)
-        print('measure:', measure.shape)
-        gphi = self.smspace.grad_basis(ps) 
+
+        gphi = ch.space.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
 
@@ -487,7 +486,7 @@ class RaviartThomasFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
         gval = g(ps[:, index], t) # 这里假设 g 是一个函数， TODO：其它情形？
-        phi = self.smspace.basis(ps, index=edge2cell[index, 0]) # 边左边单元的
+        phi = ch.space.basis(ps, index=edge2cell[index, 0]) # 边左边单元的
         val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi, measure[index])
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
@@ -495,14 +494,13 @@ class RaviartThomasFiniteElementSpace2d:
         val = np.zeros_like(val0)  
         val[flag] = val0[flag]*val1[flag] 
         val[~flag] = val0[~flag]*val2[~flag]
-        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi = ch.space.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
 
-        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi = ch.space.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
-
         return F
 
 

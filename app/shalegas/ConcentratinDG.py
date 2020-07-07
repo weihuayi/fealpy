@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
+from fealpy.functionspace import ScaledMonomialSpace2d 
 from fealpy.timeintegratoralg import UniformTimeLine 
 
 """
@@ -88,11 +89,12 @@ class ConcentrationDG():
         self.vdata = vdata
         self.cdata = cdata
         self.mesh = mesh
-        self.space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+        self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+        self.cspace = ScaledMonomialSpace2d(mesh, p=p+1)
 
-        self.uh = self.space.function() # 速度场自由度数组
-        self.ph = self.space.smspace.function() # 压力场自由度数组
-        self.ch = self.space.smspace.function() # 浓度场自由度数组
+        self.uh = self.uspace.function() # 速度场自由度数组
+        self.ph = self.uspace.smspace.function() # 压力场自由度数组
+        self.ch = self.cspace.function() # 浓度场自由度数组
 
         self.M = self.space.smspace.cell_mass_matrix() 
         self.H = inv(self.M)
