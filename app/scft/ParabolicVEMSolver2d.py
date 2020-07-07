@@ -45,12 +45,24 @@ class ParabolicVEMSolver2d():
         r = self.M[0,...]@data[...,0] + timeline.dct_time_integral(q) - self.M@data
         return r
 
-    def solve(self, A, b):
-        data = spsolve(A,b).reshape((-1,))
-        #data = self.solver.divide(A, b)
-        return data
+    def run(self, data, timeline):
+        timeline.reset()
+        while not timeline.stop():
+            """
+            get a initial solution by CN
+            """
+            dt = timeline.current_time_step_length()
+            A = self.get_current_left_matrix(dt)
+            b = self.get_current_right_vector(data, dt)
+            A, b = self.apply_boundary_condition(A, b)
+            dmodel.solve(A, b)
+            timeline.current += 1
+        timeline.reset()
 
-    def run(self, timeline, uh):
+    def solve(self, data, A, b)
+        data = spsolve(A,b).reshape((-1,))
+
+    def run1(self, timeline, uh):
         #self.solver =[]
         F = self.F
         while not timeline.stop():
