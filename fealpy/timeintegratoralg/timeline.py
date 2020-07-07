@@ -63,16 +63,16 @@ class UniformTimeLine():
         while not self.stop():
             # 基于当前时间层的解，求解下一个时间层的解
             # dmodel 只需要提供一层时间的求解就可以了
-            dmodel.solve(data, timeline) 
+            dmodel.solve(data, timeline)
             timeline.current += 1
             if options['Output']:
                 dmodel.output(data, str(timeline.current).zfill(6), queue)
-        if options['Output']: 
+        if options['Output']:
             dmodel.output(data, '', queue, stop=True)
         timeline.reset()
 
 class ChebyshevTimeLine():
-    def __init__(self, T0, T1, NT):
+    def __init__(self, T0, T1, NT, options={'Output':False}):
         """
         Parameter
         ---------
@@ -87,6 +87,7 @@ class ChebyshevTimeLine():
         self.time = 0.5*(T0 + T1) - 0.5*(T1 - T0)*np.cos(self.theta)
         self.dt = self.time[1:] - self.time[0:-1]
         self.current = 0
+        self.options = options
 
     def uniform_refine(self):
         self.NL = 2*(self.NL - 1) + 1
@@ -153,7 +154,7 @@ class ChebyshevTimeLine():
         intq *= 0.5*(self.time[-1] - self.time[0])
         return intq
 
-    def time_integration(self, data, dmodel, nupdate=1):
+    def time_integration(self, data, dmodel, nupdate=1, queue=None):
         """
 
         Notes
@@ -161,8 +162,13 @@ class ChebyshevTimeLine():
 
         data 是要求解的量
         """
+        options = self.options
         timeline = self
         timeline.reset()
+
+        if options['Output']:
+            dmodel.output(data, str(timeline.current).zfill(10), queue)
+
         while not timeline.stop():
             """
             get a initial solution by a given method, such as CN
@@ -180,5 +186,9 @@ class ChebyshevTimeLine():
             while not self.stop():
                 dmodel.new_solve(data0, timeline)
                 self.current += 1
+                if options['Output']:
+                    dmodel.output(data0[0], str(timeline.current).zfill(6), queue)
             data = data0[0]
+            if options['Output']:
+                dmodel.output(data, '', queue, stop=True)
             self.reset()

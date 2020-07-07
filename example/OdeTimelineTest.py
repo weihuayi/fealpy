@@ -7,7 +7,7 @@ from fealpy.timeintegratoralg.timeline import UniformTimeLine, ChebyshevTimeLine
 
 class OdeSolver():
     """
-    This is an example for timeline 
+    This is an example for timeline
     ode: u_t = -u
     u(0) = 1
     exact solution: u =e^(-t)
@@ -52,6 +52,14 @@ class OdeSolver():
         A, b = self.apply_boundary_condition(A, b)
         data[-1][current+1]=b/A
         data[0][current+1] += data[-1][current+1]
+
+    def output(self, data, nameflag, queue=None, stop=False):
+        if queue is not None:
+            if not stop:
+                queue.put({'u'+nameflag: data})
+            else:
+                queue.put(-1)
+
 
 T=5
 maxit = 5
