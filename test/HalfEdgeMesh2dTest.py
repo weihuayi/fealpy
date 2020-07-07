@@ -109,7 +109,7 @@ class HalfEdgeMesh2dTest:
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
         mesh.uniform_refine(n=2)
-        print(mesh.number_of_nodes)
+        print(mesh.number_of_nodes())
 
         #fig = plt.figure()
         #axes = fig.gca()
@@ -144,17 +144,6 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([0, 21])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        clevel = mesh.celldata['level']
-
-        print("halfedge level:\n")
-        for i, val in enumerate(mesh.halfedgedata['level']):
-            print(i, ':', val, mesh.ds.halfedge[i, 0:2])
-
-        print("cell level:\n")
-        for i, val in enumerate(mesh.celldata['level']):
-            print(i, ':', val)
-
-        mesh.print()
         if plot:
 
             fig = plt.figure()

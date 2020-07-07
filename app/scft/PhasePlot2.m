@@ -85,15 +85,15 @@ for fA = fALft:1:fARgt
 minphiA = min(phiA(:));
 maxphiA = max(phiA(:));
 isoA = minphiA+0.7*(maxphiA-minphiA);
-       	   isoA = 0.4;
+%        	   isoA = 0.1;
 minphiB = min(phiB(:));
 maxphiB = max(phiB(:));
 isoB = minphiB+0.7*(maxphiB-minphiB);
-            isoB = 0.5;
+%             isoB = 0.1;
 minphiC = min(phiC(:));
 maxphiC = max(phiC(:));
 isoC = minphiC+0.7*(maxphiC-minphiC);
-            isoC = 0.4;
+%             isoC = 0.9;
 
 %             fprintf('Line=%d, Column=%d;  isoA=%.4f, isoB=%.4f, isoC=%.4f\n',...
 %                 Line, Column, isoA, isoB, isoC);
