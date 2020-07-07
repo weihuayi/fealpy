@@ -20,6 +20,22 @@ class HalfEdgeAVEMTest():
         mu = obj.init_value(fieldstype=fieldstype)
         self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
 
+    def uni_run(self):
+        problem = self.problem
+        options = self.optoptions
+        model = problem['objective']
+        mesh = problem['mesh']
+
+        #fig = plt.figure()
+        #axes = fig.gca()
+        #mesh.add_plot(axes)
+        #mesh.find_node(axes, showindex=True)
+        #mesh.find_cell(axes, showindex=True)
+        #plt.show()
+
+        optalg = SteepestDescentAlg(problem, options)
+        optalg.run()
+
     def run(self, estimator='mix'):
         problem = self.problem
         options = self.optoptions
@@ -86,17 +102,19 @@ moptions = scftmodel2d_options(
         nblend = 1,
         nblock = 2,
         ndeg = 100,
-        fA = 0.2,
+        fA = 0.5,
         chiAB = 0.25,
         dim = 2,
-        T0 = 10,
-        T1 = 40,
-        nupdate = 1,
-        order = 2)
+        T0 = 80,
+        T1 = 320,
+        nupdate = 0,
+        order = 1)
 
 
-mesh = halfedgemesh(h=4,n=6)
-Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
+mesh = halfedgemesh(h=5,n=5)
+print('NN', mesh.number_of_nodes())
+Halftest = HalfEdgeAVEMTest(mesh, fieldstype=4, moptions=moptions,
         optoptions=options)
-Halftest.run()
+Halftest.uni_run()
 
+#Halftest.run()

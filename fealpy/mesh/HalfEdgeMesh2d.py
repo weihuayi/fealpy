@@ -445,7 +445,8 @@ class HalfEdgeMesh2d(Mesh2d):
         bc = self.cell_barycenter(return_all=True) # 返回所有单元的重心, 包括外
 
         if isMarkedCell is None:
-            isMarkedCell = np.ones(nC, dtype=np.bool_)
+            isMarkedCell = np.zeros(nC, dtype=np.bool_)
+            isMarkedCell[self.ds.cellstart:] = True
             isMarkedHEdge = np.ones(nE*2,dtype=np.bool_)
         else:
             isMarkedHEdge = self.mark_halfedge(isMarkedCell)
@@ -809,9 +810,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def uniform_refine(self, n=1):
         for i in range(n):
-            nC = self.number_of_all_cells()
-            isMarkedCell = np.ones(nC, dtype=np.bool_)
-            self.refine_poly(isMarkedCell)
+            self.refine_poly()
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()

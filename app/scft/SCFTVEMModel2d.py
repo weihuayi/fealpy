@@ -213,7 +213,7 @@ class SCFTVEMModel2d():
             #fields[:, 1] *= chiN
         elif fieldstype == 4:
             def f(p):
-                return np.sin(2*p[..., 0])
+                return np.sin(4*p[..., 0])
             fields[:, 1] += self.vemspace.interpolation(f)
 
         w[:, 0] = fields[:, 0] - fields[:, 1]
@@ -234,7 +234,7 @@ class SCFTVEMModel2d():
         start = timer()
         self.compute_propagator()
         print('Times for PDE solving:', timer() - start)
-        self.compute_eta_ref(eta_ref='etamaxmin')
+        #self.compute_eta_ref(eta_ref='etamaxmin')
 
         self.compute_singleQ()
         self.compute_density1()
@@ -258,7 +258,7 @@ class SCFTVEMModel2d():
         self.H = self.H/self.totalArea - np.log(self.sQ)
 
         #self.save_data(fname='./data/test'+str(self.count)+'.mat')
-        #self.show_solution(self.count)
+        self.show_solution(self.count)
         self.count +=1
         self.grad[:, 0] = self.rho[:, 0]  + self.rho[:, 1] - 1.0
         self.grad[:, 1] = 2.0*mu[:, 1]/chiN - self.rho[:, 0] + self.rho[:, 1]
@@ -288,24 +288,24 @@ class SCFTVEMModel2d():
         #w = self.vemspace.function(array = self.w[:, 0]).value
         w = self.w[:,0]
         S = self.vemspace.project_to_smspace(w)#TODO
-        F0 = self.vemspace.cross_mass_matrix(S.value)
-        self.smodel.F = F0
-        self.timeline0.time_integration(self.q0[:, 0:n0], self.smodel,
-                self.nupdate)
-        self.timeline0.time_integration(self.q0[:, n1-1:], self.smodel,
-                self.nupdate)
+        F = self.vemspace.cross_mass_matrix(S.value)
+        #self.smodel.F = F0
+        smodel0 = ParabolicVEMSolver2d(self.A, self.M, F)
 
         #w = self.vemspace.function(array = self.w[:, 1]).value
         w = self.w[:, 1]
         S = self.vemspace.project_to_smspace(w)
-        F1 = self.vemspace.cross_mass_matrix(S.value)
-        self.smodel.F = F1
-
-        self.timeline1.time_integration(self.q0[:, n0-1:], self.smodel,
+        F = self.vemspace.cross_mass_matrix(S.value)
+        smodel1 = ParabolicVEMSolver2d(self.A, self.M, F)
+        #self.smodel.F = F1
+        self.timeline0.time_integration(self.q0[:, 0:n0], smodel0,
                 self.nupdate)
-        self.timeline1.time_integration(self.q0[:, 0:n1], self.smodel,
+        self.timeline1.time_integration(self.q0[:, n0-1:], smodel1,
                 self.nupdate)
-
+        self.timeline1.time_integration(self.q1[:, 0:n1], smodel1,
+                self.nupdate)
+        self.timeline0.time_integration(self.q1[:, n1-1:], smodel0,
+                self.nupdate)
     def compute_density_2(self):
         q = self.q0*self.q1[:, -1::-1]
         n0 = self.timeline0.NT
@@ -324,7 +324,7 @@ class SCFTVEMModel2d():
             self.sQ1[i,:] = self.integral_space(q[:, i])/self.totalArea
         #print('sQ', self.sQ1)
         self.sQ = self.integral_space(self.q0[:, -1])/self.totalArea
-        print(self.sQ)
+        print('Q',self.sQ)
 
     def compute_density(self):
         q = self.q0*self.q1[:, -1::-1]
@@ -389,8 +389,8 @@ class SCFTVEMModel2d():
         mu[:, 0] = 0.5*(self.w[:, 0] + self.w[:, 1])
         mu[:, 1] = 0.5*(self.w[:, 1] - self.w[:, 0])
 
-        eta = self.eta
-        eta_ref = self.eta_ref
+        #eta = self.eta
+        #eta_ref = self.eta_ref
 
         data = {
                 'node':node,
@@ -401,27 +401,27 @@ class SCFTVEMModel2d():
                 'H':H,
                 'mu':mu,
                 'q0':q,
-                'q1':q1,
-                'eta':eta,
-                'eta_ref':eta_ref,
+                'q1':q1
+                #'eta':eta,
+                #'eta_ref':eta_ref,
                 }
         sio.savemat(fname, data)
 
     def show_solution(self,i):
         mesh = self.mesh
-        cell = mesh.ds.cell
-        cellLocation = mesh.ds.cellLocation
+        cell, cellLocation = mesh.entity('cell')
         N = len(cellLocation)
         d = np.zeros(N-1)
         for j in range(N-1):
             newcell = cell[cellLocation[j]:cellLocation[j+1]]
             c = self.rho[:,0].view(np.ndarray)
+            #c = u[:,1].view(np.ndarray)
             d[j] = np.sum(c[newcell],axis=0)/len(newcell)
         node = mesh.node
         fig = plt.figure()
         axes = fig.gca()
         show_mesh_2d(axes,mesh,cellcolor=d,cmap='jet',linewidths=0.0,markersize=10, showaxis=False,showcolorbar= True)
-        plt.savefig('./Figure/figure'+str(i)+'.png')
-        plt.savefig('./Figure/figure'+str(i)+'.pdf')
+        plt.savefig('./figure/figure'+str(i)+'.png')
+        plt.savefig('./figure/figure'+str(i)+'.pdf')
         plt.close()
 

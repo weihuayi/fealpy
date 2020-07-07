@@ -48,6 +48,7 @@ class ParabolicVEMSolver2d():
     def solve(self, A, b):
         data = spsolve(A,b).reshape((-1,))
         #data = self.solver.divide(A, b)
+        return data
 
     def run(self, timeline, uh):
         #self.solver =[]
