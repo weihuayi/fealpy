@@ -96,21 +96,22 @@ class ConcentrationDG():
         self.ph = self.uspace.smspace.function() # 压力场自由度数组
         self.ch = self.cspace.function() # 浓度场自由度数组
 
-        self.M = self.space.smspace.cell_mass_matrix() 
+        self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
 
     def set_init_velocity_field(self):
         vdata = self.vdata
         mesh = self.mesh
-        space = self.space
+        uspace = self.uspace
         uh = self.uh
         ph = self.ph
 
-        udof = space.number_of_global_dofs()
-        pdof = space.smspace.number_of_global_dofs()
+        udof = uspace.number_of_global_dofs()
+        pdof = uspace.smspace.number_of_global_dofs()
         gdof = udof + pdof + 1
 
+        M = uspace.smspace.cell_mass_matrix()
         A = space.stiff_matrix()
         B = space.div_matrix()
         C = self.M[:, 0, :].reshape(-1)

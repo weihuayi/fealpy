@@ -197,18 +197,3 @@ class ChebyshevTimeLine():
             self.reset()
             data[0] += data[-1]
             data = data[0]
-
-
-""""
-error = np.zeros()
-data0 = [data, error, r[], diff[]]
-error_solve()
-data[:, current+1] + = error
-""""
-
-
-
-
-
-
-
