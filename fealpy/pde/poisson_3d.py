@@ -74,6 +74,32 @@ class CosCosCosData:
         """Dilichlet boundary condition
         """
         return self.solution(p)
+    
+    @cartesian
+    def neumann(self, p, n):
+        """ 
+        Neuman  boundary condition
+
+        Parameters
+        ----------
+
+        p: (NQ, NE, 3)
+        n: (NE, 3)
+
+        grad*n : (NQ, NE, 3)
+        """
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1) # (NQ, NE)
+        return val
+
+    @cartesian
+    def robin(self, p, n):
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1)
+        shape = len(val.shape)*(1, )
+        kappa = np.array([1.0], dtype=np.float).reshape(shape)
+        val += self.solution(p) 
+        return val, kappa
 
 
 class X2Y2Z2Data:
@@ -124,6 +150,10 @@ class X2Y2Z2Data:
         val[..., 1] = 2*x**2*y*z**2
         val[..., 2] = 2*x**2*y**2*z
         return val
+
+    @cartesian
+    def flux(self, p):
+        return -self.gradient(p)
 
     @cartesian
     def source(self, p):

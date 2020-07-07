@@ -338,7 +338,7 @@ class RaviartThomasFiniteElementSpace2d:
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[cell2dof]) # index? 
         return val
 
     @barycentric
@@ -348,7 +348,7 @@ class RaviartThomasFiniteElementSpace2d:
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, dphi, uh[cell2dof])
+        val = np.einsum(s1, dphi, uh[cell2dof])# index ?
         return val
 
     @barycentric
@@ -422,9 +422,9 @@ class RaviartThomasFiniteElementSpace2d:
     def source_vector(self, f, dim=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
-                gdof=gdof) 
+        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
         return b
+
 
     def convection_vector(self, t, g, ch, vh, threshold=None, q=None):
         """
@@ -505,7 +505,7 @@ class RaviartThomasFiniteElementSpace2d:
 
 
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
+    def set_neumann_bc(self, g, threshold=None, q=None):
         """
         Parameters
         ----------
@@ -572,8 +572,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
-        uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi,
-                measure, optimize=True)
+        uh[edge2dof[index]] = np.einsum('i, ij, ijm, j->jm', ws, val, phi, measure, optimize=True)
         isDDof = np.zeros(gdof, dtype=np.bool_) 
         isDDof[edge2dof[index]] = True
         return isDDof

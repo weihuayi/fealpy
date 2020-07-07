@@ -12,7 +12,7 @@ class MeshWriter:
     -----
     用于在数值模拟过程中输出网格和数据到 vtk 文件中
     """
-    def __init__(self, mesh, simulation=None):
+    def __init__(self, mesh, simulation=None, args=None):
 
         GD = mesh.geo_dimension()
         TD = mesh.top_dimension()
@@ -23,30 +23,11 @@ class MeshWriter:
             NF = mesh.number_of_faces()
         NC = mesh.number_of_cells()
 
-        node = mesh.entity('node')
-        if GD == 1:
-            node = np.concatenate((node, np.zeros((node.shape[0], 2), dtype=mesh.ftype)), axis=1)
-        elif GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=mesh.ftype)), axis=1)
+        cellType = mesh.vtk_cell_type()
+        node, cell = mesh.to_vtk()
 
         points = vtk.vtkPoints()
         points.SetData(vnp.numpy_to_vtk(node))
-
-        cell = mesh.entity('cell')
-        cellType = mesh.vtk_cell_type()
-        NV = mesh.ds.number_of_vertices_of_cells()
-        if isinstance(cell, tuple): # Polygon Mesh
-            mcell, mcellLocation = cell
-        else:
-            mcell = cell
-            NV = np.repeat(NV, NC)
-
-        cell = np.zeros(len(mcell.reshape(-1)) + NC, dtype=np.int_)
-        isIdx = np.ones(len(mcell.reshape(-1)) + NC, dtype=np.bool_)
-        isIdx[0] = False
-        isIdx[np.add.accumulate(NV+1)[:-1]] = False
-        cell[~isIdx] = NV
-        cell[isIdx] = mcell.flat
 
         cells = vtk.vtkCellArray()
         cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
@@ -75,7 +56,6 @@ class MeshWriter:
         else:
             self.queue = None
             self.process = None
-
 
     def write(self, fname='test.vtk'):
         writer = vtk.vtkXMLUnstructuredGridWriter()

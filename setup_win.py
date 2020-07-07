@@ -10,7 +10,6 @@ setup(name='fealpy',
       install_requires=[
           'numpy',
           'scipy',
-          'matplotlib',
-          'pyfftw'
+          'matplotlib'
       ],
       zip_safe=False)

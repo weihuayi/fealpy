@@ -44,7 +44,9 @@ class Function(np.ndarray):
         else:
             print('The function space has not implemented method {}'.format(item))
 
-    def add_plot(self, plot, cmap=None):
+    def add_plot(self, plot, cmap=None, threshold=None):
+        import matplotlib.colors as colors
+        import matplotlib.cm as cm
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
@@ -62,6 +64,12 @@ class Function(np.ndarray):
                     ipoints[:, 0], ipoints[:, 1],
                     self, cmap=cmap, lw=0.0)
             return axes
+        elif mesh.meshtype == 'tet':#TODO: make it work!
+            space = self.space
+            face = mesh.boundary_face(threshold=threshold) 
+            node = mesh.entity('node')
+            axes.plot_trisurf(node[:, 0], node[:, 1], node[:, 2],
+                    triangles=face, cmap=cmap)
         elif mesh.meshtype in {'polygon', 'halfedge', 'halfedge2d'}:
             node = mesh.entity('node')
             axes.plot_trisurf(

@@ -1,7 +1,7 @@
 import numpy as np
 
 from fealpy.decorator import cartesian
-from fealpy.mesh import TetrahedronMesh
+from fealpy.mesh import TetrahedronMesh, TriangleMesh
 
 class CornerData3D:
     def __init__(self):

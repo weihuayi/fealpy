@@ -7,6 +7,7 @@ class DirichletBC():
         self.space = space
         self.gD = gD
         self.threshold = threshold
+        self.bctype = 'Dirichlet'
 
     def apply(self, A, F, uh):
         space = self.space
@@ -67,8 +68,19 @@ class NeumannBC():
         self.space = space
         self.gN = gN
         self.threshold = threshold
+        self.bctype = 'Neumann'
 
     def apply(self, F, A=None, threshold=None, q=None):
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+            当矩阵 A 不是 None的时候，就假设是纯 Neumann 边界条件，需要同时修改
+            矩阵 A 和右端 F。
+        """
         space = self.space
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
@@ -85,12 +97,13 @@ class RobinBC():
         self.space = space
         self.gR = gR
         self.threshold = threshold
+        self.bctype = "Robin"
 
     def apply(self, A, F, threshold=None, q=None):
         space = self.space
         gR = self.gR
         threshold = self.threshold if threshold is None else threshold
-        space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
+        A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
 
 class BoundaryCondition():
