@@ -225,22 +225,24 @@ class HalfEdgeMesh2d(Mesh2d):
         index0 = index[flag] # 没有在生成树中的边的编号
         index1 = index[~flag]# 在生成树中的边的编号
 
+        # 这里可以多线程并行处理
         gamma = []
-        count = np.zeros(NN, dtype=np.int_)
+        count = np.zeros(NN, dtype=np.int8)
         for i in idx0:
-            isKeepEdge1 = np.ones(len(idx1), dtype=np.bool_)
+            isKeepEdge = np.ones(len(index1), dtype=np.bool_)
             while True:
                 np.add.at(count, edge[i], 1)
-                np.add.at(count, edge[idx1[isKeepEdge1]], 1)
-                isDEdge = (count[edge[idx1, 0]] == 1) | (count[edge[idx1, 1]] == 1)
+                np.add.at(count, edge[index1[isKeepEdge]], 1)
+                isDelEdge = (count[edge[index1, 0]] == 1) | (count[edge[index1, 1]] == 1)
                 count[:] = 0
-                if np.any(isDEdge):
-                    isKeepEdge1 = isKeepEdge1 & (~isDEdge)
+                if np.any(isDelEdge):
+                    isKeepEdge = isKeepEdge & (~isDelEdge)
                 else:
                     break
-            loop = np.r_['0', i, idx1[isKeepEdge1]]
+            loop = np.r_['0', i, index1[isKeepEdge]]
             gamma.append(loop)
-        pass
+
+        return gamma
 
     def init_level_info(self):
         NN = self.number_of_nodes()
