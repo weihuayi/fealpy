@@ -53,7 +53,7 @@ class ParabolicVEMSolver2d():
         A, b = self.apply_boundary_condition(A, b)
         data[:,current+1] = spsolve(A,b).reshape((-1,))
 
-    def new_solve(self, data, timeline):
+    def correct_solve(self, data, timeline):
         current = timeline.current
         dt = timeline.current_time_step_length()
         A = self.get_current_left_matrix(dt)

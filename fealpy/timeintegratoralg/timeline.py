@@ -186,7 +186,7 @@ class ChebyshevTimeLine():
             spectral deferred correction
             """
             while not self.stop():
-                dmodel.new_solve(data0, timeline)
+                dmodel.correct_solve(data0, timeline)
                 self.current += 1
                 if options['Output']:
                     dmodel.output(data0[0], str(timeline.current).zfill(6), queue)
