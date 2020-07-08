@@ -457,7 +457,6 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
         val *= ch(ps)[..., None]
-
         gphi = ch.space.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
@@ -469,8 +468,7 @@ class RaviartThomasFiniteElementSpace2d:
         # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
         en = mesh.edge_unit_normal() 
         measure = self.integralalg.edgemeasure # 边界长度
-        edge2dof = self.dof.edge_to_dof() 
-        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内 积
+        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内积
 
         ps = mesh.bc_to_point(bcs, etype='edge')
         val1 = ch(ps, index=edge2cell[:, 0]) # 边的左边单元在这条边上的浓度值

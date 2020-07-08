@@ -39,7 +39,7 @@ class TriangleMesh(Mesh2d):
         VTK_TRIANGLE = 5
         return VTK_TRIANGLE
 
-    def to_vtk(self):
+    def to_vtk(self, etype='cell', index=np.s_[:]):
         """
 
         Parameters
@@ -53,23 +53,23 @@ class TriangleMesh(Mesh2d):
         -----
         把网格转化为 VTK 的格式
         """
-        NC = self.number_of_cells()
-        NV = self.number_of_vertices_of_cells()
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
-        mcell = self.entity('cell')
-        NV = np.repeat(NV, NC)
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
 
-        cell = np.zeros(len(mcell.reshape(-1)) + NC, dtype=np.int_)
-        isIdx = np.ones(len(mcell.reshape(-1)) + NC, dtype=np.bool_)
-        isIdx[0] = False
-        isIdx[np.add.accumulate(NV+1)[:-1]] = False
-        cell[~isIdx] = NV
-        cell[isIdx] = mcell.flat
-        return node, cell
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 5
+        elif etype == 'edge':
+            cellType = 3
+
+        return node, cell.flatten(), cellType, len(cell)
 
     def integrator(self, k, etype='cell'):
         if etype in {'cell', 2}:

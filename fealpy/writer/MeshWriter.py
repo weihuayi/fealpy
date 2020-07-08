@@ -12,19 +12,15 @@ class MeshWriter:
     -----
     用于在数值模拟过程中输出网格和数据到 vtk 文件中
     """
-    def __init__(self, mesh, simulation=None, args=None):
+    def __init__(self, mesh, simulation=None, args=None, etype='cell',
+            index=np.s_[:]):
 
         GD = mesh.geo_dimension()
         TD = mesh.top_dimension()
 
         NN = mesh.number_of_nodes()
-        NE = mesh.number_of_edges()
-        if TD == 3:
-            NF = mesh.number_of_faces()
-        NC = mesh.number_of_cells()
 
-        cellType = mesh.vtk_cell_type()
-        node, cell = mesh.to_vtk()
+        node, cell, cellType, NC = mesh.to_vtk(etype=etype, index=index)
 
         points = vtk.vtkPoints()
         points.SetData(vnp.numpy_to_vtk(node))
@@ -57,7 +53,7 @@ class MeshWriter:
             self.queue = None
             self.process = None
 
-    def write(self, pdata, cdata, fname='test.vtu'):
+    def write(self, fname='test.vtu'):
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
         writer.SetInputData(self.mesh)
