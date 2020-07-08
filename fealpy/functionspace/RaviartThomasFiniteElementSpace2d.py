@@ -494,16 +494,17 @@ class RaviartThomasFiniteElementSpace2d:
         val[flag] = val0[flag]*val1[flag] 
         val[~flag] = val0[~flag]*val2[~flag]
 
+
         phi = ch.space.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
 
         phi = ch.space.basis(ps, index=edge2cell[:, 1])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
-        isInEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1]) # 只处理内部边
         np.add.at(F, (edge2cell[isInEdge, 1], np.s_[:]), b[isInEdge])  
-        return F
 
+        return F, edge2cell[index, 0]
 
 
     def set_neumann_bc(self, g, threshold=None, q=None):

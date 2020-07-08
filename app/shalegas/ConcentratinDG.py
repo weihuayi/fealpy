@@ -141,11 +141,12 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F = self.uspace.convection_vector(nt, cdata.neumann, ch, uh,
+        F, index = self.uspace.convection_vector(nt, cdata.neumann, ch, uh,
                 threshold=cdata.is_neumann_boundary) 
 
         F = self.H@(F[:, :, None]/0.2)
         F *= dt
+
         return F.flat
 
     def solve(self, data, timeline):
@@ -154,6 +155,7 @@ class ConcentrationDG():
         ch += F 
 
     def output(self, data, nameflag, queue, stop=False):
+        print(nameflag)
         ch = data[0]
         if stop:
             uh = data[1]
@@ -176,7 +178,7 @@ if __name__ == '__main__':
     cdata = ConcentrationData()
     model = ConcentrationDG(vdata, cdata, mesh)
     options = {'Output': True}
-    timeline = UniformTimeLine(0, 1, 100, options)
+    timeline = UniformTimeLine(0, 1, 1000, options)
     data = (model.ch, model.uh)
 
     writer = MeshWriter(mesh, 
