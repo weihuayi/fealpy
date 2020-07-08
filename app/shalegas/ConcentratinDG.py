@@ -43,9 +43,9 @@ class VelocityData:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 1
+        val[flag0] = 0.01 
         flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -1
+        val[flag1] = -0.01
         return val
 
     @cartesian
@@ -72,7 +72,7 @@ class ConcentrationData:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 1
+        val[flag0] = 0.01
         return val
 
     @cartesian
