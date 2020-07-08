@@ -18,7 +18,7 @@ class CosCosCosData:
             [-1, -1, 1],
             [1, -1, 1],
             [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float)
+            [-1, 1, 1]], dtype=np.float64)
 
         cell = np.array([
             [0, 1, 2, 6],
@@ -26,7 +26,7 @@ class CosCosCosData:
             [0, 4, 5, 6],
             [0, 7, 4, 6],
             [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int)
+            [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
@@ -97,7 +97,7 @@ class CosCosCosData:
         grad = self.gradient(p) # (NQ, NE, 3)
         val = np.sum(grad*n, axis=-1)
         shape = len(val.shape)*(1, )
-        kappa = np.array([1.0], dtype=np.float).reshape(shape)
+        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
         val += self.solution(p) 
         return val, kappa
 
@@ -115,7 +115,7 @@ class X2Y2Z2Data:
             [-1, -1, 1],
             [1, -1, 1],
             [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float)
+            [-1, 1, 1]], dtype=np.float64)
 
         cell = np.array([
             [0, 1, 2, 6],
@@ -123,7 +123,7 @@ class X2Y2Z2Data:
             [0, 4, 5, 6],
             [0, 7, 4, 6],
             [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int)
+            [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
@@ -183,7 +183,7 @@ class LShapeRSinData:
             [-1, -1, 1],
             [1, -1, 1],
             [1, 1, 1],
-            [-1, 1, 1]], dtype=np.float)
+            [-1, 1, 1]], dtype=np.float64)
 
         cell = np.array([
             [0, 1, 2, 6],
@@ -191,7 +191,7 @@ class LShapeRSinData:
             [0, 4, 5, 6],
             [0, 7, 4, 6],
             [0, 3, 7, 6],
-            [0, 2, 3, 6]], dtype=np.int)
+            [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
         for i in range(n):
             mesh.bisect()
