@@ -6,8 +6,8 @@ class CosData:
         pass
 
     def init_mesh(self, n=1):
-        node = np.array([[0], [1]], dtype=np.float)
-        cell = np.array([(0, 1)], dtype=np.int)
+        node = np.array([[0], [1]], dtype=np.float64)
+        cell = np.array([(0, 1)], dtype=np.int_)
         mesh = IntervalMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh

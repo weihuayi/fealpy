@@ -20,7 +20,8 @@ def scftmodel2d_options(
         T0 = 4,
         T1 = 16,
         nupdate = 1,
-        order = 1):
+        order = 1, 
+        rdir='.'):
     """
     Get the options used in model.
     """
@@ -37,7 +38,8 @@ def scftmodel2d_options(
             'T0'          :T0,
             'T1'          :T1,
             'nupdate'     :nupdate,
-            'order'       :order
+            'order'       :order,
+            'rdir'        :rdir
             }
 
     options['chiN'] = options['chiAB']*options['ndeg']
@@ -273,9 +275,9 @@ class SCFTVEMModel2d():
         q[:,1] = self.q1[:,-1]
 
         self.eta = self.mix_estimate(q, w=1)
-        if eta_ref is 'etamaxmin':
+        if eta_ref == 'etamaxmin':
             self.eta_ref = np.std(self.eta)/(np.max(self.eta)-np.min(self.eta))
-        if eta_ref is 'etamean':
+        if eta_ref == 'etamean':
             self.eta_ref = np.std(self.eta)/np.mean(self.eta)
         print('第'+str(self.count)+'次迭代的etaref:', self.eta_ref)
 
@@ -392,6 +394,7 @@ class SCFTVEMModel2d():
         sio.savemat(fname, data)
 
     def show_solution(self,i):
+        options = self.options
         mesh = self.mesh
         cell, cellLocation = mesh.entity('cell')
         N = len(cellLocation)
@@ -405,7 +408,7 @@ class SCFTVEMModel2d():
         fig = plt.figure()
         axes = fig.gca()
         show_mesh_2d(axes,mesh,cellcolor=d,cmap='jet',linewidths=0.0,markersize=10, showaxis=False,showcolorbar= True)
-        plt.savefig('./Figure/figure'+str(i)+'.png')
-        plt.savefig('./Figure/figure'+str(i)+'.pdf')
+        plt.savefig(options['rdir']+'/figure'+str(i)+'.png')
+        plt.savefig(options['rdir']+'/figure'+str(i)+'.pdf')
         plt.close()
 
