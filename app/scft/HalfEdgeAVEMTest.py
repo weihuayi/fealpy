@@ -108,13 +108,14 @@ moptions = scftmodel2d_options(
         T0 = 20,
         T1 = 80,
         nupdate = 1,
-        order = 1)
+        order = 1,
+        rdir = sys.argv[2])
 
 if sys.argv[1] == "quadtree":
-    quadtree = init_mesh(n=5,h=12)
+    quadtree = init_mesh(n=5, h=12)
     mesh = quadtree.to_pmesh()
 elif sys.argv[1] == 'halfedge':
-    mesh = halfedgemesh(n=4,h=6)
+    mesh = halfedgemesh(n=5, h=12)
 
 print('NN', mesh.number_of_nodes())
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
