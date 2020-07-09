@@ -29,7 +29,7 @@ class TriangleQuadrature():
     def get_all_gauss_point_and_weight(self):
         return self.quadpts, self.weights
 
-    def __init__(self, order, ftype=np.float):
+    def __init__(self, order, ftype=np.float64):
         A = []
         w = []
         if order == 1: #  Order 1, nQuad 1

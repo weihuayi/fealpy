@@ -31,12 +31,14 @@ class MeshWriter:
         self.mesh =vtk.vtkUnstructuredGrid() 
         self.mesh.SetPoints(points)
         self.mesh.SetCells(cellType, cells)
-        
+
         pdata = self.mesh.GetPointData()
-        for key, val in mesh.nodedata.items():
-            d = vnp.numpy_to_vtk(val)
-            d.SetName(key)
-            pdata.AddArray(d)
+
+        if 0:#TODO
+            for key, val in mesh.nodedata.items():
+                d = vnp.numpy_to_vtk(val)
+                d.SetName(key)
+                pdata.AddArray(d)
 
         cdata = self.mesh.GetCellData()
         for key, val in mesh.celldata.items():

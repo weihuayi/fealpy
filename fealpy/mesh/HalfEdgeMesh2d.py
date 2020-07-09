@@ -169,7 +169,7 @@ class HalfEdgeMesh2d(Mesh2d):
         """
         pass
 
-    def tri_cut_graph(self):
+    def tri_cut_graph(self, wight = None):
         """
         Notes
         -----
@@ -184,7 +184,7 @@ class HalfEdgeMesh2d(Mesh2d):
             Chunyu Chen
         """
         # 确认是三角形网格
-        assert self.NV == 3
+        assert self.ds.NV == 3
 
         # 检查网格的封闭性 
 
@@ -203,7 +203,7 @@ class HalfEdgeMesh2d(Mesh2d):
         # edge2cell[i, 3]: 第 i 条边的在右边单元局部编号
         edge2cell = self.ds.edge_to_cell()
 
-        cell2cell = self.ds.cell_to_cell(return_sparse=True) 
+        cell2cell = self.ds.cell_to_cell(return_sparse=True)
         celltree = minimum_spanning_tree(cell2cell)
         celltree = celltree + celltree.T # 对称化
 
@@ -213,22 +213,27 @@ class HalfEdgeMesh2d(Mesh2d):
         cutEdge = edge[index]
         nc = len(cutEdge)
 
-        val = np.ones(nc, dtype=np.bool)
+        if wight == None:
+            val = np.ones(nc, dtype=np.bool)
+        elif wight == 'length':
+            val = self.entity_measure('edge')[index]
+
         n2n = coo_matrix((val, (cutEdge[:, 0], cutEdge[:, 1])), shape=(NN, NN))
         n2n += coo_matrix((val, (cutEdge[:, 1], cutEdge[:, 0])), shape=(NN, NN))
         n2n = n2n.tocsr()
         ctree = minimum_spanning_tree(n2n) # 初始割图的最小生成树
         ctree = ctree + ctree.T # 对称化
 
-        flag = np.asarray(ctree[cutEdge[:, 0], cutEdge[:, 1]]).reshape(-1).astype(np.int)
-        flag = flag == 0
+        flag = np.asarray(ctree[cutEdge[:, 0], cutEdge[:,
+            1]]).reshape(-1)
+        flag = (flag == 0)
         index0 = index[flag] # 没有在生成树中的边的编号
         index1 = index[~flag]# 在生成树中的边的编号
 
         # 这里可以多线程并行处理
         gamma = []
         count = np.zeros(NN, dtype=np.int8)
-        for i in idx0:
+        for i in index0:
             isKeepEdge = np.ones(len(index1), dtype=np.bool_)
             while True:
                 np.add.at(count, edge[i], 1)
@@ -919,6 +924,39 @@ class HalfEdgeMesh2d(Mesh2d):
                 fontsize=fontsize, fontcolor=fontcolor, 
                 multiindex=multiindex, linewidth=linewidth)
 
+    def to_vtk(self, etype='cell', index=np.s_[:]):
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 5
+        elif etype == 'edge':
+            cellType = 3
+
+
+        return node, cell.flatten(), cellType, len(cell)
+
+
     def print(self):
         print("hcell:\n")
         for i, val in enumerate(self.ds.hcell):
@@ -1039,7 +1077,7 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 3], dtype = np.int_)
             current = halfedge[self.hcell[cstart:], 2]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
@@ -1048,7 +1086,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2node[:, 2] = halfedge[current, 0]
             return cell2node
         elif self.NV == 4: # quad mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 4], dtype = np.int_)
             current = halfedge[self.hcell[cstart:], 3]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
@@ -1098,14 +1136,14 @@ class HalfEdgeMesh2dDataStructure():
                 isNotOK = (NV0 < self.NV)
             return cell2edge, cellLocation
         elif self.NV == 3: # tri mesh
-            cell2edge = np.zeros(NC, 3)
+            cell2edge = np.zeros([NC, 3], dtype = np.int_)
             current = self.hcell[cstart:]
             cell2edge[:, 2] = J[current]
             cell2edge[:, 0] = J[halfedge[current, 2]]
             cell2edge[:, 1] = J[halfedge[current, 3]]
             return cell2edge
         elif self.NV == 4: # quad mesh
-            cell2edge = np.zeros(NC, 4)
+            cell2edge = np.zeros([NC, 4], dtype=np.int_)
             current = self.hcell[cstart:]
             cell2edge[:, 3] = J[current]
             current = halfedge[current, 2]
@@ -1125,14 +1163,15 @@ class HalfEdgeMesh2dDataStructure():
         NC = self.NC
         halfedge = self.halfedge
         cstart = self.cellstart
+        subdomain = self.subdomain
         hflag = subdomain[halfedge[:, 1]] > 0
         hedge = self.hedge
 
         if return_sparse:
             flag = hflag & hflag[halfedge[:, 4]]
             val = np.ones(flag.sum(), dtype=np.bool_)
-            I = halfedge[flag, 1]
-            J = halfedge[halfedge[flag, 4], 1]
+            I = halfedge[flag, 1] - cstart
+            J = halfedge[halfedge[flag, 4], 1]-cstart
             cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool)
             cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool)
             return cell2cell.tocsr()
