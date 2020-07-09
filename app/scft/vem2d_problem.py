@@ -23,7 +23,7 @@ def init_mesh(n=4, h=10):
     mesh.uniform_refine(n)
     return mesh
 
-def halfedgemesh(h=4,n=4):
+def halfedgemesh(n=4,h=4):
     """
     半边数据结构的网格
     """

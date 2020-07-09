@@ -6,7 +6,7 @@ from fealpy.mesh.mesh_tools import show_mesh_2d
 
 from timeit import default_timer as timer
 
-from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine
+from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine,UniformTimeLine
 from ParabolicVEMSolver2d import ParabolicVEMSolver2d
 
 def scftmodel2d_options(
@@ -59,6 +59,7 @@ class SCFTVEMModel2d():
         T1 = options['T1']
         self.timeline0 = ChebyshevTimeLine(0, fA, T0)
         self.timeline1 = ChebyshevTimeLine(fA, 1, T1)
+
         N = T0 + T1 + 1
         gdof = self.vemspace.number_of_global_dofs()
         self.gof = gdof
@@ -238,20 +239,17 @@ class SCFTVEMModel2d():
 
         self.compute_singleQ()
         self.compute_density1()
-        #self.compute_hamiltonian()
 
-        #self.compute_density_2()
 
-        #u = self.vemspace.function(array = mu[:, 0]).value
         u = mu[:,0]
         mu1_int = self.integral_space(u)
 
-        #u1 = self.vemspace.function(array = mu[:, 1]).value
         u1 = mu[:,1]
         S = self.vemspace.project_to_smspace(u1)
         u = lambda x, index : S.value(x, index=index)**2
 
-        mu2_int = self.vemspace.integralalg.integral(u)
+        mu2_int = self.vemspace.integralalg.integral(u)###TODO 区别
+        #mu2_int = self.integral_space(u1**2)
 
         chiN = self.options['chiN']
         self.H = -mu1_int + mu2_int/chiN
@@ -285,38 +283,24 @@ class SCFTVEMModel2d():
         n0 = self.timeline0.NL
         n1 = self.timeline1.NL
 
-        #w = self.vemspace.function(array = self.w[:, 0]).value
         w = self.w[:,0]
         S = self.vemspace.project_to_smspace(w)#TODO
         F = self.vemspace.cross_mass_matrix(S.value)
-        #self.smodel.F = F0
         smodel0 = ParabolicVEMSolver2d(self.A, self.M, F)
 
-        #w = self.vemspace.function(array = self.w[:, 1]).value
         w = self.w[:, 1]
         S = self.vemspace.project_to_smspace(w)
         F = self.vemspace.cross_mass_matrix(S.value)
         smodel1 = ParabolicVEMSolver2d(self.A, self.M, F)
-        #self.smodel.F = F1
         self.timeline0.time_integration(self.q0[:, 0:n0], smodel0,
                 self.nupdate)
         self.timeline1.time_integration(self.q0[:, n0-1:], smodel1,
                 self.nupdate)
+        ###TODO 反向传播子的时间线时间步长对应位置
         self.timeline1.time_integration(self.q1[:, 0:n1], smodel1,
                 self.nupdate)
         self.timeline0.time_integration(self.q1[:, n1-1:], smodel0,
                 self.nupdate)
-    def compute_density_2(self):
-        q = self.q0*self.q1[:, -1::-1]
-        n0 = self.timeline0.NT
-        self.rho[:, 0] = self.timeline0.new_time_integral(q[:, 0:n0])
-        self.rho[:, 1] = self.timeline1.new_time_integral(q[:, n0-1:])
-        q = self.rho.sum(axis=-1)
-        #self.sQ = self.integral_space(q)/self.totalArea
-        self.sQ = self.vemspace.integral(q)/self.totalArea
-        #print(self.sQ)
-        #print('sQ1', self.sQ)
-        self.rho /=self.sQ
 
     def compute_singleQ(self):
         q = self.q0*self.q1[:, -1::-1]
@@ -328,7 +312,7 @@ class SCFTVEMModel2d():
 
     def compute_density(self):
         q = self.q0*self.q1[:, -1::-1]
-        n0 = self.timeline0.get_number_of_time_steps()
+        n0 = self.timeline0.NL
         self.rho[:, 0] = self.integral_time(q[:, 0:n0], self.timeline0.dt)/self.sQ
         self.rho[:, 1] = self.integral_time(q[:, n0-1:], self.timeline1.dt)/self.sQ
 
@@ -353,7 +337,7 @@ class SCFTVEMModel2d():
         H2 = self.integral_space(wA*rhoA+wB*rhoB)/self.totalArea
         H2 += np.log(self.sQ)
 
-        H = H1 - H2
+        self.H = H1 - H2
 
     def integral_time(self, q, dt):
         f = -0.625*(q[:, 0] + q[:, -1]) + 1/6*(q[:, 1] + q[:, -2]) - 1/24*(q[:, 2] + q[:, -3])
@@ -421,7 +405,7 @@ class SCFTVEMModel2d():
         fig = plt.figure()
         axes = fig.gca()
         show_mesh_2d(axes,mesh,cellcolor=d,cmap='jet',linewidths=0.0,markersize=10, showaxis=False,showcolorbar= True)
-        plt.savefig('./figure/figure'+str(i)+'.png')
-        plt.savefig('./figure/figure'+str(i)+'.pdf')
+        plt.savefig('./Figure/figure'+str(i)+'.png')
+        plt.savefig('./Figure/figure'+str(i)+'.pdf')
         plt.close()
 
