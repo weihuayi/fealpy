@@ -580,6 +580,38 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
+    def stiff_matrix_1(self, cfun=None):
+        """
+
+        Notes
+        -----
+        采用积分算法中矩阵组装程序，来组装
+        """
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        M = self.integralalg.construct_matrix(self.grad_basis, cell2dof0=cell2dof,
+                gdof0=gdof)
+        return M
+
+    def mass_matrix_1(self, cfun=None):
+        """
+
+        Notes
+        -----
+        采用积分算法中矩阵组装程序，来组装
+        """
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
+                gdof0=gdof)
+        return M
+
+    def source_vector_1(self, f, dim=None):
+        cell2dof = self.smspace.cell_to_dof()
+        gdof = self.smspace.number_of_global_dofs()
+        b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
+        return b
+
     def stiff_matrix(self, cfun=None):
         p = self.p
         GD = self.geo_dimension()
