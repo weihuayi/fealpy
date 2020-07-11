@@ -202,6 +202,7 @@ class HalfEdgeMesh2d(Mesh2d):
         # edge2cell[i, 2]: 第 i 条边的在左边单元局部编号
         # edge2cell[i, 3]: 第 i 条边的在右边单元局部编号
         edge2cell = self.ds.edge_to_cell()
+        cell2edge = self.ds.cell_to_edge()
 
         cell2cell = self.ds.cell_to_cell(return_sparse=True)
         celltree = minimum_spanning_tree(cell2cell)
@@ -231,6 +232,7 @@ class HalfEdgeMesh2d(Mesh2d):
         index1 = index[~flag]# 在生成树中的边的编号
 
         # 这里可以多线程并行处理
+        cell2cell = self.ds.cell_to_cell(return_sparse=False)
         gamma = []
         count = np.zeros(NN, dtype=np.int8)
         for i in index0:
@@ -245,6 +247,28 @@ class HalfEdgeMesh2d(Mesh2d):
                 else:
                     break
             loop = np.r_['0', i, index1[isKeepEdge]]
+            while True:
+                times = np.zeros(NC, dtype = np.int_)
+                np.add.at(times, edge2cell[loop], 1)
+
+                isMarkedCell = times==2
+                for i in range(NC):
+                    if isMarkedCell[i]:
+                        print(cell2cell[i])
+                        isMarkedCell[cell2cell[i]] = False
+
+                isDelEdge = isMarkedCell[edge2cell[loop]].any(axis=1)
+
+                isMarkedEdge = np.zeros(NE, dtype=np.bool_)
+                isMarkedEdge[loop[isDelEdge]] = True
+
+                cell2edgeMark = cell2edge[isMarkedCell]
+                AddEdge = cell2edgeMark[~isMarkedEdge[cell2edgeMark]]
+
+                loop = loop[~isDelEdge]
+                loop = np.r_[loop, AddEdge]
+                if len(AddEdge)==0:
+                    break
             gamma.append(loop)
 
         return gamma
@@ -1105,6 +1129,7 @@ class HalfEdgeMesh2dDataStructure():
 
         halfedge = self.halfedge
         cstart = self.cellstart
+        subdomain = self.subdomain
         hflag = subdomain[halfedge[:, 1]] > 0
         hedge = self.hedge
 
@@ -1117,7 +1142,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2edge = csr_matrix((val[hflag], (I,
                 J[hflag])), shape=(NC, NE), dtype=np.bool)
             return cell2edge
-        elif NV is None:
+        elif self.NV is None:
             NV = self.number_of_vertices_of_cells()
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
@@ -1204,7 +1229,7 @@ class HalfEdgeMesh2dDataStructure():
             idx = np.repeat(range(NC), 3).reshape(NC, 3)
             flag = (cell2cell < 0)
             cell2cell[flag] = idx[flag]
-            return cell2cella
+            return cell2cell
         elif self.NV == 4: # quad mesh
             cell2cell = np.zeros(NC, 4)
             current = self.hcell[cstart:]
