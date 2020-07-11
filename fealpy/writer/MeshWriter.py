@@ -69,13 +69,17 @@ class MeshWriter:
 
         动态写入时间有关的数据
         """
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(self.mesh)
         self.process.start()
-        pdata = self.mesh.GetPointData()
         cdata = self.mesh.GetCellData()
+        pdata = self.mesh.GetPointData()
+        i = 0
         while True:
             if not self.queue.empty():
                 data = self.queue.get()
-                if data != -1:
+                if isinstance(data, dict):
                     for key, val in data.items():
                         datatype, data = val
                         d = vnp.numpy_to_vtk(data)
@@ -84,11 +88,19 @@ class MeshWriter:
                             cdata.AddArray(d)
                         elif datatype == 'pointdata':
                             pdata.AddArray(d)
+                    writer.WriteNextTime(i)    
+                    i += 1
+                elif isinstance(data, int):
+                    if data > 0: # 这里是总的时间层
+                        writer.SetNumberOfTimeSteps(data)
+                        writer.Start()
+                    elif data == -1:
+                        self.process.join()
+                        print('Simulation stop!')
+                        break
                 else:
-                    print('exit program!')
-                    self.process.join()
                     break
-        writer = vtk.vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(fname)
-        writer.SetInputData(self.mesh)
-        writer.Write()
+            else:
+                break
+
+        writer.Stop()

@@ -116,6 +116,7 @@ class ConcentrationDG():
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
+        self.NL = 0
 
     def set_init_velocity_field(self):
         vdata = self.vdata
@@ -172,21 +173,27 @@ class ConcentrationDG():
         ch = data[0]
         ch += F 
 
-    def output(self, data, nameflag, queue, stop=False):
+    def output(self, data, nameflag, queue, status=None):
         print(nameflag)
         ch = data[0]
-        if stop:
-            uh = data[1]
-            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-            V = uh.value(bc)
-            V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
-            queue.put({'velocity':('celldata', V)})
-            queue.put(-1)
-        else:
+        if status is None:
             bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
             ps = self.mesh.bc_to_point(bc)
             val = ch.value(ps)
             queue.put({'c'+nameflag: ('celldata', val)})
+        elif status == 'start':
+            queue.put(self.NL)
+            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            ps = self.mesh.bc_to_point(bc)
+            val = ch.value(ps)
+            queue.put({'c'+nameflag: ('celldata', val)})
+        elif status == 'stop':
+            #uh = data[1]
+            #bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            #V = uh.value(bc)
+            #V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
+            #queue.put({'velocity':('celldata', V)})
+            queue.put(-1)
 
 
 
@@ -197,9 +204,11 @@ if __name__ == '__main__':
     mesh = mf.regular([0, 1, 0, 1], n=6)
     vdata = VelocityData()
     cdata = ConcentrationData1()
-    model = ConcentrationDG(vdata, cdata, mesh)
     options = {'Output': True}
     timeline = UniformTimeLine(0, 1, 1000, options)
+    model = ConcentrationDG(vdata, cdata, mesh)
+    model.NL = timeline.number_of_time_levels()
+
     data = (model.ch, model.uh)
 
     writer = MeshWriter(mesh, 

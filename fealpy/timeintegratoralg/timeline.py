@@ -57,19 +57,20 @@ class UniformTimeLine():
         timeline = self
         timeline.reset()
 
-        if options['Output']:
+        if options['Output'] & (queue is not None) :
             # dmodel 要提供一个输入数据的功能 
-            dmodel.output(data, str(timeline.current).zfill(10), queue)
+            dmodel.output(data, str(timeline.current).zfill(10), queue, status='start')
 
         while not self.stop():
             # 基于当前时间层的解，求解下一个时间层的解
             # dmodel 只需要提供一层时间的求解就可以了
             dmodel.solve(data, timeline)
             timeline.current += 1
-            if options['Output']:
+            if options['Output'] & (queue is not None):
                 dmodel.output(data, str(timeline.current).zfill(10), queue)
-        if options['Output']:
-            dmodel.output(data, '', queue, stop=True)
+
+        if options['Output'] & (queue is not None):
+            dmodel.output(data, '', queue, status='stop')
         timeline.reset()
 
 class ChebyshevTimeLine():
