@@ -74,7 +74,7 @@ class PolygonMeshIntegralAlg():
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
-        e = np.zeros(shape, dtype=np.float)
+        e = np.zeros(shape, dtype=np.float64)
 
         ee = np.einsum('i, ij..., j->j...', ws, val, a)
         np.add.at(e, edge2cell[:, 0], ee)

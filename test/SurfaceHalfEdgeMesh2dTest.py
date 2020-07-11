@@ -80,10 +80,10 @@ class SurfaceHalfEdgemesh2dTest():
 
         writer = MeshWriter(mesh)
         writer.write(fname='test.vtu')
-
-        for i, index in enumerate(gamma):
-            writer = MeshWriter(mesh, etype='edge', index=index)
-            writer.write(fname='test'+str(i)+'.vtu')
+        if 0:
+            for i, index in enumerate(gamma):
+                writer = MeshWriter(mesh, etype='edge', index=index)
+                writer.write(fname='test'+str(i)+'.vtu')
 
 
 
