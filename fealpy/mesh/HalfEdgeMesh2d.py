@@ -170,7 +170,7 @@ class HalfEdgeMesh2d(Mesh2d):
         """
         pass
 
-    def tri_cut_graph(self, wight = None):
+    def tri_cut_graph(self, weight = None):
         """
         Notes
         -----
@@ -188,6 +188,7 @@ class HalfEdgeMesh2d(Mesh2d):
         assert self.ds.NV == 3
 
         # 检查网格的封闭性 
+        # 该程序只处理定向封闭曲面
 
         # 获取单元实体的个数
         NN = self.number_of_nodes()
@@ -196,6 +197,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # 获取边
         edge = self.entity('edge')
+        eh = self.entity_measure('edge')
 
         # 获取边与单元的关系矩阵
         # edge2cell[i, 0]: 第 i 条边的左边单元编号
@@ -203,6 +205,21 @@ class HalfEdgeMesh2d(Mesh2d):
         # edge2cell[i, 2]: 第 i 条边的在左边单元局部编号
         # edge2cell[i, 3]: 第 i 条边的在右边单元局部编号
         edge2cell = self.ds.edge_to_cell()
+        cell2edge = self.ds.cell_to_edge()
+
+        halfedge = self.ds.halfedge
+        cstart = self.ds.cellstart
+        print(cstart)
+        hedge = self.ds.hedge
+        I = halfedge[:, 1] - cstart
+        J = halfedge[halfedge[:, 4], 1] - cstart
+        if weight is None:
+            val = np.ones(2*NE, dtype=np.bool_)
+        elif weight == 'length':
+            val = np.zeros(2*NE, dtype=self.ftype) 
+            val[hedge] = eh
+            val[halfedge[hedge, 4]] = eh
+        cell2cell  = csr_matrix((val, (I, J)), shape=(NC, NC))
 
         cell2cell = self.ds.cell_to_cell(return_sparse=True)
         celltree = minimum_spanning_tree(cell2cell)
@@ -214,10 +231,10 @@ class HalfEdgeMesh2d(Mesh2d):
         cutEdge = edge[index]
         nc = len(cutEdge)
 
-        if wight == None:
+        if weight == None:
             val = np.ones(nc, dtype=np.bool)
-        elif wight == 'length':
-            val = self.entity_measure('edge')[index]
+        elif weight == 'length':
+            val = eh[index]
 
         n2n = coo_matrix((val, (cutEdge[:, 0], cutEdge[:, 1])), shape=(NN, NN))
         n2n += coo_matrix((val, (cutEdge[:, 1], cutEdge[:, 0])), shape=(NN, NN))
@@ -232,6 +249,7 @@ class HalfEdgeMesh2d(Mesh2d):
         index1 = index[~flag]# 在生成树中的边的编号
 
         # 这里可以多线程并行处理
+        cell2cell = self.ds.cell_to_cell(return_sparse=False)
         gamma = []
         count = np.zeros(NN, dtype=np.int8)
         for i in index0:
@@ -964,7 +982,6 @@ class HalfEdgeMesh2d(Mesh2d):
         elif etype == 'edge':
             cellType = 3
 
-
         return node, cell.flatten(), cellType, len(cell)
 
 
@@ -1116,6 +1133,7 @@ class HalfEdgeMesh2dDataStructure():
 
         halfedge = self.halfedge
         cstart = self.cellstart
+        subdomain = self.subdomain
         hflag = subdomain[halfedge[:, 1]] > 0
         hedge = self.hedge
 
@@ -1128,7 +1146,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2edge = csr_matrix((val[hflag], (I,
                 J[hflag])), shape=(NC, NE), dtype=np.bool)
             return cell2edge
-        elif NV is None:
+        elif self.NV is None:
             NV = self.number_of_vertices_of_cells()
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
@@ -1215,7 +1233,7 @@ class HalfEdgeMesh2dDataStructure():
             idx = np.repeat(range(NC), 3).reshape(NC, 3)
             flag = (cell2cell < 0)
             cell2cell[flag] = idx[flag]
-            return cell2cella
+            return cell2cell
         elif self.NV == 4: # quad mesh
             cell2cell = np.zeros(NC, 4)
             current = self.hcell[cstart:]
