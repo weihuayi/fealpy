@@ -55,7 +55,7 @@ class VelocityData:
         flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
         return flag
 
-class ConcentrationData:
+class ConcentrationData0:
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -82,6 +82,22 @@ class ConcentrationData:
         flag = (np.abs(x) < 1e-13)
         return flag
 
+class ConcentrationData1:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    def init_value(self, p):
+        val = np.array([1.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
 class ConcentrationDG():
     def __init__(self, vdata, cdata, mesh, p=0):
         self.vdata = vdata
@@ -93,6 +109,9 @@ class ConcentrationDG():
         self.uh = self.uspace.function() # 速度场自由度数组
         self.ph = self.uspace.smspace.function() # 压力场自由度数组
         self.ch = self.cspace.function() # 浓度场自由度数组
+
+        ldof = self.cspace.number_of_local_dofs()
+        self.ch[0::ldof] = 1.0
 
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
@@ -141,8 +160,7 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F, index = self.uspace.convection_vector(nt, cdata.neumann, ch, uh,
-                threshold=cdata.is_neumann_boundary) 
+        F = self.uspace.convection_vector(nt, ch, uh) 
 
         F = self.H@(F[:, :, None]/0.2)
         F *= dt
@@ -165,7 +183,10 @@ class ConcentrationDG():
             queue.put({'velocity':('celldata', V)})
             queue.put(-1)
         else:
-            queue.put({'c'+nameflag: ('celldata', ch)})
+            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            ps = self.mesh.bc_to_point(bc)
+            val = ch.value(ps)
+            queue.put({'c'+nameflag: ('celldata', val)})
 
 
 
@@ -173,9 +194,9 @@ if __name__ == '__main__':
 
     from fealpy.writer import MeshWriter
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=10)
+    mesh = mf.regular([0, 1, 0, 1], n=6)
     vdata = VelocityData()
-    cdata = ConcentrationData()
+    cdata = ConcentrationData1()
     model = ConcentrationDG(vdata, cdata, mesh)
     options = {'Output': True}
     timeline = UniformTimeLine(0, 1, 1000, options)
