@@ -280,7 +280,7 @@ class LagrangeFiniteElementSpace():
 
 
     @barycentric
-    def basis(self, bc):
+    def basis(self, bc, index=np.s_[:]):
         """
         compute the basis function values at barycentric point bc
 
