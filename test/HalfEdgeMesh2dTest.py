@@ -275,7 +275,7 @@ class HalfEdgeMesh2dTest:
         cell = np.array(data['elem'] - 1, dtype=np.int_)
 
         mesh = TriangleMesh(node, cell)
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh, closed=True)
         mesh.ds.NV = 3
 
         gamma = mesh.tri_cut_graph(weight = weight)

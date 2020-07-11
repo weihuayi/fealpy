@@ -76,7 +76,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.init_level_info()
 
     @classmethod
-    def from_mesh(cls, mesh):
+    def from_mesh(cls, mesh, closed=False):
         mtype = mesh.meshtype
         if mtype != 'halfedge':
             NE = mesh.number_of_edges()
@@ -91,8 +91,12 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge = np.zeros((2*NE, 5), dtype=mesh.itype)
             halfedge[:, 0] = edge.flat
 
-            halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
-            halfedge[1::2, 1] = edge2cell[:, 0] + 1
+            if closed:
+                halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1]
+                halfedge[1::2, 1] = edge2cell[:, 0]
+            else:
+                halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
+                halfedge[1::2, 1] = edge2cell[:, 0] + 1
 
             halfedge[0::2, 4] = range(1, 2*NE, 2)
             halfedge[1::2, 4] = range(0, 2*NE, 2)
@@ -107,8 +111,11 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[idx[:, 0], 2] = idx[:, 1]
             halfedge[halfedge[:, 2], 3] = range(NHE)
 
-            subdomain = np.ones(NC+1, dtype=halfedge.dtype)
-            subdomain[0] = 0
+            if closed:
+                subdomain = np.ones(NC, dtype=halfedge.dtype)
+            else:
+                subdomain = np.ones(NC+1, dtype=halfedge.dtype)
+                subdomain[0] = 0
             return cls(node, halfedge, subdomain)
         else:
             newMesh =  cls(mesh.node, mesh.subdomain, mesh.ds.halfedge.copy())
@@ -207,11 +214,9 @@ class HalfEdgeMesh2d(Mesh2d):
         cell2edge = self.ds.cell_to_edge()
 
         halfedge = self.ds.halfedge
-        cstart = self.ds.cellstart
-        print(cstart)
         hedge = self.ds.hedge
-        I = halfedge[:, 1] - cstart
-        J = halfedge[halfedge[:, 4], 1] - cstart
+        I = halfedge[:, 1]
+        J = halfedge[halfedge[:, 4], 1]
         if weight is None:
             val = np.ones(2*NE, dtype=np.bool_)
         elif weight == 'length':
