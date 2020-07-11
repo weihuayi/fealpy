@@ -169,7 +169,7 @@ class HalfEdgeMesh2d(Mesh2d):
         """
         pass
 
-    def tri_cut_graph(self, wight = None):
+    def tri_cut_graph(self, weight = None):
         """
         Notes
         -----
@@ -187,6 +187,7 @@ class HalfEdgeMesh2d(Mesh2d):
         assert self.ds.NV == 3
 
         # 检查网格的封闭性 
+        # 该程序只处理定向封闭曲面
 
         # 获取单元实体的个数
         NN = self.number_of_nodes()
@@ -195,6 +196,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # 获取边
         edge = self.entity('edge')
+        eh = self.entity_measure('edge')
 
         # 获取边与单元的关系矩阵
         # edge2cell[i, 0]: 第 i 条边的左边单元编号
@@ -203,6 +205,20 @@ class HalfEdgeMesh2d(Mesh2d):
         # edge2cell[i, 3]: 第 i 条边的在右边单元局部编号
         edge2cell = self.ds.edge_to_cell()
         cell2edge = self.ds.cell_to_edge()
+
+        halfedge = self.ds.halfedge
+        cstart = self.ds.cellstart
+        print(cstart)
+        hedge = self.ds.hedge
+        I = halfedge[:, 1] - cstart
+        J = halfedge[halfedge[:, 4], 1] - cstart
+        if weight is None:
+            val = np.ones(2*NE, dtype=np.bool_)
+        elif weight == 'length':
+            val = np.zeros(2*NE, dtype=self.ftype) 
+            val[hedge] = eh
+            val[halfedge[hedge, 4]] = eh
+        cell2cell  = csr_matrix((val, (I, J)), shape=(NC, NC))
 
         cell2cell = self.ds.cell_to_cell(return_sparse=True)
         celltree = minimum_spanning_tree(cell2cell)
@@ -214,10 +230,10 @@ class HalfEdgeMesh2d(Mesh2d):
         cutEdge = edge[index]
         nc = len(cutEdge)
 
-        if wight == None:
+        if weight == None:
             val = np.ones(nc, dtype=np.bool)
-        elif wight == 'length':
-            val = self.entity_measure('edge')[index]
+        elif weight == 'length':
+            val = eh[index]
 
         n2n = coo_matrix((val, (cutEdge[:, 0], cutEdge[:, 1])), shape=(NN, NN))
         n2n += coo_matrix((val, (cutEdge[:, 1], cutEdge[:, 0])), shape=(NN, NN))
@@ -247,28 +263,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 else:
                     break
             loop = np.r_['0', i, index1[isKeepEdge]]
-            while True:
-                times = np.zeros(NC, dtype = np.int_)
-                np.add.at(times, edge2cell[loop], 1)
-
-                isMarkedCell = times==2
-                for i in range(NC):
-                    if isMarkedCell[i]:
-                        print(cell2cell[i])
-                        isMarkedCell[cell2cell[i]] = False
-
-                isDelEdge = isMarkedCell[edge2cell[loop]].any(axis=1)
-
-                isMarkedEdge = np.zeros(NE, dtype=np.bool_)
-                isMarkedEdge[loop[isDelEdge]] = True
-
-                cell2edgeMark = cell2edge[isMarkedCell]
-                AddEdge = cell2edgeMark[~isMarkedEdge[cell2edgeMark]]
-
-                loop = loop[~isDelEdge]
-                loop = np.r_[loop, AddEdge]
-                if len(AddEdge)==0:
-                    break
             gamma.append(loop)
 
         return gamma
@@ -976,7 +970,6 @@ class HalfEdgeMesh2d(Mesh2d):
             cellType = 5
         elif etype == 'edge':
             cellType = 3
-
 
         return node, cell.flatten(), cellType, len(cell)
 

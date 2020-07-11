@@ -269,7 +269,7 @@ class HalfEdgeMesh2dTest:
         else:
             return mesh
 
-    def tri_cut_graph(self, fname, wight = None):
+    def tri_cut_graph(self, fname, weight = None):
         data = sio.loadmat(fname)
         node = np.array(data['node'], dtype=np.float64)
         cell = np.array(data['elem'] - 1, dtype=np.int_)
@@ -278,7 +278,7 @@ class HalfEdgeMesh2dTest:
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
         mesh.ds.NV = 3
 
-        gamma = mesh.tri_cut_graph(wight = wight)
+        gamma = mesh.tri_cut_graph(weight = weight)
 
         writer = MeshWriter(mesh)
         writer.write(fname='test.vtu')
@@ -304,11 +304,11 @@ elif sys.argv[1] == 'cell_to_node':
     mesh = test.cell_to_node()
 elif sys.argv[1] == 'read':
     fname = sys.argv[2]
-    wight = sys.argv[3]
-    if wight == 'N':
+    weight = sys.argv[3]
+    if weight == 'N':
         test.tri_cut_graph(fname)
     else:
-        test.tri_cut_graph(fname, wight = 'length')
+        test.tri_cut_graph(fname, weight = 'length')
 
 
 
