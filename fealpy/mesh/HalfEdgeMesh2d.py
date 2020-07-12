@@ -471,7 +471,6 @@ class HalfEdgeMesh2d(Mesh2d):
         nlevel = self.nodedata['level']
         hlevel = self.halfedgedata['level']
         halfedge = self.entity('halfedge')
-        print(halfedge)
         if method == 'poly':
             # 当前半边的层标记小于等于所属单元的层标记
             flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0
@@ -505,7 +504,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
                 if (~flag).all():
                     break
-
         elif method == 'rg':
             pass
         elif method == 'rgb':
