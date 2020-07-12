@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.writer import MeshWriter
 from fealpy.mesh import HalfEdgeMesh2d
+from fealpy.mesh import HalfEdgeMesh
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
 
@@ -122,7 +123,7 @@ class HalfEdgeMesh2dTest:
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        if 0:
+        if True:
             isMarkedCell = mesh.mark_helper([2])
             mesh.refine_poly(isMarkedCell)
 
@@ -134,7 +135,7 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([3])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        if 0:
+        if False:
             isMarkedCell = mesh.mark_helper([1, 5])
             mesh.refine_poly(isMarkedCell)
 
@@ -147,13 +148,13 @@ class HalfEdgeMesh2dTest:
             mesh.refine_poly(isMarkedCell, dflag=False)
 
         if plot:
-
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, showindex=True)
             mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
+            plt.show()
 
             if 0:
                 NAC = mesh.number_of_all_cells() # 包括外部区域和洞
@@ -175,7 +176,7 @@ class HalfEdgeMesh2dTest:
                 #mesh.add_plot(axes)
                 mesh.find_node(axes, showindex=True, multiindex=nindex)
                 #mesh.find_cell(axes, showindex=True, multiindex=cindex)
-            plt.show()
+                plt.show()
         else:
             return mesh
 
@@ -286,13 +287,47 @@ class HalfEdgeMesh2dTest:
             writer = MeshWriter(mesh, etype='edge', index=index)
             writer.write(fname='test'+str(i)+'.vtu')
 
-    def quad_refine():
+    def quad_refine(self, plot=True):
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = QuadrangleMesh(node, cell)
 
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh0 = HalfEdgeMesh.from_mesh(mesh)
 
+        isMarkedCell = np.array([0, 0, 1], dtype=np.bool_)
+
+        mesh0.refine_quad(isMarkedCell)
+
+        mesh1 = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh1.ds.NV = 4
+        mesh1.node = mesh0.node
+        halfedge = mesh0.ds.halfedge[:, :-1]
+        mesh1.ds.reinit(halfedge, mesh0.ds.subdomain)
+
+        NE = mesh1.ds.NE
+        color = 3*np.ones(NE*2, dtype = np.int_)
+        color[0]=1
+        while (color==3).any():
+            red = color == 1
+            gre = color == 0
+            color[halfedge[red][:, [2,3,4]]] = 0
+            color[halfedge[gre][:, [2,3,4]]] = 1
+            print(color)
+
+
+        color[[24, 27]] = 2
+        mesh1.hedgecolor = color
+        isMarkedCell = np.array([0, 0, 0, 0, 0, 1, 0, 0], dtype=np.bool_)
+        isMarkedHEdge = mesh1.mark_halfedge(isMarkedCell, method = 'quad')
+        mesh0.ds.hedge = np.arange(NE*2)[isMarkedHEdge]
+        print(np.where(isMarkedHEdge))
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh0.add_plot(axes)
+            mesh0.add_halfedge_plot(axes, showindex=True)
+            mesh0.find_cell(axes, showindex=True)
+            plt.show()
 
 
 test = HalfEdgeMesh2dTest()
@@ -304,18 +339,16 @@ elif sys.argv[1] == 'from_edges':
 elif sys.argv[1] == 'refine_halfedge':
     test.refine_halfedge()
 elif sys.argv[1] == 'refine_poly':
-    test.refine_poly(plot=False)
+    test.refine_poly(plot=True)
 elif sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly()
 elif sys.argv[1] == 'cell_to_node':
     mesh = test.cell_to_node()
 elif sys.argv[1] == 'read':
     fname = sys.argv[2]
-    weight = sys.argv[3]
-    if weight == 'N':
-        test.tri_cut_graph(fname)
-    else:
-        test.tri_cut_graph(fname, weight = 'length')
+    test.tri_cut_graph(fname, weight = 'length')
+elif sys.argv[1] == 'quad_refine':
+    test.quad_refine()
 
 
 

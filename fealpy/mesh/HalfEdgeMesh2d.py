@@ -342,7 +342,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 NV = self.ds.number_of_vertices_of_cells()
                 bc = cell2node@node/NV[:, None]
             else:
-                bc = cell2node@node/NV
+                bc = cell2node@node/self.ds.NV
         elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge_to_node()
             bc = np.sum(node[edge, :], axis=1).reshape(-1, GD)/edge.shape[1]
@@ -466,6 +466,7 @@ class HalfEdgeMesh2d(Mesh2d):
         nlevel = self.nodedata['level']
         hlevel = self.halfedgedata['level']
         halfedge = self.entity('halfedge')
+        print(halfedge)
         if method == 'poly':
             # 当前半边的层标记小于等于所属单元的层标记
             flag0 = (hlevel - clevel[halfedge[:, 1]]) <= 0
@@ -481,14 +482,25 @@ class HalfEdgeMesh2d(Mesh2d):
             color = self.hedgecolor
             isGreenHEdge = color == 1
             isRedHEdge = color == 0
-            isDeepHedge = color == color[halfedge[: 4]]
+            isDeepHedge = color == 2
 
-            flag0 = isGreenHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 3]]
-            flag1 = isRedHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 2]]
-            flag2 = isDeepHedge & ~isMarkedCell & (isMarkedHEdge) 
-            flag = flag0 | flag1
+            # 标记加密的半边
+            isMarkedHEdge = isMarkedCell[halfedge[:, 1]]
+            # 标记加密的半边的相对半边也需要标记 
+            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+            isMarkedHEdge[flag] = True
+            while True:
+                flag0 = isGreenHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 3]]
+                flag1 = isRedHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 2]]
+                flag2 = isDeepHedge & ~isMarkedHEdge & (isMarkedHEdge[halfedge[:,
+                    2]] | isMarkedHEdge[halfedge[:, 3]])
+                flag = flag0 | flag1 | flag2
 
-            pass
+                isMarkedHEdge[flag] = True
+                isMarkedHEdge[halfedge[isMarkedHEdge, 4]] = True
+                if (~flag).all():
+                    break
+
         elif method == 'rg':
             pass
         elif method == 'rgb':
