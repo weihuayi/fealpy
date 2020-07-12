@@ -426,7 +426,7 @@ class RaviartThomasFiniteElementSpace2d:
         return b
 
 
-    def convection_vector(self, t, g, ch, vh, threshold=None, q=None):
+    def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):
         """
 
         Parameters
@@ -476,15 +476,17 @@ class RaviartThomasFiniteElementSpace2d:
 
         # 边界条件处理
         val2[:, isBdEdge] = 0.0 # 首先把边界的贡献都设为 0 
-        if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
-            index = threshold # 这里假设 threshold 是边界边编号数组
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        val2[:, index] = g(ps[:, index], en[index]) # 这里假设 g 是一个函数， TODO：其它情形？
+
+        if g is not None:
+            if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
+                index = threshold # 这里假设 threshold 是边界边编号数组
+            else:
+                index = self.mesh.ds.boundary_edge_index()
+                if threshold is not None:
+                    bc = self.mesh.entity_barycenter('edge', index=index)
+                    flag = threshold(bc)
+                    index = index[flag]
+            val2[:, index] = g(ps[:, index], en[index]) # 这里假设 g 是一个函数， TODO：其它情形？
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项
@@ -502,7 +504,7 @@ class RaviartThomasFiniteElementSpace2d:
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1]) # 只处理内部边
         np.add.at(F, (edge2cell[isInEdge, 1], np.s_[:]), b[isInEdge])  
 
-        return F, edge2cell[index, 0]
+        return F
 
 
     def set_neumann_bc(self, g, threshold=None, q=None):

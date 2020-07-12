@@ -297,7 +297,7 @@ class HalfEdgeMeshTest:
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
-    def refine_quad(p=1):
+    def refine_quad(self, plot=True):
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = QuadrangleMesh(node, cell)
@@ -306,7 +306,7 @@ class HalfEdgeMeshTest:
         c = np.array([0.8,0.8])
         r = 0.5
         h = 1e-2
-        l=7
+        l=6
         k=0
         NB = 0
         while k<l:
@@ -329,7 +329,7 @@ class HalfEdgeMeshTest:
             mesh.refine_quad(markedcell1)
             k+=1
             print('循环',k,'次***************************')
-        if p:
+        if plot:
             fig = plt.figure()
             axes = fig.gca()
             nindex = mesh.nodedata['level']
@@ -585,6 +585,9 @@ if sys.argv[1] == 'adaptive_poly':
 
 if sys.argv[1] == 'quadtree_test':
     mesh = test.quadtree_test()
+
+if sys.argv[1] == 'refine_quad':
+    test.refine_quad(plot=True)
 
 
 #test.triangle_mesh_test(plot=True)

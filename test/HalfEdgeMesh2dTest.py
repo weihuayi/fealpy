@@ -4,8 +4,10 @@ import sys
 import time
 
 import numpy as np
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
+from fealpy.writer import MeshWriter
 from fealpy.mesh import HalfEdgeMesh2d
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
@@ -267,6 +269,25 @@ class HalfEdgeMesh2dTest:
         else:
             return mesh
 
+    def tri_cut_graph(self, fname, weight = None):
+        data = sio.loadmat(fname)
+        node = np.array(data['node'], dtype=np.float64)
+        cell = np.array(data['elem'] - 1, dtype=np.int_)
+
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh, closed=True)
+        mesh.ds.NV = 3
+
+        gamma = mesh.tri_cut_graph(weight = weight)
+
+        writer = MeshWriter(mesh)
+        writer.write(fname='test.vtu')
+        for i, index in enumerate(gamma):
+            writer = MeshWriter(mesh, etype='edge', index=index)
+            writer.write(fname='test'+str(i)+'.vtu')
+
+
+
 test = HalfEdgeMesh2dTest()
 
 if sys.argv[1] == "data_structure":
@@ -281,5 +302,13 @@ elif sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly()
 elif sys.argv[1] == 'cell_to_node':
     mesh = test.cell_to_node()
+elif sys.argv[1] == 'read':
+    fname = sys.argv[2]
+    weight = sys.argv[3]
+    if weight == 'N':
+        test.tri_cut_graph(fname)
+    else:
+        test.tri_cut_graph(fname, weight = 'length')
+
 
 
