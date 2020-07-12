@@ -20,7 +20,7 @@ def scftmodel2d_options(
         T0 = 4,
         T1 = 16,
         nupdate = 1,
-        order = 1, 
+        order = 1,
         rdir='.'):
     """
     Get the options used in model.
