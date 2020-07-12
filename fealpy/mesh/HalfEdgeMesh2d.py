@@ -346,7 +346,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 NV = self.ds.number_of_vertices_of_cells()
                 bc = cell2node@node/NV[:, None]
             else:
-                bc = cell2node@node/NV
+                bc = cell2node@node/self.ds.NV
         elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge_to_node()
             bc = np.sum(node[edge, :], axis=1).reshape(-1, GD)/edge.shape[1]
@@ -464,6 +464,32 @@ class HalfEdgeMesh2d(Mesh2d):
         index = index if index is not None else np.s_[:]
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
         return ps
+
+    def grad_lambda(self):
+        node = self.entity('node')
+        cell, cellLocation = self.entity('cell')
+        print(cell)
+        NC = self.number_of_cells()
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        GD = self.geo_dimension()
+        nv = np.cross(v2, -v1)
+        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            W = np.array([[0, 1], [-1, 0]])
+            Dlambda[:,0,:] = v0@W/length.reshape((-1, 1))
+            Dlambda[:,1,:] = v1@W/length.reshape((-1, 1))
+            Dlambda[:,2,:] = v2@W/length.reshape((-1, 1))
+        elif GD == 3:
+            length = np.sqrt(np.square(nv).sum(axis=1))
+            n = nv/length.reshape((-1, 1))
+            Dlambda[:,0,:] = np.cross(n, v0)/length.reshape((-1,1))
+            Dlambda[:,1,:] = np.cross(n, v1)/length.reshape((-1,1))
+            Dlambda[:,2,:] = np.cross(n, v2)/length.reshape((-1,1))
+        return Dlambda
+
 
     def mark_halfedge(self, isMarkedCell, method='poly'):
         clevel = self.celldata['level'] # 注意这里是所有的单元的层信息
@@ -1117,7 +1143,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2node[:, 2] = halfedge[current, 0]
             current = halfedge[current, 2]
             cell2node[:, 3] = halfedge[current, 0]
-            return cell2node
+            return cell2node,None
         else:
             raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
 

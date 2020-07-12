@@ -58,8 +58,8 @@ class CosCosData:
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'halfedge':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
-            mesh = QuadrangleMesh(node, cell)
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
             mesh = HalfEdgeMesh2d.from_mesh(mesh)
             mesh.uniform_refine(n)
             return mesh
