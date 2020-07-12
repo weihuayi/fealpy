@@ -579,16 +579,16 @@ class HalfEdgeMesh2d(Mesh2d):
         cellstart = self.ds.cellstart
         NV1 = self.number_of_vertices_of_cells()
         if ('HB' in options) and (options['HB'] is not None):
-             isNonMarkedCell = ~isMarkedCell
-             flag0 = isNonMarkedCell[cellstart:]
-             flag1 = isMarkedCell[cellstart:]
-             NHB0 = flag0.sum()
-             NHB = NHB0 + NHE
-             HB = np.zeros((NHB, 2), dtype=np.int)
-             HB[:, 0] = range(NHB)
-             HB[0:NHB0, 1] = options['HB'][flag0, 1]
-             HB[NHB0:,  1] = cellidx - cellstart
-             options['HB'] = HB
+            isNonMarkedCell = ~isMarkedCell
+            flag0 = isNonMarkedCell[cellstart:]
+            flag1 = isMarkedCell[cellstart:]
+            NHB0 = flag0.sum()
+            NHB = NHB0 + NHE
+            HB = np.zeros((NHB, 2), dtype=np.int)
+            HB[:, 0] = range(NHB)
+            HB[0:NHB0, 1] = options['HB'][flag0, 1]
+            HB[NHB0:,  1] = cellidx - cellstart
+            options['HB'] = HB
 
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
@@ -1328,6 +1328,7 @@ class HalfEdgeMesh2dDataStructure():
     def boundary_edge_flag(self):
         NE = self.NE
         halfedge =  self.halfedge
+        hedge = self.hedge
         subdomain = self.subdomain
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
