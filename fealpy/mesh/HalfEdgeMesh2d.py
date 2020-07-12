@@ -77,7 +77,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.init_level_info()
 
     @classmethod
-    def from_mesh(cls, mesh):
+    def from_mesh(cls, mesh, closed=False):
         mtype = mesh.meshtype
         if mtype != 'halfedge':
             NE = mesh.number_of_edges()
@@ -92,8 +92,12 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge = np.zeros((2*NE, 5), dtype=mesh.itype)
             halfedge[:, 0] = edge.flat
 
-            halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
-            halfedge[1::2, 1] = edge2cell[:, 0] + 1
+            if closed:
+                halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1]
+                halfedge[1::2, 1] = edge2cell[:, 0]
+            else:
+                halfedge[0::2, 1][isInEdge] = edge2cell[isInEdge, 1] + 1
+                halfedge[1::2, 1] = edge2cell[:, 0] + 1
 
             halfedge[0::2, 4] = range(1, 2*NE, 2)
             halfedge[1::2, 4] = range(0, 2*NE, 2)
@@ -108,8 +112,11 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[idx[:, 0], 2] = idx[:, 1]
             halfedge[halfedge[:, 2], 3] = range(NHE)
 
-            subdomain = np.ones(NC+1, dtype=halfedge.dtype)
-            subdomain[0] = 0
+            if closed:
+                subdomain = np.ones(NC, dtype=halfedge.dtype)
+            else:
+                subdomain = np.ones(NC+1, dtype=halfedge.dtype)
+                subdomain[0] = 0
             return cls(node, halfedge, subdomain)
         else:
             newMesh =  cls(mesh.node, mesh.subdomain, mesh.ds.halfedge.copy())
@@ -208,11 +215,9 @@ class HalfEdgeMesh2d(Mesh2d):
         cell2edge = self.ds.cell_to_edge()
 
         halfedge = self.ds.halfedge
-        cstart = self.ds.cellstart
-        print(cstart)
         hedge = self.ds.hedge
-        I = halfedge[:, 1] - cstart
-        J = halfedge[halfedge[:, 4], 1] - cstart
+        I = halfedge[:, 1]
+        J = halfedge[halfedge[:, 4], 1]
         if weight is None:
             val = np.ones(2*NE, dtype=np.bool_)
         elif weight == 'length':
@@ -1010,6 +1015,22 @@ class HalfEdgeMesh2d(Mesh2d):
         for i, val in enumerate(self.ds.halfedge):
             print(i, ":", val)
 
+        print("edge2cell:")
+        edge = self.entity('edge')
+        for i, val in enumerate(edge):
+            print(i, ":", val)
+
+        print("edge2cell:")
+        edge2cell = self.ds.edge_to_cell()
+        for i, val in enumerate(edge2cell):
+            print(i, ":", val)
+
+        cell, cellLocation = self.entity('cell')
+        print('cell:', cell)
+        print('cellLocation:', cellLocation)
+        cell2edge, cellLocation = self.ds.cell_to_edge()
+        print("cell2edge:", cell2edge)
+
 class HalfEdgeMesh2dDataStructure():
     def __init__(self, halfedge, subdomain, NN=None, NV=None):
         self.reinit(halfedge, subdomain, NN=NN, NV=NV)
@@ -1044,7 +1065,7 @@ class HalfEdgeMesh2dDataStructure():
 
         NC = len(subdomain) # 实际单元个数, 包括外部无界区域和洞
 
-        self.hcell = DynamicArray( (NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
+        self.hcell = DynamicArray((NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
 
         self.hcell[halfedge[:, 1]] = range(2*self.NE) # 的编号
         flag = halfedge[:, 4] - np.arange(2*self.NE) > 0
@@ -1104,7 +1125,7 @@ class HalfEdgeMesh2dDataStructure():
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
             cell2node = np.zeros(cellLocation[-1], dtype=self.itype)
-            current = self.hcell[cstart:]
+            current = self.hcell[cstart:].copy()
             idx = cellLocation[:-1].copy()
             cell2node[idx] = halfedge[halfedge[current, 3], 0]
             NV0 = np.ones(NC, dtype=self.itype)
@@ -1153,10 +1174,10 @@ class HalfEdgeMesh2dDataStructure():
         J[hedge] = range(NE)
         J[halfedge[hedge, 4]] = range(NE)
         if return_sparse:
-            val = np.ones(2*NE, dtype=np.bool)
+            val = np.ones(2*NE, dtype=np.bool_)
             I = halfedge[hflag, 1] - cstart
             cell2edge = csr_matrix((val[hflag], (I,
-                J[hflag])), shape=(NC, NE), dtype=np.bool)
+                J[hflag])), shape=(NC, NE), dtype=np.bool_)
             return cell2edge
         elif self.NV is None:
             NV = self.number_of_vertices_of_cells()
@@ -1164,17 +1185,17 @@ class HalfEdgeMesh2dDataStructure():
             cellLocation[1:] = np.cumsum(NV)
 
             cell2edge = np.zeros(cellLocation[-1], dtype=self.itype)
-            current = self.hcell[cstart:]
+            current = self.hcell[cstart:].copy()
             idx = cellLocation[:-1]
             cell2edge[idx] = J[current]
             NV0 = np.ones(NC, dtype=self.itype)
-            isNotOK = NV0 < self.NV
-            while isNotOK.sum() > 0:
+            isNotOK = NV0 < NV
+            while np.any(isNotOK):
                 current[isNotOK] = halfedge[current[isNotOK], 2]
                 idx[isNotOK] += 1
                 NV0[isNotOK] += 1
                 cell2edge[idx[isNotOK]] = J[current[isNotOK]]
-                isNotOK = (NV0 < self.NV)
+                isNotOK = (NV0 < NV)
             return cell2edge, cellLocation
         elif self.NV == 3: # tri mesh
             cell2edge = np.zeros([NC, 3], dtype = np.int_)
@@ -1221,7 +1242,7 @@ class HalfEdgeMesh2dDataStructure():
             cellLocation = np.zeros(NC+1, dtype=self.itype)
             cellLocation[1:] = np.cumsum(NV)
             cell2cell = np.zeros(cellLocation[-1], dtype=self.itype)
-            current = self.hcell[cstart:]
+            current = self.hcell[cstart:].copy()
             idx = cellLocation[:-1]
             cell2cell[idx] = halfedge[halfedge[current, 4], 1]-cstart
             NV0 = np.ones(NC, dtype=self.itype)
@@ -1308,7 +1329,7 @@ class HalfEdgeMesh2dDataStructure():
         isMainHEdge[hedge] = True
 
         if self.NV is None:
-            current = self.hcell[cstart:]
+            current = self.hcell[cstart:].copy()
             end = current.copy()
             lidx = np.zeros_like(current)
             isNotOK = np.ones_like(current, dtype=np.bool_)

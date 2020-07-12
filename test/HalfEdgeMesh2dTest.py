@@ -17,6 +17,43 @@ class HalfEdgeMesh2dTest:
     def __init__(self):
         pass
 
+    def interpolation(self, n=2, plot=True):
+        from fealpy.pde.poisson_2d import CosCosData
+        from fealpy.functionspace import ConformingVirtualElementSpace2d
+
+        pde = CosCosData()
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float64)
+        cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
+        mesh = QuadrangleMesh(node, cell)
+        #mesh = PolygonMesh.from_mesh(mesh)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.uniform_refine(n=n)
+
+        #mesh.print()
+
+        space = ConformingVirtualElementSpace2d(mesh, p=1)
+        uI = space.interpolation(pde.solution)
+        up = space.project_to_smspace(uI)
+        error = space.integralalg.L2_error(pde.solution, up)
+        print(error)
+
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            #mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+
+
     def data_structure(self, plot=True):
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
@@ -276,7 +313,7 @@ class HalfEdgeMesh2dTest:
         cell = np.array(data['elem'] - 1, dtype=np.int_)
 
         mesh = TriangleMesh(node, cell)
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh, closed=True)
         mesh.ds.NV = 3
 
         gamma = mesh.tri_cut_graph(weight = weight)
@@ -349,6 +386,10 @@ elif sys.argv[1] == 'read':
     test.tri_cut_graph(fname, weight = 'length')
 elif sys.argv[1] == 'quad_refine':
     test.quad_refine()
+
+elif sys.argv[1] == "interpolation":
+    n = int(sys.argv[2])
+    test.interpolation(n=n, plot=False)
 
 
 

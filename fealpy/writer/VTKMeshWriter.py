@@ -5,45 +5,19 @@ import vtk.util.numpy_support as vnp
 import multiprocessing
 import time
 
-class MeshWriter:
+class VTKMeshWriter:
     """
 
     Notes
     -----
     用于在数值模拟过程中输出网格和数据到 vtk 文件中
     """
-    def __init__(self, mesh, simulation=None, args=None, etype='cell',
-            index=np.s_[:]):
+    def __init__(self, fname, simulation=None, args=None):
 
-        GD = mesh.geo_dimension()
-        TD = mesh.top_dimension()
-
-        NN = mesh.number_of_nodes()
-
-        node, cell, cellType, NC = mesh.to_vtk(etype=etype, index=index)
-
-        points = vtk.vtkPoints()
-        points.SetData(vnp.numpy_to_vtk(node))
-
-        cells = vtk.vtkCellArray()
-        cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
-
-        self.mesh =vtk.vtkUnstructuredGrid() 
-        self.mesh.SetPoints(points)
-        self.mesh.SetCells(cellType, cells)
-
-        pdata = self.mesh.GetPointData()
-
-        for key, val in mesh.nodedata.items():
-            d = vnp.numpy_to_vtk(val)
-            d.SetName(key)
-            pdata.AddArray(d)
-
-        cdata = self.mesh.GetCellData()
-        for key, val in mesh.celldata.items():
-            d = vnp.numpy_to_vtk(val)
-            d.SetName(key)
-            cdata.AddArray(d)
+        self.vtkmesh =vtk.vtkUnstructuredGrid() 
+        self.writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(self.vtkmesh)
 
         self.simulation = simulation
         if self.simulation is not None:
@@ -54,13 +28,37 @@ class MeshWriter:
             self.queue = None
             self.process = None
 
-    def write(self, fname='test.vtu'):
-        writer = vtk.vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(fname)
-        writer.SetInputData(self.mesh)
-        writer.Write()
+    def set_mesh_data(self, mesh, etype='cell', index=np.s_[:]):
+        node, cell, cellType, NC = mesh.to_vtk(etype=etype, index=index)
+        points = vtk.vtkPoints()
+        points.SetData(vnp.numpy_to_vtk(node))
+        cells = vtk.vtkCellArray()
+        cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+        self.vtkmesh.SetPoints(points)
+        self.vtkmesh.SetCells(cellType, cells)
 
-    def run(self, fname='test.vtu'):
+        self.set_point_data(mesh.nodedata)
+        self.set_cell_data(mesh.celldata)
+
+    def set_point_data(self, data):
+        pdata = self.vtkmesh.GetPointData()
+        for key, val in data.items():
+            d = vnp.numpy_to_vtk(data)
+            d.SetName(key)
+            pdata.AddArray(d)
+
+    def set_cell_data(self, data):
+        cdata = self.vtkmesh.GetCellData()
+        for key, val in data.items():
+            d = vnp.numpy_to_vtk(data)
+            d.SetName(key)
+            cdata.AddArray(d)
+
+
+    def write(self):
+        self.writer.Write()
+
+    def write_with_time(self):
         """
 
         Notes
@@ -68,12 +66,7 @@ class MeshWriter:
 
         动态写入时间有关的数据
         """
-        writer = vtk.vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(fname)
-        writer.SetInputData(self.mesh)
         self.process.start()
-        cdata = self.mesh.GetCellData()
-        pdata = self.mesh.GetPointData()
         i = 0
         while True:
             if not self.queue.empty():
