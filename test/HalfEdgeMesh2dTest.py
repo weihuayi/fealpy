@@ -245,7 +245,7 @@ class HalfEdgeMesh2dTest:
         refined mesh
         """
         aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-        eta = [2,2,2,2,2]
+        eta = [0,0,0,0,2]
 
         mesh.adaptive(eta, aopts)
         print('r',aopts['HB'])
@@ -262,11 +262,10 @@ class HalfEdgeMesh2dTest:
         coarsened mesh
         """
 #        eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
-#        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
-#
-#        mesh.adaptive(eta, aopts)
-#        print('c',aopts['HB'])
-#        print(mesh.ds.hcell)
+        #eta = [0,0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
+
+        #mesh.adaptive(eta, aopts)
+        #print('c',aopts['HB'])
         #fig = plt.figure()
         #axes = fig.gca()
         #mesh.add_plot(axes)
@@ -279,9 +278,9 @@ class HalfEdgeMesh2dTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.add_halfedge_plot(axes, showindex=True)
-            mesh.find_node(axes, showindex=True)
-            #mesh.find_cell(axes, showindex=True)
+            #mesh.add_halfedge_plot(axes, showindex=True)
+            #mesh.find_node(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
             plt.show()
         if 0:
             NAC = mesh.number_of_all_cells() # 包括外部区域和洞

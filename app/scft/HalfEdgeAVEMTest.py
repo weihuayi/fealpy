@@ -26,13 +26,6 @@ class HalfEdgeAVEMTest():
         model = problem['objective']
         mesh = problem['mesh']
 
-        #fig = plt.figure()
-        #axes = fig.gca()
-        #mesh.add_plot(axes)
-        #mesh.find_node(axes, showindex=True)
-        #mesh.find_cell(axes, showindex=True)
-        #plt.show()
-
         optalg = SteepestDescentAlg(problem, options)
         optalg.run()
 
@@ -41,24 +34,15 @@ class HalfEdgeAVEMTest():
         options = self.optoptions
         model = problem['objective']
         mesh = problem['mesh']
-        #mesh = HalfEdgeMesh2d.from_mesh(mesh)
 
-        #fig = plt.figure()
-        #axes = fig.gca()
-        #mesh.add_plot(axes)
-        #mesh.find_node(axes, showindex=True)
-        #mesh.find_cell(axes, showindex=True)
-        #plt.show()
-
-        aopts = mesh.adaptive_options(maxcoarsen=3, HB=True)
+        aopts = mesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
         while True:
             while True:
+                print(mesh)
                 print('NN', mesh.number_of_nodes())
-                NC = mesh.number_of_cells()
-
                 mu = problem['x0']
                 if estimator == 'mix':
-                    eta = model.mix_estimate(mu,w=1)
+                    eta = model.mix_estimate(mu, w=1)
                 if estimator == 'grad':
                     eta = model.estimate(q)
 
@@ -117,9 +101,8 @@ if sys.argv[1] == "quadtree":
 elif sys.argv[1] == 'halfedge':
     mesh = halfedgemesh(n=5, h=12)
 
-print('NN', mesh.number_of_nodes())
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
         optoptions=options)
 
-Halftest.uni_run()
-
+#Halftest.uni_run()
+Halftest.run()
