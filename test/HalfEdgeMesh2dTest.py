@@ -323,6 +323,13 @@ class HalfEdgeMesh2dTest:
             writer = MeshWriter(mesh, etype='edge', index=index)
             writer.write(fname='test'+str(i)+'.vtu')
 
+    def quad_refine():
+        cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = QuadrangleMesh(node, cell)
+
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
 
 
 test = HalfEdgeMesh2dTest()

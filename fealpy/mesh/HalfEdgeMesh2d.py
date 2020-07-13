@@ -66,6 +66,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+        self.hedgecolor = {}
 
         # 网格节点的自由度标记数组
         # 0: 固定点
@@ -482,6 +483,16 @@ class HalfEdgeMesh2d(Mesh2d):
             flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
             isMarkedHEdge[flag] = True
         elif method == 'quad':
+            color = self.hedgecolor
+            isGreenHEdge = color == 1
+            isRedHEdge = color == 0
+            isDeepHedge = color == color[halfedge[: 4]]
+
+            flag0 = isGreenHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 3]]
+            flag1 = isRedHEdge & ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 2]]
+            flag2 = isDeepHedge & ~isMarkedCell & (isMarkedHEdge) 
+            flag = flag0 | flag1
+
             pass
         elif method == 'rg':
             pass
