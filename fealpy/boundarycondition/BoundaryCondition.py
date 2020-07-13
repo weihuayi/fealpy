@@ -16,7 +16,7 @@ class DirichletBC():
 
         gdof = space.number_of_global_dofs()
         isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
-        dim = A.shape[0]//gdof 
+        dim = A.shape[0]//gdof
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
             F = F.T.flat

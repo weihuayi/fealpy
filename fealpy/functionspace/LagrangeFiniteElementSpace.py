@@ -29,6 +29,9 @@ class LagrangeFiniteElementSpace():
                 elif mesh.meshtype == 'tri':
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
+                elif mesh.meshtype == 'halfedge2d':
+                    self.dof = CPLFEMDof2d(mesh, p)
+                    self.TD = 2
                 elif mesh.meshtype == 'stri':
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
@@ -659,7 +662,6 @@ class LagrangeFiniteElementSpace():
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs()
-
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A

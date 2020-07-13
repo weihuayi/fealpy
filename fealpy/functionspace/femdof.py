@@ -168,8 +168,8 @@ class CPLFEMDof2d():
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        cell = mesh.ds.cell
 
+        cell = mesh.entity('cell')
         N = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
@@ -256,7 +256,7 @@ class CPLFEMDof2d():
     def number_of_local_dofs(self, doftype='cell'):
         p = self.p
         if doftype in {'cell', 2}:
-            return (p+1)*(p+2)//2
+            return (p+1)*(p+2)//2 
         elif doftype in {'face', 'edge',  1}:
             return self.p + 1
         elif doftype in {'node', 0}:

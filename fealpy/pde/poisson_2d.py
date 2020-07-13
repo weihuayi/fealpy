@@ -8,6 +8,7 @@ from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from ..mesh.PolygonMesh import PolygonMesh
+from ..mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
 
 class CosCosData:
     """
@@ -54,6 +55,12 @@ class CosCosData:
         elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'halfedge':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'squad':
