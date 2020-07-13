@@ -720,11 +720,12 @@ class HalfEdgeMesh2d(Mesh2d):
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
 
         nn = isRNode.sum()
+        print('nn:', nn)
 
         if nn > 0:
             cellstart = self.ds.cellstart
             # 重新标记要移除的单元
-            isMarkedCell = np.zeros(NC+nn, dtype=np.bool)
+            isMarkedCell = np.zeros(NC+nn, dtype=np.bool_)
             isMarkedHEdge = isRNode[halfedge[:, 0]] | isRNode[halfedge[halfedge[:, 4], 0]]
             isMarkedCell[halfedge[isMarkedHEdge, 1]] = True
 
@@ -737,18 +738,16 @@ class HalfEdgeMesh2d(Mesh2d):
 
             subdomain.adjust_size(isMarkedCell[:NC], nsd[isRNode])
 
-            # 粗化后单元的新编号: NC:NC+nn 
-            ###TODO
-            HB0 = np.tile(np.arange(NC+nn), (2,1)).T[cellstart:, :]-cellstart
-
+            #TODO: make here more efficient
             nidxmap = np.arange(NN)
             nidxmap[isRNode] = range(NC, NC+nn)
             cidxmap = np.arange(NC)
             isRHEdge = isRNode[halfedge[:, 0]]
-
-            HB0[halfedge[isRHEdge, 1], 1] =  nidxmap[halfedge[isRHEdge, 0]]
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+
+            if ('HB' in options) and (options['HB'] is not None):
+                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]] 
 
 
 
@@ -757,7 +756,6 @@ class HalfEdgeMesh2d(Mesh2d):
             nlevel[halfedge[:, 0]] = hlevel
             level = nlevel[isRNode] - 1
             level[level < 0] = 0
-
             clevel.adjust_size(isMarkedCell[:NC], level)
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
@@ -813,36 +811,27 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[:, 2:5] = eidxmap[halfedge[:, 2:5]]
 
             # 对单元重新编号
-            isKeepedCell = np.zeros(NC+nn+1, dtype=np.bool)
+            isKeepedCell = np.zeros(NC+nn, dtype=np.bool)
             isKeepedCell[halfedge[:, 1]] = True
-            cidxmap = np.zeros(NC+nn+1, dtype=self.itype)
+            cidxmap = np.zeros(NC+nn, dtype=self.itype)
             NC = sum(isKeepedCell)
             cidxmap[isKeepedCell] = range(NC)
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
             halfedge.adjust_size(isMarkedHEdge)
+            if ('HB' in options) and (options['HB'] is not None):
+                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]] 
 
             # 更新层信息
             hlevel.adjust_size(isMarkedHEdge)
 
             # 更新节点
             self.node.adjust_size(isRNode)
-            self.ds.NC = NC-nn
+            self.ds.NC = len(subdomain) - cellstart 
             self.ds.NE = halfedge.shape[0]//2
             self.ds.NN = self.node.size
 
-            ###TODO
-            if ('HB' in options) and (options['HB'] is not None):
-                #　粗化和加密网格的对应关系
-                HB0[:, 1] = cidxmap[HB0[:, 1]]
-                HB0 = HB0[cellstart:]-cellstart
-                # 粗化和原始网格的关系
-                HB1 = options['HB']
-                HB2 = HB0.copy()
-                HB2[:,0] = HB1[HB2[:,0],1]
-                HB2 = np.c_[HB2[:,1], HB2[:, 0]]
-                HB, idx = np.unique(HB2[:, 0], return_index=True)
-                HB = np.c_[HB, HB2[idx, 1]]
-                options['HB']= HB
+            self.print()
+
 
     def adaptive_options(
             self,
@@ -930,7 +919,7 @@ class HalfEdgeMesh2d(Mesh2d):
             isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
-                self.coarsen_poly(isMarkedCell,options)
+                self.coarsen_poly(isMarkedCell, options)
                 NN = self.number_of_cells()
                 if NN == NN0:
                     break

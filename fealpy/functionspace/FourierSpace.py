@@ -20,7 +20,8 @@ class FourierSpace:
             b = pyfftw.empty_aligned(ncpt, dtype=np.complex128)
             self.ifftn = pyfftw.builders.ifftn(b)
             self.fftfreq = spfft.fftfreq # TODO:change to pyfftw
-        elif dft is "scipy":
+            self.fftfreq = pyfftw.interfaces.scipy_fftpack.fftfreq 
+        elif dft == "scipy":
             self.fftn = spfft.fftn
             self.ifftn = spfft.ifftn
             self.fftfreq = spfft.fftfreq
