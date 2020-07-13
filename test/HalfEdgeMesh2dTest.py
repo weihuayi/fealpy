@@ -259,11 +259,14 @@ class HalfEdgeMesh2dTest:
         plt.show()
 
         mesh.from_mesh(mesh)
+
         """
         coarsened mesh
         """
         #eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
-        eta = [0,0,0,-1,-1,-1,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
+        NC = mesh.number_of_cells()
+        eta = np.zeros(NC)
+        eta[3:6] = -1
         #eta = [0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
         mesh.adaptive(eta, aopts)
         print('c',aopts['HB'])
