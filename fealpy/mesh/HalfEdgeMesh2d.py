@@ -557,7 +557,7 @@ class HalfEdgeMesh2d(Mesh2d):
         nN = self.number_of_nodes()
         nE = self.number_of_edges()
 
-        bc = self.cell_barycenter(return_all=True) # 返回所有单元的重心, 包括外
+        bc = self.cell_barycenter(return_all=True) # 返回所有单元的重心, 包括外部无界区域和区域中的洞区域
 
         if isMarkedCell is None:
             isMarkedCell = np.zeros(nC, dtype=np.bool_)
@@ -565,7 +565,6 @@ class HalfEdgeMesh2d(Mesh2d):
             isMarkedHEdge = np.ones(nE*2,dtype=np.bool_)
         else:
             isMarkedHEdge = self.mark_halfedge(isMarkedCell)
-                                           # 部无界区域和区域中的洞区域
 
         # 标记边, 加密半边
         nE1 = self.refine_halfedge(isMarkedHEdge)
@@ -614,9 +613,11 @@ class HalfEdgeMesh2d(Mesh2d):
             NHB = NHB0 + NHE
             HB = np.zeros((NHB, 2), dtype=np.int)
             HB[:, 0] = range(NHB)
-            HB[0:NHB0, 1] = options['HB'][flag0, 1]
+            HB[0:NHB0, 1] = np.arange(len(flag0))[flag0]
             HB[NHB0:,  1] = cellidx - cellstart
-            options['HB'] = HB
+            HB0 = HB.copy()
+            HB0[:, 1] = options['HB'][HB0[:,1], 1]
+            options['HB'] = HB0
 
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
@@ -825,12 +826,11 @@ class HalfEdgeMesh2d(Mesh2d):
                 HB0 = HB0[cellstart:]-cellstart
                 # 粗化和原始网格的关系
                 HB1 = options['HB']
-                print(HB0[:,1].shape)
-                print(HB1[:,1].shape)
-                HB2 = np.c_[HB0[:,1], HB1[:, 1]]
+                HB2 = HB0.copy()
+                HB2[:,0] = HB1[HB2[:,0],1]
+                HB2 = np.c_[HB2[:,1], HB2[:, 0]]
                 HB, idx = np.unique(HB2[:, 0], return_index=True)
                 HB = np.c_[HB, HB2[idx, 1]]
-
                 options['HB']= HB
 
     def adaptive_options(
