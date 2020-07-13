@@ -124,10 +124,14 @@ def find_entity(
         color = mapper.to_rgba(color)
 
     if entity == 'edge':
+        GD = mesh.geo_dimension()
         node = mesh.entity('node')
         e = mesh.entity(entity)
         vts = node[e[index], :]
-        lines = LineCollection(vts, linewidths=2, colors=ecolor)
+        if GD == 2:
+            lines = LineCollection(vts, linewidths=2, colors=ecolor)
+        elif GD == 3:
+            lines = Line3DCollection(vts, linewidth=2, colors=ecolor)
         axes.add_collection(lines)
 
     dim = mesh.geo_dimension()

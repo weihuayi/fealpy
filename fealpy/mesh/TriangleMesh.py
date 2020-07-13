@@ -39,8 +39,37 @@ class TriangleMesh(Mesh2d):
         VTK_TRIANGLE = 5
         return VTK_TRIANGLE
 
-    def to_vtk(self):
-        pass
+    def to_vtk(self, etype='cell', index=np.s_[:]):
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:  
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 5
+        elif etype == 'edge':
+            cellType = 3
+
+        return node, cell.flatten(), cellType, len(cell)
 
     def integrator(self, k, etype='cell'):
         if etype in {'cell', 2}:

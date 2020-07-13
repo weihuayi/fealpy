@@ -4,7 +4,7 @@ from .GaussLegendreQuadrature import GaussLegendreQuadrature
 
 
 class HexahedronQuadrature(Quadrature):
-    def __init__(self, index, dtype=np.float):
+    def __init__(self, index, dtype=np.float64):
         q0 = GaussLegendreQuadrature(index)
         bcs, ws = q0.get_quadrature_points_and_weights()
         self.quadpts = (bcs, bcs, bcs)

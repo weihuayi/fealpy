@@ -10,6 +10,7 @@ Notes
 """
 import sys
 import numpy as np
+from numpy.linalg import inv
 from scipy.sparse import bmat, spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
@@ -18,7 +19,8 @@ import matplotlib.pyplot as plt
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.timeintegralalg import UniformTimeLine 
+from fealpy.functionspace import ScaledMonomialSpace2d 
+from fealpy.timeintegratoralg import UniformTimeLine 
 
 """
 该模型例子，在给定流场的情况下， 用间断有限元模拟物质浓度的变化过程。
@@ -41,9 +43,9 @@ class VelocityData:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 1
+        val[flag0] = 0.01 
         flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -1
+        val[flag1] = -0.01
         return val
 
     @cartesian
@@ -53,7 +55,7 @@ class VelocityData:
         flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
         return flag
 
-class ConcentrationData:
+class ConcentrationData0:
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -70,51 +72,72 @@ class ConcentrationData:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 1
-        flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -1
+        val[flag0] = 0.01
         return val
 
     @cartesian
     def is_neumann_boundary(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
+        flag = (np.abs(x) < 1e-13)
         return flag
+
+class ConcentrationData1:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    def init_value(self, p):
+        val = np.array([1.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
 
 class ConcentrationDG():
     def __init__(self, vdata, cdata, mesh, p=0):
         self.vdata = vdata
         self.cdata = cdata
         self.mesh = mesh
-        self.space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+        self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+        self.cspace = ScaledMonomialSpace2d(mesh, p=p+1)
 
-        self.uh = self.space.function() # 速度场函数
-        self.ph = self.space.smspace.function() # 压力场函数
-        self.ch = self.space.smspace.function() # 浓度场函数
-        self.M = 0.2*self.space.smspace.cell_mass_matrix() 
+        self.uh = self.uspace.function() # 速度场自由度数组
+        self.ph = self.uspace.smspace.function() # 压力场自由度数组
+        self.ch = self.cspace.function() # 浓度场自由度数组
+
+        ldof = self.cspace.number_of_local_dofs()
+        self.ch[0::ldof] = 1.0
+
+        self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
+        self.NL = 0
 
     def set_init_velocity_field(self):
         vdata = self.vdata
         mesh = self.mesh
-        space = self.space
+        uspace = self.uspace
         uh = self.uh
         ph = self.ph
 
-        udof = space.number_of_global_dofs()
-        pdof = space.smspace.number_of_global_dofs()
+        udof = uspace.number_of_global_dofs()
+        pdof = uspace.smspace.number_of_global_dofs()
         gdof = udof + pdof + 1
 
-        A = space.stiff_matrix()
-        B = space.div_matrix()
+        M = uspace.smspace.cell_mass_matrix()
+        A = uspace.stiff_matrix()
+        B = uspace.div_matrix()
         C = M[:, 0, :].reshape(-1)
-        F1 = space.source_vector(vdata.source)
+        F1 = uspace.source_vector(vdata.source)
 
         AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
 
-        isBdDof = space.set_dirichlet_bc(uh, vdata.neumann)
+        isBdDof = uspace.set_dirichlet_bc(uh, vdata.neumann)
 
         x = np.r_['0', uh, ph, 0] 
         isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
@@ -131,9 +154,6 @@ class ConcentrationDG():
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
 
-    def get_current_left_matrix(self, data, timeline):
-        return 1.0 
-
     def get_current_right_vector(self, data, timeline):
         cdata = self.cdata
         ch = data[0]
@@ -141,26 +161,58 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F = self.space.convection_vector(nt, cdata.neumann, ch, uh,
-                threshold=cdata.is_neumann_boundary) 
+        F = self.uspace.convection_vector(nt, ch, uh) 
 
-        F = self.H@F[:, :, None]
+        F = self.H@(F[:, :, None]/0.2)
         F *= dt
+
         return F.flat
 
-    def solve(self, data, A, b, solver, timeline):
+    def solve(self, data, timeline):
+        F = self.get_current_right_vector(data, timeline)
         ch = data[0]
-        ch += b
+        ch += F 
+
+    def output(self, data, nameflag, queue, status=None):
+        print(nameflag)
+        ch = data[0]
+        if status is None:
+            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            ps = self.mesh.bc_to_point(bc)
+            val = ch.value(ps)
+            queue.put({'c'+nameflag: ('celldata', val)})
+        elif status == 'start':
+            queue.put(self.NL)
+            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            ps = self.mesh.bc_to_point(bc)
+            val = ch.value(ps)
+            queue.put({'c'+nameflag: ('celldata', val)})
+        elif status == 'stop':
+            #uh = data[1]
+            #bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+            #V = uh.value(bc)
+            #V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
+            #queue.put({'velocity':('celldata', V)})
+            queue.put(-1)
 
 
 
 if __name__ == '__main__':
 
+    from fealpy.writer import MeshWriter
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=10)
+    mesh = mf.regular([0, 1, 0, 1], n=6)
     vdata = VelocityData()
-    cdata = ConcentrationData()
+    cdata = ConcentrationData1()
+    options = {'Output': True}
+    timeline = UniformTimeLine(0, 1, 1000, options)
     model = ConcentrationDG(vdata, cdata, mesh)
-    timeline = UniformTimeLine(0, 1, 100)
+    model.NL = timeline.number_of_time_levels()
+
     data = (model.ch, model.uh)
-    timeline.time_integration(data, model)
+
+    writer = MeshWriter(mesh, 
+            simulation=timeline.time_integration, 
+            args=(data, model)
+            )
+    writer.run()

@@ -231,7 +231,7 @@ class RaviartThomasFiniteElementSpace2d:
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
         idx0 = edge2cell[index, 0][:, None]
-        idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         idx = self.smspace.edge_index_1(p=p+1)
 
@@ -426,7 +426,7 @@ class RaviartThomasFiniteElementSpace2d:
         return b
 
 
-    def convection_vector(self, t, g, ch, vh, threshold=None, q=None):
+    def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):
         """
 
         Parameters
@@ -457,7 +457,7 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
         val *= ch(ps)[..., None]
-        gphi = self.smspace.grad_basis(ps) 
+        gphi = ch.space.grad_basis(ps) 
 
         F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
 
@@ -468,41 +468,43 @@ class RaviartThomasFiniteElementSpace2d:
         # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
         en = mesh.edge_unit_normal() 
         measure = self.integralalg.edgemeasure # 边界长度
-        edge2dof = self.dof.edge_to_dof() 
-        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内 积
+        val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内积
+
         ps = mesh.bc_to_point(bcs, etype='edge')
         val1 = ch(ps, index=edge2cell[:, 0]) # 边的左边单元在这条边上的浓度值
-        val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这边边上的浓度值 
+        val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这条边上的浓度值 
 
         # 边界条件处理
         val2[:, isBdEdge] = 0.0 # 首先把边界的贡献都设为 0 
-        if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
-            index = threshold # 这里假设 threshold 是边界边编号数组
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        gval = g(ps[:, index], t) # 这里假设 g 是一个函数， TODO：其它情形？
-        phi = self.smspace.basis(ps, index=edge2cell[index, 0]) # 边左边单元的
-        val2[:, index] += np.einsum('i, ij, ijk, j->jk', ws, gval, phi, measure[index])
+
+        if g is not None:
+            if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
+                index = threshold # 这里假设 threshold 是边界边编号数组
+            else:
+                index = self.mesh.ds.boundary_edge_index()
+                if threshold is not None:
+                    bc = self.mesh.entity_barycenter('edge', index=index)
+                    flag = threshold(bc)
+                    index = index[flag]
+            val2[:, index] = g(ps[:, index], en[index]) # 这里假设 g 是一个函数， TODO：其它情形？
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项
         val = np.zeros_like(val0)  
         val[flag] = val0[flag]*val1[flag] 
         val[~flag] = val0[~flag]*val2[~flag]
-        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
+
+
+        phi = ch.space.basis(ps, index=edge2cell[:, 0])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
         np.subtract.at(F, (edge2cell[:, 0], np.s_[:]), b)  
 
-        phi = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi = ch.space.basis(ps, index=edge2cell[:, 1])
         b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
-        np.add.at(F, (edge2cell[:, 1], np.s_[:]), b)  
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1]) # 只处理内部边
+        np.add.at(F, (edge2cell[isInEdge, 1], np.s_[:]), b[isInEdge])  
 
         return F
-
 
 
     def set_neumann_bc(self, g, threshold=None, q=None):
@@ -578,6 +580,16 @@ class RaviartThomasFiniteElementSpace2d:
         return isDDof
 
     def array(self, dim=None):
+        gdof = self.number_of_global_dofs()
+        if dim is None:
+            shape = gdof
+        elif type(dim) is int:
+            shape = (gdof, dim)
+        elif type(dim) is tuple:
+            shape = (gdof, ) + dim
+        return np.zeros(shape, dtype=np.float)
+
+    def dof_array(self, dim=None):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof

@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix
 
 def broadcast(c, phi):
     """
@@ -35,6 +35,83 @@ class FEMeshIntegralAlg():
             self.facemeasure = self.edgemeasure
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
+
+    def parallel_contruct_matrix(self, b0, 
+            b1=None, c=None, 
+            block=100000, q=None):
+        """
+
+        Parameters
+        ----------
+        b0: tuple, 
+            b0[0]: basis function
+            b0[1]: cell2dof
+            b0[2]: number of global dofs
+        b1: None, just like b0
+        block: 
+
+        Notes
+        -----
+        
+        把网格中的单元分组，再分组组装相应的矩阵。对于三维大规模问题，如果同时计
+        算所有单元的矩阵，占用内存会过多，效率过低。
+
+        这里默认按每组 10 万的规模进行分组，这个需要在实践中调整。
+
+        TODO
+        -----
+            1. 并行化
+            2. 考虑存在系数的情况
+        """
+
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        basis0 = b0[0]
+        cell2dof0 = b0[1]
+        gdof0 = b0[2]
+
+        # 对问题进行分割
+        if NC <= block:
+            nb = 1
+            index = np.array([0, NC], dtype=np.int_)
+        else:
+            nb = NC//block
+            r = NC%block
+            index = np.full(nb+1, block)
+            index[0] = 0
+            index[1:r+1] += 1
+            np.cumsum(index, out=index)
+
+        if b1 is None:
+            gdof1 = gdof0
+        else:
+            gdof1 = b1[2]
+
+        # 分块进行矩阵组装
+        A = coo_matrix((gdof0, gdof1))
+        for i in range(nb): #TODO：并行化计算
+            s = slice(index[i], index[i+1])
+            measure = self.cellmeasure[s]
+            c2d0 = cell2dof0[s]
+            phi0 = basis0(bcs, index=s) # (NQ, NC, ldof, ...)
+            if b1 is None:
+                phi1 = phi0
+                c2d1 = c2d0
+            else:
+                phi1 = b1[0](bcs, index=s) # (NQ, NC, ldof, ...)
+                c2d1 = b1[1][s]
+
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1, measure, optimize=True)
+            I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
+            J = np.broadcast_to(c2d1[:, None, :], shape=M.shape)
+
+            A += coo_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+
+        return A.tocsr()
+
 
     def construct_matrix(self, basis0, 
             basis1=None,  c=None, 

@@ -10,7 +10,7 @@ from fealpy.mesh import HalfEdgeMesh2d
 from fealpy.opt.saddleoptalg import SteepestDescentAlg
 
 from SCFTVEMModel2d import scftmodel2d_options, SCFTVEMModel2d
-from vem2d_problem import halfedgemesh
+from vem2d_problem import halfedgemesh, init_mesh
 
 
 class HalfEdgeAVEMTest():
@@ -19,6 +19,22 @@ class HalfEdgeAVEMTest():
         obj = SCFTVEMModel2d(mesh, options=moptions)
         mu = obj.init_value(fieldstype=fieldstype)
         self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
+
+    def uni_run(self):
+        problem = self.problem
+        options = self.optoptions
+        model = problem['objective']
+        mesh = problem['mesh']
+
+        #fig = plt.figure()
+        #axes = fig.gca()
+        #mesh.add_plot(axes)
+        #mesh.find_node(axes, showindex=True)
+        #mesh.find_cell(axes, showindex=True)
+        #plt.show()
+
+        optalg = SteepestDescentAlg(problem, options)
+        optalg.run()
 
     def run(self, estimator='mix'):
         problem = self.problem
@@ -89,14 +105,21 @@ moptions = scftmodel2d_options(
         fA = 0.2,
         chiAB = 0.25,
         dim = 2,
-        T0 = 10,
-        T1 = 40,
+        T0 = 20,
+        T1 = 80,
         nupdate = 1,
-        order = 2)
+        order = 1,
+        rdir = sys.argv[2])
 
+if sys.argv[1] == "quadtree":
+    quadtree = init_mesh(n=5, h=12)
+    mesh = quadtree.to_pmesh()
+elif sys.argv[1] == 'halfedge':
+    mesh = halfedgemesh(n=5, h=12)
 
-mesh = halfedgemesh(h=4,n=6)
+print('NN', mesh.number_of_nodes())
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
         optoptions=options)
-Halftest.run()
+
+Halftest.uni_run()
 

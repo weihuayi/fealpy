@@ -4,8 +4,10 @@ import sys
 import time
 
 import numpy as np
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
+from fealpy.writer import MeshWriter
 from fealpy.mesh import HalfEdgeMesh2d
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
@@ -13,6 +15,43 @@ from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 class HalfEdgeMesh2dTest:
     def __init__(self):
         pass
+
+    def interpolation(self, n=2, plot=True):
+        from fealpy.pde.poisson_2d import CosCosData
+        from fealpy.functionspace import ConformingVirtualElementSpace2d
+
+        pde = CosCosData()
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float64)
+        cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
+        mesh = QuadrangleMesh(node, cell)
+        #mesh = PolygonMesh.from_mesh(mesh)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.uniform_refine(n=n)
+
+        #mesh.print()
+
+        space = ConformingVirtualElementSpace2d(mesh, p=1)
+        uI = space.interpolation(pde.solution)
+        up = space.project_to_smspace(uI)
+        error = space.integralalg.L2_error(pde.solution, up)
+        print(error)
+
+
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            #mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.add_plot(axes)
+            mesh.find_node(axes, showindex=True)
+            mesh.find_edge(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+
 
     def data_structure(self, plot=True):
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -109,7 +148,7 @@ class HalfEdgeMesh2dTest:
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
         mesh.uniform_refine(n=2)
-        print(mesh.number_of_nodes)
+        print(mesh.number_of_nodes())
 
         #fig = plt.figure()
         #axes = fig.gca()
@@ -144,17 +183,6 @@ class HalfEdgeMesh2dTest:
             isMarkedCell = mesh.mark_helper([0, 21])
             mesh.refine_poly(isMarkedCell, dflag=False)
 
-        clevel = mesh.celldata['level']
-
-        print("halfedge level:\n")
-        for i, val in enumerate(mesh.halfedgedata['level']):
-            print(i, ':', val, mesh.ds.halfedge[i, 0:2])
-
-        print("cell level:\n")
-        for i, val in enumerate(mesh.celldata['level']):
-            print(i, ':', val)
-
-        mesh.print()
         if plot:
 
             fig = plt.figure()
@@ -278,6 +306,32 @@ class HalfEdgeMesh2dTest:
         else:
             return mesh
 
+    def tri_cut_graph(self, fname, weight = None):
+        data = sio.loadmat(fname)
+        node = np.array(data['node'], dtype=np.float64)
+        cell = np.array(data['elem'] - 1, dtype=np.int_)
+
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh, closed=True)
+        mesh.ds.NV = 3
+
+        gamma = mesh.tri_cut_graph(weight = weight)
+
+        writer = MeshWriter(mesh)
+        writer.write(fname='test.vtu')
+        for i, index in enumerate(gamma):
+            writer = MeshWriter(mesh, etype='edge', index=index)
+            writer.write(fname='test'+str(i)+'.vtu')
+
+    def quad_refine():
+        cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = QuadrangleMesh(node, cell)
+
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+
+
 test = HalfEdgeMesh2dTest()
 
 if sys.argv[1] == "data_structure":
@@ -292,5 +346,17 @@ elif sys.argv[1] == 'adaptive_poly':
     mesh = test.adaptive_poly()
 elif sys.argv[1] == 'cell_to_node':
     mesh = test.cell_to_node()
+elif sys.argv[1] == 'read':
+    fname = sys.argv[2]
+    weight = sys.argv[3]
+    if weight == 'N':
+        test.tri_cut_graph(fname)
+    else:
+        test.tri_cut_graph(fname, weight = 'length')
+
+elif sys.argv[1] == "interpolation":
+    n = int(sys.argv[2])
+    test.interpolation(n=n, plot=False)
+
 
 

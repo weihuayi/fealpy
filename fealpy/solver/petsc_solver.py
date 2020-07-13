@@ -1,9 +1,33 @@
 import numpy as np
-from scipy.sparse.linalg import cg, inv, dsolve, spsolve
-from scipy.sparse import spdiags
 from timeit import default_timer as timer
 
 from petsc4py import PETSc
+
+
+class PETScSolver():
+    def __init__(self):
+        pass
+
+    def solve(self, A, F, uh):
+        start = timer()
+        print("Start solving by petsc......")
+        PA = PETSc.Mat().createAIJ(
+                size=A.shape, 
+                csr=(A.indptr, A.indices,  A.data)
+                ) 
+        PF = PETSc.Vec().createWithArray(F)
+        x = PETSc.Vec().createWithArray(uh)
+        ksp = PETSc.KSP()
+        ksp.create(PETSc.COMM_WORLD)
+        # and incomplete Cholesky
+        ksp.setType('cg')
+        # and incomplete Cholesky
+        ksp.getPC().setType('gamg')
+        ksp.setOperators(PA)
+        ksp.setFromOptions()
+        ksp.solve(PF, x)
+        end = timer()
+        print("Dof:", len(uh), "with solve time:", end-start)
 
 def linear_solver(dmodel, uh, dirichlet=None):
     start = timer()
