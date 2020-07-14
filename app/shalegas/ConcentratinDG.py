@@ -124,8 +124,12 @@ class ConcentrationDG():
         self.set_init_velocity_field() # 计算初始的速度场和压力场
 
         # vtk 文件输出
-        self.vtkmesh =vtk.vtkUnstructuredGrid() 
-        self.writer = vtk.vtkXMLUnstructuredGridWriter()
+        node, cell, cellType, NC = self.mesh.to_vtk()
+        self.points = vtk.vtkPoints()
+        self.points.SetData(vnp.numpy_to_vtk(node))
+        self.cells = vtk.vtkCellArray()
+        self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+        self.cellType = cellType
 
     def set_init_velocity_field(self):
         """
@@ -242,53 +246,57 @@ class ConcentrationDG():
         计算所有的时间层。
         """
 
-        # 重心处的值
-        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-        ps = self.mesh.bc_to_point(bc)
 
         timeline = self.timeline
-        dt = timeline.current_time_step_length()
         timeline.reset() # 时间置零
 
-        cdata = self.vtkmesh.GetCellData()
-
-        NL = timeline.number_of_time_levels()
-        writer = self.writer
-        writer.SetNumberOfTimeSteps(NL)
-
-        writer.Start()
-        val = self.ch.value(ps)
-        name = 'c' + str(timeline.current).zfill(6)
-        val = vnp.numpy_to_vtk(val)
-        val.SetName(name)
-        cdata.AddArray(val)
-        print(name)
-        writer.WriteNextTime(timeline.current)    
-
+        fname = 'test_'+ str(timeline.current).zfill(6) + '.vtu'
+        self.write_to_vtk(fname)
+        print(fname)
         while not timeline.stop():
             self.one_step_solve()
             timeline.current += 1
-
-            val = self.ch.value(ps)
-            name = 'c' + str(timeline.current).zfill(6)
-            val = vnp.numpy_to_vtk(val)
-            val.SetName(name)
-            cdata.AddArray(val)
-            print(name)
-            writer.WriteNextTime(timeline.current)    
-
-        writer.Stop()
+            fname = 'test_'+ str(timeline.current).zfill(6) + '.vtu'
+            print(fname)
+            self.write_to_vtk(fname)
         timeline.reset()
+
+    def write_to_vtk(self, fname):
+        # 重心处的值
+        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+        ps = self.mesh.bc_to_point(bc)
+        vmesh = vtk.vtkUnstructuredGrid()
+        vmesh.SetPoints(self.points)
+        vmesh.SetCells(self.cellType, self.cells)
+        cdata = vmesh.GetCellData()
+
+        uh = self.uh 
+        V = uh.value(bc)
+        V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
+        val = vnp.numpy_to_vtk(V)
+        val.SetName('velocity')
+        cdata.AddArray(val)
+
+        ch = self.ch
+        val = vnp.numpy_to_vtk(ch.value(ps))
+        val.SetName('concentration')
+        cdata.AddArray(val)
+
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(vmesh)
+        writer.Write()
+
+
 
 if __name__ == '__main__':
 
     from fealpy.writer import MeshWriter
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=6)
+    mesh = mf.regular([0, 1, 0, 1], n=8)
     vdata = VelocityData()
     cdata = ConcentrationData1()
-    timeline = UniformTimeLine(0, 1, 1000)
+    timeline = UniformTimeLine(0, 10, 10000)
     model = ConcentrationDG(vdata, cdata, mesh, timeline)
-    model.set_init_vtk_mesh_and_data(fname='test.vtu')
     model.solve()
 
