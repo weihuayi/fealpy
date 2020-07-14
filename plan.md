@@ -1,4 +1,21 @@
 
+
+#
+
+使用 argparse 优化脚本的输入参数 
+
+```
+import argparse
+    import argparse
+    description = 'Read and display ExodusII data.'
+    epilogue = '''
+   '''
+    parser = argparse.ArgumentParser(description=description, epilog=epilogue)
+    parser.add_argument('filename', help='A required filename e.g mug.e.')
+    parser.add_argument('nodal_var', help='The nodal variable e,g, convected.')
+    args = parser.parse_args()
+    return args.filename, args.nodal_var
+```
 # Don't use numpy's aliases of Python builtin objects. 
 https://github.com/scipy/scipy/pull/12344/commits/02def703b8b7b28ed315a658808364fd024bb45c
 
