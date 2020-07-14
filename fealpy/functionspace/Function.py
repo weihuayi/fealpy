@@ -42,7 +42,7 @@ class Function(np.ndarray):
             self.__dict__[item]= wrap(getattr(self.space, item))
             return self.__dict__[item]
         else:
-            print('The function space has not implemented method {}'.format(item))
+            return self.__dict__[item]
 
     def add_plot(self, plot, cmap=None, threshold=None):
         import matplotlib.colors as colors

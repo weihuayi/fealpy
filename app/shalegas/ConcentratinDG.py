@@ -76,7 +76,7 @@ class ConcentrationData0:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.01
+        val[flag0] = 0.001
         return val
 
     @cartesian
@@ -103,7 +103,10 @@ class ConcentrationData1:
         return val.reshape(shape) 
 
 class ConcentrationDG():
-    def __init__(self, vdata, cdata, mesh, timeline, p=0):
+    def __init__(self, vdata, cdata, mesh, timeline, p=0,
+            options={'rdir':'/home/why/result'}):
+
+        self.options = options
         self.vdata = vdata
         self.cdata = cdata
         self.mesh = mesh
@@ -173,39 +176,6 @@ class ConcentrationDG():
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
 
-    def set_init_vtk_mesh_and_data(self, fname='test.vtu'):
-        """
-
-        Notes
-        -----
-        设定初始的vtk 数据
-        """
-
-        # 设定 vtk 网格数据
-        node, cell, cellType, NC = self.mesh.to_vtk()
-        points = vtk.vtkPoints()
-        points.SetData(vnp.numpy_to_vtk(node))
-
-        cells = vtk.vtkCellArray()
-        cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
-        self.vtkmesh.SetPoints(points)
-        self.vtkmesh.SetCells(cellType, cells)
-
-        # 设定速度场数据
-        if False:
-            uh = self.uh 
-            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-            V = uh.value(bc)
-            V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
-            cdata = self.vtkmesh.GetCellData()
-            val = vnp.numpy_to_vtk(V)
-            val.SetName('velocity')
-            cdata.AddArray(val)
-
-        # 联接 vtkmesh 到 writer 中
-        self.writer.SetFileName(fname)
-        self.writer.SetInputData(self.vtkmesh)
-
     def get_current_right_vector(self):
         """
 
@@ -246,17 +216,18 @@ class ConcentrationDG():
         计算所有的时间层。
         """
 
-
+        rdir = self.options['rdir']
         timeline = self.timeline
+        dt = timeline.current_time_step_length()
         timeline.reset() # 时间置零
 
-        fname = 'test_'+ str(timeline.current).zfill(6) + '.vtu'
+        fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
         self.write_to_vtk(fname)
         print(fname)
         while not timeline.stop():
             self.one_step_solve()
             timeline.current += 1
-            fname = 'test_'+ str(timeline.current).zfill(6) + '.vtu'
+            fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
             print(fname)
             self.write_to_vtk(fname)
         timeline.reset()
@@ -269,6 +240,7 @@ class ConcentrationDG():
         vmesh.SetPoints(self.points)
         vmesh.SetCells(self.cellType, self.cells)
         cdata = vmesh.GetCellData()
+        pdata = vmesh.GetPointData()
 
         uh = self.uh 
         V = uh.value(bc)
@@ -277,10 +249,18 @@ class ConcentrationDG():
         val.SetName('velocity')
         cdata.AddArray(val)
 
-        ch = self.ch
-        val = vnp.numpy_to_vtk(ch.value(ps))
-        val.SetName('concentration')
-        cdata.AddArray(val)
+        if True:
+            ch = self.ch
+            rch = ch.to_cspace_function()
+            val = vnp.numpy_to_vtk(rch)
+            val.SetName('concentration')
+            pdata.AddArray(val)
+        else:
+            ch = self.ch
+            val = ch.value(ps)
+            val = vnp.numpy_to_vtk(val)
+            val.SetName('concentration')
+            cdata.AddArray(val)
 
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
@@ -292,11 +272,13 @@ class ConcentrationDG():
 if __name__ == '__main__':
 
     from fealpy.writer import MeshWriter
+    rdir = sys.argv[1]
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=8)
+    mesh = mf.regular([0, 1, 0, 1], n=64)
     vdata = VelocityData()
     cdata = ConcentrationData1()
-    timeline = UniformTimeLine(0, 10, 10000)
-    model = ConcentrationDG(vdata, cdata, mesh, timeline)
+    timeline = UniformTimeLine(0, 10, 100000)
+    options = {'rdir': rdir}
+    model = ConcentrationDG(vdata, cdata, mesh, timeline, options=options)
     model.solve()
 
