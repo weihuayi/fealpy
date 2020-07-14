@@ -745,10 +745,9 @@ class HalfEdgeMesh2d(Mesh2d):
             isRHEdge = isRNode[halfedge[:, 0]]
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
-            cidxmap1 = cidxmap[cellstart:]-cellstart
 
             if ('HB' in options) and (options['HB'] is not None):
-                options['HB'][:, 0] = cidxmap1[options['HB'][:,0]]
+                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]+cellstart]
 
 
             # 更新粗化后单元的层数
@@ -757,6 +756,18 @@ class HalfEdgeMesh2d(Mesh2d):
             level = nlevel[isRNode] - 1
             level[level < 0] = 0
             clevel.adjust_size(isMarkedCell[:NC], level)
+
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                n0 = isMarkedCell.sum() 
+                numrefine = np.zeros(NC-n0+nn, dtype=options['numrefine'].dtype)
+                numrefine[0:NC-n0] = options['numrefine'][~isMarkedCell[:NC]]
+                idx = cidxmap[isMarkedCell[:NC]] - n0
+                nr = options['numrefine'][isMarkedCell[:NC]]
+                np.maximum.at(numrefine, idx, nr)
+                num = numrefine[-nn:]
+                num += 1
+                num[num > 0] = 0
+                options['numrefine'] = numrefine
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
             nex = halfedge[:, 2] # 当前半边的下一个半边编号
@@ -818,16 +829,11 @@ class HalfEdgeMesh2d(Mesh2d):
             cidxmap[isKeepedCell] = range(NC)
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
             halfedge.adjust_size(isMarkedHEdge)
-            cidxmap1 = cidxmap[cellstart:]-cellstart
-            print('map1',cidxmap1)
-            ###TODO add: find the idx 
-            cidx=np.argwhere(cidxmap==0)
 
             if ('HB' in options) and (options['HB'] is not None):
-                options['HB'][:, 0] = cidxmap1[options['HB'][:, 0]]
-                ###压缩HB
-                HB, idx = np.unique(options['HB'][:, 0], return_index=True)
-                options['HB'] = np.c_[HB, options['HB'][idx, 1]]
+                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]]
+                options['HB'][:, 0] -= cellstart
+
             # 更新层信息
             hlevel.adjust_size(isMarkedHEdge)
 
@@ -838,12 +844,6 @@ class HalfEdgeMesh2d(Mesh2d):
             self.ds.NN = self.node.size
             print(len(options['numrefine']))
 
-            if ('numrefine' in options) and (options['numrefine'] is not None):
-                options['numrefine'][cidx] += 1
-                options['numrefine'][options['numrefine']> 0] = 0
-                print('num',options['numrefine'])
-                ##压缩
-                options['numrefine'] = options['numrefine']
 
 
             #self.print()
