@@ -818,10 +818,13 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
             halfedge.adjust_size(isMarkedHEdge)
             cidxmap1 = cidxmap[cellstart:]-cellstart
+            print('map1',cidxmap1)
+            ###TODO add: find the idx 
+            cidx=np.argwhere(cidxmap==0)
 
             if ('HB' in options) and (options['HB'] is not None):
                 options['HB'][:, 0] = cidxmap1[options['HB'][:, 0]]
-                ###压缩ＨＢ
+                ###压缩HB
                 HB, idx = np.unique(options['HB'][:, 0], return_index=True)
                 options['HB'] = np.c_[HB, options['HB'][idx, 1]]
             # 更新层信息
@@ -832,9 +835,13 @@ class HalfEdgeMesh2d(Mesh2d):
             self.ds.NC = len(subdomain) - cellstart 
             self.ds.NE = halfedge.shape[0]//2
             self.ds.NN = self.node.size
+            print(len(options['numrefine']))
 
-            cell,cellLocation = self.entity('cell')
             if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'][cidx] += 1
+                options['numrefine'][options['numrefine']> 0] = 0
+                print('num',options['numrefine'])
+                ##压缩
                 options['numrefine'] = options['numrefine']
 
 
@@ -924,6 +931,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # coarsen
         if options['maxcoarsen'] > 0:
+            print(options['numrefine'])
             isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
