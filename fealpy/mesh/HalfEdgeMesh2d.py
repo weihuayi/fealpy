@@ -720,7 +720,6 @@ class HalfEdgeMesh2d(Mesh2d):
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
 
         nn = isRNode.sum()
-        print('nn:', nn)
 
         if nn > 0:
             cellstart = self.ds.cellstart
@@ -745,10 +744,10 @@ class HalfEdgeMesh2d(Mesh2d):
             isRHEdge = isRNode[halfedge[:, 0]]
             cidxmap[halfedge[isRHEdge, 1]] = nidxmap[halfedge[isRHEdge, 0]]
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
+            cidxmap1 = cidxmap[cellstart:]-cellstart
 
             if ('HB' in options) and (options['HB'] is not None):
-                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]] 
-
+                options['HB'][:, 0] = cidxmap1[options['HB'][:,0]]
 
 
             # 更新粗化后单元的层数
@@ -791,8 +790,8 @@ class HalfEdgeMesh2d(Mesh2d):
             hdxmap = np.arange(NE*2) - np.cumsum(isMarkedHEdge)
             hcell[:] = hdxmap[hcell]
             newHcell = hcell.adjust_size(isMarkedCell[:NC], int(nn))
-            newHcell[halfedge[halfedgeNewCell, 1]-NC] = hdxmap[np.arange(NE*2)[halfedgeNewCell]]
-
+            flag = halfedgeNewCell & ~isMarkedHEdge
+            newHcell[halfedge[flag, 1]-NC] = hdxmap[np.arange(NE*2)[flag]]
 
             #重新编号主半边
             NRH = isMarkedHEdge.sum()
@@ -818,9 +817,13 @@ class HalfEdgeMesh2d(Mesh2d):
             cidxmap[isKeepedCell] = range(NC)
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
             halfedge.adjust_size(isMarkedHEdge)
-            if ('HB' in options) and (options['HB'] is not None):
-                options['HB'][:, 0] = cidxmap[options['HB'][:, 0]] 
+            cidxmap1 = cidxmap[cellstart:]-cellstart
 
+            if ('HB' in options) and (options['HB'] is not None):
+                options['HB'][:, 0] = cidxmap1[options['HB'][:, 0]]
+                ###压缩ＨＢ
+                HB, idx = np.unique(options['HB'][:, 0], return_index=True)
+                options['HB'] = np.c_[HB, options['HB'][idx, 1]]
             # 更新层信息
             hlevel.adjust_size(isMarkedHEdge)
 
@@ -830,7 +833,12 @@ class HalfEdgeMesh2d(Mesh2d):
             self.ds.NE = halfedge.shape[0]//2
             self.ds.NN = self.node.size
 
-            self.print()
+            cell,cellLocation = self.entity('cell')
+            if ('numrefine' in options) and (options['numrefine'] is not None):
+                options['numrefine'] = options['numrefine']
+
+
+            #self.print()
 
 
     def adaptive_options(
