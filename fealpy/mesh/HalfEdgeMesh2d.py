@@ -549,6 +549,7 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge[isMarkedHEdge, 4] = halfedge[idx, 3]  # 原始对偶边的前一条边是新的对偶边
         halfedge[halfedge[:, 3], 2] = range(2*NE+2*NE1)
         self.ds.NE = NE + NE1
+        self.ds.NN = self.node.size 
         return NE1
 
     def refine_poly(self, isMarkedCell=None, options={'disp': True}):
@@ -1094,10 +1095,10 @@ class HalfEdgeMesh2dDataStructure():
         hflag = subdomain[halfedge[:, 1]] > 0
 
         if return_sparse:
-            val = np.ones(hflag.sum(), dtype=np.bool)
+            val = np.ones(hflag.sum(), dtype=np.bool_)
             I = halfedge[hflag, 1] - cstart
             J = halfedge[hflag, 0]
-            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
+            cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             return cell2node
         elif self.NV is None: # polygon mesh
             NV = self.number_of_vertices_of_cells()
