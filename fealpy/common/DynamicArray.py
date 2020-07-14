@@ -2,6 +2,8 @@
 Notes
 -----
 
+这里是一个动态数组
+
 References
 [1] https://github.com/maciejkula/dynarray.git
 """
