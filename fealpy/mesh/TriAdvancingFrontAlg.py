@@ -16,20 +16,30 @@ class TriAdvancingFrontAlg():
         格。
         """
         self.mesh = mesh
+        self.front = None
 
     def refine_boundary(self, n=1):
         mesh = self.mesh
 
         for i in range(n):
             halfedge = mesh.ds.halfedge
-
             NHE = len(halfedge) 
             isMarkedHEdge = np.ones(NHE, dtype=np.bool_)
             mesh.refine_halfedge(isMarkedHEdge)
 
+    def advance(self):
+
+        mesh = self.mesh
+        halfedge = mesh.ds.halfedge
+        subdomain = mesh.ds.subdomain
+        front, = np.nonzero(subdomain[halfedge[:, 1]] > 0)
+
 
 
     def run(self):
+
         self.refine_boundary(n=5)
+
+        
 
 
