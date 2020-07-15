@@ -1,6 +1,8 @@
 import numpy as np
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .TetrahedronMesh import TetrahedronMesh
+from .PolygonMesh import PolygonMesh
+from .HalfEdgeMesh2d import HalfEdgeMesh2d
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
@@ -299,6 +301,19 @@ class MeshFactory():
             mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation) 
+
+    def polygon_mesh(self, meshtype='triquad'):
+        if meshtype in {'triquad'}:
+            node = np.array([
+                (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+                (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+                (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+            cell = np.array([0, 3, 4, 4, 1, 0,
+                1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+            cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+            mesh = PolygonMesh(node, cell, cellLocation)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
+            return mesh
        
 # 下面的程序还需要标准化
     def uncross_mesh(self, box, n=10, r="1"):
