@@ -758,15 +758,18 @@ class HalfEdgeMesh2d(Mesh2d):
             clevel.adjust_size(isMarkedCell[:NC], level)
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
-                n0 = isMarkedCell.sum() 
+                n0 = isMarkedCell.sum()
                 numrefine = np.zeros(NC-n0+nn, dtype=options['numrefine'].dtype)
                 numrefine[0:NC-n0] = options['numrefine'][~isMarkedCell[:NC]]
                 idx = cidxmap[isMarkedCell[:NC]] - n0
                 nr = options['numrefine'][isMarkedCell[:NC]]
+                numrefine[-nn:] = -100 ###TODO 
+                #取对应位置最大的数，默认为０，这里是负数，所以改变默认值
                 np.maximum.at(numrefine, idx, nr)
                 num = numrefine[-nn:]
                 num += 1
                 num[num > 0] = 0
+                numrefine[-nn:] =num
                 options['numrefine'] = numrefine
 
             # 重设下一个半边 halfedge[:, 2] 和前一个半边 halfedge[:, 3]
@@ -833,7 +836,6 @@ class HalfEdgeMesh2d(Mesh2d):
             if ('HB' in options) and (options['HB'] is not None):
                 options['HB'][:, 0] = cidxmap[options['HB'][:, 0]]
                 options['HB'][:, 0] -= cellstart
-
             # 更新层信息
             hlevel.adjust_size(isMarkedHEdge)
 
@@ -842,7 +844,6 @@ class HalfEdgeMesh2d(Mesh2d):
             self.ds.NC = len(subdomain) - cellstart 
             self.ds.NE = halfedge.shape[0]//2
             self.ds.NN = self.node.size
-            print(len(options['numrefine']))
 
 
 
@@ -932,7 +933,6 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # coarsen
         if options['maxcoarsen'] > 0:
-            print(options['numrefine'])
             isMarkedCell = (options['numrefine'] < 0)
             while sum(isMarkedCell) > 0:
                 NN0 = self.number_of_cells()
