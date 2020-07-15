@@ -52,6 +52,7 @@ class ParabolicVEMSolver2d():
         b = self.get_current_right_vector(data[:,current], dt)
         A, b = self.apply_boundary_condition(A, b)
         data[:,current+1] = spsolve(A,b).reshape((-1,))
+        #data[:,current+1] = self.solver.divide(A,b)
 
     def correct_solve(self, data, timeline):
         current = timeline.current
