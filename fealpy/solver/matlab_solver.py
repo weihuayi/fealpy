@@ -9,8 +9,10 @@ class MatlabSolver:
         matlab : tranplant instance
         """
         self.matlab = matlab
+        print('a')
 
     def divide(self, A, b):
+        print(b)
         start = timer()
         x = self.matlab.mldivide(A, b.reshape(-1, 1))
         end = timer()
