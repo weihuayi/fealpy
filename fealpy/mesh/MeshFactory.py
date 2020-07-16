@@ -27,7 +27,7 @@ class MeshFactory():
             node = np.array([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, np.sqrt(3)/2]], dtype=np.float64_)
+                [0.5, np.sqrt(3)/2]], dtype=np.float64)
         elif meshtype == 'iso':
             node = np.array([
                 [0.0, 0.0],
