@@ -1,8 +1,10 @@
 import numpy as np
+
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .TetrahedronMesh import TetrahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
@@ -29,7 +31,7 @@ class MeshFactory():
             node = np.array([
                 [0.0, 0.0],
                 [1.0, 0.0],
-                [0.5, np.sqrt(3)/2]], dtype=np.float64_)
+                [0.5, np.sqrt(3)/2]], dtype=np.float64)
         elif meshtype == 'iso':
             node = np.array([
                 [0.0, 0.0],
