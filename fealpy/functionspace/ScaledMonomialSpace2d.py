@@ -447,9 +447,6 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, eh, optimize=True)
         cell2dof = self.cell_to_dof()
 
-
-
-
     def source_vector(self, f, dim=None, p=None):
         def u(x, index):
             return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index, p=None))
