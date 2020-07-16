@@ -1,8 +1,10 @@
 import numpy as np
+
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .TetrahedronMesh import TetrahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
