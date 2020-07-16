@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.mesh import MeshFactory
+from fealpy.geometry import CircleCurve, FoldCurve
 
 mf = MeshFactory()
 
@@ -34,6 +35,16 @@ mesh = mf.special_boxmesh2d(box, n=10, meshtype='nonuniform')
 mesh = mf.unitcirclemesh(0.1, meshtype='tri')
 
 mesh = mf.unitcirclemesh(0.1, meshtype='poly')
+
+
+from fealpy.mesh import MeshFactory
+from fealpy.geometry import CircleCurve, FoldCurve
+interface = FoldCurve(a=6)
+mesh = mf.interfacemesh2d(interface, n=40)
+fig = plt.figure()
+axes = fig.gca() 
+mesh.add_plot(axes)
+plt.show()
 
 
 # 3d mesh

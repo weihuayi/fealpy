@@ -18,6 +18,8 @@ from .HexahedronMesh import HexahedronMesh
 
 from .distmesh import DistMesh2d
 
+from .interface_mesh_generator import InterfaceMesh2d
+
 class MeshFactory():
     def __init__(self):
         pass
@@ -338,6 +340,12 @@ class MeshFactory():
             mesh = PolygonMesh(node, cell, cellLocation)
             mesh = HalfEdgeMesh2d.from_mesh(mesh)
             return mesh
+
+    def interfacemesh2d(self, interface, n=20):
+        alg = InterfaceMesh2d(interface, interface.box, n)
+        ppoint, pcell, pcellLocation = alg.run()
+        pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
+        return pmesh
        
 # 下面的程序还需要标准化
     def uncross_mesh(self, box, n=10, r="1"):
