@@ -1,10 +1,18 @@
 import numpy as np
-from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .TetrahedronMesh import TetrahedronMesh
+
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
 from ..geometry import huniform
+
+from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
+from .QuadrangleMesh import QuadrangleMesh
+from .PolygonMesh import PolygonMesh
+from .HalfEdgeMesh2d import HalfEdgeMesh2d
+
+from .TetrahedronMesh import TetrahedronMesh
+from .HexahedronMesh import HexahedronMesh
+
 from .distmesh import DistMesh2d
 
 class MeshFactory():
@@ -64,7 +72,7 @@ class MeshFactory():
         return TetrahedronMesh(node, cell)
 
 
-    def boxmesh2d(box, nx=10, ny=10, meshtype='tri'):
+    def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri'):
         """
 
         Notes
@@ -80,7 +88,7 @@ class MeshFactory():
         node[:,1] = Y.flatten()
 
         idx = np.arange(N).reshape(nx+1, ny+1)
-        if meshtype=='tri':
+        if meshtype in {'tri', 'triangle'}:
             cell = np.zeros((2*NC, 3), dtype=np.int)
             cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
             cell[:NC, 1] = idx[1:,1:].flatten(order='F')
@@ -96,13 +104,17 @@ class MeshFactory():
             cell[:,2] = idx[1:, 1:].flatten()
             cell[:,3] = idx[0:-1, 1:].flatten()
             return QuadrangleMesh(node, cell)
-        elif meshtype == 'polygon':
-            cell = np.zeros((NC,4), dtype=np.int)
-            cell[:,0] = idx[0:-1, 0:-1].flatten()
-            cell[:,1] = idx[1:, 0:-1].flatten()
-            cell[:,2] = idx[1:, 1:].flatten()
-            cell[:,3] = idx[0:-1, 1:].flatten()
-            return PolygonMesh(node, cell)
+        elif meshtype in {'polygon', 'poly'}:
+            cell = np.zeros((2*NC, 3), dtype=np.int)
+            cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
+            cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+            cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
+            cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
+            cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
+            cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+            mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
+            pnode, pcell, pcellLocation = mesh.to_polygonmesh()
+            return PolygonMesh(pnode, pcell, pcellLocation)
 
     def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex'):
         """
@@ -148,11 +160,11 @@ class MeshFactory():
             cell = cell[:, localCell].reshape(-1, 4)
             return TetrahedronMesh(node, cell)
 
-    def triangle(box, h, meshtype='tri'):
+    def triangle(self, box, h, meshtype='tri'):
         """
         Notes
         -----
-        生成非矩形区域上的非结构网格网格
+        生成矩形区域上的非结构网格网格
         """
         from meshpy.triangle import MeshInfo, build
         mesh_info = MeshInfo()
@@ -161,14 +173,14 @@ class MeshFactory():
         mesh = build(mesh_info, max_volume=h**2)
         node = np.array(mesh.points, dtype=np.float)
         cell = np.array(mesh.elements, dtype=np.int)
-        if meshtype == 'tri':
+        if meshtype in {'tri', 'triangle'}:
             return TriangleMesh(node, cell)
-        elif meshtype == 'polygon':
+        elif meshtype in {'polygon', 'poly'}:
             mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
-    def special_box_mesh2d(self, box, n=10, meshtype='fishbone'):
+    def special_boxmesh2d(self, box, n=10, meshtype='fishbone'):
         qmesh = self.boxmesh2d(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')
@@ -188,7 +200,7 @@ class MeshFactory():
                     rcell[:, [2, 3, 1]]]
             return TriangleMesh(node, newCell)
         elif meshtype == 'cross': 
-            bc = qmesh.barycenter('cell') 
+            bc = qmesh.entity_barycenter('cell') 
             newNode = np.r_['0', node, bc]
 
             newCell = np.zeros((4*NC, 3), dtype=np.int) 
@@ -293,9 +305,20 @@ class MeshFactory():
         domain = DistDomain2d(fd, fh, bbox, pfix)
         distmesh2d = DistMesh2d(domain, h0)
         distmesh2d.run()
-        if meshtype == 'tri':
+        if meshtype in {'tri', 'triangle'}:
             return distmesh2d.mesh
-        elif meshtype == 'polygon':
+        elif meshtype in {'polygon', 'poly'}:
+            mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
+            pnode, pcell, pcellLocation = mesh.to_polygonmesh()
+            return PolygonMesh(pnode, pcell, pcellLocation) 
+
+    def distmesh2d(self, fd, fh, bbox, pfix):
+        domain = DistDomain2d(fd, fh, bbox, pfix)
+        distmesh2d = DistMesh2d(domain, h0)
+        distmesh2d.run()
+        if meshtype in {'tri', 'triangle'}:
+            return distmesh2d.mesh
+        elif meshtype in {'polygon', 'poly'}:
             mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation) 
