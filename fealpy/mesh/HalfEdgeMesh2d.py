@@ -762,8 +762,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 numrefine[0:NC-n0] = options['numrefine'][~isMarkedCell[:NC]]
                 idx = cidxmap[isMarkedCell[:NC]] - n0
                 nr = options['numrefine'][isMarkedCell[:NC]]
-                numrefine[-nn:] = -100 ###TODO 
-                #取对应位置最大的数，默认为０，这里是负数，所以改变默认值
+                numrefine[-nn:] = -100  #取对应位置最大的数，默认为０，这里是负数，所以改变默认值
                 np.maximum.at(numrefine, idx, nr)
                 num = numrefine[-nn:]
                 num += 1
@@ -800,12 +799,7 @@ class HalfEdgeMesh2d(Mesh2d):
             NN -= nn + flag.sum()//2
 
             #起始边半边
-            halfedgeNewCell = halfedge[:, 1]>=NC
-            hdxmap = np.arange(NE*2) - np.cumsum(isMarkedHEdge)
-            hcell[:] = hdxmap[hcell]
-            newHcell = hcell.adjust_size(isMarkedCell[:NC], int(nn))
-            flag = halfedgeNewCell & ~isMarkedHEdge
-            newHcell[halfedge[flag, 1]-NC] = hdxmap[np.arange(NE*2)[flag]]
+            hcell.adjust_size(isMarkedCell[:NC], int(nn))
 
             #重新编号主半边
             NRH = isMarkedHEdge.sum()
@@ -832,6 +826,8 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[:, 1] = cidxmap[halfedge[:, 1]]
             halfedge.adjust_size(isMarkedHEdge)
 
+            hcell[halfedge[:, 1]] = range(len(halfedge)) # 的编号
+
             if ('HB' in options) and (options['HB'] is not None):
                 options['HB'][:, 0] = cidxmap[options['HB'][:, 0]]
                 options['HB'][:, 0] -= cellstart
@@ -843,10 +839,6 @@ class HalfEdgeMesh2d(Mesh2d):
             self.ds.NC = len(subdomain) - cellstart 
             self.ds.NE = halfedge.shape[0]//2
             self.ds.NN = self.node.size
-
-
-
-            #self.print()
 
 
     def adaptive_options(
