@@ -15,16 +15,21 @@ class PETScSolverTest():
         pass
 
 
-    def solve_poisson_3d(self, n=5):
+    def solve_poisson_3d(self, n=2):
         from fealpy.pde.poisson_3d import CosCosCosData as PDE
+        from fealpy.mesh import MeshFactory
         from fealpy.functionspace import LagrangeFiniteElementSpace
         from fealpy.boundarycondition import DirichletBC 
 
         pde = PDE()
-        mesh = pde.init_mesh(n=n)
+        mf = MeshFactory()
+        m = 2**n
+        box = [0, 1, 0, 1, 0, 1]
+        mesh = mf.boxmesh3d(box, nx=m, ny=m, nz=m, meshtype='tet')
         space = LagrangeFiniteElementSpace(mesh, p=1)
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
+        A = space.parallel_stiff_matrix()
         A = space.stiff_matrix()
         F = space.source_vector(pde.source)
 

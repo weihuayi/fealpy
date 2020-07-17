@@ -1,6 +1,8 @@
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix
 
+from ..decorator import timer
+
 def broadcast(c, phi):
     """
     Notes
@@ -36,7 +38,8 @@ class FEMeshIntegralAlg():
             self.facebarycenter = self.edgebarycenter
             self.faceintegrator = self.edgeintegrator
 
-    def parallel_contruct_matrix(self, b0, 
+    @timer
+    def parallel_construct_matrix(self, b0, 
             b1=None, c=None, 
             block=100000, q=None):
         """
@@ -113,6 +116,7 @@ class FEMeshIntegralAlg():
         return A.tocsr()
 
 
+    @timer
     def construct_matrix(self, basis0, 
             basis1=None,  c=None, 
             cell2dof0=None, gdof0=None, 

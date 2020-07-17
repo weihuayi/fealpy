@@ -9,6 +9,7 @@ from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
 from ..geometry import huniform
+from ..decorator import timer
 
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .QuadrangleMesh import QuadrangleMesh
@@ -79,6 +80,7 @@ class MeshFactory():
         return TetrahedronMesh(node, cell)
 
 
+    @timer
     def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri'):
         """
 
@@ -123,6 +125,7 @@ class MeshFactory():
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
+    @timer
     def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex'):
         """
         Notes

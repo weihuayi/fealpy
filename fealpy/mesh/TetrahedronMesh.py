@@ -4,6 +4,7 @@ from scipy.sparse import spdiags, eye, tril, triu, bmat
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
+from ..decorator import timer
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -467,6 +468,7 @@ class TetrahedronMesh(Mesh3d):
         if returnim is True:
             return IM
 
+    @timer
     def uniform_refine(self, n=1):
         for i in range(n):
             N = self.number_of_nodes()
