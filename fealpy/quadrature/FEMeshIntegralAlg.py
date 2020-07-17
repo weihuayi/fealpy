@@ -93,6 +93,8 @@ class FEMeshIntegralAlg():
         else:
             gdof1 = b1[2]
 
+        print('index:', index)
+
         # 分块进行矩阵组装
         A = coo_matrix((gdof0, gdof1))
         for i in range(nb): #TODO：并行化计算
@@ -107,7 +109,8 @@ class FEMeshIntegralAlg():
                 phi1 = b1[0](bcs, index=s) # (NQ, NC, ldof, ...)
                 c2d1 = b1[1][s]
 
-            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1, measure, optimize=True)
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1, measure,
+                    optimize=True)
             I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
             J = np.broadcast_to(c2d1[:, None, :], shape=M.shape)
 

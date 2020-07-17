@@ -27,6 +27,8 @@ class PETScSolverTest():
         box = [0, 1, 0, 1, 0, 1]
         mesh = mf.boxmesh3d(box, nx=m, ny=m, nz=m, meshtype='tet')
         space = LagrangeFiniteElementSpace(mesh, p=1)
+        gdof = space.number_of_global_dofs()
+        print('gdof:', gdof)
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
         A = space.parallel_stiff_matrix()
