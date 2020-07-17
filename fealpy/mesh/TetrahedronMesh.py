@@ -252,7 +252,7 @@ class TetrahedronMesh(Mesh3d):
             j,k,m = localFace[i]
             vjk = node[cell[:,k],:] - node[cell[:,j],:]
             vjm = node[cell[:,m],:] - node[cell[:,j],:]
-            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
+            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
     def label(self, node=None, cell=None, cellidx=None):
