@@ -83,7 +83,6 @@ class DynamicArray(object):
     def __setitem__(self, idx, value):
         self.data[:self.size][idx] = value
 
-
     def _as_dtype(self, value):
         if hasattr(value, 'dtype') and value.dtype == self.dtype:
             return value
