@@ -81,9 +81,7 @@ class FEMeshIntegralAlg():
         else:
             gdof1 = b1[2]
 
-        # 分块进行矩阵组装
         A = csr_matrix((gdof0, gdof1))
-
         def f(i):
             s = slice(index[i], index[i+1])
             measure = self.cellmeasure[s]
@@ -101,11 +99,7 @@ class FEMeshIntegralAlg():
                     phi1 = phi0
                 else:
                     phi1 = b1[0](bc, index=s)
-
-                print(M.shape, (w*measure).shape, phi0.shape, phi1.shape)
-                M0 = np.einsum('jk..., jm..., j->jkm', phi0, phi1, w*measure)
-                print(M0.shape)
-                M += M0
+                M += np.einsum('jkd, jmd, j->jkm', phi0, phi1, w*measure)
 
             I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
             J = np.broadcast_to(c2d1[:, None, :], shape=M.shape)

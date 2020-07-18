@@ -62,7 +62,7 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        q = q if q is not None else p+3 
+        q = q if q is not None else p+1 
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
@@ -584,7 +584,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def parallel_stiff_matrix(self, cfun=None):
+    def parallel_stiff_matrix(self, cfun=None, q=None):
         """
 
         Notes
@@ -593,7 +593,7 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
-        M = self.integralalg.parallel_construct_matrix(b0)
+        M = self.integralalg.parallel_construct_matrix(b0, q=q)
         return M
 
     def parallel_mass_matrix(self, cfun=None):

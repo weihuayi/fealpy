@@ -32,7 +32,7 @@ class PETScSolverTest():
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
         A = space.parallel_stiff_matrix()
-        A = space.stiff_matrix()
+        #A = space.stiff_matrix()
         F = space.source_vector(pde.source)
 
         A, F = bc.apply(A, F, uh)
