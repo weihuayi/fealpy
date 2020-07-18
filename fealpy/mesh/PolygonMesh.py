@@ -9,7 +9,7 @@ class PolygonMesh(Mesh2d):
 
     """ 2d Polygon Mesh data structure from vtk data structure
     """
-    def __init__(self, node, cell, cellLocation=None):
+    def __init__(self, node, cell, cellLocation=None, topdata=None):
         self.node = node
         if cellLocation is None:
             if len(cell.shape)  == 2:
@@ -20,7 +20,8 @@ class PolygonMesh(Mesh2d):
             else:
                 raise(ValueError("Miss `cellLocation` array!"))
 
-        self.ds = PolygonMeshDataStructure(node.shape[0], cell, cellLocation)
+        self.ds = PolygonMeshDataStructure(node.shape[0], cell, cellLocation,
+                topdata=None)
         self.meshtype = 'polygon'
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -65,8 +66,17 @@ class PolygonMesh(Mesh2d):
         return cls(node, cell, cellLocation)
 
     @classmethod
-    def from_halfedgepolygonmesh(cls, mesh):
-        pass
+    def from_halfedgemesh(cls, mesh):
+        """
+        Notes
+        -----
+        从 HalfEdgeMesh2d 对象中拷贝出一个多边形网格出来。
+        """
+        node = mesh.entity('node')[:].copy()
+        cell, cellLocation = mesh.entity('cell')
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        return cls(node, cell, cellLocation, topdata=(edge, edge2cell))
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
@@ -251,13 +261,19 @@ class PolygonMesh(Mesh2d):
 
 
 class PolygonMeshDataStructure():
-    def __init__(self, NN, cell, cellLocation):
+    def __init__(self, NN, cell, cellLocation, topdata=None):
         self.NN = NN
         self.NC = cellLocation.shape[0] - 1
 
         self.cell = cell
         self.cellLocation = cellLocation
-        self.construct()
+
+        if topdata is None:
+            self.construct()
+        else:
+            self.edge = topdata[0]
+            self.edge2cell = topdata[1]
+            self.NE = len(edge)
 
     def reinit(self, NN, cell, cellLocation):
         self.NN = NN
