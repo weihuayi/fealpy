@@ -63,14 +63,14 @@ class MeshFactory():
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return QuadrangleMesh(node, cell)
 
-    def one_tetrahedron_mesh(self, ttype='equ'):
-        if ttype == 'equ':
+    def one_tetrahedron_mesh(self, meshtype='equ'):
+        if meshtype == 'equ':
             node = np.array([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.5, np.sqrt(3)/2, 0.0],
                 [0.5, np.sqrt(3)/6, np.sqrt(2/3)]], dtype=np.float64)
-        elif ttype == 'iso':
+        elif meshtype == 'iso':
             node = np.array([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
