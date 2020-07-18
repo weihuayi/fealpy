@@ -1,12 +1,15 @@
 import numpy as np
+
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .TetrahedronMesh import TetrahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
 from ..geometry import huniform
+from ..decorator import timer
 
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .QuadrangleMesh import QuadrangleMesh
@@ -17,6 +20,8 @@ from .TetrahedronMesh import TetrahedronMesh
 from .HexahedronMesh import HexahedronMesh
 
 from .distmesh import DistMesh2d
+
+from .interface_mesh_generator import InterfaceMesh2d
 
 class MeshFactory():
     def __init__(self):
@@ -75,6 +80,7 @@ class MeshFactory():
         return TetrahedronMesh(node, cell)
 
 
+    @timer
     def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri'):
         """
 
@@ -119,6 +125,7 @@ class MeshFactory():
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
+    @timer
     def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex'):
         """
         Notes
@@ -338,6 +345,12 @@ class MeshFactory():
             mesh = PolygonMesh(node, cell, cellLocation)
             mesh = HalfEdgeMesh2d.from_mesh(mesh)
             return mesh
+
+    def interfacemesh2d(self, interface, n=20):
+        alg = InterfaceMesh2d(interface, interface.box, n)
+        ppoint, pcell, pcellLocation = alg.run()
+        pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
+        return pmesh
        
 # 下面的程序还需要标准化
     def uncross_mesh(self, box, n=10, r="1"):
