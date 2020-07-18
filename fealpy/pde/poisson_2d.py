@@ -59,8 +59,18 @@ class CosCosData:
         elif meshtype == 'squad':
             mesh = StructureQuadMesh([0, 1, 0, 1], h)
             return mesh
+        elif meshtype == 'halfedge2d':
+            node = np.array([
+                (0, 0),
+                (1, 0),
+                (1, 1),
+                (0, 1)], dtype=np.float64)
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
+            mesh = QuadrangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
         else:
             raise ValueError("".format)
+
 
 
     @cartesian

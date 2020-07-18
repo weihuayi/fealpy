@@ -1428,6 +1428,7 @@ class HalfEdgeMesh2dDataStructure():
         NE = self.NE
         halfedge =  self.halfedge
         subdomain = self.subdomain
+        hedge = self.hedge
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
         J = np.zeros(2*NE, dtype=self.itype)
