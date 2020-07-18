@@ -34,10 +34,12 @@ errorMatrix = np.zeros((2, maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
-    space = LagrangeFiniteElementSpace(mesh, p=p)
+    print("The {}-th computation:".format(i))
 
+    space = LagrangeFiniteElementSpace(mesh, p=p)
     NDof[i] = space.number_of_global_dofs()
     bc = DirichletBC(space, pde.dirichlet) 
+
 
     uh = space.function()
     A = space.stiff_matrix()

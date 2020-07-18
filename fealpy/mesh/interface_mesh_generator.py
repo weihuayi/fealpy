@@ -300,9 +300,9 @@ class InterfaceMesh2d():
 
         self.find_cut_cell()
 
-        self.find_cut_node()
+        self.find_cut_point()
 
-        self.find_aux_node()
+        self.find_aux_point()
 
         interfaceNode, idxMap = self.find_interface_node()
 
@@ -607,9 +607,9 @@ class InterfaceMesh3d():
 
         T = self.delaunay(interfaceNode, idxMap)
 
-        if meshtype is 'polyhedron':
+        if meshtype == 'polyhedron':
             mesh = self.tet_to_poly(T)
-        elif meshtype is 'interfacemesh':
+        elif meshtype == 'interfacemesh':
             mesh = self.interface_mesh(T)
         return mesh
 

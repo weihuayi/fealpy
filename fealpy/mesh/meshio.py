@@ -1,7 +1,35 @@
 """Mesh IO
 """
+
+import sys
+import numpy as np
 import scipy.io as sio
+
+import matplotlib.pyplot as plt
+
 from .TriangleMesh import TriangleMesh
+
+class CCGMeshReader:
+    def __init__(self, fname):
+        try:
+            with open(fname, 'r') as f:
+                self.lines = f.read().split('\n')
+        except EnvironmentError:
+            print("Warning! open file failed!")
+        self.cline = 0
+
+    def read(self):
+        pass
+
+    def read_vertex(self):
+        pass
+
+    def read_face(self):
+        pass
+
+    def read_edge(self):
+        pass
+
 
 def write_obj_mesh(trimesh, f):
     from openmesh import TriMesh, write_mesh 

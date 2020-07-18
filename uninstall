@@ -1,5 +1,0 @@
-#!/bin/bash
-
-rm -fr fealpy.egg-info
-rm /usr/local/lib/python3.6/dist-packages/easy-install.pth
-rm /usr/local/lib/python3.6/dist-packages/fealpy.egg-link

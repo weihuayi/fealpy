@@ -20,14 +20,14 @@ class SCFTABC_BCBlendModelTest():
         pass
 
     def init_value(self):
-        rhoA = init_value['C42A']
-        rhoB = init_value['C42B']
-        rhoC = init_value['C42C']
+        rhoA = init_value['LAM_A']
+        rhoB = init_value['LAM_B']
+        rhoC = init_value['LAM_C']
         print('rhoA:', rhoA)
         print('rhoB:', rhoB)
         print('rhoC:', rhoC)
-        box = np.array([[4, 0], [0, 4]], dtype=np.float)
-        NS = 8
+        box = np.array([[8, 0, 0], [0, 8, 0], [0, 0, 8]], dtype=np.float)
+        NS = 64
         space = FourierSpace(box,  NS)
         rhoA = space.fourier_interpolation(rhoA)
         rhoB = space.fourier_interpolation(rhoB)
@@ -39,9 +39,9 @@ class SCFTABC_BCBlendModelTest():
 
 
     def run(self, rdir):
-        rhoA = init_value['C42A']
-        rhoB = init_value['C42B']
-        rhoC = init_value['C42C']
+        rhoA = init_value['LAM_A']
+        rhoB = init_value['LAM_B']
+        rhoC = init_value['LAM_C']
         #rhoB = init_value['LAM']
         #rhoA = (
         #        np.array([[0, 0], [0, 0]], dtype=np.int),
@@ -51,7 +51,8 @@ class SCFTABC_BCBlendModelTest():
         #        np.array([[0, 0], [0, 0]], dtype=np.int),
         #        np.array([0, 0], dtype=np.float)
         #        )
-        box = np.array([[4 , 0], [0, 4]], dtype=np.float)
+        #box = np.array([[8 , 0, 0], [0, 8, 0], [0, 0, 8]], dtype=np.float)
+        box = np.array([[4, 0], [0, 4]], dtype=np.float)
         fA  = 0.2
         fB1 = 0.4
         fC1 = 1-fA-fB1
@@ -60,7 +61,10 @@ class SCFTABC_BCBlendModelTest():
         fC2 = 1-fB2
         nABC = 1
         nBC = 1
-        options = model_options(box=box, NS=64, fA=fA, fB1=fB1, fC1=fC1, fBC=fBC, fB2=fB2, fC2=fC2, nABCblend = nABC, nBCblend = nBC)
+        chiAB = 24
+        chiAC = 24
+        chiBC = 24
+        options = model_options(box=box, NS=64, fA=fA, fB1=fB1, fC1=fC1, fBC=fBC, fB2=fB2, fC2=fC2, chiAB = chiAB, chiAC = chiAC, chiBC = chiBC, nABCblend = nABC, nBCblend = nBC)
         model = SCFTABC_BCBlendModel(options=options)
         rho = [ model.space.fourier_interpolation(rhoA),
                 model.space.fourier_interpolation(rhoB),
@@ -71,8 +75,8 @@ class SCFTABC_BCBlendModelTest():
         maxit = options['Maxit']
 
         if True:
-            for i in range(maxit):
-#            for i in range(1):
+            #for i in range(maxit):
+            for i in range(1):
                 print("step:", i)
                 model.compute()
                 print('H:',H)

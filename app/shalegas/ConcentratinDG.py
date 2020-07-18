@@ -9,6 +9,10 @@ Notes
 变化。
 """
 import sys
+
+import vtk
+import vtk.util.numpy_support as vnp
+
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import bmat, spdiags
@@ -72,7 +76,7 @@ class ConcentrationData0:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.01
+        val[flag0] = 0.001
         return val
 
     @cartesian
@@ -99,10 +103,14 @@ class ConcentrationData1:
         return val.reshape(shape) 
 
 class ConcentrationDG():
-    def __init__(self, vdata, cdata, mesh, p=0):
+    def __init__(self, vdata, cdata, mesh, timeline, p=0,
+            options={'rdir':'/home/why/result'}):
+
+        self.options = options
         self.vdata = vdata
         self.cdata = cdata
         self.mesh = mesh
+        self.timeline = timeline
         self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=p)
         self.cspace = ScaledMonomialSpace2d(mesh, p=p+1)
 
@@ -110,15 +118,29 @@ class ConcentrationDG():
         self.ph = self.uspace.smspace.function() # 压力场自由度数组
         self.ch = self.cspace.function() # 浓度场自由度数组
 
+        # 初始浓度场设为 1
         ldof = self.cspace.number_of_local_dofs()
         self.ch[0::ldof] = 1.0
 
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
-        self.NL = 0
+
+        # vtk 文件输出
+        node, cell, cellType, NC = self.mesh.to_vtk()
+        self.points = vtk.vtkPoints()
+        self.points.SetData(vnp.numpy_to_vtk(node))
+        self.cells = vtk.vtkCellArray()
+        self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+        self.cellType = cellType
 
     def set_init_velocity_field(self):
+        """
+
+        Notes
+        ----
+        利用最低阶混合元计算初始速度场
+        """
         vdata = self.vdata
         mesh = self.mesh
         uspace = self.uspace
@@ -154,10 +176,17 @@ class ConcentrationDG():
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
 
-    def get_current_right_vector(self, data, timeline):
-        cdata = self.cdata
-        ch = data[0]
-        uh = data[1]
+    def get_current_right_vector(self):
+        """
+
+        Notes
+        -----
+        计算下一时刻对应的右端项。
+        """
+
+        timeline = self.timeline
+        ch = self.ch 
+        uh = self.uh 
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
@@ -165,54 +194,91 @@ class ConcentrationDG():
 
         F = self.H@(F[:, :, None]/0.2)
         F *= dt
-
         return F.flat
 
-    def solve(self, data, timeline):
-        F = self.get_current_right_vector(data, timeline)
-        ch = data[0]
-        ch += F 
+    def one_step_solve(self):
+        """
 
-    def output(self, data, nameflag, queue, status=None):
-        print(nameflag)
-        ch = data[0]
-        if status is None:
-            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-            ps = self.mesh.bc_to_point(bc)
+        Notes
+        -----
+        计算下一时刻的浓度。
+        """
+        F = self.get_current_right_vector()
+        self.ch += F 
+
+
+    def solve(self):
+        """
+
+        Notes
+        -----
+
+        计算所有的时间层。
+        """
+
+        rdir = self.options['rdir']
+        timeline = self.timeline
+        dt = timeline.current_time_step_length()
+        timeline.reset() # 时间置零
+
+        fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
+        self.write_to_vtk(fname)
+        print(fname)
+        while not timeline.stop():
+            self.one_step_solve()
+            timeline.current += 1
+            fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
+            print(fname)
+            self.write_to_vtk(fname)
+        timeline.reset()
+
+    def write_to_vtk(self, fname):
+        # 重心处的值
+        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+        ps = self.mesh.bc_to_point(bc)
+        vmesh = vtk.vtkUnstructuredGrid()
+        vmesh.SetPoints(self.points)
+        vmesh.SetCells(self.cellType, self.cells)
+        cdata = vmesh.GetCellData()
+        pdata = vmesh.GetPointData()
+
+        uh = self.uh 
+        V = uh.value(bc)
+        V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
+        val = vnp.numpy_to_vtk(V)
+        val.SetName('velocity')
+        cdata.AddArray(val)
+
+        if True:
+            ch = self.ch
+            rch = ch.to_cspace_function()
+            val = vnp.numpy_to_vtk(rch)
+            val.SetName('concentration')
+            pdata.AddArray(val)
+        else:
+            ch = self.ch
             val = ch.value(ps)
-            queue.put({'c'+nameflag: ('celldata', val)})
-        elif status == 'start':
-            queue.put(self.NL)
-            bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-            ps = self.mesh.bc_to_point(bc)
-            val = ch.value(ps)
-            queue.put({'c'+nameflag: ('celldata', val)})
-        elif status == 'stop':
-            #uh = data[1]
-            #bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-            #V = uh.value(bc)
-            #V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
-            #queue.put({'velocity':('celldata', V)})
-            queue.put(-1)
+            val = vnp.numpy_to_vtk(val)
+            val.SetName('concentration')
+            cdata.AddArray(val)
+
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(vmesh)
+        writer.Write()
 
 
 
 if __name__ == '__main__':
 
     from fealpy.writer import MeshWriter
+    rdir = sys.argv[1]
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=6)
+    mesh = mf.regular([0, 1, 0, 1], n=64)
     vdata = VelocityData()
     cdata = ConcentrationData1()
-    options = {'Output': True}
-    timeline = UniformTimeLine(0, 1, 1000, options)
-    model = ConcentrationDG(vdata, cdata, mesh)
-    model.NL = timeline.number_of_time_levels()
+    timeline = UniformTimeLine(0, 10, 100000)
+    options = {'rdir': rdir}
+    model = ConcentrationDG(vdata, cdata, mesh, timeline, options=options)
+    model.solve()
 
-    data = (model.ch, model.uh)
-
-    writer = MeshWriter(mesh, 
-            simulation=timeline.time_integration, 
-            args=(data, model)
-            )
-    writer.run()

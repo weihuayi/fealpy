@@ -3,10 +3,10 @@ import matplotlib.pyplot as plt
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.functionspace import ConformingVirtualElementSpace2d, ScaledMonomialSpace2d
-p = 2
+p = 1
 
 pde = CosCosData()
-quadtree = pde.init_mesh(n=4, meshtype='quadtree')
+quadtree = pde.init_mesh(n=5, meshtype='quadtree')
 options = quadtree.adaptive_options(method='numrefine', maxsize=1, HB=True)
 
 pmesh = quadtree.to_pmesh()
@@ -22,7 +22,7 @@ pmesh.add_plot(axes0)
 pmesh.find_cell(axes0, showindex=True)
 
 NC = pmesh.number_of_cells()
-eta = np.ones(NC, dtype=np.int)
+eta = -1*np.ones(NC, dtype=np.int)
 
 quadtree.adaptive(eta, options)
 pmesh = quadtree.to_pmesh()

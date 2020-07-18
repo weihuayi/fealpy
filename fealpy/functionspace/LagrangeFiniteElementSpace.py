@@ -14,6 +14,7 @@ from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
 from ..quadrature import FEMeshIntegralAlg
+from ..decorator import timer
 
 
 class LagrangeFiniteElementSpace():
@@ -27,6 +28,9 @@ class LagrangeFiniteElementSpace():
                     self.dof = CPLFEMDof1d(mesh, p)
                     self.TD = 1
                 elif mesh.meshtype == 'tri':
+                    self.dof = CPLFEMDof2d(mesh, p)
+                    self.TD = 2
+                elif mesh.meshtype == 'halfedge2d':
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
                 elif mesh.meshtype == 'stri':
@@ -580,20 +584,19 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def stiff_matrix_1(self, cfun=None):
+    def parallel_stiff_matrix(self, cfun=None):
         """
 
         Notes
         -----
-        采用积分算法中矩阵组装程序，来组装
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.grad_basis, cell2dof0=cell2dof,
-                gdof0=gdof)
+        b0 = (self.grad_basis, cell2dof, gdof)
+        M = self.integralalg.parallel_construct_matrix(b0)
         return M
 
-    def mass_matrix_1(self, cfun=None):
+    def parallel_mass_matrix(self, cfun=None):
         """
 
         Notes
@@ -606,12 +609,13 @@ class LagrangeFiniteElementSpace():
                 gdof0=gdof)
         return M
 
-    def source_vector_1(self, f, dim=None):
+    def parallel_source_vector(self, f, dim=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
+    @timer
     def stiff_matrix(self, cfun=None):
         p = self.p
         GD = self.geo_dimension()
@@ -659,7 +663,6 @@ class LagrangeFiniteElementSpace():
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs()
-
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
