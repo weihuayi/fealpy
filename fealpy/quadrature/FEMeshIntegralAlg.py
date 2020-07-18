@@ -1,18 +1,9 @@
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix
-
+import multiprocessing as mp
+from multiprocessing.pool import ThreadPool as Pool
 from ..decorator import timer
 
-def broadcast(c, phi):
-    """
-    Notes
-    -----
-
-    把 c 的形状广播为与 phi 相关的形状
-
-    phi: ijk....
-    c : 
-    """
 
 
 class FEMeshIntegralAlg():
@@ -40,8 +31,7 @@ class FEMeshIntegralAlg():
 
     @timer
     def parallel_construct_matrix(self, b0, 
-            b1=None, c=None, 
-            block=100000, q=None):
+            b1=None, c=None, q=None):
         """
 
         Parameters
@@ -77,46 +67,59 @@ class FEMeshIntegralAlg():
         gdof0 = b0[2]
 
         # 对问题进行分割
-        if NC <= block:
-            nb = 1
-            index = np.array([0, NC], dtype=np.int_)
-        else:
-            nb = NC//block
-            r = NC%block
-            index = np.full(nb+1, block)
-            index[0] = 0
-            index[1:r+1] += 1
-            np.cumsum(index, out=index)
+        nc = mp.cpu_count()-2
+
+        block = NC//nc
+        r = NC%nc
+        index = np.full(nc+1, block)
+        index[0] = 0
+        index[1:r+1] += 1
+        np.cumsum(index, out=index)
 
         if b1 is None:
             gdof1 = gdof0
         else:
             gdof1 = b1[2]
 
-        print('index:', index)
-
         # 分块进行矩阵组装
-        A = coo_matrix((gdof0, gdof1))
-        for i in range(nb): #TODO：并行化计算
+        A = csr_matrix((gdof0, gdof1))
+
+        def f(i):
             s = slice(index[i], index[i+1])
             measure = self.cellmeasure[s]
             c2d0 = cell2dof0[s]
-            phi0 = basis0(bcs, index=s) # (NQ, NC, ldof, ...)
             if b1 is None:
-                phi1 = phi0
                 c2d1 = c2d0
             else:
-                phi1 = b1[0](bcs, index=s) # (NQ, NC, ldof, ...)
                 c2d1 = b1[1][s]
 
-            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1, measure,
-                    optimize=True)
+            shape = (len(measure), c2d0.shape[1], c2d1.shape[1])
+            M = np.zeros(shape, measure.dtype)
+            for bc, w in zip(bcs, ws):
+                phi0 = basis0(bc, index=s)
+                if b1 is None:
+                    phi1 = phi0
+                else:
+                    phi1 = b1[0](bc, index=s)
+
+                print(M.shape, (w*measure).shape, phi0.shape, phi1.shape)
+                M0 = np.einsum('jk..., jm..., j->jkm', phi0, phi1, w*measure)
+                print(M0.shape)
+                M += M0
+
             I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
             J = np.broadcast_to(c2d1[:, None, :], shape=M.shape)
 
-            A += coo_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+            Bi = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+            return Bi 
 
-        return A.tocsr()
+        with Pool(nc) as p:
+            B = p.map(f, range(nc))
+
+        for val in B:
+            A += val
+
+        return A
 
 
     @timer
