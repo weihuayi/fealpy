@@ -241,8 +241,8 @@ class Mesh3dDataStructure():
 
     def clear(self):
         self.face = None
-        self.face2cell = None
         self.edge = None
+        self.face2cell = None
         self.cell2edge = None
 
     def number_of_nodes_of_cells(self):
@@ -303,7 +303,7 @@ class Mesh3dDataStructure():
         self.cell2edge = np.reshape(j, (NC, E))
         self.NE = self.edge.shape[0]
 
-    def cell_to_node(self):
+    def cell_to_node(self, return_sparse=True):
         """
         """
         NN = self.NN
