@@ -31,7 +31,7 @@ class FEMeshIntegralAlg():
 
     @timer
     def parallel_construct_matrix(self, b0, 
-            b1=None, c=None, q=None):
+            b1=None, cfun=None, q=None):
         """
 
         Parameters
@@ -40,7 +40,7 @@ class FEMeshIntegralAlg():
             b0[0]: basis function
             b0[1]: cell2dof
             b0[2]: number of global dofs
-        b1: None, just like b0
+        b1: default is None, just like b0
         block: 
 
         Notes
@@ -49,11 +49,10 @@ class FEMeshIntegralAlg():
         把网格中的单元分组，再分组组装相应的矩阵。对于三维大规模问题，如果同时计
         算所有单元的矩阵，占用内存会过多，效率过低。
 
-        这里默认按每组 10 万的规模进行分组，这个需要在实践中调整。
 
         TODO
         -----
-            1. 并行化
+            1. 给定一个计算机内存的大小和 cpu 的个数，动态决定合理的问题分割策略
             2. 考虑存在系数的情况
         """
 
@@ -114,6 +113,67 @@ class FEMeshIntegralAlg():
             A += val
 
         return A
+
+    @timer
+    def serial_construct_matrix(self, b0, 
+            b1=None, cfun=None, q=None):
+        """
+
+        Parameters
+        ----------
+        b0: tuple, 
+            b0[0]: basis function
+            b0[1]: cell2dof
+            b0[2]: number of global dofs
+        b1: default is None, just like b0
+
+        Notes
+        -----
+        """
+
+        basis0 = b0[0]
+        cell2dof0 = b0[1]
+        gdof0 = b0[2]
+
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        ps = mesh.bc_to_point(bcs)
+        if basis0.coordtype == 'barycentric':
+            phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
+        elif basis0.coordtype == 'cartesian':
+            phi0 = basis0(ps)
+
+        if basis1 is not None:
+            if basis1.coordtype == 'barycentric':
+                phi1 = basis1(bcs) # (NQ, NC, ldof, ...)
+            elif basis1.coordtype == 'cartesian':
+                phi1 = basis1(ps)
+        else:
+            phi1 = phi0
+
+        if c is None:
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
+                    self.cellmeasure, optimize=True)
+        else: 
+            pass #TODO: 考虑有系数的情况
+
+        if cell2dof0 is None: # just construct cell matrix
+            return M
+
+        if b1 is None:
+            gdof1 = gdof0
+            cell2dof1 = cell2dof0
+        else:
+            gdof1 = b1[2]
+
+        I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof1[:, None, :], shape=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+
+        return M
 
 
     @timer

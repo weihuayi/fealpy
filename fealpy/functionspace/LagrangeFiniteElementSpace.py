@@ -484,21 +484,8 @@ class LagrangeFiniteElementSpace():
         """
         construct the linear elasticity fem matrix
         """
-        cellmeasure = self.cellmeasure
-        cell2dof = self.cell_to_dof()
+
         GD = self.GD
-
-        qf = self.integrator
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.grad_basis(bcs)
-
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-
-        #TODO: make it more efficient
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-
         if GD == 2:
             idx = [(0, 0), (0, 1),  (1, 1)]
             imap = {(0, 0):0, (0, 1):1, (1, 1):2}
@@ -506,6 +493,21 @@ class LagrangeFiniteElementSpace():
             idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
             imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
         A = []
+
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs)
+
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        shape = (NC, ldof, ldof)
+        I = np.broadcast_to(cell2dof[:, :, None], shape=shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=shape)
+
+        # 分块组装矩阵
+        gdof = self.number_of_global_dofs()
+        cellmeasure = self.cellmeasure
         for k, (i, j) in enumerate(idx):
             Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
             A.append(csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)))
@@ -547,12 +549,6 @@ class LagrangeFiniteElementSpace():
         bcs, ws = qf.get_quadrature_points_and_weights()
         grad = self.grad_basis(bcs)
 
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-
         if GD == 2:
             idx = [(0, 0), (0, 1),  (1, 1)]
             imap = {(0, 0):0, (0, 1):1, (1, 1):2}
@@ -589,24 +585,25 @@ class LagrangeFiniteElementSpace():
 
         Notes
         -----
+        并行组装刚度矩阵
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
-        M = self.integralalg.parallel_construct_matrix(b0, q=q)
+        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
         return M
 
-    def parallel_mass_matrix(self, cfun=None):
+    def parallel_mass_matrix(self, cfun=None, q=None):
         """
 
         Notes
         -----
-        采用积分算法中矩阵组装程序，来组装
+        并行组装质量矩阵 
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
-                gdof0=gdof)
+        b0 = (self.basis, cell2dof, gdof)
+        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
         return M
 
     def parallel_source_vector(self, f, dim=None):
@@ -627,28 +624,7 @@ class LagrangeFiniteElementSpace():
         gphi = self.grad_basis(bcs)
 
         if cfun is not None:
-            ps = self.mesh.bc_to_point(bcs)
-            d = cfun(ps)
-
-            if isinstance(d, (int, float)):
-                dgphi = d*gphi
-            elif len(d) == GD:
-                dgphi = np.einsum('m, ...im->...im', d, gphi)
-            elif isinstance(d, np.ndarray):
-                if len(d.shape) == 1:
-                    dgphi = np.einsum('i, ...imn->...imn', d, gphi)
-                elif len(d.shape) == 2:
-                    dgphi = np.einsum('...i, ...imn->...imn', d, gphi)
-                elif len(d.shape) == 3: #TODO:
-                    dgphi = np.einsum('...imn, ...in->...im', d, gphi)
-                elif len(d.shape) == 4: #TODO:
-                    dgphi = np.einsum('...imn, ...in->...im', d, gphi)
-                else:
-                    raise ValueError("The ndarray shape length should < 5!")
-            else:
-                raise ValueError(
-                        "The return of cfun is not a number or ndarray!"
-                        )
+            pass # TODO: 考虑存在扩散系数的情形
         else:
             dgphi = gphi
 
@@ -658,11 +634,12 @@ class LagrangeFiniteElementSpace():
         A = np.einsum('i, ijkm, ijpm, j->jkp',
                 ws, dgphi, gphi, self.cellmeasure,
                 optimize=True)
-        cell2dof = self.cell_to_dof()
-        ldof = self.number_of_local_dofs()
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
+
         gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+
         # Construct the stiffness matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
@@ -684,25 +661,7 @@ class LagrangeFiniteElementSpace():
         phi = self.basis(bcs)
 
         if cfun is not None:
-            if barycenter is True:
-                d = cfun(bcs) # (NQ, NC)
-            else:
-                ps = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
-                d = cfun(ps) # (NQ, NC)
-
-            if isinstance(d, (int, float)):
-                dphi = d*phi
-            elif isinstance(d, np.ndarray):
-                if (len(d.shape) == 1):
-                    dphi = np.einsum('i, mij->mij', d, phi)
-                elif len(d.shape) == 2:
-                    dphi = np.einsum('mi, mij->mij', d, phi)
-                else:
-                    raise ValueError("The ndarray shape length should < 3!")
-            else:
-                raise ValueError(
-                        "The return of cfun is not a number or ndarray!"
-                        )
+            pass # TODO: 考虑存在系数的情形
         else:
             dphi = phi
         M = np.einsum(
