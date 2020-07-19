@@ -56,8 +56,7 @@ def complex_mesh(r, filename):
     nmesh = TriangleMeshWithInfinityNode(mesh)
     ppoint, pcell, pcellLocation =  nmesh.to_polygonmesh()
     pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
-    mesh = HalfEdgeMesh2d.from_mesh(pmesh)
-    return mesh
+    return pmesh
 
 
 def quadmesh(n=10, L=12):

@@ -119,7 +119,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 subdomain[0] = 0
             return cls(node, halfedge, subdomain)
         else:
-            newMesh =  cls(mesh.node, mesh.subdomain, mesh.ds.halfedge.copy())
+            newMesh =  cls(mesh.node, mesh.ds.subdomain, mesh.ds.halfedge.copy())
             newMesh.celldata['level'][:] = mesh.celldata['level']
             newMesh.nodedata['level'][:] = mesh.nodedata['level']
             newMesh.halfedge['level'][:] = mesh.halfedgedata['level']
@@ -718,6 +718,9 @@ class HalfEdgeMesh2d(Mesh2d):
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
         flag = isMarkedCell[halfedge[:, 1]]
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
+        flag = (np.array(hlevel)>0)
+        np.logical_and.at(isRNode, halfedge[:, 0], flag)
+
 
         nn = isRNode.sum()
 

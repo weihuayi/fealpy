@@ -6,7 +6,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import HalfEdgeMesh2d
+from fealpy.mesh import HalfEdgeMesh2d, PolygonMesh
 from fealpy.opt.saddleoptalg import SteepestDescentAlg
 
 from SCFTVEMModel2d import scftmodel2d_options, SCFTVEMModel2d
@@ -18,6 +18,7 @@ class HalfEdgeAVEMTest():
         print('NN', mesh.number_of_nodes())
         self.optoptions = optoptions
         self.moptions = moptions
+        ##多边形网格－空间
         obj = SCFTVEMModel2d(mesh, options=self.moptions)
         mu = obj.init_value(fieldstype=fieldstype)
         self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
@@ -29,8 +30,9 @@ class HalfEdgeAVEMTest():
         model = problem['objective']
 
         optalg = SteepestDescentAlg(problem, options)
-        x, f, g, diff = optalg.run(maxit=500)
+        x, f, g, diff = optalg.run(maxit=1)
         print('1', model.q0[:,-1])
+
         q = np.zeros(model.rho.shape)
         while True:
             print('chiN', moptions['chiN'])
@@ -38,13 +40,16 @@ class HalfEdgeAVEMTest():
                 optalg = SteepestDescentAlg(problem, options)
                 x, f, g, diff = optalg.run(maxit=10, eta_ref='etamaxmin')
             print('2', model.q0[:,-1])
+            q = np.zeros(model.rho.shape)
             q[:,0] = model.q0[:,-1]
             q[:,1] = model.q1[:,-1]
             problem['x0'] = x
             while True:
                 mesh = problem['mesh']
-                aopts = mesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
+                hmesh = HalfEdgeMesh2d.from_mesh(mesh)
+                aopts = hmesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
                 print('NN', mesh.number_of_nodes())
+
                 mu = problem['x0']
                 if estimator == 'mix':
                     eta = model.mix_estimate(q, w=1)
@@ -56,8 +61,9 @@ class HalfEdgeAVEMTest():
                 S1 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,1])
 
 
-                mesh.adaptive(eta, aopts)
+                hmesh.adaptive(eta, aopts)
                 print('NN', mesh.number_of_nodes())
+                mesh = PolygonMesh.from_halfedgemesh(hmesh)
 
                 model.reinit(mesh)
                 aopts['data']['mu'] = np.zeros((model.gdof,2))
@@ -70,6 +76,7 @@ class HalfEdgeAVEMTest():
                 problem['mesh'] = mesh
                 problem['x0'] = x
                 problem['rho'] = model.rho
+                q = np.zeros(model.rho.shape)
 
                 q[:,0] = model.q0[:,-1]
                 q[:,1] = model.q1[:,-1]
