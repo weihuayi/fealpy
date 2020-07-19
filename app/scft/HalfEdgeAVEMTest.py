@@ -6,15 +6,17 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import HalfEdgeMesh2d
+from fealpy.mesh import HalfEdgeMesh2d, PolygonMesh
 from fealpy.opt.saddleoptalg import SteepestDescentAlg
 
 from SCFTVEMModel2d import scftmodel2d_options, SCFTVEMModel2d
-from vem2d_problem import halfedgemesh, init_mesh
+from vem2d_problem import halfedgemesh, init_mesh, complex_mesh
 
 
 class HalfEdgeAVEMTest():
     def __init__(self, mesh, fieldstype, moptions, optoptions):
+        print('NN', mesh.number_of_nodes())
+        print(mesh.cell_area())
         self.optoptions = optoptions
         obj = SCFTVEMModel2d(mesh, options=moptions)
         mu = obj.init_value(fieldstype=fieldstype)
@@ -36,49 +38,61 @@ class HalfEdgeAVEMTest():
 
 
         optalg = SteepestDescentAlg(problem, options)
-        x, f, g, diff = optalg.run(maxit=500)
+        x, f, g, diff = optalg.run(maxit=1)
         while True:
-            while True:
-                mesh = problem['mesh']
-                aopts = mesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
-                print('NN', mesh.number_of_nodes())
-                mu = problem['x0']
-                if estimator == 'mix':
-                    eta = model.mix_estimate(mu, w=1)
-                if estimator == 'grad':
-                    eta = model.estimate(q)
+            mesh = problem['mesh']
+            hmesh = HalfEdgeMesh2d.from_mesh(mesh)
+            cell, cellLocation = hmesh.entity('cell')
+            print('2', cellLocation)
+            aopts = hmesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
+            print('NN', mesh.number_of_nodes())
+            mu = problem['x0']
+            if estimator == 'mix':
+                eta = model.mix_estimate(mu, w=1)
+            if estimator == 'grad':
+                eta = model.estimate(q)
 
-                aopts['data'] = {'mu':mu}
-                S0 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,0])
-                S1 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,1])
+            aopts['data'] = {'mu':mu}
+            S0 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,0])
+            S1 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,1])
 
 
-                mesh.adaptive(eta, aopts)
+            hmesh.adaptive(eta, aopts)
+            #fig = plt.figure()
+            #axes = fig.gca()
+            #hmesh.add_plot(axes)
+            #hmesh.find_cell(axes, showindex=True)
+            #plt.show()
 
-                model.reinit(mesh)
-                aopts['data']['mu'] = np.zeros((model.gdof,2))
-                aopts['data']['mu'][:,0] = model.vemspace.interpolation(S0, aopts['HB'])
-                aopts['data']['mu'][:,1] = model.vemspace.interpolation(S1, aopts['HB'])
-                problem['x0'] = aopts['data']['mu']
+            cell, cellLocation = hmesh.entity('cell')
+            print('3', cellLocation)
+            mesh = PolygonMesh.from_halfedgemesh(hmesh)
 
-                optalg = SteepestDescentAlg(problem, options)
-                x, f, g, diff = optalg.run(maxit=100)
-                problem['mesh'] = mesh
-                problem['x0'] = x
-                problem['rho'] = model.rho
-                self.problem = problem
+            model.reinit(mesh)
+            aopts['data']['mu'] = np.zeros((model.gdof,2))
+            aopts['data']['mu'][:,0] = model.vemspace.interpolation(S0, aopts['HB'])
+            aopts['data']['mu'][:,1] = model.vemspace.interpolation(S1, aopts['HB'])
+            problem['x0'] = aopts['data']['mu']
 
-                if diff < options['FunValDiff']:
-                   if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
-                       break
-                pass
+            optalg = SteepestDescentAlg(problem, options)
+            x, f, g, diff = optalg.run(maxit=1)
+            problem['mesh'] = mesh
+            problem['x0'] = x
+            problem['rho'] = model.rho
+            self.problem = problem
+
+            if diff < options['FunValDiff']:
+                break
+               #if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
+                   #break
+            pass
 
 
 options = {
         'MaxIters': 5000,
         'MaxFunEvals': 5000,
         'NormGradTol': 1e-6,
-        'FunValDiff': 1e-6,
+        'FunValDiff': 1e-0,
         'StepLength': 2,
         'StepTol': 1e-14,
         'Output': True
@@ -96,9 +110,14 @@ moptions = scftmodel2d_options(
         T1 = 80,
         nupdate = 1,
         order = 1,
-        rdir = sys.argv[1])
-
-mesh = halfedgemesh(n=5, h=12)
+        rdir = sys.argv[3])
+if sys.argv[1] =='quadtree':
+    mesh = init_mesh(n=5, h=12)
+    mesh = mesh.to_pmesh()
+elif sys.argv[1] =='halfedge':
+    mesh = halfedgemesh(n=6, h=12)
+elif sys.argv[1] =='complex':
+    mesh = complex_mesh(r=20, filename = sys.argv[2])
 
 Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
         optoptions=options)

@@ -216,7 +216,7 @@ class SCFTVEMModel2d():
             #fields[:, 1] *= chiN
         elif fieldstype == 4:
             def f(p):
-                return np.sin(4*p[..., 0])
+                return np.sin(2*p[..., 0])
             fields[:, 1] += self.vemspace.interpolation(f)
 
         w[:, 0] = fields[:, 0] - fields[:, 1]
@@ -257,7 +257,7 @@ class SCFTVEMModel2d():
         self.H = -mu1_int + mu2_int/chiN
         self.H = self.H/self.totalArea - np.log(self.sQ)
 
-        self.save_data(fname= self.options['rdir']+'test'+str(self.count)+'.mat')
+        self.save_data(fname= self.options['rdir']+'/test'+str(self.count)+'.mat')
         self.show_solution(self.count)
         self.count +=1
         self.grad[:, 0] = self.rho[:, 0]  + self.rho[:, 1] - 1.0
