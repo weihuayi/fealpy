@@ -32,8 +32,12 @@ class PETScSolverTest():
         print('gdof:', gdof, 'NC:', NC)
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
+        A = space.stiff_matrix()
         A = space.parallel_stiff_matrix(q=1)
-        #A = space.stiff_matrix()
+        
+        M = space.parallel_mass_matrix(q=2)
+        M = space.mass_matrix()
+
         F = space.source_vector(pde.source)
 
         A, F = bc.apply(A, F, uh)

@@ -586,6 +586,7 @@ class LagrangeFiniteElementSpace():
         Notes
         -----
         并行组装刚度矩阵
+
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
@@ -599,6 +600,9 @@ class LagrangeFiniteElementSpace():
         Notes
         -----
         并行组装质量矩阵 
+
+        TODO:
+        1. parallel_construct_matrix just work for stiff matrix
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
@@ -607,76 +611,34 @@ class LagrangeFiniteElementSpace():
         return M
 
     def parallel_source_vector(self, f, dim=None):
+        """
+
+        Notes
+        -----
+        
+        TODO
+        ----
+        1. 组装载荷向量时，用到的 einsum, 它不支持多线程， 下一步把它并行化
+
+        """
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    @timer
-    def stiff_matrix(self, cfun=None):
-        p = self.p
-        GD = self.geo_dimension()
-
-        if p == 0:
-            raise ValueError('The space order is 0!')
-
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        gphi = self.grad_basis(bcs)
-
-        if cfun is not None:
-            pass # TODO: 考虑存在扩散系数的情形
-        else:
-            dgphi = gphi
-
-        # Compute the element sitffness matrix
-        # ws:(NQ,)
-        # dgphi: (NQ, NC, ldof, GD)
-        A = np.einsum('i, ijkm, ijpm, j->jkp',
-                ws, dgphi, gphi, self.cellmeasure,
-                optimize=True)
-
+    def stiff_matrix(self, cfun=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+        b0 = (self.grad_basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        return A 
 
-        # Construct the stiffness matrix
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return A
-
-    def mass_matrix(self, cfun=None, barycenter=False):
-        p = self.p
-        mesh = self.mesh
-        cellmeasure = self.cellmeasure
-
-        if p == 0:
-            NC = mesh.number_of_cells()
-            M = spdiags(cellmeasure, 0, NC, NC)
-            return M
-
-        # bcs: (NQ, TD+1)
-        # ws: (NQ, )
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        # phi: (NQ, ldof)
-        phi = self.basis(bcs)
-
-        if cfun is not None:
-            pass # TODO: 考虑存在系数的情形
-        else:
-            dphi = phi
-        M = np.einsum(
-                'm, mij, mik, i->ijk',
-                ws, dphi, phi, self.cellmeasure,
-                optimize=True)
-
-        cell2dof = self.cell_to_dof()
-        ldof = self.number_of_local_dofs()
-        I = np.einsum('ij, k->ijk',  cell2dof, np.ones(ldof))
-        J = I.swapaxes(-1, -2)
-
+    def mass_matrix(self, cfun=None, q=None):
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return M
+        cell2dof = self.cell_to_dof()
+        b0 = (self.basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        return A 
 
     def source_vector(self, f, dim=None):
         p = self.p

@@ -92,7 +92,7 @@ class FEMeshIntegralAlg():
 
             shape = (len(measure), c2d0.shape[1], c2d1.shape[1])
             M = np.zeros(shape, measure.dtype)
-            for bc, w in zip(bcs, ws):
+            for bc, w in zip(bcs, ws): # 对所有积分点进行循环
                 phi0 = basis0(bc, index=s)
                 if b1 is None:
                     phi1 = phi0
@@ -106,6 +106,7 @@ class FEMeshIntegralAlg():
             Bi = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
             return Bi 
 
+        # 并行组装总矩阵
         with Pool(nc) as p:
             B = p.map(f, range(nc))
 
@@ -145,34 +146,34 @@ class FEMeshIntegralAlg():
         elif basis0.coordtype == 'cartesian':
             phi0 = basis0(ps)
 
-        if basis1 is not None:
-            if basis1.coordtype == 'barycentric':
-                phi1 = basis1(bcs) # (NQ, NC, ldof, ...)
-            elif basis1.coordtype == 'cartesian':
-                phi1 = basis1(ps)
+        if b1 is not None:
+            if b1[0].coordtype == 'barycentric':
+                phi1 = b1[0](bcs) # (NQ, NC, ldof, ...)
+            elif b1[0].coordtype == 'cartesian':
+                phi1 = b1[0](ps)
         else:
             phi1 = phi0
 
-        if c is None:
+        if cfun is None:
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                     self.cellmeasure, optimize=True)
         else: 
             pass #TODO: 考虑有系数的情况
 
-        if cell2dof0 is None: # just construct cell matrix
+        if cell2dof0 is None: # 仅组装单元矩阵 
             return M
 
         if b1 is None:
             gdof1 = gdof0
             cell2dof1 = cell2dof0
         else:
+            cell2dof1 = b1[1]
             gdof1 = b1[2]
 
         I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
         J = np.broadcast_to(cell2dof1[:, None, :], shape=M.shape)
 
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
-
         return M
 
 
