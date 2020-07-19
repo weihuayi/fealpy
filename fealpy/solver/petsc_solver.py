@@ -27,6 +27,7 @@ class PETScSolver():
         ksp.setOperators(PA)
         ksp.setFromOptions()
         ksp.solve(PF, x)
+        return x
 
 def linear_solver(dmodel, uh, dirichlet=None):
     start = timer()
