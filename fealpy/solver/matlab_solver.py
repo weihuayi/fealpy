@@ -6,7 +6,15 @@ class MatlabSolver:
         """
         Parameters
         ----------
-        matlab : tranplant instance
+        matlab : tranplant instance, 
+
+
+        Example
+        -------
+        >> import transplant
+        >> from fealpy.solver import MatlabSolver
+        >> matalb = transplant.Matlab()
+        >> solver = MatlabSolver(matlab)
         """
         self.matlab = matlab
 
