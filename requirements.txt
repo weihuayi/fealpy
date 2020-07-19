@@ -6,3 +6,5 @@ pytools
 pyamg
 meshpy
 pyfftw
+petsc
+petsc4py
