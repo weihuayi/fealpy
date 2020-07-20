@@ -3,8 +3,6 @@
 
 import sys 
 import numpy as np
-from scipy.sparse.linalg import spsolve
-import pyamg
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -13,6 +11,11 @@ from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 
 from fealpy.tools.show import showmultirate
+
+# solver
+from fealpy.solver import PETScSolver
+from scipy.sparse.linalg import spsolve
+import pyamg
 
 p = int(sys.argv[1])
 n = int(sys.argv[2])
@@ -25,7 +28,7 @@ elif d == 3:
     from fealpy.pde.poisson_3d import CosCosCosData as PDE
 
 pde = PDE()
-mesh = pde.init_mesh(n=3)
+mesh = pde.init_mesh(n=n)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
@@ -40,17 +43,25 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
     bc = DirichletBC(space, pde.dirichlet) 
 
-
     uh = space.function()
-    A = space.stiff_matrix()
+    if d == 2:
+        A = space.stiff_matrix()
+    elif d == 3:
+        A = space.parallel_stiff_matrix(q=p)
+
     F = space.source_vector(pde.source)
 
     A, F = bc.apply(A, F, uh)
 
-    #uh[:] = spsolve(A, F).reshape(-1)
 
-    ml = pyamg.ruge_stuben_solver(A)  
-    uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+    #ml = pyamg.ruge_stuben_solver(A)  
+    #uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
+
+    if d==2:
+        uh[:] = spsolve(A, F).reshape(-1)
+    elif d==3:
+        solver = PETScSolver()
+        solver.solve(A, F, uh)
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)
