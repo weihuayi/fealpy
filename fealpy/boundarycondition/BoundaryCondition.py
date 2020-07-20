@@ -9,14 +9,16 @@ class DirichletBC():
         self.threshold = threshold
         self.bctype = 'Dirichlet'
 
-    def apply(self, A, F, uh):
+    def apply(self, A, F, uh=None):
         space = self.space
         gD = self.gD
         threshold = self.threshold
 
         gdof = space.number_of_global_dofs()
-        isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
         dim = A.shape[0]//gdof
+        if uh is None:
+            uh = self.space.function(dim=dim)
+        isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
             F = F.T.flat

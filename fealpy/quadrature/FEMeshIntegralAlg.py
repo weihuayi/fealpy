@@ -158,7 +158,21 @@ class FEMeshIntegralAlg():
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                     self.cellmeasure, optimize=True)
         else: 
-            pass #TODO: 考虑有系数的情况
+            if isinstance(cfun, (int, float)):
+                M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+                        self.cellmeasure, optimize=True)
+            elif callable(cfun):
+                if cfun.coordtype == 'barycentric':
+                    c = cfun(bcs)
+                elif cfun.coordtype == 'cartesian':
+                    c = cfun(ps)
+
+                if isinstance(c, (int, float)):
+                    M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+                            self.cellmeasure, optimize=True)
+                elif isinstance(c, np.ndarray): # (NQ, NC)
+                    M = np.einsum('i, ij, ijk..., ijm..., j->jkm', ws, c, phi0, phi1,
+                            self.cellmeasure, optimize=True)
 
         if cell2dof0 is None: # 仅组装单元矩阵 
             return M
