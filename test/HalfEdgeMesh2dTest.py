@@ -208,6 +208,7 @@ class HalfEdgeMesh2dTest:
                 halfedge = mesh.ds.halfedge
                 nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
                 cindex = mesh.get_data('cell', 'level')
+
                 fig = plt.figure()
                 axes = fig.gca()
                 #mesh.add_plot(axes)
@@ -216,6 +217,26 @@ class HalfEdgeMesh2dTest:
                 plt.show()
         else:
             return mesh
+
+    def coarsen_poly(self, plot=True):
+
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+        isMarkedCell = np.array([0,0,0,1,0], dtype=np.bool_)
+        mesh.refine_poly(isMarkedCell)
+
+
+        isMarkedCell = np.array([0,0,0,0,1,1,1], dtype=np.bool_)
+        mesh.coarsen_poly(isMarkedCell)
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        plt.show()
 
     def adaptive_poly(self, plot=True):
 
@@ -246,55 +267,22 @@ class HalfEdgeMesh2dTest:
         refined mesh
         """
         aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-<<<<<<< HEAD
-        eta = [0,0,0,0,2]
-=======
-        #eta = [2,0,0,0,2]
->>>>>>> upstream/master
 
         eta = [1,0,0,0,2]
         mesh.adaptive(eta, aopts)
         print('r',aopts['HB'])
-<<<<<<< HEAD
-        print("**************粗化***********")
-=======
-
->>>>>>> upstream/master
         fig = plt.figure()
         axes = fig.gca()
         mesh.add_plot(axes)
         mesh.find_node(axes, showindex=True)
         mesh.find_cell(axes, showindex=True)
         plt.show()
-<<<<<<< HEAD
-=======
-
-        mesh.from_mesh(mesh)
->>>>>>> upstream/master
 
         """
         coarsened mesh
         """
         #eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
-<<<<<<< HEAD
-        eta = [0,0,0,0,-1,-2,-2,-2,-2,-1,-2,0,-2,-1,0,0,0,0,-1,0]
-        eta[eta!=0]=0
-        eta[4]=-1
-        eta[9]=-1
-        eta[13]=-1
-        eta[17]=-1
 
-
-        mesh.adaptive(eta, aopts)
-        print(mesh.ds.hcell)
-=======
-        NC = mesh.number_of_cells()
-        eta = np.zeros(NC)
-        eta[3:6] = -1
-        #eta = [0,0,0,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2,-2]
-        mesh.adaptive(eta, aopts)
-        print('c',aopts['HB'])
->>>>>>> upstream/master
         fig = plt.figure()
         axes = fig.gca()
         mesh.add_plot(axes)
@@ -355,42 +343,51 @@ class HalfEdgeMesh2dTest:
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = QuadrangleMesh(node, cell)
-
-        mesh0 = HalfEdgeMesh.from_mesh(mesh)
-
+        mesh = HalfEdgeMesh.from_mesh(mesh)
         isMarkedCell = np.array([0, 0, 1], dtype=np.bool_)
+        mesh.refine_quad(isMarkedCell)
+        mesh.ds.NV=4
 
-        mesh0.refine_quad(isMarkedCell)
+        node = mesh.node
+        cell = mesh.ds.cell_to_node()
+        mesh = QuadrangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
 
-        mesh1 = HalfEdgeMesh2d.from_mesh(mesh)
-        mesh1.ds.NV = 4
-        mesh1.node = mesh0.node
-        halfedge = mesh0.ds.halfedge[:, :-1]
-        mesh1.ds.reinit(halfedge, mesh0.ds.subdomain)
 
-        NE = mesh1.ds.NE
+        isMarkedCell = np.array([0, 0, 0,0,1,0,0,0], dtype=np.bool_)
+        halfedge = mesh.ds.halfedge
+        if 0:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            plt.show()
+
+
+        NE = mesh.ds.NE
         color = 3*np.ones(NE*2, dtype = np.int_)
-        color[0]=1
+        color[1]=1
         while (color==3).any():
             red = color == 1
             gre = color == 0
             color[halfedge[red][:, [2,3,4]]] = 0
             color[halfedge[gre][:, [2,3,4]]] = 1
-            print(color)
-
-
-        color[[24, 27]] = 2
-        mesh1.hedgecolor = color
-        isMarkedCell = np.array([0, 0, 0, 0, 0, 1, 0, 0], dtype=np.bool_)
-        isMarkedHEdge = mesh1.mark_halfedge(isMarkedCell, method = 'quad')
-        mesh0.ds.hedge = np.arange(NE*2)[isMarkedHEdge]
-        print(np.where(isMarkedHEdge))
+        color[16]= 3
+        color[17]= 2
+        mesh.hedgecolor = color
+        mesh.refine_quad(isMarkedCell)
+        #mesh.ds.hedge = np.arange(NE*2)[isMarkedHEdge]
+        mesh.print()
+        print(mesh.halfedgedata['level'])
+        print(mesh.celldata['level'])
         if plot:
             fig = plt.figure()
             axes = fig.gca()
-            mesh0.add_plot(axes)
-            mesh0.add_halfedge_plot(axes, showindex=True)
-            mesh0.find_cell(axes, showindex=True)
+            mesh.add_plot(axes)
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_cell(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
             plt.show()
 
 
@@ -418,5 +415,6 @@ elif sys.argv[1] == "interpolation":
     n = int(sys.argv[2])
     test.interpolation(n=n, plot=False)
 
-
+elif sys.argv[1] == "coarsen_poly":
+    test.coarsen_poly()
 

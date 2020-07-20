@@ -455,7 +455,6 @@ class HalfEdgeMesh(Mesh2d):
         #将蓝色单元变为红色单元
         flag = markedge[edge0]!=0
         NC1 = flag.sum()
-        flaag = np.arange(halfedge.shape[0])[halfedge[:, 1]==14]
 
         halfedge[isBlueHEdge[flag], 0] = markedge[edge1[flag]]
         halfedge20 = np.zeros([NC1, 6], dtype=np.int)
@@ -1652,7 +1651,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2node[:, 2] = halfedge[current, 0]
             return cell2node
         elif self.NV == 4: # quad mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 4], dtype=np.int_)
             current = self.cell2hedge[cstart:]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
