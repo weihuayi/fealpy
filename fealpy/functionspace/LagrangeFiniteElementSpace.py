@@ -422,13 +422,16 @@ class LagrangeFiniteElementSpace():
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
-    def projection(self, u):
+    def projection(self, u, ptype='L2'):
         """
         """
-        M= self.mass_matrix()
-        F = self.source_vector(u)
-        uh = self.function()
-        uh[:] = spsolve(M, F).reshape(-1)
+        if ptype == 'L2':
+            M= self.mass_matrix()
+            F = self.source_vector(u)
+            uh = self.function()
+            uh[:] = spsolve(M, F).reshape(-1)
+        elif ptype == 'H1':
+            pass
         return uh
 
     def function(self, dim=None, array=None):

@@ -106,6 +106,8 @@ class RobinBC():
         A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
 
+
+###
 class BoundaryCondition():
     def __init__(self, space, dirichlet=None, neumann=None, robin=None):
         self.space = space

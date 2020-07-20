@@ -123,6 +123,11 @@ class CosCosData:
         return self.solution(p)
 
     @cartesian
+    def is_dirichlet_boundary(self, p):
+        y = p[..., 1]
+        return ( y == 1.0) | ( y == 0.0)
+
+    @cartesian
     def neumann(self, p, n):
         """ 
         Neuman  boundary condition
@@ -140,6 +145,11 @@ class CosCosData:
         return val
 
     @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        return x == 1.0
+
+    @cartesian
     def robin(self, p, n):
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
@@ -147,6 +157,11 @@ class CosCosData:
         kappa = np.array([1.0], dtype=np.float64).reshape(shape)
         val += self.solution(p) 
         return val, kappa
+
+    @cartesian
+    def is_robin_boundary(self, p):
+        x = p[..., 0]
+        return x == 0.0
 
 class X2Y2Data:
     """
