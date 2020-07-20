@@ -15,7 +15,13 @@ We still have lot work to do.
 
 ## Common
 
-`pip install git+https://github.com/weihuayi/fealpy.git`
+
+Use `pip install -U fealpy` to install the latest release.
+
+Users in China can install FEALPy from mirrors such as:
+- [Aliyun](https://developer.aliyun.com/mirror/pypi)
+- [Tsinghua](https://mirrors.tuna.tsinghua.edu.cn/help/pypi/)
+- [USTC](https://lug.ustc.edu.cn/wiki/mirrors/help/pypi)
 
 ## From Source
 
@@ -28,9 +34,9 @@ pip install .
 For developers, please use `pip install -e .[dev]` to install it in develop mode.
 
 On Ubuntu system, maybe you should use `sudo -H pip3 install -e .[dev]` to install it in
-develop mode, and .
+develop mode.
 
-### Uninstallation
+## Uninstallation
 
 `pip uninstall fealpy`
 
