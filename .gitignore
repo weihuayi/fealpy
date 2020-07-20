@@ -44,3 +44,6 @@ dist
 *.swn
 *.swo
 *.vtu
+
+
+.vscode
