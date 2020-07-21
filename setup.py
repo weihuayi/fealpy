@@ -1,8 +1,12 @@
 import os
+import pathlib
 from setuptools import setup, find_packages
+from fealpy import __version__
 
 
-here = os.path.abspath(os.path.dirname(__file__))
+here = pathlib.Path(__file__).parent.resolve()
+long_description = (here / "README.md").read_text(encoding="utf-8")
+
 
 def load_requirements(path_dir=here, comment_char="#"):
     with open(os.path.join(path_dir, "requirements.txt"), "r") as file:
@@ -19,8 +23,10 @@ def load_requirements(path_dir=here, comment_char="#"):
 
 setup(
     name="fealpy",
-    version="1.0",
+    version=__version__,
     description="FEALPy: Finite Element Analysis Library in Python",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     url="http://github.com/weihuayi/fealpy",
     author="Huayi Wei",
     author_email="weihuayi@xtu.edu.cn",

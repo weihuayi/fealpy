@@ -81,18 +81,23 @@ class NeumannBC():
         Notes
         -----
             当矩阵 A 不是 None的时候，就假设是纯 Neumann 边界条件，需要同时修改
-            矩阵 A 和右端 F。
+            矩阵 A 和右端 F, 并返回。
+
+            否则只返回 F
         """
         space = self.space
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
         space.set_neumann_bc(F, gN, threshold=threshold, q=q)
+
         
         if A is not None: # pure Neumann condtion
             c = space.integral_basis()
             A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             F = np.r_[F, 0]
             return A, F
+        else:
+            return F
 
 class RobinBC():
     def __init__(self, space, gR, threshold=None):

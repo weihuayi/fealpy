@@ -21,6 +21,7 @@ def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys
     s = s.replace('[', '')
     s = s.replace(']', '')
     print(s, file=out, end=end)
+    print('\\\\\\hline', file=out)
 
     n = len(errorType)
     ff = '%.'+str(pre)+f
