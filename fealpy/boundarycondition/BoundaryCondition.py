@@ -9,14 +9,16 @@ class DirichletBC():
         self.threshold = threshold
         self.bctype = 'Dirichlet'
 
-    def apply(self, A, F, uh):
+    def apply(self, A, F, uh=None):
         space = self.space
         gD = self.gD
         threshold = self.threshold
 
         gdof = space.number_of_global_dofs()
+        dim = A.shape[0]//gdof
+        if uh is None:
+            uh = self.space.function(dim=dim)
         isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
-        dim = A.shape[0]//gdof 
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
             F = F.T.flat
@@ -79,18 +81,23 @@ class NeumannBC():
         Notes
         -----
             当矩阵 A 不是 None的时候，就假设是纯 Neumann 边界条件，需要同时修改
-            矩阵 A 和右端 F。
+            矩阵 A 和右端 F, 并返回。
+
+            否则只返回 F
         """
         space = self.space
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
         space.set_neumann_bc(F, gN, threshold=threshold, q=q)
+
         
         if A is not None: # pure Neumann condtion
             c = space.integral_basis()
             A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             F = np.r_[F, 0]
             return A, F
+        else:
+            return F
 
 class RobinBC():
     def __init__(self, space, gR, threshold=None):
@@ -106,6 +113,8 @@ class RobinBC():
         A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
 
+
+###
 class BoundaryCondition():
     def __init__(self, space, dirichlet=None, neumann=None, robin=None):
         self.space = space

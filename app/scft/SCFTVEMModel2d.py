@@ -20,7 +20,7 @@ def scftmodel2d_options(
         T0 = 4,
         T1 = 16,
         nupdate = 1,
-        order = 1, 
+        order = 1,
         rdir='.'):
     """
     Get the options used in model.
@@ -216,7 +216,7 @@ class SCFTVEMModel2d():
             #fields[:, 1] *= chiN
         elif fieldstype == 4:
             def f(p):
-                return np.sin(4*p[..., 0])
+                return np.sin(2*p[..., 0])
             fields[:, 1] += self.vemspace.interpolation(f)
 
         w[:, 0] = fields[:, 0] - fields[:, 1]
@@ -237,7 +237,7 @@ class SCFTVEMModel2d():
         start = timer()
         self.compute_propagator()
         print('Times for PDE solving:', timer() - start)
-        #self.compute_eta_ref(eta_ref='etamaxmin')
+        self.compute_eta_ref(eta_ref='etamaxmin')
 
         self.compute_singleQ()
         self.compute_density1()
@@ -257,7 +257,7 @@ class SCFTVEMModel2d():
         self.H = -mu1_int + mu2_int/chiN
         self.H = self.H/self.totalArea - np.log(self.sQ)
 
-        #self.save_data(fname='./data/test'+str(self.count)+'.mat')
+        self.save_data(fname= self.options['rdir']+'/test'+str(self.count)+'.mat')
         self.show_solution(self.count)
         self.count +=1
         self.grad[:, 0] = self.rho[:, 0]  + self.rho[:, 1] - 1.0
@@ -364,19 +364,20 @@ class SCFTVEMModel2d():
         import scipy.io as sio
 
         mesh = self.mesh
-        node = mesh.node
+        node = mesh.entity('node')
+        node = np.array(node)
         cell, cellLocation = mesh.entity('cell')
         Q = self.sQ1
         H = self.H
         q = self.q0
         q1 = self.q1
 
-        mu = self.w.copy()
+        mu = np.zeros((self.w.shape))
         mu[:, 0] = 0.5*(self.w[:, 0] + self.w[:, 1])
         mu[:, 1] = 0.5*(self.w[:, 1] - self.w[:, 0])
 
-        #eta = self.eta
-        #eta_ref = self.eta_ref
+        eta = self.eta
+        eta_ref = self.eta_ref
 
         data = {
                 'node':node,
@@ -387,9 +388,9 @@ class SCFTVEMModel2d():
                 'H':H,
                 'mu':mu,
                 'q0':q,
-                'q1':q1
-                #'eta':eta,
-                #'eta_ref':eta_ref,
+                'q1':q1,
+                'eta':eta,
+                'eta_ref':eta_ref
                 }
         sio.savemat(fname, data)
 

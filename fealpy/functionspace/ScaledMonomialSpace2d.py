@@ -10,6 +10,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..common import ranges
 
 from .femdof import multi_index_matrix2d, multi_index_matrix1d
+from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
 
 class SMDof2d():
     """
@@ -148,80 +149,6 @@ class ScaledMonomialSpace2d():
         y, = np.nonzero(index[:, 1] > 0)
         return {'x': x, 'y':y}
 
-    def index1(self, p=None):
-        """
-        缩放单项式基函数求一次导数后，非零的基函数编号，及因求导出现的系数
-        """
-        
-        p = self.p if p is None else p
-        n = (p+1)*(p+2)//2
-        idx1 = np.cumsum(np.arange(p+1))
-        idx0 = np.arange(p+1) + idx1
-
-        mask0 = np.ones(n, dtype=np.bool)
-        mask1 = np.ones(n, dtype=np.bool)
-        mask0[idx0] = False
-        mask1[idx1] = False
-
-        idx = np.arange(n)
-        idx0 = idx[mask0]
-        idx1 = idx[mask1]
-
-        idx = np.repeat(range(2, p+2), range(1, p+1))
-        idx3 = ranges(range(p+1), start=1)
-        idx2 = idx - idx3
-        # idx0: 关于 x 求一阶导数后不为零的基函数编号
-        # idx1：关于 y 求一阶导数后不为零的基函数的编号
-        # idx2: 关于 x 求一阶导数后不为零的基函数的整数系数
-        # idx3: 关于 y 求一阶导数后不为零的基函数的整数系数
-        return {'x':(idx0, idx2), 'y':(idx1, idx3)}
-
-    def index2(self, p=None):
-        """
-        缩放单项式基函数求两次导数后，非零的编号及因求导出现的系数
-        """
-        p = self.p if p is None else p
-        n = (p+1)*(p+2)//2
-        mask0 = np.ones(n, dtype=np.bool)
-        mask1 = np.ones(n, dtype=np.bool)
-        mask2 = np.ones(n, dtype=np.bool)
-
-        idx1 = np.cumsum(np.arange(p+1))
-        idx0 = np.arange(p+1) + idx1
-        mask0[idx0] = False
-        mask1[idx1] = False
-
-        mask2[idx0] = False
-        mask2[idx1] = False
-
-        idx0 = np.cumsum([1]+list(range(3, p+2)))
-        idx1 = np.cumsum([2]+list(range(2, p+1)))
-        mask0[idx0] = False
-        mask1[idx1] = False
-
-        idx = np.arange(n)
-        idx0 = idx[mask0]
-        idx1 = idx[mask1]
-        idx2 = idx[mask2]
-
-        idxa = np.repeat(range(2, p+1), range(1, p))
-        idxb = np.repeat(range(4, p+3), range(1, p))
-
-        idxc = ranges(range(p), start=1)
-        idxd = ranges(range(p), start=2)
-
-        idx3 = (idxa - idxc)*(idxb - idxd)
-        idx4 = idxc*idxd
-        idx5 = idxc*(idxa - idxc)
-
-        # idx0: 关于 x 求二阶导数后不为零的基函数编号
-        # idx1：关于 y 求二阶导数后不为零的基函数的编号
-        # idx2：关于 x 和 y 求混合导数后不为零的基函数的编号
-        # idx3: 关于 x 求二阶导数后不为零的基函数的整数系数
-        # idx4：关于 y 求二阶导数后不为零的基函数的整数系数
-        # idx5：关于 x 和 y 求混合导数扣不为零的基函数的整数系数
-        return {'xx': (idx0, idx3), 'yy': (idx1, idx4), 'xy': (idx2, idx5)}
-
     def geo_dimension(self):
         return self.GD
 
@@ -298,7 +225,7 @@ class ScaledMonomialSpace2d():
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2)
         phi = self.basis(point, index=index, p=p-1)
-        idx = self.index1(p=p)
+        idx = self.diff_index_1(p=p)
         gphi = np.zeros(shape, dtype=np.float)
         xidx = idx['x']
         yidx = idx['y']
@@ -520,9 +447,6 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, eh, optimize=True)
         cell2dof = self.cell_to_dof()
 
-
-
-
     def source_vector(self, f, dim=None, p=None):
         def u(x, index):
             return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index, p=None))
@@ -568,10 +492,11 @@ class ScaledMonomialSpace2d():
         H /= q + q.reshape(-1, 1) + 2
         return H
 
-    def projection(self, F):
+    def projection(self, f):
         """
-        F is a function in MonomialSpace2d, this function project  F to 
-        ScaledMonomialSpace2d.
+
+        Notes
+        -----
         """
         mspace = F.space
         C = self.matrix_C(mspace)
@@ -635,3 +560,35 @@ class ScaledMonomialSpace2d():
         np.add.at(d, (HB[:, 0], np.s_[:]), td)
         d /= num.reshape(-1, 1)
         return sh1
+
+    @cartesian
+    def to_cspace_function(self, uh):
+        """
+        Notes
+        -----
+        把分片的 p 次多项式空间的函数  uh， 恢复到分片连续的函数空间。这里假定网
+        格是三角形网格。
+
+        TODO
+        ----
+        1. 实现多个函数同时恢复的情形 
+        """
+
+        # number of function in uh
+
+        p = self.p
+        mesh  = self.mesh
+        bcs = multi_index_matrix2d(p)
+        ps = mesh.bc_to_point(bcs)
+        val = self.value(uh, ps) # （NQ, NC, ...)
+
+        space = LagrangeFiniteElementSpace(mesh, p=p)
+        gdof = space.number_of_global_dofs()
+        cell2dof = space.cell_to_dof()
+        deg = np.zeros(gdof, dtype=space.itype)
+        np.add.at(deg, cell2dof, 1)
+        ruh = space.function()
+        np.add.at(ruh, cell2dof, val.T)
+        ruh /= deg
+        return ruh
+

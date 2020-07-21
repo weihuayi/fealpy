@@ -8,6 +8,7 @@ from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
 from ..mesh.TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from ..mesh.PolygonMesh import PolygonMesh
+from ..mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
 
 class CosCosData:
     """
@@ -54,6 +55,12 @@ class CosCosData:
         elif meshtype == 'tri':
             cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
             mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'halfedge':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'squad':
@@ -116,6 +123,11 @@ class CosCosData:
         return self.solution(p)
 
     @cartesian
+    def is_dirichlet_boundary(self, p):
+        y = p[..., 1]
+        return ( y == 1.0) | ( y == 0.0)
+
+    @cartesian
     def neumann(self, p, n):
         """ 
         Neuman  boundary condition
@@ -133,6 +145,11 @@ class CosCosData:
         return val
 
     @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        return x == 1.0
+
+    @cartesian
     def robin(self, p, n):
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
@@ -140,6 +157,11 @@ class CosCosData:
         kappa = np.array([1.0], dtype=np.float64).reshape(shape)
         val += self.solution(p) 
         return val, kappa
+
+    @cartesian
+    def is_robin_boundary(self, p):
+        x = p[..., 0]
+        return x == 0.0
 
 class X2Y2Data:
     """

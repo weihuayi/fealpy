@@ -1,5 +1,5 @@
 import numpy as np
-from fealpy.solver import MatlabSolver
+from fealpy.solver.petsc_solver import PETScSolver
 from scipy.sparse.linalg import spsolve
 import pyamg
 
@@ -11,7 +11,7 @@ class ParabolicVEMSolver2d():
     """
     def __init__(self, A, M, F, nupdate=0, method ='CN'):
         self.method = method
-        self.solver = MatlabSolver
+        self.solver = PETScSolver()
 
         self.A = A
         self.M = M
@@ -51,7 +51,8 @@ class ParabolicVEMSolver2d():
         A = self.get_current_left_matrix(dt)
         b = self.get_current_right_vector(data[:,current], dt)
         A, b = self.apply_boundary_condition(A, b)
-        data[:,current+1] = spsolve(A,b).reshape((-1,))
+        data[:,current+1]=spsolve(A,b)
+        #self.solver.solve(A, b, data[:,current+1])
 
     def correct_solve(self, data, timeline):
         current = timeline.current
@@ -59,7 +60,8 @@ class ParabolicVEMSolver2d():
         A = self.get_current_left_matrix(dt)
         b = self.get_error_right_vector(data[-1], dt, data[2][:,current+1])
         A, b = self.apply_boundary_condition(A, b)
-        data[-1]= spsolve(A,b).reshape((-1,))
+        data[-1]=spsolve(A,b)
+        #self.solver.solve(A, b, data[-1])
 
     def output(self, data, nameflag, queue=None, stop=False):
         if queue is not None:

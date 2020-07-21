@@ -3,14 +3,15 @@ from timeit import default_timer as timer
 
 from petsc4py import PETSc
 
+from ..decorator import timer
+
 
 class PETScSolver():
     def __init__(self):
         pass
 
+    @timer
     def solve(self, A, F, uh):
-        start = timer()
-        print("Start solving by petsc......")
         PA = PETSc.Mat().createAIJ(
                 size=A.shape, 
                 csr=(A.indptr, A.indices,  A.data)
@@ -26,8 +27,7 @@ class PETScSolver():
         ksp.setOperators(PA)
         ksp.setFromOptions()
         ksp.solve(PF, x)
-        end = timer()
-        print("Dof:", len(uh), "with solve time:", end-start)
+        return x
 
 def linear_solver(dmodel, uh, dirichlet=None):
     start = timer()

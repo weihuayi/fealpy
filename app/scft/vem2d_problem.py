@@ -3,6 +3,7 @@ from SCFTVEMModel2d import SCFTVEMModel2d, scftmodel2d_options
 from fealpy.functionspace.vem_space import VirtualElementSpace2d
 from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
 from fealpy.mesh import Quadtree, QuadrangleMesh, HalfEdgeMesh2d
+from fealpy.mesh import TriangleMesh, TriangleMeshWithInfinityNode, PolygonMesh
 
 __doc__ = """
 该文件包含了所有用来测试的问题模型
@@ -33,6 +34,30 @@ def halfedgemesh(n=4, h=4):
     mesh = HalfEdgeMesh2d.from_mesh(mesh)
     mesh.uniform_refine(n)
     return mesh
+
+def complex_mesh(r, filename):
+    import meshio
+    mesh = meshio.read(filename)
+    node = mesh.points
+    node = node[:,0:2]*r
+    cell = mesh.cells
+    mesh.node = node
+    mesh.cell = cell
+    cell = cell['triangle']
+    isUsingNode = np.zeros(node.shape[0], dtype=np.bool)
+    isUsingNode[cell] = True
+    NN = isUsingNode.sum()
+    idxmap = np.zeros(node.shape[0], dtype=np.int32)
+    idxmap[isUsingNode] = range(NN)
+    cell = idxmap[cell]
+    node = node[isUsingNode]
+    #cell = cell[:,::-1]
+    mesh = TriangleMesh(node,cell)
+    nmesh = TriangleMeshWithInfinityNode(mesh)
+    ppoint, pcell, pcellLocation =  nmesh.to_polygonmesh()
+    pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
+    return pmesh
+
 
 def quadmesh(n=10, L=12):
     box = [0, L, 0, L]

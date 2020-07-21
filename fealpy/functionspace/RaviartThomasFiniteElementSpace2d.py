@@ -18,73 +18,128 @@ class RTDof2d:
         Notes
         -----
 
+        2020.07.21 
+        1. 这里不显式的存储 cell2dof, 需要的时候再构建，这样可以节约内存。
+        2. 增加对存在裂缝网格区域的自由度管理支持。
+
         Reference
         ---------
         """
         self.mesh = mesh
         self.p = p # 默认的空间次数 p >= 0
-        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+        if 'fracture' in mesh.meshdata: # 此时存储的是 fracture 边的编号
+            self.fracture = mesh.meshdata['fracture'] 
+        elif 'fracture' in mesh.edgedata: # 此时存储的是 fracture 边的标记
+            self.fracture, = np.nonzero(mesh.edgedata['fracture'])
+        else:
+            self.fracture = None
+
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+        把这个方法属性化，保证老的程序接口不会出问题
+        """
+        return self.cell_to_dof()
 
     def boundary_dof(self, threshold=None):
         """
         """
-        edge2dof = self.edge_to_dof()
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool_)
-        isBdDof[edge2dof[index]] = True
-        return isBdDof
+        return self.is_boundary_dof(threshold=threshold)
+
 
     def is_boundary_dof(self, threshold=None):
         """
+
+        Notes
+        -----
+        标记需要的边界自由度, 可用于边界条件处理。 threshold 用于处理混合边界条
+        件的情形
         """
-        idx = self.mesh.ds.boundary_edge_index()
-        if threshold is not None: #TODO: threshold 可以是一个指标数组
-            bc = self.mesh.entity_barycenter('edge', index=idx)
-            flag = threshold(bc)
-            idx  = idx[flag]
+
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool_)
-        edge2dof = self.edge_to_dof()
-        isBdDof[edge2dof[idx]] = True
+        if threshold is None:
+            flag = self.mesh.ds.boundary_edge_flag() # 全部的边界边编号
+            edge2dof = self.edge_to_dof(threshold=flag)
+        elif type(threshold) is np.ndarray: 
+            edge2dof = self.edge_to_dof(threshold=threshold)
+        elif callable(threshold):
+            index = self.mesh.ds.boundary_edge_index()
+            bc = self.mesh.entity_barycenter('edge', index=index)
+            index = index[threshold(bc)]
+            edge2dof = self.edge_to_dof(threshold=index)
+        isBdDof[edge2dof] = True
         return isBdDof
 
-    def edge_to_dof(self):
-        mesh = self.mesh
-        NE = mesh.number_of_edges()
-        edof = self.number_of_local_dofs('edge')
-        edge2dof = np.arange(NE*edof).reshape(NE, edof)
-        return edge2dof
-
-    def cell_to_dof(self):
+    def edge_to_dof(self, threshold=None, doftype='left'):
         """
+
+        Notes
+        -----
+
+        2020.07.21：
+        获取网格边上的自由度全局编号。
+
+        如果 threshold 不是 None 的话，则只获取一部分边上的自由度全局编号，这部
+        分边由 threshold 来决定。
+
+        left 参数用于网格中存在 fracture 边的情形。如果 doftype 为 'left'，则返回
+        所有边左边单元上的全局自由度，如果为 'right'，则返回所有边右边单元上的全局
+        自由度。注意对于 fracture 边，右边单元在这条边上自由度要多出一些。
+        """
+        mesh = self.mesh
+        edof = self.number_of_local_dofs(doftype='edge')
+        if threshold is None: # 所有的边上的自由度
+            NE = mesh.number_of_edges()
+            edge2dof = np.arange(NE*edof).reshape(NE, edof)
+            if (doftype == 'right') and (self.fracture is not None):
+                # 右边单元，并且存在 fracture 的情形
+                NE = mesh.number_of_edges()
+                NC = mesh.number_of_cells()
+                cdof = self.number_of_local_dofs(doftype='cell')
+                gdof0 = NE*edof + NC*cdof
+                NFE = len(self.fracture) # 裂缝边的条数
+                edge2dof[self.fracture] = np.arange(gdof0, gdof0 + NFE*edof, dtype=mesh.itype).reshape(NFE, edof)
+            return edge2dof
+        else: # 只获取一部分边上的自由度, 例如在混合边界条件的情形下，你只需要拿部分边界边
+            if type(threshold) is np.ndarray: 
+                if threshold.dtype == np.bool_:
+                    index = np.nonzero(threshold)
+                else: # 否则为整数编号 
+                    index = threshold
+            elif callable(threshold):
+                bc = self.mesh.entity_barycenter('edge')
+                index, = np.nonzero(threshold(bc))
+            edge2dof = edof*index.reshape(-1, 1) + np.arange(edof)
+            return edge2dof
+
+    def cell_to_dof(self, threshold=None):
+        """
+
+        Notes
+        -----
+        获取每个单元元上的自由度全局编号。
         """
         p = self.p 
         mesh = self.mesh
-        if p == 0:
-            cell2edge = mesh.ds.cell_to_edge()
-            return cell2edge
-        else:
-            NE = mesh.number_of_edges()
-            NC = mesh.number_of_cells()
-            ldof = self.number_of_local_dofs('all')  # 单元上的所有自由度
-            cdof = self.number_of_local_dofs('cell') # 单元内部的自由度
-            edof = self.number_of_local_dofs('edge') # 边内部的自由度
-            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
-            edge2dof = self.edge_to_dof()
-            edge2cell = mesh.ds.edge_to_cell()
-            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
-            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
-            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*cdof).reshape(NC, cdof)
-            return cell2dof
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='all')  # 单元上的所有自由度
+        cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度
+        edof = self.number_of_local_dofs(doftype='edge') # 边内部的自由度
+        cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+
+        edge2dof0 = self.edge_to_dof(doftype='left')
+        edge2dof1 = self.edge_to_dof(doftype='right')
+        edge2cell = mesh.ds.edge_to_cell()
+        cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof0 
+        cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof1
+        cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*cdof).reshape(NC, cdof)
+        return cell2dof
 
     def number_of_local_dofs(self, doftype='all'):
         p = self.p
@@ -99,14 +154,13 @@ class RTDof2d:
 
     def number_of_global_dofs(self):
         p = self.p
-
         NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
         edof = self.number_of_local_dofs(doftype='edge') 
-        gdof = NE*edof
-        if p > 0:
-            NC = self.mesh.number_of_cells()
-            cdof = self.number_of_local_dofs(doftype='cell')
-            gdof += NC*cdof
+        cdof = self.number_of_local_dofs(doftype='cell')
+        gdof = NE*edof + NC*cdof
+        if self.fracture is not None:
+            gdof += len(self.fracture)*edof
         return gdof 
 
 class RaviartThomasFiniteElementSpace2d:

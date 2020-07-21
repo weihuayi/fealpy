@@ -24,51 +24,118 @@ class RTDof3d:
         self.p = p # 默认的空间次数 p >= 0
         self.itype = mesh.itype
 
-        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+        if 'fracture' in mesh.meshdata: # 此时存储的是 fracture 边的编号
+            self.fracture = mesh.meshdata['fracture'] 
+        elif 'fracture' in mesh.facedata: # 此时存储的是 fracture 边的标记
+            self.fracture, = np.nonzero(mesh.facedata['fracture'])
+        else:
+            self.fracture = None
         
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+        把这个方法属性化，保证老的程序接口不会出问题
+        """
+        return self.cell_to_dof()
+
     def boundary_dof(self, threshold=None):
-        idx = self.mesh.ds.boundary_face_index()
-        if threshold is not None:
-            bc = self.mesh.entity_barycenter('face', index=idx)
-            flag = threshold(bc)
-            idx  = idx[flag]
+        """
+        """
+        return self.is_boundary_dof(threshold=threshold)
+
+
+    def is_boundary_dof(self, threshold=None):
+        """
+
+        Notes
+        -----
+        标记需要的边界自由度, 可用于边界条件处理。 threshold 用于处理混合边界条
+        件的情形
+        """
+
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
-        face2dof = self.face_to_dof()
-        isBdDof[face2dof[idx]] = True
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+        if threshold is None:
+            flag = self.mesh.ds.boundary_face_flag() # 全部的边界边编号
+            face2dof = self.face_to_dof(threshold=flag)
+        elif type(threshold) is np.ndarray: 
+            face2dof = self.face_to_dof(threshold=threshold)
+        elif callable(threshold):
+            index = self.mesh.ds.boundary_edge_index()
+            bc = self.mesh.entity_barycenter('face', index=index)
+            index = index[threshold(bc)]
+            edge2dof = self.face_to_dof(threshold=index)
+        isBdDof[face2dof] = True
         return isBdDof
 
-    def face_to_dof(self):
-        p = self.p
-        NF = self.mesh.number_of_faces()
-        fdof = self.number_of_local_dofs('face') 
-        face2dof = np.arange(NF*fdof).reshape(NF, fdof)
-        return face2dof
+    def face_to_dof(self, threshold=None, doftype='left'):
+        """
+
+        Notes
+        -----
+
+        2020.07.21：
+        获取网格面上的自由度全局编号。
+
+        如果 threshold 不是 None 的话，则只获取一部分边上的自由度全局编号，这部
+        分边由 threshold 来决定。
+
+        left 参数用于网格中存在 fracture 边的情形。如果 doftype 为 'left'，则返回
+        所有面左边单元上的全局自由度，如果为 'right'，则返回所有面右边单元上的全局
+        自由度。注意对于 fracture 面，右边单元在这条边上自由度要多出一些。
+        """
+        mesh = self.mesh
+        fdof = self.number_of_local_dofs(doftype='face')
+        if threshold is None: # 所有的边上的自由度
+            NF = mesh.number_of_faces()
+            face2dof = np.arange(NF*fdof).reshape(NF, fdof)
+            if (doftype == 'right') and (self.fracture is not None):
+                # 右边单元，并且存在 fracture 的情形
+                NF = mesh.number_of_faces()
+                NC = mesh.number_of_cells()
+                cdof = self.number_of_local_dofs(doftype='cell')
+                gdof0 = NF*fdof + NC*cdof
+                NFF = len(self.fracture) # 裂缝边的条数
+                face2dof[self.fracture] = np.arange(gdof0, gdof0 + NFF*fdof,
+                        dtype=mesh.itype).reshape(NFF, fdof)
+            return face2dof
+        else: # 只获取一部分边上的自由度, 例如在混合边界条件的情形下，你只需要拿部分边界边
+            if type(threshold) is np.ndarray: 
+                if threshold.dtype == np.bool_:
+                    index = np.nonzero(threshold)
+                else: # 否则为整数编号 
+                    index = threshold
+            elif callable(threshold):
+                bc = self.mesh.entity_barycenter('face')
+                index, = np.nonzero(threshold(bc))
+            face2dof = fdof*index.reshape(-1, 1) + np.arange(fdof)
+            return face2dof
 
     def cell_to_dof(self):
         """
         """
         p = self.p 
         mesh = self.mesh
-        if p == 0:
-            cell2face = mesh.ds.cell_to_face()
-            return cell2face
-        else:
-            ldof = self.number_of_local_dofs(doftype='all')
-            cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度个数
-            fdof = self.number_of_local_dofs(doftype='face') # 面上的自由度个数
-            NC = mesh.number_of_cells()
-            NF = mesh.number_of_faces()
-            cell2dof = np.zeros((NC, ldof), dtype=self.itype)
 
-            face2dof = self.face_to_dof()
-            face2cell = mesh.ds.face_to_cell()
+        ldof = self.number_of_local_dofs(doftype='all')
+        cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度个数
+        fdof = self.number_of_local_dofs(doftype='face') # 面上的自由度个数
+        NC = mesh.number_of_cells()
+        NF = mesh.number_of_faces()
+        cell2dof = np.zeros((NC, ldof), dtype=self.itype)
 
-            cell2dof[face2cell[:, [0]], face2cell[:, [2]]*fdof + np.arange(fdof)] = face2dof
-            cell2dof[face2cell[:, [1]], face2cell[:, [3]]*fdof + np.arange(fdof)] = face2dof
+        face2dof0 = self.face_to_dof(doftype='left')
+        face2dof1 = self.face_to_dof(doftype='right')
+        face2cell = mesh.ds.face_to_cell()
 
-            cell2dof[:, 4*fdof:] = NF*fdof+ np.arange(NC*cdof).reshape(NC, cdof)
-            return cell2dof
+        cell2dof[face2cell[:, [0]], face2cell[:, [2]]*fdof + np.arange(fdof)] = face2dof0
+        cell2dof[face2cell[:, [1]], face2cell[:, [3]]*fdof + np.arange(fdof)] = face2dof0
+
+        cell2dof[:, 4*fdof:] = NF*fdof+ np.arange(NC*cdof).reshape(NC, cdof)
+        return cell2dof
 
     def number_of_local_dofs(self, doftype='all'):
         p = self.p
@@ -84,12 +151,12 @@ class RTDof3d:
     def number_of_global_dofs(self):
         p = self.p
         NF = self.mesh.number_of_faces()
+        NC = self.mesh.number_of_cells()
         fdof = self.number_of_local_dofs(doftype='face') 
-        gdof = NF*fdof
-        if p > 0:
-            cdof = self.number_of_local_dofs(doftype='cell')
-            NC = self.mesh.number_of_cells()
-            gdof += NC*cdof
+        cdof = self.number_of_local_dofs(doftype='cell')
+        gdof = NF*fdof + NC*cdof
+        if self.fracture is not None:
+            gdof += len(self.fracture)*fdof
         return gdof 
 
 class RaviartThomasFiniteElementSpace3d:

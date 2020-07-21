@@ -4,6 +4,7 @@ from scipy.sparse import spdiags, eye, tril, triu, bmat
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
+from ..decorator import timer
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -52,6 +53,22 @@ class TetrahedronMesh(Mesh3d):
         self.facedata = {}
         self.nodedata = {}
         self.meshdata = {}
+
+        nsize = self.node.size*self.node.itemsize/2**30
+        csize = self.ds.cell.size*self.ds.cell.itemsize/2**30
+        fsize = self.ds.face.size*self.ds.face.itemsize/2**30
+        esize = self.ds.edge.size*self.ds.edge.itemsize/2**30
+        f2csize = self.ds.face2cell.size*self.ds.face2cell.itemsize/2**30
+        c2esize = self.ds.cell2edge.size*self.ds.cell2edge.itemsize/2**30 
+        total = nsize + csize + fsize + esize + f2csize + c2esize
+        print("memory size of node array (GB): ", nsize)
+        print("memory size of cell array (GB): ", csize)
+        print("memory size of face array (GB): ", fsize)
+        print("memory size of edge array (GB): ", esize)
+        print("memory size of face2cell array (GB): ", f2csize)
+        print("memory size of cell2edge array (GB): ", c2esize)
+        print("Total memory size (GB): ",  total)
+
 
     def vtk_cell_type(self):
         VTK_TETRA = 10
@@ -252,7 +269,7 @@ class TetrahedronMesh(Mesh3d):
             j,k,m = localFace[i]
             vjk = node[cell[:,k],:] - node[cell[:,j],:]
             vjm = node[cell[:,m],:] - node[cell[:,j],:]
-            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1,1))
+            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
     def label(self, node=None, cell=None, cellidx=None):
@@ -467,6 +484,7 @@ class TetrahedronMesh(Mesh3d):
         if returnim is True:
             return IM
 
+    @timer
     def uniform_refine(self, n=1):
         for i in range(n):
             N = self.number_of_nodes()

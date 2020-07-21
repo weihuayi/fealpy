@@ -14,6 +14,7 @@ from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
 from ..quadrature import FEMeshIntegralAlg
+from ..decorator import timer
 
 
 class LagrangeFiniteElementSpace():
@@ -27,6 +28,9 @@ class LagrangeFiniteElementSpace():
                     self.dof = CPLFEMDof1d(mesh, p)
                     self.TD = 1
                 elif mesh.meshtype == 'tri':
+                    self.dof = CPLFEMDof2d(mesh, p)
+                    self.TD = 2
+                elif mesh.meshtype == 'halfedge2d':
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
                 elif mesh.meshtype == 'stri':
@@ -58,7 +62,7 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        q = q if q is not None else p+3 
+        q = q if q is not None else p+1 
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
@@ -418,13 +422,16 @@ class LagrangeFiniteElementSpace():
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
-    def projection(self, u):
+    def projection(self, u, ptype='L2'):
         """
         """
-        M= self.mass_matrix()
-        F = self.source_vector(u)
-        uh = self.function()
-        uh[:] = spsolve(M, F).reshape(-1)
+        if ptype == 'L2':
+            M= self.mass_matrix()
+            F = self.source_vector(u)
+            uh = self.function()
+            uh[:] = spsolve(M, F).reshape(-1)
+        elif ptype == 'H1':
+            pass
         return uh
 
     def function(self, dim=None, array=None):
@@ -480,21 +487,8 @@ class LagrangeFiniteElementSpace():
         """
         construct the linear elasticity fem matrix
         """
-        cellmeasure = self.cellmeasure
-        cell2dof = self.cell_to_dof()
+
         GD = self.GD
-
-        qf = self.integrator
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.grad_basis(bcs)
-
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-
-        #TODO: make it more efficient
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-
         if GD == 2:
             idx = [(0, 0), (0, 1),  (1, 1)]
             imap = {(0, 0):0, (0, 1):1, (1, 1):2}
@@ -502,6 +496,21 @@ class LagrangeFiniteElementSpace():
             idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
             imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
         A = []
+
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs)
+
+        cell2dof = self.cell_to_dof()
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        shape = (NC, ldof, ldof)
+        I = np.broadcast_to(cell2dof[:, :, None], shape=shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=shape)
+
+        # 分块组装矩阵
+        gdof = self.number_of_global_dofs()
+        cellmeasure = self.cellmeasure
         for k, (i, j) in enumerate(idx):
             Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
             A.append(csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)))
@@ -543,12 +552,6 @@ class LagrangeFiniteElementSpace():
         bcs, ws = qf.get_quadrature_points_and_weights()
         grad = self.grad_basis(bcs)
 
-        ldof = self.number_of_local_dofs()
-        gdof = self.number_of_global_dofs()
-
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-
         if GD == 2:
             idx = [(0, 0), (0, 1),  (1, 1)]
             imap = {(0, 0):0, (0, 1):1, (1, 1):2}
@@ -580,141 +583,65 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def stiff_matrix_1(self, cfun=None):
+    def parallel_stiff_matrix(self, cfun=None, q=None):
         """
 
         Notes
         -----
-        采用积分算法中矩阵组装程序，来组装
+        并行组装刚度矩阵
+
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.grad_basis, cell2dof0=cell2dof,
-                gdof0=gdof)
+        b0 = (self.grad_basis, cell2dof, gdof)
+        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
         return M
 
-    def mass_matrix_1(self, cfun=None):
+    def parallel_mass_matrix(self, cfun=None, q=None):
         """
 
         Notes
         -----
-        采用积分算法中矩阵组装程序，来组装
+        并行组装质量矩阵 
+
+        TODO:
+        1. parallel_construct_matrix just work for stiff matrix
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
-                gdof0=gdof)
+        b0 = (self.basis, cell2dof, gdof)
+        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
         return M
 
-    def source_vector_1(self, f, dim=None):
+    def parallel_source_vector(self, f, dim=None):
+        """
+
+        Notes
+        -----
+        
+        TODO
+        ----
+        1. 组装载荷向量时，用到的 einsum, 它不支持多线程， 下一步把它并行化
+
+        """
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def stiff_matrix(self, cfun=None):
-        p = self.p
-        GD = self.geo_dimension()
-
-        if p == 0:
-            raise ValueError('The space order is 0!')
-
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        gphi = self.grad_basis(bcs)
-
-        if cfun is not None:
-            ps = self.mesh.bc_to_point(bcs)
-            d = cfun(ps)
-
-            if isinstance(d, (int, float)):
-                dgphi = d*gphi
-            elif len(d) == GD:
-                dgphi = np.einsum('m, ...im->...im', d, gphi)
-            elif isinstance(d, np.ndarray):
-                if len(d.shape) == 1:
-                    dgphi = np.einsum('i, ...imn->...imn', d, gphi)
-                elif len(d.shape) == 2:
-                    dgphi = np.einsum('...i, ...imn->...imn', d, gphi)
-                elif len(d.shape) == 3: #TODO:
-                    dgphi = np.einsum('...imn, ...in->...im', d, gphi)
-                elif len(d.shape) == 4: #TODO:
-                    dgphi = np.einsum('...imn, ...in->...im', d, gphi)
-                else:
-                    raise ValueError("The ndarray shape length should < 5!")
-            else:
-                raise ValueError(
-                        "The return of cfun is not a number or ndarray!"
-                        )
-        else:
-            dgphi = gphi
-
-        # Compute the element sitffness matrix
-        # ws:(NQ,)
-        # dgphi: (NQ, NC, ldof, GD)
-        A = np.einsum('i, ijkm, ijpm, j->jkp',
-                ws, dgphi, gphi, self.cellmeasure,
-                optimize=True)
-        cell2dof = self.cell_to_dof()
-        ldof = self.number_of_local_dofs()
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
+    def stiff_matrix(self, cfun=None, q=None):
         gdof = self.number_of_global_dofs()
-
-        # Construct the stiffness matrix
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return A
-
-    def mass_matrix(self, cfun=None, barycenter=False):
-        p = self.p
-        mesh = self.mesh
-        cellmeasure = self.cellmeasure
-
-        if p == 0:
-            NC = mesh.number_of_cells()
-            M = spdiags(cellmeasure, 0, NC, NC)
-            return M
-
-        # bcs: (NQ, TD+1)
-        # ws: (NQ, )
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        # phi: (NQ, ldof)
-        phi = self.basis(bcs)
-
-        if cfun is not None:
-            if barycenter is True:
-                d = cfun(bcs) # (NQ, NC)
-            else:
-                ps = self.mesh.bc_to_point(bcs) # (NQ, NC, GD)
-                d = cfun(ps) # (NQ, NC)
-
-            if isinstance(d, (int, float)):
-                dphi = d*phi
-            elif isinstance(d, np.ndarray):
-                if (len(d.shape) == 1):
-                    dphi = np.einsum('i, mij->mij', d, phi)
-                elif len(d.shape) == 2:
-                    dphi = np.einsum('mi, mij->mij', d, phi)
-                else:
-                    raise ValueError("The ndarray shape length should < 3!")
-            else:
-                raise ValueError(
-                        "The return of cfun is not a number or ndarray!"
-                        )
-        else:
-            dphi = phi
-        M = np.einsum(
-                'm, mij, mik, i->ijk',
-                ws, dphi, phi, self.cellmeasure,
-                optimize=True)
-
         cell2dof = self.cell_to_dof()
-        ldof = self.number_of_local_dofs()
-        I = np.einsum('ij, k->ijk',  cell2dof, np.ones(ldof))
-        J = I.swapaxes(-1, -2)
+        b0 = (self.grad_basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        return A 
 
+    def mass_matrix(self, cfun=None, q=None):
         gdof = self.number_of_global_dofs()
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return M
+        cell2dof = self.cell_to_dof()
+        b0 = (self.basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        return A 
 
     def source_vector(self, f, dim=None):
         p = self.p

@@ -76,6 +76,8 @@ for i in range(maxit):
     timeline.time_integration(u_init, smodel, nupdate=nupdate)
     #timeline.time_integration(u_init, smodel)
     e = np.max(abs(u_init - ue))
+    print('uinit:',u_init)
+    print('ue',ue)
     order = np.log2(eold/e)
     eold = e
     print(order)
