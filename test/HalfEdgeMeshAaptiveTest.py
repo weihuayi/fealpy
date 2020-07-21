@@ -12,12 +12,12 @@ cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
 node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
 mesh = QuadrangleMesh(node, cell)
 mesh = HalfEdgeMesh2d.from_mesh(mesh)
-mesh.uniform_refine(n=4)
+#mesh.uniform_refine(n=4)
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
 mesh.find_cell(axes, showindex=True)
-#plt.show()
+plt.show()
 c = np.array([0.5,0.5])
 r = 0.5
 
@@ -31,11 +31,10 @@ while k < maxit:
 
     d = np.sqrt((node[:,0]-c[0])**2+(node[:,1]-c[1])**2)
     ###要加密的点
-    print(c)
-    flag0 = np.abs(d-r) < np.min(h)
+    flag0 = np.abs(d-r) < 0.1
 
     ##要粗化的点
-    flag1 = np.abs(d-r) > np.max(h)
+    flag1 = np.abs(d-r) > 0.1
 
     ###　找到点对应的单元都是需要标记的单元 
     node2cell = mesh.ds.node_to_cell()
@@ -47,14 +46,15 @@ while k < maxit:
     iscoarsenflag = np.zeros(NC, dtype=np.bool_)
     iscoarsenflag[idx1[:,1]] = 1
     eta = np.zeros(NC)
-    #eta[isrefineflag] = 2
+    eta[isrefineflag] = 2
     eta[iscoarsenflag] = -1
     print(eta)
 
     mesh.adaptive(eta, aopts)
+    cell, cellLoation = mesh.entity('cell')
     k+=1
     print('循环',k,'次***************************')
-    c[0] += 0.2
+    c[0] += 0.1
     fig = plt.figure()
     axes = fig.gca()
     mesh.add_plot(axes)

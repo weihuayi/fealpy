@@ -492,10 +492,11 @@ class ScaledMonomialSpace2d():
         H /= q + q.reshape(-1, 1) + 2
         return H
 
-    def projection(self, F):
+    def projection(self, f):
         """
-        F is a function in MonomialSpace2d, this function project  F to 
-        ScaledMonomialSpace2d.
+
+        Notes
+        -----
         """
         mspace = F.space
         C = self.matrix_C(mspace)

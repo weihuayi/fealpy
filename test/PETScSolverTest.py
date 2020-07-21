@@ -28,11 +28,16 @@ class PETScSolverTest():
         mesh = mf.boxmesh3d(box, nx=m, ny=m, nz=m, meshtype='tet')
         space = LagrangeFiniteElementSpace(mesh, p=1)
         gdof = space.number_of_global_dofs()
-        print('gdof:', gdof)
+        NC = mesh.number_of_cells()
+        print('gdof:', gdof, 'NC:', NC)
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
-        A = space.parallel_stiff_matrix()
         A = space.stiff_matrix()
+        A = space.parallel_stiff_matrix(q=1)
+        
+        M = space.parallel_mass_matrix(q=2)
+        M = space.mass_matrix()
+
         F = space.source_vector(pde.source)
 
         A, F = bc.apply(A, F, uh)

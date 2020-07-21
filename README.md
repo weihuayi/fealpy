@@ -27,6 +27,9 @@ pip install .
 
 For developers, please use `pip install -e .[dev]` to install it in develop mode.
 
+On Ubuntu system, maybe you should use `sudo -H pip3 install -e .[dev]` to install it in
+develop mode, and .
+
 ### Uninstallation
 
 `pip uninstall fealpy`

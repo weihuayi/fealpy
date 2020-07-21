@@ -63,14 +63,14 @@ class MeshFactory():
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return QuadrangleMesh(node, cell)
 
-    def one_tetrahedron_mesh(self, ttype='equ'):
-        if ttype == 'equ':
+    def one_tetrahedron_mesh(self, meshtype='equ'):
+        if meshtype == 'equ':
             node = np.array([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
                 [0.5, np.sqrt(3)/2, 0.0],
                 [0.5, np.sqrt(3)/6, np.sqrt(2/3)]], dtype=np.float64)
-        elif ttype == 'iso':
+        elif meshtype == 'iso':
             node = np.array([
                 [0.0, 0.0, 0.0],
                 [1.0, 0.0, 0.0],
@@ -126,7 +126,8 @@ class MeshFactory():
             return PolygonMesh(pnode, pcell, pcellLocation)
 
     @timer
-    def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex'):
+    def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex',
+            ftype=np.float64, itype=np.int_):
         """
         Notes
         -----
@@ -134,7 +135,7 @@ class MeshFactory():
         """
         N = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        node = np.zeros((N, 3), dtype=np.float)
+        node = np.zeros((N, 3), dtype=ftype)
         X, Y, Z = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1),
@@ -147,7 +148,7 @@ class MeshFactory():
         idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
-        cell = np.zeros((NC, 8), dtype=np.int)
+        cell = np.zeros((NC, 8), dtype=itype)
         nyz = (ny + 1)*(nz + 1)
         cell[:, 0] = c.flatten()
         cell[:, 1] = cell[:, 0] + nyz
@@ -166,7 +167,7 @@ class MeshFactory():
                 [0, 4, 5, 6],
                 [0, 7, 4, 6],
                 [0, 3, 7, 6],
-                [0, 2, 3, 6]], dtype=np.int)
+                [0, 2, 3, 6]], dtype=itype)
             cell = cell[:, localCell].reshape(-1, 4)
             return TetrahedronMesh(node, cell)
 

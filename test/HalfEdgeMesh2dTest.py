@@ -339,32 +339,12 @@ class HalfEdgeMesh2dTest:
             writer = MeshWriter(mesh, etype='edge', index=index)
             writer.write(fname='test'+str(i)+'.vtu')
 
-    def quad_refine(self, plot=True):
+    def refine_quad(self, plot=True):
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = QuadrangleMesh(node, cell)
-        mesh = HalfEdgeMesh.from_mesh(mesh)
-        isMarkedCell = np.array([0, 0, 1], dtype=np.bool_)
-        mesh.refine_quad(isMarkedCell)
-        mesh.ds.NV=4
-
-        node = mesh.node
-        cell = mesh.ds.cell_to_node()
-        mesh = QuadrangleMesh(node, cell)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
-
-
-        isMarkedCell = np.array([0, 0, 0,0,1,0,0,0], dtype=np.bool_)
         halfedge = mesh.ds.halfedge
-        if 0:
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.add_halfedge_plot(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-            plt.show()
-
-
         NE = mesh.ds.NE
         color = 3*np.ones(NE*2, dtype = np.int_)
         color[1]=1
@@ -373,22 +353,60 @@ class HalfEdgeMesh2dTest:
             gre = color == 0
             color[halfedge[red][:, [2,3,4]]] = 0
             color[halfedge[gre][:, [2,3,4]]] = 1
-        color[16]= 3
-        color[17]= 2
         mesh.hedgecolor = color
-        mesh.refine_quad(isMarkedCell)
-        #mesh.ds.hedge = np.arange(NE*2)[isMarkedHEdge]
-        mesh.print()
-        print(mesh.halfedgedata['level'])
-        print(mesh.celldata['level'])
+        c = np.array([0.8,0.8])
+        r = 0.9
+        h = 1e-2
+        l=10
+        k=0
+        NB = 0
+        while k<l:
+            halfedge = mesh.ds.halfedge
+            halfedge1 = halfedge[:, 3]
+            node = mesh.node
+            flag = node-c
+            flag = flag[:,0]**2+flag[:,1]**2
+            flag = flag<=r**2
+            flag1 = flag[halfedge[:, 0]].astype(int)
+            flag2 = flag[halfedge[halfedge1, 0]].astype(int)
+            markedge = flag1+flag2==1
+            markedcell = halfedge[markedge, 1]
+            markedcell = np.unique(markedcell)
+            cell = np.unique(halfedge[:,1])
+            nc = cell.shape[0]
+            markedcell1 = np.zeros(nc)
+            markedcell1[markedcell] = 1
+            print('makee',markedcell)
+            mesh.refine_quad(markedcell1.astype(np.bool_))
+            k+=1
+            print('循环',k,'次***************************')
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            nindex = mesh.nodedata['level']
+            mesh.add_plot(axes)
+            #mesh.add_halfedge_plot(axes, showindex=True)
+            #mesh.find_node(axes, showindex=True, multiindex=nindex)
+            plt.show()
+
+    def refine_tri(self, maxit = 3, method = 'rg', plot=True, rb=True):
+        cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        NE = mesh.ds.NE
+        mesh.hedgecolor = np.zeros(NE*2, dtype=np.int_)
+        isMarkedCell = np.array([0, 1, 0, 0 ,1], dtype = np.bool_)
+        print("*********")
+        mesh.refine_triangle_rg(isMarkedCell)
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.add_halfedge_plot(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
             mesh.find_node(axes, showindex=True)
             plt.show()
+
 
 
 test = HalfEdgeMesh2dTest()
@@ -408,13 +426,13 @@ elif sys.argv[1] == 'cell_to_node':
 elif sys.argv[1] == 'read':
     fname = sys.argv[2]
     test.tri_cut_graph(fname, weight = 'length')
-elif sys.argv[1] == 'quad_refine':
-    test.quad_refine()
-
+elif sys.argv[1] == 'refine_quad':
+    test.refine_quad()
+elif sys.argv[1] == 'refine_tri':
+    test.refine_tri(method = sys.argv[2])
 elif sys.argv[1] == "interpolation":
     n = int(sys.argv[2])
     test.interpolation(n=n, plot=False)
-
 elif sys.argv[1] == "coarsen_poly":
     test.coarsen_poly()
 

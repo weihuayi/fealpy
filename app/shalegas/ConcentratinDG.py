@@ -30,7 +30,8 @@ from fealpy.timeintegratoralg import UniformTimeLine
 该模型例子，在给定流场的情况下， 用间断有限元模拟物质浓度的变化过程。
 """
 
-class VelocityData:
+## 模型 0 
+class VelocityData_0:
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -59,7 +60,7 @@ class VelocityData:
         flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
         return flag
 
-class ConcentrationData0:
+class ConcentrationData_0:
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -67,6 +68,12 @@ class ConcentrationData0:
             p: array object,  
         """
         val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def init_value(self, p):
+        val = np.array([1.0], np.float64)
         shape = len(p.shape[:-1])*(1, )
         return val.reshape(shape) 
 
@@ -76,7 +83,7 @@ class ConcentrationData0:
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.001
+        val[flag0] = 0.01
         return val
 
     @cartesian
@@ -86,25 +93,12 @@ class ConcentrationData0:
         flag = (np.abs(x) < 1e-13)
         return flag
 
-class ConcentrationData1:
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
+# 模型 1
 
-    def init_value(self, p):
-        val = np.array([1.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
 
 class ConcentrationDG():
     def __init__(self, vdata, cdata, mesh, timeline, p=0,
-            options={'rdir':'/home/why/result'}):
+            options={'rdir':'/home/why/result', 'step':1000, 'porosity':0.2}):
 
         self.options = options
         self.vdata = vdata
@@ -184,6 +178,7 @@ class ConcentrationDG():
         计算下一时刻对应的右端项。
         """
 
+        phi = self.options['porosity']
         timeline = self.timeline
         ch = self.ch 
         uh = self.uh 
@@ -192,7 +187,7 @@ class ConcentrationDG():
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
         F = self.uspace.convection_vector(nt, ch, uh) 
 
-        F = self.H@(F[:, :, None]/0.2)
+        F = self.H@(F[:, :, None]/phi)
         F *= dt
         return F.flat
 
@@ -217,6 +212,7 @@ class ConcentrationDG():
         """
 
         rdir = self.options['rdir']
+        step = self.options['step']
         timeline = self.timeline
         dt = timeline.current_time_step_length()
         timeline.reset() # 时间置零
@@ -227,9 +223,10 @@ class ConcentrationDG():
         while not timeline.stop():
             self.one_step_solve()
             timeline.current += 1
-            fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
-            print(fname)
-            self.write_to_vtk(fname)
+            if timeline.current%step == 0:
+                fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
+                print(fname)
+                self.write_to_vtk(fname)
         timeline.reset()
 
     def write_to_vtk(self, fname):
@@ -271,14 +268,19 @@ class ConcentrationDG():
 
 if __name__ == '__main__':
 
-    from fealpy.writer import MeshWriter
-    rdir = sys.argv[1]
     mf = MeshFactory()
-    mesh = mf.regular([0, 1, 0, 1], n=64)
-    vdata = VelocityData()
-    cdata = ConcentrationData1()
-    timeline = UniformTimeLine(0, 10, 100000)
-    options = {'rdir': rdir}
+    
+    m = int(sys.argv[1])
+    if m == 0:
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
+        vdata = VelocityData_0()
+        cdata = ConcentrationData_0()
+
+    T = float(sys.argv[2])
+    NT = int(sys.argv[3])
+    step = int(sys.argv[4])
+    timeline = UniformTimeLine(0, T, NT)
+    options = {'rdir': sys.argv[5], 'step':step, 'porosity':0.2}
     model = ConcentrationDG(vdata, cdata, mesh, timeline, options=options)
     model.solve()
 

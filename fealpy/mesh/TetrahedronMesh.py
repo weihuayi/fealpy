@@ -54,6 +54,22 @@ class TetrahedronMesh(Mesh3d):
         self.nodedata = {}
         self.meshdata = {}
 
+        nsize = self.node.size*self.node.itemsize/2**30
+        csize = self.ds.cell.size*self.ds.cell.itemsize/2**30
+        fsize = self.ds.face.size*self.ds.face.itemsize/2**30
+        esize = self.ds.edge.size*self.ds.edge.itemsize/2**30
+        f2csize = self.ds.face2cell.size*self.ds.face2cell.itemsize/2**30
+        c2esize = self.ds.cell2edge.size*self.ds.cell2edge.itemsize/2**30 
+        total = nsize + csize + fsize + esize + f2csize + c2esize
+        print("memory size of node array (GB): ", nsize)
+        print("memory size of cell array (GB): ", csize)
+        print("memory size of face array (GB): ", fsize)
+        print("memory size of edge array (GB): ", esize)
+        print("memory size of face2cell array (GB): ", f2csize)
+        print("memory size of cell2edge array (GB): ", c2esize)
+        print("Total memory size (GB): ",  total)
+
+
     def vtk_cell_type(self):
         VTK_TETRA = 10
         return VTK_TETRA
