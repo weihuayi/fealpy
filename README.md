@@ -1,7 +1,8 @@
 # FEALPy: Finite Element Analysis Library in Python
 
 [![Join the chat at https://gitter.im/weihuayi/fealpy](https://badges.gitter.im/weihuayi/fealpy.svg)](https://gitter.im/weihuayi/fealpy?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
-![Python package](https://github.com/zweien/fealpy/workflows/Python%20package/badge.svg)
+![Python package](https://github.com/weihuayi/fealpy/workflows/Python%20package/badge.svg)
+![Upload Python Package](https://github.com/weihuayi/fealpy/workflows/Upload%20Python%20Package/badge.svg)
 
 We want to develop an efficient and easy to use finite element software
 package to support our teach and research work. 
@@ -16,7 +17,7 @@ We still have lot work to do.
 ## Common
 
 
-Use `pip install -U fealpy` to install the latest release.
+Use `pip install -U fealpy` to install the latest release from PyPi.
 
 Users in China can install FEALPy from mirrors such as:
 - [Aliyun](https://developer.aliyun.com/mirror/pypi)
