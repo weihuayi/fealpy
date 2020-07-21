@@ -7,7 +7,7 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 # 导入默认的坐标类型, 这个空间基函数的相关计算，输入参数是重心坐标 
 from ..decorator import barycentric 
 
-class RTDof2d:
+class RTDof2dWithFracture:
     def __init__(self, mesh, p):
         """
         Parameters
@@ -77,6 +77,116 @@ class RTDof2d:
             ldof = self.number_of_local_dofs('all')  # 单元上的所有自由度
             cdof = self.number_of_local_dofs('cell') # 单元内部的自由度
             edof = self.number_of_local_dofs('edge') # 边内部的自由度
+            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+
+            edge2dof = self.edge_to_dof()
+            edge2cell = mesh.ds.edge_to_cell()
+            cell2dof[edge2cell[:, [0]], edge2cell[:, [2]]*edof + np.arange(edof)] = edge2dof
+            cell2dof[edge2cell[:, [1]], edge2cell[:, [3]]*edof + np.arange(edof)] = edge2dof
+            cell2dof[:, 3*edof:] = NE*edof+ np.arange(NC*cdof).reshape(NC, cdof)
+            return cell2dof
+
+    def number_of_local_dofs(self, doftype='all'):
+        p = self.p
+        if doftype == 'all': # number of all dofs on a cell 
+            return (p+1)*(p+3) 
+        elif doftype in {'cell', 2}: # number of dofs inside the cell 
+            return p*(p+1) 
+        elif doftype in {'face', 'edge', 1}: # number of dofs on a edge 
+            return p+1
+        elif doftype in {'node', 0}: # number of dofs on a node
+            return 0
+
+    def number_of_global_dofs(self):
+        p = self.p
+
+        NE = self.mesh.number_of_edges()
+        edof = self.number_of_local_dofs(doftype='edge') 
+        gdof = NE*edof
+        if p > 0:
+            NC = self.mesh.number_of_cells()
+            cdof = self.number_of_local_dofs(doftype='cell')
+            gdof += NC*cdof
+        return gdof 
+
+class RTDof2d:
+    def __init__(self, mesh, p):
+        """
+        Parameters
+        ----------
+        mesh : TriangleMesh object
+        p : the space order, p>=0
+
+        Notes
+        -----
+
+        Reference
+        ---------
+        """
+        self.mesh = mesh
+        self.p = p # 默认的空间次数 p >= 0
+        self.cell2dof = self.cell_to_dof() # 默认的自由度数组
+
+    def boundary_dof(self, threshold=None):
+        """
+        """
+        return self.is_boundary_dof(threshold=threshold)
+
+    def is_boundary_dof(self, threshold=None):
+        """
+        """
+
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+
+        if threshold is None:
+            index = self.mesh.ds.boundary_edge_index()
+        elif type(threshold) is np.ndarray: 
+            if threshold.dtype == np.bool_:
+                index = np.nonzero(threshold)
+            else: # int type
+                index = threshold
+        elif callable(threshold):
+            index = self.mesh.ds.boundary_edge_index()
+            bc = self.mesh.entity_barycenter('edge', index=index)
+            index, = threshold(bc))
+        edge2dof = self.edge_to_dof()
+        isBdDof[edge2dof[index]] = True
+        return isBdDof
+
+    def edge_to_dof(self, threshold=None):
+        mesh = self.mesh
+        edof = self.number_of_local_dofs(doftype='edge')
+        if threshold is None:
+            NE = mesh.number_of_edges()
+            edge2dof = np.arange(NE*edof).reshape(NE, edof)
+        else:
+            if type(threshold) is np.ndarray: 
+                if threshold.dtype == np.bool_:
+                    index = np.nonzero(threshold)
+                else: # int type
+                    index = threshold
+            elif callable(threshold):
+                bc = self.mesh.entity_barycenter('edge')
+                index, = np.nonzero(threshold(bc))
+            NE = len(index)
+            edge2dof = edof*index.reshape(-1, 1) + np.arange(edof)
+        return edge2dof
+
+    def cell_to_dof(self, threshold=None):
+        """
+        """
+        p = self.p 
+        mesh = self.mesh
+        if p == 0:
+            cell2edge = mesh.ds.cell_to_edge()
+            return cell2edge
+        else:
+            NE = mesh.number_of_edges()
+            NC = mesh.number_of_cells()
+            ldof = self.number_of_local_dofs(doftype='all')  # 单元上的所有自由度
+            cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度
+            edof = self.number_of_local_dofs(doftype='edge') # 边内部的自由度
             cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
             edge2dof = self.edge_to_dof()
