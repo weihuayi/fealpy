@@ -101,7 +101,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         F1 = space.source_vector(pde.source)
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
-        if True:
+        if False:
             F0 = space.set_neumann_bc(pde.dirichlet)
             FF = np.r_['0', F0, F1]
             x = spsolve(AA, FF).reshape(-1)

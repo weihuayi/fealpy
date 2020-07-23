@@ -568,9 +568,8 @@ class RaviartThomasFiniteElementSpace2d:
 
         Notes
         ----
-            For mixed finite element method, the Dirichlet boundary condition of
-            Poisson problem become Neumann boundary condition, and the Neumann
-            boundary condtion become Dirichlet boundary condition.
+        用混合有限元方法求解 Poisson 方程， Dirichlet 边界变为 Neumann 边界，
+        Neumann 边界变化 Dirichlet 边界
         """
         p = self.p
         mesh = self.mesh
@@ -604,6 +603,10 @@ class RaviartThomasFiniteElementSpace2d:
 
     def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
+
+        Notes
+        -----
+
         """
         p = self.p
         mesh = self.mesh
@@ -623,7 +626,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
-        val = -g(ps, en)
+        val = -g(ps, en) # 注意这里容易出错
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

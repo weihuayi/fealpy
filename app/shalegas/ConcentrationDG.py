@@ -95,6 +95,63 @@ class ConcentrationData_0:
 
 # 模型 1
 
+class VelocityData_1:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def neumann(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
+        val[flag0 | flag1] = 0.01
+
+        flag0 = (np.abs(x-1) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x > 1 - 1/16)
+        val[flag1 | flag0] = -0.01
+        return val
+
+
+class ConcentrationData_1:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def init_value(self, p):
+        val = np.array([1.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def neumann(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
+        val[flag0 | flag1] = -0.001
+
+        flag0 = (np.abs(x-1) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x > 1 - 1/16)
+        val[flag0 | flag1] = 0.001
+        return val
+
 
 class ConcentrationDG():
     def __init__(self, vdata, cdata, mesh, timeline, p=0,
@@ -185,7 +242,7 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F = self.uspace.convection_vector(nt, ch, uh) 
+        F = self.uspace.convection_vector(nt, ch, uh, g=self.cdata.neumann) 
 
         F = self.H@(F[:, :, None]/phi)
         F *= dt
@@ -268,6 +325,10 @@ class ConcentrationDG():
 
 if __name__ == '__main__':
 
+    """
+    python3 ConcentrationDG.py 1 5 50000 2000 /home/why/result/c/corner
+    """
+
     mf = MeshFactory()
     
     m = int(sys.argv[1])
@@ -275,6 +336,10 @@ if __name__ == '__main__':
         mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
         vdata = VelocityData_0()
         cdata = ConcentrationData_0()
+    elif m == 1:
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
+        vdata = VelocityData_1()
+        cdata = ConcentrationData_1()
 
     T = float(sys.argv[2])
     NT = int(sys.argv[3])
