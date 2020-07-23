@@ -232,11 +232,11 @@ class CornerData:
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
         flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = 10
+        val[flag0 | flag1] = 1
 
         flag0 = (np.abs(x-1) < 1e-13) & (y < 1/16)
         flag1 = (np.abs(y) < 1e-13) & (x > 1 - 1/16)
-        val[flag1] = -10
+        val[flag0 |flag1] = -1
         return val
 
     @cartesian
