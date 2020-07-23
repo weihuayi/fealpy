@@ -2014,9 +2014,6 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
-        start = time.time()
         isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
-        isMainHEdge[self.hedge] = True
-        end = time.time()
-        print('创建主半边', end - start)
+        isMainHEdge[hedge] = True
         return isMainHEdge
