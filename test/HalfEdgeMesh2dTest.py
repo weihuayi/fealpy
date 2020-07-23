@@ -389,24 +389,106 @@ class HalfEdgeMesh2dTest:
             #mesh.find_node(axes, showindex=True, multiindex=nindex)
             plt.show()
 
-    def refine_tri(self, maxit = 3, method = 'rg', plot=True, rb=True):
+    def refine_tri(self, maxit = 2, method = 'rg', plot=True, rb=True):
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
-        mesh = TriangleMesh(node, cell)
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
-        NE = mesh.ds.NE
-        mesh.hedgecolor = np.zeros(NE*2, dtype=np.int_)
-        isMarkedCell = np.array([0, 1, 0, 0 ,1], dtype = np.bool_)
-        print("*********")
-        mesh.refine_triangle_rg(isMarkedCell)
-        if plot:
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.add_halfedge_plot(axes, showindex=True)
-            mesh.find_node(axes, showindex=True)
-            plt.show()
 
+        if False:
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh.from_mesh(mesh)
+            mesh.ds.cell2hedge = np.array([0, 3, 2, 11, 10])
+            isMarkedCell = np.array([0, 1, 0, 0 ,1], dtype = np.bool_)
+            #mesh.refine_triangle_rbg(isMarkedCell)
+
+            mesh.ds.NV = 3
+            cell = mesh.ds.cell_to_node()
+            node = mesh.entity('node')
+
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
+            if False:
+                fig = plt.figure()
+                axes = fig.gca()
+                mesh.add_plot(axes)
+                mesh.add_halfedge_plot(axes, showindex=True)
+                mesh.find_node(axes, showindex=True)
+                mesh.find_cell(axes, showindex=True)
+                plt.show()
+
+            NE = mesh.ds.NE
+            color = np.zeros(NE*2, dtype=np.int_)
+            if method == 'rg':
+                color[[4, 13, 17, 28]] = 1
+                color[[23,27]] = 2
+                color[[22, 26]] = 3
+                mesh.hedgecolor=  color
+                isMarkedCell = np.array([0, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0 ,0],
+                        dtype=np.bool_)
+                mesh.refine_triangle_rg(isMarkedCell)
+            else:
+                color[[2,3,10,11]] = 1
+                mesh.hedgecolor = color
+                isMarkedCell = np.array([0, 1, 1, 0, 0], dtype=np.bool_)
+                #isMarkedCell = np.array([0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 ,0],
+                 #       dtype=np.bool_)
+                mesh.refine_triangle_nvb(isMarkedCell)
+                mesh.print()
+            if plot:
+                fig = plt.figure()
+                axes = fig.gca()
+                mesh.add_plot(axes)
+                mesh.add_halfedge_plot(axes, showindex=True)
+                mesh.find_node(axes, showindex=True)
+                mesh.find_cell(axes, showindex=True)
+                plt.show()
+        if True:
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
+            NE = mesh.ds.NE
+            color = np.zeros(NE*2, dtype=np.int_)
+            if method == 'nvb':
+                color[[2,3,10,11]] = 1
+            mesh.hedgecolor = color
+            c = np.array([0.8,0.8])
+            r = 0.9
+            h = 1e-2
+            k=0
+            NB = 0
+            start = time.time()
+            while k<maxit:
+                halfedge = mesh.ds.halfedge
+                halfedge1 = halfedge[:, 3]
+                node = mesh.node
+                flag = node-c
+                flag = flag[:,0]**2+flag[:,1]**2
+                flag = flag<=r**2
+                flag1 = flag[halfedge[:, 0]].astype(int)
+                flag2 = flag[halfedge[halfedge1, 0]].astype(int)
+                markedge = flag1+flag2==1
+                markedcell = halfedge[markedge, 1]
+                markedcell = np.unique(markedcell)
+                cell = np.unique(halfedge[:,1])
+                nc = cell.shape[0]
+                markedcell1 = np.zeros(nc)
+                markedcell1[markedcell] = 1
+                if method == 'rg':
+                    mesh.refine_triangle_rg(markedcell1.astype(np.bool_))
+                else:
+                    mesh.refine_triangle_nvb(markedcell1.astype(np.bool_))
+                k+=1
+                print('循环',k,'次***************************')
+            end = time.time()
+            print('用时', end-start)
+            if plot:
+                fig = plt.figure()
+                axes = fig.gca()
+                nindex = mesh.nodedata['level']
+                mesh.add_plot(axes)
+                #mesh.add_halfedge_plot(axes, showindex=True)
+                #mesh.find_node(axes, showindex=True, multiindex=nindex)
+                #mesh.find_cell(axes, showindex=True)
+                #print(np.c_[np.arange(len(mesh.hedgecolor)), mesh.hedgecolor])
+                plt.show()
 
 
 test = HalfEdgeMesh2dTest()
@@ -429,7 +511,7 @@ elif sys.argv[1] == 'read':
 elif sys.argv[1] == 'refine_quad':
     test.refine_quad()
 elif sys.argv[1] == 'refine_tri':
-    test.refine_tri(method = sys.argv[2])
+    test.refine_tri(maxit = int(sys.argv[3]), method = sys.argv[2])
 elif sys.argv[1] == "interpolation":
     n = int(sys.argv[2])
     test.interpolation(n=n, plot=False)

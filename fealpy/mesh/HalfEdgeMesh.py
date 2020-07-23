@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
 from .Mesh2d import Mesh2d
@@ -706,6 +707,7 @@ class HalfEdgeMesh(Mesh2d):
         self.ds.cell2hedge = cell2hedgetest
 
     def refine_triangle_rb(self, marked):
+        start0 = time.time()
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -749,6 +751,7 @@ class HalfEdgeMesh(Mesh2d):
         #加密半边扩展
         flag0 = np.array([1], dtype = bool)
         flag1 = np.array([1], dtype = bool)
+        start1 = time.time()
         while flag0.any() or flag1.any():
             #红色加密
             flag0 = markedge[halfedge[:, 2]] & markedge[halfedge[:, 3]] & ~markedge & ~isBlueHEdge
@@ -761,6 +764,8 @@ class HalfEdgeMesh(Mesh2d):
             markedge[edge3[flag1]] = 1
             markedge[halfedge[markedge, 4]] = 1
 
+        end1 = time.time()
+        print('加密用时', end1-start1)
         #边界上的新节点
         isMainHEdge = (halfedge[:, 5] == 1) # 主半边标记
         flag0 = isMainHEdge & markedge # 即是主半边, 也是标记加密的半边
@@ -788,7 +793,7 @@ class HalfEdgeMesh(Mesh2d):
         newhalfedge = np.zeros(NE, dtype = np.int)
         newhalfedge[flag0] = edgeNode[flag0]-NN+NE
         newhalfedge[flag1] = edgeNode[flag1]-NN+NE+NE1
-
+        start1 = time.time()
         #将蓝色单元变为红色单元
         flag = markedge[edge2]
         NC1 = flag.sum()
@@ -840,6 +845,8 @@ class HalfEdgeMesh(Mesh2d):
 
         markedge[edge2[flag]] = 0#加密后的边去除标记
         markedge[edge3[flag]] = 0
+        end1 = time.time()
+        print('改变单元', end1-start1)
 
         clevel1 = np.zeros(NC1*2)#新单元的层数
         clevel1[::2] = clevel[halfedge[edge1[flag], 1]]
@@ -954,8 +961,11 @@ class HalfEdgeMesh(Mesh2d):
         self.celldata['level'] = clevel
         self.ds.halfedge = halfedge.astype(np.int)
         self.node = node
+        print(markedge.sum())
 
         self.ds.reinit(len(node), subdomain, halfedge.astype(np.int))
+        end0 = time.time()
+        print('用时', end0 - start0)
 
     def refine_triangle_rbg(self, marked):# marked: bool
         NC = self.number_of_all_cells()
@@ -1642,7 +1652,7 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < self.NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 3], dtype=np.int_)
             current = self.cell2hedge[cstart:]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
