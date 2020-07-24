@@ -89,6 +89,9 @@ class DynamicArray(object):
         else:
             return np.array(value, dtype=self.dtype)
 
+    def copy(self):
+        return self.data[:self.size].copy()
+
     def resize(self, new_size):
         self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())
         self.capacity = new_size

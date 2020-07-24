@@ -540,7 +540,7 @@ class RaviartThomasFiniteElementSpace2d:
                     bc = self.mesh.entity_barycenter('edge', index=index)
                     flag = threshold(bc)
                     index = index[flag]
-            val2[:, index] = g(ps[:, index], en[index]) # 这里假设 g 是一个函数， TODO：其它情形？
+            val2[:, index] = g(ps[:, index]) # 这里假设 g 是一个函数， TODO：其它情形？
 
         flag = val0 >= 0.0 # 对于左边单元来说，是流出项
                            # 对于右边单元来说，是流入项

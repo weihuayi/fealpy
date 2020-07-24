@@ -72,12 +72,13 @@ class HalfEdgeMesh2d(Mesh2d):
         # 0: 固定点
         # 1: 边界上的点
         # 2: 区域内部的点
-        self.nodedata['dof'] = nodedof
-
+        if nodedof is not None:
+            self.nodedata['dof'] = nodedof
         self.init_level_info()
 
+
     @classmethod
-    def from_mesh(cls, mesh, closed=False):
+    def from_mesh(cls, mesh, closed=False, NV=None):
         mtype = mesh.meshtype
         if mtype not in {'halfedge', 'halfedge2d'}:
             NE = mesh.number_of_edges()
@@ -117,9 +118,11 @@ class HalfEdgeMesh2d(Mesh2d):
             else:
                 subdomain = np.ones(NC+1, dtype=halfedge.dtype)
                 subdomain[0] = 0
-            return cls(node, halfedge, subdomain)
+
+            mesh =  cls(node, halfedge, subdomain, NV=NV)
+            return mesh 
         else:
-            newMesh =  cls(mesh.node, mesh.ds.subdomain, mesh.ds.halfedge.copy())
+            newMesh =  cls(mesh.node.copy(), mesh.ds.subdomain.copy(), mesh.ds.halfedge.copy())
             newMesh.celldata['level'][:] = mesh.celldata['level']
             newMesh.nodedata['level'][:] = mesh.nodedata['level']
             newMesh.halfedge['level'][:] = mesh.halfedgedata['level']
@@ -374,25 +377,44 @@ class HalfEdgeMesh2d(Mesh2d):
             assert self.ds.NV == 3 or self.ds.NV == 4
             # TODO: for tri and quad case
 
-    def cell_area(self, index=None):
-        NC = self.number_of_cells()
-        node = self.entity('node')
+    def cell_area(self, index=np.s_[:]):
+        """
 
-        halfedge = self.ds.halfedge # DynamicArray
-        hflag = self.ds.subdomain[halfedge[:, 1]] > 0
-        cstart = self.ds.cellstart
+        Notes
+        -----
+        计算单元的面积
+        """
+        if self.ds.NV in {None, 4}:
+            NC = self.number_of_cells()
+            node = self.entity('node')
 
-        e0 = halfedge[halfedge[hflag, 3], 0]
-        e1 = halfedge[hflag, 0]
+            halfedge = self.ds.halfedge # DynamicArray
+            hflag = self.ds.subdomain[halfedge[:, 1]] > 0
+            cstart = self.ds.cellstart
 
-        w = np.array([[0, -1], [1, 0]], dtype=np.int)
-        v = (node[e1] - node[e0])@w
-        val = np.sum(v*node[e0], axis=1)
+            e0 = halfedge[halfedge[hflag, 3], 0]
+            e1 = halfedge[hflag, 0]
 
-        a = np.zeros(NC, dtype=self.ftype)
-        np.add.at(a, halfedge[hflag, 1] - cstart, val)
-        a /=2
-        return a
+            w = np.array([[0, -1], [1, 0]], dtype=np.int)
+            v = (node[e1] - node[e0])@w
+            val = np.sum(v*node[e0], axis=1)
+
+            a = np.zeros(NC, dtype=self.ftype)
+            np.add.at(a, halfedge[hflag, 1] - cstart, val)
+            a /=2
+            return a
+        elif self.ds.NV == 3:
+            node = self.entity('node')
+            cell = self.entity('cell')
+            GD = self.geo_dimension()
+            v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
+            v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
+            nv = np.cross(v2, -v1)
+            if GD == 2:
+                a = nv/2.0
+            elif GD == 3:
+                a = np.sqrt(np.square(nv).sum(axis=1))/2.0
+            return a
 
     def cell_barycenter(self, return_all=False):
         """
@@ -991,6 +1013,41 @@ class HalfEdgeMesh2d(Mesh2d):
 
         return node, cell.flatten(), cellType, len(cell)
 
+    def grad_lambda(self):
+        """
+
+        Notes
+        -----
+
+        计算三角形网格上的重心坐标函数的梯度。
+        """
+
+        assert self.ds.NV == 3 # 必须是三角形网格
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells()
+
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        GD = self.geo_dimension()
+        nv = np.cross(v2, -v1)
+        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            W = np.array([[0, 1], [-1, 0]])
+            Dlambda[:, 0, :] = v0@W/length.reshape((-1, 1))
+            Dlambda[:, 1, :] = v1@W/length.reshape((-1, 1))
+            Dlambda[:, 2, :] = v2@W/length.reshape((-1, 1))
+        elif GD == 3:
+            length = np.sqrt(np.square(nv).sum(axis=1))
+            n = nv/length.reshape((-1, 1))
+            Dlambda[:, 0, :] = np.cross(n, v0)/length.reshape((-1,1))
+            Dlambda[:, 1, :] = np.cross(n, v1)/length.reshape((-1,1))
+            Dlambda[:, 2, :] = np.cross(n, v2)/length.reshape((-1,1))
+        return Dlambda
+
 
     def print(self):
         print("hcell:\n")
@@ -1224,8 +1281,8 @@ class HalfEdgeMesh2dDataStructure():
             val = np.ones(flag.sum(), dtype=np.bool_)
             I = halfedge[flag, 1] - cstart
             J = halfedge[halfedge[flag, 4], 1]-cstart
-            cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool)
-            cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool)
+            cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC))
+            cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC))
             return cell2cell.tocsr()
         elif self.NV is None:
             NV = self.number_of_vertices_of_cells()
