@@ -2015,21 +2015,13 @@ class HalfEdgeMesh2dDataStructure():
         return isBdNode
 
     def boundary_edge_flag(self):
-        NE = self.NE
         halfedge =  self.halfedge
         hedge = self.hedge
         subdomain = self.subdomain
-        hedge = self.hedge
-        hflag = subdomain[halfedge[:, 1]] > 0
-        isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
-        J = np.zeros(2*NE, dtype=self.itype)
-        J[hedge] = range(NE)
-        J[halfedge[hedge, 4]] = range(NE)
-        return J[isBdHEdge] 
 
-    def boundary_edge(self):
-        edge = self.edge_to_node()
-        return edge[self.boundary_edge_index()]
+        hflag = subdomain[halfedge[:, 1]] > 0
+        isBdEdge = hflag[hedge] & (~hflag[halfedge[hedge, 4]])
+        return isBdEdge 
 
     def boundary_cell_flag(self):
         """
@@ -2074,3 +2066,7 @@ class HalfEdgeMesh2dDataStructure():
         isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
         isMainHEdge[self.hedge] = True
         return isMainHEdge
+
+    def boundary_edge(self):
+        edge = self.edge_to_node()
+        return edge[self.boundary_edge_index()]
