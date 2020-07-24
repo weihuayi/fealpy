@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
 from .Mesh2d import Mesh2d
@@ -455,7 +456,6 @@ class HalfEdgeMesh(Mesh2d):
         #将蓝色单元变为红色单元
         flag = markedge[edge0]!=0
         NC1 = flag.sum()
-        flaag = np.arange(halfedge.shape[0])[halfedge[:, 1]==14]
 
         halfedge[isBlueHEdge[flag], 0] = markedge[edge1[flag]]
         halfedge20 = np.zeros([NC1, 6], dtype=np.int)
@@ -789,7 +789,6 @@ class HalfEdgeMesh(Mesh2d):
         newhalfedge = np.zeros(NE, dtype = np.int)
         newhalfedge[flag0] = edgeNode[flag0]-NN+NE
         newhalfedge[flag1] = edgeNode[flag1]-NN+NE+NE1
-
         #将蓝色单元变为红色单元
         flag = markedge[edge2]
         NC1 = flag.sum()
@@ -1643,7 +1642,7 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < self.NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 3], dtype=np.int_)
             current = self.cell2hedge[cstart:]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
@@ -1652,7 +1651,7 @@ class HalfEdgeMesh2dDataStructure():
             cell2node[:, 2] = halfedge[current, 0]
             return cell2node
         elif self.NV == 4: # quad mesh
-            cell2node = np.zeros(NC, 3)
+            cell2node = np.zeros([NC, 4], dtype=np.int_)
             current = self.cell2hedge[cstart:]
             cell2node[:, 0] = halfedge[current, 0]
             current = halfedge[current, 2]
