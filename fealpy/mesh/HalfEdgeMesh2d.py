@@ -2015,5 +2015,5 @@ class HalfEdgeMesh2dDataStructure():
 
     def main_halfedge_flag(self):
         isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
-        isMainHEdge[hedge] = True
+        isMainHEdge[self.hedge] = True
         return isMainHEdge
