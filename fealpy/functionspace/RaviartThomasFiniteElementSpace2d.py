@@ -476,7 +476,7 @@ class RaviartThomasFiniteElementSpace2d:
     def source_vector(self, f, dim=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
+        b = self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
         return b
 
 
@@ -592,7 +592,7 @@ class RaviartThomasFiniteElementSpace2d:
         phi = self.edge_basis(bcs, index=index) 
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        val = -g(ps)
+        val = g(ps)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
@@ -626,7 +626,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
-        val = -g(ps, en) # 注意这里容易出错
+        val = g(ps, en) # 注意这里容易出错
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

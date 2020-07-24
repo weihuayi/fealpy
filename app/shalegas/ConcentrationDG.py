@@ -172,11 +172,11 @@ class VelocityData_2:
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
         flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = 0.1
+        val[flag0 | flag1] = -0.1 #负的表示注入区域
 
         flag0 = (np.abs(x-1) < 1e-13) & (y > 15/16)
         flag1 = (np.abs(y-1) < 1e-13) & (x > 1 - 1/16)
-        val[flag1 | flag0] = -0.1
+        val[flag1 | flag0] = 0.1 # 负的表示流出区域
         return val
 
 
@@ -224,9 +224,8 @@ class ConcentrationDG():
         self.ph = self.uspace.smspace.function() # 压力场自由度数组
         self.ch = self.cspace.function() # 浓度场自由度数组
 
-        # 初始浓度场设为 1
+        # 初始浓度场设为 0 
         ldof = self.cspace.number_of_local_dofs()
-        self.ch[0::ldof] = 0.0 
 
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
