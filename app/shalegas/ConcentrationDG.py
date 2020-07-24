@@ -152,6 +152,61 @@ class ConcentrationData_1:
         val[flag0 | flag1] = 0.001
         return val
 
+# 模型 2
+
+class VelocityData_2:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def neumann(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
+        val[flag0 | flag1] = 0.1
+
+        flag0 = (np.abs(x-1) < 1e-13) & (y > 15/16)
+        flag1 = (np.abs(y-1) < 1e-13) & (x > 1 - 1/16)
+        val[flag1 | flag0] = -0.1
+        return val
+
+
+class ConcentrationData_2:
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object,  
+        """
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def init_value(self, p):
+        val = np.array([0.0], np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape) 
+
+    @cartesian
+    def dirichlet(self, p): # 这里在边界上，始终知道边界外面的浓度
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
+        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
+        val[flag0 | flag1] = 1
+        return val
+
 
 class ConcentrationDG():
     def __init__(self, vdata, cdata, mesh, timeline, p=0,
@@ -171,7 +226,7 @@ class ConcentrationDG():
 
         # 初始浓度场设为 1
         ldof = self.cspace.number_of_local_dofs()
-        self.ch[0::ldof] = 1.0
+        self.ch[0::ldof] = 0.0 
 
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
@@ -242,7 +297,7 @@ class ConcentrationDG():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
-        F = self.uspace.convection_vector(nt, ch, uh, g=self.cdata.neumann) 
+        F = self.uspace.convection_vector(nt, ch, uh, g=self.cdata.dirichlet) 
 
         F = self.H@(F[:, :, None]/phi)
         F *= dt
@@ -340,6 +395,10 @@ if __name__ == '__main__':
         mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
         vdata = VelocityData_1()
         cdata = ConcentrationData_1()
+    elif m == 2:
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
+        vdata = VelocityData_2()
+        cdata = ConcentrationData_2()
 
     T = float(sys.argv[2])
     NT = int(sys.argv[3])

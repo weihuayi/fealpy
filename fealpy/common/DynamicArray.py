@@ -33,7 +33,7 @@ class DynamicArray(object):
             for method_name in cls.MAGIC_METHODS:
                 setattr(cls, method_name, property(make_delegate(method_name)))
 
-    def __init__(self, data, dtype=None, capacity=1000, val=0):
+    def __init__(self, data, dtype=None, capacity=100000, val=0):
 
         if isinstance(data, int): 
             self.shape = (data, )
@@ -88,6 +88,9 @@ class DynamicArray(object):
             return value
         else:
             return np.array(value, dtype=self.dtype)
+
+    def copy(self):
+        return self.data[:self.size].copy()
 
     def resize(self, new_size):
         self.data = np.resize(self.data, (new_size,) + self._get_trailing_dimensions())

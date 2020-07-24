@@ -526,6 +526,7 @@ class HalfEdgeMeshTest:
             mesh.add_plot(axes)
             #mesh.add_halfedge_plot(axes, showindex=True)
             #mesh.find_node(axes, showindex=True, multiindex=nindex)
+            #mesh.find_cell(axes, showindex=True)
             plt.show()
         if 0:
             fig = plt.figure()
@@ -560,7 +561,7 @@ test = HalfEdgeMeshTest()
 #test.refine_triangle_rbTest(8, plot=True, rb=True)
 
 if sys.argv[1] == 'refine_tri_rb':
-    test.refine_triangle_rbTest(8, plot=True, rb=1)
+    test.refine_triangle_rbTest(int(sys.argv[2]), plot=True, rb=1)
 
 if sys.argv[1] == 'refine_poly':
     test.refine_poly_test(plot=True)

@@ -35,15 +35,17 @@ class MeshWriter:
         pdata = self.mesh.GetPointData()
 
         for key, val in mesh.nodedata.items():
-            d = vnp.numpy_to_vtk(val)
-            d.SetName(key)
-            pdata.AddArray(d)
+            if val is not None:
+                d = vnp.numpy_to_vtk(val[:])
+                d.SetName(key)
+                pdata.AddArray(d)
 
         cdata = self.mesh.GetCellData()
         for key, val in mesh.celldata.items():
-            d = vnp.numpy_to_vtk(val)
-            d.SetName(key)
-            cdata.AddArray(d)
+            if val is not None:
+                d = vnp.numpy_to_vtk(val[:])
+                d.SetName(key)
+                cdata.AddArray(d)
 
         self.simulation = simulation
         if self.simulation is not None:
