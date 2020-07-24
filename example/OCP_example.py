@@ -87,7 +87,7 @@ class PDE():
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
-        val = 4*np.sin(pi*t)*np.sin(pi*x)*np.sin(pi*y)/pi/pi
+        val = (4/pi**2 - np.sin(pi*x)*np.sin(pi*y))*np.sin(pi*t)
         return val
 
 
@@ -121,10 +121,10 @@ class PDE():
         val = np.zeros(p.shape, dtype=np.float64)
         val[..., 0] = (np.cos(pi*t) - np.cos(pi*T) - pi*np.sin(pi*t)) \
                 *np.cos(pi*x)*np.sin(pi*y) \
-                + (1 - T - t)*pi*np.cos(pi*x)*np.sin(pi*y)/2
+                + (1 - T + t)*pi*np.cos(pi*x)*np.sin(pi*y)/2
         val[..., 1] = (np.cos(pi*t) - np.cos(pi*T) - pi*np.sin(pi*t)) \
                 *np.sin(pi*x)*np.cos(pi*y) \
-                + (1 - T - t)*pi*np.sin(pi*x)*np.cos(pi*y)/2
+                + (1 - T + t)*pi*np.sin(pi*x)*np.cos(pi*y)/2
         return val # val.shape == x.shape
 
 
@@ -134,7 +134,7 @@ class PDE():
         y = p[..., 1]
         pi = np.pi
         val = (2*np.exp(2*t) + pi**2*np.exp(2*t) \
-                + pi**2)*np.cos(pi*x)*np.cos(pi*y) \
+                + pi**2)*np.sin(pi*x)*np.sin(pi*y) \
                 - (4/(pi**2) - np.sin(pi*x)*np.sin(pi*y))*np.sin(pi*t)
         return val
 
@@ -163,7 +163,7 @@ class Model():
 
         # costate variable
         self.zh = self.pspace.function(dim=NL)
-        self.tqh = self.uspace.function()
+        self.tqh = self.uspace.function(dim=NL)
         self.qh = self.uspace.function()
 
 
@@ -180,7 +180,7 @@ class Model():
         nt: 表示 n-1 时间层,要求的是 n 个时间层的方程
         '''
         dt = self.dt
-        f1 = dt*sp
+        f1 = -dt*sp
         NC = self.mesh.number_of_cells()
         u = self.uh[:, nt+1].reshape(NC,1)
         NE = self.mesh.number_of_edges()
@@ -215,6 +215,7 @@ class Model():
         dt = self.dt
         NL = timeline.number_of_time_levels()
         f1 = -dt*sq
+
         NC = self.mesh.number_of_cells()
         tpd = self.uspace.function()
         edge2dof = self.uspace.dof.edge_to_dof()
@@ -223,16 +224,15 @@ class Model():
             ps = mesh.bc_to_point(bc, etype='edge')
             return np.einsum('ijk, jk, ijm->ijm', self.pde.tpd(ps, NL-nt-1), en, self.pspace.edge_basis(ps))
         tpd[edge2dof] = self.pspace.integralalg.edge_integral(f0, edgetype=True)
-        bc = np.array([1/3, 1/3, 1/3])
-        NE = self.mesh.number_of_edges()
         f2 = self.A@self.tph[:, NL-nt-1] - self.A@tpd
 
+        bc = np.array([1/3, 1/3, 1/3])
         ps = mesh.bc_to_point(bc, etype='cell')
         bb1 = self.M@self.zh[:, NL-nt-1]
         val = self.pde.yd(ps, (NL-nt-1)*dt, 1)
         bb2 = dt*self.M@(self.yh[:, NL-nt-1] - val)
 
-        f3 = -bb1 + bb2
+        f3 = bb1 + bb2
 
         return np.r_[np.r_[f1, f2], f3]
 
@@ -280,6 +280,7 @@ class Model():
         sq = np.zeros(NE, dtype=mesh.ftype)
         while not timeline.stop():
             QZ = self.costate_one_step_solve(timeline.current, sq)
+            self.tqh[:, NL-timeline.current-2] = QZ[:NE]
             self.qh[:] = QZ[NE:2*NE]
             self.zh[:, NL-timeline.current-2] = QZ[2*NE:]
             zh1 = self.pspace.function(array=self.zh[:, NL - timeline.current-2])
@@ -308,10 +309,11 @@ class Model():
             uI[:, timeline.current+1] = self.pde.u_solution(self.bc, (timeline.current+1)*dt)
             timeline.current += 1
         timeline.reset()
-        while (eu > 1e-4) and (k < maxit):
+        while eu > 1e-4 and k < 20:
+            print('maxit', maxit)
             print('ui', uI)
             uh1 = self.uh.copy()
-            print('uh1', uh1)
+#            print('uh1', uh1)
             sp = self.state_solve()
             sq = self.costate_solve()
             print('uh', self.uh)
@@ -320,7 +322,7 @@ class Model():
             print('eu', eu)
             print('k', k)
 
-            return sp, sq
+        return sp, sq
 
     def L2error(self):
         dt = self.dt
@@ -347,7 +349,7 @@ class Model():
 pde = PDE()
 mesh = pde.init_mesh(n=1, meshtype='tri')
 space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
-timeline = UniformTimeLine(0, 1, 2)
+timeline = UniformTimeLine(0, 1, 10)
 MFEMModel = Model(pde, mesh, timeline)
 MFEMModel.nonlinear_solve()
 pL2error = MFEMModel.L2error()
