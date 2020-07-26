@@ -180,29 +180,31 @@ class Model():
         nt: 表示 n-1 时间层,要求的是 n 个时间层的方程
         '''
         dt = self.dt
-        f1 = -dt*sp
         NC = self.mesh.number_of_cells()
-        u = self.uh[:, nt+1].reshape(NC,1)
+        u = self.uh[:, nt+1]
         NE = self.mesh.number_of_edges()
+       # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
+        f1 = -dt*sp
+
+        # f2 = 0
         f2 = np.zeros(NE, dtype=mesh.ftype)
 
+        # f3 = \Delta t(f^n + u^n, w_h) + (y^{n-1}, w_h)
         cell2dof = self.pspace.cell_to_dof()
         gdof = self.pspace.number_of_global_dofs()
         qf = self.integrator
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
         phi = self.pspace.basis(bcs)
-        val = self.pde.source(ps, nt*dt)
-        bb1 = np.einsum('i, ij, jk, j->jk', ws, val, phi, self.cellmeasure)
-        bb2 = self.M@u
-        bb = bb1 + bb2
+        val = self.pde.source(ps, (nt+1)*dt)
+        bb = np.einsum('i, ij, jk, j->jk', ws, val, phi, self.cellmeasure)
 
         gdof = gdof or cell2dof.max()
         shape = (gdof, )
         b = np.zeros(shape, dtype=phi.dtype)
         np.add.at(b, cell2dof, bb)
 
-        f3 = dt*b + self.M@self.yh[:, nt]
+        f3 = dt*b + dt*self.M@u + self.M@self.yh[:, nt]
 
         return np.r_[np.r_[f1, f2], f3]
 
@@ -214,10 +216,13 @@ class Model():
         '''
         dt = self.dt
         NL = timeline.number_of_time_levels()
-        f1 = -dt*sq
-
         NC = self.mesh.number_of_cells()
         tpd = self.uspace.function()
+ 
+        #  f1 = -\sum_{i=1}^n-1\Delta t (p^i, v)
+        f1 = -dt*sq
+
+        # f2 = (\tilde p^n_h - \tilde p^n_d, v)
         edge2dof = self.uspace.dof.edge_to_dof()
         en = self.mesh.edge_unit_normal()
         def f0(bc):
@@ -226,6 +231,7 @@ class Model():
         tpd[edge2dof] = self.pspace.integralalg.edge_integral(f0, edgetype=True)
         f2 = self.A@self.tph[:, NL-nt-1] - self.A@tpd
 
+        # f3 = \Delta t(y^n_h - y^n_d, w) + (z^n_h, w)
         bc = np.array([1/3, 1/3, 1/3])
         ps = mesh.bc_to_point(bc, etype='cell')
         bb1 = self.M@self.zh[:, NL-nt-1]
@@ -259,7 +265,6 @@ class Model():
         NE = self.mesh.number_of_edges()
         sp = np.zeros(NE, dtype=mesh.ftype)
         while not timeline.stop():
-#            self.state_solve()
             PU = self.state_one_step_solve(timeline.current, sp)
             self.tph[:, timeline.current+1] = PU[:NE]
             self.ph[:] = PU[NE:2*NE]
@@ -271,13 +276,14 @@ class Model():
 
     def costate_solve(self):
         timeline = self.timeline
-        timeline.reset()
         NL = timeline.number_of_time_levels()
         NE = self.mesh.number_of_edges()
         qf = self.integrator
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
         sq = np.zeros(NE, dtype=mesh.ftype)
+        
+        timeline.reset()
         while not timeline.stop():
             QZ = self.costate_one_step_solve(timeline.current, sq)
             self.tqh[:, NL-timeline.current-2] = QZ[:NE]
