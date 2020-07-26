@@ -146,6 +146,11 @@ class FEMeshIntegralAlg():
         elif basis0.coordtype == 'cartesian':
             phi0 = basis0(ps)
 
+        if len(phi0.shape) == 3:
+            GD = 1
+        else:
+            GD = phi0.shape[3]
+
         if b1 is not None:
             if b1[0].coordtype == 'barycentric':
                 phi1 = b1[0](bcs) # (NQ, NC, ldof, ...)
@@ -158,20 +163,36 @@ class FEMeshIntegralAlg():
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                     self.cellmeasure, optimize=True)
         else: 
-            if isinstance(cfun, (int, float)):
-                M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
-                        self.cellmeasure, optimize=True)
-            elif callable(cfun):
+            if callable(cfun):
                 if cfun.coordtype == 'barycentric':
                     c = cfun(bcs)
                 elif cfun.coordtype == 'cartesian':
                     c = cfun(ps)
+            else:
+                c = cfun
 
-                if isinstance(c, (int, float)):
-                    M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
+                        self.cellmeasure, optimize=True)
+            elif isinstance(c, np.ndarray): 
+                if c.shape == (GD, GD): # constant diffusion coefficient
+                    phi0 = np.einsum('mn, ijkn->ijkm', c, phi0)
+                    M = np.einsum('i, ijkl, ijml, j->jkm', ws, phi0, phi1,
                             self.cellmeasure, optimize=True)
-                elif isinstance(c, np.ndarray): # (NQ, NC)
+                elif c.shape == (GD, ): # constant convection coefficient
+                    phi0 = np.einsum('m, ijkm->ijk', c, phi0)
+                    M = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1,
+                            self.cellmeasure, optimize=True)
+                elif len(c.shape) == 2: # (NQ, NC)
                     M = np.einsum('i, ij, ijk..., ijm..., j->jkm', ws, c, phi0, phi1,
+                            self.cellmeasure, optimize=True)
+                elif len(c.shape) == 3: # (NQ, NC, GD)
+                    phi0 = np.einsum('ijm, ijkm->ijk', c, phi0)
+                    M = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1,
+                            self.cellmeasure, optimize=True)
+                elif len(c.shape) == 4: # (NQ, NC, GD, GD)
+                    phi0 = np.einsum('ijmn, ijkn->ijkm', c, phi0)
+                    M = np.einsum('i, ijkl, ijml, j->jkm', ws, phi0, phi1,
                             self.cellmeasure, optimize=True)
 
         if cell2dof0 is None: # 仅组装单元矩阵 

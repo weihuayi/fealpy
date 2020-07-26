@@ -643,6 +643,14 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
         return A 
 
+    def convection_matrix(self, cfun=None, q=None):
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        b0 = (self.grad_basis, cell2dof, gdof)
+        b1 = (self.basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, b1=b1, cfun=cfun, q=q)
+        return A 
+
     def source_vector(self, f, dim=None):
         p = self.p
         cellmeasure = self.cellmeasure
