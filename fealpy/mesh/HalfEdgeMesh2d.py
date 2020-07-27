@@ -190,6 +190,41 @@ class HalfEdgeMesh2d(Mesh2d):
         self.celldata['level'] = DynamicArray((NC, ), val=0, dtype=np.int_) 
         self.nodedata['level'] = DynamicArray((NN, ), val=0, dtype=np.int_)
 
+    def convexity(self):
+        node = self.entity('node')
+        halfedge = self.entity('halfedge')
+
+        end = halfedge[:, 0]
+        start = halfedge[halfedge[:, 4], 0]
+        vector = node[end] - node[start]
+        vectornex = vector[halfedge[:, 2]]
+
+        angle_sin = (vector[0]*vectornex[1] - vector[1]*vectornex[0])/(
+                np.linalg.norm(vector, axis=1)*np.linalg.norm(vectornex, axis=1))
+        badHEdge, = np.where(angle_sin < np.sin(np.pi/18))
+        badCell, idx = np.unique(halgedge[badHEdge, 1], return_index=True)
+        badHEdge = badHEdge[idx]
+        badNode = halfedge[badHEdge, 0]
+
+        cell2node = halfedge[cell, 0]
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
     def number_of_all_cells(self):
         return self.ds.number_of_all_cells()
 
