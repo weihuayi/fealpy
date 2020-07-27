@@ -653,7 +653,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def parallel_stiff_matrix(self, cfun=None, q=None):
+    def parallel_stiff_matrix(self, c=None, q=None):
         """
 
         Notes
@@ -664,10 +664,10 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
-        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
+        M = self.integralalg.parallel_construct_matrix(b0, c=c, q=q)
         return M
 
-    def parallel_mass_matrix(self, cfun=None, q=None):
+    def parallel_mass_matrix(self, c=None, q=None):
         """
 
         Notes
@@ -703,14 +703,14 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, cfun=c, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
         return A 
 
     def mass_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, cfun=c, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
         return A 
 
     def convection_matrix(self, c=None, q=None):
@@ -718,7 +718,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
         b1 = (self.basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, b1=b1, cfun=c, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, b1=b1, c=c, q=q)
         return A 
 
     def source_vector(self, f, dim=None):

@@ -31,7 +31,7 @@ class FEMeshIntegralAlg():
 
     @timer
     def parallel_construct_matrix(self, b0, 
-            b1=None, cfun=None, q=None):
+            b1=None, c=None, q=None):
         """
 
         Parameters
@@ -41,7 +41,6 @@ class FEMeshIntegralAlg():
             b0[1]: cell2dof
             b0[2]: number of global dofs
         b1: default is None, just like b0
-        block: 
 
         Notes
         -----
@@ -117,7 +116,7 @@ class FEMeshIntegralAlg():
 
     @timer
     def serial_construct_matrix(self, b0, 
-            b1=None, cfun=None, q=None):
+            b1=None, c=None, q=None):
         """
 
         Parameters
@@ -159,17 +158,15 @@ class FEMeshIntegralAlg():
         else:
             phi1 = phi0
 
-        if cfun is None:
+        if c is None:
             M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi0, phi1,
                     self.cellmeasure, optimize=True)
         else: 
-            if callable(cfun):
-                if cfun.coordtype == 'barycentric':
-                    c = cfun(bcs)
-                elif cfun.coordtype == 'cartesian':
-                    c = cfun(ps)
-            else:
-                c = cfun
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    c = c(ps)
 
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijk..., ijm..., j->jkm', c*ws, phi0, phi1,
