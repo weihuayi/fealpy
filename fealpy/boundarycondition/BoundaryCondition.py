@@ -9,7 +9,7 @@ class DirichletBC():
         self.threshold = threshold
         self.bctype = 'Dirichlet'
 
-    def apply(self, A, F, uh=None):
+    def apply(self, A, F, uh=None, threshold=None):
         space = self.space
         gD = self.gD
         threshold = self.threshold
@@ -34,11 +34,11 @@ class DirichletBC():
 
     def apply_on_matrix(self, A):
         space = self.space
-        threshold = self.threshold
         gdof = space.number_of_global_dofs()
+        threshold = self.threshold if threshold is None else threshold
 
         isDDof = space.boundary_dof(threshold=threshold)
-        dim = A.shape[0]//gdof
+        dim = A.shape[0]//gdof # 如果是向量型问题
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
 

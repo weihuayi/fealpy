@@ -56,6 +56,21 @@ class CPLFEMDof1d():
         isBdDof[index] = True
         return isBdDof
 
+    def is_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_node_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('node', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof[index] = True
+        return isBdDof
+
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
@@ -132,6 +147,23 @@ class CPLFEMDof2d():
         return self.multiIndex == 0
 
     def boundary_dof(self, threshold=None):
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        gdof = self.number_of_global_dofs()
+        edge2dof = self.edge_to_dof()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof[edge2dof[index]] = True
+        return isBdDof
+
+    def is_boundary_dof(self, threshold=None):
 
         if type(threshold) is np.ndarray:
             index = threshold
@@ -345,6 +377,23 @@ class CPLFEMDof3d():
         return face2dof
 
     def boundary_dof(self, threshold=None):
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('face', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.face_to_dof()
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof[face2dof[index]] = True
+        return isBdDof
+
+    def is_boundary_dof(self, threshold=None):
 
         if type(threshold) is np.ndarray:
             index = threshold

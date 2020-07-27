@@ -98,13 +98,83 @@ class LagrangeFiniteElementSpace():
         else:
             raise ValueError('This space is a discontinuous space!')
 
+    def is_boundary_dof(self, threshold=None):
+        if self.spacetype == 'C':
+            return self.dof.is_boundary_dof(threshold=threshold)
+        else:
+            raise ValueError('This space is a discontinuous space!')
+
     def geo_dimension(self):
         return self.GD
 
     def top_dimension(self):
         return self.TD
 
+    def residual_estimate(self, uh, f=None, c=None):
+        """
+
+        Parameters
+        ----------
+        uh: lagrange finite element solution
+        f: the source, default None
+        c: diffusion coefficient, default None
+
+        Notes
+        -----
+            uh 是一个 p 次的有限元解，该函数计算 uh 对应的残量型后验误差估计。
+        """
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
+
+        n = mesh.face_unit_normal()
+        bc = np.array([1/(GD+1)]*(GD+1), dtype=self.ftype)
+        grad = self.grad_value(uh, bc)
+
+        ps = mesh.bc_to_point(bc)
+
+        if callable(c):
+            if c.coordtype == 'cartesian':
+                c = c(ps)
+            elif c.coordtype == 'barycentric':
+                c = c(bc)
+
+        if isinstance(c, {int, float}):
+            grad *= c 
+        elif isinstance(c, np.ndarray):
+            if c.shape == (GD, GD):
+                grad = np.einsum('mn, in->im', c, grad)
+            elif c.shape == (GD, ): # 对角系数 
+                grad = np.einsum('m, im->im', c, grad)
+            elif len(c.shape) == 1: # (NC, )
+                grad = np.einsum('i, im->im', c, grad)
+            elif len(d.shape) == 2: # (NC, GD)
+                grad = np.einsum('im, im->im', c, grad)
+            elif len(d.shape) == 3: # (NC, GD, GD)
+                grad = np.einsum('imn, in->im', c, grad)
+
+        if GD == 2:
+            face2cell = mesh.ds.edge_to_cell()
+            h = np.sqrt(np.sum(n**2, axis=-1))
+        elif GD == 3:
+            face2cell = mesh.ds.face_to_cell()
+            h = np.sum(n**2, axis=-1)**(1/4)
+
+        cell2cell = mesh.ds.cell_to_cell()
+        cell2face = mesh.ds.cell_to_face()
+        measure = mesh.entity_measure('cell')
+        J = 0
+        for i in range(cell2cell.shape[1]):
+            J += np.sum((grad - grad[cell2cell[:, i]])*n[cell2face[:, i]], axis=-1)**2
+        return np.sqrt(J*measure)
+
     def grad_recovery(self, uh, method='simple'):
+        """
+
+        Notes
+        -----
+
+        """
         GD = self.GD
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -629,26 +699,26 @@ class LagrangeFiniteElementSpace():
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def stiff_matrix(self, cfun=None, q=None):
+    def stiff_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=c, q=q)
         return A 
 
-    def mass_matrix(self, cfun=None, q=None):
+    def mass_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, cfun=cfun, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, cfun=c, q=q)
         return A 
 
-    def convection_matrix(self, cfun=None, q=None):
+    def convection_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
         b1 = (self.basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, b1=b1, cfun=cfun, q=q)
+        A = self.integralalg.serial_construct_matrix(b0, b1=b1, cfun=c, q=q)
         return A 
 
     def source_vector(self, f, dim=None):
