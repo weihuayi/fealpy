@@ -437,24 +437,38 @@ class FEMeshIntegralAlg():
             e = np.einsum(s1, ws, val, self.facemeasure)
         return e
 
-    def cell_integral(self, u, celltype=False, q=None, barycenter=True):
+    def cell_integral(self, f, q=None):
+        """
+
+        Notes
+        -----
+        在网格的每个单元上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='cell')
-            val = u(ps)
-        dim = len(ws.shape)
-        s0 = 'abcde'
-        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-        if celltype is True:
-            e = np.einsum(s1, ws, val, self.cellmeasure)
-        else:
-            e = np.einsum(s1, ws, val, self.cellmeasure)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs)
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
+
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.cellmeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.cellmeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.cellmeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, val, self.cellmeasure)
         return e
 
     def integral(self, u, celltype=False, barycenter=True):
@@ -463,7 +477,7 @@ class FEMeshIntegralAlg():
         qf = self.integrator
         bcs = qf.quadpts # 积分点 (NQ, 3)
         ws = qf.weights # 积分点对应的权重 (NQ, )
-        if barycenter:
+        if barycenter or u.coordtype == 'barycentric':
             val = u(bcs)
         else:
             ps = self.mesh.bc_to_point(bcs) # (NQ, NC, 2)
