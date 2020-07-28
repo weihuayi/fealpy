@@ -398,46 +398,74 @@ class FEMeshIntegralAlg():
         return b
 
 
-    def edge_integral(self, u, edgetype=False, q=None, barycenter=True):
+    def edge_integral(self, f, q=None):
+        """
+        Notes
+        -----
+        在网格的每条边上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='edge')
-            val = u(ps)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs, 'edge')
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
 
-        if edgetype is True:
-            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure)
-        else:
-            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.facemeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.facemeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.facemeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.facemeasure)
         return e
 
-    def face_integral(self, u, facetype=False, q=None, barycenter=True):
+    def face_integral(self, f, q=None):
+        """
+
+        Notes
+        -----
+        在网格的每个面上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='face')
-            val = u(ps)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs, 'face')
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
 
-        dim = len(ws.shape)
-        s0 = 'abcde'
-        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-        if facetype is True:
-            e = np.einsum(s1, ws, val, self.facemeasure)
-        else:
-            e = np.einsum(s1, ws, val, self.facemeasure)
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.facemeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.facemeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.facemeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.facemeasure)
         return e
 
-    def cell_integral(self, f, q=None):
+    def cell_integral(self, f, q=None, power=None):
         """
 
         Notes
@@ -452,10 +480,13 @@ class FEMeshIntegralAlg():
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs)
+                ps = mesh.bc_to_point(bcs, 'cell')
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
+
+        if power is not None:
+            f = np.power(f, power) 
 
         dim = len(ws.shape) # 张量型积分公式
         if isinstance(f, (int, float)): # f为标量常函数
@@ -468,7 +499,7 @@ class FEMeshIntegralAlg():
             else:
                 s0 = 'abcde'
                 s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-                e = np.einsum(s1, ws, val, self.cellmeasure)
+                e = np.einsum(s1, ws, f, self.cellmeasure)
         return e
 
     def integral(self, u, celltype=False, barycenter=True):

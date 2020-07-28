@@ -134,7 +134,6 @@ class LagrangeFiniteElementSpace():
         bc = np.array([1/(GD+1)]*(GD+1), dtype=self.ftype)
         grad = self.grad_value(uh, bc)
 
-
         if callable(c):
             if c.coordtype == 'barycentric':
                 c = c(bc)
@@ -143,37 +142,39 @@ class LagrangeFiniteElementSpace():
                 c = c(ps)
 
         # A\nabla u_h
-        if isinstance(c, {int, float}):
-            grad *= c 
-        elif isinstance(c, np.ndarray):
-            if c.shape == (GD, GD):
-                grad = np.einsum('mn, in->im', c, grad)
-            elif c.shape == (GD, ): # 对角系数 
-                grad = np.einsum('m, im->im', c, grad)
-            elif len(c.shape) == 1: # (NC, )
-                grad = np.einsum('i, im->im', c, grad)
-            elif len(d.shape) == 2: # (NC, GD)
-                grad = np.einsum('im, im->im', c, grad)
-            elif len(d.shape) == 3: # (NC, GD, GD)
-                grad = np.einsum('imn, in->im', c, grad)
+        if c is not None:
+            if isinstance(c, {int, float}):
+                grad *= c 
+            elif isinstance(c, np.ndarray):
+                if c.shape == (GD, GD):
+                    grad = np.einsum('mn, in->im', c, grad)
+                elif c.shape == (GD, ): # 对角系数 
+                    grad = np.einsum('m, im->im', c, grad)
+                elif len(c.shape) == 1: # (NC, )
+                    grad = np.einsum('i, im->im', c, grad)
+                elif len(d.shape) == 2: # (NC, GD)
+                    grad = np.einsum('im, im->im', c, grad)
+                elif len(d.shape) == 3: # (NC, GD, GD)
+                    grad = np.einsum('imn, in->im', c, grad)
+
+        cellmeasure = mesh.entity_measure('cell')
+        ch = cellmeasure**(1.0/GD)
 
         facemeasure = mesh.entity_measure('face')
-        cellmeasure = mesh.entity_measure('cell')
-        ch = measure**(1.0/GD)
-        fh = measure**(1.0/(GD-1))
+        fh = facemeasure**(1.0/(GD-1))
 
         face2cell = mesh.ds.face_to_cell()
         eta = np.zeros(NC, dtype=self.ftype)
         n = mesh.face_normal()
 
-        J = fh*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+        J = 0.5*fh*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
         np.add.at(eta, face2cell[:, 0], J)
         np.add.at(eta, face2cell[:, 1], J)
 
         if f is not None:
-            eta += np.integralalg.
+            eta += cellmeasure**2*self.integralalg.cell_integral(f, power=2) # \int f**2 dx
 
-        return np.sqrt(J*measure)
+        return np.sqrt(eta)
 
     def grad_recovery(self, uh, method='simple'):
         """
@@ -206,7 +207,7 @@ class LagrangeFiniteElementSpace():
             measure = self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
-            guh = np.einsum('ij..., i->ij...',guh,measure)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
@@ -218,7 +219,7 @@ class LagrangeFiniteElementSpace():
             v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
             d = np.sqrt(np.sum(v**2, axis=-1))
             deg = np.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
-            guh = np.einsum('ij..., ij->ij...',guh,d)
+            guh = np.einsum('ij..., ij->ij...', guh, d)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
@@ -228,7 +229,7 @@ class LagrangeFiniteElementSpace():
             measure = 1/self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
-            guh = np.einsum('ij..., i->ij...',guh,measure)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
