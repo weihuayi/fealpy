@@ -101,8 +101,8 @@ class RaviartThomasFiniteElementSpace2dTest:
         F1 = space.source_vector(pde.source)
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
-        if False:
-            F0 = space.set_neumann_bc(pde.dirichlet)
+        if True:
+            F0 = -space.set_neumann_bc(pde.dirichlet)
             FF = np.r_['0', F0, F1]
             x = spsolve(AA, FF).reshape(-1)
             uh[:] = x[:udof]
@@ -115,7 +115,7 @@ class RaviartThomasFiniteElementSpace2dTest:
             error1 = space.integralalg.integral(f)
             print(error0, error1)
         else:
-            isBdDof = space.set_dirichlet_bc(uh, pde.neumann)
+            isBdDof = -space.set_dirichlet_bc(uh, pde.neumann)
             x = np.r_['0', uh, ph] 
             isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool_)]
             
