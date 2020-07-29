@@ -212,7 +212,7 @@ class LShapeRSinData:
         idxMap[isValidNode] = range(isValidNode.sum())
         cell = idxMap[cell]
         mesh = TetrahedronMesh(node, cell)
-        mesh.label()
+        mesh.label() # 标记最长边
 
         return mesh
 

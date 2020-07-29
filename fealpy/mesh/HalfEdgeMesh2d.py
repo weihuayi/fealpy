@@ -80,6 +80,14 @@ class HalfEdgeMesh2d(Mesh2d):
 
     @classmethod
     def from_mesh(cls, mesh, closed=False, NV=None):
+        """
+
+        Notes
+        -----
+        输入一个其它类型数据结构的网格，转化为半边数据结构。如果 closed 为真，则
+        表明输入网格是一个封闭的曲面网格；为假，则为开的网格，可以存在洞，或者无
+        界的外界区域
+        """
         mtype = mesh.meshtype
         if mtype not in {'halfedge', 'halfedge2d'}:
             NE = mesh.number_of_edges()

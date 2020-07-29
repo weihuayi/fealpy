@@ -838,6 +838,12 @@ class TriangleMeshWithInfinityNode:
         return isBdNode
 
     def to_polygonmesh(self):
+        """
+
+        Notes
+        -----
+        把一个三角形网格转化为多边形网格。
+        """
         isBdNode = self.is_boundary_node()
         NB = isBdNode.sum()
 

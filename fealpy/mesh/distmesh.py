@@ -73,8 +73,8 @@ class DistMesh2d():
         p = self.mesh.node
         d = fd(p, *args)
         idx = d > 0
-        depsx = np.array([self.deps,0])
-        depsy = np.array([0,self.deps])
+        depsx = np.array([self.deps, 0])
+        depsy = np.array([0, self.deps])
         dgradx = (fd(p[idx, :]+depsx, *args) - d[idx])/self.deps
         dgrady = (fd(p[idx, :]+depsy, *args) - d[idx])/self.deps
         p[idx, 0] = p[idx, 0] - d[idx]*dgradx

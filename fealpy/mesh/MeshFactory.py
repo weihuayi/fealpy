@@ -27,6 +27,26 @@ class MeshFactory():
     def __init__(self):
         pass
 
+    def delete_cells(self, node, cell, threshold):
+        """
+
+        Notes
+        -----
+        利用 threshhold 来删除一部分网格单元。threshold 以单元的重心为输入参数，
+        返回一个逻辑数组，需要删除的单元标记为真。
+        """
+        bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+        isDelCell = threshold(bc) 
+        cell = cell[~isDelCell]
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+
+        return node, cell
+
     def one_triangle_mesh(self, meshtype='iso'):
         if meshtype == 'equ':
             node = np.array([
@@ -81,20 +101,21 @@ class MeshFactory():
 
 
     @timer
-    def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri'):
+    def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri', threshold=None):
         """
 
         Notes
         -----
         生成二维矩形区域上的网格，包括结构的三角形、四边形和三角形对偶的多边形网
-        格
+        格. 
         """
         N = (nx+1)*(ny+1)
         NC = nx*ny
         node = np.zeros((N,2))
         X, Y = np.mgrid[box[0]:box[1]:complex(0,nx+1), box[2]:box[3]:complex(0,ny+1)]
-        node[:,0] = X.flatten()
-        node[:,1] = Y.flatten()
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        NN = len(node)
 
         idx = np.arange(N).reshape(nx+1, ny+1)
         if meshtype in {'tri', 'triangle'}:
@@ -105,6 +126,10 @@ class MeshFactory():
             cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
             cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
             cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+
+            if threshold is not None:
+                node, cell = self.delete_cell(node, cell, threshold)
+
             return TriangleMesh(node, cell)
         elif meshtype == 'quad':
             cell = np.zeros((NC,4), dtype=np.int)
@@ -112,6 +137,8 @@ class MeshFactory():
             cell[:,1] = idx[1:, 0:-1].flatten()
             cell[:,2] = idx[1:, 1:].flatten()
             cell[:,3] = idx[0:-1, 1:].flatten()
+            if threshold is not None:
+                node, cell = self.delete_cell(node, cell, threshold)
             return QuadrangleMesh(node, cell)
         elif meshtype in {'polygon', 'poly'}:
             cell = np.zeros((2*NC, 3), dtype=np.int)
@@ -121,13 +148,16 @@ class MeshFactory():
             cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
             cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
             cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+
+            if threshold is not None:
+                node, cell = self.delete_cell(node, cell, threshold)
+
             mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
     @timer
-    def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex',
-            ftype=np.float64, itype=np.int_):
+    def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
         """
         Notes
         -----
@@ -159,6 +189,8 @@ class MeshFactory():
         cell[:, 6] = cell[:, 5] + nz + 1
         cell[:, 7] = cell[:, 4] + nz + 1
         if meshtype == 'hex':
+            if threshold is not None:
+                node, cell = self.delete_cell(node, cell, threshold)
             return HexahedronMesh(node, cell)
         elif meshtype == 'tet':
             localCell = np.array([
@@ -169,6 +201,8 @@ class MeshFactory():
                 [0, 3, 7, 6],
                 [0, 2, 3, 6]], dtype=itype)
             cell = cell[:, localCell].reshape(-1, 4)
+            if threshold is not None:
+                node, cell = self.delete_cell(node, cell, threshold)
             return TetrahedronMesh(node, cell)
 
     def triangle(self, box, h, meshtype='tri'):
