@@ -47,10 +47,11 @@ class Function(np.ndarray):
     def add_plot(self, plot, cmap=None, threshold=None):
         import matplotlib.colors as colors
         import matplotlib.cm as cm
+        from mpl_toolkits.mplot3d import Axes3D
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            axes = fig.gca(projection='3d')
         else:
             axes = plot
 

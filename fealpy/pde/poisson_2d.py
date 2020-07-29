@@ -619,6 +619,7 @@ class LShapeRSinData:
         facets = [(0, 1), (1, 2), (2, 3), (3, 4), (4, 5), (5, 0)]
         return points, facets
 
+    @cartesian
     def solution(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -628,6 +629,7 @@ class LShapeRSinData:
         u = (x*x + y*y)**(1/3)*np.sin(2/3*theta)
         return u
 
+    @cartesian
     def source(self, p):
         """the right hand side of Possion equation
         INPUT:
@@ -636,6 +638,7 @@ class LShapeRSinData:
         rhs = np.zeros(p.shape[0:-1])
         return rhs
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -652,6 +655,7 @@ class LShapeRSinData:
         val[..., 1] = 2*(x*cos(2*theta/3) + y*sin(2*theta/3))/(3*r**(2/3))
         return val
 
+    @cartesian
     def dirichlet(self, p):
         """Dilichlet boundary condition
         """
