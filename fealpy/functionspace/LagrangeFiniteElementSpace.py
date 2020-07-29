@@ -132,7 +132,7 @@ class LagrangeFiniteElementSpace():
         TD = mesh.top_dimension()
         NC = mesh.number_of_cells()
 
-        # 计算重心处的梯度值
+        # 计算重心处的梯度值, p=1 时每个单元上的梯度是常向量
         bc = np.array([1/(TD+1)]*(TD+1), dtype=self.ftype)
         grad = self.grad_value(uh, bc)
 
@@ -166,12 +166,13 @@ class LagrangeFiniteElementSpace():
         fh = facemeasure**(1.0/(TD-1))
 
         face2cell = mesh.ds.face_to_cell()
-        n = mesh.face_normal() # 注意不是单位法向，它的长度为 face 的测度
-        J = fh*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+        n = mesh.face_unit_normal() # 单位法向
+        J = np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
         
         eta = np.zeros(NC, dtype=self.ftype)
         np.add.at(eta, face2cell[:, 0], J)
         np.add.at(eta, face2cell[:, 1], J)
+        eta *= cellmeasure
 
         if f is not None:
             # 计算  f**2 在每个单元上的积分

@@ -29,6 +29,7 @@ class CosCosCosData:
             [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
+        mesh.label() # 标记最长边
         return mesh
 
     @cartesian
@@ -126,6 +127,7 @@ class X2Y2Z2Data:
             [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
         mesh.uniform_refine(n)
+        mesh.label()
         return mesh
 
     @cartesian
@@ -210,9 +212,11 @@ class LShapeRSinData:
         idxMap[isValidNode] = range(isValidNode.sum())
         cell = idxMap[cell]
         mesh = TetrahedronMesh(node, cell)
+        mesh.label()
 
         return mesh
 
+    @cartesian
     def solution(self, p):
         """ the exact solution
         """
@@ -225,6 +229,7 @@ class LShapeRSinData:
         u = r**(2/3)*np.sin(2*theta/3)
         return u
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -249,10 +254,12 @@ class LShapeRSinData:
                 )
         return val
 
+    @cartesian
     def source(self, p):
         val = np.zeros(p.shape[:-1], dtype=p.dtype)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         """Dilichlet boundary condition
         """
