@@ -509,6 +509,12 @@ class FEMeshIntegralAlg():
         Notes
         -----
         给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2)
+
+        power 的取值可以是任意的 p。
+
+        TODO
+        ----
+        1. 考虑无穷范数的情形
         """
         mesh = self.mesh
         GD = mesh.geo_dimension()
@@ -525,9 +531,9 @@ class FEMeshIntegralAlg():
 
         if callable(v):
             if v.coordtype == 'cartesian':
-                v = u(ps)
+                v = v(ps)
             elif v.coordtype == 'barycentric':
-                v = u(bcs)
+                v = v(bcs)
 
         f = np.power(np.abs(u - v), power) 
 
@@ -547,11 +553,8 @@ class FEMeshIntegralAlg():
         if celltype == False:
             e = np.power(np.sum(e), 1/power)
         else:
-            n = len(e.shape)
-            if n > 1:
-                e = np.sum(e, axis=tuple(range(1, n) 
+            e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e
-
 
     # old api 
     def integral(self, u, celltype=False, barycenter=True):

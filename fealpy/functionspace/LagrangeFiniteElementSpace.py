@@ -129,12 +129,14 @@ class LagrangeFiniteElementSpace():
         """
         mesh = self.mesh
         GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
         NC = mesh.number_of_cells()
 
-        bc = np.array([1/(GD+1)]*(GD+1), dtype=self.ftype)
+        # 计算重心处的梯度值
+        bc = np.array([1/(TD+1)]*(TD+1), dtype=self.ftype)
         grad = self.grad_value(uh, bc)
 
-        if callable(c):
+        if callable(c): # 考虑存在扩散系数的情形
             if c.coordtype == 'barycentric':
                 c = c(bc)
             elif c.coordtype == 'cartesian':
@@ -148,7 +150,7 @@ class LagrangeFiniteElementSpace():
             elif isinstance(c, np.ndarray):
                 if c.shape == (GD, GD):
                     grad = np.einsum('mn, in->im', c, grad)
-                elif c.shape == (GD, ): # 对角系数 
+                elif c.shape == (GD, ): # 系数为常数的对角阵
                     grad = np.einsum('m, im->im', c, grad)
                 elif len(c.shape) == 1: # (NC, )
                     grad = np.einsum('i, im->im', c, grad)
@@ -158,21 +160,22 @@ class LagrangeFiniteElementSpace():
                     grad = np.einsum('imn, in->im', c, grad)
 
         cellmeasure = mesh.entity_measure('cell')
-        ch = cellmeasure**(1.0/GD)
+        ch = cellmeasure**(1.0/TD)
 
         facemeasure = mesh.entity_measure('face')
-        fh = facemeasure**(1.0/(GD-1))
+        fh = facemeasure**(1.0/(TD-1))
 
         face2cell = mesh.ds.face_to_cell()
+        n = mesh.face_normal() # 注意不是单位法向，它的长度为 face 的测度
+        J = fh*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+        
         eta = np.zeros(NC, dtype=self.ftype)
-        n = mesh.face_normal()
-
-        J = 0.5*fh*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
         np.add.at(eta, face2cell[:, 0], J)
         np.add.at(eta, face2cell[:, 1], J)
 
         if f is not None:
-            eta += cellmeasure**2*self.integralalg.cell_integral(f, power=2) # \int f**2 dx
+            # 计算  f**2 在每个单元上的积分
+            eta += cellmeasure*self.integralalg.cell_integral(f, power=2) # \int_\tau f**2 dx
 
         return np.sqrt(eta)
 

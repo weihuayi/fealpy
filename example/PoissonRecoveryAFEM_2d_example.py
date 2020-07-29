@@ -19,23 +19,24 @@ pde = LShapeRSinData()
 mesh = pde.init_mesh(n=4, meshtype='tri')
 
 theta = 0.2
-maxit = 30
+maxit = 40
 p = 1
 errorType = ['$|| u - u_h||_{0}$',
              '$||\\nabla u - \\nabla u_h||_{0}$',
-             '$\eta$']
+             '$||\\nabla u - G(\\nabla u_h)||_{0}$',
+             '$||\\nabla u_h - G(\\nabla u_h)||_{0}$']
 
 NDof = np.zeros((maxit,), dtype=np.int_)
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
 
 mesh.add_plot(plt)
-plt.savefig('/home/why/test-0.png')
+plt.savefig('./test-0.png')
 plt.close()
 
 for i in range(maxit):
     print('step:', i)
     space = LagrangeFiniteElementSpace(mesh, p=p)
-    A = space.stiff_matrix()
+    A = space.stiff_matrix(q=1)
     F = space.source_vector(pde.source)
 
     NDof[i] = space.number_of_global_dofs()
@@ -45,20 +46,24 @@ for i in range(maxit):
     A, F = bc.apply(A, F, uh)
     uh[:] = spsolve(A, F)
 
-    errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
-    errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value) 
-    eta = space.residual_estimate(uh, f=pde.source)
-    errorMatrix[2, i] = np.sqrt(np.sum(eta**2))
+    rguh = space.grad_recovery(uh)
+
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)  
+    errorMatrix[2, i] = space.integralalg.error(pde.gradient, rguh.value) 
+    eta = space.integralalg.error(rguh.value, uh.grad_value, power=2,
+            celltype=True) # 计算单元上的恢复型误差
+    errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
 
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
         mesh.bisect(isMarkedCell)
         mesh.add_plot(plt)
-        plt.savefig('/home/why/test-' + str(i+1) + '.png')
+        plt.savefig('./test-' + str(i+1) + '.png')
         plt.close()
 
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-showmultirate(plt, maxit - 15, NDof, errorMatrix, errorType)
+showmultirate(plt, maxit - 5, NDof, errorMatrix, errorType)
 plt.show()

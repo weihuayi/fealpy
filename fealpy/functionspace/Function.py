@@ -65,7 +65,7 @@ class Function(np.ndarray):
                     ipoints[:, 0], ipoints[:, 1],
                     self, cmap=cmap, lw=0.0)
             return axes
-        elif mesh.meshtype == 'tet':#TODO: make it work!
+        elif mesh.meshtype == 'tet': #TODO: make it work!
             space = self.space
             face = mesh.boundary_face(threshold=threshold) 
             node = mesh.entity('node')
