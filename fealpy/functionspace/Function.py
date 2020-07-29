@@ -53,7 +53,7 @@ class Function(np.ndarray):
             fig.set_facecolor('white')
             axes = fig.gca(projection='3d')
         else:
-            axes = Axes3D(plot)
+            axes = plot
 
         mesh = self.space.mesh
         if mesh.meshtype == 'tri':
