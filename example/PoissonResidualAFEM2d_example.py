@@ -19,7 +19,7 @@ pde = LShapeRSinData()
 mesh = pde.init_mesh(n=4, meshtype='tri')
 
 theta = 0.2
-maxit = 30
+maxit = 40 
 p = 1
 errorType = ['$|| u - u_h||_{0}$',
              '$||\\nabla u - \\nabla u_h||_{0}$',

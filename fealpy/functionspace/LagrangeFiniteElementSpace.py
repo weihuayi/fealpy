@@ -82,14 +82,13 @@ class LagrangeFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self, index=None):
-        index = index if index is not None else np.s_[:]
+    def cell_to_dof(self, index=np.s_[:]):
         return self.dof.cell2dof[index]
 
-    def face_to_dof(self, index=None):
+    def face_to_dof(self, index=np.s_[:]):
         return self.dof.face_to_dof()
 
-    def edge_to_dof(self, index=None):
+    def edge_to_dof(self, index=np.s_[:]):
         return self.dof.edge_to_dof()
 
     def boundary_dof(self, threshold=None):
@@ -161,18 +160,17 @@ class LagrangeFiniteElementSpace():
 
         cellmeasure = mesh.entity_measure('cell')
         ch = cellmeasure**(1.0/TD)
-
         facemeasure = mesh.entity_measure('face')
-        fh = facemeasure**(1.0/(TD-1))
 
         face2cell = mesh.ds.face_to_cell()
         n = mesh.face_unit_normal() # 单位法向
-        J = np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+        J = facemeasure*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
         
         eta = np.zeros(NC, dtype=self.ftype)
         np.add.at(eta, face2cell[:, 0], J)
         np.add.at(eta, face2cell[:, 1], J)
-        eta *= cellmeasure
+        eta *= ch 
+        eta *= 0.25 # 2D: 1/8, 3D:   
 
         if f is not None:
             # 计算  f**2 在每个单元上的积分
