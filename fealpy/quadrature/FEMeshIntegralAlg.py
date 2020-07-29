@@ -502,6 +502,58 @@ class FEMeshIntegralAlg():
                 e = np.einsum(s1, ws, f, self.cellmeasure)
         return e
 
+
+    def error(self, u, v, power=2, celltype=False, q=None):
+        """
+
+        Notes
+        -----
+        给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2)
+        """
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, 'cell')
+
+        if callable(u):
+            if u.coordtype == 'cartesian':
+                u = u(ps)
+            elif u.coordtype == 'barycentric':
+                u = u(bcs)
+
+        if callable(v):
+            if v.coordtype == 'cartesian':
+                v = u(ps)
+            elif v.coordtype == 'barycentric':
+                v = u(bcs)
+
+        f = np.power(np.abs(u - v), power) 
+
+        dim = len(ws.shape) # dim > 1, 表示是张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.cellmeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.cellmeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.cellmeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.cellmeasure)
+
+        if celltype == False:
+            e = np.power(np.sum(e), 1/power)
+        else:
+            n = len(e.shape)
+            if n > 1:
+                e = np.sum(e, axis=tuple(range(1, n) 
+        return e
+
+
+    # old api 
     def integral(self, u, celltype=False, barycenter=True):
         """
         """
@@ -521,6 +573,7 @@ class FEMeshIntegralAlg():
             return e
         else:
             return e.sum()
+
 
     def L2_norm(self, uh, celltype=False):
         def f(x):
