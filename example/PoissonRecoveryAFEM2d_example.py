@@ -51,8 +51,7 @@ for i in range(maxit):
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)  
     errorMatrix[2, i] = space.integralalg.error(pde.gradient, rguh.value) 
-    eta = space.integralalg.error(rguh.value, uh.grad_value, power=2,
-            celltype=True) # 计算单元上的恢复型误差
+    eta = space.recovery_estimate(uh)
     errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
 
     if i < maxit - 1:

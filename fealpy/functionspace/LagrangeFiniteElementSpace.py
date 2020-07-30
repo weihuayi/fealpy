@@ -62,7 +62,7 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        q = q if q is not None else p+1 
+        q = q if q is not None else p+3 
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
@@ -177,6 +177,14 @@ class LagrangeFiniteElementSpace():
             eta += cellmeasure*self.integralalg.cell_integral(f, power=2) # \int_\tau f**2 dx
 
         return np.sqrt(eta)
+
+    def recovery_estimate(self, uh, method='simple'):
+        """
+        """
+        rguh = self.grad_recovery(uh, method='simple')
+        eta = self.integralalg.error(rguh.value, uh.grad_value, power=2,
+                celltype=True) # 计算单元上的恢复型误差
+        return eta
 
     def grad_recovery(self, uh, method='simple'):
         """
@@ -734,7 +742,7 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, b1=b1, c=c, q=q)
         return A 
 
-    def source_vector(self, f, dim=None):
+    def source_vector(self, f, dim=None, q=None):
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()

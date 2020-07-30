@@ -27,7 +27,7 @@ class MeshFactory():
     def __init__(self):
         pass
 
-    def delete_cells(self, node, cell, threshold):
+    def delete_cell(self, node, cell, threshold):
         """
 
         Notes
@@ -35,6 +35,7 @@ class MeshFactory():
         利用 threshhold 来删除一部分网格单元。threshold 以单元的重心为输入参数，
         返回一个逻辑数组，需要删除的单元标记为真。
         """
+        NN = len(node)
         bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
         isDelCell = threshold(bc) 
         cell = cell[~isDelCell]
