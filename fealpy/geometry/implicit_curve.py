@@ -37,6 +37,7 @@ class PolygonCurve():
         w = np.array([(0,-1),(1,0)])
         n = v@w
 
+        # 计算符号距离
         # (NP, 2) - (NE, 2)->(NP, NE, 2), (NE, 2) -> (NP, NE)  
         d = np.sum((p[..., None, :] - node[edge[:, 0]])*n, axis=-1)
 

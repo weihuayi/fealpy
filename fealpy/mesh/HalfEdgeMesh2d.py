@@ -486,12 +486,6 @@ class HalfEdgeMesh2d(Mesh2d):
             a /=2
             c /=3*a.reshape(-1, 1)
             return c
-    def cell_center(self):
-        cell, cellLocation = self.entity('cell')
-        node = self.entity('node')
-        NC = self.ds.NC
-        bc = np.zeros([NC, 2], dtype=np.float_)
-        bc
 
     def bc_to_point(self, bc, etype='cell', index=None):
         """
