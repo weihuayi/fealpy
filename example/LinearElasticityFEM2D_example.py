@@ -63,7 +63,7 @@ class BoxDomain2DData():
 
     @cartesian
     def neumann(self, p, n):
-        val = np.array([500, 0.0], dtype=np.float64)
+        val = np.array([-500, 0.0], dtype=np.float64)
         shape = len(p.shape[:-1])*(1, ) + (2, )
         return val.reshape(shape)
 
@@ -100,15 +100,18 @@ space = LagrangeFiniteElementSpace(mesh, p=p)
 bc0 = DirichletBC(space, pde.dirichlet, threshold=pde.is_dirichlet_boundary) 
 bc1 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
 
-uh = space.function(dim=2)
-A = space.linear_elasticity_matrix(pde.mu, pde.lam)
-F = space.source_vector(pde.source, dim=2)
-bc1.apply(F)
+uh = space.function(dim=2) # (gdof, 2) and vector fem function uh[i, j] 
+A = space.linear_elasticity_matrix(pde.mu, pde.lam) # (2*gdof, 2*gdof)
+F = space.source_vector(pde.source, dim=2) 
+F = bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
-uh.T.flat[:] = spsolve(A, F)
+uh.T.flat[:] = spsolve(A, F) # (2, gdof ).flat
 
+# 原始的网格
 mesh.add_plot(plt)
 
+# 变形的网格
 mesh.node += scale*uh
 mesh.add_plot(plt)
+
 plt.show()

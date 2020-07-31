@@ -590,9 +590,9 @@ class LagrangeFiniteElementSpace():
 
         qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.grad_basis(bcs)
+        grad = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
 
-        cell2dof = self.cell_to_dof()
+        cell2dof = self.cell_to_dof() # (NC, ldof)
         ldof = self.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         shape = (NC, ldof, ldof)

@@ -17,9 +17,6 @@ p = int(sys.argv[2])
 scale = float(sys.argv[3])
 
 pde = BoxDomainData3d() 
-
-mu = pde.mu
-lam = pde.lam
 mesh = pde.init_mesh(n=n)
 
 space = LagrangeFiniteElementSpace(mesh, p=p)
