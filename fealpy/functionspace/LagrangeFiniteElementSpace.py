@@ -574,7 +574,7 @@ class LagrangeFiniteElementSpace():
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
-    def linear_elasticity_matrix(self, mu, lam, format='csr'):
+    def linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
         """
         construct the linear elasticity fem matrix
         """
@@ -588,7 +588,7 @@ class LagrangeFiniteElementSpace():
             imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
         A = []
 
-        qf = self.integrator
+        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         grad = self.grad_basis(bcs)
 
@@ -628,7 +628,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr'):
+    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
         """
         construct the recovery linear elasticity fem matrix
         """
@@ -639,7 +639,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         GD = self.GD
 
-        qf = self.integrator
+        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         grad = self.grad_basis(bcs)
 

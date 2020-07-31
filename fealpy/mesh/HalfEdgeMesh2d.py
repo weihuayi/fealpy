@@ -22,7 +22,8 @@ from ..common import DynamicArray
 
 
 class HalfEdgeMesh2d(Mesh2d):
-    def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None):
+    def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None,
+            initlevel=False):
         """
 
         Parameters
@@ -75,7 +76,9 @@ class HalfEdgeMesh2d(Mesh2d):
         # 2: 区域内部的点
         if nodedof is not None:
             self.nodedata['dof'] = nodedof
-        self.init_level_info()
+
+        if initlevel:
+            self.init_level_info()
 
 
     @classmethod
@@ -129,7 +132,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 subdomain[0] = 0
 
             mesh =  cls(node, halfedge, subdomain, NV=NV)
-            mesh.convexity()
+            #mesh.convexity()
             return mesh
         else:
             newMesh =  cls(mesh.node.copy(), mesh.ds.subdomain.copy(), mesh.ds.halfedge.copy())
@@ -193,11 +196,26 @@ class HalfEdgeMesh2d(Mesh2d):
     def init_level_info(self):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
-
         NC = self.number_of_all_cells() # 实际单元个数
+
         self.halfedgedata['level'] = DynamicArray((2*NE, ), val=0,dtype=np.int_)
         self.celldata['level'] = DynamicArray((NC, ), val=0, dtype=np.int_) 
         self.nodedata['level'] = DynamicArray((NN, ), val=0, dtype=np.int_)
+
+        
+        # 如果单元的角度大于 170 度， 设对应的半边层数为 1
+        node = self.node
+        halfedge = self.ds.halfedge
+        v0 = node[halfedge[halfedge[:, 2], 0]] - node[halfedge[:, 0]]
+        v1 = node[halfedge[halfedge[:, 4], 0]] - node[halfedge[:, 0]]
+        angle = 180*np.arccos(
+                np.sum(
+                    v0*v1, axis=1
+                )/np.sqrt(
+                    np.sum(v0**2, axis=1)*np.sum(v1**2, axis=1)))/np.pi
+        self.halfedgedata['level'][
+                (angle > 170) & (halfedge[:, 1] >= self.ds.cellstart)
+                ] = 1 
 
     def convexity(self):#
         def angle(x, y):
