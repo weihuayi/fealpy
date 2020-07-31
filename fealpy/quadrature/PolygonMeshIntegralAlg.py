@@ -102,20 +102,34 @@ class PolygonMeshIntegralAlg():
             return f(x)
         return self.integral(u, celltype=celltype, q=q)
 
-    def error(self, efun, celltype=False, power=None, q=None):
+    def error(self, u, v, celltype=False, power=2, q=None):
+        """
+
+        Notes
+        -----
+        给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2)
+
+        power 的取值可以是任意的 p。
+
+        TODO
+        ----
+        1. 考虑无穷范数的情形
+        """
+        def efun(x, index):
+            return np.abs(u(x) - v(x, index))**power
+
         e = self.integral(efun, celltype=celltype, q=q)
         if isinstance(e, np.ndarray):
             n = len(e.shape) - 1
             if n > 0:
                 for i in range(n):
                     e = e.sum(axis=-1)
-        if celltype is False:
-            e = e.sum()
 
-        if power is not None:
-            return power(e)
+        if celltype == False:
+            e = np.power(np.sum(e), 1/power)
         else:
-            return e
+            e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e
 
     def L1_error(self, u, uh, celltype=False, q=None):
         def f(x, index):

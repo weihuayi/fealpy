@@ -485,7 +485,7 @@ class ScaledMonomialSpace3d():
         phi = ['$'+x+'$' for x in map(sp.latex, phi)]
         bc = index/p
 
-        mesh0 = mfactory.one_tetrahedron_mesh(ttype='equ') # 正四面体
+        mesh0 = mfactory.one_tetrahedron_mesh(meshtype='equ') # 正四面体
         node0 = mesh0.entity('node')
 
         # plot
