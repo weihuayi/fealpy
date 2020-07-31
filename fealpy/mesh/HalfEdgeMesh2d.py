@@ -224,41 +224,37 @@ class HalfEdgeMesh2d(Mesh2d):
 
             end = halfedge[:, 0]
             start = halfedge[halfedge[:, 4], 0]
-            vector = node[end] - node[start]
-            vectornex = vector[halfedge[:, 2]]
+            vector = node[end] - node[start]#所有边的方向
+            vectornex = vector[halfedge[:, 2]]#所有边的下一个边的方向
 
-            angle0 = angle(vectornex, -vector)
-            badHEdge, = np.where(angle0 > np.pi*17/18)
-            badCell, idx= np.unique(halfedge[badHEdge, 1], return_index=True)
-            badHEdge = badHEdge[idx]
+            angle0 = angle(vectornex, -vector)#所有边的反方向与下一个边的角度
+            badHEdge, = np.where(angle0 > np.pi*17/18)#夹角大于170度的半边
+            badCell, idx= np.unique(halfedge[badHEdge, 1], return_index=True)#每个单元每次只处理中的一个
+            badHEdge = badHEdge[idx]#现在坏半边的单元都不同
             badHEdge = badHEdge[halfedge[badHEdge, 1]>cstart-1]
             badNode = halfedge[badHEdge, 0]
             NE1 = len(badHEdge)
 
-            vectorBad = vector[badHEdge]
-            vectorBadnex = vector[halfedge[badHEdge, 2]]
             nex = halfedge[badHEdge, 2]
             pre = halfedge[badHEdge, 3]
+            vectorBad = vector[badHEdge]#坏半边的方向
+            vectorBadnex = vector[nex]#坏半边的下一个半边的方向
 
-            anglecur = np.zeros(NE1)
-            anglenex = angle(vectorBadnex, -vectorBad)
-            anglepre = -1
-            goodHEdge = badHEdge.copy()
-            isNotOK = np.ones(NE1, dtype = np.bool_)
-            l1 = 8
+            anglenex = angle(vectorBadnex, -vectorBad)#坏边的夹角
+            anglecur = anglenex/2#当前方向与角平分线的夹角
+            angle_err_min = anglenex/2#与角平分线夹角的最小值
+            goodHEdge = np.zeros(NE1, dtype=np.int_)#最小夹角的边
+            isNotOK = np.ones(NE1, dtype = np.bool_)#每个单元的循环情况
+            nex = halfedge[nex, 2]#从下下一个边开始
             while isNotOK.any():
-                tmp = nex.copy()
-                nex = halfedge[nex, 2]
                 vectornex = node[halfedge[nex, 0]] - node[badNode]
                 anglecur[isNotOK] = angle(vectorBadnex[isNotOK], vectornex[isNotOK])
-                l0 = abs(anglecur - anglenex/2)
-                flag = ((l0>l1)|(nex==pre)) & isNotOK 
-                goodHEdge[flag] = tmp[flag]
-                isNotOK[flag] = False
-                l1=l0.copy()
-                anglepre = anglecur.copy()
+                angle_err = abs(anglecur - anglenex/2)
+                goodHEdge[angle_err<angle_err_min] = nex[angle_err<angle_err_min]#与角平分线夹角小于做小夹角的边做goodHEdge.
+                angle_err_min[angle_err<angle_err_min] = angle_err[angle_err<angle_err_min]#更新最小角
+                nex = halfedge[nex, 2]
+                isNotOK[nex==pre] = False#循环到坏边的上上一个边结束
             halfedgeNew = halfedge.increase_size(NE1*2)
-
             halfedgeNew[:NE1, 0] = halfedge[goodHEdge, 0].copy()
             halfedgeNew[:NE1, 1] = halfedge[badHEdge, 1].copy()
             halfedgeNew[:NE1, 2] = halfedge[goodHEdge, 2].copy()
