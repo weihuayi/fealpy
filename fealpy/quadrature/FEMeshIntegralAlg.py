@@ -208,6 +208,57 @@ class FEMeshIntegralAlg():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
         return M
 
+    def serial_construct_vector(self, f, b, q=None):
+        """
+
+        Notes
+        -----
+        组装向量， 这里要考虑 f 是标量还是向量函数， 也要考虑基函数是向量还是标
+        量函数
+        """
+        basis = b[0]
+        cell2dof = b[1]
+        gdof = b[2]
+
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
+
+        if basis.coordtype == 'barycentric':
+            phi = basis(bcs)
+        elif basis.coordtype == 'cartesian':
+            phi = basis(ps)
+
+        if callable(f):
+            if f.coordtype == 'barycentric':
+                val = f(bcs)
+            elif f.coordtype == 'cartesian':
+                val = f(ps)
+        else:
+            #TODO: f 可以是多种形式的, 函数, 数组 
+            val = f
+
+        if (len(val.shape) == 2) and (len(phi.shape) == 3):
+            # f 是标量函数，基是标量函数
+            bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
+            shape = (gdof, )
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, cell2dof, bb)
+        elif (len(val.shape) == 3) and (len(phi.shape) == 3): 
+            # f 是向量函数， 基是标量函数
+            bb = np.einsum('i, ijn, ijk, j->jkn', ws, val, phi, self.cellmeasure)
+            shape = (gdof, val.shape[2])
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, (cell2dof, np.s_[:]), bb)
+        elif (len(val.shape) == 3) and (len(phi.shape) == 4): 
+            # f 是向量函数， 基是向量函数
+            bb = np.einsum('i, ijn, ijkn, j->jk', ws, val, phi, self.cellmeasure)
+            shape = (gdof, )
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, cell2dof, bb)
+        return b
+
 
     @timer
     def construct_matrix(self, basis0, 
@@ -290,6 +341,7 @@ class FEMeshIntegralAlg():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
         return M
+
 
     def construct_vector_s_s(self, f, basis, cell2dof, gdof=None, q=None):
         """
