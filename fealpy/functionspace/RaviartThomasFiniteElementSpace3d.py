@@ -535,6 +535,85 @@ class RaviartThomasFiniteElementSpace3d:
         isDDof[face2dof[index]] = True
         return isDDof
 
+    def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):
+        """
+
+        Parameters
+        ----------
+        t: current time level
+        ch: current concentration
+        vh: current flow field
+        g: boundary condition, g(x, t) = ch*vh \\cdot n 
+
+        Notes
+        -----
+        (ch*vh, \\nabla p_h)_K - (ch*vh \\cdot n, p_h)_{\\partial K}
+
+        注意单元内部浓度的变化要考虑从单元边界是流入， 还是流出， 流入导致单
+        元内部物质浓度增加，流出导致物质浓度减少。
+
+        Riemann Solvers
+        Toro E. Riemann Solvers and Numerical Methods for Fluid dynamics. Springer: Berlin, 1997.
+        """
+
+        mesh = self.mesh
+        face2cell = mesh.ds.face_to_cell()
+        isBdFace = face2cell[:, 0] == face2cell[:, 1]
+
+        qf = self.integralalg.cellintegrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        measure = self.integralalg.cellmeasure
+        ps = mesh.bc_to_point(bcs)
+        val = vh(bcs) # TODO：考虑加入笛卡尔坐标的情形
+        val *= ch(ps)[..., None]
+        gphi = ch.space.grad_basis(ps) 
+
+        F = np.einsum('i, ijm, ijkm, j->jk', ws, val, gphi, measure)
+
+        # 边界积分
+        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        # 面的定向法线，它是左边单元的外法线， 右边单元内法线。
+        fn = mesh.face_unit_normal() 
+        measure = self.integralalg.facemeasure # 边界长度
+        val0 = np.einsum('ijm, jm->ij', vh.face_value(bcs), fn) # 速度和法线的内积
+
+        ps = mesh.bc_to_point(bcs, etype='face')
+        val1 = ch(ps, index=face2cell[:, 0]) # 面的左边单元在这条边上的浓度值
+        val2 = ch(ps, index=face2cell[:, 1]) # 面的右边单元在这条边上的浓度值 
+
+        # 边界条件处理
+        val2[:, isBdFace] = 0.0 # 首先把边界的贡献都设为 0 
+
+        if g is not None:
+            if type(threshold) is np.ndarray: # 下面考虑非零边界的贡献
+                index = threshold # 这里假设 threshold 是边界边编号数组
+            else:
+                index = self.mesh.ds.boundary_face_index()
+                if threshold is not None:
+                    bc = self.mesh.entity_barycenter('face', index=index)
+                    flag = threshold(bc)
+                    index = index[flag]
+            val2[:, index] = g(ps[:, index]) # 这里假设 g 是一个函数， TODO：其它情形？
+
+        flag = val0 >= 0.0 # 对于左边单元来说，是流出项
+                           # 对于右边单元来说，是流入项
+        val = np.zeros_like(val0)  
+        val[flag] = val0[flag]*val1[flag] 
+        val[~flag] = val0[~flag]*val2[~flag]
+
+        phi = ch.space.basis(ps, index=face2cell[:, 0])
+        b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
+        np.subtract.at(F, (face2cell[:, 0], np.s_[:]), b)  
+
+        phi = ch.space.basis(ps, index=face2cell[:, 1])
+        b = np.einsum('i, ij, ijk, j->jk', ws, val, phi, measure)
+        isInFace = (face2cell[:, 0] != face2cell[:, 1]) # 只处理内部面
+        np.add.at(F, (face2cell[isInFace, 1], np.s_[:]), b[isInFace])  
+
+        return F
+
     def cell_to_dof(self):
         return self.dof.cell_to_dof()
 

@@ -133,7 +133,7 @@ class MeshFactory():
 
             return TriangleMesh(node, cell)
         elif meshtype == 'quad':
-            cell = np.zeros((NC,4), dtype=np.int)
+            cell = np.zeros((NC,4), dtype=np.int_)
             cell[:,0] = idx[0:-1, 0:-1].flatten()
             cell[:,1] = idx[1:, 0:-1].flatten()
             cell[:,2] = idx[1:, 1:].flatten()
@@ -142,7 +142,7 @@ class MeshFactory():
                 node, cell = self.delete_cell(node, cell, threshold)
             return QuadrangleMesh(node, cell)
         elif meshtype in {'polygon', 'poly'}:
-            cell = np.zeros((2*NC, 3), dtype=np.int)
+            cell = np.zeros((2*NC, 3), dtype=np.int_)
             cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
             cell[:NC, 1] = idx[1:,1:].flatten(order='F')
             cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
@@ -166,7 +166,7 @@ class MeshFactory():
         """
         N = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        node = np.zeros((N, 3), dtype=ftype)
+        node = np.zeros((N, 3), dtype=np.float64)
         X, Y, Z = np.mgrid[
                 box[0]:box[1]:complex(0, nx+1), 
                 box[2]:box[3]:complex(0, ny+1),
@@ -179,7 +179,7 @@ class MeshFactory():
         idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
-        cell = np.zeros((NC, 8), dtype=itype)
+        cell = np.zeros((NC, 8), dtype=np.int_)
         nyz = (ny + 1)*(nz + 1)
         cell[:, 0] = c.flatten()
         cell[:, 1] = cell[:, 0] + nyz
@@ -200,7 +200,7 @@ class MeshFactory():
                 [0, 4, 5, 6],
                 [0, 7, 4, 6],
                 [0, 3, 7, 6],
-                [0, 2, 3, 6]], dtype=itype)
+                [0, 2, 3, 6]], dtype=np.int_)
             cell = cell[:, localCell].reshape(-1, 4)
             if threshold is not None:
                 node, cell = self.delete_cell(node, cell, threshold)
