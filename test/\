@@ -339,7 +339,7 @@ class HalfEdgeMesh2dTest:
             writer = MeshWriter(mesh, etype='edge', index=index)
             writer.write(fname='test'+str(i)+'.vtu')
 
-    def refine_quad(self, l, plot=True):
+    def refine_quad(self, plot=True):
         cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         mesh = QuadrangleMesh(node, cell)
@@ -354,11 +354,11 @@ class HalfEdgeMesh2dTest:
             gre = color == 0
             color[halfedge[red][:, [2,3,4]]] = 0
             color[halfedge[gre][:, [2,3,4]]] = 1
-        colorlevel = ((color==1) | (color==2)).astype(np.int_)
-        mesh.hedgecolor = {'color':color, 'level':colorlevel}
+        mesh.hedgecolor = color
         c = np.array([0.8,0.8])
         r = 0.9
         h = 1e-2
+        l=10
         k=0
         NB = 0
         while k<l:
@@ -381,14 +381,12 @@ class HalfEdgeMesh2dTest:
             mesh.refine_quad(markedcell1.astype(np.bool_))
             k+=1
             print('循环',k,'次***************************')
-        print(np.c_[np.arange(mesh.ds.NE*2), mesh.hedgecolor['color'],
-            mesh.hedgecolor['level']])
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             nindex = mesh.nodedata['level']
             mesh.add_plot(axes)
-            mesh.add_halfedge_plot(axes, showindex=True)
+            #mesh.add_halfedge_plot(axes, showindex=True)
             #mesh.find_node(axes, showindex=True, multiindex=nindex)
             plt.show()
 
@@ -407,21 +405,12 @@ class HalfEdgeMesh2dTest:
             gre = color == 0
             color[halfedge[red][:, [2,3,4]]] = 0
             color[halfedge[gre][:, [2,3,4]]] = 1
-        colorlevel = ((color==1) | (color==2)).astype(np.int_)
-        mesh.hedgecolor = {'color':color, 'level':colorlevel}
+        mesh.hedgecolor = color
 
-        for i in range(2):
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.ones(NC, dtype=np.bool_)
-            mesh.refine_quad(isMarkedCell)
-        NC = mesh.number_of_all_cells()
-        isMarkedCell = np.zeros(NC, dtype=np.bool_)
-        isMarkedCell[[1, 3, 12,18, 20, 17, 16, 9, 7, 2, 4,6, 7, 8, 9 , 27, 15,
-            8, 23, 32, 5, 24, 16, 29, 4, 7, 28, 11, 14, 22, 31, 19]] = True
-        mesh.coarsen_quad(isMarkedCell)
-        print(np.c_[np.arange(mesh.ds.NE*2), mesh.hedgecolor['color'],
-            mesh.hedgecolor['level']])
-        print(np.c_[np.arange(mesh.ds.NE*2), mesh.halfedgedata['level']])
+        isMarkedCell = np.array([1, 1, 1], dtype=np.bool_)
+        mesh.refine_quad(isMarkedCell)
+
+        isMarkedCell = np.array([1,1,1,1,1,1,1,1,1], dtype = np.bool_)
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -571,7 +560,7 @@ elif sys.argv[1] == 'read':
     fname = sys.argv[2]
     test.tri_cut_graph(fname, weight = 'length')
 elif sys.argv[1] == 'refine_quad':
-    test.refine_quad(int(sys.argv[2]))
+    test.refine_quad()
 elif sys.argv[1] == 'refine_tri':
     test.refine_tri(maxit = int(sys.argv[3]), method = sys.argv[2])
 elif sys.argv[1] == "interpolation":
