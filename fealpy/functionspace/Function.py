@@ -47,10 +47,11 @@ class Function(np.ndarray):
     def add_plot(self, plot, cmap=None, threshold=None):
         import matplotlib.colors as colors
         import matplotlib.cm as cm
+        from mpl_toolkits.mplot3d import Axes3D
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            axes = fig.gca(projection='3d')
         else:
             axes = plot
 
@@ -64,7 +65,7 @@ class Function(np.ndarray):
                     ipoints[:, 0], ipoints[:, 1],
                     self, cmap=cmap, lw=0.0)
             return axes
-        elif mesh.meshtype == 'tet':#TODO: make it work!
+        elif mesh.meshtype == 'tet': #TODO: make it work!
             space = self.space
             face = mesh.boundary_face(threshold=threshold) 
             node = mesh.entity('node')

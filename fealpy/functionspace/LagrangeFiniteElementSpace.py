@@ -62,7 +62,7 @@ class LagrangeFiniteElementSpace():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-        q = q if q is not None else p+1 
+        q = q if q is not None else p+3 
         self.integralalg = FEMeshIntegralAlg(
                 self.mesh, q,
                 cellmeasure=self.cellmeasure)
@@ -82,14 +82,13 @@ class LagrangeFiniteElementSpace():
     def interpolation_points(self):
         return self.dof.interpolation_points()
 
-    def cell_to_dof(self, index=None):
-        index = index if index is not None else np.s_[:]
+    def cell_to_dof(self, index=np.s_[:]):
         return self.dof.cell2dof[index]
 
-    def face_to_dof(self, index=None):
+    def face_to_dof(self, index=np.s_[:]):
         return self.dof.face_to_dof()
 
-    def edge_to_dof(self, index=None):
+    def edge_to_dof(self, index=np.s_[:]):
         return self.dof.edge_to_dof()
 
     def boundary_dof(self, threshold=None):
@@ -121,58 +120,80 @@ class LagrangeFiniteElementSpace():
 
         Notes
         -----
-            uh 是一个 p 次的有限元解，该函数计算 uh 对应的残量型后验误差估计。
+            uh 是一个 线性有限元解，该函数计算 uh 对应的残量型后验误差估计。
+
+        TODO
+        ----
+        1. 任意的 p 次元 
         """
         mesh = self.mesh
         GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
         NC = mesh.number_of_cells()
 
-        n = mesh.face_unit_normal()
-        bc = np.array([1/(GD+1)]*(GD+1), dtype=self.ftype)
+        # 计算重心处的梯度值, p=1 时每个单元上的梯度是常向量
+        bc = np.array([1/(TD+1)]*(TD+1), dtype=self.ftype)
         grad = self.grad_value(uh, bc)
 
-        ps = mesh.bc_to_point(bc)
-
-        if callable(c):
-            if c.coordtype == 'cartesian':
-                c = c(ps)
-            elif c.coordtype == 'barycentric':
+        if callable(c): # 考虑存在扩散系数的情形
+            if c.coordtype == 'barycentric':
                 c = c(bc)
+            elif c.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bc)
+                c = c(ps)
 
-        if isinstance(c, {int, float}):
-            grad *= c 
-        elif isinstance(c, np.ndarray):
-            if c.shape == (GD, GD):
-                grad = np.einsum('mn, in->im', c, grad)
-            elif c.shape == (GD, ): # 对角系数 
-                grad = np.einsum('m, im->im', c, grad)
-            elif len(c.shape) == 1: # (NC, )
-                grad = np.einsum('i, im->im', c, grad)
-            elif len(d.shape) == 2: # (NC, GD)
-                grad = np.einsum('im, im->im', c, grad)
-            elif len(d.shape) == 3: # (NC, GD, GD)
-                grad = np.einsum('imn, in->im', c, grad)
+        # A\nabla u_h
+        if c is not None:
+            if isinstance(c, {int, float}):
+                grad *= c 
+            elif isinstance(c, np.ndarray):
+                if c.shape == (GD, GD):
+                    grad = np.einsum('mn, in->im', c, grad)
+                elif c.shape == (GD, ): # 系数为常数的对角阵
+                    grad = np.einsum('m, im->im', c, grad)
+                elif len(c.shape) == 1: # (NC, )
+                    grad = np.einsum('i, im->im', c, grad)
+                elif len(d.shape) == 2: # (NC, GD)
+                    grad = np.einsum('im, im->im', c, grad)
+                elif len(d.shape) == 3: # (NC, GD, GD)
+                    grad = np.einsum('imn, in->im', c, grad)
 
-        if GD == 2:
-            face2cell = mesh.ds.edge_to_cell()
-            h = np.sqrt(np.sum(n**2, axis=-1))
-        elif GD == 3:
-            face2cell = mesh.ds.face_to_cell()
-            h = np.sum(n**2, axis=-1)**(1/4)
+        cellmeasure = mesh.entity_measure('cell')
+        ch = cellmeasure**(1.0/TD)
+        facemeasure = mesh.entity_measure('face')
 
-        cell2cell = mesh.ds.cell_to_cell()
-        cell2face = mesh.ds.cell_to_face()
-        measure = mesh.entity_measure('cell')
-        J = 0
-        for i in range(cell2cell.shape[1]):
-            J += np.sum((grad - grad[cell2cell[:, i]])*n[cell2face[:, i]], axis=-1)**2
-        return np.sqrt(J*measure)
+        face2cell = mesh.ds.face_to_cell()
+        n = mesh.face_unit_normal() # 单位法向
+        J = facemeasure*np.sum((grad[face2cell[:, 0]] - grad[face2cell[:, 1]])*n, axis=-1)**2
+        
+        eta = np.zeros(NC, dtype=self.ftype)
+        np.add.at(eta, face2cell[:, 0], J)
+        np.add.at(eta, face2cell[:, 1], J)
+        eta *= ch 
+        eta *= 0.25 # 2D: 1/8, 3D:   
+
+        if f is not None:
+            # 计算  f**2 在每个单元上的积分
+            eta += cellmeasure*self.integralalg.cell_integral(f, power=2) # \int_\tau f**2 dx
+
+        return np.sqrt(eta)
+
+    def recovery_estimate(self, uh, method='simple'):
+        """
+        """
+        rguh = self.grad_recovery(uh, method='simple')
+        eta = self.integralalg.error(rguh.value, uh.grad_value, power=2,
+                celltype=True) # 计算单元上的恢复型误差
+        return eta
 
     def grad_recovery(self, uh, method='simple'):
         """
 
         Notes
         -----
+
+        uh 是线性有限元函数，该程序把 uh 的梯度(分片常数）恢复到分片线性连续空间
+        中。
 
         """
         GD = self.GD
@@ -196,7 +217,7 @@ class LagrangeFiniteElementSpace():
             measure = self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
-            guh = np.einsum('ij..., i->ij...',guh,measure)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
@@ -208,7 +229,7 @@ class LagrangeFiniteElementSpace():
             v = bp[:, np.newaxis, :] - ipoints[cell2dof, :]
             d = np.sqrt(np.sum(v**2, axis=-1))
             deg = np.bincount(cell2dof.flat,weights = d.flat, minlength = gdof)
-            guh = np.einsum('ij..., ij->ij...',guh,d)
+            guh = np.einsum('ij..., ij->ij...', guh, d)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
@@ -218,7 +239,7 @@ class LagrangeFiniteElementSpace():
             measure = 1/self.mesh.entity_measure('cell')
             ws = np.einsum('i, j->ij', measure,np.ones(ldof))
             deg = np.bincount(cell2dof.flat,weights = ws.flat, minlength = gdof)
-            guh = np.einsum('ij..., i->ij...',guh,measure)
+            guh = np.einsum('ij..., i->ij...', guh, measure)
             if GD > 1:
                 np.add.at(rguh, (cell2dof, np.s_[:]), guh)
             else:
@@ -553,7 +574,7 @@ class LagrangeFiniteElementSpace():
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
-    def linear_elasticity_matrix(self, mu, lam, format='csr'):
+    def linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
         """
         construct the linear elasticity fem matrix
         """
@@ -567,11 +588,11 @@ class LagrangeFiniteElementSpace():
             imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
         A = []
 
-        qf = self.integrator
+        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.grad_basis(bcs)
+        grad = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
 
-        cell2dof = self.cell_to_dof()
+        cell2dof = self.cell_to_dof() # (NC, ldof)
         ldof = self.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         shape = (NC, ldof, ldof)
@@ -607,7 +628,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr'):
+    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
         """
         construct the recovery linear elasticity fem matrix
         """
@@ -618,7 +639,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         GD = self.GD
 
-        qf = self.integrator
+        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         grad = self.grad_basis(bcs)
 
@@ -721,7 +742,7 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, b1=b1, c=c, q=q)
         return A 
 
-    def source_vector(self, f, dim=None):
+    def source_vector(self, f, dim=None, q=None):
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()

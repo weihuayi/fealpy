@@ -490,6 +490,25 @@ class HalfEdgeMesh2dTest:
                 #print(np.c_[np.arange(len(mesh.hedgecolor)), mesh.hedgecolor])
                 plt.show()
 
+    def convexity(self):
+        node = np.array([[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [1, 3], 
+            [1, 4], [2, 4], [2, 5], [0, 5], [0, 2]], dtype
+                = np.float)
+        cell = np.array([0, 1, 2, 3, 4, 10, 5, 6, 7, 8, 9, 10, 4], dtype=np.int_)
+        cellLocation = np.array([0, 6, 13], dtype=np.int)
+
+        mesh = PolygonMesh(node, cell, cellLocation)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+
+        mesh.print()
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        mesh.add_halfedge_plot(axes, showindex=True)
+        plt.show()
+
 
 test = HalfEdgeMesh2dTest()
 
@@ -517,4 +536,5 @@ elif sys.argv[1] == "interpolation":
     test.interpolation(n=n, plot=False)
 elif sys.argv[1] == "coarsen_poly":
     test.coarsen_poly()
-
+elif sys.argv[1] == "convexity":
+    test.convexity()

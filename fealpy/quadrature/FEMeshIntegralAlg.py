@@ -208,6 +208,57 @@ class FEMeshIntegralAlg():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
         return M
 
+    def serial_construct_vector(self, f, b, q=None):
+        """
+
+        Notes
+        -----
+        组装向量， 这里要考虑 f 是标量还是向量函数， 也要考虑基函数是向量还是标
+        量函数
+        """
+        basis = b[0]
+        cell2dof = b[1]
+        gdof = b[2]
+
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='cell')
+
+        if basis.coordtype == 'barycentric':
+            phi = basis(bcs)
+        elif basis.coordtype == 'cartesian':
+            phi = basis(ps)
+
+        if callable(f):
+            if f.coordtype == 'barycentric':
+                val = f(bcs)
+            elif f.coordtype == 'cartesian':
+                val = f(ps)
+        else:
+            #TODO: f 可以是多种形式的, 函数, 数组 
+            val = f
+
+        if (len(val.shape) == 2) and (len(phi.shape) == 3):
+            # f 是标量函数，基是标量函数
+            bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
+            shape = (gdof, )
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, cell2dof, bb)
+        elif (len(val.shape) == 3) and (len(phi.shape) == 3): 
+            # f 是向量函数， 基是标量函数
+            bb = np.einsum('i, ijn, ijk, j->jkn', ws, val, phi, self.cellmeasure)
+            shape = (gdof, val.shape[2])
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, (cell2dof, np.s_[:]), bb)
+        elif (len(val.shape) == 3) and (len(phi.shape) == 4): 
+            # f 是向量函数， 基是向量函数
+            bb = np.einsum('i, ijn, ijkn, j->jk', ws, val, phi, self.cellmeasure)
+            shape = (gdof, )
+            b = np.zeros(shape, dtype=phi.dtype)
+            np.add.at(b, cell2dof, bb)
+        return b
+
 
     @timer
     def construct_matrix(self, basis0, 
@@ -290,6 +341,7 @@ class FEMeshIntegralAlg():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
 
         return M
+
 
     def construct_vector_s_s(self, f, basis, cell2dof, gdof=None, q=None):
         """
@@ -398,72 +450,172 @@ class FEMeshIntegralAlg():
         return b
 
 
-    def edge_integral(self, u, edgetype=False, q=None, barycenter=True):
+    def edge_integral(self, f, q=None):
+        """
+        Notes
+        -----
+        在网格的每条边上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='edge')
-            val = u(ps)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs, 'edge')
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
 
-        if edgetype is True:
-            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure)
-        else:
-            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure)
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.facemeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.facemeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.facemeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.facemeasure)
         return e
 
-    def face_integral(self, u, facetype=False, q=None, barycenter=True):
+    def face_integral(self, f, q=None):
+        """
+
+        Notes
+        -----
+        在网格的每个面上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='face')
-            val = u(ps)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs, 'face')
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
 
-        dim = len(ws.shape)
-        s0 = 'abcde'
-        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-        if facetype is True:
-            e = np.einsum(s1, ws, val, self.facemeasure)
-        else:
-            e = np.einsum(s1, ws, val, self.facemeasure)
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.facemeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.facemeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.facemeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.facemeasure)
         return e
 
-    def cell_integral(self, u, celltype=False, q=None, barycenter=True):
+    def cell_integral(self, f, q=None, power=None):
+        """
+
+        Notes
+        -----
+        在网格的每个单元上积分函数 f。 
+        """
         mesh = self.mesh
+        GD = mesh.geo_dimension()
 
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
-        bcs, ws = qf.quadpts, qf.weights
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-        if barycenter:
-            val = u(bcs)
-        else:
-            ps = mesh.bc_to_point(bcs, etype='cell')
-            val = u(ps)
-        dim = len(ws.shape)
-        s0 = 'abcde'
-        s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-        if celltype is True:
-            e = np.einsum(s1, ws, val, self.cellmeasure)
-        else:
-            e = np.einsum(s1, ws, val, self.cellmeasure)
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                ps = mesh.bc_to_point(bcs, 'cell')
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
+
+        if power is not None:
+            f = np.power(f, power) 
+
+        dim = len(ws.shape) # 张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.cellmeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.cellmeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.cellmeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.cellmeasure)
         return e
 
+
+    def error(self, u, v, power=2, celltype=False, q=None):
+        """
+
+        Notes
+        -----
+        给定两个函数，计算两个函数的之间的差，默认计算 L2 差（power=2)
+
+        power 的取值可以是任意的 p。
+
+        TODO
+        ----
+        1. 考虑无穷范数的情形
+        """
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+
+        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, 'cell')
+
+        if callable(u):
+            if u.coordtype == 'cartesian':
+                u = u(ps)
+            elif u.coordtype == 'barycentric':
+                u = u(bcs)
+
+        if callable(v):
+            if v.coordtype == 'cartesian':
+                v = v(ps)
+            elif v.coordtype == 'barycentric':
+                v = v(bcs)
+
+        f = np.power(np.abs(u - v), power) 
+
+        dim = len(ws.shape) # dim > 1, 表示是张量型积分公式
+        if isinstance(f, (int, float)): # f为标量常函数
+            e = f*self.cellmeasure
+        elif isinstance(f, np.ndarray):
+            if f.shape == (GD, ): # 常向量函数
+                e = self.cellmeasure[:, None]*f
+            elif f.shape == (GD, GD):
+                e = self.cellmeasure[:, None, None]*f
+            else:
+                s0 = 'abcde'
+                s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
+                e = np.einsum(s1, ws, f, self.cellmeasure)
+
+        if celltype == False:
+            e = np.power(np.sum(e), 1/power)
+        else:
+            e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
+        return e
+
+    # old api 
     def integral(self, u, celltype=False, barycenter=True):
         """
         """
         qf = self.integrator
         bcs = qf.quadpts # 积分点 (NQ, 3)
         ws = qf.weights # 积分点对应的权重 (NQ, )
-        if barycenter:
+        if barycenter or u.coordtype == 'barycentric':
             val = u(bcs)
         else:
             ps = self.mesh.bc_to_point(bcs) # (NQ, NC, 2)
@@ -476,6 +628,7 @@ class FEMeshIntegralAlg():
             return e
         else:
             return e.sum()
+
 
     def L2_norm(self, uh, celltype=False):
         def f(x):

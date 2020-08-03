@@ -2,6 +2,45 @@ import numpy as np
 from .geoalg import project
 
 
+class PolygonCurve():
+    """
+
+    Notes
+    -----
+    用于描述一个多边形区域的边界。目前假设区域内部没有内部边界，即区域是连通的。
+
+    TODO
+    ----
+    1. 考虑区域有内部边界的情形
+    """
+    def __init__(self, node, edge, edge2subdomain=None):
+        self.node = node
+        self.edge = edge
+        self.edge2subdomain = edge2subdomain
+
+    def __call__(self, p):
+        """
+
+        Notes
+        -----
+        给定点集 p， 计算它们到多边形边界的距离。
+        """
+
+        node = self.node
+        edge = self.edge
+
+        NE = len(edge)
+        NP = len(p) # 这里假设 p 是二维数组 TODO：考虑只有一个点的情形
+        v = node[edge[:, 1]] - node[edge[:, 2]]
+        l = np.sqrt(np.sum(v**2, axis=1))
+        v /= l.reshape(-1, 1)
+        w = np.array([(0,-1),(1,0)])
+        n = v@w
+
+        # 计算符号距离
+        # (NP, 2) - (NE, 2)->(NP, NE, 2), (NE, 2) -> (NP, NE)  
+        d = np.sum((p[..., None, :] - node[edge[:, 0]])*n, axis=-1)
+
 class CircleCurve():
     def __init__(self, center=np.array([0.0, 0.0]), radius=1.0):
         self.center = center

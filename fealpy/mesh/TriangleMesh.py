@@ -205,7 +205,7 @@ class TriangleMesh(Mesh2d):
         for i,(j,k) in zip(range(3),localEdge):
             v0 = node[cell[:,j]] - node[cell[:,i]]
             v1 = node[cell[:,k]] - node[cell[:,i]]
-            angle[:,i] = np.arccos(np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1) * np.sum(v1**2, axis=1)))
+            angle[:, i] = np.arccos(np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1) * np.sum(v1**2, axis=1)))
         return angle
 
     def edge_swap(self):
@@ -838,6 +838,12 @@ class TriangleMeshWithInfinityNode:
         return isBdNode
 
     def to_polygonmesh(self):
+        """
+
+        Notes
+        -----
+        把一个三角形网格转化为多边形网格。
+        """
         isBdNode = self.is_boundary_node()
         NB = isBdNode.sum()
 

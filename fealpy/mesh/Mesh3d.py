@@ -154,9 +154,10 @@ class Mesh3d():
             showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
         if isinstance(plot, ModuleType):
+            from mpl_toolkits.mplot3d import Axes3D
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca()
+            axes = fig.gca(projection='3d')
         else:
             axes = plot
 

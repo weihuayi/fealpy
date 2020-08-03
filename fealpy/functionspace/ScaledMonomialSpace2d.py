@@ -101,6 +101,12 @@ class ScaledMonomialSpace2d():
 
 
     def diff_index_1(self, p=None):
+        """
+
+        Notes
+        -----
+        对基函数求一阶导后非零项的编号，及系数
+        """
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
 
@@ -112,6 +118,12 @@ class ScaledMonomialSpace2d():
                 }
 
     def diff_index_2(self, p=None):
+        """
+
+        Notes
+        -----
+        对基函数求二阶导后非零项的编号，及系数
+        """
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
 

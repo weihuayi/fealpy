@@ -125,7 +125,7 @@ class TetrahedronMesh(Mesh3d):
         v01 = node[face[index, 1], :] - node[face[index, 0], :]
         v02 = node[face[index, 2], :] - node[face[index, 0], :]
         nv = np.cross(v01, v02)
-        return nv
+        return nv/2.0 # 长度为三角形面的面积
 
     def face_unit_normal(self, index=np.s_[:]):
         face = self.ds.face
