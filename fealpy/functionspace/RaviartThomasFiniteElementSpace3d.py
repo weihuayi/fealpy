@@ -286,7 +286,7 @@ class RaviartThomasFiniteElementSpace3d:
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NF, fdof, 2)
 
         idx0 = face2cell[index, 0][:, None]
-        idx2 = face2cell[index[:, None], [2]]*fdof + np.arange(fdof)
+        idx2 = face2cell[index, 2][:, None]*fdof + np.arange(fdof)
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NF, ldof, edof) 
         idx = self.smspace.face_index_1(p=p+1)
 
@@ -362,6 +362,16 @@ class RaviartThomasFiniteElementSpace3d:
     @barycentric
     def grad_basis(self, bc):
         pass
+
+    @barycentric
+    def face_value(self, uh, bc, index=np.s_[:]):
+        phi = self.face_basis(bc, index=index)
+        face2dof = self.dof.face_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[face2dof])
+        return val
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):

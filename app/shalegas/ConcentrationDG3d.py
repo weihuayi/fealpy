@@ -20,7 +20,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 
-from fealpy.decorator import cartesian
+from fealpy.decorator import cartesian, timer
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
 from fealpy.functionspace import ScaledMonomialSpace3d 
@@ -76,6 +76,7 @@ class ConcentrationData_0:
     def dirichlet(self, p): # 这里在边界上，始终知道边界外面的浓度
         x = p[..., 0]
         y = p[..., 1]
+        z = p[..., 2]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = (x < 0.1) & (y < 0.1) & (np.abs(z-1) < 1e-12)
         val[flag0] = 1 
@@ -115,6 +116,7 @@ class ConcentrationDG3d():
         self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
         self.cellType = cellType
 
+    @timer
     def set_init_velocity_field(self):
         """
 
@@ -153,6 +155,7 @@ class ConcentrationDG3d():
         T = spdiags(1-bdIdx, 0, gdof, gdof)
         AA = T@AA@T + Tbd
         FF[isBdDof] = x[isBdDof]
+        print("test!")
         x[:] = spsolve(AA, FF)
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
@@ -171,6 +174,7 @@ class ConcentrationDG3d():
         uh = self.uh 
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
+
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
         F = self.uspace.convection_vector(nt, ch, uh, g=self.cdata.dirichlet) 
 
@@ -264,7 +268,7 @@ if __name__ == '__main__':
     m = int(sys.argv[1])
     if m == 0:
         mesh = mf.boxmesh3d([0, 1, 0, 1, 0, 1], 
-                nx=20, ny=20, nz=20, meshtype='tet')
+                nx=10, ny=10, nz=10, meshtype='tet')
         vdata = VelocityData_0()
         cdata = ConcentrationData_0()
 

@@ -3,6 +3,7 @@ from ..decorator import cartesian
 from .Function import Function
 from ..quadrature import PolyhedronMeshIntegralAlg
 from ..quadrature import FEMeshIntegralAlg
+from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
 from .femdof import multi_index_matrix2d, multi_index_matrix3d
 
 
@@ -452,6 +453,37 @@ class ScaledMonomialSpace3d():
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
+
+    @cartesian
+    def to_cspace_function(self, uh):
+        """
+        Notes
+        -----
+        把分片的 p 次多项式空间的函数  uh， 恢复到分片连续的函数空间。这里假定网
+        格是四面体网格。
+
+        TODO
+        ----
+        1. 实现多个函数同时恢复的情形 
+        """
+
+        # number of function in uh
+
+        p = self.p
+        mesh  = self.mesh
+        bcs = multi_index_matrix3d(p)
+        ps = mesh.bc_to_point(bcs)
+        val = self.value(uh, ps) # （NQ, NC, ...)
+
+        space = LagrangeFiniteElementSpace(mesh, p=p)
+        gdof = space.number_of_global_dofs()
+        cell2dof = space.cell_to_dof()
+        deg = np.zeros(gdof, dtype=space.itype)
+        np.add.at(deg, cell2dof, 1)
+        ruh = space.function()
+        np.add.at(ruh, cell2dof, val.T)
+        ruh /= deg
+        return ruh
 
     def show_frame(self, axes, index=1):
         n = np.array([[1.0, 2.0, 1.0], [-1.0, 2.0, 1.0]], dtype=np.float)/np.sqrt(6)

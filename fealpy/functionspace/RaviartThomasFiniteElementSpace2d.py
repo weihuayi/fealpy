@@ -419,6 +419,16 @@ class RaviartThomasFiniteElementSpace2d:
         val = np.einsum(s1, phi, uh[edge2dof])
         return val
 
+    @barycentric
+    def face_value(self, uh, bc, index=np.s_[:]):
+        phi = self.edge_basis(bc, index=index)
+        edge2dof = self.dof.edge_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
+
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f
