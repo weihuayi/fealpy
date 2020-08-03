@@ -429,32 +429,28 @@ class RaviartThomasFiniteElementSpace3d:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
-    def stiff_matrix(self):
+    def stiff_matrix(self, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof,
-                gdof0=gdof)
-        return M
+        b0 = (self.basis, cell2dof, gdof)
+        A = self.integralalg.serial_construct_matrix(b0, q=q)
+        return A
 
-    def div_matrix(self):
-        p = self.p
+    def div_matrix(self, q=None):
         gdof0 = self.number_of_global_dofs()
         cell2dof0 = self.cell_to_dof()
+        b0 = (self.div_basis, cell2dof0, gdof0)
+
         gdof1 = self.smspace.number_of_global_dofs()
         cell2dof1 = self.smspace.cell_to_dof()
-        basis0 = self.div_basis
-        basis1 = self.smspace.basis
+        b1 = (self.smspace.basis, cell2dof1, gdof1)
+        B = self.integralalg.serial_construct_matrix(b0, b1=b1, q=q)
+        return B 
 
-        D = self.integralalg.construct_matrix(basis0, basis1=basis1, 
-                cell2dof0=cell2dof0, gdof0=gdof0,
-                cell2dof1=cell2dof1, gdof1=gdof1)
-        return D 
-
-    def source_vector(self, f, dim=None):
+    def source_vector(self, f, q=None):
         cell2dof = self.smspace.cell_to_dof()
         gdof = self.smspace.number_of_global_dofs()
-        b = -self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, 
-                gdof=gdof) 
+        b = self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
         return b
 
     def set_neumann_bc(self, g, threshold=None, q=None):

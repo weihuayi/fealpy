@@ -30,7 +30,6 @@ class Function(np.ndarray):
         space = self.space
         return space.value(self, bc, index=index)
 
-    #TODO: Here has bugs
     def __getattr__(self, item):
         def wrap(func):
             def outer(*args,  **kwargs):

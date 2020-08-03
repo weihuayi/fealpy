@@ -105,7 +105,7 @@ class SurfaceTriangleMesh():
     def top_dimension(self):
         return 2
 
-    def jacobi_matrix(self, bc, index=None):
+    def jacobi_matrix(self, bc, index=np.s_[:]):
         mesh = self.mesh
         cell2dof = self.space.dof.cell2dof
 
@@ -114,16 +114,10 @@ class SurfaceTriangleMesh():
         Jh = mesh.jacobi_matrix(index=index)
 
         # the tranpose of the jacobi matrix between S_p and S_h
-        if index is None:
-            Jph = np.einsum(
-                    'ijm, ...ijk->...imk',
-                    self.node[cell2dof, :],
-                    grad)
-        else:
-            Jph = np.einsum(
-                    'ijm, ...ijk->...imk',
-                    self.node[cell2dof[index], :],
-                    grad)
+        Jph = np.einsum(
+                'ijm, ...ijk->...imk',
+                self.node[cell2dof[index], :],
+                grad)
 
         # the transpose of the jacobi matrix between S_p and K
         Jp = np.einsum('...ijk, imk->...imj', Jph, Jh)
@@ -153,8 +147,8 @@ class SurfaceTriangleMesh():
         bcp, _ = self.project(bcp)
         return bcp
 
-    def area(self, idx=3):
-        integrator = self.integrator(idx)
+    def area(self, q=3):
+        integrator = self.integrator(q)
         bcs, ws = integrator.quadpts, integrator.weights
         Jp, _ = self.jacobi_matrix(bcs)
         n = np.cross(Jp[..., 0, :], Jp[..., 1, :], axis=-1)
