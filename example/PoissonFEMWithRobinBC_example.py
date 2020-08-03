@@ -50,8 +50,8 @@ for i in range(maxit):
     ml = pyamg.ruge_stuben_solver(A)  
     uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
 
-    errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
-    errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
 
     if i < maxit-1:
         mesh.uniform_refine()
