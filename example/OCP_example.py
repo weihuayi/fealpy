@@ -183,8 +183,8 @@ class Model():
         NC = self.mesh.number_of_cells()
         u = self.uh[:, nt+1]
         NE = self.mesh.number_of_edges()
-       # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
-        f1 = -dt*sp
+        # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
+        f1 = -sp
 
         # f2 = 0
         f2 = np.zeros(NE, dtype=mesh.ftype)
@@ -220,16 +220,38 @@ class Model():
         tpd = self.uspace.function()
  
         #  f1 = -\sum_{i=1}^n-1\Delta t (p^i, v)
-        f1 = -dt*sq
+        f1 = -sq
 
         # f2 = (\tilde p^n_h - \tilde p^n_d, v)
+        cell2dof = self.pspace.cell_to_dof()
         edge2dof = self.uspace.dof.edge_to_dof()
-        en = self.mesh.edge_unit_normal()
-        def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
-            return np.einsum('ijk, jk, ijm->ijm', self.pde.tpd(ps, NL-nt-1), en, self.pspace.edge_basis(ps))
-        tpd[edge2dof] = self.pspace.integralalg.edge_integral(f0, edgetype=True)
-        f2 = self.A@self.tph[:, NL-nt-1] - self.A@tpd
+        cell2edge = self.mesh.ds.cell_to_edge()
+        edge2cell = self.mesh.ds.edge_to_cell()
+        edgemeasure = self.mesh.entity_measure('edge')
+        
+        qf = self.integrator
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = self.mesh.bc_to_point(bcs)
+        phi = self.uspace.basis(bcs)
+        val = self.pde.tpd(ps, NL-nt-1)
+        bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
+        gdof = edge2dof.max()
+        b = np.zeros(gdof+1, dtype=phi.dtype)
+        print('bb', bb.shape)
+        print('b', b.shape)
+        print('tpd',self.tph.shape[0])
+        print('cell2edge', cell2dof)
+        np.add.at(b, edge2dof, bb)
+#        f22 = self.uspace.integralalg.construct_vector_v_v(lambda x:self.pde.tpd(x, NL-nt-1), \
+#                self.uspace.basis, cell2dof)
+
+#        edge2dof = self.uspace.dof.edge_to_dof()
+#        en = self.mesh.edge_unit_normal()
+#        def f0(bc):
+#            ps = mesh.bc_to_point(bc, etype='edge')
+#            return np.einsum('ijk, jk, ijm->ijm', self.pde.tpd(ps, NL-nt-1), en, self.pspace.edge_basis(ps))
+#        tpd[edge2dof] = self.pspace.integralalg.edge_integral(f0, edgetype=True)
+        f2 = self.A@self.tph[:, NL-nt-1] - b
 
         # f3 = \Delta t(y^n_h - y^n_d, w) + (z^n_h, w)
         bc = np.array([1/3, 1/3, 1/3])
@@ -270,7 +292,7 @@ class Model():
             self.ph[:] = PU[NE:2*NE]
             self.yh[:, timeline.current+1] = PU[2*NE:]
             timeline.current += 1
-            sp = sp + self.A@self.ph[:] 
+            sp = sp + self.dt*self.A@self.ph[:] 
         timeline.reset()
         return sp
 
@@ -298,7 +320,7 @@ class Model():
 #            self.uh[:, NL-timeline.current-1] = self.pspace.integralalg.cell_integral \
 #                    (zh1, celltype=True)/np.sum(self.cellmeasure)
             timeline.current += 1
-            sq = sq + self.qh
+            sq = sq + self.dt*self.A@self.qh
         timeline.reset()
         return sq
 
@@ -353,7 +375,7 @@ class Model():
 
         
 pde = PDE()
-mesh = pde.init_mesh(n=1, meshtype='tri')
+mesh = pde.init_mesh(n=2, meshtype='tri')
 space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
 timeline = UniformTimeLine(0, 1, 10)
 MFEMModel = Model(pde, mesh, timeline)
