@@ -208,7 +208,8 @@ class FEMeshIntegralAlg():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
         return M
 
-    def serial_construct_vector(self, f, b, q=None):
+    @timer
+    def serial_construct_vector(self, f, b, celltype=False, q=None):
         """
 
         Notes
@@ -221,9 +222,11 @@ class FEMeshIntegralAlg():
         gdof = b[2]
 
         mesh = self.mesh
+        GD = mesh.geo_dimension()
         qf = self.integrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
+
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
@@ -239,25 +242,32 @@ class FEMeshIntegralAlg():
             #TODO: f 可以是多种形式的, 函数, 数组 
             val = f
 
-        if (len(val.shape) == 2) and (len(phi.shape) == 3):
-            # f 是标量函数，基是标量函数
-            bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
+        if isinstance(val, (int, float)):
+            val = np.array([[val]], dtype=mesh.ftype)
+        elif isinstance(val, np.ndarray) and (val.shape == (GD, )): 
+            val = val.reshape(-1, -1, GD)
+
+        if (len(phi.shape) - len(val.shape)) == 1:
+            # f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
+            # f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
+            bb = np.einsum('i, ij..., ijk..., j->jk', ws, val, phi, self.cellmeasure)
+            if celltype:
+                return bb
             shape = (gdof, )
-            b = np.zeros(shape, dtype=phi.dtype)
-            np.add.at(b, cell2dof, bb)
-        elif (len(val.shape) == 3) and (len(phi.shape) == 3): 
-            # f 是向量函数， 基是标量函数
+            F = np.zeros(shape, dtype=mesh.ftype)
+            np.add.at(F, cell2dof, bb)
+            return F 
+        elif len(val.shape) == len(phi.shape): 
+            # f 是向量函数 (NQ, NC, GD)， 基是标量函数 (NQ, NC, ldof)
             bb = np.einsum('i, ijn, ijk, j->jkn', ws, val, phi, self.cellmeasure)
-            shape = (gdof, val.shape[2])
-            b = np.zeros(shape, dtype=phi.dtype)
-            np.add.at(b, (cell2dof, np.s_[:]), bb)
-        elif (len(val.shape) == 3) and (len(phi.shape) == 4): 
-            # f 是向量函数， 基是向量函数
-            bb = np.einsum('i, ijn, ijkn, j->jk', ws, val, phi, self.cellmeasure)
-            shape = (gdof, )
-            b = np.zeros(shape, dtype=phi.dtype)
-            np.add.at(b, cell2dof, bb)
-        return b
+            if celltype:
+                return bb
+            shape = (gdof, GD)
+            F = np.zeros(shape, dtype=mesh.ftype)
+            np.add.at(F, (cell2dof, np.s_[:]), bb)
+            return F
+        else:
+            print('Warning!, we can not deal with this f function!')
 
 
     @timer

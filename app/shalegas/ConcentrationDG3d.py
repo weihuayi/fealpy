@@ -5,7 +5,7 @@
 Notes
 -----
 
-给定一个求解区域， 区域中有一个固定的流场 v 和一个初始浓度 c， 计算浓度随时间的
+给定一个二维求解区域， 区域中有一个固定的流场 v 和一个初始浓度 c， 计算浓度随时间的
 变化。
 """
 import sys
@@ -22,15 +22,15 @@ import matplotlib.pyplot as plt
 
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory
-from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.functionspace import ScaledMonomialSpace2d 
+from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
+from fealpy.functionspace import ScaledMonomialSpace3d 
 from fealpy.timeintegratoralg import UniformTimeLine 
 
 """
 该模型例子，在给定流场的情况下， 用间断有限元模拟物质浓度的变化过程。
 """
 
-## 模型 0 
+# 模型 0 
 class VelocityData_0:
     @cartesian
     def source(self, p):
@@ -46,141 +46,16 @@ class VelocityData_0:
     def neumann(self, p, n):
         x = p[..., 0]
         y = p[..., 1]
+        z = p[..., 2]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.01 
-        flag1 = np.abs(x-1) < 1e-13
-        val[flag1] = -0.01
+        flag0 = (x < 0.1) & (y < 0.1) & (np.abs(z-1) < 1e-12)
+        val[flag0] = -0.1
+        flag1 = (x > 0.9) & (y > 0.9) & (np.abs(z-1) < 1e-12)
+        val[flag1] = 0.1 
         return val
 
-    @cartesian
-    def is_neumann_boundary(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        flag = (np.abs(x) < 1e-13) | (np.abs(x-1) < 1e-13)
-        return flag
 
 class ConcentrationData_0:
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def init_value(self, p):
-        val = np.array([1.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = np.abs(x) < 1e-13
-        val[flag0] = 0.01
-        return val
-
-    @cartesian
-    def is_neumann_boundary(self, p):
-        x = p[..., 0]
-        y = p[..., 1]
-        flag = (np.abs(x) < 1e-13)
-        return flag
-
-# 模型 1
-
-class VelocityData_1:
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = 0.01
-
-        flag0 = (np.abs(x-1) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x > 1 - 1/16)
-        val[flag1 | flag0] = -0.01
-        return val
-
-
-class ConcentrationData_1:
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def init_value(self, p):
-        val = np.array([1.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = -0.001
-
-        flag0 = (np.abs(x-1) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x > 1 - 1/16)
-        val[flag0 | flag1] = 0.001
-        return val
-
-# 模型 2
-
-class VelocityData_2:
-    @cartesian
-    def source(self, p):
-        """ The right hand side of Possion equation
-        INPUT:
-            p: array object,  
-        """
-        val = np.array([0.0], np.float64)
-        shape = len(p.shape[:-1])*(1, )
-        return val.reshape(shape) 
-
-    @cartesian
-    def neumann(self, p, n):
-        x = p[..., 0]
-        y = p[..., 1]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = -0.1 #负的表示流入区域
-
-        flag0 = (np.abs(x-1) < 1e-13) & (y > 15/16)
-        flag1 = (np.abs(y-1) < 1e-13) & (x > 1 - 1/16)
-        val[flag1 | flag0] = 0.1 # 负的表示流出区域
-        return val
-
-
-class ConcentrationData_2:
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -202,13 +77,14 @@ class ConcentrationData_2:
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (np.abs(x) < 1e-13) & (y < 1/16)
-        flag1 = (np.abs(y) < 1e-13) & (x < 1/16)
-        val[flag0 | flag1] = 1
+        flag0 = (x < 0.1) & (y < 0.1) & (np.abs(z-1) < 1e-12)
+        val[flag0] = 1 
+        #flag1 = (x > 0.9) & (y > 0.9) & (np.abs(z-1) < 1e-12)
+        #val[flag1] = 1 
         return val
 
 
-class ConcentrationDG():
+class ConcentrationDG3d():
     def __init__(self, vdata, cdata, mesh, timeline, p=0,
             options={'rdir':'/home/why/result', 'step':1000, 'porosity':0.2}):
 
@@ -217,8 +93,8 @@ class ConcentrationDG():
         self.cdata = cdata
         self.mesh = mesh
         self.timeline = timeline
-        self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=p)
-        self.cspace = ScaledMonomialSpace2d(mesh, p=p+1)
+        self.uspace = RaviartThomasFiniteElementSpace3d(mesh, p=p)
+        self.cspace = ScaledMonomialSpace3d(mesh, p=p+1)
 
         self.uh = self.uspace.function() # 速度场自由度数组
         self.ph = self.uspace.smspace.function() # 压力场自由度数组
@@ -257,10 +133,10 @@ class ConcentrationDG():
         gdof = udof + pdof + 1
 
         M = uspace.smspace.cell_mass_matrix()
+        C = M[:, 0, :].reshape(-1)
         A = uspace.stiff_matrix()
         B = uspace.div_matrix()
-        C = M[:, 0, :].reshape(-1)
-        F1 = uspace.source_vector(vdata.source)
+        F1 = -uspace.source_vector(vdata.source) # 注意这里前面要加一个负号
 
         AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
 
@@ -342,7 +218,7 @@ class ConcentrationDG():
 
     def write_to_vtk(self, fname):
         # 重心处的值
-        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+        bc = np.array([1/4, 1/4, 1/4, 1/4], dtype=np.float64)
         ps = self.mesh.bc_to_point(bc)
         vmesh = vtk.vtkUnstructuredGrid()
         vmesh.SetPoints(self.points)
@@ -380,30 +256,24 @@ class ConcentrationDG():
 if __name__ == '__main__':
 
     """
-    python3 ConcentrationDG.py 1 5 50000 2000 /home/why/result/c/corner
+    python3 ConcentrationDG3d.py 1 2 500 20 /home/why/result/c/3d
     """
 
     mf = MeshFactory()
     
     m = int(sys.argv[1])
     if m == 0:
-        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
+        mesh = mf.boxmesh3d([0, 1, 0, 1, 0, 1], 
+                nx=20, ny=20, nz=20, meshtype='tet')
         vdata = VelocityData_0()
         cdata = ConcentrationData_0()
-    elif m == 1:
-        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
-        vdata = VelocityData_1()
-        cdata = ConcentrationData_1()
-    elif m == 2:
-        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=64, ny=64, meshtype='tri')
-        vdata = VelocityData_2()
-        cdata = ConcentrationData_2()
 
     T = float(sys.argv[2])
     NT = int(sys.argv[3])
     step = int(sys.argv[4])
     timeline = UniformTimeLine(0, T, NT)
     options = {'rdir': sys.argv[5], 'step':step, 'porosity':0.2}
-    model = ConcentrationDG(vdata, cdata, mesh, timeline, options=options)
+
+    model = ConcentrationDG3d(vdata, cdata, mesh, timeline, options=options)
     model.solve()
 

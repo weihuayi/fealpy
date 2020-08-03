@@ -82,25 +82,37 @@ class TetrahedronMesh(Mesh3d):
         elif etype in {'edge', 1}:
             return GaussLegendreQuadrature(k)
 
-    def delete_cell(self, threshold):
-        NN = self.number_of_nodes()
+    def to_vtk(self, etype='cell', index=np.s_[:]):
+        """
 
-        cell = self.entity('cell')
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:  
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
         node = self.entity('node')
-        bc = self.entity_barycenter('cell')
-        isKeepCell = ~threshold(bc)
-        cell = cell[isKeepCell]
+        GD = self.geo_dimension()
 
-        isValidNode = np.zeros(NN, dtype=np.bool)
-        isValidNode[cell] = True
-        node = node[isValidNode]
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
 
-        idxMap = np.zeros(NN, dtype=self.itype)
-        idxMap[isValidNode] = range(isValidNode.sum())
-        cell = idxMap[cell]
-        self.node = node
-        NN = len(node)
-        self.ds.reinit(NN, cell)
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 10  # 四面体
+        elif etype == 'face':
+            cellType = 5  # 三角形
+        elif etype == 'edge':
+            cellType = 3  # segment 
+
+        return node, cell.flatten(), cellType, len(cell)
 
     def direction(self, i):
         """ Compute the direction on every node of
