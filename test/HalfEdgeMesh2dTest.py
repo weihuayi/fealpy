@@ -413,12 +413,24 @@ class HalfEdgeMesh2dTest:
         for i in range(2):
             NC = mesh.number_of_all_cells()
             isMarkedCell = np.ones(NC, dtype=np.bool_)
-            mesh.refine_quad(isMarkedCell)
+            mesh.refine_quad_new(isMarkedCell)
         NC = mesh.number_of_all_cells()
         isMarkedCell = np.zeros(NC, dtype=np.bool_)
         isMarkedCell[[1, 3, 12,18, 20, 17, 16, 9, 7, 2, 4,6, 7, 8, 9 , 27, 15,
             8, 23, 32, 5, 24, 16, 29, 4, 7, 28, 11, 14, 22, 31, 19]] = True
         mesh.coarsen_quad(isMarkedCell)
+        if 1:
+            NC = mesh.number_of_all_cells()
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
+            isMarkedCell[[20,21,23,22,18,24,26,11,1,7,13,3,8,15,12,17]] = True
+            mesh.coarsen_quad(isMarkedCell)
+
+        for i in range(1):
+            print(i, '*************************************************')
+            NC = mesh.number_of_all_cells()
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+            mesh.refine_quad_new(isMarkedCell)
+        print(np.where(mesh.hedgecolor['color']==2)) 
         print(np.c_[np.arange(mesh.ds.NE*2), mesh.hedgecolor['color'],
             mesh.hedgecolor['level']])
         print(np.c_[np.arange(mesh.ds.NE*2), mesh.halfedgedata['level']])
