@@ -708,7 +708,7 @@ class TriangleMesh(Mesh2d):
             Dlambda[:,2,:] = np.cross(n, v2)/length.reshape((-1,1))
         return Dlambda
 
-    def jacobi_matrix(self, index=None):
+    def jacobi_matrix(self, index=np.s_[:]):
         """
         Return
         ------
@@ -718,7 +718,6 @@ class TriangleMesh(Mesh2d):
         """
         node = self.node
         cell = self.ds.cell
-        index = index if index is not None else np.s_[:]
         J = node[cell[index, [1, 2]]] - node[cell[index, [0]]]
         return J
 

@@ -459,14 +459,16 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, eh, optimize=True)
         cell2dof = self.cell_to_dof()
 
-    def source_vector(self, f, dim=None, p=None):
-        def u(x, index):
-            return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index, p=None))
-        bb = self.integralalg.integral(u, celltype=True, q=p+3)
-        gdof = self.number_of_global_dofs(p=p)
-        cell2dof = self.cell_to_dof(p=p)
-        b = np.bincount(cell2dof.flat, weights=bb.flat, minlength=gdof)
-        return b
+    def source_vector(self, f, celltype=False, q=None):
+        """
+
+        """
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        b = (self.basis, cell2dof, gdof)
+        F = self.integralalg.serial_construct_vector(f, b, celltype=celltype,
+                q=q) 
+        return F 
 
     def matrix_H(self, p=None):
         p = self.p if p is None else p
@@ -503,6 +505,20 @@ class ScaledMonomialSpace2d():
         q = np.sum(multiIndex, axis=1)
         H /= q + q.reshape(-1, 1) + 2
         return H
+
+    def local_projection(self, f, q=None):
+        """
+
+        Notes
+        -----
+
+        结定一个函数 f， 把它投影到缩放单项式空间
+        """
+
+        b = self.source_vector(f, celltype=True, q=q)
+        M = self.cell_mass_matrix()
+        F = inv(M)@b[:, :, None]
+        F = self.function(array=F.reshape(-1))
 
     def projection(self, f):
         """

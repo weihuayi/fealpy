@@ -4,34 +4,17 @@ from scipy.sparse import bmat, spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import MeshFactory
 from fealpy.decorator import cartesian
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-from fealpy.functionspace.femdof import multi_index_matrix2d
 
 class PDE():
+    def __init__(self,  T):
+        self.T = T
 
     def domain(self):
         return np.array([0, 1, 0, 1])
-
-    def init_mesh(self, n=1, meshtype='tri'):
-        """ generate the initial mesh
-        """
-        node = np.array([
-            (0, 0),
-            (1, 0),
-            (1, 1),
-            (0, 1)], dtype=np.float64)
-
-        if meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        else:
-            raise ValueError("".format)
-
 
     @cartesian
     def y_solution(self, p, t):
@@ -42,7 +25,8 @@ class PDE():
         return val # val.shape == x.shape
 
     @cartesian
-    def yd(self, p, t, T):
+    def yd(self, p, t):
+        T = self.T
         x = p[..., 0]
         y = p[..., 1]
         pi = np.pi
@@ -51,7 +35,6 @@ class PDE():
                 *np.sin(pi*x)*np.sin(pi*y) \
                 + (1 - T + t)*pi**2*np.sin(pi*x)*np.sin(pi*y)
         return val # val.shape == x.shape
-
 
     @cartesian
     def p_solution(self, p, t):
@@ -127,7 +110,6 @@ class PDE():
                 + (1 - T + t)*pi*np.sin(pi*x)*np.cos(pi*y)/2
         return val # val.shape == x.shape
 
-
     @cartesian
     def source(self, p, t):
         x = p[..., 0]
@@ -138,41 +120,35 @@ class PDE():
                 - (4/(pi**2) - np.sin(pi*x)*np.sin(pi*y))*np.sin(pi*t)
         return val
 
+
 class Model():
     def __init__(self, pde, mesh, timeline):
         self.pde = pde
         self.mesh = mesh
-        NC = mesh.number_of_cells()
-        self.integrator = mesh.integrator(3, 'cell')
-        self.bc = mesh.entity_barycenter('cell')
-        self.ec = mesh.entity_barycenter('edge')
-        self.cellmeasure = mesh.entity_measure('cell')
+
         self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=0)
         self.pspace = self.uspace.smspace 
 
         self.timeline = timeline
         NL = timeline.number_of_time_levels()
-        self.dt = timeline.current_time_step_length()
 
         # state variable
         self.yh = self.pspace.function(dim=NL)
         self.uh = self.pspace.function(dim=NL)
         self.tph = self.uspace.function(dim=NL)
         self.ph = self.uspace.function()
-        self.yh[:, 0] = pde.y_solution(self.bc, 0)
+
+        f = cartesian(lambda p: pde.y_solution(p, 0))
+        self.yh[:, 0] = self.pspace.local_projection(f) 
 
         # costate variable
         self.zh = self.pspace.function(dim=NL)
         self.tqh = self.uspace.function(dim=NL)
         self.qh = self.uspace.function()
 
-
         self.A = self.uspace.stiff_matrix() # RT 质量矩阵
-        self.D = self.uspace.div_matrix() # TODO: 确定符号, 符号为正
-        data = self.cellmeasure*np.ones(NC, )
-        self.M = spdiags(data, 0, NC, NC)
-
-#        self.M = self.pspace.cell_mass_matrix() # 每个单元上是 1 x 1 的矩阵i
+        self.D = self.uspace.div_matrix() # (p, \div v) 
+        self.M = self.pspace.mass_matrix()
 
     def get_state_current_right_vector(self, sp, nt):
         '''
