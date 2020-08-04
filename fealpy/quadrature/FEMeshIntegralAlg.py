@@ -250,9 +250,15 @@ class FEMeshIntegralAlg():
         if (len(phi.shape) - len(val.shape)) == 1:
             # f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
             # f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
-            bb = np.einsum('i, ij..., ijk..., j->jk', ws, val, phi, self.cellmeasure)
+            if len(val.shape) == 2: #TODO: einsum have bug for ...?
+                bb = np.einsum('i, ij, ijk, j->jk', ws, val, phi, self.cellmeasure)
+            else:
+                bb = np.einsum('i, ijn, ijkn, j->jk', ws, val, phi, self.cellmeasure)
+
             if celltype:
                 return bb
+            print(cell2dof.shape)
+            print(bb.shape)
             shape = (gdof, )
             F = np.zeros(shape, dtype=mesh.ftype)
             np.add.at(F, cell2dof, bb)

@@ -34,7 +34,6 @@ class HighOrderTriangleMesh(Mesh2d):
 
     def to_vtk(self, etype='cell', index=np.s_[:]):
         """
-
         Parameters
         ----------
 
