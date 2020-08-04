@@ -20,7 +20,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 
-from fealpy.decorator import cartesian
+from fealpy.decorator import cartesian, timer
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
 from fealpy.functionspace import ScaledMonomialSpace3d 
@@ -76,6 +76,7 @@ class ConcentrationData_0:
     def dirichlet(self, p): # 这里在边界上，始终知道边界外面的浓度
         x = p[..., 0]
         y = p[..., 1]
+        z = p[..., 2]
         val = np.zeros(p.shape[:-1], dtype=np.float64)
         flag0 = (x < 0.1) & (y < 0.1) & (np.abs(z-1) < 1e-12)
         val[flag0] = 1 
@@ -103,6 +104,7 @@ class ConcentrationDG3d():
         # 初始浓度场设为 0 
         ldof = self.cspace.number_of_local_dofs()
 
+        print("cell_mass_matrix:")
         self.M = self.cspace.cell_mass_matrix() 
         self.H = inv(self.M)
         self.set_init_velocity_field() # 计算初始的速度场和压力场
@@ -115,6 +117,7 @@ class ConcentrationDG3d():
         self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
         self.cellType = cellType
 
+    @timer
     def set_init_velocity_field(self):
         """
 
@@ -136,7 +139,7 @@ class ConcentrationDG3d():
         C = M[:, 0, :].reshape(-1)
         A = uspace.stiff_matrix()
         B = uspace.div_matrix()
-        F1 = -uspace.source_vector(vdata.source) # 注意这里前面要加一个负号
+        F1 = uspace.source_vector(vdata.source) 
 
         AA = bmat([[A, -B, None], [-B.T, None, C[:, None]], [None, C, None]], format='csr')
 
@@ -171,6 +174,7 @@ class ConcentrationDG3d():
         uh = self.uh 
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
+
         # 这里没有考虑源项，F 只考虑了单元内的流入和流出
         F = self.uspace.convection_vector(nt, ch, uh, g=self.cdata.dirichlet) 
 
@@ -228,7 +232,6 @@ class ConcentrationDG3d():
 
         uh = self.uh 
         V = uh.value(bc)
-        V = np.r_['1', V, np.zeros((len(V), 1), dtype=np.float64)]
         val = vnp.numpy_to_vtk(V)
         val.SetName('velocity')
         cdata.AddArray(val)
@@ -256,7 +259,7 @@ class ConcentrationDG3d():
 if __name__ == '__main__':
 
     """
-    python3 ConcentrationDG3d.py 1 2 500 20 /home/why/result/c/3d
+    python3 ConcentrationDG3d.py 0 20 20000 500 /home/why/result/c/3d
     """
 
     mf = MeshFactory()
@@ -264,7 +267,7 @@ if __name__ == '__main__':
     m = int(sys.argv[1])
     if m == 0:
         mesh = mf.boxmesh3d([0, 1, 0, 1, 0, 1], 
-                nx=20, ny=20, nz=20, meshtype='tet')
+                nx=10, ny=10, nz=10, meshtype='tet')
         vdata = VelocityData_0()
         cdata = ConcentrationData_0()
 

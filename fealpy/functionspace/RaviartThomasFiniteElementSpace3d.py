@@ -286,7 +286,7 @@ class RaviartThomasFiniteElementSpace3d:
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NF, fdof, 2)
 
         idx0 = face2cell[index, 0][:, None]
-        idx2 = face2cell[index[:, None], [2]]*fdof + np.arange(fdof)
+        idx2 = face2cell[index, 2][:, None]*fdof + np.arange(fdof)
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NF, ldof, edof) 
         idx = self.smspace.face_index_1(p=p+1)
 
@@ -362,6 +362,16 @@ class RaviartThomasFiniteElementSpace3d:
     @barycentric
     def grad_basis(self, bc):
         pass
+
+    @barycentric
+    def face_value(self, uh, bc, index=np.s_[:]):
+        phi = self.face_basis(bc, index=index)
+        face2dof = self.dof.face_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[face2dof])
+        return val
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
@@ -447,11 +457,13 @@ class RaviartThomasFiniteElementSpace3d:
         B = self.integralalg.serial_construct_matrix(b0, b1=b1, q=q)
         return B 
 
-    def source_vector(self, f, q=None):
-        cell2dof = self.smspace.cell_to_dof()
-        gdof = self.smspace.number_of_global_dofs()
-        b = self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
-        return b
+    def source_vector(self, f, celltype=False, q=None):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        b = (self.basis, cell2dof, gdof)
+        F = self.integralalg.serial_construct_vector(f, b,
+                celltype=celltype, q=q) 
+        return F 
 
     def set_neumann_bc(self, g, threshold=None, q=None):
         """
@@ -484,7 +496,7 @@ class RaviartThomasFiniteElementSpace3d:
         phi = self.face_basis(bcs, index=index) 
 
         ps = mesh.bc_to_point(bcs, etype='face', index=index)
-        val = -g(ps)
+        val = g(ps)
         measure = self.integralalg.facemeasure[index]
 
         gdof = self.number_of_global_dofs()
@@ -520,7 +532,7 @@ class RaviartThomasFiniteElementSpace3d:
 
         ps = mesh.bc_to_point(bcs, etype='face', index=index)
         fn = mesh.face_unit_normal(index=index)
-        val = -g(ps, fn)
+        val = g(ps, fn)
         phi = self.smspace.face_basis(ps, index=index)
 
         measure = self.integralalg.facemeasure[index]
