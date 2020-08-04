@@ -422,7 +422,8 @@ class ScaledMonomialSpace3d():
     def cell_mass_matrix(self, p=None):
         """
         """
-        M = self.integralalg.construct_matrix(self.basis)
+        b = (self.basis, None, None)
+        M = self.integralalg.serial_construct_matrix(b)
         return M 
 
     def face_mass_matrix(self, p=None):

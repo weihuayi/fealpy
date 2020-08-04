@@ -156,7 +156,6 @@ class ConcentrationDG3d():
         T = spdiags(1-bdIdx, 0, gdof, gdof)
         AA = T@AA@T + Tbd
         FF[isBdDof] = x[isBdDof]
-        print("test!")
         x[:] = spsolve(AA, FF)
         uh[:] = x[:udof]
         ph[:] = x[udof:-1]
@@ -268,7 +267,7 @@ if __name__ == '__main__':
     m = int(sys.argv[1])
     if m == 0:
         mesh = mf.boxmesh3d([0, 1, 0, 1, 0, 1], 
-                nx=20, ny=20, nz=20, meshtype='tet')
+                nx=10, ny=10, nz=10, meshtype='tet')
         vdata = VelocityData_0()
         cdata = ConcentrationData_0()
 
