@@ -419,6 +419,16 @@ class RaviartThomasFiniteElementSpace2d:
         val = np.einsum(s1, phi, uh[edge2dof])
         return val
 
+    @barycentric
+    def face_value(self, uh, bc, index=np.s_[:]):
+        phi = self.edge_basis(bc, index=index)
+        edge2dof = self.dof.edge_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
+
     def function(self, dim=None, array=None):
         f = Function(self, dim=dim, array=array)
         return f
@@ -470,11 +480,13 @@ class RaviartThomasFiniteElementSpace2d:
         B = self.integralalg.serial_construct_matrix(b0, b1=b1, q=q)
         return B 
 
-    def source_vector(self, f, dim=None):
-        cell2dof = self.smspace.cell_to_dof()
-        gdof = self.smspace.number_of_global_dofs()
-        b = self.integralalg.construct_vector_s_s(f, self.smspace.basis, cell2dof, gdof=gdof) 
-        return b
+    def source_vector(self, f, celltype=False, q=None):
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+        b = (self.basis, cell2dof, gdof)
+        F = self.integralalg.serial_construct_vector(f, b,
+                celltype=celltype, q=q) 
+        return F 
 
 
     def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):

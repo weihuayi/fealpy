@@ -519,6 +519,7 @@ class ScaledMonomialSpace2d():
         M = self.cell_mass_matrix()
         F = inv(M)@b[:, :, None]
         F = self.function(array=F.reshape(-1))
+        return F
 
     def projection(self, f):
         """
