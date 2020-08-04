@@ -250,6 +250,10 @@ class FEMeshIntegralAlg():
         if (len(phi.shape) - len(val.shape)) == 1:
             # f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
             # f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
+            print('val', val.shape)
+            print('phi', phi.shape)
+            print('ws', ws.shape)
+            print('area', self.cellmeasure.shape)
             bb = np.einsum('i, ij..., ijk..., j->jk', ws, val, phi, self.cellmeasure)
             if celltype:
                 return bb

@@ -459,7 +459,7 @@ class RaviartThomasFiniteElementSpace2d:
         A = self.integralalg.serial_construct_matrix(b0, q=q)
         return A
 
-    def div_matrix(self):
+    def div_matrix(self, q = None):
         gdof0 = self.number_of_global_dofs()
         cell2dof0 = self.cell_to_dof()
         b0 = (self.div_basis, cell2dof0, gdof0)
