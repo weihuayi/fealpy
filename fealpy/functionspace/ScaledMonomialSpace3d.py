@@ -385,8 +385,6 @@ class ScaledMonomialSpace3d():
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        print(phi.shape)
-        print(uh[cell2dof[index]].shape)
         return np.einsum(s1, phi, uh[cell2dof[index]]) #TODO: phi[:, index]?
 
     @cartesian
