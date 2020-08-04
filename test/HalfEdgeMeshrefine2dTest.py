@@ -8,7 +8,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 
 from fealpy.writer import MeshWriter
-from fealpy.mesh import HalfEdgeMesh2d
+from fealpy.mesh.HalfEdgeMeshrefine2d import HalfEdgeMesh2d
 from fealpy.mesh import HalfEdgeMesh
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
@@ -573,6 +573,7 @@ class HalfEdgeMesh2dTest:
             if method == 'rg':
                 isMarkedCell = np.zeros(NE*2, dtype=np.bool_)
                 isMarkedCell[[4, 1, 8, 10, 12, 11, 3]]
+                print('*************lll*********8')
                 mesh.coarsen_triangle_rg(isMarkedCell)
             else:
                 color[[2,3,10,11]] = 1
