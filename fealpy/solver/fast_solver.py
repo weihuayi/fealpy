@@ -5,9 +5,13 @@ from scipy.sparse import spdiags, eye, bmat, tril, triu
 from scipy.sparse.linalg import cg, inv, dsolve,  gmres, LinearOperator, spsolve_triangular
 import pyamg
 
+class LagrangeFEMFastSolver():
+    def __init__(self, A, F, P):
+        self.A = A
+        self.F = F
+        self.P = P
 
 class SaddlePointFastSolver():
-
     def __init__(self, A, F):
         """
 
@@ -76,3 +80,6 @@ class SaddlePointFastSolver():
         x, exitCode = gmres(A, F, M=P, tol=1e-8)
 
         return x[:m], x[m:] 
+
+
+
