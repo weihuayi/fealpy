@@ -32,8 +32,8 @@ class SaddlePointFastSolver():
 
         self.D = 1.0/M.diagonal() # M 矩阵的对角线的逆
         # S 相当于间断元的刚度矩阵
-        self.S = B.T@spdiags(self.D, 0, M.shape[0], M.shape[1])@B 
-        self.ml = pyamg.ruge_stuben_solver(self.S) # 这里要求必须有网格内部节点 
+        S = B.T@spdiags(self.D, 0, M.shape[0], M.shape[1])@B 
+        self.ml = pyamg.ruge_stuben_solver(S) # 这里要求必须有网格内部节点 
 
         # TODO：把间断元插值到连续元线性元空间，然后再做 AMG
 
@@ -42,11 +42,10 @@ class SaddlePointFastSolver():
         B = self.A[1]
         m = M.shape[0]
         n = B.shape[1]
-
         r = np.zeors_like(b)
-        #r[:m] = M@ 
-        
-
+        r[:m] = M@b[:m] + B@b[m:]
+        r[m:] = B.T@b[:m]
+        return r
 
     def diag_preconditioner(self, b):
         D = self.D
@@ -69,9 +68,11 @@ class SaddlePointFastSolver():
 
         m = M.shape[0]
         n = B.shape[1]
+        gdof = m + n
 
-        A = bmat([[M, B], [B.T, None]], format='csr')
         F = np.r_[self.F[0], self.F[1]]
+        A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
+        P = LinearOperator((gdof, gdof), matvec=self.diag_preconditioner)
+        x, exitCode = gmres(A, F, M=P, tol=1e-8)
 
-        P = LinearOperator((gdof, gdof), matvec=self.linear_operator)
-        x, exitCode = gmres(AA, bb, M=P, tol=1e-8)
+        return x[:m], x[m:] 
