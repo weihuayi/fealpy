@@ -570,6 +570,21 @@ class FEMeshIntegralAlg():
                 e = np.einsum(s1, ws, f, self.cellmeasure)
         return e
 
+    def mesh_integral(self, u, etype='cell', q=None):
+        """
+
+        Notes
+        -----
+            计算函数 u 在指定网格实体上的整体积分。
+        """
+        if etype == 'cell':
+            e = np.sum(self.cell_integral(u, q=q))
+        elif etype == 'face':
+            e = np.sum(self.face_integral(u, q=q))
+        elif etype == 'edge':
+            e = np.sum(self.edge_integral(u, q=q))
+
+        return e
 
     def error(self, u, v, power=2, celltype=False, q=None):
         """
@@ -624,17 +639,17 @@ class FEMeshIntegralAlg():
             e = np.power(np.sum(e, axis=tuple(range(1, len(e.shape)))), 1/power)
         return e
 
-    # old api 
+# old api 
     def integral(self, u, celltype=False, barycenter=True):
         """
-        """
+            """
         qf = self.integrator
-        bcs = qf.quadpts # 积分点 (NQ, 3)
-        ws = qf.weights # 积分点对应的权重 (NQ, )
-        if barycenter or u.coordtype == 'barycentric':
+        bcs = qf.quadpts  # 积分点 (NQ, 3)
+        ws = qf.weights  # 积分点对应的权重 (NQ, )
+        if barycenter:
             val = u(bcs)
         else:
-            ps = self.mesh.bc_to_point(bcs) # (NQ, NC, 2)
+            ps = self.mesh.bc_to_point(bcs)  # (NQ, NC, 2)
             val = u(ps)
         dim = len(ws.shape)
         s0 = 'abcde'
@@ -644,7 +659,6 @@ class FEMeshIntegralAlg():
             return e
         else:
             return e.sum()
-
 
     def L2_norm(self, uh, celltype=False):
         def f(x):
