@@ -89,7 +89,7 @@ class ScaledMonomialSpace2d():
                     self.mesh, q,
                     cellmeasure=self.cellmeasure,
                     cellbarycenter=self.cellbarycenter)
-        elif mtype == 'tri':
+        else:
             self.integralalg = FEMeshIntegralAlg(
                     self.mesh, q,
                     cellmeasure=self.cellmeasure)

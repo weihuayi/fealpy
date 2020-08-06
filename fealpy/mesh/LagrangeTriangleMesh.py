@@ -5,17 +5,26 @@ from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 from .TriangleMesh import TriangleMesh
 
+from .multi_index import multi_index_matrix1d
 from .multi_index import multi_index_matrix2d
+from .multi_index import multi_index_matrix3d
 
 class LagrangeTriangleMesh(Mesh2d):
-    def __init__(self, node, cell, p=1):
+    def __init__(self, node, cell, p=1, surface=None):
 
         mesh = TriangleMesh(node, cell) 
         dof = LagrangeTriangleDof2d(mesh, p)
 
         self.p = p
         self.node = dof.interpolation_points()
+
+        if surface is not None:
+            self.node, _ = surface.project(self.node)
+   
         self.ds = LagrangeTriangleMeshDataStructure(dof)
+
+        self.TD = 2
+        self.GD = node.shape[1]
 
         self.meshtype = 'ltri'
         self.ftype = mesh.ftype
@@ -23,6 +32,8 @@ class LagrangeTriangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+
+        self.multi_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
 
     def vtk_cell_type(self, etype='cell'):
         """
@@ -70,6 +81,98 @@ class LagrangeTriangleMesh(Mesh2d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+    def cell_area(self, index=None):
+        pass
+
+    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+        node = self.node
+        entity = self.entity(etype) # default  cell
+        phi = self.lagrange_basis(bc, etype=etype) # (NQ, 1, ldof)
+        p = np.einsum('ijk, jkn->ijn', phi, node[entity[index]])
+        return p
+
+    def lagrange_basis(self, bc, etype='cell'):
+        p = self.p   # the degree of lagrange basis function
+
+        if etype in {'cell', 2}:
+            TD = 2
+        elif etype in {'edge', 'face', 1}:
+            TD = 1
+
+        multiIndex = self.multi_index_matrix[TD-1](p)
+
+        c = np.arange(1, p+1, dtype=np.int)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi[..., np.newaxis, :] # (..., 1, ldof)
+
+    def jacobi_matrix(self, bc, index=np.s_[:]):
+        mesh = self.mesh
+        cell = mesh.entity('cell')
+        grad = self.grad_basis(bc, index=index)
+
+        # the tranpose of the jacobi matrix between S_h and K
+        NV = self.ds.number_of_nodes_of_cells()
+        J = node[cell[index, [NV-1-p, NV-1]]] - node[cell[index, [0]]]
+        Jh = mesh.jacobi_matrix(index=index)
+
+        # the tranpose of the jacobi matrix between S_p and S_h
+        Jph = np.einsum(
+                'ijm, ...ijk->...imk',
+                self.node[cell2dof[index], :],
+                grad)
+
+        # the transpose of the jacobi matrix between S_p and K
+        Jp = np.einsum('...ijk, imk->...imj', Jph, Jh)
+        grad = np.einsum('ijk, ...imk->...imj', Jh, grad)
+        return Jp, grad
+
+    def grad_basis(self, bc, index=np.s_[:]):
+
+        p = self.p   # the degree of polynomial basis function
+        TD = self.TD
+
+        multiIndex = self.multi_index_matrix[TD](p) 
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        # Dlambda = self.mesh.grad_lambda()
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
+        return gphi #(..., NC, ldof, GD)
 
     def print(self):
 

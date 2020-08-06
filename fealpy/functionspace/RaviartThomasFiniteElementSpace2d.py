@@ -493,6 +493,37 @@ class RaviartThomasFiniteElementSpace2d:
         B = self.integralalg.serial_construct_matrix(b0, b1=b1, q=q)
         return B 
 
+    def pressure_matrix(self, ch, q=None):
+        """
+
+        Notes
+        ----
+            物质在单元上流入流出，是单元压力变化的原因。
+
+            ch 是要考虑的的 n 种物质的浓度
+
+            c_0 = ch.index(0)
+            c_1 = ch.index(1)
+            c_2 = ch.index(2)
+            .....
+            c_{n-1} = ch.index(n-1)
+
+            目前仅考虑 p= 0 的情形，
+
+            < V_i c_i v\cdot n, w>_{\partial K}, 
+            其中 V_i 是混合物的第 i 个组分偏摩尔体积，现在设为 1.
+
+        TODO
+        ----
+            1. 考虑变化的 V_i 
+        """
+
+        mesh = self.mesh
+        edge2cell = mesh.ds.edge_to_cell()
+        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+
+
+
     def source_vector(self, f, celltype=False, q=None):
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -500,7 +531,6 @@ class RaviartThomasFiniteElementSpace2d:
         F = self.integralalg.serial_construct_vector(f, b,
                 celltype=celltype, q=q) 
         return F 
-
 
     def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):
         """

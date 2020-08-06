@@ -15,6 +15,7 @@ mesh.add_plot(axes)
 mesh.find_cell(axes, showindex=True)
 mesh.find_node(axes, showindex=True)
 
+mesh.init_level_info()
 mesh.uniform_refine(n=3)
 
 node = mesh.entity('node')

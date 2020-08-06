@@ -46,6 +46,18 @@ class LagrangeTriangleMeshTest():
         mesh = LagrangeTriangleMesh(node, cell, p=p)
         mesh.to_vtk(fname=fname)
 
+    def surface_mesh(self, p=2, fname='surface.vtu'):
+        from fealpy.geometry import SphereSurface
+
+        surface = SphereSurface()
+        mesh = surface.init_mesh()
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
+        lmesh.to_vtk(fname=fname)
+
 
 test = LagrangeTriangleMeshTest()
 
@@ -56,3 +68,7 @@ elif sys.argv[1] == 'save_mesh':
     p = int(sys.argv[2])
     fname = sys.argv[3]
     test.save_mesh(p=p, fname=fname)
+elif sys.argv[1] == 'surface_mesh':
+    p = int(sys.argv[2])
+    fname = sys.argv[3]
+    test.surface_mesh(p=p, fname=fname)
