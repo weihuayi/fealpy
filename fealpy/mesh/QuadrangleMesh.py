@@ -42,9 +42,11 @@ class QuadrangleMesh(Mesh2d):
         cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
         self.ds.reinit(NN, cell)
 
-    def integrator(self, k):
-        return QuadrangleQuadrature(k)
-
+    def integrator(self, k, etype='cell'):
+        if etype in {'cell', 2}:
+            return QuadrangleQuadrature(k)
+        elif etype in {'edge', 'face', 1}:
+            return GaussLegendreQuadrature(k)
 
     def area(self, index=np.s_[:]):
         return self.cell_area(index=index)

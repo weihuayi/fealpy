@@ -49,16 +49,17 @@ from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
 class Model1():
-    def __init__(self):
-        self.domain = [0, 50, 0, 50]
-        self.mesh = MeshFactory().regular(self.domain, n=50)
-        self.timeline = UniformTimeLine(0, 1, 100) 
-        self.space0 = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
-        self.space1 = ScaledMonomialSpace2d(self.mesh, p=1) # 线性间断有限元空间
+    def __init__(self, mesh, timeline):
+        self.mesh = mesh 
+        self.timeline = timeline 
+        self.uspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
+        self.cspace = ScaledMonomialSpace2d(self.mesh, p=1) # 线性间断有限元空间
 
-        self.vh = self.space0.function() # 速度
-        self.ph = self.space0.smspace.function() # 压力
-        self.ch = self.space1.function(dim=3) # 三个组分的摩尔密度
+        self.uh = self.uspace.function() # 速度
+        self.ph = self.uspace.smspace.function() # 压力
+        # 三个组分的摩尔密度, 只要算其中 c_0, c_1 
+        self.ch = self.cspace1.function(dim=3) 
+
         self.options = {
                 'viscosity': 1.0, 
                 'permeability': 1.0,
@@ -67,17 +68,15 @@ class Model1():
                 'porosity': 0.2,
                 'injecttion_rate': 0.1,
                 'compressibility': (0.001, 0.001, 0.001),
-                'pmv': (1.0, 1.0, 1.0),
-                'dt': self.timeline.dt}
+                'pmv': (1.0, 1.0, 1.0)}
 
         
         c = self.options['viscosity']/self.options['permeability']
-        self.A = c*self.space0.mass_matrix()
-        self.B = self.space0.div_matrix()
+        self.M = c*self.uspace.mass_matrix()
+        self.B = -self.uspace.div_matrix()
 
         phi = self.options['porosity']
-        self.M = phi/dt*self.space0.smspace.mass_matrix() #  
-        self.MC = self.space1.cell_mass_matrix()/dt
+        self.C = phi*self.uspace.smspace.mass_matrix() #  
 
     def get_current_pv_matrix(self, data):
         """
