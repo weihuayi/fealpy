@@ -547,50 +547,6 @@ class HalfEdgeMesh2dTest:
                 #print(np.c_[np.arange(len(mesh.hedgecolor)), mesh.hedgecolor])
                 plt.show()
 
-    def coarsen_tri(self, maxit = 2, method = 'rg', plot=True, rb=True):
-        cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
-        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
-
-        if True:
-            mesh = TriangleMesh(node, cell)
-            mesh = HalfEdgeMesh2d.from_mesh(mesh)
-            mesh.init_level_info()
-            isMarkedCell = np.array([0,1,0,0,1], dtype=np.bool_)
-            NE = mesh.ds.NE
-            color = np.zeros(NE*2, dtype=np.int_)
-            mesh.hedgecolor = color
-            mesh.refine_triangle_rg(isMarkedCell)
-            NE = mesh.ds.NE
-            color = np.zeros(NE*2, dtype=np.int_)
-            if 0:
-                fig = plt.figure()
-                axes = fig.gca()
-                mesh.add_plot(axes)
-                mesh.add_halfedge_plot(axes, showindex=True)
-                mesh.find_node(axes, showindex=True)
-                mesh.find_cell(axes, showindex=True)
-                plt.show()
-            if method == 'rg':
-                isMarkedCell = np.zeros(NE*2, dtype=np.bool_)
-                isMarkedCell[[4, 1, 8, 10, 12, 11, 3]]
-                mesh.coarsen_triangle_rg(isMarkedCell)
-            else:
-                color[[2,3,10,11]] = 1
-                mesh.hedgecolor = color
-                isMarkedCell = np.array([0, 1, 1, 0, 0], dtype=np.bool_)
-                #isMarkedCell = np.array([0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 ,0],
-                 #       dtype=np.bool_)
-                mesh.refine_triangle_nvb(isMarkedCell)
-                mesh.print()
-            if plot:
-                fig = plt.figure()
-                axes = fig.gca()
-                mesh.add_plot(axes)
-                mesh.add_halfedge_plot(axes, showindex=True)
-                mesh.find_node(axes, showindex=True)
-                mesh.find_cell(axes, showindex=True)
-                plt.show()
-
     def convexity(self):
         node = np.array([[0, 0], [2, 0], [2, 1], [1, 1], [1, 2], [1, 3], 
             [1, 4], [2, 4], [2, 5], [0, 5], [0, 2]], dtype
@@ -642,5 +598,3 @@ elif sys.argv[1] == "convexity":
     test.convexity()
 elif sys.argv[1] == "coarsen_quad":
     test.coarsen_quad()
-elif sys.argv[1] == "coarsen_tri":
-    test.coarsen_tri()

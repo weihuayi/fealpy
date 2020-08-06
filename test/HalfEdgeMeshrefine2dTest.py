@@ -571,17 +571,23 @@ class HalfEdgeMesh2dTest:
                 mesh.find_cell(axes, showindex=True)
                 plt.show()
             if method == 'rg':
-                NC = mesh.number_of_all_cells()
-                isMarkedCell = np.zeros(NC, dtype=np.bool_)
-                isMarkedCell[[4, 1, 8, 10, 12, 11, 3]] = True
-                print('*************lll*********')
-                mesh.coarsen_triangle_rg(isMarkedCell)
                 if 1:
                     NC = mesh.number_of_all_cells()
                     isMarkedCell = np.zeros(NC, dtype=np.bool_)
-                    isMarkedCell[[0, 1, 2, 3, 4, 5, 6]] = True
+                    isMarkedCell[[1, 2, 5, 6, 7, 9]] = True
                     print('*************lll*********')
                     mesh.coarsen_triangle_rg(isMarkedCell)
+                if 1:
+                    NC = mesh.number_of_all_cells()
+                    isMarkedCell = np.zeros(NC, dtype=np.bool_)
+                    isMarkedCell[[0, 1, 2, 3, 4, 5, 6, 7]] = True
+                    print('*************lll*********')
+                    mesh.coarsen_triangle_rg(isMarkedCell)
+                    NC = mesh.number_of_all_cells()
+                    isMarkedCell = np.ones(NC, dtype=np.bool_)
+                    print('*************lll*********')
+                    mesh.refine_triangle_rg(isMarkedCell)
+
             else:
                 color[[2,3,10,11]] = 1
                 mesh.hedgecolor = color

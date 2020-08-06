@@ -1623,7 +1623,6 @@ class HalfEdgeMesh2d(Mesh2d):
         cidxmap[halfedge[opp[flag], 1]] = cidxmap[halfedge[flag, 1]]
         halfedge[:, 1] = cidxmap[halfedge[:, 1]]
 
-        print(np.c_[np.arange(len(halfedge)), halfedge])
         #TODO
         cell0 = np.unique(halfedge[:, 1])
         cidxmap0 = np.arange(NC+nc)
@@ -1695,24 +1694,29 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.NC = (subdomain[:]>0).sum()
         self.ds.NE = halfedge.size//2
 
+
         #标记要生成新单元的单元
         NV = self.ds.number_of_vertices_of_all_cells()
         isBlueCell = NV == 4
         isNewCell = (NV == 4)|(NV == 6)
+        isNewCell[:cstart] = False
 
         NC = len(subdomain)
         NNE = ne
 
-        flag0 = clevel[halfedge[:, 1]]==clevel[halfedge[halfedge[:, 4], 1]]
-        flag2 = hlevel[:]>hlevel[halfedge[:, 4]]
-        flag = flag2 & isBlueCell[halfedge[:, 1]]
-        tmp, = np.where(flag)
         #生成新单元
-        flag = (hlevel[halfedge[:, 3]]==0) & flag0
-        flag = flag & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        flag0 = clevel[halfedge[:, 1]]!=clevel[halfedge[halfedge[:, 4], 1]]
+        flag1 = (hlevel[:]!=0) & (flag0|isNewCell[halfedge[halfedge[:, 4], 1]])
+        flag = flag1 & isNewCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        tmp = flag1 & isBlueCell[halfedge[:, 1]]#既是标记边又对应标记单元
+        tmp, = np.where(tmp)
         NC1 = flag.sum()
 
         current = np.arange(NNE*2)[flag]#被标记的边或黄色半边的下一个边
+        print(np.c_[np.arange(len(halfedge)), halfedge])
+        print(current)
+        print(np.c_[np.arange(ne*2), hlevel])
+        #return 0
         pre = halfedge[current, 3]
         ppre = halfedge[pre, 3]
         nex = halfedge[current, 2]
@@ -1773,7 +1777,6 @@ class HalfEdgeMesh2d(Mesh2d):
         color[halfedge[color==3, 4]] = 2
         color[halfedge[color==2, 3]] = 1
         self.hedgecolor = color
-        print(np.c_[np.arange(len(halfedge)), halfedge])
 
         self.ds.NN = self.node.size
         self.ds.NC = (subdomain[:]>0).sum()
