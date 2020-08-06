@@ -29,7 +29,7 @@ class HalfEdgeMesh2d(Mesh2d):
         Parameters
         ----------
         node : (NN, GD)
-        halfedge : (2*NE, 4), 
+        halfedge : (2*NE, 5), 
             halfedge[i, 0]: the index of the vertex the i-th halfedge point to
             halfedge[i, 1]: the index of the cell the i-th halfedge blong to
             halfedge[i, 2]: the index of the next halfedge of i-th haledge 
@@ -632,8 +632,8 @@ class HalfEdgeMesh2d(Mesh2d):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
 
-        clevel = self.celldata['level']
-        hlevel = self.halfedgedata['level']
+        if 'level' in self.halfedgedata:
+            hlevel = self.halfedgedata['level']
 
         halfedge = self.entity('halfedge')
         node = self.entity('node')
@@ -654,17 +654,22 @@ class HalfEdgeMesh2d(Mesh2d):
 
         #细分边
         newHalfedge = halfedge.increase_size(2*NE1)
-        newHlevel = hlevel.increase_size(2*NE1)
         newHedge = hedge.increase_size(NE1)
+
+        if 'level' in self.halfedgedata:
+            newHlevel = hlevel.increase_size(2*NE1)
 
         flag1 = isMainHEdge[isMarkedHEdge] # 标记加密边中的主半边
         newHedge[:] = np.arange(NE*2, NE*2+NE1*2)[flag1]
         newHalfedge[flag1, 0] = range(NN, NN+NE1) # 新的节点编号
         idx0 = np.argsort(idx) # 当前边的对偶边的从小到大进行排序
         newHalfedge[~flag1, 0] = newHalfedge[flag1, 0][idx0] # 按照排序
-        newHlevel[flag1] = np.maximum(hlevel[:NE*2][flag0],
-                hlevel[halfedge[:NE*2][flag0, 3]]) + 1
-        newHlevel[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]+1
+
+
+        if 'level' in self.halfedgedata:
+            newHlevel[flag1] = np.maximum(hlevel[:NE*2][flag0],
+                    hlevel[halfedge[:NE*2][flag0, 3]]) + 1
+            newHlevel[~flag1] = np.maximum(hlevel[idx], hlevel[halfedge[idx, 3]])[idx0]+1
 
         isMarkedHEdge = np.r_[isMarkedHEdge, np.zeros(NE1*2, dtype = np.bool_)]
         newHalfedge[:, 1] = halfedge[isMarkedHEdge, 1]

@@ -7,11 +7,10 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import HighOrderTriangleMesh, MeshFactory
+from fealpy.mesh import LagrangeTriangleMesh, MeshFactory
 
 
-
-class HighOrderTriangleMeshTest():
+class LagrangeTriangleMeshTest():
 
     def __init__(self):
         pass
@@ -24,9 +23,9 @@ class HighOrderTriangleMeshTest():
         node = mesh.entity('node')
         cell = mesh.entity('cell')
 
-        homesh = HighOrderTriangleMesh(node, cell, p=p)
-        node = homesh.entity('node')
-        homesh.print()
+        ltmesh = LagrangeTriangleMesh(node, cell, p=p)
+        node = ltmesh.entity('node')
+        ltmesh.print()
 
         if plot:
             fig = plt.figure()
@@ -37,10 +36,23 @@ class HighOrderTriangleMeshTest():
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
+    def save_mesh(self, p=2, fname='test.vtu'):
+        mf = MeshFactory()
+
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx =2, ny=2, meshtype='tri')
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        mesh = LagrangeTriangleMesh(node, cell, p=p)
+        mesh.to_vtk(fname=fname)
 
 
-test = HighOrderTriangleMeshTest()
+test = LagrangeTriangleMeshTest()
 
 if sys.argv[1] == 'show_mesh':
     p = int(sys.argv[2])
     test.show_mesh(p=p)
+elif sys.argv[1] == 'save_mesh':
+    p = int(sys.argv[2])
+    fname = sys.argv[3]
+    test.save_mesh(p=p, fname=fname)

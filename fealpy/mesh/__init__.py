@@ -24,7 +24,7 @@ from .CVTPMesher import CVTPMesher
 from .ATriMesher import ATriMesher
 from .MeshFactory import MeshFactory
 
-from .HighOrderTriangleMesh import HighOrderTriangleMesh
+from .LagrangeTriangleMesh import LagrangeTriangleMesh
 
 from .Tritree import Tritree
 from .Quadtree import Quadtree
