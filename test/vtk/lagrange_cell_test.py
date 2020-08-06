@@ -56,6 +56,21 @@ elif sys.argv[1] == 'tet':
     s1 = np.sum(mi[:, 2:], axis=-1)
     idx = s0*(s0+1)*(s0+2)//6 + s1*(s1+1)//2 + mi[:, 3]
     print(np.sort(idx))
+elif sys.argv[1] == 'quad':
+    order = int(sys.argv[2])
+    orders = (order, order)
+    sizes = (order + 1, order + 1)
+    quad = vtk.vtkLagrangeQuadrilateral()
+    nPoints = (order + 1)*(order + 1)
+    print(np.ndindex(sizes))
+    loc_to_cart = np.empty(nPoints, dtype='object')
+    for loc in np.ndindex(sizes):
+        print(loc)
+        idx = quad.PointIndexFromIJK(loc[0], loc[1], orders)
+        cart = np.array([c / o for (c, o) in zip(loc, orders)])
+        loc_to_cart[idx] = cart
+
+    print(loc_to_cart)
  
 
 if False:
