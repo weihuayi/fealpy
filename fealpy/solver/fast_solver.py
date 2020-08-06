@@ -2,10 +2,19 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg, inv, dsolve,  gmres, LinearOperator, spsolve_triangular
+from scipy.sparse.linalg import cg, inv, dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular
 import pyamg
 
 from ..decorator import timer
+
+class IterationCounter(object):
+    def __init__(self, disp=True):
+        self._disp = disp
+        self.niter = 0
+    def __call__(self, rk=None):
+        self.niter += 1
+        if self._disp:
+            print('iter %3i\trk = %s' % (self.niter, str(rk)))
 
 class LagrangeFEMFastSolver():
     def __init__(self, A, F, P):
@@ -84,11 +93,13 @@ class SaddlePointFastSolver():
         n = B.shape[1]
         gdof = m + n
 
+        counter = IterationCounter()
         F = np.r_[self.F[0], self.F[1]]
         A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
         P = LinearOperator((gdof, gdof), matvec=self.diag_preconditioner)
-        x, exitCode = gmres(A, F, M=P, tol=1e-8)
-        print(exitCode)
+        x, info = lgmres(A, F, M=P, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of gmres:", counter.niter)
 
         return x[:m], x[m:] 
 
