@@ -257,8 +257,6 @@ class FEMeshIntegralAlg():
 
             if celltype:
                 return bb
-            print(cell2dof.shape)
-            print(bb.shape)
             shape = (gdof, )
             F = np.zeros(shape, dtype=mesh.ftype)
             np.add.at(F, cell2dof, bb)

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace.Function import Function
-from fealpy.decorator import cartesian
+from fealpy.decorator import cartesian, barycentric
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 
@@ -160,7 +160,6 @@ class Model():
         nt: 表示 n-1 时间层,要求的是 n 个时间层的方程
         '''
         dt = self.timeline.current_time_step_length()
-        NC = self.mesh.number_of_cells()
         u = self.uh[:, nt+1]
         NE = self.mesh.number_of_edges()
         # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
@@ -185,8 +184,6 @@ class Model():
         '''
         dt = self.timeline.current_time_step_length()
         NL = self.timeline.number_of_time_levels()
-        NC = self.mesh.number_of_cells()
-        tpd = self.uspace.function()
  
         #  f1 = -\sum_{i=1}^n-1\Delta t (q^i, v)
         f1 = -sq
@@ -194,7 +191,6 @@ class Model():
         # f2 = (\tilde p^n_h - \tilde p^n_d, v)
         b = self.uspace.source_vector(cartesian(lambda x: self.pde.tpd(x,
             (NL-nt-1)*dt)))
-
         f2 = self.A@self.tph[:, NL-nt-1] - b
 
         # f3 = \Delta t(y^n_h - y^n_d, w) + (z^n_h, w)
@@ -202,7 +198,6 @@ class Model():
             (NL-nt-1)*dt)))
         bb1 = self.M@self.zh[:, NL-nt-1]
         bb2 = dt*self.M@self.yh[:, NL-nt-1] - dt*bb0
-
         f3 = bb1 + bb2
 
         return np.r_[f1, f2, f3]
@@ -227,7 +222,6 @@ class Model():
         timeline = self.timeline
         dt = timeline.current_time_step_length()
         timeline.reset()
-        NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
         sp = np.zeros(NE, dtype=self.mesh.ftype)
         while not timeline.stop():
@@ -259,7 +253,6 @@ class Model():
             e = self.pspace.integralalg.cell_integral(cartesian(zh1))
             self.uh[:, NL-timeline.current-1] = max(0, np.sum(e)/np.sum(cellmeasure)) \
                             - self.zh[:, NL - timeline.current-2]
-
             timeline.current += 1
             sq = sq + dt*self.A@self.qh
         timeline.reset()
@@ -279,7 +272,7 @@ class Model():
             uI[:, timeline.current+1] = self.pde.u_solution(bc, (timeline.current+1)*dt)
             timeline.current += 1
         timeline.reset()
-        print('ui', uI)
+ #       print('ui', uI)
         while eu > 1e-12 and k < maxit:
             yh1 = self.yh.copy()
             sp = self.state_solve()
@@ -289,7 +282,7 @@ class Model():
             print('eu', eu)
             print('k', k)
 
-        print('uh', self.uh)
+#        print('uh', self.uh)
         return sp, sq
 
     def L2error(self):
@@ -297,14 +290,14 @@ class Model():
         NL = self.timeline.number_of_time_levels()
         T = dt*(NL-1)
 
-        pL2error = self.uspace.integralalg.L2_error(lambda x: \
-                self.pde.p_solution(x, T), self.ph)
+        pL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.p_solution(x, T)), barycentric(self.ph))
         print(pL2error)
-        tpL2error = self.uspace.integralalg.L2_error(lambda x: \
-                self.pde.tp_solution(x, T), \
-                self.uspace.function(array=self.tph[:, NL-1])) 
+        tpL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.tp_solution(x, T)), \
+                barycentric(self.uspace.function(array=self.tph[:, NL-1]))) 
         print(tpL2error)
-        uL2error = self.pspace.integralalg.L2_error(cartesian(lambda x:
+        uL2error = self.pspace.integralalg.error(cartesian(lambda x:
                 self.pde.u_solution(x, T)), cartesian(self.pspace.function(array=self.uh[:,
                     NL-1])))
         print('uerror', uL2error)
@@ -327,8 +320,8 @@ class Model():
 
         
 pde = PDE(T = 1)
-timeline = UniformTimeLine(0, 1, 800)
-MFEMModel = Model(pde, timeline, n=5)
+timeline = UniformTimeLine(0, 1, 400)
+MFEMModel = Model(pde, timeline, n=7)
 MFEMModel.nonlinear_solve()
 pL2error = MFEMModel.L2error()
 #state = StateModel(pde, mesh, timeline)
