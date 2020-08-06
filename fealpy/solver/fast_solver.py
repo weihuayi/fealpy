@@ -5,8 +5,17 @@ from scipy.sparse import spdiags, eye, bmat, tril, triu
 from scipy.sparse.linalg import cg, inv, dsolve,  gmres, LinearOperator, spsolve_triangular
 import pyamg
 
+from ..decorator import timer
+
 class LagrangeFEMFastSolver():
     def __init__(self, A, F, P):
+        """
+
+
+        Notes
+        -----
+            求解高次拉格朗日有限元的快速算法
+        """
         self.A = A
         self.F = F
         self.P = P
@@ -36,7 +45,7 @@ class SaddlePointFastSolver():
 
         self.D = 1.0/M.diagonal() # M 矩阵的对角线的逆
         # S 相当于间断元的刚度矩阵
-        S = B.T@spdiags(self.D, 0, M.shape[0], M.shape[1])@B 
+        S = (B.T@spdiags(self.D, 0, M.shape[0], M.shape[1])@B).tocsr()
         self.ml = pyamg.ruge_stuben_solver(S) # 这里要求必须有网格内部节点 
 
         # TODO：把间断元插值到连续元线性元空间，然后再做 AMG
@@ -46,7 +55,7 @@ class SaddlePointFastSolver():
         B = self.A[1]
         m = M.shape[0]
         n = B.shape[1]
-        r = np.zeors_like(b)
+        r = np.zeros_like(b)
         r[:m] = M@b[:m] + B@b[m:]
         r[m:] = B.T@b[:m]
         return r
@@ -64,8 +73,9 @@ class SaddlePointFastSolver():
         r[:m] = b0*D
         r[m:] = self.ml.solve(b1, tol=1e-8, accel='cg')       
         return r 
-
-    def solve(self):
+    
+    @timer
+    def solve(self, tol=1e-8):
         M = self.A[0]
         B = self.A[1]
         C = self.A[2]
@@ -78,6 +88,7 @@ class SaddlePointFastSolver():
         A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
         P = LinearOperator((gdof, gdof), matvec=self.diag_preconditioner)
         x, exitCode = gmres(A, F, M=P, tol=1e-8)
+        print(exitCode)
 
         return x[:m], x[m:] 
 
