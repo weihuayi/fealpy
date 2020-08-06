@@ -122,11 +122,13 @@ class PDE():
 
 
 class Model():
-    def __init__(self, pde, mesh, timeline):
+    def __init__(self, pde, timeline, n=1):
         self.pde = pde
-        self.mesh = mesh
+        box = pde.domain()
+        mf = MeshFactory()
+        self.mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
 
-        self.uspace = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+        self.uspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
         self.pspace = self.uspace.smspace 
 
         self.timeline = timeline
@@ -137,9 +139,13 @@ class Model():
         self.uh = self.pspace.function(dim=NL)
         self.tph = self.uspace.function(dim=NL)
         self.ph = self.uspace.function()
-
-        f = cartesian(lambda p: pde.y_solution(p, 0))
-        self.yh[:, 0] = self.pspace.local_projection(f) 
+        bc = self.mesh.entity_barycenter('cell')
+        self.yh[:, 0] = pde.y_solution(bc, 0)
+#        print('yh0', self.yh[:, 0])
+#
+#        f = cartesian(lambda p: pde.y_solution(p, 0))
+#        self.yh[:, 0] = self.pspace.local_projection(f) 
+#        print('projectionyh0', self.yh[:, 0])
 
         # costate variable
         self.zh = self.pspace.function(dim=NL)
@@ -155,34 +161,29 @@ class Model():
         sp: (NE, 1), 前 n-1 层的累加
         nt: 表示 n-1 时间层,要求的是 n 个时间层的方程
         '''
-        dt = self.dt
+        dt = self.timeline.current_time_step_length()
         NC = self.mesh.number_of_cells()
         u = self.uh[:, nt+1]
         NE = self.mesh.number_of_edges()
-       # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
-        f1 = -dt*sp
+        # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
+        f1 = -sp
 
         # f2 = 0
-        f2 = np.zeros(NE, dtype=mesh.ftype)
+        f2 = np.zeros(NE, dtype=self.mesh.ftype)
 
         # f3 = \Delta t(f^n + u^n, w_h) + (y^{n-1}, w_h)
-        cell2dof = self.pspace.cell_to_dof()
-        gdof = self.pspace.number_of_global_dofs()
-        qf = self.integrator
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
-        phi = self.pspace.basis(bcs)
-        val = self.pde.source(ps, (nt+1)*dt)
-        bb = np.einsum('i, ij, jk, j->jk', ws, val, phi, self.cellmeasure)
-
-        gdof = gdof or cell2dof.max()
-        shape = (gdof, )
-        b = np.zeros(shape, dtype=phi.dtype)
-        np.add.at(b, cell2dof, bb)
+        b = self.pspace.source_vector(cartesian(lambda x: self.pde.source(x,
+            (nt+1)*dt)))
+#        print('b', b)
+        cell = self.mesh.entity('cell')
+        cellmeasure = self.mesh.entity_measure('cell')
+        b1 = (self.pde.source(cell[:, 0], (nt+1)*dt) + self.pde.source(cell[:, 1], (nt+1)*dt)
+                + self.pde.source(cell[:, 2], (nt+1)*dt))*cellmeasure/3
+#        print('b1', b1)
 
         f3 = dt*b + dt*self.M@u + self.M@self.yh[:, nt]
 
-        return np.r_[np.r_[f1, f2], f3]
+        return np.r_[f1, f2, f3]
 
     def get_costate_current_right_vector(self, sq, nt):
         '''
@@ -190,22 +191,28 @@ class Model():
         nt: 正序的 n-1 个时间层的值, 则逆序所对应的时间层为 NL - nt -1
         NL: 时间方向剖分的总的层数
         '''
-        dt = self.dt
-        NL = timeline.number_of_time_levels()
+        dt = self.timeline.current_time_step_length()
+        NL = self.timeline.number_of_time_levels()
         NC = self.mesh.number_of_cells()
+        print('NC', NC)
+        print('NE', self.mesh.number_of_edges())
         tpd = self.uspace.function()
  
         #  f1 = -\sum_{i=1}^n-1\Delta t (p^i, v)
-        f1 = -dt*sq
+        f1 = -sq
 
         # f2 = (\tilde p^n_h - \tilde p^n_d, v)
-        edge2dof = self.uspace.dof.edge_to_dof()
-        en = self.mesh.edge_unit_normal()
-        def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
-            return np.einsum('ijk, jk, ijm->ijm', self.pde.tpd(ps, NL-nt-1), en, self.pspace.edge_basis(ps))
-        tpd[edge2dof] = self.pspace.integralalg.edge_integral(f0, edgetype=True)
-        f2 = self.A@self.tph[:, NL-nt-1] - self.A@tpd
+        cell2dof = self.uspace.cell_to_dof()
+        gdof = self.uspace.number_of_global_dofs()
+        m = (self.uspace.basis, cell2dof, gdof)
+        b = self.uspace.integralalg.serial_construct_vector(cartesian(lambda x:
+            self.pde.tpd(x, (nt+1)*dt)), m)
+        print('11', self.A.shape)
+        print('22', self.tph)
+        print('1', self.A@self.tph[:, NL-nt-1].reshape(-1))
+        print('2', b.shape)
+
+        f2 = self.A@self.tph[:, NL-nt-1].reshape(-1) - b
 
         # f3 = \Delta t(y^n_h - y^n_d, w) + (z^n_h, w)
         bc = np.array([1/3, 1/3, 1/3])
@@ -219,45 +226,47 @@ class Model():
         return np.r_[np.r_[f1, f2], f3]
 
     def state_one_step_solve(self, t, sp):
-        dt = self.dt
+        dt = self.timeline.current_time_step_length()
         F = self.get_state_current_right_vector(sp, t)
         A = bmat([[self.A, (dt-1)*self.A, None],[None, self.A, self.D], \
-                [-self.dt*self.D.T, None, self.M]], format='csr')
+                [-dt*self.D.T, None, self.M]], format='csr')
         PU = spsolve(A, F)
         return PU
 
     def costate_one_step_solve(self, t, sq):
-        dt = self.dt
+        dt = self.timeline.current_time_step_length()
         F = self.get_costate_current_right_vector(sq, t)
         A = bmat([[self.A, (dt-1)*self.A, None],[None, self.A, -self.D], \
-                [self.dt*self.D.T, None, self.M]], format='csr')
+                [dt*self.D.T, None, self.M]], format='csr')
         QZ = spsolve(A, F)
         return QZ
 
     def state_solve(self):
         timeline = self.timeline
+        dt = timeline.current_time_step_length()
         timeline.reset()
         NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
-        sp = np.zeros(NE, dtype=mesh.ftype)
+        sp = np.zeros(NE, dtype=self.mesh.ftype)
         while not timeline.stop():
             PU = self.state_one_step_solve(timeline.current, sp)
             self.tph[:, timeline.current+1] = PU[:NE]
             self.ph[:] = PU[NE:2*NE]
             self.yh[:, timeline.current+1] = PU[2*NE:]
             timeline.current += 1
-            sp = sp + self.A@self.ph[:] 
+            sp = sp + dt*self.A@self.ph[:] 
         timeline.reset()
         return sp
 
     def costate_solve(self):
         timeline = self.timeline
+        dt = timeline.current_time_step_length()
         NL = timeline.number_of_time_levels()
         NE = self.mesh.number_of_edges()
-        qf = self.integrator
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
-        sq = np.zeros(NE, dtype=mesh.ftype)
+#        qf = self.integrator
+#        bcs, ws = qf.get_quadrature_points_and_weights()
+#        ps = mesh.bc_to_point(bcs, etype='cell')
+        sq = np.zeros(NE, dtype=self.mesh.ftype)
         
         timeline.reset()
         while not timeline.stop():
@@ -265,16 +274,16 @@ class Model():
             self.tqh[:, NL-timeline.current-2] = QZ[:NE]
             self.qh[:] = QZ[NE:2*NE]
             self.zh[:, NL-timeline.current-2] = QZ[2*NE:]
-            zh1 = self.pspace.function(array=self.zh[:, NL - timeline.current-2])
-            val = zh1(ps)
-            e = np.einsum('i, ij, j->j', ws, val, self.cellmeasure)
-            self.uh[:, NL-timeline.current-1] = max(0, np.sum(e)/np.sum(self.cellmeasure)) \
-                            - self.zh[:, NL - timeline.current-2]
+#            zh1 = self.pspace.function(array=self.zh[:, NL - timeline.current-2])
+#            val = zh1(ps)
+#            e = np.einsum('i, ij, j->j', ws, val, self.cellmeasure)
+#            self.uh[:, NL-timeline.current-1] = max(0, np.sum(e)/np.sum(self.cellmeasure)) \
+#                            - self.zh[:, NL - timeline.current-2]
 
-#            self.uh[:, NL-timeline.current-1] = self.pspace.integralalg.cell_integral \
-#                    (zh1, celltype=True)/np.sum(self.cellmeasure)
+            self.uh[:, NL-timeline.current-1] = self.pspace.integralalg.cell_integral \
+                    (zh1, celltype=True)/np.sum(self.cellmeasure)
             timeline.current += 1
-            sq = sq + self.qh
+            sq = sq + dt*self.A@self.qh
         timeline.reset()
         return sq
 
@@ -282,20 +291,19 @@ class Model():
 
         eu = 1
         k = 1
-        dt = self.dt
+        dt = self.timeline.current_time_step_length()
         timeline = self.timeline
         NL = timeline.number_of_time_levels()
         timeline.reset()
         uI = self.pspace.function(NL)
+        bc = self.mesh.entity_barycenter('cell')
         while not timeline.stop():
-            uI[:, timeline.current+1] = self.pde.u_solution(self.bc, (timeline.current+1)*dt)
+            uI[:, timeline.current+1] = self.pde.u_solution(bc, (timeline.current+1)*dt)
             timeline.current += 1
         timeline.reset()
+        print('ui', uI)
         while eu > 1e-4 and k < 20:
-            print('maxit', maxit)
-            print('ui', uI)
             uh1 = self.uh.copy()
-#            print('uh1', uh1)
             sp = self.state_solve()
             sq = self.costate_solve()
             print('uh', self.uh)
@@ -328,11 +336,9 @@ class Model():
 
 
         
-pde = PDE()
-mesh = pde.init_mesh(n=1, meshtype='tri')
-space = RaviartThomasFiniteElementSpace2d(mesh, p=0)
+pde = PDE(T = 1)
 timeline = UniformTimeLine(0, 1, 10)
-MFEMModel = Model(pde, mesh, timeline)
+MFEMModel = Model(pde, timeline, n=3)
 MFEMModel.nonlinear_solve()
 pL2error = MFEMModel.L2error()
 #state = StateModel(pde, mesh, timeline)
