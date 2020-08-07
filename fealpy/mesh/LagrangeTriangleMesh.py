@@ -30,9 +30,11 @@ class LagrangeTriangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+        self.multi_index_matrix = multi_index_matrix
 
     def number_of_corner_nodes(self):
         return self.ds.NCN
+
 
     def lagrange_dof(self, p):
         return LagrangeTriangleDof2d(self, p)
@@ -140,8 +142,8 @@ class LagrangeTriangleMesh(Mesh2d):
                 self.node[entity[index], :], grad)
         return J
 
-    def lagrange_basis(self, bc, index=np.s_[:], etype='cell'):
-        p = self.p   # the degree of lagrange basis function
+    def lagrange_basis(self, bc, index=np.s_[:], etype='cell', p=None):
+        p = self.p if p is None else p 
 
         if etype in {'cell', 2}:
             TD = 2
@@ -162,9 +164,9 @@ class LagrangeTriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
-    def lagrange_grad_basis(self, bc, index=np.s_[:], etype='cell'):
+    def lagrange_grad_basis(self, bc, index=np.s_[:], etype='cell', p=None):
 
-        p = self.p   # the degree of polynomial basis function
+        p = self.p if p is None else p 
 
         if etype in {'cell', 2}:
             TD = 2
