@@ -21,8 +21,8 @@ class LagrangeTriangleMesh(Mesh2d):
    
         self.ds = LagrangeTriangleMeshDataStructure(dof)
 
-        self.TD = 2
         self.GD = node.shape[1]
+        self.TD = 2
 
         self.meshtype = 'ltri'
         self.ftype = mesh.ftype
@@ -30,6 +30,12 @@ class LagrangeTriangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+
+    def number_of_corner_nodes(self):
+        return self.ds.NCN
+
+    def lagrange_dof(self, p):
+        return LagrangeTriangleDof2d(self, p)
 
     def vtk_cell_type(self, etype='cell'):
         """
@@ -235,6 +241,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
 class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, dof):
+        self.NCN = dof.mesh.number_of_nodes()
         self.cell = dof.cell_to_dof()
         self.edge = dof.edge_to_dof()
         self.edge2cell = dof.mesh.ds.edge_to_cell()
@@ -280,32 +287,66 @@ class LagrangeTriangleDof2d():
     def face_to_dof(self):
         return self.edge_to_dof()
 
+    @property
+    def edge2dof(self):
+        return self.edge_to_dof()
+
     def edge_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分边上的自由度
+        """
         p = self.p
         mesh = self.mesh
+        edge = mesh.entity('edge')
 
-        NE= mesh.number_of_edges()
-        NN = mesh.number_of_nodes()
+        if p == mesh.p:
+            return edge
 
-        edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int)
-        edge2dof[:, [0, -1]] = edge[:, [0, -1]]
+        edge2dof[:, [0, -1]] = edge[:, [0, -1]] # edge 可以是高次曲线
         if p > 1:
-            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
+            NE = mesh.number_of_edges()
+            edge2dof[:, 1:-1] = NCN + np.arange(NE*(p-1)).reshape(NE, p-1)
+
         return edge2dof
 
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+            把这个方法属性化，保证程序接口兼容性
+        """
+        return self.cell_to_dof()
+
+
     def cell_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分单元上的自由度
+        """
+
         p = self.p
         mesh = self.mesh
+        cell = mesh.entity('cell') # cell 可以是高次单元
 
-        cell = mesh.entity('cell')
-        NN = mesh.number_of_nodes()
+        if p == mesh.p:
+            return cell 
+
+        # 空间自由度和网格的自由度不一致时，重新构造单元自由度矩阵
+        NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
-
-        cell2dof = np.zeros((NC, ldof), dtype=np.int)
+        cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
         isEdgeDof = self.is_on_edge_local_dof()
         edge2dof = self.edge_to_dof()
@@ -340,34 +381,26 @@ class LagrangeTriangleDof2d():
         cell = mesh.entity('cell')
         node = mesh.entity('node')
 
-        if p == 1:
+        if p == mesh.p:
             return node
-        if p > 1:
-            N = node.shape[0]
-            dim = node.shape[-1]
-            gdof = self.number_of_global_dofs()
-            ipoint = np.zeros((gdof, dim), dtype=np.float)
-            ipoint[:N, :] = node
-            NE = mesh.number_of_edges()
-            edge = mesh.ds.edge
-            w = np.zeros((p-1,2), dtype=np.float)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    node[edge,:]).reshape(-1, dim)
-        if p > 2:
-            isEdgeDof = self.is_on_edge_local_dof()
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            w = self.multiIndex[isInCellDof, :]/p
-            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell,:]).reshape(-1, dim)
+
+        NN = mesh.number_of_nodes()
+        GD = mesh.geo_dimension()
+        gdof = self.number_of_global_dofs()
+        ipoint = np.zeros((gdof, GD), dtype=np.float64)
+        bcs = self.multiIndex/p 
+        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1)
 
         return ipoint
 
     def number_of_global_dofs(self):
         p = self.p
-        N = self.mesh.number_of_nodes()
-        gdof = N
+        mesh = self.mesh
+
+        if p == mesh.p:
+            return mesh.number_of_nodes()
+
+        gdof = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
         if p > 1:
             NE = self.mesh.number_of_edges()
             gdof += (p-1)*NE

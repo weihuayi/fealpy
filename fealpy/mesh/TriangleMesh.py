@@ -28,12 +28,16 @@ class TriangleMesh(Mesh2d):
 
         self.itype = cell.dtype
         self.ftype = node.dtype
+        self.p = 1 # 平面三角形
 
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+
+    def number_of_corner_nodes(self):
+        return self.ds.NN
 
     def vtk_cell_type(self):
         VTK_TRIANGLE = 5
