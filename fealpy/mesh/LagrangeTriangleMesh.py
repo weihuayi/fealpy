@@ -6,6 +6,8 @@ from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from .TriangleMesh import TriangleMesh
 
 from .multi_index import multi_index_matrix
+from .multi_index import lagrange_shape_function
+from .multi_index import lagrange_grad_shape_function
 
 class LagrangeTriangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
@@ -142,73 +144,30 @@ class LagrangeTriangleMesh(Mesh2d):
                 self.node[entity[index], :], grad)
         return J
 
-    def lagrange_basis(self, bc, index=np.s_[:], etype='cell', p=None):
+    def shape_function(self, bc, p=None):
+        p = self.p if p is None else p
+        return lagrange_shape_function(bc, p)
+
+
+    def grad_shape_function(self, bc, p=None):
+        """
+
+        Notes
+        -----
+        计算单元形函数关于参考单元变量的梯度。
+
+        lambda_0 = 1 - xi - eta
+        lambda_1 = xi
+        lambda_2 = eta
+        """
         p = self.p if p is None else p 
-
-        if etype in {'cell', 2}:
-            TD = 2
-        elif etype in {'edge', 'face', 1}:
-            TD = 1
-
-        multiIndex = multi_index_matrix[TD](p)
-
-        c = np.arange(1, p+1, dtype=np.int)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi[..., np.newaxis, :] # (..., 1, ldof)
-
-    def lagrange_grad_basis(self, bc, index=np.s_[:], etype='cell', p=None):
-
-        p = self.p if p is None else p 
-
-        if etype in {'cell', 2}:
-            TD = 2
-        elif etype in {'edge', 'face', 1}:
-            TD = 1
-
-        multiIndex = multi_index_matrix[TD](p) 
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_nodes_of_cells()
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
+        TD = bc.shape[-1] - 1
         if TD == 2:
             Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
         else:
             Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+        R = lagrange_grad_shape_function(bc, p) # (..., ldof, TD+1)
 
-        # R.shape = (NQ, ldof, TD+1), Dlambda.shape = (TD+1, TD) 
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (NQ, ldof, TD)
         return gphi[..., None, :, :] #(..., 1, ldof, TD)
 
