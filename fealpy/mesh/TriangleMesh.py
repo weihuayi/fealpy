@@ -71,11 +71,11 @@ class TriangleMesh(Mesh2d):
 
         return node, cell.flatten(), cellType, len(cell)
 
-    def integrator(self, k, etype='cell'):
+    def integrator(self, q, etype='cell'):
         if etype in {'cell', 2}:
-            return TriangleQuadrature(k)
+            return TriangleQuadrature(q)
         elif etype in {'edge', 'face', 1}:
-            return GaussLegendreQuadrature(k)
+            return GaussLegendreQuadrature(q)
 
     def copy(self):
         return TriangleMesh(self.node.copy(), self.ds.cell.copy());

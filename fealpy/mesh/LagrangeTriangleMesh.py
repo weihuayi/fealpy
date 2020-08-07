@@ -1,13 +1,11 @@
 import numpy as np
-from ..quadrature import TriangleQuadrature
+from ..quadrature import TriangleQuadrature, GaussLegendreQuadrature
 
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 from .TriangleMesh import TriangleMesh
 
-from .multi_index import multi_index_matrix1d
-from .multi_index import multi_index_matrix2d
-from .multi_index import multi_index_matrix3d
+from .multi_index import multi_index_matrix
 
 class LagrangeTriangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
@@ -32,8 +30,6 @@ class LagrangeTriangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
-
-        self.multi_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
 
     def vtk_cell_type(self, etype='cell'):
         """
@@ -82,17 +78,63 @@ class LagrangeTriangleMesh(Mesh2d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
-    def cell_area(self, index=None):
-        pass
+    def integrator(self, q, etype='cell'):
+        if etype in {'cell', 2}:
+            return TriangleQuadrature(q)
+        elif etype in {'edge', 'face', 1}:
+            return GaussLegendreQuadrature(q)
+
+    def cell_area(self, q=None):
+        """
+
+        Notes
+        -----
+            
+        """
+        p = self.p
+        q = p if q is None else q
+
+        qf = self.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        J = self.jacobi_matrix(bcs)
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        l = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, l)/2.0
+        return a
+
+    def edge_length(self, q=None):
+        """
+
+        """
+        p = self.p
+        q = p if q is None else q
+
+        qf = self.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+
+        J = self.jacobi_matrix(bcs)
+        l = np.sqrt(np.sum(J**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, l)/2.0
+        return a
 
     def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
         node = self.node
-        entity = self.entity(etype) # default  cell
+        entity = self.entity(etype)[index] # 
         phi = self.lagrange_basis(bc, etype=etype) # (NQ, 1, ldof)
-        p = np.einsum('ijk, jkn->ijn', phi, node[entity[index]])
+        p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
 
-    def lagrange_basis(self, bc, etype='cell'):
+    def jacobi_matrix(self, bc, index=np.s_[:], etype='cell'):
+        entity = self.entity(etype)
+        grad = self.lagrange_grad_basis(bc, index=index, etype=etype)
+
+        # the tranpose of the jacobi matrix between S_p and S_h
+        J = np.einsum(
+                'ijn, ...ijk->...ink',
+                self.node[entity[index], :], grad)
+        return J
+
+    def lagrange_basis(self, bc, index=np.s_[:], etype='cell'):
         p = self.p   # the degree of lagrange basis function
 
         if etype in {'cell', 2}:
@@ -100,7 +142,7 @@ class LagrangeTriangleMesh(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             TD = 1
 
-        multiIndex = self.multi_index_matrix[TD-1](p)
+        multiIndex = multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
@@ -114,33 +156,16 @@ class LagrangeTriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
-    def jacobi_matrix(self, bc, index=np.s_[:]):
-        mesh = self.mesh
-        cell = mesh.entity('cell')
-        grad = self.grad_basis(bc, index=index)
-
-        # the tranpose of the jacobi matrix between S_h and K
-        NV = self.ds.number_of_nodes_of_cells()
-        J = node[cell[index, [NV-1-p, NV-1]]] - node[cell[index, [0]]]
-        Jh = mesh.jacobi_matrix(index=index)
-
-        # the tranpose of the jacobi matrix between S_p and S_h
-        Jph = np.einsum(
-                'ijm, ...ijk->...imk',
-                self.node[cell2dof[index], :],
-                grad)
-
-        # the transpose of the jacobi matrix between S_p and K
-        Jp = np.einsum('...ijk, imk->...imj', Jph, Jh)
-        grad = np.einsum('ijk, ...imk->...imj', Jh, grad)
-        return Jp, grad
-
-    def grad_basis(self, bc, index=np.s_[:]):
+    def lagrange_grad_basis(self, bc, index=np.s_[:], etype='cell'):
 
         p = self.p   # the degree of polynomial basis function
-        TD = self.TD
 
-        multiIndex = self.multi_index_matrix[TD](p) 
+        if etype in {'cell', 2}:
+            TD = 2
+        elif etype in {'edge', 'face', 1}:
+            TD = 1
+
+        multiIndex = multi_index_matrix[TD](p) 
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -162,7 +187,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
         Q = A[..., multiIndex, range(TD+1)]
         M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_nodes_of_cells()
         shape = bc.shape[:-1]+(ldof, TD+1)
         R = np.zeros(shape, dtype=self.ftype)
         for i in range(TD+1):
@@ -170,9 +195,14 @@ class LagrangeTriangleMesh(Mesh2d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        # Dlambda = self.mesh.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
-        return gphi #(..., NC, ldof, GD)
+        if TD == 2:
+            Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
+        else:
+            Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+
+        # R.shape = (NQ, ldof, TD+1), Dlambda.shape = (TD+1, TD) 
+        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (NQ, ldof, TD)
+        return gphi[..., None, :, :] #(..., 1, ldof, TD)
 
     def print(self):
 
@@ -203,8 +233,6 @@ class LagrangeTriangleMesh(Mesh2d):
         for i, ec in enumerate(edge2cell):
             print(i, ": ", ec)
 
-
-
 class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, dof):
         self.cell = dof.cell_to_dof()
@@ -222,7 +250,7 @@ class LagrangeTriangleDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = multi_index_matrix2d(p)
+        self.multiIndex = multi_index_matrix[2](p)
 
     def is_on_node_local_dof(self):
         p = self.p
@@ -261,7 +289,7 @@ class LagrangeTriangleDof2d():
 
         edge = mesh.ds.edge
         edge2dof = np.zeros((NE, p+1), dtype=np.int)
-        edge2dof[:, [0, -1]] = edge
+        edge2dof[:, [0, -1]] = edge[:, [0, -1]]
         if p > 1:
             edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
@@ -271,39 +299,35 @@ class LagrangeTriangleDof2d():
         mesh = self.mesh
 
         cell = mesh.entity('cell')
-        N = mesh.number_of_nodes()
+        NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
         ldof = self.number_of_local_dofs()
 
-        if p == 1:
-            cell2dof = cell
+        cell2dof = np.zeros((NC, ldof), dtype=np.int)
 
-        if p > 1:
-            cell2dof = np.zeros((NC, ldof), dtype=np.int)
+        isEdgeDof = self.is_on_edge_local_dof()
+        edge2dof = self.edge_to_dof()
+        cell2edgeSign = mesh.ds.cell_to_edge_sign()
+        cell2edge = mesh.ds.cell_to_edge()
 
-            isEdgeDof = self.is_on_edge_local_dof()
-            edge2dof = self.edge_to_dof()
-            cell2edgeSign = mesh.ds.cell_to_edge_sign()
-            cell2edge = mesh.ds.cell_to_edge()
+        cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
+                edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
+        cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
+                edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+        cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
+                edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
+        cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
+                edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
-
-            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
+        cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
+                edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
+        cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
+                edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
         if p > 2:
-            base = N + (p-1)*NE
+            base = NN + (p-1)*NE
             isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
             idof = ldof - 3*p
             cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
