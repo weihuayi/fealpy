@@ -12,7 +12,7 @@ class DirichletBC():
     def apply(self, A, F, uh=None, threshold=None):
         space = self.space
         gD = self.gD
-        threshold = self.threshold
+        threshold = self.threshold if threshold is None else threshold
 
         gdof = space.number_of_global_dofs()
         dim = A.shape[0]//gdof
