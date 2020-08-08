@@ -40,6 +40,9 @@ Notes
 References
 ----------
 [1] https://www.sciencedirect.com/science/article/abs/pii/S0378381217301851
+
+Authors
+    Huayi Wei, weihuayi@xtu.edu.cn
 """
 import numpy as np
 from scipy.sparse import coo_matrix
@@ -57,26 +60,27 @@ class Model1():
 
         self.uh = self.uspace.function() # 速度
         self.ph = self.uspace.smspace.function() # 压力
+
         # 三个组分的摩尔密度, 只要算其中 c_0, c_1 
         self.ch = self.cspace1.function(dim=3) 
 
+        # TODO：初始化三种物质的浓度
         self.options = {
-                'viscosity': 1.0, 
-                'permeability': 1.0,
-                'temperature': 397,
-                'pressure': 50,
-                'porosity': 0.2,
-                'injecttion_rate': 0.1,
-                'compressibility': (0.001, 0.001, 0.001),
-                'pmv': (1.0, 1.0, 1.0)}
+                'viscosity': 1.0,    # 粘性系数
+                'permeability': 1.0, # 渗透率 
+                'temperature': 397, # 初始温度 K
+                'pressure': 50,   # 初始压力
+                'porosity': 0.2,  # 孔隙度
+                'injecttion_rate': 0.1,  # 注入速率
+                'compressibility': 0.001, #压缩率
+                'pmv': (1.0, 1.0, 1.0)} # 偏摩尔体积
 
-        
         c = self.options['viscosity']/self.options['permeability']
         self.M = c*self.uspace.mass_matrix()
         self.B = -self.uspace.div_matrix()
 
-        phi = self.options['porosity']
-        self.C = phi*self.uspace.smspace.mass_matrix() #  
+        c = self.options['porosity']*self.options['compressibility']
+        self.D = c*self.uspace.smspace.mass_matrix() #  
 
     def get_current_pv_matrix(self, data):
         """

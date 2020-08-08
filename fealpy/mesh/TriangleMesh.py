@@ -28,12 +28,16 @@ class TriangleMesh(Mesh2d):
 
         self.itype = cell.dtype
         self.ftype = node.dtype
+        self.p = 1 # 平面三角形
 
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
+
+    def number_of_corner_nodes(self):
+        return self.ds.NN
 
     def vtk_cell_type(self):
         VTK_TRIANGLE = 5
@@ -71,11 +75,11 @@ class TriangleMesh(Mesh2d):
 
         return node, cell.flatten(), cellType, len(cell)
 
-    def integrator(self, k, etype='cell'):
+    def integrator(self, q, etype='cell'):
         if etype in {'cell', 2}:
-            return TriangleQuadrature(k)
+            return TriangleQuadrature(q)
         elif etype in {'edge', 'face', 1}:
-            return GaussLegendreQuadrature(k)
+            return GaussLegendreQuadrature(q)
 
     def copy(self):
         return TriangleMesh(self.node.copy(), self.ds.cell.copy());

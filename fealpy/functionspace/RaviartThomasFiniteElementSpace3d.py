@@ -254,7 +254,7 @@ class RaviartThomasFiniteElementSpace3d:
         return inv(A)
 
     @barycentric
-    def face_basis(self, bc, index=np.s_[:], barycenter=True):
+    def face_basis(self, bc, index=np.s_[:], barycentric=True):
         """
 
         Paramerters
@@ -276,7 +276,7 @@ class RaviartThomasFiniteElementSpace3d:
         GD = mesh.geo_dimension()
         face2cell = mesh.ds.face_to_cell()
 
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, etype='face', index=index)
         else:
             ps = bc
@@ -296,7 +296,7 @@ class RaviartThomasFiniteElementSpace3d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=np.s_[:], barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycentric=True):
         """
 
         Notes
@@ -314,7 +314,7 @@ class RaviartThomasFiniteElementSpace3d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
             ps = bc
@@ -332,7 +332,7 @@ class RaviartThomasFiniteElementSpace3d:
         return phi
 
     @barycentric
-    def div_basis(self, bc, index=np.s_[:], barycenter=True):
+    def div_basis(self, bc, index=np.s_[:], barycentric=True):
         p = self.p
 
         ldof = self.number_of_local_dofs(doftype='all')
@@ -342,7 +342,7 @@ class RaviartThomasFiniteElementSpace3d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc

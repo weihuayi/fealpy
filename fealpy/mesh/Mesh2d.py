@@ -334,12 +334,12 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
             return cell2edge 
 
-    def cell_to_edge_sign(self, sparse=False):
+    def cell_to_edge_sign(self, return_sparse=False):
         NC = self.NC
         E = self.E
 
         edge2cell = self.edge2cell
-        if sparse == False:
+        if return_sparse == False:
             cell2edgeSign = np.zeros((NC, E), dtype=np.bool)
             cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
         else:
