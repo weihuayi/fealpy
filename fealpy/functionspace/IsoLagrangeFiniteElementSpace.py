@@ -99,7 +99,7 @@ class IsoLagrangeFiniteElementSpace:
 
         Notes
         -----
-        计算空间基函数在关于实际坐标点 x 的梯度。
+        计算空间基函数关于实际坐标点 x 的梯度。
         """
         p = self.p
         gphi = self.mesh.grad_shape_function(bc, index=index, p=p, variables='x')
@@ -124,6 +124,18 @@ class IsoLagrangeFiniteElementSpace:
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         val = np.einsum(s1, gphi, uh[cell2dof])
         return val
+
+    def interpolation_matrix(self, space0):
+
+        p = self.p
+        space1 = self
+        gdof0 = space0.number_of_global_dofs()
+        gdof1 = space1.number_of_global_dofs() 
+
+        bc = space0.multiIndex/p
+
+        val = space1.basis(bc) # (NQ, 1, ldof)
+        PI = csr_matrix()
 
     def stiff_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
@@ -185,3 +197,13 @@ class IsoLagrangeFiniteElementSpace:
         ipoint = self.dof.interpolation_points()
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
+
+    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+
+        ipoints = self.interpolation_points()
+        isDDof = self.is_boundary_dof(threshold=threshold)
+        uh[isDDof] = gD(ipoints[isDDof])
+        return isDDof

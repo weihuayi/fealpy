@@ -1,4 +1,5 @@
 import numpy as np
+
 from ..quadrature import TriangleQuadrature, GaussLegendreQuadrature
 
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
@@ -116,7 +117,7 @@ class LagrangeTriangleMesh(Mesh2d):
         p = self.p
         q = p if q is None else q
 
-        qf = self.integrator(q, 'cell')
+        qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
@@ -134,11 +135,11 @@ class LagrangeTriangleMesh(Mesh2d):
         p = self.p
         q = p if q is None else q
 
-        qf = self.integrator(q, 'edge')
+        qf = self.integrator(q, etype='edge')
         bcs, ws = qf.get_quadrature_points_and_weights() 
 
         J = self.jacobi_matrix(bcs, index=index)
-        l = np.sqrt(np.sum(J**2, axis=-1))
+        l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
         a = np.einsum('i, ij->j', ws, l)
         return a
 
@@ -155,7 +156,7 @@ class LagrangeTriangleMesh(Mesh2d):
         node = self.node
         TD = bc.shape[-1] - 1
         entity = self.entity(etype=TD)[index] # 
-        phi = self.lagrange_basis(bc, etype=etype) # (NQ, 1, ldof)
+        phi = self.shape_function(bc) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
 
@@ -218,15 +219,15 @@ class LagrangeTriangleMesh(Mesh2d):
             J = np.einsum(
                     'ijn, ...jk->...ink',
                     self.node[entity[index], :], gphi)
-            shape = (J.shape[-3], TD, TD)
+            shape = J.shape[0:-2] + (TD, TD)
             G = np.zeros(shape, dtype=self.ftype)
             for i in range(TD):
-                G[:, i, i] = np.sum(J[..., i]**2, axis=-1)
+                G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
                 for j in range(i+1, TD):
-                    G[:, i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
-                    G[:, j, i] = G[:, i, j]
-            G = inv(G)
-            gphi = np.einsum('...ikm, imn, ...ln->...ilk', J, G, gphi) 
+                    G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
+                    G[..., j, i] = G[..., i, j]
+            G = np.linalg.inv(G)
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
             return gphi
                     
 
@@ -406,7 +407,6 @@ class LagrangeTriangleDof2d():
         mesh = self.mesh
         cell = mesh.entity('cell')
         node = mesh.entity('node')
-
         if p == mesh.p:
             return node
 
