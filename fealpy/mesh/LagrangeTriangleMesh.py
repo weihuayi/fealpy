@@ -5,9 +5,12 @@ from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
 from .TriangleMesh import TriangleMesh
 
-from .multi_index import multi_index_matrix
-from .multi_index import lagrange_shape_function
-from .multi_index import lagrange_grad_shape_function
+# 单纯形网格的多重指标矩阵
+from .core import multi_index_matrix
+# 单纯形网格的拉格朗日形函数
+from .core import lagrange_shape_function 
+# 单纯形网格拉格朗形函数关于重心坐标的导数
+from .core import lagrange_grad_shape_function
 
 class LagrangeTriangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
@@ -35,8 +38,17 @@ class LagrangeTriangleMesh(Mesh2d):
         self.multi_index_matrix = multi_index_matrix
 
     def number_of_corner_nodes(self):
-        return self.ds.NCN
+        """
+        Notes
+        -----
 
+        拉格朗日三角形网格中的节点分为单元角点节点，边内部节节点和单元内部节点。
+
+        这些节点默认的编号顺序也是：角点节点，边内部节点，单元内部节点。
+
+        该函数返回角点节点的个数。
+        """
+        return self.ds.NCN
 
     def lagrange_dof(self, p):
         return LagrangeTriangleDof2d(self, p)
@@ -99,7 +111,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
         Notes
         -----
-            
+        计算单元的面积。
         """
         p = self.p
         q = p if q is None else q
@@ -115,6 +127,9 @@ class LagrangeTriangleMesh(Mesh2d):
     def edge_length(self, q=None):
         """
 
+        Note
+        ----
+        计算边的长度
         """
         p = self.p
         q = p if q is None else q
@@ -127,24 +142,47 @@ class LagrangeTriangleMesh(Mesh2d):
         a = np.einsum('i, ij->j', ws, l)/2.0
         return a
 
-    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+    def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
+        """
+
+        Notes
+        -----
+
+        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
+
+        因为 bc 最后一个轴的长度就包含了这个信息。
+        """
         node = self.node
-        entity = self.entity(etype)[index] # 
+        TD = bc.shape[-1] - 1
+        entity = self.entity(etype=TD)[index] # 
         phi = self.lagrange_basis(bc, etype=etype) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
 
-    def jacobi_matrix(self, bc, index=np.s_[:], etype='cell'):
-        entity = self.entity(etype)
-        grad = self.lagrange_grad_basis(bc, index=index, etype=etype)
+    def jacobi_matrix(self, bc, index=np.s_[:]):
+        """
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
 
-        # the tranpose of the jacobi matrix between S_p and S_h
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+
+        TD = bc.shape[-1] - 1
+        entity = self.entity(etype=TD)
+        grad = self.grad_shape_function(bc)
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity[index], :], grad)
         return J
 
     def shape_function(self, bc, p=None):
+        """
+
+        Notes
+        -----
+
+        """
         p = self.p if p is None else p
         return lagrange_shape_function(bc, p)
 
@@ -159,6 +197,7 @@ class LagrangeTriangleMesh(Mesh2d):
         lambda_0 = 1 - xi - eta
         lambda_1 = xi
         lambda_2 = eta
+
         """
         p = self.p if p is None else p 
         TD = bc.shape[-1] - 1
@@ -215,6 +254,12 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
         self.E = 3
 
 class LagrangeTriangleDof2d():
+    """
+
+    Notes
+    -----
+    拉格朗日三角形网格上的自由度管理类。
+    """
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
@@ -229,7 +274,6 @@ class LagrangeTriangleDof2d():
         return self.multiIndex == 0
 
     def is_boundary_dof(self, threshold=None):
-
         if type(threshold) is np.ndarray:
             index = threshold
         else:
@@ -272,7 +316,6 @@ class LagrangeTriangleDof2d():
             NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
             NE = mesh.number_of_edges()
             edge2dof[:, 1:-1] = NCN + np.arange(NE*(p-1)).reshape(NE, p-1)
-
         return edge2dof
 
     @property
@@ -291,13 +334,13 @@ class LagrangeTriangleDof2d():
 
         TODO
         ----
-        1. 只取一部分单元上的自由度
+        1. 只取一部分单元上的自由度。
+        2. 用更高效的方式来生成单元自由度数组。
         """
 
         p = self.p
         mesh = self.mesh
         cell = mesh.entity('cell') # cell 可以是高次单元
-
         if p == mesh.p:
             return cell 
 
@@ -345,13 +388,11 @@ class LagrangeTriangleDof2d():
         if p == mesh.p:
             return node
 
-        NN = mesh.number_of_nodes()
         GD = mesh.geo_dimension()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
-        bcs = self.multiIndex/p 
-        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1)
-
+        bcs = self.multiIndex/p # 计算插值点对应的重心坐标
+        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1) # 这里是连续
         return ipoint
 
     def number_of_global_dofs(self):
