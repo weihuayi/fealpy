@@ -11,8 +11,6 @@ Huayi Wei, weihuayi@xtu.edu.cn
 
 """
 import numpy as np 
-import operator as op
-
 
 def multi_index_matrix0d(p):
     multiIndex = 1
@@ -68,7 +66,7 @@ def lagrange_shape_function(bc, p):
     P = 1.0/np.multiply.accumulate(c)
     t = np.arange(0, p)
     shape = bc.shape[:-1]+(p+1, TD+1)
-    A = np.ones(shape, dtype=self.ftype)
+    A = np.ones(shape, dtype=bc.dtype)
     A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
     np.cumprod(A, axis=-2, out=A)
     A[..., 1:, :] *= P.reshape(-1, 1)
@@ -85,10 +83,11 @@ def lagrange_grad_shape_function(bc, p):
     Lagrange 形函数值关于该重心坐标的梯度。
     """
 
+    TD = bc.shape[-1] - 1
     multiIndex = multi_index_matrix[TD](p) 
     ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
 
-    c = np.arange(1, p+1, dtype=self.itype)
+    c = np.arange(1, p+1)
     P = 1.0/np.multiply.accumulate(c)
 
     t = np.arange(0, p)
