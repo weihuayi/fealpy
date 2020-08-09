@@ -3,7 +3,6 @@ from .Quadrature import Quadrature
 
 # http://keisan.casio.com/exec/system/1280624821
 
-
 class GaussLegendreQuadrature(Quadrature):
     def __init__(self, k):
         if k == 1:
