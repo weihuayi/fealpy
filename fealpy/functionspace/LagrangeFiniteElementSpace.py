@@ -303,8 +303,7 @@ class LagrangeFiniteElementSpace():
 
         phi = self.basis(bcs)
         shape = phi.shape[0:-2] + phi.shape[-1:] 
-        phi.reshape(shape)
-        return phi
+        return phi.reshape(shape)
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
