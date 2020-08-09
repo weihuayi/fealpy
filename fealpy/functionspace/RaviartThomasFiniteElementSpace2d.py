@@ -542,7 +542,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+        isBdEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -571,10 +571,32 @@ class RaviartThomasFiniteElementSpace2d:
         # (NQ, NE, ldof1)
         phi2 = np.einsum('...jln, jn->...jl', phi2, en)
 
-        E0 = np.einsum('i, ij, ijm, ijn, j->jmn', ws, val0, phi0, phi2, measure)
-        E1 = np.einsum('i, ij, ijm, ijn, j->jmn', ws, val1, phi1, phi2, measure)
+        E0 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val0, phi0, phi2, measure,
+                optimize=True)
+        E1 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val1, phi1, phi2, measure,
+                optimize=True)
 
+        gdof0 = self.smspace.number_of_global_dofs()
+        gdof1 = self.number_of_global_dofs()
+        cell2dof = self.smspace.cell_to_dof()
+        edge2dof = self.dof.edge_to_dof()
 
+        I = np.broadcast_to(cell2dof[edge2cell[:, 0], :, None], shape=E0.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E = csr_matrix(
+                (E0.flat, (I.flat, J.flat)), 
+                shape=(gdof0, gdof1))
+
+        I = np.broadcast_to(cell2dof[edge2cell[:, 1], :, None], shape=E1.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E += csr_matrix(
+                (E1[isInEdge].flat, (I[isInEdge].flat, J[isInEdge].flat)),
+                shape=(gdof0, gdof1))
+        return E
 
     def source_vector(self, f, celltype=False, q=None):
         cell2dof = self.cell_to_dof()
