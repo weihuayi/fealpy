@@ -57,7 +57,7 @@ from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
 class Model_1():
     def __init__(self):
-        self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量
+        self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量, TODO：确认是 g/mol
         self.R = 8.31446261815324 # J/K/mol
         self.T = 397 # K 绝对温度
 
@@ -72,9 +72,10 @@ class Model_1():
         ph[:] = 50 # 初始压力
         return ph
 
-    def init_molar_density(self, cspace):
+    def init_molar_density(self, cspace, ph):
+        c = self.mixed_molar_dentsity(ph)
         ch = cspace.function(dim=3)
-        ch[:, 2] = cspace.local_projection(1)
+        ch[:, 2] = c 
         return ch
 
     def space_mesh(self, n=50):
@@ -87,24 +88,25 @@ class Model_1():
         timeline = UniformTimeLine(0, 0.1, n)
         return timeline
 
-    def molar_dentsity(self, p):
+    def mixed_molar_dentsity(self, ph):
         """
 
         Notes
         ----
         给一个分片常数的压力，计算混合物的浓度 c
         """
-        NC = len(p)
+        NC = len(ph)
         t = self.R*self.T 
         A = 3*p/t**2
         B = p/t/3 
         
-        a = np.ones((NC, 4), dtype=p.dtype)
+        a = np.ones((NC, 4), dtype=ph.dtype)
         a[:, 1] = B - 1
         a[:, 2] = A - 3*B**2 - 2*B
         a[:, 3] = -A*B + B**2 - B**3
-        r = list(map(np.roots, c))
-        print(r)
+        Z = np.max(np.array(list(map(np.roots, a))), axis=-1)
+        c = p/Z/t 
+        return c
 
 class ShaleGasSolver():
     def __init__(self, model):
@@ -118,7 +120,7 @@ class ShaleGasSolver():
         self.ph = model.init_pressure(self.uspace.smspace) # 初始压力
 
         # 三个组分的摩尔密度, 只要算其中 c_0, c_1 
-        self.ch = model.init_molar_density(self.cspace) 
+        self.ch = model.init_molar_density(self.cspace, self.ph) 
 
         # TODO：初始化三种物质的浓度
         self.options = {
