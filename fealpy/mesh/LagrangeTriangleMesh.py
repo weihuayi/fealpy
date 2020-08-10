@@ -116,13 +116,15 @@ class LagrangeTriangleMesh(Mesh2d):
         """
         p = self.p
         q = p if q is None else q
+        GD = self.geo_dimension()
 
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        l = np.sqrt(np.sum(n**2, axis=-1))
-        a = np.einsum('i, ij->j', ws, l)/2.0
+        if GD == 3:
+            n = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, n)/2.0
         return a
 
     def edge_length(self, q=None, index=np.s_[:]):

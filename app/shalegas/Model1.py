@@ -7,8 +7,8 @@ Notes
     1. 混合物的摩尔浓度 c 的计算公式为
         c = p/(ZRT), 
         Z^3 - (1 - B)Z^2 + (A - 3B^2 -2B)Z - (AB - B^2 -B^3) = 0
-        A = aP/(R^2T^2)
-        B = bP/(RT)
+        A = a p/(R^2T^2)
+        B = b p/(RT)
         其中:
 
         a = 3
@@ -23,6 +23,7 @@ Notes
         混合物的密度计算公式为:
 
         rho = M_0 c_0 + M_1 c_1 + M_2 c_2 ...
+
     2. c_i : 组分 i 的摩尔浓度
        z_i : 组分 i 的摩尔分数
 
@@ -35,6 +36,8 @@ Notes
     (25度 100 kPa
 
     4. 气体常数  R = 8.31446261815324 	J/K/mol
+
+    5. 6.02214076 x 10^{23}
 
 
 References
@@ -51,18 +54,71 @@ from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
-class Model1():
-    def __init__(self, mesh, timeline):
-        self.mesh = mesh 
-        self.timeline = timeline 
+
+class Model_1():
+    def __init__(self):
+        self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量
+        self.R = 8.31446261815324 # J/K/mol
+        self.T = 397 # K 绝对温度
+
+    def init_pressure(self, pspace):
+        """
+
+        Notes
+        ----
+        目前压力用分片常数逼近。
+        """
+        ph = pspace.function()
+        ph[:] = 50 # 初始压力
+        return ph
+
+    def init_molar_density(self, cspace):
+        ch = cspace.function(dim=3)
+        ch[:, 2] = cspace.local_projection(1)
+        return ch
+
+    def space_mesh(self, n=50):
+        box = [0, 50, 0, 50]
+        mf = MeshFactory()
+        mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
+        return mesh
+
+    def time_mesh(self, n=100):
+        timeline = UniformTimeLine(0, 0.1, n)
+        return timeline
+
+    def molar_dentsity(self, p):
+        """
+
+        Notes
+        ----
+        给一个分片常数的压力，计算混合物的浓度 c
+        """
+        NC = len(p)
+        t = self.R*self.T 
+        A = 3*p/t**2
+        B = p/t/3 
+        
+        a = np.ones((NC, 4), dtype=p.dtype)
+        a[:, 1] = B - 1
+        a[:, 2] = A - 3*B**2 - 2*B
+        a[:, 3] = -A*B + B**2 - B**3
+        r = list(map(np.roots, c))
+        print(r)
+
+class ShaleGasSolver():
+    def __init__(self, model):
+        self.model = model
+        self.mesh = model.space_mesh()
+        self.timeline =  model.time_mesh() 
         self.uspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
         self.cspace = ScaledMonomialSpace2d(self.mesh, p=1) # 线性间断有限元空间
 
         self.uh = self.uspace.function() # 速度
-        self.ph = self.uspace.smspace.function() # 压力
+        self.ph = model.init_pressure(self.uspace.smspace) # 初始压力
 
         # 三个组分的摩尔密度, 只要算其中 c_0, c_1 
-        self.ch = self.cspace1.function(dim=3) 
+        self.ch = model.init_molar_density(self.cspace) 
 
         # TODO：初始化三种物质的浓度
         self.options = {
@@ -79,8 +135,9 @@ class Model1():
         self.M = c*self.uspace.mass_matrix()
         self.B = -self.uspace.div_matrix()
 
-        c = self.options['porosity']*self.options['compressibility']
-        self.D = c*self.uspace.smspace.mass_matrix() #  
+        dt = self.timeline.dt
+        c = self.options['porosity']*self.options['compressibility']/dt
+        self.D = c*self.uspace.smspace.mass_matrix() 
 
     def get_current_pv_matrix(self, data):
         """
@@ -195,11 +252,15 @@ class Model1():
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
-    model = Model1()
+    model = Model_1()
 
-    NN = model.mesh.number_of_nodes()
-    print(NN)
+    solver = ShaleGasSolver(model)
+
+    model.molar_dentsity(solver.ph)
+
+    mesh = solver.mesh
+
     fig = plt.figure()
     axes = fig.gca()
-    model.mesh.add_plot(axes)
+    mesh.add_plot(axes)
     plt.show()
