@@ -527,7 +527,7 @@ class RaviartThomasFiniteElementSpace2d:
 
             目前仅考虑最低次元的情形，
 
-            < V_i c_i v\cdot n, w >_{\partial K}, 
+            sum_i V_i (\\nabla \\cdot (c_i v), w) = < V_i c_i v\cdot n, w >_{\partial K}, 
 
             其中 V_i 是混合物的第 i 个组分偏摩尔体积，现在设为 1.
 

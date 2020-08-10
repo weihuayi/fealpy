@@ -126,7 +126,6 @@ class IsoLagrangeFiniteElementSpace:
         return val
 
     def interpolation_matrix(self, space0):
-
         p = self.p
         space1 = self
         gdof0 = space0.number_of_global_dofs()

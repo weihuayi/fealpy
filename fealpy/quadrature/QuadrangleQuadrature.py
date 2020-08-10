@@ -4,8 +4,8 @@ from .GaussLegendreQuadrature import GaussLegendreQuadrature
 
 
 class QuadrangleQuadrature(Quadrature):
-    def __init__(self, k):
-        q0 = GaussLegendreQuadrature(k)
+    def __init__(self, index):
+        q0 = GaussLegendreQuadrature(index)
         bcs, ws = q0.get_quadrature_points_and_weights()
         self.quadpts = (bcs, bcs)
         self.weights = np.einsum('i, j->ij', ws, ws)
