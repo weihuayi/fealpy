@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.surface_poisson import SphereSinSinSinData  as PDE
-#from fealpy.pde.poisson_2d import CosCosData as PDE
 from fealpy.mesh import LagrangeTriangleMesh
 from fealpy.functionspace import IsoLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
@@ -29,8 +28,7 @@ mesh = pde.init_mesh(n=n)
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
              '$|| u - u_I||_{\Omega,0}$',
-             '$||\\nabla u - \\nabla u_I||_{\Omega, 0}$',
-             '$||uh - u_I||_{\Omega, 0}$',
+             '$||\\nabla u - \\nabla u_I||_{\Omega, 0}$'
              ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
@@ -53,12 +51,15 @@ for i in range(maxit):
     A, F = bc.apply(A, F, uh, threshold=np.array([0]))
     uh[:] = spsolve(A, F).reshape(-1)
 
-    uI = space.interpolation(pde.source)
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
-    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
-    errorMatrix[2, i] = space.integralalg.error(pde.source, uI.value)
-    errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value)
-    errorMatrix[4, i] = space.integralalg.error(uh.value, uI.value)
+    uI = space.interpolation(pde.solution)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value,
+            linear=False)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value,
+            linear=False)
+    errorMatrix[2, i] = space.integralalg.error(pde.solution, uI.value,
+            linear=False)
+    errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value,
+            linear=False)
 
     if i < maxit-1:
         mesh.uniform_refine()

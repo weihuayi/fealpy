@@ -145,6 +145,22 @@ class LagrangeTriangleMesh(Mesh2d):
         a = np.einsum('i, ij->j', ws, l)
         return a
 
+    def linear_bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+        """
+
+        Parameter
+        ---------
+        bc : (3, ) or (NQ, 3)
+        etype : 'cell' or 'edge'
+        """
+        p = self.p
+        node = self.node
+        entity = self.entity(etype)[index]
+        entity = entity[:, [0, -p-1, -1]]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+
     def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
         """
 
