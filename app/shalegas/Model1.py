@@ -54,6 +54,8 @@ from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
+import vtk
+import vtk.util.numpy_support as vnp
 
 class Model_1():
     def __init__(self):
@@ -108,6 +110,30 @@ class Model_1():
         c = p/Z/t 
         return c
 
+    @cartesian
+    def velocity_bc(self, p, n):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (x < 1) & (y < 1)
+        val[flag0] = -0.1
+        flag1 = (x > 0.9) & (y > 0.9)
+        val[flag1] = 0.1 
+        return val
+
+    @cartesian
+    def pressure_bc(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        flag0 = (x < 1) & (y < 1)
+        val[flag0] = 100 
+        flag1 = (x > 0.9) & (y > 0.9)
+        val[flag1] = 25 
+        return val
+
 class ShaleGasSolver():
     def __init__(self, model):
         self.model = model
@@ -119,7 +145,7 @@ class ShaleGasSolver():
         self.uh = self.uspace.function() # 速度
         self.ph = model.init_pressure(self.uspace.smspace) # 初始压力
 
-        # 三个组分的摩尔密度, 只要算其中 c_0, c_1 
+        # 三个组分的摩尔密度, 三个组分一起计算 
         self.ch = model.init_molar_density(self.cspace, self.ph) 
 
         # TODO：初始化三种物质的浓度
@@ -132,6 +158,8 @@ class ShaleGasSolver():
                 'injecttion_rate': 0.1,  # 注入速率
                 'compressibility': 0.001, #压缩率
                 'pmv': (1.0, 1.0, 1.0)} # 偏摩尔体积
+        self.CM = self.cspace.cell_mass_matrix() 
+        self.H = inv(self.CM)
 
         c = self.options['viscosity']/self.options['permeability']
         self.M = c*self.uspace.mass_matrix()
@@ -141,113 +169,116 @@ class ShaleGasSolver():
         c = self.options['porosity']*self.options['compressibility']/dt
         self.D = c*self.uspace.smspace.mass_matrix() 
 
-    def get_current_pv_matrix(self, data):
+        # vtk 文件输出
+        node, cell, cellType, NC = self.mesh.to_vtk()
+        self.points = vtk.vtkPoints()
+        self.points.SetData(vnp.numpy_to_vtk(node))
+        self.cells = vtk.vtkCellArray()
+        self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
+        self.cellType = cellType
+
+    def one_step_solve():
         """
-        (c_h[i] v_h\cdot n, w_h)_{\partial K}
+
+        Notes
+        -----
+            求解一个时间层的数值解
         """
+        udof = self.uspace.number_of_global_dofs()
+        pdof = self.uspace.smspace.number_of_global_dofs()
+        cdof = self.cspace.number_of_global_dofs()
 
-        vh = data[0]
-        ph = data[1]
-        ch = data[2]
+        timeline = self.timeline
+        phi = self.options['porosity'] # 孔隙度
+        dt = timeline.current_time_step_length()
+        nt = timeline.next_time_level()
 
-        mesh = self.mesh
-        edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
-        edge2dof = self.dof.edge_to_dof() 
-
-        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        ps = mesh.bc_to_point(bcs, etype='edge')
-        en = mesh.edge_unit_normal() # (NE, 2)
-
-        # 组分浓度在积分点上的值, 这里有 3 个组分
-        lval = ch(ps, index=edge2cell[:, 0]) # (NQ, NE, 3) 
-        rval = ch(ps, index=edge2cell[:, 1]) # (NQ, NE, 3)
-        rval[:, isBdEdge] = 0.0 # 边界值设为 0, 这样后面不产生贡献.
-
-        # 速度在积分点上的基函数值
-        phi = self.space0.edge_basis(ps) # (NQ, NE, 1, 2)
-
-        # 压力测试函数空间基函数的值
-        lphi = self.space0.smspace.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, 3)
-        rphi = self.space0.smspace.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, 3)
-        measure = self.integralalg.edgemeasure
-
-        LM = np.einsum('i, ijk, ijl, ijmn, jn, j->jlm', ws, lval, lphi, phi, en, measure)
-        RM = np.einsum('i, ijk, ijl, ijmn, jn, j->jlm', ws, rval, rphi, phi, -en, measure)
-
-        gdof0 = self.space0.smspace.number_of_global_dofs()
-        gdof1 = self.space0.number_of_global_dofs()
-        cell2dof = cell.space1.cell_to_dof()
-        I = np.broadcast_to(edge2dof[:, :, None], LM.shape)
-
-        J = np.broadcast_to(cell2dof[edge2cell[:, 0]][:, None, :], LM.shape)
-        P = coo_matrix((LM.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
-
-        J = np.broadcast_to(cell2dof[edge2cell[:, 1]][:, None, :], RM.shape)
-        P += coo_matrix((RM.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
-
-        return P.tocsr()
-
-    def get_current_density_vector(self, data, timeline):
-        vh = data[0]
-        ph = data[1]
-        ch = data[2]
-        options  = self.options
-
-        mesh = self.mesh
-
-        # 0. 单元内的浓度方程积分
-        qf = self.integralalg.cellintegrator if q is None else mesh.integrator(q, 'cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
-        measure = self.integralalg.cellmeasure
-
-        cval = ch.value(ps) # (NQ, NC, 3) 3 个组分的值
-        vval = vh.value(bcs) # (NQ, NC, 2) 向量的值
-        gphi = self.space1.grad_basis(ps) # (NQ, NC, 3, 2)
-
-        # bb: (NC, 3, 3)
-        bb = np.einsum('i, ijk, ijmn, ijln, j->jkl', ws, cval, vval, gphi, measure)
-
-        # 1.  
-
-        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        ps = mesh.bc_to_point(bcs, etype='edge')
-        en = mesh.edge_unit_normal() # (NE, 2)
-        
-        lphi = np.space1.basis(ps, index=edge2cell[:, 0]) # (NQ, NC, 3)
-        rphi = np.space1.basis(ps, index=edge2cell[:, 1]) # (NQ, NC, 3)
-
-        M = np.einsum('', ws, lphi, rphi)
-        
-
-    def get_current_left_matrix(self, data, timeline):
-
-        vh = data[0]
-        ph = data[1]
-        ch = data[2]
-        options  = self.options
-
-        A = self.A
-        B = self.B
-        P = self.get_current_pv_matrix()
+        # 1. 求解下一层速度和压力
         M = self.M
-        AA = bmat([[A, -B], [P, M]], format='csr')
-        return AA
+        B = self.B
+        D = self.D
+        E = self.uspace.pressure_matrix(self.ch)
 
-    def get_current_right_vector(self, data, timeline):
-        vh = data[0]
-        ph = data[1]
-        ch = data[2]
-        options  = self.options
-        return self.M@ph
+        F1 = D@self.ph
 
-    def solve(self, data, A, b, solver, timeline):
-        pass
+        AA = bmat([[M, B], [E, D]], format='csr')
+        FF = np.r_['0', np.zeros(udof), F1]
+        x = spsolve(AA, FF).reshape(-1)
+        self.uh[:] = x[:udof]
+        self.ph[:] = x[udof:]
+
+        # 2. 求解下一层的浓度
+
+        nc = len(self.ch.shape[1])
+        for i in range(nc):
+            F = self.uspace.convection_vector(nt, self.ch.index(i), self.uh,
+                    g=model.dirichlet) 
+            F = self.H@(F[:, :, None]/phi)
+            F *= dt
+            self.ch[:, i] += F.flat
+
+    def solve(self):
+        """
+
+        Notes
+        -----
+
+        计算所有的时间层。
+        """
+
+        rdir = self.options['rdir']
+        step = self.options['step']
+        timeline = self.timeline
+        dt = timeline.current_time_step_length()
+        timeline.reset() # 时间置零
+
+        fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
+        self.write_to_vtk(fname)
+        print(fname)
+        while not timeline.stop():
+            self.one_step_solve()
+            timeline.current += 1
+            if timeline.current%step == 0:
+                fname = rdir + '/test_'+ str(timeline.current).zfill(10) + '.vtu'
+                print(fname)
+                self.write_to_vtk(fname)
+        timeline.reset()
+
+    def write_to_vtk(self, fname):
+        # 重心处的值
+        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+        ps = self.mesh.bc_to_point(bc)
+        vmesh = vtk.vtkUnstructuredGrid()
+        vmesh.SetPoints(self.points)
+        vmesh.SetCells(self.cellType, self.cells)
+        cdata = vmesh.GetCellData()
+        pdata = vmesh.GetPointData()
+
+        uh = self.uh 
+        ph = self.ph
+
+        V = uh.value(bc)
+        val = vnp.numpy_to_vtk(V)
+        val.SetName('velocity')
+        cdata.AddArray(val)
+
+        P = ph.value(bc)
+        val = vnp.numpy_to_vtk(V)
+        val.SetName('velocity')
+        cdata.AddArray(val)
+
+        ch = self.ch
+        val = ch.value(ps)
+        if len(ch.shape) == 2:
+            for i in range(ch.shape[1]):
+                val = vnp.numpy_to_vtk(val:, i])
+                val.SetName('concentration' + str(i))
+                cdata.AddArray(val)
+
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(vmesh)
+        writer.Write()
 
 
 
@@ -257,8 +288,6 @@ if __name__ == '__main__':
     model = Model_1()
 
     solver = ShaleGasSolver(model)
-
-    model.molar_dentsity(solver.ph)
 
     mesh = solver.mesh
 
