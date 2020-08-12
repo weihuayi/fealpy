@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
+from scipy.sparse import csr_matrix
 
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -527,7 +528,7 @@ class RaviartThomasFiniteElementSpace2d:
 
             目前仅考虑最低次元的情形，
 
-            sum_i V_i (\\nabla \\cdot (c_i v), w) = < V_i c_i v\cdot n, w >_{\partial K}, 
+            sum_i V_i (\\nabla \\cdot (c_i v), w) = V_i < c_i v\cdot n, w >_{\partial K}, 
 
             其中 V_i 是混合物的第 i 个组分偏摩尔体积，现在设为 1.
 
@@ -542,7 +543,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] != edge2cell[:, 1]
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -719,6 +720,8 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = g(ps)
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
@@ -753,6 +756,8 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
         val = g(ps, en) # 注意这里容易出错
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]
