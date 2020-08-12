@@ -48,7 +48,11 @@ Authors
     Huayi Wei, weihuayi@xtu.edu.cn
 """
 import numpy as np
-from scipy.sparse import coo_matrix
+from numpy.linalg import inv
+from scipy.sparse import csr_matrix, bmat, spdiags
+from scipy.sparse.linalg import spsolve
+
+from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
@@ -58,6 +62,20 @@ import vtk
 import vtk.util.numpy_support as vnp
 
 class Model_1():
+    """
+
+    Notes
+    -----
+    时间单位是天
+
+    每天在区域右下角注入：
+
+    50x50x0.2x0.1/365 = 0.136986301369863 体积的甲烷和乙烷的混合物，各自的摩尔分
+    数分别是 0.8 和 0.2
+
+    在注入边界上每天单位长度上注入的体积为 0.0684931506849315
+
+    """
     def __init__(self):
         self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量, TODO：确认是 g/mol
         self.R = 8.31446261815324 # J/K/mol
@@ -74,10 +92,10 @@ class Model_1():
         ph[:] = 50 # 初始压力
         return ph
 
-    def init_molar_density(self, cspace, ph):
-        c = self.mixed_molar_dentsity(ph)
+    def init_molar_density(self, cspace):
+        c = self.molar_dentsity(50)
         ch = cspace.function(dim=3)
-        ch[:, 2] = c 
+        ch[:, 2] = cspace.local_projection(c)
         return ch
 
     def space_mesh(self, n=50):
@@ -90,49 +108,92 @@ class Model_1():
         timeline = UniformTimeLine(0, 0.1, n)
         return timeline
 
-    def mixed_molar_dentsity(self, ph):
+    def molar_dentsity(self, ph):
         """
 
         Notes
         ----
         给一个分片常数的压力，计算混合物的浓度 c
         """
-        NC = len(ph)
+
         t = self.R*self.T 
-        A = 3*p/t**2
-        B = p/t/3 
-        
-        a = np.ones((NC, 4), dtype=ph.dtype)
-        a[:, 1] = B - 1
-        a[:, 2] = A - 3*B**2 - 2*B
-        a[:, 3] = -A*B + B**2 - B**3
-        Z = np.max(np.array(list(map(np.roots, a))), axis=-1)
-        c = p/Z/t 
+        if type(ph) in {int, float}:
+            A = 3*ph/t**2
+            B = ph/t/3 
+            a = np.ones(4, dtype=np.float64)
+            a[1] = B - 1
+            a[2] = A - 3*B**2 - 2*B
+            a[3] = -A*B + B**2 - B**3
+            Z = np.max(np.roots(a))
+            c = ph/Z/t 
+        else:
+            A = 3*ph/t**2
+            B = ph/t/3 
+
+            a = np.ones((len(ph), 4), dtype=ph.dtype)
+            a[:, 1] = B - 1
+            a[:, 2] = A - 3*B**2 - 2*B
+            a[:, 3] = -A*B + B**2 - B**3
+            Z = np.max(np.array(list(map(np.roots, a))), axis=-1)
+            c = ph/Z/t 
         return c
 
     @cartesian
-    def velocity_bc(self, p, n):
+    def concentration_bc(self, p, n=0):
+        """
+
+        Notes
+        -----
+        在区域左下角给一个浓度的边界条件 c_i 
+
+        n 表示该函数计算第 n 个组分的边界条件
+        """
+        if n == 0:
+            return 0.1
+        elif n == 1:
+            return 0.1
+        elif n == 3:
+            return 0.0
+
+    @cartesian
+    def is_concentration_bc(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        z = p[..., 2]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (x < 1) & (y < 1)
-        val[flag0] = -0.1
-        flag1 = (x > 0.9) & (y > 0.9)
-        val[flag1] = 0.1 
-        return val
+        flag = (x < 1) & (y < 1)
+        return flag
+
+    @cartesian
+    def velocity_bc(self, p, n):
+        """
+
+        Notes
+        -----
+        在区域左下角给一个速度边界条件 v\cdot n
+        """
+        return -0.1 
+
+    @cartesian
+    def is_velocity_bc(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = (x < 1) & (y < 1)
+        return flag
 
     @cartesian
     def pressure_bc(self, p):
+        """
+        Notes
+        -----
+        在区域右上角给出一个压力控制条件，要低于区域内部的压力。
+        """
+        return 25 
+
+    @cartesian
+    def is_pressure_bc(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        z = p[..., 2]
-        val = np.zeros(p.shape[:-1], dtype=np.float64)
-        flag0 = (x < 1) & (y < 1)
-        val[flag0] = 100 
-        flag1 = (x > 0.9) & (y > 0.9)
-        val[flag1] = 25 
-        return val
+        flag = (x > 49) & (y > 49)
+        return flag
 
 class ShaleGasSolver():
     def __init__(self, model):
@@ -146,7 +207,7 @@ class ShaleGasSolver():
         self.ph = model.init_pressure(self.uspace.smspace) # 初始压力
 
         # 三个组分的摩尔密度, 三个组分一起计算 
-        self.ch = model.init_molar_density(self.cspace, self.ph) 
+        self.ch = model.init_molar_density(self.cspace) 
 
         # TODO：初始化三种物质的浓度
         self.options = {
@@ -157,7 +218,9 @@ class ShaleGasSolver():
                 'porosity': 0.2,  # 孔隙度
                 'injecttion_rate': 0.1,  # 注入速率
                 'compressibility': 0.001, #压缩率
-                'pmv': (1.0, 1.0, 1.0)} # 偏摩尔体积
+                'pmv': (1.0, 1.0, 1.0), # 偏摩尔体积
+                'rdir': '/home/why/result/test/',
+                'step': 1} 
         self.CM = self.cspace.cell_mass_matrix() 
         self.H = inv(self.CM)
 
@@ -169,6 +232,10 @@ class ShaleGasSolver():
         c = self.options['porosity']*self.options['compressibility']/dt
         self.D = c*self.uspace.smspace.mass_matrix() 
 
+        # 压力边界条件
+        self.F0 = -self.uspace.set_neumann_bc(
+                model.pressure_bc, threshold=model.is_pressure_bc)
+
         # vtk 文件输出
         node, cell, cellType, NC = self.mesh.to_vtk()
         self.points = vtk.vtkPoints()
@@ -177,7 +244,7 @@ class ShaleGasSolver():
         self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
         self.cellType = cellType
 
-    def one_step_solve():
+    def one_step_solve(self):
         """
 
         Notes
@@ -186,6 +253,8 @@ class ShaleGasSolver():
         """
         udof = self.uspace.number_of_global_dofs()
         pdof = self.uspace.smspace.number_of_global_dofs()
+        gdof = udof + pdof
+
         cdof = self.cspace.number_of_global_dofs()
 
         timeline = self.timeline
@@ -193,7 +262,7 @@ class ShaleGasSolver():
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
 
-        # 1. 求解下一层速度和压力
+        # 1. 求解下一时间层的速度和压力
         M = self.M
         B = self.B
         D = self.D
@@ -202,17 +271,31 @@ class ShaleGasSolver():
         F1 = D@self.ph
 
         AA = bmat([[M, B], [E, D]], format='csr')
-        FF = np.r_['0', np.zeros(udof), F1]
+        FF = np.r_['0', self.F0, F1]
+
+        isBdDof = self.uspace.set_dirichlet_bc(self.uh, 
+                self.model.velocity_bc, threshold=self.model.is_velocity_bc)
+        x = np.r_['0', self.uh, self.ph] 
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof, dtype=np.bool_)]
+        
+        FF -= AA@x
+        bdIdx = np.zeros(gdof, dtype=np.int)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, gdof, gdof)
+        T = spdiags(1-bdIdx, 0, gdof, gdof)
+        AA = T@AA@T + Tbd
+        FF[isBdDof] = x[isBdDof]
+
         x = spsolve(AA, FF).reshape(-1)
         self.uh[:] = x[:udof]
         self.ph[:] = x[udof:]
 
         # 2. 求解下一层的浓度
-
-        nc = len(self.ch.shape[1])
+        nc = self.ch.shape[1] # 这里有 nc 个组分
         for i in range(nc):
+            g = lambda x : self.model.concentration_bc(x, n=i)
             F = self.uspace.convection_vector(nt, self.ch.index(i), self.uh,
-                    g=model.dirichlet) 
+                    g=g) 
             F = self.H@(F[:, :, None]/phi)
             F *= dt
             self.ch[:, i] += F.flat
@@ -258,22 +341,27 @@ class ShaleGasSolver():
         ph = self.ph
 
         V = uh.value(bc)
+        V = np.concatenate((V, np.zeros((V.shape[0], 1), dtype=V.dtype)), axis=1)
         val = vnp.numpy_to_vtk(V)
         val.SetName('velocity')
         cdata.AddArray(val)
 
-        P = ph.value(bc)
-        val = vnp.numpy_to_vtk(V)
-        val.SetName('velocity')
+        val = vnp.numpy_to_vtk(ph[:])
+        val.SetName('pressure')
         cdata.AddArray(val)
 
         ch = self.ch
         val = ch.value(ps)
         if len(ch.shape) == 2:
             for i in range(ch.shape[1]):
-                val = vnp.numpy_to_vtk(val:, i])
-                val.SetName('concentration' + str(i))
-                cdata.AddArray(val)
+                val0 = vnp.numpy_to_vtk(val[:, i])
+                val0.SetName('concentration' + str(i))
+                cdata.AddArray(val0)
+        else:
+            val = vnp.numpy_to_vtk(val)
+            val.SetName('concentration')
+            cdata.AddArray(val)
+            
 
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
@@ -288,10 +376,5 @@ if __name__ == '__main__':
     model = Model_1()
 
     solver = ShaleGasSolver(model)
+    solver.solve()
 
-    mesh = solver.mesh
-
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh.add_plot(axes)
-    plt.show()

@@ -296,7 +296,7 @@ class ScaledMonomialSpace2d():
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
         phi = self.basis(point, index=index)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
