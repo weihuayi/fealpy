@@ -14,6 +14,7 @@ from fealpy.tools.show import showmultirate
 
 # solver
 from fealpy.solver import PETScSolver
+from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve
 import pyamg
 
@@ -45,21 +46,25 @@ for i in range(maxit):
     uh = space.function()
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
+    F -= np.mean(F)
+    C = space.integral_basis()
 
-    # 封闭曲面，设置其第 0 个插值节点的值为真解值
-    bc = DirichletBC(space, pde.solution)
-    A, F = bc.apply(A, F, uh, threshold=np.array([0]))
-    uh[:] = spsolve(A, F).reshape(-1)
+    A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
+    F = np.r_[F, 0]
+
+    x = spsolve(A, F).reshape(-1)
+    uh[:] = x[:-1]
+
+    u = space.integralalg.mesh_integral(pde.solution)/np.sum(space.cellmeasure)
+    uh += u
+
 
     uI = space.interpolation(pde.solution)
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value,
-            linear=False)
-    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value,
-            linear=False)
-    errorMatrix[2, i] = space.integralalg.error(pde.solution, uI.value,
-            linear=False)
-    errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value,
-            linear=False)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
+
+    errorMatrix[2, i] = space.integralalg.error(pde.solution, uI.value)
+    errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value)
 
     if i < maxit-1:
         mesh.uniform_refine()

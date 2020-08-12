@@ -69,7 +69,7 @@ class SphereSinSinSinData():
         valy = pi*(t2 - (t1*x*y + t2*y**2 + t3*y*z)/r)
         valz = pi*(t3 - (t1*x*z + t2*y*z +t3*z**2)/r)
         
-        grad = np.zeros(p.shape, dtype=np.float)
+        grad = np.zeros(p.shape, dtype=np.float64)
         grad[..., 0] = valx
         grad[..., 1] = valy
         grad[..., 2] = valz
