@@ -9,7 +9,7 @@ from ..decorator import timer
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         self.mesh = mesh
-        self.integrator = mesh.integrator(q, 'cell')
+        self.integrator = mesh.integrator(q, etype='cell')
 
         self.cellintegrator = self.integrator
         self.cellbarycenter =  mesh.entity_barycenter('cell')
@@ -57,7 +57,7 @@ class FEMeshIntegralAlg():
 
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         basis0 = b0[0]
@@ -136,7 +136,7 @@ class FEMeshIntegralAlg():
         gdof0 = b0[2]
 
         mesh = self.mesh
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
@@ -223,7 +223,7 @@ class FEMeshIntegralAlg():
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
 
@@ -294,7 +294,7 @@ class FEMeshIntegralAlg():
         """
 
         mesh = self.mesh
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
@@ -365,7 +365,7 @@ class FEMeshIntegralAlg():
         basis 是标量函数
         """
         mesh = self.mesh
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
 
@@ -400,7 +400,7 @@ class FEMeshIntegralAlg():
         basis 是向量函数
         """
         mesh = self.mesh
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
 
@@ -436,7 +436,7 @@ class FEMeshIntegralAlg():
         basis 是标量函数
         """
         mesh = self.mesh
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs, etype='cell')
 
@@ -473,12 +473,12 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        qf = self.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        qf = self.edgeintegrator if q is None else mesh.integrator(q, etype='edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, 'edge')
+                ps = mesh.bc_to_point(bcs, etype='edge')
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -507,12 +507,12 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        qf = self.faceintegrator if q is None else mesh.integrator(q, 'face')
+        qf = self.faceintegrator if q is None else mesh.integrator(q, etype='face')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, 'face')
+                ps = mesh.bc_to_point(bcs, etype='face')
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -541,12 +541,12 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, 'cell')
+                ps = mesh.bc_to_point(bcs, etype='cell')
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -584,7 +584,7 @@ class FEMeshIntegralAlg():
 
         return e
 
-    def error(self, u, v, power=2, celltype=False, q=None):
+    def error(self, u, v, power=2, celltype=False, q=None, linear=False):
         """
 
         Notes
@@ -600,9 +600,12 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        qf = self.integrator if q is None else mesh.integrator(q, 'cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, 'cell')
+        if linear is False:
+            ps = mesh.bc_to_point(bcs, etype='cell')
+        else:
+            ps = mesh.linear_bc_to_point(bcs, etype='cell')
 
         if callable(u):
             if u.coordtype == 'cartesian':

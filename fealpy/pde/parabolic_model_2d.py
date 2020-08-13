@@ -1,13 +1,13 @@
 import numpy as np
 
-from ..mesh.TriangleMesh import TriangleMesh
-from ..mesh.Quadtree import Quadtree
-from ..mesh.QuadrangleMesh import QuadrangleMesh
-from ..mesh.Tritree import Tritree
-from ..mesh.StructureQuadMesh import StructureQuadMesh
+from fealpy.mesh.TriangleMesh import TriangleMesh
+from fealpy.mesh.Quadtree import Quadtree
+from fealpy.mesh.QuadrangleMesh import QuadrangleMesh
+from fealpy.mesh.Tritree import Tritree
+from fealpy.mesh.StructureQuadMesh import StructureQuadMesh
 
-from ..timeintegratoralg.timeline_new import UniformTimeLine
-from ..timeintegratoralg.timeline_new import ChebyshevTimeLine
+from fealpy.timeintegratoralg.timeline import UniformTimeLine
+from fealpy.timeintegratoralg.timeline import ChebyshevTimeLine
 
 class SinSinExpData:
     def __init__(self):

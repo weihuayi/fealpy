@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
+from scipy.sparse import csr_matrix
 
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -164,6 +165,11 @@ class RTDof2d:
         return gdof 
 
 class RaviartThomasFiniteElementSpace2d:
+    """
+
+    TODO
+    ----
+    """
     def __init__(self, mesh, p, q=None, dof=None):
         """
         Parameters
@@ -253,12 +259,12 @@ class RaviartThomasFiniteElementSpace2d:
         return inv(A)
 
     @barycentric
-    def face_basis(self, bc, index=np.s_[:], barycenter=True):
-        return self.edge_basis(bc, index, barycenter)
+    def face_basis(self, bc, index=np.s_[:], barycentric=True):
+        return self.edge_basis(bc, index, barycentric)
 
 
     @barycentric
-    def edge_basis(self, bc, index=np.s_[:], barycenter=True):
+    def edge_basis(self, bc, index=np.s_[:], barycentric=True):
         """
 
         Notes
@@ -275,7 +281,7 @@ class RaviartThomasFiniteElementSpace2d:
         GD = mesh.geo_dimension()
         edge2cell = mesh.ds.edge_to_cell()
 
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
@@ -295,7 +301,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def basis(self, bc, index=np.s_[:], barycenter=True):
+    def basis(self, bc, index=np.s_[:], barycentric=True):
         """
         compute the basis function values at barycentric point bc
 
@@ -329,7 +335,7 @@ class RaviartThomasFiniteElementSpace2d:
         mesh = self.mesh
         GD = mesh.geo_dimension()
 
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, etype='cell', index=index)
         else:
             ps = bc
@@ -347,7 +353,7 @@ class RaviartThomasFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def div_basis(self, bc, index=np.s_[:], barycenter=True):
+    def div_basis(self, bc, index=np.s_[:], barycentric=True):
         p = self.p
         ldof = self.number_of_local_dofs('all')
         cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
@@ -355,7 +361,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
-        if barycenter:
+        if barycentric:
             ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
@@ -463,6 +469,12 @@ class RaviartThomasFiniteElementSpace2d:
         return uh
 
     def stiff_matrix(self, q=None):
+        """
+
+        Notes
+        -----
+            基函数对应的矩阵, 和 mass_matrix 是一样的功能。
+        """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
@@ -474,7 +486,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         Notes
         -----
-        基函数对应的矩阵
+            基函数对应的矩阵，和 stiff_matrix 是一样的矩阵。
         """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
@@ -483,6 +495,12 @@ class RaviartThomasFiniteElementSpace2d:
         return A
 
     def div_matrix(self, q=None):
+        """
+
+        Notes
+        -----
+            (div v, p)
+        """
         gdof0 = self.number_of_global_dofs()
         cell2dof0 = self.cell_to_dof()
         b0 = (self.div_basis, cell2dof0, gdof0)
@@ -493,6 +511,94 @@ class RaviartThomasFiniteElementSpace2d:
         B = self.integralalg.serial_construct_matrix(b0, b1=b1, q=q)
         return B 
 
+    def pressure_matrix(self, ch, q=None):
+        """
+
+        Notes
+        ----
+            物质在单元上流入流出，是单元压力变化的原因。
+
+            ch 是要考虑的的 n 种物质的浓度
+
+            c_0 = ch.index(0)
+            c_1 = ch.index(1)
+            c_2 = ch.index(2)
+            .....
+            c_{n-1} = ch.index(n-1)
+
+            目前仅考虑最低次元的情形，
+
+            sum_i V_i (\\nabla \\cdot (c_i v), w) = V_i < c_i v\cdot n, w >_{\partial K}, 
+
+            其中 V_i 是混合物的第 i 个组分偏摩尔体积，现在设为 1.
+
+            这里不用考虑是物质的流入和流出吗？ 
+
+            注意这里的 n 是单元的外法线，不是边的定向法线。
+
+        TODO
+        ----
+            1. 考虑变化的 V_i 
+        """
+
+        mesh = self.mesh
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs, etype='edge')
+
+        # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
+        en = mesh.edge_unit_normal() 
+        measure = self.integralalg.edgemeasure # 边界长度
+
+        # 边的左边单元在这条边上的 n 种成分的浓度值, (NQ, NE, ...) 
+        val0 = ch(ps, index=edge2cell[:, 0]) 
+        # 边的右边单元在这条边上的 n 种成分的浓度值, (NQ, NE, ...)
+        val1 = ch(ps, index=edge2cell[:, 1])  
+        if len(ch.shape) > 1:
+            # TODO：考虑乘以偏摩尔体积系数
+            val0 = np.sum(val0, axis=-1)
+            val1 = np.sum(val1, axis=-1)
+
+        # 压力空间左右单元基函数在共用边上的值
+        # (NQ, NE, ldof0)
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi1 = self.smspace.basis(ps, index=edge2cell[:, 1])
+
+        # (NQ, NE, ldof1, 2)
+        phi2 = self.basis(ps, index=edge2cell[:, 0], barycentric=False)
+        # (NQ, NE, ldof1)
+        phi2 = np.einsum('...jln, jn->...jl', phi2, en)
+
+        E0 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val0, phi0, phi2, measure,
+                optimize=True)
+        E1 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val1, phi1, phi2, measure,
+                optimize=True)
+
+        gdof0 = self.smspace.number_of_global_dofs()
+        gdof1 = self.number_of_global_dofs()
+        cell2dof = self.smspace.cell_to_dof()
+        edge2dof = self.dof.edge_to_dof()
+
+        I = np.broadcast_to(cell2dof[edge2cell[:, 0], :, None], shape=E0.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E = csr_matrix(
+                (E0.flat, (I.flat, J.flat)), 
+                shape=(gdof0, gdof1))
+
+        I = np.broadcast_to(cell2dof[edge2cell[:, 1], :, None], shape=E1.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E += csr_matrix(
+                (E1[isInEdge].flat, (I[isInEdge].flat, J[isInEdge].flat)),
+                shape=(gdof0, gdof1))
+        return E
+
     def source_vector(self, f, celltype=False, q=None):
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -500,7 +606,6 @@ class RaviartThomasFiniteElementSpace2d:
         F = self.integralalg.serial_construct_vector(f, b,
                 celltype=celltype, q=q) 
         return F 
-
 
     def convection_vector(self, t, ch, vh, g=None, threshold=None, q=None):
         """
@@ -615,6 +720,8 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = g(ps)
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
@@ -649,6 +756,8 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
         val = g(ps, en) # 注意这里容易出错
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

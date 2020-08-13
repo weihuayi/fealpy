@@ -267,7 +267,7 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(tdim,)` or `(NQ, tdim)`
+            the shape of `bc` can be `(TD,)` or `(NQ, TD)`
 
         Returns
         -------
@@ -301,7 +301,9 @@ class LagrangeFiniteElementSpace():
             bcs[idx[isInEdge], ..., nmap[lidx[isInEdge]]] = bc[..., 1]
             bcs[idx[isInEdge], ..., pmap[lidx[isInEdge]]] = bc[..., 0]
 
-        return self.basis(bcs)
+        phi = self.basis(bcs)
+        shape = phi.shape[0:-2] + phi.shape[-1:] 
+        return phi.reshape(shape)
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):

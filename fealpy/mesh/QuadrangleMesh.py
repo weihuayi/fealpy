@@ -27,6 +27,7 @@ class QuadrangleMesh(Mesh2d):
         self.ds = QuadrangleMeshDataStructure(NN, cell)
 
         self.meshtype = 'quad'
+        self.p = 1 # 最低次的四边形 
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -35,6 +36,9 @@ class QuadrangleMesh(Mesh2d):
         self.nodedata = {}
         self.edgedata = {}
 
+    def number_of_corner_nodes(self):
+        return self.ds.NN
+
     def reorder_cell(self, idx):
         NC = self.number_of_cells()
         NN = self.number_of_nodes()
@@ -42,9 +46,11 @@ class QuadrangleMesh(Mesh2d):
         cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
         self.ds.reinit(NN, cell)
 
-    def integrator(self, k):
-        return QuadrangleQuadrature(k)
-
+    def integrator(self, k, etype='cell'):
+        if etype in {'cell', 2}:
+            return QuadrangleQuadrature(k)
+        elif etype in {'edge', 'face', 1}:
+            return GaussLegendreQuadrature(k)
 
     def area(self, index=np.s_[:]):
         return self.cell_area(index=index)

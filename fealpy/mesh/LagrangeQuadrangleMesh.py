@@ -1,23 +1,17 @@
 import numpy as np
 
-from ..quadrature import TriangleQuadrature, GaussLegendreQuadrature
-
+from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 
-from .TriangleMesh import TriangleMesh
-
-# 单纯形网格的多重指标矩阵
 from .core import multi_index_matrix
-# 单纯形网格的拉格朗日形函数
 from .core import lagrange_shape_function 
-# 单纯形网格拉格朗形函数关于重心坐标的导数
 from .core import lagrange_grad_shape_function
 
-class LagrangeTriangleMesh(Mesh2d):
+class LagrangeQuadrangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
 
-        mesh = TriangleMesh(node, cell) 
-        dof = LagrangeTriangleDof2d(mesh, p)
+        mesh = QuadrangleMesh(node, cell) 
+        dof = LagrangeQuadrangleDof2d(mesh, p)
 
         self.p = p
         self.node = dof.interpolation_points()
@@ -25,18 +19,17 @@ class LagrangeTriangleMesh(Mesh2d):
         if surface is not None:
             self.node, _ = surface.project(self.node)
    
-        self.ds = LagrangeTriangleMeshDataStructure(dof)
+        self.ds = LagrangeQuadrangleMeshDataStructure(dof)
 
         self.GD = node.shape[1]
         self.TD = 2
 
-        self.meshtype = 'ltri'
+        self.meshtype = 'lquad'
         self.ftype = mesh.ftype
         self.itype = mesh.itype
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
-        self.multi_index_matrix = multi_index_matrix
 
     def number_of_corner_nodes(self):
         """
@@ -52,18 +45,18 @@ class LagrangeTriangleMesh(Mesh2d):
         return self.ds.NCN
 
     def lagrange_dof(self, p):
-        return LagrangeTriangleDof2d(self, p)
+        return LagrangeQuadrangleDof2d(self, p)
 
     def vtk_cell_type(self, etype='cell'):
         """
 
         Notes
         -----
-            返回网格单元对应的 vtk类型。
+            返回网格单元对应的 vtk 类型。
         """
         if etype in {'cell', 2}:
-            VTK_LAGRANGE_TRIANGLE = 69
-            return VTK_LAGRANGE_TRIANGLE 
+            VTK_LAGRANGE_QUADRILATERAL = 70 
+            return VTK_LAGRANGE_QUADRILATERAL
         elif etype in {'face', 'edge', 1}:
             VTK_LAGRANGE_CURVE = 68
             return VTK_LAGRANGE_CURVE
@@ -86,7 +79,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-        index = vtk_cell_index(self.p, cellType)
+        index = vtk_cell_index(self.p, cellType) # TODO: 转化为 vtk 编号顺序
         NV = cell.shape[-1]
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
@@ -102,10 +95,11 @@ class LagrangeTriangleMesh(Mesh2d):
                     celldata=self.celldata)
 
     def integrator(self, q, etype='cell'):
+        qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 2}:
-            return TriangleQuadrature(q)
+            return TensorProductQuadrature(qf, n=2) 
         elif etype in {'edge', 'face', 1}:
-            return GaussLegendreQuadrature(q)
+            return TensorProductQuadrature(qf, n=1) 
 
     def cell_area(self, q=None, index=np.s_[:]):
         """
@@ -116,15 +110,13 @@ class LagrangeTriangleMesh(Mesh2d):
         """
         p = self.p
         q = p if q is None else q
-        GD = self.geo_dimension()
 
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         J = self.jacobi_matrix(bcs, index=index)
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        if GD == 3:
-            n = np.sqrt(np.sum(n**2, axis=-1))
-        a = np.einsum('i, ij->j', ws, n)/2.0
+        l = np.sqrt(np.sum(n**2, axis=-1))
+        a = np.einsum('i, ij->j', ws, l)/2.0
         return a
 
     def edge_length(self, q=None, index=np.s_[:]):
@@ -138,28 +130,12 @@ class LagrangeTriangleMesh(Mesh2d):
         q = p if q is None else q
 
         qf = self.integrator(q, etype='edge')
-        bcs, ws = qf.get_quadrature_points_and_weights() 
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         J = self.jacobi_matrix(bcs, index=index)
         l = np.sqrt(np.sum(J**2, axis=(-1, -2)))
         a = np.einsum('i, ij->j', ws, l)
         return a
-
-    def linear_bc_to_point(self, bc, etype='cell', index=np.s_[:]):
-        """
-
-        Parameter
-        ---------
-        bc : (3, ) or (NQ, 3)
-        etype : 'cell' or 'edge'
-        """
-        p = self.p
-        node = self.node
-        entity = self.entity(etype)[index]
-        entity = entity[:, [0, -p-1, -1]]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
 
     def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
         """
@@ -173,7 +149,7 @@ class LagrangeTriangleMesh(Mesh2d):
         """
         node = self.node
         TD = bc.shape[-1] - 1
-        entity = self.entity(etype=TD)[index] # 
+        entity = self.entity(etype=TD)[index] #
         phi = self.shape_function(bc) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
@@ -204,9 +180,21 @@ class LagrangeTriangleMesh(Mesh2d):
         Notes
         -----
 
+        bc 是一个长度为 TD 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
+
         """
         p = self.p if p is None else p
-        return lagrange_shape_function(bc, p)
+        TD = len(bc)
+        phi = lagrange_shape_function(bc[0]) 
+        if TD == 2:
+            phi = np.einsum('ijm, kjn->ikjmn', phi, phi)
+            shape = phi.shape[:-2] + (-1, )
+            phi = phi.reshape(shape) # (..., 1, p+1*p+1)
+        return phi  
 
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
@@ -216,19 +204,35 @@ class LagrangeTriangleMesh(Mesh2d):
         -----
         计算单元形函数关于参考单元变量 u=(xi, eta) 或者实际变量 x 梯度。
 
-        lambda_0 = 1 - xi - eta
-        lambda_1 = xi
-        lambda_2 = eta
+        bc 是一个长度为 TD 的 tuple
+
+        bc[i] 是一个一维积分公式的重心坐标数组
+
+        这里假设 bc[0] == bc[1] == ... = bc[TD-1]
 
         """
-        p = self.p if p is None else p 
-        TD = bc.shape[-1] - 1
+        p = self.p if p is None else p
+        TD = len(bc)
+        # (2, 1)
+        Dlambda = np.array([[-1], [1]], dtype=self.ftype)
+
+        # 一维基函数值
+        # (NQ, 1, p+1)
+        phi = lagrange_shape_function(bc[0])  
+
+        # 关于一维变量重心坐标的导数
+        # lambda_0 = 1 - xi
+        # lambda_1 = xi
+        # (NQ, ldof, 2) 
+        R = lagrange_grad_shape_function(bc[0], p)  
+        # i: 积分点
+        # j: 自由度
+        # k: 分量
+        gphi = np.einsum('ijk, kn->ijn', R, Dlambda) 
+
         if TD == 2:
-            Dlambda = np.array([[-1, -1], [1, 0], [0, 1]], dtype=self.ftype)
-        else:
-            Dlambda = np.array([[-1], [1]], dtype=self.ftype)
-        R = lagrange_grad_shape_function(bc, p) # (..., ldof, TD+1)
-        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, TD)
+            gphi = np.einsum('ijn, kmt->ikjmn', gphi, phi)
+
 
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD)
@@ -245,9 +249,8 @@ class LagrangeTriangleMesh(Mesh2d):
                     G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
                     G[..., j, i] = G[..., i, j]
             G = np.linalg.inv(G)
-            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
+            gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
-                    
 
     def print(self):
 
@@ -278,7 +281,7 @@ class LagrangeTriangleMesh(Mesh2d):
         for i, ec in enumerate(edge2cell):
             print(i, ": ", ec)
 
-class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
+class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, dof):
         self.NCN = dof.mesh.number_of_nodes()
         self.cell = dof.cell_to_dof()
@@ -292,12 +295,12 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
         self.V = dof.number_of_local_dofs() 
         self.E = 3
 
-class LagrangeTriangleDof2d():
+class LagrangeQuadrangleDof2d():
     """
 
     Notes
     -----
-    拉格朗日三角形网格上的自由度管理类。
+    拉格朗日四边形网格上的自由度管理类。
     """
     def __init__(self, mesh, p):
         self.mesh = mesh

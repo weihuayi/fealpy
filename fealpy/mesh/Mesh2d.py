@@ -76,9 +76,9 @@ class Mesh2d(object):
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
-            return self.cell_area(index)
+            return self.cell_area(index=index)
         elif etype in {'edge', 'face', 1}:
-            return self.edge_length(index)
+            return self.edge_length(index=index)
         elif etype in {'node', 0}:
             return 0
         else:
@@ -334,12 +334,12 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
             return cell2edge 
 
-    def cell_to_edge_sign(self, sparse=False):
+    def cell_to_edge_sign(self, return_sparse=False):
         NC = self.NC
         E = self.E
 
         edge2cell = self.edge2cell
-        if sparse == False:
+        if return_sparse == False:
             cell2edgeSign = np.zeros((NC, E), dtype=np.bool)
             cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
         else:
