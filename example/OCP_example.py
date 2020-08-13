@@ -272,7 +272,6 @@ class Model():
             uI[:, timeline.current+1] = self.pde.u_solution(bc, (timeline.current+1)*dt)
             timeline.current += 1
         timeline.reset()
- #       print('ui', uI)
         while eu > 1e-12 and k < maxit:
             yh1 = self.yh.copy()
             sp = self.state_solve()
@@ -282,7 +281,6 @@ class Model():
             print('eu', eu)
             print('k', k)
 
-#        print('uh', self.uh)
         return sp, sq
 
     def L2error(self):
@@ -301,12 +299,11 @@ class Model():
                 self.pde.u_solution(x, T)), cartesian(self.pspace.function(array=self.uh[:,
                     NL-1])))
         print('uerror', uL2error)
-        def f(bc):
-            xx = self.mesh.bc_to_point(bc)
-            return (pde.u_solution(xx, 1) - self.pspace.function(array=self.uh[:,
-                    NL-1]))**2
-        error1 = self.pspace.integralalg.integral(f)
-        print('error1', error1)
+        yL2error = self.pspace.integralalg.error(cartesian(lambda x:
+                self.pde.y_solution(x, T)),
+                cartesian(self.pspace.function(array=self.yh[:,
+                    NL-1])))
+        print('yerror', yL2error)
         def f(bc):
             xx = self.mesh.bc_to_point(bc)
             return (pde.y_solution(xx, 1) -
@@ -318,10 +315,10 @@ class Model():
         return pL2error
 
 
-        
+n = int(sys.argv[1])
 pde = PDE(T = 1)
 timeline = UniformTimeLine(0, 1, 400)
-MFEMModel = Model(pde, timeline, n=7)
+MFEMModel = Model(pde, timeline, n=n)
 MFEMModel.nonlinear_solve()
 pL2error = MFEMModel.L2error()
 #state = StateModel(pde, mesh, timeline)
