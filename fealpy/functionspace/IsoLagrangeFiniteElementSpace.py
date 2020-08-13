@@ -143,7 +143,7 @@ class IsoLagrangeFiniteElementSpace:
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
         return A 
 
-    def stiff_matrix_1(self, c=None, q=None):
+    def surface_stiff_matrix(self, c=None, q=None):
         """
 
         Notes
@@ -154,10 +154,9 @@ class IsoLagrangeFiniteElementSpace:
         # G.shape == (NQ, NC, TD, TD)
         # J.shape == (NQ, NC, GD, TD)
         # gphi.shape == (NQ, 1, ldof, TD)
-        G, J, gphi = self.mesh.first_fundamental_form(
+        G, J = self.mesh.first_fundamental_form(
                 bcs, 
-                return_jacobi=True,
-                return_grad=True)
+                return_jacobi=True)
 
         # 计算 Jacobi 行列式
         # n.shape == (NQ, NC) 
@@ -166,16 +165,21 @@ class IsoLagrangeFiniteElementSpace:
         if self.GD == 3:
             n = np.sqrt(np.sum(n**2, axis=-1))
 
+        p = self.p
+        gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
+
         #print("condition number:", np.linalg.cond(G[0]))
 
 
         # dG.shape == (NQ, NC)
-        dG = G[..., 0, 0]*G[..., 1, 1] - G[..., 0, 1]*G[..., 1, 0] 
-        G[..., [0, 1], [0, 1]] = G[..., [1, 0], [1, 0]]
-        G[..., 0, 1] *= -1
-        G[..., 1, 0] *= -1
+        #dG = G[..., 0, 0]*G[..., 1, 1] - G[..., 0, 1]*G[..., 1, 0] 
+        #G[..., [0, 1], [0, 1]] = G[..., [1, 0], [1, 0]]
+        #G[..., 0, 1] *= -1
+        #G[..., 1, 0] *= -1
+        #A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n/dG)
 
-        A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n/dG)
+        G = np.linalg.inv(G)
+        A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n)
 
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()

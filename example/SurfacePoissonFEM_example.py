@@ -48,7 +48,7 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     uh = space.function()
-    A = space.stiff_matrix_1(q=10)
+    A = space.surface_stiff_matrix()
     F = space.source_vector(pde.source)
     F -= np.mean(F)
     C = space.integral_basis()
