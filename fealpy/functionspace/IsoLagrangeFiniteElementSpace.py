@@ -90,7 +90,7 @@ class IsoLagrangeFiniteElementSpace:
 
         """
         
-        phi = self.mesh.shape_function(bc)
+        phi = self.mesh.shape_function(bc, p=self.p)
         return phi 
 
     @barycentric
@@ -141,6 +141,47 @@ class IsoLagrangeFiniteElementSpace:
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
+        return A 
+
+    def stiff_matrix_1(self, c=None, q=None):
+        """
+
+        Notes
+         针对三角形的情形，组装刚度矩阵，测试想法的正确性。
+        """
+        qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        # G.shape == (NQ, NC, TD, TD)
+        # J.shape == (NQ, NC, GD, TD)
+        # gphi.shape == (NQ, 1, ldof, TD)
+        G, J, gphi = self.mesh.first_fundamental_form(
+                bcs, 
+                return_jacobi=True,
+                return_grad=True)
+
+        # 计算 Jacobi 行列式
+        # n.shape == (NQ, NC) 
+        # 注意这里只针对拓扑维数为 2 三角形的情形。
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        if self.GD == 3:
+            n = np.sqrt(np.sum(n**2, axis=-1))
+
+        #print("condition number:", np.linalg.cond(G[0]))
+
+
+        # dG.shape == (NQ, NC)
+        dG = G[..., 0, 0]*G[..., 1, 1] - G[..., 0, 1]*G[..., 1, 0] 
+        G[..., [0, 1], [0, 1]] = G[..., [1, 0], [1, 0]]
+        G[..., 0, 1] *= -1
+        G[..., 1, 0] *= -1
+
+        A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n/dG)
+
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A 
 
     def mass_matrix(self, c=None, q=None):

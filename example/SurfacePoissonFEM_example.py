@@ -12,6 +12,9 @@ from fealpy.functionspace import IsoLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.tools.show import showmultirate
 
+from fealpy.solver import MatlabSolver
+import transplant
+
 # solver
 from fealpy.solver import PETScSolver
 from scipy.sparse import bmat
@@ -34,6 +37,7 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
 
+
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
@@ -44,7 +48,7 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
     uh = space.function()
-    A = space.stiff_matrix()
+    A = space.stiff_matrix_1(q=10)
     F = space.source_vector(pde.source)
     F -= np.mean(F)
     C = space.integral_basis()
@@ -54,6 +58,7 @@ for i in range(maxit):
 
     x = spsolve(A, F).reshape(-1)
     uh[:] = x[:-1]
+
 
     u = space.integralalg.mesh_integral(pde.solution)/np.sum(space.cellmeasure)
     uh += u
@@ -69,7 +74,7 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine()
 
-
+print(errorMatrix)
 lmesh.nodedata['uh'] = uh
 lmesh.nodedata['uI'] = uI 
 

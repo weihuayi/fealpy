@@ -178,7 +178,7 @@ class LagrangeTriangleMesh(Mesh2d):
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
 
-    def jacobi_matrix(self, bc, index=np.s_[:], p=None, return_grad=False):
+    def jacobi_matrix(self, bc, index=np.s_[:], return_grad=False):
         """
         Notes
         -----
@@ -189,21 +189,70 @@ class LagrangeTriangleMesh(Mesh2d):
 
         TD = bc.shape[-1] - 1
         entity = self.entity(etype=TD)
-        gphi = self.grad_shape_function(bc, p=p)
+        gphi = self.grad_shape_function(bc)
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity[index], :], gphi)
         if return_grad is False:
             return J
         else:
-            return J, grad
+            return J, gphi
+
+    def first_fundamental_form(self, bc, index=np.s_[:], 
+            return_jacobi=False, return_grad=False):
+        """
+        Notes
+        -----
+            计算网格曲面在积分点处的第一基本形式。
+        """
+
+        TD = bc.shape[-1] - 1
+        J = self.jacobi_matrix(bc, index=index,
+                return_grad=return_grad)
+        
+        if return_grad:
+            J, gphi = J
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD):
+            G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
+            for j in range(i+1, TD):
+                G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
+                G[..., j, i] = G[..., i, j]
+        if (return_jacobi is False) & (return_grad is False):
+            return G
+        elif (return_jacobi is True) & (return_grad is False): 
+            return G, J
+        elif (return_jacobi is False) & (return_grad is True): 
+            return G, gphi 
+        else:
+            return G, J, gphi
+
+    def second_fundamental_form(self, bc, index=np.s_[:]):
+        """
+        Notes
+        -----
+            计算网格曲面在积分点处的第二基本形式。
+        """
+        pass
+
+    def third_fundamental_form(self, bc, index=np.s_[:]):
+        """
+        Notes
+        -----
+            计算网格曲面在积分点处的第三基本形式。
+        """
+        pass
+
 
     def shape_function(self, bc, p=None):
         """
 
         Notes
         -----
-
+            默认返回网格单元的形函数在积分点的值，否则返回空间基函数在积分点处的
+            值
         """
         p = self.p if p is None else p
         return lagrange_shape_function(bc, p)
@@ -233,17 +282,7 @@ class LagrangeTriangleMesh(Mesh2d):
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD)
         elif variables == 'x':
-            entity = self.entity(etype=TD)
-            J = np.einsum(
-                    'ijn, ...jk->...ink',
-                    self.node[entity[index], :], gphi)
-            shape = J.shape[0:-2] + (TD, TD)
-            G = np.zeros(shape, dtype=self.ftype)
-            for i in range(TD):
-                G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
-                for j in range(i+1, TD):
-                    G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
-                    G[..., j, i] = G[..., i, j]
+            G, J = self.first_fundamental_form(bc, index=index, return_jacobi=True)
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi) 
             return gphi
@@ -291,6 +330,7 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
 
         self.V = dof.number_of_local_dofs() 
         self.E = 3
+        self.itype = dof.mesh.itype
 
 class LagrangeTriangleDof2d():
     """
