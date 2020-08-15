@@ -33,7 +33,8 @@ mesh = pde.init_mesh(n=n)
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
              '$|| u - u_I||_{\Omega,0}$',
-             '$||\\nabla u - \\nabla u_I||_{\Omega, 0}$'
+             '$||\\nabla u - \\nabla u_I||_{\Omega, 0}$',
+             '$|| u_I - u_h ||_{\Omega, \infty}$'
              ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
@@ -120,6 +121,7 @@ for i in range(maxit):
 
     errorMatrix[2, i] = space.integralalg.error(pde.solution, uI.value)
     errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value)
+    errorMatrix[4, i] = np.max(np.abs(uI - uh))
 
     if i < maxit-1:
         mesh.uniform_refine()
