@@ -584,7 +584,7 @@ class FEMeshIntegralAlg():
 
         return e
 
-    def error(self, u, v, power=2, celltype=False, q=None, linear=False):
+    def error(self, u, v, power=2, celltype=False, q=None):
         """
 
         Notes
@@ -602,10 +602,7 @@ class FEMeshIntegralAlg():
 
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        if linear is False:
-            ps = mesh.bc_to_point(bcs, etype='cell')
-        else:
-            ps = mesh.linear_bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs, etype='cell')
 
         if callable(u):
             if u.coordtype == 'cartesian':

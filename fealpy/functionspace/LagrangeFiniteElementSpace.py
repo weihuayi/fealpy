@@ -528,7 +528,7 @@ class LagrangeFiniteElementSpace():
         return uh
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='barycentric')
         return f
 
     def array(self, dim=None):

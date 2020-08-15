@@ -145,20 +145,23 @@ class LagrangeTriangleMesh(Mesh2d):
         a = np.einsum('i, ij->j', ws, l)
         return a
 
-    def linear_bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+    def cell_unit_normal(self, bc, index=np.s_[:]):
         """
 
-        Parameter
-        ---------
-        bc : (3, ) or (NQ, 3)
-        etype : 'cell' or 'edge'
+        Notes
+        -----
+        计算曲面情形下，积分点处的单位法线方向。
         """
-        p = self.p
-        node = self.node
-        entity = self.entity(etype)[index]
-        entity = entity[:, [0, -p-1, -1]]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
+        J = self.jacobi_matrix(bc, index=index)
+
+        # n.shape 
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        if self.GD == 3:
+            l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
+            n /= l
+
+        return n
+
 
 
     def bc_to_point(self, bc, index=np.s_[:], etype='cell'):

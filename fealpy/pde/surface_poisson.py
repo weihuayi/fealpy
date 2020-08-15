@@ -49,13 +49,18 @@ class SphereSinSinSinData():
         return rhs
 
     @cartesian
-    def gradient(self, p):
-        """ The Gradu of the exact solution
+    def gradient(self, p, n=None):
+        """ 
+
+        Notes
+        -----
+
+        单位球面上的真解
         """
-        p, _ = self.surface.project(p)
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        p0, d = self.surface.project(p)
+        x = p0[..., 0]
+        y = p0[..., 1]
+        z = p0[..., 2]
         pi = np.pi
         cos = np.cos
         sin = np.sin
@@ -69,8 +74,15 @@ class SphereSinSinSinData():
         valy = pi*(t2 - (t1*x*y + t2*y**2 + t3*y*z)/r)
         valz = pi*(t3 - (t1*x*z + t2*y*z +t3*z**2)/r)
         
-        grad = np.zeros(p.shape, dtype=np.float64)
-        grad[..., 0] = valx
-        grad[..., 1] = valy
-        grad[..., 2] = valz
-        return grad  
+        val = np.zeros(p0.shape, dtype=np.float64)
+        val[..., 0] = valx
+        val[..., 1] = valy
+        val[..., 2] = valz
+
+        if n is not None:
+            H = self.surface.hessian(p)
+            n0 = self.surface.unit_normal(p0)
+            val -= np.sum(n0*val, axis=-1, keepdims=True)*n0
+            val -= np.einsum('..., ...mn, ...n->...m', d, H, val)
+            val -= np.sum(n*val, axis=-1, keepdims=True)*n
+        return val  
