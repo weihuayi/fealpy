@@ -2,7 +2,7 @@
 # 
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import HalfEdgeDomain, HalfEdgeMesh, CVTPMesher
+from fealpy.mesh import HalfEdgeMesh2d, CVTPMesher
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import KDTree
@@ -19,12 +19,12 @@ class CVTPMesherTest:
             (0, 1),(1, 2),(2, 3),(3, 0)], dtype=np.int)
         subdomain = np.array([
             (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
-        domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-        uniform_boundary_mesh = CVTPMesher(domain)
+        dof =np.array([1,1,1,1],dtype=np.bool)
+        mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+        uniform_boundary_mesh = CVTPMesher(mesh)
         uniform_boundary_mesh.uniform_boundary_meshing(n=2)
         bnode = uniform_boundary_mesh.bnode
         vor = Voronoi(bnode)
-        mesh = domain.to_halfedgemesh()
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -51,8 +51,8 @@ class CVTPMesherTest:
                 (0, 1),(1, 2),(2, 3),(3, 0)], dtype=np.int)
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=2)
             bnode = uniform_mesh.bnode
        
@@ -60,7 +60,7 @@ class CVTPMesherTest:
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0,  1.0),(0.0,  1.0),
                 (-1.0, 1.0),(-1.0, 0.0),(-1.0, -1.0),(0.0, -1.0)],dtype=np.float)
-            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1],dtype=np.bool)
+            fixed = np.array([0, 0, 0, 1, 0, 1, 0, 0],dtype=np.bool)
             facets = np.array([
                (0, 1), (1, 2), (2, 3), (3, 4), 
                (4, 5), (5, 6), (6, 7), (7, 0)],dtype=np.int)
@@ -68,8 +68,8 @@ class CVTPMesherTest:
                (1, 0), (1, 0), (1, 0), (1, 0),
                (1, 0), (1, 0), (1, 0), (1, 0)],dtype=np.int)
         
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain, fixed)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain, fixed)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=2)
             bnode = uniform_mesh.bnode
 
@@ -87,9 +87,9 @@ class CVTPMesherTest:
             subdomain = np.zeros((n, 2),dtype=np.int)
             subdomain[:, 0] = 1
 
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain,
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
-            uniform_mesh= CVTPMesher(domain)
+            uniform_mesh= CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=0)
             bnode = uniform_mesh.bnode
         elif domain == 'partition1':
@@ -101,8 +101,8 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(2, 0),(3, 0),(4, 0),
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=3)
             bnode = uniform_mesh.bnode
 
@@ -119,8 +119,8 @@ class CVTPMesherTest:
                 (1, 0),(2, 0),(2, 0),(3, 0),
                 (3, 0),(4, 0),(4, 0),(1, 0),
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=2)
             bnode = uniform_mesh.bnode
         elif domain == 'hole1':
@@ -149,8 +149,8 @@ class CVTPMesherTest:
                 (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
             """
 
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=1)
             bnode = uniform_mesh.bnode
         elif domain == 'hole2':
@@ -196,8 +196,8 @@ class CVTPMesherTest:
 
             #"""
 
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=1)
             bnode = uniform_mesh.bnode
 
@@ -211,7 +211,6 @@ class CVTPMesherTest:
             newnode = uniform_mesh.inode
             for k in newnode:
                 vor.add_points(newnode[k])
-        mesh = domain.to_halfedgemesh()
 
         if plot:
             fig = plt.figure()
@@ -219,6 +218,7 @@ class CVTPMesherTest:
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=True)
             mesh.find_node(axes, node=bnode, showindex=True)
+            mesh.print()
             voronoi_plot_2d(vor, ax=axes)
             plt.show()
     
@@ -230,8 +230,8 @@ class CVTPMesherTest:
                 (0, 1),(1, 2),(2, 3),(3, 0)], dtype=np.int)
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=2)
        
         elif domain == 'LShape':
@@ -246,9 +246,9 @@ class CVTPMesherTest:
                (1, 0), (1, 0), (1, 0), (1, 0),
                (1, 0), (1, 0), (1, 0), (1, 0),],dtype=np.int)
         
-            domain = HalfEdgeDomain.from_facets(vertices, facets,
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
-            uniform_mesh = CVTPMesher(domain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=2)
         elif domain =='circle':
             n = 20
@@ -257,16 +257,16 @@ class CVTPMesherTest:
             vertices = np.zeros((n, 2), dtype=np.float)
             vertices[:, 0] = np.cos(theta)
             vertices[:, 1] = np.sin(theta)
-            fixed = np.zeros(n, dtype=np.bool)
+            fixed = np.ones(n, dtype=np.bool)
             facets = np.zeros((n,2), dtype=np.int)
             facets[:, 0] = range(0, n)
             facets[:-1, 1] = range(1, n)
             subdomain = np.zeros((n, 2),dtype=np.int)
             subdomain[:, 0] = 1
 
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain,
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
-            uniform_mesh = CVTPMesher(domain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=0)
         elif domain == 'partition1':
             vertices = np.array([
@@ -277,8 +277,8 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(2, 0),(3, 0),(4, 0),
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=3)
 
         elif domain == 'partition2':
@@ -294,8 +294,8 @@ class CVTPMesherTest:
                 (1, 0),(2, 0),(2, 0),(3, 0),
                 (3, 0),(4, 0),(4, 0),(1, 0),
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mgesh)
             uniform_mesh.uniform_meshing(refine=2)
         elif domain == 'hole1':
             
@@ -323,12 +323,11 @@ class CVTPMesherTest:
                 (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
             """
 
-            domain = HalfEdgeDomain.from_facets(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(domain)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=1)
-
+        mesh.print()
         vor, start = uniform_mesh.voronoi()
-        mesh = domain.to_halfedgemesh()
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -337,13 +336,17 @@ class CVTPMesherTest:
             mesh.find_node(axes, node=vor.points, showindex=True)
             voronoi_plot_2d(vor, ax=axes)
             plt.show()
-        
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.find_node(axes, showindex=True)
+            plt.show()
+       
         i =0
         while i<100:
             vor = uniform_mesh.Lloyd(vor,start)
             i+=1
         
-        mesh = domain.to_halfedgemesh()
 
         if plot:
             fig = plt.figure()
@@ -364,12 +367,12 @@ class CVTPMesherTest:
 test = CVTPMesherTest()
 #test.uniform_boundary_meshing_test()
 #test.uniform_meshing_test(domain='square')
-#test.uniform_meshing_test(domain='LShape')
+test.uniform_meshing_test(domain='LShape')
 #test.uniform_meshing_test(domain='circle')
 #test.uniform_meshing_test(domain = 'partition1')
 #test.uniform_meshing_test(domain = 'partition2')
 #test.uniform_meshing_test(domain = 'hole1')
-test.uniform_meshing_test(domain='hole2',interior_nodes=False)
+#test.uniform_meshing_test(domain='hole2',interior_nodes=False)
 #test.Lloyd_test(domain='square')
 #test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
