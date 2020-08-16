@@ -1,6 +1,16 @@
 import numpy as np
 from .geoalg import project
 
+class ScaledSurface():
+
+    def __init__(self, surface, scale=1.0):
+        self.surface = surface
+        self.scale = scale
+
+    def __call__(self, p):
+        p0 = p/self.scale
+        return self.surface(p0)
+
 class SphereSurface():
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
