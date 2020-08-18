@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import bmat
+from scipy.sparse.linalg import spsolve
 
 import vtk
 import vtk.util.numpy_support as vnp
@@ -57,18 +58,18 @@ class PhaseFieldCrystalModel():
         dt = self.timeline.current_time_step_length()
         gdof = self.space.number_of_global_dofs()
 
-        s = self.moptions['s']
-        epsilon = self.moptions['epsilon']
+        s = self.options['s']
+        epsilon = self.options['epsilon']
 
-        uh = uh0.index(i)
+        uh0 = self.uh0 
         M = self.M
         F = np.zeros((2*gdof, ), dtype=self.ftype)
-        F[:gdof] = M@self.uh0
+        F[:gdof] = M@uh0
         F[:gdof] *= 1 - dt*epsilon
 
         @barycentric
         def f(bcs):
-            val = uh(bcs)
+            val = uh0(bcs)
             return s*val**2/2 - val**3/6
         F[:gdof] += dt*self.space.source_vector(f)
         return F
@@ -81,11 +82,16 @@ class PhaseFieldCrystalModel():
             求解一个时间层的数值解
         """
 
+        gdof = self.space.number_of_global_dofs()
         A = self.get_current_left_matrix()
         F = self.get_current_right_vector()
         x = spsolve(A, F)
         self.uh0[:] = x[:gdof]
         self.uh1[:] = x[gdof:]
+
+    def post_process(self):
+        area = np.sum(self.space.cellmeasure)
+        self.uh0 -= self.space.integralalg.mesh_integral(self.uh0)/area
 
     def Hamilton(self):
         s = self.options['s']
@@ -110,11 +116,16 @@ class PhaseFieldCrystalModel():
         def f1(bcs):
             val = uh0(bcs)
             return s*val**2/2 - val**3/6
-        grad = -self.M*uh0 - epsilon*self.M*uh0 + 2*self.A*uh0 + self.space.source_vector(f, barycenter=True) + self.A*uh1
-        self.G.append(np.linal.norm(grad))
+        grad = -self.M*uh0 
+        grad -= epsilon*self.M*uh0 
+        grad += 2*self.A*uh0 
+        grad += self.space.source_vector(f1) 
+        grad += self.A*uh1
+
+        self.G.append(np.linalg.norm(grad))
 
 
-    def solve(self, disp=True, output=False, rdir='.', step=1):
+    def solve(self, disp=True, output=False, rdir='.', step=1, postprocess=False):
         """
 
         Notes
@@ -127,25 +138,34 @@ class PhaseFieldCrystalModel():
         dt = timeline.current_time_step_length()
         timeline.reset() # 时间置零
 
+        if postprocess:
+            self.post_process()
+
         self.Hamilton()
 
         if output:
             fname = rdir + '/step_'+ str(timeline.current).zfill(10) + '.vtu'
-            self.write_to_vtk(fname)
             print(fname)
+            self.write_to_vtk(fname)
 
         if disp:
-            print("Current Hamilton energy ", self.H[-1], " with gradient ",
+            print(timeline.current, "Current Hamilton energy ", self.H[-1], " with gradient ",
                     self.G[-1] )
+            print("Max phase value:", np.max(self.uh0))
+            print("Min phase value:", np.min(self.uh0))
 
         while not timeline.stop():
             self.one_step_solve()
+            if postprocess:
+                self.post_process()
             self.Hamilton()
             timeline.current += 1
 
             if disp:
                 print("Current Hamilton energy ", self.H[-1], " with gradient ",
-                        self.G[-1] )
+                        self.G[-1])
+                print("Max phase value:", np.max(self.uh0))
+                print("Min phase value:", np.min(self.uh0))
 
             if output & (timeline.current%step == 0):
                 fname = rdir + '/step_'+ str(timeline.current).zfill(10) + '.vtu'
