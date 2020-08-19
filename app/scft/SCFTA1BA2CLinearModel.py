@@ -1,4 +1,4 @@
-import numpy as np
+importnumpy as np
 import matplotlib.pyplot as plt
 import math
 

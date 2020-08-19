@@ -16,10 +16,11 @@ meviewer
 
 *.mat
 meshdata
-result
+result*
 build
 __pycache__
 results
+results1
 refineresults
 data
 matlab

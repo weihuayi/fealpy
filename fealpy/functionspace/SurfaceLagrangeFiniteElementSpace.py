@@ -41,7 +41,8 @@ class SurfaceLagrangeFiniteElementSpace:
 
         self.scale = scale
         self.p = p
-        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0, scale=scale)
+
+        self.mesh = SurfaceTriangleMesh(mesh, surface, p=p0, scale=self.scale)
         self.surface = surface
 
         self.cellmeasure = self.mesh.entity_measure('cell')
@@ -147,7 +148,7 @@ class SurfaceLagrangeFiniteElementSpace:
         """
         return self.mesh.space.basis(bc)
 
-    def grad_basis(self, bc, index=None, returncond=False):
+    def grad_basis(self, bc, index=np.s_[:], returncond=False):
         """
         Compute the gradients of all basis functions at a given barrycenter.
         """
@@ -176,7 +177,6 @@ class SurfaceLagrangeFiniteElementSpace:
 
     def value(self, uh, bc, index=None):
         phi = self.basis(bc)
-        print('phi', phi.shape)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -187,7 +187,7 @@ class SurfaceLagrangeFiniteElementSpace:
             val = np.einsum(s1, phi, uh[cell2dof[index]])
         return val
 
-    def grad_value(self, uh, bc, index=None):
+    def grad_value(self, uh, bc, index=np.s_[:]):
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
@@ -262,3 +262,10 @@ class SurfaceLagrangeFiniteElementSpace:
             uh = self.function()
             uh[cell2dof] = data[:, [0, 5, 4, 1, 3, 2]]
             return uh
+
+    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
+        """
+        初始化解 uh  的第一类边界条件。
+        """
+        pass
+

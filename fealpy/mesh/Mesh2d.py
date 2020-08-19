@@ -99,7 +99,9 @@ class Mesh2d(object):
         return bc
 
     def face_unit_normal(self, index=np.s_[:]):
+        print(index.shape)
         v = self.face_unit_tangent(index=index)
+        print('v',v.shape)
         w = np.array([(0,-1),(1,0)])
         return v@w
 

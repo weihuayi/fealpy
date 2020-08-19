@@ -47,9 +47,12 @@ class LagrangeTriangleMeshTest():
         mesh.to_vtk(fname=fname)
 
     def surface_mesh(self, p=2, fname='surface.vtu'):
-        from fealpy.geometry import SphereSurface
+        from fealpy.geometry import SphereSurface, EllipsoidSurface, SphereSurfaceTest
 
-        surface = SphereSurface()
+        #surface = SphereSurface()
+        surface = SphereSurfaceTest()
+        #surface = EllipsoidSurface()
+        #surface = ScaledSurface(surface,scale=[9,3,1])
         mesh = surface.init_mesh()
 
         node = mesh.entity('node')
@@ -58,10 +61,31 @@ class LagrangeTriangleMeshTest():
         lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
         NC = lmesh.number_of_cells()
         a = lmesh.cell_area()
-        print("NC:", NC)
-        print("area:", a)
-        print(sum(a))
         lmesh.to_vtk(fname=fname)
+
+    def surface_area(self, p=2):
+        from fealpy.geometry import SphereSurface
+
+        surface = SphereSurface()
+        mesh = surface.init_mesh()
+        e = 0
+        maxit = 5
+        for i in range(maxit):
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+
+            lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
+            NC = lmesh.number_of_cells()
+            a = lmesh.cell_area()
+            a = sum(a)
+            a_e = (4*np.pi)
+            e_new = abs(a-a_e)
+            order = np.log2(e/e_new)
+            e = e_new
+            print("e:", e)
+            print("0:", order)
+            if i < maxit - 1:
+                mesh.uniform_refine(surface = surface)
 
 
 test = LagrangeTriangleMeshTest()
@@ -77,3 +101,6 @@ elif sys.argv[1] == 'surface_mesh':
     p = int(sys.argv[2])
     fname = sys.argv[3]
     test.surface_mesh(p=p, fname=fname)
+elif sys.argv[1] == 'surface_area':
+    p = int(sys.argv[2])
+    test.surface_area(p=p)

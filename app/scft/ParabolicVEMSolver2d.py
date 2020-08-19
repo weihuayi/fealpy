@@ -9,7 +9,7 @@ class ParabolicVEMSolver2d():
     q_t = \Delta q - w*q
     q[0] = 1
     """
-    def __init__(self, A, M, F, nupdate=0, method ='CN'):
+    def __init__(self, A, M, F=None, nupdate=0, method ='CN'):
         self.method = method
         self.solver = PETScSolver()
 
