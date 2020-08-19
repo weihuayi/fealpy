@@ -300,7 +300,7 @@ class ScaledMonomialSpace2d():
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        return np.einsum(s1, phi, uh[cell2dof[index]])
+        return np.einsum(s1, phi, uh[cell2dof])
 
     @cartesian
     def grad_value(self, uh, point, index=np.s_[:]):

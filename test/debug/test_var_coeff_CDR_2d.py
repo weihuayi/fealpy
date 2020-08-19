@@ -94,11 +94,13 @@ class CDRMODEL:
         x = p[..., 0]
         y = p[..., 1]
         eips = 1
-        val_11 = eips*(1+x**2)
-        val_12 = eips*x*y
-        val_21 = eips*x*y
-        val_22 = eips*(1+y**2)
-        return np.array([[val_11, val_12], [val_21, val_22]], dtype=np.float64)
+        shape = p.shape + (2, )
+        val = np.zeros(shape, dtype=np.float64) 
+        val[..., 0, 0] = eips*(1+x**2)
+        val[..., 0, 1] = eips*x*y
+        val[..., 1, 0] = val[..., 0, 1]
+        val[..., 1, 1] = eips*(1+y**2)
+        return val 
 
     @cartesian
     def convection_coefficient_ndf(self, p):
