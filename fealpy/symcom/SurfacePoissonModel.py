@@ -49,8 +49,11 @@ class SurfacePoissonModel:
 if __name__ == "__main__":
     print("Model 0:")
 
-    model = SurfacePoissonModel() 
     u = sin(pi*x)*sin(pi*y)*sin(pi*z) 
     phi = sqrt(x**2 + y**2 + z**2) - 1
+    model = SurfacePoissonModel(u,phi) 
 
-    u, gu, f = model.show(u, phi)
+    u, gu, f = model.show_pde()
+    print('u', u)
+    print('\n gu', gu)
+    print('\n f', f)

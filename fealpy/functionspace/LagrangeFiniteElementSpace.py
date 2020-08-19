@@ -477,7 +477,7 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
         return gphi #(..., NC, ldof, GD)
 
     @barycentric
