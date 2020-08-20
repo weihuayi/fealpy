@@ -19,6 +19,7 @@ from .implicit_curve import PearShapedCurve
 from .implicit_curve import SpiricSectionsCurve
 
 from .implicit_surface import SphereSurface
+from .implicit_surface import SphereSurfaceTest
 from .implicit_surface import TwelveSpheres
 from .implicit_surface import HeartSurface
 from .implicit_surface import EllipsoidSurface

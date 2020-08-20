@@ -8,10 +8,11 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.surface_poisson import SphereSinSinSinData  as PDE
+#from fealpy.pde.surface_poisson import EllipsoidSinSinSinData  as PDE
 from fealpy.mesh import LagrangeTriangleMesh
 from fealpy.functionspace import IsoLagrangeFiniteElementSpace
-from fealpy.boundarycondition import DirichletBC 
-from fealpy.tools.show import showmultirate
+from fealpy.boundarycondition import DirichletBC, NeumannBC
+from fealpy.tools.show import showmultirate, show_error_table
 
 from fealpy.solver import MatlabSolver
 import transplant
@@ -49,6 +50,7 @@ for i in range(maxit):
     lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
     space = IsoLagrangeFiniteElementSpace(lmesh, p=p)
     NDof[i] = space.number_of_global_dofs()
+    print(NDof[i])
 
     uh = space.function()
     A = space.surface_stiff_matrix()
@@ -137,6 +139,7 @@ for i in range(maxit):
     errorMatrix[2, i] = space.integralalg.error(pde.solution, uI.value)
     errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value)
     errorMatrix[4, i] = np.max(np.abs(uI - uh))
+    print(errorMatrix)
 
     if i < maxit-1:
         mesh.uniform_refine()
@@ -145,6 +148,6 @@ lmesh.nodedata['uh'] = uh
 lmesh.nodedata['uI'] = uI 
 
 lmesh.to_vtk(fname='surface_with_solution.vtu')
+show_error_table(NDof, errorType, errorMatrix)
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
-
 plt.show()

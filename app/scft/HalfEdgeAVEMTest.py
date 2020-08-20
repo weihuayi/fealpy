@@ -16,7 +16,6 @@ from vem2d_problem import halfedgemesh, init_mesh, complex_mesh
 class HalfEdgeAVEMTest():
     def __init__(self, mesh, fieldstype, moptions, optoptions):
         print('NN', mesh.number_of_nodes())
-        print(mesh.cell_area())
         self.optoptions = optoptions
         obj = SCFTVEMModel2d(mesh, options=moptions)
         mu = obj.init_value(fieldstype=fieldstype)
@@ -82,9 +81,8 @@ class HalfEdgeAVEMTest():
             self.problem = problem
 
             if diff < options['FunValDiff']:
-                break
-               #if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
-                   #break
+               if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
+                   break
             pass
 
 
@@ -92,7 +90,7 @@ options = {
         'MaxIters': 5000,
         'MaxFunEvals': 5000,
         'NormGradTol': 1e-6,
-        'FunValDiff': 1e-0,
+        'FunValDiff': 1e-6,
         'StepLength': 2,
         'StepTol': 1e-14,
         'Output': True
@@ -103,13 +101,13 @@ moptions = scftmodel2d_options(
         nblend = 1,
         nblock = 2,
         ndeg = 100,
-        fA = 0.2,
-        chiAB = 0.25,
+        fA = 0.5,
+        chiAB = 0.15,
         dim = 2,
         T0 = 20,
         T1 = 80,
         nupdate = 1,
-        order = 1,
+        order = 2,
         rdir = sys.argv[3])
 if sys.argv[1] =='quadtree':
     mesh = init_mesh(n=5, h=12)
@@ -117,10 +115,10 @@ if sys.argv[1] =='quadtree':
 elif sys.argv[1] =='halfedge':
     mesh = halfedgemesh(n=6, h=12)
 elif sys.argv[1] =='complex':
-    mesh = complex_mesh(r=20, filename = sys.argv[2])
+    mesh = complex_mesh(r=0.006, filename = sys.argv[2], n=1)
 
-Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
+Halftest = HalfEdgeAVEMTest(mesh, fieldstype=4, moptions=moptions,
         optoptions=options)
 
-#Halftest.uni_run()
-Halftest.run()
+Halftest.uni_run()
+#Halftest.run()

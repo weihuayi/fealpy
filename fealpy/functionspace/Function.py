@@ -43,7 +43,7 @@ class Function(np.ndarray):
             return self.__dict__[item]
         else:
             return self.__dict__[item]
-
+        
     def add_plot(self, plot, cmap=None, threshold=None):
         import matplotlib.colors as colors
         import matplotlib.cm as cm

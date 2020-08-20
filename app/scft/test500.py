@@ -2,6 +2,7 @@
 
 import sys
 import time
+import scipy.io as scio
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -17,41 +18,33 @@ class HalfEdgeAVEMTest():
     def __init__(self, mesh, fieldstype, moptions, optoptions):
         print('NN', mesh.number_of_nodes())
         self.optoptions = optoptions
-        self.moptions = moptions
-        ##多边形网格－空间
+        self.moptions = moptions##多边形网格－空间
+
+        data = scio.loadmat('results1/test500.mat')
+        rho = data['rho']
+        q = np.zeros(rho.shape)
+        q[:,0] = data['q0'][:,-1]
+        q[:,1] = data['q1'][:,-1]
+        mu = data['mu']
         obj = SCFTVEMModel2d(mesh, options=self.moptions)
-        mu = obj.init_value(fieldstype=fieldstype)
-        self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
+        self.problem = {'objective': obj, 'x0': mu, 'mesh': mesh, 'q': q}
 
     def run(self, estimator='grad'):
         problem = self.problem
         options = self.optoptions
         moptions = self.moptions
         model = problem['objective']
-        mesh = problem['mesh']
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes,cellcolor='w')
-        plt.show()
-        #plt.savefig('flower15.png')
-        #plt.savefig('flower15.pdf')
-        #plt.close()
+        q = problem['q']
 
-
-
-        optalg = SteepestDescentAlg(problem, options)
-        x, f, g, diff = optalg.run(maxit=500)
-
-        q = np.zeros(model.rho.shape)
         while True:
             print('chiN', moptions['chiN'])
             if moptions['chiN'] > 15:
                 optalg = SteepestDescentAlg(problem, options)
                 x, f, g, diff = optalg.run(maxit=10, eta_ref='etamaxmin')
-            q = np.zeros(model.rho.shape)
-            q[:,0] = model.q0[:,-1]
-            q[:,1] = model.q1[:,-1]
-            problem['x0'] = x
+                q = np.zeros(model.rho.shape)
+                q[:,0] = model.q0[:,-1]
+                q[:,1] = model.q1[:,-1]
+                problem['x0'] = x
             while True:
                 mesh = problem['mesh']
                 hmesh = HalfEdgeMesh2d.from_mesh(mesh)
@@ -98,7 +91,7 @@ class HalfEdgeAVEMTest():
                 myfile.close()
                 model.save_data(moptions['rdir']+'/'+ str(int(moptions['chiN']))+'.mat')
 
-            moptions['chiN'] +=1
+            moptions['chiN'] +=5
             if moptions['chiN'] >60:
                 break
 

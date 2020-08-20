@@ -3,7 +3,7 @@ from .geoalg import project
 
 class ScaledSurface():
 
-    def __init__(self, surface, scale=1.0):
+    def __init__(self, surface, scale):
         self.surface = surface
         self.scale = scale
 
@@ -15,7 +15,8 @@ class SphereSurface():
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
         self.center = center
         self.radius = radius
-        self.box = [-1.2, 1.2, -1.2, 1.2, -1.2, 1.2]
+        m=1.2
+        self.box = [-m, m, -m, m, -m, m]
 
     def __call__(self, *args):
         if len(args) == 1:
@@ -115,6 +116,140 @@ class SphereSurface():
             [10,9,11]], dtype=np.int)
         point, d = self.project(point)
         return TriangleMesh(point, cell) 
+
+class SphereSurfaceTest():
+    def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
+        self.center = center
+        self.radius = radius
+        m=9.2
+        self.box = [-m, m, -m, m, m, m]
+
+    def __call__(self, *args):
+        if len(args) == 1:
+            p, = args
+            x = p[..., 0]*9
+            y = p[..., 1]*3
+            z = p[..., 2]*1
+        elif len(args) == 3:
+            x, y, z = args
+        else:
+            raise ValueError("the args must be a N*3 or (X, Y, Z)")
+
+        cx, cy, cz = self.center
+        r = self.radius
+        return np.sqrt((x - cx)**2 + (y - cy)**2 + (z - cz)**2) - r 
+
+    def gradient1(self, p):
+        l = np.sqrt(np.sum((p - self.center)**2, axis=-1))
+        n = (p - self.center)/l[..., np.newaxis]
+        return n
+
+
+    def gradient(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        a, b, c = [9,3,1]
+        grad = np.zeros(p.shape, dtype=p.dtype)
+        grad[..., 0] = 2*x/a**2
+        grad[..., 1] = 2*y/b**2
+        grad[..., 2] = 2*z/c**2
+        return grad
+    def unit_normal1(self, p):
+        s = [9,3,1]
+        p = p*s
+        return self.gradient1(p)
+
+    def unit_normal(self, p):
+        grad = self.gradient(p)
+        l = np.sqrt(np.sum(grad**2, axis=1, keepdims=True))
+        n = grad/l
+        return n
+
+
+    def hessian(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        shape = p.shape[:-1]+(3, 3)
+        H = np.zeros(shape, dtype=np.float)
+        L = np.sqrt(np.sum(p*p, axis=-1))
+        L3=L**3
+        H[..., 0, 0] = 1/L-x**2/L3
+        H[..., 0, 1] = -x*y/L3
+        H[..., 1, 0] = H[..., 0, 1]
+        H[..., 0, 2] = - x*z/L3
+        H[..., 2, 0] = H[..., 0, 2]
+        H[..., 1, 1] = 1/L - y**2/L3
+        H[..., 1, 2] = -y*z/L3
+        H[..., 2, 1] = H[..., 1, 2]
+        H[..., 2, 2] = 1/L - z**2/L3
+        return H
+
+    def jacobi_matrix(self, p):
+        H = self.hessian(p)
+        n = self.unit_normal(p)
+        p[:], d = self.project(p)
+
+        J = -(d[..., np.newaxis, np.newaxis]*H + np.einsum('...ij, ...ik->...ijk', n, n))
+        J[..., range(3), range(3)] += 1
+        return J
+
+    def tangent_operator(self, p):
+        pass
+
+    def project1(self, p, maxit=200, tol=1e-8):
+        p0, d = project(self, p, maxit=maxit, tol=tol, returngrad=False, returnd=True)
+        return p0, d
+
+    def project(self, p):
+        d = self(p)
+        p = p - d[..., np.newaxis]*self.unit_normal(p)
+        return p, d
+
+
+
+    def init_mesh(self):
+        from fealpy.mesh import TriangleMesh
+        #t = (np.sqrt(5) - 1)/2
+        t =[9.1,9.1,9.1]
+        point = np.array([
+            [ 0, 1, t[2]],
+            [ 0, 1,-t[2]],
+            [ 1, t[1], 0],
+            [ 1,-t[1], 0],
+            [ 0,-1,-t[2]],
+            [ 0,-1, t[2]],
+            [ t[0], 0, 1],
+            [-t[0], 0, 1],
+            [ t[0], 0,-1],
+            [-t[0], 0,-1],
+            [-1, t[0], 0],
+            [-1,-t[0], 0]], dtype=np.float)
+        cell = np.array([
+            [6, 2, 0],
+            [3, 2, 6],
+            [5, 3, 6],
+            [5, 6, 7],
+            [6, 0, 7],
+            [3, 8, 2],
+            [2, 8, 1],
+            [2, 1, 0],
+            [0, 1,10],
+            [1, 9,10],
+            [8, 9, 1],
+            [4, 8, 3],
+            [4, 3, 5],
+            [4, 5,11],
+            [7,10,11],
+            [0,10, 7],
+            [4,11, 9],
+            [8, 4, 9],
+            [5, 7,11],
+            [10,9,11]], dtype=np.int)
+        point, d = self.project1(point)
+        return TriangleMesh(point, cell)
+
 
 class TwelveSpheres:
     def __init__(self, r=0.7):

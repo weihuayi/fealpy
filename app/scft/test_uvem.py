@@ -26,9 +26,7 @@ moptions = scftmodel_options(
         nupdate = 0,
         order = order)
 
-#problem = quad_model(fieldstype=3, n=n, options=moptions)
-problem = plane_model(fieldstype=3, n=n, options=moptions)
-#problem = converge_model(fieldstype=3, options=moptions)
+mesh = complex_mesh(r=20, filename = sys.argv[2])
 options = {
         'MaxIters'          :500000,
         'MaxFunEvals'       :500000,

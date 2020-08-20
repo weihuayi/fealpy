@@ -2,9 +2,11 @@
 
 import sys
 import time
+import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.io as scio
 
 from fealpy.mesh import HalfEdgeMesh2d, PolygonMesh
 from fealpy.opt.saddleoptalg import SteepestDescentAlg
@@ -14,47 +16,37 @@ from vem2d_problem import halfedgemesh, init_mesh, complex_mesh
 
 
 class HalfEdgeAVEMTest():
-    def __init__(self, mesh, fieldstype, moptions, optoptions):
-        print('NN', mesh.number_of_nodes())
+    def __init__(self, fieldstype, moptions, optoptions):
         self.optoptions = optoptions
         self.moptions = moptions
         ##多边形网格－空间
-        obj = SCFTVEMModel2d(mesh, options=self.moptions)
-        mu = obj.init_value(fieldstype=fieldstype)
-        self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
 
-    def run(self, estimator='grad'):
+        data = scio.loadmat('results_lam/15.mat')
+        rho = data['rho']
+        mu = data['mu']
+        mesh= open('results_lam/15mesh.bin','rb')
+        mesh= pickle.load(mesh)
+        obj = SCFTVEMModel2d(mesh, options=self.moptions)
+        self.problem = {'objective': obj, 'x0': mu, 'mesh': mesh, 'rho': rho}
+
+    def run(self, estimator='mix'):
         problem = self.problem
         options = self.optoptions
         moptions = self.moptions
         model = problem['objective']
-        mesh = problem['mesh']
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes,cellcolor='w')
-        plt.show()
-        #plt.savefig('flower15.png')
-        #plt.savefig('flower15.pdf')
-        #plt.close()
-
-
 
         optalg = SteepestDescentAlg(problem, options)
-        x, f, g, diff = optalg.run(maxit=500)
+        x, f, g, diff = optalg.run(maxit=10)
 
         q = np.zeros(model.rho.shape)
+        q[:,0] = model.q0[:,-1]
+        q[:,1] = model.q1[:,-1]
+        problem['x0'] = x
         while True:
             print('chiN', moptions['chiN'])
-            if moptions['chiN'] > 15:
-                optalg = SteepestDescentAlg(problem, options)
-                x, f, g, diff = optalg.run(maxit=10, eta_ref='etamaxmin')
-            q = np.zeros(model.rho.shape)
-            q[:,0] = model.q0[:,-1]
-            q[:,1] = model.q1[:,-1]
-            problem['x0'] = x
             while True:
-                mesh = problem['mesh']
-                hmesh = HalfEdgeMesh2d.from_mesh(mesh)
+                mesh = problem['mesh']##多边形网格
+                hmesh = HalfEdgeMesh2d.from_mesh(mesh)##半边网格
                 aopts = hmesh.adaptive_options(method='mean', maxcoarsen=3, HB=True)
                 print('NN', mesh.number_of_nodes())
 
@@ -69,20 +61,21 @@ class HalfEdgeAVEMTest():
                 S1 = model.vemspace.project_to_smspace(aopts['data']['mu'][:,1])
 
 
-                hmesh.adaptive(eta, aopts)
-                mesh = PolygonMesh.from_halfedgemesh(hmesh)
+                hmesh.adaptive(eta, aopts)###半边网格做自适应
+                mesh = PolygonMesh.from_halfedgemesh(hmesh)###多边形网格
 
-                model.reinit(mesh)
+                model.reinit(mesh)###多边形网格给进空间
                 aopts['data']['mu'] = np.zeros((model.gdof,2))
                 aopts['data']['mu'][:,0] = model.vemspace.interpolation(S0, aopts['HB'])
                 aopts['data']['mu'][:,1] = model.vemspace.interpolation(S1, aopts['HB'])
                 problem['x0'] = aopts['data']['mu']
 
                 optalg = SteepestDescentAlg(problem, options)
-                x, f, g, diff = optalg.run(maxit=100)
-                problem['mesh'] = mesh
+                x, f, g, diff = optalg.run(maxit=200)
+                problem['mesh'] = mesh###多边形网格
                 problem['x0'] = x
                 problem['rho'] = model.rho
+                self.problem = problem
                 q = np.zeros(model.rho.shape)
 
                 q[:,0] = model.q0[:,-1]
@@ -92,13 +85,14 @@ class HalfEdgeAVEMTest():
                 if diff < options['FunValDiff']:
                    if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
                        break
-                myfile=open(moptions['rdir'] +'/'+str(int(moptions['chiN']))+'mesh.bin','wb')
-                import pickle
-                pickle.dump(problem['mesh'], myfile)
-                myfile.close()
-                model.save_data(moptions['rdir']+'/'+ str(int(moptions['chiN']))+'.mat')
 
-            moptions['chiN'] +=1
+            myfile=open(moptions['rdir'] +'/'+str(int(moptions['chiN']))+'mesh.bin','wb')
+            import pickle
+            pickle.dump(problem['mesh'], myfile)
+            myfile.close()
+            model.save_data(moptions['rdir']+'/'+ str(int(moptions['chiN']))+'.mat')
+
+            moptions['chiN'] +=5
             if moptions['chiN'] >60:
                 break
 
@@ -120,17 +114,16 @@ moptions = scftmodel2d_options(
         nblock = 2,
         ndeg = 100,
         fA = 0.5,
-        chiAB = 0.15,
+        chiAB = 0.20,
         dim = 2,
         T0 = 40,
         T1 = 160,
         nupdate = 1,
         order = 2,
-        rdir = sys.argv[2])
+        rdir = sys.argv[1])
 
-mesh = complex_mesh(r=20, filename = sys.argv[1])
 
-Halftest = HalfEdgeAVEMTest(mesh, fieldstype=4, moptions=moptions,
+Halftest = HalfEdgeAVEMTest(fieldstype=4, moptions=moptions,
         optoptions=options)
 
 Halftest.run()

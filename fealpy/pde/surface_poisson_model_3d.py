@@ -65,14 +65,14 @@ class SphereSinSinSinData():
         t2 = sin(pi*x)*cos(pi*y)*sin(pi*z)
         t3 = sin(pi*x)*sin(pi*y)*cos(pi*z)
 
-        valx = pi*(t1 - (t1*x**2 + t2*x*y + t3*x*z)/r)
-        valy = pi*(t2 - (t1*x*y + t2*y**2 + t3*y*z)/r)
-        valz = pi*(t3 - (t1*x*z + t2*y*z +t3*z**2)/r)
+        valx = pi*(t1 - (t1*x**2 + t2*x*y + t3*x*z))
+        valy = pi*(t2 - (t1*x*y + t2*y**2 + t3*y*z))
+        valz = pi*(t3 - (t1*x*z + t2*y*z +t3*z**2))
         
         grad = np.zeros(p.shape, dtype=np.float)
-        grad[..., 0] = valx
-        grad[..., 1] = valy
-        grad[..., 2] = valz
+        grad[..., 0] = valx/r
+        grad[..., 1] = valy/r
+        grad[..., 2] = valz/r
         return grad  
 
 
