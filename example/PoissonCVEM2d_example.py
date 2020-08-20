@@ -44,24 +44,15 @@ for i in range(maxit):
 
     sh = space.project_to_smspace(uh)
 
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, sh.value, power=2)
-    errorMatrix[1, i] = space.integralalg.error(pde.gradient, sh.grad_value,
-            power=2)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, sh.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, sh.grad_value)
+
+    uI = space.interpolation(pde.solution)
+
     n *= 2
-
-
 
 mesh.add_plot(plt)
 uh.add_plot(plt, cmap='rainbow')
 showmultirate(plt, 0, NDof, errorMatrix, errorType, propsize=20, lw=2,
         ms=4)
 plt.show()
-
-if False:
-    halfedge = mesh.entity('halfedge')
-    hlevel = mesh.halfedgedata['level']
-    NN = mesh.number_of_nodes()
-    level = np.zeros(NN, dtype=np.int_)
-    subdomain = mesh.ds.subdomain
-    flag = subdomain[halfedge[:, 1]] > 0
-    level[halfedge[flag, 0]] = hlevel[flag]
