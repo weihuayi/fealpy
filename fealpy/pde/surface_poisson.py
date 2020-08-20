@@ -28,15 +28,17 @@ class SphereSinSinSinData():
         return u
 
     @cartesian
-    def source(self, p):
+    def source(self, p, n=None):
         """ The right hand side of Possion equation
         INPUT:
             p: array object, N*3
         """
-        p, _ = self.surface.project(p)
-        x = p[..., 0]
-        y = p[..., 1]
-        z = p[..., 2]
+        p0, d = self.surface.project(p)
+
+
+        x = p0[..., 0]
+        y = p0[..., 1]
+        z = p0[..., 2]
         pi = np.pi
         cos = np.cos
         sin = np.sin
@@ -46,7 +48,20 @@ class SphereSinSinSinData():
         t3 = sin(pi*x)*sin(pi*y)*cos(pi*z)*z + sin(pi*x)*sin(pi*z)*cos(pi*y)*y + sin(pi*y)*cos(pi*x)*sin(pi*z)*x
         r = x**2 + y**2 + z**2
         rhs = 2*pi*(t1 + (t2 + t3)/r) 
+
+        if n is not None:
+            n0 = self.surface.unit_normal(p)
+            H0 = self.surface.hessian(p0)
+            e, _ = np.linalg.eig(H0)
+            e = e.real
+            e /= 1 + d[..., None]*e
+            e *= -d[..., None]
+            e += 1
+            rhs *= np.sum(n*n0, axis=-1)
+            rhs *= np.product(e, axis=-1)
+
         return rhs
+
 
     @cartesian
     def gradient(self, p, n=None):
