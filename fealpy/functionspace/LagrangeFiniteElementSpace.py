@@ -634,6 +634,7 @@ class LagrangeFiniteElementSpace():
         """
         construct the recovery linear elasticity fem matrix
         """
+        gdof = self.number_of_global_dofs()
         G = self.revcovery_matrix()
         M = self.mass_matrix()
 

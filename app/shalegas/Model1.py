@@ -80,6 +80,14 @@ class Model_1():
         self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量, TODO：确认是 g/mol
         self.R = 8.31446261815324 # J/K/mol
         self.T = 397 # K 绝对温度
+        self.p = 5e+6 # 单位是 Pa， 1 bar = 1e+5 
+
+        self.c = self.molar_dentsity(self.p) # 压强 p 下， 气体的摩尔浓度
+
+        # 根据理想气体状态方程，计算单位边界输入的摩尔浓度
+
+        self.V = 50**2*0.2*0.1 # 每年注入的体积数 
+        self.n = self.p*self.V/self.R/self.T/2 # 单位边界长度每年注入的摩尔数
 
     def init_pressure(self, pspace):
         """
@@ -89,16 +97,23 @@ class Model_1():
         目前压力用分片常数逼近。
         """
         ph = pspace.function()
-        ph[:] = 50 # 初始压力
+        ph[:] = 5e+6 # 单位是 Pa， 1 bar = 1e+5  
         return ph
 
     def init_molar_density(self, cspace):
-        c = self.molar_dentsity(50)
+        c = self.molar_dentsity(5e+6)
         ch = cspace.function(dim=3)
         ch[:, 2] = cspace.local_projection(c)
         return ch
 
     def space_mesh(self, n=50):
+        """
+
+        Notes
+        -----
+
+        最小网格单元尺寸为 1 m
+        """
         box = [0, 50, 0, 50]
         mf = MeshFactory()
         mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
@@ -116,7 +131,7 @@ class Model_1():
         给一个分片常数的压力，计算混合物的浓度 c
         """
 
-        t = self.R*self.T 
+        t = self.R*self.T  # 气体常数和绝对温度的乘积
         if type(ph) in {int, float}:
             A = 3*ph/t**2
             B = ph/t/3 
@@ -149,9 +164,9 @@ class Model_1():
         n 表示该函数计算第 n 个组分的边界条件
         """
         if n == 0:
-            return 0.1
+            return self.c*0.8 
         elif n == 1:
-            return 0.1
+            return self.c*0.2 
         elif n == 3:
             return 0.0
 
@@ -170,14 +185,25 @@ class Model_1():
         -----
         在区域左下角给一个速度边界条件 v\cdot n
         """
-        return -0.1 
+        """
+
+        Notes
+        -----
+        在区域左下角给一个速度边界条件 v\cdot n
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = (x < 1) & (y < 1)
+        val = np.zeros(p.shape[0:-1], dtype=p.dtype)
+        val[flag] = -self.n/self.c
+        return val 
 
     @cartesian
     def is_velocity_bc(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        flag = (x < 1) & (y < 1)
-        return flag
+        flag = (x > 49) & (y > 49)
+        return ~flag
 
     @cartesian
     def pressure_bc(self, p):
@@ -186,7 +212,7 @@ class Model_1():
         -----
         在区域右上角给出一个压力控制条件，要低于区域内部的压力。
         """
-        return 25 
+        return 2.5e+6
 
     @cartesian
     def is_pressure_bc(self, p):
@@ -199,7 +225,7 @@ class ShaleGasSolver():
     def __init__(self, model):
         self.model = model
         self.mesh = model.space_mesh()
-        self.timeline =  model.time_mesh() 
+        self.timeline =  model.time_mesh(n=3650) 
         self.uspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
         self.cspace = ScaledMonomialSpace2d(self.mesh, p=1) # 线性间断有限元空间
 
@@ -374,6 +400,9 @@ if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
     model = Model_1()
+
+    c = model.molar_dentsity(5e+6)
+    print(c)
 
     solver = ShaleGasSolver(model)
     solver.solve()
