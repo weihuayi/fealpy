@@ -39,6 +39,8 @@ Notes
 
     5. 6.02214076 x 10^{23}
 
+    6. 压力单位是 bar, 温度单位是 K, 时间单位是 d 
+
 
 References
 ----------
@@ -47,6 +49,7 @@ References
 Authors
     Huayi Wei, weihuayi@xtu.edu.cn
 """
+import matplotlib.pyplot as plt
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import csr_matrix, bmat, spdiags
@@ -77,9 +80,20 @@ class Model_1():
 
     """
     def __init__(self):
-        self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量, TODO：确认是 g/mol
+        self.m = [0.01604, 0.03007, 0.044096] # kg/mol 一摩尔质量, 这里是常数
         self.R = 8.31446261815324 # J/K/mol
         self.T = 397 # K 绝对温度
+        self.p = 50 # 单位是 bar,  1 bar = 1e+5 Pa
+
+        self.c = self.molar_dentsity(self.p) # 压强 p 下， 气体的摩尔浓度
+        print("压强 {} (bar)下的气体摩尔浓度:".format(self.p), self.c)
+
+        # 根据理想气体状态方程，计算单位边界输入的摩尔浓度
+        self.V = 50**2*0.2*0.1/365 # 每天注入的体积数 
+        self.n = self.p*1e+5**self.V/self.R/self.T/2 # 单位边界长度每天注入的摩尔数
+
+        print("每天注入单位边界的体积数为:", self.V)
+        print("每天注入单位边界的物质摩尔数为:", self.n)
 
     def init_pressure(self, pspace):
         """
@@ -89,7 +103,7 @@ class Model_1():
         目前压力用分片常数逼近。
         """
         ph = pspace.function()
-        ph[:] = 50 # 初始压力
+        ph[:] = 50 # 单位是 bar， 1 bar = 1e+5  
         return ph
 
     def init_molar_density(self, cspace):
@@ -99,6 +113,13 @@ class Model_1():
         return ch
 
     def space_mesh(self, n=50):
+        """
+
+        Notes
+        -----
+
+        最小网格单元尺寸为 1 m
+        """
         box = [0, 50, 0, 50]
         mf = MeshFactory()
         mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
@@ -116,15 +137,18 @@ class Model_1():
         给一个分片常数的压力，计算混合物的浓度 c
         """
 
-        t = self.R*self.T 
+        ph *= 1e+5 # 转换为标准单位 Pa
+
+        t = self.R*self.T  # 气体常数和绝对温度的乘积
         if type(ph) in {int, float}:
             A = 3*ph/t**2
             B = ph/t/3 
             a = np.ones(4, dtype=np.float64)
             a[1] = B - 1
             a[2] = A - 3*B**2 - 2*B
-            a[3] = -A*B + B**2 - B**3
+            a[3] = -A*B + B**2 + B**3
             Z = np.max(np.roots(a))
+            print("Compressibility factor is :", Z, np.roots(a))
             c = ph/Z/t 
         else:
             A = 3*ph/t**2
@@ -133,7 +157,7 @@ class Model_1():
             a = np.ones((len(ph), 4), dtype=ph.dtype)
             a[:, 1] = B - 1
             a[:, 2] = A - 3*B**2 - 2*B
-            a[:, 3] = -A*B + B**2 - B**3
+            a[:, 3] = -A*B + B**2 + B**3
             Z = np.max(np.array(list(map(np.roots, a))), axis=-1)
             c = ph/Z/t 
         return c
@@ -149,9 +173,9 @@ class Model_1():
         n 表示该函数计算第 n 个组分的边界条件
         """
         if n == 0:
-            return 0.1
+            return self.c*0.8 
         elif n == 1:
-            return 0.1
+            return self.c*0.2 
         elif n == 3:
             return 0.0
 
@@ -170,14 +194,25 @@ class Model_1():
         -----
         在区域左下角给一个速度边界条件 v\cdot n
         """
-        return -0.1 
+        """
+
+        Notes
+        -----
+        在区域左下角给一个速度边界条件 v\cdot n
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = (x < 1) & (y < 1)
+        val = np.zeros(p.shape[0:-1], dtype=p.dtype)
+        val[flag] = -self.n/self.c
+        return val 
 
     @cartesian
     def is_velocity_bc(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        flag = (x < 1) & (y < 1)
-        return flag
+        flag = (x > 49) & (y > 49)
+        return ~flag
 
     @cartesian
     def pressure_bc(self, p):
@@ -186,7 +221,7 @@ class Model_1():
         -----
         在区域右上角给出一个压力控制条件，要低于区域内部的压力。
         """
-        return 25 
+        return 25
 
     @cartesian
     def is_pressure_bc(self, p):
@@ -199,7 +234,7 @@ class ShaleGasSolver():
     def __init__(self, model):
         self.model = model
         self.mesh = model.space_mesh()
-        self.timeline =  model.time_mesh() 
+        self.timeline =  model.time_mesh(n=3650) 
         self.uspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0)
         self.cspace = ScaledMonomialSpace2d(self.mesh, p=1) # 线性间断有限元空间
 
@@ -210,9 +245,11 @@ class ShaleGasSolver():
         self.ch = model.init_molar_density(self.cspace) 
 
         # TODO：初始化三种物质的浓度
+        # 1 muPa*s = 1e-11 bar*s = 1e-11*24*3600 bar*d = 8.64e-07 bar*d
+        # 1 md = 9.869 233e-16 m^2
         self.options = {
-                'viscosity': 1.0,    # 粘性系数
-                'permeability': 1.0, # 渗透率 
+                'viscosity': 1.0,    # 粘性系数 1 muPa*s = 1e-6 Pa*s, 1 cP = 10^{−3} Pa⋅s = 1 mPa⋅s
+                'permeability': 1.0, # 1 md 渗透率, 1 md = 9.869233e-16 m^2
                 'temperature': 397, # 初始温度 K
                 'pressure': 50,   # 初始压力
                 'porosity': 0.2,  # 孔隙度
@@ -224,7 +261,7 @@ class ShaleGasSolver():
         self.CM = self.cspace.cell_mass_matrix() 
         self.H = inv(self.CM)
 
-        c = self.options['viscosity']/self.options['permeability']
+        c = 8.64/9.869233*1e+9 
         self.M = c*self.uspace.mass_matrix()
         self.B = -self.uspace.div_matrix()
 
@@ -376,5 +413,19 @@ if __name__ == '__main__':
     model = Model_1()
 
     solver = ShaleGasSolver(model)
-    solver.solve()
+
+    mesh = solver.mesh 
+    isBdEdge = mesh.ds.boundary_edge_flag()
+    bc = mesh.entity_barycenter('edge', index=isBdEdge)
+
+    print(model.velocity_bc(bc, None))
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    isPBC = model.is_pressure_bc(bc)
+    isVBC = model.is_velocity_bc(bc)
+    mesh.find_node(axes, node=bc, index=isVBC)
+    plt.show()
+
+    #solver.solve()
 

@@ -638,6 +638,12 @@ class PolyModel3d():
         val[..., 2] -= mu*(b*t0*x - b*t2*x*y - b*t3*x*z + b*x*y*z*(-x + 1) - 2*c*t2*x*z)
         return val
 
+    def dirichlet(self, p):  
+        """
+        """
+        val = self.displacement(p) 
+        return val
+
 class HuangModel2d():
     def __init__(self, lam=10, mu=1):
         self.lam = lam
