@@ -30,9 +30,9 @@ Notes
        c_i = z_i c
 
     3. 
-    甲烷: methane,  CH_4,   16.04 g/mol,  0.42262 g/cm^3
-    乙烷: Ethane, C_2H_6,   30.07 g/mol, 1.212 kg/m^3
-    丙烷: Propane,  C_3H_8,  44.096 g/mol,  1.83 kg/m^3 
+    甲烷: methane,  CH_4,   16.04 g/mol,  0.42262 g/cm^3, 190.8 K, 4.640 MPa
+    乙烷: Ethane, C_2H_6,   30.07 g/mol, 1.212 kg/m^3, 305.33 K, 4.872 MPa
+    丙烷: Propane,  C_3H_8,  44.096 g/mol,  1.83 kg/m^3, 369.8 K, 4.26 MPa
     (25度 100 kPa
 
     4. 气体常数  R = 8.31446261815324 	J/K/mol
@@ -40,6 +40,8 @@ Notes
     5. 6.02214076 x 10^{23}
 
     6. 压力单位是 bar, 温度单位是 K, 时间单位是 d 
+
+    7. acentricity factor 偏心因子
 
 
 References

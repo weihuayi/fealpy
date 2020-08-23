@@ -143,7 +143,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         Notes
         -----
 
-        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
+        etype 这个参数实际上是不需要的，为了兼容，所以这里先保留。
 
         因为 bc 最后一个轴的长度就包含了这个信息。
         """
