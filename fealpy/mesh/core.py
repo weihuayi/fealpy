@@ -12,6 +12,83 @@ Huayi Wei, weihuayi@xtu.edu.cn
 """
 import numpy as np 
 
+class LinearMeshDataStructure():
+
+    def total_edge(self):
+        NC = self.NC
+        cell = self.cell
+        localEdge = self.localEdge
+
+        totalEdge = cell[:, localEdge].reshape(-1, 2)
+        return totalEdge
+
+    def total_face(self):
+        NC = self.NC
+        cell = self.cell
+        localFace = self.localFace
+
+        totalFace = cell[:, localFace].reshape(-1, 2)
+        return totalFace
+
+    def construct_face(self):
+        """ 
+
+        Notes
+        -----
+            构造面
+        """
+        NC = self.NC
+        F = self.F
+        FV = self.FV
+
+        totalFace = self.total_face()
+        I = np.sum(np.sort(totalFace, axis=-1)*np.arange(FV, 0, -1), axis=-1)
+        _, i0, j = np.unique(I, return_index=True, return_inverse=True)
+
+        NF = i0.shape[0]
+        self.NF = NF
+        self.face = totalFace[i0, :]
+
+        self.face2cell = np.zeros((NF, 4), dtype=self.itype)
+
+        i1 = np.zeros(NF, dtype=self.itype)
+        i1[j] = np.arange(F*NC, dtype=self.itype)
+
+        self.face2cell[:, 0] = i0//F
+        self.face2cell[:, 1] = i1//F
+        self.face2cell[:, 2] = i0%F
+        self.face2cell[:, 3] = i1%F
+
+    def construct_edge(self, TD=2):
+        """ 
+
+        Notes
+        -----
+            TD == 2: 构造 edge 和 edge2cell
+            TD == 3: 构造 edge
+        """
+        NC = self.NC
+        E = self.E
+        EV = self.EV
+
+        totalEdge = self.total_edge()
+        I = np.sum(np.sort(totalEdge, axis=-1)*np.arange(EV, 0, -1), axis=-1)
+        _, i0, j = np.unique(I, return_index=True, return_inverse=True)
+        NE = i0.shape[0]
+        self.NE = NE
+        self.edge = totalEdge[i0, :]
+
+        if TD == 2:
+            self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
+
+            i1 = np.zeros(NE, dtype=self.itype)
+            i1[j] = np.arange(E*NC, dtype=self.itype)
+
+            self.edge2cell[:, 0] = i0//E
+            self.edge2cell[:, 1] = i1//E
+            self.edge2cell[:, 2] = i0%E
+            self.edge2cell[:, 3] = i1%E
+
 def multi_index_matrix0d(p):
     multiIndex = 1
     return multiIndex 
@@ -72,7 +149,7 @@ def lagrange_shape_function(bc, p):
     A[..., 1:, :] *= P.reshape(-1, 1)
     idx = np.arange(TD+1)
     phi = np.prod(A[..., multiIndex, idx], axis=-1)
-    return phi[..., np.newaxis, :] # (..., 1, ldof)
+    return phi
 
 def lagrange_grad_shape_function(bc, p): 
     """

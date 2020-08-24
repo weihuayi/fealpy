@@ -3,7 +3,7 @@ import numpy as np
 from .Quadrature import Quadrature
 
 class TensorProductQuadrature(Quadrature):
-    def __init__(self, qfs, n=None):
+    def __init__(self, qfs, TD=None):
         """
 
         Notes
@@ -12,7 +12,7 @@ class TensorProductQuadrature(Quadrature):
         qfs 是一组积分公式
         """
 
-        if n is None:
+        if TD is None:
             n = len(qfs) # 积分公式的个数
             self.quadpts = () # 空元组
             weights = ()
