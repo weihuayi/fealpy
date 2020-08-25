@@ -343,6 +343,12 @@ class LagrangeTriangleMesh(Mesh2d):
 
 class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, ds, p):
+        """
+
+        Notes
+        -----
+        给定一个线性网格的数据结构，构造 p 次拉格朗日网格的数据结构
+        """
         self.itype = ds.itype
         self.NCN = ds.NN  # 角点的个数
         self.edge2cell = ds.edge2cell 
@@ -359,7 +365,6 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
             self.cell = ds.cell
             self.edge = ds.edge
         else:
-            index = multi_index_matrix[2](p)
             NE = ds.NE
             edge = ds.edge
             self.edge = np.zeros((NE, p+1), dtype=self.itype)
@@ -371,9 +376,14 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
             idx = (edge[:, None, :]*idx[None, ...]).sort(axis=-1)
             I = idx[:, 0]
             I += idx[:, 1]*(idx[:, 1] + 1)//2
+            imap = dict(zip(I, range(NE*(p-1))))
+
 
             NC = ds.NC
             self.cell = np.zeros((NC, self.V), dtype=self.itype)
+
+            index = multi_index_matrix[2](p)
+            idx0 = np.nonzero(index[:, 0] == 0)[0]
 
             if p > 2:
                 flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
