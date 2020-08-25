@@ -72,7 +72,10 @@ class LinearMeshDataStructure():
         EV = self.EV
 
         totalEdge = self.total_edge()
-        I = np.sum(np.sort(totalEdge, axis=-1)*np.arange(EV, 0, -1), axis=-1)
+        index = np.cumsum(np.sort(totalEdge, axis=-1), axis=-1)
+        I = index[:, 0] 
+        I += index[:, 1]*(index[:, 1] + 1)//2
+
         _, i0, j = np.unique(I, return_index=True, return_inverse=True)
         NE = i0.shape[0]
         self.NE = NE

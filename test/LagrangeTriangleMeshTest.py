@@ -24,14 +24,15 @@ class LagrangeTriangleMeshTest():
         cell = mesh.entity('cell')
 
         ltmesh = LagrangeTriangleMesh(node, cell, p=p)
+        NN = ltmesh.number_of_nodes()
         node = ltmesh.entity('node')
-        ltmesh.print()
+        #ltmesh.print()
 
         if plot:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, node=node, showindex=True, fontsize=28)
+            mesh.find_node(axes, showindex=True, fontsize=28)
             mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()

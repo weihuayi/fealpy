@@ -26,7 +26,6 @@ class LinearTriangleMeshDataStructure(LinearMeshDataStructure):
         self.NC = cell.shape[0]
         self.cell = cell
         self.itype = cell.dtype
-
         self.construct_edge()
 
 
@@ -368,23 +367,13 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
             self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
             self.NN += NE*(p-1)
 
+            idx = multi_index_matrix[1](p)[1:-1]
+            idx = (edge[:, None, :]*idx[None, ...]).sort(axis=-1)
+            I = idx[:, 0]
+            I += idx[:, 1]*(idx[:, 1] + 1)//2
+
             NC = ds.NC
             self.cell = np.zeros((NC, self.V), dtype=self.itype)
-            edge2cell = self.edge2cell
-
-            flag = edge2cell[:, 2] == 0
-            self.cell[edge2cell[flag, 0][:, None], index[:, 0] == 0] = self.edge[flag]
-            flag = edge2cell[:, 2] == 1
-            self.cell[edge2cell[flag, 0][:, None], index[:, 1] == 0] = self.edge[flag, -1::-1]
-            flag = edge2cell[:, 2] == 2
-            self.cell[edge2cell[flag, 0][:, None], index[:, 2] == 0] = self.edge[flag]
-
-            flag = edge2cell[:, 3] == 0
-            self.cell[edge2cell[flag, 1][:, None], index[:, 0] == 0] = self.edge[flag, -1::-1]
-            flag = edge2cell[:, 3] == 1
-            self.cell[edge2cell[flag, 1][:, None], index[:, 1] == 0] = self.edge[flag]
-            flag = edge2cell[:, 3] == 2
-            self.cell[edge2cell[flag, 1][:, None], index[:, 2] == 0] = self.edge[flag, -1::-1]
 
             if p > 2:
                 flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
