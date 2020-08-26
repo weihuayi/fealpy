@@ -13,7 +13,7 @@ class TensorProductQuadrature(Quadrature):
         """
 
         if TD is None:
-            n = len(qfs) # 积分公式的个数
+            TD = len(qfs) # 积分公式的个数
             self.quadpts = () # 空元组
             weights = ()
             for i, qf in enumerate(qfs):
@@ -22,17 +22,17 @@ class TensorProductQuadrature(Quadrature):
                 weights += (ws, )
         else: # n 是一个整数, qfs 是一个积分公式
             bcs, ws = qfs.get_quadrature_points_and_weights()
-            self.quadpts = n*(bcs, ) 
-            weights = n*(bcs, )
+            self.quadpts = TD*(bcs, ) 
+            weights = TD*(ws, )
 
         # 构造 einsum 运算字符串
         s0 = 'abcdef'
         s = ''
-        for i in range(n):
+        for i in range(TD):
             s = s + s0[i]
-            if i < n-1:
+            if i < TD-1:
                 s = s + ', '
-        s = s + '->' + s0[:n]
+        s = s + '->' + s0[:TD]
         self.weights = np.einsum(s, *weights)
 
     def number_of_quadrature_points(self):

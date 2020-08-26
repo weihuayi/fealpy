@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# 
 
 import sys
 
@@ -65,8 +67,8 @@ elif sys.argv[1] == 'quad':
     print(np.ndindex(sizes))
     loc_to_cart = np.empty(nPoints, dtype='object')
     for loc in np.ndindex(sizes):
-        print(loc)
         idx = quad.PointIndexFromIJK(loc[0], loc[1], orders)
+        print(loc, idx)
         cart = np.array([c / o for (c, o) in zip(loc, orders)])
         loc_to_cart[idx] = cart
 

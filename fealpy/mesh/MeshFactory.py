@@ -102,7 +102,8 @@ class MeshFactory():
 
 
     @timer
-    def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri', threshold=None):
+    def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri', threshold=None,
+            returnnc=False):
         """
 
         Notes
@@ -131,7 +132,10 @@ class MeshFactory():
             if threshold is not None:
                 node, cell = self.delete_cell(node, cell, threshold)
 
-            return TriangleMesh(node, cell)
+            if returnnc:
+                return node, cell
+            else:
+                return TriangleMesh(node, cell)
         elif meshtype == 'quad':
             cell = np.zeros((NC,4), dtype=np.int_)
             cell[:,0] = idx[0:-1, 0:-1].flatten()
@@ -140,7 +144,10 @@ class MeshFactory():
             cell[:,3] = idx[0:-1, 1:].flatten()
             if threshold is not None:
                 node, cell = self.delete_cell(node, cell, threshold)
-            return QuadrangleMesh(node, cell)
+            if returnnc:
+                return node, cell
+            else:
+                return QuadrangleMesh(node, cell)
         elif meshtype in {'polygon', 'poly'}:
             cell = np.zeros((2*NC, 3), dtype=np.int_)
             cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')

@@ -7,7 +7,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import LagrangeTriangleMesh, MeshFactory
+from fealpy.mesh import LagrangeQuadrangleMesh, MeshFactory
 
 
 class LagrangeTriangleMeshTest():
@@ -19,51 +19,58 @@ class LagrangeTriangleMeshTest():
 
         mf = MeshFactory()
 
-        mesh = mf.boxmesh2d([0, 1, 0, 1], nx =2, ny=2, meshtype='tri')
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx =2, ny=2, meshtype='quad')
         node = mesh.entity('node')
         cell = mesh.entity('cell')
 
-        ltmesh = LagrangeTriangleMesh(node, cell, p=p)
-        NN = ltmesh.number_of_nodes()
-
-        mesh.ds.edge = ltmesh.lds.edge
-        mesh.ds.edge2cell = ltmesh.lds.edge2cell
-
-        node = ltmesh.entity('node')
-        #ltmesh.print()
+        lqmesh = LagrangeQuadrangleMesh(node, cell[:, [0, 3, 1, 2]], p=p)
+        NN = lqmesh.number_of_nodes()
+        node = lqmesh.entity('node')
+        lqmesh.print()
 
         if plot:
             fig = plt.figure()
             axes = fig.gca()
+            mesh.ds.edge = lqmesh.ds.edge
+            mesh.ds.edge2cell = lqmesh.ds.edge2cell
             mesh.add_plot(axes)
             mesh.find_node(axes, node=node, showindex=True, fontsize=28)
-            mesh.find_edge(axes, showindex=True)
+            #mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()
 
     def save_mesh(self, p=2, fname='test.vtu'):
         mf = MeshFactory()
 
-        mesh = mf.boxmesh2d([0, 1, 0, 1], nx =2, ny=2, meshtype='tri')
+        mesh = mf.boxmesh2d([0, 1, 0, 1], nx=2, ny=2, meshtype='quad')
         node = mesh.entity('node')
         cell = mesh.entity('cell')
 
-        mesh = LagrangeTriangleMesh(node, cell, p=p)
+        mesh = LagrangeQuadrangleMesh(node, cell[:, [0, 3, 1, 2]], p=p)
         mesh.to_vtk(fname=fname)
 
     def surface_mesh(self, p=2, fname='surface.vtu'):
-        from fealpy.geometry import SphereSurface, EllipsoidSurface, SphereSurfaceTest
+        from fealpy.geometry import SphereSurface
 
         surface = SphereSurface()
-        #surface = SphereSurfaceTest()
-        #surface = EllipsoidSurface()
-        #surface = ScaledSurface(surface,scale=[9,3,1])
-        mesh = surface.init_mesh()
+        node = np.array([
+            (-1, -1, -1),
+            (-1, -1, 1),
+            (-1, 1, -1),
+            (-1, 1, 1),
+            (1, -1, -1),
+            (1, -1, 1),
+            (1, 1, -1),
+            (1, 1, 1)], dtype=np.float64)
+        cell = np.array([
+            (0, 1, 4, 5),
+            (6, 7, 2, 3),
+            (2, 3, 0, 1),
+            (4, 5, 6, 7),
+            (1, 3, 5, 7),
+            (2, 0, 6, 4)], dtype=np.int_)
 
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-
-        lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
+        lmesh = LagrangeQuadrangleMesh(node, cell, p=p, surface=surface)
         NC = lmesh.number_of_cells()
         a = lmesh.cell_area()
         lmesh.to_vtk(fname=fname)

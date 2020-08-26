@@ -14,6 +14,7 @@ class LinearQuadrangleMeshDataStructure(LinearMeshDataStructure):
     V = 4
     E = 4
     F = 1
+    EV = 2
 
     def __init__(self, NN, cell):
         self.NN = NN
@@ -226,7 +227,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         # 一维基函数值
         # (NQ, p+1)
-        phi = lagrange_shape_function(bc[0])  
+        phi = lagrange_shape_function(bc[0], p)  
 
         # 关于**一维变量重心坐标**的导数
         # lambda_0 = 1 - xi
@@ -377,22 +378,22 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
             edge2cell = ds.edge2cell
 
             flag = edge2cell[:, 2] == 0
-            cell[edge2cell[flag, 0], :, 0] = edge[flag]
+            cell[edge2cell[flag, 0], :, 0] = self.edge[flag]
             flag = edge2cell[:, 2] == 1
-            cell[edge2cell[flag, 0], -1, :] = edge[flag]
+            cell[edge2cell[flag, 0], -1, :] = self.edge[flag]
             flag = edge2cell[:, 2] == 2
-            cell[edge2cell[flag, 0], :, -1] = edge[flag, -1::-1]
+            cell[edge2cell[flag, 0], :, -1] = self.edge[flag, -1::-1]
             flag = edge2cell[:, 2] == 3
-            cell[edge2cell[flag, 0], 0, :] = edge[flag, -1::-1]
+            cell[edge2cell[flag, 0], 0, :] = self.edge[flag, -1::-1]
 
             flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], :, 0] = edge[flag, -1::-1]
+            cell[edge2cell[flag, 1], :, 0] = self.edge[flag, -1::-1]
             flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], -1, :] = edge[flag, -1::-1]
+            cell[edge2cell[flag, 1], -1, :] = self.edge[flag, -1::-1]
             flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], :, -1] = edge[flag]
+            cell[edge2cell[flag, 1], :, -1] = self.edge[flag]
             flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], 0, :] = edge[flag]
+            cell[edge2cell[flag, 1], 0, :] = self.edge[flag]
 
             cell[:, 1:-1, 1:-1] = self.NN + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
             self.NN += NC*(p-1)*(p-1)
