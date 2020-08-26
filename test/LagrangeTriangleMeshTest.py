@@ -25,6 +25,8 @@ class LagrangeTriangleMeshTest():
 
         ltmesh = LagrangeTriangleMesh(node, cell, p=p)
         NN = ltmesh.number_of_nodes()
+        mesh.ds.edge = ltmesh.lds.edge
+        mesh.ds.edge2cell = ltmesh.lds.edge2cell
         node = ltmesh.entity('node')
         #ltmesh.print()
 
@@ -32,7 +34,7 @@ class LagrangeTriangleMeshTest():
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True, fontsize=28)
+            mesh.find_node(axes, node=node, showindex=True, fontsize=28)
             mesh.find_edge(axes, showindex=True)
             mesh.find_cell(axes, showindex=True)
             plt.show()

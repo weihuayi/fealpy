@@ -42,7 +42,12 @@ class LinearMeshDataStructure():
         FV = self.FV
 
         totalFace = self.total_face()
-        I = np.sum(np.sort(totalFace, axis=-1)*np.arange(FV, 0, -1), axis=-1)
+        index = np.sort(totalFace, axis=-1)
+        I = index[:, 0]
+        I += index[:, 1]*(index[:, 1] + 1)//2
+        I += index[:, 2]*(index[:, 2] + 1)*(index[:, 2] + 2)//6
+        if FV == 4: 
+            I += index[:, 3]*(index[:, 3] + 1)*(index[:, 3] + 2)*(index[:, 3] + 3)//24
         _, i0, j = np.unique(I, return_index=True, return_inverse=True)
 
         NF = i0.shape[0]
@@ -72,7 +77,7 @@ class LinearMeshDataStructure():
         EV = self.EV
 
         totalEdge = self.total_edge()
-        index = np.cumsum(np.sort(totalEdge, axis=-1), axis=-1)
+        index = np.sort(totalEdge, axis=-1)
         I = index[:, 0] 
         I += index[:, 1]*(index[:, 1] + 1)//2
 

@@ -22,15 +22,6 @@ class LinearQuadrangleMeshDataStructure(LinearMeshDataStructure):
         self.itype = cell.dtype
         self.construct_edge()
 
-    def total_edge(self):
-        NC = self.NC
-
-        cell = self.cell
-        localEdge = self.localEdge
-
-        totalEdge = cell[:, localEdge].reshape(-1, 2)
-        return totalEdge
-
 class LagrangeQuadrangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
 
@@ -356,7 +347,16 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
 
         self.itype = ds.itype
 
+        self.p = p
+        self.V = (p+1)*(p+1) 
+        self.E = ds.E 
+        self.F = ds.F
+
         self.NCN = ds.NN  # 角点的个数
+        self.NN = ds.NN 
+        self.NE = ds.NE 
+        self.NC = ds.NC 
+
         self.edge2cell = ds.edge2cell 
 
         if p == 1:
@@ -367,39 +367,37 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
             edge = ds.edge
             self.edge = np.zeros((NE, p+1), dtype=self.itype)
             self.edge[:, [0, -1]] = edge
-            self.edge[:, 1:-1] = ds.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            self.NN += NE*(p-1)
 
             NC = ds.NC
             self.cell = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
             cell = self.cell.reshape((NC, p+1, p+1))
 
+            edge2cell = ds.edge2cell
+
             flag = edge2cell[:, 2] == 0
             cell[edge2cell[flag, 0], :, 0] = edge[flag]
             flag = edge2cell[:, 2] == 1
             cell[edge2cell[flag, 0], -1, :] = edge[flag]
-
             flag = edge2cell[:, 2] == 2
             cell[edge2cell[flag, 0], :, -1] = edge[flag, -1::-1]
             flag = edge2cell[:, 2] == 3
             cell[edge2cell[flag, 0], 0, :] = edge[flag, -1::-1]
 
-            flag = edge2cell[:, 3] == 0
+            flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
             cell[edge2cell[flag, 1], :, 0] = edge[flag, -1::-1]
-            flag = edge2cell[:, 3] == 1
+            flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
             cell[edge2cell[flag, 1], -1, :] = edge[flag, -1::-1]
-            flag = edge2cell[:, 3] == 2
+            flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
             cell[edge2cell[flag, 1], :, -1] = edge[flag]
-            flag = edge2cell[:, 3] == 3
+            flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
             cell[edge2cell[flag, 1], 0, :] = edge[flag]
 
-            cell[:, 1:-1, 1:-1] = ds.NN + ds.NE*(p-1) + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
+            cell[:, 1:-1, 1:-1] = self.NN + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
+            self.NN += NC*(p-1)*(p-1)
             
-        self.NN = ds.NN + ds.NE*(p-1) + ds.NC*(p-1)*(p-1) 
-        self.NE = len(self.edge)
-        self.NC = len(self.cell)
 
-        self.V = (p+1)*(p+1) 
-        self.E = 4
 
 class LagrangeQuadrangleDof2d():
     """
@@ -487,9 +485,9 @@ class LagrangeQuadrangleDof2d():
 
         # 空间自由度和网格的自由度不一致时，重新构造单元自由度矩阵
         edge2cell = self.mesh.ds.edge_to_cell()
-        NC = self.mesh.number_of_cells() 
-        NE = self.mesh.number_of_edges()
         NN = self.mesh.number_of_corner_nodes()
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells() 
 
         cell2dof = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
         c2d = cell2dof.reshape((NC, p+1, p+1))
@@ -499,19 +497,18 @@ class LagrangeQuadrangleDof2d():
         c2d[edge2cell[flag, 0], :, 0] = e2d[flag]
         flag = edge2cell[:, 2] == 1
         c2d[edge2cell[flag, 0], -1, :] = e2d[flag]
-
         flag = edge2cell[:, 2] == 2
         c2d[edge2cell[flag, 0], :, -1] = e2d[flag, -1::-1]
         flag = edge2cell[:, 2] == 3
         cell[edge2cell[flag, 0], 0, :] = e2d[flag, -1::-1]
 
-        flag = edge2cell[:, 3] == 0
+        flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
         c2d[edge2cell[flag, 1], :, 0] = e2d[flag, -1::-1]
-        flag = edge2cell[:, 3] == 1
+        flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
         c2d[edge2cell[flag, 1], -1, :] = e2d[flag, -1::-1]
-        flag = edge2cell[:, 3] == 2
+        flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
         c2d[edge2cell[flag, 1], :, -1] = e2d[flag]
-        flag = edge2cell[:, 3] == 3
+        flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
         c2d[edge2cell[flag, 1], 0, :] = e2d[flag]
 
         c2d[:, 1:-1, 1:-1] = NN + NE*(p-1) + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)

@@ -41,6 +41,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
         ds = LinearTriangleMeshDataStructure(node.shape[0], cell) 
         self.ds = LagrangeTriangleMeshDataStructure(ds, p)
+        self.lds = ds
 
         if p == 1:
             self.node = node
@@ -181,8 +182,6 @@ class LagrangeTriangleMesh(Mesh2d):
             n /= l
 
         return n
-
-
 
     def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
         """
@@ -341,6 +340,7 @@ class LagrangeTriangleMesh(Mesh2d):
         for i, ec in enumerate(edge2cell):
             print(i, ": ", ec)
 
+
 class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, ds, p):
         """
@@ -350,16 +350,17 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
         给定一个线性网格的数据结构，构造 p 次拉格朗日网格的数据结构
         """
         self.itype = ds.itype
-        self.NCN = ds.NN  # 角点的个数
-        self.edge2cell = ds.edge2cell 
 
         self.V = (p+1)*(p+2)//2 # 单元顶点个数
         self.E = ds.E # 单元边的个数
         self.F = ds.F # F == 1
 
+        self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 
         self.NE = ds.NE 
         self.NC = ds.NC 
+
+        self.edge2cell = ds.edge2cell 
 
         if p == 1:
             self.cell = ds.cell
@@ -372,24 +373,29 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
             self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
             self.NN += NE*(p-1)
 
-            idx = multi_index_matrix[1](p)[1:-1]
-            idx = (edge[:, None, :]*idx[None, ...]).sort(axis=-1)
-            I = idx[:, 0]
-            I += idx[:, 1]*(idx[:, 1] + 1)//2
-            imap = dict(zip(I, range(NE*(p-1))))
-
-
-            NC = ds.NC
-            self.cell = np.zeros((NC, self.V), dtype=self.itype)
+            self.cell = np.zeros((self.NC, self.V), dtype=self.itype)
 
             index = multi_index_matrix[2](p)
-            idx0 = np.nonzero(index[:, 0] == 0)[0]
+            edge2cell = ds.edge2cell
+            flag = edge2cell[:, 2] == 0
+            self.cell[edge2cell[flag, 0][:, None], index[:, 0] == 0] = self.edge[flag]
+            flag = edge2cell[:, 2] == 1
+            self.cell[edge2cell[flag, 0][:, None], index[:, 1] == 0] = self.edge[flag, -1::-1]
+            flag = edge2cell[:, 2] == 2
+            self.cell[edge2cell[flag, 0][:, None], index[:, 2] == 0] = self.edge[flag]
+
+            flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 0] == 0] = self.edge[flag, -1::-1]
+            flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 1] == 0] = self.edge[flag]
+            flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 2] == 0] = self.edge[flag, -1::-1]
 
             if p > 2:
                 flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
                 cdof = self.V - 3*p
-                self.cell[:, flag]= self.NN + np.arange(NC*cdof).reshape(NC, cdof)
-                self.NN += NC*cdof
+                self.cell[:, flag]= self.NN + np.arange(self.NC*cdof).reshape(self.NC, cdof)
+                self.NN += self.NC*cdof
 
 
 class LagrangeTriangleDof2d():
@@ -492,17 +498,17 @@ class LagrangeTriangleDof2d():
         flag = edge2cell[:, 2] == 2
         cell2dof[edge2cell[flag, 0][:, None], index[:, 2] == 0] = edge2dof[flag]
 
-        flag = edge2cell[:, 3] == 0
+        flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
         cell2dof[edge2cell[flag, 1][:, None], index[:, 0] == 0] = edge2dof[flag, -1::-1]
-        flag = edge2cell[:, 3] == 1
+        flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
         cell2dof[edge2cell[flag, 1][:, None], index[:, 1] == 0] = edge2dof[flag]
-        flag = edge2cell[:, 3] == 2
+        flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
         cell2dof[edge2cell[flag, 1][:, None], index[:, 2] == 0] = edge2dof[flag, -1::-1]
 
         if p > 2:
             flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
             cdof =  ldof - 3*p
-            cell2dof[:, flag]= self.NN + np.arange(NC*cdof).reshape(NC, cdof)
+            cell2dof[:, flag]= NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
 
         return cell2dof
 
