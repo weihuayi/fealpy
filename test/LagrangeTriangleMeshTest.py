@@ -52,8 +52,8 @@ class LagrangeTriangleMeshTest():
     def surface_mesh(self, p=2, fname='surface.vtu'):
         from fealpy.geometry import SphereSurface, EllipsoidSurface, SphereSurfaceTest
 
-        #surface = SphereSurface()
-        surface = SphereSurfaceTest()
+        surface = SphereSurface()
+        #surface = SphereSurfaceTest()
         #surface = EllipsoidSurface()
         #surface = ScaledSurface(surface,scale=[9,3,1])
         mesh = surface.init_mesh()
