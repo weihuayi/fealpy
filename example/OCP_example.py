@@ -287,31 +287,38 @@ class Model():
         dt = self.timeline.current_time_step_length()
         NL = self.timeline.number_of_time_levels()
         T = dt*(NL-1)
-
+        
         pL2error = self.uspace.integralalg.error(cartesian(lambda x: \
                 self.pde.p_solution(x, T)), barycentric(self.ph))
-        print(pL2error)
+        print('pL2error', pL2error)
+        
         tpL2error = self.uspace.integralalg.error(cartesian(lambda x: \
                 self.pde.tp_solution(x, T)), \
-                barycentric(self.uspace.function(array=self.tph[:, NL-1]))) 
-        print(tpL2error)
-        uL2error = self.pspace.integralalg.error(cartesian(lambda x:
-                self.pde.u_solution(x, T)), cartesian(self.pspace.function(array=self.uh[:,
-                    NL-1])))
-        print('uerror', uL2error)
-        yL2error = self.pspace.integralalg.error(cartesian(lambda x:
-                self.pde.y_solution(x, T)),
-                cartesian(self.pspace.function(array=self.yh[:,
-                    NL-1])))
+                barycentric(self.uspace.function(array=self.tph[:, NL-1])))
+        print('tpL2error', tpL2error)
+        
+        uL2error = self.pspace.integralalg.error(cartesian(lambda x:    
+        self.pde.u_solution(x, T)), cartesian(self.pspace.function(array=self.uh[:, NL-1])))                                                    
+        print('uerror', uL2error)                                           
+        
+        yL2error = self.pspace.integralalg.error(cartesian(lambda x:    
+                self.pde.y_solution(x, T)),             
+                cartesian(self.pspace.function(array=self.yh[:, NL-1])))
         print('yerror', yL2error)
-        def f(bc):
-            xx = self.mesh.bc_to_point(bc)
-            return (pde.y_solution(xx, 1) -
-                    self.pspace.function(array=self.yh[:, NL-1]))**2
-        error1 = self.pspace.integralalg.integral(f)
-        print('error1', error1)
-
-
+        
+        qL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.q_solution(x, T)), barycentric(self.qh))
+        print('qL2error', qL2error)
+        tqL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.tq(x, T, T)), \
+                barycentric(self.uspace.function(array=self.tqh[:, NL-1])))
+        print('tqL2error', tqL2error)
+        
+        zL2error = self.pspace.integralalg.error(cartesian(lambda x:
+            self.pde.z_solution(x, T)),
+            cartesian(self.pspace.function(array=self.zh[:, NL-1])))
+        print('zerror', zL2error)
+    
         return pL2error
 
 
