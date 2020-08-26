@@ -98,7 +98,7 @@ class RaviartThomasFiniteElementSpace2dTest:
         ph = space.smspace.function()
         A = space.stiff_matrix()
         B = space.div_matrix()
-        F1 = space.source_vector(pde.source)
+        F1 = space.smspace.source_vector(pde.source)
         AA = bmat([[A, -B], [-B.T, None]], format='csr')
 
         if True:

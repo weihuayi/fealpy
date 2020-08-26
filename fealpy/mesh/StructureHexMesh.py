@@ -33,6 +33,9 @@ class StructureHexMesh(Mesh3d):
     def number_of_nodes(self):
         return self.ds.NN
 
+    def number_of_cells(self):
+        return self.ds.NC
+
     def laplace_operator(self):
         NX = self.ds.nx + 1
         h = self.h
@@ -169,12 +172,12 @@ class StructureHexMeshDataStructure():
         NF1 += nx*nz
         face2cell[NF0:NF1, 0] = c[0].flatten()
         face2cell[NF0:NF1, 1] = c[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 4 
+        face2cell[NF0:NF1, 2:4] = 4
 
         NF0 = NF1
         NF1 += nx*ny*nz 
         face2cell[NF0:NF1, 0] = c.flatten()
-        face2cell[NF0:NF1, 2] = 4
+        face2cell[NF0:NF1, 2] = 5
         face2cell[NF0:NF1-nx*nz, 1] = c[1:].flatten() 
         face2cell[NF0:NF1-nx*nz, 3] = 4
         face2cell[NF1-nx*nz:NF1, 1] = c[-1].flatten()
@@ -184,7 +187,6 @@ class StructureHexMeshDataStructure():
         c = np.transpose(idx, (2, 0, 1))
         NF0 = NF1
         NF1 += nx*ny
-
         face2cell[NF0:NF1, 0] = c[0].flatten()
         face2cell[NF0:NF1, 1] = c[0].flatten()
         face2cell[NF0:NF1, 2:4] = 0 
@@ -192,7 +194,7 @@ class StructureHexMeshDataStructure():
         NF0 = NF1
         NF1 += nx*ny*nz 
         face2cell[NF0:NF1, 0] = c.flatten()
-        face2cell[NF0:NF1, 2] = 0
+        face2cell[NF0:NF1, 2] = 1
         face2cell[NF0:NF1-nx*ny, 1] = c[1:].flatten() 
         face2cell[NF0:NF1-nx*ny, 3] = 0
         face2cell[NF1-nx*ny:NF1, 1] = c[-1].flatten()

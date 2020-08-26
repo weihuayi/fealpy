@@ -20,10 +20,12 @@ import sys
 import matplotlib.pyplot as plt
 
 import numpy as np
+from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.mesh import MeshFactory
+from fealpy.decorator import cartesian, barycentric
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 
 from fealpy.solver import SaddlePointFastSolver
@@ -61,7 +63,7 @@ for i in range(maxit):
         solver = SaddlePointFastSolver((M, B, None), (F0, F1))
         uh[:], ph[:] = solver.solve()
     else:
-        AA = bmat([[A, B], [B.T, None]], format='csr')
+        AA = bmat([[M, B], [B.T, None]], format='csr')
         FF = np.r_['0', F0, F1]
         x = spsolve(AA, FF).reshape(-1)
         uh[:] = x[:udof]
