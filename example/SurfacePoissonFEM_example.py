@@ -40,7 +40,7 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
 
-m = 1
+m = 4
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
@@ -88,6 +88,21 @@ for i in range(maxit):
         u = space.integralalg.mesh_integral(pde.solution)/np.sum(space.cellmeasure)
         uh += u - e
         print(e)
+    elif m == 4:
+
+        @barycentric
+        def f(bc):
+            p = lmesh.bc_to_point(bc)
+            n = lmesh.cell_unit_normal(bc)
+            return pde.source(p, n) 
+        F = space.source_vector(f)
+
+        C = space.integral_basis()
+        A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
+        F = np.r_[F, 0]
+
+        x = spsolve(A, F).reshape(-1)
+        uh[:] = x[:-1]
 
     @barycentric
     def gradient0(bc):

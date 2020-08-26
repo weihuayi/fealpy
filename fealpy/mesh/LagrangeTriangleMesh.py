@@ -12,27 +12,48 @@ from .core import multi_index_matrix
 from .core import lagrange_shape_function 
 # 单纯形网格拉格朗形函数关于重心坐标的导数
 from .core import lagrange_grad_shape_function
+from .core import LinearMeshDataStructure
+
+class LinearTriangleMeshDataStructure(LinearMeshDataStructure):
+    localEdge = np.array([(1, 2), (2, 0), (0, 1)])
+    ccw = np.array([0, 1, 2])
+    V = 3
+    E = 3
+    EV = 2
+    F = 1
+    def __init__(self, NN, cell):
+        self.NN = NN
+        self.NC = cell.shape[0]
+        self.cell = cell
+        self.itype = cell.dtype
+        self.construct_edge()
+
 
 class LagrangeTriangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
 
-        mesh = TriangleMesh(node, cell) 
-        dof = LagrangeTriangleDof2d(mesh, p)
-
         self.p = p
-        self.node = dof.interpolation_points()
+        self.GD = node.shape[1]
+        self.TD = 2
+        self.meshtype = 'ltri'
+        self.ftype = node.dtype
+        self.itype = cell.dtype
+
+        ds = LinearTriangleMeshDataStructure(node.shape[0], cell) 
+        self.ds = LagrangeTriangleMeshDataStructure(ds, p)
+        self.lds = ds
+
+        if p == 1:
+            self.node = node
+        else:
+            NN = self.number_of_nodes()
+            self.node = np.zeros((NN, self.GD), dtype=self.ftype)
+            bc = multi_index_matrix[2](p)/p # (NQ, TD+1)
+            self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
 
         if surface is not None:
             self.node, _ = surface.project(self.node)
    
-        self.ds = LagrangeTriangleMeshDataStructure(dof)
-
-        self.GD = node.shape[1]
-        self.TD = 2
-
-        self.meshtype = 'ltri'
-        self.ftype = mesh.ftype
-        self.itype = mesh.itype
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
@@ -162,8 +183,6 @@ class LagrangeTriangleMesh(Mesh2d):
 
         return n
 
-
-
     def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
         """
 
@@ -258,7 +277,8 @@ class LagrangeTriangleMesh(Mesh2d):
             值
         """
         p = self.p if p is None else p
-        return lagrange_shape_function(bc, p)
+        phi = lagrange_shape_function(bc, p)
+        return phi[..., None, :]
 
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
@@ -320,20 +340,63 @@ class LagrangeTriangleMesh(Mesh2d):
         for i, ec in enumerate(edge2cell):
             print(i, ": ", ec)
 
+
 class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
-    def __init__(self, dof):
-        self.NCN = dof.mesh.number_of_nodes()
-        self.cell = dof.cell_to_dof()
-        self.edge = dof.edge_to_dof()
-        self.edge2cell = dof.mesh.ds.edge_to_cell()
+    def __init__(self, ds, p):
+        """
 
-        self.NN = dof.number_of_global_dofs() 
-        self.NE = len(self.edge)
-        self.NC = len(self.cell)
+        Notes
+        -----
+        给定一个线性网格的数据结构，构造 p 次拉格朗日网格的数据结构
+        """
+        self.itype = ds.itype
 
-        self.V = dof.number_of_local_dofs() 
-        self.E = 3
-        self.itype = dof.mesh.itype
+        self.V = (p+1)*(p+2)//2 # 单元顶点个数
+        self.E = ds.E # 单元边的个数
+        self.F = ds.F # F == 1
+
+        self.NCN = ds.NN  # 角点的个数
+        self.NN = ds.NN 
+        self.NE = ds.NE 
+        self.NC = ds.NC 
+
+        self.edge2cell = ds.edge2cell 
+
+        if p == 1:
+            self.cell = ds.cell
+            self.edge = ds.edge
+        else:
+            NE = ds.NE
+            edge = ds.edge
+            self.edge = np.zeros((NE, p+1), dtype=self.itype)
+            self.edge[:, [0, -1]] = edge
+            self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            self.NN += NE*(p-1)
+
+            self.cell = np.zeros((self.NC, self.V), dtype=self.itype)
+
+            index = multi_index_matrix[2](p)
+            edge2cell = ds.edge2cell
+            flag = edge2cell[:, 2] == 0
+            self.cell[edge2cell[flag, 0][:, None], index[:, 0] == 0] = self.edge[flag]
+            flag = edge2cell[:, 2] == 1
+            self.cell[edge2cell[flag, 0][:, None], index[:, 1] == 0] = self.edge[flag, -1::-1]
+            flag = edge2cell[:, 2] == 2
+            self.cell[edge2cell[flag, 0][:, None], index[:, 2] == 0] = self.edge[flag]
+
+            flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 0] == 0] = self.edge[flag, -1::-1]
+            flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 1] == 0] = self.edge[flag]
+            flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+            self.cell[edge2cell[flag, 1][:, None], index[:, 2] == 0] = self.edge[flag, -1::-1]
+
+            if p > 2:
+                flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
+                cdof = self.V - 3*p
+                self.cell[:, flag]= self.NN + np.arange(self.NC*cdof).reshape(self.NC, cdof)
+                self.NN += self.NC*cdof
+
 
 class LagrangeTriangleDof2d():
     """
@@ -346,14 +409,6 @@ class LagrangeTriangleDof2d():
         self.mesh = mesh
         self.p = p
         self.multiIndex = multi_index_matrix[2](p)
-
-    def is_on_node_local_dof(self):
-        p = self.p
-        isNodeDof = np.sum(self.multiIndex == p, axis=-1) > 0
-        return isNodeDof
-
-    def is_on_edge_local_dof(self):
-        return self.multiIndex == 0
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -397,8 +452,6 @@ class LagrangeTriangleDof2d():
         edge2dof = np.zeros((NE, p+1), dtype=np.int)
         edge2dof[:, [0, -1]] = edge[:, [0, -1]] # edge 可以是高次曲线
         if p > 1:
-            NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
-            NE = mesh.number_of_edges()
             edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2dof
 
@@ -433,33 +486,29 @@ class LagrangeTriangleDof2d():
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
+        edge2cell = mesh.ds.edge_to_cell()
         ldof = self.number_of_local_dofs()
         cell2dof = np.zeros((NC, ldof), dtype=np.int_)
-
-        isEdgeDof = self.is_on_edge_local_dof()
         edge2dof = self.edge_to_dof()
-        cell2edgeSign = mesh.ds.cell_to_edge_sign()
-        cell2edge = mesh.ds.cell_to_edge()
 
-        cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-        cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+        flag = edge2cell[:, 2] == 0
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 0] == 0] = edge2dof[flag]
+        flag = edge2cell[:, 2] == 1
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 1] == 0] = edge2dof[flag, -1::-1]
+        flag = edge2cell[:, 2] == 2
+        cell2dof[edge2cell[flag, 0][:, None], index[:, 2] == 0] = edge2dof[flag]
 
-        cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-        cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
+        flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 0] == 0] = edge2dof[flag, -1::-1]
+        flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 1] == 0] = edge2dof[flag]
+        flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+        cell2dof[edge2cell[flag, 1][:, None], index[:, 2] == 0] = edge2dof[flag, -1::-1]
 
-        cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-        cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
         if p > 2:
-            base = NN + (p-1)*NE
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            idof = ldof - 3*p
-            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+            flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
+            cdof =  ldof - 3*p
+            cell2dof[:, flag]= NN + NE*(p-1) + np.arange(NC*cdof).reshape(NC, cdof)
 
         return cell2dof
 
@@ -476,7 +525,7 @@ class LagrangeTriangleDof2d():
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
         bcs = self.multiIndex/p # 计算插值点对应的重心坐标
-        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1) # 这里是连续
+        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1) 
         return ipoint
 
     def number_of_global_dofs(self):

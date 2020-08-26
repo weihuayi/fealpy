@@ -6,11 +6,25 @@ from scipy.sparse import spdiags, eye, tril, triu, diags, kron
 
 
 class StructureHexMesh(Mesh3d):
-    def __init__(self, box, nx, ny, nz):
+    def __init__(self, box, nx, ny, nz, itype=np.int_, ftype=np.float64):
+        self.itype = itype
+        self.ftype = ftype
         self.box = box
         self.h = (box[1] - box[0])/nx
         self.ds = StructureHexMeshDataStructure(nx, ny, nz)
     
+    def multi_index(self):
+        NN = self.ds.NN
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+        i, j, k = np.mgrid[0:nx+1, 0:ny+1, 0:nz+1]
+        index = np.zeros((NN, 3), dtype=self.itype)
+        index[:, 0] = i.flat
+        index[:, 1] = j.flat
+        index[:, 2] = k.flat
+        return index
+
     @property
     def node(self):
         NN = self.ds.NN

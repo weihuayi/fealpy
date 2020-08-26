@@ -30,9 +30,9 @@ Notes
        c_i = z_i c
 
     3. 
-    甲烷: methane,  CH_4,   16.04 g/mol,  0.42262 g/cm^3
-    乙烷: Ethane, C_2H_6,   30.07 g/mol, 1.212 kg/m^3
-    丙烷: Propane,  C_3H_8,  44.096 g/mol,  1.83 kg/m^3 
+    甲烷: methane,  CH_4,   16.04 g/mol,  0.42262 g/cm^3, 190.8 K, 4.640 MPa
+    乙烷: Ethane, C_2H_6,   30.07 g/mol, 1.212 kg/m^3, 305.33 K, 4.872 MPa
+    丙烷: Propane,  C_3H_8,  44.096 g/mol,  1.83 kg/m^3, 369.8 K, 4.26 MPa
     (25度 100 kPa
 
     4. 气体常数  R = 8.31446261815324 	J/K/mol
@@ -40,6 +40,8 @@ Notes
     5. 6.02214076 x 10^{23}
 
     6. 压力单位是 bar, 温度单位是 K, 时间单位是 d 
+
+    7. acentricity factor 偏心因子
 
 
 References
@@ -109,7 +111,8 @@ class Model_1():
     def init_molar_density(self, cspace):
         c = self.molar_dentsity(50)
         ch = cspace.function(dim=3)
-        ch[:, 2] = cspace.local_projection(c)
+        ch[0::3, 2] = c
+        #ch[:, 2] = cspace.local_projection(c)
         return ch
 
     def space_mesh(self, n=50):
@@ -221,7 +224,7 @@ class Model_1():
         -----
         在区域右上角给出一个压力控制条件，要低于区域内部的压力。
         """
-        return 25
+        return 49.9999 
 
     @cartesian
     def is_pressure_bc(self, p):
@@ -251,7 +254,7 @@ class ShaleGasSolver():
                 'viscosity': 1.0,    # 粘性系数 1 muPa*s = 1e-6 Pa*s, 1 cP = 10^{−3} Pa⋅s = 1 mPa⋅s
                 'permeability': 1.0, # 1 md 渗透率, 1 md = 9.869233e-16 m^2
                 'temperature': 397, # 初始温度 K
-                'pressure': 50,   # 初始压力
+                'pressure': 50,   # bar 初始压力
                 'porosity': 0.2,  # 孔隙度
                 'injecttion_rate': 0.1,  # 注入速率
                 'compressibility': 0.001, #压缩率
@@ -295,7 +298,6 @@ class ShaleGasSolver():
         cdof = self.cspace.number_of_global_dofs()
 
         timeline = self.timeline
-        phi = self.options['porosity'] # 孔隙度
         dt = timeline.current_time_step_length()
         nt = timeline.next_time_level()
 
@@ -303,6 +305,7 @@ class ShaleGasSolver():
         M = self.M
         B = self.B
         D = self.D
+        print('ch:', self.ch)
         E = self.uspace.pressure_matrix(self.ch)
 
         F1 = D@self.ph
@@ -326,15 +329,20 @@ class ShaleGasSolver():
         x = spsolve(AA, FF).reshape(-1)
         self.uh[:] = x[:udof]
         self.ph[:] = x[udof:]
+        print('uh:', self.uh)
+        print('ph:', self.ph)
 
         # 2. 求解下一层的浓度
         nc = self.ch.shape[1] # 这里有 nc 个组分
-        for i in range(nc):
+        phi = self.options['porosity'] # 孔隙度
+        for i in range(nc-1):
             g = lambda x : self.model.concentration_bc(x, n=i)
             F = self.uspace.convection_vector(nt, self.ch.index(i), self.uh,
                     g=g) 
             F = self.H@(F[:, :, None]/phi)
             F *= dt
+            print('ch:', self.ch.index(i))
+            print('F:', F)
             self.ch[:, i] += F.flat
 
     def solve(self):
@@ -414,18 +422,22 @@ if __name__ == '__main__':
 
     solver = ShaleGasSolver(model)
 
-    mesh = solver.mesh 
-    isBdEdge = mesh.ds.boundary_edge_flag()
-    bc = mesh.entity_barycenter('edge', index=isBdEdge)
 
-    print(model.velocity_bc(bc, None))
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh.add_plot(axes)
-    isPBC = model.is_pressure_bc(bc)
-    isVBC = model.is_velocity_bc(bc)
-    mesh.find_node(axes, node=bc, index=isVBC)
-    plt.show()
+    if False:
+        mesh = solver.mesh 
+        isBdEdge = mesh.ds.boundary_edge_flag()
+        bc = mesh.entity_barycenter('edge', index=isBdEdge)
+        flag= model.velocity_bc(bc, None) < 0
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        isPBC = model.is_pressure_bc(bc)
+        isVBC = model.is_velocity_bc(bc)
+        mesh.find_node(axes, node=bc, index=flag)
+        plt.show()
 
-    #solver.solve()
+    print(solver.ch)
+    print(solver.ph)
+
+    solver.one_step_solve()
 

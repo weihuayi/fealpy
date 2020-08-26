@@ -50,6 +50,8 @@ def vtk_cell_index(p, celltype):
         s0 = np.sum(multiIndex[:, 1:], axis=-1)
         s1 = np.sum(multiIndex[:, 2:], axis=-1)
         index = s0*(s0+1)*(s0+2)//6 + s1*(s1+1)//2 + multiIndex[:, 3]
+    elif celltype == VTK_LAGRANGE_QUADRILATERAL:
+        pass
 
 def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     """

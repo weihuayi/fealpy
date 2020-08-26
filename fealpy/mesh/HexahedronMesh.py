@@ -22,6 +22,9 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
     V = 8
     E = 12
     F = 6
+    FV = 4
+    FE = 4
+    C = 1
 
     def __init__(self, N, cell):
         super(HexahedronMeshDataStructure, self).__init__(N, cell)

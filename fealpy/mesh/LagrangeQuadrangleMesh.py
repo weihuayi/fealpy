@@ -6,27 +6,48 @@ from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from .core import multi_index_matrix
 from .core import lagrange_shape_function 
 from .core import lagrange_grad_shape_function
+from .core import LinearMeshDataStructure
+
+class LinearQuadrangleMeshDataStructure(LinearMeshDataStructure):
+    localEdge = np.array([(0, 2), (2, 3), (3, 1), (1, 0)])
+    ccw = np.array([0, 2, 3, 1])
+    V = 4
+    E = 4
+    F = 1
+
+    def __init__(self, NN, cell):
+        self.NN = NN
+        self.NC = cell.shape[0]
+        self.cell = cell
+        self.itype = cell.dtype
+        self.construct_edge()
 
 class LagrangeQuadrangleMesh(Mesh2d):
     def __init__(self, node, cell, p=1, surface=None):
 
-        mesh = QuadrangleMesh(node, cell) 
-        dof = LagrangeQuadrangleDof2d(mesh, p)
-
         self.p = p
-        self.node = dof.interpolation_points()
+        self.GD = node.shape[1]
+        self.TD = 2
+        self.ftype = node.dtype
+        self.itype = cell.dtype
+        self.meshtype = 'lquad'
+
+        ds = LinearQuadrangleMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
+        self.ds = LagrangeQuadrangleMeshDataStructure(ds, p)
+
+        if p == 1:
+            self.node = node
+        else:
+            NN = self.number_of_nodes()
+            self.node = np.zeros((NN, self.GD), dtype=self.ftype)
+            bc = multi_index_matrix[1](p)/p
+            bc = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
+            self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
 
         if surface is not None:
             self.node, _ = surface.project(self.node)
    
-        self.ds = LagrangeQuadrangleMeshDataStructure(dof)
 
-        self.GD = node.shape[1]
-        self.TD = 2
-
-        self.meshtype = 'lquad'
-        self.ftype = mesh.ftype
-        self.itype = mesh.itype
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
@@ -97,9 +118,9 @@ class LagrangeQuadrangleMesh(Mesh2d):
     def integrator(self, q, etype='cell'):
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 2}:
-            return TensorProductQuadrature(qf, n=2) 
+            return TensorProductQuadrature(qf, TD=2) 
         elif etype in {'edge', 'face', 1}:
-            return TensorProductQuadrature(qf, n=1) 
+            return TensorProductQuadrature(qf, TD=1) 
 
     def cell_area(self, q=None, index=np.s_[:]):
         """
@@ -142,37 +163,23 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         Notes
         -----
+        etype 这个参数实际上是不需要的，为了兼容，所以这里先保留。
 
-        etype 这个参数实际上是不需要的，为了向后兼容，所以这里先保留。
+        bc 是一个 tuple 数组
 
-        因为 bc 最后一个轴的长度就包含了这个信息。
+        Examples
+        --------
+        >>> bc = TensorProductQuadrature(3, TD=2) # 第三个张量积分公式
+        >>> points = mesh.bc_to_point(bc)
+
         """
         node = self.node
-        TD = bc.shape[-1] - 1
+        TD = len(bc) 
         entity = self.entity(etype=TD)[index] #
         phi = self.shape_function(bc) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
 
-    def jacobi_matrix(self, bc, index=np.s_[:], p=None, return_grad=False):
-        """
-        Notes
-        -----
-        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
-
-        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
-        """
-
-        TD = bc.shape[-1] - 1
-        entity = self.entity(etype=TD)
-        gphi = self.grad_shape_function(bc, p=p)
-        J = np.einsum(
-                'ijn, ...ijk->...ink',
-                self.node[entity[index], :], gphi)
-        if return_grad is False:
-            return J
-        else:
-            return J, grad
 
     def shape_function(self, bc, p=None):
         """
@@ -191,11 +198,13 @@ class LagrangeQuadrangleMesh(Mesh2d):
         TD = len(bc)
         phi = lagrange_shape_function(bc[0]) 
         if TD == 2:
-            phi = np.einsum('ijm, kjn->ikjmn', phi, phi)
+            # i 是积分点
+            # j 是单元
+            # m 是基函数
+            phi = np.einsum('im, kn->ikmn', phi, phi)
             shape = phi.shape[:-2] + (-1, )
-            phi = phi.reshape(shape) # (..., 1, p+1*p+1)
-        return phi  
-
+            phi = phi.reshape(shape) 
+        return phi[..., None, :]  # (..., 1, p+1*p+1) 增加一个单元轴，方便广播运算
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
@@ -213,29 +222,30 @@ class LagrangeQuadrangleMesh(Mesh2d):
         """
         p = self.p if p is None else p
         TD = len(bc)
-        # (2, 1)
         Dlambda = np.array([[-1], [1]], dtype=self.ftype)
 
         # 一维基函数值
-        # (NQ, 1, p+1)
+        # (NQ, p+1)
         phi = lagrange_shape_function(bc[0])  
 
-        # 关于一维变量重心坐标的导数
+        # 关于**一维变量重心坐标**的导数
         # lambda_0 = 1 - xi
         # lambda_1 = xi
         # (NQ, ldof, 2) 
         R = lagrange_grad_shape_function(bc[0], p)  
-        # i: 积分点
-        # j: 自由度
-        # k: 分量
-        gphi = np.einsum('ijk, kn->ijn', R, Dlambda) 
+
+        # 关于**一维变量**的导数
+        gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
 
         if TD == 2:
-            gphi = np.einsum('ijn, kmt->ikjmn', gphi, phi)
-
+            gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+            shape = gphi.shape[:-2] + ((p+1)*(p+1), TD)
+            gphi = np.zeros(shape, dtype=self.ftype)
+            gphi[..., 0].flat = gphi0.flat
+            gphi[..., 1].flat = gphi0.swapaxes(-1, -2).flat
 
         if variables == 'u':
-            return gphi[..., None, :, :] #(..., 1, ldof, TD)
+            return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
         elif variables == 'x':
             entity = self.entity(etype=TD)
             J = np.einsum(
@@ -251,6 +261,57 @@ class LagrangeQuadrangleMesh(Mesh2d):
             G = np.linalg.inv(G)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
+
+    def jacobi_matrix(self, bc, index=np.s_[:], p=None, return_grad=False):
+        """
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+
+        x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
+        """
+
+        TD = len(bc)
+        entity = self.entity(etype=TD)
+        gphi = self.grad_shape_function(bc, p=p)
+        J = np.einsum(
+                'ijn, ...ijk->...ink',
+                self.node[entity[index], :], gphi)
+        if return_grad is False:
+            return J
+        else:
+            return J, gphi
+
+    def first_fundamental_form(self, bc, index=np.s_[:], 
+            return_jacobi=False, return_grad=False):
+        """
+        Notes
+        -----
+            计算拉格朗日网格在积分点处的第一基本形式。
+        """
+
+        TD = len(bc) 
+        J = self.jacobi_matrix(bc, index=index,
+                return_grad=return_grad)
+        
+        if return_grad:
+            J, gphi = J
+
+        shape = J.shape[0:-2] + (TD, TD)
+        G = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD):
+            G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
+            for j in range(i+1, TD):
+                G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
+                G[..., j, i] = G[..., i, j]
+        if (return_jacobi is False) & (return_grad is False):
+            return G
+        elif (return_jacobi is True) & (return_grad is False): 
+            return G, J
+        elif (return_jacobi is False) & (return_grad is True): 
+            return G, gphi 
+        else:
+            return G, J, gphi
 
     def print(self):
 
@@ -282,18 +343,61 @@ class LagrangeQuadrangleMesh(Mesh2d):
             print(i, ": ", ec)
 
 class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
-    def __init__(self, dof):
-        self.NCN = dof.mesh.number_of_nodes()
-        self.cell = dof.cell_to_dof()
-        self.edge = dof.edge_to_dof()
-        self.edge2cell = dof.mesh.ds.edge_to_cell()
+    def __init__(self, ds, p):
 
-        self.NN = dof.number_of_global_dofs() 
-        self.NE = len(self.edge)
-        self.NC = len(self.cell)
+        self.itype = ds.itype
 
-        self.V = dof.number_of_local_dofs() 
-        self.E = 3
+        self.p = p
+        self.V = (p+1)*(p+1) 
+        self.E = ds.E 
+        self.F = ds.F
+
+        self.NCN = ds.NN  # 角点的个数
+        self.NN = ds.NN 
+        self.NE = ds.NE 
+        self.NC = ds.NC 
+
+        self.edge2cell = ds.edge2cell 
+
+        if p == 1:
+            self.cell = ds.cell
+            self.edge = ds.edge
+        else:
+            NE = ds.NE
+            edge = ds.edge
+            self.edge = np.zeros((NE, p+1), dtype=self.itype)
+            self.edge[:, [0, -1]] = edge
+            self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+            self.NN += NE*(p-1)
+
+            NC = ds.NC
+            self.cell = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
+            cell = self.cell.reshape((NC, p+1, p+1))
+
+            edge2cell = ds.edge2cell
+
+            flag = edge2cell[:, 2] == 0
+            cell[edge2cell[flag, 0], :, 0] = edge[flag]
+            flag = edge2cell[:, 2] == 1
+            cell[edge2cell[flag, 0], -1, :] = edge[flag]
+            flag = edge2cell[:, 2] == 2
+            cell[edge2cell[flag, 0], :, -1] = edge[flag, -1::-1]
+            flag = edge2cell[:, 2] == 3
+            cell[edge2cell[flag, 0], 0, :] = edge[flag, -1::-1]
+
+            flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+            cell[edge2cell[flag, 1], :, 0] = edge[flag, -1::-1]
+            flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+            cell[edge2cell[flag, 1], -1, :] = edge[flag, -1::-1]
+            flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+            cell[edge2cell[flag, 1], :, -1] = edge[flag]
+            flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
+            cell[edge2cell[flag, 1], 0, :] = edge[flag]
+
+            cell[:, 1:-1, 1:-1] = self.NN + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
+            self.NN += NC*(p-1)*(p-1)
+            
+
 
 class LagrangeQuadrangleDof2d():
     """
@@ -305,15 +409,6 @@ class LagrangeQuadrangleDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = multi_index_matrix[2](p)
-
-    def is_on_node_local_dof(self):
-        p = self.p
-        isNodeDof = np.sum(self.multiIndex == p, axis=-1) > 0
-        return isNodeDof
-
-    def is_on_edge_local_dof(self):
-        return self.multiIndex == 0
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -389,37 +484,34 @@ class LagrangeQuadrangleDof2d():
             return cell 
 
         # 空间自由度和网格的自由度不一致时，重新构造单元自由度矩阵
-        NN = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
-        NE = mesh.number_of_edges()
-        NC = mesh.number_of_cells()
+        edge2cell = self.mesh.ds.edge_to_cell()
+        NN = self.mesh.number_of_corner_nodes()
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells() 
 
-        ldof = self.number_of_local_dofs()
-        cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+        cell2dof = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
+        c2d = cell2dof.reshape((NC, p+1, p+1))
 
-        isEdgeDof = self.is_on_edge_local_dof()
-        edge2dof = self.edge_to_dof()
-        cell2edgeSign = mesh.ds.cell_to_edge_sign()
-        cell2edge = mesh.ds.cell_to_edge()
+        e2d = self.edge_to_dof()
+        flag = edge2cell[:, 2] == 0
+        c2d[edge2cell[flag, 0], :, 0] = e2d[flag]
+        flag = edge2cell[:, 2] == 1
+        c2d[edge2cell[flag, 0], -1, :] = e2d[flag]
+        flag = edge2cell[:, 2] == 2
+        c2d[edge2cell[flag, 0], :, -1] = e2d[flag, -1::-1]
+        flag = edge2cell[:, 2] == 3
+        cell[edge2cell[flag, 0], 0, :] = e2d[flag, -1::-1]
 
-        cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-        cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+        flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
+        c2d[edge2cell[flag, 1], :, 0] = e2d[flag, -1::-1]
+        flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
+        c2d[edge2cell[flag, 1], -1, :] = e2d[flag, -1::-1]
+        flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
+        c2d[edge2cell[flag, 1], :, -1] = e2d[flag]
+        flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
+        c2d[edge2cell[flag, 1], 0, :] = e2d[flag]
 
-        cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-        cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
-
-        cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-        cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
-        if p > 2:
-            base = NN + (p-1)*NE
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            idof = ldof - 3*p
-            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+        c2d[:, 1:-1, 1:-1] = NN + NE*(p-1) + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
 
         return cell2dof
 
@@ -435,9 +527,10 @@ class LagrangeQuadrangleDof2d():
         GD = mesh.geo_dimension()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
-        bcs = self.multiIndex/p # 计算插值点对应的重心坐标
-        ipoint[cell2dof] = mesh.bc_to_point(bcs).swapaxes(0, 1) # 这里是连续
+        bc = multi_index_matrix[1](p)/p
+        ipoint[cell2dof] = mesh.bc_to_point((bc, bc)).swapaxes(0, 1)
         return ipoint
+
 
     def number_of_global_dofs(self):
         p = self.p
@@ -448,20 +541,19 @@ class LagrangeQuadrangleDof2d():
 
         gdof = mesh.number_of_corner_nodes() # 注意这里只是单元角点的个数
         if p > 1:
-            NE = self.mesh.number_of_edges()
+            NE = mesh.number_of_edges()
             gdof += (p-1)*NE
 
         if p > 2:
-            ldof = self.number_of_local_dofs()
-            NC = self.mesh.number_of_cells()
-            gdof += (ldof - 3*p)*NC
+            NC = mesh.number_of_cells()
+            gdof += (p - 1)*(p - 1)*NC
         return gdof
 
     def number_of_local_dofs(self, doftype='cell'):
         p = self.p
         if doftype in {'cell', 2}:
-            return (p+1)*(p+2)//2 
+            return (p+1)*(p+1) 
         elif doftype in {'face', 'edge',  1}:
-            return self.p + 1
+            return p + 1
         elif doftype in {'node', 0}:
             return 1

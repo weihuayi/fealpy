@@ -94,7 +94,7 @@ class IsoLagrangeFiniteElementSpace:
         return phi 
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:]):
+    def grad_basis(self, bc, index=np.s_[:], variables='x'):
         """
 
         Notes
@@ -102,7 +102,8 @@ class IsoLagrangeFiniteElementSpace:
         计算空间基函数关于实际坐标点 x 的梯度。
         """
         p = self.p
-        gphi = self.mesh.grad_shape_function(bc, index=index, p=p, variables='x')
+        gphi = self.mesh.grad_shape_function(bc, index=index, p=p,
+                variables=variables)
         return gphi
 
     @barycentric
@@ -169,8 +170,6 @@ class IsoLagrangeFiniteElementSpace:
         gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
 
         #print("condition number:", np.linalg.cond(G[0]))
-
-
         # dG.shape == (NQ, NC)
         #dG = G[..., 0, 0]*G[..., 1, 1] - G[..., 0, 1]*G[..., 1, 0] 
         #G[..., [0, 1], [0, 1]] = G[..., [1, 0], [1, 0]]

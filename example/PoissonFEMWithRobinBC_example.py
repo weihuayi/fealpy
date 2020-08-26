@@ -14,10 +14,10 @@ from fealpy.boundarycondition import RobinBC
 from fealpy.tools.show import showmultirate
 
 
-p = int(sys.argv[1])
-n = int(sys.argv[2])
-maxit = int(sys.argv[3])
-d = int(sys.argv[4])
+p = int(sys.argv[1]) # 空间次数
+n = int(sys.argv[2]) # 初始网格加密次数
+maxit = int(sys.argv[3]) # 最大迭代次数
+d = int(sys.argv[4]) # 空间维数， 取 2 或 3
 
 if d == 2:
     from fealpy.pde.poisson_2d import CosCosData as PDE
