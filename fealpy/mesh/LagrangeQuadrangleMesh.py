@@ -33,6 +33,8 @@ class LagrangeQuadrangleMesh(Mesh2d):
         self.itype = cell.dtype
         self.meshtype = 'lquad'
 
+        self.surface = surface
+
         ds = LinearQuadrangleMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
         self.ds = LagrangeQuadrangleMeshDataStructure(ds, p)
 
@@ -45,13 +47,14 @@ class LagrangeQuadrangleMesh(Mesh2d):
             bc = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
             self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
 
-        if surface is not None:
-            self.node, _ = surface.project(self.node)
+        if self.surface is not None:
+            self.node, _ = self.surface.project(self.node)
    
 
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+        self.multi_index_matrix = multi_index_matrix
 
     def number_of_corner_nodes(self):
         """
@@ -101,7 +104,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-        index = vtk_cell_index(self.p, cellType) # TODO: 转化为 vtk 编号顺序
+        index = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
         NV = cell.shape[-1]
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
@@ -126,10 +129,12 @@ class LagrangeQuadrangleMesh(Mesh2d):
     def entity_barycenter(self, etype=2, index=np.s_[:]):
         GD = self.geo_dimension()
         if etype in {'cell', 2}:
-            bc = TensorProductQuadrature(1, TD=2)
+            qf = self.integrator(1, etype=2)
+            bc, ws = qf.get_quadrature_points_and_weights()
             p = self.bc_to_point(bc, index=index).reshape(-1, GD)
         elif etype in {'edge', 'face', 1}:
-            bc = TensorProductQuadrature(1, TD=1)
+            qf = self.integrator(1, etype=1)
+            bc, ws = qf.get_quadrature_points_and_weights()
             p = self.bc_to_point(bc, index=index).reshape(-1, GD)
         elif etype in {'node', 0}:
             p = node[index]
@@ -137,7 +142,8 @@ class LagrangeQuadrangleMesh(Mesh2d):
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return p 
 
-    def uniform_refine(self, n=1, surface=None):
+    def uniform_refine(self, n=1):
+        p = self.p
         for i in range(n):
             NN = self.number_of_corner_nodes()
             NE = self.number_of_edges()
@@ -148,21 +154,52 @@ class LagrangeQuadrangleMesh(Mesh2d):
             edgeCenter = self.entity_barycenter('edge')
             cellCenter = self.entity_barycenter('cell')
 
+            if self.surface is not None:
+                edgeCenter, _ = self.surface.project(edgeCenter)
+                cellCenter, _ = self.surface.project(cellCenter)
+
             edge2center = np.arange(NN, NN+NE)
 
-            cell = self.ds.cell
-            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
-            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
-            cc = np.arange(N + NE, N + NE + NC).reshape(-1, 1)
+            cp = [0, p, -p-1, -1]
+            cc = range(NN + NE, NN + NE + NC)
  
             cell = np.zeros((4*NC, 4), dtype=np.int)
-            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
-            cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
-            cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
-            cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
+            cell[0::4, 0] = self.ds.cell[:, cp[0]]
+            cell[0::4, 1] = edge2center[cell2edge[:, 3]]
+            cell[0::4, 2] = edge2center[cell2edge[:, 0]]
+            cell[0::4, 3] = cc
 
-            self.node = np.r_['0', self.node, edgeCenter, cellCenter]
-            self.ds.reinit(N + NE + NC, cell)
+            cell[1::4, 0] = edge2center[cell2edge[:, 3]]
+            cell[1::4, 1] = self.ds.cell[:, cp[1]]
+            cell[1::4, 2] = cc
+            cell[1::4, 3] = edge2center[cell2edge[:, 2]]
+
+            cell[2::4, 0] = edge2center[cell2edge[:, 0]]
+            cell[2::4, 1] = cc 
+            cell[2::4, 2] = self.ds.cell[:, cp[2]]
+            cell[2::4, 3] = edge2center[cell2edge[:, 1]]
+
+            cell[3::4, 0] = cc 
+            cell[3::4, 1] = edge2center[cell2edge[:, 2]]
+            cell[3::4, 2] = edge2center[cell2edge[:, 1]]
+            cell[3::4, 3] = self.ds.cell[:, cp[3]]
+
+            node = np.r_['0', self.node[:NN], edgeCenter, cellCenter]
+            ds = LinearQuadrangleMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
+            self.ds = LagrangeQuadrangleMeshDataStructure(ds, p)
+
+            if p == 1:
+                self.node = node
+            else:
+                NN = self.number_of_nodes()
+                self.node = np.zeros((NN, self.GD), dtype=self.ftype)
+                bc = multi_index_matrix[1](p)/p
+                bc = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
+                self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
+
+            if self.surface is not None:
+                self.node, _ = self.surface.project(self.node)
+
 
     def cell_area(self, q=None, index=np.s_[:]):
         """
@@ -172,16 +209,12 @@ class LagrangeQuadrangleMesh(Mesh2d):
         计算单元的面积。
         """
         p = self.p
-        q = p if q is None else q
+        q = p+3 if q is None else q
 
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs, index=index)
-        n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        l = np.sqrt(np.sum(n**2, axis=-1))
-        print('J:', J.shape)
-        print('l:', l.shape)
-        print('ws:', ws.shape)
+        G = self.first_fundamental_form(bcs)
+        l = np.sqrt(np.linalg.det(G))
         a = np.einsum('ij, ijk->k', ws, l)
         return a
 
@@ -222,7 +255,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         TD = len(bc) 
         entity = self.entity(etype=TD)[index] #
         phi = self.shape_function(bc) # (NQ, 1, ldof)
-        p = np.einsum('...jk, jkn->ijn', phi, node[entity])
+        p = np.einsum('...jk, jkn->...jn', phi, node[entity])
         return p
 
 
@@ -241,7 +274,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         """
         p = self.p if p is None else p
         TD = len(bc)
-        phi = lagrange_shape_function(bc[0]) 
+        phi = lagrange_shape_function(bc[0], p) 
         if TD == 2:
             # i 是积分点
             # j 是单元
@@ -292,18 +325,12 @@ class LagrangeQuadrangleMesh(Mesh2d):
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
         elif variables == 'x':
-            entity = self.entity(etype=TD)
-            J = np.einsum(
-                    'ijn, ...jk->...ink',
-                    self.node[entity[index], :], gphi)
-            shape = J.shape[0:-2] + (TD, TD)
-            G = np.zeros(shape, dtype=self.ftype)
-            for i in range(TD):
-                G[..., i, i] = np.sum(J[..., i]**2, axis=-1)
-                for j in range(i+1, TD):
-                    G[..., i, j] = np.sum(J[..., i]*J[..., j], axis=-1)
-                    G[..., j, i] = G[..., i, j]
+            G, J = self.first_fundamental_form(bc, index=index,
+                    return_jacobi=True)
             G = np.linalg.inv(G)
+            print('G:', G.shape)
+            print('J:', J.shape)
+            print('gphi:', gphi.shape)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
 
@@ -319,9 +346,6 @@ class LagrangeQuadrangleMesh(Mesh2d):
         TD = len(bc)
         entity = self.entity(etype=TD)[index]
         gphi = self.grad_shape_function(bc, p=p)
-        print('bc:', bc)
-        print('gphi:', gphi.shape)
-        print('node:', self.node[entity].shape)
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity], gphi)

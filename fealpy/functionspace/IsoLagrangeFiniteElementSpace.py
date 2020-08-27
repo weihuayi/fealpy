@@ -126,17 +126,6 @@ class IsoLagrangeFiniteElementSpace:
         val = np.einsum(s1, gphi, uh[cell2dof])
         return val
 
-    def interpolation_matrix(self, space0):
-        p = self.p
-        space1 = self
-        gdof0 = space0.number_of_global_dofs()
-        gdof1 = space1.number_of_global_dofs() 
-
-        bc = space0.multiIndex/p
-
-        val = space1.basis(bc) # (NQ, 1, ldof)
-        PI = csr_matrix()
-
     def stiff_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
