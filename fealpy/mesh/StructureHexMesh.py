@@ -249,6 +249,53 @@ class StructureHexMeshDataStructure():
         edge[NE0:NE1, :] = idx.transpose(1, 2, 0)[:, :, I].reshape(-1, 2)
         return edge
 
+    def x_direction_face_flag(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        isXDFace = np.zeros(NF, dtype=np.bool)
+        isXDFace[:ny*nz*(nx+1)] = True
+        return isXDFace
+
+    def y_direction_face_flag(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        isYDFace = np.zeros(NF, dtype=np.bool)
+        isYDFace[ny*nz*(nx+1):ny*nz*(nx+1)+nx*nz*(ny+1)] = True
+        return isYDFace
+
+    def z_direction_face_flag(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        isZDFace = np.zeros(NF, dtype=np.bool)
+        isZDFace[ny*nz*(nx+1)+nx*nz*(ny+1):] = True
+        return isZDFace
+
+    def x_direction_face_index(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        return np.arange(ny*nz*(nx+1))
+
+    def y_direction_face_index(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        return np.arange(ny*nz*(nx+1), ny*nz*(nx+1)+nx*nz*(ny+1))
+
+    def z_direction_face_index(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        return np.arange(ny*nz*(nx+1)+nx*nz*(ny+1), NF)
+
+
     @property
     def cell2edge(self):
         NN = self.NN
