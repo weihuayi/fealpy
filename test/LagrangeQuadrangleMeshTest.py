@@ -72,7 +72,6 @@ class LagrangeTriangleMeshTest():
 
         lmesh = LagrangeQuadrangleMesh(node, cell, p=p, surface=surface)
         NC = lmesh.number_of_cells()
-        a = lmesh.cell_area()
         lmesh.to_vtk(fname=fname)
 
     def surface_area(self, p=2):
@@ -86,7 +85,7 @@ class LagrangeTriangleMeshTest():
             node = mesh.entity('node')
             cell = mesh.entity('cell')
 
-            lmesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
+            lmesh = LagrangeQuadrangleMesh(node, cell, p=p, surface=surface)
             NC = lmesh.number_of_cells()
             a = lmesh.cell_area()
             a = sum(a)

@@ -123,6 +123,47 @@ class LagrangeQuadrangleMesh(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return TensorProductQuadrature(qf, TD=1) 
 
+    def entity_barycenter(self, etype=2, index=np.s_[:]):
+        GD = self.geo_dimension()
+        if etype in {'cell', 2}:
+            bc = TensorProductQuadrature(1, TD=2)
+            p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+        elif etype in {'edge', 'face', 1}:
+            bc = TensorProductQuadrature(1, TD=1)
+            p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+        elif etype in {'node', 0}:
+            p = node[index]
+        else:
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+        return p 
+
+    def uniform_refine(self, n=1, surface=None):
+        for i in range(n):
+            NN = self.number_of_corner_nodes()
+            NE = self.number_of_edges()
+            NC = self.number_of_cells()
+
+            # Find the cutted edge  
+            cell2edge = self.ds.cell_to_edge()
+            edgeCenter = self.entity_barycenter('edge')
+            cellCenter = self.entity_barycenter('cell')
+
+            edge2center = np.arange(NN, NN+NE)
+
+            cell = self.ds.cell
+            cp = [cell[:, i].reshape(-1, 1) for i in range(4)]
+            ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
+            cc = np.arange(N + NE, N + NE + NC).reshape(-1, 1)
+ 
+            cell = np.zeros((4*NC, 4), dtype=np.int)
+            cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
+            cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
+            cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
+            cell[3::4, :] = np.r_['1', ep[3], cc, ep[2], cp[3]]
+
+            self.node = np.r_['0', self.node, edgeCenter, cellCenter]
+            self.ds.reinit(N + NE + NC, cell)
+
     def cell_area(self, q=None, index=np.s_[:]):
         """
 
@@ -138,7 +179,10 @@ class LagrangeQuadrangleMesh(Mesh2d):
         J = self.jacobi_matrix(bcs, index=index)
         n = np.cross(J[..., 0], J[..., 1], axis=-1)
         l = np.sqrt(np.sum(n**2, axis=-1))
-        a = np.einsum('i, ij->j', ws, l)/2.0
+        print('J:', J.shape)
+        print('l:', l.shape)
+        print('ws:', ws.shape)
+        a = np.einsum('ij, ijk->k', ws, l)
         return a
 
     def edge_length(self, q=None, index=np.s_[:]):
@@ -178,7 +222,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         TD = len(bc) 
         entity = self.entity(etype=TD)[index] #
         phi = self.shape_function(bc) # (NQ, 1, ldof)
-        p = np.einsum('ijk, jkn->ijn', phi, node[entity])
+        p = np.einsum('...jk, jkn->ijn', phi, node[entity])
         return p
 
 
@@ -240,7 +284,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         if TD == 2:
             gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
-            shape = gphi.shape[:-2] + ((p+1)*(p+1), TD)
+            shape = gphi0.shape[:-2] + ((p+1)*(p+1), TD)
             gphi = np.zeros(shape, dtype=self.ftype)
             gphi[..., 0].flat = gphi0.flat
             gphi[..., 1].flat = gphi0.swapaxes(-1, -2).flat
@@ -273,11 +317,14 @@ class LagrangeQuadrangleMesh(Mesh2d):
         """
 
         TD = len(bc)
-        entity = self.entity(etype=TD)
+        entity = self.entity(etype=TD)[index]
         gphi = self.grad_shape_function(bc, p=p)
+        print('bc:', bc)
+        print('gphi:', gphi.shape)
+        print('node:', self.node[entity].shape)
         J = np.einsum(
                 'ijn, ...ijk->...ink',
-                self.node[entity[index], :], gphi)
+                self.node[entity], gphi)
         if return_grad is False:
             return J
         else:
