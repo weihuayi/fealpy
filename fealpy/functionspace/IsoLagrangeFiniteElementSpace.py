@@ -90,7 +90,8 @@ class IsoLagrangeFiniteElementSpace:
 
         """
         
-        phi = self.mesh.shape_function(bc, p=self.p)
+        p = self.p
+        phi = self.mesh.shape_function(bc, p=p)
         return phi 
 
     @barycentric

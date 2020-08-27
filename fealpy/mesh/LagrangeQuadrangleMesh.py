@@ -209,7 +209,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         计算单元的面积。
         """
         p = self.p
-        q = p+3 if q is None else q
+        q = p if q is None else q
 
         qf = self.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -311,9 +311,11 @@ class LagrangeQuadrangleMesh(Mesh2d):
         # lambda_1 = xi
         # (NQ, ldof, 2) 
         R = lagrange_grad_shape_function(bc[0], p)  
+        print('R:', R.shape)
 
         # 关于**一维变量**的导数
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
+        print('gphi:', gphi.shape)
 
         if TD == 2:
             gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
@@ -321,6 +323,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
             gphi = np.zeros(shape, dtype=self.ftype)
             gphi[..., 0].flat = gphi0.flat
             gphi[..., 1].flat = gphi0.swapaxes(-1, -2).flat
+            print('gphi:', gphi.shape)
 
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
@@ -330,22 +333,21 @@ class LagrangeQuadrangleMesh(Mesh2d):
             G = np.linalg.inv(G)
             print('G:', G.shape)
             print('J:', J.shape)
-            print('gphi:', gphi.shape)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
 
-    def jacobi_matrix(self, bc, index=np.s_[:], p=None, return_grad=False):
+    def jacobi_matrix(self, bc, index=np.s_[:], return_grad=False):
         """
         Notes
         -----
-        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵。
+        计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵。
 
         x(xi, eta) = phi_0 x_0 + phi_1 x_1 + ... + phi_{ldof-1} x_{ldof-1}
         """
 
         TD = len(bc)
         entity = self.entity(etype=TD)[index]
-        gphi = self.grad_shape_function(bc, p=p)
+        gphi = self.grad_shape_function(bc)
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity], gphi)
