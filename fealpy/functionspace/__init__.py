@@ -24,4 +24,4 @@ from .PrismFiniteElementSpace import PrismFiniteElementSpace
 from .femdof import CPPFEMDof3d
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
 
-from .IsoLagrangeFiniteElementSpace import IsoLagrangeFiniteElementSpace
+from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace

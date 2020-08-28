@@ -56,6 +56,9 @@ class LagrangeQuadrangleMesh(Mesh2d):
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
 
+    def reference_cell_measure(self):
+        return 1
+
     def number_of_corner_nodes(self):
         """
         Notes
@@ -311,19 +314,17 @@ class LagrangeQuadrangleMesh(Mesh2d):
         # lambda_1 = xi
         # (NQ, ldof, 2) 
         R = lagrange_grad_shape_function(bc[0], p)  
-        print('R:', R.shape)
 
         # 关于**一维变量**的导数
         gphi = np.einsum('...ij, jn->...in', R, Dlambda) # (..., ldof, 1)
-        print('gphi:', gphi.shape)
 
         if TD == 2:
             gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+            gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
             shape = gphi0.shape[:-2] + ((p+1)*(p+1), TD)
             gphi = np.zeros(shape, dtype=self.ftype)
             gphi[..., 0].flat = gphi0.flat
-            gphi[..., 1].flat = gphi0.swapaxes(-1, -2).flat
-            print('gphi:', gphi.shape)
+            gphi[..., 1].flat = gphi1.flat
 
         if variables == 'u':
             return gphi[..., None, :, :] #(..., 1, ldof, TD) 增加一个单元轴
@@ -331,8 +332,6 @@ class LagrangeQuadrangleMesh(Mesh2d):
             G, J = self.first_fundamental_form(bc, index=index,
                     return_jacobi=True)
             G = np.linalg.inv(G)
-            print('G:', G.shape)
-            print('J:', J.shape)
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
 

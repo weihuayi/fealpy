@@ -9,7 +9,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
 
 
-class IsoLagrangeFiniteElementSpace:
+class ParametricLagrangeFiniteElementSpace:
     def __init__(self, mesh, p, q=None):
 
         """
@@ -127,55 +127,38 @@ class IsoLagrangeFiniteElementSpace:
         val = np.einsum(s1, gphi, uh[cell2dof])
         return val
 
-    def stiff_matrix(self, c=None, q=None):
-        gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof()
-        b0 = (self.grad_basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
-        return A 
+    def stiff_matrix(self, c=None, q=None, variables='u'):
+        if variables == 'x':
+            gdof = self.number_of_global_dofs()
+            cell2dof = self.cell_to_dof()
+            b0 = (self.grad_basis, cell2dof, gdof)
+            A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
+            return A 
+        elif variables == 'u':
+            p = self.p
+            qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            G = self.mesh.first_fundamental_form(bcs)
+            gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
 
-    def surface_stiff_matrix(self, c=None, q=None):
+            rm = self.mesh.reference_cell_measure()
+            d = np.sqrt(np.linalg.det(G))
+            G = np.linalg.inv(G)
+            A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws*rm, gphi, G, gphi, d)
+
+            gdof = self.number_of_global_dofs()
+            cell2dof = self.cell_to_dof()
+            I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
+            J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+            A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            return A 
+
+    def stiff_matrix(self, c=None, q=None):
         """
 
         Notes
          针对三角形的情形，组装刚度矩阵，测试想法的正确性。
         """
-        qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        # G.shape == (NQ, NC, TD, TD)
-        # J.shape == (NQ, NC, GD, TD)
-        # gphi.shape == (NQ, 1, ldof, TD)
-        G, J = self.mesh.first_fundamental_form(
-                bcs, 
-                return_jacobi=True)
-
-        # 计算 Jacobi 行列式
-        # n.shape == (NQ, NC) 
-        # 注意这里只针对拓扑维数为 2 三角形的情形。
-        n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        if self.GD == 3:
-            n = np.sqrt(np.sum(n**2, axis=-1))
-
-        p = self.p
-        gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
-
-        #print("condition number:", np.linalg.cond(G[0]))
-        # dG.shape == (NQ, NC)
-        #dG = G[..., 0, 0]*G[..., 1, 1] - G[..., 0, 1]*G[..., 1, 0] 
-        #G[..., [0, 1], [0, 1]] = G[..., [1, 0], [1, 0]]
-        #G[..., 0, 1] *= -1
-        #G[..., 1, 0] *= -1
-        #A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n/dG)
-
-        G = np.linalg.inv(G)
-        A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws/2, gphi, G, gphi, n)
-
-        gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof()
-        I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return A 
 
     def mass_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()

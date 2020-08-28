@@ -59,6 +59,9 @@ class LagrangeTriangleMesh(Mesh2d):
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
 
+    def reference_cell_measure(self):
+        return 0.5
+
     def number_of_corner_nodes(self):
         """
         Notes

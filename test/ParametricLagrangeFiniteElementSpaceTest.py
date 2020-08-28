@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 
 from fealpy.decorator import cartesian
 from fealpy.mesh import LagrangeTriangleMesh
-from fealpy.functionspace import IsoLagrangeFiniteElementSpace
+from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
 
 
-class IsoLagrangeFiniteElementSpaceTest():
+class ParametricLagrangeFiniteElementSpaceTest():
 
     def __init__(self):
         pass
@@ -30,7 +30,7 @@ class IsoLagrangeFiniteElementSpaceTest():
         cell = mesh.entity('cell')
 
         mesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
-        space = IsoLagrangeFiniteElementSpace(mesh, p=p)
+        space = ParametricLagrangeFiniteElementSpace(mesh, p=p)
 
         uI = space.interpolation(pde.solution)
         mesh.nodedata['uI'] = uI[:]
@@ -54,7 +54,7 @@ class IsoLagrangeFiniteElementSpaceTest():
         mesh = LagrangeQuadrangleMesh(node, cell, p=p)
 
         for i in range(4): 
-            space = IsoLagrangeFiniteElementSpace(mesh, p=p)
+            space = ParametricLagrangeFiniteElementSpace(mesh, p=p)
             uI = space.interpolation(pde.solution)
             mesh.nodedata['uI'] = uI[:]
             error0 = space.integralalg.error(pde.solution, uI.value) 
@@ -65,7 +65,7 @@ class IsoLagrangeFiniteElementSpaceTest():
 
         mesh.to_vtk(fname=fname)
 
-test = IsoLagrangeFiniteElementSpaceTest()
+test = ParametricLagrangeFiniteElementSpaceTest()
 
 if sys.argv[1] == 'SI':
     p = int(sys.argv[2])
