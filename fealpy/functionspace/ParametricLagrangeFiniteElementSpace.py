@@ -18,7 +18,7 @@ class ParametricLagrangeFiniteElementSpace:
         -----
             mesh 为一个 Lagrange 网格。
 
-            p 是等参拉格朗日有限元空间的次数，它和 mesh 的次数可以不同。
+            p 是参数拉格朗日有限元空间的次数，它和 mesh 的次数可以不同。
         """
 
         self.p = p
@@ -40,7 +40,7 @@ class ParametricLagrangeFiniteElementSpace:
         self.ftype = mesh.ftype
 
     def __str__(self):
-        return "Isoparametric Lagrange finite element space!"
+        return "Parametric Lagrange finite element space!"
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -144,7 +144,11 @@ class ParametricLagrangeFiniteElementSpace:
             rm = self.mesh.reference_cell_measure()
             d = np.sqrt(np.linalg.det(G))
             G = np.linalg.inv(G)
-            A = np.einsum('i, ijkm, ijmn, ijln, ij->jkl', ws*rm, gphi, G, gphi, d)
+            n = len(ws.shape)
+            s0 = 'abcd'
+            s1 = '{}, {}kim, {}kmn, {}kjn, {}k->kij'.format(s0[:n], s0[:n],
+                    s0[:n], s0[:n], s0[:n])
+            A = np.einsum(s1, ws*rm, gphi, G, gphi, d)
 
             gdof = self.number_of_global_dofs()
             cell2dof = self.cell_to_dof()
@@ -152,13 +156,6 @@ class ParametricLagrangeFiniteElementSpace:
             J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
             A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
             return A 
-
-    def stiff_matrix(self, c=None, q=None):
-        """
-
-        Notes
-         针对三角形的情形，组装刚度矩阵，测试想法的正确性。
-        """
 
     def mass_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()

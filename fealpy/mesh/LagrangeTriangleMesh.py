@@ -412,6 +412,8 @@ class LagrangeTriangleDof2d():
         self.mesh = mesh
         self.p = p
         self.multiIndex = multi_index_matrix[2](p)
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:

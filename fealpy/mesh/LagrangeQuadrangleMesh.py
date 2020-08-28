@@ -370,6 +370,12 @@ class LagrangeQuadrangleMesh(Mesh2d):
         if return_grad:
             J, gphi = J
 
+        if False:
+            ps = self.bc_to_point(bc)
+            l = np.sqrt(ps[..., 0]**2 + ps[..., 1]**2 + ps[..., 2]**2)
+            l = (l-1)/l**2
+            J *= l[..., None, None]
+
         shape = J.shape[0:-2] + (TD, TD)
         G = np.zeros(shape, dtype=self.ftype)
         for i in range(TD):
@@ -482,6 +488,8 @@ class LagrangeQuadrangleDof2d():
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -573,7 +581,7 @@ class LagrangeQuadrangleDof2d():
         flag = edge2cell[:, 2] == 2
         c2d[edge2cell[flag, 0], :, -1] = e2d[flag, -1::-1]
         flag = edge2cell[:, 2] == 3
-        cell[edge2cell[flag, 0], 0, :] = e2d[flag, -1::-1]
+        c2d[edge2cell[flag, 0], 0, :] = e2d[flag, -1::-1]
 
         flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
         c2d[edge2cell[flag, 1], :, 0] = e2d[flag, -1::-1]
@@ -596,12 +604,14 @@ class LagrangeQuadrangleDof2d():
         if p == mesh.p:
             return node
 
+        NC = mesh.number_of_cells()
         cell2dof = self.cell_to_dof()
         GD = mesh.geo_dimension()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
         bc = multi_index_matrix[1](p)/p
-        ipoint[cell2dof] = mesh.bc_to_point((bc, bc)).swapaxes(0, 1)
+        ipoint[cell2dof] = mesh.bc_to_point((bc, bc)).reshape(-1, NC,
+                GD).swapaxes(0, 1)
         return ipoint
 
 

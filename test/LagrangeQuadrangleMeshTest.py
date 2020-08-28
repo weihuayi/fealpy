@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import LagrangeQuadrangleMesh, MeshFactory
 
 
-class LagrangeTriangleMeshTest():
+class LagrangeQuadrangleMeshTest():
 
     def __init__(self):
         pass
@@ -79,24 +79,7 @@ class LagrangeTriangleMeshTest():
         from fealpy.geometry import SphereSurface
 
         surface = SphereSurface()
-        node = np.array([
-            (-1, -1, -1),
-            (-1, -1, 1),
-            (-1, 1, -1),
-            (-1, 1, 1),
-            (1, -1, -1),
-            (1, -1, 1),
-            (1, 1, -1),
-            (1, 1, 1)], dtype=np.float64)
-        cell = np.array([
-            (0, 1, 4, 5),
-            (6, 7, 2, 3),
-            (2, 3, 0, 1),
-            (4, 5, 6, 7),
-            (1, 3, 5, 7),
-            (2, 0, 6, 4)], dtype=np.int_)
-
-        mesh = LagrangeQuadrangleMesh(node, cell, p=p, surface=surface)
+        mesh = surface.init_mesh(meshtype='quad', p=p)
         e = 0
         maxit = 4
         a_e = (4*np.pi)
@@ -118,7 +101,7 @@ class LagrangeTriangleMeshTest():
         print(mesh.ds.V)
 
 
-test = LagrangeTriangleMeshTest()
+test = LagrangeQuadrangleMeshTest()
 
 if sys.argv[1] == 'show_mesh':
     p = int(sys.argv[2])

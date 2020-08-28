@@ -150,7 +150,7 @@ class SphereSurface():
                     return QuadrangleMesh(node, cell) 
                 else:
                     from fealpy.mesh import LagrangeQuadrangleMesh 
-                    return LagrangeQuadrangleMesh(node, cell, surface=self) 
+                    return LagrangeQuadrangleMesh(node, cell, p=p, surface=self) 
 
 
 
