@@ -77,45 +77,82 @@ class SphereSurface():
         p = p - d[..., np.newaxis]*self.unit_normal(p)
         return p, d
 
-    def init_mesh(self):
-        from fealpy.mesh import TriangleMesh
-        t = (np.sqrt(5) - 1)/2
-        point = np.array([
-            [ 0, 1, t],
-            [ 0, 1,-t],
-            [ 1, t, 0],
-            [ 1,-t, 0],
-            [ 0,-1,-t],
-            [ 0,-1, t],
-            [ t, 0, 1],
-            [-t, 0, 1],
-            [ t, 0,-1],
-            [-t, 0,-1],
-            [-1, t, 0],
-            [-1,-t, 0]], dtype=np.float)
-        cell = np.array([
-            [6, 2, 0],
-            [3, 2, 6],
-            [5, 3, 6],
-            [5, 6, 7],
-            [6, 0, 7],
-            [3, 8, 2],
-            [2, 8, 1],
-            [2, 1, 0],
-            [0, 1,10],
-            [1, 9,10],
-            [8, 9, 1],
-            [4, 8, 3],
-            [4, 3, 5],
-            [4, 5,11],
-            [7,10,11],
-            [0,10, 7],
-            [4,11, 9],
-            [8, 4, 9],
-            [5, 7,11],
-            [10,9,11]], dtype=np.int)
-        point, d = self.project(point)
-        return TriangleMesh(point, cell) 
+    def init_mesh(self, meshtype='tri', returnnc=False, p=None):
+        if meshtype == 'tri':
+            t = (np.sqrt(5) - 1)/2
+            node = np.array([
+                [ 0, 1, t],
+                [ 0, 1,-t],
+                [ 1, t, 0],
+                [ 1,-t, 0],
+                [ 0,-1,-t],
+                [ 0,-1, t],
+                [ t, 0, 1],
+                [-t, 0, 1],
+                [ t, 0,-1],
+                [-t, 0,-1],
+                [-1, t, 0],
+                [-1,-t, 0]], dtype=np.float64)
+            cell = np.array([
+                [6, 2, 0],
+                [3, 2, 6],
+                [5, 3, 6],
+                [5, 6, 7],
+                [6, 0, 7],
+                [3, 8, 2],
+                [2, 8, 1],
+                [2, 1, 0],
+                [0, 1,10],
+                [1, 9,10],
+                [8, 9, 1],
+                [4, 8, 3],
+                [4, 3, 5],
+                [4, 5,11],
+                [7,10,11],
+                [0,10, 7],
+                [4,11, 9],
+                [8, 4, 9],
+                [5, 7,11],
+                [10,9,11]], dtype=np.int)
+            node, d = self.project(point)
+            if returnnc:
+                return node, cell
+            else:
+                if p is None:
+                    from fealpy.mesh import TriangleMesh
+                    return TriangleMesh(node, cell) 
+                else:
+                    from fealpy.mesh import LagrangeTriangleMesh
+                    return LagrangeTriangleMesh(node, cell, p=p, surface=self) 
+        elif meshtype == 'quad':
+            node = np.array([
+                (-1, -1, -1),
+                (-1, -1, 1),
+                (-1, 1, -1),
+                (-1, 1, 1),
+                (1, -1, -1),
+                (1, -1, 1),
+                (1, 1, -1),
+                (1, 1, 1)], dtype=np.float64)
+            cell = np.array([
+                (0, 1, 4, 5),
+                (6, 7, 2, 3),
+                (2, 3, 0, 1),
+                (4, 5, 6, 7),
+                (1, 3, 5, 7),
+                (2, 0, 6, 4)], dtype=np.int_)
+            node, d = self.project(node)
+            if returnnc:
+                return node, cell
+            else:
+                if p is None:
+                    from fealpy.mesh import QuadrangleMesh 
+                    return QuadrangleMesh(node, cell) 
+                else:
+                    from fealpy.mesh import LagrangeQuadrangleMesh 
+                    return LagrangeQuadrangleMesh(node, cell, surface=self) 
+
+
 
 class SphereSurfaceTest():
     def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):

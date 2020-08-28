@@ -10,9 +10,9 @@ class SphereSinSinSinData():
     def domain(self):
         return self.surface
 
-    def init_mesh(self, n=0):
-        mesh = self.surface.init_mesh()
-        mesh.uniform_refine(n, self.surface)
+    def init_mesh(self, n=0, meshtype='tri', returnnc=False, p=None):
+        mesh = self.surface.init_mesh(meshtype=meshtype, returnnc=returnnc, p=p)
+        mesh.uniform_refine(n)
         return mesh
 
     @cartesian

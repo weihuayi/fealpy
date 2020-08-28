@@ -176,11 +176,22 @@ class ParametricLagrangeFiniteElementSpace:
         return A 
 
     def source_vector(self, f, celltype=False, q=None):
+        mesh = self.mesh
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        n = len(ws.shape)
+        s0 = 'abcd'
+        ps = mesh.bc_to_point(bcs, etype='cell')
+
+        phi = self.basis(bcs)
+        val = f(ps)
+        s1 = '{}, {}j, {}jk, j->jk'.format(s0[:n], s0[:n], s0[:n])
+        bb = np.einsum(s1, ws, val, phi, self.cellmeasure)
+
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
-        b = (self.basis, cell2dof, gdof)
-        F = self.integralalg.serial_construct_vector(f, b,
-                celltype=celltype, q=q) 
+        F = np.zeros(gdof, dtype=self.ftype)
+        np.add.at(F, cell2dof, bb)
         return F 
 
     def function(self, dim=None, array=None):
@@ -203,7 +214,10 @@ class ParametricLagrangeFiniteElementSpace:
         cell2dof = self.cell_to_dof()
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs)
-        cc = np.einsum('m, mik, i->ik', ws, phi, self.cellmeasure)
+        n = len(ws.shape)
+        s0 = 'abcd'
+        s1 = '{}, {}ik, i->ik'.format(s0[:n], s0[:n])
+        cc = np.einsum(s1, ws, phi, self.cellmeasure)
         gdof = self.number_of_global_dofs()
         c = np.zeros(gdof, dtype=self.ftype)
         np.add.at(c, cell2dof, cc)

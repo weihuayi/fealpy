@@ -8,14 +8,10 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.surface_poisson import SphereSinSinSinData  as PDE
-#from fealpy.pde.surface_poisson import EllipsoidSinSinSinData  as PDE
 from fealpy.mesh import LagrangeTriangleMesh
-from fealpy.functionspace import IsoLagrangeFiniteElementSpace
+from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC, NeumannBC
 from fealpy.tools.show import showmultirate, show_error_table
-
-from fealpy.solver import MatlabSolver
-import transplant
 
 # solver
 from fealpy.solver import PETScSolver
