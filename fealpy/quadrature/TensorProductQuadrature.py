@@ -33,8 +33,8 @@ class TensorProductQuadrature(Quadrature):
             if i < TD-1:
                 s = s + ', '
         s = s + '->' + s0[:TD]
-        self.weights = np.einsum(s, *weights)
+        self.weights = np.einsum(s, *weights).reshape(-1)
 
     def number_of_quadrature_points(self):
-        n = np.product(self.weights.shape) 
+        n = self.weights.shape[0]
         return n 

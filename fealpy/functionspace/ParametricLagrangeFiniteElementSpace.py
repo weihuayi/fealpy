@@ -141,14 +141,14 @@ class ParametricLagrangeFiniteElementSpace:
             G = self.mesh.first_fundamental_form(bcs)
             gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
 
+            # q: 积分点指标
+            # k: 单元指标
+            # i, j: 自由度指标
+            # m, n: 空间维度
             rm = self.mesh.reference_cell_measure()
-            d = np.sqrt(np.linalg.det(G))
             G = np.linalg.inv(G)
-            n = len(ws.shape)
-            s0 = 'abcd'
-            s1 = '{}, {}kim, {}kmn, {}kjn, {}k->kij'.format(s0[:n], s0[:n],
-                    s0[:n], s0[:n], s0[:n])
-            A = np.einsum(s1, ws*rm, gphi, G, gphi, d)
+            A = np.einsum('q, qkim, qkmn, qkjn, k->kij', ws*rm, gphi, G, gphi,
+                    self.cellmeasure)
 
             gdof = self.number_of_global_dofs()
             cell2dof = self.cell_to_dof()
@@ -176,14 +176,10 @@ class ParametricLagrangeFiniteElementSpace:
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        n = len(ws.shape)
-        s0 = 'abcd'
         ps = mesh.bc_to_point(bcs, etype='cell')
-
         phi = self.basis(bcs)
         val = f(ps)
-        s1 = '{}, {}j, {}jk, j->jk'.format(s0[:n], s0[:n], s0[:n])
-        bb = np.einsum(s1, ws, val, phi, self.cellmeasure)
+        bb = np.einsum('q, qk, qkj, k->kj', ws, val, phi, self.cellmeasure)
 
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()

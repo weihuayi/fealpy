@@ -218,7 +218,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         bcs, ws = qf.get_quadrature_points_and_weights()
         G = self.first_fundamental_form(bcs)
         l = np.sqrt(np.linalg.det(G))
-        a = np.einsum('ij, ijk->k', ws, l)
+        a = np.einsum('i, ik->k', ws, l)
         return a
 
     def edge_length(self, q=None, index=np.s_[:]):
@@ -284,8 +284,10 @@ class LagrangeQuadrangleMesh(Mesh2d):
             # m 是基函数
             phi = np.einsum('im, kn->ikmn', phi, phi)
             shape = phi.shape[:-2] + (-1, )
-            phi = phi.reshape(shape) 
-        return phi[..., None, :]  # (..., 1, p+1*p+1) 增加一个单元轴，方便广播运算
+            phi = phi.reshape(shape) # 展平自由度
+            shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
+            phi = phi.reshape(shape) # 展平积分点
+        return phi 
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:], variables='u'):
         """
@@ -321,7 +323,8 @@ class LagrangeQuadrangleMesh(Mesh2d):
         if TD == 2:
             gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
             gphi1 = np.einsum('kn, imt->kinm', phi, gphi)
-            shape = gphi0.shape[:-2] + ((p+1)*(p+1), TD)
+            n = gphi0.shape[0]*gphi0.shape[1]
+            shape = (n, (p+1)*(p+1), TD)
             gphi = np.zeros(shape, dtype=self.ftype)
             gphi[..., 0].flat = gphi0.flat
             gphi[..., 1].flat = gphi1.flat
@@ -350,6 +353,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity], gphi)
+        shape = (-1, ) + J.shape[-3:]
         if return_grad is False:
             return J
         else:
@@ -369,12 +373,6 @@ class LagrangeQuadrangleMesh(Mesh2d):
         
         if return_grad:
             J, gphi = J
-
-        if False:
-            ps = self.bc_to_point(bc)
-            l = np.sqrt(ps[..., 0]**2 + ps[..., 1]**2 + ps[..., 2]**2)
-            l = (l-1)/l**2
-            J *= l[..., None, None]
 
         shape = J.shape[0:-2] + (TD, TD)
         G = np.zeros(shape, dtype=self.ftype)

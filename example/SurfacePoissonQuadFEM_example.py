@@ -42,10 +42,16 @@ for i in range(maxit):
     space = ParametricLagrangeFiniteElementSpace(mesh, p=p)
     NDof[i] = space.number_of_global_dofs()
 
+    uI = space.interpolation(pde.solution)
+
     A = space.stiff_matrix(variables='u')
     C = space.integral_basis()
-
     F = space.source_vector(pde.source)
+
+    NN = mesh.number_of_corner_nodes()
+    NC = mesh.number_of_cells()
+    delta = (A@uI - F)
+
     A = bmat([[A, C.reshape(-1, 1)], [C, None]], format='csr')
     F = np.r_[F, 0]
 
@@ -53,7 +59,6 @@ for i in range(maxit):
     x = spsolve(A, F).reshape(-1)
     uh[:] = x[:-1]
 
-    uI = space.interpolation(pde.solution)
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
 
@@ -61,14 +66,17 @@ for i in range(maxit):
     errorMatrix[3, i] = space.integralalg.error(pde.gradient, uI.grad_value)
     errorMatrix[4, i] = np.max(np.abs(uI - uh))
 
+    mesh.nodedata['uh'] = uh
+    mesh.nodedata['uI'] = uI 
+    mesh.nodedata['delta'] = delta
+
+    mesh.to_vtk(fname='surface_with_solution' + str(i)+'.vtu')
+
     if i < maxit-1:
         mesh.uniform_refine()
 
-mesh.nodedata['uh'] = uh
-mesh.nodedata['uI'] = uI 
 
 print(errorMatrix)
-mesh.to_vtk(fname='surface_with_solution.vtu')
 show_error_table(NDof, errorType, errorMatrix)
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()
