@@ -69,6 +69,7 @@ for i in range(maxit):
     mesh.nodedata['uh'] = uh
     mesh.nodedata['uI'] = uI 
     mesh.nodedata['delta'] = delta
+    mesh.nodedata['error'] = uI - uh
 
     mesh.to_vtk(fname='surface_with_solution' + str(i)+'.vtu')
 

@@ -114,7 +114,7 @@ class SphereSurface():
                 [8, 4, 9],
                 [5, 7,11],
                 [10,9,11]], dtype=np.int)
-            node, d = self.project(point)
+            node, d = self.project(node)
             if returnnc:
                 return node, cell
             else:

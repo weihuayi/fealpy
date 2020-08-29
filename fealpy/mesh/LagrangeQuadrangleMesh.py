@@ -148,12 +148,14 @@ class LagrangeQuadrangleMesh(Mesh2d):
     def uniform_refine(self, n=1):
         p = self.p
         for i in range(n):
-            NN = self.number_of_corner_nodes()
+            NCN = self.number_of_corner_nodes()
             NE = self.number_of_edges()
             NC = self.number_of_cells()
 
             # Find the cutted edge  
+            cell = self.entity('cell')
             cell2edge = self.ds.cell_to_edge()
+            cell2edge += NCN
             edgeCenter = self.entity_barycenter('edge')
             cellCenter = self.entity_barycenter('cell')
 
@@ -161,34 +163,32 @@ class LagrangeQuadrangleMesh(Mesh2d):
                 edgeCenter, _ = self.surface.project(edgeCenter)
                 cellCenter, _ = self.surface.project(cellCenter)
 
-            edge2center = np.arange(NN, NN+NE)
-
             cp = [0, p, -p-1, -1]
-            cc = range(NN + NE, NN + NE + NC)
+            cc = range(NCN + NE, NCN + NE + NC)
  
-            cell = np.zeros((4*NC, 4), dtype=np.int)
-            cell[0::4, 0] = self.ds.cell[:, cp[0]]
-            cell[0::4, 1] = edge2center[cell2edge[:, 3]]
-            cell[0::4, 2] = edge2center[cell2edge[:, 0]]
-            cell[0::4, 3] = cc
+            newCell = np.zeros((4*NC, 4), dtype=np.int)
+            newCell[0::4, 0] = cell[:, cp[0]]
+            newCell[0::4, 1] = cell2edge[:, 3]
+            newCell[0::4, 2] = cell2edge[:, 0]
+            newCell[0::4, 3] = cc
 
-            cell[1::4, 0] = edge2center[cell2edge[:, 3]]
-            cell[1::4, 1] = self.ds.cell[:, cp[1]]
-            cell[1::4, 2] = cc
-            cell[1::4, 3] = edge2center[cell2edge[:, 2]]
+            newCell[1::4, 0] = cell2edge[:, 3]
+            newCell[1::4, 1] = cell[:, cp[1]]
+            newCell[1::4, 2] = cc
+            newCell[1::4, 3] = cell2edge[:, 2]
 
-            cell[2::4, 0] = edge2center[cell2edge[:, 0]]
-            cell[2::4, 1] = cc 
-            cell[2::4, 2] = self.ds.cell[:, cp[2]]
-            cell[2::4, 3] = edge2center[cell2edge[:, 1]]
+            newCell[2::4, 0] = cell2edge[:, 0]
+            newCell[2::4, 1] = cc 
+            newCell[2::4, 2] = cell[:, cp[2]]
+            newCell[2::4, 3] = cell2edge[:, 1]
 
-            cell[3::4, 0] = cc 
-            cell[3::4, 1] = edge2center[cell2edge[:, 2]]
-            cell[3::4, 2] = edge2center[cell2edge[:, 1]]
-            cell[3::4, 3] = self.ds.cell[:, cp[3]]
+            newCell[3::4, 0] = cc 
+            newCell[3::4, 1] = cell2edge[:, 2]
+            newCell[3::4, 2] = cell2edge[:, 1]
+            newCell[3::4, 3] = cell[:, cp[3]]
 
-            node = np.r_['0', self.node[:NN], edgeCenter, cellCenter]
-            ds = LinearQuadrangleMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
+            node = np.r_['0', self.node[:NCN], edgeCenter, cellCenter]
+            ds = LinearQuadrangleMeshDataStructure(node.shape[0], newCell) # 线性网格的数据结构
             self.ds = LagrangeQuadrangleMeshDataStructure(ds, p)
 
             if p == 1:
@@ -198,10 +198,11 @@ class LagrangeQuadrangleMesh(Mesh2d):
                 self.node = np.zeros((NN, self.GD), dtype=self.ftype)
                 bc = multi_index_matrix[1](p)/p
                 bc = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
-                self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
+                self.node[self.ds.cell] = np.einsum('cvn, iv->cin', node[newCell], bc)
 
-            if self.surface is not None:
-                self.node, _ = self.surface.project(self.node)
+                NCN = self.number_of_corner_nodes() # 角点节点的个数
+                if self.surface is not None:
+                    self.node[NCN:], _ = self.surface.project(self.node[NCN:])
 
 
     def cell_area(self, q=None, index=np.s_[:]):

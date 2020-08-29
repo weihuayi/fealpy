@@ -38,10 +38,10 @@ class LagrangeTriangleMesh(Mesh2d):
         self.meshtype = 'ltri'
         self.ftype = node.dtype
         self.itype = cell.dtype
+        self.surface = surface
 
         ds = LinearTriangleMeshDataStructure(node.shape[0], cell) 
         self.ds = LagrangeTriangleMeshDataStructure(ds, p)
-        self.lds = ds
 
         if p == 1:
             self.node = node
@@ -124,6 +124,62 @@ class LagrangeTriangleMesh(Mesh2d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+    def uniform_refine(self, n=1):
+        p = self.p
+        for i in range(n):
+            NCN = self.number_of_corner_nodes()
+            NC = self.number_of_cells()
+            NE = self.number_of_edges()
+            node = self.entity('node')
+            cell = self.entity('cell')
+            cell2edge = self.ds.cell_to_edge()
+            cell2edge += NCN
+            edgeCenter = self.entity_barycenter('edge')
+
+            if self.surface is not None:
+                edgeCenter, _ = self.surface.project(edgeCenter)
+
+            cp = [0, -p-1, -1]
+            newCell = np.zeros((4*NC, 3), dtype=self.itype)
+            newCell[0::4, 0] = cell[:, cp[0]] 
+            newCell[0::4, 1] = cell2edge[:, 2] 
+            newCell[0::4, 2] = cell2edge[:, 1]
+
+            newCell[1::4, 0] = cell2edge[:, 2] 
+            newCell[1::4, 1] = cell[:, cp[1]] 
+            newCell[1::4, 2] = cell2edge[:, 0]
+
+            newCell[2::4, 0] = cell2edge[:, 1] 
+            newCell[2::4, 1] = cell2edge[:, 0] 
+            newCell[2::4, 2] = cell[:, cp[2]]
+
+            newCell[3::4, 0] = cell2edge[:, 0] 
+            newCell[3::4, 1] = cell2edge[:, 1] 
+            newCell[3::4, 2] = cell2edge[:, 2]
+
+            node = np.r_['0', self.node[:NCN], edgeCenter]
+            ds = LinearTriangleMeshDataStructure(node.shape[0], newCell) # 线性网格的数据结构
+            self.ds = LagrangeTriangleMeshDataStructure(ds, p)
+
+            if p == 1:
+                self.node = node
+            else:
+                NN = self.number_of_nodes()
+                self.node = np.zeros((NN, self.GD), dtype=self.ftype)
+                bc = multi_index_matrix[2](p)/p
+                # c: 单元指标
+                # f: 面指标
+                # e: 边指标
+                # v: 顶点个数指标
+                # i, j, k, d: 自由度或基函数指标
+                # q: 积分点或重心坐标点指标
+                # m, n: 空间或拓扑维数指标
+                self.node[self.ds.cell] = np.einsum('cvn, iv->cin', node[newCell], bc)
+                NCN = self.number_of_corner_nodes()
+                if self.surface is not None:
+                    self.node[NCN:], _ = self.surface.project(self.node[NCN:]) 
+
 
     def integrator(self, q, etype='cell'):
         if etype in {'cell', 2}:
@@ -213,13 +269,13 @@ class LagrangeTriangleMesh(Mesh2d):
         """
 
         TD = bc.shape[-1] - 1
-        entity = self.entity(etype=TD)
+        entity = self.entity(etype=TD)[index]
         gphi = self.grad_shape_function(bc)
         J = np.einsum(
-                'ijn, ...ijk->...ink',
-                self.node[entity[index], :], gphi)#(NC,ldof,GD),(NQ,NC,ldof,TD)
+                'cin, qcim->qcnm',
+                self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
         if return_grad is False:
-            return J#(NQ,NC,GD,TD)
+            return J #(NQ,NC,GD,TD)
         else:
             return J, gphi
 

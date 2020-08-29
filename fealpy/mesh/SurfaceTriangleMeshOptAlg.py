@@ -18,7 +18,6 @@ class SurfaceTriangleMeshOptAlg:
         for i in range(maxit):
             print(i)
             mesh.node = self.cvt_smoothing()
-            print('test')
             isNonDelaunayEdge = mesh.edge_swap()
             return isNonDelaunayEdge
 

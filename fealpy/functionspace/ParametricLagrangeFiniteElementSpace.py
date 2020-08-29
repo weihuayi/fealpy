@@ -141,14 +141,18 @@ class ParametricLagrangeFiniteElementSpace:
             G = self.mesh.first_fundamental_form(bcs)
             gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
 
-            # q: 积分点指标
-            # k: 单元指标
-            # i, j: 自由度指标
-            # m, n: 空间维度
             rm = self.mesh.reference_cell_measure()
+            print(rm)
+            d = np.sqrt(np.linalg.det(G))
             G = np.linalg.inv(G)
-            A = np.einsum('q, qkim, qkmn, qkjn, k->kij', ws*rm, gphi, G, gphi,
-                    self.cellmeasure)
+            # c: 单元指标
+            # f: 面指标
+            # e: 边指标
+            # v: 顶点个数指标
+            # i, j, k, d: 自由度或基函数指标
+            # q: 积分点或重心坐标点指标
+            # m, n: 空间或拓扑维数指标
+            A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, G, gphi, d)
 
             gdof = self.number_of_global_dofs()
             cell2dof = self.cell_to_dof()
@@ -176,10 +180,14 @@ class ParametricLagrangeFiniteElementSpace:
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
+        rm = self.mesh.reference_cell_measure()
+        G = self.mesh.first_fundamental_form(bcs)
+        d = np.sqrt(np.linalg.det(G))
         ps = mesh.bc_to_point(bcs, etype='cell')
         phi = self.basis(bcs)
         val = f(ps)
-        bb = np.einsum('q, qk, qkj, k->kj', ws, val, phi, self.cellmeasure)
+        bb = np.einsum('q, qc, qci, qc->ci', ws*rm, val, phi, d)
 
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -201,16 +209,17 @@ class ParametricLagrangeFiniteElementSpace:
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
-    def integral_basis(self):
+    def integral_basis(self, q=None):
         """
         """
         cell2dof = self.cell_to_dof()
-        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        qf = self.integrator if q is None else self.mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        rm = self.mesh.reference_cell_measure()
+        G = self.mesh.first_fundamental_form(bcs)
+        d = np.sqrt(np.linalg.det(G))
         phi = self.basis(bcs)
-        n = len(ws.shape)
-        s0 = 'abcd'
-        s1 = '{}, {}ik, i->ik'.format(s0[:n], s0[:n])
-        cc = np.einsum(s1, ws, phi, self.cellmeasure)
+        cc = np.einsum('q, qci, qc->ci', ws*rm, phi, d)
         gdof = self.number_of_global_dofs()
         c = np.zeros(gdof, dtype=self.ftype)
         np.add.at(c, cell2dof, cc)
