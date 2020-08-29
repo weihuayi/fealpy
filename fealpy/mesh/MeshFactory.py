@@ -16,6 +16,9 @@ from .QuadrangleMesh import QuadrangleMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 
+from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
+from .LagrangeTriangleMesh import LagrangeTriangleMesh
+
 from .TetrahedronMesh import TetrahedronMesh
 from .HexahedronMesh import HexahedronMesh
 
@@ -103,7 +106,7 @@ class MeshFactory():
 
     @timer
     def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri', threshold=None,
-            returnnc=False):
+            returnnc=False, p=None):
         """
 
         Notes
@@ -134,8 +137,10 @@ class MeshFactory():
 
             if returnnc:
                 return node, cell
-            else:
+            elif p is None:
                 return TriangleMesh(node, cell)
+            else:
+                return LagrangeTriangleMesh(node, cell, p=p)
         elif meshtype == 'quad':
             cell = np.zeros((NC,4), dtype=np.int_)
             cell[:,0] = idx[0:-1, 0:-1].flatten()
@@ -146,8 +151,10 @@ class MeshFactory():
                 node, cell = self.delete_cell(node, cell, threshold)
             if returnnc:
                 return node, cell
-            else:
+            elif p is None:
                 return QuadrangleMesh(node, cell)
+            else:
+                return LagrangeQuadrangleMesh(node, cell[:, [0, 3, 1, 2]], p=p)
         elif meshtype in {'polygon', 'poly'}:
             cell = np.zeros((2*NC, 3), dtype=np.int_)
             cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')

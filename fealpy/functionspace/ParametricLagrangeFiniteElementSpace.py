@@ -10,7 +10,7 @@ from ..decorator import timer
 
 
 class ParametricLagrangeFiniteElementSpace:
-    def __init__(self, mesh, p, q=None):
+    def __init__(self, mesh, p, q=None, spacetype='C'):
 
         """
 
@@ -24,7 +24,7 @@ class ParametricLagrangeFiniteElementSpace:
         self.p = p
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
-        self.dof = mesh.lagrange_dof(p)
+        self.dof = mesh.lagrange_dof(p, spacetype=spacetype)
         self.multi_index_matrix = mesh.multi_index_matrix
 
         self.GD = mesh.geo_dimension()

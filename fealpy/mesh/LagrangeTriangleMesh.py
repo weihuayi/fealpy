@@ -75,8 +75,11 @@ class LagrangeTriangleMesh(Mesh2d):
         """
         return self.ds.NCN
 
-    def lagrange_dof(self, p):
-        return LagrangeTriangleDof2d(self, p)
+    def lagrange_dof(self, p, spacetype='C'):
+        if spacetype == 'C':
+            return CLagrangeTriangleDof2d(self, p)
+        elif spacetype == 'D':
+            return DLagrangeTriangleDof2d(self, p)
 
     def vtk_cell_type(self, etype='cell'):
         """
@@ -457,7 +460,7 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
                 self.NN += self.NC*cdof
 
 
-class LagrangeTriangleDof2d():
+class CLagrangeTriangleDof2d():
     """
 
     Notes
@@ -487,6 +490,10 @@ class LagrangeTriangleDof2d():
         isBdDof[edge2dof[index]] = True
         return isBdDof
 
+    @property
+    def face2dof(self):
+        return self.edge_to_dof()
+   
     def face_to_dof(self):
         return self.edge_to_dof()
 
@@ -613,5 +620,89 @@ class LagrangeTriangleDof2d():
             return (p+1)*(p+2)//2 
         elif doftype in {'face', 'edge',  1}:
             return self.p + 1
+        elif doftype in {'node', 0}:
+            return 1
+
+class DLagrangeTriangleDof2d():
+    """
+
+    Notes
+    -----
+    拉格朗日四边形网格上的自由度管理类。
+    """
+    def __init__(self, mesh, p):
+        self.mesh = mesh
+        self.p = p
+        self.multiIndex = multi_index_matrix[2](p)
+        self.itype = mesh.itype
+        self.ftype = mesh.ftype
+
+    @property
+    def face2dof(self):
+        return None 
+
+    def face_to_dof(self):
+        return None 
+
+    @property
+    def edge2dof(self):
+        return None 
+
+    def edge_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分边上的自由度
+        """
+        return None
+
+    @property
+    def cell2dof(self):
+        """
+        
+        Notes
+        -----
+            把这个方法属性化，保证程序接口兼容性
+        """
+        return self.cell_to_dof()
+
+
+    def cell_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分单元上的自由度。
+        2. 用更高效的方式来生成单元自由度数组。
+        """
+
+        p = self.p
+        NC = self.mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='cell')
+        cell2dof = np.arange(NC*ldof).reshape(NC, ldof)
+        return cell2dof
+
+    def interpolation_points(self):
+        p = self.p
+        mesh = self.mesh
+        GD = self.mesh.geo_dimension()
+        bcs = self.multiIndex/p # 计算插值点对应的重心坐标
+        ipoint = mesh.bc_to_point(bcs).swapaxes(0, 1).reshape(-1, GD)
+        return ipoint
+
+    def number_of_global_dofs(self):
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        ldof = self.number_of_local_dofs(doftype='cell')
+        return NC*ldof
+
+    def number_of_local_dofs(self, doftype='cell'):
+        p = self.p
+        if doftype in {'cell', 2}:
+            return (p+1)*(p+2)//2
+        elif doftype in {'face', 'edge',  1}:
+            return p + 1
         elif doftype in {'node', 0}:
             return 1
