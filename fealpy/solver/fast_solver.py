@@ -16,6 +16,151 @@ class IterationCounter(object):
         if self._disp:
             print('iter %3i\trk = %s' % (self.niter, str(rk)))
 
+class LinearElasticityRLFEMFastSolver():
+    def __init__(self, lam, mu, M, G, P, isBdDof):
+        """
+
+        Notes
+        -----
+        M: 质量矩阵 (gdof, gdof)
+        G: 恢复矩阵 
+        P: 预条件矩阵
+        isBdDof: Dirichlet 边界自由度标记
+        """
+
+        self.GD = len(G) 
+        self.gdof = P.shape[0]
+
+        # 系数矩阵
+        self.C = np.full((GD, GD), mu, dtype=M.dtype)
+        self.C[range(GD), range(GD)] += lam + mu
+
+        self.M = M
+        self.G = G
+
+        if GD == 2:
+            self.idx = [(0, 0), (0, 1),  (1, 1)]
+            self.imap = {(0, 0):0, (0, 1):1, (1, 1):2}
+        elif GD == 3:
+            self.idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+            self.imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
+
+        # 处理预条件子的边界条件
+        bdIdx = np.zeros(P.shape[0], dtype=np.int_)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, P.shape[0], P.shape[0])
+        T = spdiags(1-bdIdx, 0, P.shape[0], P.shape[0])
+        P = T@P@T + Tbd
+        self.ml = pyamg.ruge_stuben_solver(P) 
+
+    def linear_operator(self, b):
+        """
+
+        Notes
+        -----
+        b: (GD*gdof, )
+        """
+        lam = self.lam
+        mu = self.mu
+        GD = self.GD
+
+        idx = self.idx
+        imap = self.imap
+
+        M = self.M
+        C = self.C
+        G = self.G
+
+        isBdDof = self.isBdDof
+        b = b.reshape(GD, -1)
+        r = np.zeros_like(b)
+        val = b[:, isBdDof]
+        b[:, isBdDof] = 0.0
+        for i in range(GD):
+            for j in range(GD):
+                if i == j:
+                    r[i] += C[i, k]*G[ 
+        r[:, isBdDof] = val
+        return r.reshape(-1)
+
+class LinearElasticityLFEMFastSolver():
+    def __init__(self, A, P, isBdDof):
+        """
+        Notes
+        -----
+        A: [[A00, A01], [A10, A11]] (2*gdof, 2*gdof)
+           [[A00, A01, A02], [A10, A11, A12], [A20, A21, A22]] (3*gdof, 3*gdof)
+        P: 预条件子 (gdof, gdof)
+
+        这里的边界条件处理放到矩阵和向量的乘积运算当中, 所心不需要修改矩阵本身
+        """
+        self.GD = len(A) 
+        self.gdof = P.shape[0]
+
+        self.A = A
+        self.isBdDof = isBdDof
+
+        # 处理预条件子的边界条件
+        bdIdx = np.zeros(P.shape[0], dtype=np.int_)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, P.shape[0], P.shape[0])
+        T = spdiags(1-bdIdx, 0, P.shape[0], P.shape[0])
+        P = T@P@T + Tbd
+        self.ml = pyamg.ruge_stuben_solver(P) 
+
+    def linear_operator(self, b):
+        """
+        Notes
+        -----
+        b: (2*gdof, )
+        """
+        GD = self.GD
+        isBdDof = self.isBdDof
+        b = b.reshape(GD, -1)
+        r = np.zeros_like(b)
+        val = b[:, isBdDof]
+        b[:, isBdDof] = 0.0
+        for i in range(GD):
+            for j in range(GD):
+                r[i] += self.A[i][j]@b[j]
+        r[:, isBdDof] = val
+        return r.reshape(-1)
+
+    def preconditioner(self, b):
+        GD = self.GD
+        b = b.reshape(GD, -1)
+        r = np.zeros_like(b)
+        for i in range(GD):
+            r[i] = self.ml.solve(b[i], tol=1e-8, accel='cg')       
+        return r.reshape(-1)
+
+    @timer
+    def solve(self, uh, F, tol=1e-8):
+        """
+
+        Notes
+        -----
+
+        uh 是初值, uh[isBdDof] 中的值已经设为 D 氏边界条件的值, uh[~isBdDof]==0.0
+        """
+
+        GD = self.GD
+        gdof = self.gdof
+
+        # 处理 Dirichlet 右端边界条件
+        for i in range(GD):
+            for j in range(GD):
+                F[:, i] -= self.A[i][j]@uh[:, j]
+
+        A = LinearOperator((GD*gdof, GD*gdof), matvec=self.linear_operator)
+        P = LinearOperator((GD*gdof, GD*gdof), matvec=self.preconditioner)
+                
+        uh.T.flat, info = pcg(A, F.T.flat, M=P, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
+
+        return uh 
+
 class LagrangeFEMFastSolver():
     def __init__(self, A, F, P):
         """
