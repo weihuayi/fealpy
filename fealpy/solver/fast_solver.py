@@ -17,33 +17,26 @@ class IterationCounter(object):
             print('iter %3i\trk = %s' % (self.niter, str(rk)))
 
 class LinearElasticityRLFEMFastSolver():
-    def __init__(self, lam, mu, M, G, P, isBdDof):
+    def __init__(self, mu, lam, M, G, P, isBdDof):
         """
 
         Notes
         -----
         M: 质量矩阵 (gdof, gdof)
-        G: 恢复矩阵 
+        G: 恢复矩阵 [X, Y, Z] 
         P: 预条件矩阵
-        isBdDof: Dirichlet 边界自由度标记
+        isBdDof: Dirichlet 边界自由度标记 (gdof, )
         """
 
         self.GD = len(G) 
         self.gdof = P.shape[0]
 
-        # 系数矩阵
-        self.C = np.full((GD, GD), mu, dtype=M.dtype)
-        self.C[range(GD), range(GD)] += lam + mu
+        self.isBdDof = isBdDof
+        self.lam = lam
+        self.mu = mu
 
         self.M = M
         self.G = G
-
-        if GD == 2:
-            self.idx = [(0, 0), (0, 1),  (1, 1)]
-            self.imap = {(0, 0):0, (0, 1):1, (1, 1):2}
-        elif GD == 3:
-            self.idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
-            self.imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
 
         # 处理预条件子的边界条件
         bdIdx = np.zeros(P.shape[0], dtype=np.int_)
@@ -64,24 +57,90 @@ class LinearElasticityRLFEMFastSolver():
         mu = self.mu
         GD = self.GD
 
-        idx = self.idx
-        imap = self.imap
-
         M = self.M
-        C = self.C
         G = self.G
 
+        # A@b
         isBdDof = self.isBdDof
         b = b.reshape(GD, -1)
         r = np.zeros_like(b)
         val = b[:, isBdDof]
         b[:, isBdDof] = 0.0
+
+        t = GD*[GD*[None]]
+        for i in range(GD):
+            for j in range(GD):
+                t[i][j] = M@(G[j]@b[i, :])
+
         for i in range(GD):
             for j in range(GD):
                 if i == j:
-                    r[i] += C[i, k]*G[ 
+                    r[i, :] += (2*mu + lam)*t[i][i]@G[i]
+                else:
+                    r[i, :] += lam*t[j][j]@G[i]
+                    r[i, :] += mu*t[i][j]@G[j]
+                    r[i, :] += mu*t[j][i]@G[j]
         r[:, isBdDof] = val
         return r.reshape(-1)
+
+    def preconditioner(self, b):
+        GD = self.GD
+        b = b.reshape(GD, -1)
+        r = np.zeros_like(b)
+        for i in range(GD):
+            r[i] = self.ml.solve(b[i], tol=1e-8, accel='cg')       
+        return r.reshape(-1)
+
+    @timer
+    def solve(self, uh, F, tol=1e-8):
+        """
+
+        Notes
+        -----
+
+        uh 是初值, uh[isBdDof] 中的值已经设为 D 氏边界条件的值, uh[~isBdDof]==0.0
+        """
+
+        lam = self.lam
+        mu = self.mu
+        GD = self.GD
+        gdof = self.gdof
+        M = self.M
+        G = self.G
+
+        # 处理 Dirichlet 右端边界条件
+        isBdDof = self.isBdDof
+        t = GD*[GD*[None]]
+        for i in range(GD):
+            for j in range(GD):
+                t[i][j] = M@(G[j]@uh[:, i])
+
+        for i in range(GD):
+            for j in range(GD):
+                if i == j:
+                    F[:, i] -= (2*mu + lam)*t[i][i]@G[i]
+                else:
+                    F[:, i] -= lam*t[j][j]@G[i]
+                    F[:, i] -= mu*t[i][j]@G[j]
+                    F[:, i] -= mu*t[j][i]@G[j]
+        F[isBdDof] = uh[isBdDof]
+
+        A = LinearOperator((GD*gdof, GD*gdof), matvec=self.linear_operator)
+        P = LinearOperator((GD*gdof, GD*gdof), matvec=self.preconditioner)
+                
+        counter = IterationCounter()
+        uh.T.flat, info = cg(A, F.T.flat, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
+
+        return uh 
+
+    def cg(self, A, F, uh):
+        counter = IterationCounter()
+        uh.T.flat, info = cg(A, F.T.flat, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
+        return uh 
 
 class LinearElasticityLFEMFastSolver():
     def __init__(self, A, P, isBdDof):
@@ -151,6 +210,7 @@ class LinearElasticityLFEMFastSolver():
         for i in range(GD):
             for j in range(GD):
                 F[:, i] -= self.A[i][j]@uh[:, j]
+        F[isBdDof] = uh[isBdDof]
 
         A = LinearOperator((GD*gdof, GD*gdof), matvec=self.linear_operator)
         P = LinearOperator((GD*gdof, GD*gdof), matvec=self.preconditioner)

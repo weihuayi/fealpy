@@ -635,8 +635,12 @@ class LagrangeFiniteElementSpace():
         construct the recovery linear elasticity fem matrix
         """
         gdof = self.number_of_global_dofs()
-        G = self.revcovery_matrix()
+
         M = self.mass_matrix()
+        G = self.revcovery_matrix()
+
+        if format is None:
+            return M, G
 
         cellmeasure = self.cellmeasure
         cell2dof = self.cell_to_dof()
@@ -664,12 +668,10 @@ class LagrangeFiniteElementSpace():
             C.append([T]*GD)
         D *= mu
         for i in range(GD):
-            for j in range(i, GD):
-                if i == j:
-                    C[i][j] = D + (mu+lam)*A[imap[(i, i)]]
-                else:
-                    C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
-                    C[j][i] = C[i][j].T
+            C[i][i] = D + (mu+lam)*A[imap[(i, i)]]
+            for j in range(i+1, GD):
+                C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
+                C[j][i] = C[i][j].T
         if format == 'csr':
             return bmat(C, format='csr') # format = bsr ??
         elif format == 'bsr':
