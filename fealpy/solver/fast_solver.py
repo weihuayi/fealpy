@@ -222,7 +222,7 @@ class LinearElasticityLFEMFastSolver():
         return uh 
 
 class LagrangeFEMFastSolver():
-    def __init__(self, A, F, P):
+    def __init__(self, A, F, P, isBdDof):
         """
 
 
@@ -230,6 +230,7 @@ class LagrangeFEMFastSolver():
         -----
             求解高次拉格朗日有限元的快速算法
         """
+        self.isBdDof = isBdDof
         self.A = A
         self.F = F
         self.P = P
