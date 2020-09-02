@@ -16,6 +16,68 @@ class IterationCounter(object):
         if self._disp:
             print('iter %3i\trk = %s' % (self.niter, str(rk)))
 
+class HighOrderLagrangeFEMFastSolver():
+    def __init__(self, A, F, P, I, isBdDof):
+        """
+
+
+        Notes
+        -----
+            求解高次拉格朗日有限元的快速算法
+        """
+        self.gdof = len(isBdDof)
+        self.A = A # 矩阵 (gdof, gdof), 注意这里是没有处理 D 氏边界的矩阵
+        self.F = F # 右端 (gdof, ), 注意这里也没有处理 D 氏边界
+        self.ml = pyamg.ruge_stuben_solver(P)  # P 的 D 氏边界条件用户先处理一下
+        self.I = I # 插值矩阵 (gdof, NN), 把线性元的解插值到 p 次解
+        self.isBdDof = isBdDof
+
+
+    def linear_operator(self, b):
+        """
+        Notes
+        -----
+        b: (2*gdof, )
+        """
+        isBdDof = self.isBdDof
+        r = np.zeros_like(b)
+        val = b[isBdDof]
+        b[isBdDof] = 0.0
+        r += self.A@b
+        r[isBdDof] = val
+        return r
+
+    def preconditioner(self, b):
+        b = self.I.T@b
+        r = self.ml.solve(b, tol=1e-8, accel='cg')       
+        return self.I@r
+
+    @timer
+    def solve(self, uh, F, tol=1e-8):
+        """
+
+        Notes
+        -----
+
+        uh 是初值, uh[isBdDof] 中的值已经设为 D 氏边界条件的值, uh[~isBdDof]==0.0
+        """
+
+        gdof = self.gdof
+
+        # 处理 Dirichlet 右端边界条件
+        isBdDof = self.isBdDof
+        F -= self.A@uh
+        F[isBdDof] = uh[isBdDof]
+
+        A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
+        P = LinearOperator((gdof, gdof), matvec=self.preconditioner)
+                
+        uh[:], info = pcg(A, F.T.flat, M=P, tol=1e-12, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
+
+        return uh 
+
 class LinearElasticityRLFEMFastSolver():
     def __init__(self, mu, lam, M, G, P, isBdDof):
         """
@@ -221,19 +283,6 @@ class LinearElasticityLFEMFastSolver():
 
         return uh 
 
-class LagrangeFEMFastSolver():
-    def __init__(self, A, F, P, isBdDof):
-        """
-
-
-        Notes
-        -----
-            求解高次拉格朗日有限元的快速算法
-        """
-        self.isBdDof = isBdDof
-        self.A = A
-        self.F = F
-        self.P = P
 
 class SaddlePointFastSolver():
     def __init__(self, A, F):

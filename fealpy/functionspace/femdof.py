@@ -2,6 +2,10 @@ import numpy as np
 import operator as op
 from functools import reduce
 
+def multi_index_matrix0d(p):
+    multiIndex = 1
+    return multiIndex 
+
 def multi_index_matrix1d(p):
     ldof = p+1
     multiIndex = np.zeros((ldof, 2), dtype=np.int)
@@ -32,6 +36,8 @@ def multi_index_matrix3d(p):
     multiIndex[1:, 1] = idx0 - idx2
     multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
     return multiIndex
+
+multi_index_matrix = [multi_index_matrix0d, multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
 
 
 class CPLFEMDof1d():

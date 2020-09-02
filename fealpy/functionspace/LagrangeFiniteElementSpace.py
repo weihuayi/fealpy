@@ -10,6 +10,8 @@ from .femdof import multi_index_matrix1d
 from .femdof import multi_index_matrix2d
 from .femdof import multi_index_matrix3d
 
+from .femdof import multi_index_matrix
+
 from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
@@ -68,7 +70,7 @@ class LagrangeFiniteElementSpace():
                 cellmeasure=self.cellmeasure)
         self.integrator = self.integralalg.integrator
 
-        self.multi_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
+        self.multi_index_matrix = multi_index_matrix 
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -323,7 +325,7 @@ class LagrangeFiniteElementSpace():
         p = self.p   # the degree of polynomial basis function
         TD = self.TD
 
-        multiIndex = self.dof.multiIndex
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -360,8 +362,8 @@ class LagrangeFiniteElementSpace():
     @barycentric
     def face_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
-        TD = self.TD - 1
-        multiIndex = self.multi_index_matrix[TD-1](p)
+        TD = bc.shape[1] - 1
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
@@ -377,7 +379,7 @@ class LagrangeFiniteElementSpace():
 
 
     @barycentric
-    def basis(self, bc, index=np.s_[:]):
+    def basis(self, bc, index=np.s_[:], p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -397,7 +399,8 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        p = self.p   # the degree of polynomial basis function
+        if p is None:
+            p = self.p
 
         if p == 0 and self.spacetype == 'D':
             if len(bc.shape) == 1:
@@ -405,8 +408,8 @@ class LagrangeFiniteElementSpace():
             else:
                 return np.ones((bc.shape[0], 1), dtype=self.ftype)
 
-        TD = self.TD
-        multiIndex = self.dof.multiIndex
+        TD = bc.shape[-1] - 1 
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
@@ -421,7 +424,7 @@ class LagrangeFiniteElementSpace():
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:]):
+    def grad_basis(self, bc, index=np.s_[:], p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -443,10 +446,12 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        p = self.p   # the degree of polynomial basis function
+
+        if p is None:
+            p= self.p
         TD = self.TD
 
-        multiIndex = self.dof.multiIndex
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -514,6 +519,30 @@ class LagrangeFiniteElementSpace():
         ipoint = self.dof.interpolation_points()
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
+
+    def linear_interpolation_matrix(self):
+        """
+
+        Notes
+        -----
+        把线性元基函数插值到 p 次元空间
+
+        插值矩阵 I 的形状为 (gdof, NN)
+        """
+        TD = self.TD
+        p = self.p
+        bc = multi_index_matrix[TD](p)/p
+
+        gdof = self.number_of_global_dofs()
+        NN = self.mesh.number_of_nodes()
+
+        I = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(gdof, NN),
+                dtype=self.ftype)
+
+        I += coo_matrix(, shape=(gdof, NN), dtype=self.ftype)
+
+        cell = self.mesh.entity('cell')
+        cell2dof = self.cell_to_dof()
 
     def projection(self, u, ptype='L2'):
         """
