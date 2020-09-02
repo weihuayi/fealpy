@@ -332,7 +332,7 @@ class ScaledMonomialSpace2d():
         pass
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='cartesian')
         return f
 
     def array(self, dim=None):

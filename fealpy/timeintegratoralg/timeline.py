@@ -39,17 +39,32 @@ class UniformTimeLine():
     def next_time_level(self):
         return self.T0 + (self.current + 1)*self.dt
 
+    def prev_time_level(self):
+        return self.T0 + (self.current - 1)*self.dt
+
     def current_time_step_length(self):
         return self.dt
 
-    def stop(self):
-        return self.current >= self.NL - 1
+    def stop(self, order='forward'):
+        if order == 'forward':
+            return self.current >= self.NL - 1
+        elif order == 'backward':
+            return self.current <= 0
 
     def advance(self):
         self.current += 1
 
-    def reset(self):
-        self.current = 0
+    def forward(self):
+        self.current += 1
+
+    def backward(self):
+        self.current -= 1
+
+    def reset(self, order='forward'):
+        if order == 'forward':
+            self.current = 0 
+        elif order == 'backward':
+            self.current = self.NL - 1
 
     def time_integration(self, data, dmodel, queue=None):
 
