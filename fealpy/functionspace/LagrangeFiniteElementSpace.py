@@ -539,7 +539,7 @@ class LagrangeFiniteElementSpace():
         I = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(gdof, NN),
                 dtype=self.ftype)
 
-        I += coo_matrix(, shape=(gdof, NN), dtype=self.ftype)
+        #I += coo_matrix( shape=(gdof, NN), dtype=self.ftype)
 
         cell = self.mesh.entity('cell')
         cell2dof = self.cell_to_dof()
