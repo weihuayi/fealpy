@@ -14,7 +14,7 @@ class IterationCounter(object):
     def __call__(self, rk=None):
         self.niter += 1
         if self._disp:
-            print('iter %3i\trk = %s' % (self.niter, str(rk)))
+            print('iter %3i\trk = %s' % (self.niter, rk))
 
 class HighOrderLagrangeFEMFastSolver():
     def __init__(self, A, F, P, I, isBdDof):
@@ -24,26 +24,37 @@ class HighOrderLagrangeFEMFastSolver():
         Notes
         -----
             求解高次拉格朗日有限元的快速算法
+
+            
         """
         self.gdof = len(isBdDof)
         self.A = A # 矩阵 (gdof, gdof), 注意这里是没有处理 D 氏边界的矩阵
         self.F = F # 右端 (gdof, ), 注意这里也没有处理 D 氏边界
-        self.ml = pyamg.ruge_stuben_solver(P)  # P 的 D 氏边界条件用户先处理一下
         self.I = I # 插值矩阵 (gdof, NN), 把线性元的解插值到 p 次解
         self.isBdDof = isBdDof
+
+        # 处理预条件子的边界条件
+        NN = P.shape[0]
+        bdIdx = np.zeros(NN, dtype=np.int_)
+        bdIdx[isBdDof[:NN]] = 1 # 这里假定 A 的前 NN 个自由度是网格节点
+        Tbd = spdiags(bdIdx, 0, NN, NN)
+        T = spdiags(1-bdIdx, 0, NN, NN)
+        P = T@P@T + Tbd
+        self.ml = pyamg.ruge_stuben_solver(P)  # P 的 D 氏边界条件用户先处理一下
 
 
     def linear_operator(self, b):
         """
         Notes
         -----
-        b: (2*gdof, )
+        注意这里对 D 氏边界条件的处理与传统的不一样，这里处理的是向量，而不是矩
+        阵， 这种处理方法不会改变矩阵的结构。
         """
         isBdDof = self.isBdDof
-        r = np.zeros_like(b)
-        val = b[isBdDof]
-        b[isBdDof] = 0.0
-        r += self.A@b
+        r = b.copy()
+        val = r[isBdDof]
+        r[isBdDof] = 0.0
+        r[:] = self.A@r
         r[isBdDof] = val
         return r
 
@@ -72,9 +83,10 @@ class HighOrderLagrangeFEMFastSolver():
         A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
         P = LinearOperator((gdof, gdof), matvec=self.preconditioner)
                 
-        uh[:], info = pcg(A, F.T.flat, M=P, tol=1e-12, callback=counter)
+        counter = IterationCounter()
+        uh[:], info = cg(A, F, tol=tol, callback=counter)
         print("Convergence info:", info)
-        print("Number of iteration of pcg:", counter.niter)
+        print("Number of iteration of cg:", counter.niter)
 
         return uh 
 
@@ -124,16 +136,17 @@ class LinearElasticityRLFEMFastSolver():
 
         # A@b
         isBdDof = self.isBdDof
-        b = b.reshape(GD, -1)
-        r = np.zeros_like(b)
-        val = b[:, isBdDof]
-        b[:, isBdDof] = 0.0
+        r = b.copy()
+        r = r.reshape(GD, -1)
+        val = r[:, isBdDof]
+        r[:, isBdDof] = 0.0
 
         t = GD*[GD*[None]]
         for i in range(GD):
             for j in range(GD):
-                t[i][j] = M@(G[j]@b[i, :])
+                t[i][j] = M@(G[j]@r[i, :])
 
+        r[:] = 0.0
         for i in range(GD):
             for j in range(GD):
                 if i == j:
@@ -237,10 +250,11 @@ class LinearElasticityLFEMFastSolver():
         """
         GD = self.GD
         isBdDof = self.isBdDof
+        b = b.copy()
         b = b.reshape(GD, -1)
-        r = np.zeros_like(b)
         val = b[:, isBdDof]
         b[:, isBdDof] = 0.0
+        r = np.zeros_like(b)
         for i in range(GD):
             for j in range(GD):
                 r[i] += self.A[i][j]@b[j]

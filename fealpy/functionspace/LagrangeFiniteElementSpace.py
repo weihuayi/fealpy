@@ -559,6 +559,8 @@ class LagrangeFiniteElementSpace():
                     I = np.broadcast_to(e2d[:, flag, None], shape=shape)
                     J = np.broadcast_to(entity[:, None, :], shape=shape)
                     P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+            return P.tocsr()
+
         elif self.spacetype == 'D':
             NC = self.mesh.number_of_cells()
             c2d0 = self.cell_to_dof()
@@ -569,8 +571,9 @@ class LagrangeFiniteElementSpace():
             val = np.broadcast_to(bc, shape=shape)
             I = np.broadcast_to(c2d0[:, :, None], shape=shape)
             J = np.broadcast_to(c2d1[:, None, :], shape=shape)
-
-        return P.tocsr()
+            P = csr_matrix((val.flat, (I.flat, J.flat)), shape=(dof, NN),
+                    dtype=self.ftype)
+            return P
 
 
     def projection(self, u, ptype='L2'):
