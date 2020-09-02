@@ -77,6 +77,13 @@ class CPLFEMDof1d():
         isBdDof[index] = True
         return isBdDof
 
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell', 'face', 'edge', 1}:
+            return self.cell_to_dof()[index]
+        elif etype in {'node', 0}:
+            NN = self.mesh.number_of_nodes()
+            return np.arange(NN)[index]
+
     def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
@@ -185,6 +192,15 @@ class CPLFEMDof2d():
         isBdDof = np.zeros(gdof, dtype=np.bool)
         isBdDof[edge2dof[index]] = True
         return isBdDof
+
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell', 2}:
+            return self.cell_to_dof()[index]
+        elif etype in {'face', 'edge', 1}:
+            return self.edge_to_dof()[index]
+        elif etype in {'node', 0}:
+            NN = self.mesh.number_of_nodes()
+            return np.arange(NN)[index]
 
     def face_to_dof(self):
         return self.edge_to_dof()
@@ -327,6 +343,18 @@ class CPLFEMDof3d():
         ldof = self.number_of_local_dofs()
         isFaceDof = (self.multiIndex == 0)
         return isFaceDof
+
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell', 3}:
+            return self.cell_to_dof()[index]
+        elif etype in {'face', 2}:
+            return self.face_to_dof()[index]
+        elif etype in {'edge', 1}:
+            return self.edge_to_dof()[index]
+        elif etype in {'node', 0}:
+            NN = self.mesh.number_of_nodes()
+            return np.arange(NN)[index]
+
 
     def edge_to_dof(self):
         p = self.p

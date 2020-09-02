@@ -531,18 +531,79 @@ class LagrangeFiniteElementSpace():
         """
         TD = self.TD
         p = self.p
-        bc = multi_index_matrix[TD](p)/p
 
         gdof = self.number_of_global_dofs()
         NN = self.mesh.number_of_nodes()
 
-        I = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(gdof, NN),
+        # 网格节点处的值
+        val = np.broadcast_to(np.zeros(1), shape=(NN, ))
+        P = coo_matrix((val, (range(NN), range(NN))), shape=(gdof, NN),
                 dtype=self.ftype)
 
-        #I += coo_matrix( shape=(gdof, NN), dtype=self.ftype)
+        for i in range(1, TD):
+            if p > i:
+                entity = self.mesh.entity(i)
+                e2d = self.dof.entity_to_dof(etype=i)
+                N = len(entity)
+                index = multi_index_matrix[i](p)
+                val = np.broadcast_to(bc, (N, p-1, 2)) 
+                I = np.broadcast_to(edge2dof[:, 1:-1, None], shape=val.shape)
+                J = np.broadcast_to(edge2dof[:, None, [0, -1]], shape=val.shape)
 
-        cell = self.mesh.entity('cell')
-        cell2dof = self.cell_to_dof()
+
+        if p > 1:
+            # 边内部的插值
+            NE = self.mesh.number_of_edges()
+            edge2dof = self.dof.edge_to_dof()
+
+            bc = multi_index_matrix[1](p)[1:-1]/p
+            val = np.broadcast_to(bc, (NE, p-1, 2)) 
+            I = np.broadcast_to(edge2dof[:, 1:-1, None], shape=val.shape)
+            J = np.broadcast_to(edge2dof[:, None, [0, -1]], shape=val.shape)
+            
+            P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+
+        if p > 2:
+            if TD == 2:
+                NC = self.mesh.number_of_cells() 
+                cell2dof = self.dof.cell_to_dof()
+                index = multi_index_matrix[2](p)
+                flag = (index[: 0] != 0) & (index[:, 1] !=0) & (index[:, 2] != 0)
+                cdof = flag.sum()
+                bc = index[flag, :]/p
+
+                val = np.broadcast_to(bc, (NC, cdof, 3)) 
+                I = np.broadcast_to(cell2dof[:, flag, None], shape=val.shape)
+                J = np.broadcast_to(cell[:, None, :], shape=val.shape)
+                P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+
+            elif TD == 3:
+                # 面内部的插值
+                NF = self.mesh.number_of_faces() 
+                face2dof = self.dof.face_to_dof()
+                index = multi_index_matrix[2](p)
+                flag = (index[: 0] != 0) & (index[:, 1] !=0) & (index[:, 2] != 0)
+                fdof = flag.sum()
+                bc = index[flag, :]/p
+
+                val = np.broadcast_to(bc, (NF, fdof, 3)) 
+                I = np.broadcast_to(face2dof[:, flag, None], shape=val.shape)
+                J = np.broadcast_to(face[:, None, :], shape=val.shape)
+                P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+
+        if (p > 3) and (TD == 3):
+            NC = self.mesh.number_of_cells() 
+            cell2dof = self.dof.cell_to_dof()
+            index = multi_index_matrix[3](p)
+            flag = (index[: 0] != 0) & (index[:, 1] !=0) & (index[:, 2] != 0) & (index[:, 3] != 0)
+            cdof = flag.sum()
+            bc = index[flag, :]/p
+
+            val = np.broadcast_to(bc, (NC, cdof, 4)) 
+            I = np.broadcast_to(cell2dof[:, flag, None], shape=val.shape)
+            J = np.broadcast_to(cell[:, None, :], shape=val.shape)
+            P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+
 
     def projection(self, u, ptype='L2'):
         """
