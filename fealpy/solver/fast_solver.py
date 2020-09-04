@@ -175,7 +175,7 @@ class HighOrderLagrangeFEMFastSolver():
         return uh 
 
 class LinearElasticityRLFEMFastSolver():
-    def __init__(self, mu, lam, M, G, P, isBdDof):
+    def __init__(self, lam, mu, M, G, P, isBdDof):
         """
 
         Notes
