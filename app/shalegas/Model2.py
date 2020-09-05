@@ -83,6 +83,8 @@ https://www.coursehero.com/file/14152920/Rel-Perm/
           [0.55    , 0.256049, 0.028178],
           [0.575   , 0.263672, 0.003125],
           [0.6     , 0.3     , 0.      ]])
+
+体积模量:  K = E/3/(1 - 2*nu)
 """
 
 import numpy as np
@@ -98,24 +100,24 @@ class WaterFloodingModel():
     def __init__(self):
         self.domain=[0, 10, 0, 10] # m
         self.rock = {
-            'permeability': 2000, # md
+            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
             'lame':(1.0e+8, 3.0e+8), # lambda and mu
             'biot': 1.0,
-            'initial pressure': 3e+6, # Pa
-            'initial stress': 6.066e+7, # Pa 先不考虑应力的计算 
-            'solid grain stiffness': 6.25
+            'initial pressure': 3, # MPa
+            'initial stress': 60.66, # MPa 先不考虑应力的计算 
+            'solid grain stiffness': 6.25 # MPa
             }
-        self.oil = {
+        self.water = {
             'viscosity': 1, # cp
-            'compressibility': 1.0e-9, # Pa^{-1}
-            'initial saturation': 1.0, 
-            'production rate': 3.50e-6 # s^{-1}
-            }
-        self.water = {'viscosity': 2, # cp
-            'compressibility': 2.0e-9 # Pa^{-1}
+            'compressibility': 1.0e-3, # MPa^{-1}
             'initial saturation': 0.0, 
             'injection rate': 3.51e-6 # s^{-1}
+            }
+        self.oil = {'viscosity': 2, # cp
+            'compressibility': 2.0e-3, # MPa^{-1}
+            'initial saturation': 1.0, 
+            'production rate': 3.50e-6 # s^{-1}
             }
         self.bc = {'displacement': 0.0, 'flux': 0.0}
 
@@ -153,6 +155,19 @@ class WaterFloodingModel():
         timeline = UniformTimeLine(0, T, n)
         return timeline
 
+    def relative_permeability_water(self, Sw):
+        val = self.krw(Sw)
+        val[val<0.0] = 0.0
+        val[val>1.0] = 1.0
+        return val
+
+    def relative_permeability_oil(self, Sw):
+        val = self.kro(Sw)
+        val[val<0.0] = 0.0
+        val[val>1.0] = 1.0
+        return val
+
+
 
 
 
@@ -177,8 +192,6 @@ class WaterFloodingModelSolver():
         self.p[:] = model.rock['initial pressure'] 
         self.phi[:] = model.rock['porosity']
 
-        # 常数矩阵
-
     @barycentric
     def pressure_coefficient(self, bc):
 
@@ -199,7 +212,7 @@ class WaterFloodingModelSolver():
         return val
 
     @barycentric
-    def saturatin_coefficient(self, bc):
+    def saturation_coefficient(self, bc):
         b = self.model.rock['biot'] 
         Ks = self.model.rock['solid grain stiffness']
         cw = self.model.water['compressibility']
@@ -215,22 +228,50 @@ class WaterFloodingModelSolver():
 
         return val
 
-    def flux_coefficient(self):
+    def flux_coefficient(self, bc):
         """
         Notes
         -----
         目前假设是常系数
         """
-        lo = 0.5
-        lw = 0.5
+
+        muw = self.model.water['viscosity'] # 单位是 1 cp = mPa/s
+        muo = self.model.oil['viscosity'] 
+
+        k = self.model.rock['permeability']*9.869233-4 # 压强单位是 MPa 
+
+        Sw = self.s.value(bc) # 水的饱和度系数
+
+        lamw = self.model.relative_permeability_water(Sw)
+        lamw /= muw
+        lamo = self.model.relative_permeability_oil(Sw)
+        lamo /= muo
+
+        val = 1/(lamw + lam)/k # 
+
+        return val
+
+    def stabilization_coefficient(self, bc):
+        alpha = 0.1
+        beta = 0.2
+        CR = 1.0
+        return 0.01
+
+    def get_linear_elasticity_system(self):
+
+        lam, mu = self.model.rock['lame']
+        A = self.cspace.linear_elasticity_matrix(lam, mu)
+
+    def get_right_vector(self):
+        pass
 
 
+if __name__ == '__main__':
 
-
-
-
-    def get_current_left_matrix(self, 
-        
-
-
-
+    model = WaterFloodingModel()
+    s = np.random.rand(10)
+    print(s)
+    val = model.relative_permeability_water(s)
+    print(val)
+    val = model.relative_permeability_oil(s)
+    print(val)

@@ -637,7 +637,7 @@ class LagrangeFiniteElementSpace():
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
-    def linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
+    def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the linear elasticity fem matrix
         """
