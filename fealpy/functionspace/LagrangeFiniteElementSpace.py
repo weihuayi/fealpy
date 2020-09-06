@@ -812,8 +812,12 @@ class LagrangeFiniteElementSpace():
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        pp = self.mesh.bc_to_point(bcs)
-        fval = f(pp)
+
+        if f.coordtype == 'cartesian':
+            pp = self.mesh.bc_to_point(bcs)
+            fval = f(pp)
+        elif f.coordtype == 'barycentric':
+            fval = f(bcs)
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)

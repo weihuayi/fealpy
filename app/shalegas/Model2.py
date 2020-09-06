@@ -218,8 +218,13 @@ class WaterFloodingModelSolver():
         self.phi[:] = model.rock['porosity'] 
 
         # 一些常数矩阵和向量
+
+        # (\nu \nabla S_w, \nabla v)
+        self.A = 0.001*self.cspace.stiff_matrix() # 稳定项
+
         # (\nabla\cdot v, w) 速度散度矩阵
         self.B = self.vspace.div_matrix()
+
 
         # (\nabla\cdot u, w) 位移散度矩阵
         cellmeasure = self.mesh.entity_measure('cell')
@@ -455,8 +460,45 @@ class WaterFloodingModelSolver():
                 )
 
 
+        I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
+        J = np.broadcast_to(c2d0[:, None, :], shape=M.shape)
+
+        phi = self.cspace.basis(bcs) # (NQ, 1, ldof)
+        c = self.phi[:] # (NC, )
+        S = np.einsum('q, c, qci, qcj, c->cij', ws, c, phi, phi, cellmeasure)
+        S = csr_matrix(
+                (S.flat, (I.flat, I.flat)),
+                shape=(gdof0, gdof1)
+                )
+
+        gphi = self.mesh.grad_lambda() # (NC, TD+1, GD)
+        c = self.s.value(bcs)*self.model.rock['biot'] # (NQ, NC)
+        U10 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 0], cellmeasure)
+        U11 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 1], cellmeasure)
+
+        U10 = csr_matrix(
+                (U10.flat, (I.flat, J.flat)),
+                shape=U10.shape
+                )
+        U11 = csr_matrix(
+                (U11.flat, (I.flat, J.flat)),
+                shape=U10.shape
+                )
 
 
+        c = self.saturation_coefficient(bcs) # (NQ, NC)
+        c = np.sum(c, axis=0)
+        c *= cellmeasure 
+        SP = diags(val, 0)
+
+        # 右端矩阵
+        F = dt*self.cspace.source_vector(self.fw)
+        F += dt*SP@self.p 
+        F += S@self.s
+        F += U10@self.u[:, 0]
+        F += U11@self.u[:, 1]
+
+        S += dt*self.A
 
     def get_dispacement_system(self):
         """
