@@ -227,8 +227,10 @@ class WaterFloodingModelSolver():
 
 
         # (\nabla\cdot u, w) 位移散度矩阵
+        # * 注意这里利用了压强空间分片常数, 线性函数导数也是分片常数的事实
         cellmeasure = self.mesh.entity_measure('cell')
         cellmeasure *= self.model.rock['biot']
+
         gphi = self.mesh.grad_lambda() # (NC, TD+1, GD)
         gphi *= cellmeasure[:, None, None]
         c2d0 = self.pspace.cell_to_dof()
@@ -237,11 +239,11 @@ class WaterFloodingModelSolver():
         gdof1 = self.cspace.number_of_global_dofs()
         I = np.broadcast_to(c2d0, shape=c2d1.shape)
         J = c2d1 
-        self.U00 = csr_matrix(
+        self.PU0 = csr_matrix(
                 (gphi[..., 0].flat, (I.flat, J.flat)), 
                 shape=(gdof0, gdof1)
                 )
-        self.U01 = csr_matrix(
+        self.PU1 = csr_matrix(
                 (gphi[..., 1].flat, (I.flat, J.flat)),
                 shape=(gdof0, gdof1)
                 )
@@ -340,7 +342,7 @@ class WaterFloodingModelSolver():
         CR = 1.0
         return 0.01
 
-    def water_fractional_flow(self, bc):
+    def water_fractional_flow_coefficient(self, bc):
         """
 
         Notes
@@ -363,13 +365,13 @@ class WaterFloodingModelSolver():
 
         x = [v, p, s, u0, u1]
 
-        A = [[   V,  -B, None, None,  None]
-             [ B.T,   P, None, DU00,  DU01]
-             [  FV,  SP,    S, DU10,  DU10] 
+        A = [[   V,  VP, None, None,  None]
+             [  PV,   P, None,  PU0,   PU1]
+             [ -SV,  SP,    S,  SU0,   SU1] 
              [None, UP0, None,  U00,   U01]
              [None, UP1, None,  U10,   U11]
 
-        F = [None, FP, FS, FU0, FU1]
+        F = [FV, FP, FS, FU0, FU1]
         """
         pass
 
@@ -378,7 +380,11 @@ class WaterFloodingModelSolver():
         Notes
         -----
         计算速度方程对应的离散系统.
+
+        [   V,  VP, None, None,  None]
+
         """
+        dt = self.timeline.current_time_step_length()
         cellmeasure = self.vspace.cellmeasure
         qf = self.mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -395,8 +401,9 @@ class WaterFloodingModelSolver():
         V = csr_matrix(
                 (V.flat, (I.flat, J.flat)), 
                 shape=(gdof, gdof)
-
-        return [V, -B, None, None, None], np.zeros(gdof, dtype=np.float64) 
+        VP = -self.B
+        FV = np.zeros(gdof, dtype=np.float64)
+        return [V, VP, None, None, None], FV
 
     def get_pressure_system(self, q=2):
         """
@@ -405,26 +412,37 @@ class WaterFloodingModelSolver():
         计算压强方程对应的离散系统
 
         这里组装矩阵时, 利用了压强是分片常数的特殊性 
+
+        [  PV,   P, None,  PU0,   PU1]
         """
+
         dt = self.timeline.current_time_step_length()
         cellmeasure = self.pspace.cellmeasure
         qf = self.mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
+        PV = dt*self.B.T
+
+        # P 是对角矩阵
         c = self.pressure_coefficient(bcs) # (NQ, NC)
+        c *= ws[:, None] # 积分权重
         c = np.sum(c, axis=0)
         c *= cellmeasure 
-        P = diags(val, 0)
+        P = diags(c, 0)
 
-        FP = self.fg.value(bcs) + self.fw.value(bcs)
-        FP = np.sum(val, axis=0)
+        # 组装压强方程的右端向量
+        # * 这里利用了压强空间基是分片常数
+        FP = self.fg.value(bcs) + self.fw.value(bcs) # (NQ, NC)
+        FP *= ws[:, None]
+        FP = np.sum(FP, axis=0)
         FP *= cellmeasure
         FP *= dt
 
         FP += P@self.p
-        FP += self.U00@self.u[:, 0]
-        FP += self.U01@self.u[:, 1]
+        FP += self.PU0@self.u[:, 0]
+        FP += self.PU1@self.u[:, 1]
 
-        return [dt*self.B.T, P, None, self.U00, self.U01], FP
+        return [PV, P, None, self.PU0, self.PU1], FP
 
     def get_saturation_system(self, q=2):
         """
@@ -432,7 +450,7 @@ class WaterFloodingModelSolver():
         ----
         计算饱和度方程对应的离散系统
 
-        [  FV,  SP,    S, DU10,  DU10] 
+        [ SV,  SP,    S, SU0,  SU1] 
 
         """
 
@@ -441,25 +459,25 @@ class WaterFloodingModelSolver():
         qf = self.mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
+        cgdof = self.cspace.number_of_global_dofs()
+        vgdof = self.vspace.number_of_global_dofs()
+        cc2d = self.cspace.cell_to_dof()
+        vc2d = self.vspace.cell_to_dof()
+
+        # SV
         gphi = self.mesh.grad_lambda() #(NC, TD+1, GD)
         vphi = self.vspace.basis(bcs) # (NQ, NC, TD+1, GD)
-        c = self.water_fractional_flow(bcs) # (NQ, NC)
-
-        FV = np.einsum('q, qc, cin, qcjn, c->cij', ws, c, gphi, vphi, cellmeasure)
-
-        gdof0 = self.cspace.number_of_global_dofs()
-        gdof1 = self.vspace.number_of_global_dofs()
-        c2d0 = self.cspace.cell_to_dof()
-        c2d1 = self.vspace.cell_to_dof()
-        I = np.broadcast_to(c2d0[:, :, None], shape=FV.shape)
-        J = np.broadcast_to(c2d1[:, None, :], shape=FV.shape)
-
-        FV = csr_matrix(
-                (FV.flat, (I.flat, J.flat)),
-                shape=(gdof0, gdof1)
+        c = self.water_fractional_flow_coefficient(bcs) # (NQ, NC)
+        SV = np.einsum('q, qc, cin, qcjn, c->cij', ws, c, gphi, vphi, cellmeasure)
+        I = np.broadcast_to(cc2d[:, :, None], shape=SV.shape)
+        J = np.broadcast_to(vc2d[:, None, :], shape=SV.shape)
+        SV = csr_matrix(
+                (SV.flat, (I.flat, J.flat)),
+                shape=(cgdof, vgdof)
                 )
 
 
+        # SP
         I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
         J = np.broadcast_to(c2d0[:, None, :], shape=M.shape)
 
