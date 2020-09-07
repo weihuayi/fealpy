@@ -171,7 +171,7 @@ class WaterFloodingModel():
         给定水的饱和度, 计算水的相对渗透率
         """
         val = self.krw(Sw)
-        val[val<0.0] = 0.0
+        val[Sw<0.2] = 0.0
         val[val>1.0] = 1.0
         return val
 
@@ -183,7 +183,7 @@ class WaterFloodingModel():
         给定水的饱和度, 计算油的相对渗透率
         """
         val = self.kro(Sw)
-        val[val<0.0] = 0.0
+        val[Sw>0.7] = 0.0
         val[val>1.0] = 1.0
         return val
 
@@ -243,7 +243,7 @@ class WaterFloodingModelSolver():
 
         # (\nu \nabla S_w, \nabla v), 饱和度方程稳定项的值
         # TODO: 采用论文中的稳定项
-        self.A = 0.00001*self.cspace.stiff_matrix() # 稳定项
+        self.A = 1e-9*self.cspace.stiff_matrix() # 稳定项
 
         # 速度散度矩阵, 速度方程对应的散度矩阵, (\nabla\cdot v, w) 
         self.B = self.vspace.div_matrix()
@@ -395,6 +395,7 @@ class WaterFloodingModelSolver():
 
         Sw = self.cs.value(bc) # 当前水的饱和度系数
         lamw = self.model.water_relative_permeability(Sw)
+        print('lamw:', lamw[0])
         lamw /= self.model.water['viscosity'] 
         lamo = self.model.oil_relative_permeability(Sw)
         lamo /= self.model.oil['viscosity'] 
@@ -668,6 +669,14 @@ class WaterFloodingModelSolver():
             e0 = np.sqrt(e0) # 误差的 l2 norm
             k += 1
 
+            start = end
+            end += cgdof
+            self.cu[:, 0] = x[start:end]
+
+            start = end
+            end += cgdof
+            self.cu[:, 1] = x[start:end]
+
             print(e0)
 
             if k >= maxit: 
@@ -678,6 +687,8 @@ class WaterFloodingModelSolver():
         self.v[:] = self.cv
         self.p[:] = self.cp
         self.s[:] = self.cs
+        flag = self.s < 0.0
+        self.s[flag] = 0.0
         self.u[:] = self.cu
 
     def solve(self, step=10):
@@ -720,6 +731,7 @@ class WaterFloodingModelSolver():
         v = self.v 
         p = self.p
         s = self.s
+        u = self.u
 
         val = v.value(bc)
         val = np.concatenate((val, np.zeros((val.shape[0], 1), dtype=val.dtype)), axis=1)
@@ -735,6 +747,11 @@ class WaterFloodingModelSolver():
         val.SetName('saturation')
         pdata.AddArray(val)
 
+        val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
+        val = vnp.numpy_to_vtk(val)
+        val.SetName('displacement')
+        pdata.AddArray(val)
+
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
         writer.SetInputData(vmesh)
@@ -745,6 +762,18 @@ if __name__ == '__main__':
 
     model = WaterFloodingModel()
     solver = WaterFloodingModelSolver(model)
+
+
+    if False:
+        Sw = np.linspace(0, 1)
+        val0 = model.krw(Sw)
+        val1 = model.kro(Sw)
+        fig = plt.figure()
+        axes = fig.gca()
+        axes.plot(Sw, val0, 'r')
+        axes.plot(Sw, val1, 'b')
+        plt.show()
+
 
     solver.solve()
 
