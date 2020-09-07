@@ -477,7 +477,7 @@ class WaterFloodingModelSolver():
                 )
 
 
-        # SP
+        # S 质量矩阵组装, 系数为孔隙度
         I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
         J = np.broadcast_to(c2d0[:, None, :], shape=M.shape)
 
@@ -527,8 +527,6 @@ class WaterFloodingModelSolver():
 
         lam, mu = self.model.rock['lame']
         A = self.cspace.linear_elasticity_matrix(lam, mu)
-
-
 
 
 

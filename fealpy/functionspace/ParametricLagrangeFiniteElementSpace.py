@@ -142,7 +142,6 @@ class ParametricLagrangeFiniteElementSpace:
             gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
 
             rm = self.mesh.reference_cell_measure()
-            print(rm)
             d = np.sqrt(np.linalg.det(G))
             G = np.linalg.inv(G)
             # c: 单元指标
@@ -162,11 +161,35 @@ class ParametricLagrangeFiniteElementSpace:
             return A 
 
     def mass_matrix(self, c=None, q=None):
+        """
+
+        Notes
+        -----
+        组装质量矩阵
+        """
+
+        # 积分公式
+        qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
+        # bcs : (NQ, n)
+        # ws : (NQ, )
+        bcs, ws = qf.get_quadrature_points_and_weights() 
+
+        rm = self.mesh.reference_cell_measure() # 参考单元测度
+        d = self.mesh.first_fundamental_form(bcs)
+        d = np.sqrt(np.linalg.det(d))
+        phi = self.mesh.shape_function(bcs, p=self.p)
+
+        # 组装单元矩阵
+        M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+
+        cell2dof = self.cell_to_dof() # (NC, ldof)
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape) # (NC, ldof, ldof)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape) # (NC, ldof, ldof)
+
+        # 组装总矩阵
         gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof()
-        b0 = (self.basis, cell2dof, gdof)
-        A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
-        return A 
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
 
     def convection_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
