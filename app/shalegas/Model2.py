@@ -92,6 +92,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.sparse import csr_matrix, coo_matrix, bmat, diags
+from scipy.sparse.linalg import spsolve
 
 from fealpy.decorator import barycentric
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -242,7 +243,7 @@ class WaterFloodingModelSolver():
 
         # (\nu \nabla S_w, \nabla v), 饱和度方程稳定项的值
         # TODO: 采用论文中的稳定项
-        self.A = 0.001*self.cspace.stiff_matrix() # 稳定项
+        self.A = 0.00001*self.cspace.stiff_matrix() # 稳定项
 
         # 速度散度矩阵, 速度方程对应的散度矩阵, (\nabla\cdot v, w) 
         self.B = self.vspace.div_matrix()
@@ -276,8 +277,8 @@ class WaterFloodingModelSolver():
         self.FU[cgdof:] -= self.p@self.PU1
 
         # 初始应力项
-        self.FU[:cgdof] -= sigma0@self.PU0
-        self.FU[cgdof:] -= sigma0@self.PU1
+        #self.FU[:cgdof] -= sigma0@self.PU0
+        #self.FU[cgdof:] -= sigma0@self.PU1
 
         # vtk 文件输出
         node, cell, cellType, NC = self.mesh.to_vtk()
@@ -304,11 +305,9 @@ class WaterFloodingModelSolver():
         co = self.model.oil['compressibility']
 
         Sw = self.cs.value(bc) # 当前的水饱和度 (NQ, NC)
-        print('Sw:', Sw.shape)
 
         ps = self.mesh.bc_to_point(bc)
         phi = self.cphi.value(ps) # 当前的孔隙度
-        print('phi:', phi.shape)
 
         val = phi*Sw*cw
         val += phi*(1 - Sw)*co # 注意这里的 co 是常数, 但在水气混合物条件下应该依赖于压力
@@ -424,17 +423,13 @@ class WaterFloodingModelSolver():
         A0, FV, isBdDof0 = self.get_velocity_system(q=2)
         A1, FP, isBdDof1 = self.get_pressure_system(q=2)
         A2, FS, isBdDof2 = self.get_saturation_system(q=2)
-        A3, FU, isBdDof3 = self.get_dispacement_system(q=2)
-        print(type(A0))
-        print(type(A1))
-        print(type(A2))
-        print(type(A3))
+        A3, A4, FU, isBdDof3 = self.get_dispacement_system(q=2)
 
-        A = bmat([A0, A1, A2, A3], format='csr')
+        A = bmat([A0, A1, A2, A3, A4], format='csr')
         F = np.r_['0', FV, FP, FS, FU]
         isBdDof = np.r_['0', isBdDof0, isBdDof1, isBdDof2, isBdDof3]
 
-        return A, F
+        return A, F, isBdDof
 
     def get_velocity_system(self, q=2):
         """
@@ -623,28 +618,29 @@ class WaterFloodingModelSolver():
 
         # 拉梅参数 (lambda, mu)
         lam, mu = self.model.rock['lame']
-        U = self.cspace.linear_elasticity_matrix(lam, mu)
+        U = self.cspace.linear_elasticity_matrix(lam, mu, format='list')
 
         UP = bmat([[self.PU0.T], [self.PU1.T]])
 
         isBdDof = self.cspace.dof.is_boundary_dof()
 
-        return [None, UP, None, U ], -self.FU, np.r_['0', isBdDof, isBdDof]
+        return [None, self.PU0.T, None, U[0][0], U[0][1] ], [None, self.PU1.T,
+                None, U[1][0], U[1][1]], -self.FU, np.r_['0', isBdDof, isBdDof]
 
     def picard_iteration(self, maxit=10):
 
         e0 = 1.0
         k = 0
-        while e0 > 1e-8: 
+        while e0 > 1e-10: 
             # 构建总系统
             A, F, isBdDof = self.get_total_system()
 
             # 处理边界条件, 这里是 0 边界
             gdof = len(isBdDof)
             bdIdx = np.zeros(gdof, dtype=np.int_)
-            bdIdx[isDDof] = 1 
-            Tbd = spdiags(bdIdx, 0, gdof, gdof)
-            T = spdiags(1-bdIdx, 0, gdof, gdof)
+            bdIdx[isBdDof] = 1 
+            Tbd = diags(bdIdx)
+            T = diags(1-bdIdx)
             A = T@A@T + Tbd
             F[isBdDof] = 0.0
 
@@ -671,6 +667,8 @@ class WaterFloodingModelSolver():
             self.cs[:] = x[start:end]
             e0 = np.sqrt(e0) # 误差的 l2 norm
             k += 1
+
+            print(e0)
 
             if k >= maxit: 
                 print('picard iteration arrive max iteration with error:', e0)
