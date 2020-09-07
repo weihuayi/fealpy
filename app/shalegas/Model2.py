@@ -198,56 +198,68 @@ class WaterFloodingModelSolver():
         self.pspace = self.vspace.smspace # 压强空间
         self.cspace = LagrangeFiniteElementSpace(self.mesh, p=1) # 位移和饱和度连续空间
 
-
+        # 上一时刻物理量的值
         self.v = self.vspace.function() # 速度函数
         self.p = self.pspace.function() # 压强函数
         self.u = self.cspace.function(dim=2) # 位移函数
         self.s = self.cspace.function() # 水的饱和度函数 默认为0, 初始时刻区域内水的饱和度为0
         self.phi = self.pspace.function() # 孔隙度函数, 分片常数
 
-        NN = self.mesh.number_of_nodes()
-        self.fg = self.cspace.function()
-        self.fw = self.cspace.function()
-
-        # TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
-        self.fg[0] = self.model.water['injection rate'] # 注入
-        self.fw[-1] = -self.model.oil['production rate'] # 产出
+        # 当前时刻物理量的值, 用于保存临时计算出的值
+        self.cv = self.vspace.function() # 速度函数
+        self.cp = self.pspace.function() # 压强函数
+        self.cu = self.cspace.function(dim=2) # 位移函数
+        self.cs = self.cspace.function() # 水的饱和度函数 默认为0, 初始时刻区域内水的饱和度为0
+        self.cphi = self.pspace.function() # 孔隙度函数, 分片常数
 
         # 初值
         self.p[:] = model.rock['initial pressure']  # MPa
         self.phi[:] = model.rock['porosity'] 
+        self.cp[:] = self.p
+        self.cphi[:] = self.phi
+
+        # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
+        self.fg = self.cspace.function()
+        self.fw = self.cspace.function()
+        self.fg[0] = self.model.water['injection rate'] # 注入
+        self.fw[-1] = -self.model.oil['production rate'] # 产出
+
 
         # 一些常数矩阵和向量
 
-        # (\nu \nabla S_w, \nabla v)
+        # (\nu \nabla S_w, \nabla v), 饱和度方程稳定项的值
+        # TODO: 采用论文中的稳定项
         self.A = 0.001*self.cspace.stiff_matrix() # 稳定项
 
-        # (\nabla\cdot v, w) 速度散度矩阵
+        # 速度散度矩阵, 速度方程对应的散度矩阵, (\nabla\cdot v, w) 
         self.B = self.vspace.div_matrix()
 
-
-        # (\nabla\cdot u, w) 位移散度矩阵
+        # 压强方程对应的位移散度矩阵, (\nabla\cdot u, w) 位移散度矩阵
         # * 注意这里利用了压强空间分片常数, 线性函数导数也是分片常数的事实
         cellmeasure = self.mesh.entity_measure('cell')
         cellmeasure *= self.model.rock['biot']
 
         gphi = self.mesh.grad_lambda() # (NC, TD+1, GD)
         gphi *= cellmeasure[:, None, None]
-        c2d0 = self.pspace.cell_to_dof()
-        c2d1 = self.cspace.cell_to_dof()
-        gdof0 = self.pspace.number_of_global_dofs()
-        gdof1 = self.cspace.number_of_global_dofs()
-        I = np.broadcast_to(c2d0, shape=c2d1.shape)
-        J = c2d1 
+        pc2d = self.pspace.cell_to_dof()
+        cc2d = self.cspace.cell_to_dof()
+        pgdof = self.pspace.number_of_global_dofs()
+        cgdof = self.cspace.number_of_global_dofs()
+        I = np.broadcast_to(pc2d, shape=cc2d.shape)
+        J = cc2d 
         self.PU0 = csr_matrix(
                 (gphi[..., 0].flat, (I.flat, J.flat)), 
-                shape=(gdof0, gdof1)
+                shape=(pgdof, cgdof)
                 )
         self.PU1 = csr_matrix(
                 (gphi[..., 1].flat, (I.flat, J.flat)),
-                shape=(gdof0, gdof1)
+                shape=(pgdof, cgdof)
                 )
-        
+        # 线弹性矩阵的右端向量
+        self.FU = np.zeros(2*cgdof, dtype=np.float64)
+        self.FU[:cgdof] -= self.p@self.PU0
+        self.FU[cgdof:] -= self.p@self.PU1
+
 
     @barycentric
     def pressure_coefficient(self, bc):
@@ -256,7 +268,7 @@ class WaterFloodingModelSolver():
 
         Notes
         -----
-        计算压强矩阵的系数
+        计算当前物理量下的压强质量矩阵系数
         """
 
         b = self.model.rock['biot'] 
@@ -264,10 +276,10 @@ class WaterFloodingModelSolver():
         cw = self.model.water['compressibility']
         co = self.model.oil['compressibility']
 
-        Sw = self.s.value(bc)
+        Sw = self.cs.value(bc)
 
         ps = mesh.bc_to_point(bc)
-        phi = self.phi.value(ps)
+        phi = self.cphi.value(ps)
 
         val = b - phi
         val /= Ks
@@ -276,20 +288,20 @@ class WaterFloodingModelSolver():
         return val
 
     @barycentric
-    def saturation_coefficient(self, bc):
+    def saturation_pressure_coefficient(self, bc):
         """
 
         Notes
         -----
-        计算饱和度矩阵的系数
+        计算当前物理量下, 饱和度方程中, 压强项对应的系数
         """
         b = self.model.rock['biot'] 
         Ks = self.model.rock['solid grain stiffness']
         cw = self.model.water['compressibility']
 
-        Sw = self.s.value(bc)
+        Sw = self.cs.value(bc)
         ps = mesh.bc_to_point(bc)
-        phi = self.phi.value(ps)
+        phi = self.cphi.value(ps)
 
         val = b - phi
         val /= Ks
@@ -301,6 +313,8 @@ class WaterFloodingModelSolver():
         """
         Notes
         -----
+
+        计算**当前**物理量下, 速度方程对应的系数
 
         计算通量的系数, 流体的相对渗透率除以粘性系数得到流动性系数 
         krg/mu_g 是气体的流动性系数 
@@ -320,7 +334,7 @@ class WaterFloodingModelSolver():
         # 岩石的绝对渗透率, 这里考虑量纲的一致性
         k = self.model.rock['permeability']*9.869233e-4  
 
-        Sw = self.s.value(bc) # 水的饱和度系数
+        Sw = self.cs.value(bc) # 水的饱和度系数
 
         lamw = self.model.relative_permeability_water(Sw)
         lamw /= muw
@@ -347,6 +361,8 @@ class WaterFloodingModelSolver():
 
         Notes
         -----
+
+        计算**当前**物理量下, 饱和度方程中, 水的流动性系数
         """
 
         Sw = self.s.value(bc) # 水的饱和度系数
@@ -367,7 +383,7 @@ class WaterFloodingModelSolver():
 
         A = [[   V,  VP, None, None,  None]
              [  PV,   P, None,  PU0,   PU1]
-             [ -SV,  SP,    S,  SU0,   SU1] 
+             [  SV,  SP,    S,  SU0,   SU1] 
              [None, UP0, None,  U00,   U01]
              [None, UP1, None,  U10,   U11]
 
@@ -384,10 +400,13 @@ class WaterFloodingModelSolver():
         [   V,  VP, None, None,  None]
 
         """
+
         dt = self.timeline.current_time_step_length()
-        cellmeasure = self.vspace.cellmeasure
+        cellmeasure = self.mesh.entity_measure('cell')
         qf = self.mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
+        # 速度对应的矩阵  V
         c = self.flux_coefficient(bcs)
         phi = self.vspace.basis(bcs)
         V = np.einsum('q, qc, qcin, qcjn, c->cij', ws, c, phi, phi,
@@ -401,7 +420,11 @@ class WaterFloodingModelSolver():
         V = csr_matrix(
                 (V.flat, (I.flat, J.flat)), 
                 shape=(gdof, gdof)
+
+        # 压强矩阵
         VP = -self.B
+
+        # 右端向量, 0 向量
         FV = np.zeros(gdof, dtype=np.float64)
         return [V, VP, None, None, None], FV
 
@@ -438,8 +461,8 @@ class WaterFloodingModelSolver():
         FP *= cellmeasure
         FP *= dt
 
-        FP += P@self.p
-        FP += self.PU0@self.u[:, 0]
+        FP += P@self.p # 上一步的压强向量
+        FP += self.PU0@self.u[:, 0] 
         FP += self.PU1@self.u[:, 1]
 
         return [PV, P, None, self.PU0, self.PU1], FP
@@ -461,14 +484,19 @@ class WaterFloodingModelSolver():
 
         cgdof = self.cspace.number_of_global_dofs()
         vgdof = self.vspace.number_of_global_dofs()
+        pgdof = self.pspace.number_of_global_dofs()
+
         cc2d = self.cspace.cell_to_dof()
         vc2d = self.vspace.cell_to_dof()
+        pc2d = self.pspace.cell_to_dof()
 
-        # SV
+        # SV, 饱和度方程中对应的速度矩阵
         gphi = self.mesh.grad_lambda() #(NC, TD+1, GD)
         vphi = self.vspace.basis(bcs) # (NQ, NC, TD+1, GD)
-        c = self.water_fractional_flow_coefficient(bcs) # (NQ, NC)
+        c = self.water_fractional_flow_coefficient(bcs) # (NQ, NC) # 当前系数
+
         SV = np.einsum('q, qc, cin, qcjn, c->cij', ws, c, gphi, vphi, cellmeasure)
+
         I = np.broadcast_to(cc2d[:, :, None], shape=SV.shape)
         J = np.broadcast_to(vc2d[:, None, :], shape=SV.shape)
         SV = csr_matrix(
@@ -476,57 +504,80 @@ class WaterFloodingModelSolver():
                 shape=(cgdof, vgdof)
                 )
 
+        # SP, 饱和度方程中对应的压强矩阵
+        c = self.saturation_pressure_coefficient(bcs) # (NQ, NC)
+        phi = self.cspace.basis(bcs)
 
-        # S 质量矩阵组装, 系数为孔隙度
-        I = np.broadcast_to(c2d0[:, :, None], shape=M.shape)
-        J = np.broadcast_to(c2d0[:, None, :], shape=M.shape)
+        SP = np.einsum('q, qc, qci, c->ci', ws, c, phi, cellmeasure)
 
+        I = np.broadcast_to(pc2d, shape=SP.shape)
+        J = cc2d
+        SP = csr_matrix(
+                (SP.flat, (I.flat, J.flat)),
+                shape=(cgdof, pgdof)
+                )
+
+        # S 质量矩阵组装, 
         phi = self.cspace.basis(bcs) # (NQ, 1, ldof)
-        c = self.phi[:] # (NC, )
+        c = self.phi[:] # (NC, ), 孔隙度是分片常数
         S = np.einsum('q, c, qci, qcj, c->cij', ws, c, phi, phi, cellmeasure)
+        I = np.broadcast_to(cc2d[:, :, None], shape=S.shape)
+        J = np.broadcast_to(cc2d[:, None, :], shape=S.shape)
         S = csr_matrix(
                 (S.flat, (I.flat, I.flat)),
-                shape=(gdof0, gdof1)
+                shape=(cgdof, cgdof)
                 )
 
+        # SU0, SU1, 饱和度方程中的位移散度对应的矩阵
         gphi = self.mesh.grad_lambda() # (NC, TD+1, GD)
-        c = self.s.value(bcs)*self.model.rock['biot'] # (NQ, NC)
-        U10 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 0], cellmeasure)
-        U11 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 1], cellmeasure)
+        c = self.cs.value(bcs)*self.model.rock['biot'] # (NQ, NC), 注意用当前的饱和度
+        SU0 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 0], cellmeasure)
+        SU1 = np.einsum('q, qc, qci, qcj, c->cij', ws, c, phi, gphi[..., 1], cellmeasure)
 
-        U10 = csr_matrix(
-                (U10.flat, (I.flat, J.flat)),
-                shape=U10.shape
+        SU0 = csr_matrix(
+                (SU0.flat, (I.flat, J.flat)),
+                shape=SU0.shape
                 )
-        U11 = csr_matrix(
-                (U11.flat, (I.flat, J.flat)),
-                shape=U10.shape
+        SU1 = csr_matrix(
+                (SU1.flat, (I.flat, J.flat)),
+                shape=SU1.shape
                 )
 
-
-        c = self.saturation_coefficient(bcs) # (NQ, NC)
-        c = np.sum(c, axis=0)
-        c *= cellmeasure 
-        SP = diags(val, 0)
 
         # 右端矩阵
-        F = dt*self.cspace.source_vector(self.fw)
-        F += dt*SP@self.p 
-        F += S@self.s
-        F += U10@self.u[:, 0]
-        F += U11@self.u[:, 1]
+        FS = dt*self.cspace.source_vector(self.fw)
+        FS += dt*SP@self.p # 上一时间步的压强 
+        FS += S@self.s # 上一时间步的饱和度
+        FS += SU0@self.u[:, 0] # 上一时间步的位移, 共有两个分量
+        FS += SU1@self.u[:, 1] 
 
-        S += dt*self.A
+        S += dt*self.A # 质量矩阵加上稳定项矩阵
+
+        return [SV, SP, S, SU0, SU1], FS
 
     def get_dispacement_system(self):
         """
         Notes
         -----
         计算位移方程对应的离散系统, 即线弹性方程系统.
+
+         [None, UP0, None,  U00,   U01]
+         [None, UP1, None,  U10,   U11]
+
+        A = [[U00, U01], [U10, U11]]
         """
 
+
+        # 拉梅参数 (lambda, mu)
         lam, mu = self.model.rock['lame']
-        A = self.cspace.linear_elasticity_matrix(lam, mu)
+        U = self.cspace.linear_elasticity_matrix(lam, mu)
+
+        UP = bmat([[self.PU0.T], [self.PU1.T]])
+
+
+        return [None, UP, None, U ]
+
+
 
 
 
