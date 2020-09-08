@@ -10,6 +10,8 @@ from .femdof import multi_index_matrix1d
 from .femdof import multi_index_matrix2d
 from .femdof import multi_index_matrix3d
 
+from .femdof import multi_index_matrix
+
 from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
@@ -68,7 +70,7 @@ class LagrangeFiniteElementSpace():
                 cellmeasure=self.cellmeasure)
         self.integrator = self.integralalg.integrator
 
-        self.multi_index_matrix = [multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
+        self.multi_index_matrix = multi_index_matrix 
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -267,7 +269,7 @@ class LagrangeFiniteElementSpace():
         Parameters
         ----------
         bc : numpy.array
-            the shape of `bc` can be `(tdim,)` or `(NQ, tdim)`
+            the shape of `bc` can be `(TD,)` or `(NQ, TD)`
 
         Returns
         -------
@@ -301,7 +303,9 @@ class LagrangeFiniteElementSpace():
             bcs[idx[isInEdge], ..., nmap[lidx[isInEdge]]] = bc[..., 1]
             bcs[idx[isInEdge], ..., pmap[lidx[isInEdge]]] = bc[..., 0]
 
-        return self.basis(bcs)
+        phi = self.basis(bcs)
+        shape = phi.shape[0:-2] + phi.shape[-1:] 
+        return phi.reshape(shape)
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
@@ -321,7 +325,7 @@ class LagrangeFiniteElementSpace():
         p = self.p   # the degree of polynomial basis function
         TD = self.TD
 
-        multiIndex = self.dof.multiIndex
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -358,8 +362,8 @@ class LagrangeFiniteElementSpace():
     @barycentric
     def face_basis(self, bc):
         p = self.p   # the degree of polynomial basis function
-        TD = self.TD - 1
-        multiIndex = self.multi_index_matrix[TD-1](p)
+        TD = bc.shape[1] - 1
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
@@ -375,7 +379,7 @@ class LagrangeFiniteElementSpace():
 
 
     @barycentric
-    def basis(self, bc, index=np.s_[:]):
+    def basis(self, bc, index=np.s_[:], p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -395,7 +399,8 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        p = self.p   # the degree of polynomial basis function
+        if p is None:
+            p = self.p
 
         if p == 0 and self.spacetype == 'D':
             if len(bc.shape) == 1:
@@ -403,8 +408,8 @@ class LagrangeFiniteElementSpace():
             else:
                 return np.ones((bc.shape[0], 1), dtype=self.ftype)
 
-        TD = self.TD
-        multiIndex = self.dof.multiIndex
+        TD = bc.shape[-1] - 1 
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=np.int)
         P = 1.0/np.multiply.accumulate(c)
@@ -419,7 +424,7 @@ class LagrangeFiniteElementSpace():
         return phi[..., np.newaxis, :] # (..., 1, ldof)
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:]):
+    def grad_basis(self, bc, index=np.s_[:], p=None):
         """
         compute the basis function values at barycentric point bc
 
@@ -441,10 +446,12 @@ class LagrangeFiniteElementSpace():
         -----
 
         """
-        p = self.p   # the degree of polynomial basis function
+
+        if p is None:
+            p= self.p
         TD = self.TD
 
-        multiIndex = self.dof.multiIndex
+        multiIndex = self.multi_index_matrix[TD](p)
 
         c = np.arange(1, p+1, dtype=self.itype)
         P = 1.0/np.multiply.accumulate(c)
@@ -475,7 +482,7 @@ class LagrangeFiniteElementSpace():
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.mesh.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index, :, :])
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
         return gphi #(..., NC, ldof, GD)
 
     @barycentric
@@ -513,6 +520,62 @@ class LagrangeFiniteElementSpace():
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
+    def linear_interpolation_matrix(self):
+        """
+
+        Notes
+        -----
+        把线性元基函数插值到 p 次元空间
+
+        插值矩阵 I 的形状为 (gdof, NN)
+        """
+        TD = self.TD
+        p = self.p
+
+        gdof = self.number_of_global_dofs()
+        NN = self.mesh.number_of_nodes()
+
+
+        if self.spacetype == 'C':
+            # 网格节点处的值
+            val = np.broadcast_to(np.ones(1), shape=(NN, ))
+            P = coo_matrix((val, (range(NN), range(NN))), shape=(gdof, NN),
+                    dtype=self.ftype)
+
+            for d in range(1, TD+1):
+                if p > d:
+                    entity = self.mesh.entity(etype=d)
+                    e2d = self.dof.entity_to_dof(etype=d)
+                    N = len(entity)
+                    index = multi_index_matrix[d](p)
+                    n = len(index)
+                    flag = np.ones(n, dtype=np.bool_)
+                    for i in range(d+1):
+                        flag = flag & (index[:, i] != 0)
+                    s = flag.sum()
+                    bc = index[flag]/p
+                    shape = (N, ) + bc.shape
+                    val = np.broadcast_to(bc, shape=shape) 
+                    I = np.broadcast_to(e2d[:, flag, None], shape=shape)
+                    J = np.broadcast_to(entity[:, None, :], shape=shape)
+                    P += coo_matrix((val.flat, (I.flat, J.flat)), shape=(gdof, NN), dtype=self.ftype)
+            return P.tocsr()
+
+        elif self.spacetype == 'D':
+            NC = self.mesh.number_of_cells()
+            c2d0 = self.cell_to_dof()
+            c2d1 = np.arange((TD+1)*NC).reshape(NC, TD+1)
+            bc = multi_index_matrix[TD](p)/p
+
+            shape = (NC, ) + bc.shape
+            val = np.broadcast_to(bc, shape=shape)
+            I = np.broadcast_to(c2d0[:, :, None], shape=shape)
+            J = np.broadcast_to(c2d1[:, None, :], shape=shape)
+            P = csr_matrix((val.flat, (I.flat, J.flat)), shape=(dof, NN),
+                    dtype=self.ftype)
+            return P
+
+
     def projection(self, u, ptype='L2'):
         """
         """
@@ -526,7 +589,7 @@ class LagrangeFiniteElementSpace():
         return uh
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='barycentric')
         return f
 
     def array(self, dim=None):
@@ -574,7 +637,7 @@ class LagrangeFiniteElementSpace():
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
-    def linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
+    def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the linear elasticity fem matrix
         """
@@ -632,8 +695,13 @@ class LagrangeFiniteElementSpace():
         """
         construct the recovery linear elasticity fem matrix
         """
-        G = self.revcovery_matrix()
+        gdof = self.number_of_global_dofs()
+
         M = self.mass_matrix()
+        G = self.revcovery_matrix()
+
+        if format is None:
+            return M, G
 
         cellmeasure = self.cellmeasure
         cell2dof = self.cell_to_dof()
@@ -661,12 +729,10 @@ class LagrangeFiniteElementSpace():
             C.append([T]*GD)
         D *= mu
         for i in range(GD):
-            for j in range(i, GD):
-                if i == j:
-                    C[i][j] = D + (mu+lam)*A[imap[(i, i)]]
-                else:
-                    C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
-                    C[j][i] = C[i][j].T
+            C[i][i] = D + (mu+lam)*A[imap[(i, i)]]
+            for j in range(i+1, GD):
+                C[i][j] = lam*A[imap[(i, j)]] + mu*A[imap[(i, j)]].T
+                C[j][i] = C[i][j].T
         if format == 'csr':
             return bmat(C, format='csr') # format = bsr ??
         elif format == 'bsr':
@@ -746,8 +812,12 @@ class LagrangeFiniteElementSpace():
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        pp = self.mesh.bc_to_point(bcs)
-        fval = f(pp)
+
+        if f.coordtype == 'cartesian':
+            pp = self.mesh.bc_to_point(bcs)
+            fval = f(pp)
+        elif f.coordtype == 'barycentric':
+            fval = f(bcs)
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)

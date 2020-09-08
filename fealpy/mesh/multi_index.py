@@ -13,6 +13,8 @@ Huayi Wei, weihuayi@xtu.edu.cn
 
 """
 import numpy as np 
+import operator as op
+
 
 def multi_index_matrix0d(p):
     multiIndex = 1
@@ -50,3 +52,70 @@ def multi_index_matrix3d(p):
     return multiIndex
 
 multi_index_matrix = [multi_index_matrix0d, multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
+
+def lagrange_shape_function(bc, p):
+    """
+
+    Notes
+    -----
+    
+    计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次 Lagrange 形函数值。
+    """
+
+    TD = bc.shape[-1] - 1
+    multiIndex = multi_index_matrix[TD](p) 
+    ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
+
+    c = np.arange(1, p+1, dtype=np.int)
+    P = 1.0/np.multiply.accumulate(c)
+    t = np.arange(0, p)
+    shape = bc.shape[:-1]+(p+1, TD+1)
+    A = np.ones(shape, dtype=self.ftype)
+    A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+    np.cumprod(A, axis=-2, out=A)
+    A[..., 1:, :] *= P.reshape(-1, 1)
+    idx = np.arange(TD+1)
+    phi = np.prod(A[..., multiIndex, idx], axis=-1)
+    return phi[..., np.newaxis, :] # (..., 1, ldof)
+
+def lagrange_grad_shape_function(bc, p): 
+    """
+    Notes
+    -----
+    
+    计算形状为 (..., TD+1) 的重心坐标数组 bc 中, 每一个重心坐标处的 p 次
+    Lagrange 形函数值关于该重心坐标的梯度。
+    """
+
+    multiIndex = multi_index_matrix[TD](p) 
+    ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数
+
+    c = np.arange(1, p+1, dtype=self.itype)
+    P = 1.0/np.multiply.accumulate(c)
+
+    t = np.arange(0, p)
+    shape = bc.shape[:-1]+(p+1, TD+1)
+    A = np.ones(shape, dtype=bc.dtype)
+    A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+    FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+    FF[..., range(p), range(p)] = p
+    np.cumprod(FF, axis=-2, out=FF)
+    F = np.zeros(shape, dtype=bc.dtype)
+    F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+    F[..., 1:, :] *= P.reshape(-1, 1)
+
+    np.cumprod(A, axis=-2, out=A)
+    A[..., 1:, :] *= P.reshape(-1, 1)
+
+    Q = A[..., multiIndex, range(TD+1)]
+    M = F[..., multiIndex, range(TD+1)]
+
+    shape = bc.shape[:-1]+(ldof, TD+1)
+    R = np.zeros(shape, dtype=bc.dtype)
+    for i in range(TD+1):
+        idx = list(range(TD+1))
+        idx.remove(i)
+        R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+    return R # (..., ldof, TD+1)
+

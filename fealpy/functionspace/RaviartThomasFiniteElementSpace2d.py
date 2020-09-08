@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
+from scipy.sparse import csr_matrix
 
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -527,7 +528,7 @@ class RaviartThomasFiniteElementSpace2d:
 
             目前仅考虑最低次元的情形，
 
-            < V_i c_i v\cdot n, w >_{\partial K}, 
+            sum_i V_i (\\nabla \\cdot (c_i v), w) = V_i < c_i v\cdot n, w >_{\partial K}, 
 
             其中 V_i 是混合物的第 i 个组分偏摩尔体积，现在设为 1.
 
@@ -542,7 +543,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         mesh = self.mesh
         edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -571,10 +572,32 @@ class RaviartThomasFiniteElementSpace2d:
         # (NQ, NE, ldof1)
         phi2 = np.einsum('...jln, jn->...jl', phi2, en)
 
-        E0 = np.einsum('i, ij, ijm, ijn, j->jmn', ws, val0, phi0, phi2, measure)
-        E1 = np.einsum('i, ij, ijm, ijn, j->jmn', ws, val1, phi1, phi2, measure)
+        E0 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val0, phi0, phi2, measure,
+                optimize=True)
+        E1 = np.einsum(
+                'i, ij..., ijm, ijn, j->jmn', 
+                ws, val1, phi1, phi2, measure,
+                optimize=True)
 
+        gdof0 = self.smspace.number_of_global_dofs()
+        gdof1 = self.number_of_global_dofs()
+        cell2dof = self.smspace.cell_to_dof()
+        edge2dof = self.dof.edge_to_dof()
 
+        I = np.broadcast_to(cell2dof[edge2cell[:, 0], :, None], shape=E0.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E = csr_matrix(
+                (E0.flat, (I.flat, J.flat)), 
+                shape=(gdof0, gdof1))
+
+        I = np.broadcast_to(cell2dof[edge2cell[:, 1], :, None], shape=E1.shape)
+        J = np.broadcast_to(edge2dof[:, None, :], shape=E0.shape)
+        E += csr_matrix(
+                (E1[isInEdge].flat, (I[isInEdge].flat, J[isInEdge].flat)),
+                shape=(gdof0, gdof1))
+        return E
 
     def source_vector(self, f, celltype=False, q=None):
         cell2dof = self.cell_to_dof()
@@ -697,6 +720,8 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         val = g(ps)
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         measure = self.integralalg.edgemeasure[index]
 
         gdof = self.number_of_global_dofs()
@@ -731,6 +756,8 @@ class RaviartThomasFiniteElementSpace2d:
         ps = mesh.bc_to_point(bcs, etype='edge', index=index)
         en = mesh.edge_unit_normal(index=index)
         val = g(ps, en) # 注意这里容易出错
+        if type(val) in {int, float}:
+            val = np.array([[val]], dtype=self.ftype)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

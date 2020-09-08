@@ -5,7 +5,8 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import MeshFactory
-from fealpy.decorator import cartesian
+from fealpy.functionspace.Function import Function
+from fealpy.decorator import cartesian, barycentric
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 
@@ -140,12 +141,9 @@ class Model():
         self.tph = self.uspace.function(dim=NL)
         self.ph = self.uspace.function()
         bc = self.mesh.entity_barycenter('cell')
-        self.yh[:, 0] = pde.y_solution(bc, 0)
-#        print('yh0', self.yh[:, 0])
-#
-#        f = cartesian(lambda p: pde.y_solution(p, 0))
-#        self.yh[:, 0] = self.pspace.local_projection(f) 
-#        print('projectionyh0', self.yh[:, 0])
+
+        f = cartesian(lambda p: pde.y_solution(p, 0))
+        self.yh[:, 0] = self.pspace.local_projection(f) 
 
         # costate variable
         self.zh = self.pspace.function(dim=NL)
@@ -162,7 +160,6 @@ class Model():
         nt: 表示 n-1 时间层,要求的是 n 个时间层的方程
         '''
         dt = self.timeline.current_time_step_length()
-        NC = self.mesh.number_of_cells()
         u = self.uh[:, nt+1]
         NE = self.mesh.number_of_edges()
         # f1 = -\sum_{i=1}^n-1\Delta t (p^i, v^i)
@@ -174,12 +171,6 @@ class Model():
         # f3 = \Delta t(f^n + u^n, w_h) + (y^{n-1}, w_h)
         b = self.pspace.source_vector(cartesian(lambda x: self.pde.source(x,
             (nt+1)*dt)))
-#        print('b', b)
-        cell = self.mesh.entity('cell')
-        cellmeasure = self.mesh.entity_measure('cell')
-        b1 = (self.pde.source(cell[:, 0], (nt+1)*dt) + self.pde.source(cell[:, 1], (nt+1)*dt)
-                + self.pde.source(cell[:, 2], (nt+1)*dt))*cellmeasure/3
-#        print('b1', b1)
 
         f3 = dt*b + dt*self.M@u + self.M@self.yh[:, nt]
 
@@ -193,37 +184,23 @@ class Model():
         '''
         dt = self.timeline.current_time_step_length()
         NL = self.timeline.number_of_time_levels()
-        NC = self.mesh.number_of_cells()
-        print('NC', NC)
-        print('NE', self.mesh.number_of_edges())
-        tpd = self.uspace.function()
  
-        #  f1 = -\sum_{i=1}^n-1\Delta t (p^i, v)
+        #  f1 = -\sum_{i=1}^n-1\Delta t (q^i, v)
         f1 = -sq
 
         # f2 = (\tilde p^n_h - \tilde p^n_d, v)
-        cell2dof = self.uspace.cell_to_dof()
-        gdof = self.uspace.number_of_global_dofs()
-        m = (self.uspace.basis, cell2dof, gdof)
-        b = self.uspace.integralalg.serial_construct_vector(cartesian(lambda x:
-            self.pde.tpd(x, (nt+1)*dt)), m)
-        print('11', self.A.shape)
-        print('22', self.tph)
-        print('1', self.A@self.tph[:, NL-nt-1].reshape(-1))
-        print('2', b.shape)
-
-        f2 = self.A@self.tph[:, NL-nt-1].reshape(-1) - b
+        b = self.uspace.source_vector(cartesian(lambda x: self.pde.tpd(x,
+            (NL-nt-1)*dt)))
+        f2 = self.A@self.tph[:, NL-nt-1] - b
 
         # f3 = \Delta t(y^n_h - y^n_d, w) + (z^n_h, w)
-        bc = np.array([1/3, 1/3, 1/3])
-        ps = mesh.bc_to_point(bc, etype='cell')
+        bb0 = self.pspace.source_vector(cartesian(lambda x: self.pde.yd(x,
+            (NL-nt-1)*dt)))
         bb1 = self.M@self.zh[:, NL-nt-1]
-        val = self.pde.yd(ps, (NL-nt-1)*dt, 1)
-        bb2 = dt*self.M@(self.yh[:, NL-nt-1] - val)
-
+        bb2 = dt*self.M@self.yh[:, NL-nt-1] - dt*bb0
         f3 = bb1 + bb2
 
-        return np.r_[np.r_[f1, f2], f3]
+        return np.r_[f1, f2, f3]
 
     def state_one_step_solve(self, t, sp):
         dt = self.timeline.current_time_step_length()
@@ -245,7 +222,6 @@ class Model():
         timeline = self.timeline
         dt = timeline.current_time_step_length()
         timeline.reset()
-        NC = self.mesh.number_of_cells()
         NE = self.mesh.number_of_edges()
         sp = np.zeros(NE, dtype=self.mesh.ftype)
         while not timeline.stop():
@@ -263,10 +239,9 @@ class Model():
         dt = timeline.current_time_step_length()
         NL = timeline.number_of_time_levels()
         NE = self.mesh.number_of_edges()
-#        qf = self.integrator
-#        bcs, ws = qf.get_quadrature_points_and_weights()
-#        ps = mesh.bc_to_point(bcs, etype='cell')
+        cellmeasure = self.mesh.entity_measure('cell')
         sq = np.zeros(NE, dtype=self.mesh.ftype)
+        zh1 = self.pspace.function()
         
         timeline.reset()
         while not timeline.stop():
@@ -274,20 +249,16 @@ class Model():
             self.tqh[:, NL-timeline.current-2] = QZ[:NE]
             self.qh[:] = QZ[NE:2*NE]
             self.zh[:, NL-timeline.current-2] = QZ[2*NE:]
-#            zh1 = self.pspace.function(array=self.zh[:, NL - timeline.current-2])
-#            val = zh1(ps)
-#            e = np.einsum('i, ij, j->j', ws, val, self.cellmeasure)
-#            self.uh[:, NL-timeline.current-1] = max(0, np.sum(e)/np.sum(self.cellmeasure)) \
-#                            - self.zh[:, NL - timeline.current-2]
-
-            self.uh[:, NL-timeline.current-1] = self.pspace.integralalg.cell_integral \
-                    (zh1, celltype=True)/np.sum(self.cellmeasure)
+            zh1[:] = self.zh[:, NL-timeline.current-2]
+            e = self.pspace.integralalg.cell_integral(cartesian(zh1))
+            self.uh[:, NL-timeline.current-1] = max(0, np.sum(e)/np.sum(cellmeasure)) \
+                            - self.zh[:, NL - timeline.current-2]
             timeline.current += 1
             sq = sq + dt*self.A@self.qh
         timeline.reset()
         return sq
 
-    def nonlinear_solve(self, maxit=20):
+    def nonlinear_solve(self, maxit=2000):
 
         eu = 1
         k = 1
@@ -301,13 +272,11 @@ class Model():
             uI[:, timeline.current+1] = self.pde.u_solution(bc, (timeline.current+1)*dt)
             timeline.current += 1
         timeline.reset()
-        print('ui', uI)
-        while eu > 1e-4 and k < 20:
-            uh1 = self.uh.copy()
+        while eu > 1e-12 and k < maxit:
+            yh1 = self.yh.copy()
             sp = self.state_solve()
             sq = self.costate_solve()
-            print('uh', self.uh)
-            eu = abs(sum(sum(uh1 - self.uh)))
+            eu = abs(sum(sum(yh1 - self.yh)))
             k = k + 1
             print('eu', eu)
             print('k', k)
@@ -315,30 +284,48 @@ class Model():
         return sp, sq
 
     def L2error(self):
-        dt = self.dt
-        NL = timeline.number_of_time_levels()
+        dt = self.timeline.current_time_step_length()
+        NL = self.timeline.number_of_time_levels()
         T = dt*(NL-1)
-
-#        def f(bc, t):
-#            xx = mesh.bc_to_point(bc)
-#            return (self.pde.p_solution(xx, t) - self.ph(xx))**2
-#        pL2error = self.uspace.integralalg.integral(lambda x: f(x, T))
-        pL2error = self.uspace.integralalg.L2_error(lambda x: \
-                self.pde.p_solution(x, T), self.ph)
-        print(pL2error)
-        tpL2error = self.uspace.integralalg.L2_error(lambda x: \
-                self.pde.tp_solution(x, T), \
-                self.uspace.function(array=self.tph[:, NL-1])) 
-        print(tpL2error)
-
-
+        
+        pL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.p_solution(x, T)), barycentric(self.ph))
+        print('pL2error', pL2error)
+        
+        tpL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.tp_solution(x, T)), \
+                barycentric(self.uspace.function(array=self.tph[:, NL-1])))
+        print('tpL2error', tpL2error)
+        
+        uL2error = self.pspace.integralalg.error(cartesian(lambda x:    
+        self.pde.u_solution(x, T)), cartesian(self.pspace.function(array=self.uh[:, NL-1])))                                                    
+        print('uerror', uL2error)                                           
+        
+        yL2error = self.pspace.integralalg.error(cartesian(lambda x:    
+                self.pde.y_solution(x, T)),             
+                cartesian(self.pspace.function(array=self.yh[:, NL-1])))
+        print('yerror', yL2error)
+        
+        qL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.q_solution(x, T)), barycentric(self.qh))
+        print('qL2error', qL2error)
+        tqL2error = self.uspace.integralalg.error(cartesian(lambda x: \
+                self.pde.tq(x, T, T)), \
+                barycentric(self.uspace.function(array=self.tqh[:, NL-1])))
+        print('tqL2error', tqL2error)
+        
+        zL2error = self.pspace.integralalg.error(cartesian(lambda x:
+            self.pde.z_solution(x, T)),
+            cartesian(self.pspace.function(array=self.zh[:, NL-1])))
+        print('zerror', zL2error)
+    
         return pL2error
 
 
-        
+n = int(sys.argv[1])
 pde = PDE(T = 1)
-timeline = UniformTimeLine(0, 1, 10)
-MFEMModel = Model(pde, timeline, n=3)
+timeline = UniformTimeLine(0, 1, 400)
+MFEMModel = Model(pde, timeline, n=n)
 MFEMModel.nonlinear_solve()
 pL2error = MFEMModel.L2error()
 #state = StateModel(pde, mesh, timeline)

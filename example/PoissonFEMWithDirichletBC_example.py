@@ -13,7 +13,7 @@ from fealpy.boundarycondition import DirichletBC
 from fealpy.tools.show import showmultirate
 
 # solver
-from fealpy.solver import PETScSolver
+from fealpy.solver import PETScSolver, HighOrderLagrangeFEMFastSolver
 from scipy.sparse.linalg import spsolve
 import pyamg
 

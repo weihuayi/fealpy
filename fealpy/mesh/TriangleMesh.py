@@ -687,6 +687,37 @@ class TriangleMesh(Mesh2d):
         pass
 
 
+    def linear_stiff_matrix(self, c=None):
+        """
+        Notes
+        -----
+        线性元的刚度矩阵
+        """
+
+        NN = self.number_of_nodes()
+
+        area = self.cell_area()
+        gphi = self.grad_lambda()
+
+        if callable(c):
+            bc = np.array([1/3, 1/3, 1/3], dtype=self.ftype) 
+            if c.coordtype == 'cartesian':
+                ps = self.bc_to_point(bc)
+                c = c(ps)
+            elif c.coordtype == 'barycentric':
+                c = c(bc)
+        
+        if c is not None:
+            area *= c
+
+        A = gphi@gphi.swapaxes(-1, -2)
+        A *= area[:, None, None]
+
+        cell = self.entity('cell')
+        I = np.broadcast_to(cell[:, :, None], shape=A.shape)
+        J = np.broadcast_to(cell[:, None, :], shape=A.shape)
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return A
 
     def grad_lambda(self):
         node = self.node
@@ -747,11 +778,10 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def cell_area(self, index=None):
+    def cell_area(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
         GD = self.geo_dimension()
-        index = index if index is not None else np.s_[:]
         v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
         v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
@@ -761,18 +791,18 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
-    def bc_to_point(self, bc, etype='cell', index=None):
+    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
         """
 
-        Parameter
-        ---------
-        bc : (3, ) or (NQ, 3)
-        etype : 'cell' or 'edge'
+        Notes
+        ----
+
+        etype 是一个多余的参数， bc 中已经包含这单元类型的信息
         """
+        TD = bc.shape[-1] - 1 #
         node = self.node
-        entity = self.entity(etype) # default  cell
-        index = index if index is not None else np.s_[:]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
+        entity = self.entity(etype=TD)[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
     def edge_bc_to_point(self, bcs, index=None):

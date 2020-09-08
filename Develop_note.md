@@ -58,6 +58,14 @@ The name rules of the number of entity:
 * NFV: the Number of Face Vertices 
 * NCV: the Number of Cell Vertices 
 
+# c: 单元指标
+# f: 面指标
+# e: 边指标
+# v: 顶点个数指标
+# i, j, k, d: 自由度或基函数指标
+# q: 积分点或重心坐标点指标
+# m, n: 空间或拓扑维数指标
+
 
 The basic member data in a mesh:
 * node: a numpy array with shape `(NN, GD)`

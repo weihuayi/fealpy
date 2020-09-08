@@ -23,23 +23,31 @@ class HalfEdgeAVEMTest():
         mu = obj.init_value(fieldstype=fieldstype)
         self.problem = {'objective': obj, 'mesh': mesh, 'x0': mu}
 
-    def run(self, estimator='mix'):
+    def run(self, estimator='grad'):
         problem = self.problem
         options = self.optoptions
         moptions = self.moptions
         model = problem['objective']
+        mesh = problem['mesh']
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes,cellcolor='w')
+        plt.show()
+        #plt.savefig('flower15.png')
+        #plt.savefig('flower15.pdf')
+        #plt.close()
+
+
 
         optalg = SteepestDescentAlg(problem, options)
-        x, f, g, diff = optalg.run(maxit=1)
-        print('1', model.q0[:,-1])
+        x, f, g, diff = optalg.run(maxit=500)
 
         q = np.zeros(model.rho.shape)
         while True:
             print('chiN', moptions['chiN'])
-            if moptions['chiN'] > 25:
+            if moptions['chiN'] > 15:
                 optalg = SteepestDescentAlg(problem, options)
                 x, f, g, diff = optalg.run(maxit=10, eta_ref='etamaxmin')
-            print('2', model.q0[:,-1])
             q = np.zeros(model.rho.shape)
             q[:,0] = model.q0[:,-1]
             q[:,1] = model.q1[:,-1]
@@ -62,7 +70,6 @@ class HalfEdgeAVEMTest():
 
 
                 hmesh.adaptive(eta, aopts)
-                print('NN', mesh.number_of_nodes())
                 mesh = PolygonMesh.from_halfedgemesh(hmesh)
 
                 model.reinit(mesh)
@@ -83,16 +90,15 @@ class HalfEdgeAVEMTest():
 
 
                 if diff < options['FunValDiff']:
-                    break
-                   #if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
-                   #    break
-            myfile=open(str(int(moptions['chiN']))+'mesh.bin','wb')
-            import pickle
-            pickle.dump(problem['mesh'], myfile)
-            myfile.close()
-            model.save_data(str(int(moptions['chiN']))+'.mat')
+                   if (np.max(problem['rho'][:,0]) < 1) and (np.min(problem['rho'][:,0]) >0):
+                       break
+                myfile=open(moptions['rdir'] +'/'+str(int(moptions['chiN']))+'mesh.bin','wb')
+                import pickle
+                pickle.dump(problem['mesh'], myfile)
+                myfile.close()
+                model.save_data(moptions['rdir']+'/'+ str(int(moptions['chiN']))+'.mat')
 
-            moptions['chiN'] +=5
+            moptions['chiN'] +=1
             if moptions['chiN'] >60:
                 break
 
@@ -101,9 +107,10 @@ options = {
         'MaxIters': 5000,
         'MaxFunEvals': 5000,
         'NormGradTol': 1e-6,
-        'FunValDiff': 1e-0,
+        'FunValDiff': 1e-6,
         'StepLength': 2,
         'StepTol': 1e-14,
+        'etarefTol':0.1,
         'Output': True
         }
 
@@ -112,18 +119,18 @@ moptions = scftmodel2d_options(
         nblend = 1,
         nblock = 2,
         ndeg = 100,
-        fA = 0.2,
-        chiAB = 0.25,
+        fA = 0.5,
+        chiAB = 0.15,
         dim = 2,
-        T0 = 20,
-        T1 = 80,
+        T0 = 40,
+        T1 = 160,
         nupdate = 1,
         order = 2,
         rdir = sys.argv[2])
 
 mesh = complex_mesh(r=20, filename = sys.argv[1])
 
-Halftest = HalfEdgeAVEMTest(mesh, fieldstype=3, moptions=moptions,
+Halftest = HalfEdgeAVEMTest(mesh, fieldstype=4, moptions=moptions,
         optoptions=options)
 
 Halftest.run()

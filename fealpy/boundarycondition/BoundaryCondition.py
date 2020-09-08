@@ -12,7 +12,7 @@ class DirichletBC():
     def apply(self, A, F, uh=None, threshold=None):
         space = self.space
         gD = self.gD
-        threshold = self.threshold
+        threshold = self.threshold if threshold is None else threshold
 
         gdof = space.number_of_global_dofs()
         dim = A.shape[0]//gdof
@@ -90,11 +90,13 @@ class NeumannBC():
         threshold = self.threshold if threshold is None else threshold
         space.set_neumann_bc(F, gN, threshold=threshold, q=q)
 
-        
         if A is not None: # pure Neumann condtion
             c = space.integral_basis()
             A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             F = np.r_[F, 0]
+            print('A', A.shape)
+            print('F', F.shape)
+            print('c', c.shape)
             return A, F
         else:
             return F

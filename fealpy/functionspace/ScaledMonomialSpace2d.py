@@ -296,11 +296,11 @@ class ScaledMonomialSpace2d():
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
         phi = self.basis(point, index=index)
-        cell2dof = self.dof.cell2dof
+        cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        return np.einsum(s1, phi, uh[cell2dof[index]])
+        return np.einsum(s1, phi, uh[cell2dof])
 
     @cartesian
     def grad_value(self, uh, point, index=np.s_[:]):
@@ -332,7 +332,7 @@ class ScaledMonomialSpace2d():
         pass
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='cartesian')
         return f
 
     def array(self, dim=None):

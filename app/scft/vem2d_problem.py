@@ -35,7 +35,7 @@ def halfedgemesh(n=4, h=4):
     mesh.uniform_refine(n)
     return mesh
 
-def complex_mesh(r, filename):
+def complex_mesh(r, filename, n):
     import meshio
     mesh = meshio.read(filename)
     node = mesh.points
@@ -56,7 +56,12 @@ def complex_mesh(r, filename):
     nmesh = TriangleMeshWithInfinityNode(mesh)
     ppoint, pcell, pcellLocation =  nmesh.to_polygonmesh()
     pmesh = PolygonMesh(ppoint, pcell, pcellLocation)
-    return pmesh
+    hmesh = HalfEdgeMesh2d.from_mesh(pmesh)
+    hmesh.init_level_info()
+    hmesh.convexity()
+    hmesh.uniform_refine(n=n)
+    mesh = PolygonMesh.from_halfedgemesh(hmesh)
+    return mesh
 
 
 def quadmesh(n=10, L=12):
@@ -119,7 +124,7 @@ def converge_apt_model(fieldstype, options, dataname):
     rho = data['rho']
     mu = data['mu']
     import pickle
-    quadtree1 = open('7558quadtree.bin','rb')
+    quadtree1 = open('25mesh.bin','rb')
     quadtree = pickle.load(quadtree1)
     mesh = quadtree.to_pmesh()
     obj = SCFTVEMModel(mesh, options=options)

@@ -78,8 +78,7 @@ class SCFTVEMModel2d():
         self.nupdate = options['nupdate']
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.F = np.zeros(self.A.shape, dtype = np.float)
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M, self.F)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
 
         self.eta_ref = 0
 
@@ -143,8 +142,8 @@ class SCFTVEMModel2d():
         NV = self.mesh.number_of_vertices_of_cells()
         cell = self.mesh.ds.cell
 
-        barycenter = vemspace.smspace.barycenter
-        area = vemspace.smspace.area
+        barycenter = vemspace.smspace.cellbarycenter
+        area = vemspace.smspace.cellmeasure
         ldof = vemspace.smspace.number_of_local_dofs()
 
         idx = np.repeat(range(NC), NV)
@@ -185,9 +184,8 @@ class SCFTVEMModel2d():
 
         self.A = self.vemspace.stiff_matrix()
         self.M = self.vemspace.mass_matrix()
-        self.F = np.zeros(self.A.shape, dtype = np.float)
 
-        self.smodel = ParabolicVEMSolver2d(self.A, self.M, self.F)
+        self.smodel = ParabolicVEMSolver2d(self.A, self.M)
 
         self.eta_ref= 0
 
@@ -216,7 +214,7 @@ class SCFTVEMModel2d():
             #fields[:, 1] *= chiN
         elif fieldstype == 4:
             def f(p):
-                return np.sin(2*p[..., 0])
+                return np.sin(3*p[..., 0])
             fields[:, 1] += self.vemspace.interpolation(f)
 
         w[:, 0] = fields[:, 0] - fields[:, 1]

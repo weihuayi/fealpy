@@ -1,12 +1,14 @@
 import numpy as np
+import transplant
 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from ..quadrature  import TriangleQuadrature
 from fealpy.functionspace import SurfaceLagrangeFiniteElementSpace
 from fealpy.solver import MatlabSolver
 from ..boundarycondition import DirichletBC
-from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg 
+from fealpy.quadrature.FEMeshIntegralAlg import FEMeshIntegralAlg
 
+from scipy.sparse.linalg import spsolve
 class SurfacePoissonFEMModel():
     def __init__(self, mesh, pde, p, q, p0=None):
         """
@@ -17,6 +19,8 @@ class SurfacePoissonFEMModel():
         self.pde = pde
         self.uh = self.space.function()
         self.uI = self.space.interpolation(pde.solution)
+        #matlab = transplant.Matlab()
+        #self.solver = MatlabSolver(matlab)
 
     def recover_estimate(self, rguh):
         qf = self.integrator
@@ -36,17 +40,17 @@ class SurfacePoissonFEMModel():
 
     def get_right_vector(self):
         b = self.space.source_vector(self.pde.source)
-        b -= np.mean(b)
+        #b -= np.mean(b)
         return b
 
     def solve(self):
-        u = self.pde.solution
-        bc = DirichletBC(self.space, u, self.is_boundary_dof)
-        solver = MatlabSolver()
+        #u = self.pde.solution
+        #bc = DirichletBC(self.space, u, self.is_boundary_dof)
         A = self.get_left_matrix()
         b = self.get_right_vector()
-        AD, b = bc.apply(A, b)
-        self.uh[:] = solver.divide(AD, b)
+        #AD, b = bc.apply(A, b)
+        #self.uh[:] = self.solver.divide(A, b)
+        self.uh[:] = spsolve(A, b)
 
     def is_boundary_dof(self, p):
         isBdDof = np.zeros(p.shape[0], dtype=np.bool)

@@ -27,6 +27,7 @@ class QuadrangleMesh(Mesh2d):
         self.ds = QuadrangleMeshDataStructure(NN, cell)
 
         self.meshtype = 'quad'
+        self.p = 1 # 最低次的四边形 
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -34,6 +35,9 @@ class QuadrangleMesh(Mesh2d):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
+
+    def number_of_corner_nodes(self):
+        return self.ds.NN
 
     def reorder_cell(self, idx):
         NC = self.number_of_cells()

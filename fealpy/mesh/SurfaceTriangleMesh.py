@@ -80,7 +80,7 @@ class SurfaceTriangleMesh():
     def entity_measure(self, etype=2):
         p = self.p
         if etype in {'cell', 2}:
-            return self.area(idx=p+1)
+            return self.area(p+1)
         elif etype in {'edge', 'face', 1}:
             return self.mesh.entity_measure('edge') 
         else:

@@ -76,9 +76,9 @@ class Mesh2d(object):
 
     def entity_measure(self, etype=2, index=np.s_[:]):
         if etype in {'cell', 2}:
-            return self.cell_area(index)
+            return self.cell_area(index=index)
         elif etype in {'edge', 'face', 1}:
-            return self.edge_length(index)
+            return self.edge_length(index=index)
         elif etype in {'node', 0}:
             return 0
         else:
@@ -99,7 +99,9 @@ class Mesh2d(object):
         return bc
 
     def face_unit_normal(self, index=np.s_[:]):
+        print(index.shape)
         v = self.face_unit_tangent(index=index)
+        print('v',v.shape)
         w = np.array([(0,-1),(1,0)])
         return v@w
 

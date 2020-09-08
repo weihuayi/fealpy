@@ -10,3 +10,5 @@ from .FEMeshIntegralAlg import FEMeshIntegralAlg
 from .PolygonMeshIntegralAlg import PolygonMeshIntegralAlg
 from .PolyhedronMeshIntegralAlg import PolyhedronMeshIntegralAlg
 
+from .TensorProductQuadrature import TensorProductQuadrature
+
