@@ -109,10 +109,10 @@ class WaterFloodingModel():
         self.rock = {
             'permeability': 2, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
-            'lame':(1.0e+8, 3.0e+8), # lambda and mu 拉梅常数
+            'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
             'biot': 1.0,
             'initial pressure': 3, # MPa
-            'initial stress': 60.66, # MPa 初始应力 sigma_0 
+            'initial stress': 60.66+86.5, # MPa 初始应力 sigma_0 
             'solid grain stiffness': 6.25 # MPa
             }
         self.water = {
@@ -200,7 +200,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=3600, NS=32, NT=3600):
+    def __init__(self, model, T=10*3600*24, NS=32, NT=10*60*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -233,17 +233,18 @@ class WaterFloodingModelSolver():
         self.cphi[:] = self.phi
 
         # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
-        self.fg = self.cspace.function()
+        self.fo = self.cspace.function()
+        self.fo[-1] = -self.model.oil['production rate'] # 产出
+
         self.fw = self.cspace.function()
-        self.fg[0] = self.model.water['injection rate'] # 注入
-        self.fw[-1] = -self.model.oil['production rate'] # 产出
+        self.fw[0] = self.model.water['injection rate'] # 注入
 
 
         # 一些常数矩阵和向量
 
         # (\nu \nabla S_w, \nabla v), 饱和度方程稳定项的值
         # TODO: 采用论文中的稳定项
-        self.A = 1e-9*self.cspace.stiff_matrix() # 稳定项
+        #self.A = 1e-7*self.cspace.stiff_matrix() # 稳定项
 
         # 速度散度矩阵, 速度方程对应的散度矩阵, (\nabla\cdot v, w) 
         self.B = self.vspace.div_matrix()
@@ -277,8 +278,8 @@ class WaterFloodingModelSolver():
         self.FU[cgdof:] -= self.p@self.PU1
 
         # 初始应力项
-        #self.FU[:cgdof] -= sigma0@self.PU0
-        #self.FU[cgdof:] -= sigma0@self.PU1
+        self.FU[:cgdof] -= sigma0@self.PU0
+        self.FU[cgdof:] -= sigma0@self.PU1
 
         # vtk 文件输出
         node, cell, cellType, NC = self.mesh.to_vtk()
@@ -395,7 +396,6 @@ class WaterFloodingModelSolver():
 
         Sw = self.cs.value(bc) # 当前水的饱和度系数
         lamw = self.model.water_relative_permeability(Sw)
-        print('lamw:', lamw[0])
         lamw /= self.model.water['viscosity'] 
         lamo = self.model.oil_relative_permeability(Sw)
         lamo /= self.model.oil['viscosity'] 
@@ -498,7 +498,7 @@ class WaterFloodingModelSolver():
 
         # 组装压强方程的右端向量
         # * 这里利用了压强空间基是分片常数
-        FP = self.fg.value(bcs) + self.fw.value(bcs) # (NQ, NC)
+        FP = self.fo.value(bcs) + self.fw.value(bcs) # (NQ, NC)
         FP *= ws[:, None]
 
         FP = np.sum(FP, axis=0)
@@ -598,7 +598,7 @@ class WaterFloodingModelSolver():
         FS += SU0@self.u[:, 0] # 上一时间步的位移, 共有两个分量
         FS += SU1@self.u[:, 1] 
 
-        S += dt*self.A # 质量矩阵加上稳定项矩阵
+        #S += dt*self.A # 质量矩阵加上稳定项矩阵
 
         isBdDof = np.zeros(cgdof, dtype=np.bool_) 
 
@@ -676,7 +676,6 @@ class WaterFloodingModelSolver():
             start = end
             end += cgdof
             self.cu[:, 1] = x[start:end]
-
             print(e0)
 
             if k >= maxit: 
@@ -689,9 +688,10 @@ class WaterFloodingModelSolver():
         self.s[:] = self.cs
         flag = self.s < 0.0
         self.s[flag] = 0.0
+        print('s:', self.s[0])
         self.u[:] = self.cu
 
-    def solve(self, step=10):
+    def solve(self, step=30):
         """
 
         Notes
@@ -704,7 +704,8 @@ class WaterFloodingModelSolver():
         dt = timeline.current_time_step_length()
         timeline.reset() # 时间置零
 
-        fname = 'test_'+ str(timeline.current).zfill(10) + '.vtu'
+        n = timeline.current
+        fname = 'test_'+ str(n).zfill(10) + '.vtu'
         print(fname)
         self.write_to_vtk(fname)
         while not timeline.stop():
@@ -712,7 +713,8 @@ class WaterFloodingModelSolver():
             self.update_solution()
             timeline.current += 1
             if timeline.current%step == 0:
-                fname = 'test_'+ str(timeline.current).zfill(10) + '.vtu'
+                n = timeline.current
+                fname = 'test_'+ str(n).zfill(10) + '.vtu'
                 print(fname)
                 self.write_to_vtk(fname)
         timeline.reset()

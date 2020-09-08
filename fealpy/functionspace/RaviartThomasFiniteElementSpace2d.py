@@ -436,7 +436,7 @@ class RaviartThomasFiniteElementSpace2d:
         return val
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='barycentric')
         return f
 
     def project(self, u):
