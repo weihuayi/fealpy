@@ -338,6 +338,7 @@ class WaterFloodingModelSolver():
 
         return val
 
+    @barycentric
     def flux_coefficient(self, bc):
         """
         Notes
@@ -374,17 +375,20 @@ class WaterFloodingModelSolver():
 
         return val
 
+    @barycentric
     def stabilization_coefficient(self, bc):
         """
         Notes
         -----
         稳定项系数, 这里暂时假设为常数
         """
-        alpha = 0.1
-        beta = 0.2
-        CR = 1.0
-        return 0.01
+        Sw = self.cs.value(bc) # 当前水的饱和度系数
+        Sw *= 0.001
+        Sw *= np.sqrt(np.sum(self.cv.value(bc)**2, axis=-1)) # 当前速度值
 
+        return Sw 
+
+    @barycentric
     def water_fractional_flow_coefficient(self, bc):
         """
 
@@ -598,7 +602,8 @@ class WaterFloodingModelSolver():
         FS += SU0@self.u[:, 0] # 上一时间步的位移, 共有两个分量
         FS += SU1@self.u[:, 1] 
 
-        #S += dt*self.A # 质量矩阵加上稳定项矩阵
+        A = self.cspace(c=self.stabilization_coefficient)
+        S += dt*A # 质量矩阵加上稳定项矩阵
 
         isBdDof = np.zeros(cgdof, dtype=np.bool_) 
 
