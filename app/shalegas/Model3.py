@@ -173,7 +173,7 @@ class WaterFloodingModel():
         """
         val = self.krw(Sw)
         val[Sw<0.2] = 0.0
-        val[Sw>0.7] = 0.390600 
+        val[val>1.0] = 1.0 
         return val
 
     def oil_relative_permeability(self, Sw):
@@ -185,7 +185,7 @@ class WaterFloodingModel():
         """
         val = self.kro(Sw)
         val[Sw>0.7] = 0.0
-        val[Sw<0.2] = 0.51020 
+        val[val>1.0] = 1.0 
         return val
 
     def gas_relative_permeability(self, Sw):
@@ -215,7 +215,6 @@ class WaterFloodingModelSolver():
         self.p = self.pspace.function() # 压强函数
         self.s = self.pspace.function() # 水的饱和度函数 默认为0, 初始时刻区域内水的饱和度为0
         self.u = self.cspace.function(dim=2) # 位移函数
-
         self.phi = self.pspace.function() # 孔隙度函数, 分片常数
 
         # 当前时刻物理量的值, 用于保存临时计算出的值, 模型中系数的计算由当前时刻
@@ -247,11 +246,11 @@ class WaterFloodingModelSolver():
 
         # 压强方程对应的位移散度矩阵, (\nabla\cdot u, w) 位移散度矩阵
         # * 注意这里利用了压强空间分片常数, 线性函数导数也是分片常数的事实
-        cellmeasure = self.mesh.entity_measure('cell')
-        cellmeasure *= self.model.rock['biot']
+        c = self.mesh.entity_measure('cell')
+        c *= self.model.rock['biot']
 
-        gphi = self.mesh.grad_lambda() # (NC, TD+1, GD)
-        gphi *= cellmeasure[:, None, None]
+        val = self.mesh.grad_lambda() # (NC, TD+1, GD)
+        val *= c[:, None, None]
         pc2d = self.pspace.cell_to_dof()
         cc2d = self.cspace.cell_to_dof()
         pgdof = self.pspace.number_of_global_dofs()
@@ -259,11 +258,11 @@ class WaterFloodingModelSolver():
         I = np.broadcast_to(pc2d, shape=cc2d.shape)
         J = cc2d 
         self.PU0 = csr_matrix(
-                (gphi[..., 0].flat, (I.flat, J.flat)), 
+                (val[..., 0].flat, (I.flat, J.flat)), 
                 shape=(pgdof, cgdof)
                 )
         self.PU1 = csr_matrix(
-                (gphi[..., 1].flat, (I.flat, J.flat)),
+                (val[..., 1].flat, (I.flat, J.flat)),
                 shape=(pgdof, cgdof)
                 )
 
@@ -287,8 +286,7 @@ class WaterFloodingModelSolver():
         self.cellType = cellType
 
 
-    @barycentric
-    def pressure_coefficient(self, bc):
+    def pressure_coefficient(self):
 
         """
 
@@ -302,10 +300,9 @@ class WaterFloodingModelSolver():
         cw = self.model.water['compressibility']
         co = self.model.oil['compressibility']
 
-        Sw = self.cs.value(bc) # 当前的水饱和度 (NQ, NC)
+        Sw = self.cs[:].copy() # 当前的水饱和度 (NQ, NC)
 
-        ps = self.mesh.bc_to_point(bc)
-        phi = self.cphi.value(ps) # 当前的孔隙度
+        phi = self.cphi[:].copy() # 当前的孔隙度
 
         val = phi*Sw*cw
         val += phi*(1 - Sw)*co # 注意这里的 co 是常数, 但在水气混合物条件下应该依赖于压力
@@ -324,17 +321,14 @@ class WaterFloodingModelSolver():
         Ks = self.model.rock['solid grain stiffness']
         cw = self.model.water['compressibility']
 
-        val = self.cs[:] # 当前水饱和度
-
-        ps = self.mesh.bc_to_point(bc)
-        phi = self.cphi[:] # 当前孔隙度
+        val = self.cs[:].copy() # 当前水饱和度
+        phi = self.cphi[:].copy() # 当前孔隙度
 
         val *= (b-phi)/Ks + phi*cw
 
         return val
 
-    @barycentric
-    def flux_coefficient(self, bc):
+    def flux_coefficient(self):
         """
         Notes
         -----
@@ -359,7 +353,8 @@ class WaterFloodingModelSolver():
         # 岩石的绝对渗透率, 这里考虑了量纲的一致性, 压强是 MPa
         k = self.model.rock['permeability']*9.869233e-4  
 
-        Sw = self.cs.value(bc) # 当前水的饱和度系数
+     
+        Sw = self.cs[:].copy() # 当前水的饱和度系数
 
         lamw = self.model.water_relative_permeability(Sw)
         lamw /= muw
@@ -379,7 +374,7 @@ class WaterFloodingModelSolver():
         计算**当前**物理量下, 饱和度方程中, 水的流动性系数
         """
 
-        Sw = self.cs[:] # 当前水的饱和度系数
+        Sw = self.cs[:].copy() # 当前水的饱和度系数
         lamw = self.model.water_relative_permeability(Sw)
         lamw /= self.model.water['viscosity'] 
         lamo = self.model.oil_relative_permeability(Sw)
@@ -435,10 +430,10 @@ class WaterFloodingModelSolver():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         # 速度对应的矩阵  V
-        c = self.flux_coefficient(bcs)
+        c = self.flux_coefficient()
+        c *= cellmeasure
         phi = self.vspace.basis(bcs)
-        V = np.einsum('q, qc, qcin, qcjn, c->cij', ws, c, phi, phi,
-                cellmeasure, optimize=True)
+        V = np.einsum('q, qcin, qcjn, c->cij', ws, phi, phi, c, optimize=True)
 
         c2d = self.vspace.cell_to_dof()
         I = np.broadcast_to(c2d[:, :, None], shape=V.shape)
@@ -477,9 +472,7 @@ class WaterFloodingModelSolver():
         PV = dt*self.B.T
 
         # P 是对角矩阵, 利用分片常数的
-        c = self.pressure_coefficient(bcs) # (NQ, NC)
-        c *= ws[:, None] # 积分权重
-        c = np.sum(c, axis=0)
+        c = self.pressure_coefficient() # (NQ, NC)
         c *= cellmeasure 
         P = diags(c, 0)
 
@@ -507,7 +500,7 @@ class WaterFloodingModelSolver():
         ----
         计算饱和度方程对应的离散系统
 
-        [ SV,  SP,    S, SU0,  SU1] 
+        [ None,  SP,    S, SU0,  SU1] 
 
         """
 
@@ -515,7 +508,7 @@ class WaterFloodingModelSolver():
         bcs, ws = qf.get_quadrature_points_and_weights()
         cellmeasure = self.mesh.entity_measure('cell')
 
-        # SP 是对角矩阵, 利用分片常数的
+        # SP 是对角矩阵 
         c = self.saturation_pressure_coefficient() # (NC, )
         c *= cellmeasure 
         SP = diags(c, 0)
@@ -530,8 +523,8 @@ class WaterFloodingModelSolver():
         c *= cellmeasure 
         val *= c[:, None, None]
 
-        pgdof = self.pspace.number_of_global_dofs()
-        cgdof = self.cspace.number_of_global_dofs()
+        pgdof = self.pspace.number_of_global_dofs() # 压力空间自由度个数
+        cgdof = self.cspace.number_of_global_dofs() # 连续空间自由度个数
 
         pc2d = self.pspace.cell_to_dof()
         cc2d = self.cspace.cell_to_dof()
@@ -551,7 +544,12 @@ class WaterFloodingModelSolver():
 
         # 右端矩阵
         dt = self.timeline.current_time_step_length()
-        FS = dt*self.cspace.source_vector(self.fw)
+        FS = self.fw.value(bcs) # (NQ, NC)
+        FS *= ws[:, None]
+        FS = np.sum(FS, axis=0)
+        FS *= cellmeasure
+        FS *= dt
+
         FS += SP@self.p # 上一时间步的压强 
         FS += S@self.s # 上一时间步的饱和度
         FS += SU0@self.u[:, 0] # 上一时间步的位移 x 分量
@@ -561,18 +559,18 @@ class WaterFloodingModelSolver():
         edge2cell = self.mesh.ds.edge_to_cell()
         isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
 
-        qf = self.mesh.integrator(2, 'edge')
+        qf = self.mesh.integrator(2, 'edge') # 边上的积分公式
         bcs, ws = qf.get_quadrature_points_and_weights()
         edgemeasure = self.mesh.entity_measure('edge') # 所有网格边的长度
 
-        # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
+        # 边的定向法线，它是左边单元的外法线，右边单元内法线。
         en = self.mesh.edge_unit_normal() 
         val0 = np.einsum('qem, em->qe', self.cv.edge_value(bcs), en) # 当前速度和法线的内积
 
         # 水的流动分数, 与水的饱和度有关, 如果饱和度为0, 则为 0
         Fw = self.water_fractional_flow_coefficient()
-        val1 = Fw[edge2cell[:, 0]] 
-        val2 = Fw[edge2cell[:, 1]] 
+        val1 = Fw[edge2cell[:, 0]] # 边的左边单元的水流动分数
+        val2 = Fw[edge2cell[:, 1]] # 边的右边单元的水流动分数 
 
         # 速度边界法向分量为 0 
         val2[isBdEdge] = 0.0 
@@ -590,7 +588,10 @@ class WaterFloodingModelSolver():
         np.add.at(FS, edge2cell[isInEdge, 1], b[isInEdge])  
 
 
-        isBdDof = np.zeros(cgdof, dtype=np.bool_) 
+        isBdDof = np.zeros(pgdof, dtype=np.bool_) 
+
+        print('Fw:', Fw)
+        print('FS:', FS)
 
         return [None, SP, S, SU0, SU1], FS, isBdDof
 
@@ -647,13 +648,16 @@ class WaterFloodingModelSolver():
             end = vgdof
             self.cv[:] = x[start:end]
 
+
             start = end
             end += pgdof
             e0 += np.sum((self.cp - x[start:end])**2)
             self.cp[:] = x[start:end]
 
+
             start = end
-            end += cgdof
+            end += pgdof
+
             e0 += np.sum((self.cs - x[start:end])**2)
             self.cs[:] = x[start:end]
             e0 = np.sqrt(e0) # 误差的 l2 norm
@@ -738,7 +742,7 @@ class WaterFloodingModelSolver():
 
         val = vnp.numpy_to_vtk(s[:])
         val.SetName('saturation')
-        pdata.AddArray(val)
+        cdata.AddArray(val)
 
         val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
         val = vnp.numpy_to_vtk(val)
