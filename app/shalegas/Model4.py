@@ -109,7 +109,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=10*3600*24, NS=32, NT=10*60*24):
+    def __init__(self, model, T=20*3600*24, NS=32, NT=20*60*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -192,6 +192,30 @@ class WaterFloodingModelSolver():
         self.cells = vtk.vtkCellArray()
         self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
         self.cellType = cellType
+
+    def recover(self, val):
+        """
+
+        Notes
+        -----
+        给定一个分片常数的量, 恢复为分片连续的量
+        """
+
+        mesh = self.mesh
+        cell = self.mesh.entity('cell')
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+
+        w = 1/self.mesh.entity_measure('cell') # 恢复权重
+        w = np.broadcast_to(w[:, None], shape=(NC, 3))
+
+        r = np.zeros(NN, dtype=np.float64)
+        d = np.zeros(NN, dtype=np.float64)
+
+        np.add.at(d, cell, w)
+        np.add.at(r, cell, val[:, None]*w)
+
+        return r/d
 
 
     def pressure_coefficient(self):
@@ -500,9 +524,6 @@ class WaterFloodingModelSolver():
 
         isBdDof = np.zeros(pgdof, dtype=np.bool_) 
 
-        print('Fw:', Fw)
-        print('FS:', FS)
-
         return [None, SP, S, SU0, SU1], FS, isBdDof
 
     def get_dispacement_system(self, q=2):
@@ -590,10 +611,8 @@ class WaterFloodingModelSolver():
         self.v[:] = self.cv
         self.p[:] = self.cp
         self.s[:] = self.cs
-        print('s[-1]', self.s[-1])
         flag = self.s < 0.0
         self.s[flag] = 0.0
-        print('s[0]:', self.s[0])
         self.u[:] = self.cu
 
     def solve(self, step=30):
@@ -611,16 +630,16 @@ class WaterFloodingModelSolver():
 
         n = timeline.current
         fname = 'test_'+ str(n).zfill(10) + '.vtu'
-        print(fname)
         self.write_to_vtk(fname)
         while not timeline.stop():
+            ct = timeline.current_time_level()/3600/24 # 天为单位
+            print('当前时刻为第', ct, '天')
             self.picard_iteration()
             self.update_solution()
             timeline.current += 1
             if timeline.current%step == 0:
                 n = timeline.current
                 fname = 'test_'+ str(n).zfill(10) + '.vtu'
-                print(fname)
                 self.write_to_vtk(fname)
         timeline.reset()
 
@@ -646,13 +665,15 @@ class WaterFloodingModelSolver():
         val.SetName('velocity')
         cdata.AddArray(val)
 
-        val = vnp.numpy_to_vtk(p[:])
+        val = self.recover(p[:])
+        val = vnp.numpy_to_vtk(val)
         val.SetName('pressure')
-        cdata.AddArray(val)
+        pdata.AddArray(val)
 
-        val = vnp.numpy_to_vtk(s[:])
+        val = self.recover(s[:])
+        val = vnp.numpy_to_vtk(val)
         val.SetName('saturation')
-        cdata.AddArray(val)
+        pdata.AddArray(val)
 
         val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
         val = vnp.numpy_to_vtk(val)
@@ -680,7 +701,6 @@ if __name__ == '__main__':
         axes.plot(Sw, val0, 'r')
         axes.plot(Sw, val1, 'b')
         plt.show()
-
 
     solver.solve()
 
