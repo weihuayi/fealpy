@@ -5,23 +5,30 @@ Notes
 -----
 这是一个两相流和地质力学耦合的模型, 需要求的量有
 
-* p: 压强
 * v: 总速度
+* p: 压强
 * S_w: 水的饱和度 S_w
 * u: 岩石位移  
+
+速度 RT0 元
+压强 P0 元
+饱和度 P0 元
+岩石位移 P1 连续元离散
 
 目前, 模型
 * 忽略了毛细管压强和重力作用
 * 没有考虑裂缝
 * 饱和度用分片线性间断元求解, 非线性的迎风格式
 
+
+
 渐近解决方案:
 1. Picard 迭代
 2. 气的可压性随着压强的变化而变化
 3. 考虑渗透率随着孔隙度的变化而变化 
-4. 考虑裂缝
+4. 考虑裂缝，裂缝用自适应网格加密，设设置更大的渗透率实现
 
-体积模量:  K = E/3/(1 - 2*nu)
+体积模量:  K = E/3/(1 - 2*nu) = lambda + 2/3* mu
 """
 
 import numpy as np
@@ -50,7 +57,7 @@ class WaterFloodingModel():
             'biot': 1.0,
             'initial pressure': 3, # MPa
             'initial stress': 60.66+86.5, # MPa 初始应力 sigma_0 , sigma_eff
-            'solid grain stiffness': 6.25 # MPa 固体体积模量
+            'solid grain stiffness': 2.0e+2 # MPa 固体体积模量
             }
         self.water = {
             'viscosity': 1, # 1 cp = 1 mPa*s
@@ -109,7 +116,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=20*3600*24, NS=32, NT=20*60*24):
+    def __init__(self, model, T=30*3600*24, NS=32, NT=3*60*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
