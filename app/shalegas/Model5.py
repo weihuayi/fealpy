@@ -625,7 +625,7 @@ class WaterFloodingModelSolver():
 
         # 用当前时刻的速度场, 构造非线性迎风格式
         face2cell = self.mesh.ds.face_to_cell()
-        isBdFace = Face2cell[:, 0] == Face2cell[:, 1]
+        isBdFace = face2cell[:, 0] == face2cell[:, 1]
 
         qf = self.mesh.integrator(2, 'face') # 边上的积分公式
         bcs, ws = qf.get_quadrature_points_and_weights()
