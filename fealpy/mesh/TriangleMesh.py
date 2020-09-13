@@ -141,23 +141,46 @@ class TriangleMesh(Mesh2d):
         h = self.entity_measure('edge')
         isShortEdge = h < h0
 
+    def find_segment_location(self, point, edge):
+        """
 
-    def line_walk(self, p):
+        Notes
+        -----
+
+        给定一组边，找到每条边穿过的单元 
+        """
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
-        NP = p.shape[0]
+        node = self.entity('node')
         cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
 
-        cidx = np.random.randint(0, NC, NP)
-        isNotOK = np.ones(NP, dtype=np.bool)
-        while isNotOK.sum() > 0:
-            idx0, = np.find(isNotOK)
+        # 用于标记被线段穿过的网格节点，这些节点周围的单元都会被标记为
+        # 穿过单元，这样保持了连通性
+        isCutNode = np.zeros(NN, dtype=np.bool_)
+
+
+        isCutCell = np.zeros(NC, dtype=np.bool_)
+        locaction = self.find_point_location(point)
+        isCutCell[locaction] = True
+
+
+
+        # 从一个顶点所在的单元出发，走到另一个单元
+
+        p = point[edge[:, 1]] # 目标点
+        cidx = locaction[edge[:, 0]] # 出发单元
+        NP = p.shape[0]
+
+        isNotOK = np.ones(NP, dtype=np.bool_)
+        while np.any(isNotOK):
             cidx0 = cidx[isNotOK]
             pp = p[isNotOK]
 
             a = np.zeros((len(cidx0), 3), dtype=self.ftype)
-            p0 = cell[cidx0, 0]
-            p1 = cell[cidx0, 1]
-            p2 = cell[cidx0, 2]
+            p0 = node[cell[cidx0, 0]] # 所在单元的三个顶点
+            p1 = node[cell[cidx0, 1]]
+            p2 = node[cell[cidx0, 2]]
 
             v0 = p0 - pp
             v1 = p1 - pp
@@ -165,9 +188,86 @@ class TriangleMesh(Mesh2d):
             a[:, 0] = np.cross(v1, v2)
             a[:, 1] = np.cross(v2, v0)
             a[:, 2] = np.cross(v0, v1)
+
+            idx = np.argmin(a, axis=-1) 
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), idx] < 0.0 
+
+            idx0, = np.nonzero(isNotOK)
+            cidx[idx0[isOutCell]] = cell2cell[cidx0[isOutCell], idx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+            # 如果直线与单元的边重合， 则边的两侧单元需要被标记
+            np.abs(a, out=a)
             idx = np.argmin(a, axis=-1)
 
-            isOK = a[range(a.shape[0]), idx] >= 0
+            isOverlap = a[range(a.shape[0]), idx] < 1e-8 
+            isCutCell[cell2cell[cidx0[isOverlap], idx[isOverlap]]] = True
+
+
+            isCutCell[cidx] = True
+
+
+        # 处理边经过单元的连通性
+
+        cidx, = np.nonzero(isCutCell)
+
+        return cidx
+
+
+
+
+
+
+    def find_point_location(self, p, cidx=None):
+        """
+        Notes
+        -----
+        给定一组点 p ， 找到这些点所在的单元
+
+        这里假设：
+
+        1. 所有点在网格内部，
+        2. 网格中没有洞
+        3. 区域还要是凸的
+        """
+
+        NC = self.number_of_cells()
+        NP = p.shape[0]
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
+
+        if cidx is None:
+            cidx = np.random.randint(0, NC, NP) # 设置一个初始单元位置
+
+        isNotOK = np.ones(NP, dtype=np.bool)
+        while np.any(isNotOK):
+            cidx0 = cidx[isNotOK]
+            pp = p[isNotOK]
+
+            a = np.zeros((len(cidx0), 3), dtype=self.ftype)
+            p0 = node[cell[cidx0, 0]] # 所在单元的三个顶点
+            p1 = node[cell[cidx0, 1]]
+            p2 = node[cell[cidx0, 2]]
+
+            v0 = p0 - pp
+            v1 = p1 - pp
+            v2 = p2 - pp
+            a[:, 0] = np.cross(v1, v2)
+            a[:, 1] = np.cross(v2, v0)
+            a[:, 2] = np.cross(v0, v1)
+            idx = np.argmin(a, axis=-1) 
+
+            # 最小面积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), idx] < 0.0 
+
+            idx0, = np.nonzero(isNotOK)
+            cidx[idx0[isOutCell]] = cell2cell[cidx0[isOutCell], idx[isOutCell]]
+            isNotOK[idx0[~isOutCell]] = False
+
+        return cidx
 
     def circumcenter(self):
         node = self.node
