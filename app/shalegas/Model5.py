@@ -44,6 +44,8 @@ from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
 
+import pyamg 
+
 import vtk
 import vtk.util.numpy_support as vnp
 
@@ -724,6 +726,7 @@ class WaterFloodingModelSolver():
             F[isBdDof] = 0.0
 
             # 求解
+
             x = spsolve(A, F)
 
             vgdof = self.vspace.number_of_global_dofs()

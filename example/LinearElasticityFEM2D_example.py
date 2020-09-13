@@ -3,7 +3,7 @@
 import sys
 
 import numpy as np
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import spsolve, cg
 
 import matplotlib.pyplot as plt
 
@@ -11,6 +11,9 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC, NeumannBC
+
+import pyamg
+from timeit import default_timer as timer
 
 class BoxDomain2DData():
     def __init__(self, E=1e+5, nu=0.2):
@@ -105,7 +108,17 @@ A = space.linear_elasticity_matrix(pde.mu, pde.lam) # (2*gdof, 2*gdof)
 F = space.source_vector(pde.source, dim=2) 
 F = bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
-uh.T.flat[:] = spsolve(A, F) # (2, gdof ).flat
+
+if False:
+    uh.T.flat[:] = spsolve(A, F) # (2, gdof ).flat
+else:
+    ml = pyamg.rootnode_solver(A)                     # AMG solver
+    M = ml.aspreconditioner(cycle='V')             # preconditioner
+    start = timer()
+    uh.T.flat[:], info = cg(A, F, tol=1e-8, maxiter=100, M=M)   # solve with CG
+    end = timer()
+    print('time:', end - start)
+
 
 # 原始的网格
 mesh.add_plot(plt)
