@@ -180,7 +180,11 @@ class ParametricLagrangeFiniteElementSpace:
         phi = self.mesh.shape_function(bcs, p=self.p)
 
         # 组装单元矩阵
-        M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+        if c is None:
+            M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+        else:
+            # 这里默认 c 是一个长度为 NC 的一维数组
+            M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
 
         cell2dof = self.cell_to_dof() # (NC, ldof)
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape) # (NC, ldof, ldof)
