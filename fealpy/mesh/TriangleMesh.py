@@ -799,6 +799,7 @@ class TriangleMesh(Mesh2d):
 
         etype 是一个多余的参数， bc 中已经包含这单元类型的信息
         """
+        print('`etype` will be removed in the future!')
         TD = bc.shape[-1] - 1 #
         node = self.node
         entity = self.entity(etype=TD)[index]
