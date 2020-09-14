@@ -141,14 +141,19 @@ class TriangleMesh(Mesh2d):
         h = self.entity_measure('edge')
         isShortEdge = h < h0
 
-    def find_segment_location(self, point, edge):
+    def find_segment_location(self, point, segment):
         """
 
         Notes
         -----
 
-        给定一组边，找到每条边穿过的单元 
+        给定一组线段，找到这些线段的一个邻域单元集合, 且这些单元要满足一定的连通
+        性
         """
+
+        nx = np.array([1, 2, 0])
+        pr = np.array([2, 0, 1])
+
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         node = self.entity('node')
@@ -156,7 +161,7 @@ class TriangleMesh(Mesh2d):
         cell2cell = self.ds.cell_to_cell()
 
         # 用于标记被线段穿过的网格节点，这些节点周围的单元都会被标记为
-        # 穿过单元，这样保持了连通性
+        # 穿过单元，这样保持了加密单元的连通性
         isCutNode = np.zeros(NN, dtype=np.bool_)
 
 
@@ -168,14 +173,15 @@ class TriangleMesh(Mesh2d):
 
         # 从一个顶点所在的单元出发，走到另一个单元
 
-        p = point[edge[:, 1]] # 目标点
-        cidx = locaction[edge[:, 0]] # 出发单元
+        p = point[segment[:, 0]] # 目标点
+        cidx = locaction[segment[:, 1]] # 出发单元
         NP = p.shape[0]
 
         isNotOK = np.ones(NP, dtype=np.bool_)
         while np.any(isNotOK):
             cidx0 = cidx[isNotOK]
             pp = p[isNotOK]
+            ss = segment[isNotOK]
 
             a = np.zeros((len(cidx0), 3), dtype=self.ftype)
             p0 = node[cell[cidx0, 0]] # 所在单元的三个顶点
@@ -202,22 +208,40 @@ class TriangleMesh(Mesh2d):
             np.abs(a, out=a)
             idx = np.argmin(a, axis=-1)
 
-            isOverlap = a[range(a.shape[0]), idx] < 1e-8 
-            isCutCell[cell2cell[cidx0[isOverlap], idx[isOverlap]]] = True
+            isOverlap = a[range(a.shape[0]), idx] < 1e-12 
+            if np.any(isOverlap):
+                idx0 = cell[cidx0[isOverlap], nx[idx[isOverlap]]]
+                p0 = point[ss[isOverlap, 0]]
+                p1 = point[ss[isOverlap, 1]]
 
+                flag = np.abs(np.cross(p0 - node[idx0], p1 - node[idx0])) < 1e-12
+                isCutNode[idx0[flag]] = True
+
+                idx1 = cell[cidx0[isOverlap], pr[idx[isOverlap]]]
+                flag = np.abs(np.cross(p0 - node[idx1], p1 - node[idx1])) < 1e-12
+                isCutNode[idx1[flag]] = True
 
             isCutCell[cidx] = True
 
 
-        # 处理边经过单元的连通性
+        # 处理被线段穿过的网格点的连通性
 
-        cidx, = np.nonzero(isCutCell)
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        isFEdge0 = isCutCell[edge2cell[:, 0]] & (~isCutCell[edge2cell[:, 1]])
+        isFEdge1 = (~isCutCell[edge2cell[:, 0]]) & isCutCell[edge2cell[:, 1]]
+        flag = isFEdge0 | isFEdge1
 
-        return cidx
+        if np.any(flag):
+            valence = np.zeros(NN, dtype=self.itype)
+            np.add.at(valence, edge[flag], 1)
+            isCutNode[valence > 2] = True
 
+            for i in range(3):
+                np.logical_or.at(isCutCell, range(NC), isCutNode[cell[:, i]])
 
-
-
+        
+        return isCutCell
 
 
     def find_point_location(self, p, cidx=None):
