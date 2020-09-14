@@ -55,7 +55,7 @@ class WaterFloodingModel2d():
     def __init__(self):
         self.domain=[0, 10, 0, 10] # m
         self.rock = {
-            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
             'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
             'biot': 1.0,
@@ -118,7 +118,7 @@ class WaterFloodingModel3d():
     def __init__(self):
         self.domain=[0, 10, 0, 10, 0, 10] # m
         self.rock = {
-            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
             'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
             'biot': 1.0,
@@ -182,7 +182,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=20*3600*24, NS=32, NT=20*60*24):
+    def __init__(self, model, T=100*3600*24, NS=32, NT=10*60*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -853,17 +853,6 @@ if __name__ == '__main__':
 
     model = WaterFloodingModel2d()
     solver = WaterFloodingModelSolver(model)
-
-
-    if False:
-        Sw = np.linspace(0, 1)
-        val0 = model.krw(Sw)
-        val1 = model.kro(Sw)
-        fig = plt.figure()
-        axes = fig.gca()
-        axes.plot(Sw, val0, 'r')
-        axes.plot(Sw, val1, 'b')
-        plt.show()
 
     solver.solve()
 
