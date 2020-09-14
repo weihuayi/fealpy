@@ -49,12 +49,12 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         if self.surface is not None:
             self.node, _ = self.surface.project(self.node)
-   
 
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
+
 
     def reference_cell_measure(self):
         return 1

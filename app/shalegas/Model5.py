@@ -55,7 +55,7 @@ class WaterFloodingModel2d():
     def __init__(self):
         self.domain=[0, 10, 0, 10] # m
         self.rock = {
-            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
             'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
             'biot': 1.0,
@@ -182,7 +182,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=10*3600*24, NS=32, NT=1*60*24):
+    def __init__(self, model, T=20*3600*24, NS=32, NT=20*60*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -753,7 +753,7 @@ class WaterFloodingModelSolver():
             e0 = np.sqrt(e0) # 误差的 l2 norm
             k += 1
 
-            for i in GD:
+            for i in range(GD):
                 start = end
                 end += cgdof
                 self.cu[:, i] = x[start:end]
@@ -851,7 +851,7 @@ class WaterFloodingModelSolver():
 
 if __name__ == '__main__':
 
-    model = WaterFloodingModel3d()
+    model = WaterFloodingModel2d()
     solver = WaterFloodingModelSolver(model)
 
 
