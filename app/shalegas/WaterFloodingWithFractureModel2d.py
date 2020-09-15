@@ -21,15 +21,15 @@ class WaterFloodingWithFractureModel2d():
         self.rock = {
             'permeability': 2, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
-            'lame':(1.0e+8, 3.0e+8), # lambda and mu 拉梅常数, Pa
+            'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
             'biot': 1.0,
-            'initial pressure': 3e+6, # Pa
-            'initial stress': 2.0e+8, # Pa 初始应力 sigma_0 , sigma_eff
-            'solid grain stiffness': 2.0e+8, # Pa 固体体积模量
+            'initial pressure': 3, # MPa
+            'initial stress': 2.0e+2, # MPa 初始应力 sigma_0 , sigma_eff
+            'solid grain stiffness': 2.0e+2, # MPa 固体体积模量
             }
 
         self.fracture = {
-            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 4, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
             'point': np.array([
                 (1, 1),
@@ -41,14 +41,14 @@ class WaterFloodingWithFractureModel2d():
 
         self.water = {
             'viscosity': 1, # 1 cp = 1 mPa*s
-            'compressibility': 1.0e-9, # Pa^{-1}
+            'compressibility': 1.0e-3, # MPa^{-1}
             'initial saturation': 0.0, 
             'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
             }
 
         self.oil = {
             'viscosity': 2, # cp
-            'compressibility': 2.0e-9, # Pa^{-1}
+            'compressibility': 2.0e-3, # MPa^{-1}
             'initial saturation': 1.0, 
             'production rate': 3.50e-6 # s^{-1}, 每秒产出多少油
             }
