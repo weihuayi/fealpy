@@ -182,7 +182,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=100*3600*24, NS=32, NT=10*60*24):
+    def __init__(self, model, T=800*3600*24, NS=32, NT=800*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -772,7 +772,7 @@ class WaterFloodingModelSolver():
         #self.s[flag] = 0.0
         self.u[:] = self.cu
 
-    def solve(self, step=30):
+    def solve(self, step=24):
         """
 
         Notes
