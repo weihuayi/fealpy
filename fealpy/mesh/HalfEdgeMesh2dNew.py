@@ -320,6 +320,58 @@ class HalfEdgeMesh2d(Mesh2d):
             if len(badHEdge)==0:
                 break
 
+    def location(self, points):
+        halfedge = self.entity('halfedge')
+        node = self.entity('node')
+        hcell = self.ds.hcell
+
+        NP = points.shape[0]
+        cell = np.ones(NP, dtype=self.itype)
+        isNotOK = np.ones(NP, dtype=np.bool_)
+        while isNotOK.any():
+            cell2hedge = np.c_[hcell[cell],
+                    halfedge[hcell[cell], 2], halfedge[hcell[cell], 3]].T
+            cell2vector = node[halfedge[cell2hedge, 0]] - node[halfedge[
+                halfedge[cell2hedge, 3], 0]]
+            vector = x - node[halfedge[halfedge[cell2hedge, 3], 0]]
+            area = np.cross(cell2vector, vector)
+            idx, jdx = np.where(area<0)
+            isNotOK[:] = False
+            isNotOK[jdx]=True
+            cell[jdx] = halfedge[halfedge[cell2hedge[idx, jdx], 4], 1]
+        return cell
+
+    def line_to_cell(self, point, segment):
+        halfedge = self.entity('halfedge')
+        node = self.entity('node')
+        hcell = self.ds.hcell
+        NC = self.ds.number_of_all_cells()
+
+        x = point[segment[:, 0]]
+        y = point[segment[:, 1]]
+
+        start = self.node_to_cell(x)
+        end = self.node_to_cell(y)
+        isCrossCell = np.zeros(NC, dtype=np.bool_)
+        isCrossCell[start] = True
+        vector = x-y
+
+        while len(start)>0:
+            cell2hedge = np.c_[hcell[start],
+                    halfedge[hcell[start], 2], halfedge[hcell[start], 3]].T
+            cell2vector = node[halfedge[cell2hedge, 0]] - y
+            area = np.cross(cell2vector, vector)
+            area0 = np.r_['0', np.array([area[-1]]), area[:-1]]
+            flag = ((area>=0)&(area0<0)).T
+            start = halfedge[halfedge[cell2hedge.T[flag], 4], 1]
+            isCrossCell[start] = True
+            flag = (start==end)
+            start = start[~flag]
+            end = end[~flag]
+            y = y[~flag]
+            vector = vector[~flag]
+        return isCrossCell, np.where(isCrossCell)
+
     def number_of_all_cells(self):
         return self.ds.number_of_all_cells()
 

@@ -141,7 +141,7 @@ class TriangleMesh(Mesh2d):
         h = self.entity_measure('edge')
         isShortEdge = h < h0
 
-    def find_segment_location(self, point, segment):
+    def find_crossed_cell(self, point, segment):
         """
 
         Notes
@@ -162,89 +162,94 @@ class TriangleMesh(Mesh2d):
 
         # 用于标记被线段穿过的网格节点，这些节点周围的单元都会被标记为
         # 穿过单元，这样保持了加密单元的连通性
-        isCutNode = np.zeros(NN, dtype=np.bool_)
+        isCrossedNode = np.zeros(NN, dtype=np.bool_)
+        isCrossedCell = np.zeros(NC, dtype=np.bool_)
+
+        # 找到线段端点所属的网格单元， 并标记为穿过单元
+        location = self.location(point)
+        isCrossedCell[location] = True
 
 
-        isCutCell = np.zeros(NC, dtype=np.bool_)
-        locaction = self.find_point_location(point)
-        isCutCell[locaction] = True
+        # 从一个端点所在的单元出发，走到另一个端点所在的单元
+        p0 = point[segment[:, 0]] # 线段起点
+        p1 = point[segment[:, 1]] # 线段终点
+        v = p0 - p1
 
+        start = location[segment[:, 0]] # 出发单元
+        end = location[segment[:, 1]] # 终止单元
 
+        isNotOK = np.ones(len(segment), dtype=np.bool_) 
+        while isNotOK.any():
+            idx = start[isNotOK] # 当前单元 
 
-        # 从一个顶点所在的单元出发，走到另一个单元
+            pp0 = p0[isNotOK]
+            pp1 = p1[isNotOK]
+            vv = v[isNotOK]
 
-        p = point[segment[:, 0]] # 目标点
-        cidx = locaction[segment[:, 1]] # 出发单元
-        NP = p.shape[0]
+            a = np.zeros((len(idx), 3), dtype=self.ftype)
+            v0 = node[cell[idx, 0]] - pp1 # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp1
+            v2 = node[cell[idx, 2]] - pp1
+            a[:, 0] = np.cross(v0, vv)
+            a[:, 1] = np.cross(v1, vv)
+            a[:, 2] = np.cross(v2, vv)
 
-        isNotOK = np.ones(NP, dtype=np.bool_)
-        while np.any(isNotOK):
-            cidx0 = cidx[isNotOK]
-            pp = p[isNotOK]
-            ss = segment[isNotOK]
+            
+            b = np.zeros((len(idx), 3), dtype=self.ftype)
+            b[:, 0] = np.cross(v1, v2)
+            b[:, 1] = np.cross(v2, v0)
+            b[:, 2] = np.cross(v0, v1)
 
-            a = np.zeros((len(cidx0), 3), dtype=self.ftype)
-            p0 = node[cell[cidx0, 0]] # 所在单元的三个顶点
-            p1 = node[cell[cidx0, 1]]
-            p2 = node[cell[cidx0, 2]]
-
-            v0 = p0 - pp
-            v1 = p1 - pp
-            v2 = p2 - pp
-            a[:, 0] = np.cross(v1, v2)
-            a[:, 1] = np.cross(v2, v0)
-            a[:, 2] = np.cross(v0, v1)
-
-            idx = np.argmin(a, axis=-1) 
-
-            # 最小面积小于 0, 说明点在单元外
-            isOutCell = a[range(a.shape[0]), idx] < 0.0 
-
+            isOK = np.sum(b >=0, axis=-1) == 3
             idx0, = np.nonzero(isNotOK)
-            cidx[idx0[isOutCell]] = cell2cell[cidx0[isOutCell], idx[isOutCell]]
-            isNotOK[idx0[~isOutCell]] = False
 
-            # 如果直线与单元的边重合， 则边的两侧单元需要被标记
-            np.abs(a, out=a)
-            idx = np.argmin(a, axis=-1)
+            print('start:', start)
+            print('end:', end)
+            for i in range(3):
+                flag = np.abs(a[:, i]) < 1e-12
+                isCrossedNode[cell[idx[flag], i]] = True
 
-            isOverlap = a[range(a.shape[0]), idx] < 1e-12 
-            if np.any(isOverlap):
-                idx0 = cell[cidx0[isOverlap], nx[idx[isOverlap]]]
-                p0 = point[ss[isOverlap, 0]]
-                p1 = point[ss[isOverlap, 1]]
+            lidx = np.zeros(len(idx), dtype=np.int_)
+            for i in range(3):
+                j = nx[i]
+                k = pr[i]
+                flag0 = (a[:, j] < 0) & (a[:, k] >0)
+                lidx[flag0] = i
 
-                flag = np.abs(np.cross(p0 - node[idx0], p1 - node[idx0])) < 1e-12
-                isCutNode[idx0[flag]] = True
+            # 移动到下一个单元
+            start[idx0[~isOK]] = cell2cell[idx[~isOK], lidx[~isOK]]
+            isNotOK[idx0[isOK]] = False 
 
-                idx1 = cell[cidx0[isOverlap], pr[idx[isOverlap]]]
-                flag = np.abs(np.cross(p0 - node[idx1], p1 - node[idx1])) < 1e-12
-                isCutNode[idx1[flag]] = True
+            # 这些单元标记为穿过单元
+            isCrossedCell[start] = True
 
-            isCutCell[cidx] = True
 
 
         # 处理被线段穿过的网格点的连通性
 
         edge = self.entity('edge')
         edge2cell = self.ds.edge_to_cell()
-        isFEdge0 = isCutCell[edge2cell[:, 0]] & (~isCutCell[edge2cell[:, 1]])
-        isFEdge1 = (~isCutCell[edge2cell[:, 0]]) & isCutCell[edge2cell[:, 1]]
+        isFEdge0 = isCrossedCell[edge2cell[:, 0]] & (~isCrossedCell[edge2cell[:, 1]])
+        isFEdge1 = (~isCrossedCell[edge2cell[:, 0]]) & isCrossedCell[edge2cell[:, 1]]
         flag = isFEdge0 | isFEdge1
 
         if np.any(flag):
             valence = np.zeros(NN, dtype=self.itype)
             np.add.at(valence, edge[flag], 1)
-            isCutNode[valence > 2] = True
-
+            isCrossedNode[valence > 2] = True
             for i in range(3):
-                np.logical_or.at(isCutCell, range(NC), isCutNode[cell[:, i]])
+                np.logical_or.at(isCrossedCell, range(NC), isCrossedNode[cell[:, i]])
 
+<<<<<<< HEAD
 
         return isCutCell
+=======
+        
+        return isCrossedCell
+>>>>>>> upstream/master
 
 
-    def find_point_location(self, p, cidx=None):
+    def location(self, points, start=None):
         """
         Notes
         -----
@@ -258,40 +263,37 @@ class TriangleMesh(Mesh2d):
         """
 
         NC = self.number_of_cells()
-        NP = p.shape[0]
+        NP = points.shape[0]
         node = self.entity('node')
         cell = self.entity('cell')
         cell2cell = self.ds.cell_to_cell()
 
-        if cidx is None:
-            cidx = np.random.randint(0, NC, NP) # 设置一个初始单元位置
+        if start is None:
+            start = np.random.randint(0, NC, NP) # 设置一个初始单元位置
 
         isNotOK = np.ones(NP, dtype=np.bool)
         while np.any(isNotOK):
-            cidx0 = cidx[isNotOK]
-            pp = p[isNotOK]
+            idx = start[isNotOK]
+            pp = points[isNotOK]
 
-            a = np.zeros((len(cidx0), 3), dtype=self.ftype)
-            p0 = node[cell[cidx0, 0]] # 所在单元的三个顶点
-            p1 = node[cell[cidx0, 1]]
-            p2 = node[cell[cidx0, 2]]
+            v0 = node[cell[idx, 0]] - pp # 所在单元的三个顶点
+            v1 = node[cell[idx, 1]] - pp 
+            v2 = node[cell[idx, 2]] - pp
 
-            v0 = p0 - pp
-            v1 = p1 - pp
-            v2 = p2 - pp
+            a = np.zeros((len(idx), 3), dtype=self.ftype)
             a[:, 0] = np.cross(v1, v2)
             a[:, 1] = np.cross(v2, v0)
             a[:, 2] = np.cross(v0, v1)
-            idx = np.argmin(a, axis=-1) 
+            lidx = np.argmin(a, axis=-1) 
 
             # 最小面积小于 0, 说明点在单元外
-            isOutCell = a[range(a.shape[0]), idx] < 0.0 
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0 
 
             idx0, = np.nonzero(isNotOK)
-            cidx[idx0[isOutCell]] = cell2cell[cidx0[isOutCell], idx[isOutCell]]
+            start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
             isNotOK[idx0[~isOutCell]] = False
 
-        return cidx
+        return start 
 
     def circumcenter(self):
         node = self.node

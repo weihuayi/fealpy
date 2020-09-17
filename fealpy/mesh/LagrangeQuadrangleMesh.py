@@ -148,8 +148,20 @@ class LagrangeQuadrangleMesh(Mesh2d):
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return p 
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, HB=None):
+        """
+
+        Notes
+        -----
+
+        HB: HB[i] 表示第 i 个网格单元对应的粗网格单元编号
+        """
         p = self.p
+
+        if HB is None:
+            NC = self.number_of_cells()
+            HB = np.arange(NC, dtype=np.int_)
+
         for i in range(n):
             NCN = self.number_of_corner_nodes()
             NE = self.number_of_edges()
@@ -190,6 +202,9 @@ class LagrangeQuadrangleMesh(Mesh2d):
             newCell[3::4, 2] = cell2edge[:, 1]
             newCell[3::4, 3] = cell[:, cp[3]]
 
+            imap = np.broadcast_to(np.arange(NC).reshape(NC, 1), shape=(NC, 4))
+            HB = HB[imap]
+
             node = np.r_['0', self.node[:NCN], edgeCenter, cellCenter]
             ds = LinearQuadrangleMeshDataStructure(node.shape[0], newCell) # 线性网格的数据结构
             self.ds = LagrangeQuadrangleMeshDataStructure(ds, p)
@@ -206,6 +221,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
                 NCN = self.number_of_corner_nodes() # 角点节点的个数
                 if self.surface is not None:
                     self.node[NCN:], _ = self.surface.project(self.node[NCN:])
+        return HB # 每个细网格与最粗网格的对应关系
 
 
     def cell_area(self, q=None, index=np.s_[:]):
