@@ -240,14 +240,7 @@ class TriangleMesh(Mesh2d):
             for i in range(3):
                 np.logical_or.at(isCrossedCell, range(NC), isCrossedNode[cell[:, i]])
 
-<<<<<<< HEAD
-
-        return isCutCell
-=======
-        
         return isCrossedCell
->>>>>>> upstream/master
-
 
     def location(self, points, start=None):
         """

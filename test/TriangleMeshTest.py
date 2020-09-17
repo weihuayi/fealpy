@@ -19,7 +19,7 @@ class TriangleMeshTest():
         point = np.array([[0.2, 0.3], [0.5, 0.8], [1.6, 0.7], [1.2, 0.2]])
         segment = np.array([[0, 2], [1, 3]])
 
-        isCrossCell = mesh.find_segment_location(point, segment)
+        isCrossCell = mesh.find_crossed_cell(point, segment)
         print(np.where(isCrossCell))
         fig = plt.figure()
         axes = fig.gca()
