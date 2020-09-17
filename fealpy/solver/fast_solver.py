@@ -375,7 +375,7 @@ class LinearElasticityLFEMFastSolver():
         A = LinearOperator((GD*gdof, GD*gdof), matvec=self.linear_operator)
         P = LinearOperator((GD*gdof, GD*gdof), matvec=self.preconditioner)
                 
-        uh.T.flat, info = pcg(A, F.T.flat, M=P, tol=1e-8, callback=counter)
+        uh.T.flat, info = cg(A, F.T.flat, M=P, tol=1e-8, callback=counter)
         print("Convergence info:", info)
         print("Number of iteration of pcg:", counter.niter)
 

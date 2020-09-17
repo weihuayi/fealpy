@@ -127,38 +127,51 @@ class ParametricLagrangeFiniteElementSpace:
         val = np.einsum(s1, gphi, uh[cell2dof])
         return val
 
-    def stiff_matrix(self, c=None, q=None, variables='u'):
-        if variables == 'x':
-            gdof = self.number_of_global_dofs()
-            cell2dof = self.cell_to_dof()
-            b0 = (self.grad_basis, cell2dof, gdof)
-            A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
-            return A 
-        elif variables == 'u':
-            p = self.p
-            qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
-            bcs, ws = qf.get_quadrature_points_and_weights()
-            G = self.mesh.first_fundamental_form(bcs)
-            gphi = self.mesh.grad_shape_function(bcs, p=p, variables='u')
+    def stiff_matrix(self, c=None, q=None):
+        """
 
-            rm = self.mesh.reference_cell_measure()
-            d = np.sqrt(np.linalg.det(G))
-            G = np.linalg.inv(G)
-            # c: 单元指标
-            # f: 面指标
-            # e: 边指标
-            # v: 顶点个数指标
-            # i, j, k, d: 自由度或基函数指标
-            # q: 积分点或重心坐标点指标
-            # m, n: 空间或拓扑维数指标
-            A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, G, gphi, d)
+        Notes
+        -----
+        组装刚度矩阵，
 
-            gdof = self.number_of_global_dofs()
-            cell2dof = self.cell_to_dof()
-            I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
-            J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
-            A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-            return A 
+        TODO
+        ----
+        1. 考虑带系数 c 的情况
+        """
+        p = self.p
+        qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        # 参考单元的测度
+        rm = self.mesh.reference_cell_measure()
+
+        # 第一基本形式
+        G = self.mesh.first_fundamental_form(bcs)
+
+        # 第一基本形式行列式的开方
+        d = np.sqrt(np.linalg.det(G))
+
+        # 第一基本形式的逆
+        G = np.linalg.inv(G)
+
+        # 计算每个单元基函数在积分点处的梯度值，注意这里是关于参考变量 u 的导数
+        gphi = self.grad_basis(bcs, variables='u') # (NQ, 1, ldof, GD)
+
+        # c: 单元指标
+        # f: 面指标
+        # e: 边指标
+        # v: 顶点个数指标
+        # i, j, k, d: 自由度或基函数指标
+        # q: 积分点或重心坐标点指标
+        # m, n: 空间或拓扑维数指标
+        A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, G, gphi, d)
+
+        gdof = self.number_of_global_dofs()
+        cell2dof = self.cell_to_dof()
+        I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A 
 
     def mass_matrix(self, c=None, q=None):
         """
@@ -180,7 +193,11 @@ class ParametricLagrangeFiniteElementSpace:
         phi = self.mesh.shape_function(bcs, p=self.p)
 
         # 组装单元矩阵
-        M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+        if c is None:
+            M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+        else:
+            # 这里默认 c 是一个长度为 NC 的一维数组
+            M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
 
         cell2dof = self.cell_to_dof() # (NC, ldof)
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape) # (NC, ldof, ldof)

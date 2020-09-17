@@ -108,7 +108,7 @@ class RTDof2d:
         else: # 只获取一部分边上的自由度, 例如在混合边界条件的情形下，你只需要拿部分边界边
             if type(threshold) is np.ndarray: 
                 if threshold.dtype == np.bool_:
-                    index = np.nonzero(threshold)
+                    index, = np.nonzero(threshold)
                 else: # 否则为整数编号 
                     index = threshold
             elif callable(threshold):
@@ -436,7 +436,7 @@ class RaviartThomasFiniteElementSpace2d:
         return val
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='barycentric')
         return f
 
     def project(self, u):

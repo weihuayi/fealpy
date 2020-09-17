@@ -487,16 +487,23 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
+        TD = bc.shape[-1] - 1
         phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof
+        e2d = self.dof.entity_to_dof(etype=TD, index=index)
+
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof[index]])
+        val = np.einsum(s1, phi, uh[e2d])
         return val
 
     @barycentric
     def grad_value(self, uh, bc, index=np.s_[:]):
+        """
+        Notes
+        -----
+        不同维度的实体
+        """
         gphi = self.grad_basis(bc, index=index)
         cell2dof = self.dof.cell2dof
         dim = len(uh.shape) - 1

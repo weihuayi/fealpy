@@ -708,6 +708,10 @@ class HalfEdgeMesh2d(Mesh2d):
         NE1 = self.refine_halfedge(isMarkedHEdge)
 
         #获取信息
+
+        if 'level' not in self.celldata:
+            self.init_level_info()
+
         clevel = self.celldata['level']
         hlevel = self.halfedgedata['level']
 

@@ -25,7 +25,7 @@ class Function(np.ndarray):
         return self
 
     def index(self, i):
-        return Function(self.space, array=self[:, i])
+        return Function(self.space, array=self[:, i], coordtype=self.coordtype)
 
     def __call__(self, bc, index=np.s_[:]):
         space = self.space

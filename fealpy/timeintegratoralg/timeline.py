@@ -14,9 +14,19 @@ class UniformTimeLine():
         self.T1 = T1
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
-        self.time = np.linspace(T0,T1,self.NL)
         self.current = 0
         self.options = options
+
+    def add_time(self, n):
+        """
+
+        Notes
+        -----
+        增加计算时间， n 表示增加的步数
+        """
+
+        self.T1 = self.T1 + n*self.dt
+        self.NL += n
 
     def uniform_refine(self, n=1):
         for i in range(n):

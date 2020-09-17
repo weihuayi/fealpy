@@ -189,8 +189,12 @@ class TetrahedronMesh(Mesh3d):
 
 
     def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+
+        print('The argument `etype` in  `bc_to_point` function will be removed in the future!')
+
+        TD = bc.shape[-1] - 1 #
         node = self.node
-        entity = self.entity(etype)
+        entity = self.entity(etype=TD)
         p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
         return p
 
