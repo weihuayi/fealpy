@@ -240,7 +240,7 @@ class TriangleMesh(Mesh2d):
             for i in range(3):
                 np.logical_or.at(isCutCell, range(NC), isCutNode[cell[:, i]])
 
-        
+
         return isCutCell
 
 
