@@ -178,7 +178,7 @@ class WaterFloodingModelSolver():
 
         # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
         self.fo = self.cspace.function()
-        self.fo[-1] = -self.model.oil['production rate'] # 产出
+        self.fo[3] = -self.model.oil['production rate'] # 产出
 
         self.fw = self.cspace.function()
         self.fw[0] = self.model.water['injection rate'] # 注入

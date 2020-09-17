@@ -56,10 +56,12 @@ class TwoPhaseFlowWithGeostressSimulator():
     1. 增加重启与续算功能
 
     """
-    def __init__(self, model, T0=0, T1=200*3600*24, NS=14, NT=20*60*24):
+    def __init__(self, model, args):
+        NT = int((args.T1 - args.T0)/args.DT)
+        self.args = args
         self.model = model
-        self.mesh = model.space_mesh(n=NS)
-        self.timeline = model.time_mesh(T0=T0, T1=T1, n=NT)
+        self.mesh = model.space_mesh(n=args.NS)
+        self.timeline = model.time_mesh(T0=args.T0, T1=args.T1, n=NT)
 
         self.GD = model.GD
         if self.GD == 2:
@@ -91,12 +93,13 @@ class TwoPhaseFlowWithGeostressSimulator():
         self.cp[:] = model.rock['initial pressure']  # 初始地层压强
         self.cphi[:] = model.rock['porosity'] # 当前孔隙度系数
 
-        # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
+        # 源项,  TODO: 注意这里换其它的网格需要修改代码
+        self.fw = self.cspace.function()
+        self.fw[0] = self.model.water['injection rate'] # 注入
+
         self.fo = self.cspace.function()
         self.fo[3] = -self.model.oil['production rate'] # 产出
 
-        self.fw = self.cspace.function()
-        self.fw[0] = self.model.water['injection rate'] # 注入
 
 
         # 一些常数矩阵和向量
@@ -258,7 +261,7 @@ class TwoPhaseFlowWithGeostressSimulator():
         Sw = self.cs[:].copy() # 当前水的饱和度系数
 
         # 岩石的绝对渗透率, 这里考虑了量纲的一致性, 压强单位是 Pa
-        k = self.model.rock['permeability']*9.869233e-10  
+        k = self.model.rock['permeability']*9.869233e-4 
 
         lamw = self.model.water_relative_permeability(Sw)
         lamw /= muw
@@ -271,7 +274,7 @@ class TwoPhaseFlowWithGeostressSimulator():
             val /=k 
         else:
             val[~isFCell] /= k
-            kf = self.model.fracture['permeability']*9.869233e-10
+            kf = self.model.fracture['permeability']*9.869233e-4
             val[isFCell] /= kf
         return val
 
@@ -660,7 +663,7 @@ class TwoPhaseFlowWithGeostressSimulator():
         #self.s[flag] = 0.0
         self.u[:] = self.cu
 
-    def solve(self, step=30):
+    def solve(self, reset=True):
         """
 
         Notes
@@ -669,12 +672,15 @@ class TwoPhaseFlowWithGeostressSimulator():
         计算所有的时间层。
         """
 
+        args = self.args
+
         timeline = self.timeline
         dt = timeline.current_time_step_length()
-        timeline.reset() # 时间置零
+        if reset is True:
+            timeline.reset() # 时间置零
 
         n = timeline.current
-        fname = 'test_'+ str(n).zfill(10) + '.vtu'
+        fname = args.output + str(n).zfill(10) + '.vtu'
         self.write_to_vtk(fname)
         while not timeline.stop():
             ct = timeline.current_time_level()/3600/24 # 天为单位
@@ -682,11 +688,11 @@ class TwoPhaseFlowWithGeostressSimulator():
             self.picard_iteration()
             self.update_solution()
             timeline.current += 1
-            if timeline.current%step == 0:
+            if timeline.current%args.step == 0:
                 n = timeline.current
-                fname = 'test_'+ str(n).zfill(10) + '.vtu'
+                fname = args.output + str(n).zfill(10) + '.vtu'
                 self.write_to_vtk(fname)
-        timeline.reset()
+
 
     def write_to_vtk(self, fname):
         # 重心处的值
