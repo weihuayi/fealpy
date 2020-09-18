@@ -148,15 +148,28 @@ class LagrangeQuadrangleMesh(Mesh2d):
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return p 
 
-    def uniform_refine(self, n=1, HB=None):
+    def uniform_refine(self, n=1, HB=None, inplace=True):
         """
 
         Notes
         -----
 
         HB: HB[i] 表示第 i 个网格单元对应的粗网格单元编号
+
+        inplace：为真则会在修改网格对象内部的数据结构，如果为假，则返回新的网格
+        对象
         """
         p = self.p
+
+        if inplace is False: # 重新建立新的网格对象
+            cp = [0, p, -p-1, -1]
+            NCN = self.number_of_corner_nodes()
+            newCell = self.entity('cell')
+            node = self.entity('node')[:NCN].copy()
+            newMesh = LagrangeQuadrangleMesh(node, newCell, p=p,
+                    surface=self.surface) 
+            HB = newMesh.uniform_refine(n=n, HB=HB, inplace=True)
+            return newMesh, HB
 
         if HB is None:
             NC = self.number_of_cells()
@@ -203,7 +216,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
             newCell[3::4, 3] = cell[:, cp[3]]
 
             imap = np.broadcast_to(np.arange(NC).reshape(NC, 1), shape=(NC, 4))
-            HB = HB[imap]
+            HB = HB[imap].reshape(-1)
 
             node = np.r_['0', self.node[:NCN], edgeCenter, cellCenter]
             ds = LinearQuadrangleMeshDataStructure(node.shape[0], newCell) # 线性网格的数据结构
