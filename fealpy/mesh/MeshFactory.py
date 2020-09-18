@@ -104,6 +104,7 @@ class MeshFactory():
         return TetrahedronMesh(node, cell)
 
 
+    @classmethod
     @timer
     def boxmesh2d(self, box, nx=10, ny=10, meshtype='tri', threshold=None,
             returnnc=False, p=None):
