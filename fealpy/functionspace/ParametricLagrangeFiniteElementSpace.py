@@ -134,13 +134,42 @@ class ParametricLagrangeFiniteElementSpace:
         -----
         组装刚度矩阵，
 
+        c 可以是标量，数组和函数，其中函数的例子如下：
+
+        @cartesian # 函数增加输入参数坐标类型的标签 coordtype，这里指明是 笛卡尔 坐标 
+        def c(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = ...
+            retrun val 
+
+        函数返回的 val 可以是标量和数组。数组的形状可以是：
+        * (GD, ) -- 常对角矩阵
+        * (GD, GD) -- 常对称矩阵
+        * (NC, ) -- 分片标量
+        * (NC, GD) -- 分片对角矩阵
+        * (NC, GD, GD) -- 分片对称矩阵
+        * (NQ, NC) -- 变化的标量系数 
+        * (NQ, NC, GD) -- 变化的对角矩阵系数
+        * (NQ, NC, GD, GD) -- 变化的对称矩阵系数
+
+        其中 
+        NQ: 积分点的个数 
+        GD：空间维数
+        NC：单元个数
+
+        这里默认 NC 远大于 GD 和 NQ
+
         TODO
         ----
-        1. 考虑带系数 c 的情况
         """
         p = self.p
         qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
+        NQ = len(ws) # 积分点个数
+        NC = self.mesh.number_of_cells() # 单元个数
+        GD = self.mesh.geo_dimension() # 空间维数，这里假定 NC > GD  
 
         # 参考单元的测度
         rm = self.mesh.reference_cell_measure()
@@ -151,20 +180,58 @@ class ParametricLagrangeFiniteElementSpace:
         # 第一基本形式行列式的开方
         d = np.sqrt(np.linalg.det(G))
 
-        # 第一基本形式的逆
-        G = np.linalg.inv(G)
+        if c is None:  
+            # 第一基本形式的逆
+            G = np.linalg.inv(G)
+            # 计算每个单元基函数在积分点处的梯度值，注意这里是关于参考变量 u 的导数
+            gphi = self.grad_basis(bcs, variables='u') # (NQ, 1, ldof, GD)
 
-        # 计算每个单元基函数在积分点处的梯度值，注意这里是关于参考变量 u 的导数
-        gphi = self.grad_basis(bcs, variables='u') # (NQ, 1, ldof, GD)
+            # c: 单元指标
+            # f: 面指标
+            # e: 边指标
+            # v: 顶点个数指标
+            # i, j, k, d: 自由度或基函数指标
+            # q: 积分点或重心坐标点指标
+            # m, n: 空间或拓扑维数指标
+            A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, G, gphi, d)
+        else:
+            if callable(c): # c 是一个函数， 返回标量，或者一个数组
+                if c.coordtype == 'cartesian':
+                    ps = self.mesh.bc_to_point(bcs)
+                    c = c(ps)
+                elif c.coordtype == 'barycentric':
+                    c = c(bcs)
 
-        # c: 单元指标
-        # f: 面指标
-        # e: 边指标
-        # v: 顶点个数指标
-        # i, j, k, d: 自由度或基函数指标
-        # q: 积分点或重心坐标点指标
-        # m, n: 空间或拓扑维数指标
-        A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, G, gphi, d)
+            gphi = self.grad_basis(bcs, variables='x') # (NQ, NC, ldof, GD)
+            if isinstance(c, (int, float)): # 标量
+                A = np.einsum('q, qcim, qcjm, qc->cij', ws*rm*c, gphi, gphi, d)
+            elif isinstance(c, np.ndarray): 
+                if c.shape == (GD, ):  # 常数对角矩阵
+                    A = np.einsum('q, qcim, m, qcjm, qc->cij', ws*rm, gphi,
+                            c, gphi, d)
+                elif c.shape == (GD, GD): # 常数对称矩阵
+                    A = np.einsum('q, qcim, mn, qcjn, qc->cij', ws*rm, gphi,
+                            c, gphi, d)
+                elif c.shape == (NC, ): # 分片常数矩阵，这里假设 NC > GD
+                    A = np.einsum('q, qcim, qcjm, qc, c->cij', ws*rm, gphi,
+                            gphi, d, c)
+                elif c.shape == (NC, GD): # 分片对角矩阵
+                    A = np.einsum('q, qcim, cm, qcjm, qc->cij', ws*rm, gphi, c,
+                            gphi, d)
+                elif c.shape == (NC, GD, GD): # 分片常数对称矩阵（正定）
+                    A = np.einsum('q, qcim, cmn, qcjn, qc->cij', ws*rm, gphi, c,
+                            gphi, d)
+                elif c.shape == (NQ, NC, GD): 
+                    A = np.einsum('q, qcim, qcm, qcjm, qc->cij', ws*rm, gphi, c,
+                            gphi, d)
+                elif c.shape == (NQ, NC, GD, GD):
+                    A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, c,
+                            gphi, d)
+                else:
+                    pass #TODO: raise error
+
+            else:
+                pass #TODO: raise error
 
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
@@ -176,14 +243,37 @@ class ParametricLagrangeFiniteElementSpace:
     def mass_matrix(self, c=None, q=None):
         """
 
+        Parameters
+        ----------
+
         Notes
         -----
         组装质量矩阵
+
+        c 可以是标量，数组和函数，其中函数的例子如下：
+
+            from fealpy.decorator import cartesian
+            @cartesian # 函数增加输入参数坐标类型的标签 coordtype，这里指明是笛卡尔坐标 
+            def c(p):
+                x = p[..., 0]
+                y = p[..., 1]
+                val = ...
+                retrun val 
+
+        函数返回的 val 可以是标量和数组。数组的形状可以是：
+        * (NC, ) -- 分片常数 
+        * (NQ, NC) -- 连续变系数 
+
+        其中 
+        NQ: 积分点的个数 
+        NC：单元个数
+
+        这里默认 NC 远大于 GD 和 NQ
         """
 
         # 积分公式
         qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
-        # bcs : (NQ, n)
+        # bcs : (NQ, ...)
         # ws : (NQ, )
         bcs, ws = qf.get_quadrature_points_and_weights() 
 
@@ -196,8 +286,24 @@ class ParametricLagrangeFiniteElementSpace:
         if c is None:
             M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
         else:
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    c = c(ps)
             # 这里默认 c 是一个长度为 NC 的一维数组
-            M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
+            if isinstance(c, (int, float)):
+                M = np.einsum('q, qci, qcj, qc->cij', ws*rm*c, phi, phi, d) # (NC, ldof, ldof)
+            elif isinstance(c, np.ndarray): 
+                if len(c.shape) == 1:  # (NC, )
+                    M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
+                elif len(c.shape) == 2: # (NQ, NC)
+                    d *=c
+                    M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+                else:
+                    pass #TODO: raise error
+            else:
+                pass #TODO: raise error
 
         cell2dof = self.cell_to_dof() # (NC, ldof)
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape) # (NC, ldof, ldof)

@@ -5,8 +5,8 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 import pyamg 
 
+from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.poisson_2d import CosCosData as PDE
-
 from fealpy.mesh import MeshFactory
 from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
@@ -55,7 +55,7 @@ space = ParametricLagrangeFiniteElementSpace(mesh, p=args.p, spacetype='C')
 # 数值解函数
 uh = space.function()
 
-# 刚度矩阵
+# 组装刚度矩阵
 A = space.stiff_matrix()
 
 # 右端载荷
@@ -79,3 +79,12 @@ if args.o is not None:
     mesh.nodedata['uh'] = uh
     mesh.to_vtk(fname=args.o)
 
+# 网格加密
+# inplace = False, 表示不修改粗网格内部数据结构，
+# 返回一个新的网格对象，及新网格单元与老网格单元之间的对应关系
+# HB[i] 存储第 i 个新单元对应的粗网格单元
+newMesh, HB = mesh.uniform_refine(n=3, inplace=False)
+
+mesh.to_vtk(fname='coarse.vtu')
+newMesh.to_vtk(fname='fine.vtu')
+print(HB)
