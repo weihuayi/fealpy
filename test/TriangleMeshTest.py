@@ -15,8 +15,8 @@ class TriangleMeshTest():
         node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
         cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
         mesh = TriangleMesh(node, cell)
-        mesh.uniform_refine(n=3)
-        point = np.array([[0.2, 0.3], [0.5, 0.8], [1.6, 0.7], [1.2, 0.2]])
+        mesh.uniform_refine(n=5)
+        point = np.array([[0.2, 0.5], [0.5, 0.8], [1.6, 0.5], [1.2, 0.2]])
         segment = np.array([[0, 2], [1, 3]])
 
         isCrossCell = mesh.find_crossed_cell(point, segment)
