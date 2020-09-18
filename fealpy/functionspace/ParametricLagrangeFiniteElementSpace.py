@@ -134,6 +134,32 @@ class ParametricLagrangeFiniteElementSpace:
         -----
         组装刚度矩阵，
 
+        c 可以是标量，数组和函数，其中函数的例子如下：
+
+        @cartesian # 函数增加输入参数坐标类型的标签 coordtype，这里指明是 笛卡尔 坐标 
+        def c(p):
+            x = p[..., 0]
+            y = p[..., 1]
+            val = ...
+            retrun val 
+
+        函数返回的 val 可以是标量和数组。数组的形状可以是：
+        * (GD, ) -- 常对角矩阵
+        * (GD, GD) -- 常对称矩阵
+        * (NC, ) -- 分片标量
+        * (NC, GD) -- 分片对角矩阵
+        * (NC, GD, GD) -- 分片对称矩阵
+        * (NQ, NC) -- 变化的标量系数 
+        * (NQ, NC, GD) -- 变化的对角矩阵系数
+        * (NQ, NC, GD, GD) -- 变化的对称矩阵系数
+
+        其中 
+        NQ: 积分点的个数 
+        GD：空间维数
+        NC：单元个数
+
+        这里默认 NC 远大于 GD 和 NQ
+
         TODO
         ----
         """
@@ -217,20 +243,37 @@ class ParametricLagrangeFiniteElementSpace:
     def mass_matrix(self, c=None, q=None):
         """
 
-
         Parameters
         ----------
-
-        c: 
 
         Notes
         -----
         组装质量矩阵
+
+        c 可以是标量，数组和函数，其中函数的例子如下：
+
+            from fealpy.decorator import cartesian
+            @cartesian # 函数增加输入参数坐标类型的标签 coordtype，这里指明是笛卡尔坐标 
+            def c(p):
+                x = p[..., 0]
+                y = p[..., 1]
+                val = ...
+                retrun val 
+
+        函数返回的 val 可以是标量和数组。数组的形状可以是：
+        * (NC, ) -- 分片常数 
+        * (NQ, NC) -- 连续变系数 
+
+        其中 
+        NQ: 积分点的个数 
+        NC：单元个数
+
+        这里默认 NC 远大于 GD 和 NQ
         """
 
         # 积分公式
         qf = self.integralalg.integrator if q is None else self.mesh.integrator(q, etype='cell')
-        # bcs : (NQ, n)
+        # bcs : (NQ, ...)
         # ws : (NQ, )
         bcs, ws = qf.get_quadrature_points_and_weights() 
 
