@@ -38,11 +38,11 @@ parser.add_argument('--DT',
 
 parser.add_argument('--NS', 
         default=14, type=int,
-        help='裂缝附近加密次数，默认 12 次')
+        help='裂缝附近加密次数，默认 14 次')
 
 parser.add_argument('--step', 
         default=60, type=int,
-        help='结果输出的步数间隔，默认为 60')
+        help='结果输出的步数间隔，默认为 60 步输出一次 vtu 文件')
 
 parser.add_argument('--output', 
         default='test', type=str,
@@ -59,9 +59,11 @@ parser.add_argument('--reload',
 parser.add_argument('--showmesh',
         default=False, type=bool,
         help='是否展示计算网格，默认为 False')
+
 parser.print_help()
 args = parser.parse_args()
-print(args)
+# 打印当前所有参数
+print(args) 
 
 # 单位转换
 args.T0 *= 3600*24 # 由天转换为 秒

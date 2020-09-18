@@ -30,6 +30,7 @@ class MeshFactory():
     def __init__(self):
         pass
 
+    @classmethod
     def delete_cell(self, node, cell, threshold):
         """
 
@@ -51,6 +52,7 @@ class MeshFactory():
 
         return node, cell
 
+    @classmethod
     def one_triangle_mesh(self, meshtype='iso'):
         if meshtype == 'equ':
             node = np.array([
@@ -65,6 +67,7 @@ class MeshFactory():
         cell = np.array([[0, 1, 2]], dtype=np.int_)
         return TriangleMesh(node, cell)
 
+    @classmethod
     def one_quad_mesh(self, meshtype='square'):
         if meshtype in {'square', 'zhengfangxing'}:
             node = np.array([
@@ -87,6 +90,7 @@ class MeshFactory():
         cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
         return QuadrangleMesh(node, cell)
 
+    @classmethod
     def one_tetrahedron_mesh(self, meshtype='equ'):
         if meshtype == 'equ':
             node = np.array([
@@ -173,6 +177,7 @@ class MeshFactory():
             return PolygonMesh(pnode, pcell, pcellLocation)
 
     @timer
+    @classmethod
     def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
         """
         Notes
@@ -221,6 +226,7 @@ class MeshFactory():
                 node, cell = self.delete_cell(node, cell, threshold)
             return TetrahedronMesh(node, cell)
 
+    @classmethod
     def triangle(self, box, h, meshtype='tri'):
         """
         Notes
@@ -241,6 +247,7 @@ class MeshFactory():
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
+    @classmethod
     def special_boxmesh2d(self, box, n=10, meshtype='fishbone'):
         qmesh = self.boxmesh2d(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
@@ -327,6 +334,7 @@ class MeshFactory():
             cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
             return TriangleMesh(node, cell)
         
+    @classmethod
     def lshape_mesh(self, n=4):
         point = np.array([
             (-1, -1),
@@ -349,7 +357,8 @@ class MeshFactory():
         mesh.uniform_refine(n)
         return mesh
 
-    def unitcirclemesh(self, h0, meshtype='tri'):
+    @classmethod
+    def unitcirclemesh(self, h=0.1, meshtype='tri', p=None):
         """
 
         Reference
@@ -364,10 +373,16 @@ class MeshFactory():
         bbox = [-1.2, 1.2, -1.2, 1.2]
         pfix = None 
         domain = DistDomain2d(fd, fh, bbox, pfix)
-        distmesh2d = DistMesh2d(domain, h0)
+        distmesh2d = DistMesh2d(domain, h)
         distmesh2d.run()
         if meshtype in {'tri', 'triangle'}:
-            return distmesh2d.mesh
+            if p is None:
+                return distmesh2d.mesh
+            else:
+                node = distmesh2d.mesh.entity('node')
+                cell = distmesh2d.mesh.entity('cell')
+                mesh = LagrangeTriangleMesh(node, cell, p=p)
+                return mesh
         elif meshtype in {'polygon', 'poly'}:
             mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()

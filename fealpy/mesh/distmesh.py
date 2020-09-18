@@ -119,7 +119,7 @@ class DistMesh2d():
     def delaunay(self, p):
         fd, *_, args = self.domain.params
         d = Delaunay(p)
-        t = d.simplices
+        t = np.asarray(d.simplices, dtype=np.int_)
         pc = (p[t[:, 0], :]+p[t[:, 1], :]+p[t[:, 2], :])/3
         return  t[fd(pc, *args) < -self.geps, :]
 

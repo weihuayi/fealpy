@@ -38,10 +38,7 @@ class TwoPhaseFlowWithGeostressSimulator():
 
     目前, 模型
     * 忽略了毛细管压强和重力作用
-    * 没有考虑裂缝
     * 饱和度用分片线性间断元求解, 非线性的迎风格式
-
-
 
     渐近解决方案:
     1. Picard 迭代
@@ -152,14 +149,6 @@ class TwoPhaseFlowWithGeostressSimulator():
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
 
         self.isFCell = model.is_fracture_cell(self.mesh)
-
-        # vtk 文件输出
-        node, cell, cellType, NC = self.mesh.to_vtk()
-        self.points = vtk.vtkPoints()
-        self.points.SetData(vnp.numpy_to_vtk(node))
-        self.cells = vtk.vtkCellArray()
-        self.cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
-        self.cellType = cellType
 
     def recover(self, val):
         """
@@ -303,36 +292,32 @@ class TwoPhaseFlowWithGeostressSimulator():
         构造整个系统
 
         二维情形：
+        x = [s, v, p, u0, u1]
 
-        x = [v, p, s, u0, u1]
-
-        A = [[   V,  VP, None, None,  None]
-             [  PV,   P, None,  PU0,   PU1]
-             [None,  SP,    S,  SU0,   SU1] 
-             [None, UP0, None,  U00,   U01]
-             [None, UP1, None,  U10,   U11]
-
-        F = [FV, FP, FS, FU0, FU1]
+        A = [[   S, None,   SP,  SU0,  SU1]
+             [None,    V,   VP, None, None]
+             [None,   PV,    P,  PU0,  PU1]
+             [None, None,  UP0,  U00,  U01]
+             [None, None,  UP1,  U10,  U11]]
+        F = [FS, FV, FP, FU0, FU1]
 
         三维情形：
-        x = [v, p, s, u0, u1, u2]
 
-        A = [[   V,  VP, None, None,  None, None]
-             [  PV,   P, None,  PU0,   PU1,  PU2]
-             [None,  SP,    S,  SU0,   SU1,  SU2] 
-             [None, UP0, None,  U00,   U01,  U02]
-             [None, UP1, None,  U10,   U11,  U12]
-             [None, UP2, None,  U20,   U21,  U22]]
+        x = [s, v, p, u0, u1, u2]
+        A = [[   S, None,   SP,  SU0,  SU1,  SU2]
+             [None,    V,   VP, None, None, None]
+             [None,   PV,    P,  PU0,  PU1,  PU2]
+             [None, None,  UP0,  U00,  U01,  U02]
+             [None, None,  UP1,  U10,  U11,  U12]
+             [None, None,  UP2,  U20,  U21,  U22]]
+        F = [FS, FV, FP, FU0, FU1, FU2]
 
-        F = [FV, FP, FS, FU0, FU1, FU2]
-
-        FS 中考虑的迎风格式
         """
 
         GD = self.GD
-        A0, FV, isBdDof0 = self.get_velocity_system(q=2)
-        A1, FP, isBdDof1 = self.get_pressure_system(q=2)
-        A2, FS, isBdDof2 = self.get_saturation_system(q=2)
+        A0, FS, isBdDof0 = self.get_saturation_system(q=2)
+        A1, FV, isBdDof1 = self.get_velocity_system(q=2)
+        A2, FP, isBdDof2 = self.get_pressure_system(q=2)
 
         if GD == 2:
             A3, A4, FU, isBdDof3 = self.get_dispacement_system(q=2)
@@ -342,106 +327,8 @@ class TwoPhaseFlowWithGeostressSimulator():
             A3, A4, A5, FU, isBdDof3 = self.get_dispacement_system(q=2)
             A = bmat([A0, A1, A2, A3, A4, A5], format='csr')
             F = np.r_['0', FV, FP, FS, FU]
-
         isBdDof = np.r_['0', isBdDof0, isBdDof1, isBdDof2, isBdDof3]
         return A, F, isBdDof
-
-    def get_velocity_system(self, q=2):
-        """
-        Notes
-        -----
-        计算速度方程对应的离散系统.
-
-        if GD == 2:
-            [   V,  VP, None, None,  None]
-        elif GD == 3:
-            [   V,  VP, None, None,  None, None]
-
-        """
-
-        GD = self.GD
-        dt = self.timeline.current_time_step_length()
-        cellmeasure = self.mesh.entity_measure('cell')
-        qf = self.mesh.integrator(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        # 速度对应的矩阵  V
-        c = self.flux_coefficient()
-        c *= cellmeasure
-        phi = self.vspace.basis(bcs)
-        V = np.einsum('q, qcin, qcjn, c->cij', ws, phi, phi, c, optimize=True)
-
-        c2d = self.vspace.cell_to_dof()
-        I = np.broadcast_to(c2d[:, :, None], shape=V.shape)
-        J = np.broadcast_to(c2d[:, None, :], shape=V.shape)
-
-        gdof = self.vspace.number_of_global_dofs()
-        V = csr_matrix(
-                (V.flat, (I.flat, J.flat)), 
-                shape=(gdof, gdof)
-                )
-
-        # 压强矩阵
-        VP = -self.B
-
-        # 右端向量, 0 向量
-        FV = np.zeros(gdof, dtype=np.float64)
-        isBdDof = self.vspace.dof.is_boundary_dof()
-
-        if GD == 2:
-            return [V, VP, None, None, None], FV, isBdDof 
-        elif GD == 3:
-            return [V, VP, None, None, None, None], FV, isBdDof 
-
-    def get_pressure_system(self, q=2):
-        """
-        Notes
-        -----
-        计算压强方程对应的离散系统
-
-        这里组装矩阵时, 利用了压强是分片常数的特殊性 
-
-        [  PV,   P, None,  PU0,   PU1]
-
-        [  PV,   P, None,  PU0,   PU1, PU2]
-        """
-
-        GD = self.GD
-        dt = self.timeline.current_time_step_length()
-        cellmeasure = self.mesh.entity_measure('cell')
-        qf = self.mesh.integrator(q, etype='cell')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        PV = dt*self.B.T
-
-        # P 是对角矩阵, 利用分片常数的
-        c = self.pressure_coefficient() # (NQ, NC)
-        c *= cellmeasure 
-        P = diags(c, 0)
-
-        # 组装压强方程的右端向量
-        # * 这里利用了压强空间基是分片常数
-        FP = self.fo.value(bcs) + self.fw.value(bcs) # (NQ, NC)
-        FP *= ws[:, None]
-
-        FP = np.sum(FP, axis=0)
-        FP *= cellmeasure
-        FP *= dt
-
-        FP += P@self.p # 上一步的压强向量
-        FP += self.PU0@self.u[:, 0] 
-        FP += self.PU1@self.u[:, 1]
-
-        if GD == 3:
-            FP += self.PU2@self.u[:, 2]
-
-        gdof = self.pspace.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool_)
-
-        if GD == 2:
-            return [PV, P, None, self.PU0, self.PU1], FP, isBdDof
-        elif GD == 3:
-            return [PV, P, None, self.PU0, self.PU1, self.PU2], FP, isBdDof
 
     def get_saturation_system(self, q=2):
         """
@@ -449,8 +336,9 @@ class TwoPhaseFlowWithGeostressSimulator():
         ----
         计算饱和度方程对应的离散系统
 
-        [ None,  SP,    S, SU0,  SU1] 
+        [   S, None,   SP,  SU0,  SU1]
 
+        [   S, None,   SP,  SU0,  SU1, SU2]
         """
 
         GD = self.GD
@@ -554,9 +442,106 @@ class TwoPhaseFlowWithGeostressSimulator():
         isBdDof = np.zeros(pgdof, dtype=np.bool_) 
 
         if GD == 2:
-            return [None, SP, S, SU0, SU1], FS, isBdDof
+            return [   S, None,   SP,  SU0,  SU1], FS, isBdDof
         elif GD == 3:
-            return [None, SP, S, SU0, SU1, SU2], FS, isBdDof
+            return [   S, None,   SP,  SU0,  SU1, SU2], FS, isBdDof
+
+    def get_velocity_system(self, q=2):
+        """
+        Notes
+        -----
+        计算速度方程对应的离散系统.
+
+
+         [None,    V,   VP, None, None]
+
+         [None,    V,   VP, None, None, None]
+        """
+
+        GD = self.GD
+        dt = self.timeline.current_time_step_length()
+        cellmeasure = self.mesh.entity_measure('cell')
+        qf = self.mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        # 速度对应的矩阵  V
+        c = self.flux_coefficient()
+        c *= cellmeasure
+        phi = self.vspace.basis(bcs)
+        V = np.einsum('q, qcin, qcjn, c->cij', ws, phi, phi, c, optimize=True)
+
+        c2d = self.vspace.cell_to_dof()
+        I = np.broadcast_to(c2d[:, :, None], shape=V.shape)
+        J = np.broadcast_to(c2d[:, None, :], shape=V.shape)
+
+        gdof = self.vspace.number_of_global_dofs()
+        V = csr_matrix(
+                (V.flat, (I.flat, J.flat)), 
+                shape=(gdof, gdof)
+                )
+
+        # 压强矩阵
+        VP = -self.B
+
+        # 右端向量, 0 向量
+        FV = np.zeros(gdof, dtype=np.float64)
+        isBdDof = self.vspace.dof.is_boundary_dof()
+
+        if GD == 2:
+            return [None, V, VP, None, None], FV, isBdDof 
+        elif GD == 3:
+            return [None, V, VP, None, None, None], FV, isBdDof 
+
+    def get_pressure_system(self, q=2):
+        """
+        Notes
+        -----
+        计算压强方程对应的离散系统
+
+        这里组装矩阵时, 利用了压强是分片常数的特殊性 
+
+        [  Noe,P PV,   P, PU0,   PU1]
+
+        [  None, PV,   P, PU0,   PU1, PU2]
+        """
+
+        GD = self.GD
+        dt = self.timeline.current_time_step_length()
+        cellmeasure = self.mesh.entity_measure('cell')
+        qf = self.mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        PV = dt*self.B.T
+
+        # P 是对角矩阵, 利用分片常数的
+        c = self.pressure_coefficient() # (NQ, NC)
+        c *= cellmeasure 
+        P = diags(c, 0)
+
+        # 组装压强方程的右端向量
+        # * 这里利用了压强空间基是分片常数
+        FP = self.fo.value(bcs) + self.fw.value(bcs) # (NQ, NC)
+        FP *= ws[:, None]
+
+        FP = np.sum(FP, axis=0)
+        FP *= cellmeasure
+        FP *= dt
+
+        FP += P@self.p # 上一步的压强向量
+        FP += self.PU0@self.u[:, 0] 
+        FP += self.PU1@self.u[:, 1]
+
+        if GD == 3:
+            FP += self.PU2@self.u[:, 2]
+
+        gdof = self.pspace.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+
+        if GD == 2:
+            return [None, PV, P, self.PU0, self.PU1], FP, isBdDof
+        elif GD == 3:
+            return [None, PV, P, self.PU0, self.PU1, self.PU2], FP, isBdDof
+
 
     def get_dispacement_system(self, q=2):
         """
@@ -565,14 +550,13 @@ class TwoPhaseFlowWithGeostressSimulator():
         计算位移方程对应的离散系统, 即线弹性方程系统.
         
         GD == 2:
-
-         [None, UP0, None,  U00,   U01]
-         [None, UP1, None,  U10,   U11]
+         [None, None, UP0, U00,   U01]
+         [None, None, UP1, U10,   U11]
 
         GD == 3:
-         [None, UP0, None,  U00,   U01, U02]
-         [None, UP1, None,  U10,   U11, U12]
-         [None, UP2, None,  U20,   U21, U22]
+         [None, None, UP0, U00, U01, U02]
+         [None, None, UP1, U10, U11, U12]
+         [None, None, UP2, U20, U21, U22]
 
         """
 
@@ -586,15 +570,15 @@ class TwoPhaseFlowWithGeostressSimulator():
 
         if GD == 2:
             return (
-                    [None, -self.PU0.T, None, U[0][0], U[0][1]], 
-                    [None, -self.PU1.T, None, U[1][0], U[1][1]], 
+                    [None, None, -self.PU0.T, U[0][0], U[0][1]], 
+                    [None, None, -self.PU1.T, U[1][0], U[1][1]], 
                     self.FU, np.r_['0', isBdDof, isBdDof]
                     )
         elif GD == 3:
             return (
-                    [None, -self.PU0.T, None, U[0][0], U[0][1], U[0][2]], 
-                    [None, -self.PU1.T, None, U[1][0], U[1][1], U[1][2]], 
-                    [None, -self.PU2.T, None, U[2][0], U[2][1], U[2][2]], 
+                    [None, None, -self.PU0.T, U[0][0], U[0][1], U[0][2]], 
+                    [None, None, -self.PU1.T, U[1][0], U[1][1], U[1][2]], 
+                    [None, None, -self.PU2.T, U[2][0], U[2][1], U[2][2]], 
                     self.FU, np.r_['0', isBdDof, isBdDof, isBdDof]
                     )
 
@@ -655,15 +639,53 @@ class TwoPhaseFlowWithGeostressSimulator():
                 print('picard iteration arrive max iteration with error:', e0)
                 break
 
-    def update_solution(self):
+        # 更新解
         self.v[:] = self.cv
         self.p[:] = self.cp
         self.s[:] = self.cs
-        #flag = self.s < 0.0
-        #self.s[flag] = 0.0
         self.u[:] = self.cu
 
-    def solve(self, reset=True):
+    def set_mesh_data(self):
+        """
+
+        Notes
+        -----
+        更新 mesh 中的数据
+        """
+        GD = self.GD
+        bc = np.array((GD+1)*[1/(GD+1)], dtype=np.float64)
+
+        mesh = self.mesh
+
+        v = self.v 
+        p = self.p
+        s = self.s
+        u = self.u
+
+        # 单元中心的流体速度
+        val = v.value(bc)
+        if GD == 2:
+            val = np.concatenate((val, np.zeros((val.shape[0], 1), dtype=val.dtype)), axis=1)
+        mesh.celldata['velocity'] = val 
+
+        # 分片常数的压强
+        val = self.recover(p[:])
+        mesh.nodedata['pressure'] = val
+
+        # 分片常数的饱和度
+        val = self.recover(s[:])
+        mesh.nodedata['saturation'] = val
+
+        # 节点处的位移
+        if GD == 2:
+            val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
+        mesh.nodedata['displacement'] = val
+
+        #TODO：增加应力的计算
+
+
+
+    def solve(self, reset=True, queue=None):
         """
 
         Notes
@@ -679,9 +701,13 @@ class TwoPhaseFlowWithGeostressSimulator():
         if reset is True:
             timeline.reset() # 时间置零
 
-        n = timeline.current
-        fname = args.output + str(n).zfill(10) + '.vtu'
-        self.write_to_vtk(fname)
+        if queue is not None:
+            n = timeline.current
+            fname = args.output + str(n).zfill(10) + '.vtu'
+            self.set_mesh_data()
+            data = {'name':fname, 'mesh':mesh}
+            queue.put(data)
+
         while not timeline.stop():
             ct = timeline.current_time_level()/3600/24 # 天为单位
             print('当前时刻为第', ct, '天')
@@ -689,55 +715,18 @@ class TwoPhaseFlowWithGeostressSimulator():
             self.update_solution()
             timeline.current += 1
             if timeline.current%args.step == 0:
-                n = timeline.current
-                fname = args.output + str(n).zfill(10) + '.vtu'
-                self.write_to_vtk(fname)
+                if queue is not None:
+                    n = timeline.current
+                    fname = args.output + str(n).zfill(10) + '.vtu'
+                    self.set_mesh_data()
+                    data = {'name':fname, 'mesh':mesh}
+                    queue.put(data)
+
+        if queue is not None:
+            n = timeline.current
+            fname = args.output + str(n).zfill(10) + '.vtu'
+            self.set_mesh_data()
+            data = {'name':fname, 'mesh':mesh}
+            queue.put(data)
 
 
-    def write_to_vtk(self, fname):
-        # 重心处的值
-        mesh = self.mesh
-
-        GD = self.GD
-
-        bc = np.array((GD+1)*[1/(GD+1)], dtype=np.float64)
-
-        ps = self.mesh.bc_to_point(bc)
-        vmesh = vtk.vtkUnstructuredGrid()
-        vmesh.SetPoints(self.points)
-        vmesh.SetCells(self.cellType, self.cells)
-        cdata = vmesh.GetCellData()
-        pdata = vmesh.GetPointData()
-
-        v = self.v 
-        p = self.p
-        s = self.s
-        u = self.u
-
-        val = v.value(bc)
-        if GD == 2:
-            val = np.concatenate((val, np.zeros((val.shape[0], 1), dtype=val.dtype)), axis=1)
-        val = vnp.numpy_to_vtk(val)
-        val.SetName('velocity')
-        cdata.AddArray(val)
-
-        val = self.recover(p[:])
-        val = vnp.numpy_to_vtk(val)
-        val.SetName('pressure')
-        pdata.AddArray(val)
-
-        val = self.recover(s[:])
-        val = vnp.numpy_to_vtk(val)
-        val.SetName('saturation')
-        pdata.AddArray(val)
-
-        if GD == 2:
-            val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
-        val = vnp.numpy_to_vtk(val)
-        val.SetName('displacement')
-        pdata.AddArray(val)
-
-        writer = vtk.vtkXMLUnstructuredGridWriter()
-        writer.SetFileName(fname)
-        writer.SetInputData(vmesh)
-        writer.Write()
