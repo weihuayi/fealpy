@@ -141,6 +141,9 @@ class TriangleMesh(Mesh2d):
         h = self.entity_measure('edge')
         isShortEdge = h < h0
 
+    def is_crossed_cell(self, point, segment): 
+        pass
+
     def find_crossed_cell(self, point, segment):
         """
 

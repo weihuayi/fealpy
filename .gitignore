@@ -48,3 +48,4 @@ dist
 
 
 .vscode
+*.pickle

@@ -807,6 +807,105 @@ class LagrangeFiniteElementSpace():
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
         return A 
 
+    def div_matrix(self, pspace, q=None):
+        """
+
+        Notes
+        -----
+        (div v, p) 
+
+        GD == 2
+        [[phi, 0], [0, phi]]
+
+        GD == 3
+        [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
+
+        [[B0], [B1], [B2]]
+        """
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        # bcs.shape == (NQ, TD+1)
+        # ws.shape == (NQ, )
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = self.cellmeasure
+
+        # gphi.shape == (NQ, NC, ldof, GD)
+        gphi = self.grad_basis(bcs)
+        # pphi.shape == (NQ, 1, ldof) 
+        pphi = pspace.basis(bcs)
+
+        c2d0 = self.cell_to_dof() # (NC, ldof0)
+        c2d1 = pspace.cell_to_dof() # (NC, ldof1)
+        gdof0 = self.number_of_global_dofs()
+        gdof1 = pspace.number_of_global_dofs()
+
+        # I.shape == (NC, ldof0, ldof1)
+        shape = c2d0.shape + c2d1.shape[1:]
+        I = np.broadcast_to(c2d0[:, :, None], shape=shape)
+        J = np.broadcast_to(c2d1[:, None, :], shape=shape)
+
+        B = []
+        for i in range(GD):
+            D = np.einsum('q, qci, qcj, c->cij', ws, gphi[..., i], pphi, cellmeasure)
+            D = csr_matrix(
+                    (D.flat, (I.flat, J.flat)), shape=(gdof0, gdof1)
+                    )
+            B += [D]
+
+        # B = [[B0], [B1], [B2]]
+
+        return B
+
+
+    def velocity_matrix(self, u):
+        """
+
+        Notes
+        ----
+        ((u\cdot \nabla) u, v)
+
+        GD == 2
+        [[phi, 0], [0, phi]]
+
+        GD == 3
+        [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
+
+        varphi = (u0 \partial_x + u1 \partial_y + u2 \partial_z) phi
+
+        [[varphi, 0, 0], [0, varphi, 0], [0, 0, varphi]]
+
+        """
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        # bcs.shape == (NQ, TD+1)
+        # ws.shape == (NQ, )
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = self.cellmeasure
+
+        val = u.value(bcs) # (NQ, NC, GD) 
+        gphi = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
+
+        val = np.einsum('qcm, qcim->qci', val, gphi) # (NQ, NC, ldof)
+        phi = self.basis(bcs) # (NQ, NC, ldof)
+
+        gdof = self.number_of_global_dofs()
+        c2d = self.cell_to_dof()
+
+        shape = c2d.shape + c2d.shape[1:]
+        I = np.broadcast_to(c2d[:, :, None], shape=shape)
+        J = np.broadcast_to(c2d[:, None, :], shape=shape)
+
+        val = np.einsum('q, qci, qcj, c->cij', ws, val, phi, cellmeasure)
+        M = csr_matrix(
+                (val.flat, (I.flat, J.flat)),
+                shape=(gdof, gdof)
+                )
+        return M
+
+
+
     def convection_matrix(self, c=None, q=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
