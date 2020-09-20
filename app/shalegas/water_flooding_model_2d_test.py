@@ -2,7 +2,8 @@
 import argparse
 import pickle
 
-from WaterFloodingWithFractureModel2d import WaterFloodingWithFractureModel2d 
+from fealpy.writer import VTKMeshWriter
+
 from TwoPhaseFlowWithGeostressSimulator import TwoPhaseFlowWithGeostressSimulator
 
 
@@ -23,6 +24,10 @@ parser = argparse.ArgumentParser(description=
         * 应力\n
 
         """)
+
+parser.add_argument('--mesh', 
+        default='mesh.pickle', type=str,
+        help='需要导入的地质网格模型，默认为 model.pickle')
 
 parser.add_argument('--T0', 
         default=0, type=float,
@@ -56,10 +61,6 @@ parser.add_argument('--reload',
         default=[None, None], nargs=2,
         help='导入保存的运行环境，增加更多时间步, 如 --reload fname.pickle 10，导入 fname.pickle 文件，在原来的基础上多算 10 天')
 
-parser.add_argument('--showmesh',
-        default=False, type=bool,
-        help='是否展示计算网格，默认为 False')
-
 parser.print_help()
 args = parser.parse_args()
 # 打印当前所有参数
@@ -74,28 +75,20 @@ args.DT *= 60 # 由分钟转换为 秒
 if args.reload[0] is not None:
     n = int(float(args.reload[1])*3600*24/args.DT)
     with open(args.reload[0], 'rb') as f:
-        solver = pickle.load(f)
-    solver.add_time(n)
-else:
-    model = WaterFloodingWithFractureModel2d()
-    solver = TwoPhaseFlowWithGeostressSimulator(model, args)
+        simulator = pickle.load(f)
+    simulator.add_time(n)
 
-if args.showmesh is True:
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh = solver.mesh
-    mesh.add_plot(axes)
-    bdNodeIdx = mesh.ds.boundary_node_index()
-    mesh.find_node(axes, index=bdNodeIdx, showindex=True)
-    plt.show()
+    writer = VTKMeshWriter(simulation=simulator.run)
+    writer.run()
 else:
-    if args.reload[0] is not None:
-        solver.solve(step=args.step, reset=False)
-    else:
-        solver.solve()
+    with open(args.model, 'rb') as f:
+        mesh = pickle.load(f)
+    simulator = TwoPhaseFlowWithGeostressSimulator(mesh, args)
+    writer = VTKMeshWriter(simulation=simulator.run)
+    writer.run()
+    solver.solve()
 
-    # 保存程序终止状态，用于后续计算测试
-    with open(args.save, 'wb') as f:
-        pickle.dump(solver, f, protocol=pickle.HIGHEST_PROTOCOL)
+# 保存程序终止状态，用于后续计算测试
+with open(args.save, 'wb') as f:
+    pickle.dump(solver, f, protocol=pickle.HIGHEST_PROTOCOL)
 

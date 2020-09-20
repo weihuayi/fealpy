@@ -7,7 +7,7 @@ from scipy.sparse import csr_matrix, coo_matrix, bmat, diags
 from scipy.sparse.linalg import spsolve
 
 from fealpy.decorator import barycentric
-
+from fealpy.timeintegratoralg.timeline import UniformTimeLine
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
@@ -53,12 +53,12 @@ class TwoPhaseFlowWithGeostressSimulator():
     1. 增加重启与续算功能
 
     """
-    def __init__(self, model, args):
-        NT = int((args.T1 - args.T0)/args.DT)
+    def __init__(self, mesh, args):
         self.args = args
-        self.model = model
-        self.mesh = model.space_mesh(n=args.NS)
-        self.timeline = model.time_mesh(T0=args.T0, T1=args.T1, n=NT)
+        self.mesh = mesh 
+
+        NT = int((args.T1 - args.T0)/args.DT)
+        self.timeline = UniformTimeLine(args.T0, args.T1, NT)
 
         self.GD = model.GD
         if self.GD == 2:
@@ -85,17 +85,14 @@ class TwoPhaseFlowWithGeostressSimulator():
         self.cphi = self.pspace.function() # 孔隙度函数, 分片常数
 
         # 初值
-        self.p[:] = model.rock['initial pressure']  # MPa
-        self.phi[:] = model.rock['porosity'] # 初始孔隙度 
-        self.cp[:] = model.rock['initial pressure']  # 初始地层压强
-        self.cphi[:] = model.rock['porosity'] # 当前孔隙度系数
+        self.p[:] = self.mesh.celldata['pressure']  # MPa
+        self.phi[:] = self.mesh.celldata['porosity'] # 初始孔隙度 
+        self.cp[:] = self.p # 初始地层压强
+        self.cphi[:] = self.phi # 当前孔隙度系数
 
-        # 源项,  TODO: 注意这里换其它的网格需要修改代码
-        self.fw = self.cspace.function()
-        self.fw[0] = self.model.water['injection rate'] # 注入
-
-        self.fo = self.cspace.function()
-        self.fo[3] = -self.model.oil['production rate'] # 产出
+        # 源项 
+        self.fw = self.cspace.function(array=self.mesh.nodedata['Fw'])
+        self.fo = self.cspace.function(array=self.mesh.nodedata['Fo'])
 
 
 
@@ -107,7 +104,7 @@ class TwoPhaseFlowWithGeostressSimulator():
         # 压强方程对应的位移散度矩阵, (\nabla\cdot u, w) 位移散度矩阵
         # * 注意这里利用了压强空间分片常数, 线性函数导数也是分片常数的事实
         c = self.mesh.entity_measure('cell')
-        c *= self.model.rock['biot']
+        c *= self.mesh.celldata['biot']
 
         val = self.mesh.grad_lambda() # (NC, TD+1, GD)
         val *= c[:, None, None]
@@ -134,7 +131,7 @@ class TwoPhaseFlowWithGeostressSimulator():
 
         # 线弹性矩阵的右端向量
         sigma0 = self.pspace.function()
-        sigma0[:] = self.model.rock['initial stress']
+        sigma0[:] = self.mesh.celldata['stress'] # 初始应力和等效应力
         self.FU = np.zeros(self.GD*cgdof, dtype=np.float64)
         self.FU[0*cgdof:1*cgdof] -= self.p@self.PU0
         self.FU[1*cgdof:2*cgdof] -= self.p@self.PU1
@@ -147,8 +144,6 @@ class TwoPhaseFlowWithGeostressSimulator():
         self.FU[1*cgdof:2*cgdof] -= sigma0@self.PU1
         if self.GD == 3:
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
-
-        self.isFCell = model.is_fracture_cell(self.mesh)
 
     def recover(self, val):
         """
@@ -194,15 +189,15 @@ class TwoPhaseFlowWithGeostressSimulator():
         计算当前物理量下的压强质量矩阵系数
         """
 
-        b = self.model.rock['biot'] 
-        Ks = self.model.rock['solid grain stiffness']
-        cw = self.model.water['compressibility']
-        co = self.model.oil['compressibility']
+        b = self.mesh.celldata['biot'] 
+        Ks = self.mesh.celldata['K']
+        cw = self.mesh.meshdata['water']['compressibility']
+        co = self.mesh.meshdata['oil']['compressibility']
 
-        Sw = self.cs[:].copy() # 当前的水饱和度 (NQ, NC)
-        phi = self.cphi[:].copy() # 当前的孔隙度
+        Sw = self.cs # 当前的水饱和度 (NQ, NC)
+        phi = self.cphi # 当前的孔隙度
 
-        val = phi*Sw*cw
+        val = phi*Sw*cw  
         val += phi*(1 - Sw)*co # 注意这里的 co 是常数, 但在水气混合物条件下应该依赖于压力
         val += (b - phi)/Ks
         return val
@@ -215,15 +210,16 @@ class TwoPhaseFlowWithGeostressSimulator():
         计算当前物理量下, 饱和度方程中, 压强项对应的系数
         """
 
-        b = self.model.rock['biot'] 
-        Ks = self.model.rock['solid grain stiffness']
-        cw = self.model.water['compressibility']
+        b = self.mesh.celldata['biot'] 
+        Ks = self.mesh.celldata['K']
+        cw = self.mesh.meshdata['water']['compressibility']
 
-        val = self.cs[:].copy() # 当前水饱和度
-        phi = self.cphi[:].copy() # 当前孔隙度
+        Sw = self.cs # 当前水饱和度
+        phi = self.cphi # 当前孔隙度
 
-        val *= (b-phi)/Ks + phi*cw
-
+        val  = (b-phi)/Ks
+        val += phi*cw
+        val *= Sw
         return val
 
     def flux_coefficient(self):
@@ -245,26 +241,21 @@ class TwoPhaseFlowWithGeostressSimulator():
 
         """
 
-        muw = self.model.water['viscosity'] # 单位是 1 cp = 1 mPa.s
-        muo = self.model.oil['viscosity'] # 单位是 1 cp = 1 mPa.s 
-        Sw = self.cs[:].copy() # 当前水的饱和度系数
+        muw = self.mesh.meshdata['water']['viscosity'] # 单位是 1 cp = 1 mPa.s
+        muo = self.mesh.meshdata['oil']['viscosity'] # 单位是 1 cp = 1 mPa.s 
+        Sw = self.cs # 当前水的饱和度系数
 
         # 岩石的绝对渗透率, 这里考虑了量纲的一致性, 压强单位是 Pa
-        k = self.model.rock['permeability']*9.869233e-4 
+        k = self.mesh.celldata['permeability']*9.869233e-4 
 
-        lamw = self.model.water_relative_permeability(Sw)
+        lamw = Sw**2 # TODO: 考虑更复杂的饱和度和渗透的关系 
         lamw /= muw
-        lamo = self.model.oil_relative_permeability(Sw)
+        lamo = (1 - Sw)**2 # TODO: 考虑更复杂的饱和度和渗透的关系 
         lamo /= muo
-        val = 1/(lamw + lamo)
 
-        isFCell = self.isFCell
-        if isFCell is None:     
-            val /=k 
-        else:
-            val[~isFCell] /= k
-            kf = self.model.fracture['permeability']*9.869233e-4
-            val[isFCell] /= kf
+        val = 1/(lamw + lamo)
+        val /=k 
+
         return val
 
     def water_fractional_flow_coefficient(self):
@@ -276,11 +267,13 @@ class TwoPhaseFlowWithGeostressSimulator():
         计算**当前**物理量下, 饱和度方程中, 水的流动性系数
         """
 
-        Sw = self.cs[:].copy() # 当前水的饱和度系数
-        lamw = self.model.water_relative_permeability(Sw)
-        lamw /= self.model.water['viscosity'] 
-        lamo = self.model.oil_relative_permeability(Sw)
-        lamo /= self.model.oil['viscosity'] 
+        muw = self.mesh.meshdata['water']['viscosity'] # 单位是 1 cp = 1 mPa.s
+        muo = self.mesh.meshdata['oil']['viscosity'] # 单位是 1 cp = 1 mPa.s 
+        Sw = self.cs # 当前水的饱和度系数
+        lamw = Sw**2 
+        lamw /= muw 
+        lamo = (1-Sw)**2 
+        lamo /= muo 
         val = lamw/(lamw + lamo)
         return val
 
@@ -582,6 +575,62 @@ class TwoPhaseFlowWithGeostressSimulator():
                     self.FU, np.r_['0', isBdDof, isBdDof, isBdDof]
                     )
 
+    def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
+        """
+        construct the linear elasticity fem matrix
+        """
+
+        GD = self.GD
+        if GD == 2:
+            idx = [(0, 0), (0, 1),  (1, 1)]
+            imap = {(0, 0):0, (0, 1):1, (1, 1):2}
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+            imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
+        A = []
+
+        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
+
+
+        # 分块组装矩阵
+        gdof = self.number_of_global_dofs()
+        cellmeasure = self.cellmeasure
+        for k, (i, j) in enumerate(idx):
+            Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
+            A.append(Aij)
+
+        if GD == 2:
+            C = [[None, None], [None, None]]
+            D = mu[:, None, None]*(A[imap[(0, 0)]] + A[imap[(1, 1)]]) 
+        elif GD == 3:
+            C = [[None, None, None], [None, None, None], [None, None, None]]
+            D = mu[:, None, None]*(A[imap[(0, 0)]] + A[imap[(1, 1)]] + A[imap[(2, 2)]])
+
+        
+        cell2dof = self.cell_to_dof() # (NC, ldof)
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        shape = (NC, ldof, ldof)
+        I = np.broadcast_to(cell2dof[:, :, None], shape=shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=shape)
+
+        for i in range(GD):
+            Aii = D + (mu + lam)[:, None, None]*A[imap[(i, i)]] 
+            C[i][i] = csr_matrix((Aii.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            for j in range(i+1, GD):
+                Aij = lam[:, None, None]*A[imap[(i, j)]] + mu[:, None, None]*A[imap[(i, j)]].swapaxes(-1, -2)
+                C[i][j] = csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)) 
+                C[j][i] = C[i][j].T 
+
+        if format == 'csr':
+            return bmat(C, format='csr') # format = bsr ??
+        elif format == 'bsr':
+            return bmat(C, format='bsr')
+        elif format == 'list':
+            return C
+
     def picard_iteration(self, maxit=10):
 
         GD = self.GD
@@ -685,7 +734,7 @@ class TwoPhaseFlowWithGeostressSimulator():
 
 
 
-    def solve(self, reset=True, queue=None):
+    def run(self, queue=None):
         """
 
         Notes
@@ -698,8 +747,6 @@ class TwoPhaseFlowWithGeostressSimulator():
 
         timeline = self.timeline
         dt = timeline.current_time_step_length()
-        if reset is True:
-            timeline.reset() # 时间置零
 
         if queue is not None:
             n = timeline.current
@@ -728,5 +775,4 @@ class TwoPhaseFlowWithGeostressSimulator():
             self.set_mesh_data()
             data = {'name':fname, 'mesh':mesh}
             queue.put(data)
-
-
+            queue.put(-1) # 结束模拟过程

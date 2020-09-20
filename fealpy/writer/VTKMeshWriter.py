@@ -12,7 +12,7 @@ class VTKMeshWriter:
     -----
     用于在数值模拟过程中输出网格和数据到 vtk 数据文件中 
     """
-    def __init__(self, fname, simulation=None, args=None):
+    def __init__(self, simulation=None, args=tuple()):
 
         self.simulation = simulation
         if self.simulation is not None:
@@ -57,7 +57,7 @@ class VTKMeshWriter:
         writer.SetInputData(vmesh)
         writer.Write()
 
-    def run_simulation(self):
+    def run(self):
         """
 
         Notes

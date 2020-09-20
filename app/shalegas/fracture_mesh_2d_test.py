@@ -54,11 +54,11 @@ for i in range(14):
 NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
 
-# 构建 KDTree，用于定义注入和生成井的网格点位置
+# 构建 KDTree，用于定义注入和生产井的网格点位置
 node = mesh.entity('node')
 tree = KDTree(node)
 
-p0 = np.array([(9.5, 5)], dtype=np.float64) # 生成井位置
+p0 = np.array([(9.5, 5)], dtype=np.float64) # 生产井位置
 p1 = np.array([(0, 0), (0, 10)], dtype=np.float64) # 注水井位置 
 
 _, location0 = tree.query(p0)
@@ -72,7 +72,7 @@ print('注水井的位置:', node[location1])
 isFractureCell = is_fracture_cell(mesh)
 mesh.celldata['fracture'] = isFractureCell
 
-# 渗透率
+# 渗透率，裂缝和岩石的渗透率不同
 mesh.celldata['permeability'] = np.zeros(NC, dtype=np.float64) # 1 d = 9.869 233e-13 m^2
 mesh.celldata['permeability'][ isFractureCell] = 6 # 裂缝 
 mesh.celldata['permeability'][~isFractureCell] = 2 # 岩石 
@@ -82,17 +82,17 @@ mesh.celldata['porosity'] = np.zeros(NC, dtype=np.float64) # 百分比
 mesh.celldata['porosity'][ isFractureCell] = 0.1 # 裂缝
 mesh.celldata['porosity'][~isFractureCell] = 0.3 # 岩石
 
-# 拉梅第一常数
+# 拉梅第一常数，裂缝和岩石不同
 mesh.celldata['lambda'] =  np.zeros(NC, dtype=np.float64) # MPa
 mesh.celldata['lambda'][ isFractureCell] = 0.5e+2 # 裂缝 
 mesh.celldata['lambda'][~isFractureCell] = 1.0e+2 # 岩石 
 
-# 拉梅第二常数
+# 拉梅第二常数，裂缝和岩石不同
 mesh.celldata['mu'] =  np.zeros(NC, dtype=np.float64) # MPa
-mesh.celldata['lambda'][ isFractureCell] = 1.5e+2 # 裂缝 
-mesh.celldata['lambda'][~isFractureCell] = 3.0e+2 # 岩石 
+mesh.celldata['mu'][ isFractureCell] = 1.5e+2 # 裂缝 
+mesh.celldata['mu'][~isFractureCell] = 3.0e+2 # 岩石 
 
-# Biot 系数
+# Biot 系数, TODO: 岩石和裂缝不同
 mesh.celldata['biot'] =  np.zeros(NC, dtype=np.float64) # 
 mesh.celldata['biot'][ isFractureCell] = 1.0 # 裂缝 
 mesh.celldata['biot'][~isFractureCell] = 1.0 # 岩石 
@@ -106,6 +106,7 @@ mesh.celldata['pressure'] = np.zeros(NC, dtype=np.float64)
 mesh.celldata['pressure'][:] = 3.0 # MPa
 
 # 初始应力
+mesh.celldata['stress'] = np.zeros(NC, dtype=np.float64)
 mesh.celldata['stress'] = 2.0e+2 # MPa 初始应力 sigma_0, sigma_eff
 
 # 初始水的饱和度 
@@ -115,7 +116,7 @@ mesh.celldata['oil saturation'] = 1 - mesh.celldata['water saturation']
 
 # 油的开采速度
 mesh.nodedata['Fo'] = np.zeros(NN, dtype=np.float64)
-mesh.nodedata['Fo'][location0] = 7.0e-6
+mesh.nodedata['Fo'][location0] = -7.0e-6
 
 # 水的注入速度
 mesh.nodedata['Fw'] = np.zeros(NN, dtype=np.float64)
@@ -132,6 +133,8 @@ mesh.meshdata['oil'] = {
     'compressibility': 2.0e-3, # MPa^{-1}
     }
 
+with open('model1.pickle', 'wb') as f:
+    pickle.dump(mesh, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 fig = plt.figure()
 axes = fig.gca()
