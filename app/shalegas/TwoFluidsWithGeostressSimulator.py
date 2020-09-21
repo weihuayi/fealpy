@@ -23,7 +23,7 @@ class TwoFluidsWithGeostressSimulator():
 
     Notes
     -----
-    这是一个两相流和地质力学耦合的模拟程序, 可以模拟水油和水气
+    这是一个模拟两种流体和地质力学耦合的程序  
 
     * S_w: 水的饱和度 S_w
     * S_g:
@@ -53,13 +53,13 @@ class TwoFluidsWithGeostressSimulator():
 
     """
     def __init__(self, mesh, args):
-        self.args = args
+        self.args = args # 模拟相关参数
         self.mesh = mesh 
 
         NT = int((args.T1 - args.T0)/args.DT)
         self.timeline = UniformTimeLine(args.T0, args.T1, NT)
 
-        self.GD = model.GD
+        self.GD = mesh.geo_dimension()
         if self.GD == 2:
             self.vspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0) # 速度空间
         elif self.GD == 3:
@@ -90,10 +90,10 @@ class TwoFluidsWithGeostressSimulator():
         self.cphi[:] = self.phi # 当前孔隙度系数
 
         # 源项 
-        self.fw = self.cspace.function(array=self.mesh.nodedata['Fw'])
-        self.fo = self.cspace.function(array=self.mesh.nodedata['Fo'])
-
-
+        self.fin = self.cspace.function()
+        self.fout = self.cspace.function()
+        self.fin[:] = self.mesh.nodedata['injection']
+        self.fout[:] = self.mesh.nodedata['production']
 
         # 一些常数矩阵和向量
 
@@ -130,7 +130,7 @@ class TwoFluidsWithGeostressSimulator():
 
         # 线弹性矩阵的右端向量
         sigma0 = self.pspace.function()
-        sigma0[:] = self.mesh.celldata['stress'] # 初始应力和等效应力
+        sigma0[:] = self.mesh.celldata['stress'] # 初始应力和等效应力之和
         self.FU = np.zeros(self.GD*cgdof, dtype=np.float64)
         self.FU[0*cgdof:1*cgdof] -= self.p@self.PU0
         self.FU[1*cgdof:2*cgdof] -= self.p@self.PU1
@@ -189,16 +189,16 @@ class TwoFluidsWithGeostressSimulator():
         """
 
         b = self.mesh.celldata['biot'] 
-        Ks = self.mesh.celldata['K']
-        cw = self.mesh.meshdata['water']['compressibility']
-        co = self.mesh.meshdata['oil']['compressibility']
+        K = self.mesh.celldata['K']
+        c0 = self.mesh.meshdata['fluid_0']['compressibility']
+        c1 = self.mesh.meshdata['fluid_1']['compressibility']
 
-        Sw = self.cs # 当前的水饱和度 (NQ, NC)
+        s = self.cs # 流体 0 当前的饱和度 (NQ, NC)
         phi = self.cphi # 当前的孔隙度
 
-        val = phi*Sw*cw  
-        val += phi*(1 - Sw)*co # 注意这里的 co 是常数, 但在水气混合物条件下应该依赖于压力
-        val += (b - phi)/Ks
+        val = phi*s*c0  
+        val += phi*(1 - s)*c1 # 注意这里的 co 是常数, 但在水气混合物条件下应该依赖于压力
+        val += (b - phi)/K
         return val
 
     def saturation_pressure_coefficient(self):
@@ -210,15 +210,15 @@ class TwoFluidsWithGeostressSimulator():
         """
 
         b = self.mesh.celldata['biot'] 
-        Ks = self.mesh.celldata['K']
-        cw = self.mesh.meshdata['water']['compressibility']
+        K = self.mesh.celldata['K']
+        c0 = self.mesh.meshdata['fluid_0']['compressibility']
 
-        Sw = self.cs # 当前水饱和度
+        s = self.cs # 当前流体 0 的饱和度
         phi = self.cphi # 当前孔隙度
 
-        val  = (b-phi)/Ks
-        val += phi*cw
-        val *= Sw
+        val  = (b - phi)/K
+        val += phi*c0
+        val *= s 
         return val
 
     def flux_coefficient(self):
@@ -240,40 +240,40 @@ class TwoFluidsWithGeostressSimulator():
 
         """
 
-        muw = self.mesh.meshdata['water']['viscosity'] # 单位是 1 cp = 1 mPa.s
-        muo = self.mesh.meshdata['oil']['viscosity'] # 单位是 1 cp = 1 mPa.s 
-        Sw = self.cs # 当前水的饱和度系数
+        mu0 = self.mesh.meshdata['fluid_0']['viscosity'] # 单位是 1 cp = 1 mPa.s
+        mu1 = self.mesh.meshdata['fluid_1']['viscosity'] # 单位是 1 cp = 1 mPa.s 
+        s = self.cs # 流体 0 当前的饱和度系数
 
         # 岩石的绝对渗透率, 这里考虑了量纲的一致性, 压强单位是 Pa
         k = self.mesh.celldata['permeability']*9.869233e-4 
 
-        lamw = Sw**2 # TODO: 考虑更复杂的饱和度和渗透的关系 
-        lamw /= muw
-        lamo = (1 - Sw)**2 # TODO: 考虑更复杂的饱和度和渗透的关系 
-        lamo /= muo
+        lam0 = self.mesh.fluid_relative_permeability_0(s) # TODO: 考虑更复杂的饱和度和渗透的关系 
+        lam0 /= mu0
+        lam1 = self.mesh.fluid_relative_permeability_1(s) # TODO: 考虑更复杂的饱和度和渗透的关系 
+        lam1 /= mu1
 
-        val = 1/(lamw + lamo)
+        val = 1/(lam0 + lam1)
         val /=k 
 
         return val
 
-    def water_fractional_flow_coefficient(self):
+    def fluid_fractional_flow_coefficient_0(self):
         """
 
         Notes
         -----
 
-        计算**当前**物理量下, 饱和度方程中, 水的流动性系数
+        计算**当前**物理量下, 饱和度方程中, 主流体的的流动性系数
         """
 
-        muw = self.mesh.meshdata['water']['viscosity'] # 单位是 1 cp = 1 mPa.s
-        muo = self.mesh.meshdata['oil']['viscosity'] # 单位是 1 cp = 1 mPa.s 
-        Sw = self.cs # 当前水的饱和度系数
-        lamw = Sw**2 
-        lamw /= muw 
-        lamo = (1-Sw)**2 
-        lamo /= muo 
-        val = lamw/(lamw + lamo)
+        mu0 = self.mesh.meshdata['fluid_0']['viscosity'] # 单位是 1 cp = 1 mPa.s
+        mu1 = self.mesh.meshdata['fluid_1']['viscosity'] # 单位是 1 cp = 1 mPa.s 
+        s = self.cs # 流体 0 当前的饱和度系数
+        lam0 = self.mesh.fluid_relative_permeability_0(s) 
+        lam0 /= mu0
+        lam1 = self.mesh.fluid_relative_permeability_1(s) 
+        lam1 /= mu1 
+        val = lam0/(lam0 + lam1)
         return val
 
 
@@ -348,8 +348,9 @@ class TwoFluidsWithGeostressSimulator():
         S = diags(c, 0)
 
         # SU0, SU1, 饱和度方程中的位移散度对应的矩阵
+        b = self.mesh.celldata['biot']
         val = self.mesh.grad_lambda() # (NC, TD+1, GD)
-        c = self.cs[:]*self.model.rock['biot'] # (NC, ), 注意用当前的水饱和度
+        c = self.cs[:]*b # (NC, ), 注意用当前的水饱和度
         c *= cellmeasure 
         val *= c[:, None, None]
 
@@ -381,7 +382,7 @@ class TwoFluidsWithGeostressSimulator():
 
         # 右端矩阵
         dt = self.timeline.current_time_step_length()
-        FS = self.fw.value(bcs) # (NQ, NC)
+        FS = self.fin.value(bcs) # (NQ, NC)
         FS *= ws[:, None]
         FS = np.sum(FS, axis=0)
         FS *= cellmeasure
@@ -393,14 +394,14 @@ class TwoFluidsWithGeostressSimulator():
         FS += SU1@self.u[:, 1] # 上一个时间步的位移 y 分量 
 
         if GD == 3:
-            FS += SU2@self.u[:, 2] # 上一个时间步的位移 y 分量 
+            FS += SU2@self.u[:, 2] # 上一个时间步的位移 z 分量 
 
 
         # 用当前时刻的速度场, 构造非线性迎风格式
         face2cell = self.mesh.ds.face_to_cell()
         isBdFace = face2cell[:, 0] == face2cell[:, 1]
 
-        qf = self.mesh.integrator(2, 'face') # 边上的积分公式
+        qf = self.mesh.integrator(2, 'face') # 边或面上的积分公式
         bcs, ws = qf.get_quadrature_points_and_weights()
         facemeasure = self.mesh.entity_measure('face') 
 
@@ -408,8 +409,8 @@ class TwoFluidsWithGeostressSimulator():
         fn = self.mesh.face_unit_normal() 
         val0 = np.einsum('qfm, fm->qf', self.cv.face_value(bcs), fn) # 当前速度和法线的内积
 
-        # 水的流动分数, 与水的饱和度有关, 如果饱和度为0, 则为 0
-        Fw = self.water_fractional_flow_coefficient()
+        # 流体 0 的流动分数, 与水的饱和度有关, 如果饱和度为0, 则为 0
+        Fw = self.fluid_fractional_flow_coefficient_0()
         val1 = Fw[face2cell[:, 0]] # 边的左边单元的水流动分数
         val2 = Fw[face2cell[:, 1]] # 边的右边单元的水流动分数 
         val2[isBdFace] = 0.0 # 边界的贡献是 0 
@@ -492,7 +493,7 @@ class TwoFluidsWithGeostressSimulator():
 
         这里组装矩阵时, 利用了压强是分片常数的特殊性 
 
-        [  Noe,P PV,   P, PU0,   PU1]
+        [  Noe,  PV,   P, PU0,   PU1]
 
         [  None, PV,   P, PU0,   PU1, PU2]
         """
@@ -512,7 +513,7 @@ class TwoFluidsWithGeostressSimulator():
 
         # 组装压强方程的右端向量
         # * 这里利用了压强空间基是分片常数
-        FP = self.fo.value(bcs) + self.fw.value(bcs) # (NQ, NC)
+        FP = self.fout.value(bcs) + self.fin.value(bcs) # (NQ, NC)
         FP *= ws[:, None]
 
         FP = np.sum(FP, axis=0)
@@ -555,7 +556,8 @@ class TwoFluidsWithGeostressSimulator():
 
         GD = self.GD
         # 拉梅参数 (lambda, mu)
-        lam, mu = self.model.rock['lame']
+        lam = self.mesh.celldata['lambda'][0]
+        mu = self.mesh.celldata['mu'][0]
         U = self.cspace.linear_elasticity_matrix(lam, mu, format='list')
 
         isBdDof = self.cspace.dof.is_boundary_dof()
@@ -576,7 +578,11 @@ class TwoFluidsWithGeostressSimulator():
 
     def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
-        construct the linear elasticity fem matrix
+        Notes
+        -----
+        注意这里的拉梅常数是单元分片常数
+        lam.shape == (NC, ) # MPa
+        mu.shape == (NC, ) # MPa
         """
 
         GD = self.GD
@@ -588,28 +594,28 @@ class TwoFluidsWithGeostressSimulator():
             imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
         A = []
 
-        qf = self.integrator if q is None else self.mesh.integrator(q, 'cell')
+        qf = self.cspace.integrator if q is None else self.mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        grad = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
+        grad = self.cspace.grad_basis(bcs) # (NQ, NC, ldof, GD)
 
 
         # 分块组装矩阵
-        gdof = self.number_of_global_dofs()
-        cellmeasure = self.cellmeasure
+        gdof = self.cspace.number_of_global_dofs()
+        cellmeasure = self.cspace.cellmeasure
         for k, (i, j) in enumerate(idx):
             Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
             A.append(Aij)
 
         if GD == 2:
             C = [[None, None], [None, None]]
-            D = mu[:, None, None]*(A[imap[(0, 0)]] + A[imap[(1, 1)]]) 
+            D = mu[:, None, None]*(A[0] + A[2]) 
         elif GD == 3:
             C = [[None, None, None], [None, None, None], [None, None, None]]
-            D = mu[:, None, None]*(A[imap[(0, 0)]] + A[imap[(1, 1)]] + A[imap[(2, 2)]])
+            D = mu[:, None, None]*(A[0] + A[3] + A[imap[5]])
 
         
-        cell2dof = self.cell_to_dof() # (NC, ldof)
-        ldof = self.number_of_local_dofs()
+        cell2dof = self.cspace.cell_to_dof() # (NC, ldof)
+        ldof = self.cspace.number_of_local_dofs()
         NC = self.mesh.number_of_cells()
         shape = (NC, ldof, ldof)
         I = np.broadcast_to(cell2dof[:, :, None], shape=shape)
@@ -722,7 +728,10 @@ class TwoFluidsWithGeostressSimulator():
 
         # 分片常数的饱和度
         val = self.recover(s[:])
-        mesh.nodedata['saturation'] = val
+        mesh.nodedata['fluid_0'] = val
+
+        val = self.recover(1 - s)
+        mesh.nodedata['fluid_1'] = val 
 
         # 节点处的位移
         if GD == 2:
@@ -751,27 +760,26 @@ class TwoFluidsWithGeostressSimulator():
             n = timeline.current
             fname = args.output + str(n).zfill(10) + '.vtu'
             self.set_mesh_data()
-            data = {'name':fname, 'mesh':mesh}
+            data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
 
         while not timeline.stop():
             ct = timeline.current_time_level()/3600/24 # 天为单位
             print('当前时刻为第', ct, '天')
             self.picard_iteration()
-            self.update_solution()
             timeline.current += 1
             if timeline.current%args.step == 0:
                 if queue is not None:
                     n = timeline.current
                     fname = args.output + str(n).zfill(10) + '.vtu'
                     self.set_mesh_data()
-                    data = {'name':fname, 'mesh':mesh}
+                    data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
 
         if queue is not None:
             n = timeline.current
             fname = args.output + str(n).zfill(10) + '.vtu'
             self.set_mesh_data()
-            data = {'name':fname, 'mesh':mesh}
+            data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
-            queue.put(-1) # 结束模拟过程
+            queue.put(-1) # 发送模拟结束信号 
