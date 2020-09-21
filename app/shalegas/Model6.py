@@ -32,6 +32,7 @@ Notes
 """
 
 import numpy as np
+from scipy.spatial import KDTree 
 
 import matplotlib.pyplot as plt
 
@@ -91,17 +92,20 @@ class WaterFloodingModelFracture2d():
 
         self.GD = 2
 
+        self.p0 = np.array([(10, 10)], dtype=np.float64) # 生产井位置
+        self.p1 = np.array([(0, 0)], dtype=np.float64) # 注水井位置 
+
     def space_mesh(self, n=10):
         from fealpy.mesh import MeshFactory
         mf = MeshFactory()
         mesh = mf.boxmesh2d(self.domain, nx=2, ny=2, meshtype='tri')
         for i in range(n):
-            isCutCell= mesh.find_segment_location(self.point, self.segment)
-            mesh.bisect(isCutCell)
+            isCrossedCell= mesh.is_crossed_cell(self.point, self.segment)
+            mesh.bisect(isCrossedCell)
         return mesh
 
     def is_fracture_cell(self, mesh):
-        isFCell= mesh.find_segment_location(self.point, self.segment)
+        isFCell= mesh.is_crossed_cell(self.point, self.segment)
         return isFCell
 
 
@@ -177,11 +181,19 @@ class WaterFloodingModelSolver():
         self.cphi[:] = model.rock['porosity'] # 当前孔隙度系数
 
         # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
+
+        node = self.mesh.entity('node')
+        tree = KDTree(node)
+
+
+        _, location0 = tree.query(self.model.p0)
+        _, location1 = tree.query(self.model.p1)
+
         self.fo = self.cspace.function()
-        self.fo[3] = -self.model.oil['production rate'] # 产出
+        self.fo[location0] = -self.model.oil['production rate'] # 产出
 
         self.fw = self.cspace.function()
-        self.fw[0] = self.model.water['injection rate'] # 注入
+        self.fw[location1] = self.model.water['injection rate'] # 注入
 
 
         # 一些常数矩阵和向量
@@ -819,4 +831,7 @@ if __name__ == '__main__':
     model = WaterFloodingModelFracture2d()
     solver = WaterFloodingModelSolver(model)
     solver.solve()
+    #solver.mesh.add_plot(plt)
+    #plt.show()
+
 

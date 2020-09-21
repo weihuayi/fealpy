@@ -141,10 +141,8 @@ class TriangleMesh(Mesh2d):
         h = self.entity_measure('edge')
         isShortEdge = h < h0
 
-    def is_crossed_cell(self, point, segment): 
-        pass
 
-    def find_crossed_cell(self, point, segment):
+    def is_crossed_cell(self, point, segment):
         """
 
         Notes
@@ -206,8 +204,6 @@ class TriangleMesh(Mesh2d):
             isOK = np.sum(b >=0, axis=-1) == 3
             idx0, = np.nonzero(isNotOK)
 
-            print('start:', start)
-            print('end:', end)
             for i in range(3):
                 flag = np.abs(a[:, i]) < 1e-12
                 isCrossedNode[cell[idx[flag], i]] = True

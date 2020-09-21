@@ -28,7 +28,7 @@ class TriangleMeshTest():
             b = segment[i, 1]
             axes.plot(point[[a, b], 0], point[[a, b], 1], 'r')
         mesh.add_plot(axes)
-        mesh.find_cell(axes, showindex=True)
+        mesh.find_cell(axes, index=isCrossCell)
         plt.show()
 
 test = TriangleMeshTest()
