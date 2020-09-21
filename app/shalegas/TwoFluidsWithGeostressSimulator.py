@@ -18,7 +18,7 @@ import vtk
 import vtk.util.numpy_support as vnp
 
 
-class TwoPhaseFlowWithGeostressSimulator():
+class TwoFluidsWithGeostressSimulator():
     """
 
     Notes
@@ -50,7 +50,6 @@ class TwoPhaseFlowWithGeostressSimulator():
 
     Develop
     ------
-    1. 增加重启与续算功能
 
     """
     def __init__(self, mesh, args):
