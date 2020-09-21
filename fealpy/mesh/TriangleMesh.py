@@ -181,7 +181,8 @@ class TriangleMesh(Mesh2d):
         start = location[segment[:, 0]] # 出发单元
         end = location[segment[:, 1]] # 终止单元
 
-        isNotOK = np.ones(len(segment), dtype=np.bool_) 
+        isNotOK = np.ones(len(segment), dtype=np.bool_)
+        jdx = 3
         while isNotOK.any():
             idx = start[isNotOK] # 当前单元 
 
@@ -197,7 +198,6 @@ class TriangleMesh(Mesh2d):
             a[:, 1] = np.cross(v1, vv)
             a[:, 2] = np.cross(v2, vv)
 
-            
             b = np.zeros((len(idx), 3), dtype=self.ftype)
             b[:, 0] = np.cross(v1, v2)
             b[:, 1] = np.cross(v2, v0)
@@ -216,12 +216,14 @@ class TriangleMesh(Mesh2d):
             for i in range(3):
                 j = nx[i]
                 k = pr[i]
-                flag0 = (a[:, j] < 0) & (a[:, k] >0)
+                flag0 = (a[:, j] <= 0) & (a[:, k] >=0) & (jdx!=i)
                 lidx[flag0] = i
 
             # 移动到下一个单元
+            tmp = start[idx0[~isOK]]
             start[idx0[~isOK]] = cell2cell[idx[~isOK], lidx[~isOK]]
             isNotOK[idx0[isOK]] = False 
+            _, jdx = np.where((cell2cell[start[isNotOK]].T==tmp).T)
 
             # 这些单元标记为穿过单元
             isCrossedCell[start] = True
@@ -243,9 +245,7 @@ class TriangleMesh(Mesh2d):
             for i in range(3):
                 np.logical_or.at(isCrossedCell, range(NC), isCrossedNode[cell[:, i]])
 
-        
         return isCrossedCell
-
 
     def location(self, points, start=None):
         """
