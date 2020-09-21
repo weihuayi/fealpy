@@ -86,12 +86,14 @@ class TwoFluidsWithGeostressSimulator():
         # 初值
         self.p[:] = self.mesh.celldata['pressure']  # MPa
         self.phi[:] = self.mesh.celldata['porosity'] # 初始孔隙度 
+
         self.cp[:] = self.p # 初始地层压强
         self.cphi[:] = self.phi # 当前孔隙度系数
 
         # 源项 
         self.fin = self.cspace.function()
         self.fout = self.cspace.function()
+
         self.fin[:] = self.mesh.nodedata['injection']
         self.fout[:] = self.mesh.nodedata['production']
 
@@ -129,8 +131,6 @@ class TwoFluidsWithGeostressSimulator():
                     )
 
         # 线弹性矩阵的右端向量
-        sigma0 = self.pspace.function()
-        sigma0[:] = self.mesh.celldata['stress'] # 初始应力和等效应力之和
         self.FU = np.zeros(self.GD*cgdof, dtype=np.float64)
         self.FU[0*cgdof:1*cgdof] -= self.p@self.PU0
         self.FU[1*cgdof:2*cgdof] -= self.p@self.PU1
@@ -139,6 +139,8 @@ class TwoFluidsWithGeostressSimulator():
             self.FU[2*cgdof:3*cgdof] -= self.p@self.PU2
 
         # 初始应力和等效应力项
+        sigma0 = self.pspace.function()
+        sigma0[:] = self.mesh.celldata['stress'] # 初始应力和等效应力之和
         self.FU[0*cgdof:1*cgdof] -= sigma0@self.PU0
         self.FU[1*cgdof:2*cgdof] -= sigma0@self.PU1
         if self.GD == 3:
@@ -242,11 +244,11 @@ class TwoFluidsWithGeostressSimulator():
 
         mu0 = self.mesh.meshdata['fluid_0']['viscosity'] # 单位是 1 cp = 1 mPa.s
         mu1 = self.mesh.meshdata['fluid_1']['viscosity'] # 单位是 1 cp = 1 mPa.s 
-        s = self.cs # 流体 0 当前的饱和度系数
 
         # 岩石的绝对渗透率, 这里考虑了量纲的一致性, 压强单位是 Pa
         k = self.mesh.celldata['permeability']*9.869233e-4 
 
+        s = self.cs # 流体 0 当前的饱和度系数
         lam0 = self.mesh.fluid_relative_permeability_0(s) # TODO: 考虑更复杂的饱和度和渗透的关系 
         lam0 /= mu0
         lam1 = self.mesh.fluid_relative_permeability_1(s) # TODO: 考虑更复杂的饱和度和渗透的关系 
@@ -266,13 +268,17 @@ class TwoFluidsWithGeostressSimulator():
         计算**当前**物理量下, 饱和度方程中, 主流体的的流动性系数
         """
 
-        mu0 = self.mesh.meshdata['fluid_0']['viscosity'] # 单位是 1 cp = 1 mPa.s
-        mu1 = self.mesh.meshdata['fluid_1']['viscosity'] # 单位是 1 cp = 1 mPa.s 
+
         s = self.cs # 流体 0 当前的饱和度系数
+
+        mu0 = self.mesh.meshdata['fluid_0']['viscosity'] # 单位是 1 cp = 1 mPa.s
         lam0 = self.mesh.fluid_relative_permeability_0(s) 
         lam0 /= mu0
+
         lam1 = self.mesh.fluid_relative_permeability_1(s) 
+        mu1 = self.mesh.meshdata['fluid_1']['viscosity'] # 单位是 1 cp = 1 mPa.s 
         lam1 /= mu1 
+
         val = lam0/(lam0 + lam1)
         return val
 
@@ -314,11 +320,11 @@ class TwoFluidsWithGeostressSimulator():
         if GD == 2:
             A3, A4, FU, isBdDof3 = self.get_dispacement_system(q=2)
             A = bmat([A0, A1, A2, A3, A4], format='csr')
-            F = np.r_['0', FV, FP, FS, FU]
+            F = np.r_['0', FS, FV, FP, FU]
         elif GD == 3:
             A3, A4, A5, FU, isBdDof3 = self.get_dispacement_system(q=2)
             A = bmat([A0, A1, A2, A3, A4, A5], format='csr')
-            F = np.r_['0', FV, FP, FS, FU]
+            F = np.r_['0', FS, FV, FP, FU]
         isBdDof = np.r_['0', isBdDof0, isBdDof1, isBdDof2, isBdDof3]
         return A, F, isBdDof
 
@@ -694,12 +700,12 @@ class TwoFluidsWithGeostressSimulator():
                 break
 
         # 更新解
+        self.s[:] = self.cs
         self.v[:] = self.cv
         self.p[:] = self.cp
-        self.s[:] = self.cs
         self.u[:] = self.cu
 
-    def set_mesh_data(self):
+    def update_mesh_data(self):
         """
 
         Notes
@@ -759,7 +765,7 @@ class TwoFluidsWithGeostressSimulator():
         if queue is not None:
             n = timeline.current
             fname = args.output + str(n).zfill(10) + '.vtu'
-            self.set_mesh_data()
+            self.update_mesh_data()
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
 
@@ -779,7 +785,7 @@ class TwoFluidsWithGeostressSimulator():
         if queue is not None:
             n = timeline.current
             fname = args.output + str(n).zfill(10) + '.vtu'
-            self.set_mesh_data()
+            self.update_mesh_data()
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
             queue.put(-1) # 发送模拟结束信号 
