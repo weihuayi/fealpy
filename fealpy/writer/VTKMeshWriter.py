@@ -46,7 +46,7 @@ class VTKMeshWriter:
             d.SetName(key)
             pdata.AddArray(d)
 
-        cdata = self.vtkmesh.GetCellData()
+        cdata = vtkmesh.GetCellData()
         for key, val in mesh.celldata.items():
             d = vnp.numpy_to_vtk(val)
             d.SetName(key)
@@ -54,7 +54,7 @@ class VTKMeshWriter:
 
         writer = vtk.vtkXMLUnstructuredGridWriter()
         writer.SetFileName(fname)
-        writer.SetInputData(vmesh)
+        writer.SetInputData(vtkmesh)
         writer.Write()
 
     def run(self):

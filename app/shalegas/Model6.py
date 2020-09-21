@@ -65,7 +65,7 @@ class WaterFloodingModelFracture2d():
             }
 
         self.fracture = {
-            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 6, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
                 }
 
@@ -141,7 +141,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=200*3600*24, NS=14, NT=20*60*24):
+    def __init__(self, model, T=800*3600*24, NS=14, NT=800*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -737,7 +737,7 @@ class WaterFloodingModelSolver():
         #self.s[flag] = 0.0
         self.u[:] = self.cu
 
-    def solve(self, step=30):
+    def solve(self, step=24):
         """
 
         Notes
