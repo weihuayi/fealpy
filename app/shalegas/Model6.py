@@ -299,17 +299,16 @@ class WaterFloodingModelSolver():
         node = self.mesh.entity('node')
         tree = KDTree(node)
 
-
-        _, location0 = tree.query(self.model.p0)
-        _, location1 = tree.query(self.model.p1)
-        print(location0)
-        print(location1)
+        _, loc0 = tree.query(self.model.p0)
+        _, loc1 = tree.query(self.model.p1)
+        print(loc0)
+        print(loc1)
 
         self.fo = self.cspace.function()
-        self.fo[location0] = -self.model.oil['production rate'] # 产出
+        self.fo[825] = -self.model.oil['production rate'] # 产出
 
         self.fw = self.cspace.function()
-        self.fw[location1] = self.model.water['injection rate'] # 注入
+        self.fw[loc1] = self.model.water['injection rate'] # 注入
 
 
         # 一些常数矩阵和向量
@@ -955,15 +954,16 @@ if __name__ == '__main__':
     #model = WaterFloodingModelFracture2d()
     model = WaterFloodingModelFracture2d_1()
     solver = WaterFloodingModelSolver(model)
-    if False:
+    if True:
         solver.solve()
     else:
+        node = solver.mesh.entity('node')
         lc = mc.LineCollection(model.point[model.segment], linewidths=2)
         fig = plt.figure()
         axes = fig.gca()
         color = np.copy(solver.phi)
         solver.mesh.add_plot(axes, cellcolor=color)
-        solver.mesh.find_node(axes, showindex=True)
+        #solver.mesh.find_node(axes, showindex=True)
         axes.add_collection(lc)
         plt.show()
 

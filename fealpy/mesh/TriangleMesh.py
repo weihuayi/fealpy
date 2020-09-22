@@ -1,5 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
+from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
@@ -243,7 +244,7 @@ class TriangleMesh(Mesh2d):
 
         return isCrossedCell
 
-    def location(self, points, start=None):
+    def location(self, points):
         """
         Notes
         -----
@@ -256,14 +257,20 @@ class TriangleMesh(Mesh2d):
         3. 区域还要是凸的
         """
 
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NP = points.shape[0]
         node = self.entity('node')
         cell = self.entity('cell')
         cell2cell = self.ds.cell_to_cell()
 
-        if start is None:
-            start = np.random.randint(0, NC, NP) # 设置一个初始单元位置
+        start = np.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc] # 设置一个初始单元位置
 
         isNotOK = np.ones(NP, dtype=np.bool)
         while np.any(isNotOK):
