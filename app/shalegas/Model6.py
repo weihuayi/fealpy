@@ -137,6 +137,111 @@ class WaterFloodingModelFracture2d():
     def gas_relative_permeability(self, Sw):
         pass
 
+class WaterFloodingModelFracture2d_1():
+
+    def __init__(self):
+        self.domain=[0, 10, 0, 10] # m
+        self.rock = {
+            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
+            'porosity': 0.3, # None
+            'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
+            'biot': 1.0,
+            'initial pressure': 3, # MPa
+            'initial stress': 60.66+86.5, # MPa 初始应力 sigma_0 , sigma_eff
+            'solid grain stiffness': 2.0e+2, # MPa 固体体积模量
+            }
+
+        self.fracture = {
+            'permeability': 6, # 1 d = 9.869 233e-13 m^2 
+            'porosity': 0.3, # None
+                }
+
+        self.water = {
+            'viscosity': 1, # 1 cp = 1 mPa*s
+            'compressibility': 1.0e-3, # MPa^{-1}
+            'initial saturation': 0.0, 
+            'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
+            }
+        self.oil = {'viscosity': 2, # cp
+            'compressibility': 2.0e-3, # MPa^{-1}
+            'initial saturation': 1.0, 
+            'production rate': 7.0e-6 # s^{-1}, 每秒产出多少油
+            }
+        self.bc = {'displacement': 0.0, 'flux': 0.0}
+
+        # fracture
+        #a = [5, 1, 3, 5, 7, 9]
+        #b = [(0.5, 9.5), (2, 8), (3, 7), (2, 8), (1, 9), (4, 6)]
+        #d = [(0, 1), (1, 0), (1, 0), (1, 0), (1, 0), (1, 0)]
+        #list(map(f, zip(a, b, d)))
+
+        self.point = np.array([
+            (0.5, 5),
+            (9.5, 5),
+            (1, 2),
+            (1, 8),
+            (3, 3),
+            (3, 7),
+            (5, 2),
+            (5, 8),
+            (7, 1),
+            (7, 9),
+            (9, 4),
+            (9, 6)], dtype=np.float64)
+        self.segment = np.array([
+            (0, 1), 
+            (2, 3),
+            (4, 5),
+            (6, 7),
+            (8, 9),
+            (10, 11)], dtype=np.int_)
+
+        self.GD = 2
+
+        self.p0 = np.array([(9.5, 5)], dtype=np.float64) # 生产井位置
+        self.p1 = np.array([(0, 0), (0, 10)], dtype=np.float64) # 注水井位置 
+
+    def space_mesh(self, n=10):
+        from fealpy.mesh import MeshFactory
+        mf = MeshFactory()
+        mesh = mf.boxmesh2d(self.domain, nx=2, ny=2, meshtype='tri')
+        for i in range(n):
+            isCrossedCell= mesh.is_crossed_cell(self.point, self.segment)
+            mesh.bisect(isCrossedCell)
+        return mesh
+
+    def is_fracture_cell(self, mesh):
+        isFCell= mesh.is_crossed_cell(self.point, self.segment)
+        return isFCell
+
+
+    def time_mesh(self, T=1, n=100):
+        from fealpy.timeintegratoralg.timeline import UniformTimeLine
+        timeline = UniformTimeLine(0, T, n)
+        return timeline
+
+    def water_relative_permeability(self, Sw):
+        """
+
+        Notes
+        ----
+        给定水的饱和度, 计算水的相对渗透率
+        """
+        val = Sw**2
+        return val
+
+    def oil_relative_permeability(self, Sw):
+        """
+
+        Notes
+        ----
+        给定水的饱和度, 计算油的相对渗透率
+        """
+        val = (1 - Sw)**2 
+        return val
+
+    def gas_relative_permeability(self, Sw):
+        pass
 
 class WaterFloodingModelSolver():
     """
@@ -828,7 +933,8 @@ class WaterFloodingModelSolver():
 
 if __name__ == '__main__':
 
-    model = WaterFloodingModelFracture2d()
+    #model = WaterFloodingModelFracture2d()
+    model = WaterFloodingModelFracture2d_1()
     solver = WaterFloodingModelSolver(model)
     solver.solve()
     #solver.mesh.add_plot(plt)
