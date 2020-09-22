@@ -30,11 +30,13 @@ Notes
 
 体积模量:  K = E/3/(1 - 2*nu) = lambda + 2/3* mu
 """
+from mumps import DMumpsContext
 
 import numpy as np
 from scipy.spatial import KDTree 
 
 import matplotlib.pyplot as plt
+from matplotlib import collections  as mc
 
 from scipy.sparse import csr_matrix, coo_matrix, bmat, diags
 from scipy.sparse.linalg import spsolve
@@ -76,6 +78,7 @@ class WaterFloodingModelFracture2d():
             'initial saturation': 0.0, 
             'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
             }
+
         self.oil = {'viscosity': 2, # cp
             'compressibility': 2.0e-3, # MPa^{-1}
             'initial saturation': 1.0, 
@@ -153,7 +156,7 @@ class WaterFloodingModelFracture2d_1():
 
         self.fracture = {
             'permeability': 6, # 1 d = 9.869 233e-13 m^2 
-            'porosity': 0.3, # None
+            'porosity': 0.1, # None
                 }
 
         self.water = {
@@ -162,6 +165,7 @@ class WaterFloodingModelFracture2d_1():
             'initial saturation': 0.0, 
             'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
             }
+
         self.oil = {'viscosity': 2, # cp
             'compressibility': 2.0e-3, # MPa^{-1}
             'initial saturation': 1.0, 
@@ -279,13 +283,18 @@ class WaterFloodingModelSolver():
         self.cu = self.cspace.function(dim=self.GD) # 位移函数
         self.cphi = self.pspace.function() # 孔隙度函数, 分片常数
 
+        self.isFCell = model.is_fracture_cell(self.mesh)
         # 初值
         self.p[:] = model.rock['initial pressure']  # MPa
-        self.phi[:] = model.rock['porosity'] # 初始孔隙度 
-        self.cp[:] = model.rock['initial pressure']  # 初始地层压强
-        self.cphi[:] = model.rock['porosity'] # 当前孔隙度系数
+
+        self.phi[~self.isFCell] = model.rock['porosity'] # 初始孔隙度 
+        self.phi[self.isFCell] = model.fracture['porosity'] # 初始孔隙度 
+
+        self.cp[:] = self.p  # 初始地层压强
+        self.cphi[:] = self.phi # 当前孔隙度系数
 
         # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
+
 
         node = self.mesh.entity('node')
         tree = KDTree(node)
@@ -293,6 +302,8 @@ class WaterFloodingModelSolver():
 
         _, location0 = tree.query(self.model.p0)
         _, location1 = tree.query(self.model.p1)
+        print(location0)
+        print(location1)
 
         self.fo = self.cspace.function()
         self.fo[location0] = -self.model.oil['production rate'] # 产出
@@ -350,7 +361,6 @@ class WaterFloodingModelSolver():
         if self.GD == 3:
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
 
-        self.isFCell = model.is_fracture_cell(self.mesh)
 
         # vtk 文件输出
         node, cell, cellType, NC = self.mesh.to_vtk()
@@ -809,7 +819,16 @@ class WaterFloodingModelSolver():
 
             # 求解
 
-            x = spsolve(A, F)
+            if False:
+                x = spsolve(A, F)
+            else:
+                ctx = DMumpsContext()
+                if ctx.myid == 0:
+                    ctx.set_centralized_sparse(A)
+                    x = F.copy()
+                    ctx.set_rhs(x) # Modified in place
+                ctx.run(job=6) # Analysis + Factorization + Solve
+                ctx.destroy() # Cleanup
 
             vgdof = self.vspace.number_of_global_dofs()
             pgdof = self.pspace.number_of_global_dofs()
@@ -936,8 +955,16 @@ if __name__ == '__main__':
     #model = WaterFloodingModelFracture2d()
     model = WaterFloodingModelFracture2d_1()
     solver = WaterFloodingModelSolver(model)
-    solver.solve()
-    #solver.mesh.add_plot(plt)
-    #plt.show()
+    if False:
+        solver.solve()
+    else:
+        lc = mc.LineCollection(model.point[model.segment], linewidths=2)
+        fig = plt.figure()
+        axes = fig.gca()
+        color = np.copy(solver.phi)
+        solver.mesh.add_plot(axes, cellcolor=color)
+        solver.mesh.find_node(axes, showindex=True)
+        axes.add_collection(lc)
+        plt.show()
 
 
