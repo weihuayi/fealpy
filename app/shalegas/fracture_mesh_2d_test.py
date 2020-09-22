@@ -62,17 +62,18 @@ p0 = np.array([(9.5, 5)], dtype=np.float64) # 生产井位置
 p1 = np.array([(0, 0), (0, 10)], dtype=np.float64) # 注水井位置 
 
 _, location0 = tree.query(p0)
-_, location1 = tree.query(p1)
-
 print('生产井的位置:', node[location0])
+
+_, location1 = tree.query(p1)
 print('注水井的位置:', node[location1])
 
 
 # 裂缝标签
 isFractureCell = is_fracture_cell(mesh)
+# vtk 不支持 bool 类型
 mesh.celldata['fracture'] = np.asarray(isFractureCell, dtype=np.int_)
 
-# 渗透率，裂缝和岩石的渗透率不同
+# 渗透率
 mesh.celldata['permeability'] = np.zeros(NC, dtype=np.float64) # 1 d = 9.869 233e-13 m^2
 mesh.celldata['permeability'][ isFractureCell] = 6 # 裂缝 
 mesh.celldata['permeability'][~isFractureCell] = 2 # 岩石 
@@ -82,17 +83,17 @@ mesh.celldata['porosity'] = np.zeros(NC, dtype=np.float64) # 百分比
 mesh.celldata['porosity'][ isFractureCell] = 0.3 # 裂缝
 mesh.celldata['porosity'][~isFractureCell] = 0.3 # 岩石
 
-# 拉梅第一常数，裂缝和岩石不同
+# 拉梅第一常数
 mesh.celldata['lambda'] =  np.zeros(NC, dtype=np.float64) # MPa
 mesh.celldata['lambda'][ isFractureCell] = 1.0e+2 # 裂缝 
 mesh.celldata['lambda'][~isFractureCell] = 1.0e+2 # 岩石 
 
-# 拉梅第二常数，裂缝和岩石不同
+# 拉梅第二常数
 mesh.celldata['mu'] =  np.zeros(NC, dtype=np.float64) # MPa
 mesh.celldata['mu'][ isFractureCell] = 3.0e+2 # 裂缝 
 mesh.celldata['mu'][~isFractureCell] = 3.0e+2 # 岩石 
 
-# Biot 系数, TODO: 岩石和裂缝不同
+# Biot 系数
 mesh.celldata['biot'] =  np.zeros(NC, dtype=np.float64) # 
 mesh.celldata['biot'][ isFractureCell] = 1.0 # 裂缝 
 mesh.celldata['biot'][~isFractureCell] = 1.0 # 岩石 
@@ -107,28 +108,29 @@ mesh.celldata['pressure'][:] = 3.0 # MPa
 
 # 初始应力
 mesh.celldata['stress'] = np.zeros(NC, dtype=np.float64)
-mesh.celldata['stress'] = 2.0e+2 # MPa 初始应力 sigma_0, sigma_eff
+mesh.celldata['stress'] = 2.0e+2 # MPa 初始应力 sigma_0 + sigma_eff
 
-# 初始水的饱和度 
+# 初始 0 号流体的饱和度 
 mesh.celldata['fluid_0'] = np.zeros(NC, dtype=np.float64)
-# 初始气或油的饱和度 
+# 初始 1 号流体的饱和度 
 mesh.celldata['fluid_1'] = 1 - mesh.celldata['fluid_0'] 
 
-# 气或油的开采速度
-mesh.nodedata['production'] = np.zeros(NN, dtype=np.float64)
-mesh.nodedata['production'][location0] = -7.0e-6
-
-# 水的注入速度
+# 0 号流体的注入速度
 mesh.nodedata['injection'] = np.zeros(NN, dtype=np.float64)
 mesh.nodedata['injection'][location1] = 3.5e-6
 
+# 1 号流体的开采速度
+mesh.nodedata['production'] = np.zeros(NN, dtype=np.float64)
+mesh.nodedata['production'][location0] = -7.0e-6
 
+
+# 0 号流体的性质
 mesh.meshdata['fluid_0'] = {
     'name': 'water',
     'viscosity': 1, # 1 cp = 1 mPa*s
     'compressibility': 1.0e-3, # MPa^{-1}
     }
-
+# 1 号流体的性质
 mesh.meshdata['fluid_1'] = {
     'name': 'oil', 
     'viscosity': 2, # cp
