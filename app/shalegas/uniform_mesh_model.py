@@ -64,8 +64,7 @@ mesh.celldata['biot'] =  np.zeros(NC, dtype=np.float64) #
 mesh.celldata['biot'][:] = 1.0 # 裂缝 
 
 # MPa 固体体积模量 K = lambda + 2*mu/3
-mesh.celldata['K'] =  np.zeros(NC, dtype=np.float64) # 
-mesh.celldata['K'] =  mesh.celldata['lambda'] + 2*mesh.celldata['mu']/3
+mesh.celldata['K'] =  mesh.celldata['lambda'] + 2*mesh.celldata['mu']/3 
 
 # 初始压强
 mesh.celldata['pressure'] = np.zeros(NC, dtype=np.float64)
@@ -73,20 +72,21 @@ mesh.celldata['pressure'][:] = 3.0 # MPa
 
 # 初始应力
 mesh.celldata['stress'] = np.zeros(NC, dtype=np.float64)
-mesh.celldata['stress'] = 5.0e+2 # MPa 初始应力 sigma_0, sigma_eff
+mesh.celldata['stress'][:] = 2.0e+2 # MPa 初始应力 sigma_0, sigma_eff
 
 # 初始水的饱和度 
 mesh.celldata['fluid_0'] = np.zeros(NC, dtype=np.float64)
 # 初始气或油的饱和度 
 mesh.celldata['fluid_1'] = 1 - mesh.celldata['fluid_0'] 
 
-# 气或油的开采速度
-mesh.nodedata['production'] = np.zeros(NN, dtype=np.float64)
-mesh.nodedata['production'][location0] = -3.5e-6
+# 流体 0 的源汇项
+mesh.nodedata['source_0'] = np.zeros(NN, dtype=np.float64)
+mesh.nodedata['source_0'][location1] = 3.51e-6 # 正号表示注入
 
-# 水的注入速度
-mesh.nodedata['injection'] = np.zeros(NN, dtype=np.float64)
-mesh.nodedata['injection'][location1] = 3.51e-6
+# 流体 1 的源汇项
+mesh.nodedata['source_1'] = np.zeros(NN, dtype=np.float64)
+mesh.nodedata['source_1'][location0] = -3.5e-6 # 负值表示产出
+
 
 
 mesh.meshdata['fluid_0'] = {

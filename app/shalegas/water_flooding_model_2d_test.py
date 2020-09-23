@@ -5,7 +5,9 @@ import pickle
 from fealpy.writer import VTKMeshWriter
 
 from TwoFluidsWithGeostressSimulator import TwoFluidsWithGeostressSimulator
-
+"""
+python3 water_flooding_model_2d_test.py --mesh waterflooding_u32.pickle --T1 10 --DT 60 --step 1
+"""
 
 ## 参数解析
 
@@ -38,12 +40,12 @@ parser.add_argument('--T1',
         help='模拟开始时间, 单位是天， 默认为 1 天，模拟程序内部会转换为秒')
 
 parser.add_argument('--DT', 
-        default=60, type=float,
+        default=1, type=float,
         help='模拟时间步长, 单位是分种， 默认为 1 分种，模拟程序内部会转换为秒')
 
 parser.add_argument('--step', 
-        default=24, type=int,
-        help='结果输出的步数间隔，默认为 24 步输出一次 vtu 文件')
+        default=60, type=int,
+        help='结果输出的步数间隔，默认为 60 步输出一次 vtu 文件')
 
 parser.add_argument('--output', 
         default='test', type=str,
@@ -94,5 +96,5 @@ else:
 
 # 保存程序终止状态，用于后续计算测试
 with open(args.save, 'wb') as f:
-    pickle.dump(solver, f, protocol=pickle.HIGHEST_PROTOCOL)
+    pickle.dump(simulator, f, protocol=pickle.HIGHEST_PROTOCOL)
 
