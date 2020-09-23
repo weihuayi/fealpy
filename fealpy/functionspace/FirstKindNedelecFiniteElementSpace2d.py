@@ -407,7 +407,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         def f0(bc):
             ps = mesh.bc_to_point(bc, etype='edge')
             return np.einsum('ijk, jk, ijm->ijm', u(ps), t, self.smspace.edge_basis(ps))
-        uh[edge2dof] = self.integralalg.edge_integral(f0, edgetype=True)
+        uh[edge2dof] = self.integralalg.edge_integral(f0)
 
         if p >= 1:
             NE = mesh.number_of_edges()
@@ -418,7 +418,7 @@ class FirstKindNedelecFiniteElementSpace2d:
             def f1(bc): #TODO: check here
                 ps = mesh.bc_to_point(bc, etype='cell')
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
-            val = self.integralalg.cell_integral(f1, celltype=True)
+            val = self.integralalg.cell_integral(f1)
             uh[cell2dof[:, 0:idof//2]] = val[:, 0, :] 
             uh[cell2dof[:, idof//2:]] = val[:, 1, :]
         return uh
