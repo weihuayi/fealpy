@@ -25,7 +25,7 @@ ext_modules = [
             get_pybind_include(),
             get_pybind_include(user=True)
         ],
-        libraries=["stdc++", "gmp", "mpfr", "CGAL"],
+        libraries=["stdc++", "gmp", "mpfr"],
     ),
     Extension(
         "fealpy.extent.detri2",
@@ -65,10 +65,6 @@ if __name__ == "__main__":
               'numpy',
               'scipy',
               'matplotlib',
-              'pybind11',
-              'pyamg',
-              'meshpy',
-              'meshio'
           ],
           ext_modules = ext_modules
       )
