@@ -404,9 +404,12 @@ class FirstKindNedelecFiniteElementSpace2d:
         uh = self.function()
         edge2dof = self.dof.edge_to_dof() 
         t = mesh.edge_unit_tangent()
+
+        @barycentric
         def f0(bc):
             ps = mesh.bc_to_point(bc, etype='edge')
             return np.einsum('ijk, jk, ijm->ijm', u(ps), t, self.smspace.edge_basis(ps))
+
         uh[edge2dof] = self.integralalg.edge_integral(f0)
 
         if p >= 1:
@@ -415,9 +418,12 @@ class FirstKindNedelecFiniteElementSpace2d:
             edof = self.number_of_local_dofs('edge')
             idof = self.number_of_local_dofs('cell') # dofs inside the cell 
             cell2dof = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
+
+            @barycentric
             def f1(bc): #TODO: check here
                 ps = mesh.bc_to_point(bc, etype='cell')
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
+
             val = self.integralalg.cell_integral(f1)
             uh[cell2dof[:, 0:idof//2]] = val[:, 0, :] 
             uh[cell2dof[:, idof//2:]] = val[:, 1, :]
