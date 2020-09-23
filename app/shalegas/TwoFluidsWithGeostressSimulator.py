@@ -25,15 +25,15 @@ class TwoFluidsWithGeostressSimulator():
     -----
     这是一个模拟两种流体和地质力学耦合的程序  
 
-    * S_w: 水的饱和度 S_w
-    * S_g:
+    * S_0: 流体 0 的饱和度，一般是水
+    * S_1: 流体 1 的饱和度，可以为气或油
     * v: 总速度
-    * p: 压强
+    * p: 压力
     * u: 岩石位移  
 
+    饱和度 P0 间断元，单元边界用迎风格式
     速度 RT0 元
     压强 P0 元
-    饱和度 P0 元
     岩石位移 P1 连续元离散
 
     目前, 模型
@@ -87,23 +87,23 @@ class TwoFluidsWithGeostressSimulator():
         self.p[:] = self.mesh.celldata['pressure']  # MPa
         self.phi[:] = self.mesh.celldata['porosity'] # 初始孔隙度 
 
-        self.cp[:] = self.p # 初始地层压强
+        self.cp[:] = self.p # 初始地层压力
         self.cphi[:] = self.phi # 当前孔隙度系数
 
         # 源项 
-        self.fin = self.cspace.function()
-        self.fout = self.cspace.function()
+        self.f0 = self.cspace.function()
+        self.f1 = self.cspace.function()
 
-        self.fin[:] = self.mesh.nodedata['injection']
-        self.fout[:] = self.mesh.nodedata['production']
+        self.f0[:] = self.mesh.nodedata['source_0'] # 流体 0 的源项
+        self.f1[:] = self.mesh.nodedata['source_1'] # 流体 1 的源项
 
         # 一些常数矩阵和向量
 
         # 速度散度矩阵, 速度方程对应的散度矩阵, (\nabla\cdot v, w) 
         self.B = self.vspace.div_matrix()
 
-        # 压强方程对应的位移散度矩阵, (\nabla\cdot u, w) 位移散度矩阵
-        # * 注意这里利用了压强空间分片常数, 线性函数导数也是分片常数的事实
+        # 压力方程对应的位移散度矩阵, (\nabla\cdot u, w) 位移散度矩阵
+        # * 注意这里利用了压力空间分片常数, 线性函数导数也是分片常数的事实
         c = self.mesh.entity_measure('cell')
         c *= self.mesh.celldata['biot']
 
@@ -388,7 +388,7 @@ class TwoFluidsWithGeostressSimulator():
 
         # 右端矩阵
         dt = self.timeline.current_time_step_length()
-        FS = self.fin.value(bcs) # (NQ, NC)
+        FS = self.f0.value(bcs) # (NQ, NC)
         FS *= ws[:, None]
         FS = np.sum(FS, axis=0)
         FS *= cellmeasure
@@ -517,16 +517,16 @@ class TwoFluidsWithGeostressSimulator():
         c *= cellmeasure 
         P = diags(c, 0)
 
-        # 组装压强方程的右端向量
-        # * 这里利用了压强空间基是分片常数
-        FP = self.fout.value(bcs) + self.fin.value(bcs) # (NQ, NC)
+        # 组装压力方程的右端向量
+        # * 这里利用了压力空间基是分片常数
+        FP = self.f1.value(bcs) + self.f0.value(bcs) # (NQ, NC)
         FP *= ws[:, None]
 
         FP = np.sum(FP, axis=0)
         FP *= cellmeasure
         FP *= dt
 
-        FP += P@self.p # 上一步的压强向量
+        FP += P@self.p # 上一步的压力向量
         FP += self.PU0@self.u[:, 0] 
         FP += self.PU1@self.u[:, 1]
 
