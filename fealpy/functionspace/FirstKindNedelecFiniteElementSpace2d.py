@@ -343,10 +343,10 @@ class FirstKindNedelecFiniteElementSpace2d:
         x = idx['x']
         y = idx['y']
 
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
+        phi[:] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
         return phi
 
     @barycentric

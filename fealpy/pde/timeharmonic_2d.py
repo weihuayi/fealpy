@@ -4,10 +4,6 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh
 
 class CosSinData:
-    """
-    -\Delta u = f
-    u = cos(pi*x)*cos(pi*y)
-    """
     def __init__(self):
         pass
 
