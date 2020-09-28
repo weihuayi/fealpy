@@ -23,6 +23,9 @@ class VTKMeshWriter:
             self.queue = None
             self.process = None
 
+    def __call__(self, fname, mesh):
+        return self.write_to_vtk(fname, mesh) 
+
     def write_to_vtk(self, fname, mesh):
         """
 

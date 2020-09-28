@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 
 from scipy.sparse import csr_matrix, coo_matrix, bmat, diags
 from scipy.sparse.linalg import spsolve
-from mumps import DMumpsContext
 
 from fealpy.decorator import barycentric
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
@@ -14,9 +13,6 @@ from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
 
 import pyamg 
-
-import vtk
-import vtk.util.numpy_support as vnp
 
 
 class TwoFluidsWithGeostressSimulator():
@@ -643,67 +639,155 @@ class TwoFluidsWithGeostressSimulator():
         elif format == 'list':
             return C
 
-    def picard_iteration(self, maxit=10):
+    def solve_linear_system_0(self, ctx=None):
+        # 构建总系统
+        A, F, isBdDof = self.get_total_system()
+
+        # 处理边界条件, 这里是 0 边界
+        gdof = len(isBdDof)
+        bdIdx = np.zeros(gdof, dtype=np.int_)
+        bdIdx[isBdDof] = 1 
+        Tbd = diags(bdIdx)
+        T = diags(1-bdIdx)
+        A = T@A@T + Tbd
+        F[isBdDof] = 0.0
+
+        # 求解
+        if ctx is None:
+            x = spsolve(A, F)
+        else:
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(A)
+                x = F.copy()
+                ctx.set_rhs(x) # Modified in place
+            ctx.run(job=6) # Analysis + Factorization + Solve
+            #ctx.destroy() # Cleanup
+
+        vgdof = self.vspace.number_of_global_dofs()
+        pgdof = self.pspace.number_of_global_dofs()
+        cgdof = self.cspace.number_of_global_dofs()
+        
+        start = 0
+        end = pgdof
+        s = x[start:end]
+
+        start = end
+        end += vgdof
+        v = x[start:end]
+
+        start = end
+        end += pgdof
+        p = x[start:end]
+
+        start = end
+        u = x[start:]
+
+        return s, v, p, u
+
+
+
+    def solve_linear_system_1(self, ctx=None):
+        """
+        Notes
+        -----
+        构造整个系统
+
+        二维情形：
+        x = [s, v, p, u0, u1]
+
+        A = [[   S, None,   SP,  SU0,  SU1]
+             [None,    V,   VP, None, None]
+             [None,   PV,    P,  PU0,  PU1]
+             [None, None,  UP0,  U00,  U01]
+             [None, None,  UP1,  U10,  U11]]
+        F = [FS, FV, FP, FU0, FU1]
+
+        三维情形：
+
+        x = [s, v, p, u0, u1, u2]
+        A = [[   S, None,   SP,  SU0,  SU1,  SU2]
+             [None,    V,   VP, None, None, None]
+             [None,   PV,    P,  PU0,  PU1,  PU2]
+             [None, None,  UP0,  U00,  U01,  U02]
+             [None, None,  UP1,  U10,  U11,  U12]
+             [None, None,  UP2,  U20,  U21,  U22]]
+        F = [FS, FV, FP, FU0, FU1, FU2]
+
+        """
+
+        vgdof = self.vspace.number_of_global_dofs()
+        pgdof = self.pspace.number_of_global_dofs()
+        cgdof = self.cspace.number_of_global_dofs()
+
+        GD = self.GD
+        A0, FS, isBdDof0 = self.get_saturation_system(q=2)
+        A1, FV, isBdDof1 = self.get_velocity_system(q=2)
+        A2, FP, isBdDof2 = self.get_pressure_system(q=2)
+
+        if GD == 2:
+            A3, A4, FU, isBdDof3 = self.get_dispacement_system(q=2)
+            A = bmat([A1[1:], A2[1:], A3[1:], A4[1:]], format='csr')
+            F = np.r_['0', FV, FP, FU]
+        elif GD == 3:
+            A3, A4, A5, FU, isBdDof3 = self.get_dispacement_system(q=2)
+            A = bmat([A1[1:], A2[1:], A3[1:], A4[1:], A5[1:]], format='csr')
+
+        isBdDof = np.r_['0', isBdDof1, isBdDof2, isBdDof3]
+
+        gdof = len(isBdDof)
+        bdIdx = np.zeros(gdof, dtype=np.int_)
+        bdIdx[isBdDof] = 1 
+        Tbd = diags(bdIdx)
+        T = diags(1-bdIdx)
+        A = T@A@T + Tbd
+        F[isBdDof] = 0.0
+
+        #[   S, None,   SP,  SU0,  SU1, SU2]
+        if ctx is None:
+            x = spsolve(A, F)
+        else:
+            if ctx.myid == 0:
+                ctx.set_centralized_sparse(A)
+                x = F.copy()
+                ctx.set_rhs(x) # Modified in place
+            ctx.run(job=6) # Analysis + Factorization + Solve
+            #ctx.destroy() # Cleanup
+
+        v = x[0:vgdof]
+        p = x[vgdof:vgdof+pgdof]
+        u = x[vgdof+pgdof:]
+
+        s = A0[2]@p 
+        s+= A0[3]@u[0*cgdof:1*cgdof] 
+        s+= A0[4]@u[1*cgdof:2*cgdof] 
+        if GD == 3:
+            s += A0[5]@u[2*cgdof:3*cgdof]
+        s /= A0[0].diagonal()
+
+        return s, v, p, u
+
+    def picard_iteration(self, maxit=10, ctx=None):
 
         GD = self.GD
         e0 = 1.0
         k = 0
         while e0 > 1e-10: 
-            # 构建总系统
-            A, F, isBdDof = self.get_total_system()
-
-            # 处理边界条件, 这里是 0 边界
-            gdof = len(isBdDof)
-            bdIdx = np.zeros(gdof, dtype=np.int_)
-            bdIdx[isBdDof] = 1 
-            Tbd = diags(bdIdx)
-            T = diags(1-bdIdx)
-            A = T@A@T + Tbd
-            F[isBdDof] = 0.0
-
-            # 求解
-
-            if False:
-                x = spsolve(A, F)
-            else:
-                ctx = DMumpsContext()
-                if ctx.myid == 0:
-                    ctx.set_centralized_sparse(A)
-                    x = F.copy()
-                    ctx.set_rhs(x) # Modified in place
-                ctx.run(job=6) # Analysis + Factorization + Solve
-                ctx.destroy() # Cleanup
-
-            vgdof = self.vspace.number_of_global_dofs()
-            pgdof = self.pspace.number_of_global_dofs()
-            cgdof = self.cspace.number_of_global_dofs()
+            s, v, p, u = self.solve_linear_system_0(ctx=ctx)
 
             e0 = 0.0
+            e0 += np.sum((self.cs - s)**2)
+            self.cs[:] = s 
 
-            start = 0
-            end = pgdof
-            e0 += np.sum((self.cs - x[start:end])**2)
-            self.cs[:] = x[start:end]
+            e0 += np.sum((self.cp - p)**2)
+            self.cp[:] = p 
 
-            start = end
-            end += vgdof
-            self.cv[:] = x[start:end]
-
-            start = end
-            end += pgdof
-            e0 += np.sum((self.cp - x[start:end])**2)
-            self.cp[:] = x[start:end]
+            self.cv[:] = v 
+            self.cu.flat[:] = u
 
             e0 = np.sqrt(e0) # 误差的 l2 norm
-            k += 1
-
-            for i in range(GD):
-                start = end
-                end += cgdof
-                self.cu[:, i] = x[start:end]
-
             print(e0)
 
+            k += 1
             if k >= maxit: 
                 print('picard iteration arrive max iteration with error:', e0)
                 break
@@ -777,13 +861,13 @@ class TwoFluidsWithGeostressSimulator():
 
 
 
-    def run(self, queue=None):
+    def run(self, ctx=None, writer=None, queue=None):
         """
 
         Notes
         -----
 
-        计算所有的时间层。
+        计算所有时间层物理量。
         """
 
         args = self.args
@@ -798,10 +882,16 @@ class TwoFluidsWithGeostressSimulator():
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
 
+        if writer is not None:
+            n = timeline.current
+            fname = args.output + str(n).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            writer(fname, self.mesh)
+
         while not timeline.stop():
             ct = timeline.current_time_level()/3600/24 # 天为单位
             print('当前时刻为第', ct, '天')
-            self.picard_iteration()
+            self.picard_iteration(ctx=ctx)
             timeline.current += 1
             if timeline.current%args.step == 0:
                 if queue is not None:
@@ -811,6 +901,12 @@ class TwoFluidsWithGeostressSimulator():
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
 
+                if writer is not None:
+                    n = timeline.current
+                    fname = args.output + str(n).zfill(10) + '.vtu'
+                    self.update_mesh_data()
+                    writer(fname, self.mesh)
+
         if queue is not None:
             n = timeline.current
             fname = args.output + str(n).zfill(10) + '.vtu'
@@ -818,3 +914,9 @@ class TwoFluidsWithGeostressSimulator():
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
             queue.put(-1) # 发送模拟结束信号 
+
+        if writer is not None:
+            n = timeline.current
+            fname = args.output + str(n).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            writer(fname, self.mesh)
