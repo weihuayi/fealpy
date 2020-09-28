@@ -10,6 +10,7 @@ from fealpy.mesh import MeshFactory
 from fealpy.pde.timeharmonic_2d import CosSinData
 from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
+from fealpy.boundarycondition import DirichletBC 
 
 from fealpy.tools.show import showmultirate
 from fealpy.tools.show import show_error_table
@@ -29,6 +30,7 @@ NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(maxit):
     space = FirstKindNedelecFiniteElementSpace2d(mesh, p=p)
+    bc = DirichletBC(space, pde.dirichlet) 
 
     lspace = LagrangeFiniteElementSpace(mesh, p=p+1)
 
@@ -40,13 +42,8 @@ for i in range(maxit):
     A = space.curl_matrix() - space.mass_matrix()
     F = space.source_vector(pde.source)
 
-    isBdDof = space.boundary_dof()
-    bdIdx = np.zeros(gdof, dtype=np.int)
-    bdIdx[isBdDof] = 1
-    Tbd = spdiags(bdIdx, 0, gdof, gdof)
-    T = spdiags(1-bdIdx, 0, gdof, gdof)
-    A = T@A@T + Tbd
-    F[isBdDof] = 0 
+    A, F = bc.apply(A, F, uh)
+
     uh[:] = spsolve(A, F)
 
     ruh = lspace.function(dim=2) # (gdof, 2)

@@ -614,7 +614,7 @@ class TwoFluidsWithGeostressSimulator():
             D = mu[:, None, None]*(A[0] + A[2]) 
         elif GD == 3:
             C = [[None, None, None], [None, None, None], [None, None, None]]
-            D = mu[:, None, None]*(A[0] + A[3] + A[imap[5]])
+            D = mu[:, None, None]*(A[0] + A[3] + A[5])
 
         
         cell2dof = self.cspace.cell_to_dof() # (NC, ldof)
@@ -757,11 +757,12 @@ class TwoFluidsWithGeostressSimulator():
         p = x[vgdof:vgdof+pgdof]
         u = x[vgdof+pgdof:]
 
-        s = A0[2]@p 
-        s+= A0[3]@u[0*cgdof:1*cgdof] 
-        s+= A0[4]@u[1*cgdof:2*cgdof] 
+        s = FS
+        s -= A0[2]@p 
+        s -= A0[3]@u[0*cgdof:1*cgdof] 
+        s -= A0[4]@u[1*cgdof:2*cgdof] 
         if GD == 3:
-            s += A0[5]@u[2*cgdof:3*cgdof]
+            s -= A0[5]@u[2*cgdof:3*cgdof]
         s /= A0[0].diagonal()
 
         return s, v, p, u
@@ -772,7 +773,7 @@ class TwoFluidsWithGeostressSimulator():
         e0 = 1.0
         k = 0
         while e0 > 1e-10: 
-            s, v, p, u = self.solve_linear_system_0(ctx=ctx)
+            s, v, p, u = self.solve_linear_system_1(ctx=ctx)
 
             e0 = 0.0
             e0 += np.sum((self.cs - s)**2)
@@ -782,7 +783,7 @@ class TwoFluidsWithGeostressSimulator():
             self.cp[:] = p 
 
             self.cv[:] = v 
-            self.cu.flat[:] = u
+            self.cu.T.flat[:] = u
 
             e0 = np.sqrt(e0) # 误差的 l2 norm
             print(e0)

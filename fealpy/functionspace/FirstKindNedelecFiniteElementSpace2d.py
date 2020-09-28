@@ -407,7 +407,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         @barycentric
         def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
+            ps = mesh.bc_to_point(bc)
             return np.einsum('ijk, jk, ijm->ijm', u(ps), t, self.smspace.edge_basis(ps))
 
         uh[edge2dof] = self.integralalg.edge_integral(f0)
@@ -454,47 +454,6 @@ class FirstKindNedelecFiniteElementSpace2d:
         b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
-        """
-        Parameters
-        ----------
-
-        Notes
-        ----
-            For mixed finite element method, the Dirichlet boundary condition of
-            Poisson problem become Neumann boundary condition, and the Neumann
-            boundary condtion become Dirichlet boundary condition.
-        """
-        p = self.p
-        mesh = self.mesh
-        edof = self.smspace.number_of_local_dofs(doftype='edge') 
-        edge2cell = mesh.ds.edge_to_cell()
-        edge2dof = self.dof.edge_to_dof() 
-
-        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        en = mesh.edge_unit_normal(index=index)
-        phi = self.edge_basis(bcs, index=index) 
-
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        val = -g(ps)
-        measure = self.integralalg.edgemeasure[index]
-
-        gdof = self.number_of_global_dofs()
-        F = np.zeros(gdof, dtype=self.ftype)
-        bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
-        np.add.at(F, edge2dof[index], bb)
-        return F 
-
     def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
         """
@@ -514,9 +473,9 @@ class FirstKindNedelecFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        en = mesh.edge_unit_normal(index=index)
-        val = g(ps, en)
+        t = mesh.edge_unit_tangent(index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
+        val = g(ps, t)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]
@@ -526,6 +485,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         isDDof = np.zeros(gdof, dtype=np.bool_) 
         isDDof[edge2dof[index]] = True
         return isDDof
+
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()

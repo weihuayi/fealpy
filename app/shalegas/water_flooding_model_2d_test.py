@@ -92,9 +92,7 @@ if args.reload[0] is not None:
 else:
 
     
-    #ctx = DMumpsContext()
-
-    ctx = None
+    ctx = DMumpsContext()
     with open(args.mesh, 'rb') as f:
         mesh = pickle.load(f) # 导入地质网格模型
 
@@ -102,11 +100,12 @@ else:
     mesh.fluid_relative_permeability_1 = oil 
 
     simulator = TwoFluidsWithGeostressSimulator(mesh, args)
-    #writer = VTKMeshWriter(simulation=simulator.run, args=(ctx, None))
-    #writer.run()
-    writer = VTKMeshWriter()
-    simulator.run(ctx=ctx, writer=writer)
-    #ctx.destroy()
+    writer = VTKMeshWriter(simulation=simulator.run, args=(ctx, None))
+    writer.run()
+
+    #writer = VTKMeshWriter()
+    #simulator.run(ctx=ctx, writer=writer)
+    ctx.destroy()
 
 # 保存程序终止状态，用于后续计算测试
 with open(args.save, 'wb') as f:
