@@ -93,6 +93,42 @@ class StructureHexMeshDataStructure():
         self.NF = 3*nx*ny*nz + nx*ny + ny*nz + nz*nx
         self.NC = nx*ny*nz
 
+    def vtk_cell_type(self):
+        VTK_HEXAHEDRON= 12
+        return VTK_HEXAHEDRON
+
+    def to_vtk(self, etype='cell', index=np.s_[:]):
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if etype == 'cell':
+            cellType = 12  # 六面体
+        elif etype == 'face':
+            cellType = 9  # 四边形
+        elif etype == 'edge':
+            cellType = 3  # segment
+
+        return node, cell.flatten(), cellType, len(cell)
+
     @property
     def cell(self):
         NN = self.NN
