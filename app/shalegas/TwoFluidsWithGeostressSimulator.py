@@ -767,8 +767,7 @@ class TwoFluidsWithGeostressSimulator():
 
         return s, v, p, u
 
-    def picard_iteration(self, maxit=10, ctx=None):
-
+    def picard_iteration(self, ctx=None):
         GD = self.GD
         e0 = 1.0
         k = 0
@@ -789,7 +788,7 @@ class TwoFluidsWithGeostressSimulator():
             print(e0)
 
             k += 1
-            if k >= maxit: 
+            if k >= self.args.npicard: 
                 print('picard iteration arrive max iteration with error:', e0)
                 break
 

@@ -49,6 +49,10 @@ parser.add_argument('--step',
         default=60, type=int,
         help='结果输出的步数间隔，默认为 60 步输出一次 vtu 文件')
 
+parser.add_argument('--npicard', 
+        default=20, type=int,
+        help='Picard 迭代次数， 默认 20 次')
+
 parser.add_argument('--output', 
         default='test', type=str,
         help='结果输出文件的主名称，默认为 test')
@@ -91,7 +95,6 @@ if args.reload[0] is not None:
     simulator.run(ctx=ctx, writer=writer)
 else:
 
-    
     ctx = DMumpsContext()
     with open(args.mesh, 'rb') as f:
         mesh = pickle.load(f) # 导入地质网格模型
