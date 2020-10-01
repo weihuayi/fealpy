@@ -1,4 +1,3 @@
-
 import numpy as np
 
 import matplotlib.pyplot as plt
@@ -13,6 +12,8 @@ from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import RaviartThomasFiniteElementSpace3d
 
 import pyamg 
+
+from fast_solver import FastSover
 
 
 class TwoFluidsWithGeostressSimulator():
@@ -660,6 +661,7 @@ class TwoFluidsWithGeostressSimulator():
                 ctx.set_centralized_sparse(A)
                 x = F.copy()
                 ctx.set_rhs(x) # Modified in place
+            ctx.set_silent()
             ctx.run(job=6) # Analysis + Factorization + Solve
             #ctx.destroy() # Cleanup
 
@@ -731,6 +733,7 @@ class TwoFluidsWithGeostressSimulator():
         elif GD == 3:
             A3, A4, A5, FU, isBdDof3 = self.get_dispacement_system(q=2)
             A = bmat([A1[1:], A2[1:], A3[1:], A4[1:], A5[1:]], format='csr')
+            F = np.r_['0', FV, FP, FU]
 
         isBdDof = np.r_['0', isBdDof1, isBdDof2, isBdDof3]
 
@@ -750,8 +753,84 @@ class TwoFluidsWithGeostressSimulator():
                 ctx.set_centralized_sparse(A)
                 x = F.copy()
                 ctx.set_rhs(x) # Modified in place
+            ctx.set_silent()
             ctx.run(job=6) # Analysis + Factorization + Solve
             #ctx.destroy() # Cleanup
+
+        v = x[0:vgdof]
+        p = x[vgdof:vgdof+pgdof]
+        u = x[vgdof+pgdof:]
+
+        s = FS
+        s -= A0[2]@p 
+        s -= A0[3]@u[0*cgdof:1*cgdof] 
+        s -= A0[4]@u[1*cgdof:2*cgdof] 
+        if GD == 3:
+            s -= A0[5]@u[2*cgdof:3*cgdof]
+        s /= A0[0].diagonal()
+
+        return s, v, p, u
+
+    def solve_linear_system_2(self):
+        """
+        Notes
+        -----
+        构造整个系统
+
+        二维情形：
+        x = [s, v, p, u0, u1]
+
+        A = [[   S, None,   SP,  SU0,  SU1]
+             [None,    V,   VP, None, None]
+             [None,   PV,    P,  PU0,  PU1]
+             [None, None,  UP0,  U00,  U01]
+             [None, None,  UP1,  U10,  U11]]
+        F = [FS, FV, FP, FU0, FU1]
+
+        三维情形：
+
+        x = [s, v, p, u0, u1, u2]
+        A = [[   S, None,   SP,  SU0,  SU1,  SU2]
+             [None,    V,   VP, None, None, None]
+             [None,   PV,    P,  PU0,  PU1,  PU2]
+             [None, None,  UP0,  U00,  U01,  U02]
+             [None, None,  UP1,  U10,  U11,  U12]
+             [None, None,  UP2,  U20,  U21,  U22]]
+        F = [FS, FV, FP, FU0, FU1, FU2]
+
+        """
+
+        vgdof = self.vspace.number_of_global_dofs()
+        pgdof = self.pspace.number_of_global_dofs()
+        cgdof = self.cspace.number_of_global_dofs()
+
+        GD = self.GD
+        A0, FS, isBdDof0 = self.get_saturation_system(q=2)
+        A1, FV, isBdDof1 = self.get_velocity_system(q=2)
+        A2, FP, isBdDof2 = self.get_pressure_system(q=2)
+
+        if GD == 2:
+            A3, A4, FU, isBdDof3 = self.get_dispacement_system(q=2)
+            A = bmat([A1[1:], A2[1:], A3[1:], A4[1:]], format='csr')
+            F = np.r_['0', FV, FP, FU]
+        elif GD == 3:
+            A3, A4, A5, FU, isBdDof3 = self.get_dispacement_system(q=2)
+            A = bmat([A1[1:], A2[1:], A3[1:], A4[1:], A5[1:]], format='csr')
+            F = np.r_['0', FV, FP, FU]
+
+        isBdDof = np.r_['0', isBdDof1, isBdDof2, isBdDof3]
+
+        gdof = len(isBdDof)
+        bdIdx = np.zeros(gdof, dtype=np.int_)
+        bdIdx[isBdDof] = 1 
+        Tbd = diags(bdIdx)
+        T = diags(1-bdIdx)
+        A = T@A@T + Tbd
+        F[isBdDof] = 0.0
+
+        #[   S, None,   SP,  SU0,  SU1, SU2]
+        solver = FastSover(A, F)
+        x = solver.solve()
 
         v = x[0:vgdof]
         p = x[vgdof:vgdof+pgdof]

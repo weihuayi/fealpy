@@ -345,7 +345,7 @@ class TetrahedronMesh(Mesh3d):
 
 
     def uniform_bisect(self, n=1):
-        for i in range(2*n):
+        for i in range(n):
             self.bisect()
 
     def bisect(self, isMarkedCell=None, data=None, returnim=False):
