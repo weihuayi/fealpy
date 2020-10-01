@@ -96,6 +96,7 @@ if args.reload[0] is not None:
 else:
 
     ctx = DMumpsContext()
+    ctx.set_silent()
     with open(args.mesh, 'rb') as f:
         mesh = pickle.load(f) # 导入地质网格模型
 
