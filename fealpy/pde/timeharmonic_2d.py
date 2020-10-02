@@ -4,10 +4,6 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh
 
 class CosSinData:
-    """
-    -\Delta u = f
-    u = cos(pi*x)*cos(pi*y)
-    """
     def __init__(self):
         pass
 
@@ -103,8 +99,20 @@ class CosSinData:
         return val 
 
     @cartesian
-    def dirichlet(self, p):
-        return self.solution(p)
+    def dirichlet(self, p, t):
+        """
+        Notes
+        -----
+        p : (NQ, NE, GD)
+        t:  (NE, GD)
+        """
+        val = np.sum(self.solution(p)*t, axis=-1)
+        return val 
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        return np.abs(x) < 1e-12 
 
     @cartesian
     def neumann(self, p, n):
