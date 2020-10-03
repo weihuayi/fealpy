@@ -12,7 +12,7 @@ python3 water_flooding_model_2d_test.py --mesh waterflooding_u32.pickle --T1 10 
 """
 
 ctx = DMumpsContext()
-ctx.set_silent()
+#ctx.set_silent()
 
 ## 参数解析
 

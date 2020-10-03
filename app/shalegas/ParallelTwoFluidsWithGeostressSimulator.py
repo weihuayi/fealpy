@@ -21,7 +21,7 @@ class ParallelTwoFluidsWithGeostressSimulator():
 
     Notes
     -----
-    这是一个并行模拟两种流体和地质力学耦合的程序  
+    这是一个并行模拟两种流体和地质力学耦合的程序, 这里只是线性系统是并行的  
 
     * S_0: 流体 0 的饱和度，一般是水
     * S_1: 流体 1 的饱和度，可以为气或油
@@ -59,7 +59,6 @@ class ParallelTwoFluidsWithGeostressSimulator():
         self.mesh = mesh 
 
         if self.ctx.myid == 0:
-
             self.GD = mesh.geo_dimension()
             if self.GD == 2:
                 self.vspace = RaviartThomasFiniteElementSpace2d(self.mesh, p=0) # 速度空间
@@ -691,7 +690,7 @@ class ParallelTwoFluidsWithGeostressSimulator():
 
 
 
-    def solve_linear_system_1(self, ctx=None):
+    def solve_linear_system_1(self):
         """
         Notes
         -----
@@ -749,11 +748,11 @@ class ParallelTwoFluidsWithGeostressSimulator():
             F[isBdDof] = 0.0
 
         #[   S, None,   SP,  SU0,  SU1, SU2]
-            ctx.set_centralized_sparse(A)
+            self.ctx.set_centralized_sparse(A)
             x = F.copy()
-            ctx.set_rhs(x) # Modified in place
+            self.ctx.set_rhs(x) # Modified in place
 
-        ctx.run(job=6) # Analysis + Factorization + Solve
+        self.ctx.run(job=6) # Analysis + Factorization + Solve
 
         if self.ctx.myid == 0:
 
