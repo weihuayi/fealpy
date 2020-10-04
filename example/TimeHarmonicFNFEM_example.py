@@ -43,6 +43,53 @@ def curl_recover(uh):
 
     return ruh
 
+def spr_edge(node, edge, edgeVal):
+    NN = len(node)
+    NE  = len(edge)
+    v  = node[edge[:, 1]] - node[edge[:, 0]]
+    v /= 2.0
+    phi = np.ones((NE, 3), dtype=node.dtype)
+    phi[:, 1:] = v 
+
+    A = np.zeros((NN, 3, 3), dtype=node.dtype)
+
+    val = phi[:, :, None]*phi[:, None, :]
+    np.add.at(A, (edge[:, 0], np.s_[:], np.s_[:]), val)
+    np.add.at(A, (edge[:, 1], np.s_[:], np.s_[:]), val)
+
+    b = np.zeros((NN, 3), dtype=node.dtype)
+    val = phi*edgeVal[:, None]
+    np.add.at(b, (edge[:, 0], np.s_[:]), val)
+    np.subtract.at(b, (edge[:, 1], np.s_[:]), val)
+    return A, b
+
+def spr_curl(uh):
+    mesh = uh.space.mesh
+    NN = mesh.number_of_nodes()
+    NE = mesh.number_of_edges()
+    NC = mesh.number_of_cells()
+
+    # 计算数值解在单元上的 curl 值
+    bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
+    cellVal = uh.curl_value(bc) #(NC, )
+
+    # 计算每条边的平均 curl 值
+    edge2cell = mesh.ds.edge_to_cell()
+    edgeVal = np.zeros(NE, dtype=mesh.ftype) # (NE, )
+    val = np.broadcast_to(cellVal[:, None], shape=(NC, 2))
+    np.add.at(edgeVal, edge2cell[:, 0:2], val)
+    edgeVal /= 2.0
+
+    A, b = spr(node, edge, edgeVal) 
+
+
+    
+
+
+
+
+
+
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
