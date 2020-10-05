@@ -106,12 +106,12 @@ class Mesh2d(object):
         """
 
         NN = self.number_of_nodes()
-        edge = mesh.entity('edge')
-        eh = mesh.entity_measure('edge')
+        edge = self.entity('edge')
+        eh = self.entity_measure('edge')
         h = np.zeros(NN, dtype=self.ftype)
         deg = np.zeros(NN, dtype=self.itype)
 
-        val = np.broadcast_to(h[:, None], shape=edge.shape)
+        val = np.broadcast_to(eh[:, None], shape=edge.shape)
         np.add.at(h, edge, val)
         np.add.at(deg, edge, 1)
 

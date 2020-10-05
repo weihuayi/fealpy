@@ -4,6 +4,7 @@ import sys
 import argparse
 
 import numpy as np
+from numpy.linalg import inv
 from scipy.sparse import spdiags
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
@@ -45,76 +46,98 @@ def curl_recover(uh):
 
 def spr_edge(mesh, h, edgeVal):
 
+    """
+
+    Notes
+    -----
+    mesh: 三角形网格
+    h: 网格节点尺寸
+    edgeVal: 定义在边上的值
+    """
+
     NN = mesh.number_of_nodes() 
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
 
+    edge = mesh.entity('edge')
+    v = mesh.edge_tangent()/2 # 
+    phi = np.ones((NE, 3), dtype=mesh.ftype)
 
-    v = mesh.edge_tangent()/2
-    phi = np.ones((NE, 3), dtype=node.dtype)
-    phi[:, 1:] = v 
 
-    A = np.zeros((NN, 3, 3), dtype=node.dtype)
-    b = np.zeros((NN, 3), dtype=node.dtype)
+    A = np.zeros((NN, 3, 3), dtype=mesh.ftype)
+    b = np.zeros((NN, 3), dtype=mesh.ftype)
 
+    phi[:, 1:] = v/h[edge[:, 0], None] # 边中点相对于 0 号端点的局部坐标 
     val = phi[:, :, None]*phi[:, None, :]
-    np.add.at(A, (edge[:, 0], np.s_[:], np.s_[:]), val/h[edge[:, 0], None, None])
+    np.add.at(A, (edge[:, 0], np.s_[:], np.s_[:]), val) # A^TA
     val = phi*edgeVal[:, None]
     np.add.at(b, (edge[:, 0], np.s_[:]), val)
 
-    phi[:, 1:] *=-1
-    np.add.at(A, (edge[:, 1], np.s_[:], np.s_[:]), val/h[edge[:, 1], None, None])
+    phi[:, 1:] = -v/h[edge[:, 1], None] # 边中点相对于 1 号端点的局部坐标 
+    val = phi[:, :, None]*phi[:, None, :]
+    np.add.at(A, (edge[:, 1], np.s_[:], np.s_[:]), val) # A^TA
     val = phi*edgeVal[:, None]
     np.add.at(b, (edge[:, 1], np.s_[:]), val)
     return A, b
 
 def spr_curl(uh):
+
+    """
+    Notes
+    -----
+    给定一个解, 恢复节点处的值
+    """
     mesh = uh.space.mesh
-    edge = mesh.entity('edge')
-    cell = mesh.entity('cell')
+
     NN = mesh.number_of_nodes()
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
 
-    # 计算数值解在单元上的 curl 值
+    node = mesh.entity('node')
+    edge = mesh.entity('edge')
+    cell = mesh.entity('cell')
+
+    # 计算数值解在单元重心处的 curl 值
     bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
     cellVal = uh.curl_value(bc) #(NC, )
 
     # 计算每条边的平均 curl 值
     edge2cell = mesh.ds.edge_to_cell()
-    edgeVal = np.zeros(NE, dtype=mesh.ftype) # (NE, )
-    val = np.broadcast_to(cellVal[:, None], shape=(NC, 2))
-    np.add.at(edgeVal, edge2cell[:, 0:2], val)
-    edgeVal /= 2.0
+    edgeVal = (cellVal[edge2cell[:, 0]] + cellVal[edge2cell[:, 1]])/2.0
 
-    # 计算每个节点的最小二乖矩阵
+    # 计算每个节点的最小二乘矩阵
     h = mesh.node_size()
     A, b = spr_edge(mesh, h, edgeVal) 
 
     # 处理边界点
+    # 找到每个边界点对应的内部点, 把对应内部点的样本点当做边界节点的样本点
+
     isBdNode = mesh.ds.boundary_node_flag()
-    idx, = np.nonzero(isBdNode)
+    idxMap = np.arange(NN, dtype=mesh.itype) # 节点映射数组, 自身到自身的映射
 
-    idxMap = np.arange(NN, dtype=mesh.itype)
-
+    # 找到一端是边界点, 一端是内部节点的边, 修改节点映射数组
     flag = isBdNode[edge[:, 0]] & (~isBdNode[edge[:, 1]])
     idxMap[edge[flag, 0]] = edge[flag, 1]
     flag = isBdNode[edge[:, 1]] & (~isBdNode[edge[:, 0]])
     idxMap[edge[flag, 1]] = edge[flag, 0]
 
+    # 找到没有内部节点相邻的角点, 修改节点映射数组
     isCEdge = edge2cell[:, 0] != edge2cell[:, 1]
     isCEdge = isCEdge & isBdNode[edge[:, 0]] & isBdNode[edge[:, 1]]
 
     idxMap[cell[edge2cell[isCEdge, 0], edge2cell[isCEdge, 2]]] = cell[edge2cell[isCEdge, 1], edge2cell[isCEdge, 3]] 
     idxMap[cell[edge2cell[isCEdge, 1], edge2cell[isCEdge, 3]]] = cell[edge2cell[isCEdge, 0], edge2cell[isCEdge, 2]] 
 
+    # 计算边界节点对应的最小二乘矩阵和右端
+    # 注意可以直接利用对应内部节点对应的最小二乘矩阵和右端来计算边界点的系统, 
+    # 它们有内在的数学关系
     c = h[idxMap[isBdNode]]/h[isBdNode] 
-    xe = (node[idxMap[isBdNode]] - node[isBdNode])/h[isBdNode]
+    xe = (node[idxMap[isBdNode]] - node[isBdNode])/h[isBdNode, None]
 
     A[isBdNode, 0, 0] = A[idxMap[isBdNode], 0, 0]
 
     A[isBdNode, 0, 1] = A[idxMap[isBdNode], 0, 0]*xe[:, 0] 
-    A[isBdNone, 0, 1]+= A[idxMap[isBdNode], 0, 1]*c
+    A[isBdNode, 0, 1]+= A[idxMap[isBdNode], 0, 1]*c
     A[isBdNode, 1, 0] = A[isBdNode, 0, 1]
 
     A[isBdNode, 0, 2] = A[idxMap[isBdNode], 0, 0]*xe[:, 1] 
@@ -133,20 +156,24 @@ def spr_curl(uh):
 
     A[isBdNode, 2, 2] = A[idxMap[isBdNode], 0, 0]*xe[:, 1]**2
     A[isBdNode, 2, 2]+= A[idxMap[isBdNode], 0, 2]*xe[:, 1]*2*c
-    A[isBdNode, 2, 3]+= A[idxMap[isBdNode], 2, 2]*c**2
+    A[isBdNode, 2, 2]+= A[idxMap[isBdNode], 2, 2]*c**2
 
+    b[isBdNode, 0] = b[idxMap[isBdNode], 0]
 
+    b[isBdNode, 1] = b[idxMap[isBdNode], 0]*xe[:, 0]
+    b[isBdNode, 1]+= b[idxMap[isBdNode], 1]*c
 
+    b[isBdNode, 2] = b[idxMap[isBdNode], 0]*xe[:, 1]
+    b[isBdNode, 2]+= b[idxMap[isBdNode], 2]*c
 
+    A = inv(A)
+    val = (A@b[:, :, None]).reshape(-1, 3)
 
+    space = LagrangeFiniteElementSpace(mesh, p=1)
+    ruh = space.function() # (gdof, 2)
+    ruh[:] = val[:, 0]
 
-
-
-    
-
-
-
-
+    return ruh
 
 
 ## 参数解析
@@ -204,6 +231,7 @@ for i in range(args.maxit):
     uh[:] = spsolve(A, F)
 
     ruh = curl_recover(uh)
+    ruh = spr_curl(uh) 
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.curl, uh.curl_value)
