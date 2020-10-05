@@ -43,28 +43,35 @@ def curl_recover(uh):
 
     return ruh
 
-def spr_edge(node, edge, edgeVal):
-    NN = len(node)
-    NE  = len(edge)
-    v  = node[edge[:, 1]] - node[edge[:, 0]]
-    v /= 2.0
+def spr_edge(mesh, h, edgeVal):
+
+    NN = mesh.number_of_nodes() 
+    NE = mesh.number_of_edges()
+    NC = mesh.number_of_cells()
+
+
+    v = mesh.edge_tangent()/2
     phi = np.ones((NE, 3), dtype=node.dtype)
     phi[:, 1:] = v 
 
     A = np.zeros((NN, 3, 3), dtype=node.dtype)
+    b = np.zeros((NN, 3), dtype=node.dtype)
 
     val = phi[:, :, None]*phi[:, None, :]
-    np.add.at(A, (edge[:, 0], np.s_[:], np.s_[:]), val)
-    np.add.at(A, (edge[:, 1], np.s_[:], np.s_[:]), val)
-
-    b = np.zeros((NN, 3), dtype=node.dtype)
+    np.add.at(A, (edge[:, 0], np.s_[:], np.s_[:]), val/h[edge[:, 0], None, None])
     val = phi*edgeVal[:, None]
     np.add.at(b, (edge[:, 0], np.s_[:]), val)
-    np.subtract.at(b, (edge[:, 1], np.s_[:]), val)
+
+    phi[:, 1:] *=-1
+    np.add.at(A, (edge[:, 1], np.s_[:], np.s_[:]), val/h[edge[:, 1], None, None])
+    val = phi*edgeVal[:, None]
+    np.add.at(b, (edge[:, 1], np.s_[:]), val)
     return A, b
 
 def spr_curl(uh):
     mesh = uh.space.mesh
+    edge = mesh.entity('edge')
+    cell = mesh.entity('cell')
     NN = mesh.number_of_nodes()
     NE = mesh.number_of_edges()
     NC = mesh.number_of_cells()
@@ -80,7 +87,59 @@ def spr_curl(uh):
     np.add.at(edgeVal, edge2cell[:, 0:2], val)
     edgeVal /= 2.0
 
-    A, b = spr(node, edge, edgeVal) 
+    # 计算每个节点的最小二乖矩阵
+    h = mesh.node_size()
+    A, b = spr_edge(mesh, h, edgeVal) 
+
+    # 处理边界点
+    isBdNode = mesh.ds.boundary_node_flag()
+    idx, = np.nonzero(isBdNode)
+
+    idxMap = np.arange(NN, dtype=mesh.itype)
+
+    flag = isBdNode[edge[:, 0]] & (~isBdNode[edge[:, 1]])
+    idxMap[edge[flag, 0]] = edge[flag, 1]
+    flag = isBdNode[edge[:, 1]] & (~isBdNode[edge[:, 0]])
+    idxMap[edge[flag, 1]] = edge[flag, 0]
+
+    isCEdge = edge2cell[:, 0] != edge2cell[:, 1]
+    isCEdge = isCEdge & isBdNode[edge[:, 0]] & isBdNode[edge[:, 1]]
+
+    idxMap[cell[edge2cell[isCEdge, 0], edge2cell[isCEdge, 2]]] = cell[edge2cell[isCEdge, 1], edge2cell[isCEdge, 3]] 
+    idxMap[cell[edge2cell[isCEdge, 1], edge2cell[isCEdge, 3]]] = cell[edge2cell[isCEdge, 0], edge2cell[isCEdge, 2]] 
+
+    c = h[idxMap[isBdNode]]/h[isBdNode] 
+    xe = (node[idxMap[isBdNode]] - node[isBdNode])/h[isBdNode]
+
+    A[isBdNode, 0, 0] = A[idxMap[isBdNode], 0, 0]
+
+    A[isBdNode, 0, 1] = A[idxMap[isBdNode], 0, 0]*xe[:, 0] 
+    A[isBdNone, 0, 1]+= A[idxMap[isBdNode], 0, 1]*c
+    A[isBdNode, 1, 0] = A[isBdNode, 0, 1]
+
+    A[isBdNode, 0, 2] = A[idxMap[isBdNode], 0, 0]*xe[:, 1] 
+    A[isBdNode, 0, 2]+= A[idxMap[isBdNode], 0, 2]*c
+    A[isBdNode, 2, 0] = A[isBdNode, 0, 2]
+
+    A[isBdNode, 1, 1] = A[idxMap[isBdNode], 0, 0]*xe[:, 0]**2 
+    A[isBdNode, 1, 1]+= A[idxMap[isBdNode], 0, 1]*xe[:, 0]*2*c
+    A[isBdNode, 1, 1]+= A[idxMap[isBdNode], 1, 1]*c**2
+
+    A[isBdNode, 1, 2] = A[idxMap[isBdNode], 0, 0]*xe[:, 0]*xe[:, 1] 
+    A[isBdNode, 1, 2]+= A[idxMap[isBdNode], 0, 1]*xe[:, 1]*c
+    A[isBdNode, 1, 2]+= A[idxMap[isBdNode], 0, 2]*xe[:, 0]*c
+    A[isBdNode, 1, 2]+= A[idxMap[isBdNode], 1, 2]*c**2
+    A[isBdNode, 2, 1] = A[isBdNode, 1, 2]
+
+    A[isBdNode, 2, 2] = A[idxMap[isBdNode], 0, 0]*xe[:, 1]**2
+    A[isBdNode, 2, 2]+= A[idxMap[isBdNode], 0, 2]*xe[:, 1]*2*c
+    A[isBdNode, 2, 3]+= A[idxMap[isBdNode], 2, 2]*c**2
+
+
+
+
+
+
 
 
     
