@@ -176,8 +176,8 @@ class MeshFactory():
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
-    @timer
     @classmethod
+    @timer
     def boxmesh3d(self, box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
         """
         Notes

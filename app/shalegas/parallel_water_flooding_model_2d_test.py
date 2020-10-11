@@ -4,12 +4,15 @@ import pickle
 
 from fealpy.writer import VTKMeshWriter
 
-from TwoFluidsWithGeostressSimulator import TwoFluidsWithGeostressSimulator
+from ParallelTwoFluidsWithGeostressSimulator import ParallelTwoFluidsWithGeostressSimulator
 
 from mumps import DMumpsContext
 """
 python3 water_flooding_model_2d_test.py --mesh waterflooding_u32.pickle --T1 10 --DT 60 --step 1
 """
+
+ctx = DMumpsContext()
+ctx.set_silent()
 
 ## 参数解析
 
@@ -65,53 +68,41 @@ parser.add_argument('--reload',
         default=[None, None], nargs=2,
         help='导入保存的运行环境，增加更多时间步, 如 --reload simulator.pickle 10，导入 simulator.pickle 文件，在原来的基础上多算 10 天')
 
-parser.print_help()
-args = parser.parse_args()
+if ctx.myid == 0:
+    parser.print_help()
 
+args = parser.parse_args()
 # 单位转换
 args.T0 *= 3600*24 # 由天转换为秒
 args.T1 *= 3600*24 # 由天转换为秒
 args.DT *= 60 # 由分钟转换为 秒
 
 # 打印当前所有参数
-print(args) 
+if ctx.myid == 0:
+    print(args) 
 
-def water(s):
-    return s**2
 
-def oil(s):
-    return (1-s)**2
+if ctx.myid == 0:
+    def water(s):
+        return s**2
 
-if args.reload[0] is not None:
-    n = int(float(args.reload[1])*3600*24/args.DT)
-    with open(args.reload[0], 'rb') as f:
-        simulator = pickle.load(f)
-    simulator.add_time(n)
+    def oil(s):
+        return (1-s)**2
 
-    #writer = VTKMeshWriter(simulation=simulator.run)
-    #writer.run()
-
-    writer = VTKMeshWriter()
-    simulator.run(ctx=ctx, writer=writer)
-else:
-
-    ctx = DMumpsContext()
-    ctx.set_silent()
     with open(args.mesh, 'rb') as f:
         mesh = pickle.load(f) # 导入地质网格模型
 
     mesh.fluid_relative_permeability_0 = water 
     mesh.fluid_relative_permeability_1 = oil 
+else:
+    mesh = None
 
-    simulator = TwoFluidsWithGeostressSimulator(mesh, args)
-    writer = VTKMeshWriter(simulation=simulator.run, args=(ctx, None))
-    writer.run()
+simulator = ParallelTwoFluidsWithGeostressSimulator(mesh, args, ctx)
 
-    #writer = VTKMeshWriter()
-    #simulator.run(ctx=ctx, writer=writer)
-    ctx.destroy()
+if ctx.myid == 0:
+    writer = VTKMeshWriter()
+    simulator.run(writer=writer)
+else:
+    simulator.run()
 
-# 保存程序终止状态，用于后续计算测试
-with open(args.save, 'wb') as f:
-    pickle.dump(simulator, f, protocol=pickle.HIGHEST_PROTOCOL)
-
+ctx.destroy()

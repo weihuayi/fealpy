@@ -190,8 +190,6 @@ class TetrahedronMesh(Mesh3d):
 
     def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
 
-        print('The argument `etype` in  `bc_to_point` function will be removed in the future!')
-
         TD = bc.shape[-1] - 1 #
         node = self.node
         entity = self.entity(etype=TD)
@@ -347,7 +345,7 @@ class TetrahedronMesh(Mesh3d):
 
 
     def uniform_bisect(self, n=1):
-        for i in range(2*n):
+        for i in range(n):
             self.bisect()
 
     def bisect(self, isMarkedCell=None, data=None, returnim=False):

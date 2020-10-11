@@ -485,16 +485,16 @@ class FEMeshIntegralAlg():
 
         dim = len(ws.shape) # 张量型积分公式
         if isinstance(f, (int, float)): # f为标量常函数
-            e = f*self.facemeasure
+            e = f*self.edgemeasure
         elif isinstance(f, np.ndarray):
             if f.shape == (GD, ): # 常向量函数
-                e = self.facemeasure[:, None]*f
+                e = self.edgemeasure[:, None]*f
             elif f.shape == (GD, GD):
-                e = self.facemeasure[:, None, None]*f
+                e = self.edgemeasure[:, None, None]*f
             else:
                 s0 = 'abcde'
                 s1 = '{}, {}j..., j->j...'.format(s0[0:dim], s0[0:dim])
-                e = np.einsum(s1, ws, f, self.facemeasure)
+                e = np.einsum(s1, ws, f, self.edgemeasure)
         return e
 
     def face_integral(self, f, q=None):

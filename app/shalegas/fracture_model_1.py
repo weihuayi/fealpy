@@ -1,10 +1,10 @@
-
 import pickle
 
 import numpy as np
 from scipy.spatial import KDTree 
 
 import matplotlib.pyplot as plt
+from matplotlib import collections  as mc
 
 from fealpy.mesh import MeshFactory
 
@@ -17,42 +17,39 @@ Notes
 """
 
 
-def is_fracture_cell(mesh):
-
-    NC = mesh.number_of_cells()
-
-    node = mesh.entity('node')
-    cell = mesh.entity('cell')
-    isFractureCell = np.zeros(NC, dtype=np.bool_)
-
-    def f(x):
-        a = x[0]
-        b = x[1]
-        d = x[2]
-        flag0 = (node[cell[:, 0], d[0]] >= b[0]) & (node[cell[:, 0], d[0]] <= b[1]) & (node[cell[:, 0], d[1]] == a)
-        flag1 = (node[cell[:, 1], d[0]] >= b[0]) & (node[cell[:, 1], d[0]] <= b[1]) & (node[cell[:, 1], d[1]] == a)
-        flag2 = (node[cell[:, 2], d[0]] >= b[0]) & (node[cell[:, 2], d[0]] <= b[1]) & (node[cell[:, 2], d[1]] == a)
-        isFractureCell[flag0 | flag1 | flag2] = True
-
-    # fracture
-    a = [5, 1, 3, 5, 7, 9]
-    b = [(0.5, 9.5), (2, 8), (3, 7), (2, 8), (1, 9), (4, 6)]
-    d = [(0, 1), (1, 0), (1, 0), (1, 0), (1, 0), (1, 0)]
-    list(map(f, zip(a, b, d)))
-
-    return isFractureCell
-
 box = [0, 10, 0, 10] # m 
 mesh = MeshFactory.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
 
 mesh.box = box
-
 for i in range(10):
     mesh.bisect()
 
+point = np.array([
+    (0.5, 5.0), #0
+    (9.5, 5.0), #1
+    (1.0, 2.0), #2
+    (1.0, 8.0), #3 
+    (3.0, 3.0), #4
+    (3.0, 7.0), #5
+    (5.0, 2.0), #6
+    (5.0, 8.0), #7
+    (7.0, 1.0), #8
+    (7.0, 9.0), #9
+    (9.0, 4.0), #10
+    (9.0, 6.0), #11
+    ], dtype=np.float64)
+
+segment = np.array([
+    (0, 1), 
+    (2, 3),
+    (4, 5),
+    (6, 7),
+    (8, 9),
+    (10, 11),
+    ], dtype=np.int_)
 
 for i in range(8):
-    isFractureCell = is_fracture_cell(mesh)
+    isFractureCell = mesh.is_crossed_cell(point, segment) 
     mesh.bisect(isFractureCell)
 
 # 构建模型和数据参数
@@ -74,20 +71,20 @@ print('生产井的位置:', node[location1])
 
 
 # 裂缝标签
-isFractureCell = is_fracture_cell(mesh)
+isFractureCell = mesh.is_crossed_cell(point, segment)
 
 # vtk 不支持 bool 类型
 mesh.celldata['fracture'] = np.asarray(isFractureCell, dtype=np.int_)
 
 # 渗透率
 mesh.celldata['permeability'] = np.zeros(NC, dtype=np.float64) # 1 d = 9.869 233e-13 m^2
-mesh.celldata['permeability'][ isFractureCell] = 6 # 裂缝 
-mesh.celldata['permeability'][~isFractureCell] = 2 # 岩石 
+mesh.celldata['permeability'][ isFractureCell] = 0.06 # 裂缝 
+mesh.celldata['permeability'][~isFractureCell] = 0.02 # 岩石 
 
 # 孔隙度
 mesh.celldata['porosity'] = np.zeros(NC, dtype=np.float64) # 百分比
-mesh.celldata['porosity'][ isFractureCell] = 0.1 # 裂缝
-mesh.celldata['porosity'][~isFractureCell] = 0.3 # 岩石
+mesh.celldata['porosity'][ isFractureCell] = 0.05 # 裂缝
+mesh.celldata['porosity'][~isFractureCell] = 0.1 # 岩石
 
 # 拉梅第一常数
 mesh.celldata['lambda'] =  np.zeros(NC, dtype=np.float64) # MPa
@@ -143,13 +140,15 @@ mesh.meshdata['fluid_1'] = {
     'compressibility': 2.0e-3, # MPa^{-1}
     }
 
-with open('waterflooding.pickle', 'wb') as f:
+with open('fracture_model_1.pickle', 'wb') as f:
     pickle.dump(mesh, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 fig = plt.figure()
+lc = mc.LineCollection(point[segment], linewidths=2, color='r')
 axes = fig.gca()
 mesh.add_plot(axes)
 mesh.find_cell(axes, index=isFractureCell)
 mesh.find_node(axes, index=location0, showindex=True)
 mesh.find_node(axes, index=location1, showindex=True)
+axes.add_collection(lc)
 plt.show()

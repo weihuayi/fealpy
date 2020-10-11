@@ -15,12 +15,12 @@ from fealpy.functionspace.femdof import multi_index_matrix2d
 
 class FirstKindNedelecFiniteElementSpace2dTest:
     def __init__(self):
-        self.meshfactory = MeshFactory()
+        pass
 
     def show_basis(self):
         h = 0.5
         box = [-h, 1+h, -h, np.sqrt(3)/2+h]
-        mesh = self.meshfactory.one_triangle_mesh()
+        mesh = MeshFactory.one_triangle_mesh()
         space = FirstKindNedelecFiniteElementSpace2d(mesh, p=0)
         fig = plt.figure()
         space.show_basis(fig, box=box)
@@ -39,7 +39,7 @@ class FirstKindNedelecFiniteElementSpace2dTest:
             val[..., 1] = np.sin(pi*x)*np.cos(pi*y)
             return val
 
-        mesh = self.meshfactory.regular([0, 1, 0, 1], n=n)
+        mesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=n, ny=n, meshtype='tri')
         space = FirstKindNedelecFiniteElementSpace2d(mesh, p=p)
         uI = space.interpolation(u)
         error = space.integralalg.L2_error(u, uI)

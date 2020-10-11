@@ -54,48 +54,6 @@ class Mesh3d():
                     axis=-1) == 2) & isBdFace
             return face[isBdFace | isInterfaceFace]
 
-    def to_vtk(self, vtk, vns, filename=None):
-        nodes = vtk.vtkPoints()
-        nodes.SetData(vns.numpy_to_vtk(node))
-
-        NC = len(cell)
-        cells = vtk.vtkCellArray()
-        cells.SetCells(NC, vns.numpy_to_vtkIdTypeArray(cell))
-
-        celltype = self.vtk_cell_type()
-
-        vmesh = vtk.vtkUnstructuredGrid()
-        vmesh.SetPoints(points)
-        vmesh.SetCells(celltype, cells)
-
-        if len(self.celldata) > 0:
-            cdata = vmesh.GetCellData()
-            for key, value in self.celldata.items():
-                data = vns.numpy_to_vtk(value)
-                data.SetName(key)
-                cdata.AddArray(data)
-
-        if len(self.nodedata) > 0:
-            ndata = vmesh.GetPointData()
-            for key, value in self.nodedata.items():
-                data = vns.numpy_to_vtk(value)
-                data.SetName(key)
-                ndata.AddArray(data)
-
-        if len(self.edgedata) > 0:
-            ndata = vmesh.GetPointData()
-            for key, value in self.edgedata.items():
-                data = vns.numpy_to_vtk(value)
-                data.SetName(key)
-                ndata.AddArray(data)
-
-        if len(self.facedata) > 0:
-            ndata = vmesh.GetPointData()
-            for key, value in self.facedata.items():
-                data = vns.numpy_to_vtk(value)
-                data.SetName(key)
-                ndata.AddArray(data)
-        return vmesh
 
     def entity(self, etype='cell'):
         if etype in {'cell', 3}:

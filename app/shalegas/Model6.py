@@ -30,10 +30,13 @@ Notes
 
 体积模量:  K = E/3/(1 - 2*nu) = lambda + 2/3* mu
 """
+from mumps import DMumpsContext
 
 import numpy as np
+from scipy.spatial import KDTree 
 
 import matplotlib.pyplot as plt
+from matplotlib import collections  as mc
 
 from scipy.sparse import csr_matrix, coo_matrix, bmat, diags
 from scipy.sparse.linalg import spsolve
@@ -65,7 +68,7 @@ class WaterFloodingModelFracture2d():
             }
 
         self.fracture = {
-            'permeability': 20, # 1 d = 9.869 233e-13 m^2 
+            'permeability': 6, # 1 d = 9.869 233e-13 m^2 
             'porosity': 0.3, # None
                 }
 
@@ -75,6 +78,7 @@ class WaterFloodingModelFracture2d():
             'initial saturation': 0.0, 
             'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
             }
+
         self.oil = {'viscosity': 2, # cp
             'compressibility': 2.0e-3, # MPa^{-1}
             'initial saturation': 1.0, 
@@ -91,17 +95,20 @@ class WaterFloodingModelFracture2d():
 
         self.GD = 2
 
+        self.p0 = np.array([(10, 10)], dtype=np.float64) # 生产井位置
+        self.p1 = np.array([(0, 0)], dtype=np.float64) # 注水井位置 
+
     def space_mesh(self, n=10):
         from fealpy.mesh import MeshFactory
         mf = MeshFactory()
         mesh = mf.boxmesh2d(self.domain, nx=2, ny=2, meshtype='tri')
         for i in range(n):
-            isCutCell= mesh.find_segment_location(self.point, self.segment)
-            mesh.bisect(isCutCell)
+            isCrossedCell= mesh.is_crossed_cell(self.point, self.segment)
+            mesh.bisect(isCrossedCell)
         return mesh
 
     def is_fracture_cell(self, mesh):
-        isFCell= mesh.find_segment_location(self.point, self.segment)
+        isFCell= mesh.is_crossed_cell(self.point, self.segment)
         return isFCell
 
 
@@ -133,6 +140,112 @@ class WaterFloodingModelFracture2d():
     def gas_relative_permeability(self, Sw):
         pass
 
+class WaterFloodingModelFracture2d_1():
+
+    def __init__(self):
+        self.domain=[0, 10, 0, 10] # m
+        self.rock = {
+            'permeability': 2, # 1 d = 9.869 233e-13 m^2 
+            'porosity': 0.3, # None
+            'lame':(1.0e+2, 3.0e+2), # lambda and mu 拉梅常数, MPa
+            'biot': 1.0,
+            'initial pressure': 3, # MPa
+            'initial stress': 60.66+86.5, # MPa 初始应力 sigma_0 , sigma_eff
+            'solid grain stiffness': 2.0e+2, # MPa 固体体积模量
+            }
+
+        self.fracture = {
+            'permeability': 6, # 1 d = 9.869 233e-13 m^2 
+            'porosity': 0.1, # None
+                }
+
+        self.water = {
+            'viscosity': 1, # 1 cp = 1 mPa*s
+            'compressibility': 1.0e-3, # MPa^{-1}
+            'initial saturation': 0.0, 
+            'injection rate': 3.51e-6 # s^{-1}, 每秒注入多少水
+            }
+
+        self.oil = {'viscosity': 2, # cp
+            'compressibility': 2.0e-3, # MPa^{-1}
+            'initial saturation': 1.0, 
+            'production rate': 7.0e-6 # s^{-1}, 每秒产出多少油
+            }
+        self.bc = {'displacement': 0.0, 'flux': 0.0}
+
+        # fracture
+        #a = [5, 1, 3, 5, 7, 9]
+        #b = [(0.5, 9.5), (2, 8), (3, 7), (2, 8), (1, 9), (4, 6)]
+        #d = [(0, 1), (1, 0), (1, 0), (1, 0), (1, 0), (1, 0)]
+        #list(map(f, zip(a, b, d)))
+
+        self.point = np.array([
+            (0.5, 5),
+            (9.5, 5),
+            (1, 2),
+            (1, 8),
+            (3, 3),
+            (3, 7),
+            (5, 2),
+            (5, 8),
+            (7, 1),
+            (7, 9),
+            (9, 4),
+            (9, 6)], dtype=np.float64)
+        self.segment = np.array([
+            (0, 1), 
+            (2, 3),
+            (4, 5),
+            (6, 7),
+            (8, 9),
+            (10, 11)], dtype=np.int_)
+
+        self.GD = 2
+
+        self.p0 = np.array([(9.5, 5)], dtype=np.float64) # 生产井位置
+        self.p1 = np.array([(0, 0), (0, 10)], dtype=np.float64) # 注水井位置 
+
+    def space_mesh(self, n=10):
+        from fealpy.mesh import MeshFactory
+        mf = MeshFactory()
+        mesh = mf.boxmesh2d(self.domain, nx=2, ny=2, meshtype='tri')
+        for i in range(n):
+            isCrossedCell= mesh.is_crossed_cell(self.point, self.segment)
+            mesh.bisect(isCrossedCell)
+        return mesh
+
+    def is_fracture_cell(self, mesh):
+        isFCell= mesh.is_crossed_cell(self.point, self.segment)
+        return isFCell
+
+
+    def time_mesh(self, T=1, n=100):
+        from fealpy.timeintegratoralg.timeline import UniformTimeLine
+        timeline = UniformTimeLine(0, T, n)
+        return timeline
+
+    def water_relative_permeability(self, Sw):
+        """
+
+        Notes
+        ----
+        给定水的饱和度, 计算水的相对渗透率
+        """
+        val = Sw**2
+        return val
+
+    def oil_relative_permeability(self, Sw):
+        """
+
+        Notes
+        ----
+        给定水的饱和度, 计算油的相对渗透率
+        """
+        val = (1 - Sw)**2 
+        return val
+
+    def gas_relative_permeability(self, Sw):
+        pass
 
 class WaterFloodingModelSolver():
     """
@@ -141,7 +254,7 @@ class WaterFloodingModelSolver():
     -----
 
     """
-    def __init__(self, model, T=200*3600*24, NS=14, NT=20*60*24):
+    def __init__(self, model, T=800*3600*24, NS=14, NT=800*24):
         self.model = model
         self.mesh = model.space_mesh(n=NS)
         self.timeline = model.time_mesh(T=T, n=NT)
@@ -170,18 +283,32 @@ class WaterFloodingModelSolver():
         self.cu = self.cspace.function(dim=self.GD) # 位移函数
         self.cphi = self.pspace.function() # 孔隙度函数, 分片常数
 
+        self.isFCell = model.is_fracture_cell(self.mesh)
         # 初值
         self.p[:] = model.rock['initial pressure']  # MPa
-        self.phi[:] = model.rock['porosity'] # 初始孔隙度 
-        self.cp[:] = model.rock['initial pressure']  # 初始地层压强
-        self.cphi[:] = model.rock['porosity'] # 当前孔隙度系数
+
+        self.phi[~self.isFCell] = model.rock['porosity'] # 初始孔隙度 
+        self.phi[self.isFCell] = model.fracture['porosity'] # 初始孔隙度 
+
+        self.cp[:] = self.p  # 初始地层压强
+        self.cphi[:] = self.phi # 当前孔隙度系数
 
         # 源项,  TODO: 注意这里假设用的是结构网格, 换其它的网格需要修改代码
+
+
+        node = self.mesh.entity('node')
+        tree = KDTree(node)
+
+        _, loc0 = tree.query(self.model.p0)
+        _, loc1 = tree.query(self.model.p1)
+        print(loc0)
+        print(loc1)
+
         self.fo = self.cspace.function()
-        self.fo[3] = -self.model.oil['production rate'] # 产出
+        self.fo[825] = -self.model.oil['production rate'] # 产出
 
         self.fw = self.cspace.function()
-        self.fw[0] = self.model.water['injection rate'] # 注入
+        self.fw[loc1] = self.model.water['injection rate'] # 注入
 
 
         # 一些常数矩阵和向量
@@ -233,7 +360,6 @@ class WaterFloodingModelSolver():
         if self.GD == 3:
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
 
-        self.isFCell = model.is_fracture_cell(self.mesh)
 
         # vtk 文件输出
         node, cell, cellType, NC = self.mesh.to_vtk()
@@ -692,7 +818,16 @@ class WaterFloodingModelSolver():
 
             # 求解
 
-            x = spsolve(A, F)
+            if False:
+                x = spsolve(A, F)
+            else:
+                ctx = DMumpsContext()
+                if ctx.myid == 0:
+                    ctx.set_centralized_sparse(A)
+                    x = F.copy()
+                    ctx.set_rhs(x) # Modified in place
+                ctx.run(job=6) # Analysis + Factorization + Solve
+                ctx.destroy() # Cleanup
 
             vgdof = self.vspace.number_of_global_dofs()
             pgdof = self.pspace.number_of_global_dofs()
@@ -737,7 +872,7 @@ class WaterFloodingModelSolver():
         #self.s[flag] = 0.0
         self.u[:] = self.cu
 
-    def solve(self, step=30):
+    def solve(self, step=24):
         """
 
         Notes
@@ -816,7 +951,20 @@ class WaterFloodingModelSolver():
 
 if __name__ == '__main__':
 
-    model = WaterFloodingModelFracture2d()
+    #model = WaterFloodingModelFracture2d()
+    model = WaterFloodingModelFracture2d_1()
     solver = WaterFloodingModelSolver(model)
-    solver.solve()
+    if True:
+        solver.solve()
+    else:
+        node = solver.mesh.entity('node')
+        lc = mc.LineCollection(model.point[model.segment], linewidths=2)
+        fig = plt.figure()
+        axes = fig.gca()
+        color = np.copy(solver.phi)
+        solver.mesh.add_plot(axes, cellcolor=color)
+        #solver.mesh.find_node(axes, showindex=True)
+        axes.add_collection(lc)
+        plt.show()
+
 

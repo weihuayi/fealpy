@@ -98,6 +98,25 @@ class Mesh2d(object):
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
+    def node_size(self):
+        """
+        Notes
+        -----
+        计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
+        """
+
+        NN = self.number_of_nodes()
+        edge = self.entity('edge')
+        eh = self.entity_measure('edge')
+        h = np.zeros(NN, dtype=self.ftype)
+        deg = np.zeros(NN, dtype=self.itype)
+
+        val = np.broadcast_to(eh[:, None], shape=edge.shape)
+        np.add.at(h, edge, val)
+        np.add.at(deg, edge, 1)
+
+        return h/deg
+
     def face_unit_normal(self, index=np.s_[:]):
         v = self.face_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])

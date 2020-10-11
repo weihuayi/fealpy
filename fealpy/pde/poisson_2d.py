@@ -1,6 +1,6 @@
 import numpy as np
 
-from ..decorator import cartesian, barycentric
+from fealpy.decorator import cartesian, barycentric
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.Quadtree import Quadtree
 from ..mesh.QuadrangleMesh import QuadrangleMesh
