@@ -913,8 +913,8 @@ class TwoFluidsWithGeostressSimulator():
 
         # 节点处的位移
         if GD == 2:
-            val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
-        mesh.nodedata['displacement'] = val
+            u = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
+        mesh.nodedata['displacement'] = u[:] 
 
         # 增加应变和应力的计算
 
@@ -935,7 +935,7 @@ class TwoFluidsWithGeostressSimulator():
 
         s1[:, range(GD), range(GD)] += (lam*s0.trace(axis1=-1, axis2=-2))[:, None]
         s1[:, range(GD), range(GD)] += mesh.celldata['stress_0'][:, None]
-        s1[:, range(GD), range(GD)] -= (mesh.celldata['biot']*(p - self.celldata['pressure_0']))[:, None]
+        s1[:, range(GD), range(GD)] -= (mesh.celldata['biot']*(p - mesh.celldata['pressure_0']))[:, None]
 
         mesh.celldata['strain'] = s0.reshape(NC, -1)
         mesh.celldata['stress'] = s1.reshape(NC, -1)
