@@ -3,7 +3,7 @@
 import sys
 
 import numpy as np
-from scipy.sparse.linalg import spsolve, cg
+from scipy.sparse.linalg import spsolve, cg, LinearOperator, spilu
 
 import matplotlib.pyplot as plt
 
@@ -97,6 +97,9 @@ pde = BoxDomain2DData()
 
 mesh = pde.init_mesh(n=n)
 
+area = mesh.entity_measure('cell')
+print(area[0])
+
 
 space = LagrangeFiniteElementSpace(mesh, p=p)
 
@@ -109,13 +112,17 @@ F = space.source_vector(pde.source, dim=2)
 F = bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
 
+N = len(F)
+print(N)
+
 if False:
     uh.T.flat[:] = spsolve(A, F) # (2, gdof ).flat
 else:
-    ml = pyamg.rootnode_solver(A)                     # AMG solver
-    M = ml.aspreconditioner(cycle='V')             # preconditioner
+    ilu = spilu(A.tocsc(), drop_tol=1e-6, fill_factor=40)
+    M = LinearOperator((N, N), lambda x: ilu.solve(x))
     start = timer()
-    uh.T.flat[:], info = cg(A, F, tol=1e-8, maxiter=100, M=M)   # solve with CG
+    uh.T.flat[:], info = cg(A, F, tol=1e-8, M=M)   # solve with CG
+    print(info)
     end = timer()
     print('time:', end - start)
 
