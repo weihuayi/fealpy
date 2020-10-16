@@ -77,28 +77,34 @@ class BoxDomainData3d():
         mesh = boxmesh3d(domain, nx=5*n, ny=1*n, nz=1*n, meshtype='tet')
         return mesh
 
+    @cartesian
     def displacement(self, p):
         pass
 
+    @cartesian
     def jacobian(self, p):
         pass
 
+    @cartesian
     def strain(self, p):
         pass
 
+    @cartesian
     def stress(self, p):
         pass
 
+    @cartesian
     def source(self, p):
         shape = len(p.shape[:-1])*(1,) + (-1, )
         val = self.d*self.g*self.rho
         return val.reshape(shape) 
-
+    @cartesian
     def dirichlet(self, p):
         shape = len(p.shape)*(1, )
         val = np.array([0.0])
         return val.reshape(shape)
 
+    @cartesian
     def is_dirichlet_boundary(self, p):
         return np.abs(p[..., 0]) < 1e-12
 
@@ -297,7 +303,7 @@ class CookMembraneData():
         mesh = build(domain, max_volume=h**2)
         node = np.array(mesh.points, dtype=np.float)
         cell = np.array(mesh.elements, dtype=np.int)
-        if meshtype is 'tri':
+        if meshtype == 'tri':
             mesh = TriangleMesh(node, cell)
             return mesh 
 
