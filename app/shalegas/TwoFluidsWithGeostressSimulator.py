@@ -139,9 +139,9 @@ class TwoFluidsWithGeostressSimulator():
             self.FU[2*cgdof:3*cgdof] -= self.p@self.PU2
 
         # 初始应力和等效应力项
-        sigma0 = self.mesh.celldata['stress_0'] # 初始应力和等效应力之和
-        self.FU[0*cgdof:1*cgdof] -= sigma0@self.PU0
-        self.FU[1*cgdof:2*cgdof] -= sigma0@self.PU1
+        sigma = self.mesh.celldata['stress_0'] + self.mesh.celldata['stress_eff'] # 初始应力和等效应力之和
+        self.FU[0*cgdof:1*cgdof] -= sigma@self.PU0
+        self.FU[1*cgdof:2*cgdof] -= sigma@self.PU1
         if self.GD == 3:
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
 
@@ -935,6 +935,7 @@ class TwoFluidsWithGeostressSimulator():
 
         s1[:, range(GD), range(GD)] += (lam*s0.trace(axis1=-1, axis2=-2))[:, None]
         s1[:, range(GD), range(GD)] += mesh.celldata['stress_0'][:, None]
+        s1[:, range(GD), range(GD)] += mesh.celldata['stress_eff'][:, None]
         s1[:, range(GD), range(GD)] -= (mesh.celldata['biot']*(p - mesh.celldata['pressure_0']))[:, None]
 
         mesh.celldata['strain'] = s0.reshape(NC, -1)

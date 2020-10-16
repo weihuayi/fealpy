@@ -141,7 +141,7 @@ class ParallelTwoFluidsWithGeostressSimulator():
                 self.FU[2*cgdof:3*cgdof] -= self.p@self.PU2
 
             # 初始应力和等效应力项
-            sigma0 = self.mesh.celldata['stress_0'] # 初始应力和等效应力之和
+            sigma = self.mesh.celldata['stress_0'] + self.mesh.celldata['stress_eff']# 初始应力和等效应力之和
             self.FU[0*cgdof:1*cgdof] -= sigma0@self.PU0
             self.FU[1*cgdof:2*cgdof] -= sigma0@self.PU1
             if self.GD == 3:
