@@ -912,8 +912,10 @@ class TwoFluidsWithGeostressSimulator():
         mesh.nodedata['fluid_1'] = val 
 
         # 节点处的位移
+        s = u.grad_value(bc) # (NC, GD, GD)
         if GD == 2:
             u = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
+
         mesh.nodedata['displacement'] = u[:] 
 
         # 增加应变和应力的计算
@@ -922,7 +924,6 @@ class TwoFluidsWithGeostressSimulator():
         s0 = np.zeros((NC, 3, 3), dtype=np.float64)
         s1 = np.zeros((NC, 3, 3), dtype=np.float64)
 
-        s = u.grad_value(bc) # (NC, GD, GD)
         s0[:, 0:GD, 0:GD] = s + s.swapaxes(-1, -2)
         s0[:, 0:GD, 0:GD] /= 2
 
