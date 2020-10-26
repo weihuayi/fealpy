@@ -1,26 +1,57 @@
 #ifndef Matrix_h
 #define Matrix_h
 
-#include <array>
-#include <algorithm>
-#include <initializer_list>
-#include <assert.h>
+#include <iostream>
 
 namespace WHYSC {
 namespace AlgebraObject {
 
-template<typename F, int ROW, int COL>
-struct Matrix: public std::array<F, ROW*COL>
+template<typename F=double>
+struct Matrix
 {
-    F & operator[](const I i, const I j) 
+    F ** data;
+    int shape[2];
+
+    Matrix(int nr, int nc, F fill=0.0)
     {
-        return _data[i*ROW+j];
+        shape[0] = nr;
+        shape[1] = nc;
+        data = new F*[nr];
+        for(int i=0; i < nr; i++)
+        {
+            data[i] = new F[nc];
+            for(int j = 0; j < nc; j++)
+                data[i][j] = fill;
+        }
+
     }
 
-    const F & operator[](const I i, const I j) const
+    ~Matrix()
     {
-        return _data[i*ROW+j];
+        delete [] data;
     }
+
+    F * operator[](const int i) 
+    {
+        return data[i];
+    }
+
+    void print()
+    {
+        std::cout << "Matrix("<< shape[0] << ","
+            << shape[1] << ")" << std::endl;
+
+        for(int i = 0; i < shape[0]; i++)
+        {
+            for(int j = 0; j < shape[1]; j++)
+            {
+                std::cout << data[i][j] << " ";
+            }
+            std::cout << std::endl;
+        }
+        
+    }
+
 };
 
 } // end of namespace AlgebraObject
