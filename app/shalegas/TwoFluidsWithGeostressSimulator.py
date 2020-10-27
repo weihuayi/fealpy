@@ -83,8 +83,8 @@ class TwoFluidsWithGeostressSimulator():
 
         # 初值
         self.s[:] = self.mesh.celldata['fluid_0']
-        self.p[:] = self.mesh.celldata['pressure']  # MPa
-        self.phi[:] = self.mesh.celldata['porosity'] # 初始孔隙度 
+        self.p[:] = self.mesh.celldata['pressure_0']  # MPa
+        self.phi[:] = self.mesh.celldata['porosity_0'] # 初始孔隙度 
 
         self.s[:] = self.mesh.celldata['fluid_0']
         self.cp[:] = self.p # 初始地层压力
@@ -139,9 +139,9 @@ class TwoFluidsWithGeostressSimulator():
             self.FU[2*cgdof:3*cgdof] -= self.p@self.PU2
 
         # 初始应力和等效应力项
-        sigma0 = self.mesh.celldata['stress'] # 初始应力和等效应力之和
-        self.FU[0*cgdof:1*cgdof] -= sigma0@self.PU0
-        self.FU[1*cgdof:2*cgdof] -= sigma0@self.PU1
+        sigma = self.mesh.celldata['stress_0'] + self.mesh.celldata['stress_eff'] # 初始应力和等效应力之和
+        self.FU[0*cgdof:1*cgdof] -= sigma@self.PU0
+        self.FU[1*cgdof:2*cgdof] -= sigma@self.PU1
         if self.GD == 3:
             self.FU[2*cgdof:3*cgdof] -= sigma0@self.PU2
 
@@ -912,9 +912,11 @@ class TwoFluidsWithGeostressSimulator():
         mesh.nodedata['fluid_1'] = val 
 
         # 节点处的位移
+        s = u.grad_value(bc) # (NC, GD, GD)
         if GD == 2:
-            val = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
-        mesh.nodedata['displacement'] = val
+            u = np.concatenate((u[:], np.zeros((u.shape[0], 1), dtype=u.dtype)), axis=1)
+
+        mesh.nodedata['displacement'] = u[:] 
 
         # 增加应变和应力的计算
 
@@ -922,7 +924,6 @@ class TwoFluidsWithGeostressSimulator():
         s0 = np.zeros((NC, 3, 3), dtype=np.float64)
         s1 = np.zeros((NC, 3, 3), dtype=np.float64)
 
-        s = u.grad_value(bc) # (NC, GD, GD)
         s0[:, 0:GD, 0:GD] = s + s.swapaxes(-1, -2)
         s0[:, 0:GD, 0:GD] /= 2
 
@@ -934,6 +935,9 @@ class TwoFluidsWithGeostressSimulator():
         s1[:, 0:GD, 0:GD] *= 2 
 
         s1[:, range(GD), range(GD)] += (lam*s0.trace(axis1=-1, axis2=-2))[:, None]
+        s1[:, range(GD), range(GD)] += mesh.celldata['stress_0'][:, None]
+        s1[:, range(GD), range(GD)] += mesh.celldata['stress_eff'][:, None]
+        s1[:, range(GD), range(GD)] -= (mesh.celldata['biot']*(p - mesh.celldata['pressure_0']))[:, None]
 
         mesh.celldata['strain'] = s0.reshape(NC, -1)
         mesh.celldata['stress'] = s1.reshape(NC, -1)

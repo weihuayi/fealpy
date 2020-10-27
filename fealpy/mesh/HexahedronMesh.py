@@ -26,8 +26,8 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
     FE = 4
     C = 1
 
-    def __init__(self, N, cell):
-        super(HexahedronMeshDataStructure, self).__init__(N, cell)
+    def __init__(self, NN, cell):
+        super(HexahedronMeshDataStructure, self).__init__(NN, cell)
 
         
     def face_to_edge_sign(self):

@@ -187,12 +187,12 @@ parser.add_argument('--order',
         help='第一类 Nedlec 元的次数, 默认为 0, 注意目前高次的还没有测试成功!')
 
 parser.add_argument('--size', 
-        default=5, type=int,
-        help='初始网格的 x 和 y 方向剖分段数, 默认为 5 次')
+        default=8, type=int,
+        help='初始网格的 x 和 y 方向剖分段数, 默认为 5 段')
 
 parser.add_argument('--maxit', 
         default=40, type=int,
-        help='自适应迭代次数, 默认自适应迭代 30 次')
+        help='自适应迭代次数, 默认自适应迭代 40 次')
 
 parser.add_argument('--theta', 
         default=0.3, type=float,
@@ -206,7 +206,12 @@ print('程序参数为:', args)
 ## 开始计算
 
 pde = CosSinData()
-mesh = MeshFactory.boxmesh2d(pde.domain(), nx=args.size, ny=args.size, meshtype='tri') 
+
+box = [-1, 1, -1, 1]
+mesh = MeshFactory.boxmesh2d(box, nx=args.size, ny=args.size, meshtype='tri') 
+
+# 去掉第四象限
+mesh.delete_cell(threshold=lambda x: (x[..., 0] > 0) & (x[..., 1] < 0)) 
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
@@ -230,7 +235,7 @@ for i in range(args.maxit):
 
     uh[:] = spsolve(A, F)
 
-    ruh = curl_recover(uh)
+    #ruh = curl_recover(uh)
     ruh = spr_curl(uh) 
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
