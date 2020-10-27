@@ -73,8 +73,10 @@ class PdeTest():
         A, b = bc.apply(A, b, uh)
         uh[:] = spsolve(A, b).reshape(-1)
 
-        error = space.integralalg.L2_error(pde.solution, uh)
-        print(error)
+        error0 = space.integralalg.L2_error(pde.solution, uh)
+        error1 = space.integralalg.L2_error(pde.gradient, uh.grad_value)
+        print(error0)
+        print(error1)
 
 test = PdeTest()
 test.Arctan(n = int(sys.argv[1]))

@@ -1110,10 +1110,10 @@ class ArctanData:
         """
         x = p[..., 0]
         y = p[..., 1]
-        a = (x**2+y**2)**2
+        a = 10000*(x**2+y**2)**2
         uprime = np.zeros(p.shape, dtype=np.float64)
-        uprime[..., 0] = 2*x/(1+a)
-        uprime[..., 1] = 2*y/(1+a)
+        uprime[..., 0] = 200*x/(1+a)
+        uprime[..., 1] = 200*y/(1+a)
         return uprime
 
     def is_boundary(self, p):
