@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 
 import numpy as np
+import sys
 from scipy.sparse.linalg import spsolve
 
 from fealpy.pde.poisson_2d import CosCosData as PDE
+from fealpy.pde.poisson_2d import ArctanData
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
+from fealpy.mesh import TriangleMesh
 
 
 def test_poisson():
@@ -48,3 +51,32 @@ def test_poisson():
             mesh.uniform_refine()  # 一致加密网格
 
     assert (errorMatrix < 1.0).all()
+
+class PdeTest():
+    def __int__(self):
+        pass
+    def Arctan(self, p=1, n=3):
+        pde = ArctanData()
+
+        node = np.array([[-1, -1], [1, -1], [1, 1], [-1, 1]], dtype=np.float_)
+        cell = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int_)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n=n)
+
+        space = LagrangeFiniteElementSpace(mesh, p=p)
+        uh = space.function()
+
+        A = space.stiff_matrix()
+        b = space.source_vector(pde.source)
+
+        bc = DirichletBC(space, pde.dirichlet)
+        A, b = bc.apply(A, b, uh)
+        uh[:] = spsolve(A, b).reshape(-1)
+
+        error0 = space.integralalg.L2_error(pde.solution, uh)
+        error1 = space.integralalg.L2_error(pde.gradient, uh.grad_value)
+        print(error0)
+        print(error1)
+
+test = PdeTest()
+test.Arctan(n = int(sys.argv[1]))
