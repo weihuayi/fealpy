@@ -1074,3 +1074,48 @@ class ExpData:
     def is_boundary(self, p):
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+
+class ArctanData:
+    def __init__(self):
+        pass
+
+    @cartesian
+    def solution(self, p):
+        """ The exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        u = np.arctan((x**2+y**2)*100)
+        return u
+
+    @cartesian
+    def source(self, p):
+        """ The right hand side of Possion equation
+        INPUT:
+            p: array object, N*2 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        a = 10000*(x**2+y**2)**2
+        rhs = -100*(4-4*a)/(a+1)**2
+        return rhs
+
+    def dirichlet(self, p):
+        """ Dilichlet boundary condition
+        """
+        return self.solution(p)
+
+    def gradient(self, p):
+        """ The gradient of the exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        a = (x**2+y**2)**2
+        uprime = np.zeros(p.shape, dtype=np.float64)
+        uprime[..., 0] = 2*x/(1+a)
+        uprime[..., 1] = 2*y/(1+a)
+        return uprime
+
+    def is_boundary(self, p):
+        eps = 1e-14 
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
