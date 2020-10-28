@@ -60,6 +60,15 @@ def vtk_cell_index(p, celltype):
             idx = quad.PointIndexFromIJK(loc[0], loc[1], orders)
             index[idx] = i
         return index
+    elif celltype == VTK_LAGRANGE_HEXAHEDRON:
+        hexa = vtk.vtkLagrangeHexahedron()
+        orders = (p, p, p)
+        sizes = (p + 1, p + 1, p+1)
+        index = np.zeros(sizes[0]*sizes[1]*sizes[2], dtype=np.int_)
+        for i, loc in enumerate(np.ndindex(sizes)):
+            idx = hexa.PointIndexFromIJK(loc[0], loc[1], loc[2], orders)
+            index[idx] = i
+        return index
 
 def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     """

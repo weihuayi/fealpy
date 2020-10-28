@@ -24,11 +24,12 @@ class LinearHexahedronMeshDataStructure(LinearMeshDataStructure):
         (0,  3, 5, 1), (9, 11, 10, 8),  # left and right faces 
         (2,  8, 4, 0), (6, 5, 7,  11)]) # front and back faces
 
-    V = 8 # number of vertexs of each cell
-    E = 12 # number of edges of each cell
-    F = 6 # number of faces
-    FV = 4 # number of vertex of each face
-    FE = 4 
+    V = 8 # 每个单元 8 个顶点  
+    E = 12 # 每个单元 12 条边 
+    F = 6 # 每个单元  6 个面 
+    FV = 4 # 每个单元面有 4 个顶点 
+    FE = 4 # 每个单元面有 4 条边
+    EV = 2 # 每个边有 2 个顶点
     C = 1
 
     def __init__(self, NN, cell):
@@ -39,7 +40,7 @@ class LinearHexahedronMeshDataStructure(LinearMeshDataStructure):
         self.construct_edge()
         self.construct_face()
 
-class LagrangeHexahedronMesh(Mesh2d):
+class LagrangeHexahedronMesh(Mesh3d):
     def __init__(self, node, cell, p=1, domain=None):
 
         self.p = p
@@ -59,7 +60,6 @@ class LagrangeHexahedronMesh(Mesh2d):
         else:
             pass
 
-
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
@@ -76,6 +76,62 @@ class LagrangeHexahedronMesh(Mesh2d):
         该函数返回角点节点的个数。
         """
         return self.ds.NCN
+
+    def lagrange_dof(self, p, spacetype='C'):
+        if spacetype == 'C':
+            return CLagrangeHexahedronMeshDof(self, p)
+        elif spacetype == 'D':
+            return DLagrangeHexahedronDof(self, p)
+
+    def vtk_cell_type(self, etype='cell'):
+        """
+
+        Notes
+        -----
+            返回网格单元对应的 vtk 类型。
+        """
+        if etype in {'cell', 3}:
+            VTK_LAGRANGE_HEXAHEDRON = 72
+            return VTK_LAGRANGE_HEXAHEDRON
+        elif etype in {'face', 2}:
+            VTK_LAGRANGE_QUADRILATERAL = 70 
+            return VTK_LAGRANGE_QUADRILATERAL
+        elif etype in {'edge', 1}:
+            VTK_LAGRANGE_CURVE = 68
+            return VTK_LAGRANGE_CURVE
+
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
+        """
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        index = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
 
     def shape_function(self, bc, p=None):
         """
@@ -150,48 +206,15 @@ class LagrangeHexahedronMeshDataStructure(Mesh3dDataStructure):
             self.cell = ds.cell
             self.edge = ds.edge
         else:
-            NE = ds.NE
-            edge = ds.edge
-            self.edge = np.zeros((NE, p+1), dtype=self.itype)
-            self.edge[:, [0, -1]] = edge
-            self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
-            self.NN += NE*(p-1)
-
-            NC = ds.NC
-            self.cell = np.zeros((NC, (p+1)*(p+1)), dtype=self.itype)
-            cell = self.cell.reshape((NC, p+1, p+1))
-
-            edge2cell = ds.edge2cell
-
-            flag = edge2cell[:, 2] == 0
-            cell[edge2cell[flag, 0], :, 0] = self.edge[flag]
-            flag = edge2cell[:, 2] == 1
-            cell[edge2cell[flag, 0], -1, :] = self.edge[flag]
-            flag = edge2cell[:, 2] == 2
-            cell[edge2cell[flag, 0], :, -1] = self.edge[flag, -1::-1]
-            flag = edge2cell[:, 2] == 3
-            cell[edge2cell[flag, 0], 0, :] = self.edge[flag, -1::-1]
-
-            flag = (edge2cell[:, 3] == 0) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], :, 0] = self.edge[flag, -1::-1]
-            flag = (edge2cell[:, 3] == 1) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], -1, :] = self.edge[flag, -1::-1]
-            flag = (edge2cell[:, 3] == 2) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], :, -1] = self.edge[flag]
-            flag = (edge2cell[:, 3] == 3) & (edge2cell[:, 0] != edge2cell[:, 1])
-            cell[edge2cell[flag, 1], 0, :] = self.edge[flag]
-
-            cell[:, 1:-1, 1:-1] = self.NN + np.arange(NC*(p-1)*(p-1)).reshape(NC, p-1, p-1)
-            self.NN += NC*(p-1)*(p-1)
-            
+            pass
 
 
-class CLagrangeQuadrangleDof2d():
+class CLagrangeHexahedronMeshDof():
     """
 
     Notes
     -----
-    拉格朗日六面体网格上的自由度管理类。
+    拉格朗日六面体网格上的连续空间的自由度管理类.
     """
     def __init__(self, mesh, p):
         self.mesh = mesh
@@ -203,7 +226,7 @@ class CLagrangeQuadrangleDof2d():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_edge_index()
+            index = self.mesh.ds.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter('face', index=index)
                 flag = threshold(bc)
@@ -212,7 +235,7 @@ class CLagrangeQuadrangleDof2d():
         gdof = self.number_of_global_dofs()
         face2dof = self.face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        isBdDof[edge2dof[index]] = True
+        isBdDof[face2dof[index]] = True
         return isBdDof
 
     @property
@@ -313,7 +336,7 @@ class CLagrangeQuadrangleDof2d():
         elif doftype in {'node', 0}:
             return 1
 
-class DLagrangeQuadrangleDof2d():
+class DLagrangeHexahedronDof():
     """
 
     Notes
@@ -388,13 +411,15 @@ class DLagrangeQuadrangleDof2d():
         p = self.p
         mesh = self.mesh
         NC = mesh.number_of_cells()
-        return NC*(p+1)*(p+1)
+        return NC*(p+1)*(p+1)*(p+1)
 
     def number_of_local_dofs(self, doftype='cell'):
         p = self.p
-        if doftype in {'cell', 2}:
-            return (p+1)*(p+1) 
-        elif doftype in {'face', 'edge',  1}:
-            return p + 1
+        if doftype in {'cell', 3}:
+            return (p + 1)**3
+        elif doftype in {'face', 2}:
+            return (p + 1)**2
+        elif doftype in {'edge', 1}:
+            return (p + 1)
         elif doftype in {'node', 0}:
             return 1

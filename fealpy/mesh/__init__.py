@@ -26,6 +26,7 @@ from .MeshFactory import MeshFactory
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
+from .LagrangeHexahedronMesh import LagrangeHexahedronMesh
 
 from .Tritree import Tritree
 from .Quadtree import Quadtree

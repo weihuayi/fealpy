@@ -26,8 +26,9 @@ class LinearMeshDataStructure():
         NC = self.NC
         cell = self.cell
         localFace = self.localFace
+        FV = self.FV
 
-        totalFace = cell[:, localFace].reshape(-1, 2)
+        totalFace = cell[:, localFace].reshape(-1, FV)
         return totalFace
 
     def construct_face(self):
