@@ -52,4 +52,4 @@ To be added.
 
 ## Please cite fealpy if you use it in you paper
 
-H. Wei, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, Xiangtan University, 2017-2020.
+H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, Xiangtan University, 2017-2020.
