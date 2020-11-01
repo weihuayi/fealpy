@@ -8,6 +8,8 @@ from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 from .QuadBilinearFiniteElementSpace import QuadBilinearFiniteElementSpace
 from .WeakGalerkinSpace2d import WeakGalerkinSpace2d
 
+from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
+
 from .DivFreeNonConformingVirtualElementSpace2d import DivFreeNonConformingVirtualElementSpace2d
 from .ReducedDivFreeNonConformingVirtualElementSpace2d import ReducedDivFreeNonConformingVirtualElementSpace2d
 

@@ -308,6 +308,7 @@ class LinearElasticityLFEMFastSolver():
         Notes
         -----
         A: [[A00, A01], [A10, A11]] (2*gdof, 2*gdof)
+        
            [[A00, A01, A02], [A10, A11, A12], [A20, A21, A22]] (3*gdof, 3*gdof)
         P: 预条件子 (gdof, gdof)
 
