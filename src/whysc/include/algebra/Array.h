@@ -1,5 +1,5 @@
-#ifndef Matrix_h
-#define Matrix_h
+#ifndef Array_h
+#define Array_h
 
 #include <array>
 #include <algorithm>
