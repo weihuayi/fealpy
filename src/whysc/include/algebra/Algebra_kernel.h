@@ -2,17 +2,23 @@
 #define AlgebraKernel_h
 
 #include "Matrix.h"
-#include "Array.h"
+#include "Vector.h"
+#include "linalg.h"
+
 namespace WHYSC {
 
 template<typename F=double, typename I=int>
 class Algebra_kernel
 {
 public:
-    typedef typename AlgebraObject::Matrix<F, 2, 2> Matrix22;
-    typedef typename AlgebraObject::Matrix<F, 3, 3> Matrix33;
-    typedef typename AlgebraObject::Matrix<F, 4, 4> Marrix44;
-    typedef typename AlgebraObject::Array<F, I> Array2d;
+    typedef typename AlgebraObject::Matrix<F, I> Matrix;
+    typedef typename AlgebraObject::Vector<F, I> Vector;
+    //typedef AlgebraAlgrithom::lu<Matrix> lu;
+public:
+    static void lu(Matrix & A, Matrix & L, Matrix & U)
+    {
+        return AlgebraAlgrithom::lu<Matrix>(A, L, U);
+    }
 
 };
 
