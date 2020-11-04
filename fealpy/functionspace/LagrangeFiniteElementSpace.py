@@ -644,6 +644,37 @@ class LagrangeFiniteElementSpace():
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
+    def rigid_motion_matrix(self):
+        GD = self.GD
+        p = self.p
+        if p == 1:
+            NN = self.mesh.number_of_nodes()
+            node = self.mesh.entity('node')
+            if GD == 2:
+                P = np.zeros((2*NN, 3), dtype=self.ftype)
+                P[0*NN:1*NN, 0] = 1.0
+                P[1*NN:2*NN, 1] = 1.0
+                P[0*NN:1*NN, 2] = node[:, 1]
+                P[1*NN:2*NN, 2] = -node[:, 0]
+            elif GD == 3:
+                P = np.zeros((3*NN, 6), dtype=self.ftype)
+                P[0*NN:1*NN, 0] = 1.0
+                P[1*NN:2*NN, 1] = 1.0
+                P[2*NN:3*NN, 2] = 1.0
+
+                P[0*NN:1*NN, 3] =  node[:, 1]
+                P[1*NN:2*NN, 3] = -node[:, 0]
+
+                P[1*NN:2*NN, 4] =  node[:, 2]
+                P[2*NN:3*NN, 4] = -node[:, 1]
+
+                P[0*NN:1*NN, 5] =  node[:, 2]
+                P[2*NN:3*NN, 4] = -node[:, 0]
+            return P
+                
+        else:
+            return None
+
     def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the linear elasticity fem matrix

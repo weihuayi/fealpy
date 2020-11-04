@@ -3,6 +3,7 @@
 import sys
 
 import numpy as np
+from numpy.linalg import inv
 from scipy.sparse.linalg import spsolve, cg, LinearOperator, spilu
 from scipy.sparse import spdiags
 
@@ -27,16 +28,13 @@ class IterationCounter(object):
             print('iter %3i:' % (self.niter))
 
 class LinearElasticityLFEMFastSolver():
-    def __init__(self, A, P, isBdDof):
-        """
-        Notes
-        -----
-
-        这里的边界条件处理放到矩阵和向量的乘积运算当中, 所心不需要修改矩阵本身
-        """
+    def __init__(self, A, P, I, isBdDof):
         self.gdof = P.shape[0]
         self.GD = A.shape[0]//self.gdof
 
+        self.AM = inv(I.T@(A@I))
+
+        self.I = I
         self.A = A
         self.isBdDof = isBdDof
 
@@ -48,13 +46,30 @@ class LinearElasticityLFEMFastSolver():
         P = T@P@T + Tbd
         self.ml = pyamg.ruge_stuben_solver(P) 
 
-    def preconditioner(self, b):
+    def preconditioner_1(self, b):
         GD = self.GD
         b = b.reshape(GD, -1)
         r = np.zeros_like(b)
         for i in range(GD):
             r[i] = self.ml.solve(b[i], tol=1e-8, accel='cg')       
         return r.reshape(-1)
+
+    def preconditioner(self, r):
+        gdof = self.gdof
+        GD = self.GD
+        e = np.zeros_like(r)
+        for i in range(GD):
+            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-8, accel='cg')       
+
+        if False:
+            r0 = r - self.A*e
+            r0 = I.T@r0
+            e0 = self.AM@r0
+            e += I@e0
+
+        return e
+
+
 
     def solve(self, uh, F, tol=1e-8):
         """
@@ -140,6 +155,60 @@ class LinearElasticityLFEMFastSolver_1():
 
         return uh 
 
+class LinearElasticityLFEMFastSolver_2():
+    def __init__(self, A,  A0, P, isBDDof):
+        """
+        Notes
+        -----
+
+        """
+
+        self.A = A
+        self.P = P # 插值矩阵
+        self.AM = inv(P.T@(A@P))
+        self.gdof = A.shape[0]
+        self.gdof0 = A0.shape[0]
+        self.GD = self.gdof//self.gdof0
+
+        # 处理预条件子的边界条件
+        bdIdx = np.zeros(A0.shape[0], dtype=np.int_)
+        bdIdx[isBdDof] = 1
+        Tbd = spdiags(bdIdx, 0, A0.shape[0], A0.shape[0])
+        T = spdiags(1-bdIdx, 0, A0.shape[0], A0.shape[0])
+        self.ml = pyamg.ruge_stuben_solver(A0) 
+
+    def preconditioner(self, r):
+        gdof0 = self.gdof0
+        GD = self.GD
+        e = np.zeros_like(r)
+        for i in range(GD):
+            e[i*gdof0:(i+1)*gdof0] = self.ml.solve(r[i*gdof0:(i+1)*gdof0], tol=1e-8, accel='cg')       
+        return e 
+
+
+        #r = P.T@r
+        #e = self.AM@r
+        #e = P@e
+        #e[isBdDof] = 0
+        #return e
+
+    def solve(self, uh, F, tol=1e-8):
+        """
+
+        Notes
+        -----
+        uh 是初值, uh[isBdDof] 中的值已经设为 D 氏边界条件的值, uh[~isBdDof]==0.0
+        """
+
+        gdof = self.gdof
+        counter = IterationCounter()
+        P = LinearOperator((gdof, gdof), matvec=self.preconditioner)
+        uh.T.flat, info = cg(self.A, F.T.flat, x0= uh.T.flat, M=P, tol=1e-8,
+                callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
+
+        return uh 
 
 n = int(sys.argv[1])
 
@@ -171,10 +240,21 @@ elif False:
     end = timer()
     print('time:', end - start)
 elif True:
+    I = space.rigid_motion_matrix()
     P = space.stiff_matrix(c=2*pde.mu)
     isBdDof = space.set_dirichlet_bc(uh, pde.dirichlet,
             threshold=pde.is_dirichlet_boundary)
-    solver = LinearElasticityLFEMFastSolver(A, P, isBdDof) 
+    solver = LinearElasticityLFEMFastSolver(A, P, I, isBdDof) 
+    start = timer()
+    uh[:] = solver.solve(uh, F) 
+    end = timer()
+    print('time:', end - start, 'dof:', A.shape)
+elif False:
+    A0 = space.stiff_matrix(c=2*pde.mu)
+    isBdDof = space.set_dirichlet_bc(uh, pde.dirichlet,
+            threshold=pde.is_dirichlet_boundary)
+    P = space.rigid_motion_matrix()
+    solver = LinearElasticityLFEMFastSolver_2(A, A0, P, isBdDof)
     start = timer()
     uh[:] = solver.solve(uh, F) 
     end = timer()
