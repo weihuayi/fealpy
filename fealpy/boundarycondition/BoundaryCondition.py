@@ -32,7 +32,7 @@ class DirichletBC():
         F[isDDof] = x[isDDof]
         return A, F 
 
-    def apply_on_matrix(self, A):
+    def apply_on_matrix(self, A, threshold=None):
         space = self.space
         gdof = space.number_of_global_dofs()
         threshold = self.threshold if threshold is None else threshold

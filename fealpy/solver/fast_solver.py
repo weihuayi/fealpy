@@ -15,40 +15,29 @@ class IterationCounter(object):
     def __call__(self, rk=None):
         self.niter += 1
         if self._disp:
-            print('iter %3i\trk = %s' % (self.niter, rk))
+            print('iter %3i' % (self.niter))
 
 class GaussSeidelSmoother():
-    def __init__(self, A, isDDof=None):
+    def __init__(self, A):
         """
 
         Notes
         -----
 
+        对称正定矩阵的 Gauss 光滑
+
         """
-        if isDDof is not None:
-            # 处理 D 氏 自由度条件
-            gdof = len(isDDof)
-            bdIdx = np.zeros(gdof, dtype=np.int_)
-            bdIdx[isDDof] = 1 
-            Tbd = spdiags(bdIdx, 0, gdof, gdof)
-            T = spdiags(1-bdIdx, 0, gdof, gdof)
-            A = T@A@T + Tbd
 
-        self.L0 = tril(A).tocsr()
-        self.U0 = triu(A, k=1).tocsr()
+        self.A = A
+        self.U = triu(A, k=1).tocsr()
 
-        self.U1 = self.L0.T.tocsr()
-        self.L1 = self.U0.T.tocsr()
-
-    def smooth(self, b, lower=True, maxit=100):
-        r = np.zeros_like(b)
+    def smooth(self, b, x0, lower=True, maxit=3):
         if lower:
             for i in range(maxit):
-                r[:] = spsolve_triangular(self.L0, b-self.U0@r, lower=lower)
+                x0[:] = spsolve_triangular(self.A, b-self.U@x0, lower=lower)
         else:
             for i in range(maxit):
-                r[:] = spsolve_triangular(self.U1, b-self.L1@r, lower=lower)
-        return r
+                x0[:] = spsolve_triangular(self.A, b-x0@self.U, lower=lower)
 
 class JacobiSmoother():
     def __init__(self, A, isDDof=None):
@@ -381,6 +370,113 @@ class LinearElasticityLFEMFastSolver():
         print("Convergence info:", info)
         print("Number of iteration of pcg:", counter.niter)
 
+        return uh 
+
+class LinearElasticityLFEMFastSolver_1():
+    def __init__(self, A, S, I=None, stype='pamg', drop_tol=None,
+            fill_factor=None):
+        """
+
+        Notes
+        -----
+
+        A : 线弹性矩阵离散矩阵
+        S : 刚度矩阵
+        I : 刚体运动空间基函数系数矩阵
+        """
+        self.gdof = S.shape[0] # 标量自由度个数
+        self.GD = A.shape[0]//self.gdof
+        self.A = A
+        self.I = I
+        self.stype = stype
+
+
+        if stype == 'pamg':
+            start = timer()
+            self.ml = pyamg.ruge_stuben_solver(S) 
+            end = timer()
+            print('time for poisson amg setup:', end - start)
+        elif stype == 'lu':
+            start = timer()
+            self.ilu = spilu(A.tocsc(), drop_tol=drop_tol,
+                    fill_factor=fill_factor)
+            end = timer()
+            print('time for ILU:', end - start)
+        elif stype == 'rm':
+            assert I is not None
+            self.I = I
+            self.AM = inv(I.T@(A@I))
+            self.smoother = GaussSeidelSmoother(A)
+            start = timer()
+            self.ml = pyamg.ruge_stuben_solver(S) 
+            end = timer()
+            print('time for poisson amg setup:', end - start)
+
+    def lu_preconditioner(self, r):
+        e = self.ilu.solve(r)
+        return e
+
+    def pamg_preconditioner(self, b):
+        gdof = self.gdof
+        GD = self.GD
+        e = np.zeros_like(r)
+        for i in range(GD):
+            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-8)       
+        return r.reshape(-1)
+
+    def rm_preconditioner(self, r):
+        gdof = self.gdof
+        GD = self.GD
+
+        e = r.copy()
+        self.smoother.smooth(r, e, lower=True, maxit=3)
+
+        rd = r - self.A@e # 更新残量
+        for i in range(GD):
+            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof], tol=1e-8)       
+
+        rd = r - self.A@e # 更新残量
+        rd = I.T@rd
+        ed = self.AM@rd
+        e += I@ed
+
+        rd = r - self.A@e # 更新残量
+        for i in range(GD):
+            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof], tol=1e-8)       
+
+        self.smoother.smooth(r, e, lower=False, maxit=3)
+
+        return e
+
+
+    def solve(self, uh, F, tol=1e-8):
+        """
+
+        Notes
+        -----
+        uh 是初值, uh[isBdDof] 中的值已经设为 D 氏边界条件的值, uh[~isBdDof]==0.0
+        """
+
+        GD = self.GD
+        gdof = self.gdof
+        stype = self.stype
+
+        if stype == 'pamg':
+            P = LinearOperator((GD*gdof, GD*gdof), matvec=self.pamg_preconditioner)
+        elif stype == 'lu':
+            P = LinearOperator((GD*gdof, GD*gdof), matvec=self.lu_preconditioner)
+        elif stype == 'rm':
+            P = LinearOperator((GD*gdof, GD*gdof), matvec=self.rm_preconditioner)
+            
+        start = timer()
+
+        counter = IterationCounter()
+        uh.T.flat, info = cg(self.A, F.T.flat, x0=uh.T.flat, M=P, tol=1e-8,
+                callback=counter)
+        end = timer()
+        print('time of pcg:', end - start)
+        print("Convergence info:", info)
+        print("Number of iteration of pcg:", counter.niter)
         return uh 
 
 

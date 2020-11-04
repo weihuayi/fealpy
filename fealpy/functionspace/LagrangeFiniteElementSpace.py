@@ -824,11 +824,18 @@ class LagrangeFiniteElementSpace():
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def stiff_matrix(self, c=None, q=None):
+    def stiff_matrix(self, c=None, q=None, isDDof=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
+
+        if isDDof is not None: # 处理 D 氏边界条件
+            bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+            bdIdx[isDDof] = 1
+            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+            A = T@A@T + Tbd
         return A 
 
     def mass_matrix(self, c=None, q=None):

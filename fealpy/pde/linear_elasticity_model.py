@@ -565,6 +565,7 @@ class PolyModel3d():
         mesh.uniform_refine(n)
         return mesh
 
+    @cartesian
     def displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -573,6 +574,7 @@ class PolyModel3d():
         val = np.einsum('...j, k->...jk', val, np.array([2**4, 2**5, 2**6]))
         return val
 
+    @cartesian
     def grad_displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -594,6 +596,7 @@ class PolyModel3d():
         val[..., 2, 2] = -c*t1*(-x + 1)*(-y + 1) + c*x*y*t0
         return val
 
+    @cartesian
     def stress(self, p):
         lam = self.lam
         mu = self.mu
@@ -604,6 +607,7 @@ class PolyModel3d():
         return val
         
 
+    @cartesian
     def compliance_tensor(self, phi):
         lam = self.lam
         mu = self.mu
@@ -613,9 +617,11 @@ class PolyModel3d():
         aphi /= 2*mu
         return aphi
 
+    @cartesian
     def div_stress(self, p):
         return -self.source(p)
 
+    @cartesian
     def source(self, p):
         lam = self.lam
         mu = self.mu
@@ -644,6 +650,7 @@ class PolyModel3d():
         val[..., 2] -= mu*(b*t0*x - b*t2*x*y - b*t3*x*z + b*x*y*z*(-x + 1) - 2*c*t2*x*z)
         return val
 
+    @cartesian
     def dirichlet(self, p):  
         """
         """
