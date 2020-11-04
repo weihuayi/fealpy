@@ -59,16 +59,19 @@ class LinearElasticityLFEMFastSolver():
         GD = self.GD
         e = np.zeros_like(r)
         for i in range(GD):
-            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-8, accel='cg')       
+            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-8)       
 
-        if False:
-            r0 = r - self.A*e
-            r0 = I.T@r0
-            e0 = self.AM@r0
-            e += I@e0
+        rd = r - self.A@e # 更新残量
+
+        rd = I.T@rd
+        ed = self.AM@rd
+        e += I@ed
+
+        rd = r - self.A@e # 更新残量
+        for i in range(GD):
+            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof], tol=1e-8)       
 
         return e
-
 
 
     def solve(self, uh, F, tol=1e-8):
@@ -183,14 +186,18 @@ class LinearElasticityLFEMFastSolver_2():
         e = np.zeros_like(r)
         for i in range(GD):
             e[i*gdof0:(i+1)*gdof0] = self.ml.solve(r[i*gdof0:(i+1)*gdof0], tol=1e-8, accel='cg')       
-        return e 
 
+        rd = r - self.A@e # 更新残量
 
-        #r = P.T@r
-        #e = self.AM@r
-        #e = P@e
-        #e[isBdDof] = 0
-        #return e
+        rd = P.T@rd
+        ed = self.AM@rd
+        e += P@e
+
+        rd = r - self.A@e
+        for i in range(GD):
+            e[i*gdof0:(i+1)*gdof0] += self.ml.solve(rd[i*gdof0:(i+1)*gdof0], tol=1e-8, accel='cg')       
+
+        return e
 
     def solve(self, uh, F, tol=1e-8):
         """
