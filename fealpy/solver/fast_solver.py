@@ -1,10 +1,12 @@
 
 import numpy as np
+from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg, inv, dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular
+from scipy.sparse.linalg import cg,  dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular
 from scipy.sparse.linalg import spilu
 import pyamg
+from timeit import default_timer as dtimer 
 
 from ..decorator import timer
 
@@ -28,16 +30,19 @@ class GaussSeidelSmoother():
 
         """
 
-        self.A = A
-        self.U = triu(A, k=1).tocsr()
+        self.L0 = tril(A).tocsr()
+        self.U0 = triu(A, k=1).tocsr()
+
+        self.U1 = self.L0.T.tocsr()
+        self.L1 = self.U0.T.tocsr()
 
     def smooth(self, b, x0, lower=True, maxit=3):
         if lower:
             for i in range(maxit):
-                x0[:] = spsolve_triangular(self.A, b-self.U@x0, lower=lower)
+                x0[:] = spsolve_triangular(self.L0, b-self.U0@x0, lower=lower)
         else:
             for i in range(maxit):
-                x0[:] = spsolve_triangular(self.A, b-x0@self.U, lower=lower)
+                x0[:] = spsolve_triangular(self.U1, b-self.L1@x0, lower=lower)
 
 class JacobiSmoother():
     def __init__(self, A, isDDof=None):
@@ -392,37 +397,42 @@ class LinearElasticityLFEMFastSolver_1():
 
 
         if stype == 'pamg':
-            start = timer()
+            self.smoother = GaussSeidelSmoother(A)
+            start = dtimer()
             self.ml = pyamg.ruge_stuben_solver(S) 
-            end = timer()
+            end = dtimer()
             print('time for poisson amg setup:', end - start)
         elif stype == 'lu':
-            start = timer()
+            start = dtimer()
             self.ilu = spilu(A.tocsc(), drop_tol=drop_tol,
                     fill_factor=fill_factor)
-            end = timer()
+            end = dtimer()
             print('time for ILU:', end - start)
         elif stype == 'rm':
             assert I is not None
             self.I = I
             self.AM = inv(I.T@(A@I))
             self.smoother = GaussSeidelSmoother(A)
-            start = timer()
+            start = dtimer()
             self.ml = pyamg.ruge_stuben_solver(S) 
-            end = timer()
+            end = dtimer()
             print('time for poisson amg setup:', end - start)
 
     def lu_preconditioner(self, r):
         e = self.ilu.solve(r)
         return e
 
-    def pamg_preconditioner(self, b):
+    def pamg_preconditioner(self, r):
         gdof = self.gdof
         GD = self.GD
-        e = np.zeros_like(r)
+
+        e = r.copy() 
+        self.smoother.smooth(r, e, lower=True, maxit=3)
         for i in range(GD):
-            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-8)       
-        return r.reshape(-1)
+            e[i*gdof:(i+1)*gdof] = self.ml.solve(r[i*gdof:(i+1)*gdof], tol=1e-2)       
+        self.smoother.smooth(r, e, lower=False, maxit=3)
+
+        return e 
 
     def rm_preconditioner(self, r):
         gdof = self.gdof
@@ -433,16 +443,19 @@ class LinearElasticityLFEMFastSolver_1():
 
         rd = r - self.A@e # 更新残量
         for i in range(GD):
-            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof], tol=1e-8)       
+            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof],
+                    tol=1e-1)       
+
 
         rd = r - self.A@e # 更新残量
-        rd = I.T@rd
+        rd = self.I.T@rd
         ed = self.AM@rd
-        e += I@ed
+        e += self.I@ed
 
         rd = r - self.A@e # 更新残量
         for i in range(GD):
-            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof], tol=1e-8)       
+            e[i*gdof:(i+1)*gdof] += self.ml.solve(rd[i*gdof:(i+1)*gdof],
+                    tol=1e-1)       
 
         self.smoother.smooth(r, e, lower=False, maxit=3)
 
@@ -468,12 +481,12 @@ class LinearElasticityLFEMFastSolver_1():
         elif stype == 'rm':
             P = LinearOperator((GD*gdof, GD*gdof), matvec=self.rm_preconditioner)
             
-        start = timer()
+        start = dtimer()
 
         counter = IterationCounter()
         uh.T.flat, info = cg(self.A, F.T.flat, x0=uh.T.flat, M=P, tol=1e-8,
                 callback=counter)
-        end = timer()
+        end = dtimer()
         print('time of pcg:', end - start)
         print("Convergence info:", info)
         print("Number of iteration of pcg:", counter.niter)

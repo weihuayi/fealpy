@@ -23,6 +23,9 @@ pde = PolyModel3d(lam=lam, mu=mu)
 
 mesh = pde.init_mesh(n=n)
 
+NN = mesh.number_of_nodes()
+print("NN:", 3*NN)
+
 space = LagrangeFiniteElementSpace(mesh, p=1)
 
 bc = DirichletBC(space, pde.dirichlet)
@@ -33,10 +36,13 @@ F = space.source_vector(pde.source, dim=3)
 A, F = bc.apply(A, F, uh)
 
 I = space.rigid_motion_matrix()
-S = space.stiff_matrix(c=2*pde.mu)
+S = space.stiff_matrix(2*pde.mu)
 S = bc.apply_on_matrix(S)
 
-solver = LinearElasticityLFEMFastSolver_1(A, S, I, stype=stype) 
+solver = LinearElasticityLFEMFastSolver_1(A, S, I, stype=stype, drop_tol=1e-6,
+        fill_factor=40) 
 
 solver.solve(uh, F)
+error = space.integralalg.error(pde.displacement, uh)
+print(error)
 
