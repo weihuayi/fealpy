@@ -236,9 +236,13 @@ class ScaledMonomialSpace2d():
 
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2)
+        gphi = np.zeros(shape, dtype=np.float)
+
+        if p == 0:
+            return gphi
+
         phi = self.basis(point, index=index, p=p-1)
         idx = self.diff_index_1(p=p)
-        gphi = np.zeros(shape, dtype=np.float)
         xidx = idx['x']
         yidx = idx['y']
         gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi) 
