@@ -8,8 +8,9 @@ typedef typename Kernel::Vector Vector;
 
 int main(int argc, char **argv)
 {
-    Matrix M{{1,2,3},{2,5,2},{3,1,5}};
+    //Matrix M{{1,2,3},{2,5,2},{3,1,5}};
 
+    Matrix M{{4,5,6}, {8,17,20}, {12,43,59}};
     std::cout << "M:\n" << M << std::endl;
 
     auto n = M.shape[0];
@@ -25,7 +26,8 @@ int main(int argc, char **argv)
 
     std::cout << C << std::endl;
 
-    Matrix A{{1,2,3},{2,5,2},{3,1,5}};
+    //Matrix A{{1,2,3},{2,5,2},{3,1,5}};
+    Matrix A{{4,5,6}, {8,17,20}, {12,43,59}};
     Matrix E = C - A;
     std::cout << "E.norm:" << E.norm() << std::endl;
 

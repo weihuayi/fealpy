@@ -1,17 +1,36 @@
 #include <iostream>
 #include <math.h>
+
+
+#include "algebra/Algebra_kernel.h"
+
+typedef typename WHYSC::Algebra_kernel<double, int> Kernel;
+typedef typename Kernel::Matrix Matrix;
+
+
+/*
 #include "algebra/Matrix.h"
 
 using namespace std;
 typedef WHYSC::AlgebraObject::Matrix<double> Matrix;
+*/
 
 int main()
 {
     int n=3;//n is dim of matrix
     double Larr2[n][n];
-    double arr[n][n]={4,5,6,8,17,20,12,43,59};
+    double arr[n][n]={{4,5,6}, {8,17,20}, {12,43,59}};
+
+    for(int i=0; i < n; i++)
+        for(int j=0; j < n; j++)
+            std::cout << arr[i][j] << " " << std::endl;
+    //Matrix arr{{4,5,6}, {8,17,20}, {12,43,59}};
     Matrix Larr(n,n,1.0);
     Matrix Uarr(n,n,0.0);
+
+    std::cout << "before:" << std::endl;
+    std::cout << Larr << std::endl;
+    std::cout << Uarr << std::endl;
 /* ---------------------------------------------- */
 for(int w1=0;w1<n;w1++)
 {
@@ -22,6 +41,9 @@ for(int w1=0;w1<n;w1++)
     }
 }
 /* ---------------------------------------------- */
+    std::cout << "Iniitialize:" << std::endl;
+    std::cout << Larr << std::endl;
+    std::cout << Uarr << std::endl;
 for (int k=0;k<n;k++)
 {
         for (int i=k+1;i<n;i++)
@@ -42,21 +64,9 @@ for (int k=0;k<n;k++)
         }
 }
 /* ---------------------------------------------- */
+    std::cout << "Result:" << std::endl;
+    std::cout << Larr << std::endl;
+    std::cout << Uarr << std::endl;
 
-cout << "L matrix is \n"<<endl;
-    for(int t1=0;t1<n;t1++)
-    {
-     for(int t2=0;t2<n;t2++)
-        cout << Larr[t1][t2] << "   ";
-        cout << "\n" ;
-    }
-cout << "U matrix is \n"<<endl;
-    for(int t1=0;t1<n;t1++)
-    {
-     for(int t2=0;t2<n;t2++)
-        cout << Uarr[t1][t2] << "   ";
-        cout << "\n" ;
-    }
-cout <<endl;
 return 0;
 }
