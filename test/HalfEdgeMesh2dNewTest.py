@@ -658,6 +658,7 @@ class HalfEdgeMesh2dTest:
                 color[halfedge[gre][:, [2,3,4]]] = 1
             colorlevel = ((color==1) | (color==2)).astype(np.int_)
             mesh.hedgecolor = {'color':color, 'level':colorlevel}
+            mesh.ds.NV = 4
         elif method=='rg':
             cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
             node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -669,6 +670,7 @@ class HalfEdgeMesh2dTest:
             NE = mesh.ds.NE
             color = np.zeros(NE*2, dtype=np.int_)
             mesh.hedgecolor = color
+            #mesh.ds.NV = 3
         elif method=='nvb':
             cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
             node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -695,7 +697,7 @@ class HalfEdgeMesh2dTest:
         r = 0.5
         h = 1e-2
         k=0
-        N = 30
+        N = 19
         fig = plt.figure()
         axes = fig.gca()
         plt.ion()
@@ -729,6 +731,13 @@ class HalfEdgeMesh2dTest:
                 print('加密',k,i,'次***************************')
             k=0
             sta2 = time.time()
+
+            aa = 2*i
+            bb = 2*i+1
+            plt.cla()
+            mesh.add_plot(axes, linewidths = 0.4)
+            #fig.savefig('%f.png' %aa, dpi=600, bbox_inches='tight')
+
             while k<10:
                 halfedge = mesh.ds.halfedge
                 pre = halfedge[:, 3]
@@ -753,60 +762,15 @@ class HalfEdgeMesh2dTest:
                     break
                 k+=1
                 print('循环',k,'次***************************')
+            plt.cla()
+            mesh.add_plot(axes, linewidths = 0.4)
+            #fig.savefig('%f.png' %bb, dpi=600, bbox_inches='tight')
             sta3 = time.time()
+            plt.show()
             print('加密时间:', sta2-sta1)
             print('粗化时间:', sta3-sta2)
-
-            if 1:
-                plt.cla()
-                mesh.add_plot(axes)
-                #mesh.find_node(axes, showindex = True)
-                #mesh.find_cell(axes, showindex = True)
-                #mesh.add_halfedge_plot(axes, showindex=True)
-                plt.pause(0.001)
-            if i==10000:
-                break
         plt.ioff()
         plt.show()
-        if 0:
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[20, 23, 19, 16, 4, 5, 6, 7, 24,
-                15]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[1, 2, 3, 20,10, 11, 13, 16]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[1, 5, 13, 15]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[10, 11, 12]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[4,5,6,7]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            #mesh.print()
-            #print(mesh.ds.edge_to_cell())
-            print(np.c_[np.arange(len(halfedge)), halfedge])
-            print(np.where(halfedge[halfedge[:, 2],
-                3]!=np.arange(len(halfedge))))
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-            mesh.add_halfedge_plot(axes, showindex=True)
-            plt.show()
 
 
 test = HalfEdgeMesh2dTest()
