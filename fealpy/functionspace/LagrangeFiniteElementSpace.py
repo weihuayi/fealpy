@@ -516,7 +516,7 @@ class LagrangeFiniteElementSpace():
     def div_value(self, uh, bc, index=np.s_[:]):
         dim = len(uh.shape)
         GD = self.geo_dimension()
-        if (dim == 2) & (uh.shape[1] == gdim):
+        if (dim == 2) & (uh.shape[1] == GD):
             val = self.grad_value(uh, bc, index=index)
             return val.trace(axis1=-2, axis2=-1)
         else:
