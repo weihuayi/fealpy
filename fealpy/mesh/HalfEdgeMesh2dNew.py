@@ -476,18 +476,17 @@ class HalfEdgeMesh2d(Mesh2d):
             node = self.entity('node')
 
             halfedge = self.ds.halfedge # DynamicArray
-            hflag = self.ds.subdomain[halfedge[:, 1]] > 0
             cstart = self.ds.cellstart
 
-            e0 = halfedge[halfedge[hflag, 3], 0]
-            e1 = halfedge[hflag, 0]
+            e0 = halfedge[halfedge[cstart:, 3], 0]
+            e1 = halfedge[cstart:, 0]
 
             w = np.array([[0, -1], [1, 0]], dtype=np.int)
             v = (node[e1] - node[e0])@w
             val = np.sum(v*node[e0], axis=1)
 
             a = np.zeros(NC, dtype=self.ftype)
-            np.add.at(a, halfedge[hflag, 1] - cstart, val)
+            np.add.at(a, halfedge[cstart:, 1] - cstart, val)
             a /=2
             return a
         elif self.ds.NV == 3:
@@ -502,6 +501,11 @@ class HalfEdgeMesh2d(Mesh2d):
             elif GD == 3:
                 a = np.sqrt(np.square(nv).sum(axis=1))/2.0
             return a
+    def all_cell_area(self):
+        cstart = self.ds.cellstart
+        area = self.cell_area()
+        area = np.r_[np.ones(cstart, dtype=np.float_), area]
+        return np.abs(area)
 
     def cell_barycenter(self, return_all=False):
         """
