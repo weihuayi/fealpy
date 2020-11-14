@@ -1894,6 +1894,18 @@ class HalfEdgeMesh2d(Mesh2d):
         for i in range(n):
             self.refine_poly()
 
+    def halfedge_direction(self):
+        node = self.entity('node')
+        halfedge = self.entity('halfedge')
+
+        v = node[halfedge[:, 0]] - node[halfedge[halfedge[:, 4], 0]]
+        return v
+
+    def halfedge_length(self):
+        v = self.halfedge_direction()
+        l = np.linalg.norm(v, axis=1)
+        return l
+
     def mark_helper(self, idx):
         NC = self.number_of_cells()
         flag = np.zeros(NC, dtype=np.bool)
