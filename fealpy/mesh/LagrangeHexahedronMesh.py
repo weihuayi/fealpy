@@ -200,10 +200,12 @@ class LagrangeHexahedronMeshDataStructure(Mesh3dDataStructure):
         self.NE = ds.NE 
         self.NC = ds.NC 
 
-        self.edge2cell = ds.edge2cell 
+        self.face2cell = ds.face2cell 
+        self.cell2edge = ds.cell2edge
 
         if p == 1:
             self.cell = ds.cell
+            self.face = ds.face
             self.edge = ds.edge
         else:
             pass
