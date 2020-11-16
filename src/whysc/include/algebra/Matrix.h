@@ -100,22 +100,6 @@ struct Matrix
         return std::sqrt(sum);
     }
 
-    void print()
-    {
-        std::cout << "Matrix("<< shape[0] << ","
-            << shape[1] << ")" << std::endl;
-
-        for(I i = 0; i < shape[0]; i++)
-        {
-            for(I j = 0; j < shape[1]; j++)
-            {
-                std::cout << data[i][j] << " ";
-            }
-            std::cout << std::endl;
-        }
-        
-    }
-
 };
 
 template<typename F, typename I>

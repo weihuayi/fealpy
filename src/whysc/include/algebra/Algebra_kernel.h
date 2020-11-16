@@ -2,6 +2,7 @@
 #define AlgebraKernel_h
 
 #include "Matrix.h"
+#include "CSRMatrix.h"
 #include "Vector.h"
 #include "linalg.h"
 
@@ -13,6 +14,8 @@ class Algebra_kernel
 public:
     typedef typename AlgebraObject::Matrix<F, I> Matrix;
     typedef typename AlgebraObject::Vector<F, I> Vector;
+
+    typedef typename AlgebraObject::CSRMatrix<F, I> CSRMatrix;
     //typedef AlgebraAlgrithom::lu<Matrix> lu;
 public:
     static void lu(Matrix & A, Matrix & L, Matrix & U)
