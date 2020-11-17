@@ -670,7 +670,7 @@ class HalfEdgeMesh2dTest:
                 if method=='quad':
                     mesh.coarsen_quad(isMarkedCell)
                 elif method=='rg':
-                    mesh.coarsen_triangle_rg(isMarkedCell, i=i)
+                    mesh.coarsen_triangle_rg(isMarkedCell)
                 elif method=='nvb':
                     mesh.coarsen_triangle_nvb(isMarkedCell)
                 elif method=='poly':

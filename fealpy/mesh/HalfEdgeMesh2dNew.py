@@ -68,7 +68,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.edgedata = {}
         self.facedata = self.edgedata
         self.meshdata = {}
-        self.hedgecolor = {}
+        self.hedgecolor = None
 
         # 网格节点的自由度标记数组
         # 0: 固定点
@@ -773,7 +773,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.NN = self.node.size
 
     def refine_cell(self, isMarked, isMarkedHEdge, method='quad',
-            bc='None', options={}):
+            bc=None, options={}):
 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -794,7 +794,7 @@ class HalfEdgeMesh2d(Mesh2d):
         if method=='quad':
             isMarkedCell = isMarked
             #生成新的节点
-            if bc=='None':
+            if bc is None:
                 bc = self.cell_barycenter()
                 node.extend(bc[isMarkedCell[cstart:NC]])
             else:
@@ -866,7 +866,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
             #更新起始边
             hcell.increase_size(NC2-NC)
-            hcell[halfedge[:, 1]] = range(len(halfedge)) # 的编号
+            hcell[halfedge[:, 1]] = np.arange(len(halfedge)) # 的编号
 
             #单元层
             clevel1 = clevel[cidx]
@@ -928,8 +928,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 flag[cidx] = True
                 flag  = flag & (num<0)
                 num[flag]=0
-                print(NC1)
-                print('adada', len(cidx))
 
                 num[-NC1:] = num[cidx]
                 options['numrefine'] = num
@@ -1299,6 +1297,9 @@ class HalfEdgeMesh2d(Mesh2d):
             return isMarkedHEdge
 
     def refine_poly(self, isMarkedCell=None, options={'disp': True}):
+        NC = self.ds.number_of_all_cells()
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
 
         cstart = self.ds.cellstart
         hlevel = self.halfedgedata['level']
@@ -1513,7 +1514,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.hedgecolor['color'] = color
         self.hedgecolor['level'] = colorlevel
 
-    def refine_triangle_rg(self, isMarkedCell, options={}):
+    def refine_triangle_rg(self, isMarkedCell=None, options={}):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1526,6 +1527,13 @@ class HalfEdgeMesh2d(Mesh2d):
         hedge = self.ds.hedge
         hcell = self.ds.hcell
 
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+
+        if self.hedgecolor is None:
+            color = np.zeros(NE*2, dtype=np.int_)
+            self.hedgecolor = color
+
         hlevel = self.halfedgedata['level']
         clevel = self.celldata['level']
         isMarkedCell[:cstart] = False
@@ -1536,6 +1544,7 @@ class HalfEdgeMesh2d(Mesh2d):
         #得到加密半边并加密
         isMarkedHEdge0 = self.mark_halfedge(isMarkedCell, method='rg')
         isMarkedHEdge = isMarkedHEdge0 & ((color==0)|(color==1))
+
         NN1 = self.refine_halfedge(isMarkedHEdge)
         isMainHEdge = self.ds.main_halfedge_flag()
         NNE = NE+NN1
@@ -1544,6 +1553,7 @@ class HalfEdgeMesh2d(Mesh2d):
         #标记的蓝色单元变成红色单元
         flag = isBlueHEdge & isMarkedHEdge0
         NE1 = flag.sum()
+
         color0 = self.refine_cell(flag, isMarkedHEdge,
                 method='tri_coordinateCell', options=options)
 
@@ -1658,7 +1668,6 @@ class HalfEdgeMesh2d(Mesh2d):
         flag = flag | ((hlevel[:]==0) & isRedCell[halfedge[:, 1]])
         flag = flag[halfedge[:, 3]]
 
-        print(options)
         self.refine_cell(isNewCell, flag, method='tri', options=options)
 
         #修改半边颜色
@@ -1949,7 +1958,6 @@ class HalfEdgeMesh2d(Mesh2d):
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
         cell = self.entity(etype)[index]
-        print('GGGDDD', cell)
         NV = cell.shape[-1]
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
