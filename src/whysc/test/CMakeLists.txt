@@ -7,3 +7,5 @@ add_executable(dsolve_test dsolve_test.cpp)
 add_executable(ceshi ceshi.cpp)
 
 add_executable(masks masks.cpp)
+
+add_executable(CSRMatrix_test CSRMatrix_test.cpp)

@@ -25,7 +25,7 @@ struct Matrix
 
     ~Matrix()
     {
-        delete [] this->data;
+        delete [] data;
     }
 
     void fill(const F val)

@@ -11,6 +11,9 @@ namespace AlgebraObject {
 template<typename F=double, typename I=int>
 struct Vector 
 {
+    typedef F Float;
+    typedef I Int;
+
     F * data;
     I size;
 
@@ -28,7 +31,6 @@ struct Vector
         size = s;
         init(val);
     }
-
 
     Vector(const std::initializer_list<F> &l)
     {
@@ -72,18 +74,6 @@ struct Vector
     const F & operator[](const I i) const
     {
         return data[i];
-    }
-
-    void print()
-    {
-        std::cout << "Vector("<< size <<")" << std::endl;
-
-        for(I i = 0; i < size; i++)
-        {
-            std::cout << data[i] << " ";
-        }
-        std::cout << std::endl;
-        
     }
 
 };
