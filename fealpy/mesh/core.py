@@ -86,6 +86,7 @@ class LinearMeshDataStructure():
         NE = i0.shape[0]
         self.NE = NE
         self.edge = totalEdge[i0, :]
+        self.cell2edge = np.reshape(j, (NC, E))
 
         if TD == 2:
             self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
@@ -97,6 +98,7 @@ class LinearMeshDataStructure():
             self.edge2cell[:, 1] = i1//E
             self.edge2cell[:, 2] = i0%E
             self.edge2cell[:, 3] = i1%E
+
 
 def multi_index_matrix0d(p):
     multiIndex = 1
