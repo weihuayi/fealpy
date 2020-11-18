@@ -282,44 +282,45 @@ class LagrangeTriangleMesh(Mesh2d):
             return J #(NQ,NC,GD,TD)
         else:
             return J, gphi
-    def jacobi_TMOP(self,bc,index = np.s_[:]):
+
+    def jacobi_TMOP(self, index = np.s_[:]):
         '''
         Notes
         -----
         计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵
         分解出的各个度量
         '''
+
         p = self.p
-        qf = self.integrator(p, etype='cell')
-        bcs, _ = qf.get_quadrature_points_and_weights()
+        bcs = multi_index_matrix[2](p)/p
 
         J = self.jacobi_matrix(bcs, index=index)# Jacobi矩阵
         
         Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis=-1))# 网格单元尺寸
         
-        r = np.sqrt(np.einsum('...ij->...j',J**2))# [r1,r2]
+        r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
 
-        Delta = np.einsum('ij,...j->...ij',np.eye(2),r)
-        r0 = r[:,:,0]*r[:,:,1]
+        Delta = np.einsum('ij,...j->...ij', np.eye(2), r)
+        r0 = r[:, :, 0]*r[:, :, 1]
         Delta = np.einsum('...ijk,...i->...ijk',Delta, np.sqrt(1/r0))# 网格单元纵横比
         
-        sphi = np.cross(J[...,0],J[...,1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
-        cphi = np.sum(J[...,0]*J[...,1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+        sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
+        cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
         
         Q = np.zeros(J.shape)# 网格单元夹角
-        Q[...,0,0] = 1/np.sqrt(sphi)
-        Q[...,1,0] = cphi/np.sqrt(sphi)
-        Q[...,1,1] = sphi/np.sqrt(sphi)
+        Q[..., 0, 0] = 1/np.sqrt(sphi)
+        Q[..., 1, 0] = cphi/np.sqrt(sphi)
+        Q[..., 1, 1] = sphi/np.sqrt(sphi)
         
         U = np.zeros(J.shape)# 网格单元尺寸和形状
-        U[...,0,0] = r[...,0]
-        U[...,1,0] = r[...,1]*cphi
-        U[...,1,1] = r[...,1]*sphi
+        U[...,0,0] = r[..., 0]
+        U[...,1,0] = r[..., 1]*cphi
+        U[...,1,1] = r[..., 1]*sphi
 
-        S = np.einsum('...ijk,...i->...ijk',U,1/Lambda)# 网格单元形状
+        S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
 
-        V = np.dot(J,np.linalg.inv(U))# 网格单元方向
-        return Lambda,Q,Delta,S,U,V
+        V = np.dot(J, np.linalg.inv(U))# 网格单元方向
+        return Lambda, Q, Delta, S, U, V
 
 
     def first_fundamental_form(self, bc, index=np.s_[:], 
