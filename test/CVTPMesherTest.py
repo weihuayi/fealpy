@@ -42,7 +42,7 @@ class CVTPMesherTest:
             mesh.find_node(axes, showindex=True)
             plt.show()
     def uniform_meshing_test(self, domain='square' , plot = True , interior_nodes = True,
-            add_cnode = False):
+            add_cnode = True):
 
         if domain == 'square':
             vertices = np.array([
@@ -367,14 +367,14 @@ class CVTPMesherTest:
 test = CVTPMesherTest()
 #test.uniform_boundary_meshing_test()
 #test.uniform_meshing_test(domain='square')
-test.uniform_meshing_test(domain='LShape')
+#test.uniform_meshing_test(domain='LShape')
 #test.uniform_meshing_test(domain='circle')
 #test.uniform_meshing_test(domain = 'partition1')
 #test.uniform_meshing_test(domain = 'partition2')
 #test.uniform_meshing_test(domain = 'hole1')
 #test.uniform_meshing_test(domain='hole2',interior_nodes=False)
 #test.Lloyd_test(domain='square')
-#test.Lloyd_test(domain = 'LShape')
+test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
