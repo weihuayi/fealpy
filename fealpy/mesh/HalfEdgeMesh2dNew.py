@@ -206,13 +206,10 @@ class HalfEdgeMesh2d(Mesh2d):
         halfedge = self.ds.halfedge
         v0 = node[halfedge[halfedge[:, 2], 0]] - node[halfedge[:, 0]]
         v1 = node[halfedge[halfedge[:, 4], 0]] - node[halfedge[:, 0]]
-        angle = 180*np.arccos(
-                np.sum(
-                    v0*v1, axis=1
-                )/np.sqrt(
-                    np.sum(v0**2, axis=1)*np.sum(v1**2, axis=1)))/np.pi
+
+        angle = np.sum(v0*v1, axis=1)/np.sqrt(np.sum(v0**2, axis=1)*np.sum(v1**2, axis=1))
         self.halfedgedata['level'][
-                (angle > 170) & (halfedge[:, 1] >= self.ds.cellstart)
+                (angle < -0.98) & (halfedge[:, 1] >= self.ds.cellstart)
                 ] = 1 
 
     def convexity(self):#
