@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
+from scipy.spatial import KDTree
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
@@ -122,6 +123,81 @@ class TetrahedronMesh(Mesh3d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+    def is_crossed_cell(self, point, segment):
+        pass
+
+    def location(self, points):
+        """
+
+        Notes
+        ----
+
+        给定一个点, 找到这些点所在的单元
+
+        这里假设：
+
+        1. 网格中没有洞
+        2. 区域还要是凸的
+
+        """
+
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+
+        self.celldata['cell'] = np.zeros(NC)
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
+
+        start = np.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        start[cell[:, 3]] = range(NC)
+
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc] # 设置一个初始单元位置
+
+        print("start:", start)
+
+        self.celldata['cell'][start] = 1
+
+        localFace = self.ds.localFace
+        isNotOK = np.ones(NP, dtype=np.bool)
+        while np.any(isNotOK):
+            idx = start[isNotOK] # 试探的单元编号
+            pp = points[isNotOK] # 还没有找到所在单元的点的坐标
+
+            v = node[cell[idx, :]] - pp[:, None, :] # (NP, 4, 3) - (NP, 1, 3)
+            # 计算点和当前四面体四个面形成四面体的体积
+            a = np.zeros((len(idx), 4), dtype=self.ftype)
+            for i in range(4):
+                vv = np.cross(v[:, localFace[i, 0]], v[:, localFace[i, 1]])
+                a[:, i] = np.sum(vv*v[:, localFace[i, 2]], axis=-1) 
+            lidx = np.argmin(a, axis=-1) 
+
+            # 最小体积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0 
+
+            idx0, = np.nonzero(isNotOK)
+            flag = (idx[isOutCell] == cell2cell[idx[isOutCell],
+                lidx[isOutCell]])
+
+            start[idx0[isOutCell][~flag]] = cell2cell[idx[isOutCell][~flag],
+                    lidx[isOutCell][~flag]]
+            start[idx0[isOutCell][flag]] = -1 
+
+            self.celldata['cell'][start[start > -1]] = 1
+
+            isNotOK[idx0[isOutCell][flag]] = False
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start 
 
     def direction(self, i):
         """ Compute the direction on every node of
