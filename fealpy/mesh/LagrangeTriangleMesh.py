@@ -114,10 +114,10 @@ class LagrangeTriangleMesh(Mesh2d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-        index = vtk_cell_index(self.p, cellType)
+        idx = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
         cell[:, 0] = NV
 
         NC = len(cell)
