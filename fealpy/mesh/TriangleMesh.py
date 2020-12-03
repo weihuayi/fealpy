@@ -40,41 +40,46 @@ class TriangleMesh(Mesh2d):
     def number_of_corner_nodes(self):
         return self.ds.NN
 
-    def vtk_cell_type(self):
-        VTK_TRIANGLE = 5
-        return VTK_TRIANGLE
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_TRIANGLE = 5
+            return VTK_TRIANGLE
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
 
-    def to_vtk(self, etype='cell', index=np.s_[:]):
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
-
         Parameters
         ----------
-        points: vtkPoints object
-        cells:  vtkCells object
-        pdata:  
-        cdata:
 
         Notes
         -----
         把网格转化为 VTK 的格式
         """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
         cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        index = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
         cell[:, 0] = NV
 
-        if etype == 'cell':
-            cellType = 5
-        elif etype == 'edge':
-            cellType = 3
-
-        return node, cell.flatten(), cellType, len(cell)
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
 
     def integrator(self, q, etype='cell'):
         if etype in {'cell', 2}:
