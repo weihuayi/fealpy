@@ -110,10 +110,10 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-        index = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
+        idx = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
         cell[:, 0] = NV
 
         NC = len(cell)
