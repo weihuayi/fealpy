@@ -62,6 +62,7 @@ class LagrangeHexahedronMesh(Mesh3d):
 
         self.nodedata = {}
         self.edgedata = {}
+        self.facedata = {}
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
 
