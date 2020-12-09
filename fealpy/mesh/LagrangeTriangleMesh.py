@@ -262,7 +262,7 @@ class LagrangeTriangleMesh(Mesh2d):
         phi = self.shape_function(bc) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
-
+    
     def jacobi_matrix(self, bc, index=np.s_[:], return_grad=False):
         """
         Notes
@@ -284,6 +284,7 @@ class LagrangeTriangleMesh(Mesh2d):
             return J, gphi
 
     def jacobi_TMOP(self, index = np.s_[:]):
+
         '''
         Notes
         -----
@@ -292,11 +293,11 @@ class LagrangeTriangleMesh(Mesh2d):
         '''
 
         p = self.p
-        bcs = multi_index_matrix[2](p)/p
+        bc = multi_index_matrix[2](p)/p
 
-        J = self.jacobi_matrix(bcs, index=index)# Jacobi矩阵
+        J = self.jacobi_matrix(bc, index=index)# Jacobi矩阵
         
-        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis=-1))# 网格单元尺寸
+        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis = -1))# 网格单元尺寸
         
         r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
 
@@ -306,6 +307,17 @@ class LagrangeTriangleMesh(Mesh2d):
         
         sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
         cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+
+        E = np.zeros(J[...,1].shape)
+        E[...,0] = 1
+        stheta = np.cross(E,J[...,0],axis=-1)/r[...,0]
+        ctheta = np.sum(J[...,0]*E,axis=-1)/r[...,0]
+        
+        V = np.zeros(J.shape)# 网格单元方向
+        V[..., 0, 0] = ctheta
+        V[..., 1, 0] = stheta
+        V[..., 0, 1] = -stheta
+        V[..., 1, 1] = ctheta
         
         Q = np.zeros(J.shape)# 网格单元夹角
         Q[..., 0, 0] = 1/np.sqrt(sphi)
@@ -318,9 +330,8 @@ class LagrangeTriangleMesh(Mesh2d):
         U[...,1,1] = r[..., 1]*sphi
 
         S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
-
-        V = np.dot(J, np.linalg.inv(U))# 网格单元方向
-        return Lambda, Q, Delta, S, U, V
+        #V = np.dot(J, np.linalg.inv(U))# 网格单元方向
+        return J, Lambda, Q, Delta, S, U, V
 
 
     def first_fundamental_form(self, bc, index=np.s_[:], 
