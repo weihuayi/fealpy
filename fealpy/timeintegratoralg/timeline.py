@@ -14,7 +14,7 @@ class UniformTimeLine():
         self.T1 = T1
         self.NL = NT + 1 # the number of time levels
         self.dt = (self.T1 - self.T0)/NT
-        self.current = 0
+        self.current = int(0)
         self.options = options
 
     def add_time(self, n):
@@ -32,7 +32,7 @@ class UniformTimeLine():
         for i in range(n):
             self.NL = 2*(self.NL - 1) + 1
             self.dt = (self.T1 - self.T0)/(self.NL - 1)
-        self.current = 0
+        self.current = int(0)
 
     def number_of_time_levels(self):
         return self.NL
