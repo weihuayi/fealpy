@@ -45,13 +45,19 @@ class VTKMeshWriter:
 
         pdata = vtkmesh.GetPointData()
         for key, val in mesh.nodedata.items():
-            d = vnp.numpy_to_vtk(val)
+            if val.dtype == np.bool:
+                d = vnp.numpy_to_vtk(val.astype(np.int_))
+            else:
+                d = vnp.numpy_to_vtk(val)
             d.SetName(key)
             pdata.AddArray(d)
 
         cdata = vtkmesh.GetCellData()
         for key, val in mesh.celldata.items():
-            d = vnp.numpy_to_vtk(val)
+            if val.dtype == np.bool:
+                d = vnp.numpy_to_vtk(val.astype(np.int_))
+            else:
+                d = vnp.numpy_to_vtk(val)
             d.SetName(key)
             cdata.AddArray(d)
 

@@ -111,10 +111,13 @@ class TetrahedronMesh(Mesh3d):
 
         if etype == 'cell':
             cellType = 10  # 四面体
+            celldata = self.celldata
         elif etype == 'face':
             cellType = 5  # 三角形
+            celldata = self.facedata
         elif etype == 'edge':
             cellType = 3  # segment 
+            celldata = self.edgedata
 
         if fname is None:
             return node, cell.flatten(), cellType, NC 
@@ -122,7 +125,7 @@ class TetrahedronMesh(Mesh3d):
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
-                    celldata=self.celldata)
+                    celldata=celldata)
 
     def is_crossed_cell(self, point, segment):
         pass

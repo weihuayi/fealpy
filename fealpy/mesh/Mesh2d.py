@@ -534,9 +534,9 @@ class Mesh2dDataStructure():
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros((NN,), dtype=np.bool)
-        isBdPoint[edge[isBdEdge,:]] = True
-        return isBdPoint
+        isBdNode = np.zeros((NN,), dtype=np.bool)
+        isBdNode[edge[isBdEdge,:]] = True
+        return isBdNode
 
     def boundary_edge_flag(self):
         edge2cell = self.edge2cell
