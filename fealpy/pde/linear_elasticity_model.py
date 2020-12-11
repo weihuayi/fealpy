@@ -656,6 +656,10 @@ class PolyModel3d():
         """
         val = self.displacement(p) 
         return val
+        
+    def is_dirichlet_boundary(self, p):
+        eps = 1e-14
+        return (p[:,0] < eps) | (p[:,1] < eps) | (p[:,2] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps) | (p[:, 2] > 1.0 - eps)
 
 class HuangModel2d():
     def __init__(self, lam=10, mu=1):
