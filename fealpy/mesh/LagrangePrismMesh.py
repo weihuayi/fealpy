@@ -143,10 +143,47 @@ class LagrangePrismMesh(Mesh3d):
         """
         return self.ds.NCN
 
-    def integrator(self, k):
+    def integrator(self, k, etype='cell', ftype=None):
         qf0 = GaussLegendreQuadrature(k)
         qf1 = TriangleQuadrature(k)
-        return TensorProductQuadrature((qf0, qf1)) 
+        if etype in {'cell', 3}:
+            return TensorProductQuadrature((qf0, qf1)) 
+        elif etype in {'face', 2}:
+            if ftype == 'tri':
+                return TriangleQuadrature(qf1) 
+            elif ftype == 'quad':
+                return TensorProductQuadrature((qf0, qf0), TD=2) 
+            else:
+                raise ValueError('the integrator `ftype` is not given! `tri` or `quad`'.format(face)) 
+        elif etype in {'edge', 1}:
+            return qf0 
+
+    def entity_barycenter(self, etype=3, ftype=None, index=np.s_[:]):
+        GD = self.geo_dimension()
+        if etype in {'cell', 3}:
+            qf = self.integrator(1, etype=3)
+            bc, ws = qf.get_quadrature_points_and_weights()
+            p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+        elif etype in {'face', 2}:
+            if ftype == 'tri':
+                qf = self.integrator(1, etype=2, ftype='tri')
+                bcs, ws = qf.get_quadrature_points_and_weights()
+                p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+            elif ftype == 'quad':
+                qf = self.integrator(1, etype=2, ftype='quad')
+                bcs, ws = qf.get_quadrature_points_and_weights()
+                p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+            else:
+                raise ValueError('the entity `ftype` is not given! `tri` or `quad`'.format(face)) 
+        elif etype in {'edge', 1}:
+            qf = self.integrator(1, etype=1)
+            bc, ws = qf.get_quadrature_points_and_weights()
+            p = self.bc_to_point(bc, index=index).reshape(-1, GD)
+        elif etype in {'node', 0}:
+            p = node[index]
+        else:
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+        return p 
 
     def cell_volume(self, q=None, index=None):
         """
@@ -284,6 +321,94 @@ class LagrangePrismMesh(Mesh3d):
         else:
             return G, J, gphi
 
+    def uniform_refine0(self, n=1, surface=None, returnim=False):
+        """"
+        uniform refine prism mesh.
+        one cell -> 8
+        """
+        p = self.p+1
+        ldof = (p+1)*(p+1)*(p+2)//2
+        w1 = np.zeros((p+1, 2), dtype=np.int8)
+        w1[:, 0] = np.arange(p, -1, -1)
+        w1[:, 1] = w1[-1::-1, 0]
+        w2 = self.multi_index_matrix[2](p)
+        w3 = np.einsum('ij, km->ijkm', w1, w2)
+
+        w = np.zeros((ldof, 6), dtype=np.int8)
+        w[:, 0:3] = w3[:, 0, :, :].reshape(-1, 3)
+        w[:, 3:] = w3[:, 1, :, :].reshape(-1, 3)
+
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            cell = self.entity('cell') # TODO: for high order 
+            ps = np.einsum('im, km->ikm', cell + (NN + NC), w)
+            ps.sort()
+            _, i0, j = np.unique(
+                    ps.reshape(-1, 6),
+                    return_index=True,
+                    return_inverse=True,
+                    axis=0)
+            ps = np.einsum('km, imd->ikd', w/p/p, node[cell]).reshape(-1, 3)
+            self.node = ps[i0]
+
+            cell2newNode = j.reshape(-1, ldof)
+            cell = np.zeros((8*NC, 6), dtype=np.int)
+            cell[0*NC:1*NC] = cell2newNode[:, [0, 1, 2, 6, 7, 8]]
+            cell[1*NC:2*NC] = cell2newNode[:, [1, 3, 4, 7, 9, 10]]
+            cell[2*NC:3*NC] = cell2newNode[:, [4, 2, 1, 10, 8, 7]]
+            cell[3*NC:4*NC] = cell2newNode[:, [2, 4, 5, 8, 10, 11]]
+
+            cell[4*NC:5*NC] = cell2newNode[:, [6, 7, 8, 12, 13, 14]]
+            cell[5*NC:6*NC] = cell2newNode[:, [7, 9, 10, 13, 15, 16]]
+            cell[6*NC:7*NC] = cell2newNode[:, [7, 10, 8, 13, 16, 14]]
+            cell[7*NC:8*NC] = cell2newNode[:, [8, 10, 11, 14, 16, 17]]
+            NN = len(i0)
+            ds = LinearPrismMeshDataStructure(NN, cell)
+            self.ds = LagrangePrismMeshDataStructure(ds, self.p)
+    
+    def uniform_refine1(self, n=1, surface=None, returnim=False):
+        """"
+        uniform refine prism mesh.
+        one cell -> 2
+        """
+        p = self.p+1
+        ldof = (p+1)*(self.p+1)*(self.p+2)//2
+        w1 = np.zeros((p+1, 2), dtype=np.int8)
+        w1[:, 0] = np.arange(p, -1, -1)
+        w1[:, 1] = w1[-1::-1, 0]
+        w2 = self.multi_index_matrix[2](self.p)
+        w3 = np.einsum('ij, km->ijkm', w1, w2)
+
+        w = np.zeros((ldof, 6), dtype=np.int8)
+        w[:, 0:3] = w3[:, 0, :, :].reshape(-1, 3)
+        w[:, 3:] = w3[:, 1, :, :].reshape(-1, 3)
+
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            node = self.entity('node')
+            cell = self.entity('cell') # TODO: for high order 
+            ps = np.einsum('im, km->ikm', cell + (NN + NC), w)
+            ps.sort()
+            _, i0, j = np.unique(
+                    ps.reshape(-1, 6),
+                    return_index=True,
+                    return_inverse=True,
+                    axis=0)
+            ps = np.einsum('km, imd->ikd', w/p/p, node[cell]).reshape(-1, 3)
+            self.node = ps[i0]
+
+            cell2newNode = j.reshape(-1, ldof)
+            cell = np.zeros((2*NC, 6), dtype=np.int)
+            cell[0*NC:1*NC] = cell2newNode[:, [0, 1, 2, 3, 4, 5]]
+            cell[1*NC:2*NC] = cell2newNode[:, [3, 4, 5, 6, 7, 8]]
+            NN = len(i0)
+            
+            ds = LinearPrismMeshDataStructure(NN, cell)
+            self.ds = LagrangePrismMeshDataStructure(ds, self.p)
+    
     def vtk_cell_type(self, etype='cell'):
         """
 
