@@ -452,6 +452,12 @@ class TetrahedronMesh(Mesh3d):
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
+
+        for key in self.celldata:
+            data = np.zeros(4*NC, dtype=self.itype)
+            data[:NC] = self.celldata[key]
+            self.celldata[key] = data.copy()
+
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = np.zeros(NN + 6*NC, dtype=np.uint8)
 
@@ -554,6 +560,11 @@ class TetrahedronMesh(Mesh3d):
             cell[NC:NC+nMarked, 1] = p1
             cell[NC:NC+nMarked, 2] = p3
             cell[NC:NC+nMarked, 3] = p4
+
+            for key in self.celldata:
+                data = self.celldata[key]
+                data[NC:NC+nMarked] = data[markedCell]
+
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3, p4
 
@@ -582,6 +593,9 @@ class TetrahedronMesh(Mesh3d):
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
+
+        for key in self.celldata:
+            self.celldata[key] = self.celldata[key][:NC]
 
         if returnim is True:
             return IM

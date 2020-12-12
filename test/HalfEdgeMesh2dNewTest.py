@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from fealpy.writer import MeshWriter
 from fealpy.mesh.HalfEdgeMesh2dNew import HalfEdgeMesh2d
-from fealpy.mesh import HalfEdgeMesh
+#from fealpy.mesh import HalfEdgeMesh
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 
 
@@ -230,90 +230,6 @@ class HalfEdgeMesh2dTest:
         mesh.find_cell(axes, showindex=True)
         mesh.add_halfedge_plot(axes, showindex=True)
         plt.show()
-
-    def adaptive_poly(self, plot=True):
-
-        """"
-        initial mesh
-        """
-        node = np.array([
-            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
-            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
-            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
-        cell = np.array([0, 3, 4, 4, 1, 0,
-            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
-        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
-
-        mesh = PolygonMesh(node, cell, cellLocation)
-        mesh = HalfEdgeMesh2d.from_mesh(mesh)
-
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-
-        NE = mesh.number_of_edges()
-        nC = mesh.number_of_cells()
-
-        """
-        refined mesh
-        """
-        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
-
-        eta = [1,0,0,0,2]
-        mesh.adaptive(eta, aopts)
-        print('r',aopts['HB'])
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-        plt.show()
-
-        """
-        coarsened mesh
-        """
-        #eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
-
-        fig = plt.figure()
-        axes = fig.gca()
-        mesh.add_plot(axes)
-        mesh.find_node(axes, showindex=True)
-        mesh.find_cell(axes, showindex=True)
-        plt.show()
-
-        if plot:
-
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            #mesh.add_halfedge_plot(axes, showindex=True)
-            #mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-            plt.show()
-        if 0:
-            NAC = mesh.number_of_all_cells() # 包括外部区域和洞
-            cindex = range(mesh.ds.cellstart, NAC)
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True, multiindex=cindex)
-
-            NN = mesh.number_of_nodes()
-            nindex = np.zeros(NN, dtype=np.int)
-            halfedge = mesh.ds.halfedge
-            nindex[halfedge[:, 0]] = mesh.get_data('halfedge', 'level')
-            cindex = mesh.get_data('cell', 'level')
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True, multiindex=nindex)
-            mesh.find_cell(axes, showindex=True, multiindex=cindex)
-            plt.show()
-        else:
-            return mesh
 
     def tri_cut_graph(self, fname, weight = None):
         data = sio.loadmat(fname)
@@ -658,6 +574,7 @@ class HalfEdgeMesh2dTest:
                 color[halfedge[gre][:, [2,3,4]]] = 1
             colorlevel = ((color==1) | (color==2)).astype(np.int_)
             mesh.hedgecolor = {'color':color, 'level':colorlevel}
+            mesh.ds.NV = 4
         elif method=='rg':
             cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
             node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -669,6 +586,7 @@ class HalfEdgeMesh2dTest:
             NE = mesh.ds.NE
             color = np.zeros(NE*2, dtype=np.int_)
             mesh.hedgecolor = color
+            #mesh.ds.NV = 3
         elif method=='nvb':
             cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
             node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
@@ -695,7 +613,7 @@ class HalfEdgeMesh2dTest:
         r = 0.5
         h = 1e-2
         k=0
-        N = 30
+        N = 19
         fig = plt.figure()
         axes = fig.gca()
         plt.ion()
@@ -729,6 +647,14 @@ class HalfEdgeMesh2dTest:
                 print('加密',k,i,'次***************************')
             k=0
             sta2 = time.time()
+
+            aa = 2*i
+            bb = 2*i+1
+            plt.cla()
+            mesh.add_plot(axes, linewidths = 0.4)
+            #fig.savefig('%f.png' %aa, dpi=600, bbox_inches='tight')
+            plt.pause(0.01)
+
             while k<10:
                 halfedge = mesh.ds.halfedge
                 pre = halfedge[:, 3]
@@ -744,7 +670,7 @@ class HalfEdgeMesh2dTest:
                 if method=='quad':
                     mesh.coarsen_quad(isMarkedCell)
                 elif method=='rg':
-                    mesh.coarsen_triangle_rg(isMarkedCell, i=i)
+                    mesh.coarsen_triangle_rg(isMarkedCell)
                 elif method=='nvb':
                     mesh.coarsen_triangle_nvb(isMarkedCell)
                 elif method=='poly':
@@ -753,60 +679,132 @@ class HalfEdgeMesh2dTest:
                     break
                 k+=1
                 print('循环',k,'次***************************')
+            plt.cla()
+            mesh.add_plot(axes, linewidths = 0.4)
+            #fig.savefig('%f.png' %bb, dpi=600, bbox_inches='tight')
             sta3 = time.time()
+            plt.pause(0.01)
             print('加密时间:', sta2-sta1)
             print('粗化时间:', sta3-sta2)
-
-            if 1:
-                plt.cla()
-                mesh.add_plot(axes)
-                #mesh.find_node(axes, showindex = True)
-                #mesh.find_cell(axes, showindex = True)
-                #mesh.add_halfedge_plot(axes, showindex=True)
-                plt.pause(0.001)
-            if i==10000:
-                break
         plt.ioff()
         plt.show()
-        if 0:
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[20, 23, 19, 16, 4, 5, 6, 7, 24,
-                15]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[1, 2, 3, 20,10, 11, 13, 16]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[1, 5, 13, 15]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[10, 11, 12]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            NC = mesh.number_of_all_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool_)
-            isMarkedCell[[4,5,6,7]] = True
-            print('*************lll*********')
-            mesh.coarsen_poly(isMarkedCell)
-            #mesh.print()
-            #print(mesh.ds.edge_to_cell())
-            print(np.c_[np.arange(len(halfedge)), halfedge])
-            print(np.where(halfedge[halfedge[:, 2],
-                3]!=np.arange(len(halfedge))))
-            fig = plt.figure()
-            axes = fig.gca()
-            mesh.add_plot(axes)
-            mesh.find_node(axes, showindex=True)
-            mesh.find_cell(axes, showindex=True)
-            mesh.add_halfedge_plot(axes, showindex=True)
-            plt.show()
+
+    def adaptive(self, method='poly', plot=True):
+
+        """"
+        initial mesh
+        """
+        Mesh = initMesh(method=method)
+        mesh = Mesh.mesh
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+
+        """
+        refined mesh
+        """
+        aopts = mesh.adaptive_options(method='numrefine',maxcoarsen=3,HB=True)
+
+        eta = [0,2, 0, 0 , 3]
+        mesh.adaptive(eta, aopts, method=method)
+        #eta = np.zeros(mesh.number_of_cells(), dtype=np.int_)
+        #eta[[0, 2]] = 1
+        #eta[16] = 2
+        #mesh.adaptive(eta, aopts, method=method)
+        #eta[[5, 11, 6, 20, 15, 12]] = -1
+
+        #mesh.adaptive(eta, aopts, method=method)
+        print('r',aopts['HB'])
+        print('r',np.c_[np.arange(len(aopts['numrefine'])),
+            aopts['numrefine']])
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        plt.show()
+
+        """
+        coarsened mesh
+        """
+        #eta = [0,0,0,0,0,0,0,-1,0,-1,0,-1,0,-1]
+
+        fig = plt.figure()
+        axes = fig.gca()
+        mesh.add_plot(axes)
+        mesh.find_node(axes, showindex=True)
+        mesh.find_cell(axes, showindex=True)
+        plt.show()
+
+class initMesh():
+    def __init__(self, method='rg'):
+        if (method == 'rg') | (method == 'nvb'):
+            self.mesh = self.triMesh(method=method)
+        elif method == 'quad':
+            self.mesh = self.quadMesh()
+        elif method == 'poly':
+            self.mesh = self.polyMesh()
+
+    def triMesh(self, method='rg'):
+        cell = np.array([[0,1,2],[0,2,3],[1,4,5],[2,1,5]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = TriangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.init_level_info()
+        if method == 'rg':
+            halfedge = mesh.ds.halfedge
+            cstart = mesh.ds.cellstart
+            NE = mesh.ds.NE
+            color = np.zeros(NE*2, dtype=np.int_)
+            mesh.hedgecolor = color
+        elif method=='nvb':
+            halfedge = mesh.ds.halfedge
+            cstart = mesh.ds.cellstart
+            NE = mesh.ds.NE
+            color = np.zeros(NE*2, dtype=np.int_)
+            color[[2,3,10,11]] = 1
+            mesh.hedgecolor = color
+        return mesh
+
+    def quadMesh(self):
+        cell = np.array([[0,1,2,3],[1,4,5,2]],dtype = np.int)
+        node = np.array([[0,0],[1,0],[1,1],[0,1],[2,0],[2,1]], dtype = np.float)
+        mesh = QuadrangleMesh(node, cell)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.init_level_info()
+
+        halfedge = mesh.ds.halfedge
+        cstart = mesh.ds.cellstart
+        NE = mesh.ds.NE
+        color = 3*np.ones(NE*2, dtype = np.int_)
+        color[1]=1
+        while (color==3).any():
+            red = color == 1
+            gre = color == 0
+            color[halfedge[red][:, [2,3,4]]] = 0
+            color[halfedge[gre][:, [2,3,4]]] = 1
+        colorlevel = ((color==1) | (color==2)).astype(np.int_)
+        mesh.hedgecolor = {'color':color, 'level':colorlevel}
+        return mesh
+
+    def polyMesh(self):
+        node = np.array([
+            (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
+            (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+        cell = np.array([0, 3, 4, 4, 1, 0,
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+
+        mesh = PolygonMesh(node, cell, cellLocation)
+        mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.init_level_info()
+
+
+        return mesh
 
 
 test = HalfEdgeMesh2dTest()
@@ -818,8 +816,8 @@ elif sys.argv[1] == 'refine_halfedge':
     test.refine_halfedge()
 elif sys.argv[1] == 'refine_poly':
     test.refine_poly(plot=True)
-elif sys.argv[1] == 'adaptive_poly':
-    mesh = test.adaptive_poly()
+elif sys.argv[1] == 'adaptive':
+    mesh = test.adaptive(method=sys.argv[2])
 elif sys.argv[1] == 'cell_to_node':
     mesh = test.cell_to_node()
 elif sys.argv[1] == 'read':
