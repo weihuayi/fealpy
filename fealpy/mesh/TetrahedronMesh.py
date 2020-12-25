@@ -404,7 +404,7 @@ class TetrahedronMesh(Mesh3d):
         length = np.sum(
                 (node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
                 axis = -1)
-        length += 0.1*np.random.rand(NE)*length
+        #length += 0.1*np.random.rand(NE)*length
         cellEdgeLength = length.reshape(NC, 6)
         lidx = np.argmax(cellEdgeLength, axis=-1)
 

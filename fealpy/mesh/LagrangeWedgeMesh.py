@@ -14,7 +14,7 @@ from .core import lagrange_grad_shape_function
 
 from .core import LinearMeshDataStructure
 
-class LinearPrismMeshDataStructure(LinearMeshDataStructure):
+class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
 
     localTFace = np.array([(0, 4, 2), (1, 3, 5)])
     localQFace = np.array([(2, 3, 4, 5), (4, 5, 0, 1), (0, 1, 2, 3)])
@@ -85,10 +85,14 @@ class LinearPrismMeshDataStructure(LinearMeshDataStructure):
         return face, face2cell
 
 
-class LagrangePrismMesh(Mesh3d):
+class LagrangeWedgeMesh(Mesh3d):
     def __init__(self, node, cell, p=1, domain=None):
 
-        self.p = p
+        if type(p) is int:
+            self.p = (p, p)
+        else:
+            self.p = p
+
         self.GD = node.shape[1]
         self.TD = 3
         self.ftype = node.dtype
@@ -97,8 +101,8 @@ class LagrangePrismMesh(Mesh3d):
 
         self.domain = domain
 
-        ds = LinearPrismMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
-        self.ds = LagrangePrismMeshDataStructure(ds, p)
+        ds = LinearWedgeMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
+        self.ds = LagrangeWedgeMeshDataStructure(ds, p)
 
         if p == 1:
             self.node = node
@@ -231,8 +235,8 @@ class LagrangePrismMesh(Mesh3d):
 
     def shape_function(self, bc, p=None):
         p = self.p if p is None else p
-        phi0 = lagrange_shape_function(bc[0], p)
-        phi1 = lagrange_shape_function(bc[1], p)
+        phi0 = lagrange_shape_function(bc[0], p[0])
+        phi1 = lagrange_shape_function(bc[1], p[1])
 
         # i 是积分点
         # j 是单元
@@ -461,7 +465,7 @@ class LagrangePrismMesh(Mesh3d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
     
-class LagrangePrismMeshDataStructure(Mesh3dDataStructure):
+class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
     def __init__(self, ds, p):
         """
 

@@ -69,6 +69,22 @@ def vtk_cell_index(p, celltype):
             idx = hexa.PointIndexFromIJK(loc[0], loc[1], loc[2], orders)
             index[idx] = i
         return index
+    elif celltype == VTK_LAGRANGE_WEDGE:
+        wedge = vtk.vtkLagrangeWedge()
+        orders = (p[0], p[0], p[1])
+        sizes = tuple([o + 1 for o in orders])
+        size = (orders[0] + 1) * (orders[0] + 2) * (orders[2] + 1)// 2
+        index = np.zeros(size, dtype=np.int_)
+        i = 0
+        for loc in np.ndindex(sizes):
+            if loc[0] + loc[1] > orders[0]:
+                continue
+            print(i, ":", loc)
+            idx = wedge.PointIndexFromIJK(loc[0], loc[1], loc[2], orders)
+            index[idx] = i 
+            i += 1
+        return index
+
 
 def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     """
