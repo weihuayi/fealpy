@@ -29,7 +29,6 @@ class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
     E = 9 # 每个单元 9 条边
     F = 5 # 每个单元 5 个面
     EV = 2 # 每个边有 2 个顶点
-    FV = 4 # 每个单元面最多有 4 个顶点
 
     def __init__(self, NN, cell):
         self.NN = NN
@@ -86,33 +85,30 @@ class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
 
 
 class LagrangeWedgeMesh(Mesh3d):
-    def __init__(self, node, cell, p=1, domain=None):
+    def __init__(self, node, cell, p=(1, 1), domain=None):
 
-        if type(p) is int:
-            self.p = (p, p)
-        else:
-            self.p = p
+        self.p = p
 
         self.GD = node.shape[1]
         self.TD = 3
         self.ftype = node.dtype
         self.itype = cell.dtype
-        self.meshtype = 'lpri'
+        self.meshtype = 'lwedge'
 
         self.domain = domain
 
         ds = LinearWedgeMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
         self.ds = LagrangeWedgeMeshDataStructure(ds, p)
 
-        if p == 1:
+        if (self.p[0] == 1) and (self.p[1] == 1):
             self.node = node
         else:
             NN = node.shape[0]
             self.node = np.zeros((NN, self.GD), dtype=self.ftype)
-            bc0 = multi_index_matrix[1](p)/p
-            bc1 = multi_index_matrix[2](p)/p
+            bc0 = multi_index_matrix[2](self.p[0])/self.p[0]
+            bc1 = multi_index_matrix[1](self.p[1])/self.p[1]
             bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 6)
-            self.node[self.ds.cell] = np.einsum('ijn, kj->ikn', node[cell], bc)
+            self.node = np.einsum('ijn, kj->ikn', node[cell], bc)
 
         self.nodedata = {}
         self.edgedata = {}
@@ -148,19 +144,19 @@ class LagrangeWedgeMesh(Mesh3d):
         return self.ds.NCN
 
     def integrator(self, k, etype='cell', ftype=None):
-        qf0 = GaussLegendreQuadrature(k)
-        qf1 = TriangleQuadrature(k)
+        qf0 = TriangleQuadrature(k)
+        qf1 = GaussLegendreQuadrature(k)
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf0, qf1)) 
         elif etype in {'face', 2}:
             if ftype == 'tri':
-                return TriangleQuadrature(qf1) 
+                return qf0 
             elif ftype == 'quad':
-                return TensorProductQuadrature((qf0, qf0), TD=2) 
+                return TensorProductQuadrature((qf1, qf1)) 
             else:
                 raise ValueError('the integrator `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
-            return qf0 
+            return qf1 
 
     def entity_barycenter(self, etype=3, ftype=None, index=np.s_[:]):
         GD = self.geo_dimension()
@@ -476,7 +472,7 @@ class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
         self.itype = ds.itype
 
         self.p = p
-        self.V = (p+1)*(p+1)*(p+2)//2
+        self.V = (p[0] + 1)*(p[0] + 2)*(p[1] + 1)//2
         self.E = ds.E 
         self.F = ds.F
         self.EV = ds.EV
@@ -492,7 +488,7 @@ class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
         self.cell2edge = ds.cell2edge 
 
 
-        if p == 1:
+        if (p[0] == 1) and (p[1] == 1) :
             self.cell = ds.cell
             self.edge = ds.edge
             self.tface = ds.tface

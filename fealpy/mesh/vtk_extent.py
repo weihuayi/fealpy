@@ -14,6 +14,8 @@ import vtk.util.numpy_support as vnp
 
 from .vtkCellTypes import *
 
+from .core import multi_index_matrix2d
+
 def vtk_cell_index(p, celltype):
     """
 
@@ -72,17 +74,16 @@ def vtk_cell_index(p, celltype):
     elif celltype == VTK_LAGRANGE_WEDGE:
         wedge = vtk.vtkLagrangeWedge()
         orders = (p[0], p[0], p[1])
-        sizes = tuple([o + 1 for o in orders])
         size = (orders[0] + 1) * (orders[0] + 2) * (orders[2] + 1)// 2
         index = np.zeros(size, dtype=np.int_)
+        multiIndex = multi_index_matrix2d(p[0])
         i = 0
-        for loc in np.ndindex(sizes):
-            if loc[0] + loc[1] > orders[0]:
-                continue
-            print(i, ":", loc)
-            idx = wedge.PointIndexFromIJK(loc[0], loc[1], loc[2], orders)
-            index[idx] = i 
-            i += 1
+        for i0, i1 in multiIndex[:, 1:]:
+            for i2 in range(p[1]+1):
+                idx = wedge.PointIndexFromIJK(i0, i1, i2, orders)
+                print(i, ":", i0, i1, i2, idx)        
+                index[idx] = i  
+                i += 1
         return index
 
 

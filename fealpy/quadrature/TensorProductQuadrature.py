@@ -20,7 +20,7 @@ class TensorProductQuadrature(Quadrature):
                 bcs, ws = qf.get_quadrature_points_and_weights()
                 self.quadpts += (bcs, )
                 weights += (ws, )
-        else: # n 是一个整数, qfs 是一个积分公式
+        else: # TD 是一个整数, qfs 是一个积分公式
             bcs, ws = qfs.get_quadrature_points_and_weights()
             self.quadpts = TD*(bcs, ) 
             weights = TD*(ws, )
