@@ -83,7 +83,7 @@ class RDFNCVEMDof2d():
 
 
 class ReducedDivFreeNonConformingVirtualElementSpace2d:
-    def __init__(self, mesh, p, q=None):
+    def __init__(self, mesh, p=2, q=None):
         """
         Parameter
         ---------
@@ -1082,6 +1082,79 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             b[c2d] += np.sum(bb[:, :, [0]]*self.E[0][2], axis=1)
             b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
             return b 
+
+    def interpolation_RT(self, space, q=None):
+        """
+
+        Notes
+        -----
+        把 Reduced 虚单元空间的中基函数插值到 RT_{k-1} 空间中.
+
+        这里假设所用的多边形网格是三角形网格, 
+
+        给定一个三角形网格, 转化为多边形网格, 转化时要注意三角形的第 0
+        条边, 转化为多边形网格的第 0 条边.
+
+        self 是 Reduced 虚单元的空间
+        space 是 RT 空间的 space
+     
+        """
+
+        p = self.p 
+        mesh = self.mesh # 多边形网格
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        en = mesh.edge_unit_normal() # (NE, 2)
+        eh = self.mesh.entity_measure('edge') # (NE, )
+
+        GD = mesh.geo_dimension()
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        # RT_{k-1} 空间在单元 K 上全部自由度的个数
+        rtldof = space.number_of_local_dofs(doftype='all')  
+        vldof = self.number_of_local_dofs()
+        
+        A = np.zeros((NC, RTldof, RTldof), dtype=self.ftype)
+        F = np.zeros((NC, RTldof,  
+
+        # 网格边上的积分公式
+        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs)
+
+        # 网格边上的缩放单项式空间的基函数 (NQ, NE, p)
+        ephi = self.smspace.edge_basis(ps, p=p-1))
+
+        # 左边单元 (NQ, NE, ldof, 2)
+        phi = space.edge_basis(bcs, left=True) # 计算左边单元基函数在当前边上积分点处的函数值
+        idx0 = edge2cell[:, 0][:, None, None]
+        idx1 = (edge2cell[:, [2]]*p + np.arange(p))[:, :, None]
+        # (NE, p, ldof)
+        A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
+
+        # 右边单元 (NQ, NE, ldof, 2)
+        phi = space.edge_basis(bcs, left=False) # 计算右边单元基函数在当前边上积分点处的函数值
+        idx0 = edge2cell[:, 1][:, None, None]
+        idx1 = (edge2cell[:, [3]]*p + np.arange(p))[:, :, None]
+        # (NE, p, ldof)
+        A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
+
+
+
+
+
+
+
+    def pressure_robust_source_vector(self, f):
+        p = self.p
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
+        pass
 
     def set_dirichlet_bc(self, uh, gd, is_dirichlet_edge=None):
         """

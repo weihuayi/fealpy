@@ -170,7 +170,7 @@ class RaviartThomasFiniteElementSpace2d:
     TODO
     ----
     """
-    def __init__(self, mesh, p, q=None, dof=None):
+    def __init__(self, mesh, p=0, q=None, dof=None):
         """
         Parameters
         ----------
@@ -264,7 +264,7 @@ class RaviartThomasFiniteElementSpace2d:
 
 
     @barycentric
-    def edge_basis(self, bc, index=np.s_[:], barycentric=True):
+    def edge_basis(self, bc, index=np.s_[:], barycentric=True, left=True):
         """
 
         Notes
@@ -285,13 +285,22 @@ class RaviartThomasFiniteElementSpace2d:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
-        val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+
+        if left:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+        else:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 1]) # (NQ, NE, ndof)
 
         shape = ps.shape[:-1] + (edof, GD)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
-        idx0 = edge2cell[index, 0][:, None]
-        idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
+        if left:
+            idx0 = edge2cell[index, 0][:, None]
+            idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
+        else:
+            idx0 = edge2cell[index, 1][:, None]
+            idx2 = edge2cell[index, 3][:, None]*edof + np.arange(edof)
+
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         idx = self.smspace.edge_index_1(p=p+1)
 

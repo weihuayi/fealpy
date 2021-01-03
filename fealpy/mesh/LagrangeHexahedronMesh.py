@@ -200,6 +200,7 @@ class LagrangeHexahedronMeshDataStructure(Mesh3dDataStructure):
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 
         self.NE = ds.NE 
+        self.NF = ds.NF
         self.NC = ds.NC 
 
         self.face2cell = ds.face2cell 
