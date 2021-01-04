@@ -1120,7 +1120,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         vldof = self.number_of_local_dofs()
         
         A = np.zeros((NC, RTldof, RTldof), dtype=self.ftype)
-        F = np.zeros((NC, RTldof,  
+        # F = np.zeros((NC, RTldof,  
 
         # 网格边上的积分公式
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
@@ -1128,7 +1128,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ps = mesh.bc_to_point(bcs)
 
         # 网格边上的缩放单项式空间的基函数 (NQ, NE, p)
-        ephi = self.smspace.edge_basis(ps, p=p-1))
+        ephi = self.smspace.edge_basis(ps, p=p-1)
 
         # 左边单元 (NQ, NE, ldof, 2)
         phi = space.edge_basis(bcs, left=True) # 计算左边单元基函数在当前边上积分点处的函数值
