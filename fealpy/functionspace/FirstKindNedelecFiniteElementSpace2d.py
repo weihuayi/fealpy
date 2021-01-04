@@ -116,7 +116,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         Note
         ----
-        RT_p : [P_{p}]^d(T) + [-m_2, m_1]^T \\bar P_{p}(T)
+        Nedelec_p : [P_{p}]^d(T) + [-m_2, m_1]^T \\bar P_{p}(T)
 
         """
         self.mesh = mesh
