@@ -243,7 +243,8 @@ if False:
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
-             '$||\\nabla\\times u - G(\\nabla\\times u_h)||_{\Omega, 0}$',
+             '$|| u - R_h(u_h)||_{\Omega,0}$',
+             '$||\\nabla\\times u - R_h(\\nabla\\times u_h)||_{\Omega, 0}$',
              'eta'
              ]
 errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float)
@@ -266,22 +267,25 @@ for i in range(args.maxit):
 
     #ruh = curl_recover(uh)
     space = LagrangeFiniteElementSpace(mesh, p=1)
-    rcuh = space.function()
-    rcuh[:] = spr(uh, edge_curl_value) 
+    rcuh = space.function(dim=1)
+    rcuh[:] = spr(uh, edge_curl_value)  # curl 
 
     ruh = space.function(dim=2)
-    ruh[:, 0] = spr(uh, edge_value_0)
+    ruh[:, 0] = spr(uh, edge_value_0) # 
     ruh[:, 1] = spr(uh, edge_value_1)
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.curl, uh.curl_value)
-    errorMatrix[2, i] = space.integralalg.L2_error(pde.curl, rcuh)
+    errorMatrix[2, i] = space.integralalg.L2_error(pde.solution, ruh)
+    errorMatrix[3, i] = space.integralalg.L2_error(pde.curl, rcuh)
 
     # 计算单元上的恢复型误差
-    eta0 = space.integralalg.error(uh.curl_value, rcuh, power=2, celltype=True) 
-    eta1 = space.integralalg.error(uh.value, ruh, power=2, celltype=True) 
-    eta = np.sqrt(eta0**2 + eta1**2)
-    errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
+    eta0 = space.integralalg.error(uh.curl_value, 
+            rcuh, power=2, celltype=True) # eta_K
+    eta1 = space.integralalg.error(uh.value,  
+            ruh, power=2, celltype=True) # xi_K
+    eta = np.sqrt(eta0**2 + eta1**2) # S_K
+    errorMatrix[4, i] = np.sqrt(np.sum(eta**2)) # S_h
     if i < args.maxit - 1:
         isMarkedCell = mark(eta, theta=args.theta)
         mesh.bisect(isMarkedCell)
