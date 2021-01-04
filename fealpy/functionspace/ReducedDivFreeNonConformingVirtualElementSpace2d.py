@@ -1105,50 +1105,73 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
-        en = mesh.edge_unit_normal() # (NE, 2)
-        eh = self.mesh.entity_measure('edge') # (NE, )
+        en = mesh.edge_unit_normal() # 每条边的单位法向(NE, 2)
+        eh = self.mesh.entity_measure('edge') # 每条边的长度 (NE, )
 
-        GD = mesh.geo_dimension()
+        GD = mesh.geo_dimension() # GD == 2
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        # RT_{k-1} 空间在单元 K 上全部自由度的个数
-        rtldof = space.number_of_local_dofs(doftype='all')  
-        vldof = self.number_of_local_dofs()
+        # RT_{k-1} 空间在单元 K 上局部自由度的个数
+        ldof0 = space.number_of_local_dofs(doftype='all')  
+        # Reduced 虚单元空间在单元  K 上局部自由度的个数
+        ldof1 = self.number_of_local_dofs()
         
-        A = np.zeros((NC, RTldof, RTldof), dtype=self.ftype)
-        # F = np.zeros((NC, RTldof,  
+        # 每个单元 K 上的插值矩阵
+        A = np.zeros((NC, ldof0, ldof0), dtype=self.ftype)
 
-        # 网格边上的积分公式
-        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
+        # 三角形网格边上的积分公式
+        qf = self.integralalg.edgeintegrator if q is None else space.mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs)
 
         # 网格边上的缩放单项式空间的基函数 (NQ, NE, p)
         ephi = self.smspace.edge_basis(ps, p=p-1)
 
-        # 左边单元 (NQ, NE, ldof, 2)
-        phi = space.edge_basis(bcs, left=True) # 计算左边单元基函数在当前边上积分点处的函数值
+        # 计算左边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
+        phi = space.basis(ps, index=edge2cell[:, 0], barycenter=False) 
         idx0 = edge2cell[:, 0][:, None, None]
         idx1 = (edge2cell[:, [2]]*p + np.arange(p))[:, :, None]
-        # (NE, p, ldof)
-        A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
+        # (NE, p, ldof0)
+        A[idx0, idx1] = np.einsum('qei, em, qejm, e->eij', ephi, en, phi, eh)  
 
-        # 右边单元 (NQ, NE, ldof, 2)
-        phi = space.edge_basis(bcs, left=False) # 计算右边单元基函数在当前边上积分点处的函数值
+        # 计算右边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
+        phi = space.basis(ps, index=edge2cell[:, 1], barycenter=False) 
         idx0 = edge2cell[:, 1][:, None, None]
         idx1 = (edge2cell[:, [3]]*p + np.arange(p))[:, :, None]
-        # (NE, p, ldof)
+        # (NE, p, ldof0)
         A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
 
+        # 三角形网格单元上的积分公式
+        cellmeasure = space.mesh.entity_measure('cell')
+        qf = self.integralalg.cellintegrator if q is None else space.mesh.integrator(q, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        ps = mesh.bc_to_point(bcs)
+        phi0 = space.basis(bcs) # (NQ, NC, ldof0, GD)
+        phi1 = self.smspace.basis(ps, p=p-2) # (NQ, NC, ldof1)
+        val = np.einsum('qcim, qcj, c->cmij', phi0, phi1, cellmeasure)
+        ldof = self.smspace.number_of_local_dofs(p=p-2, doftype='cell')
+        start = 3*(p-1)
+        stop = start + ldof
+        A[:, start:stop, :] = val[:, 0]
+        start = stop
+        stop += ldof
+        A[:, start:stop, :] = val[:, 1]
 
+        # 每个单元 K 上的右端矩阵
+        F = np.zeros((NC, ldof0, ldof1), dtype=self.ftype) 
+        val = en*eh[:, None] # 左右单元的法向取为一致会有问题吗?
+        idx0 = edge2cell[:, [2]]*(p-1) + np.arange(p-1)
+        F[edge2cell[:, 0][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
+        idx1 = 3*(p-1) + idx0
+        F[edge2cell[:, 0][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None] 
 
-
-
-
+        idx0 = edge2cell[:, [3]]*(p-1) + np.arange(p-1)
+        F[edge2cell[:, 1][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
+        idx1 = 3*(p-1) + idx0
+        F[edge2cell[:, 1][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None]
 
     def pressure_robust_source_vector(self, f):
         p = self.p
