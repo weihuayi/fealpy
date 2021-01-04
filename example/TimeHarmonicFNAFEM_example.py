@@ -187,8 +187,8 @@ parser.add_argument('--order',
         help='第一类 Nedlec 元的次数, 默认为 0!')
 
 parser.add_argument('--size', 
-        default=5, type=int,
-        help='初始网格的 x 和 y 方向剖分段数, 默认为 5 段')
+        default=8, type=int,
+        help='初始网格的 x 和 y 方向剖分段数, 默认为 8 段')
 
 parser.add_argument('--maxit', 
         default=40, type=int,
@@ -210,8 +210,14 @@ pde = CosSinData()
 box = [-1, 1, -1, 1]
 mesh = MeshFactory.boxmesh2d(box, nx=args.size, ny=args.size, meshtype='tri') 
 
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
+
 # 去掉第四象限
 mesh.delete_cell(threshold=lambda x: (x[..., 0] > 0) & (x[..., 1] < 0)) 
+
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
