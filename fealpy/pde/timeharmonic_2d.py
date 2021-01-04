@@ -200,8 +200,9 @@ class LShapeRSinData:
         x = p[..., 0]
         y = p[..., 1]
         
-        
+        pi = np.pi
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         beta=2/3
         val = np.zeros_like(p)
         
@@ -221,13 +222,15 @@ class LShapeRSinData:
         y = p[..., 1]
         
         
+        pi = np.pi
         theta = np.arctan2(y, x)
+        theta = (theta >= 0)*theta + (theta < 0)*(theta+2*pi)
         beta=2/3
         val = np.zeros_like(p) 
         
         # the source we need
-        val[..., 0] = beta*(x*x+y*y)**((beta-1)/2)*np.sin((beta-1)*theta)
-        val[..., 1] = beta*(x*x+y*y)**((beta-1)/2)*np.cos((beta-1)*theta)
+        val[..., 0] = -beta*(x*x+y*y)**((beta-1)/2)*np.sin((beta-1)*theta)
+        val[..., 1] = -beta*(x*x+y*y)**((beta-1)/2)*np.cos((beta-1)*theta)
         
         return val
 
@@ -241,6 +244,7 @@ class LShapeRSinData:
         # the curl we need 
         val = 0
         return val 
+
     @cartesian
     def curlcurl(self, p):
         x = p[..., 0]

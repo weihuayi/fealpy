@@ -208,7 +208,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
 
     @barycentric
-    def edge_basis(self, bc, index=None, barycenter=True):
+    def edge_basis(self, bc, index=None, barycenter=True, left=True):
         """
         """
         p = self.p
@@ -226,23 +226,33 @@ class FirstKindNedelecFiniteElementSpace2d:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
-        val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+
+        if left:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+        else:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 1]) # (NQ, NE, ndof)
 
         shape = ps.shape[:-1] + (edof, GD)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
-        idx0 = edge2cell[index, 0][:, None]
-        idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        if left:
+            idx0 = edge2cell[index, 0][:, None]
+            idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
+        else:
+            idx0 = edge2cell[index, 1][:, None]
+            idx2 = edge2cell[index, 3][:, None]*edof + np.arange(edof)
+
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         idx = self.smspace.edge_index_1(p=p+1)
         x = idx['x']
         y = idx['y']
 
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., cdof+y], c[:, GD*cdof:, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y], c[:, GD*cdof:, :])
 
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x], c[:, GD*cdof:, :])
+        phi[..., 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x], c[:, GD*cdof:, :])
+
         return phi
 
     @barycentric
@@ -384,6 +394,16 @@ class FirstKindNedelecFiniteElementSpace2d:
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
         val = np.einsum(s1, cphi, uh[cell2dof[index]])
+        return val
+
+    @barycentric
+    def edge_value(self, uh, bc, index=np.s_[:], left=True):
+        phi = self.edge_basis(bc, index=index, left=left)
+        edge2dof = self.dof.edge_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
         return val
 
     @barycentric

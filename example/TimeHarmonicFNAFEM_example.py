@@ -10,7 +10,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import MeshFactory
-from fealpy.pde.timeharmonic_2d import CosSinData
+from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData
 from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
@@ -80,7 +80,7 @@ def spr_edge(mesh, h, edgeVal):
     np.add.at(b, (edge[:, 1], np.s_[:]), val)
     return A, b
 
-def spr_curl(uh):
+def spr(uh, edge_value):
 
     """
     Notes
@@ -96,14 +96,9 @@ def spr_curl(uh):
     node = mesh.entity('node')
     edge = mesh.entity('edge')
     cell = mesh.entity('cell')
-
-    # 计算数值解在单元重心处的 curl 值
-    bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
-    cellVal = uh.curl_value(bc) #(NC, )
-
-    # 计算每条边的平均 curl 值
     edge2cell = mesh.ds.edge_to_cell()
-    edgeVal = (cellVal[edge2cell[:, 0]] + cellVal[edge2cell[:, 1]])/2.0
+    edgeVal = edge_value(uh)
+
 
     # 计算每个节点的最小二乘矩阵
     h = mesh.node_size()
@@ -168,13 +163,37 @@ def spr_curl(uh):
 
     A = inv(A)
     val = (A@b[:, :, None]).reshape(-1, 3)
+    return val[:, 0] 
 
-    space = LagrangeFiniteElementSpace(mesh, p=1)
-    ruh = space.function() # (gdof, 2)
-    ruh[:] = val[:, 0]
 
-    return ruh
+def edge_value_0(uh):
+    mesh = uh.space.mesh
+    edge2cell = mesh.ds.edge_to_cell()
+    bc = mesh.entity_barycenter('edge')
+    val0 = uh.value(bc, index=edge2cell[:, 0], barycenter=False)
+    val1 = uh.value(bc, index=edge2cell[:, 1], barycenter=False)
+    edgeVal = (val0 + val1)/2.0
+    return edgeVal[..., 0]
 
+def edge_value_1(uh):
+    mesh = uh.space.mesh
+    edge2cell = mesh.ds.edge_to_cell()
+    bc = mesh.entity_barycenter('edge')
+    val0 = uh.value(bc, index=edge2cell[:, 0], barycenter=False)
+    val1 = uh.value(bc, index=edge2cell[:, 1], barycenter=False)
+    edgeVal = (val0 + val1)/2.0
+    return edgeVal[..., 1]
+
+def edge_curl_value(uh):
+    # 计算数值解在单元重心处的 curl 值
+    mesh = uh.space.mesh
+    bc = np.array([1/3, 1/3, 1/3], dtype=mesh.ftype)
+    cellVal = uh.curl_value(bc) #(NC, )
+
+    # 计算每条边的平均 curl 值
+    edge2cell = mesh.ds.edge_to_cell()
+    edgeVal = (cellVal[edge2cell[:, 0]] + cellVal[edge2cell[:, 1]])/2.0
+    return edgeVal
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -195,7 +214,7 @@ parser.add_argument('--maxit',
         help='自适应迭代次数, 默认自适应迭代 40 次')
 
 parser.add_argument('--theta', 
-        default=0.3, type=float,
+        default=0.2, type=float,
         help='自适应迭代的 theta 参数, 默认为  0.3')
 
 parser.print_help()
@@ -205,23 +224,27 @@ print('程序参数为:', args)
 
 ## 开始计算
 
-pde = CosSinData()
+#pde = CosSinData()
+pde = LShapeRSinData()
 
-box = [-1, 1, -1, 1]
-mesh = MeshFactory.boxmesh2d(box, nx=args.size, ny=args.size, meshtype='tri') 
+mesh = pde.init_mesh()
 
-fig = plt.figure()
-axes = fig.gca()
-mesh.add_plot(axes)
-plt.show()
+if False:
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
 
-# 去掉第四象限
-mesh.delete_cell(threshold=lambda x: (x[..., 0] > 0) & (x[..., 1] < 0)) 
-
+    fig = plt.figure()
+    axes = fig.gca()
+    bc = mesh.entity_barycenter('edge')
+    v = pde.solution(bc)
+    axes.quiver(bc[:, 0], bc[:, 1], v[:, 0], v[:, 1])
+    plt.show()
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
              '$||\\nabla\\times u - G(\\nabla\\times u_h)||_{\Omega, 0}$',
+             'eta'
              ]
 errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float)
 NDof = np.zeros(args.maxit, dtype=np.float)
@@ -242,20 +265,29 @@ for i in range(args.maxit):
     uh[:] = spsolve(A, F)
 
     #ruh = curl_recover(uh)
-    ruh = spr_curl(uh) 
+    space = LagrangeFiniteElementSpace(mesh, p=1)
+    rcuh = space.function()
+    rcuh[:] = spr(uh, edge_curl_value) 
+
+    ruh = space.function(dim=2)
+    ruh[:, 0] = spr(uh, edge_value_0)
+    ruh[:, 1] = spr(uh, edge_value_1)
 
     errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.L2_error(pde.curl, uh.curl_value)
-    errorMatrix[2, i] = space.integralalg.L2_error(pde.curl, ruh)
-    eta = space.integralalg.error(uh.curl_value, ruh, power=2, celltype=True) # 计算单元上的恢复型误差
+    errorMatrix[2, i] = space.integralalg.L2_error(pde.curl, rcuh)
 
+    # 计算单元上的恢复型误差
+    eta0 = space.integralalg.error(uh.curl_value, rcuh, power=2, celltype=True) 
+    eta1 = space.integralalg.error(uh.value, ruh, power=2, celltype=True) 
+    eta = np.sqrt(eta0**2 + eta1**2)
+    errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
     if i < args.maxit - 1:
         isMarkedCell = mark(eta, theta=args.theta)
         mesh.bisect(isMarkedCell)
         mesh.add_plot(plt)
         plt.savefig('./test-' + str(i+1) + '.png')
         plt.close()
-
 
 showmultirate(plt, args.maxit-10, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()
