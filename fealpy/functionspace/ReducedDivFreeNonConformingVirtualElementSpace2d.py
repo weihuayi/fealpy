@@ -1101,7 +1101,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         """
 
         p = self.p 
-        mesh = self.mesh # 多边形网格
+        mesh = space.mesh # 多边形网格
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
@@ -1114,7 +1114,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        # RT_{k-1} 空间在单元 K 上局部自由度的个数
+        # RT_{k-1} 空间在单元 K 上局部自由度的个数, TODO：确认是 k-1 还是 k
         ldof0 = space.number_of_local_dofs(doftype='all')  
         # Reduced 虚单元空间在单元  K 上局部自由度的个数
         ldof1 = self.number_of_local_dofs()
@@ -1123,7 +1123,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         A = np.zeros((NC, ldof0, ldof0), dtype=self.ftype)
 
         # 三角形网格边上的积分公式
-        qf = self.integralalg.edgeintegrator if q is None else space.mesh.integrator(q, 'edge')
+        qf = space.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs)
 
@@ -1131,22 +1131,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ephi = self.smspace.edge_basis(ps, p=p-1)
 
         # 计算左边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
-        phi = space.basis(ps, index=edge2cell[:, 0], barycenter=False) 
-        idx0 = edge2cell[:, 0][:, None, None]
-        idx1 = (edge2cell[:, [2]]*p + np.arange(p))[:, :, None]
+        phi = space.basis(ps, index=edge2cell[:, 0], barycentric=False) 
+        idx0 = edge2cell[:, 0][:, None]
+        idx1 = edge2cell[:, [2]]*p + np.arange(p)
         # (NE, p, ldof0)
         A[idx0, idx1] = np.einsum('qei, em, qejm, e->eij', ephi, en, phi, eh)  
 
         # 计算右边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
-        phi = space.basis(ps, index=edge2cell[:, 1], barycenter=False) 
-        idx0 = edge2cell[:, 1][:, None, None]
-        idx1 = (edge2cell[:, [3]]*p + np.arange(p))[:, :, None]
+        phi = space.basis(ps, index=edge2cell[:, 1], barycentric=False) 
+        idx0 = edge2cell[:, 1][:, None]
+        idx1 = edge2cell[:, [3]]*p + np.arange(p)
         # (NE, p, ldof0)
         A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
 
         # 三角形网格单元上的积分公式
-        cellmeasure = space.mesh.entity_measure('cell')
-        qf = self.integralalg.cellintegrator if q is None else space.mesh.integrator(q, 'cell')
+        cellmeasure = mesh.entity_measure('cell')
+        qf = space.integralalg.cellintegrator if q is None else mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
         ps = mesh.bc_to_point(bcs)
         phi0 = space.basis(bcs) # (NQ, NC, ldof0, GD)
@@ -1155,10 +1155,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ldof = self.smspace.number_of_local_dofs(p=p-2, doftype='cell')
         start = 3*(p-1)
         stop = start + ldof
+        print(val.shape)
+        print(A[:, start:stop, :].shape)
         A[:, start:stop, :] = val[:, 0]
         start = stop
         stop += ldof
         A[:, start:stop, :] = val[:, 1]
+
+        A = inv(A)
 
         # 每个单元 K 上的右端矩阵
         F = np.zeros((NC, ldof0, ldof1), dtype=self.ftype) 
@@ -1172,6 +1176,29 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F[edge2cell[:, 1][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
         idx1 = 3*(p-1) + idx0
         F[edge2cell[:, 1][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None]
+
+        E = self.E
+        E00 = E[0][0].T.reshape(NC, 3*(p-1), 3*(p-1))
+        E01 = E[0][1].T.reshape(NC, 3*(p-1), 3*(p-1))
+        E02 = E[0][2]
+        E10 = E[1][0].T.reshape(NC, 3*(p-1), 3*(p-1))
+        E10 = E[1][1].T.reshape(NC, 3*(p-1), 3*(p-1))
+        E12 = E[2][2]
+
+        smldof = self.smspace.number_of_local_dofs(p=p-2) # 标量 p-2 次单元缩放空间的维数
+        start = 3*(p-1)
+        end = start + smldof
+        F[:, start:end, 0*(p-1):3*(p-1)] = E00
+        F[:, start:end, 3*(p-1):6*(p-1)] = E01
+        F[:, start:end, 6*(p-1):] = E02
+
+        start = end
+        end += smldof
+        F[:, start:end, 0*(p-1):3*(p-1)] = E10
+        F[:, start:end, 3*(p-1):6*(p-1)] = E11
+        F[:, start:end, 6*(p-1):] = E12
+
+        return A@F 
 
     def pressure_robust_source_vector(self, f):
         p = self.p

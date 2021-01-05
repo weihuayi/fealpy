@@ -928,7 +928,8 @@ class TriangleMesh(Mesh2d):
         Notes
         ----
 
-        etype 是一个多余的参数， bc 中已经包含这单元类型的信息
+        etype 是一个多余的参数， bc 中已经包含这单元类型的信息,
+        为了向后兼容这里保留下来
         """
         TD = bc.shape[-1] - 1 #
         node = self.node
