@@ -276,7 +276,7 @@ class LagrangeTriangleMesh(Mesh2d):
         entity = self.entity(etype=TD)[index]
         gphi = self.grad_shape_function(bc)
         J = np.einsum(
-                'cin, qcim->qcnm',
+                'cin, ...cim->...cnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
         if return_grad is False:
             return J #(NQ,NC,GD,TD)

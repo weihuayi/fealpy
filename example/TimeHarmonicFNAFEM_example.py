@@ -290,7 +290,7 @@ for i in range(args.maxit):
         isMarkedCell = mark(eta, theta=args.theta)
         mesh.bisect(isMarkedCell)
         mesh.add_plot(plt)
-        plt.savefig('./test-' + str(i+1) + '.png')
+        plt.savefig('./test-' + str(i+1) + '.eps')
         plt.close()
 
 showmultirate(plt, args.maxit-10, NDof, errorMatrix,  errorType, propsize=20)
