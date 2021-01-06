@@ -1116,6 +1116,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # RT_{k-1} 空间在单元 K 上局部自由度的个数, TODO：确认是 k-1 还是 k
         ldof0 = space.number_of_local_dofs(doftype='all')  
+
         
         # 每个单元 K 上的插值矩阵
         A = np.zeros((NC, ldof0, ldof0), dtype=self.ftype)
@@ -1151,28 +1152,26 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         phi1 = self.smspace.basis(ps, p=p-2) # (NQ, NC, ldof1)
         val = np.einsum('qci, qcjm, c->cmij', phi1, phi0, cellmeasure)
         ldof = self.smspace.number_of_local_dofs(p=p-2, doftype='cell')
-        start = 6*(p-1)
+        start = 3*p
         stop = start + ldof
         A[:, start:stop, :] = val[:, 0]
         start = stop
         stop += ldof
         A[:, start:stop, :] = val[:, 1]
-        print(A)
-
         A = inv(A)
 
         # Reduced 虚单元空间在单元  K 上局部自由度的个数
         ldof1 = self.number_of_local_dofs()[0]
         # 每个单元 K 上的右端矩阵
         F = np.zeros((NC, ldof0, ldof1), dtype=self.ftype) 
-        idx0 = edge2cell[:, [2]]*(p-1) + np.arange(p-1)
+        idx0 = edge2cell[:, [2]]*p + np.arange(p)
         F[edge2cell[:, 0][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
-        idx1 = 3*(p-1) + idx0
+        idx1 = 3*p + idx0
         F[edge2cell[:, 0][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None] 
 
-        idx0 = edge2cell[:, [3]]*(p-1) + np.arange(p-1)
+        idx0 = edge2cell[:, [3]]*p + np.arange(p)
         F[edge2cell[:, 1][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
-        idx1 = 3*(p-1) + idx0
+        idx1 = 3*p + idx0
         F[edge2cell[:, 1][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None]
         
         E = self.E
@@ -1184,25 +1183,54 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         E12 = E[1][2]
 
         smldof = self.smspace.number_of_local_dofs(p=p-2) # 标量 p-2 次单元缩放空间的维数
-        start = 6*(p-1)
+        start = 3*p
         stop = start + smldof
-        F[:, start:stop, 0*(p-1):3*(p-1)] = E00
-        F[:, start:stop, 3*(p-1):6*(p-1)] = E01
-        F[:, start:stop, 6*(p-1):] = E02
+        F[:, start:stop, 0*p:3*p] = E00
+        F[:, start:stop, 3*p:6*p] = E01
+        F[:, start:stop, 6*p:] = E02
 
         start = stop
         stop += smldof
-        F[:, start:stop, 0*(p-1):3*(p-1)] = E10
-        F[:, start:stop, 3*(p-1):6*(p-1)] = E11
-        F[:, start:stop, 6*(p-1):] = E12
+        F[:, start:stop, 0*p:3*p] = E10
+        F[:, start:stop, 3*p:6*p] = E11
+        F[:, start:stop, 6*p:] = E12
 
         return A@F 
 
-    def pressure_robust_source_vector(self, f):
+    def pressure_robust_source_vector(self, f, space, q=None):
+        """
+
+        Note
+        ----
+        假设网格是三角形网格, 把缩减虚单元空间的基函数投影到 RT_{k-1} 空间
+
+        space 是 k-1 次的 RT 空间的 space
+        """
         p = self.p
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
-        pass
+
+        ldof0 = space.number_of_local_dofs(doftype='all')  
+        ldof1 = self.number_of_local_dofs()[0] # 因为假设是三角形, 所有单元自由度个数是相同的
+        # A.shape == (NC, ldof0, ldof1)
+        A = self.interpolation_RT(space, q=q)
+
+        # 向量函数 f 在 RT 空间中的离散, (NC, ldof0)
+        # celltype = True, 表示只计算每个单元上的右端
+        bb = space.source_vector(f, celltype=True, q=q)
+        bb = (bb[:, None, :]@A).reshape(NC, -1)
+
+        gdof = self.number_of_global_dofs()
+        b = np.zeros((gdof, ), dtype=self.ftype)
+
+        cell2dof = self.dof.cell2dof # 边上的自由度
+        np.add.at(b, cell2dof, bb[:, 0:3*p].flat)
+        np.add.at(b[NE*p:], cell2dof, bb[:, 3*p:6*p].flat)
+
+        c2d = self.cell_to_dof('cell')
+        b[c2d] += bb[:, 6*p:]
+
+        return b
 
     def set_dirichlet_bc(self, uh, gd, is_dirichlet_edge=None):
         """

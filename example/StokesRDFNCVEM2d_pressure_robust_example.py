@@ -19,11 +19,15 @@ from fealpy.functionspace import DivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ReducedDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d
 
+from fealpy.pde.stokes_model_2d import StokesModelData_0, StokesModelData_1
+
+pde = StokesModelData_0()
+
 p = 2
 tmesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=1, ny=1, meshtype='tri')
 
 # RT 空间
-space0 = RaviartThomasFiniteElementSpace2d(tmesh, p=1)
+space0 = RaviartThomasFiniteElementSpace2d(tmesh, p=p-1)
 
 
 # 三角形转化为多边形网格， 注意这里要求三角形的 0 号边转化后仍然是多边形的 0
@@ -38,8 +42,11 @@ pmesh = PolygonMesh(node, cell.reshape(-1), cellLocation)
 # 缩减虚单元空间
 space1 = ReducedDivFreeNonConformingVirtualElementSpace2d(pmesh, p=p)
 
+b0 = space1.source_vector(pde.source)
+b1 = space1.pressure_robust_source_vector(pde.source, space0)
 
-RT = space1.interpolation_RT(space0)
+print(b0)
+print(b1)
 
 fig = plt.figure()
 axes = fig.gca()
