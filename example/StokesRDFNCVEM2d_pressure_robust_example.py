@@ -20,7 +20,7 @@ from fealpy.functionspace import ReducedDivFreeNonConformingVirtualElementSpace2
 from fealpy.functionspace import ScaledMonomialSpace2d
 
 p = 2
-tmesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=2, ny=2, meshtype='tri')
+tmesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=1, ny=1, meshtype='tri')
 
 # RT 空间
 space0 = RaviartThomasFiniteElementSpace2d(tmesh, p=1)

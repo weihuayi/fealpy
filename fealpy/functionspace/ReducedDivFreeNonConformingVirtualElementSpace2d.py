@@ -1116,8 +1116,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # RT_{k-1} 空间在单元 K 上局部自由度的个数, TODO：确认是 k-1 还是 k
         ldof0 = space.number_of_local_dofs(doftype='all')  
-        # Reduced 虚单元空间在单元  K 上局部自由度的个数
-        ldof1 = self.number_of_local_dofs()
         
         # 每个单元 K 上的插值矩阵
         A = np.zeros((NC, ldof0, ldof0), dtype=self.ftype)
@@ -1151,22 +1149,22 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         phi0 = space.basis(bcs) # (NQ, NC, ldof0, GD)
         phi1 = self.smspace.basis(ps, p=p-2) # (NQ, NC, ldof1)
-        val = np.einsum('qcim, qcj, c->cmij', phi0, phi1, cellmeasure)
+        val = np.einsum('qci, qcjm, c->cmij', phi1, phi0, cellmeasure)
         ldof = self.smspace.number_of_local_dofs(p=p-2, doftype='cell')
-        start = 3*(p-1)
+        start = 6*(p-1)
         stop = start + ldof
-        print(val.shape)
-        print(A[:, start:stop, :].shape)
         A[:, start:stop, :] = val[:, 0]
         start = stop
         stop += ldof
         A[:, start:stop, :] = val[:, 1]
+        print(A)
 
         A = inv(A)
 
+        # Reduced 虚单元空间在单元  K 上局部自由度的个数
+        ldof1 = self.number_of_local_dofs()[0]
         # 每个单元 K 上的右端矩阵
         F = np.zeros((NC, ldof0, ldof1), dtype=self.ftype) 
-        val = en*eh[:, None] # 左右单元的法向取为一致会有问题吗?
         idx0 = edge2cell[:, [2]]*(p-1) + np.arange(p-1)
         F[edge2cell[:, 0][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
         idx1 = 3*(p-1) + idx0
@@ -1176,27 +1174,27 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F[edge2cell[:, 1][:, None], idx0, idx0] = (en[:, 0]*eh)[:, None]
         idx1 = 3*(p-1) + idx0
         F[edge2cell[:, 1][:, None], idx0, idx1] = (en[:, 1]*eh)[:, None]
-
+        
         E = self.E
-        E00 = E[0][0].T.reshape(NC, 3*(p-1), 3*(p-1))
-        E01 = E[0][1].T.reshape(NC, 3*(p-1), 3*(p-1))
+        E00 = np.hsplit(E[0][0], NC)
+        E01 = np.hsplit(E[0][1], NC)
         E02 = E[0][2]
-        E10 = E[1][0].T.reshape(NC, 3*(p-1), 3*(p-1))
-        E10 = E[1][1].T.reshape(NC, 3*(p-1), 3*(p-1))
-        E12 = E[2][2]
+        E10 = np.hsplit(E[1][0], NC)
+        E11 = np.hsplit(E[1][1], NC)
+        E12 = E[1][2]
 
         smldof = self.smspace.number_of_local_dofs(p=p-2) # 标量 p-2 次单元缩放空间的维数
-        start = 3*(p-1)
-        end = start + smldof
-        F[:, start:end, 0*(p-1):3*(p-1)] = E00
-        F[:, start:end, 3*(p-1):6*(p-1)] = E01
-        F[:, start:end, 6*(p-1):] = E02
+        start = 6*(p-1)
+        stop = start + smldof
+        F[:, start:stop, 0*(p-1):3*(p-1)] = E00
+        F[:, start:stop, 3*(p-1):6*(p-1)] = E01
+        F[:, start:stop, 6*(p-1):] = E02
 
-        start = end
-        end += smldof
-        F[:, start:end, 0*(p-1):3*(p-1)] = E10
-        F[:, start:end, 3*(p-1):6*(p-1)] = E11
-        F[:, start:end, 6*(p-1):] = E12
+        start = stop
+        stop += smldof
+        F[:, start:stop, 0*(p-1):3*(p-1)] = E10
+        F[:, start:stop, 3*(p-1):6*(p-1)] = E11
+        F[:, start:stop, 6*(p-1):] = E12
 
         return A@F 
 
