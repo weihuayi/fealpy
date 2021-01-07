@@ -1102,17 +1102,17 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         p = self.p 
         mesh = space.mesh # 多边形网格
+        GD = mesh.geo_dimension() # GD == 2
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
         en = mesh.edge_unit_normal() # 每条边的单位法向(NE, 2)
         eh = self.mesh.entity_measure('edge') # 每条边的长度 (NE, )
 
-        GD = mesh.geo_dimension() # GD == 2
-        edge2cell = mesh.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         # RT_{k-1} 空间在单元 K 上局部自由度的个数, TODO：确认是 k-1 还是 k
         ldof0 = space.number_of_local_dofs(doftype='all')  
@@ -1132,16 +1132,16 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         # 计算左边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
         phi = space.basis(ps, index=edge2cell[:, 0], barycentric=False) 
         idx0 = edge2cell[:, 0][:, None]
-        idx1 = edge2cell[:, [2]]*p + np.arange(p)
+        idx1 = edge2cell[:, 2][:, None]*p + np.arange(p)
         # (NE, p, ldof0)
-        A[idx0, idx1] = np.einsum('qei, em, qejm, e->eij', ephi, en, phi, eh)  
+        A[idx0, idx1] = np.einsum('q, qei, em, qejm, e->eij', ws, ephi, en, phi, eh)  
 
         # 计算右边单元基函数在当前边上积分点处的函数值, (NQ, NE, ldof0, 2)
         phi = space.basis(ps, index=edge2cell[:, 1], barycentric=False) 
         idx0 = edge2cell[:, 1][:, None]
-        idx1 = edge2cell[:, [3]]*p + np.arange(p)
+        idx1 = edge2cell[:, 3][:, None]*p + np.arange(p)
         # (NE, p, ldof0)
-        A[idx0, idx1] = np.einsum('qei, ed, qejd, e->eij', ephi, en, phi, eh)  
+        A[idx0, idx1] = np.einsum('q, qei, ed, qejd, e->eij', ws, ephi, en, phi, eh)  
 
         # 三角形网格单元上的积分公式
         cellmeasure = mesh.entity_measure('cell')
@@ -1150,7 +1150,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         ps = mesh.bc_to_point(bcs)
         phi0 = space.basis(bcs) # (NQ, NC, ldof0, GD)
         phi1 = self.smspace.basis(ps, p=p-2) # (NQ, NC, ldof1)
-        val = np.einsum('qci, qcjm, c->cmij', phi1, phi0, cellmeasure)
+        val = np.einsum('q, qci, qcjm, c->cmij', ws, phi1, phi0, cellmeasure)
         ldof = self.smspace.number_of_local_dofs(p=p-2, doftype='cell')
         start = 3*p
         stop = start + ldof
@@ -1158,7 +1158,6 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         start = stop
         stop += ldof
         A[:, start:stop, :] = val[:, 1]
-        A = inv(A)
 
         # Reduced 虚单元空间在单元  K 上局部自由度的个数
         ldof1 = self.number_of_local_dofs()[0]
@@ -1195,7 +1194,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F[:, start:stop, 3*p:6*p] = E11
         F[:, start:stop, 6*p:] = E12
 
-        return A@F 
+        return inv(A)@F 
 
     def pressure_robust_source_vector(self, f, space, q=None):
         """
@@ -1212,13 +1211,13 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         ldof0 = space.number_of_local_dofs(doftype='all')  
         ldof1 = self.number_of_local_dofs()[0] # 因为假设是三角形, 所有单元自由度个数是相同的
-        # A.shape == (NC, ldof0, ldof1)
-        A = self.interpolation_RT(space, q=q)
+        # 插值矩阵 I.shape == (NC, ldof0, ldof1)
+        I = self.interpolation_RT(space, q=q)
 
         # 向量函数 f 在 RT 空间中的离散, (NC, ldof0)
         # celltype = True, 表示只计算每个单元上的右端
         bb = space.source_vector(f, celltype=True, q=q)
-        bb = (bb[:, None, :]@A).reshape(NC, -1)
+        bb = (bb[:, None, :]@I).reshape(NC, -1)
 
         gdof = self.number_of_global_dofs()
         b = np.zeros((gdof, ), dtype=self.ftype)
