@@ -85,7 +85,7 @@ class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
 
 
 class LagrangeWedgeMesh(Mesh3d):
-    def __init__(self, node, cell, p=(1, 1), domain=None):
+    def __init__(self, node, cell, p=1, domain=None):
 
         self.p = p
 
@@ -100,13 +100,13 @@ class LagrangeWedgeMesh(Mesh3d):
         ds = LinearWedgeMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
         self.ds = LagrangeWedgeMeshDataStructure(ds, p)
 
-        if (self.p[0] == 1) and (self.p[1] == 1):
+        if self.p == 1:
             self.node = node
         else:
             NN = node.shape[0]
             self.node = np.zeros((NN, self.GD), dtype=self.ftype)
-            bc0 = multi_index_matrix[2](self.p[0])/self.p[0]
-            bc1 = multi_index_matrix[1](self.p[1])/self.p[1]
+            bc0 = multi_index_matrix[2](self.p)/self.p
+            bc1 = multi_index_matrix[1](self.p)/self.p
             bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 6)
             self.node = np.einsum('ijn, kj->ikn', node[cell], bc)
 
@@ -472,7 +472,7 @@ class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
         self.itype = ds.itype
 
         self.p = p
-        self.V = (p[0] + 1)*(p[0] + 2)*(p[1] + 1)//2
+        self.V = (p + 1)*(p + 2)*(p + 1)//2
         self.E = ds.E 
         self.F = ds.F
         self.EV = ds.EV
@@ -488,10 +488,43 @@ class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
         self.cell2edge = ds.cell2edge 
 
 
-        if (p[0] == 1) and (p[1] == 1) :
+        if p == 1:
             self.cell = ds.cell
             self.edge = ds.edge
             self.tface = ds.tface
             self.qface = ds.qface
         else:
-            pass
+            NE = ds.NE
+            edge = ds.edge
+            self.edge = np.zeros((NE, p+1), dtype=self.itype)
+            self.edge[:, [0, -1]] = edge
+            flag = edge[:, 0] < edge[:, 1]
+            idx0, = np.nonzero(flag)
+            idx1, = np.nonzero(~flag)
+            self.edge[idx0, 1:-1] = idx0[:, None]*(p-1) + self.NN + np.arange(ds.NN, ds.NN + p-1) 
+            self.edge[idx1, -1:0:-1] = idx1[:, None]*(p-1) + np.arange(ds.NN, ds.NN + p-1)
+            self.NN += NE*(p-1)
+
+            # 三角形面
+            NTF = ds.NTF
+            self.tface = np.zeros((NTF, (p+1)*(p+2)//2), dtype=self.itype)
+            self.tface[:, [0, -p-1, -1]] = ds.tface
+
+            flag = ds.tface[:, 1] < ds.tface[:, 2]
+            idx0, = np.nonzero(flag)
+            idx1, = np.nonzero(~flag)
+            self.tface[idx0, -p-1:-1] =  
+            self.tface[idx1, -1:-p:-1] 
+
+            self.tface[:, 
+            self.NN += NTF*(p-2)*(p-1)//2
+
+            # 四边形面
+            NQF = ds.NQF
+            self.qface = np.zeros((NQF, (p+1)*(p+1)), dtype=self.itype)
+            self.qface[:, [0, p, -p-1, -1]] = ds.qface
+            self.NN += NQF*(p-1)*(p-1)
+
+
+
+            self.cell = np.zeros((self.NC, self.V), dtype=self.itype)
