@@ -14,42 +14,36 @@ from .core import lagrange_grad_shape_function
 
 from .core import LinearMeshDataStructure
 
-class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
+class LinearWedgeMeshDataStructure():
 
-    localTFace = np.array([(0, 4, 2), (1, 3, 5)])
-    localQFace = np.array([(2, 3, 4, 5), (4, 5, 0, 1), (0, 1, 2, 3)])
-    localEdge = np.array([
-        (0, 1), (0, 2), (0, 4),
-        (1, 3), (1, 5), (2, 3),
-        (2, 4), (3, 5), (4, 5)])
-    localTFace2edge = np.array([(6, 1, 2), (7, 4, 3)])
-    localQFace2edge = np.array([(6, 8, 7, 5), (2, 0, 4, 8), (1, 5, 3, 0)])
+    def __init__(self, mesh):
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
 
-    V = 6 # 每个单元 6 个顶点 
-    E = 9 # 每个单元 9 条边
-    F = 5 # 每个单元 5 个面
-    EV = 2 # 每个边有 2 个顶点
+        self.NN = mesh.number_of_nodes()*2
+        self.NC = mesh.number_of_cells()
+        self.NE = mesh.number_of_cells()*2
 
-    def __init__(self, NN, cell):
-        self.NN = NN
-        self.NC = cell.shape[0]
-        self.cell = cell
-        self.itype = cell.dtype
-        self.construct_edge()
-        self.tface, self.tface2cell = self.construct_face(self.localTFace)
-        self.qface, self.qface2cell = self.construct_face(self.localQFace)
-        self.NTF = len(self.tface)
-        self.NQF = len(self.qface)
-        self.NF = self.NTF + self.NQF
+        self.itype = mesh.itype
 
-    def total_face(self, localFace):
-        NC = self.NC
-        cell = self.cell
-        FV = localFace.shape[1] 
-        totalFace = cell[:, localFace].reshape(-1, FV)
-        return totalFace
+        #构造单元
+        self.cell = np.zeros((self.NC, 6), dtype = cell.dtype)
+        self.cell[:, ::2] = cell
+        self.cell[:, 1::2] = cell+self.NN//2
 
-    def construct_face(self, localFace):
+        #构建面
+        self.face, self.cell2face, self.face2cell = self.construct_face(cell)
+
+        #构建边
+        self.edge = np.r_[edge, edge+self.NN//2]
+        
+        face2edge = mesh.ds.cell_to_edge()
+        self.face2edge = np.r_[face2edge, face2edge+self.NE//2]
+        self.cell2edge = np.c_[face2edge, face2edge+self.NE//2]
+        self.NF = len(self.face)
+        
+    def construct_face(self, cell):
         """ 
 
         Notes
@@ -57,37 +51,24 @@ class LinearWedgeMeshDataStructure(LinearMeshDataStructure):
             构造面
         """
         NC = self.NC
-        F = localFace.shape[0] 
-        FV = localFace.shape[1] 
+        NN = self.NN
+        cell = self.cell
 
-        totalFace = self.total_face(localFace)
-        index = np.sort(totalFace, axis=-1)
-        I = index[:, 0]
-        I += index[:, 1]*(index[:, 1] + 1)//2
-        I += index[:, 2]*(index[:, 2] + 1)*(index[:, 2] + 2)//6
-        if FV == 4: 
-            I += index[:, 3]*(index[:, 3] + 1)*(index[:, 3] + 2)*(index[:, 3] + 3)//24
-        _, i0, j = np.unique(I, return_index=True, return_inverse=True)
-
-        NF = i0.shape[0]
-        face = totalFace[i0, :]
-        face2cell = np.zeros((NF, 4), dtype=self.itype)
-
-        i1 = np.zeros(NF, dtype=self.itype)
-        i1[j] = np.arange(F*NC, dtype=self.itype)
-
-        face2cell[:, 0] = i0//F
-        face2cell[:, 1] = i1//F
-        face2cell[:, 2] = i0%F
-        face2cell[:, 3] = i1%F
-
-        return face, face2cell
+        face = np.r_[cell, cell+NN//2]
+        cell2face = np.c_[np.arange(NC), np.arange(NC, NC*2)]
+        face2cell = np.r_[np.arange(NC), np.arange(NC)]
+        return face, cell2face, face2cell
 
 
 class LagrangeWedgeMesh(Mesh3d):
-    def __init__(self, node, cell, p=1, domain=None):
+    def __init__(self, mesh, h, p=1, surface=None):
+
+        cell = mesh.entity('cell')
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
 
         self.p = p
+        self.h = h
 
         self.GD = node.shape[1]
         self.TD = 3
@@ -95,10 +76,10 @@ class LagrangeWedgeMesh(Mesh3d):
         self.itype = cell.dtype
         self.meshtype = 'lwedge'
 
-        self.domain = domain
+        self.surface = surface
 
-        ds = LinearWedgeMeshDataStructure(node.shape[0], cell) # 线性网格的数据结构
-        self.ds = LagrangeWedgeMeshDataStructure(ds, p)
+        self.ds = LinearWedgeMeshDataStructure(mesh) # 线性网格的数据结构
+        node = self.construct(node, cell)
 
         if self.p == 1:
             self.node = node
@@ -115,6 +96,21 @@ class LagrangeWedgeMesh(Mesh3d):
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
 
+    def construct(self, node, cell):
+        h = self.h
+        v0 = node[cell[:, 2]] - node[cell[:, 0]]
+        v1 = node[cell[:, 1]] - node[cell[:, 0]]
+
+        n = np.cross(v1, v0)#每个单元的法向量
+        n = (n.T/np.linalg.norm(n, axis=-1)).T#单位化法向量       
+
+        node2n = np.zeros([len(node), 3])
+        np.add.at(node2n, cell.reshape(-1), np.tile(n, (1, 3)).reshape(-1, 3))
+        node2n = (node2n.T/np.linalg.norm(node2n, axis=-1)).T
+
+        node = np.r_[node, node+h*node2n]
+        return node
+    
     def entity(self, etype='cell'):
         if etype in {'cell', 3}:
             return self.ds.cell
@@ -445,10 +441,10 @@ class LagrangeWedgeMesh(Mesh3d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-#        idx = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
+        idx = vtk_cell_index(self.p, cellType) # 转化为 vtk 编号顺序
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
         # 这里cell的编号顺序与vtk默认顺序一致
         cell[:, 0] = NV
 
@@ -513,10 +509,10 @@ class LagrangeWedgeMeshDataStructure(Mesh3dDataStructure):
             flag = ds.tface[:, 1] < ds.tface[:, 2]
             idx0, = np.nonzero(flag)
             idx1, = np.nonzero(~flag)
-            self.tface[idx0, -p-1:-1] =  
-            self.tface[idx1, -1:-p:-1] 
+#            self.tface[idx0, -p-1:-1] =  
+#            self.tface[idx1, -1:-p:-1] 
 
-            self.tface[:, 
+#            self.tface[:, 
             self.NN += NTF*(p-2)*(p-1)//2
 
             # 四边形面
