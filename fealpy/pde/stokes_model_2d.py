@@ -1304,3 +1304,88 @@ class PolyY2X2Data:
     @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
+
+
+
+class StokesModelRTData:
+    """
+    [0, 1]^2
+    u(x, y) = 0
+    p = Ra*(y^3 - y^2/2 + y - 7/12)
+    """
+    def __init__(self, Ra):
+        self.box = [0, 1, 0, 1]
+        self.Ra = Ra
+
+    def domain(self):
+        return self.box
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        if meshtype == 'tri':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'quad':
+            nx = 2
+            ny = 2
+            mesh = StructureQuadMesh(self.box, nx, ny)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'poly':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            nmesh = TriangleMeshWithInfinityNode(mesh)
+            pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
+            pmesh = PolygonMesh(pnode, pcell, pcellLocation)
+            return pmesh
+
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0
+        val[..., 1] = 0
+        return val
+
+    def strain(self, p):
+        """
+        (nabla u + nabla u^T)/2
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape + (2, ), dtype=np.float)
+        val[..., 0, 0] = 0
+        val[..., 1, 1] = 0
+        return val
+
+
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = self.Ra*(y**3 - y**2/2 + y - 7/12)
+        return val
+
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0
+        val[..., 1] = -self.Ra*(1 - y + 3*y**2)
+        return val
+
+    def dirichlet(self, p):
+        return self.velocity(p)
+

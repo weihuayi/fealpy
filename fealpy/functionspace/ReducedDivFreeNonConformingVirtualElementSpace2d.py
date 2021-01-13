@@ -1083,6 +1083,18 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
             b[c2d] += np.sum(bb[:, :, [1]]*self.E[1][2], axis=1)
             return b 
 
+    def to_rtspace(self, uh0, uh1, q=None):
+
+        space0 = self
+        space1 = uh1.space
+        A = self.interpolation_RT(space, q=q)
+
+        c2d0 = space0.cell_to_dof()
+        c2d1 = space1.cell_to_dof()
+
+        uh1[c2d1] = np.einsum('cij, cj->ci', A, uh0[c2d0])
+
+
     def interpolation_RT(self, space, q=None):
         """
 
