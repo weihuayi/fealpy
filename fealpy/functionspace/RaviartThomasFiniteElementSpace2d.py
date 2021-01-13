@@ -404,6 +404,8 @@ class RaviartThomasFiniteElementSpace2d:
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
+        print(cell2dof.shape)
+        print(uh.shape)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
