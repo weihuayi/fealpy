@@ -1085,11 +1085,20 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
     def to_rtspace(self, uh0, uh1, q=None):
 
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
         space0 = self
         space1 = uh1.space
         A = self.interpolation_RT(space, q=q)
 
-        c2d0 = space0.cell_to_dof()
+        ldof0 = space0.number_of_local_dofs()[0]
+        c2d0 = np.zeros((NC, ldof0), dtype=self.itype)
+        c2d, cell2dofLocation = space0.cell_to_dof()
+
+        c2d0[:, 0:3*p] = c2d.reshape(-1, 3*p)
+        c2d0[:, 3*p:6*p] = c2d0[:, 0:3*p] + NE*p
+        c2d0[:, 6*p:] = space0.cell_to_dof('cell') 
+
         c2d1 = space1.cell_to_dof()
 
         uh1[c2d1] = np.einsum('cij, cj->ci', A, uh0[c2d0])
