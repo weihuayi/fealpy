@@ -1101,14 +1101,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         c2d0[:, 6*p:] = space0.cell_to_dof('cell') 
 
         c2d1 = space1.cell_to_dof()
-        print('NE', NE)
-        print('NC', NC)
-        print('A', A.shape)
-        print('c2d0', c2d0.shape)
-        print('c2d1', c2d1.shape)
-
         uh1[c2d1] = np.einsum('cij, cj->ci', A, uh0[c2d0])
-        print('uh1', uh1.shape)
 
 
     def interpolation_RT(self, space, q=None):

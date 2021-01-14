@@ -403,20 +403,14 @@ class RaviartThomasFiniteElementSpace2d:
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
         
-        print('bc', bc.shape)
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
         phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         edge2dof = self.dof.edge_to_dof()
-        print(cell2dof.shape)
-        print(uh.shape)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        print('s1', s1)
-        print('uh', uh[cell2dof].shape)
-        print('phi', phi.shape)
         val = np.einsum(s1, phi, uh[cell2dof]) # index? 
         return val
 
