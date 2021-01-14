@@ -1351,6 +1351,7 @@ class StokesModelRTData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1359,6 +1360,7 @@ class StokesModelRTData:
         val[..., 1] = 0
         return val
 
+    @cartesian
     def strain(self, p):
         """
         (nabla u + nabla u^T)/2
@@ -1371,6 +1373,7 @@ class StokesModelRTData:
         return val
 
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1378,6 +1381,7 @@ class StokesModelRTData:
         val = self.Ra*(y**3 - y**2/2 + y - 7/12)
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1386,6 +1390,7 @@ class StokesModelRTData:
         val[..., 1] = -self.Ra*(1 - y + 3*y**2)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 

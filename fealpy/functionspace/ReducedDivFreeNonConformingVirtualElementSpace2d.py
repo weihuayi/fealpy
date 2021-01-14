@@ -1087,9 +1087,10 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         NE = self.mesh.number_of_edges()
         NC = self.mesh.number_of_cells()
+        p = self.p
         space0 = self
         space1 = uh1.space
-        A = self.interpolation_RT(space, q=q)
+        A = self.interpolation_RT(space1, q=q)
 
         ldof0 = space0.number_of_local_dofs()[0]
         c2d0 = np.zeros((NC, ldof0), dtype=self.itype)
@@ -1100,8 +1101,14 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         c2d0[:, 6*p:] = space0.cell_to_dof('cell') 
 
         c2d1 = space1.cell_to_dof()
+        print('NE', NE)
+        print('NC', NC)
+        print('A', A.shape)
+        print('c2d0', c2d0.shape)
+        print('c2d1', c2d1.shape)
 
         uh1[c2d1] = np.einsum('cij, cj->ci', A, uh0[c2d0])
+        print('uh1', uh1.shape)
 
 
     def interpolation_RT(self, space, q=None):
@@ -1136,7 +1143,8 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
 
         # RT_{k-1} 空间在单元 K 上局部自由度的个数, TODO：确认是 k-1 还是 k
-        ldof0 = space.number_of_local_dofs(doftype='all')  
+        ldof0 = space.number_of_local_dofs(doftype='all') 
+        print('ldof', ldof0)
 
         
         # 每个单元 K 上的插值矩阵
@@ -1182,6 +1190,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
 
         # Reduced 虚单元空间在单元  K 上局部自由度的个数
         ldof1 = self.number_of_local_dofs()[0]
+        print('ldof1', ldof1)
         # 每个单元 K 上的右端矩阵
         F = np.zeros((NC, ldof0, ldof1), dtype=self.ftype) 
         idx0 = edge2cell[:, [2]]*p + np.arange(p)
