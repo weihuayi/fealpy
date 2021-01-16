@@ -152,6 +152,20 @@ class PolygonMeshIntegralAlg():
 
         return np.sqrt(e)
 
+    def L2_error_1(self, u, uh, celltype=False, q=None):
+        def f(x, index):
+            return (u(x, index) - uh(x, index))**2
+        e = self.integral(f, celltype=celltype, q=q)
+        if isinstance(e, np.ndarray):
+            n = len(e.shape) - 1
+            if n > 0:
+                for i in range(n):
+                    e = e.sum(axis=-1)
+        if celltype is False:
+            e = e.sum()
+
+        return np.sqrt(e)
+
     def edge_L2_error(self, u, uh, celltype=False, q=None):
         mesh = self.mesh
         NE = mesh.number_of_edges()
