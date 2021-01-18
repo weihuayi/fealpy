@@ -1368,8 +1368,6 @@ class StokesModelRTData:
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(p.shape + (2, ), dtype=np.float)
-        val[..., 0, 0] = 0
-        val[..., 1, 1] = 0
         return val
 
 
