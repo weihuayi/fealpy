@@ -52,7 +52,9 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         self.nodedata = {}
         self.edgedata = {}
+        self.facedata = self.edgedata
         self.celldata = {}
+        self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
 
 
