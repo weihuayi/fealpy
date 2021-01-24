@@ -425,11 +425,35 @@ class TriangleMesh(Mesh2d):
         for i in range(n):
             self.bisect()
 
-    def bisect(self, isMarkedCell=None, returnim=False, refine=None):
+    def bisect_options(
+            self,
+            HB=None,
+            IM=None,
+            data=None,
+            disp=True,
+            ):
+
+        options = {
+                'HB': HB,
+                'IM': IM,
+                'data': data,
+                'disp': disp
+            }
+        return options
+
+    def bisect(self, isMarkedCell=None, options={'disp':True}):
+        
+        if options['disp']:
+            print('Bisection begining......')
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
         NE = self.number_of_edges()
+
+        if options['disp']:
+            print('Current number of nodes:', NN)
+            print('Current number of edges:', NE)
+            print('Current number of cells:', NC)
 
         if isMarkedCell is None:
             isMarkedCell = np.ones(NC, dtype=np.bool)
@@ -442,11 +466,17 @@ class TriangleMesh(Mesh2d):
 
         isCutEdge = np.zeros((NE,), dtype=np.bool)
 
+        if options['disp']:
+            print('The initial number of marked elements:', isMarkedCell.sum())
+
         markedCell, = np.nonzero(isMarkedCell)
         while len(markedCell)>0:
             isCutEdge[cell2edge[markedCell, 0]]=True
             refineNeighbor = cell2cell[markedCell, 0]
             markedCell = refineNeighbor[~isCutEdge[cell2edge[refineNeighbor,0]]]
+
+        if options['disp']:
+            print('The number of markedg edges: ', isCutEdge.sum())
 
         edge2newNode = np.zeros((NE,), dtype=self.itype)
         edge2newNode[isCutEdge] = np.arange(NN, NN+isCutEdge.sum())
@@ -456,7 +486,7 @@ class TriangleMesh(Mesh2d):
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
-        if returnim:
+        if 'IM' in options:
             nn = len(newNode)
             IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
                     shape=(NN+nn, NN), dtype=self.ftype)
@@ -477,12 +507,21 @@ class TriangleMesh(Mesh2d):
                             edge[isCutEdge, 1]
                         )
                     ), shape=(NN+nn, NN), dtype=self.ftype)
+            options['IM'] = IM.tocsr()
+
+        if 'HB' in options:
+            options['HB'] = np.arange(NC)
 
         for k in range(2):
             idx, = np.nonzero(edge2newNode[cell2edge0]>0)
             nc = len(idx)
             if nc == 0:
                 break
+
+            if 'HB' in options:
+                HB = options['HB']
+                options['HB'] = np.concatenate((HB, HB[idx]), axis=0)
+
             L = idx
             R = np.arange(NC, NC+nc)
             p0 = cell[idx,0]
@@ -505,9 +544,6 @@ class TriangleMesh(Mesh2d):
 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
-
-        if returnim:
-            return IM.tocsr()
 
     def label(self, node=None, cell=None, cellidx=None):
         """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
