@@ -388,7 +388,6 @@ class LagrangeQuadrangleMesh(Mesh2d):
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity], gphi)
-        shape = (-1, ) + J.shape[-3:]
         if return_grad is False:
             return J
         else:
