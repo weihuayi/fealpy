@@ -92,6 +92,27 @@ class CVTPMesherTest:
             uniform_mesh= CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=0)
             bnode = uniform_mesh.bnode
+
+        elif domain =='sc':
+            n = 20
+            h = 2*np.pi/n
+            theta = np.arange(0, 2*np.pi, h)
+            vertices = np.zeros((n, 2), dtype=np.float)
+            vertices[:, 0] = np.cos(theta)
+            vertices[:, 1] = np.sin(theta)
+            fixed = np.zeros(n, dtype=np.bool)
+            facets = np.zeros((n,2), dtype=np.int)
+            facets[:, 0] = range(0, n)
+            facets[:-1, 1] = range(1, n)
+            subdomain = np.zeros((n, 2),dtype=np.int)
+            subdomain[:, 0] = 1
+
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
+                    fixed)
+            uniform_mesh= CVTPMesher(mesh)
+            uniform_mesh.uniform_boundary_meshing(n=0)
+            bnode = uniform_mesh.bnode
+
         elif domain == 'partition1':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),(0.5,0.5)],dtype=np.float)
@@ -204,7 +225,7 @@ class CVTPMesherTest:
         if domain == 'square2':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
-                ( 3.0, 0.0),( 4.0, 0.0),( 4.0, 1.0),( 3.0, 1.0)],dtype=np.float)
+                ( 2.0, 0.0),( 3.0, 0.0),( 3.0, 1.0),( 2.0, 1.0)],dtype=np.float)
             facets = np.array([
                 (0, 1),(1, 2),(2, 3),(3, 0),
                 (4, 5),(5, 6),(6, 7),(7, 4)], dtype=np.int)
@@ -215,6 +236,47 @@ class CVTPMesherTest:
             uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_boundary_meshing(n=2)
             bnode = uniform_mesh.bnode
+
+        if domain == 'triangle':
+            vertices = np.array([
+                ( 0.0, 0.0),( 2.0, 0.0),( 1.0, 1.0)],dtype=np.float)
+            facets = np.array([
+                (0, 1),(1, 2),(2, 0)], dtype=np.int)
+            subdomain = np.array([
+                (1, 0),(1, 0),(1, 0)], dtype=np.int)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
+            uniform_mesh.uniform_boundary_meshing(n=2)
+            bnode = uniform_mesh.bnode
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            #cs = [axes.add_artist( plt.Circle(x, r, facecolor='none',edgecolor='r')) for x, r in zip(center, radius)]
+            mesh.find_node(axes, color='k', showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=True)
+            mesh.print()
+            plt.show()
+
+       
+        if domain == 'trapezoid':
+            vertices = np.array([
+                ( 0.0, 0.0),( 4.0, 0.0),( 4.0, 4.0),(0.0,4.0)],dtype=np.float)
+            facets = np.array([
+                (0, 1),(1, 2),(2, 3),(3,0)], dtype=np.int)
+            subdomain = np.array([
+                (1, 0),(1, 0),(1, 0),(1,0)], dtype=np.int)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
+            uniform_mesh.uniform_boundary_meshing(n=2)
+            bnode = uniform_mesh.bnode
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            #cs = [axes.add_artist( plt.Circle(x, r, facecolor='none',edgecolor='r')) for x, r in zip(center, radius)]
+            mesh.find_node(axes, color='k', showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=True)
+            mesh.print()
+            plt.show()
 
         if add_cnode == True:
             cnode = uniform_mesh.cnode
@@ -341,6 +403,20 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(refine=1)
+        elif domain == 'square2':
+            vertices = np.array([
+                ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
+                ( 2.0, 0.0),( 3.0, 0.0),( 3.0, 1.0),( 2.0, 1.0)],dtype=np.float)
+            facets = np.array([
+                (0, 1),(1, 2),(2, 3),(3, 0),
+                (4, 5),(5, 6),(6, 7),(7, 4)], dtype=np.int)
+            subdomain = np.array([
+                (1, 0),(1, 0),(1, 0),(1, 0),
+                (2, 0),(2, 0),(2, 0),(2, 0)], dtype=np.int)
+            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+            uniform_mesh = CVTPMesher(mesh)
+            uniform_mesh.uniform_meshing(refine=2)
+
         elif domain == 'hole2':
             """
             vertices = np.array([
@@ -416,8 +492,8 @@ class CVTPMesherTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, color='k', showindex=True)
-            mesh.find_node(axes, node=vor.points, showindex=True)
+            mesh.find_node(axes, color='k', showindex=False)
+            mesh.find_node(axes, node=vor.points, showindex=False)
             voronoi_plot_2d(vor, ax=axes)
             plt.show()
  
@@ -431,9 +507,11 @@ class CVTPMesherTest:
 test = CVTPMesherTest()
 #test.uniform_boundary_meshing_test()
 #test.uniform_meshing_test(domain='square')
-test.uniform_meshing_test(domain='square2',interior_nodes = False)
+#test.uniform_meshing_test(domain='square2',interior_nodes = True)
 #test.uniform_meshing_test(domain='LShape')
-#test.uniform_meshing_test(domain='circle')
+#test.uniform_meshing_test(domain='triangle')
+test.uniform_meshing_test(domain='circle')
+#test.uniform_meshing_test(domain='trapezoid',interior_nodes = False)
 #test.uniform_meshing_test(domain = 'partition1')
 #test.uniform_meshing_test(domain = 'partition2')
 #test.uniform_meshing_test(domain = 'hole1')
@@ -444,5 +522,7 @@ test.uniform_meshing_test(domain='square2',interior_nodes = False)
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
 #test.Lloyd_test(domain='hole2')
+#test.Lloyd_test(domain='square2')
+
 
 
