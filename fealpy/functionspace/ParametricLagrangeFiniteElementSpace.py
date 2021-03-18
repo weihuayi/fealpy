@@ -388,3 +388,56 @@ class ParametricLagrangeFiniteElementSpace:
         isDDof = self.is_boundary_dof(threshold=threshold)
         uh[isDDof] = gD(ipoints[isDDof])
         return isDDof
+    
+    def set_robin_bc(self, A, F, gR, threshold=None, q=None):
+        """
+
+        Notes
+        -----
+
+        设置 Robin 边界条件到离散系统 Ax = b 中.
+
+        TODO: 考虑更多的 gR 的情况
+
+        """
+        p = self.p
+        mesh = self.mesh
+        dim = 1 if len(F.shape) == 1 else F.shape[1]
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.face_to_dof()[index]
+
+        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        measure = mesh.entity_measure('face', index=index)
+
+        phi = self.face_basis(bcs)
+        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        n = mesh.face_unit_normal(bcs, index=index)
+        
+        val, kappa = gR(pp, n) # (NQ, NF, ...)
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
+        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
+
+        I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
+        J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
+
+        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+
+        return A, F
+

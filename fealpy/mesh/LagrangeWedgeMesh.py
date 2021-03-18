@@ -27,6 +27,8 @@ class LinearWedgeMeshDataStructure():
 
         self.itype = mesh.itype
 
+        self.nh = nh
+
         #构造单元
         I = NN*p*np.tile(np.arange(nh), (NC, 1)).T.flatten()#多层单元
         self.cell = np.zeros([NC*nh, cell.shape[-1]*(p+1)], dtype = cell.dtype)
@@ -56,7 +58,14 @@ class LinearWedgeMeshDataStructure():
         self.NN = NN*(nh+1)
         self.NC = NC*nh
         self.NE = NE*(nh+1)
-        
+       
+    def boundary_face_index(self):
+        nc = self.NC//self.nh
+        boundary_face_index = np.zeros(self.NF, dtype=np.bool_)
+        boundary_face_index[:nc] = True
+        boundary_face_index[-nc:] = True
+        return boundary_face_index
+
 class LagrangeWedgeMesh(Mesh3d):
     def __init__(self, mesh, h, nh, p=1, surface=None):
 
@@ -77,12 +86,6 @@ class LagrangeWedgeMesh(Mesh3d):
 
         self.ds = LinearWedgeMeshDataStructure(mesh, nh, p) # 线性网格的数据结构
         self.node = self.construct(node, cell, h, nh)
-
-        nc = len(cell)
-        NF = self.ds.NF
-        self.is_boundary_face = np.zeros(NF, dtype=np.bool_)
-        self.is_boundary_face[:nc] = True
-        self.is_boundary_face[-nc:] = True
 
         self.nodedata = {}
         self.edgedata = {}
@@ -162,7 +165,7 @@ class LagrangeWedgeMesh(Mesh3d):
         elif spacetype == 'D':
             return DLagrangeWedgeDof2d(self, p)
     
-    def cell_volume(self, q=None, index=None):
+    def cell_volume(self, q=None, index=np.s_[:]):
         """
         
         Notes
@@ -174,7 +177,7 @@ class LagrangeWedgeMesh(Mesh3d):
 
         qf = self.integrator(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
-        G = self.first_fundamental_form(bcs)
+        G = self.first_fundamental_form(bcs, index=index)
         l = np.sqrt(np.linalg.det(G))
         vol = 0.5*np.einsum('i, ij->j', ws, l)
         return vol
@@ -192,8 +195,8 @@ class LagrangeWedgeMesh(Mesh3d):
         qf = self.integrator(q, etype='edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        J = self.jacobi_matrix(bcs, index=index, etype='edge')
-        l = np.sqrt(np.sum(J**2, axis=(-1, -2))).reshape(1,-1)
+        G = self.first_fundamental_form(bcs, index=index, etype='edge')
+        l = np.sqrt(np.linalg.det(G))
         a = np.einsum('i, ij->j', ws, l)
         return a
     
@@ -211,12 +214,27 @@ class LagrangeWedgeMesh(Mesh3d):
 
         # 三角形面积
         bcs, ws = qf.get_quadrature_points_and_weights()
-        J = self.jacobi_matrix(bcs, index=index, etype='face')
-        n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        n = np.sqrt(np.sum(n**2, axis=-1)).reshape(1,-1)
-        a = np.einsum('i, ij->j', ws, n)/2.0
+        G = self.first_fundamental_form(bcs, index=index, etype='face')
+        l = np.sqrt(np.linalg.det(G))
+        a = np.einsum('i, ij->j', ws, l)/2.0
         return a
+    
+    def face_unit_normal(self, bc, index=np.s_[:]):
+        """
 
+        Notes
+        -----
+        计算曲面情形下，积分点处的单位法线方向。
+        """
+        J = self.jacobi_matrix(bc, index=index, etype='face')
+
+        # n.shape 
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
+        n /= l
+
+        return n
+    
     def jacobi_matrix(self, bc, index=np.s_[:], etype='cell', return_grad=False):
         """
         Notes
@@ -233,15 +251,15 @@ class LagrangeWedgeMesh(Mesh3d):
         if etype in {'cell', 3}:
             gphi = self.grad_shape_function(bc)
             J = np.einsum(
-                    'ijn, ...ijk->...ink', node[cell], gphi)
+                    'ijn, ...ijk->...ink', node[cell[index], :], gphi)
         elif etype in {'face', 2}:
             gphi = self.grad_shape_function(bc, etype='face')
             J = np.einsum(
-                    'ijn, ...ijk->...ink', node[face], gphi)
+                    'ijn, ...ijk->...ink', node[face[index], :], gphi)
         elif etype in {'edge', 1}:
             gphi = self.grad_shape_function(bc, etype='edge')
             J = np.einsum(
-                    'ijn, ...ijk->...ink', node[edge], gphi)
+                    'ijn, ...ijk->...ink', node[edge[index], :], gphi)
         else:
             raise ValueError('the jacobi_matrix `{}` is not correct!'.format(entity)) 
         
@@ -259,11 +277,11 @@ class LagrangeWedgeMesh(Mesh3d):
         phi = self.shape_function(bc)
         
         if etype in {'cell', 3}:
-            p = np.einsum('...jk, jkn->...jn', phi, node[cell])
+            p = np.einsum('...jk, jkn->...jn', phi, node[cell[index], :])
         elif etype in {'face', 2}:
-            p = np.einsum('...jk, jkn->...jn', phi, node[face])
+            p = np.einsum('...jk, jkn->...jn', phi, node[face[index], :])
         elif etype in {'edge', 1}:
-            p = np.einsum('...jk, jkn->...jn', phi, node[edge])
+            p = np.einsum('...jk, jkn->...jn', phi, node[edge[index], :])
         else:
             raise ValueError('the bc_to_point `{}` is not correct!'.format(entity)) 
         return p
@@ -272,10 +290,7 @@ class LagrangeWedgeMesh(Mesh3d):
         p = self.p if p is None else p
 
         TD = len(bc)
-        if TD == 1:
-            phi = lagrange_shape_function(bc, p)
-            shape = phi.shape[:-1] + (-1, )
-        elif TD == 2:
+        if TD == 2:
             phi0 = lagrange_shape_function(bc[0], p)
             phi1 = lagrange_shape_function(bc[1], p)
             # i 是积分点
@@ -283,6 +298,9 @@ class LagrangeWedgeMesh(Mesh3d):
             # m 是基函数
             phi = np.einsum('im, kn->ikmn', phi0, phi1)
             shape = phi.shape[:-2] + (-1, )
+        else:
+            phi = lagrange_shape_function(bc, p)
+            shape = phi.shape[:-1] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
         shape = (-1, 1) + phi.shape[-1:] # 增加一个单元轴，方便广播运算
         phi = phi.reshape(shape) # 展平积分点
@@ -344,17 +362,25 @@ class LagrangeWedgeMesh(Mesh3d):
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
     
-    def first_fundamental_form(self, bc, index=np.s_[:], return_jacobi=False, 
-            return_grad=False):
+    def first_fundamental_form(self, bc, index=np.s_[:], etype='cell', 
+            return_jacobi=False, return_grad=False):
         """
         Notes
         -----
             计算拉格朗日网格在积分点处的第一基本形式。
         """
-
-        TD = 3
-        J = self.jacobi_matrix(bc, index=index,
+        if etype in {'cell', 3}:
+            TD = 3
+            J = self.jacobi_matrix(bc, index=index,
+                    return_grad=return_grad)
+        elif etype in {'face', 2}:
+            TD = 2
+            J = self.jacobi_matrix(bc, index=index, etype='face', 
                 return_grad=return_grad)
+        elif etype in {'edge', 1}:
+            TD = 1
+            J = self.jacobi_matrix(bc, index=index, etype='edge', 
+                    return_grad=return_grad)
         
         if return_grad:
             J, gphi = J
@@ -444,7 +470,7 @@ class CLagrangeWedgeDof2d():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = np.where(self.mesh.is_boundary_face)[0]
+            index = self.mesh.ds.boundary_face_index()
             if callable(threshold):
                 bc = self.mesh.entity_barycenter('face', index=index)
                 flag = threshold(bc)
@@ -461,7 +487,6 @@ class CLagrangeWedgeDof2d():
         """
 
         TODO
-        ----
         1. 只取一部分边上的自由度
         """
         p = self.p
