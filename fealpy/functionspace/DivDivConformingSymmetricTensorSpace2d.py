@@ -68,20 +68,18 @@ class DDCSTDof2d:
         isBdDof[edge2dof] = True
         return isBdDof
 
-    def edge_to_dof(self, threshold=None, doftype='left'):
+    def edge_to_dof(self, threshold=None):
         """
 
         Notes
         -----
 
-        2020.07.21：
-        获取网格边上的自由度全局编号。
-
-        如果 threshold 不是 None 的话，则只获取一部分边上的自由度全局编号，这部
-        分边由 threshold 来决定。
-
         """
-        pass
+
+        mesh = self.mesh
+        NN = mesh.number_of_nodes()
+        edof = self.number_of_local_dofs(doftype='edge') # 每条边内部的自由度
+        idx = np.arange(edof) + ndof*NN
 
     def cell_to_dof(self, threshold=None):
         """
@@ -91,7 +89,6 @@ class DDCSTDof2d:
         获取每个单元元上的自由度全局编号。
         """
 
-        l, k = self.p 
         mesh = self.mesh
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
@@ -101,21 +98,33 @@ class DDCSTDof2d:
         ldof = self.number_of_local_dofs(doftype='all')  # 单元上的所有自由度
         cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
-        ndof = self.number_of_local_dofs(doftype='node')
-        cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度
-        edof = self.number_of_local_dofs(doftype='edge') # 边内部的自由度
+        start = 0
+        c2d = cell2dof[:, start:] # 顶点上的自由度, 一共 9 个
 
         cell = mesh.entity('cell')
+        ndof = self.number_of_local_dofs(doftype='node')
+        idx = np.arange(ndof)
         for i in range(3):
-            for j, k in enumerate(range(3*i, 3*(i+1))):
-                cell2dof[:, k] = 3*cell[:, i] + j
+            c2d[:, ndof*i:ndof*(i+1)] = ndof*cell[:, i, None]
+            c2d[:, ndof*i:ndof*(i+1)] += idx
+
+        start += 3*ndof
+        c2d = cell2dof[:, start:] # 边上的自由度, 共 3*(l-1+l) 个
 
         cell2edge = mesh.ds.cell_to_edge()
-        start = ndof*NN
+        edof = self.number_of_local_dofs(doftype='edge') # 每条边内部的自由度
+        idx = np.arange(edof) + ndof*NN
         for i in range(3):
-            for j, k in enumerate(range(start, start+l-1)):
-                cell2dof[:, j] = start + cell 
+            c2d[:, edof*i:edof*(i+1)] = edof*cell2edge[:, i, None] 
+            c2d[:, edof*i:edof*(i+1)] += idx
 
+        start += 3*edof
+        c2d = cell2dof[:, start:]
+        cdof = self.number_of_local_dofs(doftype='cell') # 每个单元内部的自由度
+        
+        c2d[:, :] = np.arange(NC)[:, None]*np.arange(cdof)
+        idx = np.arange(cdof) + ndof*NN + edof*NE
+        c2d += idx 
         return cell2dof
 
     def number_of_local_dofs(self, doftype='all'):
