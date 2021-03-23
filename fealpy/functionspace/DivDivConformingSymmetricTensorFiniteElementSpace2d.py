@@ -178,26 +178,29 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
     TODO
     ----
     """
-    def __init__(self, mesh, p=0, q=None, dof=None):
+    def __init__(self, mesh, p=(2, 3), q=None, dof=None):
         """
         Parameters
         ----------
         mesh : TriangleMesh
-        p : the space order, p>=0
+        p : the space order, p=(l, k), l >= k-1, k >= 3
         q : the index of quadrature fromula
         dof : the object for degree of freedom
 
         Note
         ----
-        RT_p : [P_{p}]^d(T) + [m_1, m_2]^T \\bar P_{p}(T)
+
+
 
         """
         self.mesh = mesh
-        self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
+        self.p = p # (l, k)
+        
+        # 基础缩放单项式空间
+        self.smspace = ScaledMonomialSpace2d(mesh, max(p), q=q)
 
         if dof is None:
-            self.dof = RTDof2d(mesh, p)
+            self.dof = DDCSTDof2d(mesh, p)
         else:
             self.dof = dof
 
@@ -214,54 +217,67 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
 
         Notes
         -----
-        3*(p+1) + 2*(p+1)*p/2 = (p+1)*(p+3) 
+
+            计算基函数的系数
         """
-        p = self.p
+        mesh  = self.mesh
+        NC = mesh.number_of_cells()
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        smspace = self.smspace
+        l, k = self.p
+
         # 单元上全部自由度的个数
         ldof = self.number_of_local_dofs(doftype='all')  
 
-        cdof = self.smspace.number_of_local_dofs(doftype='cell')
-        edof = self.smspace.number_of_local_dofs(doftype='edge')
+        # 系数矩阵
+        A = np.zeros((NC, ldof, ldof), dtype=self.mesh.ftype)
 
-        ndof = self.smspace.number_of_local_dofs(p=p) 
+        # 3 个单元节点处共 9 个自由度
+        ## 0 号点
+        ldof = smspace.number_of_local_dofs(p=l+1)
+        kdof = smspace.number_of_local_dofs(p=k-2)
+        gphi = smspace.grad_basis(node[cell[:, 0]], p=l+1, scaled=False)
+        # C_l(K;\mbS)
+        A[:, 0, 0:ldof-2] = gphi[:, 2:, 1]
+        A[:, 1, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
+        A[:, 2, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
+        A[:, 2, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
+        # C_k(K;\mbS)
+        phi = smspace.basis(node[cell[:, 0]], p=k-2)
+        A[:, 0, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
+        A[:, 1, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
+        A[:, 2, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
 
-        mesh = self.mesh
-        GD = mesh.geo_dimension()
-        NC = mesh.number_of_cells()
-        
-        LM, RM = self.smspace.edge_cell_mass_matrix()
-        A = np.zeros((NC, ldof, ldof), dtype=self.ftype)
 
-        edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
-        n = mesh.edge_unit_normal() 
+        ## 1 号点
+        gphi = smspace.grad_basis(node[cell[:, 1]], p=l+1, scaled=False)
+        A[:, 3, 0:ldof-2] = gphi[:, 2:, 1]
+        A[:, 4, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
+        A[:, 5, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
+        A[:, 5, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
+        # C_k(K;\mbS)
+        phi = smspace.basis(node[cell[:, 1]], p=k-2)
+        A[:, 3, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
+        A[:, 4, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
+        A[:, 5, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
 
-        idx = self.smspace.edge_index_1(p=p+1)
-        x = idx['x']
-        y = idx['y']
-        idx2 = np.arange(cdof)[None, None, :]
-        idx3 = np.arange(GD*cdof, GD*cdof+edof)[None, None, :]
+        ## 2 号点
+        gphi = smspace.grad_basis(node[cell[:, 2]], p=l+1, scaled=False)
+        A[:, 6, 0:ldof-2] = gphi[:, 2:, 1]
+        A[:, 7, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
+        A[:, 8, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
+        A[:, 8, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
+        # C_k(K;\mbS)
+        phi = smspace.basis(node[cell[:, 2]], p=k-2)
+        A[:, 6, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
+        A[:, 7, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
+        A[:, 8, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
 
-        # idx0 = edge2cell[:, [0]][:, None, None] this is a bug!!!
-        idx0 = edge2cell[:, 0][:, None, None]
-        idx1 = (edge2cell[:, [2]]*edof + np.arange(edof))[:, :, None]
-        for i in range(GD):
-            A[idx0, idx1, i*cdof + idx2] = n[:, i, None, None]*LM[:, :, :cdof]
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*LM[:, :,  cdof+x] + n[:, 1, None, None]*LM[:, :, cdof+y]
+        # 单元内部自由度
+        start = 9 + 3*(2*l - 1) # 除出点和边上的自由度
+        kdof = smspace.number_of_local_dofs(p=k-2) # \nabla^2 m_{k-2}  kdof - 3
 
-        # idx0 = edge2cell[:, [1]][:, None, None] this is a bug!!!
-        idx0 = edge2cell[:, 1][:, None, None]
-        idx1 = (edge2cell[:, [3]]*edof + np.arange(edof))[:, :, None]
-        for i in range(GD):
-            A[idx0, idx1, i*cdof + idx2] = n[:, i, None, None]*RM[:, :, :cdof]
-        A[idx0, idx1, idx3] = n[:, 0, None, None]*RM[:, :,  cdof+x] + n[:, 1, None, None]*RM[:, :, cdof+y]
 
-        if p > 0:
-            M = self.smspace.cell_mass_matrix()
-            idx = self.smspace.diff_index_1()
-            idof = self.smspace.number_of_local_dofs(p=p-1, doftype='cell') 
-            for i, key in enumerate(idx.keys()):
-                index = np.arange((GD+1)*edof + i*idof, (GD+1)*edof+ (i+1)*idof)[:, None]
-                A[:, index, i*cdof + np.arange(cdof)] = M[:, :idof, :]
-                A[:, index, GD*cdof + np.arange(edof)] = M[:,  idx[key][0], cdof-edof:]
-        return inv(A)
+

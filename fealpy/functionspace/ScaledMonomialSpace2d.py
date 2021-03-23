@@ -110,8 +110,8 @@ class ScaledMonomialSpace2d():
         p = self.p if p is None else p
         index = multi_index_matrix2d(p)
 
-        x, = np.nonzero(index[:, 1] > 0)
-        y, = np.nonzero(index[:, 2] > 0)
+        x, = np.nonzero(index[:, 1] > 0) # 关于 x 求导非零的缩放单项式编号
+        y, = np.nonzero(index[:, 2] > 0) # 关于 y 求导非零的缩放单项式编号
 
         return {'x':(x, index[x, 1]),
                 'y':(y, index[y, 2]),
@@ -223,7 +223,7 @@ class ScaledMonomialSpace2d():
         return phi
 
     @cartesian
-    def grad_basis(self, point, index=np.s_[:], p=None):
+    def grad_basis(self, point, index=np.s_[:], p=None, scaled=True):
         """
 
         p >= 0
@@ -247,13 +247,17 @@ class ScaledMonomialSpace2d():
         yidx = idx['y']
         gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi) 
         gphi[..., yidx[0], 1] = np.einsum('i, ...i->...i', yidx[1], phi)
-        if point.shape[-2] == num:
-            return gphi/h[index].reshape(-1, 1, 1)
-        elif point.shape[0] == num:
-            return gphi/h[index].reshape(-1, 1, 1, 1)
+
+        if scaled:
+            if point.shape[-2] == num:
+                return gphi/h[index].reshape(-1, 1, 1)
+            elif point.shape[0] == num:
+                return gphi/h[index].reshape(-1, 1, 1, 1)
+        else:
+            return gphi
 
     @cartesian
-    def laplace_basis(self, point, index=np.s_[:], p=None):
+    def laplace_basis(self, point, index=np.s_[:], p=None, scaled=True):
         p = self.p if p is None else p
 
         area = self.cellmeasure
@@ -262,13 +266,17 @@ class ScaledMonomialSpace2d():
         lphi = np.zeros(shape, dtype=np.float)
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
-            idx = self.index2(p=p)
+            idx = self.diff_index_2(p=p)
             lphi[..., idx['xx'][0]] += np.einsum('i, ...i->...i', idx['xx'][1], phi)
             lphi[..., idx['yy'][0]] += np.einsum('i, ...i->...i', idx['yy'][1], phi)
-        return lphi/area[index].reshape(-1, 1)
+
+        if scaled:
+            return lphi/area[index].reshape(-1, 1)
+        else:
+            return lphi
 
     @cartesian
-    def hessian_basis(self, point, index=np.s_[:], p=None):
+    def hessian_basis(self, point, index=np.s_[:], p=None, scaled=True):
         """
         Compute the value of the hessian of the basis at a set of 'point'
 
@@ -290,12 +298,16 @@ class ScaledMonomialSpace2d():
         hphi = np.zeros(shape, dtype=np.float)
         if p > 1:
             phi = self.basis(point, index=index, p=p-2)
-            idx = self.index2(p=p)
+            idx = self.diff_index_2(p=p)
             hphi[..., idx['xx'][0], 0, 0] = np.einsum('i, ...i->...i', idx['xx'][1], phi)
             hphi[..., idx['xy'][0], 0, 1] = np.einsum('i, ...i->...i', idx['xy'][1], phi)
             hphi[..., idx['yy'][0], 1, 1] = np.einsum('i, ...i->...i', idx['yy'][1], phi)
             hphi[..., 1, 0] = hphi[..., 0, 1] 
-        return hphi/area[index].reshape(-1, 1, 1, 1)
+
+        if scaled:
+            return hphi/area[index].reshape(-1, 1, 1, 1)
+        else:
+            return hphi
 
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
