@@ -729,7 +729,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
+    def recovery_linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the recovery linear elasticity fem matrix
         """
