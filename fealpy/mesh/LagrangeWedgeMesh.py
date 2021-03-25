@@ -537,16 +537,23 @@ class CLagrangeWedgeDof2d():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_face_index()
+            index0 = self.mesh.ds.boundary_tface_index()
+            index1 = self.mesh.ds.boundary_qface_index()
             if callable(threshold):
-                bc = self.mesh.entity_barycenter('face', index=index)
-                flag = threshold(bc)
-                index = index[flag]
+                bc0 = self.mesh.entity_barycenter('face', ftype='tri',
+                        index=index0)
+                flag0 = threshold(bc0)
+                index0 = index0[flag0]
+                bc1 = self.mesh.entity_barycenter('face', ftype='quad',
+                        index=index1)
+                flag1 = threshold(bc1)
+                index1 = index1[flag1]
 
         gdof = self.number_of_global_dofs()
-        face2dof = self.face_to_dof()
+        tface2dof, qface2dof = self.face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        isBdDof[face2dof[index]] = True
+        isBdDof[tface2dof[index0]] = True
+        isBdDof[qface2dof[index1]] = True
         node = self.mesh.entity('node')
         return isBdDof
 
@@ -591,10 +598,10 @@ class CLagrangeWedgeDof2d():
         """
         p = self.p
         mesh = self.mesh
-        face = mesh.entity('face')
+        tface, qface = mesh.entity('face')
 
         if p == mesh.p:
-            return face
+            return tface, qface
         else:
             pass
 
@@ -660,7 +667,7 @@ class CLagrangeWedgeDof2d():
         if doftype in {'cell', 3}:
             return (p+1)*(p+1)*(p+1)//2
         elif doftype in {'face',  2}:
-            return (p+1)*(p+2)//2
+            return (p+1)*(p+2)//2, (P+1)*(p+1)
         elif doftype in {'edge',  1}:
             return p + 1
         elif doftype in {'node', 0}:
