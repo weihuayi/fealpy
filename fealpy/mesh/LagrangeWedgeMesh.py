@@ -37,11 +37,15 @@ class LinearWedgeMeshDataStructure():
             self.cell[:, i::p+1] = self.cell[:, ::p+1]+NN*i
         
         #构建面
-        self.face = np.r_[self.cell[:, ::p+1], self.cell[-NC:, p::p+1]]
-        self.cell2face = np.c_[np.arange(NC*nh), np.arange(NC, NC*(nh+1))]
-        self.face2cell = np.zeros([NC*(nh+1), 2])
-        self.face2cell[:, 0] = np.r_[np.arange(NC*nh), np.arange(NC*(nh-1), NC*nh)]
-        self.face2cell[:, 1] = np.r_[np.arange(NC), np.arange(NC*nh)]
+        self.tface = np.r_[self.cell[:NC, ::p+1], self.cell[-NC:, p::p+1]]
+        e2c = mesh.ds.edge_to_cell()
+        isBdEdge = e2c[:, 0]==e2c[:, 1]
+        NQF = isBdEdge.sum()
+        I = NN*p*np.tile(np.arange(nh), (NQF, 1)).T.flatten()#多层单元
+        self.qface = np.zeros([NQF*nh, edge.shape[-1]*(p+1)], dtype = edge.dtype)
+        self.qface[:, ::p+1] = (np.tile(edge[isBdEdge], (nh, 1)).T + I).T
+        for i in range(p+1):
+            self.qface[:, i::p+1] = self.qface[:, ::p+1]+NN*i
 
         #构建边
         I = NN*p*np.tile(np.arange(nh+1), (NE, 1)).T.flatten()
@@ -54,17 +58,17 @@ class LinearWedgeMeshDataStructure():
         self.cell2edge[:, 1::2] = self.cell2edge[:, ::2]+NE
  
         self.face2edge = np.r_[self.cell2edge[:, ::2], self.cell2edge[-NC:, ::2]]
-        self.NF = len(self.face)
+        self.NTF = len(self.tface)
+        self.NQF = len(self.qface)
         self.NN = NN*(nh+1)
         self.NC = NC*nh
         self.NE = NE*(nh+1)
        
-    def boundary_face_index(self):
-        nc = self.NC//self.nh
-        boundary_face_index = np.zeros(self.NF, dtype=np.bool_)
-        boundary_face_index[:nc] = True
-        boundary_face_index[-nc:] = True
-        return boundary_face_index
+    def boundary_tface_index(self):
+        return np.arange(self.NTF)
+
+    def boundary_qface_index(self):
+        return np.arange(self.NQF)
 
 class LagrangeWedgeMesh(Mesh3d):
     def __init__(self, mesh, h, nh, p=1, surface=None):
@@ -85,21 +89,20 @@ class LagrangeWedgeMesh(Mesh3d):
         self.surface = surface
 
         self.ds = LinearWedgeMeshDataStructure(mesh, nh, p) # 线性网格的数据结构
-        self.node = self.construct(node, cell, h, nh)
+        self.node = self.construct(node, cell, mesh, h, nh)
 
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
         self.multi_index_matrix = multi_index_matrix
 
-    def construct(self, node, cell, h, nh):
+    def construct(self, node, cell, mesh, h, nh):
         p = self.p
         h = self.h
-        v0 = node[cell[:, -1]] - node[cell[:, 0]]
-        v1 = node[cell[:, 1]] - node[cell[:, 0]]
+        qf, qf1 = self.integrator(1, etype='face')
 
-        n = np.cross(v1, v0)#每个单元的法向量
-        n = (n.T/np.linalg.norm(n, axis=-1)).T#单位化法向量       
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        n = mesh.cell_unit_normal(bcs)
 
         node2n = np.zeros([len(node), 3])
         a = cell.shape[-1]
@@ -112,6 +115,18 @@ class LagrangeWedgeMesh(Mesh3d):
                 node = np.r_[node, node[:NN]+h[i+1]*node2n]
 
         return node
+    
+    def entity(self, etype='cell'):
+        if etype in {'cell', 3}:
+            return self.ds.cell
+        elif etype in {'face', 2}:
+            return self.ds.tface, self.ds.qface
+        elif etype in {'edge', 1}:
+            return self.ds.edge
+        elif etype in {'node', 0}:
+            return self.node
+        else:
+            raise ValueError("`etype` is wrong!")
     
     def reference_cell_measure(self):
         return 0.5
@@ -135,20 +150,28 @@ class LagrangeWedgeMesh(Mesh3d):
         if etype in {'cell', 3}:
             return TensorProductQuadrature((qf0, qf1)) 
         elif etype in {'face', 2}:
-            return qf0 
+            return qf0, TensorProductQuadrature((qf1, qf1))
         elif etype in {'edge', 1}:
             return qf1 
 
-    def entity_barycenter(self, etype=3, index=np.s_[:]):
+    def entity_barycenter(self, etype=3, ftype=None, index=np.s_[:]):
         GD = self.geo_dimension()
         if etype in {'cell', 3}:
             qf = self.integrator(1, etype=3)
             bc, ws = qf.get_quadrature_points_and_weights()
             p = self.bc_to_point(bc, index=index).reshape(-1, GD)
         elif etype in {'face', 2}:
-            qf = self.integrator(1, etype=2)
-            bcs, ws = qf.get_quadrature_points_and_weights()
-            p = self.bc_to_point(bc, index=index, etype='face').reshape(-1, GD)
+            qf0, qf1 = self.integrator(1, etype=2)
+            if ftype == 'tri':
+                bcs, ws = qf0.get_quadrature_points_and_weights()
+                p = self.bc_to_point(bc, index=index, etype='face', 
+                        ftype='tri').reshape(-1, GD)
+            elif ftype == 'quad':
+                bcs, ws = qf1.get_quadrature_points_and_weights()
+                p = self.bc_to_point(bc, index=index, etype='face',
+                ftype='quad').reshape(-1, GD)
+            else:
+                raise ValueError('the entity `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
             qf = self.integrator(1, etype=1)
             bc, ws = qf.get_quadrature_points_and_weights()
@@ -210,14 +233,22 @@ class LagrangeWedgeMesh(Mesh3d):
         p = self.p
         q = p if q is None else q
 
-        qf = self.integrator(q, etype='face')
+        qf0, qf1 = self.integrator(q, etype='face')
 
         # 三角形面积
-        bcs, ws = qf.get_quadrature_points_and_weights()
-        G = self.first_fundamental_form(bcs, index=index, etype='face')
-        l = np.sqrt(np.linalg.det(G))
-        a = np.einsum('i, ij->j', ws, l)/2.0
-        return a
+        bcs0, ws0 = qf0.get_quadrature_points_and_weights()
+        G0 = self.first_fundamental_form(bcs0, index=index, etype='face',
+                ftype='tri')
+        l0 = np.sqrt(np.linalg.det(G0))
+        a0 = np.einsum('i, ij->j', ws0, l0)/2.0
+        
+        # 四边形面积
+        bcs1, ws1 = qf1.get_quadrature_points_and_weights()
+        G1 = self.first_fundamental_form(bcs1, index=index, etype='face',
+                ftype='quad')
+        l1 = np.sqrt(np.linalg.det(G1))
+        a1 = np.einsum('i, ik->k', ws1, l1)
+        return a0, a1
     
     def face_unit_normal(self, bc, index=np.s_[:]):
         """
@@ -226,16 +257,26 @@ class LagrangeWedgeMesh(Mesh3d):
         -----
         计算曲面情形下，积分点处的单位法线方向。
         """
-        J = self.jacobi_matrix(bc, index=index, etype='face')
+        # 三角形面法向
+        J0 = self.jacobi_matrix(bc, index=index, etype='face', ftype='tri')
 
         # n.shape 
-        n = np.cross(J[..., 0], J[..., 1], axis=-1)
-        l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
-        n /= l
+        n0 = np.cross(J0[..., 0], J0[..., 1], axis=-1)
+        l0 = np.sqrt(np.sum(n0**2, axis=-1, keepdims=True))
+        n0 /= l0
 
-        return n
+        # 四边形面法向
+        J1 = self.jacobi_matrix(bc, index=index, etype='face', ftype='quad')
+
+        # n.shape 
+        n1 = np.cross(J1[..., 0], J1[..., 1], axis=-1)
+        l1 = np.sqrt(np.sum(n1**2, axis=-1, keepdims=True))
+        n1 /= l1
+
+        return n0, n1
     
-    def jacobi_matrix(self, bc, index=np.s_[:], etype='cell', return_grad=False):
+    def jacobi_matrix(self, bc, index=np.s_[:], etype='cell', ftype=None, 
+            return_grad=False):
         """
         Notes
         -----
@@ -247,15 +288,22 @@ class LagrangeWedgeMesh(Mesh3d):
         node = self.entity('node')
         cell = self.entity('cell')
         edge = self.entity('edge')
-        face = self.entity('face')
+        tface, qface = self.entity('face')
         if etype in {'cell', 3}:
             gphi = self.grad_shape_function(bc)
             J = np.einsum(
                     'ijn, ...ijk->...ink', node[cell[index], :], gphi)
         elif etype in {'face', 2}:
-            gphi = self.grad_shape_function(bc, etype='face')
-            J = np.einsum(
-                    'ijn, ...ijk->...ink', node[face[index], :], gphi)
+            if ftype == 'tri':
+                gphi = self.grad_shape_function(bc, etype='face', ftype='tri')
+                J = np.einsum(
+                        'ijn, ...ijk->...ink', node[tface[index], :], gphi)
+            elif ftype == 'quad':
+                gphi = self.grad_shape_function(bc, etype='face', ftype='quad')
+                J = np.einsum(
+                        'ijn, ...ijk->...ink', node[qface[index], :], gphi)
+            else:
+                raise ValueError('the jacobi_matrix `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
             gphi = self.grad_shape_function(bc, etype='edge')
             J = np.einsum(
@@ -269,17 +317,22 @@ class LagrangeWedgeMesh(Mesh3d):
         else:
             return J, gphi
 
-    def bc_to_point(self, bc, index=np.s_[:], etype='cell'):
+    def bc_to_point(self, bc, index=np.s_[:], etype='cell', ftype=None):
         node = self.entity('node')
         cell = self.entity('cell')
         edge = self.entity('edge')
-        face = self.entity('face')
+        tface, qface = self.entity('face')
         phi = self.shape_function(bc)
         
         if etype in {'cell', 3}:
             p = np.einsum('...jk, jkn->...jn', phi, node[cell[index], :])
         elif etype in {'face', 2}:
-            p = np.einsum('...jk, jkn->...jn', phi, node[face[index], :])
+            if ftype == 'tri':
+                p = np.einsum('...jk, jkn->...jn', phi, node[tface[index], :])
+            elif ftpye == 'quad':
+                p = np.einsum('...jk, jkn->...jn', phi, node[qface[index], :])
+            else:
+                raise ValueError('the bc_to_point `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
             p = np.einsum('...jk, jkn->...jn', phi, node[edge[index], :])
         else:
@@ -308,7 +361,7 @@ class LagrangeWedgeMesh(Mesh3d):
 
 
     def grad_shape_function(self, bc, p=None, index=np.s_[:],
-            etype='cell', variables='u'):
+            etype='cell', ftype=None, variables='u'):
         """
 
         Notes
@@ -345,8 +398,22 @@ class LagrangeWedgeMesh(Mesh3d):
             gphi[..., 0:2].flat = Gphi0.flat
             gphi[..., -1].flat = Gphi1.flat
         elif etype in {'face', 2}:
-            R = lagrange_grad_shape_function(bc, p)
-            gphi = np.einsum('...ij, jn->...in', R, Dlambda0) # (..., ldof, 1)
+            if ftype == 'tri':
+                R = lagrange_grad_shape_function(bc, p)
+                gphi = np.einsum('...ij, jn->...in', R, Dlambda0) # (..., ldof, 1)
+            elif ftype == 'quad':
+                phi = lagrange_shape_function(bc[0], p)
+                R = lagrange_grad_shape_function(bc[0], p)
+                gphi = np.einsum('...ij, jn->...in', R, Dlambda1) # (..., ldof, 1)
+                Gphi0 = np.einsum('imt, kn->ikmn', gphi, phi)
+                Gphi1 = np.einsum('kn, imt->kinmt', phi, gphi)
+                n = Gphi0.shape[0]*Gphi0.shape[1]
+                shape = (n, (p+1)*(p+1), 2)
+                gphi = np.zeros(shape, dtype=self.ftype)
+                gphi[..., 0].flat = Gphi0.flat
+                gphi[..., 1].flat = Gphi1.flat
+            else:
+                raise ValueError('the grad_shape_function `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
             R = lagrange_grad_shape_function(bc, p)
             gphi = np.einsum('...ij, jn->...in', R, Dlambda1) # (..., ldof, 1)
@@ -362,8 +429,8 @@ class LagrangeWedgeMesh(Mesh3d):
             gphi = np.einsum('...ikm, ...imn, ...ln->...ilk', J, G, gphi)
             return gphi
     
-    def first_fundamental_form(self, bc, index=np.s_[:], etype='cell', 
-            return_jacobi=False, return_grad=False):
+    def first_fundamental_form(self, bc, index=np.s_[:], etype='cell',
+            ftype=None, return_jacobi=False, return_grad=False):
         """
         Notes
         -----
@@ -375,7 +442,7 @@ class LagrangeWedgeMesh(Mesh3d):
                     return_grad=return_grad)
         elif etype in {'face', 2}:
             TD = 2
-            J = self.jacobi_matrix(bc, index=index, etype='face', 
+            J = self.jacobi_matrix(bc, index=index, etype='face', ftype=ftype,  
                 return_grad=return_grad)
         elif etype in {'edge', 1}:
             TD = 1
