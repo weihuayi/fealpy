@@ -42,6 +42,7 @@ class LinearWedgeMeshDataStructure():
         isBdEdge = e2c[:, 0]==e2c[:, 1]
         NQF = isBdEdge.sum()
         I = NN*p*np.tile(np.arange(nh), (NQF, 1)).T.flatten()#多层单元
+
         self.qface = np.zeros([NQF*nh, edge.shape[-1]*(p+1)], dtype = edge.dtype)
         self.qface[:, ::p+1] = (np.tile(edge[isBdEdge], (nh, 1)).T + I).T
         for i in range(p+1):
@@ -222,6 +223,18 @@ class LagrangeWedgeMesh(Mesh3d):
         l = np.sqrt(np.linalg.det(G))
         a = np.einsum('i, ij->j', ws, l)
         return a
+
+    def boundary_tri_face_area():
+        pass
+
+    def boundary_quad_face_area():
+        pass
+
+    def boundary_tri_face_unit_normal():
+        pass
+
+    def boundary_quad_face_unit_normal():
+        pass
     
     def face_area(self, q=None, index=np.s_[:]):
         """
