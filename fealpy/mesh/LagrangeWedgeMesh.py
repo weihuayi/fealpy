@@ -65,10 +65,10 @@ class LinearWedgeMeshDataStructure():
         self.NC = NC*nh
         self.NE = NE*(nh+1)
        
-    def boundary_tface_index(self):
+    def boundary_tri_face_index(self):
         return np.arange(self.NTF)
 
-    def boundary_qface_index(self):
+    def boundary_quad_face_index(self):
         return np.arange(self.NQF)
 
 class LagrangeWedgeMesh(Mesh3d):
@@ -107,10 +107,10 @@ class LagrangeWedgeMesh(Mesh3d):
 
         node2n = np.zeros([len(node), 3])
         a = cell.shape[-1]
-        np.add.at(node2n, cell.reshape(-1), np.tile(n, (1, a)).reshape(-1, 3))
+        np.add.at(node2n, cell.reshape(-1), np.tile(-n, (1, a)).reshape(-1, 3))
         node2n = (node2n.T/np.linalg.norm(node2n, axis=-1)).T
 
-        h = np.linspace(0, h, nh*p+1)
+        h = np.linspace(0, h*nh, nh*p+1)
         NN = len(node)
         for i in range(nh*p):
                 node = np.r_[node, node[:NN]+h[i+1]*node2n]
@@ -128,6 +128,18 @@ class LagrangeWedgeMesh(Mesh3d):
             return self.node
         else:
             raise ValueError("`etype` is wrong!")
+    
+    def entity_measure(self, etype=3, index=np.s_[:]):
+        if etype in {'cell', 3}:
+            return self.cell_volume(index=index)
+        elif etype in {'face', 2}:
+            return self.boundary_tri_face_area(index=index), self.boundary_quad_face_area(index =index)
+        elif etype in {'edge', 1}:
+            return self.edge_length(index=index)
+        elif etype in {'node', 0}:
+            return np.zeros(1, dtype=self.ftype)
+        else:
+            raise ValueError("`entitytype` is wrong!")
     
     def reference_cell_measure(self):
         return 0.5
@@ -170,7 +182,7 @@ class LagrangeWedgeMesh(Mesh3d):
             elif ftype == 'quad':
                 bcs, ws = qf1.get_quadrature_points_and_weights()
                 p = self.bc_to_point(bc, index=index, etype='face',
-                ftype='quad').reshape(-1, GD)
+                        ftype='quad').reshape(-1, GD)
             else:
                 raise ValueError('the entity `ftype` is not given! `tri` or `quad`'.format(face)) 
         elif etype in {'edge', 1}:
@@ -224,19 +236,7 @@ class LagrangeWedgeMesh(Mesh3d):
         a = np.einsum('i, ij->j', ws, l)
         return a
 
-    def boundary_tri_face_area():
-        pass
-
-    def boundary_quad_face_area():
-        pass
-
-    def boundary_tri_face_unit_normal():
-        pass
-
-    def boundary_quad_face_unit_normal():
-        pass
-    
-    def face_area(self, q=None, index=np.s_[:]):
+    def boundary_tri_face_area(self, q=None, index=np.s_[:]):
         """
 
         Notes
@@ -249,21 +249,34 @@ class LagrangeWedgeMesh(Mesh3d):
         qf0, qf1 = self.integrator(q, etype='face')
 
         # 三角形面积
-        bcs0, ws0 = qf0.get_quadrature_points_and_weights()
-        G0 = self.first_fundamental_form(bcs0, index=index, etype='face',
+        bcs, ws = qf0.get_quadrature_points_and_weights()
+        G = self.first_fundamental_form(bcs, index=index, etype='face',
                 ftype='tri')
-        l0 = np.sqrt(np.linalg.det(G0))
-        a0 = np.einsum('i, ij->j', ws0, l0)/2.0
-        
+        l = np.sqrt(np.linalg.det(G))
+        a = np.einsum('i, ij->j', ws, l)/2.0
+        return a
+
+    def boundary_quad_face_area(self, q=None, index=np.s_[:]):
+        """
+
+        Notes
+        -----
+        计算单元的面积.
+        """
+        p = self.p
+        q = p if q is None else q
+
+        qf0, qf1 = self.integrator(q, etype='face')
+
         # 四边形面积
-        bcs1, ws1 = qf1.get_quadrature_points_and_weights()
-        G1 = self.first_fundamental_form(bcs1, index=index, etype='face',
+        bcs, ws = qf1.get_quadrature_points_and_weights()
+        G = self.first_fundamental_form(bcs, index=index, etype='face',
                 ftype='quad')
-        l1 = np.sqrt(np.linalg.det(G1))
-        a1 = np.einsum('i, ik->k', ws1, l1)
-        return a0, a1
-    
-    def face_unit_normal(self, bc, index=np.s_[:]):
+        l = np.sqrt(np.linalg.det(G))
+        a = np.einsum('i, ik->k', ws, l)
+        return a
+
+    def boundary_tri_face_unit_normal(self, bc, index=np.s_[:]):
         """
 
         Notes
@@ -271,22 +284,32 @@ class LagrangeWedgeMesh(Mesh3d):
         计算曲面情形下，积分点处的单位法线方向。
         """
         # 三角形面法向
-        J0 = self.jacobi_matrix(bc, index=index, etype='face', ftype='tri')
+        J = self.jacobi_matrix(bc, index=index, etype='face', ftype='tri')
 
         # n.shape 
-        n0 = np.cross(J0[..., 0], J0[..., 1], axis=-1)
-        l0 = np.sqrt(np.sum(n0**2, axis=-1, keepdims=True))
-        n0 /= l0
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
+        n /= l
 
+        return n
+
+    def boundary_quad_face_unit_normal(self, bc, index=np.s_[:]):
+        """
+
+        Notes
+        -----
+        计算曲面情形下，积分点处的单位法线方向。
+        """
         # 四边形面法向
-        J1 = self.jacobi_matrix(bc, index=index, etype='face', ftype='quad')
+        J = self.jacobi_matrix(bc, index=index, etype='face', ftype='quad')
 
         # n.shape 
-        n1 = np.cross(J1[..., 0], J1[..., 1], axis=-1)
-        l1 = np.sqrt(np.sum(n1**2, axis=-1, keepdims=True))
-        n1 /= l1
+        n = np.cross(J[..., 0], J[..., 1], axis=-1)
+        l = np.sqrt(np.sum(n**2, axis=-1, keepdims=True))
+        n /= l
 
-        return n0, n1
+        return n
+    
     
     def jacobi_matrix(self, bc, index=np.s_[:], etype='cell', ftype=None, 
             return_grad=False):
@@ -342,7 +365,7 @@ class LagrangeWedgeMesh(Mesh3d):
         elif etype in {'face', 2}:
             if ftype == 'tri':
                 p = np.einsum('...jk, jkn->...jn', phi, node[tface[index], :])
-            elif ftpye == 'quad':
+            elif ftype == 'quad':
                 p = np.einsum('...jk, jkn->...jn', phi, node[qface[index], :])
             else:
                 raise ValueError('the bc_to_point `ftype` is not given! `tri` or `quad`'.format(face)) 
@@ -546,24 +569,13 @@ class CLagrangeWedgeDof2d():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-    def is_boundary_dof(self, threshold=None):
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index0 = self.mesh.ds.boundary_tface_index()
-            index1 = self.mesh.ds.boundary_qface_index()
-            if callable(threshold):
-                bc0 = self.mesh.entity_barycenter('face', ftype='tri',
-                        index=index0)
-                flag0 = threshold(bc0)
-                index0 = index0[flag0]
-                bc1 = self.mesh.entity_barycenter('face', ftype='quad',
-                        index=index1)
-                flag1 = threshold(bc1)
-                index1 = index1[flag1]
+    def is_boundary_dof(self):
+        index0 = self.mesh.ds.boundary_tri_face_index()
+        index1 = self.mesh.ds.boundary_quad_face_index()
 
         gdof = self.number_of_global_dofs()
-        tface2dof, qface2dof = self.face_to_dof()
+        tface2dof = self.tri_face_to_dof()
+        qface2dof = self.quad_face_to_dof()
         isBdDof = np.zeros(gdof, dtype=np.bool)
         isBdDof[tface2dof[index0]] = True
         isBdDof[qface2dof[index1]] = True
@@ -599,10 +611,10 @@ class CLagrangeWedgeDof2d():
         return self.edge_to_dof()
 
     @property
-    def face2dof(self):
-        return self.face_to_dof()
+    def tface2dof(self):
+        return self.tri_face_to_dof()
 
-    def face_to_dof(self):
+    def tri_face_to_dof(self):
         """
 
         TODO
@@ -614,7 +626,26 @@ class CLagrangeWedgeDof2d():
         tface, qface = mesh.entity('face')
 
         if p == mesh.p:
-            return tface, qface
+            return tface
+        else:
+            pass
+    @property
+    def qface2dof(self):
+        return self.quad_face_to_dof()
+
+    def quad_face_to_dof(self):
+        """
+
+        TODO
+        ----
+        1. 只取一部分面上的自由度
+        """
+        p = self.p
+        mesh = self.mesh
+        tface, qface = mesh.entity('face')
+
+        if p == mesh.p:
+            return qface
         else:
             pass
 
@@ -642,7 +673,7 @@ class CLagrangeWedgeDof2d():
         mesh = self.mesh
         cell = mesh.entity('cell') # cell 可以是高次单元
         if p == mesh.p:
-            return cell 
+            return cell
         else:
             pass
 
