@@ -37,14 +37,15 @@ class LinearWedgeMeshDataStructure():
             self.cell[:, i::p+1] = self.cell[:, ::p+1]+NN*i
         
         #构建面
-        self.tface = np.r_[self.cell[:NC, ::p+1], self.cell[-NC:, p::p+1]]
+        self.tface = np.r_[self.cell[:NC, ::p+1], self.cell[-NC:, p::p+1][:,
+            ::-1]]
         e2c = mesh.ds.edge_to_cell()
         isBdEdge = e2c[:, 0]==e2c[:, 1]
         NQF = isBdEdge.sum()
         I = NN*p*np.tile(np.arange(nh), (NQF, 1)).T.flatten()#多层单元
 
         self.qface = np.zeros([NQF*nh, edge.shape[-1]*(p+1)], dtype = edge.dtype)
-        self.qface[:, ::p+1] = (np.tile(edge[isBdEdge], (nh, 1)).T + I).T
+        self.qface[:, ::p+1] = (np.tile(edge[isBdEdge][:, ::-1], (nh, 1)).T + I).T
         for i in range(p+1):
             self.qface[:, i::p+1] = self.qface[:, ::p+1]+NN*i
 
