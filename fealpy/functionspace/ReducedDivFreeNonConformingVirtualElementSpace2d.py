@@ -127,7 +127,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
                 u0, edgetype=True)/eh[:, None, None]
         uh[0:2*NE*p] = uh0.reshape(-1, 2).T.flat
         if p > 2:
-            idx = self.smspace.index1(p=p-2) # 一次求导后的非零基函数编号及求导系数
+            idx = self.smspace.diff_index_1(p=p-2) # 一次求导后的非零基函数编号及求导系数
             x = idx['x']
             y = idx['y']
             def u1(x, index):
@@ -370,7 +370,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         G01 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
         G11 = np.zeros((NC, smldof, smldof), dtype=self.ftype)
 
-        idx = self.smspace.index1()
+        idx = self.smspace.diff_index_1()
         x = idx['x']
         y = idx['y']
         L = x[1][None, ...]/ch[..., None]
@@ -525,7 +525,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         F0 = F0@self.H1
         # F0 /= c[:, None, None] here is a bug
 
-        idx = self.smspace.index1(p=p-1)
+        idx = self.smspace.diff_index_1(p=p-1)
         x = idx['x']
         y = idx['y']
         idx0 = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*p + np.arange(p)
@@ -607,7 +607,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         R11 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         R12 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx = self.smspace.index2()
+        idx = self.smspace.diff_index_2()
         xx = idx['xx']
         yy = idx['yy']
         xy = idx['xy']
@@ -663,7 +663,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         # F0: (NE, ndof, p)
         F0 = F0@self.H1
 
-        idx = self.smspace.index1() # 一次求导后的非零基函数编号及求导系数
+        idx = self.smspace.diff_index_1() # 一次求导后的非零基函数编号及求导系数
         x = idx['x']
         y = idx['y']
         # idx0: (NE, p)
@@ -862,7 +862,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2d:
         U21 = np.zeros((smldof, len(cell2dof)), dtype=self.ftype)
         U22 = np.zeros((NC, smldof, idof), dtype=self.ftype)
 
-        idx = self.smspace.index1(p=p-1) # 一次求导后的非零基函数编号及求导系数
+        idx = self.smspace.diff_index_1(p=p-1) # 一次求导后的非零基函数编号及求导系数
         x = idx['x']
         y = idx['y']
         ch = self.smspace.cellsize # 单元尺寸 
