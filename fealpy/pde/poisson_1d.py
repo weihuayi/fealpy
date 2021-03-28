@@ -1,5 +1,6 @@
 import numpy as np
-from fealpy.mesh.IntervalMesh import IntervalMesh
+from fealpy.mesh import IntervalMesh
+from fealpy.decorator import cartesian, barycentric
 
 class CosData:
     def __init__(self):
@@ -11,7 +12,7 @@ class CosData:
         mesh = IntervalMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
-
+    @cartesian
     def solution(self, p):
         """ the exact solution
 
@@ -24,6 +25,7 @@ class CosData:
         val = np.cos(np.pi*x)
         return val 
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
 
@@ -36,11 +38,13 @@ class CosData:
         val = -pi*np.sin(pi*p)
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         val = np.pi**2*np.cos(np.pi*x)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         """Dilichlet boundary condition
         """

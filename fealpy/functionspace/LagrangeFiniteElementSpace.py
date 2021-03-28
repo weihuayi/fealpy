@@ -516,7 +516,7 @@ class LagrangeFiniteElementSpace():
     def div_value(self, uh, bc, index=np.s_[:]):
         dim = len(uh.shape)
         GD = self.geo_dimension()
-        if (dim == 2) & (uh.shape[1] == gdim):
+        if (dim == 2) & (uh.shape[1] == GD):
             val = self.grad_value(uh, bc, index=index)
             return val.trace(axis1=-2, axis2=-1)
         else:
@@ -643,6 +643,37 @@ class LagrangeFiniteElementSpace():
             val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
+
+    def rigid_motion_matrix(self):
+        GD = self.GD
+        p = self.p
+        if p == 1:
+            NN = self.mesh.number_of_nodes()
+            node = self.mesh.entity('node')
+            if GD == 2:
+                P = np.zeros((2*NN, 3), dtype=self.ftype)
+                P[0*NN:1*NN, 0] = 1.0
+                P[1*NN:2*NN, 1] = 1.0
+                P[0*NN:1*NN, 2] = node[:, 1]
+                P[1*NN:2*NN, 2] = -node[:, 0]
+            elif GD == 3:
+                P = np.zeros((3*NN, 6), dtype=self.ftype)
+                P[0*NN:1*NN, 0] = 1.0
+                P[1*NN:2*NN, 1] = 1.0
+                P[2*NN:3*NN, 2] = 1.0
+
+                P[0*NN:1*NN, 3] =  node[:, 1]
+                P[1*NN:2*NN, 3] = -node[:, 0]
+
+                P[1*NN:2*NN, 4] =  node[:, 2]
+                P[2*NN:3*NN, 4] = -node[:, 1]
+
+                P[0*NN:1*NN, 5] =  node[:, 2]
+                P[2*NN:3*NN, 4] = -node[:, 0]
+            return P
+                
+        else:
+            return None
 
     def linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
@@ -793,11 +824,18 @@ class LagrangeFiniteElementSpace():
         b = self.integralalg.construct_vector_s_s(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def stiff_matrix(self, c=None, q=None):
+    def stiff_matrix(self, c=None, q=None, isDDof=None):
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
+
+        if isDDof is not None: # 处理 D 氏边界条件
+            bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+            bdIdx[isDDof] = 1
+            Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+            T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+            A = T@A@T + Tbd
         return A 
 
     def mass_matrix(self, c=None, q=None):

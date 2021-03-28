@@ -332,7 +332,10 @@ class ParametricLagrangeFiniteElementSpace:
         d = np.sqrt(np.linalg.det(G))
         ps = mesh.bc_to_point(bcs, etype='cell')
         phi = self.basis(bcs)
-        val = f(ps)
+        if f.coordtype == 'cartesian':
+            val = f(ps)
+        elif f.coordtype == 'barycentric':
+            val = f(bcs)
         bb = np.einsum('q, qc, qci, qc->ci', ws*rm, val, phi, d)
 
         cell2dof = self.cell_to_dof()

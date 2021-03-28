@@ -133,6 +133,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
             return np.einsum('ijn, ijmn->ijm', u(x), 
                     self.smspace.grad_basis(x, p=p-1, index=index)[:, :, 1:, :])
         ch = self.smspace.cellsize
+        # h_K\nabla m_1, h_K\nabla m_2, ......, h_K\nabla m_{n_k -1}
         uh[c2d[:, 0:idof0]] = self.integralalg.integral(u1, celltype=True)/ch[:, None]
         if p > 2:
             # G_{k-2}^\perp 空间对应的自由度

@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 ## mesh
 from fealpy.mesh import PolygonMesh
 ## space
+from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.functionspace import DivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ReducedDivFreeNonConformingVirtualElementSpace2d
 from fealpy.functionspace import ScaledMonomialSpace2d

@@ -23,6 +23,9 @@ class VTKMeshWriter:
             self.queue = None
             self.process = None
 
+    def __call__(self, fname, mesh):
+        return self.write_to_vtk(fname, mesh) 
+
     def write_to_vtk(self, fname, mesh):
         """
 
@@ -42,13 +45,19 @@ class VTKMeshWriter:
 
         pdata = vtkmesh.GetPointData()
         for key, val in mesh.nodedata.items():
-            d = vnp.numpy_to_vtk(val)
+            if val.dtype == np.bool:
+                d = vnp.numpy_to_vtk(val.astype(np.int_))
+            else:
+                d = vnp.numpy_to_vtk(val)
             d.SetName(key)
             pdata.AddArray(d)
 
         cdata = vtkmesh.GetCellData()
         for key, val in mesh.celldata.items():
-            d = vnp.numpy_to_vtk(val)
+            if val.dtype == np.bool:
+                d = vnp.numpy_to_vtk(val.astype(np.int_))
+            else:
+                d = vnp.numpy_to_vtk(val)
             d.SetName(key)
             cdata.AddArray(d)
 

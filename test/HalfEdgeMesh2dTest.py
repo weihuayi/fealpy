@@ -253,6 +253,7 @@ class HalfEdgeMesh2dTest:
 
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
+        mesh.init_level_info()
 
         fig = plt.figure()
         axes = fig.gca()

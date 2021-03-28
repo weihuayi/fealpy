@@ -236,9 +236,13 @@ class ScaledMonomialSpace2d():
 
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         shape = point.shape[:-1]+(ldof, 2)
+        gphi = np.zeros(shape, dtype=np.float)
+
+        if p == 0:
+            return gphi
+
         phi = self.basis(point, index=index, p=p-1)
         idx = self.diff_index_1(p=p)
-        gphi = np.zeros(shape, dtype=np.float)
         xidx = idx['x']
         yidx = idx['y']
         gphi[..., xidx[0], 0] = np.einsum('i, ...i->...i', xidx[1], phi) 
@@ -463,6 +467,7 @@ class ScaledMonomialSpace2d():
         """
 
         """
+
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
         b = (self.basis, cell2dof, gdof)
@@ -515,7 +520,9 @@ class ScaledMonomialSpace2d():
         结定一个函数 f， 把它投影到缩放单项式空间
         """
 
-        b = self.source_vector(f, celltype=True, q=q)
+        def u(x, index):
+            return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index))
+        b = self.integralalg.integral(u, celltype=True)
         M = self.cell_mass_matrix()
         F = inv(M)@b[:, :, None]
         F = self.function(array=F.reshape(-1))

@@ -86,3 +86,4 @@ def showrate(axes, k, N, error, option, label=None, lw=1, ms=4):
         s = 0.75*error[k[0]]/N[k[0]]**c[0]
         line1, = axes.loglog(N[k], s*N[k]**c[0], label='C$N^{%0.4f}$'%(c[0]),
                 lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+

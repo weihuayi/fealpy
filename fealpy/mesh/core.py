@@ -26,8 +26,9 @@ class LinearMeshDataStructure():
         NC = self.NC
         cell = self.cell
         localFace = self.localFace
+        FV = self.FV
 
-        totalFace = cell[:, localFace].reshape(-1, 2)
+        totalFace = cell[:, localFace].reshape(-1, FV)
         return totalFace
 
     def construct_face(self):
@@ -85,6 +86,7 @@ class LinearMeshDataStructure():
         NE = i0.shape[0]
         self.NE = NE
         self.edge = totalEdge[i0, :]
+        self.cell2edge = np.reshape(j, (NC, E))
 
         if TD == 2:
             self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
@@ -96,6 +98,7 @@ class LinearMeshDataStructure():
             self.edge2cell[:, 1] = i1//E
             self.edge2cell[:, 2] = i0%E
             self.edge2cell[:, 3] = i1%E
+
 
 def multi_index_matrix0d(p):
     multiIndex = 1
@@ -134,14 +137,18 @@ def multi_index_matrix3d(p):
 
 multi_index_matrix = [multi_index_matrix0d, multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
 
-def lagrange_shape_function(bc, p):
+def lagrange_shape_function(bc, p, n=0):
     """
 
     Notes
     -----
     
-    计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次 Lagrange 形函数值。
+    计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
+    Lagrange 形函数关于 TD+1 个重心坐标的 n 阶导数.
+    
+    注意当 n = 0 时, 返回的是函数值。
     """
+    assert n <= p
 
     TD = bc.shape[-1] - 1
     multiIndex = multi_index_matrix[TD](p) 
@@ -150,14 +157,42 @@ def lagrange_shape_function(bc, p):
     c = np.arange(1, p+1, dtype=np.int)
     P = 1.0/np.multiply.accumulate(c)
     t = np.arange(0, p)
-    shape = bc.shape[:-1]+(p+1, TD+1)
+    shape = bc.shape[:-1]+(p+1, TD+1) # (NQ, p+1, TD+1)
     A = np.ones(shape, dtype=bc.dtype)
     A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
     np.cumprod(A, axis=-2, out=A)
-    A[..., 1:, :] *= P.reshape(-1, 1)
-    idx = np.arange(TD+1)
-    phi = np.prod(A[..., multiIndex, idx], axis=-1)
-    return phi
+
+    if n == 0:
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        R = np.prod(A[..., multiIndex, idx], axis=-1)
+        return R 
+    else:
+        T = p*bc[..., None, :] - t.reshape(-1, 1) # (NQ, p, TD+1)
+        F0 = A.copy() # (NQ, p+1, TD+1) 
+        F1 = np.zeros(A.shape, dtype=bc.dtype)
+
+        # (NQ, p, TD+1) = (NQ, p, TD+1)*(NQ, p, TD+1) + (NQ, p, TD+1)
+        for i in range(1, n+1):
+            for j in range(1, p+1):
+                F1[..., j, :] = F1[..., j-1, :]*T[..., j-1, :] + i*p*F0[..., j-1, :]
+            F0[:] = F1
+
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        F0[..., 1:, :] *= P.reshape(-1, 1)
+        
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F0[..., multiIndex, range(TD+1)]
+
+        shape = bc.shape[:-1]+(ldof, TD+1) # (NQ, ldof, TD+1)
+        R = np.zeros(shape, dtype=bc.dtype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+        return R # (..., ldof, TD+1)
+
+
 
 def lagrange_grad_shape_function(bc, p): 
     """
@@ -200,4 +235,3 @@ def lagrange_grad_shape_function(bc, p):
         idx.remove(i)
         R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
     return R # (..., ldof, TD+1)
-

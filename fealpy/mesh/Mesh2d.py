@@ -38,32 +38,6 @@ class Mesh2d(object):
     def top_dimension(self):
         return 2
 
-    def set_boundary_condition(self, btype='Dirichlet', threshhold=None):
-        """
-        Set boundary condtion into self.meshdata
-
-        Parameters
-        ----------
-        btype: string, 'Dirichlet', 'Neumann', 'Robin', or 'Fracture' 
-        threshhold: calllable object or a np.ndarray 
-        """
-        
-        NE = self.number_of_edges()
-        edge = self.entity('edge')
-        bc = self.entity_barycenter('edge')
-        if callable(threshhold):
-            idx = threshhold(bc)
-            if idx.dtype is np.bool:
-                idx, = idx.nonzero()
-        elif threshhold is np.ndarray:
-            idx = bc
-            if idx.dtype is np.bool:
-                idx, = idx.nonzero()
-        else:
-            idx = self.ds.boundary_edge_index()
-
-        self.meshdata[btype] = idx
-
     def entity(self, etype=2):
         if etype in {'cell', 2}:
             return self.ds.cell
@@ -97,6 +71,25 @@ class Mesh2d(object):
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
+
+    def node_size(self):
+        """
+        Notes
+        -----
+        计算每个网格节点邻接边的长度平均值, 做为节点处的网格尺寸值
+        """
+
+        NN = self.number_of_nodes()
+        edge = self.entity('edge')
+        eh = self.entity_measure('edge')
+        h = np.zeros(NN, dtype=self.ftype)
+        deg = np.zeros(NN, dtype=self.itype)
+
+        val = np.broadcast_to(eh[:, None], shape=edge.shape)
+        np.add.at(h, edge, val)
+        np.add.at(deg, edge, 1)
+
+        return h/deg
 
     def face_unit_normal(self, index=np.s_[:]):
         v = self.face_unit_tangent(index=index)
@@ -541,9 +534,9 @@ class Mesh2dDataStructure():
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdPoint = np.zeros((NN,), dtype=np.bool)
-        isBdPoint[edge[isBdEdge,:]] = True
-        return isBdPoint
+        isBdNode = np.zeros((NN,), dtype=np.bool)
+        isBdNode[edge[isBdEdge,:]] = True
+        return isBdNode
 
     def boundary_edge_flag(self):
         edge2cell = self.edge2cell

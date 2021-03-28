@@ -1,8 +1,9 @@
 import numpy as np
 
-from ..mesh import PolygonMesh
-from ..mesh import StructureQuadMesh, QuadrangleMesh
-from ..mesh import TriangleMesh, TriangleMeshWithInfinityNode
+from fealpy.decorator import cartesian, barycentric
+from fealpy.mesh import PolygonMesh
+from fealpy.mesh import StructureQuadMesh, QuadrangleMesh
+from fealpy.mesh import TriangleMesh, TriangleMeshWithInfinityNode
 
 class StokesModelData_0:
     """
@@ -47,6 +48,7 @@ class StokesModelData_0:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -58,6 +60,7 @@ class StokesModelData_0:
         val[..., 1] = -cos(pi*x)*sin(pi*y) 
         return val
 
+    @cartesian
     def strain(self, p):
         """
         (nabla u + nabla u^T)/2
@@ -73,6 +76,7 @@ class StokesModelData_0:
         return val
 
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -80,6 +84,7 @@ class StokesModelData_0:
         val = 1/(y**2 + 1) - pi/4 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -91,6 +96,7 @@ class StokesModelData_0:
         val[..., 1] = 2*y/(y**2 + 1)**2 - pi**2*sin(pi*y)*cos(pi*x)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -132,6 +138,7 @@ class StokesModelData_1:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -142,6 +149,7 @@ class StokesModelData_1:
         val[..., 1] = cos(x)*sin(x)*cos(y)*cos(y)/2
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -154,12 +162,14 @@ class StokesModelData_1:
         val[..., 1, 1] = -sin(x)*sin(y)*cos(x)*cos(y) 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.sin(x) - np.sin(y)
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -170,6 +180,7 @@ class StokesModelData_1:
         val[..., 1] =  2*sin(x)*cos(x)*cos(y)**2 + cos(y) - cos(x)*sin(x)/2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -212,6 +223,7 @@ class StokesModelData_2:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -223,6 +235,7 @@ class StokesModelData_2:
         val[..., 1] =-2*pi*cos(pi*x)*sin(pi*x)*sin(pi*y)**2 
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -236,12 +249,14 @@ class StokesModelData_2:
         val[..., 1, 1] =-4*pi**2*sin(pi*x)*sin(pi*y)*cos(pi*x)*cos(pi*y)  
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = 0 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -253,6 +268,7 @@ class StokesModelData_2:
         val[..., 1] =-6*pi**3*sin(pi*x)*sin(pi*y)**2*cos(pi*x) + 2*pi**3*sin(pi*x)*cos(pi*x)*cos(pi*y)**2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -295,6 +311,7 @@ class StokesModelData_3:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -306,6 +323,7 @@ class StokesModelData_3:
         val[..., 1] =-2*pi*cos(pi*x)*sin(pi*x)*sin(pi*y)**2 
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -319,6 +337,7 @@ class StokesModelData_3:
         val[..., 1, 1] =-4*pi**2*sin(pi*x)*sin(pi*y)*cos(pi*x)*cos(pi*y)  
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -326,6 +345,7 @@ class StokesModelData_3:
         val = sin(x) - sin(y) 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -337,6 +357,7 @@ class StokesModelData_3:
         val[..., 1] =-6*pi**3*sin(pi*x)*sin(pi*y)**2*cos(pi*x) + 2*pi**3*sin(pi*x)*cos(pi*x)*cos(pi*y)**2 + cos(y)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -388,6 +409,7 @@ class StokesModelData_4:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -396,6 +418,7 @@ class StokesModelData_4:
         val[..., 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(y**3 - y)**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -403,6 +426,7 @@ class StokesModelData_4:
         val = 1/(x**2 + 1) - pi/4
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -416,6 +440,7 @@ class StokesModelData_4:
         val[..., 1, 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(6*y**2 - 2)*(y**3 - y)  
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -438,6 +463,7 @@ class StokesModelData_4:
         val[..., 1] -= 3*(-2*x**3 + 2*x)*(y**3 - y)**2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -480,6 +506,7 @@ class StokesModelData_5:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -488,6 +515,7 @@ class StokesModelData_5:
         val[..., 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(y**3 - y)**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -495,6 +523,7 @@ class StokesModelData_5:
         val = 1/(x**2 + 1) - pi/4
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -508,6 +537,7 @@ class StokesModelData_5:
         val[..., 1, 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(6*y**2 - 2)*(y**3 - y)  
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -530,6 +560,7 @@ class StokesModelData_5:
         val[..., 1] -= 3*(-2*x**3 + 2*x)*(y**3 - y)**2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -580,6 +611,8 @@ class StokesModelData_6:
             pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
+
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -588,12 +621,14 @@ class StokesModelData_6:
         val[..., 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(y**3 - y)**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = 0 
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -607,6 +642,7 @@ class StokesModelData_6:
         val[..., 1, 1] = (3*x**2 - 1)*(-2*x**3 + 2*x)*(6*y**2 - 2)*(y**3 - y)  
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -669,6 +705,7 @@ class StokesModelData_7:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -677,6 +714,7 @@ class StokesModelData_7:
         val[..., 1] = x**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -685,6 +723,7 @@ class StokesModelData_7:
         val = np.zeros(shape, dtype=np.float)
         return val
 
+    @cartesian
     def strain(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -693,6 +732,7 @@ class StokesModelData_7:
         val[..., 1, 0] = val[..., 0, 1] 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -700,6 +740,7 @@ class StokesModelData_7:
         val = -np.ones(shape, dtype=np.float)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -747,6 +788,7 @@ class StokesModelData_8:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -755,12 +797,14 @@ class StokesModelData_8:
         val[..., 1] = x**3 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = x**3 - 1/3 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -771,6 +815,7 @@ class StokesModelData_8:
         val[..., 1] = 0 
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -815,6 +860,7 @@ class ModelData_1:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -824,12 +870,14 @@ class ModelData_1:
         val[..., 1] = (y + 1)/r 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = (x**2+y**2)**(2/3) - 0 #TODO:
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -840,6 +888,7 @@ class ModelData_1:
         val[..., 1] = 0 
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -881,6 +930,7 @@ class PolySquareData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -889,6 +939,7 @@ class PolySquareData:
         val[..., 1] = -x**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -896,6 +947,7 @@ class PolySquareData:
         val = (x**2 + y**2)**(1/3) - 0 #TODO:  
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -906,6 +958,7 @@ class PolySquareData:
         val[..., 1] = 0
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -948,6 +1001,7 @@ class PolySquareData:
             return pmesh
  
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -956,6 +1010,7 @@ class PolySquareData:
         val[..., 1] = -x**2 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -963,6 +1018,7 @@ class PolySquareData:
         val = (x**2 + y**2)**(1/3) - 0 #TODO:  
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -973,6 +1029,7 @@ class PolySquareData:
         val[..., 1] = 0
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -1016,6 +1073,7 @@ class LShapeSingularData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1025,12 +1083,14 @@ class LShapeSingularData:
         val[..., 1] = (y - 1)/r 
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = x + 1/6 
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1041,6 +1101,7 @@ class LShapeSingularData:
         val[..., 1] = 0
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -1082,6 +1143,7 @@ class PolyData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1090,12 +1152,14 @@ class PolyData:
         val[..., 1] = x**4 + 1
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = x**3 - y**3
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1104,6 +1168,7 @@ class PolyData:
         val[:,1] = -12*x**2 + 3*y**2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
@@ -1145,6 +1210,7 @@ class SinSinData:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
 
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1153,12 +1219,14 @@ class SinSinData:
         val[:,1] = np.cos(x)*np.cos(y)
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = 2*self.alpha*(np.cos(x)*np.sin(y) - np.sin(1)*(1 - np.cos(1)))
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1167,6 +1235,7 @@ class SinSinData:
         val[:,1] = (2*self.nu + 2*self.alpha)*np.cos(x)*np.cos(y)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
 
@@ -1206,7 +1275,7 @@ class PolyY2X2Data:
             pmesh = PolygonMesh(pnode, pcell, pcellLocation)
             return pmesh
  
-
+    @cartesian
     def velocity(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1215,12 +1284,15 @@ class PolyY2X2Data:
         val[..., 1] = x**2
         return val
 
+    @cartesian
     def pressure(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros(x.shape, dtype=np.float) 
         return val
 
+
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -1229,5 +1301,96 @@ class PolyY2X2Data:
         val[..., 1] = -1
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
+
+
+
+class StokesModelRTData:
+    """
+    [0, 1]^2
+    u(x, y) = 0
+    p = Ra*(y^3 - y^2/2 + y - 7/12)
+    """
+    def __init__(self, Ra):
+        self.box = [0, 1, 0, 1]
+        self.Ra = Ra
+
+    def domain(self):
+        return self.box
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float)
+
+        if meshtype == 'tri':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'quad':
+            nx = 2
+            ny = 2
+            mesh = StructureQuadMesh(self.box, nx, ny)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'poly':
+            cell = np.array([
+                (1, 2, 0),
+                (3, 0, 2)], dtype=np.int)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            nmesh = TriangleMeshWithInfinityNode(mesh)
+            pnode, pcell, pcellLocation = nmesh.to_polygonmesh()
+            pmesh = PolygonMesh(pnode, pcell, pcellLocation)
+            return pmesh
+
+    @cartesian
+    def velocity(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0
+        val[..., 1] = 0
+        return val
+
+    @cartesian
+    def strain(self, p):
+        """
+        (nabla u + nabla u^T)/2
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape + (2, ), dtype=np.float)
+        val[..., 0, 0] = 0
+        val[..., 1, 1] = 0
+        return val
+
+
+    @cartesian
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = self.Ra*(y**3 - y**2/2 + y - 7/12)
+        return val
+
+    @cartesian
+    def source(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = np.zeros(p.shape, dtype=np.float)
+        val[..., 0] = 0
+        val[..., 1] = -self.Ra*(1 - y + 3*y**2)
+        return val
+
+    @cartesian
+    def dirichlet(self, p):
+        return self.velocity(p)
+

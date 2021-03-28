@@ -114,10 +114,10 @@ class LagrangeTriangleMesh(Mesh2d):
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)
-        index = vtk_cell_index(self.p, cellType)
+        idx = vtk_cell_index(self.p, cellType)
         NV = cell.shape[-1]
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, index]]
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell[:, idx]]
         cell[:, 0] = NV
 
         NC = len(cell)
@@ -262,7 +262,7 @@ class LagrangeTriangleMesh(Mesh2d):
         phi = self.shape_function(bc) # (NQ, 1, ldof)
         p = np.einsum('ijk, jkn->ijn', phi, node[entity])
         return p
-
+    
     def jacobi_matrix(self, bc, index=np.s_[:], return_grad=False):
         """
         Notes
@@ -276,12 +276,63 @@ class LagrangeTriangleMesh(Mesh2d):
         entity = self.entity(etype=TD)[index]
         gphi = self.grad_shape_function(bc)
         J = np.einsum(
-                'cin, qcim->qcnm',
+                'cin, ...cim->...cnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)
         if return_grad is False:
             return J #(NQ,NC,GD,TD)
         else:
             return J, gphi
+
+    def jacobi_TMOP(self, index = np.s_[:]):
+
+        '''
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 三角形(x) 之间映射的 Jacobi 矩阵
+        分解出的各个度量
+        '''
+
+        p = self.p
+        bc = multi_index_matrix[2](p)/p
+
+        J = self.jacobi_matrix(bc, index=index)# Jacobi矩阵
+        
+        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis = -1))# 网格单元尺寸
+        
+        r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
+
+        Delta = np.einsum('ij,...j->...ij', np.eye(2), r)
+        r0 = r[:, :, 0]*r[:, :, 1]
+        Delta = np.einsum('...ijk,...i->...ijk',Delta, np.sqrt(1/r0))# 网格单元纵横比
+        
+        sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
+        cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+
+        E = np.zeros(J[...,1].shape)
+        E[...,0] = 1
+        stheta = np.cross(E,J[...,0],axis=-1)/r[...,0]
+        ctheta = np.sum(J[...,0]*E,axis=-1)/r[...,0]
+        
+        V = np.zeros(J.shape)# 网格单元方向
+        V[..., 0, 0] = ctheta
+        V[..., 1, 0] = stheta
+        V[..., 0, 1] = -stheta
+        V[..., 1, 1] = ctheta
+        
+        Q = np.zeros(J.shape)# 网格单元夹角
+        Q[..., 0, 0] = 1/np.sqrt(sphi)
+        Q[..., 1, 0] = cphi/np.sqrt(sphi)
+        Q[..., 1, 1] = sphi/np.sqrt(sphi)
+        
+        U = np.zeros(J.shape)# 网格单元尺寸和形状
+        U[...,0,0] = r[..., 0]
+        U[...,1,0] = r[..., 1]*cphi
+        U[...,1,1] = r[..., 1]*sphi
+
+        S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
+        #V = np.dot(J, np.linalg.inv(U))# 网格单元方向
+        return J, Lambda, Q, Delta, S, U, V
+
 
     def first_fundamental_form(self, bc, index=np.s_[:], 
             return_jacobi=False, return_grad=False):

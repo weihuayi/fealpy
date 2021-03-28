@@ -14,6 +14,8 @@ import vtk.util.numpy_support as vnp
 
 from .vtkCellTypes import *
 
+from .core import multi_index_matrix2d
+
 def vtk_cell_index(p, celltype):
     """
 
@@ -60,6 +62,30 @@ def vtk_cell_index(p, celltype):
             idx = quad.PointIndexFromIJK(loc[0], loc[1], orders)
             index[idx] = i
         return index
+    elif celltype == VTK_LAGRANGE_HEXAHEDRON:
+        hexa = vtk.vtkLagrangeHexahedron()
+        orders = (p, p, p)
+        sizes = (p + 1, p + 1, p+1)
+        index = np.zeros(sizes[0]*sizes[1]*sizes[2], dtype=np.int_)
+        for i, loc in enumerate(np.ndindex(sizes)):
+            idx = hexa.PointIndexFromIJK(loc[0], loc[1], loc[2], orders)
+            index[idx] = i
+        return index
+    elif celltype == VTK_LAGRANGE_WEDGE:
+        wedge = vtk.vtkLagrangeWedge()
+        orders = (p, p, p)
+        size = (orders[0] + 1) * (orders[0] + 2) * (orders[2] + 1)// 2
+        index = np.zeros(size, dtype=np.int_)
+        multiIndex = multi_index_matrix2d(p)
+        i = 0
+        for i0, i1 in multiIndex[:, 1:]:
+            for i2 in range(p+1):
+                idx = wedge.PointIndexFromIJK(i0, i1, i2, orders)
+#                print(i, ":", i0, i1, i2, idx)        
+                index[idx] = i  
+                i += 1
+        return index
+
 
 def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     """
@@ -82,7 +108,10 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     if nodedata is not None:
         for key, val in nodedata.items():
             if val is not None:
-                d = vnp.numpy_to_vtk(val[:])
+                if val.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val[:])
                 d.SetName(key)
                 pdata.AddArray(d)
 
@@ -90,7 +119,10 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
         cdata = mesh.GetCellData()
         for key, val in celldata.items():
             if val is not None:
-                d = vnp.numpy_to_vtk(val[:])
+                if val.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val[:])
                 d.SetName(key)
                 cdata.AddArray(d)
     writer = vtk.vtkXMLUnstructuredGridWriter()

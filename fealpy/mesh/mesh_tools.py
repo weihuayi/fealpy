@@ -20,15 +20,17 @@ def find_node(
         node = np.r_['1', node, np.zeros_like(node)]
     if index is None:
         index = range(node.shape[0])
-    elif (type(index) is np.ndarray) & (index.dtype == np.bool):
+    elif (type(index) is np.int_):
+        index = np.array([index], dtype=np.int_)
+    elif (type(index) is np.ndarray) and (index.dtype == np.bool):
         index, = np.nonzero(index)
-    elif (type(index) is list) & (type(index[0]) is np.bool):
+    elif (type(index) is list) and (type(index[0]) is np.bool):
         index, = np.nonzero(index)
     else:
         pass
         #TODO: raise a error
 
-    if (type(color) is np.ndarray) & (np.isreal(color[0])):
+    if (type(color) is np.ndarray) and (np.isreal(color[0])):
         umax = color.max()
         umin = color.min()
         norm = colors.Normalize(vmin=umin, vmax=umax)
@@ -38,7 +40,7 @@ def find_node(
     bc = node[index]
     dim = node.shape[1]
     if dim == 2:
-        axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
+        axes.scatter(bc[..., 0], bc[..., 1], c=color, s=markersize)
         if showindex:
             if multiindex is not None:
                 if (type(multiindex) is np.ndarray) and (len(multiindex.shape) > 1):
@@ -62,7 +64,7 @@ def find_node(
                             multialignment='center', fontsize=fontsize, 
                             color=fontcolor) 
     else:
-        axes.scatter(bc[:, 0], bc[:, 1], bc[:, 2], c=color, s=markersize)
+        axes.scatter(bc[..., 0], bc[..., 1], bc[..., 2], c=color, s=markersize)
         if showindex:
             if multiindex is not None:
                 if (type(multiindex) is np.ndarray) and (len(multiindex.shape) > 1):

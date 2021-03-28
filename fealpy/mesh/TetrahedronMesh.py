@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, bmat
+from scipy.spatial import KDTree
 from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
 from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendreQuadrature
@@ -82,7 +83,7 @@ class TetrahedronMesh(Mesh3d):
         elif etype in {'edge', 1}:
             return GaussLegendreQuadrature(k)
 
-    def to_vtk(self, etype='cell', index=np.s_[:]):
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
 
         Parameters
@@ -96,23 +97,110 @@ class TetrahedronMesh(Mesh3d):
         -----
         把网格转化为 VTK 的格式
         """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
         node = self.entity('node')
         GD = self.geo_dimension()
 
         cell = self.entity(etype)[index]
         NV = cell.shape[-1]
+        NC = len(cell)
 
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell = np.r_['1', np.zeros((NC, 1), dtype=cell.dtype), cell]
         cell[:, 0] = NV
 
         if etype == 'cell':
             cellType = 10  # 四面体
+            celldata = self.celldata
         elif etype == 'face':
             cellType = 5  # 三角形
+            celldata = self.facedata
         elif etype == 'edge':
             cellType = 3  # segment 
+            celldata = self.edgedata
 
-        return node, cell.flatten(), cellType, len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=celldata)
+
+    def is_crossed_cell(self, point, segment):
+        pass
+
+    def location(self, points):
+        """
+
+        Notes
+        ----
+
+        给定一个点, 找到这些点所在的单元
+
+        这里假设：
+
+        1. 网格中没有洞
+        2. 区域还要是凸的
+
+        """
+
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NP = points.shape[0]
+
+        self.celldata['cell'] = np.zeros(NC)
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
+
+        start = np.zeros(NN, dtype=self.itype)
+        start[cell[:, 0]] = range(NC)
+        start[cell[:, 1]] = range(NC)
+        start[cell[:, 2]] = range(NC)
+        start[cell[:, 3]] = range(NC)
+
+        tree = KDTree(node)
+        _, loc = tree.query(points)
+        start = start[loc] # 设置一个初始单元位置
+
+        print("start:", start)
+
+        self.celldata['cell'][start] = 1
+
+        localFace = self.ds.localFace
+        isNotOK = np.ones(NP, dtype=np.bool)
+        while np.any(isNotOK):
+            idx = start[isNotOK] # 试探的单元编号
+            pp = points[isNotOK] # 还没有找到所在单元的点的坐标
+
+            v = node[cell[idx, :]] - pp[:, None, :] # (NP, 4, 3) - (NP, 1, 3)
+            # 计算点和当前四面体四个面形成四面体的体积
+            a = np.zeros((len(idx), 4), dtype=self.ftype)
+            for i in range(4):
+                vv = np.cross(v[:, localFace[i, 0]], v[:, localFace[i, 1]])
+                a[:, i] = np.sum(vv*v[:, localFace[i, 2]], axis=-1) 
+            lidx = np.argmin(a, axis=-1) 
+
+            # 最小体积小于 0, 说明点在单元外
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0 
+
+            idx0, = np.nonzero(isNotOK)
+            flag = (idx[isOutCell] == cell2cell[idx[isOutCell],
+                lidx[isOutCell]])
+
+            start[idx0[isOutCell][~flag]] = cell2cell[idx[isOutCell][~flag],
+                    lidx[isOutCell][~flag]]
+            start[idx0[isOutCell][flag]] = -1 
+
+            self.celldata['cell'][start[start > -1]] = 1
+
+            isNotOK[idx0[isOutCell][flag]] = False
+            isNotOK[idx0[~isOutCell]] = False
+
+        return start 
 
     def direction(self, i):
         """ Compute the direction on every node of
@@ -189,8 +277,6 @@ class TetrahedronMesh(Mesh3d):
 
 
     def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
-
-        print('The argument `etype` in  `bc_to_point` function will be removed in the future!')
 
         TD = bc.shape[-1] - 1 #
         node = self.node
@@ -318,7 +404,7 @@ class TetrahedronMesh(Mesh3d):
         length = np.sum(
                 (node[totalEdge[:, 1]] - node[totalEdge[:, 0]])**2,
                 axis = -1)
-        length += 0.1*np.random.rand(NE)*length
+        #length += 0.1*np.random.rand(NE)*length
         cellEdgeLength = length.reshape(NC, 6)
         lidx = np.argmax(cellEdgeLength, axis=-1)
 
@@ -347,7 +433,7 @@ class TetrahedronMesh(Mesh3d):
 
 
     def uniform_bisect(self, n=1):
-        for i in range(2*n):
+        for i in range(n):
             self.bisect()
 
     def bisect(self, isMarkedCell=None, data=None, returnim=False):
@@ -366,6 +452,12 @@ class TetrahedronMesh(Mesh3d):
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
+
+        for key in self.celldata:
+            data = np.zeros(4*NC, dtype=self.itype)
+            data[:NC] = self.celldata[key]
+            self.celldata[key] = data.copy()
+
         # 用于存储网格节点的代数，初始所有节点都为第 0 代
         generation = np.zeros(NN + 6*NC, dtype=np.uint8)
 
@@ -468,6 +560,11 @@ class TetrahedronMesh(Mesh3d):
             cell[NC:NC+nMarked, 1] = p1
             cell[NC:NC+nMarked, 2] = p3
             cell[NC:NC+nMarked, 3] = p4
+
+            for key in self.celldata:
+                data = self.celldata[key]
+                data[NC:NC+nMarked] = data[markedCell]
+
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3, p4
 
@@ -496,6 +593,9 @@ class TetrahedronMesh(Mesh3d):
         self.node = node[:NN]
         cell = cell[:NC]
         self.ds.reinit(NN, cell)
+
+        for key in self.celldata:
+            self.celldata[key] = self.celldata[key][:NC]
 
         if returnim is True:
             return IM

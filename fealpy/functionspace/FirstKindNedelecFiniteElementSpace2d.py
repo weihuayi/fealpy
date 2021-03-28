@@ -116,7 +116,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         Note
         ----
-        RT_p : [P_{p}]^d(T) + [-m_2, m_1]^T \\bar P_{p}(T)
+        Nedelec_p : [P_{p}]^d(T) + [-m_2, m_1]^T \\bar P_{p}(T)
 
         """
         self.mesh = mesh
@@ -208,7 +208,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
 
     @barycentric
-    def edge_basis(self, bc, index=None, barycenter=True):
+    def edge_basis(self, bc, index=None, barycenter=True, left=True):
         """
         """
         p = self.p
@@ -226,23 +226,33 @@ class FirstKindNedelecFiniteElementSpace2d:
             ps = mesh.bc_to_point(bc, etype='edge', index=index)
         else:
             ps = bc
-        val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+
+        if left:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 0]) # (NQ, NE, ndof)
+        else:
+            val = self.smspace.basis(ps, p=p+1, index=edge2cell[index, 1]) # (NQ, NE, ndof)
 
         shape = ps.shape[:-1] + (edof, GD)
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NE, edof, 2)
 
-        idx0 = edge2cell[index, 0][:, None]
-        idx2 = edge2cell[index[:, None], [2]]*edof + np.arange(edof)
+        if left:
+            idx0 = edge2cell[index, 0][:, None]
+            idx2 = edge2cell[index, 2][:, None]*edof + np.arange(edof)
+        else:
+            idx0 = edge2cell[index, 1][:, None]
+            idx2 = edge2cell[index, 3][:, None]*edof + np.arange(edof)
+
         c = self.bcoefs[idx0, :, idx2].swapaxes(-1, -2) # (NE, ldof, edof) 
         idx = self.smspace.edge_index_1(p=p+1)
         x = idx['x']
         y = idx['y']
 
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0] += np.einsum('ijm, jmn->ijn', val[..., cdof+y], c[:, GD*cdof:, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y], c[:, GD*cdof:, :])
 
-        phi[..., 1] += np.einsum('ijm, jmn->ijn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x], c[:, GD*cdof:, :])
+        phi[..., 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x], c[:, GD*cdof:, :])
+
         return phi
 
     @barycentric
@@ -343,10 +353,10 @@ class FirstKindNedelecFiniteElementSpace2d:
         x = idx['x']
         y = idx['y']
 
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
-        phi[:] += np.einsum('ijm, jmn->ijn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
-        phi[:] -= np.einsum('ijm, jmn->ijn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
+        phi[:] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
+        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
         return phi
 
     @barycentric
@@ -387,6 +397,16 @@ class FirstKindNedelecFiniteElementSpace2d:
         return val
 
     @barycentric
+    def edge_value(self, uh, bc, index=np.s_[:], left=True):
+        phi = self.edge_basis(bc, index=index, left=left)
+        edge2dof = self.dof.edge_to_dof() 
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[edge2dof])
+        return val
+
+    @barycentric
     def grad_value(self, uh, bc, index=np.s_[:]):
         pass
 
@@ -407,7 +427,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         @barycentric
         def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
+            ps = mesh.bc_to_point(bc)
             return np.einsum('ijk, jk, ijm->ijm', u(ps), t, self.smspace.edge_basis(ps))
 
         uh[edge2dof] = self.integralalg.edge_integral(f0)
@@ -454,47 +474,6 @@ class FirstKindNedelecFiniteElementSpace2d:
         b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def neumann_boundary_vector(self, g, threshold=None, q=None):
-        """
-        Parameters
-        ----------
-
-        Notes
-        ----
-            For mixed finite element method, the Dirichlet boundary condition of
-            Poisson problem become Neumann boundary condition, and the Neumann
-            boundary condtion become Dirichlet boundary condition.
-        """
-        p = self.p
-        mesh = self.mesh
-        edof = self.smspace.number_of_local_dofs(doftype='edge') 
-        edge2cell = mesh.ds.edge_to_cell()
-        edge2dof = self.dof.edge_to_dof() 
-
-        qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
-        bcs, ws = qf.get_quadrature_points_and_weights()
-
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if threshold is not None:
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        en = mesh.edge_unit_normal(index=index)
-        phi = self.edge_basis(bcs, index=index) 
-
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        val = -g(ps)
-        measure = self.integralalg.edgemeasure[index]
-
-        gdof = self.number_of_global_dofs()
-        F = np.zeros(gdof, dtype=self.ftype)
-        bb = np.einsum('i, ij, ijmk, jk, j->jm', ws, val, phi, en, measure, optimize=True)
-        np.add.at(F, edge2dof[index], bb)
-        return F 
-
     def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
         """
         """
@@ -514,9 +493,9 @@ class FirstKindNedelecFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
-        en = mesh.edge_unit_normal(index=index)
-        val = g(ps, en)
+        t = mesh.edge_unit_tangent(index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
+        val = g(ps, t)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]
@@ -526,6 +505,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         isDDof = np.zeros(gdof, dtype=np.bool_) 
         isDDof[edge2dof[index]] = True
         return isDDof
+
 
     def array(self, dim=None):
         gdof = self.number_of_global_dofs()
