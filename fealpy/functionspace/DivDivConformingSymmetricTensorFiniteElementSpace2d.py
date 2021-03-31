@@ -191,7 +191,6 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         ----
 
 
-
         """
         self.mesh = mesh
         self.p = p # (l, k)
@@ -276,8 +275,25 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         A[:, 8, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
 
         # 单元内部自由度
-        start = 9 + 3*(2*l - 1) # 除出点和边上的自由度
-        kdof = smspace.number_of_local_dofs(p=k-2) # \nabla^2 m_{k-2}  kdof - 3
+        start = 9 + 3*(2*l - 1) # 除去点和边上的自由度
+        kdof = smspace.number_of_local_dofs(p=k-2) 
+        ldof = smspace.number_of_local_dofs(p=l-1)
+
+        if k > 3:
+            bcs, ws = self.integrator.get_quadrature_points_and_weights()
+            point = mesh.bc_to_point(bcs)
+            shape = point.shape[:-1]+(kdof, 3)
+            hphi = np.zeros(shape, dtype=mesh.ftype)
+            phi = self.basis(point, index=index, p=k-4)
+            idx = self.diff_index_2(p=k-2)
+            hphi[..., idx['xx'][0], 0] = np.einsum('i, ...i->...i', idx['xx'][1], phi)
+            hphi[..., idx['yy'][0], 1] = np.einsum('i, ...i->...i', idx['yy'][1], phi)
+            hphi[..., idx['xy'][0], 2] = np.einsum('i, ...i->...i', idx['xy'][1], phi)
+
+
+
+
+
 
 
 
