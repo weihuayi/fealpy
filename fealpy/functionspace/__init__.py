@@ -20,9 +20,9 @@ from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementS
 from .FourierSpace import FourierSpace
 
 #from .mixed_fem_space import RTFiniteElementSpace2d
+#from .PrismFiniteElementSpace import PrismFiniteElementSpace
 from .vem_space import VEMDof2d, VirtualElementSpace2d
 from .MonomialSpace2d import MonomialSpace2d
-from .PrismFiniteElementSpace import PrismFiniteElementSpace
 from .femdof import CPPFEMDof3d
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
 

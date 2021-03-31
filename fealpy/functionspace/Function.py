@@ -73,8 +73,22 @@ class Function(np.ndarray):
                     triangles=face, cmap=cmap)
         elif mesh.meshtype in {'polygon', 'halfedge', 'halfedge2d'}:
             node = mesh.entity('node')
-            axes.plot_trisurf(
-                    node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)
+            if self.space.stype == 'wg':
+                NN = mesh.number_of_nodes()
+                NV = mesh.number_of_vertices_of_cells()
+                bc = mesh.entity_barycenter('cell')
+                val = np.repeat(self(bc), NV)
+                cell, cellLocation = mesh.entity('cell')
+                uh = np.zeros(NN, dtype=mesh.ftype)
+                deg = np.zeros(NN, dtype=mesh.itype)
+                np.add.at(uh, cell, val)
+                np.add.at(deg, cell, 1)
+                uh /= deg
+                axes.plot_trisurf(
+                        node[:, 0], node[:, 1], uh, cmap=cmap, lw=0.0)
+            else:
+                axes.plot_trisurf(
+                        node[:, 0], node[:, 1], self, cmap=cmap, lw=0.0)
             return axes
         elif mesh.meshtype in {'stri'}:
             bc = np.array([1/3, 1/3, 1/3])

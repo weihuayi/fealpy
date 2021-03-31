@@ -20,7 +20,7 @@ lam = pde.lam
 mesh = pde.init_mesh(n=n)
 
 space = LagrangeFiniteElementSpace(mesh, p=1, q=3)
-M, G = space.recovery_linear_elasticity_matrix(mu, lam, format=None)
+M, G = space.recovery_linear_elasticity_matrix(lam, mu, format=None)
 F = space.source_vector(pde.source, dim=3)
 
 uh = space.function(dim=3)    

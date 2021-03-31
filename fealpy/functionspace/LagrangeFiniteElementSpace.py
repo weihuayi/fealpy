@@ -71,6 +71,7 @@ class LagrangeFiniteElementSpace():
         self.integrator = self.integralalg.integrator
 
         self.multi_index_matrix = multi_index_matrix 
+        self.stype = 'lagrange'
 
     def __str__(self):
         return "Lagrange finite element space!"

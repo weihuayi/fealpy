@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 from fealpy.tools.show import showmultirate, show_error_table
@@ -119,8 +119,8 @@ maxit = int(sys.argv[3])	# 网格加密最大次数
 pde = CDRMODEL()
 domain = pde.domain()
 
-mf = MeshFactory()
-mesh = mf.boxmesh2d(domain, nx=n, ny=n, meshtype='tri')
+
+mesh = MF.boxmesh2d(domain, nx=n, ny=n, meshtype='tri')
 
 NDof = np.zeros(maxit, dtype=mesh.itype)
 errorMatrix = np.zeros((2, maxit), dtype=mesh.ftype)
