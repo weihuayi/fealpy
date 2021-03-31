@@ -259,6 +259,33 @@ class WeakGalerkinSpace2d:
         R1[:, idx] = -M[:, 1].swapaxes(0, 1)
         return R0, R1
 
+    def stiff_matrix(self):
+        gdof = self.space.number_of_global_dofs()
+        cell2dof, cell2dofLocation = self.space.cell_to_dof()
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        H0 = self.space.H0
+        R = self.space.R
+        def f0(i):
+            R0 = R[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            R1 = R[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return R0.T@H0[i]@R0, R1.T@H0[i]@R1, R0.T@H0[i]@R1
+
+        NC = self.mesh.number_of_cells()
+        M = list(map(f0, range(NC)))
+
+        idx = list(map(np.meshgrid, cd, cd))
+        I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
+        J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
+
+        val = np.concatenate(list(map(lambda x: x[0].flat, M)))
+        M00 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
+
+        val = np.concatenate(list(map(lambda x: x[1].flat, M)))
+        M11 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
+
+        A = M00 + M11 # weak gradient matrix
+        return A
+
     def mass_matrix(self):
         cell2dof = self.cell_to_dof(doftype='cell') # only get the dofs in cell
         ldof = cell2dof.shape[1]

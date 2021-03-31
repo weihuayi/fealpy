@@ -9,7 +9,6 @@ from fealpy.wg.SobolevEquationWGModel2d import SobolevEquationWGModel2d
 from fealpy.boundarycondition import DirichletBC
 from fealpy.mesh.simple_mesh_generator import triangle
 from fealpy.pde.sobolev_equation_2d import SinSinExpData, PolyExpData
-from fealpy.solver import MatlabSolver
 from fealpy.tools import show_error_table
 
 class SobolevEquationWGModel2dTest:
