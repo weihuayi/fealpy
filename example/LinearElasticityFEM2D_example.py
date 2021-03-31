@@ -165,7 +165,7 @@ bc1 = NeumannBC(space, pde.neumann, threshold=pde.is_neumann_boundary)
 
 uh = space.function(dim=2) # (gdof, 2) and vector fem function uh[i, j] 
 P = space.stiff_matrix(c=2*pde.mu)
-A = space.linear_elasticity_matrix(pde.mu, pde.lam) # (2*gdof, 2*gdof)
+A = space.linear_elasticity_matrix(pde.lam, pde.mu) # (2*gdof, 2*gdof)
 F = space.source_vector(pde.source, dim=2) 
 F = bc1.apply(F)
 A, F = bc0.apply(A, F, uh)
