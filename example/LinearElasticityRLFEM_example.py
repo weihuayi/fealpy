@@ -14,7 +14,7 @@ from fealpy.solver.LinearElasticityRLFEMFastSolver import LinearElasticityRLFEMF
 
 n = int(sys.argv[1])
 
-pde = PDE(lam=100.0, mu=1.0)
+pde = PDE(lam=10000.0, mu=1.0)
 mu = pde.mu
 lam = pde.lam
 mesh = pde.init_mesh(n=n)
