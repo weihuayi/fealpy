@@ -37,10 +37,12 @@ class LinearWedgeMeshDataStructure():
             self.cell[:, i::p+1] = self.cell[:, ::p+1]+NN*i
         
         #构建面
-        self.tface = np.r_[self.cell[:NC, ::p+1], self.cell[-NC:, p::p+1][:,
-            ::-1]]
+        idx = np.arange((p+1)*(p+2)//2)
+        for i in range(p+1):
+            idx[i*(i+1)//2:(i+1)*(i+2)//2] = idx[i*(i+1)//2:(i+1)*(i+2)//2][::-1]
+        self.tface = np.r_[self.cell[:NC, ::p+1], self.cell[-NC:, p::p+1][:, idx]]
         e2c = mesh.ds.edge_to_cell()
-        isBdEdge = e2c[:, 0]==e2c[:, 1]
+        isBdEdge = e2c[:, 0] == e2c[:, 1]
         NQF = isBdEdge.sum()
         I = NN*p*np.tile(np.arange(nh), (NQF, 1)).T.flatten()#多层单元
 
@@ -177,11 +179,11 @@ class LagrangeWedgeMesh(Mesh3d):
         elif etype in {'face', 2}:
             qf0, qf1 = self.integrator(1, etype=2)
             if ftype == 'tri':
-                bcs, ws = qf0.get_quadrature_points_and_weights()
+                bc, ws = qf0.get_quadrature_points_and_weights()
                 p = self.bc_to_point(bc, index=index, etype='face', 
                         ftype='tri').reshape(-1, GD)
             elif ftype == 'quad':
-                bcs, ws = qf1.get_quadrature_points_and_weights()
+                bc, ws = qf1.get_quadrature_points_and_weights()
                 p = self.bc_to_point(bc, index=index, etype='face',
                         ftype='quad').reshape(-1, GD)
             else:
@@ -570,18 +572,39 @@ class CLagrangeWedgeDof2d():
         self.itype = mesh.itype
         self.ftype = mesh.ftype
 
-    def is_boundary_dof(self):
-        index0 = self.mesh.ds.boundary_tri_face_index()
-        index1 = self.mesh.ds.boundary_quad_face_index()
+    def is_tri_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_tri_face_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('face', ftype='tri',
+                        index=index)
+                flag = threshold(bc)
+                index = index[flag]
 
         gdof = self.number_of_global_dofs()
         tface2dof = self.tri_face_to_dof()
+        istBdDof = np.zeros(gdof, dtype=np.bool)
+        istBdDof[tface2dof[index]] = True
+        return istBdDof
+
+    def is_quad_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_quad_face_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('face', ftype='quad',
+                        index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        gdof = self.number_of_global_dofs()
         qface2dof = self.quad_face_to_dof()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
-        isBdDof[tface2dof[index0]] = True
-        isBdDof[qface2dof[index1]] = True
-        node = self.mesh.entity('node')
-        return isBdDof
+        isqBdDof = np.zeros(gdof, dtype=np.bool)
+        isqBdDof[qface2dof[index1]] = True
+        return isqBdDof
 
     def edge_to_dof(self):
         """
