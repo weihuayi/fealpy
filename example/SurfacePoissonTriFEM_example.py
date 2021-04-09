@@ -63,7 +63,7 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
 
 
-    A = space.stiff_matrix(variables='u')
+    A = space.stiff_matrix()
     C = space.integral_basis()
     F = space.source_vector(pde.source)
 
