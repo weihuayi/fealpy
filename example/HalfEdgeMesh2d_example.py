@@ -4,10 +4,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 
-mf = MeshFactory()
-mesh = mf.polygon_mesh(meshtype='triquad')
+
+mesh = MF.polygon_mesh(meshtype='triquad')
 
 fig = plt.figure()
 axes = fig.gca()

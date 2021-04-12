@@ -29,7 +29,9 @@ class PolygonMeshIntegralAlg():
 
     def edge_integral(self, u, edgetype=False, q=None, index=None):
         """
+        Note:
 
+        edgetype 参数要去掉， 函数名字意味着是逐个实体上的积分
 
         """
         mesh = self.mesh
@@ -50,10 +52,18 @@ class PolygonMeshIntegralAlg():
         return e
 
     def face_integral(self, u, facetype=False, q=None, index=None):
+        """
+        TODO:
+            facetype 参数要去掉， 函数名字意味着是逐个实体上的积分
+        """
         return self.edge_integral(u, facetype, q, index)
 
-    def cell_integral(self, u, celltype=False, q=None):
-        return self.integral(u, celltype=celltype, q=q)
+    def cell_integral(self, u,  q=None):
+        """
+        TODO:
+            引入 power 参数
+        """
+        return self.integral(u, celltype=True, q=q)
 
     def integral(self, u, celltype=False, q=None):
         mesh = self.mesh

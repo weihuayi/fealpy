@@ -430,11 +430,19 @@ class ScaledMonomialSpace2d():
         return LM, RM 
 
     def stiff_matrix(self, p=None):
+        """
+
+        Note:
+            这个程序仅用于多边形网格上的刚度矩阵组装
+        """
         p = self.p if p is None else p
+
+        @cartesian
         def f(x, index):
             gphi = self.grad_basis(x, index=index, p=p)
             return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
-        A = self.integralalg.integral(f, celltype=True, q=p+3)
+
+        A = self.integralalg.cell_integral(f, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
         ldof = self.number_of_local_dofs(p=p, doftype='cell')
         I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
