@@ -327,7 +327,7 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
             return cell2edge 
 
-    def cell_to_edge_sign(self, return_sparse=False):
+    def cell_to_edge_sign(self, sparse=False):
         NC = self.NC
         E = self.E
 
@@ -342,7 +342,7 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
         return cell2edgeSign
 
-    def cell_to_face(self, return_sparse=False):
+    def cell_to_face(self, sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE

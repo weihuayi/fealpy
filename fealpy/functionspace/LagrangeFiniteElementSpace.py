@@ -71,6 +71,7 @@ class LagrangeFiniteElementSpace():
         self.integrator = self.integralalg.integrator
 
         self.multi_index_matrix = multi_index_matrix 
+        self.stype = 'lagrange'
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -729,7 +730,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
+    def recovery_linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the recovery linear elasticity fem matrix
         """

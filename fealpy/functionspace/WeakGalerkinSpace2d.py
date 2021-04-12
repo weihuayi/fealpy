@@ -6,6 +6,7 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 from .Function import Function
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
+from ..decorator import cartesian
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 
 
@@ -27,12 +28,34 @@ class WGDof2d():
         multiIndex[:, 1] = p - multiIndex[:, 0]
         return multiIndex
 
-    def boundary_dof(self):
+    def is_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
         edge2dof = self.edge_to_dof()
-        isBdEdge = self.mesh.ds.boundary_edge_flag()
-        isBdDof[edge2dof[isBdEdge]] = True
+        isBdDof[edge2dof[index]] = True
+        return isBdDof
+
+    def boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_edge_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('edge', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool)
+        edge2dof = self.edge_to_dof()
+        isBdDof[edge2dof[index]] = True
         return isBdDof
 
     def edge_to_dof(self):
@@ -155,14 +178,19 @@ class WeakGalerkinSpace2d:
         self.H1 = inv(self.EM)
         self.R = self.left_weak_matrix()
 
+        self.stype = 'wg' # 空间类型
+
     def number_of_local_dofs(self):
         return self.dof.number_of_local_dofs()
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
 
-    def boundary_dof(self):
-        return self.dof.boundary_dof()
+    def is_boundary_dof(self, threshold=None):
+        return self.dof.is_boundary_dof(threshold=None)
+
+    def boundary_dof(self, threshold=None):
+        return self.dof.boundary_dof(threshold=None)
 
     def edge_to_dof(self):
         return self.dof.edge_to_dof()
@@ -217,11 +245,11 @@ class WeakGalerkinSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi1 = self.smspace.basis(
                 ps[:, isInEdge, :],
                 index=edge2cell[isInEdge, 1]
-                )
+                ) # (NQ, NE, ldof)
         phi = self.edge_basis(ps)
 
         F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
@@ -258,6 +286,33 @@ class WeakGalerkinSpace2d:
         R0[:, idx] = -M[:, 0].swapaxes(0, 1)
         R1[:, idx] = -M[:, 1].swapaxes(0, 1)
         return R0, R1
+
+    def stiff_matrix(self):
+        gdof = self.number_of_global_dofs()
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        H0 = self.H0
+        R = self.R
+        def f0(i):
+            R0 = R[0][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            R1 = R[1][:, cell2dofLocation[i]:cell2dofLocation[i+1]]
+            return R0.T@H0[i]@R0, R1.T@H0[i]@R1, R0.T@H0[i]@R1
+
+        NC = self.mesh.number_of_cells()
+        M = list(map(f0, range(NC)))
+
+        idx = list(map(np.meshgrid, cd, cd))
+        I = np.concatenate(list(map(lambda x: x[1].flat, idx)))
+        J = np.concatenate(list(map(lambda x: x[0].flat, idx)))
+
+        val = np.concatenate(list(map(lambda x: x[0].flat, M)))
+        M00 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
+
+        val = np.concatenate(list(map(lambda x: x[1].flat, M)))
+        M11 = csr_matrix((val, (I, J)), shape=(gdof, gdof))
+
+        A = M00 + M11 # weak gradient matrix
+        return A
 
     def mass_matrix(self):
         cell2dof = self.cell_to_dof(doftype='cell') # only get the dofs in cell
@@ -345,7 +400,7 @@ class WeakGalerkinSpace2d:
         S += csr_matrix((F5.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return S
 
-    def set_dirichlet_bc(self, uh, g, is_dirichlet_edge=None):
+    def set_dirichlet_bc(self, uh, g, threshold=None):
         """
         初始化解 uh  的第一类边界条件。
         """
@@ -365,22 +420,27 @@ class WeakGalerkinSpace2d:
         uh[isBdDof] = np.einsum('ijk, ik->ij', self.H1[isBdEdge], b).flat
         return isBdDof
 
+    @cartesian
     def basis(self, point, index=None):
         return self.smspace.basis(point, index=index)
 
+    @cartesian
     def grad_basis(self, point, index=None):
         return self.smspace.grad_basis(point, index=index)
 
+    @cartesian
     def value(self, uh, point, index=None):
         NE = self.mesh.number_of_edges()
         p = self.p
         return self.smspace.value(uh[NE*(p+1):, ...], point, index=index)
 
+    @cartesian
     def grad_value(self, uh, point, index=None):
         NE = self.mesh.number_of_edges()
         p = self.p
         return self.smspace.grad_value(uh[NE*(p+1):, ...], point, index=index)
 
+    @cartesian
     def edge_basis(self, point, index=None):
         return self.smspace.edge_basis(point, index=index)
 
@@ -459,7 +519,7 @@ class WeakGalerkinSpace2d:
 
 
     def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+        f = Function(self, dim=dim, array=array, coordtype='cartesian')
         return f
 
     def array(self, dim=None):

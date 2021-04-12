@@ -148,9 +148,9 @@ class RTDof2d:
             return (p+1)*(p+3) 
         elif doftype in {'cell', 2}: # number of dofs inside the cell 
             return p*(p+1) 
-        elif doftype in {'face', 'edge', 1}: # number of dofs on a edge 
+        elif doftype in {'face', 'edge', 1}: # number of dofs on each edge 
             return p+1
-        elif doftype in {'node', 0}: # number of dofs on a node
+        elif doftype in {'node', 0}: # number of dofs on each node
             return 0
 
     def number_of_global_dofs(self):

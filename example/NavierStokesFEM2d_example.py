@@ -6,11 +6,11 @@ from mpl_toolkits.mplot3d import Axes3D
 
 
 from fealpy.pde.navier_stokes_equation_2d import SinCosData
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
 pde = SinCosData()
-mesh = MeshFactory.boxmesh2d(pde.box, nx=10, ny=10, meshtype='tri')
+mesh = MF.boxmesh2d(pde.box, nx=10, ny=10, meshtype='tri')
 
 uspace = LagrangeFiniteElementSpace(mesh, p=2)
 pspace = LagrangeFiniteElementSpace(mesh, p=1)
