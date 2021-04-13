@@ -1000,6 +1000,54 @@ class PolynomialData:
         u = (x-x**2)*(y-y**2)
         return u
 
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float64)
+
+        if meshtype == 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        if meshtype == 'quad':
+            node = np.array([
+                (0, 0),
+                (1, 0),
+                (1, 1),
+                (0, 1),
+                (0.5, 0),
+                (1, 0.4),
+                (0.3, 1),
+                (0, 0.6),
+                (0.5, 0.45)], dtype=np.float64)
+            cell = np.array([
+                (0, 4, 8, 7), (4, 1, 5, 8),
+                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'halfedge':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'squad':
+            mesh = StructureQuadMesh([0, 1, 0, 1], h)
+            return mesh
+        else:
+            raise ValueError("".format)
+
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:

@@ -11,11 +11,6 @@ from ..geometry import ddiff
 from ..geometry import huniform
 from ..decorator import timer
 
-from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
-from .QuadrangleMesh import QuadrangleMesh
-from .PolygonMesh import PolygonMesh
-from .HalfEdgeMesh2d import HalfEdgeMesh2d
-
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 
