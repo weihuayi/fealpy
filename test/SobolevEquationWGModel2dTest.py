@@ -3,6 +3,7 @@
 import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import spdiags
+import transplant
 
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.wg.SobolevEquationWGModel2d import SobolevEquationWGModel2d
@@ -17,7 +18,8 @@ class SobolevEquationWGModel2dTest:
         mu = 1
         epsilon = 0.1
         self.pde = SinSinExpData(mu, epsilon)
-        self.solver = MatlabSolver()
+        matalb = transplant.Matlab()        
+        self.solver = MatlabSolver(matlab)
 
     def test_poisson_equation(self, p=1, maxit=4):
         h = 0.1
