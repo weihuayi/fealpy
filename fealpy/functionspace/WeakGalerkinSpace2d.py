@@ -245,11 +245,11 @@ class WeakGalerkinSpace2d:
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
-        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0])
+        phi0 = self.smspace.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi1 = self.smspace.basis(
                 ps[:, isInEdge, :],
                 index=edge2cell[isInEdge, 1]
-                )
+                ) # (NQ, NE, ldof)
         phi = self.edge_basis(ps)
 
         F0 = np.einsum('i, ijm, ijn, j->mjn', ws, phi0, phi, h)
