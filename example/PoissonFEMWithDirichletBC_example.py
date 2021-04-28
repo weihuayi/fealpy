@@ -47,7 +47,6 @@ parser.add_argument('--maxit',
         default=4, type=int,
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
-parser.print_help()
 args = parser.parse_args()
 
 degree = args.degree
