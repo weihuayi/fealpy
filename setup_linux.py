@@ -13,6 +13,5 @@ setup(name='fealpy',
           'matplotlib',
           'cython',
           'pyfftw',
-          'pyamg'
       ],
       zip_safe=False)
