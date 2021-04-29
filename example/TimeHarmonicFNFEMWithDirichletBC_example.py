@@ -54,7 +54,7 @@ errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
 NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(args.maxit):
-    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=degree)
+    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=degree, q=7)
     bc = DirichletBC(space, pde.dirichlet)
 
     gdof = space.number_of_global_dofs()
