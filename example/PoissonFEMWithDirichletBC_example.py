@@ -65,8 +65,8 @@ mesh = pde.init_mesh(n=nrefine)
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
              ]
-errorMatrix = np.zeros((2, maxit), dtype=np.float)
-NDof = np.zeros(maxit, dtype=np.float)
+errorMatrix = np.zeros((2, maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int64)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
@@ -101,7 +101,7 @@ for i in range(maxit):
 
 if dim == 2:
     fig = plt.figure()
-    axes = fig.gca(projection='3d')
+    axes = fig.add_subplot(1, 1, 1, projection='3d')
     uh.add_plot(axes, cmap='rainbow')
 elif dim == 3:
     print('The 3d function plot is not been implemented!')
