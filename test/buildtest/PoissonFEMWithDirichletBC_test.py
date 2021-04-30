@@ -27,15 +27,10 @@ elif dim == 3:
 pde = PDE()
 mesh = pde.init_mesh(n=nrefine)
 
-errorType = ['$|| u - u_h||_{\Omega,0}$',
-             '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
-             ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int64)
 
 for i in range(maxit):
-    print("The {}-th computation:".format(i))
-
     space = LagrangeFiniteElementSpace(mesh, p=degree)
     NDof[i] = space.number_of_global_dofs()
     bc = DirichletBC(space, pde.dirichlet) 
