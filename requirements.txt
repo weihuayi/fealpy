@@ -1,7 +1,6 @@
 numpy
 scipy
 matplotlib
-pytools
 meshpy
 pyfftw
 vtk
