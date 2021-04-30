@@ -33,10 +33,7 @@ def test_poisson_fem_2d():
         bc = DirichletBC(space, pde.dirichlet) 
 
         uh = space.function()
-        if dim == 2:
-            A = space.stiff_matrix()
-        elif dim == 3:
-            A = space.parallel_stiff_matrix(q=p)
+        A = space.stiff_matrix()
 
         F = space.source_vector(pde.source)
 
