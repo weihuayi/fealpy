@@ -6,6 +6,9 @@ import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
+from matplotlib import rc
+rc('text', usetex=True)
+
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.poisson_2d import CosCosData 
@@ -17,6 +20,8 @@ from fealpy.tools.show import showmultirate
 # solver
 from scipy.sparse.linalg import spsolve
 import pyamg
+
+
 
 """
 
