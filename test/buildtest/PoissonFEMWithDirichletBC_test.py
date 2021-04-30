@@ -6,7 +6,6 @@ import sys
 import numpy as np
 
 
-from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 
@@ -14,17 +13,13 @@ from fealpy.boundarycondition import DirichletBC
 from scipy.sparse.linalg import spsolve
 
 
-dim = int(sys.argv[1])
-
-def test_poisson_fem(dim):
+def test_poisson_fem_2d():
     degree = 1  
+    dim = 2
     nrefine = 4 
     maxit = 4 
 
-    if dim == 2:
-        from fealpy.pde.poisson_2d import CosCosData as PDE
-    elif dim == 3:
-        from fealpy.pde.poisson_3d import CosCosCosData as PDE
+    from fealpy.pde.poisson_2d import CosCosData as PDE
 
     pde = PDE()
     mesh = pde.init_mesh(n=nrefine)
