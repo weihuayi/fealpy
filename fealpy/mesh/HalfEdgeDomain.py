@@ -4,7 +4,7 @@ from scipy.spatial import KDTree
 from types import ModuleType
 
 from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
-from .HalfEdgeMesh import HalfEdgeMesh
+#from .HalfEdgeMesh import HalfEdgeMesh
 
 class HalfEdgeDomain():
     def __init__(self, vertices, halfedge, fixed=None, boundary=None):
