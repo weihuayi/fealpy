@@ -1,4 +1,3 @@
-
 import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
