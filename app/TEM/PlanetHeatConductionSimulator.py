@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import pyamg
+import meshio
 import sys
 
-from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
-from fealpy.mesh import LagrangeWedgeMesh
-from fealpy.geometry.implicit_surface import SphereSurface
+from fealpy.functionspace.WedgeLagrangeFiniteElementSpace import WedgeLagrangeFiniteElementSpace
+from fealpy.mesh import  LagrangeTriangleMesh, LagrangeWedgeMesh
+from fealpy.writer import MeshWriter
 from fealpy.decorator import cartesian, barycentric
 from scipy.sparse.linalg import spsolve
 from fealpy.tools.show import showmultirate, show_error_table
@@ -17,7 +18,7 @@ class PlanetHeatConductionSimulator():
         self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p)
         self.mesh = self.space.mesh
         self.pde = pde
-        self.nr = nonlinear_robin(space, mesh, p=p)
+        self.nr = nonlinear_robin(self.pde, self.space, self.mesh, p=p)
         
         self.M = self.space.mass_matrix()
         self.A = self.space.stiff_matrix()
@@ -30,21 +31,28 @@ class PlanetHeatConductionSimulator():
     def init_solution(self, timeline):
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
-        uh = np.zeros(gdof, NL), dtype=np.float)
+        uh = np.zeros((gdof, NL), dtype=np.float)
         uh[:, 0] = 150
         return uh
 
     def apply_boundary_condition(self, A, b, uh, timeline):
         from fealpy.boundarycondition import RobinBC
+        from fealpy.boundarycondition import NeumannBC
         from fealpy.boundarycondition import DirichletBC
         t0 = timeline.current_time_level()
         t1 = timeline.next_time_level()
         i = timeline.current
-        
-        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t), threshold=self.pde.is_robin_boundary)
+       
+       # 先对 neumann 边界条件进行处理
+        bc = NeumannBC(self.space, lambda x, n:self.pde.neumann(x, n, t0), threshold=self.pde.is_neumann_boundary)
+        b = bc.apply(b) # 混合边界条件不需要输入矩阵A
+
+        # 使用 neumann 边界后对右端项进行处理
+        b = b[:-1]
+
+        # 对 robin 边界条件进行处理
+        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t0), threshold=self.pde.is_robin_boundary)
         A0, b = bc.apply(A, b)
-        bc = DirichletBC(self.space, lambda x:0, threshold=self.pde.is_dirichlet_boundary)
-        A, b = bc.apply(A, b)
         return A, b
 
     def solve(self, uh, timeline):
@@ -54,8 +62,9 @@ class PlanetHeatConductionSimulator():
         i = timeline.current
         t1 = timeline.next_time_level()
         dt = timeline.current_time_step_length()
-        F = self.right_vector(uh, timeline)
+        F = self.pde.right_vector(uh, timeline)
 
+        # 网格数据
         rho = self.mesh.meshdata['rho']
         c = self.mesh.meshdata['c']
         kappa = self.mesh.meshdata['kappa']
@@ -65,7 +74,7 @@ class PlanetHeatConductionSimulator():
         A = kappa*self.A
         M = rho*c*self.M
 
-        A, b = self.apply_boundary_condition(A, F, timeline)
+        A, b = self.apply_boundary_condition(A, F, uh, timeline)
         e = 0.000000001
         error = 1
         xi_new = self.space.function()
@@ -85,26 +94,43 @@ class TPMModel():
     def __init__(self):
         pass
 
-    def init_mesh(self, n=0, h=0.1, nh=5, p=1):
-        surface = SphereSurface()
-        mesh = surface.init_mesh(meshtype='tri', p=p)
+    def init_mesh(self, n=0, h=0.005, nh=100, p=1):
+        fname = 'initial/file1.vtu'
+        data = meshio.read(fname)
+        node = data.points
+        cell = data.cells[0][1]
+
+        mesh = LagrangeTriangleMesh(node*500, cell, p=p)
         mesh.uniform_refine(n)
         mesh = LagrangeWedgeMesh(mesh, h, nh, p=p)
+
         self.mesh = mesh
+        self.p = p
         return mesh
 
-    def init_mu():
-        pass
+    def init_mu(self):
+        boundary_face_index = self.is_robin_boundary()
+        qf0, qf1 = self.mesh.integrator(self.p, 'face')
+        bcs, ws = qf0.get_quadrature_points_and_weights()
+        m = mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
+        # 小行星外法向
+        n = np.array([0, 1, 0]) #指向太阳的方向 
+        l = np.sqrt(np.dot(n, n))
+        mu = np.max(np.dot(m, n), 0)
+        return mu
     
-    def right_vector(self):
-        return 0
+    def right_vector(self, uh, timeline):
+        shape = uh.shape[0]
+        f = np.zeros(shape, dtype=np.float)
+        return f 
     
     @cartesian
-    def dirichlet(self):
-        return 0
+    def neumann(self, p, n, t):
+        gN = np.zeros((p.shape[0], p.shape[1]), dtype=np.float) 
+        return gN
 
     @cartesian
-    def is_dirichlet_boundary(self, p):
+    def is_neumann_boundary(self, p):
         tface, qface = self.mesh.entity('face')
         nf = len(tface)
         boundary_dir_tface_index = np.zeros(nf, dtype=np.bool_)
@@ -133,10 +159,12 @@ class TPMModel():
 if __name__ == '__main__':
     p = int(sys.argv[1])
     n = int(sys.argv[2])
-    h = int(sys.argv[3])
-    nh = int(sys.argv[4])
-    NT = int(sys.argv[5])
-    maxit = int(sys.argv[6])
+    NT = int(sys.argv[3])
+    maxit = int(sys.argv[4])
+#    h = float(sys.argv[5])
+#    nh = int(sys.argv[6])
+    h = 0.005
+    nh = 1
 
     pde = TPMModel()
     mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
@@ -152,10 +180,8 @@ if __name__ == '__main__':
 
     simulator  = PlanetHeatConductionSimulator(pde, mesh)
 
-    timeline = self.time_mesh(NT=NT)
+    timeline = simulator.time_mesh(NT=NT)
 
-#    errorType = ['$||u-u_h||_0$', '$||\\nable u - \\nable u_h ||_0$']
-#    errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
     Ndof = np.zeros(maxit, dtype=np.float)
     for i in range(maxit):
         print(i)
@@ -174,10 +200,6 @@ if __name__ == '__main__':
             nh = nh*2
             mesh = pde.init_mesh(n=n, h=h, nh=nh)
         uh = model.space.function(array=uh[:, -1])
-#        errorMatrix[0, i] = model.space.integralalg.L2_error(u, uh)
-#        errorMatrix[1, i] = model.space.integralalg.L2_error(u.grad_value,
-#                uh.grad_value)
-#        print(errorMatrix)
 
     mesh.to_vtk(fname='test.vtu') 
     fig = plt.figure()

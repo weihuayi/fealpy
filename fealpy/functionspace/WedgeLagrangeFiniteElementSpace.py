@@ -403,6 +403,107 @@ class WedgeLagrangeFiniteElementSpace:
             uh[isqDDof] = gD(ipoints[isqDDof])
             return istDDof, isqDDof
     
+    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+        mesh = self.mesh
+        tface, qface = mesh.entity('face')
+        F = self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
+        if qface.shape[0] == 0:
+            return F
+        else:
+            #TODO 
+            F = self.set_quad_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
+            return F
+    
+    def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
+
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷矩阵 F 中
+
+        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
+        """
+        p = self.p
+        mesh = self.mesh
+
+        dim = 1 if len(F.shape)==1 else F.shape[1]
+       
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_tri_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='tri', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.tri_face_to_dof()[index]
+
+        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf0.get_quadrature_points_and_weights()
+        phi = self.face_basis(bcs)
+
+        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
+        measure = mesh.boundary_tri_face_area(index=index)
+
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        print(ws.shape)
+        print(val)
+        print(phi.shape)
+        print(measure.shape)
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
+    def set_quad_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
+
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷矩阵 F 中
+
+        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
+        """
+        p = self.p
+        mesh = self.mesh
+
+        dim = 1 if len(F.shape)==1 else F.shape[1]
+       
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_quad_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='quad', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.quad_face_to_dof()[index]
+
+        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf1.get_quadrature_points_and_weights()
+        phi = self.face_basis(bcs)
+
+        n = mesh.boundary_quad_face_unit_normal(bcs, index=index)
+        measure = mesh.boundary_quad_face_area(index=index)
+
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='quad', index=index)
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
+    
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
         mesh = self.mesh
         tface, qface = mesh.entity('face')

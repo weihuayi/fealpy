@@ -98,6 +98,7 @@ class LagrangeWedgeMesh(Mesh3d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+        self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
 
     def construct(self, node, cell, mesh, h, nh):

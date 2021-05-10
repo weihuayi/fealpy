@@ -7,7 +7,7 @@ from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
 class nonlinear_robin():
     def __init__(self, pde, space, mesh, p=1):
         self.space = space
-        self.mesh = self.mesh
+        self.mesh = mesh
         self.pde = pde
         self.p = p
 

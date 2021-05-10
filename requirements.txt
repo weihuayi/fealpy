@@ -1,8 +1,5 @@
 numpy
 scipy
 matplotlib
-pytools
-pyamg
-meshpy
 pyfftw
 vtk

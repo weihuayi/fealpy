@@ -21,37 +21,40 @@ from fealpy.tools.show import show_error_table
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        这是一个自适应求解时谐方程的程序
+        这是一个用二维棱元求解时谐方程的程序
         """)
 
-parser.add_argument('--order',
+parser.add_argument('--degree',
         default=0, type=int,
         help='第一类 Nedlec 元的次数, 默认为 0!')
 
-parser.add_argument('--size',
-        default=8, type=int,
-        help='初始网格的 x 和 y 方向剖分段数, 默认为 8 段')
+parser.add_argument('--nrefine',
+        default=4, type=int,
+        help='初始网格加密的次数, 默认初始加密 4 次.')
 
 parser.add_argument('--maxit',
         default=4, type=int,
-        help='网格一致加密次数, 默认加密  4 次')
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
 
-parser.print_help()
 args = parser.parse_args()
-print('程序参数为:', args)
+
+degree = args.degree
+nrefine = args.nrefine
+maxit = args.maxit
+
 
 
 pde = CosSinData()
-mesh = pde.init_mesh()
+mesh = pde.init_mesh(n=nrefine)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$'
              ]
-errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float)
-NDof = np.zeros(args.maxit, dtype=np.float)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
+NDof = np.zeros(maxit, dtype=np.float)
 
 for i in range(args.maxit):
-    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=args.order)
+    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=degree, q=7)
     bc = DirichletBC(space, pde.dirichlet)
 
     gdof = space.number_of_global_dofs()
