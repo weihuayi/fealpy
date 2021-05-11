@@ -94,9 +94,6 @@ class NeumannBC():
             c = space.integral_basis()
             A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             F = np.r_[F, 0]
-            print('A', A.shape)
-            print('F', F.shape)
-            print('c', c.shape)
             return A, F
         else:
             return F

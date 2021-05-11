@@ -623,25 +623,36 @@ class LagrangeFiniteElementSpace():
         return c
 
     def revcovery_matrix(self, rtype='simple'):
+        """
+
+        Notes
+        -----
+        构造梯度恢复算子矩阵
+
+        """
         NC = self.mesh.number_of_cells()
         NN = self.mesh.number_of_nodes()
         cell = self.mesh.entity('cell')
         GD = self.GD
         cellmeasure = self.cellmeasure
-        gphi = self.mesh.grad_lambda()
+        gphi = self.mesh.grad_lambda() # (NC, GD+1, GD)
         G = []
         if rtype == 'simple':
             D = spdiags(1.0/np.bincount(cell.flat), 0, NN, NN)
         elif rtype == 'harmonic':
             gphi = gphi/cellmeasure.reshape(-1, 1, 1)
-            d = np.zeros(NN, dtype=np.float)
+            d = np.zeros(NN, dtype=np.float64)
             np.add.at(d, cell, 1/cellmeasure.reshape(-1, 1))
             D = spdiags(1/d, 0, NN, NN)
 
-        I = np.einsum('k, ij->ijk', np.ones(GD+1), cell)
-        J = I.swapaxes(-1, -2)
+        I = np.broadcast_to(cell[:, :, None], shape=(NC, GD+1, GD+1))
+        J = np.broadcast_to(cell[:, None, :], shape=(NC, GD+1, GD+1))
+
+        #I = np.einsum('k, ij->ijk', np.ones(GD+1), cell)
+        #J = I.swapaxes(-1, -2)
         for i in range(GD):
-            val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
+            #val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
+            val = np.broadcast_to(gphi[:, :, i][:, None, :], shape=(NC, GD+1, GD+1))
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
