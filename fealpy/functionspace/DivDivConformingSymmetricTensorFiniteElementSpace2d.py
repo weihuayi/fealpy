@@ -219,6 +219,8 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
             计算基函数的系数
         """
         mesh  = self.mesh
+        ftype = mesh.ftype
+
         NC = mesh.number_of_cells()
         node = mesh.entity('node')
         cell = mesh.entity('cell')
@@ -227,10 +229,10 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         l, k = self.p
 
         # 单元上全部自由度的个数
-        ldof = self.number_of_local_dofs(doftype='all')  
+        aldof = self.number_of_local_dofs(doftype='all')  
 
         # 系数矩阵
-        A = np.zeros((NC, ldof, ldof), dtype=self.mesh.ftype)
+        A = np.zeros((NC, aldof, aldof), dtype=ftype)
 
         # 3 个单元节点处共 9 个自由度
         ## 0 号点
@@ -244,9 +246,9 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         A[:, 2, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
         # C_k^\oplus(K;\mbS)
         phi = smspace.basis(node[cell[:, 0]], p=k-2) # 每个节点在节点 0 处取值
-        A[:, 0, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 1, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 2, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        A[:, 0, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 1, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 2, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
 
         ## 1 号点
@@ -258,9 +260,9 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         A[:, 5, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
         # C_k^\oplus(K;\mbS)
         phi = smspace.basis(node[cell[:, 1]], p=k-2)
-        A[:, 3, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 4, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 5, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        A[:, 3, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 4, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 5, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
         ## 2 号点
         gphi = smspace.grad_basis(node[cell[:, 2]], p=l+1, scaled=False)
@@ -271,9 +273,9 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         A[:, 8, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
         # C_k^\oplus(K;\mbS)
         phi = smspace.basis(node[cell[:, 2]], p=k-2)
-        A[:, 6, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 7, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 8, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        A[:, 6, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 7, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 8, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
         # 边上的自由度，每条边上有 l-1 + l 个自由度
 
@@ -288,9 +290,13 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs) 
         phi = self.smspace.edge_basis(ps, p=l-1) 
-        gphi = smspace.grad_basis(ps, index=edge2cell[:, 0], p=l+1, scaled=False)
 
+        # 左边单元
+        gphi = smspace.grad_basis(ps, index=edge2cell[:, 0], p=l+1,
+                scaled=False) # 不除最终的 h 
+        n[:, 0]
 
+        # 右边单元
 
         # 单元内部自由度，共有 （k - 1)k/2 - 3 + (l-1)l 个自由度
         start = 9 + 3*(2*l - 1) # 除去点和边上的自由度
