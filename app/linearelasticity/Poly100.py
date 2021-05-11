@@ -7,18 +7,20 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix, csr_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve, cg, LinearOperator, spilu
 
-from fealpy.pde.linear_elasticity_model import  PolyModel3d 
+from fealpy.pde.linear_elasticity_model import  HuangModel2d  as PDE
+from fealpy.pde.linear_elasticity_model import  PolyModel3d  as PDE
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 
-n = int(sys.argv[1])
+n = 5 
 
-pde = PolyModel3d(lam=100, mu=1.0)
+pde = PDE(lam=1.0, mu=1.0)
 mesh = pde.init_mesh(n=n)
 
 space = LagrangeFiniteElementSpace(mesh, p=1, q=3)
 uh = space.function(dim=3)
 
+#A = space.recovery_linear_elasticity_matrix(pde.lam, pde.mu)
 A = space.linear_elasticity_matrix(pde.lam, pde.mu)
 F = space.source_vector(pde.source, dim=3)
 
