@@ -1936,7 +1936,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 fontsize=fontsize, fontcolor=fontcolor, 
                 multiindex=multiindex, linewidth=linewidth)
 
-    def to_vtk(self, etype='cell', index=np.s_[:]):
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
 
         Parameters
@@ -1950,6 +1950,8 @@ class HalfEdgeMesh2d(Mesh2d):
         -----
         把网格转化为 VTK 的格式
         """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
         node = self.entity('node')
         GD = self.geo_dimension()
         if GD == 2:
@@ -1965,7 +1967,14 @@ class HalfEdgeMesh2d(Mesh2d):
         elif etype == 'edge':
             cellType = 3
 
-        return node, cell.flatten(), cellType, len(cell)
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
 
     def grad_lambda(self):
         """

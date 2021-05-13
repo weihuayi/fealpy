@@ -5,6 +5,7 @@ from scipy.sparse import csr_matrix
 
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from ..quadrature import GaussLegendreQuadrature
 
 # 导入默认的坐标类型, 这个空间基函数的相关计算，输入参数是重心坐标 
 from ..decorator import barycentric 
@@ -24,6 +25,7 @@ class DDCSTDof2d:
         Reference
         ---------
         """
+
         self.mesh = mesh
         self.p = p 
 
@@ -75,7 +77,6 @@ class DDCSTDof2d:
         -----
 
         生成每个边上的自由度全局编号
-
         """
 
         mesh = self.mesh
@@ -132,7 +133,8 @@ class DDCSTDof2d:
             c2d[:, ndof*i:ndof*(i+1)] += idx
 
         start += 3*ndof
-        c2d = cell2dof[:, start:] # 边自由度, 共 3*(l-1+l) 个, 数组的视图
+        # 边自由度, 共 3*(l-1+l) 个, 数组的视图
+        c2d = cell2dof[:, start:] 
 
         cell2edge = mesh.ds.cell_to_edge()
         edof = self.number_of_local_dofs(doftype='edge') # 每条边内部的自由度
@@ -141,10 +143,10 @@ class DDCSTDof2d:
             c2d[:, edof*i:edof*(i+1)] = edof*cell2edge[:, i, None] 
             c2d[:, edof*i:edof*(i+1)] += idx
 
-        start += 3*edof # 内部自由度, 共 (k-1)*k/2 + (l-1)*l
+        # 内部自由度, 共 (k-1)*k/2 + (l-1)*l
+        start += 3*edof 
         c2d = cell2dof[:, start:]
         cdof = self.number_of_local_dofs(doftype='cell') # 每个单元内部的自由度
-        
         start = ndof*NN + edof*NE
         c2d[:] = np.arange(start, start+NC*edof).reshape(NC, cdof)
 
@@ -216,10 +218,15 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
 
         Notes
         -----
-
-            计算基函数的系数
+            计算基函数的系数, 基函数的表达形式为 
+            [C_l, C_k]c
+            
         """
         mesh  = self.mesh
+        ftype = mesh.ftype
+
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
         node = mesh.entity('node')
         cell = mesh.entity('cell')
@@ -228,12 +235,12 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         l, k = self.p
 
         # 单元上全部自由度的个数
-        ldof = self.number_of_local_dofs(doftype='all')  
+        aldof = self.number_of_local_dofs(doftype='all')  
 
         # 系数矩阵
-        A = np.zeros((NC, ldof, ldof), dtype=self.mesh.ftype)
+        A = np.zeros((NC, aldof, aldof), dtype=ftype)
 
-        # 3 个单元节点处共 9 个自由度
+        # 1. 3 个单元节点处共 9 个自由度
         ## 0 号点
         ldof = smspace.number_of_local_dofs(p=l+1)
         kdof = smspace.number_of_local_dofs(p=k-2)
@@ -243,38 +250,66 @@ class DivDivConformingSymmetricTensorFiniteElementSpace2d:
         A[:, 1, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
         A[:, 2, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
         A[:, 2, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
-        # C_k(K;\mbS)
-        phi = smspace.basis(node[cell[:, 0]], p=k-2)
-        A[:, 0, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 1, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 2, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        # C_k^\oplus(K;\mbS)
+        phi = smspace.basis(node[cell[:, 0]], p=k-2) # 每个节点在节点 0 处取值
+        A[:, 0, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 1, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 2, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
 
         ## 1 号点
         gphi = smspace.grad_basis(node[cell[:, 1]], p=l+1, scaled=False)
+        # C_l(K;\mbS)
         A[:, 3, 0:ldof-2] = gphi[:, 2:, 1]
         A[:, 4, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
         A[:, 5, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
         A[:, 5, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
-        # C_k(K;\mbS)
+        # C_k^\oplus(K;\mbS)
         phi = smspace.basis(node[cell[:, 1]], p=k-2)
-        A[:, 3, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 4, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 5, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        A[:, 3, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 4, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 5, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
         ## 2 号点
         gphi = smspace.grad_basis(node[cell[:, 2]], p=l+1, scaled=False)
+        # C_l(K;\mbS)
         A[:, 6, 0:ldof-2] = gphi[:, 2:, 1]
         A[:, 7, ldof-2:2*ldof-3] = gphi[:, 1:, 0]
         A[:, 8, 0:ldof-2] = -gphi[:, 2:, 0]/2.0
         A[:, 8, ldof-2:2*ldof-3] = -gphi[:, 1:, 1]/2.0
-        # C_k(K;\mbS)
+        # C_k^\oplus(K;\mbS)
         phi = smspace.basis(node[cell[:, 2]], p=k-2)
-        A[:, 6, 2*ldof-3:] = phi*phi[:, 3, None] # x**2 m_{k-2}
-        A[:, 7, 2*ldof-3:] = phi*phi[:, 5, None] # y**2 m_{k-2}
-        A[:, 8, 2*ldof-3:] = phi*phi[:, 4, None] # xy m_{k-2}
+        A[:, 6, 2*ldof-3:] = phi[:, 3, None]*phi # x**2 m_{k-2}
+        A[:, 7, 2*ldof-3:] = phi[:, 5, None]*phi # y**2 m_{k-2}
+        A[:, 8, 2*ldof-3:] = phi[:, 4, None]*phi # xy m_{k-2}
 
-        # 单元内部自由度
+        # 2. 边上的自由度，
+        # 每条边上有 l-1 + l 个自由度
+        # 每条边需要在左右单元上组装矩阵
+        # 每条边上需要组装 4 块矩阵, 分别是 
+        # [[E_00, E_01]
+        #  [E_10, E_11]]
+        edge  = mesh.entity('edge')
+        h = mesh.entity_measure('edge')
+        n, t = mesh.edge_frame() # 每条边上的标架, n: 法线， t： 切向
+
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+
+        qf = GaussLegendreQuadrature(l) # 第 l 个积分公式
+        bcs, ws = qf.quadpts, qf.weights
+        ps = mesh.edge_bc_to_point(bcs) 
+        phi = self.smspace.edge_basis(ps, p=l-1) 
+
+
+        # 左边单元
+        E = np.zeros((NE, l-1+l, aldof), dtype=ftype)
+        gphi = smspace.grad_basis(ps, index=edge2cell[:, 0], p=l+1,
+                scaled=False) # 不除最终的 h, 相当于 h_KC_l  
+
+        # 右边单元
+
+        # 单元内部自由度，共有 （k - 1)k/2 - 3 + (l-1)l 个自由度
         start = 9 + 3*(2*l - 1) # 除去点和边上的自由度
         kdof = smspace.number_of_local_dofs(p=k-2) 
         ldof = smspace.number_of_local_dofs(p=l-1)
