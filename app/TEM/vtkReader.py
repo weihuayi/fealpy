@@ -25,7 +25,7 @@ node = mesh.entity('node')
 cell = mesh.entity('cell')
 tface, qface = mesh.entity('face')
 
-print(cell)
+print(tface.shape)
 
 mesh.celldata['a'] = np.arange(len(cell))
 mesh.to_vtk(fname='write.vtu')

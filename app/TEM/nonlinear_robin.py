@@ -5,13 +5,13 @@ from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, spdiags, bmat
 from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
 
 class nonlinear_robin():
-    def __init__(self, pde, space, mesh, p=1):
+    def __init__(self, pde, space, mesh, p=1, spacetype='c'):
         self.space = space
         self.mesh = mesh
         self.pde = pde
         self.p = p
 
-    def robin_bc(self, A, uh, t, threshold=None, q=None):
+    def robin_bc(self, A, uh, gR, threshold=None, q=None):
         p = self.p
         mesh = self.mesh
 
@@ -24,26 +24,24 @@ class nonlinear_robin():
                 flag = threshold(bc)
                 index = index[flag]
 
-        face2dof = self.tri_face_to_dof()[index]
+        face2dof = self.space.tri_face_to_dof()[index]
 
         qf0, qf1 = self.space.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
         bcs, ws = qf0.get_quadrature_points_and_weights()
 
-        if uh.coordtype == 'barycentric':
-            val = uh(bcs)
-            m = self.mesh.ds.boundary_tri_face_index()
-            uhval = val[:,m]
-        elif uh.coordtype == 'cartesian':
-            pp = self.mesh.bc_to_point(bcs, index=index)
-            uhval = uh(pp)
-
-        measure = mesh.entity_measure('face', index=index)
+        measure = mesh.boundary_tri_face_area(index=index)
 
         phi = self.space.basis(bcs)
-        pp = mesh.bc_to_point(bcs, index=index)
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
         
-        val, kappa = self.pde.boundary_robin(pp, n, t) # (NQ, NF, ...)
+        if uh.coordtype == 'cartesian':
+            uhval = uh(pp)
+        elif uh.coordtype == 'barycentric':
+            val = uh(bcs)
+            uhval = val[:, index]
+
+        val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         phi0 = uhval[..., None]**3*phi
 

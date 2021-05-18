@@ -116,11 +116,15 @@ class WedgeLagrangeFiniteElementSpace:
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof[index]
+        shape = phi.shape[-1]
+        if shape == 3:
+            dof = self.dof.tface2dof[index]
+        else:
+            dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[dof])
         return val
 
     @barycentric
@@ -449,11 +453,6 @@ class WedgeLagrangeFiniteElementSpace:
 
         pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
         val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
-
-        print(ws.shape)
-        print(val)
-        print(phi.shape)
-        print(measure.shape)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
         if dim == 1:
