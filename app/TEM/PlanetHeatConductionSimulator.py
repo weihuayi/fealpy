@@ -35,7 +35,7 @@ class PlanetHeatConductionSimulator():
 
     def time_mesh(self, NT=100):
         from fealpy.timeintegratoralg.timeline import UniformTimeLine
-        timeline = UniformTimeLine(0, 5, NT)
+        timeline = UniformTimeLine(0, 3600, NT)
         return timeline
 
     def init_solution(self, timeline):
@@ -90,8 +90,8 @@ class PlanetHeatConductionSimulator():
             xi_tmp = copy.deepcopy(xi_new[:])
             R = self.nr.robin_bc(A, xi_new, lambda x, n:self.pde.robin(x,
                 n, t1), threshold=self.pde.is_robin_boundary)
-            r = M@uh[:, i] - 0.5*dt*R@uh[:,i] + dt*b
-            R = M + 0.5*dt*R
+            r = M@uh[:, i] + dt*b
+            R = M + dt*R
             ml = pyamg.ruge_stuben_solver(R)
             xi_new[:] = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)
 #            xi_new[:] = spsolve(R, b).reshape(-1)
@@ -179,8 +179,8 @@ if __name__ == '__main__':
     maxit = int(sys.argv[4])
 #    h = float(sys.argv[5])
 #    nh = int(sys.argv[6])
-    h = 0.5
-    nh = 1
+    h = 0.005
+    nh = 100
 
     pde = TPMModel()
     mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
@@ -212,11 +212,12 @@ if __name__ == '__main__':
         print('uh:', uh)
 
     np.savetxt('01solution', uh)
+    mesh.nodedata['uh'] = uh
 
     mesh.to_vtk(fname='test.vtu') 
-    fig = plt.figure()
-    axes = fig.gca(projection='3d')
-    uh.add_plot(axes, cmap='rainbow')
+#    fig = plt.figure()
+#    axes = fig.gca(projection='3d')
+#    uh.add_plot(axes, cmap='rainbow')
 
 #    show_error_table(Ndof, errorType, errorMatrix)
 #    showmultirate(plt, 0, Ndof, errorMatrix, errorType)

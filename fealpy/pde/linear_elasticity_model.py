@@ -774,6 +774,7 @@ class HuangModel2d():
         mesh.uniform_refine(n)
         return mesh 
 
+    @cartesian
     def displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -783,6 +784,7 @@ class HuangModel2d():
         val[..., 1] = -pi/2*np.sin(pi*y)**2*np.sin(2*pi*x) 
         return val
 
+    @cartesian
     def grad_displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -799,6 +801,7 @@ class HuangModel2d():
         val[..., 1, 1] = -pi**2*sin(2*pi*x)*sin(pi*y)*cos(pi*y)
         return val
 
+    @cartesian
     def stress(self, p):
         lam = self.lam
         mu = self.mu
@@ -809,6 +812,7 @@ class HuangModel2d():
         return val
         
 
+    @cartesian
     def compliance_tensor(self, phi):
         lam = self.lam
         mu = self.mu
@@ -818,9 +822,11 @@ class HuangModel2d():
         aphi /= 2*mu
         return aphi
 
+    @cartesian
     def div_stress(self, p):
         return -self.source(p)
 
+    @cartesian
     def source(self, p):
         lam = self.lam
         mu = self.mu
@@ -847,12 +853,14 @@ class HuangModel2d():
 
         return val
 
+    @cartesian
     def dirichlet(self, p):  
         """
         """
         val = self.displacement(p) 
         return val
 
+    @cartesian
     def is_dirichlet_boundary(self, p):
         eps = 1e-14
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
