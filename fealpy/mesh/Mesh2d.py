@@ -304,7 +304,7 @@ class Mesh2dDataStructure():
         cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE
@@ -313,7 +313,7 @@ class Mesh2dDataStructure():
 
         edge2cell = self.edge2cell
 
-        if sparse == False:
+        if return_sparse == False:
             cell2edge = np.zeros((NC, E), dtype=self.itype)
             cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
             cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
@@ -327,7 +327,7 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
             return cell2edge 
 
-    def cell_to_edge_sign(self, sparse=False):
+    def cell_to_edge_sign(self, return_sparse=False):
         NC = self.NC
         E = self.E
 
@@ -342,7 +342,7 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool)
         return cell2edgeSign
 
-    def cell_to_face(self, sparse=False):
+    def cell_to_face(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE
@@ -423,21 +423,21 @@ class Mesh2dDataStructure():
             edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
             return edge2node
 
-    def edge_to_edge(self, sparse=False):
+    def edge_to_edge(self, return_sparse=False):
         edge2node = self.edge_to_node(sparse=True)
         return edge2node*edge2node.transpose(0, 1)
 
-    def edge_to_edge(self, sparse=False):
+    def edge_to_edge(self, return_sparse=False):
         edge2node = self.edge_to_node()
         return edge2node*edge2node.transpose()
 
     def edge_to_edge(self):
-        edge2node = self.edge_to_node(sparse=True)
+        edge2node = self.edge_to_node(return_sparse=True)
         return edge2node*edge2node.transpose()
 
 
-    def edge_to_cell(self, sparse=False):
-        if sparse==False:
+    def edge_to_cell(self, return_sparse=False):
+        if return_sparse==False:
             return self.edge2cell
         else:
             NC = self.NC
@@ -448,8 +448,8 @@ class Mesh2dDataStructure():
             face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
             return face2cell
 
-    def face_to_cell(self, sparse=False):
-        if sparse==False:
+    def face_to_cell(self, return_sparse=False):
+        if return_sparse==False:
             return self.edge2cell
         else:
             NC = self.NC
