@@ -98,6 +98,7 @@ class LagrangeWedgeMesh(Mesh3d):
         self.nodedata = {}
         self.edgedata = {}
         self.celldata = {}
+        self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
 
     def construct(self, node, cell, mesh, h, nh):
@@ -116,8 +117,7 @@ class LagrangeWedgeMesh(Mesh3d):
         h = np.linspace(0, h*nh, nh*p+1)
         NN = len(node)
         for i in range(nh*p):
-                node = np.r_[node, node[:NN]+h[i+1]*node2n]
-
+            node = np.r_[node, node[:NN]+h[i+1]*node2n]
         return node
     
     def entity(self, etype='cell'):
