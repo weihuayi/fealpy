@@ -217,7 +217,7 @@ class PolygonMesh(Mesh2d):
 
             isMarkedEdge = np.zeros(NE, dtype=np.bool)
             edge2cell = self.ds.edge_to_cell()
-            cell2edge = self.ds.cell_to_edge(sparse=False)
+            cell2edge = self.ds.cell_to_edge(return_sparse=False)
             isMarkedEdge[isMarkedCell[edge2cell[:, 0]]] = True
             isMarkedEdge[isMarkedCell[edge2cell[:, 1]]] = True
 
@@ -254,7 +254,7 @@ class PolygonMesh(Mesh2d):
         print("Cell:\n", self.ds.cell)
         print("Edge:\n", self.ds.edge)
         print("Edge2cell:\n", self.ds.edge2cell)
-        print("Cell2edge:\n", self.ds.cell_to_edge(sparse=False))
+        print("Cell2edge:\n", self.ds.cell_to_edge(return_sparse=False))
         print("edge norm:\n", self.edge_unit_normal())
         print("cell barycenter:\n", self.entity_barycenter('cell'))
 
@@ -358,7 +358,7 @@ class PolygonMeshDataStructure():
         cell2node = csr_matrix((val, (I, J)), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         NE = self.NE
         NC = self.NC
 
@@ -366,7 +366,7 @@ class PolygonMeshDataStructure():
         cell = self.cell
         cellLocation = self.cellLocation
 
-        if sparse:
+        if return_sparse:
             J = np.arange(NE)
             val = np.ones((NE,), dtype=np.bool)
             cell2edge = coo_matrix((val, (edge2cell[:,0], J)), shape=(NC, NE), dtype=np.bool)
@@ -378,13 +378,13 @@ class PolygonMeshDataStructure():
             cell2edge[cellLocation[edge2cell[:, 1]] + edge2cell[:, 3]] = range(NE)
             return cell2edge
 
-    def cell_to_edge_sign(self, sparse=True):
+    def cell_to_edge_sign(self, return_sparse=True):
         NE = self.NE
         NC = self.NC
         edge2cell = self.edge2cell
         cell = self.cell
         cellLocation = self.cellLocation
-        if sparse:
+        if return_sparse:
             val = np.ones((NE,), dtype=np.bool)
             cell2edgeSign = csr_matrix((val, (edge2cell[:,0], range(NE))), shape=(NC,NE), dtype=np.bool)
             return cell2edgeSign
@@ -408,12 +408,12 @@ class PolygonMeshDataStructure():
                 shape=(NC,NC), dtype=np.bool)
         return cell2cell.tocsr()
 
-    def edge_to_node(self, sparse=False):
+    def edge_to_node(self, return_sparse=False):
         NN = self.NN
         NE = self.NE
 
         edge = self.edge
-        if sparse:
+        if return_sparse:
             val = np.ones((NE,), dtype=np.bool)
             edge2node = coo_matrix((val, (edge[:,0], edge[:,1])), shape=(NE, NN), dtype=np.bool)
             edge2node+= coo_matrix((val, (edge[:,1], edge[:,0])), shape=(NE, NN), dtype=np.bool)
@@ -425,11 +425,11 @@ class PolygonMeshDataStructure():
         edge2node = self.edge_to_node()
         return edge2node*edge2node.tranpose()
 
-    def edge_to_cell(self, sparse=False):
+    def edge_to_cell(self, return_sparse=False):
         NE = self.NE
         NC = self.NC
         edge2cell = self.edge2cell
-        if sparse:
+        if return_sparse:
             val = np.ones(NE, dtype=np.bool)
             edge2cell = coo_matrix((val, (range(NE), edge2cell[:,0])), shape=(NE, NC), dtype=np.bool)
             edge2cell+= coo_matrix((val, (range(NE), edge2cell[:,1])), shape=(NE, NC), dtype=np.bool)
