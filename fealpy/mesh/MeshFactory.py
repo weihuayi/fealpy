@@ -1,7 +1,9 @@
 import numpy as np
 
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
+from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
+from .HexahedronMesh import HexahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 
@@ -14,8 +16,6 @@ from ..decorator import timer
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 
-from .TetrahedronMesh import TetrahedronMesh
-from .HexahedronMesh import HexahedronMesh
 
 from .distmesh import DistMesh2d
 

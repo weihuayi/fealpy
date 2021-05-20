@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # 
 
-import sys 
 import argparse
 
 import numpy as np
@@ -96,8 +95,8 @@ for i in range(maxit):
 
     uh[:] = spsolve(A, F).reshape(-1)
 
-    errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
-    errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
 
     if i < maxit-1:
         mesh.uniform_refine()
