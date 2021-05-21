@@ -16,7 +16,6 @@ We still have lot work to do.
 
 ## Common
 
-
 Use `pip install -U fealpy` to install the latest release from PyPi.
 
 Users in China can install FEALPy from mirrors such as:
