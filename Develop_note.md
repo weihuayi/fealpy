@@ -1,5 +1,17 @@
 # Developing Standard 
 
+## 发布新版本步骤
+1. 修改如下文件中的 tag 版本号：
+.bumpversion.cfg
+fealpy/__init__.py
+2. add and commit
+3. 创建相应版本号的 tag
+4. git push github --tags
+5. github 页面 realease
+
+
+
+
 ## General Python Coding Rule
 
 * ClassName
