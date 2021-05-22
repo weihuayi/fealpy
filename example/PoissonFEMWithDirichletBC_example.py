@@ -80,19 +80,9 @@ for i in range(maxit):
     bc = DirichletBC(space, pde.dirichlet) 
 
     uh = space.function()
-    if dim == 2:
-        A = space.stiff_matrix()
-    elif dim == 3:
-        A = space.parallel_stiff_matrix(q=p)
-
+    A = space.stiff_matrix()
     F = space.source_vector(pde.source)
-
     A, F = bc.apply(A, F, uh)
-
-
-    #ml = pyamg.ruge_stuben_solver(A)  
-    #uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
-
     uh[:] = spsolve(A, F).reshape(-1)
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)
