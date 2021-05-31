@@ -33,4 +33,4 @@ jobs:
         pip install .[dev]
     - name: Test with pytest
       run: |
-        pytest test/buildtest/PoissonFEMWithDirichletBC_test.py
+        pytest test
