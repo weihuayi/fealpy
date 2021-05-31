@@ -16,22 +16,22 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
        (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
        (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
        (3, 0, 2, 1), (3, 2, 1, 0), (3, 1, 0, 2)]);
-    V = 4
-    E = 6
-    F = 4
-    FV = 3
-    FE = 3
+    NVC = 4
+    NEC = 6
+    NFC = 4
+    NVF = 3
+    NEF = 3
 
     def __init__(self, N, cell):
         super(TetrahedronMeshDataStructure, self).__init__(N, cell)
 
     def number_of_vertices_of_cells(self):
-        return self.V
+        return self.NVC
 
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
         edge = self.edge
-        face2edgeSign = np.zeros((NF, FE), dtype=np.bool)
+        face2edgeSign = np.zeros((NF, NEF), dtype=np.bool_)
         n = [1, 2, 0]
         for i in range(3):
             face2edgeSign[:, i] = (face[:, n[i]] == edge[face2edge[:, i], 0])
@@ -103,11 +103,11 @@ class TetrahedronMesh(Mesh3d):
         GD = self.geo_dimension()
 
         cell = self.entity(etype)[index]
-        NV = cell.shape[-1]
+        NVC = self.ds.NVC 
         NC = len(cell)
 
         cell = np.r_['1', np.zeros((NC, 1), dtype=cell.dtype), cell]
-        cell[:, 0] = NV
+        cell[:, 0] = NVC
 
         if etype == 'cell':
             cellType = 10  # 四面体

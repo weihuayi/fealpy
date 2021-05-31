@@ -7,9 +7,9 @@ from ..common import hash2map
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     ccw = np.array([0, 1, 2, 3])
-    V = 4
-    E = 4
-    F = 1
+    NVC = 4
+    NEC = 4
+    NFC = 4
     localCell = np.array([
         (0, 1, 2, 3),
         (1, 2, 3, 0),
