@@ -63,8 +63,11 @@ class WedgeLagrangeFiniteElementSpace:
     def edge_to_dof(self, index=np.s_[:]):
         return self.dof.edge_to_dof()
 
-    def is_boundary_dof(self):
-        return self.dof.is_boundary_dof()
+    def is_tri_boundary_dof(self, threshold=None):
+        return self.dof.is_tri_boundary_dof(threshold=threshold)
+
+    def is_quad_boundary_dof(self, threshold=None):
+        return self.dof.is_quad_boundary_dof(threshold=threshold)
 
     def geo_dimension(self):
         return self.GD
@@ -113,11 +116,15 @@ class WedgeLagrangeFiniteElementSpace:
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
-        cell2dof = self.dof.cell2dof[index]
+        shape = phi.shape[-1]
+        if shape == 3:
+            dof = self.dof.tface2dof[index]
+        else:
+            dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
+        val = np.einsum(s1, phi, uh[dof])
         return val
 
     @barycentric
@@ -387,22 +394,128 @@ class WedgeLagrangeFiniteElementSpace:
         初始化解 uh  的第一类边界条件。
         """
 
+        mesh = self.mesh
+        tface, qface = mesh.entity('face')
         ipoints = self.interpolation_points()
-        isDDof = self.is_boundary_dof()
-        uh[isDDof] = gD(ipoints[isDDof])
-        return isDDof
+        istDDof = self.is_tri_boundary_dof(threshold=threshold)
+        uh[istDDof] = gD(ipoints[istDDof])
+        if qface.shape[0] == 0:
+            return istDDof
+        else:
+            # TODO 
+            isqDDof = self.is_quad_boundary_dof(threshold=threshold)
+            uh[isqDDof] = gD(ipoints[isqDDof])
+            return istDDof, isqDDof
+    
+    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+        mesh = self.mesh
+        tface, qface = mesh.entity('face')
+        F = self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
+        if qface.shape[0] == 0:
+            return F
+        else:
+            #TODO 
+            F = self.set_quad_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
+            return F
+    
+    def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
+
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷矩阵 F 中
+
+        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
+        """
+        p = self.p
+        mesh = self.mesh
+
+        dim = 1 if len(F.shape)==1 else F.shape[1]
+       
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_tri_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='tri', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.tri_face_to_dof()[index]
+
+        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf0.get_quadrature_points_and_weights()
+        phi = self.face_basis(bcs)
+
+        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
+        measure = mesh.boundary_tri_face_area(index=index)
+
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
+    def set_quad_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
+
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷矩阵 F 中
+
+        TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
+        """
+        p = self.p
+        mesh = self.mesh
+
+        dim = 1 if len(F.shape)==1 else F.shape[1]
+       
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_quad_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='quad', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        face2dof = self.quad_face_to_dof()[index]
+
+        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf1.get_quadrature_points_and_weights()
+        phi = self.face_basis(bcs)
+
+        n = mesh.boundary_quad_face_unit_normal(bcs, index=index)
+        measure = mesh.boundary_quad_face_area(index=index)
+
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='quad', index=index)
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        if dim == 1:
+            np.add.at(F, face2dof, bb)
+        else:
+            np.add.at(F, (face2dof, np.s_[:]), bb)
+
     
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
         mesh = self.mesh
         tface, qface = mesh.entity('face')
-        A, F = self.set_tri_boundary_robin_bc(A, F, gR, q=q)
+        A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
         if qface.shape[0] == 0:
             return A, F
         else:
-            A, F = self.set_quad_boundary_robin_bc(A, F, gR, q=q)
+            #TODO 
+            A, F = self.set_quad_boundary_robin_bc(A, F,
+                    gR, threshold=threshold, q=q)
             return A, F
 
-    def set_tri_boundary_robin_bc(self, A, F, gR, q=None):
+    def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
 
         Notes
@@ -416,8 +529,16 @@ class WedgeLagrangeFiniteElementSpace:
         p = self.p
         mesh = self.mesh
         dim = 1 if len(F.shape) == 1 else F.shape[1]
+        
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_tri_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='tri', index=index)
+                flag = threshold(bc)
+                index = index[flag]
 
-        index = self.mesh.ds.boundary_tri_face_index()
         face2dof = self.tri_face_to_dof()[index]
 
         qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
@@ -446,7 +567,7 @@ class WedgeLagrangeFiniteElementSpace:
 
         return A, F
 
-    def set_quad_boundary_robin_bc(self, A, F, gR, q=None):
+    def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
 
         Notes
@@ -460,8 +581,16 @@ class WedgeLagrangeFiniteElementSpace:
         p = self.p
         mesh = self.mesh
         dim = 1 if len(F.shape) == 1 else F.shape[1]
+ 
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_quad_face_index()
+            if threshold is not None:
+                bc = self.mesh.entity_barycenter('face', ftype='quad', index=index)
+                flag = threshold(bc)
+                index = index[flag]
 
-        index = self.mesh.ds.boundary_quad_face_index()
         face2dof = self.quad_face_to_dof()[index]
 
         qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')

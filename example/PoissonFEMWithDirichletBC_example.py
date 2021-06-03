@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # 
 
-import sys 
 import argparse
 
 import numpy as np
@@ -81,23 +80,13 @@ for i in range(maxit):
     bc = DirichletBC(space, pde.dirichlet) 
 
     uh = space.function()
-    if dim == 2:
-        A = space.stiff_matrix()
-    elif dim == 3:
-        A = space.parallel_stiff_matrix(q=p)
-
+    A = space.stiff_matrix()
     F = space.source_vector(pde.source)
-
     A, F = bc.apply(A, F, uh)
-
-
-    #ml = pyamg.ruge_stuben_solver(A)  
-    #uh[:] = ml.solve(F, tol=1e-12, accel='cg').reshape(-1)
-
     uh[:] = spsolve(A, F).reshape(-1)
 
-    errorMatrix[0, i] = space.integralalg.L2_error(pde.solution, uh)
-    errorMatrix[1, i] = space.integralalg.L2_error(pde.gradient, uh.grad_value)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
 
     if i < maxit-1:
         mesh.uniform_refine()

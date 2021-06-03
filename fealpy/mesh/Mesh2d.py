@@ -241,16 +241,16 @@ class Mesh2dDataStructure():
         self.edge2cell = None
 
     def number_of_nodes_of_cells(self):
-        return self.V
+        return self.NVC
 
     def number_of_edges_of_cells(self):
-        return self.E
+        return self.NEC
 
     def number_of_faces_of_cells(self):
-        return self.E
+        return self.NEC
 
     def number_of_vertices_of_cells(self):
-        return self.V
+        return self.NVC
 
     def total_edge(self):
         NC = self.NC
@@ -268,7 +268,7 @@ class Mesh2dDataStructure():
         """ Construct edge and edge2cell from cell
         """
         NC = self.NC
-        E = self.E
+        NEC = self.NEC
 
         totalEdge = self.total_edge()
         _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
@@ -281,88 +281,91 @@ class Mesh2dDataStructure():
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
         i1 = np.zeros(NE, dtype=self.itype)
-        i1[j] = np.arange(E*NC, dtype=self.itype)
+        i1[j] = np.arange(NEC*NC, dtype=self.itype)
 
-        self.edge2cell[:, 0] = i0//E
-        self.edge2cell[:, 1] = i1//E
-        self.edge2cell[:, 2] = i0%E
-        self.edge2cell[:, 3] = i1%E
+        self.edge2cell[:, 0] = i0//NEC
+        self.edge2cell[:, 1] = i1//NEC
+        self.edge2cell[:, 2] = i0%NEC
+        self.edge2cell[:, 3] = i1%NEC
 
         self.edge = totalEdge[i0, :]
 
-    def cell_to_node(self):
+    def cell_to_node(self, return_sparse=False):
         """ 
         """
         NN = self.NN
         NC = self.NC
-        V = self.V
-
+        NVC = self.NVC
         cell = self.cell
 
-        I = np.repeat(range(NC), V)
-        val = np.ones(self.V*NC, dtype=np.bool)
-        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
-        return cell2node
+        if return_sparse:
+            I = np.repeat(range(NC), NVC)
+            val = np.ones(NVC*NC, dtype=np.bool_)
+            cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN),
+                    dtype=np.bool_)
+            return cell2node
+        else:
+            return cell
 
-    def cell_to_edge(self, sparse=False):
+    def cell_to_edge(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE
         NC = self.NC
-        E = self.E
+        NEC = self.NEC
 
         edge2cell = self.edge2cell
 
-        if sparse == False:
-            cell2edge = np.zeros((NC, E), dtype=self.itype)
+        if return_sparse == False:
+            cell2edge = np.zeros((NC, NEC), dtype=self.itype)
             cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
             cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
             return cell2edge
         else:
-            val = np.ones(2*NE, dtype=np.bool)
-            I = edge2cell[:, [0, 1]].flatten()
+            val = np.ones(2*NE, dtype=np.bool_)
+            I = edge2cell[:, [0, 1]].flat
             J = np.repeat(range(NE), 2)
             cell2edge = csr_matrix(
                     (val, (I, J)), 
-                    shape=(NC, NE), dtype=np.bool)
+                    shape=(NC, NE), dtype=np.bool_)
             return cell2edge 
 
-    def cell_to_edge_sign(self, sparse=False):
+    def cell_to_edge_sign(self, return_sparse=False):
         NC = self.NC
-        E = self.E
+        NEC = self.NEC
 
         edge2cell = self.edge2cell
         if return_sparse == False:
-            cell2edgeSign = np.zeros((NC, E), dtype=np.bool)
+            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool)
             cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
         else:
             val = np.ones(NE, dtype=np.bool)
             cell2edgeSign = csr_matrix(
                     (val, (edge2cell[:, 0], range(NE))),
-                    shape=(NC, NE), dtype=np.bool)
+                    shape=(NC, NE), dtype=np.bool_)
         return cell2edgeSign
 
-    def cell_to_face(self, sparse=False):
+    def cell_to_face(self, return_sparse=False):
         """ The neighbor information of cell to edge
         """
         NE = self.NE
         NC = self.NC
 
-        E = self.E
+        NEC = self.NEC
         edge2cell = self.edge2cell
 
         if return_sparse == False:
-            cell2edge = np.zeros((NC, E), dtype=self.itype)
+            cell2edge = np.zeros((NC, NEC), dtype=self.itype)
             cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE)
             cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE)
             return cell2edge
         else:
-            val = np.ones(2*NE, dtype=np.bool)
-            I = edge2cell[:, [0, 1]].flatten()
+            val = np.ones(2*NE, dtype=np.bool_)
+            I = edge2cell[:, [0, 1]].flat
             J = np.repeat(range(NE), 2)
             cell2edge = csr_matrix(
                     (val, (I, J)), 
-                    shape=(NC, NE), dtype=np.bool)
+                    shape=(NC, NE))
             return cell2edge 
 
 
@@ -376,20 +379,20 @@ class Mesh2dDataStructure():
         NC = self.NC
         edge2cell = self.edge2cell
         if (return_sparse == False) & (return_array == False):
-            E = self.E
-            cell2cell = np.zeros((NC, E), dtype=self.itype)
+            NEC = self.NEC
+            cell2cell = np.zeros((NC, NEC), dtype=self.itype)
             cell2cell[edge2cell[:, 0], edge2cell[:, 2]] = edge2cell[:, 1]
             cell2cell[edge2cell[:, 1], edge2cell[:, 3]] = edge2cell[:, 0]
             return cell2cell
         NE = self.NE
-        val = np.ones((NE,), dtype=np.bool)
+        val = np.ones((NE,), dtype=np.bool_)
         if return_boundary:
             cell2cell = coo_matrix(
                     (val, (edge2cell[:, 0], edge2cell[:, 1])),
-                    shape=(NC, NC), dtype=np.bool)
+                    shape=(NC, NC), dtype=np.bool_)
             cell2cell += coo_matrix(
                     (val, (edge2cell[:, 1], edge2cell[:, 0])),
-                    shape=(NC, NC), dtype=np.bool)
+                    shape=(NC, NC), dtype=np.bool_)
             return cell2cell.tocsr()
         else:
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -398,7 +401,7 @@ class Mesh2dDataStructure():
                     shape=(NC, NC), dtype=np.bool)
             cell2cell += coo_matrix(
                     (val[isInEdge], (edge2cell[isInEdge, 1], edge2cell[isInEdge, 0])),
-                    shape=(NC, NC), dtype=np.bool)
+                    shape=(NC, NC), dtype=np.bool_)
             cell2cell = cell2cell.tocsr()
             if return_array == False:
                 return cell2cell
@@ -409,67 +412,50 @@ class Mesh2dDataStructure():
                 adjLocation[1:] = np.cumsum(nn)
                 return adj.astype(np.int32), adjLocation
 
-    def edge_to_node(self, sparse=False):
+    def edge_to_node(self, return_sparse=False):
         NN = self.NN
         NE = self.NE
 
         edge = self.edge
-        if sparse == False:
+        if return_sparse == False:
             return edge
         else:
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
-            val = np.ones(2*NE, dtype=np.bool)
-            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
+            val = np.ones(2*NE, dtype=np.bool_)
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN))
             return edge2node
 
-    def edge_to_edge(self, sparse=False):
-        edge2node = self.edge_to_node(sparse=True)
-        return edge2node*edge2node.transpose(0, 1)
-
-    def edge_to_edge(self, sparse=False):
-        edge2node = self.edge_to_node()
-        return edge2node*edge2node.transpose()
-
     def edge_to_edge(self):
-        edge2node = self.edge_to_node(sparse=True)
-        return edge2node*edge2node.transpose()
+        edge2node = self.edge_to_node(return_sparse=True)
+        return edge2node*edge2node.T
 
-
-    def edge_to_cell(self, sparse=False):
-        if sparse==False:
+    def edge_to_cell(self, return_sparse=False):
+        if return_sparse==False:
             return self.edge2cell
         else:
             NC = self.NC
             NE = self.NE
             I = np.repeat(range(NF), 2)
             J = self.edge2cell[:, [0, 1]].flatten()
-            val = np.ones(2*NE, dtype=np.bool)
-            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
+            val = np.ones(2*NE, dtype=np.bool_)
+            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool_)
             return face2cell
 
-    def face_to_cell(self, sparse=False):
-        if sparse==False:
-            return self.edge2cell
-        else:
-            NC = self.NC
-            NE = self.NE
-            I = np.repeat(range(NF), 2)
-            J = self.edge2cell[:, [0, 1]].flatten()
-            val = np.ones(2*NE, dtype=np.bool)
-            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
-            return face2cell 
+    def face_to_cell(self, return_sparse=False):
+        return self.edge_to_cell(return_sparse=return_sparse)
 
     def node_to_node(self, return_array=False):
         """ The neighbor information of nodes
         """
+
         NN = self.NN
         NE = self.NE
         edge = self.edge
         I = edge
         J = edge[:, [1, 0]] 
-        val = np.ones((2*NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NN),dtype=np.bool)
+        val = np.ones((2*NE,), dtype=np.bool_)
+        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NN))
         if return_array == False:
             return node2node 
         else:
@@ -480,52 +466,57 @@ class Mesh2dDataStructure():
             return adj.astype(np.int32), adjLocation
 
     def node_to_node_in_edge(self, NN, edge):
+        """
+        Notes
+        ----
+        TODO
+        """
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
-        val = np.ones(2*edge.shape[0], dtype=np.bool)
+        val = np.ones(2*edge.shape[0], dtype=np.bool_)
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
         return node2node
 
     def node_to_edge(self):
+        """
+        """
         NN = self.NN
         NE = self.NE
-        
-        edge = self.edge
-        I = edge.flatten()
+        I = self.edge.flat
         J = np.repeat(range(NE), 2)
-        val = np.ones(2*NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE), dtype=np.bool)
+        val = np.ones(2*NE, dtype=np.bool_)
+        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE))
         return node2edge
 
-    def node_to_cell(self, localidx=False):
+    def node_to_cell(self, return_localidx=False):
         """
         """
         NN = self.NN
         NC = self.NC
-        V = self.V
+        NVC = self.NVC
 
-        cell = self.cell
+        I = self.cell.flat 
+        J = np.repeat(range(NC), NVC)
 
-        I = cell.flatten() 
-        J = np.repeat(range(NC), V)
-
-        if localidx == True:
-            val = ranges(V*np.ones(NC, dtype=self.itype), start=1) 
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
+        if return_localidx == False:
+            val = np.ones(NVC*NC, dtype=np.bool_)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC))
         else:
-            val = np.ones(V*NC, dtype=np.bool)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
+            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1) 
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
         return node2cell
 
     def boundary_edge_to_edge(self):
+        """
+        """
         NN = self.NN
         edge = self.edge
         index = self.boundary_edge_index()
         bdEdge = edge[index]
         n = bdEdge.shape[0]
-        val = np.ones(n, dtype=np.bool)
-        m0 = csr_matrix((val, (range(n), bdEdge[:, 0])), shape=(n, NN), dtype=np.bool)
-        m1 = csr_matrix((val, (range(n), bdEdge[:, 1])), shape=(n, NN), dtype=np.bool)
+        val = np.ones(n, dtype=np.bool_)
+        m0 = csr_matrix((val, (range(n), bdEdge[:, 0])), shape=(n, NN))
+        m1 = csr_matrix((val, (range(n), bdEdge[:, 1])), shape=(n, NN))
         _, pre = (m0*m1.T).nonzero()
         _, nex = (m1*m0.T).nonzero()
         return index[pre], index[nex]
