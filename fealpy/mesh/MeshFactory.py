@@ -243,7 +243,8 @@ class MeshFactory():
             return PolygonMesh(pnode, pcell, pcellLocation)
 
     @classmethod
-    def special_boxmesh2d(self, box, n=10, meshtype='fishbone'):
+    def special_boxmesh2d(self, box, n=10,
+            meshtype='fishbone'):
         qmesh = self.boxmesh2d(box, nx=n, ny=n, meshtype='quad')
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')

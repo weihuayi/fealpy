@@ -1054,7 +1054,7 @@ class TriangleMeshWithInfinityNode:
         pnode = np.concatenate((self.center, self.node[isBdNode]), axis=0)
         PN = pnode.shape[0]
 
-        node2cell = self.ds.node_to_cell(localidx=True)
+        node2cell = self.ds.node_to_cell(return_localidx=True)
         NV = np.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
         NV[isBdNode] += 1
         NV = NV[:-1]
