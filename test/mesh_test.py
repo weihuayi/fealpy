@@ -45,7 +45,7 @@ def test_triangle_mesh():
 
     cell2node = mesh.ds.cell_to_node()
     cell2edge = mesh.ds.cell_to_edge()
-    cell2face = mesh.ds.cell_to_face()
+    cell2cell = mesh.ds.cell_to_cell()
 
     edge2node = mesh.ds.edge_to_node()
     edge2edge = mesh.ds.edge_to_edge()
@@ -102,4 +102,31 @@ def test_tetrahedron_mesh():
     node2face = mesh.ds.node_to_face()
     node2cell = mesh.ds.node_to_cell()
 
-    # 加密测试 
+
+@pytest.mark.parametrize("p", [1, 2, 3, 4])
+def test_lagrange_triangle_mesh(p):
+    from fealpy.mesh import LagrangeTriangleMesh
+    node = np.array([
+        (0.0, 0.0), # 0 号点
+        (1.0, 0.0), # 1 号点
+        (1.0, 1.0), # 2 号点
+        (0.0, 1.0), # 3 号点
+        ], dtype=np.float64)
+    cell = np.array([
+        (1, 2, 0), # 0 号单元
+        (3, 0, 2), # 1 号单元
+        ], dtype=np.int_)
+
+    mesh = LagrangeTriangleMesh(node, cell, p=p)
+
+    cell2node = mesh.ds.cell_to_node()
+    cell2edge = mesh.ds.cell_to_edge()
+    cell2cell = mesh.ds.cell_to_cell()
+
+    edge2node = mesh.ds.edge_to_node()
+    edge2edge = mesh.ds.edge_to_edge()
+    edge2cell = mesh.ds.edge_to_cell()
+
+    node2node = mesh.ds.node_to_node()
+    node2edge = mesh.ds.node_to_edge()
+    node2cell = mesh.ds.node_to_cell()

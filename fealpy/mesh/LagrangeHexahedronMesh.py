@@ -24,13 +24,12 @@ class LinearHexahedronMeshDataStructure(LinearMeshDataStructure):
         (0,  3, 5, 1), (9, 11, 10, 8),  # left and right faces 
         (2,  8, 4, 0), (6, 5, 7,  11)]) # front and back faces
 
-    V = 8 # 每个单元 8 个顶点  
-    E = 12 # 每个单元 12 条边 
-    F = 6 # 每个单元  6 个面 
-    FV = 4 # 每个单元面有 4 个顶点 
-    FE = 4 # 每个单元面有 4 条边
-    EV = 2 # 每个边有 2 个顶点
-    C = 1
+    NVC = 8 # 每个单元 8 个顶点  
+    NEC = 12 # 每个单元 12 条边 
+    NFC = 6 # 每个单元  6 个面 
+    NVF = 4 # 每个单元面有 4 个顶点 
+    NEF = 4 # 每个单元面有 4 条边
+    NVE = 2 # 每个边有 2 个顶点
 
     def __init__(self, NN, cell):
         self.NN = NN

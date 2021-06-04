@@ -11,10 +11,9 @@ from .core import LinearMeshDataStructure
 class LinearQuadrangleMeshDataStructure(LinearMeshDataStructure):
     localEdge = np.array([(0, 2), (2, 3), (3, 1), (1, 0)])
     ccw = np.array([0, 2, 3, 1])
-    V = 4
-    E = 4
-    F = 1
-    EV = 2
+    NVC = 4
+    NEC = 4
+    NVE = 2
 
     def __init__(self, NN, cell):
         self.NN = NN
