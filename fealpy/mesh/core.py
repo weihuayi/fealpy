@@ -26,9 +26,9 @@ class LinearMeshDataStructure():
         NC = self.NC
         cell = self.cell
         localFace = self.localFace
-        FV = self.FV
+        NVF = self.NVF
 
-        totalFace = cell[:, localFace].reshape(-1, FV)
+        totalFace = cell[:, localFace].reshape(-1, NVF)
         return totalFace
 
     def construct_face(self):
@@ -39,8 +39,8 @@ class LinearMeshDataStructure():
             构造面
         """
         NC = self.NC
-        F = self.F
-        FV = self.FV
+        NFC = self.NFC
+        NVF = self.NVF
 
         totalFace = self.total_face()
         index = np.sort(totalFace, axis=-1)
@@ -58,12 +58,12 @@ class LinearMeshDataStructure():
         self.face2cell = np.zeros((NF, 4), dtype=self.itype)
 
         i1 = np.zeros(NF, dtype=self.itype)
-        i1[j] = np.arange(F*NC, dtype=self.itype)
+        i1[j] = np.arange(NFC*NC, dtype=self.itype)
 
-        self.face2cell[:, 0] = i0//F
-        self.face2cell[:, 1] = i1//F
-        self.face2cell[:, 2] = i0%F
-        self.face2cell[:, 3] = i1%F
+        self.face2cell[:, 0] = i0//NFC
+        self.face2cell[:, 1] = i1//NFC
+        self.face2cell[:, 2] = i0%NFC
+        self.face2cell[:, 3] = i1%NFC
 
     def construct_edge(self, TD=2):
         """ 
@@ -74,8 +74,8 @@ class LinearMeshDataStructure():
             TD == 3: 构造 edge
         """
         NC = self.NC
-        E = self.E
-        EV = self.EV
+        NEC = self.NEC
+        NVE = self.NVE
 
         totalEdge = self.total_edge()
         index = np.sort(totalEdge, axis=-1)
@@ -86,18 +86,18 @@ class LinearMeshDataStructure():
         NE = i0.shape[0]
         self.NE = NE
         self.edge = totalEdge[i0, :]
-        self.cell2edge = np.reshape(j, (NC, E))
+        self.cell2edge = np.reshape(j, (NC, NEC))
 
         if TD == 2:
             self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
             i1 = np.zeros(NE, dtype=self.itype)
-            i1[j] = np.arange(E*NC, dtype=self.itype)
+            i1[j] = np.arange(NEC*NC, dtype=self.itype)
 
-            self.edge2cell[:, 0] = i0//E
-            self.edge2cell[:, 1] = i1//E
-            self.edge2cell[:, 2] = i0%E
-            self.edge2cell[:, 3] = i1%E
+            self.edge2cell[:, 0] = i0//NEC
+            self.edge2cell[:, 1] = i1//NEC
+            self.edge2cell[:, 2] = i0%NEC
+            self.edge2cell[:, 3] = i1%NEC
 
 
 def multi_index_matrix0d(p):
