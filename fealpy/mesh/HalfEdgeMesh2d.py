@@ -716,11 +716,12 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.NE = NE + NE1
         self.ds.NN = self.node.size
         return NE1
+
     def boundary_uniform_refine(self,n=1):
         for i in range(n):
             node = self.entity('node')
             halfedge = self.entity('halfedge')
-            ndof = self.nodedata['dof']
+            ndof = np.ones(len(self.node))
             cstart = self.ds.cellstart
             isMarkedHEdge = np.zeros(len(halfedge),dtype=np.bool_)
             isMarkedHEdge[halfedge[:,1]<cstart] = True
@@ -735,6 +736,7 @@ class HalfEdgeMesh2d(Mesh2d):
             self.refine_halfedge(isMarkedHEdge)
             self.nodedata['dof'] = np.r_['0',
                     ndof,np.ones_like(ec[:, 0], dtype=np.bool)]
+
     def coarsen_halfedge(self, isMarkedHEdge):
 
         NN = self.number_of_nodes()
