@@ -9,9 +9,14 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
+
     NVC = 3
+    NVE = 2
+    NVF = 2
+
     NEC = 3
     NFC = 3
+
     def __init__(self, NN, cell):
         super(TriangleMeshDataStructure, self).__init__(NN, cell)
 
@@ -890,24 +895,24 @@ class TriangleMesh(Mesh2d):
         node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        v0 = node[cell[:, 2]] - node[cell[:, 1]]
+        v1 = node[cell[:, 0]] - node[cell[:, 2]]
+        v2 = node[cell[:, 1]] - node[cell[:, 0]]
         GD = self.geo_dimension()
-        nv = np.cross(v2, -v1)
+        nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
             length = nv
             W = np.array([[0, 1], [-1, 0]])
-            Dlambda[:,0,:] = v0@W/length.reshape((-1, 1))
-            Dlambda[:,1,:] = v1@W/length.reshape((-1, 1))
-            Dlambda[:,2,:] = v2@W/length.reshape((-1, 1))
+            Dlambda[:, 0] = v0@W/length[:, None]
+            Dlambda[:, 1] = v1@W/length[:, None]
+            Dlambda[:, 2] = v2@W/length[:, None]
         elif GD == 3:
             length = np.sqrt(np.square(nv).sum(axis=1))
             n = nv/length.reshape((-1, 1))
-            Dlambda[:,0,:] = np.cross(n, v0)/length.reshape((-1,1))
-            Dlambda[:,1,:] = np.cross(n, v1)/length.reshape((-1,1))
-            Dlambda[:,2,:] = np.cross(n, v2)/length.reshape((-1,1))
+            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
+            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
+            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
         return Dlambda
 
     def jacobi_matrix(self, index=np.s_[:]):
@@ -958,27 +963,20 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
-    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
+    def bc_to_point(self, bc, index=np.s_[:]):
         """
 
         Notes
         ----
-
-        etype 是一个多余的参数， bc 中已经包含这单元类型的信息,
-        为了向后兼容这里保留下来
+        node[cell].shape = (NC, 3, GD)
+        node[edge].shape = (NE, 2, GD)
+        bc.shape = (NQ, TD+1)
         """
-        TD = bc.shape[-1] - 1 #
+        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
         node = self.node
         entity = self.entity(etype=TD)[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
-
-    def edge_bc_to_point(self, bcs, index=None):
-        node = self.entity('node')
-        edge = self.entity('edge')
-        index = index if index is not None else np.s_[:]
-        ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
-        return ps
 
 
 

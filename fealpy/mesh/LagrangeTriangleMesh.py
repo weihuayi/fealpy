@@ -17,10 +17,9 @@ from .core import LinearMeshDataStructure
 class LinearTriangleMeshDataStructure(LinearMeshDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
-    V = 3
-    E = 3
-    EV = 2
-    F = 1
+    NVC = 3
+    NEC = 3
+    NVE = 2
     def __init__(self, NN, cell):
         self.NN = NN
         self.NC = cell.shape[0]
@@ -465,9 +464,9 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
         """
         self.itype = ds.itype
 
-        self.V = (p+1)*(p+2)//2 # 单元顶点个数
-        self.E = ds.E # 单元边的个数
-        self.F = ds.F # F == 1
+        self.NVC = (p+1)*(p+2)//2 # 单元顶点个数
+        self.NEC = ds.NEC # 单元边的个数
+        self.NVE = p+1 # 边上节点的个数
 
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 
@@ -487,7 +486,7 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
             self.edge[:, 1:-1] = self.NN + np.arange(NE*(p-1)).reshape(NE, p-1)
             self.NN += NE*(p-1)
 
-            self.cell = np.zeros((self.NC, self.V), dtype=self.itype)
+            self.cell = np.zeros((self.NC, self.NVC), dtype=self.itype)
 
             index = multi_index_matrix[2](p)
             edge2cell = ds.edge2cell
@@ -507,7 +506,7 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
 
             if p > 2:
                 flag = (index[:, 0] != 0) & (index[:, 1] != 0) & (index[:, 2] !=0)
-                cdof = self.V - 3*p
+                cdof = self.NVC - 3*p
                 self.cell[:, flag]= self.NN + np.arange(self.NC*cdof).reshape(self.NC, cdof)
                 self.NN += self.NC*cdof
 
