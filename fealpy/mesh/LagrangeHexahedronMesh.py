@@ -24,12 +24,14 @@ class LinearHexahedronMeshDataStructure(LinearMeshDataStructure):
         (0,  3, 5, 1), (9, 11, 10, 8),  # left and right faces 
         (2,  8, 4, 0), (6, 5, 7,  11)]) # front and back faces
 
-    NVC = 8 # 每个单元 8 个顶点  
-    NEC = 12 # 每个单元 12 条边 
-    NFC = 6 # 每个单元  6 个面 
-    NVF = 4 # 每个单元面有 4 个顶点 
-    NEF = 4 # 每个单元面有 4 条边
     NVE = 2 # 每个边有 2 个顶点
+    NVF = 4 # 每个单元面有 4 个顶点 
+    NVC = 8 # 每个单元 8 个顶点  
+
+    NEF = 4 # 每个单元面有 4 条边
+    NEC = 12 # 每个单元 12 条边 
+
+    NFC = 6 # 每个单元  6 个面 
 
     def __init__(self, NN, cell):
         self.NN = NN
@@ -192,9 +194,11 @@ class LagrangeHexahedronMeshDataStructure(Mesh3dDataStructure):
         self.itype = ds.itype
 
         self.p = p
-        self.V = (p+1)*(p+1)*(p+1) 
-        self.E = ds.E 
-        self.F = ds.F
+        self.NVC = (p+1)*(p+1)*(p+1) 
+        self.NVE = p+1 # 每条边上有 p+1 个点
+        self.NVF = (p+1)*(p+1)
+        self.NEC = ds.NEC
+        self.NFC = ds.NFC
 
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 
