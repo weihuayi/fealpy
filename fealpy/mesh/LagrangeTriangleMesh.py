@@ -466,6 +466,7 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
 
         self.NVC = (p+1)*(p+2)//2 # 单元顶点个数
         self.NEC = ds.NEC # 单元边的个数
+        self.NVE = p+1 # 边上节点的个数
 
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 

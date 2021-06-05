@@ -509,9 +509,9 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
         self.itype = ds.itype
 
         self.p = p
-        self.V = (p+1)*(p+1) 
-        self.E = ds.E 
-        self.F = ds.F
+        self.NVC = (p+1)*(p+1) 
+        self.NEC = ds.NEC
+        self.NVE = p+1
 
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 
