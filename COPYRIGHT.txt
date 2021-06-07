@@ -18,4 +18,5 @@ Please note that although FEALPy is freely available, it is copyrighted by the a
 If you use FEALPy in any program or publication, please acknowledge
 its author by adding a reference to: 
 
-**H. Wei, FEALPy: Finite Element Analysis Library in Python. https://github.com/weihuayi/fealpy, 2017.**
+**H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python,
+https://github.com/weihuayi/fealpy, Xiangtan University, 2017-2021.**
