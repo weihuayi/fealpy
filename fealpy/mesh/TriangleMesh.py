@@ -9,9 +9,14 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
+
     NVC = 3
+    NVE = 2
+    NVF = 2
+
     NEC = 3
     NFC = 3
+
     def __init__(self, NN, cell):
         super(TriangleMeshDataStructure, self).__init__(NN, cell)
 

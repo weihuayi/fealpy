@@ -143,10 +143,10 @@ class MeshFactory():
                 return LagrangeTriangleMesh(node, cell, p=p)
         elif meshtype == 'quad':
             cell = np.zeros((NC,4), dtype=np.int_)
-            cell[:,0] = idx[0:-1, 0:-1].flatten()
-            cell[:,1] = idx[1:, 0:-1].flatten()
-            cell[:,2] = idx[1:, 1:].flatten()
-            cell[:,3] = idx[0:-1, 1:].flatten()
+            cell[:,0] = idx[0:-1, 0:-1].flat
+            cell[:,1] = idx[1:, 0:-1].flat
+            cell[:,2] = idx[1:, 1:].flat
+            cell[:,3] = idx[0:-1, 1:].flat
             if threshold is not None:
                 node, cell = self.delete_cell(node, cell, threshold)
             if returnnc:

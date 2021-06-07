@@ -420,9 +420,10 @@ class Mesh2dDataStructure():
         if return_sparse == False:
             return edge
         else:
-            I = np.repeat(range(NE), 2)
-            J = edge.flatten()
-            val = np.ones(2*NE, dtype=np.bool_)
+            NVE = self.NVE
+            I = np.repeat(range(NE), NVE)
+            J = edge.flat
+            val = np.ones(NVE*NE, dtype=np.bool_)
             edge2node = csr_matrix((val, (I, J)), shape=(NE, NN))
             return edge2node
 
@@ -436,26 +437,35 @@ class Mesh2dDataStructure():
         else:
             NC = self.NC
             NE = self.NE
-            I = np.repeat(range(NF), 2)
-            J = self.edge2cell[:, [0, 1]].flatten()
+            I = np.repeat(range(NE), 2)
+            J = self.edge2cell[:, [0, 1]].flat
             val = np.ones(2*NE, dtype=np.bool_)
-            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool_)
+            face2cell = csr_matrix((val, (I, J)), shape=(NE, NC))
             return face2cell
 
     def face_to_cell(self, return_sparse=False):
         return self.edge_to_cell(return_sparse=return_sparse)
 
     def node_to_node(self, return_array=False):
-        """ The neighbor information of nodes
+
+        """ 
+        Notes
+        -----
+            节点与节点的相邻关系
+
+        TODO
+        ----
+            曲边元的边包含两个以上的点, 
         """
 
         NN = self.NN
         NE = self.NE
         edge = self.edge
-        I = edge
-        J = edge[:, [1, 0]] 
+        NVE = self.NVE
+        I = edge[:, [0, -1]].flat
+        J = edge[:, [-1, 0]].flat
         val = np.ones((2*NE,), dtype=np.bool_)
-        node2node = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NN))
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN))
         if return_array == False:
             return node2node 
         else:
@@ -482,9 +492,10 @@ class Mesh2dDataStructure():
         """
         NN = self.NN
         NE = self.NE
+        NVE = self.NVE
         I = self.edge.flat
-        J = np.repeat(range(NE), 2)
-        val = np.ones(2*NE, dtype=np.bool_)
+        J = np.repeat(range(NE), NVE)
+        val = np.ones(NVE*NE, dtype=np.bool_)
         node2edge = csr_matrix((val, (I, J)), shape=(NN, NE))
         return node2edge
 
