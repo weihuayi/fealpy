@@ -42,7 +42,7 @@ class TriangleMeshTest():
         plt.show()
 
         print(N)
-        print(C)
+        print(C.toarray())
 
 test = TriangleMeshTest()
 #test.lineTest()

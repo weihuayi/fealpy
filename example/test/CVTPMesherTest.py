@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # 
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import HalfEdgeMesh2d, CVTPMesher
@@ -309,7 +311,7 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=2)
+            uniform_mesh.uniform_meshing(n=2)
        
         elif domain == 'LShape':
             vertices = np.array([
@@ -326,7 +328,7 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=2)
+            uniform_mesh.uniform_meshing(n=2)
         elif domain =='circle':
             n = 20
             h = 2*np.pi/n
@@ -344,7 +346,7 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=0)
+            uniform_mesh.uniform_meshing(n=0)
         elif domain == 'partition1':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),(0.5,0.5)],dtype=np.float)
@@ -356,7 +358,7 @@ class CVTPMesherTest:
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=3)
+            uniform_mesh.uniform_meshing(n=3)
 
         elif domain == 'partition2':
             vertices = np.array([
@@ -372,8 +374,8 @@ class CVTPMesherTest:
                 (3, 0),(4, 0),(4, 0),(1, 0),
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mgesh)
-            uniform_mesh.uniform_meshing(refine=2)
+            uniform_mesh = CVTPMesher(mesh)
+            uniform_mesh.uniform_meshing(n=2)
         elif domain == 'hole1':
             
             vertices = np.array([
@@ -402,7 +404,7 @@ class CVTPMesherTest:
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=1)
+            uniform_mesh.uniform_meshing(n=1)
         elif domain == 'square2':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
@@ -415,7 +417,7 @@ class CVTPMesherTest:
                 (2, 0),(2, 0),(2, 0),(2, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(refine=2)
+            uniform_mesh.uniform_meshing(n=2)
 
         elif domain == 'hole2':
             """
@@ -463,7 +465,7 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
             #uniform_mesh.uniform_boundary_meshing(n=1)
-            uniform_mesh.uniform_meshing(refine=1)
+            uniform_mesh.uniform_meshing(n=1)
             #bnode = uniform_mesh.bnode
 
         mesh.print()
@@ -505,12 +507,32 @@ class CVTPMesherTest:
 
 
 test = CVTPMesherTest()
+if sys.argv[1] == "UN":
+    if sys.argv[2] =="S":
+        test.uniform_meshing_test(domain='square')
+    elif sys.argv[2] =="LS":
+        test.uniform_meshing_test(domain='LShape')
+    elif sys.argv[2] =="TL":
+        test.uniform_meshing_test(domain='triangle')
+    elif sys.argv[2] =="C":
+        uniform_meshing_test(domain='circle')
+
+if sys.argv[1] == "Lloyd":
+    if sys.argv[2] =="S":
+        test.Lloyd_test(domain='square')
+    elif sys.argv[2] =="LS":
+        test.Lloyd_test(domain='LShape')
+    elif sys.argv[2] =="TL":
+        test.Lloyd_test(domain='triangle')
+    elif sys.argv[2] =="C":
+        test.Lloyd_test(domain='circle')
+
 #test.uniform_boundary_meshing_test()
 #test.uniform_meshing_test(domain='square')
 #test.uniform_meshing_test(domain='square2',interior_nodes = True)
 #test.uniform_meshing_test(domain='LShape')
 #test.uniform_meshing_test(domain='triangle')
-test.uniform_meshing_test(domain='circle')
+#test.uniform_meshing_test(domain='circle')
 #test.uniform_meshing_test(domain='trapezoid',interior_nodes = False)
 #test.uniform_meshing_test(domain = 'partition1')
 #test.uniform_meshing_test(domain = 'partition2')
