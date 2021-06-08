@@ -475,15 +475,16 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge = self.ds.halfedge # DynamicArray
             cstart = self.ds.cellstart
 
-            e0 = halfedge[halfedge[cstart:, 3], 0]
-            e1 = halfedge[cstart:, 0]
+            flag = halfedge[:, 1] >= cstart
+            e0 = halfedge[halfedge[flag, 3], 0]
+            e1 = halfedge[flag, 0]
 
             w = np.array([[0, -1], [1, 0]], dtype=np.int)
             v = (node[e1] - node[e0])@w
             val = np.sum(v*node[e0], axis=1)
 
             a = np.zeros(NC, dtype=self.ftype)
-            np.add.at(a, halfedge[cstart:, 1] - cstart, val)
+            np.add.at(a, halfedge[flag, 1] - cstart, val)
             a /=2
             return a
         elif self.ds.NV == 3:
