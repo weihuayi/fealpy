@@ -37,7 +37,39 @@ class QuadrangleMeshTest:
             mesh.print()
             plt.show()
 
+    def Lshapetest(self, plot=True):
+        node = np.array([
+            (-1.0, -1.0),
+            (0.0, -1.0),
+            (1.0, -1.0),
+            (1.0, 0.0),
+            (0.0, 0.0),
+            (0.0, 1.0),
+            (-1.0, 1.0),
+            (-1.0,0.0)], dtype=np.float)
+        cell = np.array([[0, 1, 4, 7],[1,2,3,4],[7,4,5,6]], dtype=np.int)
+
+        mesh = QuadrangleMesh(node, cell)
+        mesh.uniform_refine(n=2)
+        #mesh.node = mesh.node[np.lexsort(mesh.node[:,::-1].T)]
+        '''
+        l = len(mesh.node)
+        node1 = np.zeros((l,2))
+        node1[:9,:] = mesh.node[mesh.node[:,1] = -1]
+        node1[9:18,:] = mesh.node[mesh.node[:,1] = -1]
+        '''
+        if plot:
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            mesh.node = mesh.node[np.lexsort(mesh.node[:,::-1].T)]
+            mesh.find_node(axes,showindex = True)
+            #mesh.find_edge(axes)
+            #mesh.print()
+            plt.show()
+
 
 test = QuadrangleMeshTest()
-test.refine_RB_test()
+#test.refine_RB_test()
+test.Lshapetest()
 

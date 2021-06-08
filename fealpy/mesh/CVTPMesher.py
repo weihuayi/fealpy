@@ -12,11 +12,10 @@ class CVTPMesher:
         Mesh : mesh
         """
         self.mesh = mesh
-    '''
-    def uniform_meshing(self, refine=0, c=0.618, theta=100):
-        self.uniform_boundary_meshing(n=refine, c=c, theta=theta)
-        self.uniform_init_interior_nodes()
-    '''        
+
+    def uniform_meshing(self, n=2, c=0.618, theta=100):
+        self.uniform_boundary_meshing(n=n, c=c, theta=theta)
+        self.uniform_init_interior_nodes()        
 
     def uniform_refine(self,n = 2):
         """
@@ -43,7 +42,8 @@ class CVTPMesher:
             mesh.refine_halfedge(isMarkedHEdge)
             self.dof = np.r_['0',
                     ndof,np.ones_like(ec[:, 0], dtype=np.bool)]
-
+        if n == 0:
+            self.dof = np.ones(len(mesh.node))
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
         self.uniform_refine(n=n)
@@ -159,12 +159,8 @@ class CVTPMesher:
             ymax = max(p[:, 1])
             
             area = self.mesh.cell_area(index)
-            print(area)
-            print(c)
             N = int(area/c)
             N0 = p.shape[0]
-            print(N)
-            print(N0)
             start = 0
             newNode = np.zeros((N - N0, 2), dtype=node.dtype)
             NN = newNode.shape[0]
