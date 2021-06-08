@@ -1,4 +1,5 @@
 import numpy as np
+#from .HalfEdgeMesh2d import refine_halfedge
 from scipy.spatial import KDTree
 import pdb
 from scipy.spatial import Voronoi
@@ -12,13 +13,40 @@ class CVTPMesher:
         """
         self.mesh = mesh
 
-    def uniform_meshing(self, refine=0, c=0.618, theta=100):
-        self.uniform_boundary_meshing(n=refine, c=c, theta=theta)
-        self.uniform_init_interior_nodes()
-        
+    def uniform_meshing(self, n=2, c=0.618, theta=100):
+        self.uniform_boundary_meshing(n=n, c=c, theta=theta)
+        self.uniform_init_interior_nodes()        
+
+    def uniform_refine(self,n = 2):
+        """
+        该函数用于对输入的网格边界进行加密
+        n: 加密次数
+        """
+        mesh = self.mesh
+        for i in range(n):
+            node = mesh.node
+            halfedge = mesh.ds.halfedge
+            ndof = np.ones(len(mesh.node))
+            cstart = mesh.ds.cellstart
+            isMarkedHEdge = np.zeros(len(halfedge),dtype=np.bool_)
+            isMarkedHEdge[halfedge[:,1]<cstart] = True
+            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:,4]]
+            ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[flag,0]])/2
+            isMarkedHEdge[flag]=True
+            #isMarkedHEdge[halfedge[isMarkedHEdge,4]] = True
+            '''
+            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
+            isMarkedHEdge[flag] = True
+            '''
+            mesh.init_level_info()
+            mesh.refine_halfedge(isMarkedHEdge)
+            self.dof = np.r_['0',
+                    ndof,np.ones_like(ec[:, 0], dtype=np.bool)]
+        if n == 0:
+            self.dof = np.ones(len(mesh.node))
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
-        self.mesh.boundary_uniform_refine(n=n)
+        self.uniform_refine(n=n)
         node = self.mesh.node
         NN = len(node)
         halfedge = self.mesh.entity('halfedge')
@@ -26,7 +54,7 @@ class CVTPMesher:
     
         # 这里假设所有边的尺寸是一样的
         # 进一步的算法改进中，这些尺寸应该是自适应的
-        # 顶点处的半径应该要平均平均一下
+        # 顶点处的半径应该要平均一下
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
@@ -43,7 +71,7 @@ class CVTPMesher:
 
         # 修正角点相邻点的半径， 如果角点的角度小于 theta 的
         # 这里假设角点相邻的节点， 到角点的距离相等
-        isFixed = self.mesh.nodedata['dof']
+        isFixed = self.dof
         #idx, = np.nonzero(isFixed)
         idx, = np.where(isFixed==0)
         pre = halfedge[idx, 3]
