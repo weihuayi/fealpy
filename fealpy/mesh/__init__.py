@@ -21,7 +21,6 @@ from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
 from .CVTPMesher import CVTPMesher
 from .ATriMesher import ATriMesher
-from .MeshFactory import MeshFactory
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
