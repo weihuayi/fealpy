@@ -907,13 +907,12 @@ class LagrangeFiniteElementSpace():
 
         return B
 
-
     def velocity_matrix(self, u):
-        """
 
+        """
         Notes
         ----
-        ((u\cdot \nabla) u, v)
+        ((u\\cdot \\nabla) u, v)
 
         GD == 2
         [[phi, 0], [0, phi]]
@@ -921,7 +920,7 @@ class LagrangeFiniteElementSpace():
         GD == 3
         [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
 
-        varphi = (u0 \partial_x + u1 \partial_y + u2 \partial_z) phi
+        varphi = (u0 \\partial_x + u1 \\partial_y + u2 \\partial_z) phi
 
         [[varphi, 0, 0], [0, varphi, 0], [0, 0, varphi]]
 
