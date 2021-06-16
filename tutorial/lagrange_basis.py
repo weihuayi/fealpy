@@ -1,17 +1,15 @@
-
-import sys
-import numpy as np
-import matplotlib.pyplot as plt
-
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
-
-p = int(sys.argv[1])
-
-
 box = [0, 1, 0, 1]
-mesh = MF.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
+mesh = MF.boxmesh2d(box, nx=10, ny=10, meshtype='tri')
+space = LagrangeFiniteElementSpace(mesh, p=1)
+ldof = space.number_of_local_dofs() 
+gdof = space.number_of_global_dofs() 
+
+bc = np.array([[1, 0, 0], [0, 1, 0]], dtype=np.float64)# (2, 3)
+phi = space.basis(bc)
+gphi = space.grad_basis(bc)
 
 # 打印网格信息
 NN = mesh.number_of_nodes()
@@ -22,9 +20,6 @@ print("网格中节点、边和单元的个数分别为：", NN, NE, NC)
 
 
 print('创建拉格朗日有限元空间...')
-space = LagrangeFiniteElementSpace(mesh, p=p)
-ldof = space.number_of_local_dofs()
-gdof = space.number_of_global_dofs()
 
 print('拉格朗日空间的次数为：', p)
 print('每个单元上的局部自由度个数：', ldof)
