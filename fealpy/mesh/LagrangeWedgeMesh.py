@@ -200,9 +200,9 @@ class LagrangeWedgeMesh(Mesh3d):
 
     def lagrange_dof(self, p, spacetype='C'):
         if spacetype == 'C':
-            return CLagrangeWedgeDof2d(self, p)
+            return CLagrangeWedgeDof3d(self, p)
         elif spacetype == 'D':
-            return DLagrangeWedgeDof2d(self, p)
+            return DLagrangeWedgeDof3d(self, p)
     
     def cell_volume(self, q=None, index=np.s_[:]):
         """
@@ -559,7 +559,7 @@ class LagrangeWedgeMesh(Mesh3d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
     
-class CLagrangeWedgeDof2d():
+class CLagrangeWedgeDof3d():
     """
 
     Notes
@@ -603,7 +603,7 @@ class CLagrangeWedgeDof2d():
         gdof = self.number_of_global_dofs()
         qface2dof = self.quad_face_to_dof()
         isqBdDof = np.zeros(gdof, dtype=np.bool)
-        isqBdDof[qface2dof[index1]] = True
+        isqBdDof[qface2dof[index]] = True
         return isqBdDof
 
     def edge_to_dof(self):
@@ -653,6 +653,7 @@ class CLagrangeWedgeDof2d():
             return tface
         else:
             pass
+
     @property
     def qface2dof(self):
         return self.quad_face_to_dof()
@@ -701,7 +702,6 @@ class CLagrangeWedgeDof2d():
         else:
             pass
 
-
     def interpolation_points(self):
         p = self.p
         mesh = self.mesh
@@ -715,8 +715,8 @@ class CLagrangeWedgeDof2d():
         GD = mesh.geo_dimension()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
-        bc0 = multi_index_matrix[0](p)/p
-        bc1 = multi_index_matrix[1](p)/p
+        bc0 = multi_index_matrix[1](p)/p
+        bc1 = multi_index_matrix[0](p)/p
         ipoint[cell2dof] = mesh.bc_to_point((bc0, bc1)).reshape(-1, NC,
                 GD).swapaxes(0, 1)
         return ipoint
@@ -741,7 +741,7 @@ class CLagrangeWedgeDof2d():
         elif doftype in {'node', 0}:
             return 1
 
-class DLagrangeQuadrangleDof2d():
+class DLagrangeQuadrangleDof3d():
     """
 
     Notes
