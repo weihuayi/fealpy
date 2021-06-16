@@ -3,16 +3,15 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
 
 p = int(sys.argv[1])
 
-mf = MeshFactory()
 
 box = [0, 1, 0, 1]
-mesh = mf.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
+mesh = MF.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
 
 # 打印网格信息
 NN = mesh.number_of_nodes()
