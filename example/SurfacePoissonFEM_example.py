@@ -16,12 +16,6 @@ from fealpy.tools.show import showmultirate, show_error_table
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import bmat
 
-"""
-
-TODO:
-    1. 可以选择不同的网格类型
-    2. 可以选择不同的解法器
-"""
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=

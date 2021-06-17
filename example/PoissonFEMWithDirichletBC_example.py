@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 # 
 
+"""
+Lagrange 元求解 Poisson 方程, 
+
+.. math::
+    -\Delta u = f
+
+转化为
+
+.. math::
+    (\\nabla u, \\nabla v) = (f, v)
+
+"""
+
 import argparse
 
 import numpy as np
@@ -22,10 +35,8 @@ from scipy.sparse.linalg import spsolve
 
 
 """
-
 TODO:
-    1. 可以选择不同的网格类型
-    2. 可以选择不同的解法器
+    1. 可以选择不同的解法器
 """
 
 ## 参数解析
@@ -69,7 +80,7 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
              ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.int64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
