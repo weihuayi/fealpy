@@ -18,7 +18,6 @@ from fealpy.tools.show import showmultirate
 
 # solver
 from scipy.sparse.linalg import spsolve
-import pyamg
 
 
 

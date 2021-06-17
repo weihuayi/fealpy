@@ -608,8 +608,11 @@ class LShapeRSinData:
                 (5, 2, 6),
                 (4, 7, 3),
                 (6, 3, 7)], dtype=np.int_)
-            mesh = Tritree(node, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            mesh = Tritree(node, cell)
             return mesh
         else:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
