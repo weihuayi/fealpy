@@ -715,8 +715,8 @@ class CLagrangeWedgeDof3d():
         GD = mesh.geo_dimension()
         gdof = self.number_of_global_dofs()
         ipoint = np.zeros((gdof, GD), dtype=np.float64)
-        bc0 = multi_index_matrix[1](p)/p
-        bc1 = multi_index_matrix[0](p)/p
+        bc0 = multi_index_matrix[2](p)/p
+        bc1 = multi_index_matrix[1](p)/p
         ipoint[cell2dof] = mesh.bc_to_point((bc0, bc1)).reshape(-1, NC,
                 GD).swapaxes(0, 1)
         return ipoint

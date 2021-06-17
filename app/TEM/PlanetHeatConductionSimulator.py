@@ -29,10 +29,10 @@ class PlanetHeatConductionSimulator():
         self.mesh.meshdata['rho'] = 1400 # kg/m^3 密度
         self.mesh.meshdata['c'] = 1200 # Jkg^-1K^-1 比热容
         self.mesh.meshdata['kappa'] = 0.02 # Wm^-1K^-1 热导率
-        self.mesh.meshdata['sigma'] = 5.6367e-8 # 玻尔兹曼常数
+        self.mesh.meshdata['sigma'] = 5.667e-8 # Wm^-2K^-4 斯特藩-玻尔兹曼常数
         self.mesh.meshdata['q'] = 1367.5 # W/m^2 太阳辐射通量
 #        self.mesh.meshdata['mu0'] = self.pde.init_mu()  # max(cos beta,0) 太阳高度角参数
-        self.mesh.meshdata['omega'] = 2*np.pi/18000 # 角速度 omega=2*pi/T=0.0003490658503988659, T=5小时
+        self.mesh.meshdata['omega'] = 2*np.pi/18000 # 角速度 omega=2*pi/T=3.49e-4, T=5小时
         
         # 网格数据
         rho = self.mesh.meshdata['rho']
@@ -146,8 +146,7 @@ class TPMModel():
         m = mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
 
         # 小行星外法向
-        omega = self.mesh.meshdata['omega']
-        n = np.array([1, np.cos(omega*t), 1]) # 指向太阳的方向
+        n = np.array([np.cos(t), np.sin(t), 1]) # 指向太阳的方向
         n = n/np.sqrt(np.dot(n, n))
 
         mu = np.dot(m, n)
