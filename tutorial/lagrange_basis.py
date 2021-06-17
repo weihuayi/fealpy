@@ -1,50 +1,42 @@
 
-import sys
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.mesh import MeshFactory as MF
+from fealpy.mesh import TriangleMesh
+from fealpy.mesh.core import multi_index_matrix2d
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
+mesh = MF.one_triangle_mesh(meshtype='equ')
 
-p = int(sys.argv[1])
+space = LagrangeFiniteElementSpace(mesh, p=5)
 
+n = 50
+bcs = multi_index_matrix2d(n)/n  # ldof = (n+1)(n+2)/2 
+ps = mesh.bc_to_point(bcs).reshape(-1, 2)  
 
-box = [0, 1, 0, 1]
-mesh = MF.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
+val = space.basis(bcs) # (NQ, 1, ldof)
 
-# 打印网格信息
-NN = mesh.number_of_nodes()
-NE = mesh.number_of_edges()
-NF = mesh.number_of_faces()
-NC = mesh.number_of_cells()
-print("网格中节点、边和单元的个数分别为：", NN, NE, NC)
+val = space.grad_basis(bcs) # (NQ, NC, ldof, GD)
 
-
-print('创建拉格朗日有限元空间...')
-space = LagrangeFiniteElementSpace(mesh, p=p)
-ldof = space.number_of_local_dofs()
-gdof = space.number_of_global_dofs()
-
-print('拉格朗日空间的次数为：', p)
-print('每个单元上的局部自由度个数：', ldof)
-print('每个单元上的全局自由度个数', gdof)
-
-print('计算空间基函数在每个单元重心坐标点处的值...')
-bc = np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float64)# (3, 3)
-ps = mesh.bc_to_point(bc) # (NQ, NC, 2) 
-
-phi = space.basis(bc)
-gphi = space.grad_basis(bc)
-
-print('重心坐标数组：', bc)
-print('bc.shape:', bc.shape)
-print('phi.shape:', phi.shape)
-print('gphi.shape:', gphi.shape)
+val = val[:, 0, 0]
 
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
+mesh.find_node(axes, node=ps, markersize=20)
+
+fig = plt.figure()
+axes = fig.add_subplot(projection='3d')
+axes.plot_trisurf(ps[:, 0], ps[:, 1], val, 
+        linewidth=0.2, antialiased=True, cmap='rainbow')
+
+NN = mesh.number_of_nodes()
+node = np.zeros((NN, 3), dtype=np.float64)
+node[:, 0:2] = mesh.entity('node')
+cell = mesh.entity('cell')
+mesh3 = TriangleMesh(node, cell)
+mesh3.add_plot(axes, box=[0, 1, 0, 1, -1, 1], showaxis=True)
+
 plt.show()
