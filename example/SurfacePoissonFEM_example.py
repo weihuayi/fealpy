@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # 
 
-import sys 
+import argparse
+
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -15,15 +16,46 @@ from fealpy.tools.show import showmultirate, show_error_table
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import bmat
 
-p = int(sys.argv[1])
-n = int(sys.argv[2])
-maxit = int(sys.argv[3])
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        曲面上的任意次等参有限元方法
+        """)
+
+parser.add_argument('--sdegree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--mdegree',
+        default=1, type=int,
+        help='网格的阶数, 默认为 1 次.')
+
+parser.add_argument('--mtype',
+        default='tri', type=str,
+        help='网格类型， 默认三角形网格.')
+
+parser.add_argument('--nrefine',
+        default=4, type=int,
+        help='初始网格加密的次数, 默认初始加密 4 次.')
+
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+args = parser.parse_args()
+
+sdegree = args.sdegree
+mdegree = args.mdegree
+mtype = args.mtype
+nrefine = args.nrefine
+maxit = args.maxit
 
 pde = PDE()
 surface = pde.domain()
-mesh = pde.init_mesh(meshtype='quad', p=p) # p 次的拉格朗日四边形网格
+mesh = pde.init_mesh(meshtype=mtype, p=mdegree) # p 次的拉格朗日四边形网格
 
-mesh.uniform_refine(n=n)
+mesh.uniform_refine(n=nrefine)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
@@ -32,19 +64,19 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$|| u_I - u_h ||_{\Omega, \infty}$'
              ]
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
 m = 4
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
-    space = ParametricLagrangeFiniteElementSpace(mesh, p=p)
+    space = ParametricLagrangeFiniteElementSpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
 
     uI = space.interpolation(pde.solution)
 
-    A = space.stiff_matrix(variables='u')
+    A = space.stiff_matrix()
     C = space.integral_basis()
     F = space.source_vector(pde.source)
 
@@ -69,7 +101,7 @@ for i in range(maxit):
     mesh.nodedata['uh'] = uh
     mesh.nodedata['uI'] = uI 
     mesh.nodedata['delta'] = delta
-    mesh.nodedata['error'] = uI - uh
+    mesh.nodedata['error'] = np.abs(uI - uh)
 
     mesh.to_vtk(fname='surface_with_solution' + str(i)+'.vtu')
 
@@ -77,7 +109,6 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 
-print(errorMatrix)
 show_error_table(NDof, errorType, errorMatrix)
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()
