@@ -10,9 +10,9 @@ from timeit import default_timer as timer
 
 
 
-class IPDGModel(object):
+class PoissonIPDGModel2d(object):
     def __init__(self, pde, mesh, p):
-        self.space = ScaledMonomialSpace2d(mesh,p)
+        self.space = ScaledMonomialSpace2d(mesh, p)
         self.mesh = mesh
         self.pde = pde 
         self.cellbarycenter = mesh.entity_barycenter('cell')

@@ -20,7 +20,7 @@ from fealpy.mesh import PolygonMesh
 from fealpy.functionspace import ScaledMonomialSpace2d
 from fealpy.tools import showmultirate, show_error_table
 
-from .IPDGModel import IPDGModel
+from .PoissonIPDGModel2d import PoissonIPDGModel2d
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -65,7 +65,7 @@ for i in range(maxit):
     space = ScaledMonomialSpace2d(mesh,p)
     NDof[i] = space.number_of_global_dofs()
     
-    model = IPDGModel(pde, mesh, degree) # 创建 Poisson IPDG 有限元模型
+    model = PoissonIPDGModel2d(pde, mesh, degree) # 创建 Poisson IPDG 有限元模型
     model.solve(beta, alpha) # 求解
     uh = fem.uh
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh, power=2)
