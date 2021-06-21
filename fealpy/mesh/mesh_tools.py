@@ -326,9 +326,9 @@ def show_mesh_2d(
 
     if box is None:
         if mesh.geo_dimension() == 2:
-            box = np.zeros(4, dtype=np.float)
+            box = np.zeros(4, dtype=np.float64)
         else:
-            box = np.zeros(6, dtype=np.float)
+            box = np.zeros(6, dtype=np.float64)
 
         box[0::2] = np.min(node, axis=0)
         box[1::2] = np.max(node, axis=0)
