@@ -1888,7 +1888,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 isMarkedCell = (options['numrefine'] < 0)
 
     def adjust_number(self, isMarked, method='node'):
-
         L = len(isMarked)
         l = (~isMarked).sum()
         idxmap = np.arange(L)
@@ -1916,6 +1915,12 @@ class HalfEdgeMesh2d(Mesh2d):
         v = self.halfedge_direction()
         l = np.linalg.norm(v, axis=1)
         return l
+
+    def refine_marker(self, eta, theta, method="L2"):
+        nc = self.number_of_all_cells()
+        isMarkedCell = np.zeros(nc, dtype=np.bool_)
+        isMarkedCell[self.ds.cellstart:] = mark(eta, theta, method=method)
+        return isMarkedCell
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()

@@ -23,9 +23,11 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
 
+        assert cell.shape[-1] == 3
+
         self.node = node
-        N = node.shape[0]
-        self.ds = TriangleMeshDataStructure(N, cell)
+        NN = node.shape[0]
+        self.ds = TriangleMeshDataStructure(NN, cell)
 
         if node.shape[1] == 2:
             self.meshtype = 'tri'

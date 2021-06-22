@@ -220,7 +220,7 @@ class ConformingVirtualElementSpace2d():
         uh /=ws.reshape(-1, 1)
         return uh
 
-    def recovery_estimate(self, uh, method='simple', residual=True,
+    def recovery_estimate(self, uh, pde, method='simple', residual=True,
             returnsup=False):
         """
         estimate the recover-type error
@@ -243,11 +243,11 @@ class ConformingVirtualElementSpace2d():
         mesh = self.mesh
         NC = mesh.number_of_cells()
         NV = mesh.number_of_vertices_of_cells()
-        cell = mesh.entity('cell')
-        barycenter = space.smspace.barycenter
+        cell, cellLocation = mesh.entity('cell')
+        barycenter = self.smspace.cellbarycenter
 
-        h = self.smspace.h
-        area = self.smspace.area
+        h = self.smspace.cellsize
+        area = self.cellmeasure
         ldof = self.smspace.number_of_local_dofs()
 
         # project the vem solution into linear polynomial space
@@ -255,8 +255,8 @@ class ConformingVirtualElementSpace2d():
         S = self.project_to_smspace(uh)
 
         grad = S.grad_value(barycenter)
-        S0 = space.smspace.function()
-        S1 = space.smspace.function()
+        S0 = self.smspace.function()
+        S1 = self.smspace.function()
         n2c = mesh.ds.node_to_cell()
 
         if method == 'simple':
@@ -274,38 +274,69 @@ class ConformingVirtualElementSpace2d():
         for i in range(ldof):
             S0[i::ldof] = np.bincount(
                     idx,
-                    weights=self.space.B[i, :]*ruh[cell, 0],
+                    weights=self.B[i, :]*ruh[cell, 0],
                     minlength=NC)
             S1[i::ldof] = np.bincount(
                     idx,
-                    weights=self.space.B[i, :]*ruh[cell, 1],
+                    weights=self.B[i, :]*ruh[cell, 1],
                     minlength=NC)
+
+        k = 1 # TODO: for general diffusion coef
 
         node = mesh.node
         gx = S0.value(node[cell], idx) - np.repeat(grad[:, 0], NV)
         gy = S1.value(node[cell], idx) - np.repeat(grad[:, 1], NV)
         eta = k*np.bincount(idx, weights=gx**2+gy**2)/NV*area
 
+
         if residual is True:
-            fh = space.integralalg.fun_integral(self.pde.source, True)/self.area
+            fh = self.integralalg.fun_integral(pde.source, True)/area
             g0 = S0.grad_value(barycenter)
             g1 = S1.grad_value(barycenter)
             eta += (fh + k*(g0[:, 0] + g1[:, 1]))**2*area**2
 
-        if returnsup is True:
-            def f(x, cellidx):
-                g = self.pde.gradient(x)
-                val = (
-                        (g[..., 0] - S0.value(x, cellidx))**2 +
-                        (g[..., 1] - S1.value(x, cellidx))**2
-                    )
-                return val
-            e = space.integralalg.integral(f, True)
-        if returnsup is False:
-            return np.sqrt(eta)
-        else:
-            return np.sqrt(eta), np.sqrt(np.sum(e))
+        return np.sqrt(eta)
 
+    def smooth_estimator(self, eta):
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
+        NV = mesh.number_of_vertices_of_cells()
+
+        nodeEta = np.zeros(NN, dtype=np.float_)
+
+        cell, cellLocation = mesh.entity('cell')
+        NNC = cellLocation[1:] - cellLocation[:-1] #number_of_node_per_cell
+        NCN = np.zeros(NN, dtype=np.int_) #number_of_cell_around_node
+
+        number = np.ones(NC, dtype=np.int_)
+
+        
+        for i in range(3):
+            nodeEta[:]=0
+            NCN[:]=0
+            k = 0
+            while True:
+                flag = NNC > k
+                if np.all(~flag):
+                    break
+                np.add.at(nodeEta, cell[cellLocation[:-1][flag]+k], eta[flag])
+                np.add.at(NCN, cell[cellLocation[:-1][flag]+k], number[flag])
+                k += 1
+            nodeEta = nodeEta/NCN
+            eta[:] = 0
+
+            k = 0
+            while True:
+                flag = NNC > k
+                if np.all(~flag):
+                    break
+                eta[flag] = eta[flag] + nodeEta[cell[cellLocation[:-1][flag]+k]]
+                k += 1
+            eta = eta/NNC
+        return eta
+        
+        
 
     def project(self, F, space1):
         """

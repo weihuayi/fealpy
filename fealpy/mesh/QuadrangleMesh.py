@@ -27,6 +27,7 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
 
 class QuadrangleMesh(Mesh2d):
     def __init__(self, node, cell):
+        assert cell.shape[-1] == 4
         self.node = node
         NN = node.shape[0]
         self.ds = QuadrangleMeshDataStructure(NN, cell)
