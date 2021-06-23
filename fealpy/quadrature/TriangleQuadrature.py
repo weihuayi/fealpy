@@ -1,6 +1,17 @@
 import numpy as np
 from .Quadrature import Quadrature
 
+'''
+
+Reference
+--------
+ [0] David Dunavant. High degree efficient symmetrical Gaussian
+    quadrature rules for the triangle. International journal for numerical
+    methods in engineering. 21(6):1129--1148, 1985.
+ [1] John Burkardt. DUNAVANT Quadrature Rules for the Triangle.
+    https://people.sc.fsu.edu/~jburkardt/cpp_src/triangle_dunavant_rule/triangle_dunavant_rule.html 
+'''
+
 
 class TriangleQuadrature(Quadrature):
 

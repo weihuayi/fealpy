@@ -524,7 +524,7 @@ class LagrangeFiniteElementSpace():
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
     def interpolation(self, u, dim=None):
-        ipoint = self.dof.interpolation_points()
+        ipoint = self.interpolation_points()
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 

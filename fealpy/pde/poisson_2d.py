@@ -638,7 +638,9 @@ class LShapeRSinData:
         INPUT:
             p: array object, N*2
         """
-        return 0.0 
+        val = np.array([0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape)
 
     @cartesian
     def gradient(self, p):

@@ -493,12 +493,13 @@ class HalfEdgeMesh2d(Mesh2d):
             GD = self.geo_dimension()
             v1 = node[cell[index, 1], :] - node[cell[index, 0], :]
             v2 = node[cell[index, 2], :] - node[cell[index, 0], :]
-            nv = np.cross(v2, -v1)
+            nv = np.cross(v1, v2)
             if GD == 2:
                 a = nv/2.0
             elif GD == 3:
                 a = np.sqrt(np.square(nv).sum(axis=1))/2.0
             return a
+
     def all_cell_area(self):
         cstart = self.ds.cellstart
         area = self.cell_area()
@@ -584,7 +585,6 @@ class HalfEdgeMesh2d(Mesh2d):
         hlevel = self.halfedgedata['level']
         halfedge = self.entity('halfedge')
         if method == 'poly':
-
             isMarkedHEdge = clevel[halfedge[:, 1]]>=clevel[halfedge[halfedge[:, 4], 1]]
             isMarkedHEdge = isMarkedHEdge|(halfedge[halfedge[:, 4], 1]<cstart)
             isMarkedHEdge = isMarkedHEdge & isMarkedCell[halfedge[:, 1]]
@@ -1888,7 +1888,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 isMarkedCell = (options['numrefine'] < 0)
 
     def adjust_number(self, isMarked, method='node'):
-
         L = len(isMarked)
         l = (~isMarked).sum()
         idxmap = np.arange(L)
@@ -1916,6 +1915,12 @@ class HalfEdgeMesh2d(Mesh2d):
         v = self.halfedge_direction()
         l = np.linalg.norm(v, axis=1)
         return l
+
+    def refine_marker(self, eta, theta, method="L2"):
+        nc = self.number_of_all_cells()
+        isMarkedCell = np.zeros(nc, dtype=np.bool_)
+        isMarkedCell[self.ds.cellstart:] = mark(eta, theta, method=method)
+        return isMarkedCell
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()

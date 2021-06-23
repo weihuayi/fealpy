@@ -22,6 +22,7 @@ mesh = LagrangeWedgeMesh(mesh, h=0.005, nh=1, p=1)
 
 edge = mesh.entity('edge')
 node = mesh.entity('node')
+print(np.mean(node, axis=0))
 cell = mesh.entity('cell')
 tface, qface = mesh.entity('face')
 
