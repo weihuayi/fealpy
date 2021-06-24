@@ -26,19 +26,6 @@ class CVTPMesher:
             node = mesh.node
             halfedge = mesh.ds.halfedge
             ndof = np.ones(len(mesh.node))
-            '''
-            cstart = mesh.ds.cellstart
-            isMarkedHEdge = np.zeros(len(halfedge),dtype=np.bool_)
-            isMarkedHEdge[halfedge[:,1]<cstart] = True
-            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:,4]]
-            ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[flag,0]])/2
-            isMarkedHEdge[flag]=True
-            '''
-            #isMarkedHEdge[halfedge[isMarkedHEdge,4]] = True
-            '''
-            flag = ~isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
-            isMarkedHEdge[flag] = True
-            '''
             isMarkedHEdge = mesh.ds.main_halfedge_flag()
             idx = halfedge[isMarkedHEdge,4]
             ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
@@ -160,7 +147,6 @@ class CVTPMesher:
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.mesh.ds.subdomain):
-            print(index)
             p = bd[bnode2subdomain == index]
             xmin = min(p[:, 0])
             xmax = max(p[:, 0])
@@ -194,16 +180,16 @@ class CVTPMesher:
         cnode = self.cnode
         inode = self.inode
        
-        NB = len(bnode) 
-        NC = len(cnode)
-        NN = NB + NC
+        NNB = len(bnode) 
+        NNC = len(cnode)
+        NN = NNB + NNC
         for index, point in inode.items(): # inode is a dict
             NN += len(point)
         self.NN = NN
         points = np.zeros((NN, 2), dtype=bnode.dtype)
-        points[:NB] = bnode
-        points[NB:NB+NC] = cnode
-        start = NB + NC
+        points[:NNB] = bnode
+        points[NNB:NNB+NNC] = cnode
+        start = NNB + NNC
         for index, point in inode.items():
             N = len(point)
             points[start:start+N] = point
@@ -211,7 +197,7 @@ class CVTPMesher:
 
         # construct voronoi diagram
         vor = Voronoi(points)
-        start = NB+NC
+        start = NNB+NNC
 
         return vor, start
 
