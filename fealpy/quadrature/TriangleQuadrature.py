@@ -5,11 +5,12 @@ from .Quadrature import Quadrature
 
 Reference
 --------
- [0] David Dunavant. High degree efficient symmetrical Gaussian
-    quadrature rules for the triangle. International journal for numerical
-    methods in engineering. 21(6):1129--1148, 1985.
- [1] John Burkardt. DUNAVANT Quadrature Rules for the Triangle.
-    https://people.sc.fsu.edu/~jburkardt/cpp_src/triangle_dunavant_rule/triangle_dunavant_rule.html 
+ [1] D. M. Williams, L. Shunn, A. Jameson. Symmetric quadrature rules for simplexes
+     based on sphere close packed lattice arrangements[J]. Journal of Computational
+     and Applied Mathematics, 2014, 266: 18-38.` 
+     https://www.sciencedirect.com/science/article/pii/S0377042714000211
+ [2] Long Chen. iFEM: An integrated finite element method package in matlab.
+    https://github.com/lyc102/ifem/blob/master/fem/quadpts.m
 '''
 
 
