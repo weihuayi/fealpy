@@ -327,7 +327,7 @@ class CVTPMesherTest:
         
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
-            uniform_mesh = CVTPMesher(mesh)
+            uniform_mesh = CVTPMesher(mesh,fixed)
             uniform_mesh.uniform_meshing(n=2)
         elif domain =='circle':
             n = 20
@@ -553,8 +553,8 @@ if sys.argv[1] == "Lloyd":
 #test.uniform_meshing_test(domain = 'partition2')
 #test.uniform_meshing_test(domain = 'hole1')
 #test.uniform_meshing_test(domain='hole2',interior_nodes=False)
-#test.Lloyd_test(domain='square')
-test.Lloyd_test(domain = 'LShape')
+test.Lloyd_test(domain='square')
+#test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')

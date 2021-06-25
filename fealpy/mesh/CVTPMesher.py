@@ -4,7 +4,7 @@ import pdb
 from scipy.spatial import Voronoi
 
 class CVTPMesher:
-    def __init__(self, mesh,nodedof=None):
+    def __init__(self, mesh):
         """
         Parameters
         ----------
@@ -112,7 +112,7 @@ class CVTPMesher:
         r1 = r[idx1]
         c0 = 0.5*(r0**2 - r1**2)/h**2
         c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
-        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
+        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w)
 
         isKeepNode = np.zeros(NG, dtype=np.bool)
         isKeepNode[index] = True
