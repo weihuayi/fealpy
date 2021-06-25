@@ -4,13 +4,14 @@ import pdb
 from scipy.spatial import Voronoi
 
 class CVTPMesher:
-    def __init__(self, mesh):
+    def __init__(self, mesh,nodedof=None):
         """
         Parameters
         ----------
         Mesh : mesh
         """
         self.mesh = mesh
+        
 
     def uniform_meshing(self, n=2, c=0.618, theta=100):
         self.uniform_boundary_meshing(n=n, c=c, theta=theta)
@@ -36,7 +37,7 @@ class CVTPMesher:
             self.dof = np.r_['0',
                     ndof,np.ones_like(ec[:, 0], dtype=np.bool)]
         if n == 0:
-            self.dof = np.ones(len(mesh.node))
+            self.dof = np.zeros(len(mesh.node))
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
         self.uniform_refine(n=n)
@@ -66,8 +67,9 @@ class CVTPMesher:
         # 修正角点相邻点的半径， 如果角点的角度小于 theta 的
         # 这里假设角点相邻的节点， 到角点的距离相等
         isFixed = self.dof
+        print(isFixed)
         #idx, = np.nonzero(isFixed)
-        idx, = np.where(isFixed==0)
+        idx, = np.where(isFixed==1)
         pre = halfedge[idx, 3]
         nex = halfedge[idx, 2]
 
@@ -80,6 +82,7 @@ class CVTPMesher:
         l0 = np.sqrt(np.sum(v0**2, axis=-1))
         l1 = np.sqrt(np.sum(v1**2, axis=-1))
         s = np.cross(v0, v1)/l0/l1
+        print(s)
         c = np.sum(v0*v1, axis=-1)/l0/l1
         a = np.arcsin(s)
         a[s < 0] += 2*np.pi
