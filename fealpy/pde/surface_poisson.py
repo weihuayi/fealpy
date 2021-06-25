@@ -2,6 +2,32 @@ import numpy as np
 
 from fealpy.decorator import cartesian
 
+class SphereSimpleData():
+    def __init__(self):
+        from fealpy.geometry import SphereSurface
+        self.surface = SphereSurface()
+
+    def domain(self):
+        return self.surface
+
+    def init_mesh(self, n=0, meshtype='tri', returnnc=False, p=None):
+        mesh = self.surface.init_mesh(meshtype=meshtype, returnnc=returnnc, p=p)
+        mesh.uniform_refine(n)
+        return mesh
+
+    @cartesian
+    def solution(self,p):
+        """ The exact solution
+        """
+        p, _ = self.surface.project(p)
+        x = p[..., 0]
+        y = p[..., 1]
+        z = p[..., 2]
+        u = x**2+y**2+z**2
+        return u
+
+
+
 class SphereSinSinSinData():
     def __init__(self):
         from fealpy.geometry import SphereSurface
