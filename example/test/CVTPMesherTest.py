@@ -126,7 +126,7 @@ class CVTPMesherTest:
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=3)
+            uniform_mesh.uniform_boundary_meshing(n=2)
             bnode = uniform_mesh.bnode
 
         elif domain == 'partition2':
@@ -283,14 +283,14 @@ class CVTPMesherTest:
         if add_cnode == True:
             cnode = uniform_mesh.cnode
             bnode = np.append(bnode, cnode,axis=0)
-
+        
         vor = Voronoi(bnode, incremental = True)
         if interior_nodes:
             uniform_mesh.uniform_init_interior_nodes()
             newnode = uniform_mesh.inode
             for k in newnode:
                 vor.add_points(newnode[k])
-
+        
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -507,6 +507,7 @@ class CVTPMesherTest:
 
 
 test = CVTPMesherTest()
+'''
 if sys.argv[1] == "UN":
     if sys.argv[2] =="S":
         test.uniform_meshing_test(domain='square')
@@ -526,7 +527,7 @@ if sys.argv[1] == "Lloyd":
         test.Lloyd_test(domain='triangle')
     elif sys.argv[2] =="C":
         test.Lloyd_test(domain='circle')
-
+'''
 #test.uniform_boundary_meshing_test()
 #test.uniform_meshing_test(domain='square')
 #test.uniform_meshing_test(domain='square2',interior_nodes = True)
@@ -542,7 +543,7 @@ if sys.argv[1] == "Lloyd":
 #test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
 #test.Lloyd_test(domain='partition1')
-#test.Lloyd_test(domain='partition2')
+test.Lloyd_test(domain='partition2')
 #test.Lloyd_test(domain='hole2')
 #test.Lloyd_test(domain='square2')
 
