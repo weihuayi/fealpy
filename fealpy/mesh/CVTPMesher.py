@@ -168,6 +168,9 @@ class CVTPMesher:
             area = self.mesh.cell_area(index)[index-1]
             N = int(area/c)
             N0 = p.shape[0]
+            while N-N0 <= 0:
+                c = 0.9*c
+                N = int(area/c)
             start = 0
             newNode = np.zeros((N - N0, 2), dtype=node.dtype)
             NN = newNode.shape[0]
