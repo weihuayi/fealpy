@@ -4,13 +4,17 @@ import pdb
 from scipy.spatial import Voronoi
 
 class CVTPMesher:
-    def __init__(self, mesh):
+    def __init__(self, mesh,dof = None):
         """
         Parameters
         ----------
         Mesh : mesh
         """
         self.mesh = mesh
+        if dof is not None:
+            self.dof = dof
+        else :
+            self.dof = np.ones(len(mesh.node))
 
     def uniform_meshing(self, n=2, c=0.618, theta=100):
         self.uniform_boundary_meshing(n=n, c=c, theta=theta)
@@ -25,7 +29,7 @@ class CVTPMesher:
         for i in range(n):
             node = mesh.node
             halfedge = mesh.ds.halfedge
-            ndof = np.ones(len(mesh.node))
+            dof = self.dof
             isMarkedHEdge = mesh.ds.main_halfedge_flag()
             idx = halfedge[isMarkedHEdge,4]
             ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
@@ -34,9 +38,9 @@ class CVTPMesher:
             mesh.init_level_info()
             mesh.refine_halfedge(isMarkedHEdge)
             self.dof = np.r_['0',
-                    ndof,np.ones_like(ec[:, 0], dtype=np.bool)]
+                    dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
         if n == 0:
-            self.dof = np.ones(len(mesh.node))
+            self.dof = np.zeros(len(mesh.node))
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
         self.uniform_refine(n=n)
@@ -60,14 +64,18 @@ class CVTPMesher:
         np.add.at(n, idx0, 1)
         np.add.at(n, idx1, 1)
         r /= n
-        r *= c
+        r *= c # 半径
         w = np.array([[0, 1], [-1, 0]])
 
         # 修正角点相邻点的半径， 如果角点的角度小于 theta 的
         # 这里假设角点相邻的节点， 到角点的距离相等
         isFixed = self.dof
-        #idx, = np.nonzero(isFixed)
-        idx, = np.where(isFixed==0)
+        hnode = np.zeros(NN,dtype = np.int_)
+        hnode[halfedge[:,0]] = np.arange(len(halfedge))
+        hnode1 = halfedge[halfedge[hnode,2],4]
+
+        idx, = np.where(isFixed==1)
+        idx = np.hstack((hnode[idx],hnode1[idx]))
         pre = halfedge[idx, 3]
         nex = halfedge[idx, 2]
 
@@ -84,10 +92,14 @@ class CVTPMesher:
         a = np.arcsin(s)
         a[s < 0] += 2*np.pi
         a[c == -1] = np.pi
+        aflag1 = ((c<0) & (a>np.pi))
+        a[aflag1] = 3*np.pi - a[aflag1]
+        aflag2 = ((c<0) & (a<(np.pi/2)))
+        a[aflag2] = np.pi - a[aflag2]
         a = np.degrees(a)
         isCorner = a < theta
+         
         idx = idx[isCorner] # 需要特殊处理的半边编号 
-
 
         v2 = (v0[isCorner] + v1[isCorner])/2
         v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
@@ -109,7 +121,7 @@ class CVTPMesher:
         r1 = r[idx1]
         c0 = 0.5*(r0**2 - r1**2)/h**2
         c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
-        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
+        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w)
 
         isKeepNode = np.zeros(NG, dtype=np.bool)
         isKeepNode[index] = True
@@ -156,6 +168,9 @@ class CVTPMesher:
             area = self.mesh.cell_area(index)[index-1]
             N = int(area/c)
             N0 = p.shape[0]
+            while N-N0 <= 0:
+                c = 0.9*c
+                N = int(area/c)
             start = 0
             newNode = np.zeros((N - N0, 2), dtype=node.dtype)
             NN = newNode.shape[0]
