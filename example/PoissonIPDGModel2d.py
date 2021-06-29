@@ -18,22 +18,54 @@ class PoissonIPDGModel2d(object):
         self.cellbarycenter = mesh.entity_barycenter('cell')
         self.p = p
         self.cellmeasure = mesh.entity_measure('cell')
+    
+    def Jump(self):
+        mesh = self.mesh
+        space = self.space
+        edge2cell = mesh.ds.edge_to_cell()
+        qf = GaussLegendreQuadrature(self.p + 4)
+        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+        bcs = qf.quadpts
+        ps = mesh.edge_bc_to_point(bcs)
         
-    def penalty_matrix(self):
-        p = self.p
+        #Construct the jump of edge
+        phi0 = space.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi1 = space.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, ldof)
+        phi1[:,isBdEdge] = 0*phi1[:,isBdEdge]
+        jump = np.append(phi0,-phi1,axis = 2) # (NQ, NE, 2*ldof)
+        return jump
+    
+    def Grad_average(self):
+        p =self.p
         mesh = self.mesh
         space = self.space
         edge2cell = mesh.ds.edge_to_cell()
         isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
         qf = GaussLegendreQuadrature(p + 4)
-        bcs, ws = qf.quadpts, qf.weights
+        bcs = qf.quadpts
         ps = mesh.edge_bc_to_point(bcs)
         
-        phi0 = space.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
-        phi1 = space.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, ldof)
-        phi1[:,isBdEdge] = 0*phi1[:,isBdEdge]
-        jump = np.append(phi0,-phi1,axis = 2)
+        #Construct the grad_average of edge
+        gphi0 = space.grad_basis(ps, edge2cell[:, 0])
+        gphi1 = space.grad_basis(ps,edge2cell[:, 1])
+        gphi0[:,isBdEdge] = 2*gphi0[:,isBdEdge]
+        gphi1[:,isBdEdge] = 0*gphi1[:,isBdEdge]
+        gphi = 1/2*np.append(gphi0,gphi1,axis = 2)
+        return gphi
+    
+    def penalty_matrix(self):
+        p = self.p
+        mesh = self.mesh
+        space = self.space
+        edge2cell = mesh.ds.edge_to_cell()
+        qf = GaussLegendreQuadrature(p + 4)
+        ws = qf.weights
+        jump = self.Jump()
+        
+        # Construct the penalty matrix of computing element
         P = np.einsum('i, ijk, ijm->jkm', ws, jump, jump, optimize=True)
+        
+        # Construct the global penalty matrix
         ldof = space.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = space.cell_to_dof()
         dof1  = cell2dof[edge2cell[:,0]]
@@ -42,7 +74,6 @@ class PoissonIPDGModel2d(object):
         I = np.einsum('k, ij->ijk', np.ones(2*ldof), dof)
         J = I.swapaxes(-1, -2)
         gdof = space.number_of_global_dofs(p=p)
-        # Construct the flux matrix
         P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return P
     
@@ -51,25 +82,18 @@ class PoissonIPDGModel2d(object):
         mesh = self.mesh
         space = self.space
         edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
         qf = GaussLegendreQuadrature(p + 4)
-        bcs, ws = qf.quadpts, qf.weights
-        ps = mesh.edge_bc_to_point(bcs)
+        ws = qf.weights
         eh = mesh.entity_measure('edge')
         
-        phi0 = space.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
-        phi1 = space.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, ldof)
-        phi1[:,isBdEdge] = 0*phi1[:,isBdEdge]
-        jump = np.append(phi0,-phi1,axis = 2)
-        
-        gphi0 = space.grad_basis(ps, edge2cell[:, 0])
-        gphi1 = space.grad_basis(ps,edge2cell[:, 1])
-        gphi0[:,isBdEdge] = 2*gphi0[:,isBdEdge]
-        gphi1[:,isBdEdge] = 0*gphi1[:,isBdEdge]
-        gphi = np.append(gphi0,gphi1,axis = 2)
+        jump = self.Jump()
+        gphi = self.Grad_average()
         n = mesh.edge_unit_normal()
-        S = 1/2*np.einsum('i, ijk, ijmp, jp, j->jkm', ws, jump, gphi, n, eh)
         
+        # Construct the flux matrix of computing element
+        S = np.einsum('i, ijk, ijmp, jp, j->jkm', ws, jump, gphi, n, eh)
+        
+        # Construct the global flux matrix
         ldof = space.number_of_local_dofs(p=p, doftype='cell')
         cell2dof = space.cell_to_dof()
         dof1  = cell2dof[edge2cell[:,0]]
@@ -78,9 +102,7 @@ class PoissonIPDGModel2d(object):
         I = np.einsum('k, ij->ijk', np.ones(2*ldof), dof)
         J = I.swapaxes(-1, -2)
         gdof = space.number_of_global_dofs(p=p)
-        # Construct the flux matrix
         S = csr_matrix((S.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        #print(S.toarray())
         return S
     
     def triangle_measure(self, tri):
@@ -137,7 +159,6 @@ class PoissonIPDGModel2d(object):
     def solve(self,beta,alpha):
         AD = self.get_left_matrix(beta,alpha)
         b = self.get_right_vector()
-        #处理边界条件
         self.uh = self.space.function()
         self.uh[:] = spsolve(AD, b)
         ls = {'A':AD, 'b':b, 'solution':self.uh.copy()}
