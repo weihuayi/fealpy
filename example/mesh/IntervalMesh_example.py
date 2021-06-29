@@ -9,11 +9,11 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import IntervalMesh
 
 
-if False:
-    node = np.array([[0], [0.5], [1]], dtype=np.float) # (NN, 1) array
-    cell = np.array([[0, 1], [1, 2]], dtype=np.int) # (NN, 2) array
-
 if True:
+    node = np.array([[0], [0.5], [1]], dtype=np.float64) # (NN, 1) array
+    cell = np.array([[0, 1], [1, 2]], dtype=np.int_) # (NN, 2) array
+
+if False:
     node = np.array([
         [0.0, 0.0],
         [1.0, 0.0],
@@ -64,10 +64,11 @@ cell2node = mesh.ds.cell_to_node() # cell
 node2cell = mesh.ds.node_to_cell() 
 print("node2cell:\n", node2cell)
 
+mesh.uniform_refine(n=2)
 
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
+mesh.find_node(axes, showindex=False, markersize=20)
 #mesh.find_cell(axes, showindex=True)
 plt.show()
