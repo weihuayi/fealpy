@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # 
 
-__doc__= """
+"""
+    一般椭圆方程的任意次有限元方法。
+
 作者：西安交通大学数学与统计学院 杨迪
 说明：FEALPy短课程第三次作业
 版本：1.0
@@ -20,10 +22,10 @@ from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 from fealpy.tools.show import showmultirate, show_error_table
 
-class CDRMODEL:
+class PDE:
     """
 	Equation:
-    -\\nabla\cdot(A(x)\\nabla u + b(x)u) + cu = f in \Omega
+        -\\nabla\cdot(A(x)\\nabla u + b(x)u) + cu = f in \Omega
 	
 	B.C.:
 	u = g_D on \partial\Omega
@@ -111,23 +113,46 @@ class CDRMODEL:
     def dirichlet(self, p):
         return self.solution(p)
 
+"""
+TODO:
+    1. 可以选择不同的解法器
+"""
+
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        三角形网格上求解一般椭圆问题的任意次有限元方法
+        """)
+
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--ns',
+        default=10, type=int,
+        help='初始网格 X 与 Y 方向剖分的段数, 默认 10 段.')
+
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+args = parser.parse_args()
+
+degree = args.degree
+ns = args.ns
+maxit = args.maxit
 	
-p = int(sys.argv[1])		# Lagrange 有限元多项式次数
-n = int(sys.argv[2])		# 初始网格剖分段数
-maxit = int(sys.argv[3])	# 网格加密最大次数
 
-pde = CDRMODEL()
+pde = PDE()
 domain = pde.domain()
+mesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
 
-
-mesh = MF.boxmesh2d(domain, nx=n, ny=n, meshtype='tri')
-
-NDof = np.zeros(maxit, dtype=mesh.itype)
-errorMatrix = np.zeros((2, maxit), dtype=mesh.ftype)
 errorType = ['$|| u  - u_h ||_0$', '$|| \\nabla u - \\nabla u_h||_0$']
+errorMatrix = np.zeros((2, maxit), dtype=mesh.ftype)
+NDof = np.zeros(maxit, dtype=mesh.itype)
 for i in range(maxit):
     print('Step:', i)
-    space = LagrangeFiniteElementSpace(mesh, p=p)
+    space = LagrangeFiniteElementSpace(mesh, p=degree)
     NDof[i] = space.number_of_global_dofs()
     uh = space.function() 	# 返回一个有限元函数，初始自由度值全为 0
     A = space.stiff_matrix(c=pde.diffusion_coefficient)
@@ -143,9 +168,7 @@ for i in range(maxit):
     uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value, power=2)
-    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value,
-            power=2)
-
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value, power=2) 
     if i < maxit-1:
         mesh.uniform_refine()
 		

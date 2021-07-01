@@ -212,7 +212,8 @@ class FEMeshIntegralAlg():
         I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
         J = np.broadcast_to(cell2dof1[:, None, :], shape=M.shape)
 
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+        M = csr_matrix((M.flat, (I.flat, J.flat)), 
+                shape=(gdof0, gdof1))
         return M
 
     @timer
@@ -232,7 +233,7 @@ class FEMeshIntegralAlg():
         GD = mesh.geo_dimension()
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
 
         if basis.coordtype == 'barycentric':
