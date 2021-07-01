@@ -6,7 +6,7 @@ import sys
 import copy
 
 from fealpy.functionspace.WedgeLagrangeFiniteElementSpace import WedgeLagrangeFiniteElementSpace
-from fealpy.mesh import  LagrangeTriangleMesh, LagrangeWedgeMesh
+from fealpy.mesh import LagrangeTriangleMesh, LagrangeWedgeMesh
 from fealpy.writer import MeshWriter
 from fealpy.decorator import cartesian, barycentric
 from scipy.sparse.linalg import spsolve
@@ -19,7 +19,7 @@ class PlanetHeatConductionSimulator():
         self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p, q=6)
         self.mesh = self.space.mesh
         self.pde = pde
-        self.nr = nonlinear_robin(self.pde, self.space, self.mesh, p=p)
+        self.nr = nonlinear_robin(self.pde, self.space, self.mesh, p=p, q=6)
         
         self.M = self.space.mass_matrix()
         self.A = self.space.stiff_matrix()
@@ -48,7 +48,6 @@ class PlanetHeatConductionSimulator():
         self.Tau = np.sqrt(rho*c*kappa) # 热惯量
         self.Phi = self.Tau*np.sqrt(omega)/(epsilon*sigma*self.T**3) # 热参数
 
-
     def time_mesh(self, NT=100):
         from fealpy.timeintegratoralg.timeline import UniformTimeLine
         
@@ -68,20 +67,16 @@ class PlanetHeatConductionSimulator():
         return uh
 
     def apply_boundary_condition(self, A, b, uh, timeline):
-        from fealpy.boundarycondition import RobinBC
-        from fealpy.boundarycondition import NeumannBC
-        from fealpy.boundarycondition import DirichletBC
-        t0 = timeline.current_time_level()
+        from fealpy.boundarycondition import RobinBC, NeumannBC
         t1 = timeline.next_time_level()
-        i = timeline.current
-
-        # 对 robin 边界条件进行处理
-        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t0, self.Phi), threshold=self.pde.is_robin_boundary)
-        A0, b = bc.apply(A, b)
        
        # 对 neumann 边界条件进行处理
-        bc = NeumannBC(self.space, lambda x, n:self.pde.neumann(x, n, t0), threshold=self.pde.is_neumann_boundary)
+        bc = NeumannBC(self.space, lambda x, n:self.pde.neumann(x, n), threshold=self.pde.is_neumann_boundary())
         b = bc.apply(b) # 混合边界条件不需要输入矩阵A
+
+        # 对 robin 边界条件进行处理
+        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t1, self.Phi), threshold=self.pde.is_robin_boundary())
+        A0, b = bc.apply(A, b)
         return b
 
     def solve(self, uh, timeline):
@@ -104,13 +99,13 @@ class PlanetHeatConductionSimulator():
         while error > e:
             xi_tmp = copy.deepcopy(xi_new[:])
             R = self.nr.robin_bc(A, xi_new, lambda x, n:self.pde.robin(x,
-                n, t1, self.Phi), threshold=self.pde.is_robin_boundary)
-            r = M@uh[:, i] - dt*R@uh[:, i] + dt*b
-            R = M #+ dt*R
+                n, t1, self.Phi), threshold=self.pde.is_robin_boundary())
+            r = M@uh[:, i] + dt*b
+            R = M + dt*R
             ml = pyamg.ruge_stuben_solver(R)
             xi_new[:] = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)
 #            xi_new[:] = spsolve(R, b).reshape(-1)
-            error = np.max(np.abs(xi_tmp-xi_new[:]))
+            error = np.max(np.abs(xi_tmp - xi_new[:]))
             print('error:', error)
         print('i:', i+1)
         uh[:, i+1] = xi_new
@@ -140,7 +135,7 @@ class TPMModel():
         return mesh
 
     def init_mu(self, t):
-        boundary_face_index = self.is_robin_boundary(0)
+        boundary_face_index = self.is_robin_boundary()
         qf0, qf1 = self.mesh.integrator(self.p, 'face')
         bcs, ws = qf0.get_quadrature_points_and_weights()
         m = mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
@@ -159,12 +154,12 @@ class TPMModel():
         return f 
     
     @cartesian
-    def neumann(self, p, n, t):
+    def neumann(self, p, n):
         gN = np.zeros((p.shape[0], p.shape[1]), dtype=np.float)
         return gN
 
     @cartesian
-    def is_neumann_boundary(self, p):
+    def is_neumann_boundary(self):
         tface, qface = self.mesh.entity('face')
         NTF = len(tface)
         boundary_neumann_tface_index = np.zeros(NTF, dtype=np.bool_)
@@ -182,7 +177,7 @@ class TPMModel():
         return -mu/Phi, kappa
     
     @cartesian
-    def is_robin_boundary(self, p):
+    def is_robin_boundary(self):
         tface, qface = self.mesh.entity('face')
         NTF = len(tface)
         boundary_robin_tface_index = np.zeros(NTF, dtype=np.bool_)
