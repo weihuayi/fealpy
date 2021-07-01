@@ -1,8 +1,14 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
+from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 
 class DirichletBC():
+    """
+
+    Note:
+
+    """
     def __init__(self, space, gD, threshold=None):
         self.space = space
         self.gD = gD
