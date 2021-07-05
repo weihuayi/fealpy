@@ -1,8 +1,14 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
+from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 
 class DirichletBC():
+    """
+
+    Note:
+
+    """
     def __init__(self, space, gD, threshold=None):
         self.space = space
         self.gD = gD
@@ -24,7 +30,7 @@ class DirichletBC():
             F = F.T.flat
         x = uh.T.flat # 把 uh 按列展平
         F -= A@x
-        bdIdx = np.zeros(A.shape[0], dtype=np.int)
+        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isDDof] = 1
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])

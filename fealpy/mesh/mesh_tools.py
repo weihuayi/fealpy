@@ -97,8 +97,8 @@ def find_entity(
     bc = mesh.entity_barycenter(entity)
     if index is None:
         if entity == 'node':
-            N = mesh.number_of_nodes()
-            index = range(N)
+            NN = mesh.number_of_nodes()
+            index = range(NN)
         elif entity == 'edge':
             NE = mesh.number_of_edges()
             index = range(NE)
@@ -138,7 +138,32 @@ def find_entity(
 
     dim = mesh.geo_dimension()
     bc = bc[index]
-    if dim == 2:
+    if dim == 1:
+        n = len(bc)
+        axes.scatter(bc[:, 0], np.zeros(n), c=color, s=markersize)
+        if showindex:
+            if multiindex is not None:
+                if (type(multiindex) is np.ndarray):
+                    for i,idx in enumerate(multiindex):
+                        s = str(idx).replace('[', '(')
+                        s = s.replace(']', ')')
+                        s = s.replace(' ', ',')
+                        axes.text(bc[i, 0], 0, s,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+                else:
+                    for i,idx in enumerate(multiindex):
+                        axes.text(bc[i, 0], 0, idx,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+            else:
+                for i in range(len(index)):
+                    axes.text(bc[i, 0], 0, str(index[i]),
+                            multialignment='center', fontsize=fontsize, 
+                            color=fontcolor) 
+    elif dim == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
             if multiindex is not None:

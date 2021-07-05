@@ -366,7 +366,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -412,7 +412,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -1017,7 +1017,7 @@ class LagrangeFiniteElementSpace():
 
         Notes
         -----
-        设置 Neumann 边界条件到载荷矩阵 F 中
+        设置 Neumann 边界条件到载荷向量 F 中
 
         TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
         """
@@ -1043,7 +1043,7 @@ class LagrangeFiniteElementSpace():
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -1084,7 +1084,7 @@ class LagrangeFiniteElementSpace():
         measure = mesh.entity_measure('face', index=index)
 
         phi = self.face_basis(bcs)
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         n = mesh.face_unit_normal(index=index)
 
         val, kappa = gR(pp, n) # (NQ, NF, ...)

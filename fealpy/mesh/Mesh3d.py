@@ -292,7 +292,7 @@ class Mesh3dDataStructure():
         else:
             NC = self.NC
             NE = self.NE
-            cell2edge = coo_matrix((NC, NE), dtype=np.bool)
+            cell2edge = coo_matrix((NC, NE), dtype=np.bool_)
             NEC = self.NEC
             cell2edge = csr_matrix(
                     (
@@ -396,12 +396,12 @@ class Mesh3dDataStructure():
             NF = self.NF
             face2node = csr_matrix(
                     (
-                        np.ones(FE*NF, dtype=np.bool),
+                        np.ones(FE*NF, dtype=np.bool_),
                         (
                             np.repeat(range(NF), FE),
                             face.flat
                         )
-                    ), shape=(NF, NN), dtype=np.bool)
+                    ), shape=(NF, NN), dtype=np.bool_)
             return face2node
 
     def face_to_edge(self, return_sparse=False):
@@ -440,12 +440,12 @@ class Mesh3dDataStructure():
             NF = self.NF
             face2cell = csr_matrix(
                     (
-                        np.ones(2*NF, dtype=np.bool),
+                        np.ones(2*NF, dtype=np.bool_),
                         (
                             np.repeat(range(NF), 2),
                             self.face2cell[:, [0, 1]].flat
                         )
-                    ), shape=(NF, NC), dtype=np.bool)
+                    ), shape=(NF, NC), dtype=np.bool_)
             return face2cell
 
     def edge_to_node(self, return_sparse=False):
@@ -458,12 +458,12 @@ class Mesh3dDataStructure():
             edge = self.edge
             edge2node = csr_matrix(
                     (
-                        np.ones(2*NE, dtype=np.bool),
+                        np.ones(2*NE, dtype=np.bool_),
                         (
                             np.repeat(range(NE), 2),
                             edge.flat
                         )
-                    ), shape=(NE, NN), dtype=np.bool)
+                    ), shape=(NE, NN), dtype=np.bool_)
             return edge2node
 
     def edge_to_edge(self):
@@ -513,12 +513,12 @@ class Mesh3dDataStructure():
         edge = self.edge
         node2node = csr_matrix(
                 (
-                    np.ones((2*NE,), dtype=np.bool),
+                    np.ones((2*NE,), dtype=np.bool_),
                     (
                         edge.flat,
                         edge[:, [1, 0]].flat
                     )
-                ), shape=(NN, NN), dtype=np.bool)
+                ), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
     def node_to_edge(self):
@@ -584,7 +584,7 @@ class Mesh3dDataStructure():
         NN = self.NN
         face = self.face
         isBdFace = self.boundary_face_flag()
-        isBdPoint = np.zeros((NN,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool_)
         isBdPoint[face[isBdFace, :]] = True
         return isBdPoint
 
@@ -592,7 +592,7 @@ class Mesh3dDataStructure():
         NE = self.NE
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
-        isBdEdge = np.zeros((NE,), dtype=np.bool)
+        isBdEdge = np.zeros((NE,), dtype=np.bool_)
         isBdEdge[face2edge[isBdFace, :]] = True
         return isBdEdge
 
@@ -604,7 +604,7 @@ class Mesh3dDataStructure():
         NC = self.NC
         face2cell = self.face_to_cell()
         isBdFace = self.boundary_face_flag()
-        isBdCell = np.zeros((NC,), dtype=np.bool)
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdCell[face2cell[isBdFace, 0]] = True
         return isBdCell
 

@@ -43,7 +43,7 @@ class PolygonMesh(Mesh2d):
         cell = self.ds.cell
         cellLocation = self.ds.cellLocation
         NV = self.ds.number_of_vertices_of_cells()
-        cells = np.zeros(len(cell) + NC, dtype=np.int)
+        cells = np.zeros(len(cell) + NC, dtype=self.itype)
         isIdx = np.ones(len(cell) + NC, dtype=np.bool)
         isIdx[0] = False
         isIdx[np.add.accumulate(NV+1)[:-1]] = False
@@ -108,8 +108,8 @@ class PolygonMesh(Mesh2d):
         cell = self.ds.cell
         cellLocation = self.ds.cellLocation
 
-        idx1 = np.zeros(cell.shape[0], dtype=np.int)
-        idx2 = np.zeros(cell.shape[0], dtype=np.int)
+        idx1 = np.zeros(cell.shape[0], dtype=np.int_)
+        idx2 = np.zeros(cell.shape[0], dtype=np.int_)
 
         idx1[0:-1] = cell[1:]
         idx1[cellLocation[1:]-1] = cell[cellLocation[:-1]]

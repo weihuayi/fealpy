@@ -3,7 +3,7 @@ import numpy as np
 from .femdof import multi_index_matrix2d
 
 class SimplexSetSpace():
-    def __init__(self, TD, ftype=np.float, itype=np.int):
+    def __init__(self, TD, ftype=np.float64, itype=np.int_):
         self.TD = TD
         self.multi_index_matrix = multi_index_matrix2d
         self.ftype = ftype

@@ -8,7 +8,7 @@ from .adaptive_tools import mark
 
 class Quadtree(QuadrangleMesh):
     localEdge2childCell = np.array([
-        (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int)
+        (0, 1), (1, 2), (2, 3), (3, 0)], dtype=np.int_)
 
     def __init__(self, node, cell):
         super(Quadtree, self).__init__(node, cell)
@@ -77,7 +77,7 @@ class Quadtree(QuadrangleMesh):
     def adaptive(self, eta, options):
 
         if options['HB'] is True:
-            HB = np.zeros((len(eta), 2), dtype=np.int)
+            HB = np.zeros((len(eta), 2), dtype=np.int_)
             HB[:, 0] = np.arange(len(eta))
             HB[:, 1] = np.arange(len(eta))
             options['HB'] = HB
@@ -219,7 +219,7 @@ class Quadtree(QuadrangleMesh):
                 NHB0 = flag0.sum()
                 NHB1 = flag1.sum()
                 NHB = NHB0 + 4*NHB1
-                HB = np.zeros((NHB, 2), dtype=np.int)
+                HB = np.zeros((NHB, 2), dtype=np.int_)
                 HB[:, 0] = range(NHB)
                 HB[0:NHB0, 1] = options['HB'][flag0, 1]
                 HB[NHB0:,  1] = np.repeat(options['HB'][flag1, 1], 4)
