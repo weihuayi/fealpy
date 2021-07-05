@@ -1,12 +1,20 @@
 
 import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve
-
 from scipy.sparse.linalg import spsolve
-
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
-import pyamg
+
+try:
+    import pyamg
+except ImportError:
+    print('I do not find  pyamg installed on this system!, so you can not use it.')
+    print("""
+
+
+
+
+    """)
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     space = a.space
