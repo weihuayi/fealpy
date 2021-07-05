@@ -47,7 +47,7 @@ class LinearMeshDataStructure():
         I = index[:, 0]
         I += index[:, 1]*(index[:, 1] + 1)//2
         I += index[:, 2]*(index[:, 2] + 1)*(index[:, 2] + 2)//6
-        if FV == 4: 
+        if NVF == 4: 
             I += index[:, 3]*(index[:, 3] + 1)*(index[:, 3] + 2)*(index[:, 3] + 3)//24
         _, i0, j = np.unique(I, return_index=True, return_inverse=True)
 

@@ -212,7 +212,7 @@ class CPLFEMDof2d():
         NE= mesh.number_of_edges()
         NN = mesh.number_of_nodes()
 
-        edge = mesh.ds.edge
+        edge = mesh.entity('edge')
         edge2dof = np.zeros((NE, p+1), dtype=np.int)
         edge2dof[:, [0, -1]] = edge
         if p > 1:
