@@ -81,9 +81,9 @@ def tri_to_polygonmesh(mesh, n):
 
 
 
-def squaremesh(x0, x1, y0, y1, r=3, dtype=np.float):
-    node = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=dtype)
-    cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int)
+def squaremesh(x0, x1, y0, y1, r=3, ftype=np.float64):
+    node = np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]], dtype=ftype)
+    cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int_)
     mesh = TriangleMesh(node, cell)
     mesh.uniform_refine(r)
     return mesh 
@@ -163,7 +163,7 @@ def distmesh2d(fd, h0, bbox, pfix, meshtype='tri'):
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
 
-def unitcircledomainmesh(h0, meshtype='tri', dtype=np.float):
+def unitcircledomainmesh(h0, meshtype='tri', ftype=np.float64):
     fd = lambda p: dcircle(p, (0,0), 1)
     fh = huniform
     bbox = [-1.2, 1.2, -1.2, 1.2]

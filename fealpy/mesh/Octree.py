@@ -9,18 +9,19 @@ class Octree(HexahedronMesh):
     localFace2childCell = np.array([
         (0, 2), (4, 6), 
         (0, 7), (1, 6),
-        (0, 5), (2, 7)], dtype=np.int)
+        (0, 5), (2, 7)], dtype=np.int_)
     localEdge2childCell = np.array([
         (0, 1), (1, 2), (2, 3), (3, 0),
         (4, 0), (5, 1), (6, 2), (7, 3),
-        (4, 5), (5, 6), (6, 7), (7, 4)], dtype=np.int)
+        (4, 5), (5, 6), (6, 7), (7, 4)], dtype=np.int_)
 
-    def __init__(self, node, cell, dtype=np.float):
-        super(Octree, self).__init__(node, cell, dtype=dtype)
-        self.dtype = dtype
+    def __init__(self, node, cell, itype=np.int_, ftype=np.float64):
+        super(Octree, self).__init__(node, cell, ftype=ftype)
+        self.itype = itype 
+        self.ftype = ftype
         NC = self.number_of_cells()
-        self.parent = -np.ones((NC, 2), dtype=np.int) 
-        self.child = -np.ones((NC, 8), dtype=np.int)
+        self.parent = -np.ones((NC, 2), dtype=itype) 
+        self.child = -np.ones((NC, 8), dtype=itype)
 
     def leaf_cell_index(self):
         child = self.child
@@ -84,11 +85,11 @@ class Octree(HexahedronMesh):
 
             isNeedCutEdge = ~isCuttedEdge & isCutEdge
 
-            edge2center = np.zeros(NE, dtype=np.int)
+            edge2center = np.zeros(NE, dtype=self.itype)
 
             I, J = np.nonzero(isCuttedEdge[cell2edge])
-            cellIdx = np.zeros(NE, dtype=np.int)
-            localIdx = np.zeros(NE, dtype=np.int)
+            cellIdx = np.zeros(NE, dtype=self.itype)
+            localIdx = np.zeros(NE, dtype=self.itype)
             I1 = I[~isLeafCell[I]]
             J1 = J[~isLeafCell[I]]
             cellIdx[cell2edge[I1, J1]] = I1
@@ -116,11 +117,11 @@ class Octree(HexahedronMesh):
             isNeedCutFace = ~isCuttedFace & isCutFace 
             
 
-            face2center = np.zeros(NF, dtype=np.int)
+            face2center = np.zeros(NF, dtype=self.itype)
 
             I, J = np.nonzero(isCuttedFace[cell2face])
-            cellIdx = np.zeros(NF, dtype=np.int)
-            localIdx = np.zeros(NF, dtype=np.int)
+            cellIdx = np.zeros(NF, dtype=self.itype)
+            localIdx = np.zeros(NF, dtype=self.itype)
             I1 = I[~isLeafCell[I]]
             J1 = J[~isLeafCell[I]]
             cellIdx[cell2face[I1, J1]] = I1
@@ -149,12 +150,12 @@ class Octree(HexahedronMesh):
 
             cc = np.arange(N+NEC+NFC, N+NEC+NFC+NCC).reshape(-1, 1)
 
-            newParent = np.zeros((8*NCC, 2), dtype=np.int)
+            newParent = np.zeros((8*NCC, 2), dtype=self.itype)
             newParent[:, 0] = np.repeat(idx, 8)
-            newParent[:, 1] = ranges(8*np.ones(NCC, dtype=np.int)) 
-            newChild = -np.ones((8*NCC, 8), dtype=np.int)
+            newParent[:, 1] = ranges(8*np.ones(NCC, dtype=self.itype)) 
+            newChild = -np.ones((8*NCC, 8), dtype=self.itype)
 
-            newCell = np.zeros((8*NCC, 8), dtype=np.int)
+            newCell = np.zeros((8*NCC, 8), dtype=self.itype)
             newCell[0::8, :] = np.concatenate(
                     (cp[0], ep[0], fp[0], ep[3], ep[4], fp[4], cc, fp[2]), axis=1)
             newCell[1::8, :] = np.concatenate(
@@ -226,7 +227,7 @@ class Octree(HexahedronMesh):
             isNewLeafCell = np.sum(isRemainCell[child[childIdx, :]], axis=1) == 0 
             child[childIdx[isNewLeafCell], :] = -1
 
-            cellIdxMap = np.zeros(NC, dtype=np.int)
+            cellIdxMap = np.zeros(NC, dtype=self.itype)
             NNC = isRemainCell.sum()
             cellIdxMap[isRemainCell] = np.arange(NNC)
             child[child > -1] = cellIdxMap[child[child > -1]]
@@ -234,7 +235,7 @@ class Octree(HexahedronMesh):
             self.child = child
             self.parent = parent
 
-            nodeIdxMap = np.zeros(N, dtype=np.int)
+            nodeIdxMap = np.zeros(N, dtype=self.itype)
             NN = isRemainNode.sum()
             nodeIdxMap[isRemainNode] = np.arange(NN)
             cell = nodeIdxMap[cell]
@@ -326,7 +327,7 @@ class Octree(HexahedronMesh):
 
             NC = self.number_of_cells()
             PNC = isLeafCell.sum()
-            cellIdxMap = np.zeros(NC, dtype=np.int)
+            cellIdxMap = np.zeros(NC, dtype=self.itype)
             cellIdxMap[isLeafCell] = np.arange(PNC)
             pface2cell[:, 0:2] = cellIdxMap[pface2cell[:, 0:2]]
 
@@ -339,7 +340,7 @@ class Octree(HexahedronMesh):
             pface2edge = face2edge[isLeafFace]
             isLeafEdge[pface2edge] = True
             pedge = edge[isLeafEdge]
-            idxMap = -np.ones(NE, dtype=np.int)
+            idxMap = -np.ones(NE, dtype=self.itype)
             idxMap[isLeafEdge] = range(np.sum(isLeafEdge))
             pface2edge = idxMap[pface2edge]
 
@@ -351,7 +352,7 @@ class Octree(HexahedronMesh):
             val[:, 1] = 2
             p2e = csr_matrix((val.flatten(), (I, J)), shape=(N, NE), dtype=np.int8)
 
-            NV = np.zeros(PNF, dtype=np.int)
+            NV = np.zeros(PNF, dtype=self.itype)
             node = self.node
             mp = (node[pedge[:, 0]] + node[pedge[:, 1]])/2
             l2 = np.sqrt(np.sum((node[pedge[:, 0]] - node[pedge[:, 1]])**2, axis=1))
@@ -403,9 +404,9 @@ class Octree(HexahedronMesh):
                     fp = pedge[pe, lidx%2]
                     NV[fidx] += 1
 
-            pfaceLocation = np.zeros(PNF+1, dtype=np.int)
+            pfaceLocation = np.zeros(PNF+1, dtype=self.itype)
             pfaceLocation[1:] = np.cumsum(NV)
-            pface0 = np.zeros(pfaceLocation[-1], dtype=np.int)
+            pface0 = np.zeros(pfaceLocation[-1], dtype=self.itype)
             currentLocation = pfaceLocation[:-1].copy()
             for i in range(4):
                 print("Current ", i)
