@@ -338,11 +338,17 @@ def show_mesh_2d(
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        cell, cellLocation = cell
-        NC = mesh.number_of_cells()
-        patches = [
-                Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
-                for i in range(NC)]
+        if mesh.ds.NV is None:
+            cell, cellLocation = cell
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                    for i in range(NC)]
+        elif mesh.ds.NV == 3:
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[i], :], True)
+                    for i in range(NC)]
         poly = PatchCollection(patches)
 
     poly.set_edgecolor(edgecolor)

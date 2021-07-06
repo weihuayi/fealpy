@@ -374,6 +374,9 @@ class ParametricLagrangeFiniteElementSpace:
         np.add.at(c, cell2dof, cc)
         return c
 
+    def integral(self, u):
+        return u@self.integral_basis()
+
     def interpolation(self, u, dim=None):
         ipoint = self.dof.interpolation_points()
         uI = u(ipoint)
