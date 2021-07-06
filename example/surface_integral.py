@@ -27,7 +27,7 @@ maxit = int(sys.argv[3])
 
 pde = PDE()
 surface = pde.domain()
-mesh = pde.init_mesh(meshtype='tri', p=p) # p 次的拉格朗日四边形网格
+mesh = pde.init_mesh(meshtype='tri', p=p) # p 次的拉格朗日三角形网格
 
 for i in range(maxit):
     mesh.uniform_refine(n=n)
