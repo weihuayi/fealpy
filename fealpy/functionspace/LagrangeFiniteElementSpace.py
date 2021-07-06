@@ -366,7 +366,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -412,7 +412,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)

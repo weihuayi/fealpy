@@ -5,11 +5,14 @@ from .mesh_tools import unique_row
 
 
 class PolyhedronMesh():
-    def __init__(self, node, face, faceLocation, face2cell, NC=None, dtype=np.float):
+    def __init__(self, node, face, faceLocation, face2cell, NC=None,
+            itype=np.int_,
+            ftype=np.float64):
         self.node = node
         self.ds = PolyhedronMeshDataStructure(node.shape[0], face, faceLocation, face2cell, NC=NC)
         self.meshtype = 'polyhedron'
-        self.dtype= dtype 
+        self.itype = itype
+        self.ftype = ftype 
 
     def to_vtk(self):
         NF = self.number_of_faces()
@@ -18,7 +21,7 @@ class PolyhedronMesh():
         faceLocation = self.ds.faceLocation
         NV = self.ds.number_of_vertices_of_faces()
 
-        faces = np.zeros(len(face) + NF, dtype=np.int)
+        faces = np.zeros(len(face) + NF, dtype=self.itype)
         isIdx = np.ones(len(face) + NF, dtype=np.bool)
         isIdx[0] = False
         isIdx[np.add.accumulate(NV+1)[:-1]] = False
@@ -35,9 +38,9 @@ class PolyhedronMesh():
         isIntFace = (face2cell[:, 0] != face2cell[:, 1])
 
         cell2node = self.ds.cell_to_node()
-        V = cell2node@np.ones(N, dtype=np.int)
-        E = np.zeros(NC, dtype=np.int)
-        F = np.zeros(NC, dtype=np.int)
+        V = cell2node@np.ones(N, dtype=self.itype)
+        E = np.zeros(NC, dtype=self.itype)
+        F = np.zeros(NC, dtype=self.itype)
 
         np.add.at(E, face2cell[:, 0], NFE)
         np.add.at(E, face2cell[isIntFace, 1], NFE[isIntFace])
@@ -70,8 +73,8 @@ class PolyhedronMesh():
         face = self.ds.face
         faceLocation = self.ds.faceLocation
 
-        idx1 = np.zeros(face.shape[0], dtype=np.int)
-        idx2 = np.zeros(face.shape[0], dtype=np.int)
+        idx1 = np.zeros(face.shape[0], dtype=self.itype)
+        idx2 = np.zeros(face.shape[0], dtype=self.itype)
 
         idx1[0:-1] = face[1:]
         idx1[faceLocation[1:]-1] = face[faceLocation[:-1]]
@@ -140,7 +143,7 @@ class PolyhedronMeshDataStructure():
         face = self.face
         faceLocation = self.faceLocation
 
-        totalEdge = np.zeros((len(face), 2), dtype=np.int)
+        totalEdge = np.zeros((len(face), 2), dtype=self.itype)
         totalEdge[:, 0] = face 
         totalEdge[:-1, 1] = face[1:] 
         totalEdge[faceLocation[1:] - 1, 1] = face[faceLocation[:-1]]

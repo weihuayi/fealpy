@@ -13,8 +13,8 @@ from ..mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
 
 class CosCosData:
     """
-    -\Delta u = f
-    u = cos(pi*x)*cos(pi*y)
+        -\\Delta u = f
+        u = cos(pi*x)*cos(pi*y)
     """
     def __init__(self):
         pass
@@ -166,7 +166,7 @@ class CosCosData:
 
 class X2Y2Data:
     """
-    -\Delta u = f
+    -\\Delta u = f
     u = cos(pi*x)*cos(pi*y)
     """
     def __init__(self):

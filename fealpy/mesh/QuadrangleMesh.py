@@ -94,7 +94,7 @@ class QuadrangleMesh(Mesh2d):
             ep = [edge2center[cell2edge[:, i]].reshape(-1, 1) for i in range(4)]
             cc = np.arange(N + NE, N + NE + NC).reshape(-1, 1)
  
-            cell = np.zeros((4*NC, 4), dtype=np.int)
+            cell = np.zeros((4*NC, 4), dtype=np.int_)
             cell[0::4, :] = np.r_['1', cp[0], ep[0], cc, ep[3]] 
             cell[1::4, :] = np.r_['1', ep[0], cp[1], ep[1], cc]
             cell[2::4, :] = np.r_['1', cc, ep[1], cp[2], ep[2]]
@@ -109,12 +109,12 @@ class QuadrangleMesh(Mesh2d):
         hashR = np.array([
             [1, 1, 1, 1],
             [1, 1, 0, 0],
-            [0, 0, 1, 1]], dtype=np.int)
+            [0, 0, 1, 1]], dtype=np.int_)
         mR, vR = hash2map(np.arange(16), hashR)
         print(mR, vR)
         cell2edge = self.ds.cell_to_edge()
         NE = self.number_of_edges()
-        edge2flag = np.zeros(NE, dtype=np.bool)
+        edge2flag = np.zeros(NE, dtype=np.bool_)
         edge2flag[cell2edge[markedCell]] = True
         print(edge2flag)
         print(edge2flag[cell2edge])
