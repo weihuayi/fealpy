@@ -141,7 +141,7 @@ class TPMModel():
         m = mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
 
         # 小行星外法向, 初始为 (1, 0, 1) 绕 z 轴旋转, 这里 t 为 omega*t
-        n = np.array([np.cos(t), np.sin(t), 1]) # 指向太阳的方向
+        n = np.array([np.cos(t), -np.sin(t), 1]) # 指向太阳的方向
         n = n/np.sqrt(np.dot(n, n))
 
         mu = np.dot(m, n)
