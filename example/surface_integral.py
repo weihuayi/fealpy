@@ -23,9 +23,12 @@ from scipy.sparse import bmat
 
 p = int(sys.argv[1])
 n = int(sys.argv[2])
-maxit = int(sys.argv[3])
+k = int(sys.argv[3])
+assert((k<6) & (k>=0))
 
-pde = PDE()
+maxit = int(sys.argv[4])
+
+pde = PDE(k=k)
 surface = pde.domain()
 mesh = pde.init_mesh(meshtype='tri', p=p) # p 次的拉格朗日三角形网格
 
@@ -35,4 +38,6 @@ for i in range(maxit):
     uI = space.interpolation(pde.solution)
     value = space.integral(uI)
     print(value)
+
+assert(abs(value - pde.integrate())<0.01)
 
