@@ -338,7 +338,8 @@ def show_mesh_2d(
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        if mesh.ds.NV is None:
+        
+        if mesh.meshtype in {'polygon', 'halfedge2d'}:
             cell, cellLocation = cell
             NC = mesh.number_of_cells()
             patches = [

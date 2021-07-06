@@ -77,7 +77,7 @@ class WGDof2d():
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         NC = mesh.number_of_cells()
 
@@ -115,7 +115,7 @@ class WGDof2d():
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
-        cell2edge = mesh.ds.cell_to_edge(sparse=False)
+        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         NC = mesh.number_of_cells()
 
