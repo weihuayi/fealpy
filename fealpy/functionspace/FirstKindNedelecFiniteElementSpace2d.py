@@ -223,7 +223,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         index = index if index is not None else np.s_[:]
         if barycenter:
-            ps = mesh.bc_to_point(bc, etype='edge', index=index)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
 
@@ -291,7 +291,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         GD = mesh.geo_dimension()
 
         if barycenter:
-            ps = mesh.bc_to_point(bc, etype='cell', index=index)
+            ps = mesh.bc_to_point(bc,  index=index)
         else:
             ps = bc
         val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
@@ -441,7 +441,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
             @barycentric
             def f1(bc): #TODO: check here
-                ps = mesh.bc_to_point(bc, etype='cell')
+                ps = mesh.bc_to_point(bc)
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
 
             val = self.integralalg.cell_integral(f1)
