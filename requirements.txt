@@ -1,7 +1,6 @@
 numpy
 scipy
 matplotlib
-pyfftw
 vtk
 pytest>=3.6
 pytest-cov

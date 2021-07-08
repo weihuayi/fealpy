@@ -129,6 +129,8 @@ class IntervalMesh():
         return 1
 
     def entity_measure(self, etype=1, index=None, node=None):
+        """
+        """
         if etype in {1, 'cell', 'face', 'edge'}:
             return self.cell_length(index=index, node=None)
         elif etype in {0, 'node'}:

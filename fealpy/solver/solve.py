@@ -17,7 +17,7 @@ except ImportError:
     $ pip3 install pyamg 
     ```
 
-    If your system is MacOS, you can run
+    If your system is MacOS, you also can run
 
     ```
     $ pip install pyamg
