@@ -12,6 +12,9 @@ Lagrange 元求解 Poisson 方程,
 .. math::
     (\\nabla u, \\nabla v) = (f, v)
 
+Notes
+-----
+
 """
 
 import argparse
