@@ -2,7 +2,9 @@ import numpy as np
 from numpy.linalg import inv
 
 import scipy.fftpack as spfft
+
 import pyfftw
+    
 
 class FourierSpace:
     def __init__(self, box, N, dft=None):
