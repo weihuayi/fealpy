@@ -342,9 +342,13 @@ def show_mesh_2d(
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        
-        NV = mesh.ds.number_of_vertices_of_cells()
-        if NV in {3, 4}:
+        if mesh.meshtype == 'polygon':
+            cell, cellLocation = cell
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                    for i in range(NC)]
+        elif mesh.ds.NV in {3, 4}:
             NC = mesh.number_of_cells()
             patches = [
                     Polygon(node[cell[i], :], True)

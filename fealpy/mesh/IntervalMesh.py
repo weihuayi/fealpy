@@ -129,6 +129,8 @@ class IntervalMesh():
         return 1
 
     def entity_measure(self, etype=1, index=None, node=None):
+        """
+        """
         if etype in {1, 'cell', 'face', 'edge'}:
             return self.cell_length(index=index, node=None)
         elif etype in {0, 'node'}:
@@ -335,11 +337,9 @@ class IntervalMeshDataStructure():
         NC = self.NC
         cell = self.cell
 
-        _, i0, j = np.unique(cell.reshape(-1), return_index=True, return_inverse=True)
+        _, i0, j = np.unique(cell.reshape(-1), 
+                return_index=True, return_inverse=True)
         self.node2cell = np.zeros((NN, 4), dtype=self.itype)
-
-        print("NN:", NN)
-        print(np.max(cell))
 
         i1 = np.zeros(NN, dtype=np.int) 
         i1[j] = np.arange(2*NC)

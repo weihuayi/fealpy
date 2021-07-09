@@ -310,6 +310,25 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
+        """
+
+        Notes
+        -----
+            bc：边上的一组积分点
+            index: 边所在的单元编号
+            lidx: 边在该单元的局部编号
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+
+            计算基函数梯度在单元边上积分点的值.
+
+            这里要把边上的低维的积分点转化为高维的积分点.
+
+        TODO
+        ----
+            二维和三维统一？
+            有没有更好处理办法？
+
+        """
         NE = len(index)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])

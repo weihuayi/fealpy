@@ -12,6 +12,5 @@ setup(name='fealpy',
           'scipy',
           'matplotlib',
           'cython',
-          'pyfftw',
       ],
       zip_safe=False)

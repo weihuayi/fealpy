@@ -17,7 +17,6 @@ from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
 from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
 
 from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
-from .FourierSpace import FourierSpace
 
 #from .mixed_fem_space import RTFiniteElementSpace2d
 #from .PrismFiniteElementSpace import PrismFiniteElementSpace
@@ -27,3 +26,5 @@ from .femdof import CPPFEMDof3d
 from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElementSpace2d
 
 from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace
+
+from .FourierSpace import FourierSpace
