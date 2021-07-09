@@ -10,7 +10,7 @@
 日期：31/07/2020
 """
 
-import sys
+import argparse 
 import numpy as np
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
@@ -34,8 +34,7 @@ class PDE:
         u = cos(pi*x)*cos(pi*y)
 	
 	Coefficients:
-	A(x) = [10.0, -1.0;
-			-1.0, 2.0]
+	A(x) = [10.0, -1.0; -1.0, 2.0]
 	b(x) = [-1; -1]
 	c(x) = 1 + x^2 + y^2
     """
@@ -176,7 +175,8 @@ for i in range(maxit):
 uh.add_plot(plt, cmap='rainbow')
 
 # 收敛阶图像
-showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=10)
+showmultirate(plt, 0, NDof, errorMatrix,  errorType, 
+        propsize=40)
 
 # 输出误差的 latex 表格
 show_error_table(NDof, errorType, errorMatrix)
