@@ -193,12 +193,12 @@ class Mesh2d(object):
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=20, ecolor='r',
+            color='g', markersize=20, 
             fontsize=13, fontcolor='g', multiindex=None):
 
         find_entity(axes, self, entity='edge',
                 index=index, showindex=showindex, 
-                color=color, markersize=markersize, ecolor=ecolor,
+                color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_cell(self, axes,

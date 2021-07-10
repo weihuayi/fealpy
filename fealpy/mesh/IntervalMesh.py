@@ -16,6 +16,10 @@ class IntervalMesh():
 
         See Also
         --------
+
+        Notes
+        -----
+
         """
         self.node = node
         self.ds = IntervalMeshDataStructure(len(node), cell)
@@ -31,6 +35,12 @@ class IntervalMesh():
 
 
     def integrator(self, k, etype='cell'):
+        """
+
+        Notes
+        -----
+            返回第 k 个高斯积分公式。
+        """
         return GaussLegendreQuadrature(k)
 
     def number_of_nodes(self):
@@ -39,8 +49,14 @@ class IntervalMesh():
     def number_of_cells(self):
         return self.ds.NC
 
+    def number_of_edges(self):
+        return self.ds.NC
+
+    def number_of_faces(self):
+        return self.ds.NC
+
     def number_of_entities(self, etype):
-        if etype in {'cell', 1}:
+        if etype in {'cell', 'edge', 'face', 1}:
             return self.ds.NC
         elif etype in {'node', 0}:
             return self.ds.NN
@@ -64,10 +80,6 @@ class IntervalMesh():
 
         Parameters
         ----------
-        points: vtkPoints object
-        cells:  vtkCells object
-        pdata:  
-        cdata:
 
         Notes
         -----
@@ -117,6 +129,8 @@ class IntervalMesh():
         return 1
 
     def entity_measure(self, etype=1, index=None, node=None):
+        """
+        """
         if etype in {1, 'cell', 'face', 'edge'}:
             return self.cell_length(index=index, node=None)
         elif etype in {0, 'node'}:
@@ -124,49 +138,88 @@ class IntervalMesh():
         else:
             raise ValueError("`etype` is wrong!")
 
-    def entity_barycenter(self, etype=1, index=None, node=None):
+    def entity_barycenter(self, etype=1, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            返回网格实体的重心坐标。
+
+            注意，这里用户可以提供一个新个网格节点数组。
+        """
         node = self.entity('node') if node is None else node
-        index = index if index is not None else np.s_[:]
         if etype in {1, 'cell', 'face', 'edge'}:
             cell = self.ds.cell
-            bc = np.sum(node[cell[index]], axis=1)/cell.shape[1]
+            bc = np.sum(node[cell[index]], axis=1)/cell.shape[-1]
         elif etype in {'node', 0}:
             bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-    def cell_length(self, index=None, node=None):
+    def cell_length(self, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            返回单元的长度。
+        """
         node = self.node if node is None else node
         cell = self.ds.cell
         GD = self.geo_dimension()
-        index = index if index is not None else np.s_[:]
         return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2,
                         axis=-1))
 
-    def bc_to_point(self, bc, index=None, node=None):
+    def bc_to_point(self, bc, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            把重心坐标转换为实际空间坐标
+        """
         node = self.node if node is None else node
-        cell = self.ds.cell
-        index = index if index is not None else np.s_[:]
+        cell = self.entity('cell')
         p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
         return p
 
-    def cell_normal(self, index=None, node=None):
+    def cell_normal(self, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            返回二维空间中单元的法线向量
+        """
         GD = self.geo_dimension()
         if GD != 2:
-            raise ValueError('cell_tagent just work for 2D Case')
+            raise ValueError('cell_normal just work for 2D Case')
         v = self.cell_tangent(index=index, node=node)
         w = np.array([(0, -1),(1, 0)])
         return v@w
 
-    def cell_tangent(self, index=None, node=None):
+    def cell_tangent(self, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            返回单元的切向向量
+        """
         node = self.node if node is None else node
-        cell = self.ds.cell
-        index = index if index is not None else np.s_[:]
+        cell = self.entity('cell')
         v = node[cell[index, 1]] - node[cell[index, 0]]
         return v
 
     def uniform_refine(self, n=1, inplace=True):
+        """
+
+        Notes
+        -----
+            对网格进行一致加密，
+
+            inplace 默认为 True， 意思是直接在单元内部修改
+
+        TODO:
+            1. 实现 inplace 为 False 的情形 
+        """
         for i in range(n):
             NN = self.number_of_nodes()
             NC = self.number_of_cells()
@@ -198,9 +251,11 @@ class IntervalMesh():
 
             newCell = np.zeros((NC+N, 2), dtype=self.itype)
             newCell[:NC] = cell
-            newCell[:NC][isMarkedCell, 1] = range(NC, NC+N)
-            newCell[NC:, 0] = range(NC, NC+N)
+            newCell[:NC][isMarkedCell, 1] = range(NN, NN+N)
+            newCell[NC:, 0] = range(NN, NN+N)
             newCell[NC:, 1] = cell[isMarkedCell, 1]
+            print(newCell)
+            print(self.node)
 
             self.ds.reinit(NN+N, newCell)
 
@@ -233,11 +288,20 @@ class IntervalMesh():
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
-
     def find_edge(self, axes,
             index=None, showindex=False,
-            color='g', markersize=400,
-            fontsize=24, fontcolor='k'):
+            color='g', markersize=250,
+            fontsize=24, fontcolor='g'):
+
+        find_entity(axes, self, entity='edge',
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
+    def find_face(self, axes,
+            index=None, showindex=False,
+            color='g', markersize=250,
+            fontsize=24, fontcolor='g'):
 
         find_entity(axes, self, entity='edge',
                 index=index, showindex=showindex,
@@ -246,8 +310,9 @@ class IntervalMesh():
 
     def find_cell(self, axes,
             index=None, showindex=False,
-            color='y', markersize=800,
-            fontsize=24, fontcolor='k'):
+            color='g', markersize=250,
+            fontsize=24, fontcolor='g'):
+
         find_entity(axes, self, entity='cell',
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
@@ -258,6 +323,7 @@ class IntervalMeshDataStructure():
         self.NN = NN
         self.NC = len(cell)
         self.cell = cell
+        self.itype = cell.dtype
         self.construct()
 
     def reinit(self, NN, cell):
@@ -271,8 +337,9 @@ class IntervalMeshDataStructure():
         NC = self.NC
         cell = self.cell
 
-        _, i0, j = np.unique(cell.reshape(-1), return_index=True, return_inverse=True)
-        self.node2cell = np.zeros((NN, 4), dtype=np.int)
+        _, i0, j = np.unique(cell.reshape(-1), 
+                return_index=True, return_inverse=True)
+        self.node2cell = np.zeros((NN, 4), dtype=self.itype)
 
         i1 = np.zeros(NN, dtype=np.int) 
         i1[j] = np.arange(2*NC)

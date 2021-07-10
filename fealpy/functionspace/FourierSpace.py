@@ -2,7 +2,33 @@ import numpy as np
 from numpy.linalg import inv
 
 import scipy.fftpack as spfft
-import pyfftw
+
+try:
+    import pyfftw
+except ImportError:
+    print("请先认真读下面的英文信息！！！")
+    print('I do not find  pyfftw installed on this system!, so you can not use it.')
+    print("""
+    If your system is Ubuntu, you can run 
+
+    ```
+    $ pip3 install pyfftw
+    ```
+
+    If your system is MacOS, you also can run
+
+    ```
+    $ pip install pyfftw 
+    ```
+
+    If your system is Windows, there are several methods to install `pyamg`
+
+    1. install from conda 
+    ```
+    conda install -c conda-forge pyfftw
+    ```
+    """)
+    
 
 class FourierSpace:
     def __init__(self, box, N, dft=None):
