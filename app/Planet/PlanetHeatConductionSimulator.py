@@ -44,8 +44,8 @@ class PlanetHeatConductionSimulator():
         A = self.mesh.meshdata['A']
         q = self.mesh.meshdata['q']
 
-        self.T = ((1-A)*q/(epsilon*sigma))**(1/4) # 日下点温度 T=[(1-A)*q/(epsilon*sigma)]^(1/4)
-        self.Tau = np.sqrt(rho*c*kappa) # 热惯量
+        self.T = ((1-A)*q/(epsilon*sigma))**(1/4) # 日下点温度 T_ss=[(1-A)*q/(epsilon*sigma)]^(1/4)
+        self.Tau = np.sqrt(rho*c*kappa) # 热惯量 Tau = (rho*c*kappa)^(1/2)
         self.Phi = self.Tau*np.sqrt(omega)/(epsilon*sigma*self.T**3) # 热参数
 
     def time_mesh(self, NT=100):
@@ -63,7 +63,7 @@ class PlanetHeatConductionSimulator():
         NL = timeline.number_of_time_levels()
         gdof = self.space.number_of_global_dofs()
         uh = np.zeros((gdof, NL), dtype=np.float)
-        uh[:, 0] = 150/self.T
+        uh[:, 0] = 150/self.T # u = T/T_ss, 初始温度 150K
         return uh
 
     def apply_boundary_condition(self, A, b, uh, timeline):
@@ -80,7 +80,7 @@ class PlanetHeatConductionSimulator():
         return b
 
     def solve(self, uh, timeline):
-        '''  piccard 迭代  C-N 方法 '''
+        '''  piccard 迭代  向后欧拉方法 '''
         from nonlinear_robin import nonlinear_robin
 
         i = timeline.current
@@ -92,19 +92,21 @@ class PlanetHeatConductionSimulator():
         M = self.M
         b = self.apply_boundary_condition(A, F, uh, timeline)
         
-        e = 0.0000000001
+        e = 1e-10 
         error = 1
         xi_new = self.space.function()
-        xi_new[:] = copy.deepcopy(uh[:, i])
+        xi_new[:] = uh[:, i]
         while error > e:
-            xi_tmp = copy.deepcopy(xi_new[:])
+            xi_tmp = xi_new.copy()
             R = self.nr.robin_bc(A, xi_new, lambda x, n:self.pde.robin(x,
                 n, t1, self.Phi), threshold=self.pde.is_robin_boundary())
             r = M@uh[:, i] + dt*b
             R = M + dt*R
-            ml = pyamg.ruge_stuben_solver(R)
-            xi_new[:] = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)
-#            xi_new[:] = spsolve(R, b).reshape(-1)
+
+#            ml = pyamg.ruge_stuben_solver(R)
+#            xi_new[:] = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)
+            xi_new[:] = spsolve(R, r).reshape(-1)
+
             error = np.max(np.abs(xi_tmp - xi_new[:]))
             print('error:', error)
         print('i:', i+1)
@@ -215,11 +217,12 @@ if __name__ == '__main__':
 
         if i < maxit-1:
             timeline.uniform_refine()
-#                mesh.uniform_refine()
+            
             n = n+1
             h = h/2
             nh = nh*2
             mesh = pde.init_mesh(n=n, h=h, nh=nh)
+        
         uh = model.space.function(array=uh[:, -1])
         uh = uh*self.simulator.T
         print('uh:', uh)
@@ -228,11 +231,3 @@ if __name__ == '__main__':
     mesh.nodedata['uh'] = uh
 
     mesh.to_vtk(fname='test.vtu') 
-#    fig = plt.figure()
-#    axes = fig.gca(projection='3d')
-#    uh.add_plot(axes, cmap='rainbow')
-
-#    show_error_table(Ndof, errorType, errorMatrix)
-#    showmultirate(plt, 0, Ndof, errorMatrix, errorType)
-#    plt.show()
-
