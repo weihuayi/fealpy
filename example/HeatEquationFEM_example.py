@@ -80,6 +80,7 @@ uh0 = space.interpolation(pde.init_value)
 # 下一层时间步的有限元解
 uh1 = space.function()
 
+
 for i in range(0, nt): 
     
     # 下一个的时间层 t1

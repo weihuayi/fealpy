@@ -139,9 +139,13 @@ class LagrangeFiniteElementSpace():
         grad = self.grad_value(uh, bc)
 
         if callable(c): # 考虑存在扩散系数的情形
-            if c.coordtype == 'barycentric':
-                c = c(bc)
-            elif c.coordtype == 'cartesian':
+            if hasattr(c, 'coordtype'):
+                if c.coordtype == 'barycentric':
+                    c = c(bc)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bc)
+                    c = c(ps)
+            else: # 默认是笛卡尔类型的坐标
                 ps = mesh.bc_to_point(bc)
                 c = c(ps)
 
@@ -987,11 +991,15 @@ class LagrangeFiniteElementSpace():
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
 
-        if f.coordtype == 'cartesian':
+        if hasattr(f, 'coordtype'):
+            if f.coordtype == 'cartesian':
+                pp = self.mesh.bc_to_point(bcs)
+                fval = f(pp)
+            elif f.coordtype == 'barycentric':
+                fval = f(bcs)
+        else:
             pp = self.mesh.bc_to_point(bcs)
             fval = f(pp)
-        elif f.coordtype == 'barycentric':
-            fval = f(bcs)
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)

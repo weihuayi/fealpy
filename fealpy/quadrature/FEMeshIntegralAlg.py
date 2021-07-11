@@ -147,6 +147,7 @@ class FEMeshIntegralAlg():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
+
         if basis0.coordtype == 'barycentric':
             phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
         elif basis0.coordtype == 'cartesian':
