@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+# 
+
 import argparse
 
 import numpy as np
@@ -5,11 +8,22 @@ import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
 
+# 装饰子：指明被装饰函数输入的是笛卡尔坐标点
 from fealpy.decorator import cartesian
+
+# 网格工厂：生成常用的简单区域上的网格
 from fealpy.mesh import MeshFactory as MF
+
+# 均匀剖分的时间离散
 from fealpy.timeintegratoralg import UniformTimeLine
+
+# 热传导 pde 模型
 from fealpy.pde.heatequation_model_2d import SinSinExpData
+
+# Lagrange 有限元空间
 from fealpy.functionspace import LagrangeFiniteElementSpace
+
+# Dirichlet 边界条件
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.tools.show import showmultirate
 
