@@ -965,6 +965,13 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
+    def edge_bc_to_point(self, bc, index=np.s_[:]):
+        node = self.node
+        entity = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+
     def bc_to_point(self, bc, index=np.s_[:]):
         """
 

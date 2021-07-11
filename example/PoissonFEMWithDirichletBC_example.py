@@ -12,6 +12,9 @@ Lagrange 元求解 Poisson 方程,
 .. math::
     (\\nabla u, \\nabla v) = (f, v)
 
+Notes
+-----
+
 """
 
 import argparse
@@ -20,13 +23,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 rc('text', usetex=True)
-
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
-
 from fealpy.tools.show import showmultirate
 
 # solver
@@ -110,6 +111,7 @@ if dim == 2:
 elif dim == 3:
     print('The 3d function plot is not been implemented!')
 
-showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, 0, NDof, errorMatrix,  errorType, 
+        propsize=40)
 
 plt.show()

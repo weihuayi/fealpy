@@ -91,14 +91,14 @@ def find_node(
 def find_entity(
         axes, mesh, entity='node',
         index=None, showindex=False,
-        color='r', markersize=20, ecolor='r',
+        color='r', markersize=20,
         fontsize=24, fontcolor='k', multiindex=None):
 
     bc = mesh.entity_barycenter(entity)
     if index is None:
         if entity == 'node':
-            N = mesh.number_of_nodes()
-            index = range(N)
+            NN = mesh.number_of_nodes()
+            index = range(NN)
         elif entity == 'edge':
             NE = mesh.number_of_edges()
             index = range(NE)
@@ -113,7 +113,7 @@ def find_entity(
     elif (type(index) is np.ndarray) :
         if index.dtype == np.bool:
             index, = np.nonzero(index)
-    elif (type(index) is list) & (type(index[0]) is np.bool):
+    elif (type(index) is list) & (type(index[0]) is np.bool_):
         index, = np.nonzero(index)
     else:
         pass #TODO: raise a error
@@ -125,20 +125,49 @@ def find_entity(
         mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
         color = mapper.to_rgba(color)
 
-    if entity == 'edge':
-        GD = mesh.geo_dimension()
-        node = mesh.entity('node')
-        e = mesh.entity(entity)
+    GD = mesh.geo_dimension()
+    node = mesh.entity('node')
+    if entity in {'edge', 1}:
+        e = mesh.entity(entity)[index]
         vts = node[e[index], :]
-        if GD == 2:
-            lines = LineCollection(vts, linewidths=2, colors=ecolor)
+        if GD == 1:
+            shape = vts.shape[0:-1] + (2, )
+            nvts = np.zeros(shape, dtype=vts.dtype)
+            nvts[..., 0:1] = vts
+            lines = LineCollection(nvts, linewidths=2, colors=color)
+        elif GD == 2:
+            lines = LineCollection(vts, linewidths=2, colors=color)
         elif GD == 3:
-            lines = Line3DCollection(vts, linewidth=2, colors=ecolor)
+            lines = Line3DCollection(vts, linewidth=2, colors=color)
         axes.add_collection(lines)
 
-    dim = mesh.geo_dimension()
     bc = bc[index]
-    if dim == 2:
+    if GD == 1:
+        n = len(bc)
+        axes.scatter(bc[:, 0], np.zeros(n), c=color, s=markersize)
+        if showindex:
+            if multiindex is not None:
+                if (type(multiindex) is np.ndarray):
+                    for i,idx in enumerate(multiindex):
+                        s = str(idx).replace('[', '(')
+                        s = s.replace(']', ')')
+                        s = s.replace(' ', ',')
+                        axes.text(bc[i, 0], 0, s,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+                else:
+                    for i,idx in enumerate(multiindex):
+                        axes.text(bc[i, 0], 0, idx,
+                                multialignment='center',
+                                fontsize=fontsize, 
+                                color=fontcolor) 
+            else:
+                for i in range(len(index)):
+                    axes.text(bc[i, 0], 0, str(index[i]),
+                            multialignment='center', fontsize=fontsize, 
+                            color=fontcolor) 
+    elif GD == 2:
         axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
         if showindex:
             if multiindex is not None:
@@ -313,11 +342,23 @@ def show_mesh_2d(
         else:
             poly = a3.art3d.Poly3DCollection(node[cell, :])
     else:
-        cell, cellLocation = cell
-        NC = mesh.number_of_cells()
-        patches = [
-                Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
-                for i in range(NC)]
+        if mesh.meshtype == 'polygon':
+            cell, cellLocation = cell
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                    for i in range(NC)]
+        elif mesh.ds.NV in {3, 4}:
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[i], :], True)
+                    for i in range(NC)]
+        else:
+            cell, cellLocation = cell
+            NC = mesh.number_of_cells()
+            patches = [
+                    Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                    for i in range(NC)]
         poly = PatchCollection(patches)
 
     poly.set_edgecolor(edgecolor)

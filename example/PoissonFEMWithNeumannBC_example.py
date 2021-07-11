@@ -63,9 +63,10 @@ for i in range(maxit):
     uh = space.function()
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
-
     bc = NeumannBC(space, pde.neumann) 
-    A, F = bc.apply(F, A=A) # Here is the case for pure Neumann bc, we also need modify A
+
+    # Here is the case for pure Neumann bc, we also need modify A
+    A, F = bc.apply(F, A=A) 
     uh[:] = spsolve(A, F)[:-1] # we add a addtional dof
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)

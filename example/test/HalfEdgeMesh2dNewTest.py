@@ -8,7 +8,7 @@ import scipy.io as sio
 import matplotlib.pyplot as plt
 
 from fealpy.writer import MeshWriter
-from fealpy.mesh.HalfEdgeMesh2dNew import HalfEdgeMesh2d
+from fealpy.mesh import HalfEdgeMesh2d
 #from fealpy.mesh import HalfEdgeMesh
 from fealpy.mesh import TriangleMesh, PolygonMesh, QuadrangleMesh
 

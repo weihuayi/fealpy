@@ -42,7 +42,7 @@ parser.add_argument('--maxdof',
 
 parser.add_argument('--plot',
         default=1, type=int,
-        help='是否画图, 默认聚会为 1， 画图 ')
+        help='是否画图, 默认取值为 1， 画图 ')
 
 args = parser.parse_args()
 
@@ -99,9 +99,10 @@ while True:
 
     sh = space.project_to_smspace(uh)
     eta = space.recovery_estimate(uh, pde, method='inv_area')
-    print("eta_init = ", eta)
-    eta = space.smooth_estimator(eta)
-    print("eta_smooth = ", eta)
+
+    #print("eta_init = ", eta)
+    #eta = space.smooth_estimator(eta)
+    #print("eta_smooth = ", eta)
 
     errorMatrix[0] += [np.sqrt(np.sum(eta**2))]
     errorMatrix[1] += [space.integralalg.error(pde.solution, sh.value)]

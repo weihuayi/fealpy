@@ -5,7 +5,7 @@ from scipy.sparse import triu, tril, diags, kron, eye
 from .Mesh2d import Mesh2d
 
 class StructureQuadMesh(Mesh2d):
-    def __init__(self, box, nx, ny, itype=np.int32, ftype=np.float):
+    def __init__(self, box, nx, ny, itype=np.int_, ftype=np.float64):
         self.box = box
         self.ds = StructureQuadMeshDataStructure(nx, ny, itype)
         self.meshtype="quad"
@@ -104,13 +104,13 @@ class StructureQuadMesh(Mesh2d):
         hx = 1/(self.hx**2)
         hy = 1/(self.hy**2)
 
-        d0 = (2*hy)*np.ones(n0, dtype=np.float)
-        d1 = -hy*np.ones(n0-1, dtype=np.float)
+        d0 = (2*hy)*np.ones(n0, dtype=self.ftype)
+        d1 = -hy*np.ones(n0-1, dtype=self.ftype)
         T0 = diags([d0, d1, d1], [0, -1, 1])
         I0 = eye(n0)
  
-        d0 = (2*hx)*np.ones(n1, dtype=np.float)
-        d1 = -hx*np.ones(n1-1, dtype=np.float)
+        d0 = (2*hx)*np.ones(n1, dtype=self.ftype)
+        d1 = -hx*np.ones(n1-1, dtype=self.ftype)
         T1 = diags([d0, d1, d1], [0, -1, 1])
         I1 = eye(n1)
 

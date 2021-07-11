@@ -538,8 +538,6 @@ class LagrangeWedgeMesh(Mesh3d):
 
         node = self.entity('node')
         GD = self.geo_dimension()
-        if GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
 
         cell = self.entity(etype)[index]
         cellType = self.vtk_cell_type(etype)

@@ -193,12 +193,12 @@ class Mesh2d(object):
 
     def find_edge(self, axes, 
             index=None, showindex=False,
-            color='g', markersize=20, ecolor='r',
+            color='g', markersize=20, 
             fontsize=13, fontcolor='g', multiindex=None):
 
         find_entity(axes, self, entity='edge',
                 index=index, showindex=showindex, 
-                color=color, markersize=markersize, ecolor=ecolor,
+                color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
 
     def find_cell(self, axes,
@@ -336,10 +336,10 @@ class Mesh2dDataStructure():
 
         edge2cell = self.edge2cell
         if return_sparse == False:
-            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool)
+            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
             cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
         else:
-            val = np.ones(NE, dtype=np.bool)
+            val = np.ones(NE, dtype=np.bool_)
             cell2edgeSign = csr_matrix(
                     (val, (edge2cell[:, 0], range(NE))),
                     shape=(NC, NE), dtype=np.bool_)
@@ -398,7 +398,7 @@ class Mesh2dDataStructure():
             isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
             cell2cell = coo_matrix(
                     (val[isInEdge], (edge2cell[isInEdge, 0], edge2cell[isInEdge, 1])),
-                    shape=(NC, NC), dtype=np.bool)
+                    shape=(NC, NC), dtype=np.bool_)
             cell2cell += coo_matrix(
                     (val[isInEdge], (edge2cell[isInEdge, 1], edge2cell[isInEdge, 0])),
                     shape=(NC, NC), dtype=np.bool_)
@@ -484,7 +484,7 @@ class Mesh2dDataStructure():
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
         val = np.ones(2*edge.shape[0], dtype=np.bool_)
-        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
     def node_to_edge(self):
@@ -536,7 +536,7 @@ class Mesh2dDataStructure():
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
-        isBdNode = np.zeros((NN,), dtype=np.bool)
+        isBdNode = np.zeros((NN,), dtype=np.bool_)
         isBdNode[edge[isBdEdge,:]] = True
         return isBdNode
 
@@ -559,7 +559,7 @@ class Mesh2dDataStructure():
     def boundary_cell_flag(self):
         NC = self.NC
         edge2cell = self.edge2cell
-        isBdCell = np.zeros((NC,), dtype=np.bool)
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdEdge = self.boundary_edge_flag()
         isBdCell[edge2cell[isBdEdge,0]] = True
         return isBdCell 

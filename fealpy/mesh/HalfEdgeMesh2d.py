@@ -1684,6 +1684,15 @@ class HalfEdgeMesh2d(Mesh2d):
         color = self.hedgecolor
         node = self.entity('node')
         halfedge = self.ds.halfedge
+
+        if len(color[:])<NE*2:
+            color = np.zeros(NE*2, dtype=np.int_)
+            nex = halfedge[:, 2]
+            pre = halfedge[:, 3]
+            l = node[halfedge[:, 0]]-node[halfedge[pre, 0]]
+            l = np.linalg.norm(l, axis=1)
+            color[(l>=l[nex]) & (l>=l[pre])] = 1
+
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
         hedge = self.ds.hedge
@@ -1723,7 +1732,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
             self.refine_cell(isNewCell, flag, method='tri', options=options)
 
-    def coarsen_triangle_nvb(self, isMarkedCell):
+    def coarsen_triangle_nvb(self, isMarkedCell, options={}):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1903,6 +1912,11 @@ class HalfEdgeMesh2d(Mesh2d):
     def uniform_refine(self, n=1):
         for i in range(n):
             self.refine_poly()
+
+    def tri_uniform_refine(self, n=1):
+        for i in range(n):
+            self.refine_triangle_rg()
+
 
     def halfedge_direction(self):
         node = self.entity('node')

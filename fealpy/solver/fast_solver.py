@@ -4,8 +4,38 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
 from scipy.sparse.linalg import cg,  dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular
 from scipy.sparse.linalg import spilu
-import pyamg
 from timeit import default_timer as dtimer 
+
+try:
+    import pyamg
+except ImportError:
+    print("请先认真读下面的英文信息！！！")
+    print('I do not find  pyamg installed on this system!, so you can not use it.')
+    print("""
+    If your system is Ubuntu, you can run 
+
+    ```
+    $ pip3 install pyamg 
+    ```
+
+    If your system is MacOS, you can run
+
+    ```
+    $ pip install pyamg
+    ```
+
+    If your system is Windows, there are several methods to install `pyamg`
+
+    1. install from conda 
+    ```
+    conda install -c anaconda pyamg
+    ```
+    2. Dowload wheel file suitable for your system and python
+       from https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyamg, then 
+       ```
+       pip install <pyamg-file-name>.whl
+       ```
+    """)
 
 from ..decorator import timer
 

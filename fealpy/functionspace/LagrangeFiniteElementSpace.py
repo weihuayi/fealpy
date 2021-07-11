@@ -139,11 +139,32 @@ class LagrangeFiniteElementSpace():
         grad = self.grad_value(uh, bc)
 
         if callable(c): # 考虑存在扩散系数的情形
-            if c.coordtype == 'barycentric':
-                c = c(bc)
-            elif c.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bc)
-                c = c(ps)
+            if hasattr(c, 'coordtype'):
+                if c.coordtype == 'barycentric':
+                    c = c(bc)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bc)
+                    c = c(ps)
+                else:
+                    raise ValueError('''
+                    The coordtype must be `cartesian` or `barycentric`!
+                    ''')
+            else: 
+                raise ValueError('''
+                You should add decorator "cartesian" or "barycentric" on
+                function "c".
+
+                from fealpy.decorator import cartesian, barycentric
+
+                @cartesian
+                def c(p):
+                    ...
+
+                @barycentric
+                def c(p):
+                    ...
+
+                ''')
 
         # A\nabla u_h
         if c is not None:
@@ -310,6 +331,25 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
+        """
+
+        Notes
+        -----
+            bc：边上的一组积分点
+            index: 边所在的单元编号
+            lidx: 边在该单元的局部编号
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+
+            计算基函数梯度在单元边上积分点的值.
+
+            这里要把边上的低维的积分点转化为高维的积分点.
+
+        TODO
+        ----
+            二维和三维统一？
+            有没有更好处理办法？
+
+        """
         NE = len(index)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
@@ -366,7 +406,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -412,7 +452,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -968,11 +1008,35 @@ class LagrangeFiniteElementSpace():
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
 
-        if f.coordtype == 'cartesian':
-            pp = self.mesh.bc_to_point(bcs)
-            fval = f(pp)
-        elif f.coordtype == 'barycentric':
-            fval = f(bcs)
+        if hasattr(f, 'coordtype'):
+            if f.coordtype == 'cartesian':
+                pp = self.mesh.bc_to_point(bcs)
+                fval = f(pp)
+            elif f.coordtype == 'barycentric':
+                fval = f(bcs)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function "c".
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def c(p):
+                ...
+
+            @barycentric
+            def c(p):
+                ...
+
+            ''')
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)
@@ -1017,7 +1081,7 @@ class LagrangeFiniteElementSpace():
 
         Notes
         -----
-        设置 Neumann 边界条件到载荷矩阵 F 中
+        设置 Neumann 边界条件到载荷向量 F 中
 
         TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
         """
@@ -1043,7 +1107,7 @@ class LagrangeFiniteElementSpace():
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -1084,7 +1148,7 @@ class LagrangeFiniteElementSpace():
         measure = mesh.entity_measure('face', index=index)
 
         phi = self.face_basis(bcs)
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         n = mesh.face_unit_normal(index=index)
 
         val, kappa = gR(pp, n) # (NQ, NF, ...)
