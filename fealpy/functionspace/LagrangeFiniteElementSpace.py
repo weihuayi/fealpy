@@ -145,9 +145,26 @@ class LagrangeFiniteElementSpace():
                 elif c.coordtype == 'cartesian':
                     ps = mesh.bc_to_point(bc)
                     c = c(ps)
-            else: # 默认是笛卡尔类型的坐标
-                ps = mesh.bc_to_point(bc)
-                c = c(ps)
+                else:
+                    raise ValueError('''
+                    The coordtype must be `cartesian` or `barycentric`!
+                    ''')
+            else: 
+                raise ValueError('''
+                You should add decorator "cartesian" or "barycentric" on
+                function "c".
+
+                from fealpy.decorator import cartesian, barycentric
+
+                @cartesian
+                def c(p):
+                    ...
+
+                @barycentric
+                def c(p):
+                    ...
+
+                ''')
 
         # A\nabla u_h
         if c is not None:
@@ -997,9 +1014,29 @@ class LagrangeFiniteElementSpace():
                 fval = f(pp)
             elif f.coordtype == 'barycentric':
                 fval = f(bcs)
-        else:
-            pp = self.mesh.bc_to_point(bcs)
-            fval = f(pp)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function "c".
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def c(p):
+                ...
+
+            @barycentric
+            def c(p):
+                ...
+
+            ''')
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)
