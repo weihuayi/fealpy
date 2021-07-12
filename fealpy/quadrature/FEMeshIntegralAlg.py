@@ -147,10 +147,35 @@ class FEMeshIntegralAlg():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
-        if basis0.coordtype == 'barycentric':
-            phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
-        elif basis0.coordtype == 'cartesian':
-            phi0 = basis0(ps)
+
+        if hasattr(basis0, 'coordtype'):
+            if basis0.coordtype == 'barycentric':
+                phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
+            elif basis0.coordtype == 'cartesian':
+                phi0 = basis0(ps)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function `basis0`
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def basis0(p):
+                ...
+
+            @barycentric
+            def basis0(p):
+                ...
+
+            ''')
 
         if len(phi0.shape) == 3:
             GD = 1

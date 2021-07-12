@@ -139,11 +139,32 @@ class LagrangeFiniteElementSpace():
         grad = self.grad_value(uh, bc)
 
         if callable(c): # 考虑存在扩散系数的情形
-            if c.coordtype == 'barycentric':
-                c = c(bc)
-            elif c.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bc)
-                c = c(ps)
+            if hasattr(c, 'coordtype'):
+                if c.coordtype == 'barycentric':
+                    c = c(bc)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bc)
+                    c = c(ps)
+                else:
+                    raise ValueError('''
+                    The coordtype must be `cartesian` or `barycentric`!
+                    ''')
+            else: 
+                raise ValueError('''
+                You should add decorator "cartesian" or "barycentric" on
+                function "c".
+
+                from fealpy.decorator import cartesian, barycentric
+
+                @cartesian
+                def c(p):
+                    ...
+
+                @barycentric
+                def c(p):
+                    ...
+
+                ''')
 
         # A\nabla u_h
         if c is not None:
@@ -987,11 +1008,35 @@ class LagrangeFiniteElementSpace():
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
 
-        if f.coordtype == 'cartesian':
-            pp = self.mesh.bc_to_point(bcs)
-            fval = f(pp)
-        elif f.coordtype == 'barycentric':
-            fval = f(bcs)
+        if hasattr(f, 'coordtype'):
+            if f.coordtype == 'cartesian':
+                pp = self.mesh.bc_to_point(bcs)
+                fval = f(pp)
+            elif f.coordtype == 'barycentric':
+                fval = f(bcs)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function "c".
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def c(p):
+                ...
+
+            @barycentric
+            def c(p):
+                ...
+
+            ''')
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)
