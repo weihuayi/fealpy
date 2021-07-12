@@ -62,14 +62,15 @@ dim = args.dim
 ns = args.ns
 nt = args.nt
 
-box = [0, 1, 0, 1]
 pde = SinSinExpData()
-smesh = MF.boxmesh2d(box, nx=ns, ny=ns, meshtype='tri')
-tmesh = UniformTimeLine(0, 1, 100) # 均匀时间剖分
+domain = pde.domain()
+smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
+tmesh = UniformTimeLine(0, 1, nt) # 均匀时间剖分
 
 space = LagrangeFiniteElementSpace(smesh, p=degree)
 
-A = space.stiff_matrix(c=pde.diffusionCoefficient) # 刚度矩阵
+c = pde.diffusionCoefficient
+A = c*space.stiff_matrix() # 刚度矩阵
 M = space.mass_matrix() # 质量矩阵
 dt = tmesh.current_time_step_length() # 时间步长
 G = M + dt*A # 隐式迭代矩阵
@@ -114,8 +115,10 @@ for i in range(0, nt):
     print("error:", error)
 
     uh0[:] = uh1
+    uh1[:] = 0.0
+
+    # 时间步进一层 
     tmesh.advance()
-    
 
 
 
