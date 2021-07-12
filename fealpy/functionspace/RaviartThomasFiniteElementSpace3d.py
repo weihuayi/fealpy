@@ -277,7 +277,7 @@ class RaviartThomasFiniteElementSpace3d:
         face2cell = mesh.ds.face_to_cell()
 
         if barycentric:
-            ps = mesh.bc_to_point(bc, etype='face', index=index)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
         val = self.smspace.basis(ps, p=p+1, index=face2cell[index, 0]) # (NQ, NF, ndof)
@@ -315,7 +315,7 @@ class RaviartThomasFiniteElementSpace3d:
         GD = mesh.geo_dimension()
 
         if barycentric:
-            ps = mesh.bc_to_point(bc, etype='cell', index=index)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
         val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
@@ -404,7 +404,7 @@ class RaviartThomasFiniteElementSpace3d:
         face2dof = self.dof.face_to_dof() 
         n = mesh.face_unit_normal()
         def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='face')
+            ps = mesh.bc_to_point(bc)
             return np.einsum('ijk, jk, ijm->ijm', u(ps), n, self.smspace.face_basis(ps))
         uh[face2dof] = self.integralalg.face_integral(f0, edgetype=True)
 
@@ -415,7 +415,7 @@ class RaviartThomasFiniteElementSpace3d:
             idof = self.number_of_local_dofs('cell') # dofs inside the cell 
             cell2dof = NF*fdof+ np.arange(NC*idof).reshape(NC, idof)
             def f1(bc):
-                ps = mesh.bc_to_point(bc, etype='cell')
+                ps = mesh.bc_to_point(bc)
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
             val = self.integralalg.cell_integral(f1, celltype=True)
             idof = idof//3 
@@ -495,7 +495,7 @@ class RaviartThomasFiniteElementSpace3d:
         fn = mesh.face_unit_normal(index=index)
         phi = self.face_basis(bcs, index=index) 
 
-        ps = mesh.bc_to_point(bcs, etype='face', index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
         val = g(ps)
         measure = self.integralalg.facemeasure[index]
 
@@ -530,7 +530,7 @@ class RaviartThomasFiniteElementSpace3d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        ps = mesh.bc_to_point(bcs, etype='face', index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
         fn = mesh.face_unit_normal(index=index)
         val = g(ps, fn)
         phi = self.smspace.face_basis(ps, index=index)

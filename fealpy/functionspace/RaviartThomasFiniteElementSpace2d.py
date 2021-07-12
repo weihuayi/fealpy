@@ -282,7 +282,7 @@ class RaviartThomasFiniteElementSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
 
         if barycentric:
-            ps = mesh.bc_to_point(bc, etype='edge', index=index)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
 
@@ -345,7 +345,7 @@ class RaviartThomasFiniteElementSpace2d:
         GD = mesh.geo_dimension()
 
         if barycentric:
-            ps = mesh.bc_to_point(bc, etype='cell', index=index)
+            ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
         val = self.smspace.basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
@@ -463,7 +463,7 @@ class RaviartThomasFiniteElementSpace2d:
         edge2dof = self.dof.edge_to_dof() 
         en = mesh.edge_unit_normal()
         def f0(bc):
-            ps = mesh.bc_to_point(bc, etype='edge')
+            ps = mesh.bc_to_point(bc)
             return np.einsum('ijk, jk, ijm->ijm', u(ps), en, self.smspace.edge_basis(ps))
         uh[edge2dof] = self.integralalg.edge_integral(f0, edgetype=True)
 
@@ -474,7 +474,7 @@ class RaviartThomasFiniteElementSpace2d:
             idof = self.number_of_local_dofs('cell') # dofs inside the cell 
             cell2dof = NE*edof+ np.arange(NC*idof).reshape(NC, idof)
             def f1(bc):
-                ps = mesh.bc_to_point(bc, etype='cell')
+                ps = mesh.bc_to_point(bc)
                 return np.einsum('ijk, ijm->ijkm', u(ps), self.smspace.basis(ps, p=p-1))
             val = self.integralalg.cell_integral(f1, celltype=True)
             uh[cell2dof[:, 0:idof//2]] = val[:, 0, :] 
@@ -560,7 +560,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         qf = self.integralalg.edgeintegrator if q is None else mesh.integrator(q, 'edge')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='edge')
+        ps = mesh.bc_to_point(bcs)
 
         # 边的定向法线，它是左边单元的外法线， 右边单元内法线。
         en = mesh.edge_unit_normal() 
@@ -664,7 +664,7 @@ class RaviartThomasFiniteElementSpace2d:
         measure = self.integralalg.edgemeasure # 边界长度
         val0 = np.einsum('ijm, jm->ij', vh.edge_value(bcs), en) # 速度和法线的内积
 
-        ps = mesh.bc_to_point(bcs, etype='edge')
+        ps = mesh.bc_to_point(bcs)
         val1 = ch(ps, index=edge2cell[:, 0]) # 边的左边单元在这条边上的浓度值
         val2 = ch(ps, index=edge2cell[:, 1]) # 边的右边单元在这条边上的浓度值 
 
@@ -731,7 +731,7 @@ class RaviartThomasFiniteElementSpace2d:
         en = mesh.edge_unit_normal(index=index)
         phi = self.edge_basis(bcs, index=index) 
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
         val = g(ps)
         if type(val) in {int, float}:
             val = np.array([[val]], dtype=self.ftype)
@@ -766,7 +766,7 @@ class RaviartThomasFiniteElementSpace2d:
                 flag = threshold(bc)
                 index = index[flag]
 
-        ps = mesh.bc_to_point(bcs, etype='edge', index=index)
+        ps = mesh.bc_to_point(bcs, index=index)
         en = mesh.edge_unit_normal(index=index)
         val = g(ps, en) # 注意这里容易出错
         if type(val) in {int, float}:
