@@ -26,6 +26,7 @@ from scipy.sparse.linalg import spsolve
 from fealpy.pde.poisson_2d import CosCosData as PDE
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
 from fealpy.solver import SaddlePointFastSolver
+from fealpy.tools.show import showmultirate
 
 
 ## 参数解析
@@ -58,7 +59,7 @@ pde = PDE()
 mesh = pde.init_mesh(n=nrefine)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
-             '$|| p - p_h||_{\Omega, 0}$'
+             '$|| p - p_h||_{\Omega,0}$'
              ]
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
@@ -71,9 +72,10 @@ for i in range(maxit):
     udof = space.number_of_global_dofs()
     pdof = space.smspace.number_of_global_dofs()
     gdof = udof + pdof
+    NDof[i] = gdof
 
     uh = space.function() # 速度空间
-    ph = space.smspace.function() # 位移空间
+    ph = space.smspace.function() # 压力空间
 
     M = space.mass_matrix()
     B = -space.div_matrix()
@@ -96,5 +98,6 @@ for i in range(maxit):
     if i < maxit-1:
         mesh.uniform_refine()
 
+print(errorMatrix)
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
 plt.show()
