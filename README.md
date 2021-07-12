@@ -16,7 +16,15 @@ We still have lot work to do.
 
 ## Common
 
-Use `pip install -U fealpy` to install the latest release from PyPi.
+To install the latest release from PyPi, use
+```bash
+pip install -U fealpy
+``` 
+
+If you have no `root` access on Linux/MacOS, please try 
+```bash
+python -m pip install -U fealpy
+```
 
 Users in China can install FEALPy from mirrors such as:
 - [Aliyun](https://developer.aliyun.com/mirror/pypi)
@@ -25,7 +33,7 @@ Users in China can install FEALPy from mirrors such as:
 
 ## From Source
 
-```
+```bash
 git clone https://github.com/weihuayi/fealpy.git
 cd fealpy
 pip install .
@@ -33,22 +41,39 @@ pip install .
 
 For developers, please use `pip install -e .` to install it in develop mode.
 
-On Ubuntu system, maybe you should use `pip3 install -e .` to install it in
+On Linux system such as Ubuntu or Fedora, or MacOS, maybe you should use `pip3 install -e .` to install it in
 develop mode.
 
 ## Uninstallation
 
-`pip uninstall fealpy`
+```bash
+pip uninstall fealpy
+```
 
 ## Docker
 
 To be added.
 
-## Reference
+## Reference and Acknowledgement
 
+We thank Dr. Long Chen for the guidance and compiling a systematic documentation for programming finite element methods.
 * http://www.math.uci.edu/~chenlong/programming.html
+* https://github.com/lyc102/ifem
 
 
-## Please cite fealpy if you use it in you paper
+## Citation
 
-H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, Xiangtan University, 2017-2021.
+Please cite `fealpy` if you use it in you paper
+
+H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://github.com/weihuayi/fealpy, *Xiangtan University*, 2017-2021.
+
+```bibtex
+@misc{fealpy,
+	title = {FEALPy: Finite Element Analysis Library in Python. https://github.com/weihuayi/
+        fealpy},
+	url = {https://github.com/weihuayi/fealpy},
+	author = {Wei, Huayi and Huang, Yunqing},
+    institution = {Xiangtan University},
+	year = {Xiangtan University, 2017-2021},
+}
+```
