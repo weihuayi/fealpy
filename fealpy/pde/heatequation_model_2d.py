@@ -1,8 +1,22 @@
 import numpy as np
 
 class SinSinExpData:
+    """
+
+    u_t - c*\Delta u = f
+
+    c = 1/16
+    u(x, y, t) = sin(2*PI*x)*sin(2*PI*y)*exp(-t)
+
+    domain = [0, 1]^2
+
+
+    """
     def __init__(self):
         self.diffusionCoefficient = 1/16
+
+    def domain(self):
+        return [0, 1, 0, 1]
 
     def init_value(self, p):
         return self.solution(p, 0.0)
@@ -14,7 +28,7 @@ class SinSinExpData:
         u = np.sin(2*pi*x)*np.sin(2*pi*y)*np.exp(-t)
         return u
     
-    def diffusion_coefficient(self):
+    def diffusion_coefficient(self, p):
         return self.diffusionCoefficient
 
     def source(self, p, t):
