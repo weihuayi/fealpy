@@ -5,7 +5,7 @@ from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, spdiags, bmat
 from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
 
 class nonlinear_robin():
-    def __init__(self, pde, space, mesh, p=1, spacetype='c'):
+    def __init__(self, pde, space, mesh, p=1, q=None, spacetype='c'):
         self.space = space
         self.mesh = mesh
         self.pde = pde
@@ -18,9 +18,9 @@ class nonlinear_robin():
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_tri_face_index()
+            index = mesh.ds.boundary_tri_face_index()
             if threshold is not None:
-                bc = self.mesh.entity_barycenter('face', ftype='tri', index=index)
+                bc = mesh.entity_barycenter('face', ftype='tri', index=index)
                 flag = threshold(bc)
                 index = index[flag]
 
