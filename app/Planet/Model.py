@@ -16,7 +16,7 @@ maxit = int(sys.argv[4])
 #    h = float(sys.argv[5])
 #    nh = int(sys.argv[6])
 h = 0.005
-nh = 2
+nh = 100
 
 model = TPMModel()
 mesh = model.init_mesh(n=n, h=h, nh=nh, p=p)
