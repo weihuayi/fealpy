@@ -1,73 +1,106 @@
+
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import pyamg
 import meshio
-import sys
-import copy
 
-from fealpy.functionspace.WedgeLagrangeFiniteElementSpace import WedgeLagrangeFiniteElementSpace
+from fealpy.decorator import cartesian, barycentric
 from fealpy.mesh import LagrangeTriangleMesh, LagrangeWedgeMesh
 from fealpy.writer import MeshWriter
-from fealpy.decorator import cartesian, barycentric
+from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
+from fealpy.boundarycondition import RobinBC, NeumannBC
+
 from scipy.sparse.linalg import spsolve
+import pyamg
+
 from fealpy.tools.show import showmultirate, show_error_table
 
 from nonlinear_robin import nonlinear_robin
 
 class PlanetHeatConductionSimulator():
-    def __init__(self, pde, mesh, p=1):
-        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p, q=6)
-        self.mesh = self.space.mesh
+    def __init__(self, pde, mesh, p=1, option=None):
+
         self.pde = pde
+        self.mesh = mesh
+        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p, q=6)
+
         self.nr = nonlinear_robin(self.pde, self.space, self.mesh, p=p, q=6)
         
-        self.M = self.space.mass_matrix()
-        self.A = self.space.stiff_matrix()
-        
-        self.mesh.meshdata['A'] = 0.1 # 邦德反照率
-        self.mesh.meshdata['epsilon'] = 0.9 # 辐射率
-        self.mesh.meshdata['rho'] = 1400 # kg/m^3 密度
-        self.mesh.meshdata['c'] = 1200 # Jkg^-1K^-1 比热容
-        self.mesh.meshdata['kappa'] = 0.02 # Wm^-1K^-1 热导率
-        self.mesh.meshdata['sigma'] = 5.667e-8 # Wm^-2K^-4 斯特藩-玻尔兹曼常数
-        self.mesh.meshdata['q'] = 1367.5 # W/m^2 太阳辐射通量
-#        self.mesh.meshdata['mu0'] = self.pde.init_mu()  # max(cos beta,0) 太阳高度角参数
-        self.mesh.meshdata['omega'] = 2*np.pi/18000 # 角速度 omega=2*pi/T=3.49e-4, T=5小时
-        
-        # 网格数据
-        rho = self.mesh.meshdata['rho']
-        c = self.mesh.meshdata['c']
-        kappa = self.mesh.meshdata['kappa']
-        epsilon = self.mesh.meshdata['epsilon']
-        sigma = self.mesh.meshdata['sigma']
-        omega = self.mesh.meshdata['omega']
-        A = self.mesh.meshdata['A']
-        q = self.mesh.meshdata['q']
+        self.S = self.space.stiff_matrix() # 刚度矩阵
+        self.M = self.space.mass_matrix() # 质量矩阵
 
-        self.T = ((1-A)*q/(epsilon*sigma))**(1/4) # 日下点温度 T_ss=[(1-A)*q/(epsilon*sigma)]^(1/4)
-        self.Tau = np.sqrt(rho*c*kappa) # 热惯量 Tau = (rho*c*kappa)^(1/2)
-        self.Phi = self.Tau*np.sqrt(omega)/(epsilon*sigma*self.T**3) # 热参数
+        if option is None:
+            self.options = self.model_options()
 
-    def time_mesh(self, NT=100):
-        from fealpy.timeintegratoralg.timeline import UniformTimeLine
+        self.uh0 = self.init_solution()  # 当前时间层的温度分布
+        self.uh1 = self.space.function() # 下一时间层的温度分布 
+        
+    def model_options(self, 
+            A=0.1,             # 邦德反照率
+            epsilon=0.9,       # 辐射率
+            rho=1400,          # kg/m^3 密度
+            c=1200,            # Jkg^-1K^-1 比热容
+            kappa=0.02,        # Wm^-1K^-1 热导率
+            sigma=5.667e-8,    # Wm^-2K^-4 斯特藩-玻尔兹曼常数
+            r=1367.5,          # W/m^2 太阳辐射通量
+            period=5,          # 小行星自转周期，单位小时
+            sd=[1, 0, 1],      # 指向太阳的方向
+            theta=150,         # 初始温度，单位 K
+            ):
+
+        """
+        Notes
+        -----
+            设置模型参数信息
+        """
+        period *= 3600 # 转换为秒
+        omega = 2*np.pi/period
+        Tss = ((1-A)*r/(epsilon*sigma))**(1/4) # 日下点温度 T_ss=[(1-A)*r/(epsilon*sigma)]^(1/4)
+        Tau = np.sqrt(rho*c*kappa) # 热惯量 Tau = (rho*c*kappa)^(1/2)
+        Phi = Tau*np.sqrt(omega)/(epsilon*sigma*Tss**3) # 热参数
+        options = {
+                "A": A,
+                "epsilon": epsilon,
+                "rho": rho,
+                "c": c,
+                "kappa": kappa,
+                "sigma": sigma,
+                "r": r,
+                "period": period， 
+                "sd": np.array(sd, dtype=np.float64),
+                "omega": omega,
+                "Tss": Tss,
+                "Tau": Tau, 
+                "Phi": Phi，
+                "theta": theta,
+                }
+        return options
+
+    def time_mesh(self, T=10, NT=100):
         
         """ 
-        无量纲化后 tau=omega*t 这里的时间层为 tau
+        Parameters
+        ----------
+            T: the final time (day)
+        Notes
+        ------
+            无量纲化后 tau=omega*t 这里的时间层为 tau
         """
+        from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
-        omega = self.mesh.meshdata['omega']
-        timeline = UniformTimeLine(0, 864000*omega, NT)
+        omega = self.options['omega']
+        T *= 3600*24 # 换算成秒
+        T *= omega # 归一化
+        timeline = UniformTimeLine(0, T, NT)
         return timeline
 
-    def init_solution(self, timeline):
-        NL = timeline.number_of_time_levels()
-        gdof = self.space.number_of_global_dofs()
-        uh = np.zeros((gdof, NL), dtype=np.float)
-        uh[:, 0] = 150/self.T # u = T/T_ss, 初始温度 150K
+    def init_solution(self):
+        theta = self.options['theta']
+        uh = self.space.function()
+        uh[:] = self.options['theta']/self.options['Tss'] 
         return uh
 
     def apply_boundary_condition(self, A, b, uh, timeline):
-        from fealpy.boundarycondition import RobinBC, NeumannBC
         t1 = timeline.next_time_level()
        
        # 对 neumann 边界条件进行处理

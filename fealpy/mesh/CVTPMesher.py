@@ -16,41 +16,64 @@ class CVTPMesher:
         else :
             self.dof = np.ones(len(mesh.node))
 
-    def uniform_meshing(self, n=2, c=0.618, theta=100):
-        self.uniform_boundary_meshing(n=n, c=c, theta=theta)
+    def uniform_meshing(self, n=2, c=0.618, theta=100,times = None):
+        self.uniform_boundary_meshing(n=n, c=c, theta=theta,times = times)
         self.uniform_init_interior_nodes()
 
-    def uniform_refine(self,n = 2):
+    def uniform_refine(self,n = 2,times = None):
         """
         该函数用于对输入的网格边界进行加密
         n: 加密次数
         """
         mesh = self.mesh
-        for i in range(n):
-            node = mesh.node
-            halfedge = mesh.ds.halfedge
-            dof = self.dof
-            isMarkedHEdge = mesh.ds.main_halfedge_flag()
-            idx = halfedge[isMarkedHEdge,4]
-            ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
-            isMarkedHEdge[idx] = True
+        if times is None:
+            for i in range(n):
+                node = mesh.node
+                halfedge = mesh.ds.halfedge
+                dof = self.dof
+                isMarkedHEdge = mesh.ds.main_halfedge_flag()
+                idx = halfedge[isMarkedHEdge,4]
+                ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
+                isMarkedHEdge[idx] = True
 
-            mesh.init_level_info()
-            mesh.refine_halfedge(isMarkedHEdge)
-            self.dof = np.r_['0',
-                    dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
-        if n == 0:
-            self.dof = np.zeros(len(mesh.node))
+                mesh.init_level_info()
+                mesh.refine_halfedge(isMarkedHEdge)
+                self.dof = np.r_['0',
+                        dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
+        else:
+            unique = np.unique(times)
+            for i in unique:
+                halfedge = mesh.ds.halfedge
+                l = len(halfedge)
+                isMarkedHEdge = np.zeros(l,dtype = np.bool_)
+                isMarkedHEdge[::2] = (times == i)
+                for j in range(int(i)):
+                    node = mesh.node
+                    dof = self.dof
+                    idx = halfedge[isMarkedHEdge,4]
+                    ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
+                    isMarkedHEdge[idx] = True
 
-    def uniform_boundary_meshing(self, n=0, c=0.618, theta=100):
-        self.uniform_refine(n=n)
+                    mesh.init_level_info()
+                    mesh.refine_halfedge(isMarkedHEdge)
+                    self.dof = np.r_['0',
+                            dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
+                    halfedge = mesh.ds.halfedge
+                    times = np.hstack((times,i*np.ones(int((len(halfedge)-l)/2))))
+                    l = len(halfedge)
+                    isMarkedHEdge = np.zeros(l,dtype = np.bool_)
+                    isMarkedHEdge[::2] = (times == i)
+                    print(isMarkedHEdge)
+
+    def uniform_boundary_meshing(self, n=0, c=0.618, theta=100,times=None):
+        self.uniform_refine(n=n,times = times)
         node = self.mesh.node
         NN = len(node)
         halfedge = self.mesh.entity('halfedge')
         #halfedge = self.mesh.ds.halfedge
     
         # 这里假设所有边的尺寸是一样的
-        # 进一步的算法改进中，这些尺寸应该是自适应的
+        # 进一步的算法改进中, 这些尺寸应该是自适应的
         # 顶点处的半径应该要平均一下
 
         idx0 = halfedge[halfedge[:, 3], 0]
@@ -67,8 +90,8 @@ class CVTPMesher:
         r *= c # 半径
         w = np.array([[0, 1], [-1, 0]])
 
-        # 修正角点相邻点的半径， 如果角点的角度小于 theta 的
-        # 这里假设角点相邻的节点， 到角点的距离相等
+        # 修正角点相邻点的半径, 如果角点的角度小于 theta 的
+        # 这里假设角点相邻的节点, 到角点的距离相等
         isFixed = self.dof
         hnode = np.zeros(NN,dtype = np.int_)
         hnode[halfedge[:,0]] = np.arange(len(halfedge))
@@ -97,6 +120,7 @@ class CVTPMesher:
         aflag2 = ((c<0) & (a<(np.pi/2)))
         a[aflag2] = np.pi - a[aflag2]
         a = np.degrees(a)
+        print(a)
         isCorner = a < theta
          
         idx = idx[isCorner] # 需要特殊处理的半边编号 
@@ -133,6 +157,7 @@ class CVTPMesher:
         self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
         self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
         self.chedge = idx # the index of halfedge point on corner point
+        print(halfedge)
 
     def uniform_init_interior_nodes(self):
         mesh = self.mesh
@@ -141,7 +166,7 @@ class CVTPMesher:
 
         NNB = len(self.bnode)
         NNC = len(self.cnode)
-        hcell = len(mesh.ds.hcell)
+        hcell = len(mesh.ds.hcell)# hcell[i] 是第i个单元其中一条边的索引
         cstart = mesh.ds.cellstart
         bnode2subdomain = np.zeros(NNB+NNC, dtype=np.int)
         bnode2subdomain[self.hedge2bnode] = halfedge[:, 1]
@@ -156,6 +181,7 @@ class CVTPMesher:
         else:
             bd = self.bnode
         tree = KDTree(bd)
+        #c = 6*np.sqrt(3*(h[0]/2)*(h(0)/2)**3)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.mesh.ds.subdomain):
