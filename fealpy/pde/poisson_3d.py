@@ -1,6 +1,8 @@
 import numpy as np
 
-from ..decorator  import cartesian 
+from fealpy.decorator import cartesian, barycentric
+from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh, LagrangeWedgeMesh
+from fealpy.geometry.implicit_surface import SphereSurface
 
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
 
@@ -170,7 +172,32 @@ class X2Y2Z2Data:
         """Dilichlet boundary condition
         """
         return self.solution(p)
+    
+    @cartesian
+    def neumann(self, p, n):
+        """ 
+        Neuman  boundary condition
 
+        Parameters
+        ----------
+
+        p: (NQ, NE, 3)
+        n: (NE, 3)
+
+        grad*n : (NQ, NE, 3)
+        """
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1) # (NQ, NE)
+        return val
+
+    @cartesian
+    def robin(self, p, n):
+        grad = self.gradient(p) # (NQ, NE, 3)
+        val = np.sum(grad*n, axis=-1)
+        shape = len(val.shape)*(1, )
+        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
+        val += self.solution(p) 
+        return val, kappa
 
 class LShapeRSinData:
     def __init__(self):
