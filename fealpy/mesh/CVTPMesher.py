@@ -2,6 +2,7 @@ import numpy as np
 from scipy.spatial import KDTree
 import pdb
 from scipy.spatial import Voronoi
+from .PolygonMesh import PolygonMesh
 
 class CVTPMesher:
     def __init__(self, mesh,dof = None):
@@ -63,7 +64,6 @@ class CVTPMesher:
                     l = len(halfedge)
                     isMarkedHEdge = np.zeros(l,dtype = np.bool_)
                     isMarkedHEdge[::2] = (times == i)
-                    print(isMarkedHEdge)
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100,times=None):
         self.uniform_refine(n=n,times = times)
@@ -120,7 +120,6 @@ class CVTPMesher:
         aflag2 = ((c<0) & (a<(np.pi/2)))
         a[aflag2] = np.pi - a[aflag2]
         a = np.degrees(a)
-        print(a)
         isCorner = a < theta
          
         idx = idx[isCorner] # 需要特殊处理的半边编号 
@@ -137,7 +136,7 @@ class CVTPMesher:
         NG = halfedge.shape[0] # 会生成 NG 个生成子, 每个半边都对应一个
         index = np.arange(NG)
         nex = halfedge[idx, 2]
-        index[nex] = idx
+        index[nex] = idx #半边对应的bnode 
 
         # 计算每个半边对应的节点
         center = (node[idx0] + node[idx1])/2
@@ -147,7 +146,7 @@ class CVTPMesher:
         c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
         bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w)
 
-        isKeepNode = np.zeros(NG, dtype=np.bool)
+        isKeepNode = np.zeros(NG, dtype=np.bool_)
         isKeepNode[index] = True
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
@@ -157,7 +156,6 @@ class CVTPMesher:
         self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
         self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
         self.chedge = idx # the index of halfedge point on corner point
-        print(halfedge)
 
     def uniform_init_interior_nodes(self):
         mesh = self.mesh
@@ -170,6 +168,9 @@ class CVTPMesher:
         cstart = mesh.ds.cellstart
         bnode2subdomain = np.zeros(NNB+NNC, dtype=np.int)
         bnode2subdomain[self.hedge2bnode] = halfedge[:, 1]
+        if NNC >0:
+            bnode2subdomain[-NNC:] = cstart # 将cnode对应的子区域记为内部区域
+        self.bnode2subdomain = bnode2subdomain
 
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
@@ -190,7 +191,6 @@ class CVTPMesher:
             xmax = max(p[:, 0])
             ymin = min(p[:, 1])
             ymax = max(p[:, 1])
-            
             area = self.mesh.cell_area(index)[index-1]
             N = int(area/c)
             N0 = p.shape[0]
@@ -200,13 +200,14 @@ class CVTPMesher:
             start = 0
             newNode = np.zeros((N - N0, 2), dtype=node.dtype)
             NN = newNode.shape[0]
+            i = 0
             while True:
                 pp = np.random.rand(NN-start, 2)
                 pp *= np.array([xmax-xmin,ymax-ymin])
                 pp += np.array([xmin,ymin])
                 d, idx = tree.query(pp)
                 flag0 = d > (0.7*h[0])
-                flag1 = (bnode2subdomain[idx] == index)
+                flag1 = (bnode2subdomain[idx] == cstart + index -1)
                 pp = pp[flag0 & flag1]# 筛选出符合要求的点
                 end = start + pp.shape[0]
                 newNode[start:end] = pp
@@ -239,7 +240,7 @@ class CVTPMesher:
         # construct voronoi diagram
         vor = Voronoi(points)
         start = NNB+NNC
-
+        self.start = start
         return vor, start
 
     def Lloyd(self, vor, start):
@@ -267,7 +268,29 @@ class CVTPMesher:
         vor.points[start:, :] = npoints[start:, :]
         vor = Voronoi(vor.points)
         return vor
-        
+    
+    def to_PolygonMesh(self,vor):
+        bnode2subdomain = self.bnode2subdomain
+        start = self.start
+        cstart = self.mesh.ds.cellstart
+        points = vor.points
+        pnode = vor.vertices
+        point_region = vor.point_region
+        regions = vor.regions
+        ridge_vertices = vor.ridge_vertices
+
+        bnode_region = point_region[:start]
+        bnode_region = bnode_region[bnode2subdomain>=cstart]
+        point_region = np.hstack((bnode_region,point_region[start:]))
+        regions = np.array(regions)[point_region]
+        pcellLocation =[len(x) for x in regions]
+        pcell = sum(regions,[]) # 将列表合并为一个列表
+        pcellLocation = np.array(pcellLocation)
+        pcellLocation = pcellLocation.cumsum()
+        pcellLocation = np.hstack((np.array([0]),pcellLocation))
+        pcell = np.array(pcell)
+        return PolygonMesh(pnode,pcell,pcellLocation)
+
     def energy(self,vor):
         points = vor.points
         vertices = vor.vertices
