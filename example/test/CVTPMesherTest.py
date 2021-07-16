@@ -31,9 +31,9 @@ class CVTPMesherTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, color='k', showindex=True)
-            mesh.find_node(axes, node=bnode, showindex=True)
-            voronoi_plot_2d(vor, ax=axes)
+            mesh.find_node(axes, color='k', showindex=False)
+            mesh.find_node(axes, node=bnode, showindex=False)
+            voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.3)
             '''
             cs = [axes.add_artist( plt.Circle(x, r, facecolor='none',
                 edgecolor='r')) for x, r in zip(center, radius)]
@@ -148,56 +148,22 @@ class CVTPMesherTest:
         elif domain == 'hole1':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
-                ( 0.4, 0.4),( 0.7, 0.4),( 0.7, 0.7),( 0.4, 0.7)],dtype=np.float)
+                ( 0.4, 0.4),( 0.4, 0.8),( 0.8, 0.8),( 0.8, 0.4)],dtype=np.float)
             facets = np.array([
                 (0, 1),(1, 2),( 2, 3),( 3, 0),
-                (4, 5),(5, 6),( 6, 7),( 7, 4)], dtype=np.int)
+                (4, 5),(5, 6),( 6, 7),( 7, 4)], dtype=np.int_)
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0),
-                (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
-            """ 
-            vertices = np.array([
-                ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
-                ( 0.4, 0.4),( 0.7, 0.4),( 0.7, 0.7),( 0.4, 0.7)],dtype=np.float)
-            facets = np.array([
-                (0, 1),(1, 2),( 2, 3),( 3, 0),
-                (4, 5),(5, 6),( 6, 7),( 7, 4)], dtype=np.int)
-            subdomain = np.array([
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
-            """
+                (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int_)
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
             times = np.zeros(len(facets))
-            times[:4] = 8
-            times[4:] = 2
-            uniform_mesh.uniform_boundary_meshing(n=10,times = times)
+            times[:4] = 6
+            times[4:] = 3
+            uniform_mesh.uniform_boundary_meshing(n=5,times = times)
             bnode = uniform_mesh.bnode
         elif domain == 'hole2':
-            """
-            vertices = np.array([
-                ( 0.0, 0.0),( 0.5, 1.0),( 1.0, 0.0),( 1.5, 0.0),
-                ( 2.0, 0.0),( 2.0, 0.5),( 2.0, 1.0),( 2.0, 1.5),
-                ( 2.0, 2.0),( 1.5, 2.0),( 1.0, 2.0),( 0.5, 2.0),
-                ( 0.0, 2.0),( 0.0, 1.5),( 0.0, 1.0),( 0.0, 0.5),
-                ( 0.4, 0.4),( 0.4, 0.7),( 0.7, 0.7),( 0.7, 0.4),
-                ( 1.2, 1.2),( 1.2, 1.5),( 1.5, 1.5),( 1.5, 1.2)],dtype=np.float)
-            facets = np.array([
-                ( 0, 1),( 1, 2),( 2, 3),( 3, 4),
-                ( 4, 5),( 5, 6),( 6, 7),( 7, 8),
-                ( 8, 9),( 9,10),(10,11),(11,12),
-                (12,13),(13,14),(14,15),(15, 0),
-                (16,17),(17,18),(18,19),(19,16),
-                (20,21),(21,22),(22,23),(23,20)], dtype=np.int)
-            subdomain = np.array([
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1,-1),(1,-1),(1,-1),(1,-1),
-                (1,-2),(1,-2),(1,-2),(1,-2)], dtype=np.int)
-            """
             #""" 
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 2.0, 0.0),( 2.0, 1.0),
@@ -293,9 +259,9 @@ class CVTPMesherTest:
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=False)
-            mesh.find_node(axes, node=bnode, showindex=False)
+            mesh.find_node(axes, node=bnode, showindex=True)
             #mesh.print()
-            voronoi_plot_2d(vor, ax=axes)
+            voronoi_plot_2d(vor, ax=axes,show_vertices = False)
             plt.show()
             fig = plt.figure()
             axes = fig.gca()
@@ -357,7 +323,7 @@ class CVTPMesherTest:
             vertices1 = np.array([(-2.0,-2.0),(2.0,-2.0),(2.0,2.0),(-2.0,2.0)])
             vertices2 = np.zeros((n, 2), dtype=np.float)
             vertices2[:, 0] = np.cos(theta)
-            vertices2[:, 1] = np.sin(theta)
+            vertices2[:, 1] = -np.sin(theta)
             vertices = np.vstack((vertices1,vertices2))
             n = len(vertices)
             fixed = np.ones(n, dtype=np.bool)
@@ -370,13 +336,17 @@ class CVTPMesherTest:
             facets[-1,1] = 4
             subdomain = np.zeros((n, 2),dtype=np.int)
             subdomain[:4, 0] = 1
-            subdomain[4:,0] = -1
-            subdomain[4:1] = 1
+            subdomain[4:,0] = 1
+            subdomain[4:,1] = -1
             times = np.zeros(n)
-            times[:4] = 5
-            times[4:] = 2
+            times[:4] = 3
+            times[4:] = 1
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
+            fig = plt.figure()
+            axes = fig.gca()
+            mesh.add_plot(axes)
+            plt.show()
             uniform_mesh = CVTPMesher(mesh)
             uniform_mesh.uniform_meshing(n=7,times = times)
 
@@ -414,30 +384,19 @@ class CVTPMesherTest:
             
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
-                ( 0.4, 0.4),( 0.7, 0.4),( 0.7, 0.7),( 0.4, 0.7)],dtype=np.float)
+                ( 0.4, 0.4),( 0.4, 0.8),( 0.8, 0.8),( 0.8, 0.4)],dtype=np.float)
             facets = np.array([
                 (0, 1),(1, 2),( 2, 3),( 3, 0),
                 (4, 5),(5, 6),( 6, 7),( 7, 4)], dtype=np.int)
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0),
                 (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
-            """ 
-            vertices = np.array([
-                ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
-                ( 0.4, 0.4),( 0.7, 0.4),( 0.7, 0.7),( 0.4, 0.7)],dtype=np.float)
-            facets = np.array([
-                (0, 1),(1, 2),( 2, 3),( 3, 0),
-                (4, 5),(5, 6),( 6, 7),( 7, 4)], dtype=np.int)
-            subdomain = np.array([
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
-            """
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
             times = np.zeros(len(facets))
-            times[:4] = 5
-            times[4:] = 1
+            times[:4] = 3
+            times[4:] = 2
             uniform_mesh.uniform_meshing(n=5,times = times)
         elif domain == 'square2':
             vertices = np.array([
@@ -454,29 +413,6 @@ class CVTPMesherTest:
             uniform_mesh.uniform_meshing(n=2)
 
         elif domain == 'hole2':
-            """
-            vertices = np.array([
-                ( 0.0, 0.0),( 0.5, 1.0),( 1.0, 0.0),( 1.5, 0.0),
-                ( 2.0, 0.0),( 2.0, 0.5),( 2.0, 1.0),( 2.0, 1.5),
-                ( 2.0, 2.0),( 1.5, 2.0),( 1.0, 2.0),( 0.5, 2.0),
-                ( 0.0, 2.0),( 0.0, 1.5),( 0.0, 1.0),( 0.0, 0.5),
-                ( 0.4, 0.4),( 0.4, 0.7),( 0.7, 0.7),( 0.7, 0.4),
-                ( 1.2, 1.2),( 1.2, 1.5),( 1.5, 1.5),( 1.5, 1.2)],dtype=np.float)
-            facets = np.array([
-                ( 0, 1),( 1, 2),( 2, 3),( 3, 4),
-                ( 4, 5),( 5, 6),( 6, 7),( 7, 8),
-                ( 8, 9),( 9,10),(10,11),(11,12),
-                (12,13),(13,14),(14,15),(15, 0),
-                (16,17),(17,18),(18,19),(19,16),
-                (20,21),(21,22),(22,23),(23,20)], dtype=np.int)
-            subdomain = np.array([
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1, 0),(1, 0),(1, 0),(1, 0),
-                (1,-1),(1,-1),(1,-1),(1,-1),
-                (1,-2),(1,-2),(1,-2),(1,-2)], dtype=np.int)
-            """
             #""" 
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 2.0, 0.0),( 2.0, 1.0),
@@ -521,21 +457,26 @@ class CVTPMesherTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, color='k', showindex=True)
-            mesh.find_node(axes, node=vor.points, showindex=True)
-            voronoi_plot_2d(vor, ax=axes)
+            mesh.find_node(axes, color='k', showindex=False)
+            mesh.find_node(axes, node=vor.points, showindex=False)
+            voronoi_plot_2d(vor, ax=axes,show_vertices = False, point_size =
+                    0.3)
             plt.show()
             fig = plt.figure()
             axes = fig.gca()
-            mesh.add_halfedge_plot(axes, showindex=True)
+            mesh.add_halfedge_plot(axes, showindex=False)
             mesh.find_node(axes, showindex=True)
             plt.show()
        
         i =0
-        while i<10:
+        while i<20:
             vor = uniform_mesh.Lloyd(vor,start)
             i+=1
-        
+        pmesh = uniform_mesh.to_PolygonMesh(vor) 
+        fig = plt.figure()
+        axes= fig.gca()
+        pmesh.add_plot(axes)
+        plt.show()
 
         if plot:
             fig = plt.figure()
