@@ -515,7 +515,8 @@ class WedgeLagrangeFiniteElementSpace:
                     gR, threshold=threshold, q=q)
             return A, F
 
-    def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
+    def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None,
+            uh=None, m=0):
         """
 
         Notes
@@ -549,7 +550,20 @@ class WedgeLagrangeFiniteElementSpace:
         phi = self.face_basis(bcs)
         pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
-        
+
+        if uh is not None:
+            if uh.coordtype == 'cartesian':
+                uhval = uh(pp)
+            elif uh.coordtype =='barycentric':
+                val =uh(bcs)
+                uhval = val[:, index]
+            if m == 0:
+                raise ValueError("noninear degree 'm' is not given") 
+            else:
+                phi0 = uhval[..., None]**m*phi
+        else:
+            phi0 = phi
+
         val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -558,14 +572,16 @@ class WedgeLagrangeFiniteElementSpace:
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
 
-        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
+        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi0, phi, measure)
 
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-
-        return A, F
+        if uh is not None:
+            return A
+        else:
+            return A, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
