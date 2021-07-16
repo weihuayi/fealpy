@@ -402,21 +402,12 @@ class WedgeLagrangeFiniteElementSpace:
         if qface.shape[0] == 0:
             return istDDof
         else:
-            # TODO 
             isqDDof = self.is_quad_boundary_dof(threshold=threshold)
             uh[isqDDof] = gD(ipoints[isqDDof])
             return istDDof, isqDDof
     
     def set_neumann_bc(self, F, gN, threshold=None, q=None):
-        mesh = self.mesh
-        tface, qface = mesh.entity('face')
-        F = self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
-        if qface.shape[0] == 0:
-            return F
-        else:
-            #TODO 
-            F = self.set_quad_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
-            return F
+        self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
     
     def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
 
@@ -507,13 +498,7 @@ class WedgeLagrangeFiniteElementSpace:
         mesh = self.mesh
         tface, qface = mesh.entity('face')
         A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
-        if qface.shape[0] == 0:
-            return A, F
-        else:
-            #TODO 
-            A, F = self.set_quad_boundary_robin_bc(A, F,
-                    gR, threshold=threshold, q=q)
-            return A, F
+        return A, F
 
     def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None,
             uh=None, m=0):
@@ -577,11 +562,11 @@ class WedgeLagrangeFiniteElementSpace:
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
         if uh is not None:
             return A
         else:
-            return A, F
+            return A+R, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """

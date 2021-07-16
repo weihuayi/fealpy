@@ -16,6 +16,13 @@ class DirichletBC():
         self.bctype = 'Dirichlet'
 
     def apply(self, A, F, uh=None, threshold=None):
+        """
+
+        Notes
+        -----
+
+        注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         gD = self.gD
         threshold = self.threshold if threshold is None else threshold
@@ -56,6 +63,13 @@ class DirichletBC():
         return A
 
     def apply_on_vector(self, A, F):
+        """
+
+        Notes
+        -----
+
+        注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         threshold = self.threshold
 
@@ -90,6 +104,10 @@ class NeumannBC():
             矩阵 A 和右端 F, 并返回。
 
             否则只返回 F
+
+            外界的 F 被修改了
+
+            外界的 A 没有修改
         """
         space = self.space
         gN = self.gN
@@ -112,11 +130,18 @@ class RobinBC():
         self.bctype = "Robin"
 
     def apply(self, A, F, threshold=None, q=None):
+        """
+
+        Notes
+        -----
+            注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         gR = self.gR
         threshold = self.threshold if threshold is None else threshold
         A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
+
 
 
 ###

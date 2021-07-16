@@ -74,6 +74,12 @@ class LinearWedgeMeshDataStructure():
     def boundary_quad_face_index(self):
         return np.arange(self.NQF)
 
+    def interior_boundary_tface_index(self):
+        return np.arange(self.NTF//2, self.NTF)
+
+    def exterior_boundary_tface_index(self):
+        return np.arange(self.NTF//2)
+
 class LagrangeWedgeMesh(Mesh3d):
     def __init__(self, mesh, h, nh, p=1, surface=None):
 
@@ -159,6 +165,9 @@ class LagrangeWedgeMesh(Mesh3d):
         该函数返回角点节点的个数.
         """
         return self.ds.NCN
+
+    def number_of_boundary_tri_faces(self):
+        return self.ds.NTF
 
     def integrator(self, k, etype='cell'):
         qf0 = TriangleQuadrature(k)

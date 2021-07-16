@@ -102,11 +102,11 @@ class TPMModel():
         return gN
 
     @cartesian
-    def is_neumann_boundary(self):
+    def neumann_boundary_index(self):
         tface, qface = self.mesh.entity('face')
         NTF = len(tface)
-        boundary_neumann_tface_index = np.zeros(NTF, dtype=np.bool_)
-        boundary_neumann_tface_index[-NTF//2:] = True
+        index = np.zeros(NTF, dtype=np.bool_)
+        index[-NTF//2:] = True
         return boundary_neumann_tface_index 
 
     @cartesian    
@@ -122,10 +122,10 @@ class TPMModel():
         return -mu/Phi, k
     
     @cartesian
-    def is_robin_boundary(self):
+    def robin_boundary_index(self):
         tface, qface = self.mesh.entity('face')
         NTF = len(tface)
-        boundary_robin_tface_index = np.zeros(NTF, dtype=np.bool_)
-        boundary_robin_tface_index[:NTF//2] = True
-        return boundary_robin_tface_index 
+        index = np.zeros(NTF, dtype=np.bool_)
+        index[:NTF//2] = True
+        return index 
 

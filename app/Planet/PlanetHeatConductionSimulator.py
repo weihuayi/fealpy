@@ -10,56 +10,54 @@ from fealpy.boundarycondition import RobinBC, NeumannBC
 from scipy.sparse.linalg import spsolve
 
 class PlanetHeatConductionSimulator():
-    def __init__(self, pde, mesh, p=1):
+    def __init__(self, pde, mesh, args):
 
+        self.args = args
         self.pde = pde
         self.mesh = mesh
-        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p, q=6)
-
+        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=args.degeree,
+                q=3)
         self.S = self.space.stiff_matrix() # 刚度矩阵
         self.M = self.space.mass_matrix() # 质量矩阵
 
-    def time_mesh(self, T=10, NT=100):
-        
-        """ 
-        Parameters
-        ----------
-            T: the final time (day)
-        Notes
-        ------
-            无量纲化后 tau=omega*t 这里的时间层为 tau
-        """
-
         omega = self.pde.options['omega']
-        T *= 3600*24 # 换算成秒
-        T *= omega # 归一化
-        timeline = UniformTimeLine(0, T, NT)
-        return timeline
+        self.args.T *= 3600*24 # 换算成秒
+        self.args.T *= omega # 归一化
+        self.args.DT *= omega 
+        NT = int(args.T/args.DT)
+        self.timeline = UniformTimeLine(0, args.T, NT)
 
-    def init_solution(self):
-        uh = self.space.function()
-        uh[:] = self.pde.options['theta']/self.pde.options['Tss']
-        return uh
+        self.uh0 = self.space.function() # 当前层的数值解
+        self.uh0[:] = self.pde.options['theta']/self.pde.options['Tss']
+        self.uh1 = self.space.function() # 下一层的数值解
 
-    def apply_boundary_condition(self, A, b, timeline):
-        t1 = timeline.next_time_level()
-       
-       # 对 neumann 边界条件进行处理
-        bc = NeumannBC(self.space, lambda x, n:self.pde.neumann(x, n), threshold=self.pde.is_neumann_boundary())
-        b = bc.apply(b) # 混合边界条件不需要输入矩阵A
+        self.uh = self.space.function() # 临时数值解
+        self.uh[:] = self.uh0
 
-        # 对 robin 边界条件进行处理
-        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t1), threshold=self.pde.is_robin_boundary())
-        A0, b = bc.apply(A, b)
-        return b
+    def get_current_linear_system(self):
 
-    def solve(self, uh, timeline, e=1e-10):
+        t1 = self.timeline.next_time_level()
+
+        S = self.S
+        M = self.M 
+        uh0 = self.uh0
+        b = M@uh0[:]
+
+        index = self.mesh.ds.exterior_boundary_tface_index()
+        # 处理 Robin 边界条件
+        R, b = self.space.set_tri_boundary_robin_bc(S, b, lambda x,
+                n:self.pde.robin(x, n, t1),
+                threshold=index, uh=self.uh, m=3)
+
+        return R, b
+
+    def picard_iteration(self, ctx=None):
         '''  piccard 迭代  向后欧拉方法 '''
 
+        timeline = self.timeline
         i = timeline.current
         t1 = timeline.next_time_level()
         dt = timeline.current_time_step_length()
-        F = self.pde.right_vector(uh)
 
         S = self.S
         M = self.M
@@ -70,9 +68,6 @@ class PlanetHeatConductionSimulator():
         xi_new[:] = uh[:]
         while error > e:
             xi_tmp = xi_new.copy()
-            R = self.space.set_tri_boundary_robin_bc(S, F, lambda x,
-                    n:self.pde.robin(x, n, t1),
-                    threshold=self.pde.is_robin_boundary(), uh=xi_new, m=3)
             b = M@uh[:] + dt*F
             R = M + dt*R
 
@@ -82,3 +77,5 @@ class PlanetHeatConductionSimulator():
         print('i:', i+1)
         uh[:] = xi_new
 
+    def run():
+        pass
