@@ -6,7 +6,8 @@ from fealpy.mesh import LagrangeTriangleMesh, LagrangeWedgeMesh
 from fealpy.writer import MeshWriter
 
 class TPMModel():
-    def __init__(self, options=None):
+    def __init__(self, args, options=None):
+        self.args = args
         if options is None:
             self.options = self.model_options()
 
@@ -54,7 +55,14 @@ class TPMModel():
         return options
 
 
-    def init_mesh(self, n=0, h=0.005, nh=100, H=500, p=1):
+    def init_mesh(self):
+        args = self.args
+        n = args.nrefine # 初始网格加密次数
+        p = args.degree # 空间次数 
+        h = args.h # 单个三棱柱高度
+        nh = args.nh # 三棱柱层数
+        H = args.scale # 小行星规模
+
         fname = 'initial/file1.vtu'
         data = meshio.read(fname)
         node = data.points # 无量纲数值
@@ -75,10 +83,10 @@ class TPMModel():
         return mesh
 
     def init_mu(self, t, n0):
-        boundary_face_index = self.is_robin_boundary()
+        index = self.mesh.ds.exterior_boundary_tface_index()
         qf0, qf1 = self.mesh.integrator(self.p, 'face')
         bcs, ws = qf0.get_quadrature_points_and_weights()
-        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
+        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
         Z = np.array([[np.cos(-t), -np.sin(-t), 0],
@@ -91,24 +99,6 @@ class TPMModel():
         mu[mu<0] = 0
         return mu
     
-    def right_vector(self, uh):
-        shape = uh.shape[0]
-        f = np.zeros(shape, dtype=np.float)
-        return f 
-    
-    @cartesian
-    def neumann(self, p, n):
-        gN = np.zeros((p.shape[0], p.shape[1]), dtype=np.float)
-        return gN
-
-    @cartesian
-    def neumann_boundary_index(self):
-        tface, qface = self.mesh.entity('face')
-        NTF = len(tface)
-        index = np.zeros(NTF, dtype=np.bool_)
-        index[-NTF//2:] = True
-        return boundary_neumann_tface_index 
-
     @cartesian    
     def robin(self, p, n, t):
         """ Robin boundary condition
@@ -120,12 +110,3 @@ class TPMModel():
         shape = len(mu.shape)*(1, )
         k = -np.array([1.0], dtype=np.float64).reshape(shape)/Phi
         return -mu/Phi, k
-    
-    @cartesian
-    def robin_boundary_index(self):
-        tface, qface = self.mesh.entity('face')
-        NTF = len(tface)
-        index = np.zeros(NTF, dtype=np.bool_)
-        index[:NTF//2] = True
-        return index 
-

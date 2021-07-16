@@ -1,4 +1,6 @@
 
+import argparse
+
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
@@ -9,50 +11,60 @@ from TPMModel import TPMModel
 from fealpy.tools.show import showmultirate, show_error_table
 from scipy.sparse.linalg import spsolve
 
-p = int(sys.argv[1])
-n = int(sys.argv[2])
-NT = int(sys.argv[3])
-maxit = int(sys.argv[4])
-#    h = float(sys.argv[5])
-#    nh = int(sys.argv[6])
-h = 0.005
-nh = 100
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        三棱柱网格上热传导方程任意次有限元
+        """)
 
-pde = TPMModel()
-mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
-simulator = PlanetHeatConductionSimulator(pde, mesh, p=p)
+parser.add_argument('--nrefine',
+        default=0, type=int,
+        help='初始网格加密的次数, 默认初始加密 0 次.')
 
-timeline = simulator.time_mesh(NT=NT)
+parser.add_argument('--h',
+        default=0.005, type=int,
+        help='默认单个三棱柱网格的高度, 默认高度为 0.005.')
 
-Ndof = np.zeros(maxit, dtype=np.float)
+parser.add_argument('--nh',
+        default=100, type=int,
+        help='默认三棱柱网格的层数, 默认层数为 100.')
 
-uh0 = simulator.init_solution()  # 当前时间层的温度分布
-uh1 = simulator.space.function() # 下一时间层的温度分布 
-uh1 = uh0.copy()
+parser.add_argument('--scale',
+        default=500, type=int,
+        help='默认小行星的规模, 默认规模为 500.')
 
-for i in range(maxit):
-    print(i)
-    simulator = PlanetHeatConductionSimulator(pde, mesh, p=p)
-    
-    Ndof[i] = simulator.space.number_of_global_dofs()
+parser.add_argument('--T',
+        default=10, type=int,
+        help='求解的最终时间, 默认为 10 天.')
 
-    timeline.time_integration(uh1, simulator, spsolve)
+parser.add_argument('--DT',
+        default=60, type=int,
+        help='求解的时间步长, 默认为 60 秒.')
 
-    if i < maxit-1:
-        timeline.uniform_refine()
-        
-        n = n+1
-        h = h/2
-        nh = nh*2
-        mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
-    
-    Tss = pde.options['Tss']
-    uh = uh1*Tss
-    print('uh:', uh1)
+parser.add_argument('--accuracy',
+        default=1e-10, type=int,
+        help='picard 迭代的精度, 默认为 e-10.')
+
+args = parser.parse_args()
+
+pde = TPMModel(args)
+mesh = pde.init_mesh()
+
+simulator = PlanetHeatConductionSimulator(pde, mesh, args)
+
+simulator.run()
+
+uh = simulator.uh1
+
+Tss = pde.options['Tss']
+uh = uh*Tss
+print('uh:', uh)
 
 np.savetxt('01solution', uh)
 mesh.nodedata['uh'] = uh
 
 mesh.to_vtk(fname='test.vtu') 
-

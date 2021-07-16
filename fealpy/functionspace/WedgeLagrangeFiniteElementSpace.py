@@ -495,8 +495,6 @@ class WedgeLagrangeFiniteElementSpace:
 
     
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
-        mesh = self.mesh
-        tface, qface = mesh.entity('face')
         A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
 
@@ -563,10 +561,7 @@ class WedgeLagrangeFiniteElementSpace:
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-        if uh is not None:
-            return A
-        else:
-            return A+R, F
+        return A+R, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """

@@ -15,7 +15,7 @@ class PlanetHeatConductionSimulator():
         self.args = args
         self.pde = pde
         self.mesh = mesh
-        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=args.degeree,
+        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=args.degree,
                 q=3)
         self.S = self.space.stiff_matrix() # 刚度矩阵
         self.M = self.space.mass_matrix() # 质量矩阵
@@ -48,7 +48,6 @@ class PlanetHeatConductionSimulator():
         R, b = self.space.set_tri_boundary_robin_bc(S, b, lambda x,
                 n:self.pde.robin(x, n, t1),
                 threshold=index, uh=self.uh, m=3)
-
         return R, b
 
     def picard_iteration(self, ctx=None):
@@ -56,26 +55,29 @@ class PlanetHeatConductionSimulator():
 
         timeline = self.timeline
         i = timeline.current
-        t1 = timeline.next_time_level()
+        print('i:', i+1)
         dt = timeline.current_time_step_length()
 
         S = self.S
         M = self.M
-        F = self.apply_boundary_condition(S, F, timeline)
+
+        uh0 = self.uh0
+        uh1 = self.uh1
+        uh = self.uh
         
+        e = self.args.accuracy
         error = 1
-        xi_new = self.space.function()
-        xi_new[:] = uh[:]
         while error > e:
-            xi_tmp = xi_new.copy()
-            b = M@uh[:] + dt*F
+            uh[:] = uh1
+            R, b = self.get_current_linear_system()
             R = M + dt*R
-
-            xi_new[:] = spsolve(R, b).reshape(-1)
-            error = np.max(np.abs(xi_tmp - xi_new[:]))
+            uh1[:] = spsolve(R, b).reshape(-1)
+            error = np.max(np.abs(uh[:] - uh1[:]))
             print('error:', error)
-        print('i:', i+1)
-        uh[:] = xi_new
 
-    def run():
-        pass
+    def run(self):
+        self.picard_iteration()
+        self.uh0[:] = self.uh1
+
+        # 时间步进一层 
+        tmesh.advance()
