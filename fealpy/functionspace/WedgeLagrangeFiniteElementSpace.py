@@ -503,7 +503,7 @@ class WedgeLagrangeFiniteElementSpace:
             np.add.at(F, (face2dof, np.s_[:]), bb)
 
     
-    def set_robin_bc(self, A, F, gR, threshold=None, q=None, uh=None, m=0):
+    def set_robin_bc(self, A, F, gR, threshold=None, q=None):
         mesh = self.mesh
         tface, qface = mesh.entity('face')
         A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)

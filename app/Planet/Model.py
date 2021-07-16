@@ -18,10 +18,10 @@ maxit = int(sys.argv[4])
 h = 0.005
 nh = 100
 
-model = TPMModel()
-mesh = model.init_mesh(n=n, h=h, nh=nh, p=p)
+pde = TPMModel()
+mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
 
-simulator = PlanetHeatConductionSimulator(model, mesh, p=p)
+simulator = PlanetHeatConductionSimulator(pde, mesh, p=p)
 
 timeline = simulator.time_mesh(NT=NT)
 
@@ -33,7 +33,7 @@ uh1 = uh0.copy()
 
 for i in range(maxit):
     print(i)
-    simulator = PlanetHeatConductionSimulator(model, mesh, p=p)
+    simulator = PlanetHeatConductionSimulator(pde, mesh, p=p)
     
     Ndof[i] = simulator.space.number_of_global_dofs()
 
@@ -45,9 +45,9 @@ for i in range(maxit):
         n = n+1
         h = h/2
         nh = nh*2
-        mesh = model.init_mesh(n=n, h=h, nh=nh, p=p)
+        mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
     
-    Tss = model.options['Tss']
+    Tss = pde.options['Tss']
     uh = uh1*Tss
     print('uh:', uh1)
 
