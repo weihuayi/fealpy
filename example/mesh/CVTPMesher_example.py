@@ -49,7 +49,7 @@ theta = np.arange(0, 2*np.pi, h)
 vertices1 = np.array([(-2.0,-2.0),(2.0,-2.0),(2.0,2.0),(-2.0,2.0)])
 vertices2 = np.zeros((n, 2), dtype=np.float)
 vertices2[:, 0] = np.cos(theta)
-vertices2[:, 1] = np.sin(theta)
+vertices2[:, 1] = -np.sin(theta)
 vertices = np.vstack((vertices1,vertices2))
 n = len(vertices)
 fixed = np.ones(n, dtype=np.bool_)
@@ -62,8 +62,8 @@ facets[4:-1, 1] = range(5, n)
 facets[-1,1] = 4
 subdomain = np.zeros((n, 2),dtype=np.int)
 subdomain[:4, 0] = 1
-subdomain[4:,0] = -1
-subdomain[4:1] = 1
+subdomain[4:,0] = 1
+subdomain[4:1] = -1
 times = np.zeros(n)
 times[:4] = 5
 times[4:] = 2
@@ -92,6 +92,12 @@ mesh.add_plot(axes)
 mesh.find_node(axes, color='k', showindex=False)
 mesh.find_node(axes, node=vor.points, showindex=False)
 voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.1)
+plt.show()
+
+pmesh = uniform_mesh.to_PolygonMesh(vor)
+fig = plt.figure()
+axes = fig.gca()
+pmesh.add_plot(axes)
 plt.show()
 
 
