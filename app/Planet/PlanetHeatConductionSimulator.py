@@ -16,7 +16,7 @@ class PlanetHeatConductionSimulator():
         self.pde = pde
         self.mesh = mesh
         self.space = WedgeLagrangeFiniteElementSpace(mesh, p=args.degree,
-                q=3)
+                q=args.integral)
         self.S = self.space.stiff_matrix() # 刚度矩阵
         self.M = self.space.mass_matrix() # 质量矩阵
 
@@ -37,11 +37,12 @@ class PlanetHeatConductionSimulator():
     def get_current_linear_system(self):
 
         t1 = self.timeline.next_time_level()
+        dt = self.timeline.current_time_step_length()
 
         S = self.S
         M = self.M 
         uh0 = self.uh0
-        b = M@uh0[:]
+        b = M@uh0[:]/dt
 
         index = self.mesh.ds.exterior_boundary_tface_index()
         # 处理 Robin 边界条件
@@ -54,8 +55,6 @@ class PlanetHeatConductionSimulator():
         '''  piccard 迭代  向后欧拉方法 '''
 
         timeline = self.timeline
-        i = timeline.current
-        print('i:', i+1)
         dt = timeline.current_time_step_length()
 
         S = self.S
@@ -71,13 +70,24 @@ class PlanetHeatConductionSimulator():
             uh[:] = uh1
             R, b = self.get_current_linear_system()
             R = M + dt*R
-            uh1[:] = spsolve(R, b).reshape(-1)
+            uh1[:] = spsolve(R, dt*b).reshape(-1)
             error = np.max(np.abs(uh[:] - uh1[:]))
             print('error:', error)
 
     def run(self):
-        self.picard_iteration()
-        self.uh0[:] = self.uh1
+        """
 
-        # 时间步进一层 
-        tmesh.advance()
+        Notes
+        -----
+
+        计算所有时间层
+        """
+        timeline = self.timeline
+        
+        while not timeline.stop():
+            i = timeline.current
+            print('i:', i+1)
+            self.picard_iteration()
+            self.uh0[:] = self.uh1
+            print(self.uh0)
+            timeline.current +=1

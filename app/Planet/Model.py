@@ -21,12 +21,16 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
+parser.add_argument('--integral',
+        default=6, type=int,
+        help='积分精度, 默认为 6 次.')
+
 parser.add_argument('--nrefine',
         default=0, type=int,
         help='初始网格加密的次数, 默认初始加密 0 次.')
 
 parser.add_argument('--h',
-        default=0.005, type=int,
+        default=0.005, type=float,
         help='默认单个三棱柱网格的高度, 默认高度为 0.005.')
 
 parser.add_argument('--nh',
@@ -46,7 +50,7 @@ parser.add_argument('--DT',
         help='求解的时间步长, 默认为 60 秒.')
 
 parser.add_argument('--accuracy',
-        default=1e-10, type=int,
+        default=1e-10, type=float,
         help='picard 迭代的精度, 默认为 e-10.')
 
 args = parser.parse_args()
