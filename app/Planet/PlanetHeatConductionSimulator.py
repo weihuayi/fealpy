@@ -87,7 +87,9 @@ class PlanetHeatConductionSimulator():
         while not timeline.stop():
             i = timeline.current
             print('i:', i+1)
+
             self.picard_iteration()
             self.uh0[:] = self.uh1
             print(self.uh0)
+            
             timeline.current +=1
