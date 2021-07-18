@@ -471,7 +471,7 @@ class ParametricLagrangeFiniteElementSpace:
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
-        return A, F
+        return A+R, F
 
