@@ -221,17 +221,20 @@ class ParametricLagrangeFiniteElementSpace:
                 elif c.shape == (NC, GD, GD): # 分片常数对称矩阵（正定）
                     A = np.einsum('q, qcim, cmn, qcjn, qc->cij', ws*rm, gphi, c,
                             gphi, d)
-                elif c.shape == (NQ, NC, GD): 
+                elif c.shape == (NQ, NC): # 分片变系数矩阵
+                    A = np.einsum('q, qcim, qcjm, qc, qc->cij', ws*rm, gphi,
+                            gphi, d, c)
+                elif c.shape == (NQ, NC, GD): # 变对角矩阵
                     A = np.einsum('q, qcim, qcm, qcjm, qc->cij', ws*rm, gphi, c,
                             gphi, d)
-                elif c.shape == (NQ, NC, GD, GD):
+                elif c.shape == (NQ, NC, GD, GD): # 变对称正定矩阵
                     A = np.einsum('q, qcim, qcmn, qcjn, qc->cij', ws*rm, gphi, c,
                             gphi, d)
                 else:
-                    pass #TODO: raise error
+                    raise ValueError("I can not deal with c.shape!")
 
             else:
-                pass #TODO: raise error
+                raise ValueError("c is not callable, and is not int, float, or np.ndarray")
 
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
@@ -277,6 +280,10 @@ class ParametricLagrangeFiniteElementSpace:
         # ws : (NQ, )
         bcs, ws = qf.get_quadrature_points_and_weights() 
 
+        NQ = len(ws) # 积分点个数
+        NC = self.mesh.number_of_cells() # 单元个数
+        GD = self.mesh.geo_dimension() # 空间维数，这里假定 NC > GD  
+
         rm = self.mesh.reference_cell_measure() # 参考单元测度
         d = self.mesh.first_fundamental_form(bcs)
         d = np.sqrt(np.linalg.det(d))
@@ -291,7 +298,6 @@ class ParametricLagrangeFiniteElementSpace:
                     c = c(bcs)
                 elif c.coordtype == 'cartesian':
                     c = c(ps)
-            # 这里默认 c 是一个长度为 NC 的一维数组
             if isinstance(c, (int, float)):
                 M = np.einsum('q, qci, qcj, qc->cij', ws*rm*c, phi, phi, d) # (NC, ldof, ldof)
             elif isinstance(c, np.ndarray): 
@@ -301,9 +307,9 @@ class ParametricLagrangeFiniteElementSpace:
                     d *=c
                     M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
                 else:
-                    pass #TODO: raise error
+                    raise ValueError("I can not deal with c.shape!")
             else:
-                pass #TODO: raise error
+                raise ValueError("c is not callable, and is not int, float, or np.ndarray")
 
         cell2dof = self.cell_to_dof() # (NC, ldof)
         I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape) # (NC, ldof, ldof)
@@ -323,20 +329,45 @@ class ParametricLagrangeFiniteElementSpace:
         return A 
 
     def source_vector(self, f, celltype=False, q=None):
+        """
+
+        Notes
+        -----
+
+        TODO:
+            1. 处理 f 为向量函数的情形
+        """
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+
+        NQ = len(ws) # 积分点个数
+        NC = self.mesh.number_of_cells() # 单元个数
+        GD = self.mesh.geo_dimension() # 空间维数，这里假定 NC > GD  
 
         rm = self.mesh.reference_cell_measure()
         G = self.mesh.first_fundamental_form(bcs)
         d = np.sqrt(np.linalg.det(G))
         ps = mesh.bc_to_point(bcs, etype='cell')
         phi = self.basis(bcs)
-        if f.coordtype == 'cartesian':
-            val = f(ps)
-        elif f.coordtype == 'barycentric':
-            val = f(bcs)
-        bb = np.einsum('q, qc, qci, qc->ci', ws*rm, val, phi, d)
+
+        if callable(f):
+            if f.coordtype == 'cartesian':
+                f = f(ps)
+            elif f.coordtype == 'barycentric':
+                f = f(bcs)
+
+        if isinstance(f, (int, float)): #TODO: 考虑更多的情形
+            bb = f*np.einsum('q, qci, qc->ci', ws*rm, phi, d)
+        elif isinstance(f, np.ndarray): 
+            if f.shape == (NC, ):  # (NC, ), 分片常数
+                bb = np.einsum('q, c, qci, qc->ci', ws*rm, f, phi, d)
+            elif f.shape == (NQ, NC): # (NQ, NC)
+                bb = np.einsum('q, qc, qci, qc->ci', ws*rm, f, phi, d)
+            else:
+                raise ValueError("I can not deal with f.shape!")
+        else:
+            raise ValueError("f is not callable, and is not int, float, or np.ndarray")
 
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
