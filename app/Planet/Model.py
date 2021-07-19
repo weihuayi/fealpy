@@ -3,6 +3,8 @@ import argparse
 
 import numpy as np
 
+from fealpy.writer import VTKMeshWriter
+
 from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
 from TPMModel import TPMModel 
 
@@ -37,8 +39,12 @@ parser.add_argument('--npicard',
         help='picard 迭代的最大迭代次数, 默认为 100 次.')
 
 parser.add_argument('--step',
-        default=300, type=int,
-        help='数据保存间隔步长, 默认为 300 步保存一次, 即 5 h, 完成一个自转周期.')
+        default=1, type=int,
+        help='结果输出的步数间隔，默认为 1 步输出一次 vtu 文件.')
+
+parser.add_argument('--output', 
+        default='test', type=str,
+        help='结果输出文件的主名称，默认为 test')
 
 parser.add_argument('--nrefine',
         default=0, type=int,
@@ -64,12 +70,11 @@ mesh = pde.init_mesh()
 simulator = PlanetHeatConductionSimulator(pde, mesh, args)
 
 simulator.run()
+writer = VTKMeshWriter(simulation=simulator.run)
+writer.run()
 
 uh = simulator.uh1
-
-Tss = pde.options['Tss']
-uh = uh*Tss
-print('uh:', uh)
+uh *=Tss
 
 np.savetxt('01solution', uh)
 mesh.nodedata['uh'] = uh

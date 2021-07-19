@@ -62,7 +62,7 @@ class PlanetHeatConductionSimulator():
         m = self.args.npicard
         k = 0
         error = 1.0
-        while error > e and k < m:
+        while error > e:
             uh[:] = uh1
             
             R, b = self.get_current_linear_system()
@@ -78,8 +78,25 @@ class PlanetHeatConductionSimulator():
             if k >= self.args.npicard: 
                 print('picard iteration arrive max iteration with error:', error)
                 break
+    
+    def update_mesh_data(self):
+        """
 
-    def run(self, ctx=None, queue=None, Writer=None):
+        Notes
+        -----
+        更新 mesh 中的数据
+        """
+        mesh = self.mesh
+
+        uh0 = self.uh0
+
+        # 温度
+        Tss = self.pde.options['Tss']
+        T = uh0*Tss
+        mesh.nodedata['uh'] = uh
+
+
+    def run(self, ctx=None, queue=None, writer=None):
         """
 
         Notes
@@ -88,6 +105,7 @@ class PlanetHeatConductionSimulator():
         计算所有时间层
         """
         timeline = self.timeline
+        args = self.args
         
         if queue is not None:
             i = timeline.current
@@ -103,21 +121,23 @@ class PlanetHeatConductionSimulator():
             writer(fname, self.mesh)
 
         while not timeline.stop():
+            i = timeline.current
+            print('i:', i+1)
             self.picard_iteration(ctx=ctx)
             self.uh0[:] = self.uh1
             
             timeline.advance()
-            i = timeline.current
-            print('i:', i+1)
             
-            if timeline.current%args.step == 0:
+            if timeline.current % args.step == 0:
                 if queue is not None:
+                    i = timeline.current
                     fname = args.output + str(i).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
 
                 if writer is not None:
+                    i = timeline.current
                     fname = args.output + str(i).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     writer(fname, self.mesh)
