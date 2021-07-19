@@ -135,12 +135,7 @@ class CPLFEMDof1d():
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
             GD = mesh.geo_dimension()
-            if GD == 1:
-                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                        node[cell]).reshape(-1)
-            else:
-                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                        node[cell]).reshape(-1, GD)
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w, node[cell])
 
             return ipoint
 

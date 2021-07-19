@@ -128,7 +128,7 @@ class IntervalMesh():
     def top_dimension(self):
         return 1
 
-    def entity_measure(self, etype=1, index=None, node=None):
+    def entity_measure(self, etype=1, index=np.s_[:], node=None):
         """
         """
         if etype in {1, 'cell', 'face', 'edge'}:
