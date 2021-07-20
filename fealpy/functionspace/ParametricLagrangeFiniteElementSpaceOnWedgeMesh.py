@@ -117,10 +117,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
         shape = phi.shape[-1]
-        if shape == 3:
-            dof = self.dof.tface2dof[index]
-        else:
-            dof = self.dof.cell2dof[index]
+        dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
@@ -498,8 +495,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
 
-    def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None,
-            uh=None, m=0):
+    def set_tri_boundary_robin_bc(self, gR, A, F, threshold=None, q=None):
         """
 
         Notes
@@ -525,8 +521,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
 
         face2dof = self.tri_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
+        qf = mesh.integrator(q, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.boundary_tri_face_area(index=index)
 
@@ -561,7 +557,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-        return A+R, F
+        return R, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """

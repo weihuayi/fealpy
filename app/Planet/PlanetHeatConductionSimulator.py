@@ -32,6 +32,23 @@ class PlanetHeatConductionSimulator():
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
 
+    def nolinear_robin_boundary(self, bcs):
+        uh = self.uh
+        Phi = self.pde.options['Phi']
+        t1 = self.timeline.next_time_level()
+
+        qf = mesh.integrator(self.args.nq, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = self.space.basis(bcs)
+
+        index = self.mesh.ds.exterior_boundary_tface_index()
+        face2dof = self.space.tri_face_to_dof()[index]
+
+        val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
+        val **= 3
+
+        return R, b
+
     def get_current_linear_system(self):
 
         t1 = self.timeline.next_time_level()

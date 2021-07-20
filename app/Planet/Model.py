@@ -32,7 +32,7 @@ parser.add_argument('--DT',
 
 parser.add_argument('--accuracy',
         default=1e-10, type=float,
-        help='picard 迭代的精度, 默认为 e-10.')
+        help='picard 迭代的精度, 默认为 1e-10.')
 
 parser.add_argument('--npicard',
         default=100, type=int,
