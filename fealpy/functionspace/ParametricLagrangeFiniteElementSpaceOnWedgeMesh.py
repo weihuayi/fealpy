@@ -9,7 +9,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
 
 
-class WedgeLagrangeFiniteElementSpace:
+class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
     def __init__(self, mesh, p, q=None, spacetype='C'):
 
         """
