@@ -2,10 +2,8 @@
 import numpy as np
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
+from fealpy.functionspace import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
-
-from fealpy.boundarycondition import RobinBC, NeumannBC
 
 from scipy.sparse.linalg import spsolve
 
@@ -15,8 +13,8 @@ class PlanetHeatConductionSimulator():
         self.args = args
         self.pde = pde
         self.mesh = mesh
-        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=args.degree,
-                q=args.integral)
+        self.space = ParametricLagrangeFiniteElementSpaceOnWedgeMesh(mesh,
+                p=args.degree, q=args.nq)
         self.S = self.space.stiff_matrix() # 刚度矩阵
         self.M = self.space.mass_matrix() # 质量矩阵
 
@@ -37,12 +35,9 @@ class PlanetHeatConductionSimulator():
     def get_current_linear_system(self):
 
         t1 = self.timeline.next_time_level()
-        dt = self.timeline.current_time_step_length()
 
         S = self.S
-        M = self.M 
-        uh0 = self.uh0
-        b = M@uh0[:]/dt
+        b = np.zeros(len(self.uh0), dtype=np.float64)
 
         index = self.mesh.ds.exterior_boundary_tface_index()
         # 处理 Robin 边界条件
@@ -52,12 +47,11 @@ class PlanetHeatConductionSimulator():
         return R, b
 
     def picard_iteration(self, ctx=None):
-        '''  piccard 迭代  向后欧拉方法 '''
+        '''  picard 迭代  向后欧拉方法 '''
 
         timeline = self.timeline
         dt = timeline.current_time_step_length()
 
-        S = self.S
         M = self.M
 
         uh0 = self.uh0
@@ -65,16 +59,44 @@ class PlanetHeatConductionSimulator():
         uh = self.uh
         
         e = self.args.accuracy
-        error = 1
+        m = self.args.npicard
+        k = 0
+        error = 1.0
         while error > e:
             uh[:] = uh1
+            
             R, b = self.get_current_linear_system()
-            R = M + dt*R
-            uh1[:] = spsolve(R, dt*b).reshape(-1)
+            b *= dt
+            b += M@uh0[:]
+            R *= dt
+            R += M
+            
+            uh1[:] = spsolve(R, b).reshape(-1)
             error = np.max(np.abs(uh[:] - uh1[:]))
-            print('error:', error)
+            
+            k += 1
+            if k >= self.args.npicard: 
+                print('picard iteration arrive max iteration with error:', error)
+                break
+    
+    def update_mesh_data(self):
+        """
 
-    def run(self):
+        Notes
+        -----
+        更新 mesh 中的数据
+        """
+        mesh = self.mesh
+
+        uh0 = self.uh0
+
+        # 温度
+        Tss = self.pde.options['Tss']
+        T = uh0*Tss
+        mesh.nodedata['uh'] = uh
+
+
+    def run(self, ctx=None, queue=None, writer=None):
         """
 
         Notes
@@ -83,13 +105,54 @@ class PlanetHeatConductionSimulator():
         计算所有时间层
         """
         timeline = self.timeline
+        args = self.args
         
+        if queue is not None:
+            i = timeline.current
+            fname = args.output + str(i).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            data = {'name':fname, 'mesh':self.mesh}
+            queue.put(data)
+
+        if writer is not None:
+            i = timeline.current
+            fname = args.output + str(i).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            writer(fname, self.mesh)
+
         while not timeline.stop():
             i = timeline.current
             print('i:', i+1)
-
-            self.picard_iteration()
+            self.picard_iteration(ctx=ctx)
             self.uh0[:] = self.uh1
-            print(self.uh0)
             
-            timeline.current +=1
+            timeline.advance()
+            
+            if timeline.current % args.step == 0:
+                if queue is not None:
+                    i = timeline.current
+                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    self.update_mesh_data()
+                    data = {'name':fname, 'mesh':self.mesh}
+                    queue.put(data)
+
+                if writer is not None:
+                    i = timeline.current
+                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    self.update_mesh_data()
+                    writer(fname, self.mesh)
+        
+        if queue is not None:
+            i = timeline.current
+            fname = args.output + str(i).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            data = {'name':fname, 'mesh':self.mesh}
+            queue.put(data)
+            queue.put(-1) # 发送模拟结束信号 
+
+        if writer is not None:
+            i = timeline.current
+            fname = args.output + str(i).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            writer(fname, self.mesh)
+

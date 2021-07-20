@@ -27,6 +27,6 @@ from .ConformingVirtualElementSpace2d import CVEMDof2d, ConformingVirtualElement
 
 from .ParametricLagrangeFiniteElementSpace import ParametricLagrangeFiniteElementSpace
 
-from .WedgeLagrangeFiniteElementSpace import WedgeLagrangeFiniteElementSpace
+from .ParametricLagrangeFiniteElementSpaceOnWedgeMesh import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
 
 #from .FourierSpace import FourierSpace

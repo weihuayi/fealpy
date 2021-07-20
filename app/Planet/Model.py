@@ -1,15 +1,12 @@
 
 import argparse
 
-import sys
 import numpy as np
-import matplotlib.pyplot as plt
+
+from fealpy.writer import VTKMeshWriter
 
 from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
 from TPMModel import TPMModel 
-
-from fealpy.tools.show import showmultirate, show_error_table
-from scipy.sparse.linalg import spsolve
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -21,9 +18,33 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
-parser.add_argument('--integral',
+parser.add_argument('--nq',
         default=6, type=int,
-        help='积分精度, 默认为 6 次.')
+        help='积分精度, 默认为 6.')
+
+parser.add_argument('--T',
+        default=10, type=int,
+        help='求解的最终时间, 默认为 10 天.')
+
+parser.add_argument('--DT',
+        default=60, type=int,
+        help='求解的时间步长, 默认为 60 秒.')
+
+parser.add_argument('--accuracy',
+        default=1e-10, type=float,
+        help='picard 迭代的精度, 默认为 e-10.')
+
+parser.add_argument('--npicard',
+        default=100, type=int,
+        help='picard 迭代的最大迭代次数, 默认为 100 次.')
+
+parser.add_argument('--step',
+        default=1, type=int,
+        help='结果输出的步数间隔，默认为 1 步输出一次 vtu 文件.')
+
+parser.add_argument('--output', 
+        default='test', type=str,
+        help='结果输出文件的主名称，默认为 test')
 
 parser.add_argument('--nrefine',
         default=0, type=int,
@@ -41,18 +62,6 @@ parser.add_argument('--scale',
         default=500, type=int,
         help='默认小行星的规模, 默认规模为 500.')
 
-parser.add_argument('--T',
-        default=10, type=int,
-        help='求解的最终时间, 默认为 10 天.')
-
-parser.add_argument('--DT',
-        default=60, type=int,
-        help='求解的时间步长, 默认为 60 秒.')
-
-parser.add_argument('--accuracy',
-        default=1e-10, type=float,
-        help='picard 迭代的精度, 默认为 e-10.')
-
 args = parser.parse_args()
 
 pde = TPMModel(args)
@@ -61,12 +70,11 @@ mesh = pde.init_mesh()
 simulator = PlanetHeatConductionSimulator(pde, mesh, args)
 
 simulator.run()
+writer = VTKMeshWriter(simulation=simulator.run)
+writer.run()
 
 uh = simulator.uh1
-
-Tss = pde.options['Tss']
-uh = uh*Tss
-print('uh:', uh)
+uh *=Tss
 
 np.savetxt('01solution', uh)
 mesh.nodedata['uh'] = uh
