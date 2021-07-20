@@ -5,6 +5,7 @@ from fealpy.decorator import cartesian, barycentric
 from fealpy.functionspace import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
 from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
 class PlanetHeatConductionSimulator():
@@ -31,9 +32,36 @@ class PlanetHeatConductionSimulator():
 
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
+    
+    def init_mu(self, bcs):
+        sd = self.pde.options['sd']
 
-    def nolinear_robin_boundary(self, bcs):
+        t = self.timeline.next_time_level()
+        index = self.mesh.ds.exterior_boundary_tface_index()
+        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
+
+        # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
+        Z = np.array([[np.cos(-t), -np.sin(-t), 0],
+            [np.sin(-t), np.cos(-t), 0],
+            [0, 0, 1]], dtype=np.float64)
+        n = Z@sd # t 时刻指向太阳的方向
+        n = n/np.sqrt(np.dot(n, n)) # 单位化处理
+
+        mu = np.dot(m, n)
+        mu[mu<0] = 0
+        return mu
+
+    def nolinear_robin_boundary(self):
+        """
+
+        Notes
+        -----
+        处理非线性 Robin 边界条件
+
+        """
+
         uh = self.uh
+        mesh = self.mesh
         Phi = self.pde.options['Phi']
         t1 = self.timeline.next_time_level()
 
@@ -41,27 +69,34 @@ class PlanetHeatConductionSimulator():
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.space.basis(bcs)
 
-        index = self.mesh.ds.exterior_boundary_tface_index()
+        index = mesh.ds.exterior_boundary_tface_index()
         face2dof = self.space.tri_face_to_dof()[index]
 
         val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
         val **= 3
+        kappa = -1.0/Phi 
+        val *=kappa
 
-        return R, b
+        measure = mesh.boundary_tri_face_area(index=index)
 
-    def get_current_linear_system(self):
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
+        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
-        t1 = self.timeline.next_time_level()
+        mu = self.init_mu(bcs)
+        gR = -mu/Phi # (NQ, NF, ...)
 
-        S = self.S
-        b = np.zeros(len(self.uh0), dtype=np.float64)
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, gR, phi, measure)
+        
+        b = np.zeros(len(uh), dtype=np.float64)
+        np.add.at(b, face2dof, bb)
 
-        index = self.mesh.ds.exterior_boundary_tface_index()
-        # 处理 Robin 边界条件
-        R, b = self.space.set_tri_boundary_robin_bc(S, b, lambda x,
-                n:self.pde.robin(x, n, t1),
-                threshold=index, uh=self.uh, m=3)
-        return R, b
+        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, val, phi, phi, measure)
+
+        I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
+        J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
+
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
+        return R+self.S, b
 
     def picard_iteration(self, ctx=None):
         '''  picard 迭代  向后欧拉方法 '''
@@ -82,7 +117,7 @@ class PlanetHeatConductionSimulator():
         while error > e:
             uh[:] = uh1
             
-            R, b = self.get_current_linear_system()
+            R, b = self.nolinear_robin_boundary()
             b *= dt
             b += M@uh0[:]
             R *= dt
