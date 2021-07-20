@@ -5,15 +5,14 @@ mesh
 This module provide mesh 
 
 '''
+#from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
+#from .HalfEdgeMesh import HalfEdgeMesh
+#from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
 
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
-from .HalfEdgePolygonMesh import HalfEdgePolygonMesh
-from .HalfEdgeMesh import HalfEdgeMesh
-from .HalfEdgeDomain import HalfEdgeDomain
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
-#from .HalfFacePolyhedronMesh import HalfFacePolyhedronMesh
 from .IntervalMesh import IntervalMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
@@ -22,7 +21,6 @@ from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
 from .CVTPMesher import CVTPMesher
 from .ATriMesher import ATriMesher
-from .MeshFactory import MeshFactory
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
@@ -41,6 +39,7 @@ from .distmesh import DistMesh2d
 from .mesh_tools import *
 
 
+from .HalfEdgeDomain import HalfEdgeDomain
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 #from .HalfEdgeMesh3d import HalfEdgeMesh3d
 

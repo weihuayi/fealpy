@@ -33,4 +33,4 @@ jobs:
         pip install .[dev]
     - name: Test with pytest
       run: |
-        pytest test/test_poisson_fem_2d.py
+        pytest test

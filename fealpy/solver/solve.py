@@ -1,12 +1,40 @@
 
 import numpy as np
 from scipy.sparse.linalg import cg, inv, dsolve
-
 from scipy.sparse.linalg import spsolve
-
 from scipy.sparse import spdiags
 from timeit import default_timer as timer
-import pyamg
+
+try:
+    import pyamg
+except ImportError:
+    print("请先认真读下面的英文信息！！！")
+    print('I do not find  pyamg installed on this system!, so you can not use it.')
+    print("""
+    If your system is Ubuntu, you can run 
+
+    ```
+    $ pip3 install pyamg 
+    ```
+
+    If your system is MacOS, you also can run
+
+    ```
+    $ pip install pyamg
+    ```
+
+    If your system is Windows, there are several methods to install `pyamg`
+
+    1. install from conda 
+    ```
+    conda install -c anaconda pyamg
+    ```
+    2. Dowload wheel file suitable for your system and python
+       from https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyamg, then 
+       ```
+       pip install <pyamg-file-name>.whl
+       ```
+    """)
 
 def solve1(a, L, uh, dirichlet=None, neuman=None, solver='cg'):
     space = a.space

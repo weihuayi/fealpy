@@ -1,8 +1,14 @@
 import numpy as np
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
+from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 
 class DirichletBC():
+    """
+
+    Note:
+
+    """
     def __init__(self, space, gD, threshold=None):
         self.space = space
         self.gD = gD
@@ -10,6 +16,13 @@ class DirichletBC():
         self.bctype = 'Dirichlet'
 
     def apply(self, A, F, uh=None, threshold=None):
+        """
+
+        Notes
+        -----
+
+        注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         gD = self.gD
         threshold = self.threshold if threshold is None else threshold
@@ -24,7 +37,7 @@ class DirichletBC():
             F = F.T.flat
         x = uh.T.flat # 把 uh 按列展平
         F -= A@x
-        bdIdx = np.zeros(A.shape[0], dtype=np.int)
+        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isDDof] = 1
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
@@ -50,6 +63,13 @@ class DirichletBC():
         return A
 
     def apply_on_vector(self, A, F):
+        """
+
+        Notes
+        -----
+
+        注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         threshold = self.threshold
 
@@ -84,6 +104,10 @@ class NeumannBC():
             矩阵 A 和右端 F, 并返回。
 
             否则只返回 F
+
+            外界的 F 被修改了
+
+            外界的 A 没有修改
         """
         space = self.space
         gN = self.gN
@@ -94,9 +118,6 @@ class NeumannBC():
             c = space.integral_basis()
             A = bmat([[A, c.reshape(-1, 1)], [c, None]], format='csr')
             F = np.r_[F, 0]
-            print('A', A.shape)
-            print('F', F.shape)
-            print('c', c.shape)
             return A, F
         else:
             return F
@@ -109,11 +130,18 @@ class RobinBC():
         self.bctype = "Robin"
 
     def apply(self, A, F, threshold=None, q=None):
+        """
+
+        Notes
+        -----
+            注意调用这个函数，外界的 F 最后被修改了， 外界的 A 没有修改！
+        """
         space = self.space
         gR = self.gR
         threshold = self.threshold if threshold is None else threshold
         A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
         return A, F
+
 
 
 ###

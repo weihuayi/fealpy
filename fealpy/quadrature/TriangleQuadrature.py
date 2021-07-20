@@ -1,6 +1,18 @@
 import numpy as np
 from .Quadrature import Quadrature
 
+'''
+
+Reference
+--------
+ [1] D. M. Williams, L. Shunn, A. Jameson. Symmetric quadrature rules for simplexes
+     based on sphere close packed lattice arrangements[J]. Journal of Computational
+     and Applied Mathematics, 2014, 266: 18-38. 
+     https://www.sciencedirect.com/science/article/pii/S0377042714000211
+ [2] Long Chen. iFEM: An integrated finite element method package in matlab.
+    https://github.com/lyc102/ifem/blob/master/fem/quadpts.m
+'''
+
 
 class TriangleQuadrature(Quadrature):
 

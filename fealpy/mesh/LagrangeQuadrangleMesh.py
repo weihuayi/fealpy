@@ -11,10 +11,9 @@ from .core import LinearMeshDataStructure
 class LinearQuadrangleMeshDataStructure(LinearMeshDataStructure):
     localEdge = np.array([(0, 2), (2, 3), (3, 1), (1, 0)])
     ccw = np.array([0, 2, 3, 1])
-    V = 4
-    E = 4
-    F = 1
-    EV = 2
+    NVC = 4
+    NEC = 4
+    NVE = 2
 
     def __init__(self, NN, cell):
         self.NN = NN
@@ -52,7 +51,9 @@ class LagrangeQuadrangleMesh(Mesh2d):
 
         self.nodedata = {}
         self.edgedata = {}
+        self.facedata = self.edgedata
         self.celldata = {}
+        self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
 
 
@@ -386,11 +387,61 @@ class LagrangeQuadrangleMesh(Mesh2d):
         J = np.einsum(
                 'ijn, ...ijk->...ink',
                 self.node[entity], gphi)
-        shape = (-1, ) + J.shape[-3:]
         if return_grad is False:
             return J
         else:
             return J, gphi
+    def jacobi_TMOP(self, index = np.s_[:]):
+
+        '''
+        Notes
+        -----
+        计算参考单元 （xi, eta) 到实际 Lagrange 四边形(x) 之间映射的 Jacobi 矩阵
+        分解出的各个度量
+        '''
+
+        p = self.p
+        a = np.array([[1,0],[0,1]],dtype = float)
+        b = np.array([[1,0],[0,1]],dtype = float)
+        bc = [a,b]
+
+        J = self.jacobi_matrix(bc, index=index)# Jacobi矩阵
+        
+        Lambda = np.sqrt(np.cross(J[..., 0], J[..., 1], axis = -1))# 网格单元尺寸
+        
+        r = np.sqrt(np.einsum('...ij->...j', J**2))# [r1,r2]
+
+        Delta = np.einsum('ij,...j->...ij', np.eye(2), r)
+        r0 = r[:, :, 0]*r[:, :, 1]
+        Delta = np.einsum('...ijk,...i->...ijk',Delta, np.sqrt(1/r0))# 网格单元纵横比
+        
+        sphi = np.cross(J[..., 0], J[..., 1],axis=-1)/(r[...,0]*r[...,1])# sin(phi)
+        cphi = np.sum(J[..., 0]*J[..., 1],axis=-1)/(r[...,0]*r[...,1])# cos(phi)
+
+        E = np.zeros(J[...,1].shape)
+        E[...,0] = 1
+        stheta = np.cross(E,J[...,0],axis=-1)/r[...,0]
+        ctheta = np.sum(J[...,0]*E,axis=-1)/r[...,0]
+        
+        V = np.zeros(J.shape)# 网格单元方向
+        V[..., 0, 0] = ctheta
+        V[..., 1, 0] = stheta
+        V[..., 0, 1] = -stheta
+        V[..., 1, 1] = ctheta
+        
+        Q = np.zeros(J.shape)# 网格单元夹角
+        Q[..., 0, 0] = 1/np.sqrt(sphi)
+        Q[..., 1, 0] = cphi/np.sqrt(sphi)
+        Q[..., 1, 1] = sphi/np.sqrt(sphi)
+        
+        U = np.zeros(J.shape)# 网格单元尺寸和形状
+        U[...,0,0] = r[..., 0]
+        U[...,1,0] = r[..., 1]*cphi
+        U[...,1,1] = r[..., 1]*sphi
+
+        S = np.einsum('...ijk,...i->...ijk', U, 1/Lambda)# 网格单元形状
+        #V = np.dot(J, np.linalg.inv(U))# 网格单元方向
+        return J, Lambda, Q, Delta, S, U, V
 
     def first_fundamental_form(self, bc, index=np.s_[:], 
             return_jacobi=False, return_grad=False):
@@ -458,9 +509,9 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
         self.itype = ds.itype
 
         self.p = p
-        self.V = (p+1)*(p+1) 
-        self.E = ds.E 
-        self.F = ds.F
+        self.NVC = (p+1)*(p+1) 
+        self.NEC = ds.NEC
+        self.NVE = p+1
 
         self.NCN = ds.NN  # 角点的个数
         self.NN = ds.NN 

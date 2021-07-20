@@ -71,6 +71,7 @@ class LagrangeFiniteElementSpace():
         self.integrator = self.integralalg.integrator
 
         self.multi_index_matrix = multi_index_matrix 
+        self.stype = 'lagrange'
 
     def __str__(self):
         return "Lagrange finite element space!"
@@ -138,11 +139,32 @@ class LagrangeFiniteElementSpace():
         grad = self.grad_value(uh, bc)
 
         if callable(c): # 考虑存在扩散系数的情形
-            if c.coordtype == 'barycentric':
-                c = c(bc)
-            elif c.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bc)
-                c = c(ps)
+            if hasattr(c, 'coordtype'):
+                if c.coordtype == 'barycentric':
+                    c = c(bc)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bc)
+                    c = c(ps)
+                else:
+                    raise ValueError('''
+                    The coordtype must be `cartesian` or `barycentric`!
+                    ''')
+            else: 
+                raise ValueError('''
+                You should add decorator "cartesian" or "barycentric" on
+                function "c".
+
+                from fealpy.decorator import cartesian, barycentric
+
+                @cartesian
+                def c(p):
+                    ...
+
+                @barycentric
+                def c(p):
+                    ...
+
+                ''')
 
         # A\nabla u_h
         if c is not None:
@@ -309,6 +331,25 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def edge_grad_basis(self, bc, index, lidx, direction=True):
+        """
+
+        Notes
+        -----
+            bc：边上的一组积分点
+            index: 边所在的单元编号
+            lidx: 边在该单元的局部编号
+            direction: True 表示边的方向和单元的逆时针方向一致，False 表示不一致 
+
+            计算基函数梯度在单元边上积分点的值.
+
+            这里要把边上的低维的积分点转化为高维的积分点.
+
+        TODO
+        ----
+            二维和三维统一？
+            有没有更好处理办法？
+
+        """
         NE = len(index)
         nmap = np.array([1, 2, 0])
         pmap = np.array([2, 0, 1])
@@ -365,7 +406,7 @@ class LagrangeFiniteElementSpace():
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -403,15 +444,14 @@ class LagrangeFiniteElementSpace():
             p = self.p
 
         if p == 0 and self.spacetype == 'D':
-            if len(bc.shape) == 1:
-                return np.ones(1, dtype=self.ftype)
-            else:
-                return np.ones((bc.shape[0], 1), dtype=self.ftype)
+            shape = (len(bc.shape)+1)*(1, ) 
+            print('shape:', shape)
+            phi = np.ones(shape, dtype=self.ftype)
 
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix[TD](p)
 
-        c = np.arange(1, p+1, dtype=np.int)
+        c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
         t = np.arange(0, p)
         shape = bc.shape[:-1]+(p+1, TD+1)
@@ -523,7 +563,7 @@ class LagrangeFiniteElementSpace():
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
     def interpolation(self, u, dim=None):
-        ipoint = self.dof.interpolation_points()
+        ipoint = self.interpolation_points()
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
@@ -622,25 +662,36 @@ class LagrangeFiniteElementSpace():
         return c
 
     def revcovery_matrix(self, rtype='simple'):
+        """
+
+        Notes
+        -----
+        构造梯度恢复算子矩阵
+
+        """
         NC = self.mesh.number_of_cells()
         NN = self.mesh.number_of_nodes()
         cell = self.mesh.entity('cell')
         GD = self.GD
         cellmeasure = self.cellmeasure
-        gphi = self.mesh.grad_lambda()
+        gphi = self.mesh.grad_lambda() # (NC, GD+1, GD)
         G = []
         if rtype == 'simple':
             D = spdiags(1.0/np.bincount(cell.flat), 0, NN, NN)
         elif rtype == 'harmonic':
             gphi = gphi/cellmeasure.reshape(-1, 1, 1)
-            d = np.zeros(NN, dtype=np.float)
+            d = np.zeros(NN, dtype=np.float64)
             np.add.at(d, cell, 1/cellmeasure.reshape(-1, 1))
             D = spdiags(1/d, 0, NN, NN)
 
-        I = np.einsum('k, ij->ijk', np.ones(GD+1), cell)
-        J = I.swapaxes(-1, -2)
+        I = np.broadcast_to(cell[:, :, None], shape=(NC, GD+1, GD+1))
+        J = np.broadcast_to(cell[:, None, :], shape=(NC, GD+1, GD+1))
+
+        #I = np.einsum('k, ij->ijk', np.ones(GD+1), cell)
+        #J = I.swapaxes(-1, -2)
         for i in range(GD):
-            val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
+            #val = np.einsum('k, ij->ikj', np.ones(GD+1), gphi[:, :, i])
+            val = np.broadcast_to(gphi[:, :, i][:, None, :], shape=(NC, GD+1, GD+1))
             G.append(D@csc_matrix((val.flat, (I.flat, J.flat)), shape=(NN, NN)))
         return G
 
@@ -729,7 +780,7 @@ class LagrangeFiniteElementSpace():
         elif format == 'list':
             return C
 
-    def recovery_linear_elasticity_matrix(self, mu, lam, format='csr', q=None):
+    def recovery_linear_elasticity_matrix(self, lam, mu, format='csr', q=None):
         """
         construct the recovery linear elasticity fem matrix
         """
@@ -855,6 +906,8 @@ class LagrangeFiniteElementSpace():
         GD == 2
         [[phi, 0], [0, phi]]
 
+        [[B0], [B1]]
+
         GD == 3
         [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
 
@@ -871,7 +924,7 @@ class LagrangeFiniteElementSpace():
         # gphi.shape == (NQ, NC, ldof, GD)
         gphi = self.grad_basis(bcs)
         # pphi.shape == (NQ, 1, ldof) 
-        pphi = pspace.basis(bcs)
+        pphi = pspace.basis(bcs) # TODO: consider the scale polynomial case
 
         c2d0 = self.cell_to_dof() # (NC, ldof0)
         c2d1 = pspace.cell_to_dof() # (NC, ldof1)
@@ -891,17 +944,14 @@ class LagrangeFiniteElementSpace():
                     )
             B += [D]
 
-        # B = [[B0], [B1], [B2]]
-
         return B
 
-
     def velocity_matrix(self, u):
-        """
 
+        """
         Notes
         ----
-        ((u\cdot \nabla) u, v)
+        ((u\\cdot \\nabla) u, v)
 
         GD == 2
         [[phi, 0], [0, phi]]
@@ -909,7 +959,7 @@ class LagrangeFiniteElementSpace():
         GD == 3
         [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
 
-        varphi = (u0 \partial_x + u1 \partial_y + u2 \partial_z) phi
+        varphi = (u0 \\partial_x + u1 \\partial_y + u2 \\partial_z) phi
 
         [[varphi, 0, 0], [0, varphi, 0], [0, 0, varphi]]
 
@@ -957,11 +1007,35 @@ class LagrangeFiniteElementSpace():
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
 
-        if f.coordtype == 'cartesian':
-            pp = self.mesh.bc_to_point(bcs)
-            fval = f(pp)
-        elif f.coordtype == 'barycentric':
-            fval = f(bcs)
+        if hasattr(f, 'coordtype'):
+            if f.coordtype == 'cartesian':
+                pp = self.mesh.bc_to_point(bcs)
+                fval = f(pp)
+            elif f.coordtype == 'barycentric':
+                fval = f(bcs)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function "c".
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def c(p):
+                ...
+
+            @barycentric
+            def c(p):
+                ...
+
+            ''')
 
         gdof = self.number_of_global_dofs()
         shape = gdof if dim is None else (gdof, dim)
@@ -1006,7 +1080,7 @@ class LagrangeFiniteElementSpace():
 
         Notes
         -----
-        设置 Neumann 边界条件到载荷矩阵 F 中
+        设置 Neumann 边界条件到载荷向量 F 中
 
         TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
         """
@@ -1032,7 +1106,7 @@ class LagrangeFiniteElementSpace():
         bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -1073,7 +1147,7 @@ class LagrangeFiniteElementSpace():
         measure = mesh.entity_measure('face', index=index)
 
         phi = self.face_basis(bcs)
-        pp = mesh.bc_to_point(bcs, etype='face', index=index)
+        pp = mesh.bc_to_point(bcs, index=index)
         n = mesh.face_unit_normal(index=index)
 
         val, kappa = gR(pp, n) # (NQ, NF, ...)
@@ -1089,9 +1163,9 @@ class LagrangeFiniteElementSpace():
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
-        return A, F
+        return A+R, F
 
 
     def to_function(self, data):

@@ -8,6 +8,13 @@ from ..decorator import timer
 
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
+        """
+        Parameters
+        ----------
+            mesh: mesh object, which can be Triangle, Quadrangle,
+            Tetrahedron, Hexadron mesh
+            q: int, the index of the quadrature formula
+        """
         self.mesh = mesh
         self.integrator = mesh.integrator(q, etype='cell')
 
@@ -140,10 +147,35 @@ class FEMeshIntegralAlg():
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         ps = mesh.bc_to_point(bcs)
-        if basis0.coordtype == 'barycentric':
-            phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
-        elif basis0.coordtype == 'cartesian':
-            phi0 = basis0(ps)
+
+        if hasattr(basis0, 'coordtype'):
+            if basis0.coordtype == 'barycentric':
+                phi0 = basis0(bcs) # (NQ, NC, ldof, ...)
+            elif basis0.coordtype == 'cartesian':
+                phi0 = basis0(ps)
+            else:
+                raise ValueError('''
+                The coordtype must be `cartesian` or `barycentric`!
+
+                from fealpy.decorator import cartesian, barycentric
+
+                ''')
+        else: 
+            raise ValueError('''
+            You should add decorator "cartesian" or "barycentric" on
+            function `basis0`
+
+            from fealpy.decorator import cartesian, barycentric
+
+            @cartesian
+            def basis0(p):
+                ...
+
+            @barycentric
+            def basis0(p):
+                ...
+
+            ''')
 
         if len(phi0.shape) == 3:
             GD = 1
@@ -205,7 +237,8 @@ class FEMeshIntegralAlg():
         I = np.broadcast_to(cell2dof0[:, :, None], shape=M.shape)
         J = np.broadcast_to(cell2dof1[:, None, :], shape=M.shape)
 
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+        M = csr_matrix((M.flat, (I.flat, J.flat)), 
+                shape=(gdof0, gdof1))
         return M
 
     @timer
@@ -225,7 +258,7 @@ class FEMeshIntegralAlg():
         GD = mesh.geo_dimension()
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
 
         if basis.coordtype == 'barycentric':
@@ -367,7 +400,7 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
@@ -402,7 +435,7 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
@@ -438,7 +471,7 @@ class FEMeshIntegralAlg():
         mesh = self.mesh
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
         if basis.coordtype == 'barycentric':
             phi = basis(bcs)
@@ -478,7 +511,7 @@ class FEMeshIntegralAlg():
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, etype='edge')
+                ps = mesh.bc_to_point(bcs)
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -512,7 +545,7 @@ class FEMeshIntegralAlg():
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, etype='face')
+                ps = mesh.bc_to_point(bcs)
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -546,7 +579,7 @@ class FEMeshIntegralAlg():
 
         if callable(f):
             if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs, etype='cell')
+                ps = mesh.bc_to_point(bcs)
                 f = f(ps)
             elif f.coordtype == 'barycentric':
                 f = f(bcs)
@@ -568,7 +601,7 @@ class FEMeshIntegralAlg():
                 e = np.einsum(s1, ws, f, self.cellmeasure)
         return e
 
-    def mesh_integral(self, u, etype='cell', q=None):
+    def mesh_integral(self, u, etype='cell', q=None, power=None):
         """
 
         Notes
@@ -576,11 +609,11 @@ class FEMeshIntegralAlg():
             计算函数 u 在指定网格实体上的整体积分。
         """
         if etype == 'cell':
-            e = np.sum(self.cell_integral(u, q=q))
+            e = np.sum(self.cell_integral(u, q=q, power=power))
         elif etype == 'face':
-            e = np.sum(self.face_integral(u, q=q))
+            e = np.sum(self.face_integral(u, q=q)) #TODO: add power para
         elif etype == 'edge':
-            e = np.sum(self.edge_integral(u, q=q))
+            e = np.sum(self.edge_integral(u, q=q)) #TODO: add power para
 
         return e
 
@@ -602,7 +635,7 @@ class FEMeshIntegralAlg():
 
         qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        ps = mesh.bc_to_point(bcs, etype='cell')
+        ps = mesh.bc_to_point(bcs)
 
         if callable(u):
             if u.coordtype == 'cartesian':

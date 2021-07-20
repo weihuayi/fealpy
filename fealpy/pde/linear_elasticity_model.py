@@ -52,6 +52,101 @@ class LinearElasticityTempalte():
     def is_fracture_boundary(self, p):
         pass
 
+class BeamData2d():
+    def __init__(self, E = 2*10**6, nu = 0.3):
+        self.l = 48
+        self.h = 12
+        self.q = 100
+
+        self.nu = nu
+        self.E = E
+       
+        self.lam = self.nu*self.E/((1+self.nu)*(1-2*self.nu))
+        self.mu = self.E/(2*(1+self.nu))       
+
+    def domain(self):
+        return [0.0, self.l, -self.h/2.0, self.h/2.0]
+
+    def init_mesh(self, n=1):
+        from fealpy.mesh.simple_mesh_generator import rectangledomainmesh
+        domain = self.domain()
+        mesh = rectangledomainmesh(domain, nx=4*n, ny=1*n, meshtype='tri')
+        return mesh
+
+    @cartesian
+    def displacement(self, p):
+        q = self.q
+        l = self.l
+        h = self.h
+        
+        nu = self.nu
+        E = self.E
+        I = h**3/12
+         
+        x = p[..., 0]
+        y = p[..., 1]
+        
+        val = np.zeros_like(p)
+
+        val[..., 0] = -q*x*y*(l-x)*(l-2*x)/(12*E*I)
+        val[..., 0] += q*(l-2*x)*y*(3*(1+nu)*h**2 - 2*(2+nu)*y**2)/(24*E*I)
+        
+        val[..., 1] = q*(l-x)**2*x**2/(24*E*I)
+        val[..., 1] += q*(-2*(1+2*nu)*y**4 + ((6*x**2-6*l*x+l**2)*2*nu+3*h**2*(nu+1)**2)*y**2 + 24*I*(nu**2-1)*y)/(48*E*I)
+                
+        return val
+        
+    @cartesian
+    def stress(self, p):
+        q = self.q
+        l = self.l
+        h = self.h
+        
+        nu = self.nu
+        E = self.E
+        I = h**3/12    
+        x = p[..., 0]
+        y = p[..., 1]
+        
+        shape = p.shape[:-1] + (2, 2)
+        val = np.zeros(shape, dtype=np.float)
+        
+        val[..., 0, 0] += -q*(x**2-l*x+l**2/6)*y/(2*I)    
+        val[..., 0, 0] += q*(8*y**3-3*(2+nu)*h**2*y-nu*h**3)/(24*I)  
+        
+        val[..., 0, 1] += q*(l-2*x)(h**2/4-y**2)/(4*I) 
+        
+        val[..., 1, 0] += q*(l-2*x)(h**2/4-y**2)/(4*I) 
+        
+        val[..., 1, 1] += -q*(4*y**3-3*h**2*y+h**3)/(24*I)
+        return val
+        
+    @cartesian
+    def source(self, p):
+        val = np.zeros_like(p)
+        return val 
+        
+    @cartesian
+    def dirichlet(self, p):  
+        val = np.zeros_like(p) 
+        return val
+        
+    @cartesian    
+    def neumann(self, p, n):  # p 是受到面力的节点坐标
+        val = np.array([0.0, -self.q], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, ) + (2, )
+        return val.reshape(shape)
+        
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        eps = 1e-10
+        return (np.abs(p[..., 0]) < eps) | (np.abs(p[..., 0]-self.l) < eps)
+        
+    @cartesian        
+    def is_neumann_boundary(self, p):
+        eps = 1e-10
+        return (np.abs(p[..., 1]-self.h/2) < eps)
+
 class BoxDomainData3d():
     def __init__(self):
         self.L = 1
@@ -679,6 +774,7 @@ class HuangModel2d():
         mesh.uniform_refine(n)
         return mesh 
 
+    @cartesian
     def displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -688,6 +784,7 @@ class HuangModel2d():
         val[..., 1] = -pi/2*np.sin(pi*y)**2*np.sin(2*pi*x) 
         return val
 
+    @cartesian
     def grad_displacement(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -704,6 +801,7 @@ class HuangModel2d():
         val[..., 1, 1] = -pi**2*sin(2*pi*x)*sin(pi*y)*cos(pi*y)
         return val
 
+    @cartesian
     def stress(self, p):
         lam = self.lam
         mu = self.mu
@@ -714,6 +812,7 @@ class HuangModel2d():
         return val
         
 
+    @cartesian
     def compliance_tensor(self, phi):
         lam = self.lam
         mu = self.mu
@@ -723,9 +822,11 @@ class HuangModel2d():
         aphi /= 2*mu
         return aphi
 
+    @cartesian
     def div_stress(self, p):
         return -self.source(p)
 
+    @cartesian
     def source(self, p):
         lam = self.lam
         mu = self.mu
@@ -752,12 +853,14 @@ class HuangModel2d():
 
         return val
 
+    @cartesian
     def dirichlet(self, p):  
         """
         """
         val = self.displacement(p) 
         return val
 
+    @cartesian
     def is_dirichlet_boundary(self, p):
         eps = 1e-14
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)

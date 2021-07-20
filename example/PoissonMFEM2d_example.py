@@ -15,7 +15,7 @@
 
 """
 
-import sys
+import argparse 
 
 import matplotlib.pyplot as plt
 
@@ -23,35 +23,59 @@ import numpy as np
 from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve
 
-from fealpy.pde.poisson_2d import CosCosData
-from fealpy.mesh import MeshFactory
-from fealpy.decorator import cartesian, barycentric
+from fealpy.pde.poisson_2d import CosCosData as PDE
 from fealpy.functionspace import RaviartThomasFiniteElementSpace2d
-
 from fealpy.solver import SaddlePointFastSolver
+from fealpy.tools.show import showmultirate
 
 
-p = int(sys.argv[1]) # RT 空间的次数
-n = int(sys.argv[2]) # 初始网格部分段数
-maxit = int(sys.argv[3]) # 迭代求解次数
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        二维混合有限元方法求解 Poisson 方程
+
+        """)
+
+parser.add_argument('--degree',
+        default=0, type=int,
+        help='RT 有限元空间的次数, 默认为 0 次, 即 RT0 元.')
+
+parser.add_argument('--nrefine',
+        default=4, type=int,
+        help='初始网格加密的次数, 默认初始加密 4 次.')
+
+parser.add_argument('--maxit',
+        default=4, type=int,
+        help='默认网格加密求解的次数, 默认加密求解 4 次')
+
+args = parser.parse_args()
+
+degree = args.degree
+nrefine = args.nrefine
+maxit = args.maxit
 
 
-pde = CosCosData()  # pde 模型
-box = pde.domain()  # 模型区域
-mf = MeshFactory() # 网格工场
+pde = PDE() 
+mesh = pde.init_mesh(n=nrefine)
+
+errorType = ['$|| u - u_h||_{\Omega,0}$',
+             '$|| p - p_h||_{\Omega,0}$'
+             ]
+errorMatrix = np.zeros((2, maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
-    mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
-    space = RaviartThomasFiniteElementSpace2d(mesh, p=p)
+    print("The {}-th computation:".format(i))
+
+    space = RaviartThomasFiniteElementSpace2d(mesh, p=degree)
 
     udof = space.number_of_global_dofs()
     pdof = space.smspace.number_of_global_dofs()
     gdof = udof + pdof
+    NDof[i] = gdof
 
-    print("step ", i, " with number of dofs:", gdof)
-
-    uh = space.function()
-    ph = space.smspace.function()
+    uh = space.function() # 速度空间
+    ph = space.smspace.function() # 压力空间
 
     M = space.mass_matrix()
     B = -space.div_matrix()
@@ -68,9 +92,12 @@ for i in range(maxit):
         x = spsolve(AA, FF).reshape(-1)
         uh[:] = x[:udof]
         ph[:] = x[udof:]
-    error0 = space.integralalg.error(pde.flux, uh.value, power=2)
-    error1 = space.integralalg.error(pde.solution, ph.value, power=2) 
-    print(error0, error1)
+    errorMatrix[0, i] = space.integralalg.error(pde.flux, uh.value, power=2)
+    errorMatrix[1, i] = space.integralalg.error(pde.solution, ph.value, power=2) 
 
-    n *= 2 # 加密网格 
+    if i < maxit-1:
+        mesh.uniform_refine()
 
+print(errorMatrix)
+showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
+plt.show()

@@ -6,14 +6,15 @@ from ..mesh.Quadtree import Quadtree
 from ..mesh.QuadrangleMesh import QuadrangleMesh
 from ..mesh.Tritree import Tritree
 from ..mesh.StructureQuadMesh import StructureQuadMesh
-from ..mesh.TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
+from ..mesh.TriangleMesh import TriangleMesh
+from ..mesh.TriangleMesh import TriangleMeshWithInfinityNode
 from ..mesh.PolygonMesh import PolygonMesh
 from ..mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
 
 class CosCosData:
     """
-    -\Delta u = f
-    u = cos(pi*x)*cos(pi*y)
+        -\\Delta u = f
+        u = cos(pi*x)*cos(pi*y)
     """
     def __init__(self):
         pass
@@ -165,7 +166,7 @@ class CosCosData:
 
 class X2Y2Data:
     """
-    -\Delta u = f
+    -\\Delta u = f
     u = cos(pi*x)*cos(pi*y)
     """
     def __init__(self):
@@ -608,8 +609,11 @@ class LShapeRSinData:
                 (5, 2, 6),
                 (4, 7, 3),
                 (6, 3, 7)], dtype=np.int_)
-            mesh = Tritree(node, cell)
+            mesh = TriangleMesh(node, cell)
             mesh.uniform_refine(n)
+            node = mesh.entity('node')
+            cell = mesh.entity('cell')
+            mesh = Tritree(node, cell)
             return mesh
         else:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
@@ -635,7 +639,9 @@ class LShapeRSinData:
         INPUT:
             p: array object, N*2
         """
-        return 0.0 
+        val = np.array([0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, )
+        return val.reshape(shape)
 
     @cartesian
     def gradient(self, p):
@@ -999,6 +1005,54 @@ class PolynomialData:
         y = p[..., 1]
         u = (x-x**2)*(y-y**2)
         return u
+
+    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+        """ generate the initial mesh
+        """
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float64)
+
+        if meshtype == 'quadtree':
+            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
+            mesh = Quadtree(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        if meshtype == 'quad':
+            node = np.array([
+                (0, 0),
+                (1, 0),
+                (1, 1),
+                (0, 1),
+                (0.5, 0),
+                (1, 0.4),
+                (0.3, 1),
+                (0, 0.6),
+                (0.5, 0.45)], dtype=np.float64)
+            cell = np.array([
+                (0, 4, 8, 7), (4, 1, 5, 8),
+                (7, 8, 6, 3), (8, 5, 2, 6)], dtype=np.int_)
+            mesh = QuadrangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'tri':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'halfedge':
+            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+            mesh = TriangleMesh(node, cell)
+            mesh = HalfEdgeMesh2d.from_mesh(mesh)
+            mesh.uniform_refine(n)
+            return mesh
+        elif meshtype == 'squad':
+            mesh = StructureQuadMesh([0, 1, 0, 1], h)
+            return mesh
+        else:
+            raise ValueError("".format)
 
     def source(self, p):
         """ The right hand side of Possion equation
