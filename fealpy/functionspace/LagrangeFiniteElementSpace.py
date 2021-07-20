@@ -444,10 +444,9 @@ class LagrangeFiniteElementSpace():
             p = self.p
 
         if p == 0 and self.spacetype == 'D':
-            if len(bc.shape) == 1:
-                return np.ones(1, dtype=self.ftype)
-            else:
-                return np.ones((bc.shape[0], 1), dtype=self.ftype)
+            shape = (len(bc.shape)+1)*(1, ) 
+            print('shape:', shape)
+            phi = np.ones(shape, dtype=self.ftype)
 
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix[TD](p)
@@ -907,6 +906,8 @@ class LagrangeFiniteElementSpace():
         GD == 2
         [[phi, 0], [0, phi]]
 
+        [[B0], [B1]]
+
         GD == 3
         [[phi, 0, 0], [0, phi, 0], [0, 0, phi]]
 
@@ -923,7 +924,7 @@ class LagrangeFiniteElementSpace():
         # gphi.shape == (NQ, NC, ldof, GD)
         gphi = self.grad_basis(bcs)
         # pphi.shape == (NQ, 1, ldof) 
-        pphi = pspace.basis(bcs)
+        pphi = pspace.basis(bcs) # TODO: consider the scale polynomial case
 
         c2d0 = self.cell_to_dof() # (NC, ldof0)
         c2d1 = pspace.cell_to_dof() # (NC, ldof1)
@@ -942,8 +943,6 @@ class LagrangeFiniteElementSpace():
                     (D.flat, (I.flat, J.flat)), shape=(gdof0, gdof1)
                     )
             B += [D]
-
-        # B = [[B0], [B1], [B2]]
 
         return B
 
