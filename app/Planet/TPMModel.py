@@ -56,6 +56,8 @@ class TPMModel():
 
 
     def init_mesh(self):
+        print("Generate the init mesh!...")
+
         args = self.args
         n = args.nrefine # 初始网格加密次数
         p = args.degree # 空间次数 
@@ -67,6 +69,8 @@ class TPMModel():
         data = meshio.read(fname)
         node = data.points # 无量纲数值
         cell = data.cells[0][1]
+        print("number of nodes of surface mesh:", len(node))
+        print("number of cells of surface mesh:", len(cell))
 
         node = node - np.mean(node, axis=0) # 以质心作为原点
         l = self.options['l']
@@ -82,4 +86,6 @@ class TPMModel():
 
         self.mesh = mesh
         self.p = p
+
+        print("finish mesh generation!")
         return mesh

@@ -60,7 +60,7 @@ class PlanetHeatConductionSimulator():
 
         """
 
-        uh = self.uh
+        uh = self.uh # 临时的温度有限元函数
         mesh = self.mesh
         Phi = self.pde.options['Phi']
         t1 = self.timeline.next_time_level()
@@ -85,12 +85,12 @@ class PlanetHeatConductionSimulator():
         mu = self.init_mu(bcs)
         gR = -mu/Phi # (NQ, NF, ...)
 
-        bb = np.einsum('m, mi..., mik, i->ik...', ws, gR, phi, measure)
+        bb = np.einsum('q, qf, qfi, f->fi', ws, gR, phi, measure)
         
         b = np.zeros(len(uh), dtype=np.float64)
         np.add.at(b, face2dof, bb)
 
-        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, val, phi, phi, measure)
+        FM = np.einsum('q, qf, qfi, qfj, f->fij', ws, val, phi, phi, measure)
 
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
@@ -109,22 +109,33 @@ class PlanetHeatConductionSimulator():
         uh0 = self.uh0
         uh1 = self.uh1
         uh = self.uh
+
+        uh1[:] = uh0
         
         e = self.args.accuracy
         m = self.args.npicard
         k = 0
         error = 1.0
         while error > e:
-            uh[:] = uh1
-            
             R, b = self.nolinear_robin_boundary()
             b *= dt
             b += M@uh0[:]
             R *= dt
             R += M
-            
-            uh1[:] = spsolve(R, b).reshape(-1)
+
+            if ctx is None:
+                uh[:] = spsolve(R, b).reshape(-1)
+            else:
+                if ctx.myid == 0:
+                    ctx.set_centralized_sparse(R)
+                    x = b.copy()
+                    ctx.set_rhs(x) # Modified in place
+                ctx.run(job=6)
+                uh[:] = x
+
             error = np.max(np.abs(uh[:] - uh1[:]))
+            print(k, ":", error)
+            uh1[:] = uh
             
             k += 1
             if k >= self.args.npicard: 
@@ -142,13 +153,13 @@ class PlanetHeatConductionSimulator():
 
         uh0 = self.uh0
 
-        # 温度
+        # 换算为真实的温度
         Tss = self.pde.options['Tss']
         T = uh0*Tss
-        mesh.nodedata['uh'] = uh
+        mesh.nodedata['uh'] = T 
 
 
-    def run(self, ctx=None, queue=None, writer=None):
+    def run(self, ctx=None, queue=None):
         """
 
         Notes
@@ -166,45 +177,26 @@ class PlanetHeatConductionSimulator():
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
 
-        if writer is not None:
-            i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
-            self.update_mesh_data()
-            writer(fname, self.mesh)
-
         while not timeline.stop():
             i = timeline.current
-            print('i:', i+1)
+            print('i:', i)
             self.picard_iteration(ctx=ctx)
             self.uh0[:] = self.uh1
             
             timeline.advance()
             
-            if timeline.current % args.step == 0:
+            if i % args.step == 0:
                 if queue is not None:
-                    i = timeline.current
                     fname = args.output + str(i).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
-
-                if writer is not None:
-                    i = timeline.current
-                    fname = args.output + str(i).zfill(10) + '.vtu'
-                    self.update_mesh_data()
-                    writer(fname, self.mesh)
         
         if queue is not None:
             i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
-            self.update_mesh_data()
-            data = {'name':fname, 'mesh':self.mesh}
-            queue.put(data)
+            if i % args.step != 0:
+                fname = args.output + str(i).zfill(10) + '.vtu'
+                self.update_mesh_data()
+                data = {'name':fname, 'mesh':self.mesh}
+                queue.put(data)
             queue.put(-1) # 发送模拟结束信号 
-
-        if writer is not None:
-            i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
-            self.update_mesh_data()
-            writer(fname, self.mesh)
-

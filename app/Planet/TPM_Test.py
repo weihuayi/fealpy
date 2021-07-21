@@ -4,9 +4,10 @@ import argparse
 import numpy as np
 
 from fealpy.writer import VTKMeshWriter
-
 from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
 from TPMModel import TPMModel 
+
+from mumps import DMumpsContext
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -19,8 +20,8 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--nq',
-        default=6, type=int,
-        help='积分精度, 默认为 6.')
+        default=3, type=int,
+        help='积分精度, 默认为 3.')
 
 parser.add_argument('--T',
         default=10, type=int,
@@ -67,16 +68,12 @@ args = parser.parse_args()
 pde = TPMModel(args)
 mesh = pde.init_mesh()
 
+ctx = DMumpsContext()
+ctx.set_silent()
+
 simulator = PlanetHeatConductionSimulator(pde, mesh, args)
 
-simulator.run()
-writer = VTKMeshWriter(simulation=simulator.run)
+writer = VTKMeshWriter(simulation=simulator.run, args=(ctx, ))
 writer.run()
+ctx.destroy()
 
-uh = simulator.uh1
-uh *=Tss
-
-np.savetxt('01solution', uh)
-mesh.nodedata['uh'] = uh
-
-mesh.to_vtk(fname='test.vtu') 
