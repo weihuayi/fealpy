@@ -35,12 +35,12 @@ parser.add_argument('--accuracy',
         help='picard 迭代的精度, 默认为 1e-10.')
 
 parser.add_argument('--npicard',
-        default=100, type=int,
-        help='picard 迭代的最大迭代次数, 默认为 100 次.')
+        default=30, type=int,
+        help='picard 迭代的最大迭代次数, 默认为 30 次.')
 
 parser.add_argument('--step',
-        default=1, type=int,
-        help='结果输出的步数间隔，默认为 1 步输出一次 vtu 文件.')
+        default=300, type=int,
+        help='结果输出的步数间隔，默认为 300 步输出一次 vtu 文件.')
 
 parser.add_argument('--output', 
         default='test', type=str,
@@ -51,8 +51,8 @@ parser.add_argument('--nrefine',
         help='初始网格加密的次数, 默认初始加密 0 次.')
 
 parser.add_argument('--h',
-        default=0.005, type=float,
-        help='默认单个三棱柱网格的高度, 默认高度为 0.005.')
+        default=0.5, type=float,
+        help='求解的球壳厚度, 默认厚度为 0.5.')
 
 parser.add_argument('--nh',
         default=100, type=int,
