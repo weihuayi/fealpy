@@ -135,12 +135,7 @@ class CPLFEMDof1d():
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
             GD = mesh.geo_dimension()
-            if GD == 1:
-                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                        node[cell]).reshape(-1)
-            else:
-                ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                        node[cell]).reshape(-1, GD)
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w, node[cell])
 
             return ipoint
 
@@ -679,6 +674,7 @@ class DPLFEMDof():
         self.multiIndex = self.multi_index_matrix()
         self.cell2dof = self.cell_to_dof()
 
+
     def cell_to_dof(self):
         mesh = self.mesh
         NC = mesh.number_of_cells()
@@ -724,6 +720,12 @@ class DPLFEMDof1d(DPLFEMDof):
     def __init__(self, mesh, p):
         super(DPLFEMDof1d, self).__init__(mesh, p)
 
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell', 'face', 'edge', 1}:
+            return self.cell_to_dof()[index]
+        elif etype in {'node', 0}:
+            return None # there is no dof on nodes 
+
     def multi_index_matrix(self):
         p = self.p
         ldof = self.number_of_local_dofs()
@@ -739,6 +741,14 @@ class DPLFEMDof2d(DPLFEMDof):
     """
     def __init__(self, mesh, p):
         super(DPLFEMDof2d, self).__init__(mesh, p)
+
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell',  2}:
+            return self.cell_to_dof()[index]
+        elif etype in {'face', 'edge', 1}:
+            return None # there is no dof on nodes
+        elif etype in {'node', 0}:
+            return None # there is no dof on nodes 
 
     def multi_index_matrix(self):
         p = self.p
@@ -760,6 +770,16 @@ class DPLFEMDof3d(DPLFEMDof):
     """
     def __init__(self, mesh, p):
         super(DPLFEMDof3d, self).__init__(mesh, p)
+
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        if etype in {'cell', 3}:
+            return self.cell_to_dof()[index]
+        elif etype in {'face', 2}:
+            return None # there is no dof on nodes
+        elif etype in {'face', 1}:
+            return None # there is no dof on nodes
+        elif etype in {'node', 0}:
+            return None # there is no dof on nodes 
 
     def multi_index_matrix(self):
         p = self.p

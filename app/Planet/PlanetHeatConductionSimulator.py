@@ -1,266 +1,202 @@
 
-import sys
 import numpy as np
-import matplotlib.pyplot as plt
-import meshio
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh import LagrangeTriangleMesh, LagrangeWedgeMesh
-from fealpy.writer import MeshWriter
-from fealpy.functionspace import WedgeLagrangeFiniteElementSpace
-from fealpy.boundarycondition import RobinBC, NeumannBC
+from fealpy.functionspace import ParametricLagrangeFiniteElementSpaceOnWedgeMesh
+from fealpy.timeintegratoralg.timeline import UniformTimeLine
 
+from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
-import pyamg
-
-from fealpy.tools.show import showmultirate, show_error_table
-
-from nonlinear_robin import nonlinear_robin
 
 class PlanetHeatConductionSimulator():
-    def __init__(self, pde, mesh, p=1, option=None):
+    def __init__(self, pde, mesh, args):
 
+        self.args = args
         self.pde = pde
         self.mesh = mesh
-        self.space = WedgeLagrangeFiniteElementSpace(mesh, p=p, q=6)
-
-        self.nr = nonlinear_robin(self.pde, self.space, self.mesh, p=p, q=6)
-        
+        self.space = ParametricLagrangeFiniteElementSpaceOnWedgeMesh(mesh,
+                p=args.degree, q=args.nq)
         self.S = self.space.stiff_matrix() # 刚度矩阵
         self.M = self.space.mass_matrix() # 质量矩阵
 
-        if option is None:
-            self.options = self.model_options()
+        omega = self.pde.options['omega']
+        self.args.T *= 3600*24 # 换算成秒
+        self.args.T *= omega # 归一化
+        self.args.DT *= omega 
+        NT = int(args.T/args.DT)
+        self.timeline = UniformTimeLine(0, args.T, NT)
 
-        self.uh0 = self.init_solution()  # 当前时间层的温度分布
-        self.uh1 = self.space.function() # 下一时间层的温度分布 
-        
-    def model_options(self, 
-            A=0.1,             # 邦德反照率
-            epsilon=0.9,       # 辐射率
-            rho=1400,          # kg/m^3 密度
-            c=1200,            # Jkg^-1K^-1 比热容
-            kappa=0.02,        # Wm^-1K^-1 热导率
-            sigma=5.667e-8,    # Wm^-2K^-4 斯特藩-玻尔兹曼常数
-            r=1367.5,          # W/m^2 太阳辐射通量
-            period=5,          # 小行星自转周期，单位小时
-            sd=[1, 0, 1],      # 指向太阳的方向
-            theta=150,         # 初始温度，单位 K
-            ):
+        self.uh0 = self.space.function() # 当前层的数值解
+        self.uh0[:] = self.pde.options['theta']/self.pde.options['Tss']
+        self.uh1 = self.space.function() # 下一层的数值解
 
-        """
-        Notes
-        -----
-            设置模型参数信息
-        """
-        period *= 3600 # 转换为秒
-        omega = 2*np.pi/period
-        Tss = ((1-A)*r/(epsilon*sigma))**(1/4) # 日下点温度 T_ss=[(1-A)*r/(epsilon*sigma)]^(1/4)
-        Tau = np.sqrt(rho*c*kappa) # 热惯量 Tau = (rho*c*kappa)^(1/2)
-        Phi = Tau*np.sqrt(omega)/(epsilon*sigma*Tss**3) # 热参数
-        options = {
-                "A": A,
-                "epsilon": epsilon,
-                "rho": rho,
-                "c": c,
-                "kappa": kappa,
-                "sigma": sigma,
-                "r": r,
-                "period": period， 
-                "sd": np.array(sd, dtype=np.float64),
-                "omega": omega,
-                "Tss": Tss,
-                "Tau": Tau, 
-                "Phi": Phi，
-                "theta": theta,
-                }
-        return options
+        self.uh = self.space.function() # 临时数值解
+        self.uh[:] = self.uh0
+    
+    def init_mu(self, bcs):
+        sd = self.pde.options['sd']
 
-    def time_mesh(self, T=10, NT=100):
-        
-        """ 
-        Parameters
-        ----------
-            T: the final time (day)
-        Notes
-        ------
-            无量纲化后 tau=omega*t 这里的时间层为 tau
-        """
-        from fealpy.timeintegratoralg.timeline import UniformTimeLine
+        t = self.timeline.next_time_level()
+        index = self.mesh.ds.exterior_boundary_tface_index()
+        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
-        omega = self.options['omega']
-        T *= 3600*24 # 换算成秒
-        T *= omega # 归一化
-        timeline = UniformTimeLine(0, T, NT)
-        return timeline
-
-    def init_solution(self):
-        theta = self.options['theta']
-        uh = self.space.function()
-        uh[:] = self.options['theta']/self.options['Tss'] 
-        return uh
-
-    def apply_boundary_condition(self, A, b, uh, timeline):
-        t1 = timeline.next_time_level()
-       
-       # 对 neumann 边界条件进行处理
-        bc = NeumannBC(self.space, lambda x, n:self.pde.neumann(x, n), threshold=self.pde.is_neumann_boundary())
-        b = bc.apply(b) # 混合边界条件不需要输入矩阵A
-
-        # 对 robin 边界条件进行处理
-        bc = RobinBC(self.space, lambda x, n:self.pde.robin(x, n, t1, self.Phi), threshold=self.pde.is_robin_boundary())
-        A0, b = bc.apply(A, b)
-        return b
-
-    def solve(self, uh, timeline):
-        '''  piccard 迭代  向后欧拉方法 '''
-        from nonlinear_robin import nonlinear_robin
-
-        i = timeline.current
-        t1 = timeline.next_time_level()
-        dt = timeline.current_time_step_length()
-        F = self.pde.right_vector(uh, timeline)
-
-        A = self.A
-        M = self.M
-        b = self.apply_boundary_condition(A, F, uh, timeline)
-        
-        e = 1e-10 
-        error = 1
-        xi_new = self.space.function()
-        xi_new[:] = uh[:, i]
-        while error > e:
-            xi_tmp = xi_new.copy()
-            R = self.nr.robin_bc(A, xi_new, lambda x, n:self.pde.robin(x,
-                n, t1, self.Phi), threshold=self.pde.is_robin_boundary())
-            r = M@uh[:, i] + dt*b
-            R = M + dt*R
-
-#            ml = pyamg.ruge_stuben_solver(R)
-#            xi_new[:] = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)
-            xi_new[:] = spsolve(R, r).reshape(-1)
-
-            error = np.max(np.abs(xi_tmp - xi_new[:]))
-            print('error:', error)
-        print('i:', i+1)
-        uh[:, i+1] = xi_new
-
-class TPMModel():
-    def __init__(self):
-        pass
-
-    def init_mesh(self, n=0, h=0.005, nh=100, p=1):
-        fname = 'file1.vtu'
-        data = meshio.read(fname)
-        node = data.points
-        cell = data.cells[0][1]
-
-        node = node - np.mean(node, axis=0)
-        # 无量纲化处理
-        l = np.sqrt(0.02*18000/(1400*1200*2*np.pi)) # 趋肤深度 l=(kappa/(rho*c*omega))^(1/2)
-        node = 500*node/l
-        h = h/l
-
-        mesh = LagrangeTriangleMesh(node, cell, p=p)
-        mesh.uniform_refine(n)
-        mesh = LagrangeWedgeMesh(mesh, h, nh, p=p)
-
-        self.mesh = mesh
-        self.p = p
-        return mesh
-
-    def init_mu(self, t):
-        boundary_face_index = self.is_robin_boundary()
-        qf0, qf1 = self.mesh.integrator(self.p, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
-        m = mesh.boundary_tri_face_unit_normal(bcs, index=boundary_face_index)
-
-        # 小行星外法向, 初始为 (1, 0, 1) 绕 z 轴旋转, 这里 t 为 omega*t
-        n = np.array([np.cos(t), -np.sin(t), 1]) # 指向太阳的方向
-        n = n/np.sqrt(np.dot(n, n))
+        # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
+        Z = np.array([[np.cos(-t), -np.sin(-t), 0],
+            [np.sin(-t), np.cos(-t), 0],
+            [0, 0, 1]], dtype=np.float64)
+        n = Z@sd # t 时刻指向太阳的方向
+        n = n/np.sqrt(np.dot(n, n)) # 单位化处理
 
         mu = np.dot(m, n)
         mu[mu<0] = 0
         return mu
-    
-    def right_vector(self, uh, timeline):
-        shape = uh.shape[0]
-        f = np.zeros(shape, dtype=np.float)
-        return f 
-    
-    @cartesian
-    def neumann(self, p, n):
-        gN = np.zeros((p.shape[0], p.shape[1]), dtype=np.float)
-        return gN
 
-    @cartesian
-    def is_neumann_boundary(self):
-        tface, qface = self.mesh.entity('face')
-        NTF = len(tface)
-        boundary_neumann_tface_index = np.zeros(NTF, dtype=np.bool_)
-        boundary_neumann_tface_index[-NTF//2:] = True
-        return boundary_neumann_tface_index 
-
-    @cartesian    
-    def robin(self, p, n, t, Phi):
-        """ Robin boundary condition
+    def nolinear_robin_boundary(self):
         """
-        mu = self.init_mu(t)
-       
-        shape = len(mu.shape)*(1, )
-        kappa = -np.array([1.0], dtype=np.float64).reshape(shape)/Phi
-        return -mu/Phi, kappa
-    
-    @cartesian
-    def is_robin_boundary(self):
-        tface, qface = self.mesh.entity('face')
-        NTF = len(tface)
-        boundary_robin_tface_index = np.zeros(NTF, dtype=np.bool_)
-        boundary_robin_tface_index[:NTF//2] = True
-        return boundary_robin_tface_index 
 
-if __name__ == '__main__':
-    p = int(sys.argv[1])
-    n = int(sys.argv[2])
-    NT = int(sys.argv[3])
-    maxit = int(sys.argv[4])
-#    h = float(sys.argv[5])
-#    nh = int(sys.argv[6])
-    h = 0.005
-    nh = 100
+        Notes
+        -----
+        处理非线性 Robin 边界条件
 
-    pde = TPMModel()
-    mesh = pde.init_mesh(n=n, h=h, nh=nh, p=p)
+        """
 
-    simulator = PlanetHeatConductionSimulator(pde, mesh)
+        uh = self.uh # 临时的温度有限元函数
+        mesh = self.mesh
+        Phi = self.pde.options['Phi']
+        t1 = self.timeline.next_time_level()
 
-    timeline = simulator.time_mesh(NT=NT)
+        qf = mesh.integrator(self.args.nq, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = self.space.basis(bcs)
 
-    Ndof = np.zeros(maxit, dtype=np.float)
-    
-    for i in range(maxit):
-        print(i)
-        model = PlanetHeatConductionSimulator(pde, mesh, p=p)
+        index = mesh.ds.exterior_boundary_tface_index()
+        face2dof = self.space.tri_face_to_dof()[index]
+
+        val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
+        val **= 3
+        kappa = -1.0/Phi 
+        val *=kappa
+
+        measure = mesh.boundary_tri_face_area(index=index)
+
+        pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
+        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
+
+        mu = self.init_mu(bcs)
+        gR = -mu/Phi # (NQ, NF, ...)
+
+        bb = np.einsum('q, qf, qfi, f->fi', ws, gR, phi, measure)
         
-        Ndof[i] = model.space.number_of_global_dofs()
+        b = np.zeros(len(uh), dtype=np.float64)
+        np.add.at(b, face2dof, bb)
 
-        uh = model.init_solution(timeline)
+        FM = np.einsum('q, qf, qfi, qfj, f->fij', ws, val, phi, phi, measure)
 
-        timeline.time_integration(uh, model, spsolve)
+        I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
+        J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        if i < maxit-1:
-            timeline.uniform_refine()
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
+        return R+self.S, b
+
+    def picard_iteration(self, ctx=None):
+        '''  picard 迭代  向后欧拉方法 '''
+
+        timeline = self.timeline
+        dt = timeline.current_time_step_length()
+
+        M = self.M
+
+        uh0 = self.uh0
+        uh1 = self.uh1
+        uh = self.uh
+
+        uh1[:] = uh0
+        
+        e = self.args.accuracy
+        m = self.args.npicard
+        k = 0
+        error = 1.0
+        while error > e:
+            R, b = self.nolinear_robin_boundary()
+            b *= dt
+            b += M@uh0[:]
+            R *= dt
+            R += M
+
+            if ctx is None:
+                uh[:] = spsolve(R, b).reshape(-1)
+            else:
+                if ctx.myid == 0:
+                    ctx.set_centralized_sparse(R)
+                    x = b.copy()
+                    ctx.set_rhs(x) # Modified in place
+                ctx.run(job=6)
+                uh[:] = x
+
+            error = np.max(np.abs(uh[:] - uh1[:]))
+            print(k, ":", error)
+            uh1[:] = uh
             
-            n = n+1
-            h = h/2
-            nh = nh*2
-            mesh = pde.init_mesh(n=n, h=h, nh=nh)
+            k += 1
+            if k >= self.args.npicard: 
+                print('picard iteration arrive max iteration with error:', error)
+                break
+    
+    def update_mesh_data(self):
+        """
+
+        Notes
+        -----
+        更新 mesh 中的数据
+        """
+        mesh = self.mesh
+
+        uh0 = self.uh0
+
+        # 换算为真实的温度
+        Tss = self.pde.options['Tss']
+        T = uh0*Tss
+        mesh.nodedata['uh'] = T 
+
+
+    def run(self, ctx=None, queue=None):
+        """
+
+        Notes
+        -----
+
+        计算所有时间层
+        """
+        timeline = self.timeline
+        args = self.args
         
-        uh = model.space.function(array=uh[:, -1])
-        uh = uh*self.simulator.T
-        print('uh:', uh)
+        if queue is not None:
+            i = timeline.current
+            fname = args.output + str(i).zfill(10) + '.vtu'
+            self.update_mesh_data()
+            data = {'name':fname, 'mesh':self.mesh}
+            queue.put(data)
 
-    np.savetxt('01solution', uh)
-    mesh.nodedata['uh'] = uh
-
-    mesh.to_vtk(fname='test.vtu') 
+        while not timeline.stop():
+            i = timeline.current
+            print('i:', i)
+            self.picard_iteration(ctx=ctx)
+            self.uh0[:] = self.uh1
+            
+            timeline.advance()
+            
+            if i % args.step == 0:
+                if queue is not None:
+                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    self.update_mesh_data()
+                    data = {'name':fname, 'mesh':self.mesh}
+                    queue.put(data)
+        
+        if queue is not None:
+            i = timeline.current
+            if i % args.step != 0:
+                fname = args.output + str(i).zfill(10) + '.vtu'
+                self.update_mesh_data()
+                data = {'name':fname, 'mesh':self.mesh}
+                queue.put(data)
+            queue.put(-1) # 发送模拟结束信号 

@@ -9,7 +9,7 @@ from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
 
 
-class WedgeLagrangeFiniteElementSpace:
+class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
     def __init__(self, mesh, p, q=None, spacetype='C'):
 
         """
@@ -117,10 +117,7 @@ class WedgeLagrangeFiniteElementSpace:
     def value(self, uh, bc, index=np.s_[:]):
         phi = self.basis(bc)
         shape = phi.shape[-1]
-        if shape == 3:
-            dof = self.dof.tface2dof[index]
-        else:
-            dof = self.dof.cell2dof[index]
+        dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
@@ -402,21 +399,12 @@ class WedgeLagrangeFiniteElementSpace:
         if qface.shape[0] == 0:
             return istDDof
         else:
-            # TODO 
             isqDDof = self.is_quad_boundary_dof(threshold=threshold)
             uh[isqDDof] = gD(ipoints[isqDDof])
             return istDDof, isqDDof
     
     def set_neumann_bc(self, F, gN, threshold=None, q=None):
-        mesh = self.mesh
-        tface, qface = mesh.entity('face')
-        F = self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
-        if qface.shape[0] == 0:
-            return F
-        else:
-            #TODO 
-            F = self.set_quad_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
-            return F
+        self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
     
     def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
 
@@ -444,8 +432,8 @@ class WedgeLagrangeFiniteElementSpace:
 
         face2dof = self.tri_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
+        qf = self.mesh.integrator(q, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
@@ -486,8 +474,8 @@ class WedgeLagrangeFiniteElementSpace:
 
         face2dof = self.quad_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf1.get_quadrature_points_and_weights()
+        qf = self.mesh.integrator(q, 'qface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
         n = mesh.boundary_quad_face_unit_normal(bcs, index=index)
@@ -504,18 +492,10 @@ class WedgeLagrangeFiniteElementSpace:
 
     
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
-        mesh = self.mesh
-        tface, qface = mesh.entity('face')
-        A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
-        if qface.shape[0] == 0:
-            return A, F
-        else:
-            #TODO 
-            A, F = self.set_quad_boundary_robin_bc(A, F,
-                    gR, threshold=threshold, q=q)
-            return A, F
+        A, F = self.set_tri_boundary_robin_bc(gR, A, F, threshold=threshold, q=q)
+        return A, F
 
-    def set_tri_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
+    def set_tri_boundary_robin_bc(self, gR, A, F, threshold=None, q=None):
         """
 
         Notes
@@ -541,15 +521,15 @@ class WedgeLagrangeFiniteElementSpace:
 
         face2dof = self.tri_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
+        qf = mesh.integrator(q, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.boundary_tri_face_area(index=index)
 
         phi = self.face_basis(bcs)
         pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
-        
+
         val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -563,9 +543,8 @@ class WedgeLagrangeFiniteElementSpace:
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-
-        return A, F
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+        return A+R, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
@@ -593,8 +572,8 @@ class WedgeLagrangeFiniteElementSpace:
 
         face2dof = self.quad_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf1.get_quadrature_points_and_weights()
+        qf = mesh.integrator(q, 'qface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.boundary_quad_face_area(index=index)
 
@@ -615,7 +594,7 @@ class WedgeLagrangeFiniteElementSpace:
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        A += csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
-        return A, F
+        return A+R, F
 

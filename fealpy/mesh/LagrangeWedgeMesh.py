@@ -74,6 +74,12 @@ class LinearWedgeMeshDataStructure():
     def boundary_quad_face_index(self):
         return np.arange(self.NQF)
 
+    def interior_boundary_tface_index(self):
+        return np.arange(self.NTF//2, self.NTF)
+
+    def exterior_boundary_tface_index(self):
+        return np.arange(self.NTF//2)
+
 class LagrangeWedgeMesh(Mesh3d):
     def __init__(self, mesh, h, nh, p=1, surface=None):
 
@@ -160,6 +166,9 @@ class LagrangeWedgeMesh(Mesh3d):
         """
         return self.ds.NCN
 
+    def number_of_boundary_tri_faces(self):
+        return self.ds.NTF
+
     def integrator(self, k, etype='cell'):
         qf0 = TriangleQuadrature(k)
         qf1 = GaussLegendreQuadrature(k)
@@ -167,6 +176,10 @@ class LagrangeWedgeMesh(Mesh3d):
             return TensorProductQuadrature((qf0, qf1)) 
         elif etype in {'face', 2}:
             return qf0, TensorProductQuadrature((qf1, qf1))
+        elif etype in {'tface'}:
+            return qf0
+        elif etype in {'qface'}:
+            return TensorProductQuadrature((qf1, qf1))
         elif etype in {'edge', 1}:
             return qf1 
 
@@ -381,8 +394,7 @@ class LagrangeWedgeMesh(Mesh3d):
     def shape_function(self, bc, p=None):
         p = self.p if p is None else p
 
-        TD = len(bc)
-        if TD == 2:
+        if isinstance(bc, tuple):
             phi0 = lagrange_shape_function(bc[0], p)
             phi1 = lagrange_shape_function(bc[1], p)
             # i 是积分点
@@ -390,7 +402,7 @@ class LagrangeWedgeMesh(Mesh3d):
             # m 是基函数
             phi = np.einsum('im, kn->ikmn', phi0, phi1)
             shape = phi.shape[:-2] + (-1, )
-        else:
+        elif isinstance(bc, np.ndarray):
             phi = lagrange_shape_function(bc, p)
             shape = phi.shape[:-1] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
