@@ -59,7 +59,7 @@ class TPMModel():
         args = self.args
         n = args.nrefine # 初始网格加密次数
         p = args.degree # 空间次数 
-        h = args.h # 单个三棱柱高度
+        h = args.h # 求解区域的厚度
         nh = args.nh # 三棱柱层数
         H = args.scale # 小行星规模
 
@@ -70,9 +70,11 @@ class TPMModel():
 
         node = node - np.mean(node, axis=0) # 以质心作为原点
         l = self.options['l']
-        node*= H # H 小行星的规模
-        node/=l # 无量纲化处理
-        h/= l # 无量纲化处理
+        node *= H # H 小行星的规模
+        node /=l # 无量纲化处理
+
+        h /=nh # 单个三棱柱的高度
+        h /= l # 无量纲化处理
 
         mesh = LagrangeTriangleMesh(node, cell, p=p)
         mesh.uniform_refine(n)
@@ -81,32 +83,3 @@ class TPMModel():
         self.mesh = mesh
         self.p = p
         return mesh
-
-    def init_mu(self, t, n0):
-        index = self.mesh.ds.exterior_boundary_tface_index()
-        qf0, qf1 = self.mesh.integrator(self.p, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
-        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
-
-        # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
-        Z = np.array([[np.cos(-t), -np.sin(-t), 0],
-            [np.sin(-t), np.cos(-t), 0],
-            [0, 0, 1]], dtype=np.float64)
-        n = Z@n0 # t 时刻指向太阳的方向
-        n = n/np.sqrt(np.dot(n, n)) # 单位化处理
-
-        mu = np.dot(m, n)
-        mu[mu<0] = 0
-        return mu
-    
-    @cartesian    
-    def robin(self, p, n, t):
-        """ Robin boundary condition
-        """
-        Phi = self.options['Phi']
-        sd = self.options['sd']
-        mu = self.init_mu(t, sd)
-       
-        shape = len(mu.shape)*(1, )
-        k = -np.array([1.0], dtype=np.float64).reshape(shape)/Phi
-        return -mu/Phi, k

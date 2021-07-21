@@ -432,8 +432,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
 
         face2dof = self.tri_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf0.get_quadrature_points_and_weights()
+        qf = self.mesh.integrator(q, 'tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
@@ -474,8 +474,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
 
         face2dof = self.quad_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf1.get_quadrature_points_and_weights()
+        qf = self.mesh.integrator(q, 'qface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
         phi = self.face_basis(bcs)
 
         n = mesh.boundary_quad_face_unit_normal(bcs, index=index)
@@ -492,7 +492,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
 
     
     def set_robin_bc(self, A, F, gR, threshold=None, q=None):
-        A, F = self.set_tri_boundary_robin_bc(A, F, gR, threshold=threshold, q=q)
+        A, F = self.set_tri_boundary_robin_bc(gR, A, F, threshold=threshold, q=q)
         return A, F
 
     def set_tri_boundary_robin_bc(self, gR, A, F, threshold=None, q=None):
@@ -530,19 +530,6 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         pp = mesh.bc_to_point(bcs, etype='face', ftype='tri', index=index)
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
-        if uh is not None:
-            if uh.coordtype == 'cartesian':
-                uhval = uh(pp)
-            elif uh.coordtype =='barycentric':
-                val =uh(bcs)
-                uhval = val[:, index]
-            if m == 0:
-                raise ValueError("noninear degree 'm' is not given") 
-            else:
-                phi0 = uhval[..., None]**m*phi
-        else:
-            phi0 = phi
-
         val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
@@ -551,13 +538,13 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
 
-        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi0, phi, measure)
+        FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-        return R, F
+        return A+R, F
 
     def set_quad_boundary_robin_bc(self, A, F, gR, threshold=None, q=None):
         """
@@ -585,8 +572,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
 
         face2dof = self.quad_face_to_dof()[index]
 
-        qf0, qf1 = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
-        bcs, ws = qf1.get_quadrature_points_and_weights()
+        qf = mesh.integrator(q, 'qface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.boundary_quad_face_area(index=index)
 
