@@ -24,7 +24,7 @@ class PlanetHeatConductionWithRotationSimulator():
         self.args.T *= 3600*24 # 换算成秒
         self.args.T *= omega # 归一化
         self.args.DT *= omega 
-        NT = int(args.T/args.DT)
+        self.NT = int(args.T/args.DT)
         self.timeline = UniformTimeLine(0, args.T, NT)
 
         self.uh0 = self.space.function() # 当前层的数值解
@@ -47,6 +47,7 @@ class PlanetHeatConductionWithRotationSimulator():
             [0, 0, 1]], dtype=np.float64)
         n = Z@sd # t 时刻指向太阳的方向
         n = n/np.sqrt(np.dot(n, n)) # 单位化处理
+        self.sd = n
 
         mu = np.dot(m, n)
         mu[mu<0] = 0
@@ -160,9 +161,13 @@ class PlanetHeatConductionWithRotationSimulator():
         Tss = self.pde.options['Tss']
         T = uh0*Tss
         mesh.nodedata['uh'] = T 
-        mesh.nodedata['sd'] = None 
-        mesh.meshdata['p'] = None
+        
+        sd = np.zeros((len(T), 3), dtype=np.float64)
+        sd = np.vstack((sd, self.sd))
+        mesh.nodedata['sd'] = sd
 
+        scale = self.pde.options['scale']
+        mesh.meshdata['p'] = self.sd*scale*1.5
 
     @timer
     def run(self, ctx=None, queue=None):
@@ -176,9 +181,12 @@ class PlanetHeatConductionWithRotationSimulator():
         timeline = self.timeline
         args = self.args
         
+        omega = self.pde.options['omega']
+        t = self.NT/omega
+        
         if queue is not None:
             i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
+            fname = args.output + str(i*t).zfill(10) + '.vtu'
             self.update_mesh_data()
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
@@ -193,7 +201,7 @@ class PlanetHeatConductionWithRotationSimulator():
             
             if i % args.step == 0:
                 if queue is not None:
-                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    fname = args.output + str(i*t).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
@@ -201,7 +209,7 @@ class PlanetHeatConductionWithRotationSimulator():
         if queue is not None:
             i = timeline.current
             if i % args.step != 0:
-                fname = args.output + str(i).zfill(10) + '.vtu'
+                fname = args.output + str(i*t).zfill(10) + '.vtu'
                 self.update_mesh_data()
                 data = {'name':fname, 'mesh':self.mesh}
                 queue.put(data)
