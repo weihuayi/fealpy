@@ -9,7 +9,7 @@ from fealpy.decorator import timer
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
-class PlanetHeatConductionSimulator():
+class PlanetHeatConductionWithRotationSimulator():
     def __init__(self, pde, mesh, args):
 
         self.args = args
@@ -17,31 +17,35 @@ class PlanetHeatConductionSimulator():
         self.mesh = mesh
         self.space = ParametricLagrangeFiniteElementSpaceOnWedgeMesh(mesh,
                 p=args.degree, q=args.nq)
-        
-        rho = self.pde.options['rho']
-        c = self.pde.options['c']
-        kappa = self.pde.options['kappa']
+        self.S = self.space.stiff_matrix() # 刚度矩阵
+        self.M = self.space.mass_matrix() # 质量矩阵
 
-        self.S = kappa*self.space.stiff_matrix() # 刚度矩阵
-        self.M = rho*c*self.space.mass_matrix() # 质量矩阵
-
+        omega = self.pde.options['omega']
         self.args.T *= 3600*24 # 换算成秒
+        self.args.T *= omega # 归一化
+        self.args.DT *= omega 
         NT = int(args.T/args.DT)
         self.timeline = UniformTimeLine(0, args.T, NT)
 
         self.uh0 = self.space.function() # 当前层的数值解
-        self.uh0[:] = self.pde.options['theta']
+        self.uh0[:] = self.pde.options['theta']/self.pde.options['Tss']
         self.uh1 = self.space.function() # 下一层的数值解
 
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
     
     def init_mu(self, bcs):
-        n = self.pde.options['sd']
+        sd = self.pde.options['sd']
 
+        t = self.timeline.next_time_level()
         index = self.mesh.ds.exterior_boundary_tface_index()
         m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
+        # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
+        Z = np.array([[np.cos(-t), -np.sin(-t), 0],
+            [np.sin(-t), np.cos(-t), 0],
+            [0, 0, 1]], dtype=np.float64)
+        n = Z@sd # t 时刻指向太阳的方向
         n = n/np.sqrt(np.dot(n, n)) # 单位化处理
 
         mu = np.dot(m, n)
@@ -59,10 +63,7 @@ class PlanetHeatConductionSimulator():
 
         uh = self.uh # 临时的温度有限元函数
         mesh = self.mesh
-        epsilon = self.pde.options['epsilon']
-        sigma = self.pde.options['sigma']
-        A = self.pde.options['A']
-        qs = self.pde.options['qs']
+        Phi = self.pde.options['Phi']
 
         qf = mesh.integrator(self.args.nq, 'tface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -73,7 +74,7 @@ class PlanetHeatConductionSimulator():
 
         val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
         val **= 3
-        kappa = -epsilon*sigma
+        kappa = -1.0/Phi 
         val *=kappa
 
         measure = mesh.boundary_tri_face_area(index=index)
@@ -81,7 +82,7 @@ class PlanetHeatConductionSimulator():
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         mu = self.init_mu(bcs)
-        gR = -(1-A)*qs*mu # (NQ, NF, ...)
+        gR = -mu/Phi # (NQ, NF, ...)
 
         bb = np.einsum('q, qf, qfi, f->fi', ws, gR, phi, measure)
         
@@ -104,7 +105,6 @@ class PlanetHeatConductionSimulator():
         dt = timeline.current_time_step_length()
 
         M = self.M
-        S = self.S
 
         uh0 = self.uh0
         uh1 = self.uh1
@@ -112,8 +112,9 @@ class PlanetHeatConductionSimulator():
 
         uh1[:] = uh0
         
+        Tss = self.pde.options['Tss']
         i = timeline.current
-        print(i, ",", uh0[:])
+        print(i, ",", uh0[:]*Tss)
             
         k = 0
         error = 1.0
@@ -155,7 +156,13 @@ class PlanetHeatConductionSimulator():
 
         uh0 = self.uh0
 
-        mesh.nodedata['uh'] = uh0 
+        # 换算为真实的温度
+        Tss = self.pde.options['Tss']
+        T = uh0*Tss
+        mesh.nodedata['uh'] = T 
+        mesh.nodedata['sd'] = None 
+        mesh.meshdata['p'] = None
+
 
     @timer
     def run(self, ctx=None, queue=None):

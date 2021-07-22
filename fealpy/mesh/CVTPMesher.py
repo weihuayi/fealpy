@@ -17,11 +17,11 @@ class CVTPMesher:
         else :
             self.dof = np.ones(len(mesh.node))
 
-    def uniform_meshing(self, n=2, c=0.618, theta=100,times = None):
-        self.uniform_boundary_meshing(n=n, c=c, theta=theta,times = times)
+    def uniform_meshing(self, nb=2, c=0.618, theta=100,times = None):
+        self.uniform_boundary_meshing(n=nb, c=c, theta=theta,times = times)
         self.uniform_init_interior_nodes()
 
-    def uniform_refine(self,n = 2,times = None):
+    def boundary_uniform_refine(self, n=2, times = None):
         """
         该函数用于对输入的网格边界进行加密
         n: 加密次数
@@ -66,7 +66,7 @@ class CVTPMesher:
                     isMarkedHEdge[::2] = (times == i)
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100,times=None):
-        self.uniform_refine(n=n,times = times)
+        self.boundary_uniform_refine(n=n,times = times)
         node = self.mesh.node
         sdomain = self.mesh.ds.subdomain
         NN = len(node)
@@ -302,7 +302,7 @@ class CVTPMesher:
         self.start = start
         return vor, start
 
-    def Lloyd(self, vor, start):
+    def lloyd_opt(self, vor, start):
 
         vertices = vor.vertices
         NN = self.NN

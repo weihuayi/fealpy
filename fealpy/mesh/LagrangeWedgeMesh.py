@@ -549,6 +549,7 @@ class LagrangeWedgeMesh(Mesh3d):
         from .vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
+
         GD = self.geo_dimension()
 
         cell = self.entity(etype)[index]

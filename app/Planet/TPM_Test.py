@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 
 from fealpy.writer import VTKMeshWriter
+from PlanetHeatConductionWithRotationSimulator import PlanetHeatConductionWithRotationSimulator
 from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
 from TPMModel import TPMModel 
 
@@ -66,7 +67,7 @@ parser.add_argument('--scale',
 args = parser.parse_args()
 
 pde = TPMModel(args)
-mesh = pde.init_mesh()
+mesh = pde.test_mesh()
 
 ctx = DMumpsContext()
 ctx.set_silent()
