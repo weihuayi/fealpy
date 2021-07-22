@@ -94,26 +94,6 @@ class CVTPMesherTest:
             uniform_mesh.uniform_boundary_meshing(n=0)
             bnode = uniform_mesh.bnode
 
-        elif domain =='sc':
-            n = 20
-            h = 2*np.pi/n
-            theta = np.arange(0, 2*np.pi, h)
-            vertices = np.zeros((n, 2), dtype=np.float)
-            vertices[:, 0] = np.cos(theta)
-            vertices[:, 1] = np.sin(theta)
-            fixed = np.zeros(n, dtype=np.bool)
-            facets = np.zeros((n,2), dtype=np.int)
-            facets[:, 0] = range(0, n)
-            facets[:-1, 1] = range(1, n)
-            subdomain = np.zeros((n, 2),dtype=np.int)
-            subdomain[:, 0] = 1
-
-            mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
-                    fixed)
-            uniform_mesh= CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=0)
-            bnode = uniform_mesh.bnode
-
         elif domain == 'partition1':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),(0.5,0.5)],dtype=np.float)
