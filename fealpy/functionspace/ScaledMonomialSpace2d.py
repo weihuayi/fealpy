@@ -465,23 +465,84 @@ class ScaledMonomialSpace2d():
         return M 
 
     def penalty_matrix(self, p=None):
+        """
+        Notes
+        -----
+
+        h_e^{-1}<[u], [v]>_e
+        
+        """
         p = p or self.p
         mesh = self.mesh
         edge = mesh.entity('edge')
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
         eh = mesh.entity_measure('edge')
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = self.mesh.edge_bc_to_point(bcs)
 
+        phi0 = space.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi1 = space.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, ldof)
+
         ldof = self.number_of_local_dofs(doftype='cell')
         shape = ps.shape[:-1] + (2*ldof, )
         phi = np.zeros(shape, dtype=self.ftype)
+
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
         phi[:, isInEdge, ldof:] = -self.basis(ps, index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
-        H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, eh, optimize=True)
+
+        A = np.einsum('q, qei, qej->eij', ws, phi, phi, optimize=True)
+
         cell2dof = self.cell_to_dof()
+        edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def normal_grad_penalty_matrix(self, p=None):
+        """
+        Notes
+        -----
+
+        \\beta h_e < [u_n], [v_n]>_e
+        """
+        p = p or self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
+        ldof = self.number_of_local_dofs(doftype='cell')
+        GD = mesh.geo_dimension()
+
+        eh = mesh.entity_measure('edge')
+        en = mesh.edge_normal()
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs)
+
+        shape = ps.shape[:-1] + (2*ldof, )
+        gphi = np.zeros(shape, dtype=self.ftype)
+
+        gphi[:, :, :ldof]= np.sum(space.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, isInEdge, ldof:] = -np.sum(space.grad_basis(ps, index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+
+
+        phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi[:, isInEdge, ldof:] = -self.basis(ps, index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
+
+        A = np.einsum('q, qei, qej->eij', ws, phi, phi, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
 
     def source_vector(self, f, celltype=False, q=None):
         """
