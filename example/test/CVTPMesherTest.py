@@ -279,7 +279,7 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=2)
+            uniform_mesh.uniform_meshing(n=3)
        
         elif domain == 'LShape':
             vertices = np.array([
@@ -361,7 +361,7 @@ class CVTPMesherTest:
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=3)
+            uniform_mesh.uniform_meshing(n=4)
 
         elif domain == 'partition2':
             vertices = np.array([
@@ -378,7 +378,7 @@ class CVTPMesherTest:
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=2)
+            uniform_mesh.uniform_meshing(n=3)
 
         elif domain == 'hole1':
             
@@ -477,7 +477,7 @@ class CVTPMesherTest:
             plt.show()
        
         i =0
-        while i<20:
+        while i<100:
             vor = uniform_mesh.Lloyd(vor,start)
             i+=1
 
@@ -541,9 +541,9 @@ if sys.argv[1] == "Lloyd":
 #test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
 #test.Lloyd_test(domain='circle_hole')
-#test.Lloyd_test(domain='partition1')
+test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
-test.Lloyd_test(domain = 'hole1')
+#test.Lloyd_test(domain = 'hole1')
 #test.Lloyd_test(domain='hole2')
 #test.Lloyd_test(domain='square2')
 #test.Lloyd_test(domain = 'hexagon')
