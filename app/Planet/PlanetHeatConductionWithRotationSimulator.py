@@ -160,6 +160,9 @@ class PlanetHeatConductionWithRotationSimulator():
         Tss = self.pde.options['Tss']
         T = uh0*Tss
         mesh.nodedata['uh'] = T 
+        mesh.nodedata['sd'] = None 
+        mesh.meshdata['p'] = None
+
 
     @timer
     def run(self, ctx=None, queue=None):
