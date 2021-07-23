@@ -17,4 +17,5 @@ FEALPy 是一款偏微分方程数值解的开源算法库，以对象化和数�
     + [Poisson 问题](./poisson.md)
     + [非线性 Poisson 问题](./non_linear_poisson.md)
     + [一般的椭圆方程](./general_elliptic_equation.md)
+    + [NS 方程](./ns.md)
 * [贡献](./contribution.md)
