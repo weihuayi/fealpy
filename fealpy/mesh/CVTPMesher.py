@@ -328,27 +328,29 @@ class CVTPMesher:
         vor = Voronoi(vor.points)
         return vor
     
-    def to_PolygonMesh(self,vor):
+    def to_polygonMesh(self, vor):
+        """
+        Notes
+        ----
+            给定一个 Vornori 剖分
+        """
         bnode2subdomain = self.bnode2subdomain
         start = self.start
         cstart = self.mesh.ds.cellstart
         points = vor.points
         pnode = vor.vertices
         point_region = vor.point_region
-        regions = vor.regions
         ridge_vertices = vor.ridge_vertices
 
         bnode_region = point_region[:start]
         bnode_region = bnode_region[bnode2subdomain>=cstart]
-        point_region = np.hstack((bnode_region,point_region[start:]))
-        regions = np.array(regions)[point_region]
-        pcellLocation =[len(x) for x in regions]
-        pcell = sum(regions,[]) # 将列表合并为一个列表
-        pcellLocation = np.array(pcellLocation)
-        pcellLocation = pcellLocation.cumsum()
-        pcellLocation = np.hstack((np.array([0]),pcellLocation))
-        pcell = np.array(pcell)
-        return PolygonMesh(pnode,pcell,pcellLocation)
+        point_region = np.hstack((bnode_region, point_region[start:]))
+        regions = [vor.regions[i] for i in point_region]
+        pcellLocation =np.array([0] + [len(x) for x in regions],
+                dtype=np.int_)
+        np.cumsum(pcellLocation, out=pcellLocation)
+        pcell = np.array(sum(regions,[]), dtype=np.int_)
+        return PolygonMesh(pnode, pcell, pcellLocation)
 
     def energy(self,vor):
         points = vor.points
