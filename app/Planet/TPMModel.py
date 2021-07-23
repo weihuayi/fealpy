@@ -2,7 +2,7 @@ import numpy as np
 import meshio
 
 from fealpy.decorator import cartesian, barycentric, timer
-from fealpy.geometry import SphereSurface
+from fealpy.geometry.implicit_surface import ScaledSurface, SphereSurface
 from fealpy.mesh import LagrangeTriangleMesh, LagrangeWedgeMesh
 from fealpy.writer import MeshWriter
 
@@ -55,6 +55,7 @@ class TPMModel():
                 }
         return options
 
+
     @timer
     def init_rotation_mesh(self):
         print("Generate the init mesh!...")
@@ -106,7 +107,9 @@ class TPMModel():
 
         h /=nh # 单个三棱柱的高度
 
-        mesh = LagrangeTriangleMesh(node, cell, p=p)
+        surface = ScaledSurface(surface, H)
+
+        mesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
         mesh.uniform_refine(n)
         
         node = mesh.entity('node')
@@ -145,7 +148,9 @@ class TPMModel():
         h /=nh # 单个三棱柱的高度
         h /= l # 无量纲化处理
 
-        mesh = LagrangeTriangleMesh(node, cell, p=p)
+        surface = ScaledSurface(surface, H)
+
+        mesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
         mesh.uniform_refine(n)
         
         node = mesh.entity('node')
@@ -159,6 +164,6 @@ class TPMModel():
         cell = mesh.entity('cell')
         print('node:', len(node))
         print('cell:', len(cell))
-        
+
         print("finish mesh generation!")
         return mesh
