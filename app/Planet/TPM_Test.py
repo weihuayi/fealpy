@@ -4,8 +4,7 @@ import argparse
 import numpy as np
 
 from fealpy.writer import VTKMeshWriter
-from PlanetHeatConductionWithRotationSimulator import PlanetHeatConductionWithRotationSimulator
-from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
+from PlanetHeatConductionSimulator import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
 from TPMModel import TPMModel 
 
 from mumps import DMumpsContext
