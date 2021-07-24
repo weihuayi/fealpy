@@ -165,10 +165,10 @@ class PlanetHeatConductionWithRotationSimulator():
         T[:-1] = uh0*Tss
         mesh.nodedata['uh'] = T
         
-        l = self.pde.options['l']
+        scale = self.args.scale
         
         sd = np.zeros((len(uh0), 3), dtype=np.float64)
-        n = self.sun_direction()/l
+        n = self.sun_direction()*scale*1.8
         sd = np.vstack((sd, -n))
         mesh.nodedata['sd'] = sd
 
