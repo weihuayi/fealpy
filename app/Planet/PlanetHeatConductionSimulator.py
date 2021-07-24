@@ -166,13 +166,14 @@ class PlanetHeatConductionWithRotationSimulator():
         mesh.nodedata['uh'] = T
         
         scale = self.args.scale
+        l = self.pde.options['l']
         
         sd = np.zeros((len(uh0), 3), dtype=np.float64)
-        n = self.sun_direction()*scale*1.8
-        sd = np.vstack((sd, -n))
+        n = self.sun_direction()
+        sd = np.vstack((sd, -n*1.8))
         mesh.nodedata['sd'] = sd
 
-        mesh.meshdata['p'] = n
+        mesh.meshdata['p'] = n*scale*1.3/l
 
     @timer
     def run(self, ctx=None, queue=None):
