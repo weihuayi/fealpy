@@ -23,7 +23,7 @@ $$
 
 其中符号的物理意义分别为
 
-- $\bfu=\bfu(u,v,w,t)$ 代表速度
+- $$\bfu=\bfu(u,v,w,t) $$ 代表速度
 - p代表单位面积上的压力
 - f单位质量流体微团的体积力
 - $\mu$ 分子粘性系数
@@ -44,17 +44,19 @@ $$
 对以下几项用散度定理来处理
 
 $$
-\begin{align*}
+\begin{align}
 	-\int_{\Omega} \nabla p \cdot \bfv dx 
 	&= \int_{\Omega} p (\nabla \cdot \bfv) - \nabla \cdot (p\bfv)dx\\
 	&= \int_{\Omega} p (\nabla \cdot \bfv) dx - \int_{\partial \Omega} p\bfv \cdot \bfn ds
-\end{align*}
-
-\begin{align*}
+\end{align}
+$$
+和
+$$
+\begin{align}
 	\int_{\Omega} (\nabla \cdot \nabla \bfu) \cdot \bfv \quad dx 
 	&= \int_{\Omega} \nabla \cdot (\nabla \bfu \cdot \bfv) - \nabla \bfv : \nabla \bfu dx\\
 	&= \int_{\partial \Omega} \nabla \bfu \cdot \bfv  \cdot \bfn ds - \int_{\Omega} \nabla \bfv : \nabla \bfu dx
-\end{align*}
+\end{align}
 $$
 
 因此我们可得到其变分形式
