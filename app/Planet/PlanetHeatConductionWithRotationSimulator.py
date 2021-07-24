@@ -23,9 +23,9 @@ class PlanetHeatConductionWithRotationSimulator():
         omega = self.pde.options['omega']
         self.args.T *= 3600*24 # 换算成秒
         self.args.T *= omega # 归一化
-        self.args.DT *= omega 
-        NT = int(args.T/args.DT)
-        self.timeline = UniformTimeLine(0, args.T, NT)
+        DT = self.args.DT*omega 
+        self.NT = int(args.T/DT)
+        self.timeline = UniformTimeLine(0, args.T, self.NT)
 
         self.uh0 = self.space.function() # 当前层的数值解
         self.uh0[:] = self.pde.options['theta']/self.pde.options['Tss']
@@ -33,21 +33,24 @@ class PlanetHeatConductionWithRotationSimulator():
 
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
-    
-    def init_mu(self, bcs):
-        sd = self.pde.options['sd']
 
+    def sun_direction(self):
         t = self.timeline.next_time_level()
-        index = self.mesh.ds.exterior_boundary_tface_index()
-        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
-
+        sd = self.pde.options['sd']
+        
         # 指向太阳的向量绕 z 轴旋转, 这里 t 为 omega*t
         Z = np.array([[np.cos(-t), -np.sin(-t), 0],
             [np.sin(-t), np.cos(-t), 0],
             [0, 0, 1]], dtype=np.float64)
         n = Z@sd # t 时刻指向太阳的方向
         n = n/np.sqrt(np.dot(n, n)) # 单位化处理
+        return n
+    
+    def init_mu(self, bcs):
+        index = self.mesh.ds.exterior_boundary_tface_index()
+        m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
+        n = self.sun_direction()
         mu = np.dot(m, n)
         mu[mu<0] = 0
         return mu
@@ -74,7 +77,7 @@ class PlanetHeatConductionWithRotationSimulator():
 
         val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
         val **= 3
-        kappa = -1.0/Phi 
+        kappa = 1.0/Phi 
         val *=kappa
 
         measure = mesh.boundary_tri_face_area(index=index)
@@ -82,7 +85,7 @@ class PlanetHeatConductionWithRotationSimulator():
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         mu = self.init_mu(bcs)
-        gR = -mu/Phi # (NQ, NF, ...)
+        gR = mu/Phi # (NQ, NF, ...)
 
         bb = np.einsum('q, qf, qfi, f->fi', ws, gR, phi, measure)
         
@@ -158,11 +161,18 @@ class PlanetHeatConductionWithRotationSimulator():
 
         # 换算为真实的温度
         Tss = self.pde.options['Tss']
-        T = uh0*Tss
-        mesh.nodedata['uh'] = T 
-        mesh.nodedata['sd'] = None 
-        mesh.meshdata['p'] = None
+        T = np.zeros(len(uh0)+1, dtype=np.float64)
+        T[:-1] = uh0*Tss
+        mesh.nodedata['uh'] = T
+        
+        l = self.pde.options['l']
+        
+        sd = np.zeros((len(T), 3), dtype=np.float64)
+        n = self.sun_direction()/l
+        sd = np.vstack((sd, -n))
+        mesh.nodedata['sd'] = sd
 
+        mesh.meshdata['p'] = n
 
     @timer
     def run(self, ctx=None, queue=None):
@@ -178,7 +188,7 @@ class PlanetHeatConductionWithRotationSimulator():
         
         if queue is not None:
             i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
+            fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
             self.update_mesh_data()
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
@@ -193,7 +203,7 @@ class PlanetHeatConductionWithRotationSimulator():
             
             if i % args.step == 0:
                 if queue is not None:
-                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
@@ -201,7 +211,7 @@ class PlanetHeatConductionWithRotationSimulator():
         if queue is not None:
             i = timeline.current
             if i % args.step != 0:
-                fname = args.output + str(i).zfill(10) + '.vtu'
+                fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
                 self.update_mesh_data()
                 data = {'name':fname, 'mesh':self.mesh}
                 queue.put(data)

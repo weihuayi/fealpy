@@ -43,6 +43,7 @@ class PlanetHeatConductionSimulator():
         m = self.mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         n = n/np.sqrt(np.dot(n, n)) # 单位化处理
+        self.sd = n
 
         mu = np.dot(m, n)
         mu[mu<0] = 0
@@ -59,6 +60,7 @@ class PlanetHeatConductionSimulator():
 
         uh = self.uh # 临时的温度有限元函数
         mesh = self.mesh
+        
         epsilon = self.pde.options['epsilon']
         sigma = self.pde.options['sigma']
         A = self.pde.options['A']
@@ -73,15 +75,15 @@ class PlanetHeatConductionSimulator():
 
         val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
         val **= 3
-        kappa = -epsilon*sigma
-        val *=kappa
+        kappa = epsilon*sigma
+        val *= kappa
 
         measure = mesh.boundary_tri_face_area(index=index)
 
         n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         mu = self.init_mu(bcs)
-        gR = -(1-A)*qs*mu # (NQ, NF, ...)
+        gR = (1-A)*qs*mu # (NQ, NF, ...)
 
         bb = np.einsum('q, qf, qfi, f->fi', ws, gR, phi, measure)
         
@@ -152,10 +154,19 @@ class PlanetHeatConductionSimulator():
         更新 mesh 中的数据
         """
         mesh = self.mesh
-
+        
         uh0 = self.uh0
+        T = np.zeros(len(uh0)+1, dtype=np.float64)
+        T[:-1] = uh0
+        mesh.nodedata['uh'] = T
+        
+        scale = self.args.scale
+        sd = np.zeros((len(uh0), 3), dtype=np.float64)
+        n = 1.2*scale*self.pde.options['sd']
+        sd = np.vstack((sd, -n))
+        mesh.nodedata['sd'] = sd
 
-        mesh.nodedata['uh'] = uh0 
+        mesh.meshdata['p'] = n
 
     @timer
     def run(self, ctx=None, queue=None):
@@ -171,7 +182,7 @@ class PlanetHeatConductionSimulator():
         
         if queue is not None:
             i = timeline.current
-            fname = args.output + str(i).zfill(10) + '.vtu'
+            fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
             self.update_mesh_data()
             data = {'name':fname, 'mesh':self.mesh}
             queue.put(data)
@@ -186,7 +197,7 @@ class PlanetHeatConductionSimulator():
             
             if i % args.step == 0:
                 if queue is not None:
-                    fname = args.output + str(i).zfill(10) + '.vtu'
+                    fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
                     self.update_mesh_data()
                     data = {'name':fname, 'mesh':self.mesh}
                     queue.put(data)
@@ -194,7 +205,7 @@ class PlanetHeatConductionSimulator():
         if queue is not None:
             i = timeline.current
             if i % args.step != 0:
-                fname = args.output + str(i).zfill(10) + '.vtu'
+                fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
                 self.update_mesh_data()
                 data = {'name':fname, 'mesh':self.mesh}
                 queue.put(data)
