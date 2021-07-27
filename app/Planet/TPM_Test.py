@@ -4,7 +4,7 @@ import argparse
 import numpy as np
 
 from fealpy.writer import VTKMeshWriter
-from PlanetHeatConductionSimulator import PlanetHeatConductionSimulator
+from PlanetHeatConductionSimulator import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
 from TPMModel import TPMModel 
 
 from mumps import DMumpsContext
@@ -24,7 +24,7 @@ parser.add_argument('--nq',
         help='积分精度, 默认为 3.')
 
 parser.add_argument('--T',
-        default=10, type=int,
+        default=10, type=float,
         help='求解的最终时间, 默认为 10 天.')
 
 parser.add_argument('--DT',
@@ -40,8 +40,8 @@ parser.add_argument('--npicard',
         help='picard 迭代的最大迭代次数, 默认为 30 次.')
 
 parser.add_argument('--step',
-        default=300, type=int,
-        help='结果输出的步数间隔，默认为 300 步输出一次 vtu 文件.')
+        default=1, type=int,
+        help='结果输出的步数间隔，默认为 1 步输出一次 vtu 文件.')
 
 parser.add_argument('--output', 
         default='test', type=str,
@@ -66,12 +66,12 @@ parser.add_argument('--scale',
 args = parser.parse_args()
 
 pde = TPMModel(args)
-mesh = pde.init_mesh()
+mesh = pde.init_rotation_mesh()
 
 ctx = DMumpsContext()
 ctx.set_silent()
 
-simulator = PlanetHeatConductionSimulator(pde, mesh, args)
+simulator = PlanetHeatConductionWithRotationSimulator(pde, mesh, args)
 
 writer = VTKMeshWriter(simulation=simulator.run, args=(ctx, ))
 writer.run()

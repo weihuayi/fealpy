@@ -7,7 +7,7 @@ import pyamg
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.poisson_2d import CosCosData as PDE
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 
@@ -44,10 +44,9 @@ print(args)
 
 pde = PDE()
 
-mf = MeshFactory()
 
 # 创建一个双 p 次的四边形网格
-mesh = mf.boxmesh2d(args.b, nx=args.n, ny=args.n, meshtype='quad', p=args.p) 
+mesh = MF.boxmesh2d(args.b, nx=args.n, ny=args.n, meshtype='quad', p=args.p) 
 
 # 在 mesh 上创建一个双 p 次的有限元函数空间
 space = ParametricLagrangeFiniteElementSpace(mesh, p=args.p, spacetype='C')

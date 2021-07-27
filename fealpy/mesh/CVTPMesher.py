@@ -17,11 +17,11 @@ class CVTPMesher:
         else :
             self.dof = np.ones(len(mesh.node))
 
-    def uniform_meshing(self, n=2, c=0.618, theta=100,times = None):
-        self.uniform_boundary_meshing(n=n, c=c, theta=theta,times = times)
+    def uniform_meshing(self, nb=2, c=0.618, theta=100,times = None):
+        self.uniform_boundary_meshing(n=nb, c=c, theta=theta,times = times)
         self.uniform_init_interior_nodes()
 
-    def uniform_refine(self,n = 2,times = None):
+    def boundary_uniform_refine(self, n=2, times = None):
         """
         该函数用于对输入的网格边界进行加密
         n: 加密次数
@@ -66,8 +66,9 @@ class CVTPMesher:
                     isMarkedHEdge[::2] = (times == i)
 
     def uniform_boundary_meshing(self, n=0, c=0.618, theta=100,times=None):
-        self.uniform_refine(n=n,times = times)
+        self.boundary_uniform_refine(n=n,times = times)
         node = self.mesh.node
+        sdomain = self.mesh.ds.subdomain
         NN = len(node)
         halfedge = self.mesh.entity('halfedge')
         #halfedge = self.mesh.ds.halfedge
@@ -92,70 +93,128 @@ class CVTPMesher:
 
         # 修正角点相邻点的半径, 如果角点的角度小于 theta 的
         # 这里假设角点相邻的节点, 到角点的距离相等
-        isFixed = self.dof
-        hnode = np.zeros(NN,dtype = np.int_)
-        hnode[halfedge[:,0]] = np.arange(len(halfedge))
-        hnode1 = halfedge[halfedge[hnode,2],4]
+        if max(sdomain) == 1:
+            isFixed = self.dof
+            hnode = np.zeros(NN,dtype = np.int_)
+            hnode[halfedge[:,0]] = np.arange(len(halfedge))
+            hnode1 = halfedge[halfedge[hnode,2],4]
 
-        idx, = np.where(isFixed==1)
-        idx = np.hstack((hnode[idx],hnode1[idx]))
-        pre = halfedge[idx, 3]
-        nex = halfedge[idx, 2]
+            idx, = np.where(isFixed==1)
+            idx = np.hstack((hnode[idx],hnode1[idx]))
+            pre = halfedge[idx, 3]
+            nex = halfedge[idx, 2]
 
-        p0 = node[halfedge[pre, 0]]
-        p1 = node[halfedge[idx, 0]]
-        p2 = node[halfedge[nex, 0]]
+            p0 = node[halfedge[pre, 0]]
+            p1 = node[halfedge[idx, 0]]
+            p2 = node[halfedge[nex, 0]]
 
-        v0 = p2 - p1
-        v1 = p0 - p1
-        l0 = np.sqrt(np.sum(v0**2, axis=-1))
-        l1 = np.sqrt(np.sum(v1**2, axis=-1))
-        s = np.cross(v0, v1)/l0/l1
-        c = np.sum(v0*v1, axis=-1)/l0/l1
-        a = np.arcsin(s)
-        a[s < 0] += 2*np.pi
-        a[c == -1] = np.pi
-        aflag1 = ((c<0) & (a>np.pi))
-        a[aflag1] = 3*np.pi - a[aflag1]
-        aflag2 = ((c<0) & (a<(np.pi/2)))
-        a[aflag2] = np.pi - a[aflag2]
-        a = np.degrees(a)
-        isCorner = a < theta
-         
-        idx = idx[isCorner] # 需要特殊处理的半边编号 
+            v0 = p2 - p1
+            v1 = p0 - p1
+            l0 = np.sqrt(np.sum(v0**2, axis=-1))
+            l1 = np.sqrt(np.sum(v1**2, axis=-1))
+            s = np.cross(v0, v1)/l0/l1
+            c = np.sum(v0*v1, axis=-1)/l0/l1
+            a = np.arcsin(s)
+            a[s < 0] += 2*np.pi
+            a[c == -1] = np.pi
+            aflag1 = ((c<0) & (a>np.pi))
+            a[aflag1] = 3*np.pi - a[aflag1]
+            aflag2 = ((c<0) & (a<(np.pi/2)))
+            a[aflag2] = np.pi - a[aflag2]
+            a = np.degrees(a)
+            isCorner = a < theta
+             
+            idx = idx[isCorner] # 需要特殊处理的半边编号 
 
-        v2 = (v0[isCorner] + v1[isCorner])/2
-        v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
-        v2 *= r[halfedge[idx, 0], None]
-        p = node[halfedge[idx, 0]] + v2
-        r[halfedge[pre[isCorner], 0]] = np.sqrt(np.sum((p - p0[isCorner])**2, axis=-1))
-        r[halfedge[nex[isCorner], 0]] = np.sqrt(np.sum((p - p2[isCorner])**2, axis=-1))
+            v2 = (v0[isCorner] + v1[isCorner])/2
+            v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
+            v2 *= r[halfedge[idx, 0], None]
+            p = node[halfedge[idx, 0]] + v2
+            r[halfedge[pre[isCorner], 0]] = np.sqrt(np.sum((p - p0[isCorner])**2, axis=-1))
+            r[halfedge[nex[isCorner], 0]] = np.sqrt(np.sum((p - p2[isCorner])**2, axis=-1))
 
-        # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
-        # 这里也假设很近的点对是孤立的. 
-        NG = halfedge.shape[0] # 会生成 NG 个生成子, 每个半边都对应一个
-        index = np.arange(NG)
-        nex = halfedge[idx, 2]
-        index[nex] = idx #半边对应的bnode 
+            # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
+            # 这里也假设很近的点对是孤立的. 
+            NG = halfedge.shape[0] # 会生成 NG 个生成子, 每个半边都对应一个
+            index = np.arange(NG)
+            nex = halfedge[idx, 2]
+            index[nex] = idx #半边对应的bnode 
 
-        # 计算每个半边对应的节点
-        center = (node[idx0] + node[idx1])/2
-        r0 = r[idx0]
-        r1 = r[idx1]
-        c0 = 0.5*(r0**2 - r1**2)/h**2
-        c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
-        bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w)
+            # 计算每个半边对应的节点
+            center = (node[idx0] + node[idx1])/2
+            r0 = r[idx0]
+            r1 = r[idx1]
+            c0 = 0.5*(r0**2 - r1**2)/h**2
+            c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
+            bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w)
 
-        isKeepNode = np.zeros(NG, dtype=np.bool_)
-        isKeepNode[index] = True
-        idxmap = np.zeros(NG, dtype=np.int)
-        idxmap[isKeepNode] = range(isKeepNode.sum())
+            isKeepNode = np.zeros(NG, dtype=np.bool_)
+            isKeepNode[index] = True
+            idxmap = np.zeros(NG, dtype=np.int)
+            idxmap[isKeepNode] = range(isKeepNode.sum())
 
-        self.bnode = bnode[isKeepNode] #
-        idxflag = halfedge[idx,1]<=0
-        self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
-        self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
-        self.chedge = idx # the index of halfedge point on corner point
+            self.bnode = bnode[isKeepNode] #
+            idxflag = halfedge[idx,1]<=0
+            self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
+            self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
+            self.chedge = idx # the index of halfedge point on corner point
+        else:
+            isFixed = np.zeros(len(self.dof))
+            #idx, = np.nonzero(isFixed)
+            idx, = np.where(isFixed==0)
+            pre = halfedge[idx, 3]
+            nex = halfedge[idx, 2]
+
+            p0 = node[halfedge[pre, 0]]
+            p1 = node[halfedge[idx, 0]]
+            p2 = node[halfedge[nex, 0]]
+
+            v0 = p2 - p1
+            v1 = p0 - p1
+            l0 = np.sqrt(np.sum(v0**2, axis=-1))
+            l1 = np.sqrt(np.sum(v1**2, axis=-1))
+            s = np.cross(v0, v1)/l0/l1
+            c = np.sum(v0*v1, axis=-1)/l0/l1
+            a = np.arcsin(s)
+            a[s < 0] += 2*np.pi
+            a[c == -1] = np.pi
+            a = np.degrees(a)
+            isCorner = (a < theta) & (a > 0)
+            idx = idx[isCorner] # 需要特殊处理的半边编号 
+
+
+            v2 = (v0[isCorner] + v1[isCorner])/2
+            v2 /= np.sqrt(np.sum(v2**2, axis=-1, keepdims=True))
+            v2 *= r[halfedge[idx, 0], None] 
+            p = node[halfedge[idx, 0]] + v2
+            r[halfedge[pre[isCorner], 0]] = np.sqrt(np.sum((p - p0[isCorner])**2, axis=-1))
+            r[halfedge[nex[isCorner], 0]] = np.sqrt(np.sum((p - p2[isCorner])**2, axis=-1))
+
+            # 把一些生成的点合并掉, 这里只检查当前半边和下一个半边的生成的点
+            # 这里也假设很近的点对是孤立的. 
+            NG = halfedge.shape[0] # 会生成 NG 个生成子, 每个半边都对应一个
+            index = np.arange(NG)
+            nex = halfedge[idx, 2]
+            index[nex] = idx
+            
+            # 计算每个半边对应的节点
+            center = (node[idx0] + node[idx1])/2
+            r0 = r[idx0]
+            r1 = r[idx1]
+            c0 = 0.5*(r0**2 - r1**2)/h**2
+            c1 = 0.5*np.sqrt(2*(r0**2 + r1**2)/h**2 - (r0**2 - r1**2)**2/h**4 - 1)
+            bnode = center + c0.reshape(-1, 1)*v + c1.reshape(-1, 1)*(v@w) 
+
+            isKeepNode = np.zeros(NG, dtype=np.bool)
+            isKeepNode[index] = True
+            idxmap = np.zeros(NG, dtype=np.int)
+            idxmap[isKeepNode] = range(isKeepNode.sum())
+
+            self.bnode = bnode[isKeepNode] #
+            idxflag = halfedge[idx,1]<=0
+            self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
+            self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
+            self.chedge = idx # the index of halfedge point on corner point
 
     def uniform_init_interior_nodes(self):
         mesh = self.mesh
@@ -243,7 +302,7 @@ class CVTPMesher:
         self.start = start
         return vor, start
 
-    def Lloyd(self, vor, start):
+    def lloyd_opt(self, vor, start):
 
         vertices = vor.vertices
         NN = self.NN
@@ -269,27 +328,29 @@ class CVTPMesher:
         vor = Voronoi(vor.points)
         return vor
     
-    def to_PolygonMesh(self,vor):
+    def to_polygonMesh(self, vor):
+        """
+        Notes
+        ----
+            给定一个 Vornori 剖分
+        """
         bnode2subdomain = self.bnode2subdomain
         start = self.start
         cstart = self.mesh.ds.cellstart
         points = vor.points
         pnode = vor.vertices
         point_region = vor.point_region
-        regions = vor.regions
         ridge_vertices = vor.ridge_vertices
 
         bnode_region = point_region[:start]
         bnode_region = bnode_region[bnode2subdomain>=cstart]
-        point_region = np.hstack((bnode_region,point_region[start:]))
-        regions = np.array(regions)[point_region]
-        pcellLocation =[len(x) for x in regions]
-        pcell = sum(regions,[]) # 将列表合并为一个列表
-        pcellLocation = np.array(pcellLocation)
-        pcellLocation = pcellLocation.cumsum()
-        pcellLocation = np.hstack((np.array([0]),pcellLocation))
-        pcell = np.array(pcell)
-        return PolygonMesh(pnode,pcell,pcellLocation)
+        point_region = np.hstack((bnode_region, point_region[start:]))
+        regions = [vor.regions[i] for i in point_region]
+        pcellLocation =np.array([0] + [len(x) for x in regions],
+                dtype=np.int_)
+        np.cumsum(pcellLocation, out=pcellLocation)
+        pcell = np.array(sum(regions,[]), dtype=np.int_)
+        return PolygonMesh(pnode, pcell, pcellLocation)
 
     def energy(self,vor):
         points = vor.points
