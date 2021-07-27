@@ -1799,7 +1799,7 @@ class HalfEdgeMesh2d(Mesh2d):
             self,
             method='mean',
             maxrefine=3,
-            maxcoarsen=3,
+            maxcoarsen=0,
             theta=1.0,
             maxsize=1e-2,
             minsize=1e-12,
@@ -1837,8 +1837,7 @@ class HalfEdgeMesh2d(Mesh2d):
         cellstart = self.ds.cellstart
         if options['method'] == 'mean':
             options['numrefine'][cellstart:] = np.around(
-                    #np.log2(eta/(theta*np.mean(eta)))
-                    np.log(eta/(theta*np.mean(eta)))/np.log(4)
+                    np.log2(eta/(theta*np.mean(eta)))
                 )
         elif options['method'] == 'max':
             options['numrefine'][cellstart:] = np.around(
@@ -1868,10 +1867,6 @@ class HalfEdgeMesh2d(Mesh2d):
         options['numrefine'][flag] = options['maxrefine']
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
-
-        # refine
-        if method=='nvb':
-            options['numrefine'] *= 2
 
         isMarkedCell = (options['numrefine'] > 0)
 
