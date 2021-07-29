@@ -3,6 +3,7 @@
 # Navier-stokes 问题
 
 ## PDE 模型
+
 不可压的流体
 
 $$
@@ -36,12 +37,13 @@ $$
 
 $$
 \begin{eqnarray}
-	\int_{\Omega} \rho \frac{\partial \boldsymbol u}{\partial t}\boldsymbol v dx
-	+ \int_{\Omega} \rho \boldsymbol u \cdot \nabla \boldsymbol u \cdot \boldsymbol v dx 
+	\int_{\Omega} \rho \frac{\partial \boldsymbol u}{\partial t}\boldsymbol v
+    \mathrm dx
+	+ \int_{\Omega} \rho \boldsymbol u \cdot \nabla \boldsymbol u \cdot \boldsymbol v \mathrm dx 
 	= 
-	-\int_{\Omega} \nabla p \cdot \boldsymbol v dx 
-	+\mu \int_{\Omega}(\nabla \cdot (\nabla \boldsymbol u + \nabla (\boldsymbol u)^T)) \cdot \boldsymbol v dx
-	+\int_{\Omega} \rho \boldsymbol f \cdot \boldsymbol v dx
+	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
+	+\mu \int_{\Omega}(\nabla \cdot (\nabla \boldsymbol u + \nabla (\boldsymbol u)^T)) \cdot \boldsymbol v \mathrm dx
+	+\int_{\Omega} \rho \boldsymbol f \cdot \boldsymbol v \mathrm dx
 \end{eqnarray}
 $$
 
@@ -49,9 +51,9 @@ $$
 
 $$
 \begin{align}
-	-\int_{\Omega} \nabla p \cdot \boldsymbol v dx 
-	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - \nabla \cdot (p\boldsymbol v)dx\\
-	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol v \cdot \boldsymbol n ds
+	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
+	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - \nabla \cdot (p\boldsymbol v) \mathrm dx\\
+	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol v \cdot \boldsymbol n \mathrm ds
 \end{align}
 $$
 
@@ -59,9 +61,9 @@ $$
 
 $$
 \begin{align}
-	\int_{\Omega} (\nabla \cdot \nabla \boldsymbol u) \cdot \boldsymbol v \quad dx 
-	&= \int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - \nabla \boldsymbol v : \nabla \boldsymbol u dx\\
-	&= \int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n ds - \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u dx
+	\int_{\Omega} (\nabla \cdot \nabla \boldsymbol u) \cdot \boldsymbol v \quad \mathrm dx 
+	&= \int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx\\
+	&= \int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds - \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx
 \end{align}
 $$
 
