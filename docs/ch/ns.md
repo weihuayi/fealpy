@@ -9,7 +9,7 @@ $$
 \begin{equation}
 \begin{cases}
 \rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  =
-　-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
+　-\nabla p + \nabla \cdot \bm\sigma(\boldsymbol u) +\rho \boldsymbol f \\
 \nabla \cdot \boldsymbol u = 0
 \end{cases}
 \end{equation}
@@ -19,7 +19,7 @@ $$
 
 $$
 \begin{align}
-	\sigma(\boldsymbol u) &= 2 \mu \varepsilon(\boldsymbol u) \\
+	\bm\sigma(\boldsymbol u) &= 2 \mu \varepsilon(\boldsymbol u) \\
 	\varepsilon(\boldsymbol u) &= \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T)
 \end{align}
 $$
@@ -88,8 +88,8 @@ $$
 \begin{align}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
 	- ( p ,\nabla \cdot \boldsymbol v) + (p\boldsymbol n ,\boldsymbol v)_{\partial \Omega} \\
-	+( \nabla \sigma(\boldsymbol u) , \epsilon(\boldsymbol v)) 
-	-( \nabla \sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
+	+( \nabla \bm\sigma(\boldsymbol u) , \varepsilon(\boldsymbol v)) 
+	-( \nabla \bm\sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	=  (\rho \boldsymbol f,\boldsymbol v)
 \end{align}
 $$
