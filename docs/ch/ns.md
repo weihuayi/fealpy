@@ -1,8 +1,5 @@
 <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
 
-$$
-\def\bfu{{\bf u}}
-$$
 
 # Navier-stokes 问题
 
@@ -11,8 +8,9 @@ $$
 $$
 \begin{equation}
 \begin{cases}
-\rho (\frac{\partial \bfu}{\partial t}+\bfu \cdot \nabla\bfu)  =　-\nabla p + \nabla \cdot \sigma(\bfu) +\rho \bff \\
-\nabla \cdot \bfu = 0
+\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  =
+　-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
+\nabla \cdot \boldsymbol u = 0
 \end{cases}
 \end{equation}
 $$
