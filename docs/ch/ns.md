@@ -1,5 +1,33 @@
 <script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
 
+$$
+\newcommand{\bfa}{{\boldsymbol a}}
+\newcommand{\bfb}{{\boldsymbol b}}
+\newcommand{\bfc}{{\boldsymbol c}}
+\newcommand{\bfd}{{\boldsymbol d}}
+\newcommand{\bfe}{{\boldsymbol e}}
+\newcommand{\bff}{{\boldsymbol f}}
+\newcommand{\bfg}{{\boldsymbol g}}
+\newcommand{\bfh}{{\boldsymbol h}}
+\newcommand{\bfi}{{\boldsymbol i}}
+\newcommand{\bfj}{{\boldsymbol j}}
+\newcommand{\bfk}{{\boldsymbol k}}
+\newcommand{\bfl}{{\boldsymbol l}}
+\newcommand{\bfm}{{\boldsymbol m}}
+\newcommand{\bfn}{{\boldsymbol n}}
+\newcommand{\bfo}{{\boldsymbol o}}
+\newcommand{\bfp}{{\boldsymbol p}}
+\newcommand{\bfq}{{\boldsymbol q}}
+\newcommand{\bfr}{{\boldsymbol r}}
+\newcommand{\bfs}{{\boldsymbol s}}
+\newcommand{\bft}{{\boldsymbol t}}
+\newcommand{\bfu}{{\boldsymbol u}}
+\newcommand{\bfv}{{\boldsymbol v}}
+\newcommand{\bfw}{{\boldsymbol w}}
+\newcommand{\bfx}{{\boldsymbol x}}
+\newcommand{\bfy}{{\boldsymbol y}}
+\newcommand{\bfz}{{\boldsymbol z}}
+$$
 
 # Navier-stokes 问题
 
