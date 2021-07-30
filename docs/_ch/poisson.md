@@ -1,4 +1,4 @@
-<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
+{% include "../mathjax.md" %}
 # Poisson 问题
 
 
@@ -6,7 +6,10 @@
 ## PDE 模型
 
 $$
--\Delta u = f
+\begin{cases}
+-\Delta u &=f \\
+u&=0\\
+\end{cases}
 $$
 
 ## 变分形式
