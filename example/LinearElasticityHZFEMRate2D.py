@@ -39,8 +39,8 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 3 次.')
 
 parser.add_argument('--nrefine',
-        default=1, type=int,
-        help='初始网格加密的次数, 默认初始加密 1 次.')
+        default=2, type=int,
+        help='初始网格加密的次数, 默认初始加密 2 次.')
 
 parser.add_argument('--maxit',
         default=4, type=int,
@@ -80,25 +80,33 @@ x = sp.symbols('x0:2')
 #u = [0.01*(1-x[0]),0]
 #u = [sin(2*pi*x[0])*sin(2*pi*x[1]),sin(2*pi*x[0])*sin(2*pi*x[1])]
 #u = [exp(x[0]+x[1]),exp(x[0]-x[1])]
-#u = [0,x[1]]
+#u = [x[0],x[1]]
 #u = [0,(x[0]-1)**7*(x[1]-1)**7]
 u = [-(1-x[0])*ln(1.5-x[0]),-(1-x[0])*ln(1.5-x[1])]
 #u = [sin(2*pi*x[0])*sin(2*pi*x[1]),sin(2*pi*x[0])*sin(2*pi*x[1])]
 
 
-if bdtype == 'displacement':
+if bdtype == 'displacement': 
+        pde = GenLinearElasticitymodel2D(u,x,lam=lam,mu=mu,
+                Dirichletbd_n='(x0==1)|(x0==0)|(x1==0)|(x1==1)',
+                Dirichletbd_t='(x0==1)|(x0==0)|(x1==0)|(x1==1)')
 
-    pde = GenLinearElasticitymodel2D(u,x,lam=lam,mu=mu,
-            Dirichletbd_n='(x0==1)|(x0==0)|(x1==0)|(x1==1)',
-            Dirichletbd_t='(x0==1)|(x0==0)|(x1==0)|(x1==1)')
-elif bdtype =='stress_and_displacement' :
-    pde = GenLinearElasticitymodel2D(u,x,lam=lam,mu=mu,
-                    Dirichletbd_n='(x0==1)|(x0==0)|(x1==0)|(x1==1)',
-                    Dirichletbd_t='(x0==1)|(x0==0)|(x1==0)|(x1==1)')
+elif bdtype =='stress_and_displacement':
+        pde = GenLinearElasticitymodel2D(u,x,lam=lam,mu=mu,
+                Dirichletbd_n='(x1==0)|(x1==1)',Dirichletbd_t='(x1==0)|(x1==1)',
+                Neumannbd_nn='(x0==1)|(x0==0)',Neumannbd_nt='(x0==1)|(x0==0)')
+
+elif bdtype =='stress_and_displacement_corner_point':
+        pde = GenLinearElasticitymodel2D(u,x,lam=lam,mu=mu,
+                Dirichletbd_n='(x0==1)|(x1==1)',Dirichletbd_t='(x0==1)|(x1==1)',
+                Neumannbd_nn='(x0==0)|(x1==0)',Neumannbd_nt='(x0==0)|(x1==0)')
+                        
+
 
 
 mesh = mf.boxmesh2d(pde.domain(),nx=1,ny=1,meshtype='tri')
 mesh.uniform_refine(nrefine)
+
 
 
 errorType = ['$||\sigma - \sigma_h ||_{0}$',
@@ -121,20 +129,24 @@ for i in range(maxit):
         sh = tspace.function()
         uh = vspace.function(dim=gdim)
 
-        M = tspace.compliance_tensor_matrix(mu=pde.mu,lam=pde.lam)
-        B0,B1 = tspace.div_matrix(vspace)
+        #M = tspace.compliance_tensor_matrix(mu=pde.mu,lam=pde.lam)
+        M = tspace.parallel_compliance_tensor_matrix(mu=pde.mu,lam=pde.lam)
+
+        #B0,B1 = tspace.div_matrix(vspace)
+        B0,B1 = tspace.parallel_div_matrix(vspace)
+        #print(np.max(np.abs(B0-B10)))
+
         F1 =  -vspace.source_vector(pde.source,dim=gdim)
 
-        #AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
-        #FF = np.r_[np.zeros(tgdof), -F1.T.reshape(-1)]
 
         #边界处理
         F0 = tspace.set_nature_bc(pde.dirichlet,threshold=pde.is_dirichlet_boundary) #此处以位移边界为dirichlet边界
 
-        isBDdof = tspace.set_essential_bc(sh,pde.neumann,threshold=pde.is_neumann_boundary)#以应力边界为neumann边界
-        
+        isBDdof = tspace.set_essential_bc(sh, pde.neumann,M,B0,B1,F0, threshold=pde.is_neumann_boundary)#以应力边界为neumann边界
+
 
         F0 -= M@sh
+        F0[isBDdof] = sh[isBDdof]
         F1[:,0] -= B0@sh 
         F1[:,1] -= B1@sh
         FF = np.r_[F0,F1.T.reshape(-1)]
@@ -148,26 +160,25 @@ for i in range(maxit):
         B1 = B1@T
         AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
 
-
-
-
-
+        #求解
         x = spsolve(AA,FF)
+
 
         sh[:] = x[:tgdof]
         uh[:,0] = x[tgdof:tgdof+vgdof]
         uh[:,1] = x[tgdof+vgdof:]
-
-
+ 
         gdof = tgdof+gdim*vgdof
         Ndof[i] = gdof
 
+        #有限元误差
         errorMatrix[0,i] = tspace.integralalg.error(pde.stress,sh.value)
         errorMatrix[1,i] = tspace.integralalg.error(pde.div_stress,sh.div_value)
         errorMatrix[2,i] = vspace.integralalg.error(pde.displacement,uh.value)        
         if i < maxit - 1:
                 mesh.uniform_refine()
-        
+
+       
 print('Ndof:', Ndof)
 print('error:', errorMatrix)
 showmultirate(plt, 0, Ndof, errorMatrix, errorType)
