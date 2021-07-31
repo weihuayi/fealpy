@@ -1,4 +1,6 @@
 import numpy as np
+import multiprocessing as mp
+from multiprocessing.pool import ThreadPool as Pool
 from scipy.sparse import csr_matrix
 
 
@@ -420,13 +422,13 @@ class HuZhangFiniteElementSpace():
 
 
     @barycentric
-    def basis(self, bc, cellidx=None):
+    def basis(self, bc, index=np.s_[:],p=None):
         """
         Parameters
         ----------
         bc : ndarray with shape (NQ, dim+1)
             bc[i, :] is i-th quad point
-        cellidx : ndarray
+        index : ndarray
             有时我我们只需要计算部分单元上的基函数
         Returns
         -------
@@ -440,34 +442,24 @@ class HuZhangFiniteElementSpace():
 
         gdim = self.geo_dimension() 
         tdim = self.tensor_dimension()
-        phi0 = self.space.basis(bc) #(NQ,1,ldof)
-
-        if cellidx is None:
-            NC = mesh.number_of_cells()
-            cell2dof = self.cell2dof #(NC,ldof,tdim)
-        else:
-            NC = len(cellidx)
-            cell2dof = self.cell2dof[cellidx] #(NC,ldof,tdim)
+        phi0 = self.space.basis(bc,index=index,p=p) #(NQ,1,ldof)
+        cell2dof = self.cell2dof[index] #(NC,ldof,tdim)
 
         phi = np.einsum('nijk,...ni->...nijk',self.Tensor_Frame[cell2dof],phi0) #(NC,ldof,tdim,tdim), (NQ,1,ldof)
-        #print(phi.shape)
         return phi  #(NQ,NC,ldof,tdim,tdim) 最后一个维度表示tensor
 
 
     @barycentric
-    def div_basis(self, bc, cellidx=None):
+    def div_basis(self, bc, index=np.s_[:]):
         mesh = self.mesh
 
         gdim = self.geo_dimension()
         tdim = self.tensor_dimension() 
 
         # the shape of `gphi` is (NQ, NC, ldof, gdim)
-        if cellidx is None:
-            gphi = self.space.grad_basis(bc)
-            cell2dof = self.cell2dof
-        else: 
-            gphi = self.space.grad_basis(bc, cellidx=cellidx) 
-            cell2dof = self.cell2dof[cellidx]
+
+        gphi = self.space.grad_basis(bc, index=index) 
+        cell2dof = self.cell2dof[index]
         shape = list(gphi.shape)
         shape.insert(-1, tdim)
         # the shape of `dphi` is (NQ, NC, ldof, tdim, gdim)
@@ -481,31 +473,21 @@ class HuZhangFiniteElementSpace():
 
 
     @barycentric
-    def value(self, uh, bc, cellidx=None):
-        phi = self.basis(bc, cellidx=cellidx)
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
-        tdim = self.tensor_dimension()
-        if cellidx is None:
-            uh = uh[cell2dof] #(NC,ldof,tdim)
-        else:
-            uh = uh[cell2dof[cellidx]]
+        uh = uh[cell2dof[index]]
         val = np.einsum('...ijkm, ijk->...im', phi, uh) #(NQ,NC,tdim)
         val = np.einsum('...k, kmn->...mn', val, self.T)
-        #print(val.shape)
         return val #(NQ,NC,gdim,gdim)
 
 
     @barycentric
-    def div_value(self, uh, bc, cellidx=None):
-        dphi = self.div_basis(bc, cellidx=cellidx) #(NQ,NC,ldof,tdim,gdim)
+    def div_value(self, uh, bc, index=np.s_[:]):
+        dphi = self.div_basis(bc, index=index) #(NQ,NC,ldof,tdim,gdim)
         cell2dof = self.cell_to_dof()
-        tdim = self.tensor_dimension()
-        if cellidx is None:
-            uh = uh[cell2dof] #(NC,ldof,tdim)
-        else:
-            uh = uh[cell2dof[cellidx]]
+        uh = uh[cell2dof[index]]
         val = np.einsum('...ijkm, ijk->...im', dphi, uh)
-        #print(val.shape)
         return val #(NQ,NC,gdim)
 
 
@@ -535,6 +517,93 @@ class HuZhangFiniteElementSpace():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(tgdof, tgdof))
 
         return M
+
+    def  parallel_compliance_tensor_matrix(self,mu=1,lam=1):
+        ldof = self.number_of_local_dofs()
+        tgdof = self.number_of_global_dofs()
+        tdim = self.tensor_dimension()
+        gdim = self.geo_dimension()
+        bcs, ws = self.integrator.quadpts, self.integrator.weights
+        NC = self.mesh.number_of_cells()
+        Tmeasure = self.mesh.entity_measure()
+
+        basis0 = self.basis
+        cell2dof0 = self.cell_to_dof().reshape(NC,-1)
+        gdof0 = tgdof
+
+        gdof1 = gdof0
+
+        # 对问题进行分割
+        nc = mp.cpu_count()-2
+
+        block = NC//nc
+        r = NC%nc
+
+        #print(NC,nc,block,r)
+
+        index = np.full(nc+1,block)
+        index[0] = 0
+        index[1:r+1] +=1
+        np.cumsum(index,out=index)
+
+        M = csr_matrix((gdof0,gdof1))
+        M1 = csr_matrix((gdof0,gdof1))
+
+        def f(i):
+            s = slice(index[i],index[i+1])
+            measure = Tmeasure[s]
+            c2d0 = cell2dof0[s]
+            c2d1 = c2d0
+            shape = (len(measure),c2d0.shape[1],c2d1.shape[1]) #（lNC,ldof0,ldof1)
+            lNC  = index[i+1]-index[i]
+
+            d = np.array([1, 1, 2])
+            Mi = np.zeros(shape,measure.dtype)
+            for bc, w in zip(bcs,ws):
+                phi0 = basis0(bc,index=s).reshape(lNC,-1,tdim) #(lNC,ldof,tdim)
+                t = np.sum(phi0[...,:gdim],axis=-1)
+                Mi +=np.einsum('jkl,l,jol,j->jko',phi0, d, phi0, w*measure)
+                Mi -=lam*np.einsum('jk,jo,j->jko',t,t,w*measure)/(2*mu+lam*gdim)
+
+            Mi /= 2*mu
+            I = np.broadcast_to(c2d0[:, :, None], shape=Mi.shape)
+            J = np.broadcast_to(c2d1[:, None, :], shape=Mi.shape)
+
+            Mi = csr_matrix((Mi.flat, (I.flat, J.flat)), shape=(gdof0,gdof1))
+
+            return Mi
+
+
+    
+        
+        # 并行组装总矩阵
+        with Pool(nc) as p:
+            Mi= p.map(f, range(nc))
+
+        for val in Mi:
+            M += val
+
+        return M
+
+
+
+
+            
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -571,12 +640,100 @@ class HuZhangFiniteElementSpace():
 
 
         I = np.einsum('ij, k->ijk', vspace.cell_to_dof(), np.ones(tldof,dtype=int))
-        J = np.einsum('ij, k->ikj', self.cell_to_dof().reshape(NC,-1,), np.ones(vldof,dtype=int))   
+        J = np.einsum('ij, k->ikj', self.cell_to_dof().reshape(NC,-1), np.ones(vldof,dtype=int))   
 
         B0 = csr_matrix((B0.flat, (I.flat, J.flat)), shape=(vgdof, tgdof))
         B1 = csr_matrix((B1.flat, (I.flat, J.flat)), shape=(vgdof, tgdof))
 
         return B0, B1
+
+    def parallel_div_matrix(self,vspace):
+        '''
+        把网格中的单元分组，再分组组装相应的矩阵。对于三维大规模问题，如果同时计
+        算所有单元的矩阵，占用内存会过多，效率过低。
+        '''
+
+        tldof = self.number_of_local_dofs()
+        vldof = vspace.number_of_local_dofs()
+        tgdof = self.number_of_global_dofs()
+        vgdof = vspace.number_of_global_dofs()
+        gdim = self.geo_dimension()
+        bcs, ws = self.integrator.quadpts, self.integrator.weights
+        NC = self.mesh.number_of_cells()
+        Tmeasure = self.mesh.entity_measure()
+        
+
+
+
+
+        basis1 = self.div_basis
+        cell2dof1 = self.cell_to_dof().reshape(NC,-1)
+        gdof1 = tgdof
+
+        basis0 = vspace.basis
+        cell2dof0 = vspace.cell_to_dof()
+        gdof0 = vgdof
+
+
+
+
+        # 对问题进行分割
+        nc = mp.cpu_count()-2
+
+        block = NC//nc
+        r = NC%nc
+
+        #print(NC,nc,block,r)
+
+        index = np.full(nc+1,block)
+        index[0] = 0
+        index[1:r+1] +=1
+        np.cumsum(index,out=index)
+        #print(index)
+
+        B0 = csr_matrix((gdof0, gdof1))
+        B1 = csr_matrix((gdof0, gdof1))
+
+        def f(i):
+            s = slice(index[i],index[i+1])
+            measure = Tmeasure[s]
+            c2d0 = cell2dof0[s]
+            c2d1 = cell2dof1[s]
+
+            shape = (len(measure),c2d0.shape[1],c2d1.shape[1]) #（lNC,ldof0,ldof1)
+            lNC  = index[i+1]-index[i]
+            M0 = np.zeros(shape,measure.dtype)
+            M1 = np.zeros(shape,measure.dtype)
+            for bc, w in zip(bcs, ws):
+                phi0 = basis0(bc,index=s)#(1,vldof)
+                phi1 = basis1(bc,index=s).reshape(lNC,-1,gdim)#(lNC, ldof*tdim, gdim)
+                M0 += np.einsum('jk,jo,j->jko',phi0, phi1[...,0], w*measure)
+                M1 += np.einsum('jk,jo,j->jko',phi0, phi1[...,1], w*measure)
+
+            I = np.broadcast_to(c2d0[:, :, None], shape=M0.shape)
+            J = np.broadcast_to(c2d1[:, None, :], shape=M0.shape)
+
+            Bi0 = csr_matrix((M0.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+            Bi1 = csr_matrix((M1.flat, (I.flat, J.flat)), shape=(gdof0, gdof1))
+            return Bi0,Bi1
+
+        # 并行组装总矩阵
+
+        with Pool(nc) as p:
+            Bi= p.map(f, range(nc))
+            
+        for val in Bi:
+            B0 += val[0]
+            B1 += val[1]
+        
+
+        return B0, B1
+
+
+
+
+
+
 
 
 
@@ -613,7 +770,7 @@ class HuZhangFiniteElementSpace():
         f = Function(self)
         return f
 
-    def set_essential_bc(self, uh, gN,A=None, b=None, threshold=None, q=None):
+    def set_essential_bc(self, uh, gN, M,B0, B1, F0, threshold=None):
         """
         初始化压力的本质边界条件，插值一个边界sigam,使得sigam*n=gN,对于角点，要小心选取标架
         由face2bddof 形状为(NFbd,ldof,tdim)
@@ -662,8 +819,11 @@ class HuZhangFiniteElementSpace():
 
         #将边界边内部点与顶点分别处理
 
+
+ 
+
         self.set_essential_bc_inner_edge(facebd2dof,bd_index_type,frame,val,uh,isBdDof)#处理所有边界边内部点
-        self.set_essential_bc_vertex(index,facebd2dof,bd_index_type,frame,val,uh,isBdDof,A,b)#处理所有边界边顶点
+        self.set_essential_bc_vertex(index,facebd2dof,bd_index_type,frame,val,uh,isBdDof,M,B0,B1,F0)#处理所有边界边顶点
 
         return isBdDof
 
@@ -684,7 +844,7 @@ class HuZhangFiniteElementSpace():
                 isBdDof[bdinedge2dof[bd_index_temp,:,i]] = True
                 #print(uh[bdinedge2dof[bd_index_temp,:,i]])
 
-    def set_essential_bc_vertex(self,index,facebd2dof,bd_index_type,frame,val,uh,isBdDof,A,b):
+    def set_essential_bc_vertex(self,index,facebd2dof,bd_index_type,frame,val,uh,isBdDof,M,B0,B1,F0):
         NFbd = len(index)
         tdim = self.tensor_dimension()
         gdim = self.geo_dimension()
@@ -763,7 +923,7 @@ class HuZhangFiniteElementSpace():
             cor_TF = self.Change_frame(frame)
             orign_TF = self.Tensor_Frame[corner_point*tdim:corner_point*tdim+tdim] #原来角点选用点标架
             Correct_P = self.Transition_matrix(cor_TF,orign_TF)
-            self.Change_basis_frame_matrix(A,b,Correct_P,corner_point)
+            self.Change_basis_frame_matrix(M,B0,B1,F0,Correct_P,corner_point)
             self.Tensor_Frame[corner_point*tdim:corner_point*tdim+tdim] = cor_TF #对原始标架做矫正
 
             #固定自由度赋值
@@ -831,7 +991,7 @@ class HuZhangFiniteElementSpace():
                 cor_TF = self.Change_frame(frame_edge[[1,0]])
                 orign_TF = self.Tensor_Frame[corner_point*tdim:corner_point*tdim+tdim] #原来角点选用点标架
                 Correct_P = self.Transition_matrix(cor_TF,orign_TF)
-                self.Change_basis_frame_matrix(A,b,Correct_P,corner_point)
+                self.Change_basis_frame_matrix(M,B0,B1,F0,Correct_P,corner_point)
                 self.Tensor_Frame[corner_point*tdim:corner_point*tdim+tdim] = cor_TF
 
                 uh_pre = np.zeros(3) #可能为三个，也可能只有两个
@@ -873,7 +1033,7 @@ class HuZhangFiniteElementSpace():
                 U,Lam,Correct_P = np.linalg.svd(orign_matrix)
 
                 cor_TF = np.einsum('ik,kj->ij',Correct_P,orign_TF) #(tdim,tdim)
-                self.Change_basis_frame_matrix(A,b,Correct_P,corner_point)
+                self.Change_basis_frame_matrix(M,B0,B1,F0,Correct_P,corner_point)
                 self.Tensor_Frame[corner_point*tdim:corner_point*tdim+tdim] = cor_TF
 
                 corner_gNb = np.einsum('ij,ij->i',val_temp,corner_projection)
@@ -972,14 +1132,19 @@ class HuZhangFiniteElementSpace():
         else:
             raise ValueError('标架表示有问题！')
 
-    def Change_basis_frame_matrix(self,A,b,Correct_P,corner_point):
+    def Change_basis_frame_matrix(self,M,B0,B1,F0,Correct_P,corner_point):
         tdim = self.tensor_dimension()       
         #对矩阵A,以及b做矫正
         #print(Correct_P)
         Correct_P = csr_matrix(Correct_P)                  
-        A[corner_point*tdim:corner_point*tdim+tdim] = Correct_P@A[corner_point*tdim:corner_point*tdim+tdim]
-        A[:,corner_point*tdim:corner_point*tdim+tdim] = A[:,corner_point*tdim:corner_point*tdim+tdim]@(Correct_P.T)
-        b[corner_point*tdim:corner_point*tdim+tdim] = Correct_P@b[corner_point*tdim:corner_point*tdim+tdim]
+
+        M[corner_point*tdim:corner_point*tdim+tdim] = Correct_P@M[corner_point*tdim:corner_point*tdim+tdim]
+        M[:,corner_point*tdim:corner_point*tdim+tdim] = M[:,corner_point*tdim:corner_point*tdim+tdim]@(Correct_P.T)
+
+        B0[:,corner_point*tdim:corner_point*tdim+tdim] = B0[:,corner_point*tdim:corner_point*tdim+tdim]@(Correct_P.T)
+        B1[:,corner_point*tdim:corner_point*tdim+tdim] = B1[:,corner_point*tdim:corner_point*tdim+tdim]@(Correct_P.T)
+
+        F0[corner_point*tdim:corner_point*tdim+tdim] = Correct_P@F0[corner_point*tdim:corner_point*tdim+tdim]
 
 
 
