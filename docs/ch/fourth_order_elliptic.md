@@ -9,18 +9,19 @@ $$
 \begin{equation}
 \begin{cases}
 \Delta^2 u - \Delta u = f & in \quad \Omega\\
-u = g_1, \quad \frac{\partial u}{\partial n} = g_2 & on \quad \partial \Omega
+u = g_1, \quad \frac{\partial u}{\partial \boldsymbol n} = g_2 & on \quad \partial \Omega
 \end{cases}
 \end{equation}
 $$
 
 令 $$-\Delta u = \sigma$$, 将四阶问题化为二阶问题:
+
 $$
 \begin{equation}
 \begin{cases}
 -\Delta u - \sigma = 0 & in \quad \Omega\\
 -\Delta \sigma + \sigma = f & in \quad \Omega\\
-u = g_1, \quad \frac{\partial u}{\partial n} = g_2 & on \quad \partial \Omega
+u = g_1, \quad \frac{\partial u}{\partial \boldsymbol n} = g_2 & on \quad \partial \Omega
 \end{cases}
 \end{equation}
 $$
@@ -63,30 +64,30 @@ $$
 $$
 \begin{align}
 (\nabla v_0, \nabla v_1)_{\mathcal T} = -(\Delta v_0, v_1)_{\mathcal T} +
-(\left[\frac{\partial v_0}{\partial n}\right], \{ v_1\} )_{\Gamma_I}+
-(\left\{\frac{\partial v_0}{\partial n}\right\}, [v_1] )_{\Gamma}.
+(\left[\frac{\partial v_0}{\partial \boldsymbol n}\right], \{ v_1\} )_{\Gamma_I}+
+(\left\{\frac{\partial v_0}{\partial \boldsymbol n}\right\}, [v_1] )_{\Gamma}.
 \end{align}
 $$
 
 ## 弱形式
-由 $$(3)$$​ 可知:  $$\forall v\in H^1(\mathcal T)$$:
+由 $$(3)$$ 可知:  $$\forall v\in H^1(\mathcal T)$$:
 
 $$
 \begin{align}
 (\nabla u, \nabla v)_{\mathcal T} = -(\Delta u, v)_{\mathcal T} +
-(\left[\frac{\partial u}{\partial n}\right], \{ v\} )_{\Gamma}+
-(\left\{\frac{\partial u}{\partial n}\right\}, [v] )_{\Gamma_I}.
+(\left[\frac{\partial u}{\partial \boldsymbol n}\right], \{ v\} )_{\Gamma}+
+(\left\{\frac{\partial u}{\partial \boldsymbol n}\right\}, [v] )_{\Gamma_I}.
 \end{align}
 $$
 
-因为: $$[u]_{\Gamma_I} = 0, \left[\frac{\partial u}{\partial n}\right]_{\Gamma_I} = 0, 
-\left\{\frac{\partial u}{\partial n}\right\}_{\Gamma_B} = g_2.$$ 所以有:
+因为: $$[u]_{\Gamma_I} = 0, \left[\frac{\partial u}{\partial \boldsymbol n}\right]_{\Gamma_I} = 0, 
+\left\{\frac{\partial u}{\partial \boldsymbol n}\right\}_{\Gamma_B} = g_2.$$ 所以有:
 $$
 \begin{align*}
 (\nabla u, \nabla v)_{\mathcal T} - (\sigma, v)_{\mathcal T} -
-(\left\{\frac{\partial u}{\partial n}\right\}, [v] )_{\Gamma_I} -
-(\left\{\frac{\partial v}{\partial n}\right\}, [u])_{\Gamma}
-= (g_2, v)_{\Gamma_B} - (\frac{\partial v}{\partial n}, g_1)_{\Gamma_B}
+(\left\{\frac{\partial u}{\partial \boldsymbol n}\right\}, [v] )_{\Gamma_I} -
+(\left\{\frac{\partial v}{\partial \boldsymbol n}\right\}, [u])_{\Gamma}
+= (g_2, v)_{\Gamma_B} - (\frac{\partial v}{\partial \boldsymbol n}, g_1)_{\Gamma_B}
 \end{align*}
 $$
 
@@ -95,8 +96,8 @@ $$
 $$
 \begin{align}
 (\nabla v, \nabla \sigma)_{\mathcal T} - (\sigma, v)_{\mathcal T} -
-(\left\{\frac{\partial \sigma}{\partial n}\right\}, [v] )_{\Gamma} -
-(\left\{\frac{\partial v}{\partial n}\right\}, [\sigma])_{\Gamma_I}
+(\left\{\frac{\partial \sigma}{\partial \boldsymbol n}\right\}, [v] )_{\Gamma} -
+(\left\{\frac{\partial v}{\partial \boldsymbol n}\right\}, [\sigma])_{\Gamma_I}
 =  (f, v)_{\mathcal T}
 \end{align}
 $$
@@ -105,19 +106,19 @@ $$
 
 $$
 J(u, v) = ([u], [v])_{\Gamma}, \quad J_B(u, v) = ([u], [v])_{\Gamma_B}, \quad J_I(u, v) = ([u], [v])_{\Gamma_I}, \quad
-Q_I(u, v) = (\left[ \frac{\partial u}{\partial n}\right], \left[ \frac{\partial v}{\partial n}\right])_{\Gamma_I}
+Q_I(u, v) = (\left[ \frac{\partial u}{\partial \boldsymbol n}\right], \left[ \frac{\partial v}{\partial \boldsymbol n}\right])_{\Gamma_I}
 $$
 
 $$
-A(u, v)  =(\nabla u, \nabla v)_{\mathcal T} - (\left\{\frac{\partial u}{\partial n}\right\}, [v] )_{\Gamma_I} -
-(\left\{\frac{\partial v}{\partial n}\right\}, [u])_{\Gamma} + J_I(u, v) + Q_I(u, v)
+A(u, v)  =(\nabla u, \nabla v)_{\mathcal T} - (\left\{\frac{\partial u}{\partial \boldsymbol n}\right\}, [v] )_{\Gamma_I} -
+(\left\{\frac{\partial v}{\partial \boldsymbol n}\right\}, [u])_{\Gamma} + J_I(u, v) + Q_I(u, v)
 $$
 
-记  $$H^1(\Omega)$$​  上的线性泛函:
+记 $$H^1(\Omega)$$ 上的线性泛函:
 
 $$
 \begin{align*}
-F_1(u) = (g_2, v)_{\Gamma_B} - (\frac{\partial v}{\partial n}, g_1)_{\Gamma_B}, \quad F_2(u) = J_B(g_1, v) + (f, v)_{\mathcal T}
+F_1(u) = (g_2, v)_{\Gamma_B} - (\frac{\partial v}{\partial \boldsymbol n}, g_1)_{\Gamma_B}, \quad F_2(u) = J_B(g_1, v) + (f, v)_{\mathcal T}
 \end{align*}
 $$
 
