@@ -2,7 +2,7 @@ import numpy as np
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, block_diag
 from scipy.sparse import spdiags, eye, bmat, tril, triu
-from scipy.sparse.linalg import cg,  dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular
+from scipy.sparse.linalg import cg,  dsolve,  gmres, lgmres, LinearOperator, spsolve_triangular, spsolve
 from scipy.sparse.linalg import spilu
 from timeit import default_timer as dtimer 
 
@@ -65,13 +65,19 @@ class GaussSeidelSmoother():
         self.U1 = self.L0.T.tocsr()
         self.L1 = self.U0.T.tocsr()
 
+        self.L0_inv = inv(self.L0)
+        self.U1_inv = inv(self.U1)
+
     def smooth(self, b, x0, lower=True, maxit=3):
         if lower:
             for i in range(maxit):
-                x0[:] = spsolve_triangular(self.L0, b-self.U0@x0, lower=lower)
+                #x0[:] = spsolve_triangular(self.L0, b-self.U0@x0, lower=lower)
+                x0[:] = spsolve(self.L0, b-self.U0@x0, permc_spec="NATURAL")
         else:
             for i in range(maxit):
-                x0[:] = spsolve_triangular(self.U1, b-self.L1@x0, lower=lower)
+                #x0[:] = spsolve_triangular(self.U1, b-self.L1@x0, lower=lower)
+                x0[:] = spsolve(self.U1, b-self.L1@x0, permc_spec="NATURAL")
+
 
 class JacobiSmoother():
     def __init__(self, A, isDDof=None):
@@ -469,6 +475,112 @@ class SaddlePointFastSolver():
         print("Number of iteration of gmres:", counter.niter)
 
         return x[:m], x[m:] 
+
+
+
+
+class LinearElasticityHZFEMFastSolve():
+    def __init__(self,A,F,vspace):
+        '''
+
+        Notes
+        -----
+            求解胡张元形成的线弹性力学方程
+            A = (M, B)
+            F = (F0,F1) 
+
+            离散的代数系统如下
+            M x0 + B^T x1 = F0
+            B x0          = F1
+
+        '''
+
+        self.M = A[0]
+        self.B = A[1]
+        self.F = np.r_[F[0],F[1].T.reshape(-1)]
+        self.D = self.M.diagonal()
+        tgdof = self.M.shape[0]
+        mesh = vspace.mesh
+
+        # S 相当于间断元的刚度矩阵
+        S = self.B@spdiags(1/self.D,0,tgdof,tgdof)@self.B.T
+        self.smoother = GaussSeidelSmoother(S)
+        self.S = S
+
+
+        # construct amg solver
+        from fealpy.functionspace.LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
+        cspace = LagrangeFiniteElementSpace(mesh,1)
+        S_coarse = cspace.stiff_matrix(isDDof=cspace.is_boundary_dof()) #粗空间S矩阵的逼近
+        #self.ml = pyamg.ruge_stuben_solver(S_coarse) # 这里要求必须有网格内部节点 
+        self.ml = pyamg.smoothed_aggregation_solver(S_coarse)
+        # Get interpolation matrix
+        NC = mesh.number_of_cells()
+        bc = vspace.dof.multiIndex/vspace.p #(fldof,gdim+1)
+        val = np.tile(bc, (NC, 1)) #(NC*fldof,gdim+1)
+
+        gdim = mesh.geo_dimension()
+        fldof = vspace.number_of_local_dofs() #f表示细空间
+        cldof = cspace.number_of_local_dofs() #c表示粗空间
+        fgdof = vspace.number_of_global_dofs()
+        cgdof = cspace.number_of_global_dofs()
+
+        I = np.broadcast_to(vspace.cell_to_dof()[:,:,None],shape=(NC,fldof,gdim+1))
+        J = np.broadcast_to(cspace.cell_to_dof()[:,None,:],shape=(NC,fldof,cldof))
+
+        self.PI = csr_matrix((val.flat, (I.flat, J.flat)), shape=(fgdof, cgdof))
+        self.vgdof = fgdof*gdim
+        self.tgdof = tgdof
+        self.gdim = gdim
+
+    def linear_operator(self,b):
+        m = self.tgdof
+        r = np.zeros_like(b)
+        r[:m] = self.M@b[:m]+self.B.T@b[m:]
+        r[m:] = self.B@b[:m]
+        return r
+
+    def precondieitoner(self,r):
+        tgdof = self.tgdof
+        gdim = self.gdim
+        r1 = r[tgdof:]
+
+        u0 = r[:tgdof]/self.D
+        u1 = np.zeros_like(r1)
+        r1 -= self.B@u0
+
+        self.smoother.smooth(r1,u1,maxit=10)
+
+        r2 = r1 - self.S@u1
+
+        for i in range(gdim):
+            u1[i::gdim] += self.PI@self.ml.solve(self.PI.T@r2[i::gdim],tol=1e-8, accel='cg')
+        
+        self.smoother.smooth(r1,u1,lower=False,maxit=10)
+
+        return np.r_[u0+self.B.T@u1/self.D, -u1]
+        
+
+    @timer
+    def solve(self, tol=1e-8):
+        m = self.tgdof
+        n = self.vgdof
+        gdof = m + n
+
+        counter = IterationCounter(disp=False)
+        F = self.F
+        A = LinearOperator((gdof, gdof), matvec=self.linear_operator)
+        P = LinearOperator((gdof, gdof), matvec=self.precondieitoner)
+        x, info = lgmres(A, F, M=P, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of gmres:", counter.niter)
+
+        return x
+
+
+
+
+
 
 
 
