@@ -65,9 +65,6 @@ class GaussSeidelSmoother():
         self.U1 = self.L0.T.tocsr()
         self.L1 = self.U0.T.tocsr()
 
-        self.L0_inv = inv(self.L0)
-        self.U1_inv = inv(self.U1)
-
     def smooth(self, b, x0, lower=True, maxit=3):
         if lower:
             for i in range(maxit):
