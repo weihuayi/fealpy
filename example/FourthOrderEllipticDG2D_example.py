@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 # 
 
@@ -58,7 +57,7 @@ NDof = np.zeros(maxit, dtype=np.int_)
 
 pde = PolynomialData()
 #pde = LShapeRSinData(1)
-pde = SqrtData()
+pde = SqrtData(0.5)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))

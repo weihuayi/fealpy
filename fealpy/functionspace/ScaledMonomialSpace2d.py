@@ -606,7 +606,6 @@ class ScaledMonomialSpace2d():
         ps = self.mesh.edge_bc_to_point(bcs, index=index) #(NQ, NE, 2)
 
         gval = g(ps) #(NQ, NE)
-        print(gval)
 
         ldof = self.number_of_local_dofs(doftype='cell')
         gdof = self.number_of_global_dofs(p=p)
