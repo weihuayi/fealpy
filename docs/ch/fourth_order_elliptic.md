@@ -58,7 +58,7 @@ $$
 H^1(\mathcal T) = \{v| \forall K \in \mathcal T, v|_K \in H^1(K)\}
 $$
 
-使用分部积分, 我们有 $\forall v_0, v_1 \in H^1(\mathcal T)$:
+使用分部积分, 我们有 $$\forall v_0, v_1 \in H^1(\mathcal T)$$:
 
 $$
 \begin{align}
@@ -69,7 +69,7 @@ $$
 $$
 
 ## 弱形式
-由 $$(3)$$ 可知: $$\forall v\in H^1(\mathcal T)$$:
+由 $$(3)$$​ 可知:  $$\forall v\in H^1(\mathcal T)$$:
 
 $$
 \begin{align}
@@ -81,7 +81,6 @@ $$
 
 因为: $$[u]_{\Gamma_I} = 0, \left[\frac{\partial u}{\partial n}\right]_{\Gamma_I} = 0, 
 \left\{\frac{\partial u}{\partial n}\right\}_{\Gamma_B} = g_2.$$ 所以有:
-
 $$
 \begin{align*}
 (\nabla u, \nabla v)_{\mathcal T} - (\sigma, v)_{\mathcal T} -
@@ -106,7 +105,7 @@ $$
 
 $$
 J(u, v) = ([u], [v])_{\Gamma}, \quad J_B(u, v) = ([u], [v])_{\Gamma_B}, \quad J_I(u, v) = ([u], [v])_{\Gamma_I}, \quad
-Q_I(u, v) = (\left[ \frac{\partial u}{\partial \bold n}\right], \left[ \frac{\partial v}{\partial \bold n}\right])_{\Gamma_I}
+Q_I(u, v) = (\left[ \frac{\partial u}{\partial n}\right], \left[ \frac{\partial v}{\partial n}\right])_{\Gamma_I}
 $$
 
 $$
@@ -114,7 +113,7 @@ A(u, v)  =(\nabla u, \nabla v)_{\mathcal T} - (\left\{\frac{\partial u}{\partial
 (\left\{\frac{\partial v}{\partial n}\right\}, [u])_{\Gamma} + J_I(u, v) + Q_I(u, v)
 $$
 
-记  $H^1(\Omega)$  上的线性泛函:
+记  $$H^1(\Omega)$$​  上的线性泛函:
 
 $$
 \begin{align*}
@@ -132,7 +131,6 @@ A(v, \sigma) + (\sigma, v) + J(u, v) = F_2(u)
 \end{cases}
 \end{equation*}\quad \forall v \in H^1(\mathcal T)
 $$
-
 
 
 
