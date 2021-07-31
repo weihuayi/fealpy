@@ -80,7 +80,11 @@ class LagrangeFiniteElementSpace():
         return self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self, doftype='cell'):
-        return self.dof.number_of_local_dofs(doftype=doftype)
+        if self.spacetype == 'C':
+            return self.dof.number_of_local_dofs(doftype=doftype)
+        elif self.spacetype == 'D':
+            return self.dof.number_of_local_dofs()
+
 
     def interpolation_points(self):
         return self.dof.interpolation_points()
