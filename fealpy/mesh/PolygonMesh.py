@@ -53,8 +53,8 @@ class PolygonMesh(Mesh2d):
 
     @classmethod
     def from_mesh(cls, mesh):
-        node = mesh.node
-        cell = mesh.ds.cell
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
         NC = mesh.number_of_cells()
         NV = cell.shape[1]
         cellLocation = np.arange(0, (NC+1)*NV, NV)

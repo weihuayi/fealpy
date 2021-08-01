@@ -1676,7 +1676,7 @@ class HalfEdgeMesh2d(Mesh2d):
         color[halfedge[color==2, 3]] = 1
         self.hedgecolor = color
 
-    def refine_triangle_nvb(self, isMarkedCell, options={}):
+    def refine_triangle_nvb(self, isMarkedCell=None, options={}):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1685,13 +1685,17 @@ class HalfEdgeMesh2d(Mesh2d):
         node = self.entity('node')
         halfedge = self.ds.halfedge
 
-        if len(color[:])<NE*2:
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+
+        if color is None:
             color = np.zeros(NE*2, dtype=np.int_)
             nex = halfedge[:, 2]
             pre = halfedge[:, 3]
             l = node[halfedge[:, 0]]-node[halfedge[pre, 0]]
             l = np.linalg.norm(l, axis=1)
-            color[(l>=l[nex]) & (l>=l[pre])] = 1
+            color[(l>l[nex]) & (l>l[pre])] = 1
+            self.hedgecolor = color
 
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
@@ -1795,7 +1799,7 @@ class HalfEdgeMesh2d(Mesh2d):
             self,
             method='mean',
             maxrefine=3,
-            maxcoarsen=3,
+            maxcoarsen=0,
             theta=1.0,
             maxsize=1e-2,
             minsize=1e-12,
@@ -1864,7 +1868,6 @@ class HalfEdgeMesh2d(Mesh2d):
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
 
-        # refine
         isMarkedCell = (options['numrefine'] > 0)
 
         while np.any(isMarkedCell):
@@ -1910,12 +1913,23 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[:, 2:] = idxmap[halfedge[:, 2:]]
 
     def uniform_refine(self, n=1):
-        for i in range(n):
-            self.refine_poly()
+        if self.ds.NV == 3:
+            for i in range(n):
+                self.refine_triangle_rg()
+        else:
+            for i in range(n):
+                self.refine_poly()
 
-    def tri_uniform_refine(self, n=1):
-        for i in range(n):
-            self.refine_triangle_rg()
+    def tri_uniform_refine(self, n=1, method="rg"):
+        if method == 'rg':
+            for i in range(n):
+                self.refine_triangle_rg()
+        elif method == 'nvb':
+            for i in range(n*2):
+                self.refine_triangle_nvb()
+        else:
+            raise ValueError("refine type error! \"rg\" or \" nvb\"")
+
 
 
     def halfedge_direction(self):

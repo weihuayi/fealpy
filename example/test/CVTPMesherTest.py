@@ -239,9 +239,9 @@ class CVTPMesherTest:
             axes = fig.gca()
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=False)
-            mesh.find_node(axes, node=bnode, showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=False)
             #mesh.print()
-            voronoi_plot_2d(vor, ax=axes,show_vertices = False)
+            voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.3)
             plt.show()
             fig = plt.figure()
             axes = fig.gca()
@@ -259,7 +259,7 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=3)
+            uniform_mesh.uniform_meshing(nb=2)
        
         elif domain == 'LShape':
             vertices = np.array([
@@ -276,9 +276,9 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=2)
+            uniform_mesh.uniform_meshing(nb=2)
         elif domain =='circle':
-            n = 40
+            n = 20
             h = 2*np.pi/n
             theta = np.arange(0, 2*np.pi, h)
             vertices = np.zeros((n, 2), dtype=np.float)
@@ -294,7 +294,7 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=0)
+            uniform_mesh.uniform_meshing(nb=0)
 
         elif domain =='circle_hole':
             n = 20
@@ -306,7 +306,7 @@ class CVTPMesherTest:
             vertices2[:, 1] = -np.sin(theta)
             vertices = np.vstack((vertices1,vertices2))
             n = len(vertices)
-            fixed = np.ones(n, dtype=np.bool)
+            fixed = np.zeros(n, dtype=np.bool)
             fixed[4:] = False
             facets = np.zeros((n,2), dtype=np.int)
             facets[:4, 0] = range(0, 4)
@@ -328,7 +328,7 @@ class CVTPMesherTest:
             mesh.add_plot(axes)
             plt.show()
             uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=7,times = times)
+            uniform_mesh.uniform_meshing(nb=7,times = times)
 
         elif domain == 'partition1':
             vertices = np.array([
@@ -377,7 +377,7 @@ class CVTPMesherTest:
             times = np.zeros(len(facets))
             times[:4] = 3
             times[4:] = 2
-            uniform_mesh.uniform_meshing(n=5,times = times)
+            uniform_mesh.uniform_meshing(nb=5,times = times)
         elif domain == 'square2':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
@@ -457,8 +457,8 @@ class CVTPMesherTest:
             plt.show()
        
         i =0
-        while i<100:
-            vor = uniform_mesh.Lloyd(vor,start)
+        while i<1000:
+            vor = uniform_mesh.lloyd_opt(vor,start)
             i+=1
 
         pmesh = uniform_mesh.to_PolygonMesh(vor) 
@@ -473,7 +473,7 @@ class CVTPMesherTest:
             mesh.add_plot(axes)
             mesh.find_node(axes, color='k', showindex=False)
             mesh.find_node(axes, node=vor.points, showindex=False)
-            voronoi_plot_2d(vor, ax=axes,show_vertices = False)
+            voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.3)
             plt.show()
  
 
@@ -511,17 +511,17 @@ if sys.argv[1] == "Lloyd":
 #test.uniform_meshing_test(domain='square2',interior_nodes = True)
 #test.uniform_meshing_test(domain='LShape')
 #test.uniform_meshing_test(domain='triangle',interior_nodes = False)
-#test.uniform_meshing_test(domain='circle')
+#test.uniform_meshing_test(domain='circle',interior_nodes = False)
 #test.uniform_meshing_test(domain='trapezoid',interior_nodes = True)
 #test.uniform_meshing_test(domain = 'partition1')
 #test.uniform_meshing_test(domain = 'partition2')
 #test.uniform_meshing_test(domain = 'hole1',interior_nodes = True)
 #test.uniform_meshing_test(domain='hole2',interior_nodes=False)
 #test.Lloyd_test(domain='square')
-#test.Lloyd_test(domain = 'LShape')
+test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
 #test.Lloyd_test(domain='circle_hole')
-test.Lloyd_test(domain='partition1')
+#test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
 #test.Lloyd_test(domain = 'hole1')
 #test.Lloyd_test(domain='hole2')

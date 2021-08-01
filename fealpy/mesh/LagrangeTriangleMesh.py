@@ -473,6 +473,11 @@ class LagrangeTriangleMeshDataStructure(Mesh2dDataStructure):
         self.NE = ds.NE 
         self.NC = ds.NC 
 
+        self.ccw = np.zeros(3*p, dtype=self.itype)
+        self.ccw[0:p] = np.cumsum(range(p))
+        self.ccw[p:2*p] = range(self.NVC - p - 1, self.NVC-1)
+        self.ccw[3*p-1:2*p-1:-1] = np.cumsum(range(2, p+2))  
+
         self.edge2cell = ds.edge2cell 
 
         if p == 1:
