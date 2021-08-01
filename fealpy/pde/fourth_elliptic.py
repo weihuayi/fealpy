@@ -294,7 +294,7 @@ class LShapeRSinData:
         return self.solution(p)
 
 class SqrtData():
-    def __init__(self, k = 1):
+    def __init__(self, k = 3):
         self.k = k
 
     def init_mesh(self, n=4, meshtype='tri'):
@@ -342,8 +342,6 @@ class SqrtData():
         z = x**2+y**2
         k = self.k
         F = 16*(k**2)*((k-1)**2)*(z**(k-2))-4*(k**2)*(z**(k-1))
-        print('FFFFFFFFFFFff')
-        print(F)
         return F
 
     @cartesian
