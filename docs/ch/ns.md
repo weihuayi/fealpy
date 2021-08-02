@@ -33,6 +33,7 @@ $$
 - $$\mu$$ 分子粘性系数
 
 ##　变分格式
+
 对两便乘上向量测试函数 $$\boldsymbol v \in V$$ 并在积分区域 $$\Omega$$ 上做积分
 
 $$
@@ -86,6 +87,7 @@ $$
 $$
 
 易证反对陈矩阵和对称矩阵求内积会消失，所以变分形式可以变为
+
 $$
 \begin{align}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
@@ -95,3 +97,8 @@ $$
 	=  (\rho \boldsymbol f,\boldsymbol v)
 \end{align}
 $$
+
+## 参考文献
+
+1. [Fenics examples for the Navier-Stokes
+   equations](https://fenicsproject.org/pub/tutorial/sphinx1/._ftut1004.html#the-navier-stokes-equations)
