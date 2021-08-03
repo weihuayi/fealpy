@@ -43,7 +43,7 @@ if domain == 'square':
         (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int_)
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain)
     fixed = None
-    times = None
+    adaptive = False
 
 elif domain == 'Lshape':
     node = np.array([
@@ -57,7 +57,7 @@ elif domain == 'Lshape':
        (1, 0), (1, 0), (1, 0), (1, 0),
        (1, 0), (1, 0), (1, 0), (1, 0)],dtype=np.int_)
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain, fixed)
-    times = None
+    adaptive = False
 
 elif domain =='circle':
     n = 20
@@ -73,7 +73,7 @@ elif domain =='circle':
     subdomain = np.zeros((n, 2),dtype=np.int_)
     subdomain[:, 0] = 1
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain)
-    times = None
+    adaptive = False
 
 elif domain =='triangle':
     # n>=3
@@ -84,7 +84,7 @@ elif domain =='triangle':
     subdomain = np.array([
         (1, 0),(1, 0),(1, 0)], dtype=np.int_)
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain)
-    times = None
+    adaptive = True
     fixed = None
 
 elif domain =='circle_h':
@@ -109,10 +109,8 @@ elif domain =='circle_h':
     subdomain[:4, 0] = 1
     subdomain[4:,0] = 1
     subdomain[4:,1] = -1
-    times = np.zeros(n)
-    times[:4] = 3
-    times[4:] = 1
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain,fixed)
+    adaptive = True
 
 elif domain == 'square_h':    
     node = np.array([
@@ -126,9 +124,7 @@ elif domain == 'square_h':
         (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int_)
 
     mesh = HalfEdgeMesh2d.from_edges(node, edge, subdomain)
-    times = np.zeros(len(edge))
-    times[:4] = 3
-    times[4:] = 2
+    adaptive = True
     fixed = None
 
 elif domain == 'partition_tr':
@@ -142,7 +138,7 @@ elif domain == 'partition_tr':
         (1, 0),(2, 0),(3, 0),(4, 0),
         (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int_)
     mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-    times = None
+    adaptive = True
     fixed = None
 
 elif domain == 'partition_s':
@@ -159,19 +155,18 @@ elif domain == 'partition_s':
         (3, 0),(4, 0),(4, 0),(1, 0),
         (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int_)
     mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-    times = None
+    adaptive = False
     fixed = None
 
 else:
     raise ValueError("the domain argument appear error!") 
 
 mesher = CVTPMesher(mesh,fixed)
-mesher.uniform_meshing(nb=nbrefine,times = times)
-vor, start = mesher.voronoi()
+vor = mesher.voronoi_meshing(nb=nbrefine,adaptive = adaptive)
 
 i = 0
 while i < nlloyd:
-    vor = mesher.lloyd_opt(vor, start)
+    vor = mesher.lloyd_opt(vor)
     i+=1
 
 fig = plt.figure()
