@@ -23,9 +23,9 @@ class CVTPMesherTest:
             (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
         dof =np.array([1,1,1,1],dtype=np.bool)
         mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-        uniform_boundary_mesh = CVTPMesher(mesh)
-        uniform_boundary_mesh.uniform_boundary_meshing(n=1)
-        bnode = uniform_boundary_mesh.bnode
+        voromesher = CVTPMesher(mesh)
+        voromesher.vorocrust_boundary_matching(n=2)
+        bnode = voromesher.bnode
         vor = Voronoi(bnode)
         if plot:
             fig = plt.figure()
@@ -54,9 +54,9 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            uniform_mesh.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
        
         elif domain == 'LShape':
             vertices = np.array([
@@ -71,9 +71,9 @@ class CVTPMesherTest:
                (1, 0), (1, 0), (1, 0), (1, 0)],dtype=np.int)
         
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain, fixed)
-            uniform_mesh = CVTPMesher(mesh,fixed)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh,fixed)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
 
         elif domain =='circle':
             n = 20
@@ -90,9 +90,9 @@ class CVTPMesherTest:
             subdomain[:, 0] = 1
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh= CVTPMesher(mesh,fixed)
-            uniform_mesh.uniform_boundary_meshing(n=0)
-            bnode = uniform_mesh.bnode
+            voromesher= CVTPMesher(mesh,fixed)
+            voromesher.vorocrust_boundary_matching(n=0)
+            bnode = voromesher.bnode
 
         elif domain == 'partition1':
             vertices = np.array([
@@ -104,9 +104,9 @@ class CVTPMesherTest:
                 (1, 0),(2, 0),(3, 0),(4, 0),
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
 
         elif domain == 'partition2':
             vertices = np.array([
@@ -122,9 +122,9 @@ class CVTPMesherTest:
                 (3, 0),(4, 0),(4, 0),(1, 0),
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
         elif domain == 'hole1':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
@@ -141,8 +141,8 @@ class CVTPMesherTest:
             times = np.zeros(len(facets))
             times[:4] = 6
             times[4:] = 3
-            uniform_mesh.uniform_boundary_meshing(n=5,times = times)
-            bnode = uniform_mesh.bnode
+            voromesher.vorocrust_boundary_matching(n=5,times = times)
+            bnode = voromesher.bnode
         elif domain == 'hole2':
             #""" 
             vertices = np.array([
@@ -164,9 +164,9 @@ class CVTPMesherTest:
             #"""
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=1)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=1)
+            bnode = voromesher.bnode
 
         if domain == 'square2':
             vertices = np.array([
@@ -179,9 +179,9 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0),
                 (2, 0),(2, 0),(2, 0),(2, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
 
         if domain == 'triangle':
             vertices = np.array([
@@ -191,9 +191,9 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -212,9 +212,9 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1,0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_boundary_meshing(n=2)
-            bnode = uniform_mesh.bnode
+            voromesher = CVTPMesher(mesh)
+            voromesher.vorocrust_boundary_matching(n=2)
+            bnode = voromesher.bnode
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
@@ -229,8 +229,8 @@ class CVTPMesherTest:
         
         vor = Voronoi(bnode, incremental = True)
         if interior_nodes:
-            uniform_mesh.uniform_init_interior_nodes()
-            newnode = uniform_mesh.inode
+            voromesher.init_interior_nodes()
+            newnode = voromesher.inode
             for k in newnode:
                 vor.add_points(newnode[k])
         
@@ -258,8 +258,8 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(nb=2)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=2)
        
         elif domain == 'LShape':
             vertices = np.array([
@@ -275,8 +275,8 @@ class CVTPMesherTest:
         
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(nb=2)
+            voromesher  = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=2)
         elif domain =='circle':
             n = 20
             h = 2*np.pi/n
@@ -293,8 +293,8 @@ class CVTPMesherTest:
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain,
                     fixed)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(nb=0)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=0)
 
         elif domain =='circle_hole':
             n = 20
@@ -327,8 +327,8 @@ class CVTPMesherTest:
             axes = fig.gca()
             mesh.add_plot(axes)
             plt.show()
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(nb=7,times = times)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=3,adaptive = True)
 
         elif domain == 'partition1':
             vertices = np.array([
@@ -340,8 +340,8 @@ class CVTPMesherTest:
                 (1, 0),(2, 0),(3, 0),(4, 0),
                 (4, 1),(4, 3),(2, 1),(3, 2)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=4)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=4,adaptive=True)
 
         elif domain == 'partition2':
             vertices = np.array([
@@ -357,11 +357,10 @@ class CVTPMesherTest:
                 (3, 0),(4, 0),(4, 0),(1, 0),
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=3)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(n=3)
 
-        elif domain == 'hole1':
-            
+        elif domain == 'hole1': 
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
                 ( 0.4, 0.4),( 0.4, 0.8),( 0.8, 0.8),( 0.8, 0.4)],dtype=np.float)
@@ -373,11 +372,11 @@ class CVTPMesherTest:
                 (1,-1),(1,-1),(1,-1),(1,-1)], dtype=np.int)
 
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
+            voromesher = CVTPMesher(mesh)
             times = np.zeros(len(facets))
             times[:4] = 3
             times[4:] = 2
-            uniform_mesh.uniform_meshing(nb=5,times = times)
+            vor = voromesher.voronoi_meshing(nb=5,adaptive = True)
         elif domain == 'square2':
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0, 1.0),( 0.0, 1.0),
@@ -389,8 +388,8 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0),
                 (2, 0),(2, 0),(2, 0),(2, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=2)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(n=2)
 
         elif domain == 'hole2':
             vertices = np.array([
@@ -410,9 +409,9 @@ class CVTPMesherTest:
             times[:4] = 4
             times[4:] = 2
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
+            voromesher = CVTPMesher(mesh)
             #uniform_mesh.uniform_boundary_meshing(n=1)
-            uniform_mesh.uniform_meshing(n=2,times = times)
+            vor = voromesher.voronoi_meshing(n=2,times = times)
             #bnode = uniform_mesh.bnode
 
         elif domain == 'hexagon':
@@ -425,8 +424,8 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=2)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(n=2)
 
         elif domain =='triangle':
             vertices = np.array([
@@ -436,11 +435,10 @@ class CVTPMesherTest:
             subdomain = np.array([
                 (1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
-            uniform_mesh = CVTPMesher(mesh)
-            uniform_mesh.uniform_meshing(n=4)
+            voromesher = CVTPMesher(mesh)
+            vor = voromesher.voronoi_meshing(nb=4,adaptive=True)
 
         #mesh.print()
-        vor, start = uniform_mesh.voronoi()
         if plot:
             fig = plt.figure()
             axes = fig.gca()
@@ -457,11 +455,12 @@ class CVTPMesherTest:
             plt.show()
        
         i =0
-        while i<1000:
-            vor = uniform_mesh.lloyd_opt(vor,start)
+        while i<100:
+            vor = voromesher.lloyd_opt(vor)
             i+=1
-
-        pmesh = uniform_mesh.to_PolygonMesh(vor) 
+        en,ef = voromesher.energy(vor)
+        print(en)
+        pmesh = voromesher.to_polygonMesh(vor) 
         fig = plt.figure()
         axes= fig.gca()
         pmesh.add_plot(axes)
@@ -518,9 +517,9 @@ if sys.argv[1] == "Lloyd":
 #test.uniform_meshing_test(domain = 'hole1',interior_nodes = True)
 #test.uniform_meshing_test(domain='hole2',interior_nodes=False)
 #test.Lloyd_test(domain='square')
-test.Lloyd_test(domain = 'LShape')
+#test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
-#test.Lloyd_test(domain='circle_hole')
+test.Lloyd_test(domain='circle_hole')
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
 #test.Lloyd_test(domain = 'hole1')
