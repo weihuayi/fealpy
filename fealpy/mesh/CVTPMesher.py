@@ -398,7 +398,7 @@ class CVTPMesher:
         rv = np.array(vor.ridge_vertices)
         isKeeped = (rv[:, 0]>=0)
         rp = rp[isKeeped]
-        rv = rv[isKeeped]
+        rv = rv[sKeeped]
         N = rp.shape[0]
         NN = 2*N
         p0 = np.zeros((NN,2),dtype = np.float)
