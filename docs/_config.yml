@@ -18,49 +18,48 @@
 # You can create any custom variable you would like, and they will be accessible
 # in the templates via {{ site.myvariable }}.
 
+# Build settings
+theme: jekyll-text-theme # Gem-based Jekyll Themes
+
+
 title: "FEALPy: Finite Element Analysis Library in Python " 
 email: weihuayi@xtu.edu.cn
 description: >- # this means to ignore newlines until "baseurl:"
   Write an awesome description for your new site here. You can edit this
   line in _config.yml. It will appear in your document head meta (for
   Google search results) and in your feed.xml site description.
-baseurl: "/fealpy" # the subpath of your site, e.g. /blog
+baseurl: "/fealpy" # the subpath of your site 
 url: "weihuayi.github.io" # the base hostname & protocol for your site, e.g. http://example.com
-# twitter_username: jekyllrb
-# github_username:  jekyll
 
-# markdown settings
-markdown: kramdown
+## => Build
+##############################
+markdown    : kramdown
+highlighter : rouge
+permalink   : date
 
-# Build settings
-theme: minima
+## => Markdown Enhancements
+##############################
+## Mathjax
+mathjax: true
+mathjax_autoNumber: true
+
+## Mermaid
+mermaid: true
+
+## Chart
+chart: true
+
+
+## => Paginate
+##############################
+paginate: 8
+paginate_path: /page:num # don't change this unless for special need
+
+
+## => Plugins
+##############################
 plugins:
   - jekyll-feed
-
-# Exclude from processing.
-# The following items will not be processed, by default.
-# Any item listed under the `exclude:` key here will be automatically added to
-# the internal "default list".
-#
-# Excluded items can be processed by explicitly listing the directories or
-# their entries' file path in the `include:` list.
-#
-# exclude:
-#   - .sass-cache/
-#   - .jekyll-cache/
-#   - gemfiles/
-#   - Gemfile
-#   - Gemfile.lock
-#   - node_modules/
-#   - vendor/bundle/
-#   - vendor/cache/
-#   - vendor/gems/
-#   - vendor/ruby/
-
-defaults:
-  # _posts: these are for the post in _posts folder
-  - scope:
-      path: ""
-      type: posts
-    values:
-      mathjax: true
+  - jekyll-paginate
+  - jekyll-sitemap
+  - jemoji
