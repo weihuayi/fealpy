@@ -606,7 +606,6 @@ class ScaledMonomialSpace2d():
         ps = self.mesh.edge_bc_to_point(bcs, index=index) #(NQ, NE, 2)
 
         gval = g(ps) #(NQ, NE)
-        print(gval)
 
         ldof = self.number_of_local_dofs(doftype='cell')
         gdof = self.number_of_global_dofs(p=p)
@@ -633,11 +632,11 @@ class ScaledMonomialSpace2d():
 
         其中 g 可以是标量函数也可以是向量函数, 当是标量函数的时候计算的是:
         
-        h_e^{-1}<g, [v]>_e
+        h_e^{hpower}<g, [v]>_e
 
         当是向量函数的时候计算的是:
 
-        h_e^{-1}<g_n, [v]>_e
+        h_e^{hpower}<g_n, [v]>_e
 
         
         """

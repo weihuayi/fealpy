@@ -8,7 +8,7 @@ FEALPy 是一款偏微分方程数值解的开源算法库，以对象化和数�
 * [简介](./introduction.md)
 * [网格及其数据结构](./mesh.md)
 * [偏微分方程数值离散方法](./num_methods.md)
-    + [有限元方法](./fem.md)
+    + [单纯形网格上的 Lagrange 有限元方法](./simplex-lagrange.md)
     + [有限体积方法](./fvm.md)
     + [有限差分方法](./fdm.md)
     + [虚单元方法](./vem.md)
