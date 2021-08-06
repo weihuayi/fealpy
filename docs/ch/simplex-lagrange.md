@@ -1,59 +1,51 @@
-<script src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" type="text/javascript"></script>
-# Lagrange 有限元求解 Poisson 方程 
+# 单纯形网格上的 Lagrange 有限元 
 
-## PDE 模型
+这里以 Poisson 方程为例介绍单纯形网格上的任意次 Lagrange 有限元方法。
 
 给定区域 $\Omega\subset\mathbb R^d$, 其边界 $\partial \Omega = \Gamma_D \cup \Gamma_N
 \cup \Gamma_R$
 
 $$
--\Delta u = f, \quad\text{in }\Omega\\
+-\Delta u = f, \quad\text{in }\Omega
 $$
 
-满足如下的边界条件
+满足如下的边界条件：
 
 $$
-u = g_D, \quad\text{on }\Gamma_D \\
-$$
-
-$$
-\frac{\partial u}{\partial\boldsymbol n}  = g_N, \quad\text{on }\Gamma_N\\
+u = g_D, \quad\text{on }\Gamma_D\leftarrow \text{\bf Dirichlet } 
 $$
 
 $$
-\frac{\partial u}{\partial\boldsymbol n} + \kappa u = g_R, \quad\text{on }\Gamma_R
+\frac{\partial u}{\partial\boldsymbol n}  = g_N, \quad\text{on }\Gamma_N \leftarrow \text{\bf Neumann}
+$$
+
+$$
+\frac{\partial u}{\partial\boldsymbol n} + \kappa u = g_R, \quad\text{on }\Gamma_R \leftarrow \text{\bf Robin}
 $$
 
 
-## 连续与离散变分形式
-
-方程两端分别乘以测试函数 $v \in H_{D,0}^1(\Omega)$, 则连续的弱形式可以写为
+在 Poisson 方程两端分别乘以测试函数 $v \in H_{D,0}^1(\Omega)$, 利用分部积分，可得到其对应的**连续弱形式**
 
 $$
 (\nabla u,\nabla v)+<\kappa u,v>_{\Gamma_R} = (f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
-取一个 $N$ 维的有限维空间 $V_h = \operatorname{span}\{\phi_i\}_0^{N-1}$，其基函数向量记为
+进一步，取一个 $N$ 维的有限维空间 $V_h = \operatorname{span}\{\phi_i\}_0^{N-1}$，其基函数向量记为
 
 $$
 \bm\phi = [\phi_0, \phi_1, \cdots, \phi_{N-1}],
 $$
 
-注意这 $\bm\phi$ 是行向量函数。
-
-用 $V_h$ 替代无限维的空间 $H^1_{D,0}(\Omega)$, 从而把问题转化为**离散的弱形式**：求 
+注意这 $\bm\phi$ 是行向量函数，则 $V_h$ 中任何一个函数 $u_h$ 都对应一个唯一的 $N$ 维列向量 $\boldsymbol u$, 满足 
 
 $$
-u_h = \bm\phi\boldsymbol u = \sum_{i=0}^{N-1}u_i\phi_i\in V_h
+u_h = \bm\phi \boldsymbol u=\bm\phi
+\begin{bmatrix}
+u_0\\ u_,\\ \vdots\\ u_{N-1}
+\end{bmatrix}
 $$
 
-其中 $\boldsymbol u$ 是 $u_h$ 在基函数 $\bm\phi$ 下的坐标**列向量**, 即 
-
-$$
-\boldsymbol u=[u_0, u_1, \ldots, u_{N-1}]^T,
-$$
-
-$u_h$ 满足：
+如果用 $V_h$ 替代无限维的空间 $H^1_{D,0}(\Omega)$, 从而得到原问题的**离散弱形式**：求 $u_h\in V_h$, 满足
 
 $$
 \left(\nabla u_h, (\nabla \bm\phi)^T\right)+<\kappa u_h, \bm\phi^T>_{\Gamma_R}=
@@ -79,7 +71,23 @@ $$
 \boldsymbol b_R =  \int_{\Gamma_R} g_R\bm\phi^T\mathrm d \boldsymbol s
 $$
 
+## 重心坐标与几何单纯形网格
 
+记 $\{\boldsymbol x_i:=[x_{i,0}, x_{i, 1}, \ldots, x_{i, d-1}]\}_{i=0}^d$ 为 $\mathbb R^d$ 空
+间中的一组点, 假设它们不在同一个超平面上, 也即是说 $d$ 个向量 $\boldsymbol x_0\boldsymbol x_1$,
+$\boldsymbol x_0\boldsymbol x_2$, $\cdots$, 和 $\boldsymbol x_0\boldsymbol x_d$ 是线性无关的, 等价于矩阵
+
+$$
+    \boldsymbol A =\begin{bmatrix}
+        x_{0, 0} & x_{1, 0} & \cdots & x_{d, 0} \\
+        x_{0, 1} & x_{1, 1} & \cdots & x_{d, 1} \\
+        \vdots   & \vdots   & \ddots & \vdots \\
+        x_{0, d-1} & x_{1, d-1} & \cdots & x_{d, d-1}\\
+        1 & 1 & \cdots & 1
+    \end{bmatrix}
+$$
+
+是非奇异的.
 ## Lagrnage 有限元方法 
 
 ```python
