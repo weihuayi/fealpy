@@ -188,6 +188,10 @@ def source(p):
     pi = np.pi
     val = 2*pi**2*(3*np.cos(pi*x)**2*np.cos(pi*y)**2 - np.cos(pi*x)**2 - np.cos(pi*y)**2 + 1)*np.cos(pi*x)*cos(pi*y)
     return val
+
+@cartesian
+def dirichlet(p):
+    return solution(p)
 ```
 
 构造 $\Omega=[0, 1]^2$ 上的三角形网格，$x$ 和 $y$ 方向都剖分 10 段
@@ -198,27 +202,15 @@ domain = [0, 1, 0, 1]
 mesh = MF.boxmesh2d(domain, nx=10, ny=10, meshtype='tri')
 ```
 
-构造 `mesh` 上的 $p$ 次 Lagrange 有限元空间 `space`, 并定义一个该空间的函数 `u0`
+构造 `mesh` 上的 $p$ 次 Lagrange 有限元空间 `space`, 并定义一个该空间的函数 `u0`,
+其所有自由度默认为 0
 
 ```python
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
 space = LagrangeFiniteElementSpace(mesh, p=1) # p=1 的线性元，
-u = space.function()
-```
-
-$(a(u^0)\nabla\delta u, \nabla v)$ 对应的矩阵组装代码为 
-
-```python
-# 装饰子：指明被装饰函数输入的是重心坐标点
-from fealpy.decorator import barycentric 
-
-@barycentric
-def dcoefficient(bc):
-    # 扩散系数
-    return 1 + u(bc)
-
-A = space.stiff_matrix(c=dcoefficient)
+u0 = space.function()
+du = space.function()
 ```
 
 $(a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v)$ 对应的组装代码
@@ -235,9 +227,61 @@ def nlcoefficient(bc):
 
     两个数组相乘，需要在 u(bc) 的后面加一个轴
     '''
-    return 2*u(bc)[..., None]*u.grad_value(bc)
+    return 2*u0(bc)[..., None]*u0.grad_value(bc)
 
-def nolinear_matrix(space):
+def nolinear_matrix(space, c, q=3):
+    mesh = space.mesh
+    qf = mesh.integrator(q, 'cell') # 获得第 q 个积分公式
+    bcs, ws = qf.get_quadrature_points_and_weights() # (NQ, TD+1) 获得积分点重心坐标和权重
+    cellmeasure = mesh.entity_measure('cell') # (NC, )
+    phi = space.basis(bcs) # (NQ, 1, dof) 获得每个单元基函数在积分点的值
+    gphi = space.grad_basis(bcs) # （NQ, NC, ldof, GD), 获得每个单元基函数在重心坐标处的梯度值，
+    val = c(bcs) # (NQ, NC, GD)
+
+    # 组装单元矩阵， A.shape == (NC, ldof, ldof)
+    B = np.einsum('q, qcid, qcd, qcj, c->cij', ws, gphi, val, phi, cellmeasure)
+    gdof = space.number_of_global_dof() # 全局自由度的个数
+
+    # (NC, ldof), cell2dof[i, j] 存储第 i 个单元上的局部第 j 个自由度的全局编号
+    cell2dof = space.cell_to_dof()
+
+    # (NC, ldof) --> (NC, ldof, 1) --> (NC, ldof, ldof)
+    I = np.broadcast_to(cell2dof[:, :, None], shape=A.shape)
+
+    # (NC, lodf) --> (NC, 1, ldof) --> (NC, ldof, ldof)
+    J = np.broadcast_to(cell2dof[:, None, :], shape=A.shape)
+    B = csr_matrix((B.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+    return 
+
+```
+
+下面边界条件处理与求解
+
+```python
+# 装饰子：指明被装饰函数输入的是重心坐标点
+from fealpy.decorator import barycentric 
+from fealpy.boundarycondition import DirichletBC
+# solver
+from scipy.sparse.linalg import spsolve
+
+
+@barycentric
+def dcoefficient(bcs):
+    # 扩散系数
+    return 1 + u0(bcs)**2
+
+isDDof = space.set_dirichlet_bc(u0, dirichlet)
+tol = 1e-8
+b = space.source_vector(source)
+while True:
+    A = space.stiff_matrix(c=dcoefficient)
+    B = nolinear_matrix(space)
+    U = A + B
+    F = b - A@u0
+    du[isDDof] = spsolve(U[:, isDDof][isDDof, :], F[isDDof]).reshape(-1)
+    u0[isDDof] += du
+    if np.max(np.abs(du)) < tol:
+        break
 ```
 
 
