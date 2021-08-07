@@ -271,6 +271,7 @@ def dcoefficient(bcs):
     return 1 + u0(bcs)**2
 
 isDDof = space.set_dirichlet_bc(u0, dirichlet)
+isIDof = ~isDDof
 tol = 1e-8
 b = space.source_vector(source)
 while True:
@@ -278,8 +279,8 @@ while True:
     B = nolinear_matrix(space)
     U = A + B
     F = b - A@u0
-    du[isDDof] = spsolve(U[:, isDDof][isDDof, :], F[isDDof]).reshape(-1)
-    u0[isDDof] += du
+    du[isIDof] = spsolve(U[:, isIDof][isIDof, :], F[isIDof]).reshape(-1)
+    u0 += du
     if np.max(np.abs(du)) < tol:
         break
 ```
