@@ -16,13 +16,9 @@ $$
 
 ```python
 import numpy as np
-from fealpy.mesh import IntervalMesh
+from fealpy.mesh import MeshFactory as MF 
 
-node = np.array([[0.0], [1.0]], dtype=np.float64)
-cell = np.array([[0, 1]], dtype=np.int_)
-
-mesh = IntervalMesh(node, cell)
-mesh.uniform_refine(4)
+mesh = MF.interval_mesh([0, 1], nx=4)
 
 ```
 
