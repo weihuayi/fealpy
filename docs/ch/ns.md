@@ -7,34 +7,32 @@
 不可压的流体
 
 $$
-\begin{equation}
 \begin{cases}
-\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  =
-　-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
-\nabla \cdot \boldsymbol u = 0
+\rho (\frac{\partial \bm u}{\partial t}+\bm u \cdot \nabla\bm u)  =
+　-\nabla p + \nabla \cdot \sigma(\bm u) +\rho \bm f \\
+\nabla \cdot \bm u = 0
 \end{cases}
-\end{equation}
 $$
 
 若其为牛顿流体的话，流体的切应力与应变时间(速度梯度)成正比。其关系如下
 
 $$
-\begin{align}
-	\sigma(\boldsymbol u) &= 2 \mu \varepsilon(\boldsymbol u) \\
-	\varepsilon(\boldsymbol u) &= \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T)
-\end{align}
+\sigma(\bm u) = 2 \mu \varepsilon(\bm u) 
+$$
+$$
+\varepsilon(\bm u) = \frac{1}{2} (\nabla \bm u + (\nabla \bm u)^T)
 $$
 
 其中符号的物理意义分别为
 
-- $$\boldsymbol u$$ 代表速度
-- $$p$$ 代表单位面积上的压力
-- $$f$$ 单位质量流体微团的体积力
-- $$\mu$$ 分子粘性系数
+- $\bm u$ 代表速度
+- $p$ 代表单位面积上的压力
+- $f$ 单位质量流体微团的体积力
+- $\mu$ 分子粘性系数
 
 ##　变分格式
 
-对两便乘上向量测试函数 $$\boldsymbol v \in V$$ 并在积分区域 $$\Omega$$ 上做积分
+对两便乘上向量测试函数 $\bm v \in V$ 并在积分区域 $\Omega$ 上做积分
 
 $$
 \begin{eqnarray}
@@ -96,6 +94,69 @@ $$
 	-( \nabla \sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	=  (\rho \boldsymbol f,\boldsymbol v)
 \end{align}
+$$
+
+
+$$
+\bm\phi = [\phi_0(\bm x), \phi_1(\bm x), \cdots, \phi_{l-1}(\bm x)],
+\forall \bm x \in \tau
+$$
+
+$$
+\bm\Phi = \begin{bmatrix}
+\bm\phi & \bm0 \\
+\bm0 & \bm\phi
+\end{bmatrix}
+$$
+
+$$
+\varepsilon(\bm\Phi) = 
+\begin{bmatrix}
+	\begin{bmatrix}
+		\frac{\partial \phi_0}{\partial x} & \frac{1}{2}\frac{\partial \phi_0}{\partial y}\\
+		\frac{1}{2}\frac{\partial \phi_0}{\partial y} & 0
+	\end{bmatrix}
+	& \cdots
+	& \begin{bmatrix}
+		\frac{\partial \phi_{l_1}}{\partial x} & \frac{1}{2}\frac{\partial \phi_{l-1}}{\partial y}\\
+		\frac{1}{2}\frac{\partial \phi_{l-1}}{\partial y} & 0
+	\end{bmatrix}
+	& \begin{bmatrix}
+		0 & \frac{1}{2}\frac{\partial \phi_{0}}{\partial x} \\
+		\frac{1}{2}\frac{\partial \phi_{0}}{\partial x} & \frac{\partial \phi_{0}}{\partial y}
+	\end{bmatrix}
+	& \cdots
+	& \begin{bmatrix}
+		0 & \frac{1}{2}\frac{\partial \phi_{l-1}}{\partial x} \\
+		\frac{1}{2}\frac{\partial \phi_{l-1}}{\partial x} & \frac{\partial \phi_{l-1}}{\partial y}
+	\end{bmatrix}
+\end{bmatrix}
+$$
+
+
+$$
+\bm E = 
+\begin{bmatrix}
+\bm E_{0,0} & \bm E_{0, 1}\\
+\bm E_{1,0} & \bm E_{1, 1}\\
+\end{bmatrix}
+$$
+
+$$
+\bm E_{0, 0} = \int_\tau \frac{\partial\bm\phi^T}{\partial x}\frac{\partial\bm\phi}{\partial x}
++\frac{1}{2}\frac{\partial\bm\phi^T}{\partial y}\frac{\partial\bm\phi}{\partial y}\mathrm
+d\bm x
+$$
+
+$$
+\bm E_{1, 1} = \int_\tau \frac{\partial\bm\phi^T}{\partial y}\frac{\partial\bm\phi}{\partial y}
++\frac{1}{2}\frac{\partial\bm\phi^T}{\partial x}\frac{\partial\bm\phi}{\partial x}\mathrm
+d\bm x
+$$
+
+$$
+\bm E_{0, 1} = \int_\tau \frac{1}{2}\frac{\partial\bm\phi^T}{\partial y}\frac{\partial\bm\phi}{\partial x}\mathrm
+d\bm x
 $$
 
 ## 参考文献
