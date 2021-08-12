@@ -2,12 +2,13 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
-from .function import Function
+from .Function import Function
 from .femdof import CPLFEMDof1d, CPLFEMDof2d, CPLFEMDof3d
 from .femdof import DPLFEMDof1d, DPLFEMDof2d, DPLFEMDof3d
 
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import FEMeshIntegralAlg
+from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
 """
 The following code was no use!
 """
@@ -89,8 +90,8 @@ class VectorLagrangeFiniteElementSpace():
         val = np.einsum('...j, ij->...i',  dphi, uh) 
         return val
 
-    def function(self, dim=None):
-        f = Function(self)
+    def function(self, dim=None,array=None):
+        f = Function(self,dim=dim,array=array,coordtype='barycentric')
         return f
 
     def array(self, dim=None):

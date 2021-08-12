@@ -517,6 +517,11 @@ class LagrangeQuadrangleMeshDataStructure(Mesh2dDataStructure):
         self.NN = ds.NN 
         self.NE = ds.NE 
         self.NC = ds.NC 
+        self.ccw = np.zeros(4*p, dtype=self.itype)
+        self.ccw[0:p] = range(0, p*(p+1), p+1)
+        self.ccw[p:2*p] = range(p*(p+1), p**2+2*p)
+        self.ccw[2*p:3*p] = range(p**2+2*p, p, -p-1)
+        self.ccw[3*p:4*p] = range(p, 0, -1)
 
         self.edge2cell = ds.edge2cell 
 
