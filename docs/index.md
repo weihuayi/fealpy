@@ -1,5 +1,5 @@
 ---
-layout: page
+layout: article
 title: FEALPy Documentation
 description: "Manual for FEALPy: Finite Element Analysis Library in Python"
 ---

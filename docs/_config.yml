@@ -19,8 +19,10 @@
 # in the templates via {{ site.myvariable }}.
 
 # Build settings
-theme: jekyll-text-theme # Gem-based Jekyll Themes
-
+# theme: jekyll-text-theme # Gem-based Jekyll Themes
+remote_theme: kitian616/jekyll-TeXt-theme # remote theme, without local copy of sass files
+text_skin: default
+highlight_theme: default
 
 title: "FEALPy: Finite Element Analysis Library in Python " 
 email: weihuayi@xtu.edu.cn
