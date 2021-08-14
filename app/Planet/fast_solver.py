@@ -23,7 +23,7 @@ class PlanetFastSovler():
     def set_matrix(self, Ak):
         self.Ak = Ak
 
-    def linear_operator(self, b):
+    def linear_operator_1(self, b):
         '''
         
         (A - B D^{-1} C) b
@@ -41,7 +41,7 @@ class PlanetFastSovler():
 
         return r
 
-    def preconditioner(self, b):
+    def linear_operator_2(self, b):
         b = self.D@b
         return b
 
@@ -49,7 +49,7 @@ class PlanetFastSovler():
         rdof = self.rdof
         gdof = self.gdof
 
-        A = LinearOperator((rdof, rdof), matvec=self.linear_operator)
+        A = LinearOperator((rdof, rdof), matvec=self.linear_operator_1)
         a = F[:rdof]
         b = np.zeros(gdof, dtype=np.float64)
         b[:] = F[rdof:]
@@ -62,5 +62,5 @@ class PlanetFastSovler():
 
         uh[:rdof].T.flat, info = cg(A, a, tol=1e-8)
 
-        P = LinearOperator((gdof, gdof), matvec=self.preconditioner)
+        P = LinearOperator((gdof, gdof), matvec=self.linear_operator_2)
         uh[rdof:].T.flat, info = cg(P, F[rdof:]-uh[:rdof]@self.B, tol=1e-8)
