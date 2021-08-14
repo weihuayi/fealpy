@@ -29,50 +29,89 @@ from fealpy.tools.show import showmultirate
 
 # 定义模型数据
 
-@cartesian
-def solution(p):
-    # 真解函数
-    pi = np.pi
-    x = p[..., 0]
-    y = p[..., 1]
-    return np.cos(pi*x)*np.cos(pi*y)
+class CosCosData():
 
-@cartesian
-def gradient(p):
-    # 真解函数的梯度
-    x = p[..., 0]
-    y = p[..., 1]
-    pi = np.pi
-    val = np.zeros(p.shape, dtype=np.float64)
-    val[...,0] = -pi*np.sin(pi*x)*np.cos(pi*y)
-    val[...,1] = -pi*np.cos(pi*x)*np.sin(pi*y)
-    return val #val.shape ==p.shape
+    def domain(self):
+        return [0, 1, 0, 1]
 
-@cartesian
-def source(p):
-    # 源项
-    x = p[...,0]
-    y = p[...,1]
-    pi = np.pi
-    val = 2*pi**2*(3*np.cos(pi*x)**2*np.cos(pi*y)**2-np.cos(pi*x)**2-np.cos(pi*y)**2+1)*np.cos(pi*x)*np.cos(pi*y)
-    return val
+    @cartesian
+    def solution(self, p):
+        # 真解函数
+        pi = np.pi
+        x = p[..., 0]
+        y = p[..., 1]
+        return np.cos(pi*x)*np.cos(pi*y)
 
-@cartesian
-def dirichlet(p):
-    return solution(p)
+    @cartesian
+    def gradient(self, p):
+        # 真解函数的梯度
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        val = np.zeros(p.shape, dtype=np.float64)
+        val[...,0] = -pi*np.sin(pi*x)*np.cos(pi*y)
+        val[...,1] = -pi*np.cos(pi*x)*np.sin(pi*y)
+        return val #val.shape ==p.shape
+
+    @cartesian
+    def source(self, p):
+        # 源项
+        x = p[...,0]
+        y = p[...,1]
+        pi = np.pi
+        val = 2*pi**2*(3*np.cos(pi*x)**2*np.cos(pi*y)**2-np.cos(pi*x)**2-np.cos(pi*y)**2+1)*np.cos(pi*x)*np.cos(pi*y)
+        return val
+
+    @cartesian
+    def dirichlet(self, p):
+        return self.solution(p)
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        return x == 0.0
+
+    @cartesian
+    def neumann(self, p, n):
+        grad = self.gradient(p)
+        val = np.sum(grad*n, axis=-1)
+        return val
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        y = p[..., 1]
+        return (y == 1.0) | (y == 0.0)
+
+    @cartesian
+    def robin(self, p, n):
+        grad = self.gradient(p) # (NQ, NE, 2)
+        val = np.sum(grad*n, axis=-1)
+        shape = len(val.shape)*(1, )
+        kappa = np.array([1.0], dtype=np.float64).reshape(shape)
+        val += self.solution(p) 
+        return val, kappa
+
+    @cartesian
+    def is_robin_boundary(self, p):
+        x = p[..., 0]
+        return x == 1.0
 
 
-def nolinear_matrix(space, c, q=3):
+def nolinear_matrix(uh, q=3):
+
+    space = uh.space
     mesh = space.mesh
+
     qf = mesh.integrator(q, 'cell')
     bcs, ws = qf.get_quadrature_points_and_weights()
 
     cellmeasure = mesh.entity_measure('cell')
+
+    cval = 2*uh(bcs)[...,None]*uh.grad_value(bcs) # (NQ, NC, GD)
     phi = space.basis(bcs)       # (NQ, 1, ldof)
     gphi = space.grad_basis(bcs) # (NQ, NC, ldof, GD)
-    val = c(bcs)                 # (NQ, NC, GD)
-    
-    B = np.einsum('q, qcid, qcd, qcj, c->cij', ws, gphi, val, phi, cellmeasure)
+
+    B = np.einsum('q, qcid, qcd, qcj, c->cij', ws, gphi, cval, phi, cellmeasure)
 
     gdof = space.number_of_global_dofs()
     cell2dof = space.cell_to_dof()
@@ -82,12 +121,13 @@ def nolinear_matrix(space, c, q=3):
 
     return B
 
-p = 1
+p = 2
 maxit = 4 
 tol = 1e-8
 
-domain =[0, 1, 0, 1]
-mesh = MF.boxmesh2d(domain, nx=10, ny=10, meshtype='tri')
+pde = CosCosData()
+
+mesh = MF.boxmesh2d(pde.domain(), nx=10, ny=10, meshtype='tri')
 
 NDof = np.zeros(maxit, dtype=np.int_)
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
@@ -97,35 +137,35 @@ for i in range(maxit):
     print(i, ":")
     space = LagrangeFiniteElementSpace(mesh, p=p)
     NDof[i] = space.number_of_global_dofs()
-    b = space.source_vector(source)
-    uh = space.function() #  
+    u0 = space.function() #  
     du = space.function() #
-    isDDof = space.set_dirichlet_bc(uh, dirichlet)
+
+    isDDof = space.set_dirichlet_bc(pde.dirichlet, u0, threshold=pde.is_dirichlet_boundary)
     isIDof = ~isDDof
+
+    b = space.source_vector(pde.source)
+    b = space.set_neumann_bc(pde.neumann, b, threshold=pde.is_neumann_boundary)
+    R, b = space.set_robin_bc(pde.robin, b, threshold=pde.is_robin_boundary)
 
     @barycentric
     def dcoefficient(bcs):
-        return 1+uh(bcs)**2
-
-    @barycentric
-    def nlcoefficient(bcs):
-        return 2*uh(bcs)[...,None]*uh.grad_value(bcs)
+        return 1+u0(bcs)**2
 
     # 非线性迭代
     while True:
         A = space.stiff_matrix(c=dcoefficient)
-        B = nolinear_matrix(space, nlcoefficient)
-        U = A + B
-        F = b - A@uh
+        B = nolinear_matrix(u0, q=p+1)
+        U = A + R + B
+        F = b - A@u0 - R@u0
         du[isIDof] = spsolve(U[isIDof, :][:, isIDof], F[isIDof]).reshape(-1)
-        uh += du
+        u0 += du
         err = np.max(np.abs(du))
         print(err)
         if err < tol:
            break
 
-    errorMatrix[0, i] = space.integralalg.error(solution, uh.value)
-    errorMatrix[1, i] = space.integralalg.error(gradient, uh.grad_value)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, u0.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, u0.grad_value)
     if i < maxit-1:
         mesh.uniform_refine()
     
