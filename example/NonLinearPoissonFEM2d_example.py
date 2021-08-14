@@ -20,7 +20,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
-from fealpy.decorator import cartesian, barycentric
+from fealpy.decorator import cartesian, barycentric, timer
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
@@ -97,6 +97,7 @@ class CosCosData():
         return x == 1.0
 
 
+@timer
 def nolinear_matrix(uh, q=3):
 
     space = uh.space
@@ -144,7 +145,9 @@ for i in range(maxit):
     isIDof = ~isDDof
 
     b = space.source_vector(pde.source)
+
     b = space.set_neumann_bc(pde.neumann, b, threshold=pde.is_neumann_boundary)
+
     R, b = space.set_robin_bc(pde.robin, b, threshold=pde.is_robin_boundary)
 
     @barycentric
