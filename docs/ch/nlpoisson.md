@@ -12,8 +12,8 @@
 
 ## Newton-Galerkin 方法
 
-首先给出一个扩散系数为非线性的例子. 求解区域记为 $\Omega$, 边界
-$\partial\Omega = \Gamma_D\cup\Gamma_N\cup\Gamma_R$.
+首先给出一个扩散系数为非线性的例子. 求解区域记为 $$\Omega$$, 边界
+$$\partial\Omega = \Gamma_D\cup\Gamma_N\cup\Gamma_R$$.
 
 $$
 -\nabla\left(a(u)\nabla u\right) = f
@@ -33,25 +33,25 @@ $$
 \frac{\partial u}{\partial\bm n} + \kappa u = g_R, \quad\text{on }\Gamma_R \leftarrow \text{\bf Robin}
 $$
 
-在 Poisson 方程两端分别乘以测试函数 $v \in H_{D,0}^1(\Omega)$, 利用分部积分，可得到其对应的**连续弱形式**
+在 Poisson 方程两端分别乘以测试函数 $$v \in H_{D,0}^1(\Omega)$$, 利用分部积分，可得到其对应的**连续弱形式**
 
 $$
 (a(u)\nabla u,\nabla v)+<\kappa u,v>_{\Gamma_R} = (f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
-设 $u^0$ 是 $u$ 的一个逼近，记 $\delta u = u - u^0$, 代入连续弱形式
+设 $$u^0$$ 是 $$u$$ 的一个逼近，记 $$\delta u = u - u^0$$, 代入连续弱形式
 
 $$
 (a(u^0+\delta u)\nabla (u^0+\delta u),\nabla v)+<\kappa u^0+\delta u, v>_{\Gamma_R} = (f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
-其中 $a(u^0+\delta u)$ 在 $u^0$ 处 Taylor 展开，可得
+其中 $$a(u^0+\delta u)$$ 在 $$u^0$$ 处 Taylor 展开，可得
 
 $$
 a(u^0 + \delta u) = a(u^0) + a_u'(u^0)\delta u + \mathcal O(\delta u^2)
 $$
 
-替换连续弱形式中的 $a(u^0+\delta u)$, 并忽略掉其中 $\mathcal O(\delta u^2)$  可得
+替换连续弱形式中的 $$a(u^0+\delta u)$$, 并忽略掉其中 $$\mathcal O(\delta u^2)$$  可得
 
 $$
 (a(u^0)\nabla\delta u, \nabla v) + (a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v) 
@@ -59,7 +59,7 @@ $$
 =  (f,v) - (a(u^0)\nabla u^0, \nabla v) - <\kappa u^0, v>_{\Gamma_R} + <g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
-给定求解区域 $\Omega$ 上的网格离散 $\mathcal T = \{\tau\}$, 构造 $N$ 维的有限维空间 $V_h$，
+给定求解区域 $$\Omega$$ 上的网格离散 $$\mathcal T = \{\tau\}$$, 构造 $$N$$ 维的有限维空间 $$V_h$$，
 其 $N$ 个**全局基函数**组成的**行向量函数**记为
 
 $$
@@ -67,8 +67,8 @@ $$
 $$
 
 对于有限元程序设计实现来说，并不会显式构造出**全局基函数**，实际基函数的求值计
-算都发生网格单元或网格单元的边界上。设每个网格单元 $\tau$ 上**局部基函数**个数为 
-$l$ 个，其组成的**行向量函数**记为
+算都发生网格单元或网格单元的边界上。设每个网格单元 $$\tau$$ 上**局部基函数**个数为 
+$$l$$ 个，其组成的**行向量函数**记为
 
 $$
 \bm\varphi(\bm x) = \left[\varphi_0(\bm x), \varphi_1(\bm x), \cdots, \varphi_{l-1}(\bm x)\right], \bm x \in \tau
@@ -93,19 +93,19 @@ $$
 $$
 
 
-则 $(a(u^0)\nabla\delta u, \nabla v)$ 对应的单元矩阵为 
+则 $$(a(u^0)\nabla\delta u, \nabla v)$$ 对应的单元矩阵为 
 
 $$
 \bm A_\tau = \int_\tau a(u^0)(\nabla \bm\varphi)^T\nabla\bm\varphi\mathrm d \bm x
 $$
 
-$(a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v)$ 对应的单元矩阵为
+$$(a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v)$$ 对应的单元矩阵为
 
 $$
 \bm B_\tau = \int_\tau a_u'(u^0)(\nabla\bm\varphi)^T\nabla u^0\bm\varphi\mathrm d \bm x
 $$
 
-$(f, v)$ 对应的单元列向量为
+$$(f, v)$$ 对应的单元列向量为
 
 $$
 \bm b = \int_\tau f\bm\varphi^T\mathrm d \bm x
@@ -118,20 +118,20 @@ $$
 \bm\omega (\bm x) = \left[\omega_0(\bm x), \omega_1(\bm x), \cdots, \omega_{m-1}(\bm x)\right]
 $$
 
-设 $e$ 是一个边界边或边界面，则 $<\kappa\delta u, v>_e$ 对应的矩阵为
+设 $$e$$ 是一个边界边或边界面，则 $$<\kappa\delta u, v>_e$$ 对应的矩阵为
 
 $$
 \bm R_e = \int_e \kappa \bm\omega^T\bm\omega \mathrm d \bm s, \forall
 e\subset\Gamma_R.
 $$
 
-$<g_N, v>_e$  对应的向量为
+$$<g_N, v>_e$$  对应的向量为
 
 $$
 \bm b_N = \int_e g_N\bm\omega^T\mathrm d \bm x, \forall e \subset \Gamma_N
 $$
 
-$<g_R, v>_e$ 对应的向量为
+$$<g_R, v>_e$$ 对应的向量为
 
 $$
 \bm b_R = \int_e g_R\bm\omega^T\mathrm d \bm x, \forall e \subset \Gamma_R 
@@ -139,7 +139,7 @@ $$
 
 ### 基于 FEALPy 的程序实现
 
-设求解区域为 $\Omega=[0, 1]^2$ 真解设为
+设求解区域为 $$\Omega=[0, 1]^2$$ 真解设为
 
 $$
 u = \cos(\pi x)\cos(\pi y)
@@ -256,13 +256,14 @@ mesh = MF.boxmesh2d(domain, nx=10, ny=10, meshtype='tri')
 
 ```python
 space = LagrangeFiniteElementSpace(mesh, p=p) # p 的线性元，
-u0 = space.function()
-du = space.function()
+u0 = space.function() # 有限元函数 u0 = 0
+du = space.function() # 有限元函数 du = 0
 ```
 
 设置 Dirichlet 边界条件
+
 ```python
-isDDof = space.set_dirichlet_bc(u0, dirichlet)
+isDDof = space.set_dirichlet_bc(dirichlet, u0)
 isIDof = ~isDDof
 ```
 
