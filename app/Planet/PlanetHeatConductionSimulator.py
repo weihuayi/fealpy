@@ -36,6 +36,7 @@ class PlanetHeatConductionWithRotationSimulator():
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
 
+    @timer
     def schur(self):
         '''
 

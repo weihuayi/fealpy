@@ -23,6 +23,7 @@ class PlanetFastSovler():
     def set_matrix(self, Ak):
         self.Ak = Ak
 
+    @timer
     def linear_operator_1(self, b):
         '''
         
@@ -41,10 +42,12 @@ class PlanetFastSovler():
 
         return r
 
+    @timer
     def linear_operator_2(self, b):
         b = self.D@b
         return b
 
+    @timer
     def solve(self, uh, F):
         rdof = self.rdof
         gdof = self.gdof
