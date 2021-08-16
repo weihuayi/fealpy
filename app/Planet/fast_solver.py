@@ -1,4 +1,5 @@
 
+import pyamg
 import numpy as np
 
 from fealpy.decorator import timer
@@ -23,7 +24,6 @@ class PlanetFastSovler():
     def set_matrix(self, Ak):
         self.Ak = Ak
 
-    @timer
     def linear_operator_1(self, b):
         '''
         
@@ -42,9 +42,9 @@ class PlanetFastSovler():
 
         return r
 
-    @timer
-    def linear_operator_2(self, b):
-        b = self.D@b
+    def linear_operator_2(self, r):
+        ml = pyamg.ruge_stuben_solver(self.D)
+        b = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)    
         return b
 
     @timer
@@ -65,5 +65,4 @@ class PlanetFastSovler():
 
         uh[:rdof].T.flat, info = cg(A, a, tol=1e-8)
 
-        P = LinearOperator((gdof, gdof), matvec=self.linear_operator_2)
-        uh[rdof:].T.flat, info = cg(P, F[rdof:]-uh[:rdof]@self.B, tol=1e-8)
+        uh[rdof:] = self.linear_operator_2(F[rdof:]-uh[:rdof]@self.B)
