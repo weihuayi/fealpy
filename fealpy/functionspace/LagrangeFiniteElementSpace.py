@@ -1068,17 +1068,17 @@ class LagrangeFiniteElementSpace():
 
         return b
 
-    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
         初始化解 uh  的第一类边界条件。
         """
 
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = gD(ipoints[isDDof])
+        uh[isDDof] = gD(ipoints[isDDof]) 
         return isDDof
 
-    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+    def set_neumann_bc(self, gN, F=None, threshold=None, q=None):
 
         """
 
@@ -1090,8 +1090,7 @@ class LagrangeFiniteElementSpace():
         """
         p = self.p
         mesh = self.mesh
-
-        dim = 1 if len(F.shape)==1 else F.shape[1]
+        gdof = self.number_of_global_dofs()
        
         if type(threshold) is np.ndarray:
             index = threshold
@@ -1113,26 +1112,38 @@ class LagrangeFiniteElementSpace():
         pp = mesh.bc_to_point(bcs, index=index)
         val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
 
+        if len(val.shape) == 2:
+            dim = 1
+            if F is None:
+                F = np.zeros((gdof, ), dtype=self.ftype)
+        else:
+            dim = val.shape[-1]
+            if F is None:
+                F = np.zeros((gdof, dim), dtype=self.ftype)
+
+
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
         if dim == 1:
             np.add.at(F, face2dof, bb)
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
 
-    def set_robin_bc(self, A, F, gR, threshold=None, q=None):
+        return F
+
+    def set_robin_bc(self, gR, F=None, threshold=None, q=None):
         """
 
         Notes
         -----
 
-        设置 Robin 边界条件到离散系统 Ax = b 中.
+        设置 Robin 边界条件
 
         TODO: 考虑更多的 gR 的情况
 
         """
         p = self.p
         mesh = self.mesh
-        dim = 1 if len(F.shape) == 1 else F.shape[1]
+        gdof = self.number_of_global_dofs()
 
         if type(threshold) is np.ndarray:
             index = threshold
@@ -1157,19 +1168,27 @@ class LagrangeFiniteElementSpace():
         val, kappa = gR(pp, n) # (NQ, NF, ...)
 
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+
+        if len(val.shape) == 2:
+            dim = 1
+            if F is None:
+                F = np.zeros((gdof, ), dtype=self.ftype)
+        else:
+            dim = val.shape[-1]
+            if F is None:
+                F = np.zeros((gdof, dim), dtype=self.ftype)
+
         if dim == 1:
             np.add.at(F, face2dof, bb)
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
-
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
-        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
-
-        return A+R, F
+        return R, F
 
 
     def to_function(self, data):
