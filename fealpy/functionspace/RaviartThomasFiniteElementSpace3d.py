@@ -505,7 +505,7 @@ class RaviartThomasFiniteElementSpace3d:
         np.add.at(F, face2dof[index], bb)
         return F 
 
-    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
 
         Parameters
@@ -532,7 +532,7 @@ class RaviartThomasFiniteElementSpace3d:
 
         ps = mesh.bc_to_point(bcs, index=index)
         fn = mesh.face_unit_normal(index=index)
-        val = g(ps, fn)
+        val = gD(ps, fn)
         phi = self.smspace.face_basis(ps, index=index)
 
         measure = self.integralalg.facemeasure[index]

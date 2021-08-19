@@ -743,7 +743,7 @@ class RaviartThomasFiniteElementSpace2d:
         np.add.at(F, edge2dof[index], bb)
         return F 
 
-    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
 
         Notes
@@ -768,7 +768,7 @@ class RaviartThomasFiniteElementSpace2d:
 
         ps = mesh.bc_to_point(bcs, index=index)
         en = mesh.edge_unit_normal(index=index)
-        val = g(ps, en) # 注意这里容易出错
+        val = gD(ps, en) # 注意这里容易出错
         if type(val) in {int, float}:
             val = np.array([[val]], dtype=self.ftype)
         phi = self.smspace.edge_basis(ps, index=index)
