@@ -23,7 +23,7 @@ from ..common import DynamicArray
 
 class HalfEdgeMesh2d(Mesh2d):
     def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None,
-            initlevel=False):
+            initlevel=True):
         """
 
         Parameters
