@@ -148,7 +148,7 @@ class TPMModel():
         h /=nh # 单个三棱柱的高度
         h /= l # 无量纲化处理
 
-        surface = ScaledSurface(surface, H)
+        surface = ScaledSurface(surface, H/l)
 
         mesh = LagrangeTriangleMesh(node, cell, p=p, surface=surface)
         mesh.uniform_refine(n)
