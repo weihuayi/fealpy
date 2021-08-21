@@ -143,6 +143,7 @@ class ConformingVirtualElementSpace2d():
         self.integralalg = self.smspace.integralalg
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
+        self.stype = 'cvem' # 空间类型
 
     def integral(self, uh):
         """
@@ -571,7 +572,7 @@ class ConformingVirtualElementSpace2d():
         f = Function(self, dim=dim, array=array)
         return f
 
-    def set_dirichlet_bc(self, uh, g, threshold=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
         """
         初始化解 uh  的第一类边界条件。
         """
@@ -581,7 +582,7 @@ class ConformingVirtualElementSpace2d():
         end = NN + (p - 1)*NE
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = g(ipoints[isDDof[:end]])
+        uh[isDDof] = gD(ipoints[isDDof[:end]])
         return isDDof
 
     def interpolation(self, u, HB=None):

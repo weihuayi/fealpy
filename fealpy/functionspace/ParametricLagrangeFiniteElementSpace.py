@@ -413,7 +413,7 @@ class ParametricLagrangeFiniteElementSpace:
         uI = u(ipoint)
         return self.function(dim=dim, array=uI)
 
-    def set_dirichlet_bc(self, uh, gD, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
         初始化解 uh  的第一类边界条件。
         """
@@ -423,7 +423,7 @@ class ParametricLagrangeFiniteElementSpace:
         uh[isDDof] = gD(ipoints[isDDof])
         return isDDof
     
-    def set_robin_bc(self, A, F, gR, threshold=None, q=None):
+    def set_robin_bc(self, gR, F=None, threshold=None, q=None):
         """
 
         Notes
@@ -460,11 +460,23 @@ class ParametricLagrangeFiniteElementSpace:
         
         val, kappa = gR(pp, n) # (NQ, NF, ...)
 
+        if len(val.shape) == 2:
+            dim = 1
+            if F is None:
+                F = np.zeros((gdof, ), dtype=self.ftype)
+        else:
+            dim = val.shape[-1]
+            if F is None:
+                F = np.zeros((gdof, dim), dtype=self.ftype)
+
         bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+
+
         if dim == 1:
             np.add.at(F, face2dof, bb)
         else:
             np.add.at(F, (face2dof, np.s_[:]), bb)
+
 
         FM = np.einsum('m, mi, mij, mik, i->ijk', ws, kappa, phi, phi, measure)
 
@@ -473,5 +485,5 @@ class ParametricLagrangeFiniteElementSpace:
 
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=A.shape)
 
-        return A+R, F
+        return R, F
 
