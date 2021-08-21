@@ -66,8 +66,6 @@ parser.add_argument('--scale',
 args = parser.parse_args()
 
 pde = TPMModel(args)
-mesh = pde.init_rotation_mesh()
-
 ctx = DMumpsContext()
 ctx.set_silent()
 
