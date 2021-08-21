@@ -10,6 +10,7 @@ Authors
 """
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse.csgraph import minimum_spanning_tree
 
@@ -69,6 +70,8 @@ class HalfEdgeMesh2d(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
         self.hedgecolor = None
+        self.newnode2edge = {}
+        self.retainnode = {}
 
         # 网格节点的自由度标记数组
         # 0: 固定点
@@ -79,7 +82,6 @@ class HalfEdgeMesh2d(Mesh2d):
 
         if initlevel:
             self.init_level_info()
-
 
     @classmethod
     def from_mesh(cls, mesh, closed=False, NV=None):
@@ -677,6 +679,9 @@ class HalfEdgeMesh2d(Mesh2d):
         subdomain = self.ds.subdomain
         isMainHEdge = self.ds.main_halfedge_flag()
 
+        #新点到新半边的映射
+        self.newnode2edge, = np.where(isMarkedHEdge[hedge])
+
         # 即是主半边, 也是标记加密的半边
         flag0 = isMarkedHEdge & isMainHEdge
         idx = halfedge[flag0, 4]
@@ -742,6 +747,9 @@ class HalfEdgeMesh2d(Mesh2d):
         isRNode = np.zeros(NN, dtype=np.bool_)
         isRNode[halfedge[isMarkedHEdge, 0]] = True
 
+        #记录保留点
+        self.retainnode, = np.where(~isRNode)
+
         #更新节点
         node.adjust_size(isRNode)
         nn = (~isRNode).sum()
@@ -785,6 +793,7 @@ class HalfEdgeMesh2d(Mesh2d):
         hcell = self.ds.hcell
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
+
         NC1 = isMarkedHEdge.sum()
         NN1 = isMarked.sum()
         isMainHEdge = self.ds.main_halfedge_flag()
@@ -1563,6 +1572,7 @@ class HalfEdgeMesh2d(Mesh2d):
         NV = self.ds.number_of_vertices_of_all_cells()
         isBlueCell = NV == 4
         isNewCell = (NV == 4)|(NV == 6)
+        isNewCell[:cstart] = False
 
         NC+=NE1*2
         NNE+=NE1*2
@@ -2182,6 +2192,7 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
+            print(len(self.hcell))
             cell2node = np.zeros([NC, 3], dtype = np.int_)
             current = halfedge[self.hcell[cstart:], 2]
             cell2node[:, 0] = halfedge[current, 0]
