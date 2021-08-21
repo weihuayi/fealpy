@@ -33,6 +33,7 @@ class LagrangeFiniteElementSpace():
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
                 elif mesh.meshtype == 'halfedge2d':
+                    assert mesh.ds.NV == 3
                     self.dof = CPLFEMDof2d(mesh, p)
                     self.TD = 2
                 elif mesh.meshtype == 'stri':
@@ -209,7 +210,7 @@ class LagrangeFiniteElementSpace():
     def recovery_estimate(self, uh, method='simple'):
         """
         """
-        rguh = self.grad_recovery(uh, method='simple')
+        rguh = self.grad_recovery(uh, method=method)
         eta = self.integralalg.error(rguh.value, uh.grad_value, power=2,
                 celltype=True) # 计算单元上的恢复型误差
         return eta

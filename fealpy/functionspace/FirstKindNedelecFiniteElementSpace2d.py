@@ -474,7 +474,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
         """
         p = self.p
@@ -495,7 +495,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         t = mesh.edge_unit_tangent(index=index)
         ps = mesh.bc_to_point(bcs, index=index)
-        val = g(ps, t)
+        val = gD(ps, t)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]
