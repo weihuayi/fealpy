@@ -9,6 +9,8 @@ from fealpy.decorator import timer
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
+from fast_solver import PlanetFastSovler
+
 class PlanetHeatConductionWithRotationSimulator():
     def __init__(self, pde, mesh, args):
 
@@ -33,6 +35,28 @@ class PlanetHeatConductionWithRotationSimulator():
 
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
+
+    @timer
+    def schur(self):
+        '''
+
+        舒尔补方法矩阵分块
+
+        '''
+        rdof = self.mesh.ds.NN//(self.args.nh+1)
+        self.rdof = rdof
+        
+        self.S00 = self.S[:rdof, :rdof]
+        S01 = self.S[:rdof, rdof:]
+        S11 = self.S[rdof:, rdof:]
+
+        self.M00 = self.M[:rdof, :rdof]
+        M01 = self.M[:rdof, rdof:]
+        M11 = self.M[rdof:, rdof:]
+
+        dt = self.timeline.current_time_step_length()
+        self.B = M01+dt*S01
+        self.D = M11+dt*S11
 
     def sun_direction(self):
         t = self.timeline.next_time_level()
@@ -91,14 +115,14 @@ class PlanetHeatConductionWithRotationSimulator():
         
         b = np.zeros(len(uh), dtype=np.float64)
         np.add.at(b, face2dof, bb)
-
+        
         FM = np.einsum('q, qf, qfi, qfj, f->fij', ws, val, phi, phi, measure)
 
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
-        return R+self.S, b
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S00.shape) #这里的 R 是分块后矩阵大小
+        return R+self.S00, b
 
     @timer
     def picard_iteration(self, ctx=None):
@@ -122,22 +146,16 @@ class PlanetHeatConductionWithRotationSimulator():
         k = 0
         error = 1.0
         while error > self.args.accuracy:
-            R, b = self.nolinear_robin_boundary()
-            b *= dt
-            b += M@uh0[:]
-            R *= dt
-            R += M
+            R, F = self.nolinear_robin_boundary()
+            
+            F *= dt
+            F += M@uh0[:]
 
-            if ctx is None:
-                uh[:] = spsolve(R, b).reshape(-1)
-            else:
-                if ctx.myid == 0:
-                    ctx.set_centralized_sparse(R)
-                    x = b.copy()
-                    ctx.set_rhs(x) # Modified in place
-                ctx.set_silent()
-                ctx.run(job=6)
-                uh[:] = x
+            R *= dt
+            R += self.M00
+
+            self.solver.set_matrix(R)
+            self.solver.solve(uh, F)
 
             error = np.max(np.abs(uh[:] - uh1[:]))
             print(k, ":", error)
@@ -186,6 +204,10 @@ class PlanetHeatConductionWithRotationSimulator():
         """
         timeline = self.timeline
         args = self.args
+
+        self.schur()
+        
+        self.solver = PlanetFastSovler(self.D, self.B, ctx)
         
         if queue is not None:
             i = timeline.current
@@ -245,6 +267,27 @@ class PlanetHeatConductionWithIrrotationSimulator():
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
     
+    def schur(self):
+        '''
+
+        舒尔补方法矩阵分块
+
+        '''
+        rdof = self.mesh.ds.NN//(self.args.nh+1)
+        self.rdof = rdof
+        
+        self.S00 = self.S[:rdof, :rdof]
+        S01 = self.S[:rdof, rdof:]
+        S11 = self.S[rdof:, rdof:]
+
+        self.M00 = self.M[:rdof, :rdof]
+        M01 = self.M[:rdof, rdof:]
+        M11 = self.M[rdof:, rdof:]
+
+        dt = self.timeline.current_time_step_length()
+        self.B = M01+dt*S01
+        self.D = M11+dt*S11
+
     def init_mu(self, bcs):
         n = self.pde.options['sd']
 
@@ -304,8 +347,8 @@ class PlanetHeatConductionWithIrrotationSimulator():
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
-        return R+self.S, b
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S00.shape)
+        return R+self.S00, b
 
     @timer
     def picard_iteration(self, ctx=None):
@@ -329,22 +372,17 @@ class PlanetHeatConductionWithIrrotationSimulator():
         k = 0
         error = 1.0
         while error > self.args.accuracy:
-            R, b = self.nolinear_robin_boundary()
-            b *= dt
-            b += M@uh0[:]
-            R *= dt
-            R += M
+            R, F = self.nolinear_robin_boundary()
+            
+            F *= dt
+            F += M@uh0[:]
 
-            if ctx is None:
-                uh[:] = spsolve(R, b).reshape(-1)
-            else:
-                if ctx.myid == 0:
-                    ctx.set_centralized_sparse(R)
-                    x = b.copy()
-                    ctx.set_rhs(x) # Modified in place
-                ctx.set_silent()
-                ctx.run(job=6)
-                uh[:] = x
+            R *= dt
+            R += self.M00
+
+            self.solver.set_matrix(R)
+            self.solver.solve(uh, F)
+
 
             error = np.max(np.abs(uh[:] - uh1[:]))
             print(k, ":", error)
@@ -388,6 +426,10 @@ class PlanetHeatConductionWithIrrotationSimulator():
         """
         timeline = self.timeline
         args = self.args
+        
+        self.schur()
+        
+        self.solver = PlanetFastSovler(self.D, self.B, ctx)
         
         if queue is not None:
             i = timeline.current
