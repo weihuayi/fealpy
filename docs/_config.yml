@@ -190,6 +190,7 @@ exclude:
   - /screenshots
   - /test
   - /vendor
+  - _draft
 
 defaults:
   - scope:
