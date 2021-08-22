@@ -22,8 +22,8 @@ url     : # the base hostname & protocol for your site e.g. https://www.someone.
 baseurl : # does not include hostname
 title   : FEALPy
 description: > # this means to ignore newlines until "Language & timezone"
-    FEALPy 是一款偏微分方程数值解开源算法库，主要用于支撑相关领域的基础科研和人才培养工作，并吸引
-    一群志同道合、充满激情和创造力的小伙伴，共同打造简单、易用的新一代工业仿真计算引擎！
+    FEALPy 是一款偏微分方程数值解开源算法库，主要用于支撑相关领域的基础科研和人才培养工作，并着力吸引
+    一群志同道合、充满激情和创造力的小伙伴，共同打造简单、易用、高效的新一代工业仿真计算引擎！
 
 
 ## => Language and Timezone
