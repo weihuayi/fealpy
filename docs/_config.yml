@@ -22,7 +22,8 @@ url     : # the base hostname & protocol for your site e.g. https://www.someone.
 baseurl : # does not include hostname
 title   : FEALPy
 description: > # this means to ignore newlines until "Language & timezone"
-  Your Site Description
+    FEALPy 是一款偏微分方程数值解开源算法库，主要用于支撑相关领域的基础科研和人才培养工作，并吸引
+    一群志同道合、充满激情和创造力的小伙伴，共同打造新一代的工业仿真计算引擎！
 
 
 ## => Language and Timezone
@@ -38,7 +39,7 @@ author:
   name      : FEALPy 
   url       :
   avatar    : # path or url of avatar image (square)
-  bio       : I am an amazing person.
+  bio       : 共同打造新一代工业仿真计算引擎！
   email     :
   facebook  : # "user_name" the last part of your profile url, e.g. https://www.facebook.com/user_name
   twitter   : # "user_name" the last part of your profile url, e.g. https://twitter.com/user_name
