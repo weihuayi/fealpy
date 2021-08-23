@@ -1,9 +1,9 @@
 ---
-title: 线弹性问题求解
-permalink: /docs/zh/linear-elasticity
+title: 线弹性问题数值求解
+permalink: /docs/zh/num-linear-elasticity
 key: docs-linear-elasticity-zh
 ---
-# 线弹性问题
+
 
 ## PDE 模型
 
