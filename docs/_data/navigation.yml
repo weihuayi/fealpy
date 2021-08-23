@@ -108,6 +108,10 @@ docs-zh:
         url:    /docs/zh/quick-start
       - title: 非线性 Poisson 方程数值解
         url:   /docs/zh/num-non-linear-poisson
+      - title:  线弹性问题
+        url:   /docs/zh/linear-elasticity
+      - title: Navier-stokes 方程数值求解
+        url:   /docs/zh/num-navier-stokes-equation
   - title:      其他语言
     children:
       - title:  English
@@ -120,6 +124,10 @@ docs-en:
         url:    /docs/en/quick-start
       - title: Numerrical Solution for Non-linear Poisson Equation 
         url:   /docs/en/num-non-linear-poisson
+      - title: The problem of linear-elasticity
+        url:   /docs/en/linear-elasticity
+      - title: Numerrical Solution for Navier-stokes 
+        url:   /docs/en/num-navier-stokes-equation
   - title:      Other Languages
     children:
       - title:  中文
