@@ -464,7 +464,7 @@ class ScaledMonomialSpace2d():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
-    def penalty_matrix(self, p=None):
+    def penalty_matrix(self, p=None, index=np.s_[:]):
         """
         Notes
         -----
@@ -475,23 +475,22 @@ class ScaledMonomialSpace2d():
         p = p or self.p
         mesh = self.mesh
         edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
+        edge2cell = mesh.ds.edge_to_cell()[index]
         isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
         eh = mesh.entity_measure('edge')
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        ps = self.mesh.edge_bc_to_point(bcs)
+        ps = self.mesh.edge_bc_to_point(bcs, index=index)
 
-        phi0 = space.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
-        phi1 = space.basis(ps, index=edge2cell[:, 1]) # (NQ, NE, ldof)
-
+        gdof = self.number_of_global_dofs(p=p)
         ldof = self.number_of_local_dofs(doftype='cell')
+
         shape = ps.shape[:-1] + (2*ldof, )
         phi = np.zeros(shape, dtype=self.ftype)
 
         phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
-        phi[:, isInEdge, ldof:] = -self.basis(ps, index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
+        phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
 
         A = np.einsum('q, qei, qej->eij', ws, phi, phi, optimize=True)
 
@@ -502,7 +501,51 @@ class ScaledMonomialSpace2d():
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
-    def normal_grad_penalty_matrix(self, p=None):
+
+    def flux_matrix(self, p=None, index=np.s_[:]):
+        '''
+        Notes:
+        ------
+        <{u_n}, [v]>_e
+
+        '''
+        p = p or self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()[index]
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
+        ldof = self.number_of_local_dofs(doftype='cell')
+        gdof = self.number_of_global_dofs(p=p)
+        GD = mesh.geo_dimension()
+
+        eh = mesh.entity_measure('edge', index=index)
+        en = mesh.edge_normal(index=index)
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs, index=index)
+
+        shape = ps.shape[:-1] + (2*ldof, )
+        phi = np.zeros(shape, dtype=self.ftype)
+        gphi = np.zeros(shape, dtype=self.ftype)
+
+        phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
+
+        gphi[:, ~isInEdge, :ldof]= np.sum(self.grad_basis(ps[: ,~isInEdge], index=edge2cell[~isInEdge, 0])*en[~isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, isInEdge, :ldof]= 0.5*np.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 0])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, isInEdge, ldof:] = 0.5*np.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+
+        A = np.einsum('q, qei, qej->eij', ws, phi, gphi, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
+        I = np.broadcast_to(edge2dof[:, :, None], shape=A.shape) 
+        J = np.broadcast_to(edge2dof[:, None, :], shape=A.shape) 
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
+    def normal_grad_penalty_matrix(self, p=None, index=np.s_[:]):
         """
         Notes
         -----
@@ -512,29 +555,26 @@ class ScaledMonomialSpace2d():
         p = p or self.p
         mesh = self.mesh
         edge = mesh.entity('edge')
-        edge2cell = mesh.ds.edge_to_cell()
+        edge2cell = mesh.ds.edge_to_cell()[index]
         isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
 
         ldof = self.number_of_local_dofs(doftype='cell')
+        gdof = self.number_of_global_dofs(p=p)
         GD = mesh.geo_dimension()
 
-        eh = mesh.entity_measure('edge')
-        en = mesh.edge_normal()
+        eh = mesh.entity_measure('edge', index=index)
+        en = mesh.edge_normal(index=index)
         qf = GaussLegendreQuadrature(p + 3)
         bcs, ws = qf.quadpts, qf.weights
-        ps = self.mesh.edge_bc_to_point(bcs)
+        ps = self.mesh.edge_bc_to_point(bcs, index=index)
 
         shape = ps.shape[:-1] + (2*ldof, )
         gphi = np.zeros(shape, dtype=self.ftype)
 
-        gphi[:, :, :ldof]= np.sum(space.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
-        gphi[:, isInEdge, ldof:] = -np.sum(space.grad_basis(ps, index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, :, :ldof]= np.sum(self.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, isInEdge, ldof:] = -np.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
 
-
-        phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
-        phi[:, isInEdge, ldof:] = -self.basis(ps, index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
-
-        A = np.einsum('q, qei, qej->eij', ws, phi, phi, optimize=True)
+        A = np.einsum('q, qei, qej->eij', ws, gphi, gphi, optimize=True)
 
         cell2dof = self.cell_to_dof()
         edge2dof = np.block([cell2dof[edge2cell[:, 0]], cell2dof[edge2cell[:, 1]]])
@@ -543,6 +583,144 @@ class ScaledMonomialSpace2d():
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
+    def edge_normal_source_vector(self, g, p = None, index=np.s_[:]):
+
+        """
+        Notes
+        -----
+
+        h_e^{-1}<g, [v_n]>_e
+        """
+
+        p = p or self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()[index]
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
+        eh = mesh.entity_measure('edge', index=index)
+        en = mesh.edge_normal(index=index)
+
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs, index=index) #(NQ, NE, 2)
+
+        gval = g(ps) #(NQ, NE)
+
+        ldof = self.number_of_local_dofs(doftype='cell')
+        gdof = self.number_of_global_dofs(p=p)
+
+        shape = ps.shape[:-1] + (2*ldof, )
+        gphi = np.zeros(shape, dtype=self.ftype)
+
+        gphi[:, :, :ldof]= np.sum(self.grad_basis(ps, index=edge2cell[:, 0])*en[:, None, :], axis=-1) # (NQ, NE, ldof)
+        gphi[:, isInEdge, ldof:] = -np.sum(self.grad_basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1])*en[isInEdge, None, :], axis=-1) # (NQ, NE, ldof)
+
+        A = np.einsum('q, qe, qej->ej', ws, gval, gphi, optimize=True)
+
+        F = np.zeros(gdof, dtype=np.float64)
+        cell2dof = self.cell_to_dof()
+        np.add.at(F, cell2dof[edge2cell[:, 0]], A[:, :ldof])
+        np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], A[isInEdge, ldof:])
+        return F
+
+    def edge_source_vector(self, g, p = None, index=np.s_[:], hpower=-1):
+
+        """
+        Notes
+        -----
+
+        其中 g 可以是标量函数也可以是向量函数, 当是标量函数的时候计算的是:
+        
+        h_e^{hpower}<g, [v]>_e
+
+        当是向量函数的时候计算的是:
+
+        h_e^{hpower}<g_n, [v]>_e
+
+        
+        """
+        p = p or self.p
+        mesh = self.mesh
+        edge = mesh.entity('edge')
+        edge2cell = mesh.ds.edge_to_cell()[index]
+        isInEdge = edge2cell[:, 0] != edge2cell[:, 1]
+
+        eh = mesh.entity_measure('edge', index=index)
+        en = mesh.edge_unit_normal(index=index)
+
+        qf = GaussLegendreQuadrature(p + 3)
+        bcs, ws = qf.quadpts, qf.weights
+        ps = self.mesh.edge_bc_to_point(bcs, index=index)
+
+        gval = g(ps)
+        if len(gval.shape)==3:
+            gval = np.einsum('qei, ei->qe', gval, en)
+
+        ldof = self.number_of_local_dofs(doftype='cell')
+        gdof = self.number_of_global_dofs(p=p)
+
+        shape = ps.shape[:-1] + (2*ldof, )
+        phi = np.zeros(shape, dtype=self.ftype)
+
+        phi[:, :, :ldof] = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, ldof)
+        phi[:, isInEdge, ldof:] = -self.basis(ps[:, isInEdge], index=edge2cell[isInEdge, 1]) # (NQ, NE, ldof)
+
+        S = np.einsum('q, qe, qei->ei', ws, gval, phi, optimize=True)
+        if hpower!=-1:
+            S = S*(eh.reshape(-1, 1)**(hpower+1))
+        F = np.zeros(gdof, dtype=np.float64)
+        cell2dof = self.cell_to_dof()
+        np.add.at(F, cell2dof[edge2cell[:, 0]], S[:, :ldof])
+        np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], S[isInEdge, ldof:])
+        return F
+
+    def source_vector0(self, f, celltype=False, q=None):
+        """
+        (f, v)_T
+        """
+
+        p = self.p
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+
+        bc = mesh.entity_barycenter('cell')
+        cell2dof = self.cell_to_dof()
+        edge2cell = mesh.ds.edge_to_cell()
+
+        qf = mesh.integrator(p+4)
+        bcs, ws = qf.quadpts, qf.weights
+        tri_0 = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
+        a_0 = self.triangle_measure(tri_0)#NE
+        pp_0 = np.einsum('qj, jem->qem', bcs, tri_0)#每个三角形中高斯积分点对应的笛卡尔坐标点
+        fval_0 = f(pp_0)
+
+        phi_0 = self.basis(pp_0, edge2cell[:, 0])
+        gdof = self.number_of_global_dofs(p=p)
+        F = np.zeros(gdof, dtype=np.float64)
+        bb_0 = np.einsum('i, ij, ijk,j->jk', ws, fval_0, phi_0, a_0)
+        np.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        if np.sum(isInEdge) > 0:
+            tri_1 = [
+                    bc[edge2cell[isInEdge, 1]],
+                    node[edge[isInEdge, 1]],
+                    node[edge[isInEdge, 0]]
+                    ]
+            a_1 = self.triangle_measure(tri_1)
+            pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
+            fval_1 = f(pp_1)
+            phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
+            bb_1 = np.einsum('i, ij, ijk,j->jk', ws, fval_1, phi_1, a_1)
+            np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
+        return F 
+
+    def triangle_measure(self, tri):
+        v1 = tri[1] - tri[0]
+        v2 = tri[2] - tri[0]
+        area = np.cross(v1, v2)/2
+        return area
 
     def source_vector(self, f, celltype=False, q=None):
         """

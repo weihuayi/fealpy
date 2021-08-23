@@ -7,7 +7,7 @@ import pyamg
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.poisson_2d import CosCosData as PDE
-from fealpy.mesh import MeshFactory
+from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 
@@ -19,38 +19,46 @@ parser = argparse.ArgumentParser(description=
         求解区域 [0, 1]^2 上的纯 Dirichlet 边界的 Poisson 方程
         """)
 
-parser.add_argument('-p', 
+parser.add_argument('--degree', 
         default=1, type=int,
         help='空间次数, 默认为 1, 即双线性元')
 
-parser.add_argument('-n', 
+parser.add_argument('--nx', 
         default=10, type=int,
-        help='在 x 和 y 方向上，网格的剖分段数')
+        help='在 x 方向上，网格的剖分段数')
 
-parser.add_argument('-b', 
+parser.add_argument('--ny', 
+        default=10, type=int,
+        help='在 y 方向上，网格的剖分段数')
+
+parser.add_argument('--domain', 
         action='store_const', default=[0, 1, 0, 1], const=[0, 1, 0, 1],
         help='固定求解区域 [0, 1]^2')
 
-parser.add_argument('-o', 
-        default=None,
+parser.add_argument('--output', 
+        default=None, 
         help='把结果输出 vtu 格式的文件，可用 Paraview 打开, 默认为 None 不输出')
 
 parser.print_help()
 args = parser.parse_args()
-print(args)
+
+domain = args.domain
+degree = args.degree
+nx = args.nx
+ny = args.ny
+output = args.output
 
 
 # 开始主程序
 
 pde = PDE()
 
-mf = MeshFactory()
 
 # 创建一个双 p 次的四边形网格
-mesh = mf.boxmesh2d(args.b, nx=args.n, ny=args.n, meshtype='quad', p=args.p) 
+mesh = MF.boxmesh2d(domain, nx=nx, ny=ny, meshtype='quad', p=degree) 
 
-# 在 mesh 上创建一个双 p 次的有限元函数空间
-space = ParametricLagrangeFiniteElementSpace(mesh, p=args.p, spacetype='C')
+# 在 mesh 上创建一个双 p 次的参数有限元函数空间
+space = ParametricLagrangeFiniteElementSpace(mesh, p=degree, spacetype='C')
 
 # 数值解函数
 uh = space.function()
@@ -75,9 +83,9 @@ error = space.integralalg.L2_error(pde.solution, uh)
 
 print(error)
 
-if args.o is not None:
+if output is not None:
     mesh.nodedata['uh'] = uh
-    mesh.to_vtk(fname=args.o)
+    mesh.to_vtk(fname=output)
 
 # 网格加密
 # inplace = False, 表示不修改粗网格内部数据结构，

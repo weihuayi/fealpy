@@ -550,6 +550,9 @@ class LagrangeWedgeMesh(Mesh3d):
 
         node = self.entity('node')
 
+        if self.meshdata['p'] is not None:
+            node = np.vstack((node, self.meshdata['p']))
+
         GD = self.geo_dimension()
 
         cell = self.entity(etype)[index]
