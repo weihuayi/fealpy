@@ -241,7 +241,7 @@ g_0 \\ g_1
 \end{bmatrix}
 $$
 
-引入 $ \boldsymbol{\varphi}_k = [\varphi_0, \varphi_1, \cdots, \varphi_{n_k-1}] $，那么$\boldsymbol{B}$ 和 $\boldsymbol{G}$ 可以分别写成如下形式：
+引入 $\boldsymbol \varphi_k = [\varphi_0, \varphi_1, \cdots, \varphi_{n_k-1}]$，那么 $\boldsymbol B$ 和 $\boldsymbol G$ 可以分别写成如下形式：
 
 $$
 \boldsymbol{B} = 
