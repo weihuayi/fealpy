@@ -129,7 +129,6 @@ comments:
     repository  : weihuayi/fealpy-comment # GitHub repo
     owner       : weihuayi # GitHub repo owner
     admin: # GitHub repo owner and collaborators, only these guys can initialize GitHub issues, IT IS A LIST.
-      - weihuayi 
 
 
 ## => Pageview
