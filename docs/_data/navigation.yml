@@ -111,8 +111,8 @@ docs-zh:
     children:
       - title: 非线性 Poisson 方程
         url:   /docs/zh/num-non-linear-poisson
-      - title:  线弹性方程的
-        url:   /docs/zh/linear-elasticity
+      - title:  线弹性方程的数值求解
+        url:   /docs/zh/num-linear-elasticity
       - title: Navier-stokes 方程
         url:   /docs/zh/num-navier-stokes-equation
   - title:      其他语言
@@ -127,8 +127,8 @@ docs-en:
         url:    /docs/en/quick-start
       - title: Numerrical Solution for Non-linear Poisson Equation 
         url:   /docs/en/num-non-linear-poisson
-      - title: The problem of linear-elasticity
-        url:   /docs/en/linear-elasticity
+      - title: TNumerrical Solution for linear-elasticity problem
+        url:   /docs/en/num-linear-elasticity
       - title: Numerrical Solution for Navier-stokes 
         url:   /docs/en/num-navier-stokes-equation
   - title:      Other Languages
