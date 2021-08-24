@@ -106,8 +106,15 @@ docs-zh:
     children:
       - title:  快速开始
         url:    /docs/zh/quick-start
-      - title: 非线性 Poisson 方程数值解
+  - title:     FEALPy 入门
+  - title:     典型模型问题的数值解
+    children:
+      - title: 非线性 Poisson 方程
         url:   /docs/zh/num-non-linear-poisson
+      - title:  线弹性方程的数值求解
+        url:   /docs/zh/num-linear-elasticity
+      - title: Navier-stokes 方程
+        url:   /docs/zh/num-navier-stokes-equation
   - title:      其他语言
     children:
       - title:  English
@@ -120,6 +127,10 @@ docs-en:
         url:    /docs/en/quick-start
       - title: Numerrical Solution for Non-linear Poisson Equation 
         url:   /docs/en/num-non-linear-poisson
+      - title: TNumerrical Solution for linear-elasticity problem
+        url:   /docs/en/num-linear-elasticity
+      - title: Numerrical Solution for Navier-stokes 
+        url:   /docs/en/num-navier-stokes-equation
   - title:      Other Languages
     children:
       - title:  中文

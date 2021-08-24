@@ -27,8 +27,8 @@ $$
 $$
 \begin{align}
 u =& g_D, \quad\text{on }\Gamma_D\leftarrow \text{Dirichlet } \\
-\frac{\partial u}{\partial\boldsymbol n}  =& g_N, \quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
-\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, \quad\text{on }\Gamma_R \leftarrow \text{ Robin}
+a(u)\frac{\partial u}{\partial\boldsymbol n}  =& g_N, \quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
+a(u)\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, \quad\text{on }\Gamma_R \leftarrow \text{ Robin}
 \end{align}
 $$
 
