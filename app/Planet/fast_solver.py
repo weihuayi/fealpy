@@ -25,11 +25,9 @@ class PlanetFastSovler():
         self.Ak = Ak
 
     def linear_operator_1(self, b):
-        '''
-        
+        """ 
         (A - B D^{-1} C) b
-
-        '''
+        """
         r = self.Ak@b
 
         b = b@self.B
