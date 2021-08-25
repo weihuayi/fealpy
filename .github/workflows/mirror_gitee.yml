@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: wearerequired/git-mirror-action@v1
         env:
+          ORGANIZATION: deepmodeling
           SSH_PRIVATE_KEY: ${{ secrets.SYNC_GITEE_PRIVATE_KEY }}
         with:
           source-repo: "git@github.com:deepmodeling/fealpy.git"
