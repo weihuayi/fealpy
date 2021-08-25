@@ -15,5 +15,5 @@ jobs:
           ORGANIZATION: deepmodeling
           SSH_PRIVATE_KEY: ${{ secrets.SYNC_GITEE_PRIVATE_KEY }}
         with:
-          source-repo: "git@github.com:deepmodeling/fealpy.git"
+          source-repo: "https://github.com/deepmodeling/fealpy.git"
           destination-repo: "git@gitee.com:deepmodeling/fealpy.git"
