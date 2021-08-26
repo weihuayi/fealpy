@@ -40,9 +40,8 @@ class PlanetFastSovler():
 
         return r
 
-    def linear_operator_2(self, r):
-        ml = pyamg.ruge_stuben_solver(self.D)
-        b = ml.solve(r, tol=1e-12, accel='cg').reshape(-1)    
+    def linear_operator_2(self, b):
+        b = self.D@b
         return b
 
     @timer
@@ -52,6 +51,7 @@ class PlanetFastSovler():
 
         A = LinearOperator((rdof, rdof), matvec=self.linear_operator_1)
         a = F[:rdof]
+
         b = np.zeros(gdof, dtype=np.float64)
         b[:] = F[rdof:]
 
@@ -63,4 +63,5 @@ class PlanetFastSovler():
 
         uh[:rdof].T.flat, info = cg(A, a, tol=1e-8)
 
-        uh[rdof:] = self.linear_operator_2(F[rdof:]-uh[:rdof]@self.B)
+        P = LinearOperator((gdof, gdof), matvec=self.linear_operator_2)
+        uh[rdof:].T.flat, info = cg(P, F[rdof:]-uh[:rdof]@self.B, tol=1e-8)

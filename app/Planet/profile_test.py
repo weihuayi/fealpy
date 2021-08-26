@@ -31,8 +31,8 @@ parser.add_argument('--DT',
         help='求解的时间步长, 默认为 60 秒.')
 
 parser.add_argument('--accuracy',
-        default=1e-10, type=float,
-        help='picard 迭代的精度, 默认为 1e-10.')
+        default=1e-7, type=float,
+        help='picard 迭代的精度, 默认为 1e-7.')
 
 parser.add_argument('--npicard',
         default=30, type=int,
@@ -65,6 +65,8 @@ parser.add_argument('--scale',
 args = parser.parse_args()
 
 pde = TPMModel(args)
+mesh = pde.init_rotation_mesh()
+
 ctx = DMumpsContext()
 ctx.set_silent()
 
