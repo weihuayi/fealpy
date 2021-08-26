@@ -24,7 +24,6 @@ class PlanetFastSovler():
     def set_matrix(self, Ak):
         self.Ak = Ak
 
-    @timer
     def linear_operator_1(self, b):
         """ 
         (A - B D^{-1} C) b
@@ -41,7 +40,6 @@ class PlanetFastSovler():
 
         return r
 
-    @timer
     def linear_operator_2(self, b):
         b = self.D@b
         return b
@@ -54,11 +52,14 @@ class PlanetFastSovler():
         A = LinearOperator((rdof, rdof), matvec=self.linear_operator_1)
         a = F[:rdof]
 
+        b = np.zeros(gdof, dtype=np.float64)
+        b[:] = F[rdof:]
+
         if self.ctx.myid == 0:
             self.ctx.set_rhs(b)
         self.ctx.run(job=3)
 
-        a -= self.B@F[rdof:]
+        a -= self.B@b
 
         uh[:rdof].T.flat, info = cg(A, a, tol=1e-8)
 
