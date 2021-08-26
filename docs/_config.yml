@@ -35,7 +35,7 @@ timezone: Asia/Shanghai # see https://en.wikipedia.org/wiki/List_of_tz_database_
 ## => Author and Social
 ##############################
 author:
-  type      : organization # "person" (default), "organization"
+  type      : organization # "person" (default), "organization":w
   name      : FEALPy 
   url       :
   avatar    : # path or url of avatar image (square)
