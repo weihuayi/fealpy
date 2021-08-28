@@ -2,6 +2,7 @@
 title: Navier-stokes 方程数值求解
 permalink: /docs/zh/num-navier-stokes-equation
 key: docs-num-navier-stoke-equation-zh
+author: wpx
 ---
 
 ## PDE 模型
@@ -135,18 +136,6 @@ $$
 \end{equation}
 $$
 
-$$
-\begin{equation}
-	\boldsymbol G=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
-	\begin{bmatrix}
-		(\phi_{0}, \phi_{0})_{\tau} & (\phi_{0}, \phi_{1})_{\tau} & \cdots & (\phi_{0}, \phi_{l-1})_{\tau} \\
-		(\phi_{1}, \phi_{0})_{\tau} & (\phi_{1}, \phi_{1})_{\tau} & \cdots & (\phi_{1}, \phi_{l-1})_{\tau} \\
-		\vdots & \vdots & \ddots & \vdots \\
-		(\phi_{l-1}, \phi_{0})_{\tau} & (\phi_{l-1}, \phi_{1})_{\tau} & \cdots & (\phi_{l-1}, \phi_{l-1})_{\tau}
-	\end{bmatrix}
-\end{equation}
-$$
-
 接下用矩阵来表示向量空间需要的变量，
 
 $$
@@ -252,12 +241,13 @@ $$
  \boldsymbol d\boldsymbol x
 $$
 
-
 $$
 \boldsymbol G_{11} = \int_\tau (\boldsymbol \phi^T \boldsymbol \phi) diag(\frac{\partial\boldsymbol\phi}{\partial y})
  \boldsymbol d\boldsymbol x
 $$
+
 其中$\boldsymbol I$为单位矩阵
+
 $$
 (\varepsilon(\boldsymbol \Phi),\varepsilon(\boldsymbol \Phi)) = \int_{\tau} \varepsilon(\boldsymbol\Phi): \varepsilon(\boldsymbol\Phi) \boldsymbol d \boldsymbol x  =  
 \begin{bmatrix}
@@ -272,7 +262,7 @@ $$
 d\boldsymbol x
 $$
 
-$$ { }
+$$ 
 \boldsymbol E_{1, 1} = \int_\tau \frac{\partial\boldsymbol\phi^T}{\partial y}\frac{\partial\boldsymbol\phi}{\partial y}
 +\frac{1}{2}\frac{\partial\boldsymbol\phi^T}{\partial x}\frac{\partial\boldsymbol\phi}{\partial x}\mathrm
 d\boldsymbol x
@@ -283,7 +273,8 @@ $$
 d\boldsymbol x
 $$
 
-第一步计算$u^*$​
+第一步计算$u^{*}$
+
 $$
 \begin{align*}
 	&\frac{\rho}{\Delta t} (\boldsymbol u^*,\boldsymbol v) + \mu (\epsilon(\boldsymbol u^*),\epsilon(\boldsymbol v)) 
@@ -293,7 +284,9 @@ $$
 	+ \frac{\mu}{2}(\nabla(\boldsymbol u^n) \cdot \boldsymbol n ,\boldsymbol v)_{\partial \Omega}
 \end{align*}
 $$
+
 左边矩阵为
+
 $$
 \frac{\rho}{\Delta t}
 \begin{bmatrix}
@@ -317,6 +310,7 @@ $$
 $$
 
 右边矩阵为
+
 $$
 -\rho\begin{bmatrix}
 \boldsymbol G_{00} & \boldsymbol 0\\
