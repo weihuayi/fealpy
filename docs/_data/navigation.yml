@@ -107,6 +107,10 @@ docs-zh:
       - title:  快速开始
         url:    /docs/zh/quick-start
   - title:     FEALPy 入门
+  - title:     有限维空间的构造与实现
+    children:
+      - title:  缩放单项式空间 
+        url:    /docs/zh/scaled-polynomial-space
   - title:     典型模型问题的数值解
     children:
       - title: 非线性 Poisson 方程
