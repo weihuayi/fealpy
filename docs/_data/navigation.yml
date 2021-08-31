@@ -107,8 +107,11 @@ docs-zh:
       - title:  快速开始
         url:    /docs/zh/quick-start
   - title:     FEALPy 入门
+  - title:     网格数据结构与实现 
   - title:     有限维空间的构造与实现
     children:
+      - title:  单纯形网格上的拉格朗日有限元空间 
+        url:    /docs/zh/simplex-lagrange-space
       - title:  缩放单项式空间 
         url:    /docs/zh/scaled-polynomial-space
   - title:     典型模型问题的数值解
