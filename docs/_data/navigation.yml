@@ -1,0 +1,138 @@
+header:
+  - titles:
+      # @start locale config
+      en      : &EN       Home
+      en-GB   : *EN
+      en-US   : *EN
+      en-CA   : *EN
+      en-AU   : *EN
+      zh-Hans : &ZH_HANS  首页 
+      zh      : *ZH_HANS
+      zh-CN   : *ZH_HANS
+      zh-SG   : *ZH_HANS
+      zh-Hant : &ZH_HANT  
+      zh-TW   : *ZH_HANT
+      zh-HK   : *ZH_HANT
+      ko      : &KO       
+      ko-KR   : *KO
+      fr      : &FR       
+      fr-BE   : *FR
+      fr-CA   : *FR
+      fr-CH   : *FR
+      fr-FR   : *FR
+      fr-LU   : *FR
+      # @end locale config
+    url: /index.html
+  - titles:
+      # @start locale config
+      en      : &EN       Docs 
+      en-GB   : *EN
+      en-US   : *EN
+      en-CA   : *EN
+      en-AU   : *EN
+      zh-Hans : &ZH_HANS  文档 
+      zh      : *ZH_HANS
+      zh-CN   : *ZH_HANS
+      zh-SG   : *ZH_HANS
+      zh-Hant : &ZH_HANT  
+      zh-TW   : *ZH_HANT
+      zh-HK   : *ZH_HANT
+      ko      : &KO       
+      ko-KR   : *KO
+      fr      : &FR       
+      fr-BE   : *FR
+      fr-CA   : *FR
+      fr-CH   : *FR
+      fr-FR   : *FR
+      fr-LU   : *FR
+      # @end locale config
+    url: /docs/zh/quick-start
+
+  - titles:
+      # @start locale config
+      en      : &EN       Archive
+      en-GB   : *EN
+      en-US   : *EN
+      en-CA   : *EN
+      en-AU   : *EN
+      zh-Hans : &ZH_HANS  归档
+      zh      : *ZH_HANS
+      zh-CN   : *ZH_HANS
+      zh-SG   : *ZH_HANS
+      zh-Hant : &ZH_HANT  歸檔
+      zh-TW   : *ZH_HANT
+      zh-HK   : *ZH_HANT
+      ko      : &KO       아카이브
+      ko-KR   : *KO
+      fr      : &FR       Archives
+      fr-BE   : *FR
+      fr-CA   : *FR
+      fr-CH   : *FR
+      fr-FR   : *FR
+      fr-LU   : *FR
+      # @end locale config
+    url: /archive.html
+
+  - titles:
+      # @start locale config
+      en      : &EN       About
+      en-GB   : *EN
+      en-US   : *EN
+      en-CA   : *EN
+      en-AU   : *EN
+      zh-Hans : &ZH_HANS  关于
+      zh      : *ZH_HANS
+      zh-CN   : *ZH_HANS
+      zh-SG   : *ZH_HANS
+      zh-Hant : &ZH_HANT  關於
+      zh-TW   : *ZH_HANT
+      zh-HK   : *ZH_HANT
+      ko      : &KO       소개
+      ko-KR   : *KO
+      fr      : &FR       À propos
+      fr-BE   : *FR
+      fr-CA   : *FR
+      fr-CH   : *FR
+      fr-FR   : *FR
+      fr-LU   : *FR
+      # @end locale config
+    url: /about.html
+
+  - title: GitHub
+    url: https://github.com/weihuayi/fealpy
+
+docs-zh:
+  - title:      开始
+    children:
+      - title:  快速开始
+        url:    /docs/zh/quick-start
+  - title:     FEALPy 入门
+  - title:     典型模型问题的数值解
+    children:
+      - title: 非线性 Poisson 方程
+        url:   /docs/zh/num-non-linear-poisson
+      - title:  线弹性方程的数值求解
+        url:   /docs/zh/num-linear-elasticity
+      - title: Navier-stokes 方程
+        url:   /docs/zh/num-navier-stokes-equation
+  - title:      其他语言
+    children:
+      - title:  English
+        url:    /docs/en/quick-start
+
+docs-en:
+  - title:      Start
+    children:
+      - title:  Quick Start
+        url:    /docs/en/quick-start
+      - title: Numerrical Solution for Non-linear Poisson Equation 
+        url:   /docs/en/num-non-linear-poisson
+      - title: TNumerrical Solution for linear-elasticity problem
+        url:   /docs/en/num-linear-elasticity
+      - title: Numerrical Solution for Navier-stokes 
+        url:   /docs/en/num-navier-stokes-equation
+  - title:      Other Languages
+    children:
+      - title:  中文
+        url:    /docs/zh/quick-start
+
