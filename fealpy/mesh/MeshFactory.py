@@ -1,5 +1,6 @@
 import numpy as np
 
+from .IntervalMesh import IntervalMesh
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
@@ -94,6 +95,13 @@ def one_tetrahedron_mesh(meshtype='equ'):
             [0.0, 0.0, 1.0]], dtype=np.float64)
     cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
     return TetrahedronMesh(node, cell)
+
+def interval_mesh(interval=[0, 1], nx=1):
+    node = np.linspace(interval[0], interval[1], nx+1, dtype=np.float64).reshape(-1, 1)
+    cell = np.zeros((nx, 2), dtype=np.int_)
+    cell[:, 0] = np.arange(0, nx)
+    cell[:, 1] = np.arange(1, nx+1)
+    return IntervalMesh(node, cell)
 
 
 @timer

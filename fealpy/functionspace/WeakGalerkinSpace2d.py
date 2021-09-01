@@ -400,7 +400,7 @@ class WeakGalerkinSpace2d:
         S += csr_matrix((F5.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return S
 
-    def set_dirichlet_bc(self, uh, g, threshold=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
         """
         初始化解 uh  的第一类边界条件。
         """
@@ -413,7 +413,7 @@ class WeakGalerkinSpace2d:
         qf = GaussLegendreQuadrature(self.p + 3)
         bcs, ws = qf.quadpts, qf.weights
         ps = mesh.edge_bc_to_point(bcs, index=isBdEdge)
-        gI = g(ps)
+        gI = gD(ps)
         ephi = self.edge_basis(ps, index=isBdEdge)
         h = mesh.entity_measure('edge')
         b = np.einsum('i, ij, ijk, j->jk', ws, gI, ephi, h[isBdEdge])
