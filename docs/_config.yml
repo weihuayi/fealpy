@@ -170,7 +170,7 @@ highlighter : rouge
 kramdown:
   input: GFM
   syntax_highlighter: rouge
-permalink   : date
+permalink   : year-:month-:day-:title/
 
 include:
     - _docs
