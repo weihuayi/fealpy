@@ -214,7 +214,7 @@ parser.add_argument('--maxit',
         help='自适应迭代次数, 默认自适应迭代 40 次')
 
 parser.add_argument('--theta', 
-        default=0.2, type=float,
+        default=0.3, type=float,
         help='自适应迭代的 theta 参数, 默认为  0.3')
 
 parser.print_help()
