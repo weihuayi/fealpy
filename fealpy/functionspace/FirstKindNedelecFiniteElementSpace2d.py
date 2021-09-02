@@ -399,7 +399,7 @@ class FirstKindNedelecFiniteElementSpace2d:
     @barycentric
     def edge_value(self, uh, bc, index=np.s_[:], left=True):
         phi = self.edge_basis(bc, index=index, left=left)
-        edge2dof = self.dof.edge_to_dof() 
+        edge2dof = self.dof.edge_to_dof()[index] 
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])

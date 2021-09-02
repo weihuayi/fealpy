@@ -107,6 +107,10 @@ docs-zh:
       - title:  快速开始
         url:    /docs/zh/quick-start
   - title:     FEALPy 入门
+  - title:     WHYSC 入门
+    children:
+      - title: WHYSC 安装 
+        url:    /docs/zh/whysc-install
   - title:     网格数据结构与实现 
   - title:     有限维空间的构造与实现
     children:
