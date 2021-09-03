@@ -304,7 +304,7 @@ class CVTPMesher:
 
     def AFT_init_interior_nodes(self):
         """
-        该函数仍在设计中, 无法运行
+        该函数仍在设计中, 目前只有圆形区域能正常运行
         ------
         该函数对进行了边界重构的网格利用波前法思想对内部点进行布点
         """
@@ -318,10 +318,7 @@ class CVTPMesher:
         cstart = mesh.ds.cellstart
         isMarkedHEdge = mesh.ds.main_halfedge_flag()
         bnode2subdomain = self.bnode2subdomain
-        #hedge2bnode = hedge2bnode[halfedge[:,2]>=cstart]
-        #cornernode = bnode[corner2node]# 角点处bnode的坐标
-        #bnode = bnode[hedge2bnode]# 选出区域内部的bnode
-        ihalfedge = halfedge[halfedge[:,2]>=cstart]
+        ihalfedge = NNhalfedge[halfedge[:,2]>=cstart]
         w = np.array([[0, 1], [-1, 0]])
         ihalfedge = halfedge
 
@@ -333,7 +330,6 @@ class CVTPMesher:
         NB = len(self.bnode)
         NC = len(self.cnode)
         hcell = len(mesh.ds.hcell)# hcell[i] 是第i个单元其中一条边的索引i
-        #bnode2 = bnode[hedge2bnode[halfedge[hedge2bnode,2]]]
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
@@ -346,7 +342,6 @@ class CVTPMesher:
         nex = halfedge[halfedge[:,1]>=cstart,2]
         inode2 = bnode[hedge2bnode[nex]]
         bnode1 = bnode
-        #inode2 = bnode2[bnode2subdomain[halfedge[hedge2bnode,1]]>=cstart]
         index +=1
         self.inode[index] = (inode + inode2)/2 + 0.86*(inode2-inode)@w
         while True:
@@ -362,57 +357,11 @@ class CVTPMesher:
         for i in range(1,len(self.inode)):
             node1 = self.inode[i]
             node = np.r_[node,node1]
-        #node = node[l:,:]
-        #node = self.inode[2]
-        print(node)
         self.inode = node
         plt.figure()
         plt.scatter(node[:,0],node[:,1])
         plt.show()
 
-             
-        '''
-        for index in filter(lambda x: x > 0, self.mesh.ds.subdomain):
-            p = bd[bnode2subdomain == index]
-            xmin = min(p[:, 0])
-            xmax = max(p[:, 0])
-            ymin = min(p[:, 1])
-            ymax = max(p[:, 1])
-            area = self.mesh.cell_area(index)[index-1]
-            N = int(area/c)
-            N0 = p.shape[0]
-            while N-N0 <= 0:
-                c = 0.9*c
-                N = int(area/c)
-            start = 0
-            newNode = np.zeros((N - N0, 2), dtype=node.dtype)
-            NN = newNode.shape[0]
-            i = 0
-            while True:
-                pp = np.random.rand(NN-start, 2)
-                pp *= np.array([xmax-xmin,ymax-ymin])
-                pp += np.array([xmin,ymin])
-                d, idx = tree.query(pp)
-                flag0 = d > (0.8*h[0])
-                flag1 = (bnode2subdomain[idx] == cstart + index -1)
-                pp = pp[flag0 & flag1]# 筛选出符合要求的点
-                end = start + pp.shape[0]
-                newNode[start:end] = pp
-                if end == NN:
-                    break
-                else:
-                    start = end
-            self.inode[index] = newNode
-        
-        iedgeflag[0] = halfedge[halfedge[0,2],2]
-        iedgeflag[1:] = [halfedge[iedgeflag[i-1],2] for i in range(1,len(halfedge))]
-
-        for i,item1 in enumerate(ihalfedge[:,2]):
-            for j,item2 in enumerate(ihalfedge[:,4]):
-                if item1 == item2:
-                    ihalfedge[i,2] = j
-
-        '''
     def Background_grid_init_interior_nodes(self):
         '''
         利用背景网格方法对网格进行初始均匀布点
@@ -446,7 +395,7 @@ class CVTPMesher:
         axes = fig.gca()
         tmesh.add_plot(axes)
         tmesh.find_cell(axes)
-        plt.show()        
+        plt.show()
         tcell = range(len(tmesh.ds.cell))
         tcell = np.setdiff1d(tcell,locate,assume_unique = True)# 数组取差集
         tcell2node = tmesh.ds.cell_to_node()
@@ -458,7 +407,6 @@ class CVTPMesher:
         area = np.sum(area)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         number = int(area/c)-len(bnode[bnode2subdomain>=cstart])
-        print(number)
 
         inode = (tnode[:,0,:] + tnode[:,1,:] + tnode[:,2,:])/3
         tree =KDTree(bnode)
@@ -468,8 +416,6 @@ class CVTPMesher:
         flag0 = d>0.7*max(h)
         flag1 = bnode2subdomain[idx]>=cstart
         self.inode = inode[flag0 & flag1]
-        print(len(self.inode))
-        
 
     def voronoi(self):
         """
