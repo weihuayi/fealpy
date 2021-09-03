@@ -11,8 +11,8 @@ author: wpx
 
 $$
 \begin{cases}
-\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  =
-　-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
+\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  = 
+-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
 \nabla \cdot \boldsymbol u = 0
 \end{cases}
 $$
@@ -262,7 +262,7 @@ $$
 d\boldsymbol x
 $$
 
-$$ 
+$$
 \boldsymbol E_{1, 1} = \int_\tau \frac{\partial\boldsymbol\phi^T}{\partial y}\frac{\partial\boldsymbol\phi}{\partial y}
 +\frac{1}{2}\frac{\partial\boldsymbol\phi^T}{\partial x}\frac{\partial\boldsymbol\phi}{\partial x}\mathrm
 d\boldsymbol x
