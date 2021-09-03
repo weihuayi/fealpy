@@ -3,6 +3,7 @@ import numpy as np
 from ..quadrature import GaussLegendreQuadrature, TensorProductQuadrature
 
 from .Mesh3d import Mesh3d, Mesh3dDataStructure
+from .TetrahedronMesh import TetrahedronMesh
 
 from .core import multi_index_matrix
 from .core import lagrange_shape_function 
@@ -135,6 +136,29 @@ class LagrangeHexahedronMesh(Mesh3d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+    def to_tetmesh(self):
+        cell = self.entity('cell')
+        node = self.entity('node')
+        hexCell2face = self.ds.cell_to_face()
+        localCell = np.array([
+            [0, 6, 2, 7],
+            [0, 2, 3, 7],
+            [0, 3, 1, 7],
+            [0, 1, 5, 7],
+            [0, 5, 4, 7],
+            [0, 4, 6, 7]], dtype=np.int_)
+        cell = cell[:, localCell].reshape(-1, 4)
+        data = self.meshdata
+        celldata = self.celldata
+        nodedata = self.nodedata
+
+        mesh = TetrahedronMesh(node, cell)
+        for key in celldata:
+            mesh.celldata[key] = np.tile(celldata[key], (6, 1)).T.reshape(-1)
+        mesh.meshdata = data
+        mesh.nodedata = nodedata
+        return mesh
 
     def shape_function(self, bc, p=None):
         """
