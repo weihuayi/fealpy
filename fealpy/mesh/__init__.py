@@ -19,7 +19,7 @@ from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
-from .CVTPMesher import CVTPMesher
+from .CVTPMesher import CVTPMesher, VoroAlgorithm
 from .ATriMesher import ATriMesher
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
