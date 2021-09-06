@@ -100,14 +100,64 @@ $$
 \end{align}
 $$
 
-## channel 
+## Channel flow(Poisuille flow)
+
+其是对两个板子见流动的一个模拟
+
+另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+$$
+\begin{align}
+\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  &= -\nabla p +  \Delta \boldsymbol u \qquad in \quad \Omega\times(0,T) \\
+\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega\times(0,T)\\
+\boldsymbol u &= 0 \qquad on \quad \Omega\times\{0\} \\ 
+\boldsymbol u &= 0 \qquad on \quad [0,1] \times \{0,1\} \times[0,T]   \\ 
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1] \times[0,T] \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1] \times[0,T] \\ 
+\end{align}
+$$
+其解析解为$u = (4y(1-y),0),p = 8(1-x)$
+
+
+
+
 
 ## ipcs算法
 
-- 第一步计算中间速度$u^*$
+### 一阶ipcs
+
+由于
+$$
+\frac{1}{\Delta t}(u^{n+1}-u^{n}) = \frac{1}{\Delta t}(u^{n+1}-u^{*}) + \frac{1}{\Delta t}(u^{*}-u^{n})
+$$
+第一步计算
+$$
+\begin{align}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) - \nabla \cdot \sigma(\boldsymbol u^*) + \boldsymbol u^n \cdot \nabla\boldsymbol u^n + \nabla p^n &= f(t^{n+1}) \qquad in \quad \Omega\times(0,T)\\
+\boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
+\end{align}
+$$
+第二步计算
+$$
+\begin{align}
+\frac{1}{ \Delta t}(\boldsymbol u^{n+1} - \boldsymbol u^*) + \nabla(p^{n+1}-p^{n}) &= 0  \qquad in \quad \Omega ,\\
+\nabla \cdot \boldsymbol u^{n+1} &= 0  \qquad in \quad \Omega , \\
+(\boldsymbol u^{n+1}-\boldsymbol u^*)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
+\end{align}
+$$
+其中第二步可以分为两步来计算
+$$
+\begin{align}
+ \Delta (p^{n+1}-p^{n}) &= \frac{1}{ \Delta t} \nabla \cdot  \boldsymbol u^*   \qquad in \quad \Omega ,\\
+\nabla( p^{n+1}- p^n)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
+\end{align}
+$$
 
 $$
-\rho (\frac{u^* - u^n}{\Delta t},v) + (u^n \cdot \nabla u^n,v)
+\boldsymbol u^{n+1} = \boldsymbol u^* -  \Delta t \nabla(p^{n+1}-p^n)
 $$
 
 
@@ -169,21 +219,6 @@ $$
 \end{bmatrix}
 $$
 
-$$
-\boldsymbol \Phi  \cdot \nabla \boldsymbol \Phi = 
-\begin{bmatrix}
-\phi_0 \frac{\partial \phi_0}{\partial x} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial x} & 0 & \cdots & 0\\
-0 & \cdots & 0 & \phi_{0} \frac{\partial \phi_{0}}{\partial y} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial y} 
-\end{bmatrix}
-$$
-
-$$
-(\boldsymbol \Phi \cdot \nabla \boldsymbol \Phi )^T = 
-\begin{bmatrix}
- \phi_{0} \frac{\partial \phi_{0}}{\partial y} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial y} &0 & \cdots & 0 \\
- 0 & \cdots & 0 & \phi_0 \frac{\partial \phi_0}{\partial x} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial x}
-\end{bmatrix}
-$$
 
 
 $$
@@ -395,24 +430,6 @@ $$
 $$
 
 $$
-(\nabla \boldsymbol \Phi \cdot \boldsymbol \Phi,\boldsymbol \Phi) =
-\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}
-$$
-
-$$
-\boldsymbol G_{00} = \int_\tau (\boldsymbol \phi^T \boldsymbol \phi) diag(\frac{\partial\boldsymbol\phi}{\partial x}) 
- \boldsymbol d\boldsymbol x
-$$
-
-$$
-\boldsymbol G_{11} = \int_\tau (\boldsymbol \phi^T \boldsymbol \phi) diag(\frac{\partial\boldsymbol\phi}{\partial y})
- \boldsymbol d\boldsymbol x
-$$
-
-$$
 (\varepsilon(\boldsymbol \Phi),\varepsilon(\boldsymbol \Phi)) = \int_{\tau} \varepsilon(\boldsymbol\Phi): \varepsilon(\boldsymbol\Phi) \boldsymbol d \boldsymbol x  =  
 \begin{bmatrix}
 \boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
@@ -462,15 +479,6 @@ $$
 \begin{bmatrix}
 \boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
 \boldsymbol E_{1,0} & \boldsymbol E_{1, 1}\\
-\end{bmatrix}
--\frac{\mu}{2}
-\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}_{\partial \Omega}
-\begin{bmatrix}
-\boldsymbol n_x & \boldsymbol n_y\\
-\boldsymbol n_x & \boldsymbol n_y\\
 \end{bmatrix}
 $$
 
