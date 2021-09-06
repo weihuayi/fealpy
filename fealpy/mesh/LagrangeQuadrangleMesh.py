@@ -216,6 +216,10 @@ class LagrangeQuadrangleMesh(Mesh2d):
             newCell[3::4, 2] = cell2edge[:, 1]
             newCell[3::4, 3] = cell[:, cp[3]]
 
+            for key in self.celldata:
+                data = self.celldata[key]
+                self.celldata[key] = np.tile(data, (4, 1)).T.reshape(-1)
+
             imap = np.broadcast_to(np.arange(NC).reshape(NC, 1), shape=(NC, 4))
             HB = HB[imap].reshape(-1)
 
@@ -391,6 +395,7 @@ class LagrangeQuadrangleMesh(Mesh2d):
             return J
         else:
             return J, gphi
+
     def jacobi_TMOP(self, index = np.s_[:]):
 
         '''
@@ -813,3 +818,4 @@ class DLagrangeQuadrangleDof2d():
             return p + 1
         elif doftype in {'node', 0}:
             return 1
+

@@ -50,8 +50,8 @@ mesh = pde.init_mesh(n=nrefine)
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$'
              ]
-errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float)
-NDof = np.zeros(maxit, dtype=np.float)
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
+NDof = np.zeros(maxit, dtype=np.float64)
 
 for i in range(args.maxit):
     space = FirstKindNedelecFiniteElementSpace2d(mesh, p=degree, q=7)

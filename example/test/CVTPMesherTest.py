@@ -4,7 +4,7 @@ import sys
 
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import HalfEdgeMesh2d, CVTPMesher
+from fealpy.mesh import HalfEdgeMesh2d, CVTPMesher,VoroAlgorithm
 
 from scipy.spatial import Voronoi, voronoi_plot_2d
 from scipy.spatial import KDTree
@@ -55,7 +55,7 @@ class CVTPMesherTest:
                 (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             voromesher = CVTPMesher(mesh)
-            uniform_mesh.vorocrust_boundary_matching(n=2)
+            voromesher.vorocrust_boundary_matching(n=2)
             bnode = voromesher.bnode
        
         elif domain == 'LShape':
@@ -72,7 +72,7 @@ class CVTPMesherTest:
         
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain, fixed)
             voromesher = CVTPMesher(mesh,fixed)
-            voromesher.vorocrust_boundary_matching(n=2)
+            voromesher.vorocrust_boundary_matching(n=3)
             bnode = voromesher.bnode
 
         elif domain =='circle':
@@ -224,7 +224,7 @@ class CVTPMesherTest:
             plt.show()
 
         if add_cnode == True:
-            cnode = uniform_mesh.cnode
+            cnode = voromesher.cnode
             bnode = np.append(bnode, cnode,axis=0)
         
         vor = Voronoi(bnode, incremental = True)
@@ -238,14 +238,14 @@ class CVTPMesherTest:
             fig = plt.figure()
             axes = fig.gca()
             mesh.add_plot(axes)
-            mesh.find_node(axes, color='k', showindex=False)
-            mesh.find_node(axes, node=bnode, showindex=False)
+            mesh.find_node(axes, color='k', showindex=True)
+            mesh.find_node(axes, node=bnode, showindex=True)
             #mesh.print()
             voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.3)
             plt.show()
             fig = plt.figure()
             axes = fig.gca()
-            mesh.add_halfedge_plot(axes, showindex=False)
+            mesh.add_halfedge_plot(axes, showindex=True)
             mesh.find_node(axes, showindex=False)
             plt.show()
     
@@ -276,7 +276,7 @@ class CVTPMesherTest:
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets,
                     subdomain,fixed)
             voromesher  = CVTPMesher(mesh)
-            vor = voromesher.voronoi_meshing(nb=2)
+            vor = voromesher.voronoi_meshing(nb=3)
         elif domain =='circle':
             n = 20
             h = 2*np.pi/n
@@ -455,11 +455,13 @@ class CVTPMesherTest:
             plt.show()
        
         i =0
+        avoro = VoroAlgorithm(voromesher)
         while i<100:
-            vor = voromesher.lloyd_opt(vor)
+            vor = avoro.lloyd_opt(vor)
             i+=1
         en,ef = voromesher.energy(vor)
-        print(en)
+        avoro = VoroAlgorithm(voromesher)
+        avoro.lloyd_opt(vor)
         pmesh = voromesher.to_polygonMesh(vor) 
         fig = plt.figure()
         axes= fig.gca()
@@ -506,9 +508,9 @@ if sys.argv[1] == "Lloyd":
 '''
 
 #test.uniform_boundary_meshing_test()
-#test.uniform_meshing_test(domain='square')
+test.uniform_meshing_test(domain='square',interior_nodes= False)
 #test.uniform_meshing_test(domain='square2',interior_nodes = True)
-#test.uniform_meshing_test(domain='LShape')
+#test.uniform_meshing_test(domain='LShape', interior_nodes = False)
 #test.uniform_meshing_test(domain='triangle',interior_nodes = False)
 #test.uniform_meshing_test(domain='circle',interior_nodes = False)
 #test.uniform_meshing_test(domain='trapezoid',interior_nodes = True)
@@ -519,7 +521,7 @@ if sys.argv[1] == "Lloyd":
 #test.Lloyd_test(domain='square')
 #test.Lloyd_test(domain = 'LShape')
 #test.Lloyd_test(domain = 'circle')
-test.Lloyd_test(domain='circle_hole')
+#test.Lloyd_test(domain='circle_hole')
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
 #test.Lloyd_test(domain = 'hole1')

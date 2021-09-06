@@ -201,7 +201,7 @@ parser = argparse.ArgumentParser(description=
         这是一个自适应求解时谐方程的程序
         """)
 
-parser.add_argument('--order', 
+parser.add_argument('--degree', 
         default=0, type=int,
         help='第一类 Nedlec 元的次数, 默认为 0!')
 
@@ -214,7 +214,7 @@ parser.add_argument('--maxit',
         help='自适应迭代次数, 默认自适应迭代 40 次')
 
 parser.add_argument('--theta', 
-        default=0.2, type=float,
+        default=0.3, type=float,
         help='自适应迭代的 theta 参数, 默认为  0.3')
 
 parser.print_help()
@@ -224,8 +224,8 @@ print('程序参数为:', args)
 
 ## 开始计算
 
-#pde = CosSinData()
-pde = LShapeRSinData()
+pde = CosSinData()
+#pde = LShapeRSinData()
 
 mesh = pde.init_mesh()
 
@@ -247,11 +247,11 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - R_h(\\nabla\\times u_h)||_{\Omega, 0}$',
              'eta'
              ]
-errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float)
-NDof = np.zeros(args.maxit, dtype=np.float)
+errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float64)
+NDof = np.zeros(args.maxit, dtype=np.float64)
 
 for i in range(args.maxit):
-    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=args.order)
+    space = FirstKindNedelecFiniteElementSpace2d(mesh, p=args.degree)
     bc = DirichletBC(space, pde.dirichlet) 
 
     gdof = space.number_of_global_dofs()
@@ -265,7 +265,6 @@ for i in range(args.maxit):
 
     uh[:] = spsolve(A, F)
 
-    #ruh = curl_recover(uh)
     space = LagrangeFiniteElementSpace(mesh, p=1)
     rcuh = space.function(dim=1)
     rcuh[:] = spr(uh, edge_curl_value)  # curl 
