@@ -224,8 +224,8 @@ print('程序参数为:', args)
 
 ## 开始计算
 
-#pde = CosSinData()
-pde = LShapeRSinData()
+pde = CosSinData()
+#pde = LShapeRSinData()
 
 mesh = pde.init_mesh()
 
@@ -265,7 +265,6 @@ for i in range(args.maxit):
 
     uh[:] = spsolve(A, F)
 
-    #ruh = curl_recover(uh)
     space = LagrangeFiniteElementSpace(mesh, p=1)
     rcuh = space.function(dim=1)
     rcuh[:] = spr(uh, edge_curl_value)  # curl 
