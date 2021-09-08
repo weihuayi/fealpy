@@ -111,6 +111,10 @@ docs-zh:
     children:
       - title: WHYSC 安装 
         url:    /docs/zh/whysc-install
+  - title:     Doxygen 入门
+    children:
+      - title: Doxygen 使用 
+        url:    /docs/zh/doxygen-manual
   - title:     网格数据结构与实现 
   - title:     有限维空间的构造与实现
     children:

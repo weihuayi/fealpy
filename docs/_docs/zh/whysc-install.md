@@ -15,7 +15,6 @@ WHYSC 是一个 C++ 科学计算软件库,
 sudo apt install libgmp-dev libmpfr-dev libboost-dev 
 sudo apt install zlib1g-dev libblas-dev liblapack-dev
 sudo apt install libglu1-mesa-dev freeglut3-dev mesa-common-dev
-sudo apt-get install libcgal-dev
 sudo apt install freeglut3-dev
 ```
 
@@ -33,6 +32,7 @@ sudo apt install libopenmpi-dev
 
 [下载vtk](https://vtk.org/download/)
 ```bash
+mkdir ~/opt
 tar -xvf VTK-9.0.1.tar.gz ~/opt/vtk
 cd ~/opt/vtk
 mkdir -p build/release
