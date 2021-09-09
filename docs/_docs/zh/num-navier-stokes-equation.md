@@ -11,8 +11,8 @@ author: wpx
 
 $$
 \begin{cases}
-\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  =
-　-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
+\rho (\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u)  = 
+-\nabla p + \nabla \cdot \sigma(\boldsymbol u) +\rho \boldsymbol f \\
 \nabla \cdot \boldsymbol u = 0
 \end{cases}
 $$
@@ -34,7 +34,7 @@ $$
 - $f$ 单位质量流体微团的体积力
 - $\mu$ 分子粘性系数
 
-# 变分格式
+#　变分格式
 
 对两便乘上向量测试函数 $\boldsymbol v \in V$ 并在积分区域 $\Omega$ 上做积分
 
@@ -100,7 +100,69 @@ $$
 \end{align}
 $$
 
-## IPCS方法
+## Channel flow(Poisuille flow)
+
+其是对两个板子见流动的一个模拟
+
+另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+$$
+\begin{align}
+\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  &= -\nabla p +  \Delta \boldsymbol u \qquad in \quad \Omega\times(0,T) \\
+\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega\times(0,T)\\
+\boldsymbol u &= 0 \qquad on \quad \Omega\times\{0\} \\ 
+\boldsymbol u &= 0 \qquad on \quad [0,1] \times \{0,1\} \times[0,T]   \\ 
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1] \times[0,T] \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1] \times[0,T] \\ 
+\end{align}
+$$
+其解析解为$u = (4y(1-y),0),p = 8(1-x)$
+
+
+
+
+
+## ipcs算法
+
+### 一阶ipcs
+
+由于
+$$
+\frac{1}{\Delta t}(u^{n+1}-u^{n}) = \frac{1}{\Delta t}(u^{n+1}-u^{*}) + \frac{1}{\Delta t}(u^{*}-u^{n})
+$$
+第一步计算
+$$
+\begin{align}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) - \nabla \cdot \sigma(\boldsymbol u^*) + \boldsymbol u^n \cdot \nabla\boldsymbol u^n + \nabla p^n &= f(t^{n+1}) \qquad in \quad \Omega\times(0,T)\\
+\boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
+\end{align}
+$$
+第二步计算
+$$
+\begin{align}
+\frac{1}{ \Delta t}(\boldsymbol u^{n+1} - \boldsymbol u^*) + \nabla(p^{n+1}-p^{n}) &= 0  \qquad in \quad \Omega ,\\
+\nabla \cdot \boldsymbol u^{n+1} &= 0  \qquad in \quad \Omega , \\
+(\boldsymbol u^{n+1}-\boldsymbol u^*)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
+\end{align}
+$$
+其中第二步可以分为两步来计算
+$$
+\begin{align}
+ \Delta (p^{n+1}-p^{n}) &= \frac{1}{ \Delta t} \nabla \cdot  \boldsymbol u^*   \qquad in \quad \Omega ,\\
+\nabla( p^{n+1}- p^n)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
+\end{align}
+$$
+
+$$
+\boldsymbol u^{n+1} = \boldsymbol u^* -  \Delta t \nabla(p^{n+1}-p^n)
+$$
+
+
+
+## 基函数表示
 
 给定 $\Omega$​ 上一个单纯形网格离散 $\tau$, 构造连续的分p 次$Lgarange$多项式空间, 其基函数向量记为：
 
@@ -122,21 +184,9 @@ $$
 \end{bmatrix}
 $$
 
-则其对应的质量矩阵为
 
-$$
-\begin{equation}
-	\boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
-	\begin{bmatrix}
-		(\phi_{0}, \phi_{0})_{\tau} & (\phi_{0}, \phi_{1})_{\tau} & \cdots & (\phi_{0}, \phi_{l-1})_{\tau} \\
-		(\phi_{1}, \phi_{0})_{\tau} & (\phi_{1}, \phi_{1})_{\tau} & \cdots & (\phi_{1}, \phi_{l-1})_{\tau} \\
-		\vdots & \vdots & \ddots & \vdots \\
-		(\phi_{l-1}, \phi_{0})_{\tau} & (\phi_{l-1}, \phi_{1})_{\tau} & \cdots & (\phi_{l-1}, \phi_{l-1})_{\tau}
-	\end{bmatrix}
-\end{equation}
-$$
 
-接下用矩阵来表示向量空间需要的变量，
+则k次向量空间$\mathcal P_k(K;\mathcal R^2)$的基函数为
 
 $$
 \boldsymbol\Phi = \begin{bmatrix}
@@ -169,21 +219,6 @@ $$
 \end{bmatrix}
 $$
 
-$$
-\nabla \boldsymbol \Phi \cdot \boldsymbol \Phi = 
-\begin{bmatrix}
-\phi_0 \frac{\partial \phi_0}{\partial x} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial x} & 0 & \cdots & 0\\
-0 & \cdots & 0 & \phi_{0} \frac{\partial \phi_{0}}{\partial y} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial y} 
-\end{bmatrix}
-$$
-
-$$
-(\nabla \boldsymbol \Phi \cdot \boldsymbol \Phi)^T = 
-\begin{bmatrix}
- \phi_{0} \frac{\partial \phi_{0}}{\partial y} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial y} &0 & \cdots & 0 \\
- 0 & \cdots & 0 & \phi_0 \frac{\partial \phi_0}{\partial x} & \cdots & \phi_{l-1} \frac{\partial \phi_{l-1}}{\partial x}
-\end{bmatrix}
-$$
 
 
 $$
@@ -210,6 +245,172 @@ $$
 \end{bmatrix}
 $$
 
+
+
+## 函数的表示
+
+- $\boldsymbol u = (u_x,u_y)$
+
+$$
+\boldsymbol u = (u_x,u_y) = (\phi_{i},0)u_{x_i}+(0,\phi_{i})u_{y_i} = 
+\begin{bmatrix}
+	\boldsymbol\phi & 0 \\
+	0 & \boldsymbol\phi
+\end{bmatrix}
+\begin{bmatrix}
+	u_{x_0} \\
+	\vdots \\
+	u_{x_{N-1}}\\
+	u_{y_0} \\
+	\vdots \\
+	u_{y_{N-1}}\\
+\end{bmatrix}
+:=
+\begin{bmatrix}
+	\boldsymbol\phi & 0 \\
+	0 & \boldsymbol\phi
+\end{bmatrix}
+\begin{bmatrix}
+	\boldsymbol u_{x}\\
+	\boldsymbol u_{y}
+\end{bmatrix}
+$$
+
+- $\nabla \boldsymbol u$
+
+$$
+\begin{align*}
+	\nabla \boldsymbol u &=  
+			\begin{bmatrix}
+				 \frac{\partial u_x}{\partial x} & \frac{\partial u_y}{\partial x} \\
+				 \frac{\partial u_x}{\partial y} & \frac{\partial u_y}{\partial y}
+				\end{bmatrix} 
+			=
+			\begin{bmatrix}
+				 u_{x_i}\frac{\partial \phi_i}{\partial x} & u_{y_i}\frac{\partial \phi_i}{\partial x}  \\
+				 u_{x_i}\frac{\partial \phi_i}{\partial y} &  u_{y_i}\frac{\partial \phi_i}{\partial y}
+			\end{bmatrix}\\
+			&=
+			\begin{bmatrix}
+				\frac{\partial \phi_i}{\partial x} & 0\\
+				\frac{\partial \phi_i}{\partial y} & 0
+			\end{bmatrix}
+			u_{x_i}
+		    +
+		    \begin{bmatrix}
+		    	0 & \frac{\partial \phi_i}{\partial x} \\
+		    	0 & \frac{\partial \phi_i}{\partial y} 
+		    \end{bmatrix}
+	    	u_{y_i}
+			=\nabla \Phi 
+			\begin{bmatrix}
+				\boldsymbol u_{x}\\
+				\boldsymbol u_{y}
+			\end{bmatrix}\\	
+\end{align*}
+$$
+
+- $\boldsymbol u \cdot \nabla \boldsymbol u$
+
+$$
+\begin{align*}
+	\boldsymbol u \cdot \nabla \boldsymbol u &=  
+	[u_x,u_y]
+	\begin{bmatrix}
+		\frac{\partial u_x}{\partial x} & \frac{\partial u_y}{\partial x} \\
+		\frac{\partial u_x}{\partial y} & \frac{\partial u_y}{\partial y}
+	\end{bmatrix} 
+	\\&=
+	\begin{bmatrix}
+	u_{x_i}u_{x_i} \phi_i \frac{\partial \phi_i}{\partial x} +
+	u_{x_i}u_{y_i} \phi_i \frac{\partial \phi_i}{\partial y} , 
+	u_{x_i}u_{y_i} \phi_i \frac{\partial \phi_i}{\partial x} +
+	u_{y_i}u_{y_i} \phi_i \frac{\partial \phi_i}{\partial y}
+	\end{bmatrix}
+	\\&=
+	\begin{bmatrix}
+		\phi_i\frac{\partial \phi_i}{\partial x},
+		0
+	\end{bmatrix}
+	u_{x_i}u_{x_i}
+	+
+	\begin{bmatrix}
+		0  ,
+		\phi_i\frac{\partial \phi_i}{\partial y}
+	\end{bmatrix}
+	 u_{y_i}u_{y_i}
+	+
+	\begin{bmatrix}
+		\phi_i\frac{\partial \phi_i}{\partial y},
+		0
+	\end{bmatrix}
+	u_{x_i}u_{y_i}
+	+ 
+	\begin{bmatrix}
+		0  ,
+		\phi_i\frac{\partial \phi_i}{\partial x}
+	\end{bmatrix}
+	u_{y_i}u_{x_i}
+	\\& =\boldsymbol \Phi \cdot \nabla \boldsymbol \Phi 
+	\begin{bmatrix}
+		\boldsymbol u_{x}\boldsymbol u_{x}\\
+		\boldsymbol u_{y}\boldsymbol u_{y}
+	\end{bmatrix}
+	+ (\boldsymbol \Phi \cdot \nabla \boldsymbol \Phi)^T
+	\begin{bmatrix}
+		\boldsymbol u_{x}\boldsymbol u_{y}\\
+		\boldsymbol u_{x}\boldsymbol u_{y}
+	\end{bmatrix}
+\end{align*}
+$$
+
+- $\epsilon(\boldsymbol u) = \frac{1}{2}(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T) $
+
+$$
+\begin{align*}		
+	\epsilon(\boldsymbol u) &= \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T) \\
+			 &= \frac{1}{2}
+			 \begin{bmatrix}
+				2 u_{x_i}\frac{\partial \phi_i}{\partial x} & u_{y_i}\frac{\partial \phi_i}{\partial x} + u_{x_i}\frac{\partial \phi_i}{\partial y} \\
+				u_{y_i}\frac{\partial \phi_i}{\partial x} + u_{x_i}\frac{\partial \phi_i}{\partial y} & 2 u_{y_i}\frac{\partial \phi_i}{\partial y}
+			\end{bmatrix} \\
+			&=
+			\begin{bmatrix}
+				\frac{\partial \phi_i}{\partial x} & \frac{1}{2}\frac{\partial \phi_i}{\partial y}\\
+				\frac{1}{2} \frac{\partial \phi_i}{\partial y} & 0
+			\end{bmatrix}
+			u_{x_i}
+			+
+			\begin{bmatrix}
+				0 & \frac{1}{2}\frac{\partial \phi_i}{\partial x}\\
+				\frac{1}{2} \frac{\partial \phi_i}{\partial x} & \frac{\partial \phi_i}{\partial y}
+			\end{bmatrix}
+			u_{y_i}
+			=\epsilon (\Phi)
+			\begin{bmatrix}
+				\boldsymbol u_{x}\\
+				\boldsymbol u_{y}
+			\end{bmatrix}
+\end{align*}
+$$
+
+
+
+## 矩阵表示
+
+$$
+\begin{equation}
+    \boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
+    \begin{bmatrix}
+        (\phi_{0}, \phi_{0})_{\tau} & (\phi_{0}, \phi_{1})_{\tau} & \cdots & (\phi_{0}, \phi_{l-1})_{\tau} \\
+        (\phi_{1}, \phi_{0})_{\tau} & (\phi_{1}, \phi_{1})_{\tau} & \cdots & (\phi_{1}, \phi_{l-1})_{\tau} \\
+        \vdots & \vdots & \ddots & \vdots \\
+        (\phi_{l-1}, \phi_{0})_{\tau} & (\phi_{l-1}, \phi_{1})_{\tau} & \cdots & (\phi_{l-1}, \phi_{l-1})_{\tau}
+    \end{bmatrix}
+\end{equation}
+$$
+
+
 $$
 (\boldsymbol\Phi,\boldsymbol\Phi) = \int_{\tau} 
 \begin{bmatrix}
@@ -229,26 +430,6 @@ $$
 $$
 
 $$
-(\nabla \boldsymbol \Phi \cdot \boldsymbol \Phi,\boldsymbol \Phi) =
-\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}
-$$
-
-$$
-\boldsymbol G_{00} = \int_\tau (\boldsymbol \phi^T \boldsymbol \phi) diag(\frac{\partial\boldsymbol\phi}{\partial x}) 
- \boldsymbol d\boldsymbol x
-$$
-
-$$
-\boldsymbol G_{11} = \int_\tau (\boldsymbol \phi^T \boldsymbol \phi) diag(\frac{\partial\boldsymbol\phi}{\partial y})
- \boldsymbol d\boldsymbol x
-$$
-
-其中$\boldsymbol I$为单位矩阵
-
-$$
 (\varepsilon(\boldsymbol \Phi),\varepsilon(\boldsymbol \Phi)) = \int_{\tau} \varepsilon(\boldsymbol\Phi): \varepsilon(\boldsymbol\Phi) \boldsymbol d \boldsymbol x  =  
 \begin{bmatrix}
 \boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
@@ -262,7 +443,7 @@ $$
 d\boldsymbol x
 $$
 
-$$ 
+$$
 \boldsymbol E_{1, 1} = \int_\tau \frac{\partial\boldsymbol\phi^T}{\partial y}\frac{\partial\boldsymbol\phi}{\partial y}
 +\frac{1}{2}\frac{\partial\boldsymbol\phi^T}{\partial x}\frac{\partial\boldsymbol\phi}{\partial x}\mathrm
 d\boldsymbol x
@@ -273,15 +454,16 @@ $$
 d\boldsymbol x
 $$
 
-第一步计算$u^{*}$
+## ipcs算法
 
+第一步计算$u^{*}$
 $$
 \begin{align*}
 	&\frac{\rho}{\Delta t} (\boldsymbol u^*,\boldsymbol v) + \mu (\epsilon(\boldsymbol u^*),\epsilon(\boldsymbol v)) 
 	- \frac{\mu}{2} (\nabla(\boldsymbol u^*) \cdot \boldsymbol n , \boldsymbol v)_{\partial \Omega} \\
 	&= \frac{\rho}{\Delta t}(\boldsymbol u^n,\boldsymbol v) - \rho(\boldsymbol u^n \cdot \nabla \boldsymbol u^n,\boldsymbol v) 
 	-\mu(\epsilon(\boldsymbol u^n),\epsilon(\boldsymbol v)) \\ &+ (p^n \boldsymbol I,\epsilon(\boldsymbol v)) - (p^n \boldsymbol n ,\boldsymbol v)_{\partial \Omega}
-	+ \frac{\mu}{2}(\nabla(\boldsymbol u^n) \cdot \boldsymbol n ,\boldsymbol v)_{\partial \Omega}
+	+ \frac{\mu}{2}(\nabla(\boldsymbol u^n) \cdot \boldsymbol n ,\boldsymbol v)_{\partial \Omega}的
 \end{align*}
 $$
 
@@ -297,15 +479,6 @@ $$
 \begin{bmatrix}
 \boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
 \boldsymbol E_{1,0} & \boldsymbol E_{1, 1}\\
-\end{bmatrix}
--\frac{\mu}{2}
-\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}_{\partial \Omega}
-\begin{bmatrix}
-\boldsymbol n_x & \boldsymbol n_y\\
-\boldsymbol n_x & \boldsymbol n_y\\
 \end{bmatrix}
 $$
 
