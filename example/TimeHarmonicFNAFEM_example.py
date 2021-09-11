@@ -10,7 +10,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import MeshFactory
-from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData
+from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData, InHomogeneousData
 from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
@@ -224,8 +224,9 @@ print('程序参数为:', args)
 
 ## 开始计算
 
-pde = CosSinData()
+#pde = CosSinData()
 #pde = LShapeRSinData()
+pde =InHomogeneousData(delta=0.02)
 
 mesh = pde.init_mesh()
 
@@ -258,7 +259,7 @@ for i in range(args.maxit):
     NDof[i] = gdof 
 
     uh = space.function()
-    A = space.curl_matrix() - space.mass_matrix()
+    A = space.curl_matrix(c=pde.inv_mu) - space.mass_matrix(c=pde.epsilon)
     F = space.source_vector(pde.source)
 
     A, F = bc.apply(A, F, uh)
