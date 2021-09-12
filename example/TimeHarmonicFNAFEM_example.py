@@ -245,8 +245,8 @@ mesh = pde.init_mesh(n=args.nrefine)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
-             '$|| u - R_h(u_h)||_{\Omega,0}$',
-             '$||\\nabla\\times u - R_h(\\nabla\\times u_h)||_{\Omega, 0}$',
+             '$|| u - R_h[u_h]||_{\Omega,0}$',
+             '$||\\nabla\\times u - R_h[\\nabla\\times u_h]||_{\Omega, 0}$',
              'eta'
              ]
 errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float64)
