@@ -109,7 +109,7 @@ class InHomogeneousData:
     def inv_mu(self, p):
         x = p[..., 0]
         y = p[..., 1]
-        val=1.0/(1+x**2+y**2)
+        val=1+x**2+y**2
         return val
 
     @cartesian
