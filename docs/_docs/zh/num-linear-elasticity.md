@@ -65,6 +65,7 @@ u_x \\ v_y \\\frac{v_x + u_y}{2}
 $$
 
 由本构方程的展开式
+
 $$
 \boldsymbol{\sigma} = 2\mu\begin{bmatrix}
 u_x & \frac{v_x + u_y}{2} \\
@@ -205,6 +206,7 @@ $$
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
 \int_\Omega \boldsymbol\Phi^T_y\boldsymbol\Phi_y\mathrm d\boldsymbol x 
 $$
+
 再用拼起来就是最终的刚度矩阵。
 
 ## 三维情形
@@ -340,12 +342,14 @@ $$
 进而可得
 
 $$
-\boldsymbol B^T \boldsymbol D \boldsymbol B = 
+\begin{aligned}
+\boldsymbol B^T \boldsymbol D \boldsymbol B = &
 \begin{bmatrix}
-\boldsymbol{R_{0,0}} & \boldsymbol{R_{0, 1}} \\
-\boldsymbol{R_{1,0}} & \boldsymbol{R_{1, 1}}
-\end{bmatrix}
-= 
+\boldsymbol{R_{0,0}} & \boldsymbol{R_{0, 1}} & \boldsymbol{R_{0, 2}}\\
+\boldsymbol{R_{1,0}} & \boldsymbol{R_{1, 1}} & \boldsymbol{R_{1, 2}}\\ 
+\boldsymbol{R_{2,0}} & \boldsymbol{R_{2, 1}} & \boldsymbol{R_{2, 2}}\\ 
+\end{bmatrix} \\
+= &  
 \begin{bmatrix}
 (2\mu + \lambda)\boldsymbol\Phi^T_x
 \boldsymbol\Phi_x 
@@ -364,6 +368,7 @@ $$
 + \mu \boldsymbol\Phi^T_x
 \boldsymbol\Phi_x  
 \end{bmatrix}
+\end{aligned}
 $$
 
 最终可得静力平衡方程的离散矩阵形式
@@ -382,4 +387,5 @@ $$
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
 \int_\Omega \boldsymbol\Phi^T_y\boldsymbol\Phi_y\mathrm d\boldsymbol x 
 $$
+
 再用拼起来就是最终的刚度矩阵。
