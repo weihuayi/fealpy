@@ -5,26 +5,29 @@ key: docs-linear-elasticity-zh
 ---
 
 
-## PDE 模型
+## 1.1 PDE 模型
 
 弹性力学研究平衡条件下线弹性问题, 模型共包含三个方程： 
 
-+ 静力平衡方程： 
++ **静力平衡方程**： 
 
     $$-\nabla\cdot \boldsymbol{\sigma} = \boldsymbol{f}$$
 
-+ 几何方程： 
++ **几何方程**： 
 
     $$ \boldsymbol{\varepsilon} = \frac{1}{2}(\nabla \boldsymbol{u} + \nabla \boldsymbol{u}^T) $$ 
 
-+ 本构方程：
++ **本构方程**：
 
     $$ \boldsymbol{\sigma} = 2\mu \boldsymbol{\varepsilon} + \lambda tr \boldsymbol{\varepsilon}\boldsymbol{I} $$
 
-在实际的工程计算中，这了便于程序实现，$\boldsymbol{\varepsilon}$ 和 $\boldsymbol{\sigma}$ 一般都采用向量化的表示。
-静力平衡方程描述了弹性体在平衡条件下应力与体力的关系，几何方程表示应变与位移的关系，本构方程表示应力与应变的关系。 
+静力平衡方程描述了弹性体在平衡条件下**应力**与**体力**的关系，几何方程表示**应变**与**位移**的关系，本构方程表示**应力**与**应变**的关系。 
 
-## 变分形式
+在实际的工程计算中，这了便于程序实现和节省计算量，基于 $\boldsymbol{\varepsilon}$ 和 
+$\boldsymbol{\sigma}$
+都是对称矩阵函数的实事，可以把保它们用一个一维的向量表示，具体细节见下面的推导过程。
+
+## 1.2 经典变分形式
 
 下面我们对静力平衡方程进行变分处理，给定一个向量测试函数空间 $V$, 
 
@@ -52,7 +55,7 @@ $$
 + \int_{\partial \Omega_g} \boldsymbol{g}\cdot\boldsymbol{v} ~ \mathrm{d}\boldsymbol{x}
 $$
 
-## 二维情形
+### 1.2.1 二维 Lagrange 有限元离散
 
 记位移函数 $\boldsymbol{u} = \begin{bmatrix} u \\ v \end{bmatrix}$，由张量对象
 $\boldsymbol\varepsilon$ 和 $\boldsymbol\sigma$
@@ -156,6 +159,15 @@ $$
 \end{bmatrix}
 $$
 
+设位移有限元解 $\boldsymbol u_h$ 的自由度向量为 $\boldsymbol U$, 则
+
+$$
+\boldsymbol u_h = \boldsymbol\Psi\boldsymbol U 
+$$
+
+注意这里实际上规定了向量 $\boldsymbol U$ 的分量的排列方式，即先排 $x$
+分量的自由度，再排 $y$ 分量的自由度。
+
 矩阵 $\boldsymbol B$ 
 
 $$
@@ -209,16 +221,21 @@ $$
 
 $$
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_x\mathrm d\boldsymbol x,\quad 
-\int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
-\int_\Omega \boldsymbol\Phi^T_y\boldsymbol\Phi_y\mathrm d\boldsymbol x 
+\int_\Omega \boldsymbol\Phi^T_y\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad 
+\int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x.
 $$
 
-再用拼起来就是最终的刚度矩阵。
+再拼起来就是最终的刚度矩阵。
 
-## 三维情形
+**注意**, 上面的讨论没有说明 Lagrange
+空间次数和所用的网格，因为对任意给的次数，不管三角形或四边形网格，过程都一样的。
+
+### 1.2.2 三维 Lagrange 有限元离散
 
 三维情形与二维情形类似，记位移 $\boldsymbol{u} = \begin{bmatrix} u \\ v \\ w \end{bmatrix}$，
-同样由几何方程和本构方程可以得到 $\boldsymbol{\varepsilon}$ 和 $\boldsymbol{\sigma}$ 用位移表示的形式。
+同样由几何方程和本构方程可以得到 $\boldsymbol{\varepsilon}$ 和 $\boldsymbol{\sigma}$ 用位移表示的向量形式。
+
+其中 $\boldsymbol\varepsilon$ 对应的向量形式为
 
 $$
 \boldsymbol{\varepsilon} = 
@@ -232,6 +249,8 @@ u_x & \frac{v_x + u_y}{2} & \frac{w_x + u_z}{2} \\
 u_x \\ v_y \\ w_z \\ \frac{w_y + v_z}{2} \\ \frac{w_x + u_z}{2} \\ \frac{v_x + u_y}{2}
 \end{bmatrix}
 $$
+
+把本构方程展开来写，可得
 
 $$
 \boldsymbol{\sigma} =
@@ -247,6 +266,8 @@ u_x & \frac{v_x + u_y}{2} & \frac{w_x + u_z}{2} \\
 0 & 0 & 1
 \end{bmatrix}
 $$
+
+进而可以得到 $\boldsymbol\sigma$ 的向量展开形式，并写出它与位移函数的关系式
 
 $$
 \begin{aligned}
@@ -332,6 +353,15 @@ $$
 \end{bmatrix}
 $$
 
+设位移有限元解 $\boldsymbol u_h$ 的自由度向量为 $\boldsymbol U$, 则
+
+$$
+\boldsymbol u_h = \boldsymbol\Psi\boldsymbol U 
+$$
+
+注意这里实际上规定了向量 $\boldsymbol U$ 的分量的排列方式，即先排 $x$
+分量的自由度，再排 $y$ 分量的自由度，最后是 $z$ 分量的自由度。
+
 矩阵 $\boldsymbol B$ 
 
 $$
@@ -346,15 +376,19 @@ $$
 \end{bmatrix}
 $$
 
-进而可得
+进而可得 $\int_\Omega \boldsymbol\sigma(\boldsymbol u_h):\boldsymbol v_h~\mathrm
+d\boldsymbol x$ 对应的矩阵形式为 
 
 $$
-\boldsymbol B^T \boldsymbol D \boldsymbol B = 
+\int_\Omega \boldsymbol B^T \boldsymbol D \boldsymbol B \mathrm d\boldsymbol
+x \cdot 
+\boldsymbol U = \int_\Omega
 \begin{bmatrix}
 \boldsymbol{R_{0,0}} & \boldsymbol{R_{0, 1}} & \boldsymbol{R_{0, 2}}\\
 \boldsymbol{R_{1,0}} & \boldsymbol{R_{1, 1}} & \boldsymbol{R_{1, 2}}\\ 
 \boldsymbol{R_{2,0}} & \boldsymbol{R_{2, 1}} & \boldsymbol{R_{2, 2}}\\ 
 \end{bmatrix} 
+\mathrm d\boldsymbol x \cdot \boldsymbol U
 $$
 
 其中
@@ -403,7 +437,14 @@ $$
 \int_\Omega \boldsymbol\Phi^T_z\boldsymbol\Phi_z\mathrm d\boldsymbol x,\quad 
 \int_\Omega \boldsymbol\Phi^T_z\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_z\mathrm d\boldsymbol x,\quad
-\int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x 
+\int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x.
 $$
 
-再用拼起来就是最终的刚度矩阵。
+再拼起来就是最终的刚度矩阵。
+
+**注意**, 上面的讨论没有说明 Lagrange
+空间次数和所用的网格，因为对任意给的次数，不管四面体、六面体或者三棱柱等网格，
+过程都一样的。
+
+
+## 1.3 混合变分形式
