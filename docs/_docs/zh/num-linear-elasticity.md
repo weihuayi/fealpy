@@ -57,10 +57,14 @@ $$
 
 ### 1.2.1 二维 Lagrange 有限元离散
 
-记位移函数 $\boldsymbol{u} = \begin{bmatrix} u \\ v \end{bmatrix}$，由张量对象
-$\boldsymbol\varepsilon$ 和 $\boldsymbol\sigma$
-的对称性，可用降维的方式来表示表示它们。其中 $\boldsymbol\varepsilon$
-的降维表示为 
+记位移函数 
+
+$$
+\boldsymbol{u} = \begin{bmatrix} u \\ v \end{bmatrix},
+$$
+
+由张量对象 $\boldsymbol\varepsilon$ 和 $\boldsymbol\sigma$
+的对称性，可用向量的形式表示它们。其中 $\boldsymbol\varepsilon$ 的向量表示为 
 
 $$
 \boldsymbol{\varepsilon} = \begin{bmatrix}
@@ -87,7 +91,7 @@ u_x & \frac{v_x + u_y}{2} \\
 \end{bmatrix}
 $$
 
-可得 $\boldsymbol\sigma$ 的降维表示
+可得 $\boldsymbol\sigma$ 的向量表示形式
 
 $$
 \begin{aligned}
@@ -171,7 +175,7 @@ $$
 矩阵 $\boldsymbol B$ 
 
 $$
-\boldsymbol B = 
+\boldsymbol B = \mathcal B\boldsymbol\Psi = 
 \begin{bmatrix}
 \boldsymbol\Phi_x & \boldsymbol 0\\
 \boldsymbol 0 & \boldsymbol\Phi_y \\
@@ -179,15 +183,21 @@ $$
 \end{bmatrix}
 $$
 
-进而可得
+进而可得 $\int_\Omega \boldsymbol\sigma(\boldsymbol u_h):\boldsymbol v_h~\mathrm
+d\boldsymbol x$ 对应的矩阵形式为 
 
 $$
-\boldsymbol B^T \boldsymbol D \boldsymbol B = 
+\begin{aligned}
+&\int_\Omega \boldsymbol B^T \boldsymbol D \boldsymbol B ~\mathrm d\boldsymbol x 
+\boldsymbol U \\
+=& \int_\Omega
 \begin{bmatrix}
 \boldsymbol{R_{0,0}} & \boldsymbol{R_{0, 1}} \\
 \boldsymbol{R_{1,0}} & \boldsymbol{R_{1, 1}}
 \end{bmatrix}
-= 
+~\mathrm d\boldsymbol x 
+\boldsymbol U \\
+= &\int_\Omega  
 \begin{bmatrix}
 (2\mu + \lambda)\boldsymbol\Phi^T_x
 \boldsymbol\Phi_x 
@@ -204,8 +214,10 @@ $$
  \mu \boldsymbol\Phi^T_x\boldsymbol\Phi_x +
 (2\mu + \lambda)\boldsymbol\Phi^T_y
 \boldsymbol\Phi_y 
-  
 \end{bmatrix}
+~\mathrm d\boldsymbol x 
+\boldsymbol U 
+\end{aligned}
 $$
 
 最终可得静力平衡方程的离散矩阵形式
