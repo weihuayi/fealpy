@@ -67,7 +67,3 @@ LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
 pip3 install cupy-cuda114
 python3 -m cupyx.tools.install_library --cuda 11.4 --library cutensor
 ```
-
-```
-python3 -m cupyx.tools.install_library --cuda 11.4 --library cutensor
-```
