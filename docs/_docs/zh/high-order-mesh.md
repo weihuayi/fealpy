@@ -37,17 +37,23 @@ $$
 曲面 $S$ 的**第二基本式**对应的二次微分式为
 
 $$
-II = -<\mathrm d\boldsymbol x,\mathrm d\boldsymbol n> = b_{00}\mathrm d\xi \mathrm d\xi + 2b_{01}\mathrm d\xi \mathrm d\eta + b_{11}\mathrm d\eta \mathrm d\eta
+II = -<\mathrm d\boldsymbol x,\mathrm d\boldsymbol n> = 
+b_{00}\mathrm d\xi \mathrm d\xi + 
+2b_{01}\mathrm d\xi \mathrm d\eta + 
+b_{11}\mathrm d\eta \mathrm d\eta
 $$
 
-其中 $\mathrm d\boldsymbol n = \boldsymbol n_{\xi} \mathrm d\xi + \boldsymbol n_{\eta}\mathrm d\eta$
+其中 $\mathrm d\boldsymbol n = \boldsymbol n_{\xi} \mathrm d\xi + \boldsymbol n_{\eta}\mathrm d\eta$.
 
 $$
 \begin{aligned}
-b_{00} = <\boldsymbol x_{\xi \xi},\boldsymbol n> &= -<\boldsymbol x_{\xi},\boldsymbol n_{\xi}> \\
-b_{01} = <\boldsymbol x_{\xi \eta},\boldsymbol n> &= -<\boldsymbol x_{\xi},\boldsymbol n_{\eta}> =
+b_{00} = <\boldsymbol x_{\xi \xi},\boldsymbol n> &= 
+-<\boldsymbol x_{\xi},\boldsymbol n_{\xi}> \\
+b_{01} = <\boldsymbol x_{\xi \eta},\boldsymbol n> &= 
+-<\boldsymbol x_{\xi},\boldsymbol n_{\eta}> =
 - <\boldsymbol x_{\eta},\boldsymbol n_{\xi}> \\
-b_{11} = <\boldsymbol x_{\eta \eta},\boldsymbol n> &= -<\boldsymbol x_{\eta},\boldsymbol n_{\eta}>
+b_{11} = <\boldsymbol x_{\eta \eta},\boldsymbol n> &= 
+-<\boldsymbol x_{\eta},\boldsymbol n_{\eta}>
 \end{aligned}
 $$
 
@@ -167,13 +173,16 @@ $$
 其关于 $\boldsymbol u$ 的梯度为
 
 $$
-\nabla_\boldsymbol u \lambda_0 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_0 = 
+\begin{bmatrix}
     -1 \\ -1
 \end{bmatrix},\quad
-\nabla_\boldsymbol u \lambda_1 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_1 = 
+\begin{bmatrix}
     1 \\ 0
 \end{bmatrix}, \quad
-\nabla_\boldsymbol u \lambda_2 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_2 = 
+\begin{bmatrix}
     0 \\ 1
 \end{bmatrix}
 $$
