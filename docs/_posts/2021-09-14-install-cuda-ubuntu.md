@@ -1,7 +1,10 @@
-# Ubuntu 系统中 CUDA 的安装
+---
+title: 在 Ubuntu 系统中安装 CUDA 
+tags: cuda 
+author: why 
+---
 
-
-## Ubuntu 中 Nvidia 显卡驱动的安装方法
+# 1. 安装 Nvidia 显卡驱动
 
 安装 Nvidia 显卡驱动
 
@@ -39,7 +42,7 @@ Thu Aug 26 17:20:29 2021
 +-----------------------------------------------------------------------------+
 ```
 
-## CUDA ToolKit 的安装方法 
+# 2. 安装 CUDA ToolKit 
 
 从[这里](https://developer.nvidia.com/cuda-downloads)下载 CUDA ToolKit,
 页面上需要根据你自己的系统情况选择合适的版本，最好选择 run file
