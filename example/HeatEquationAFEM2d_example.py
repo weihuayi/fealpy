@@ -54,11 +54,11 @@ parser.add_argument('--tol',
         help='自适应加密停止阈值，默认设定为 0.05.')
 
 parser.add_argument('--rtheta',
-        default=0.3, type=float,
+        default=0.7, type=float,
         help='自适应加密参数，默认设定为 0.7.')
 
 parser.add_argument('--ctheta',
-        default=0.7, type=float,
+        default=0.3, type=float,
         help='自适应粗化参数，默认设定为 0.3.')
 
 args = parser.parse_args()
