@@ -3,6 +3,7 @@ title: 缩放单项式空间
 permalink: /docs/zh/scaled-monomial-space
 key: docs-scaled-monomial-space-zh
 ---
+
 <table border="0" align="center">
 <tr>
 <td>次幂 <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- <td>--- </td>
