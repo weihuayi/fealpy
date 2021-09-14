@@ -4,7 +4,6 @@
 import argparse
 
 
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -21,7 +20,7 @@ from fealpy.mesh import HalfEdgeMesh2d
 from fealpy.timeintegratoralg import UniformTimeLine
 
 # 热传导 pde 模型
-from fealpy.pde.heatequation_model_2d import ExpCosData
+from fealpy.pde.heatequation_model_2d import ExpExpData
 
 # Lagrange 有限元空间
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -33,17 +32,14 @@ from fealpy.tools.show import showmultirate
 # solver
 from scipy.sparse.linalg import spsolve
 
-
+#拷贝对象
+import copy
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        单纯形网格（三角形、四面体）网格上任意次有限元方法求解热传导方程
+        三角形网格自适应有限元方法求解热传导方程
         """)
-
-parser.add_argument('--degree',
-        default=1, type=int,
-        help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--ns',
         default=10, type=int,
@@ -53,38 +49,61 @@ parser.add_argument('--nt',
         default=100, type=int,
         help='时间剖分段数，默认剖分 100 段.')
 
+parser.add_argument('--tol',
+        default=0.05, type=float,
+        help='自适应加密停止阈值，默认设定为 0.05.')
+
+parser.add_argument('--rtheta',
+        default=0.3, type=float,
+        help='自适应加密参数，默认设定为 0.7.')
+
+parser.add_argument('--ctheta',
+        default=0.7, type=float,
+        help='自适应粗化参数，默认设定为 0.3.')
 
 args = parser.parse_args()
 
-degree = args.degree
 ns = args.ns
 nt = args.nt
+tol = args.tol
 
-pde = ExpCosData()
+rtheta = args.rtheta 
+ctheta = args.ctheta 
+
+pde = ExpExpData()
 domain = pde.domain()
 c = pde.diffusionCoefficient
 
 tmesh = UniformTimeLine(0, 1, nt) # 均匀时间剖分
 
 smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
-smesh = HalfEdgeMesh2d.from_mesh(smesh, NV=3)
+smesh = HalfEdgeMesh2d.from_mesh(smesh, NV=3) # 三角形网格的单边数据结构
 
+smesh.add_plot(plt)
+plt.savefig('./test-' + str(0) + '.png')
+plt.close()
+i = 0   
 while True:
+
     # 初始网格的自适应
-    space = LagrangeFiniteElementSpace(smesh, p=degree)
+    space = LagrangeFiniteElementSpace(smesh, p=1) # 构造线性元空间
     # 当前时间步的有限元解
     uh0 = space.interpolation(pde.init_value)
     eta = space.recovery_estimate(uh0, method='area_harmonic')
     err = np.sqrt(np.sum(eta**2))
     if err < tol:
         break
-    isMarkedCell = smesh.refine_marker(eta, theta, method='L2')
-    smesh.refine_triangle_nvb(isMarkedCell)
+    isMarkedCell = smesh.refine_marker(eta, rtheta, method='L2')
+    smesh.refine_triangle_rg(isMarkedCell)
+    i += 1
+    smesh.add_plot(plt)
+    plt.savefig('./test-' + str(i+1) + '.png')
+    plt.close()
 
-space = LagrangeFiniteElementSpace(smesh, p=degree)
+space = LagrangeFiniteElementSpace(smesh, p=1)
 uh0 = space.interpolation(pde.init_value)
 
-for i in range(0, nt): 
+for j in range(0, nt): 
 
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()
@@ -117,13 +136,42 @@ for i in range(0, nt):
         uh1[:] = spsolve(GD, F)
         eta = space.recovery_estimate(uh1, method='area_harmonic')
         err = np.sqrt(np.sum(eta**2))
+        print('errrefine', err)
         if err < tol:
             break
         else:
-            isMarkedCell = smesh.refine_marker(eta, theta, method='L2')
-            smesh.refine_triangle_nvb(isMarkedCell) # uh0 插值到新网格上
-            space = LagrangeFiniteElementSpace(smesh, p=degree)
-
+            #加密并插值
+            NN0 = smesh.number_of_nodes()
+            edge = smesh.entity('edge')
+            isMarkedCell = smesh.refine_marker(eta, rtheta, method='L2')
+            smesh.refine_triangle_rg(isMarkedCell)
+            i += 1
+            smesh.add_plot(plt)
+            plt.savefig('./test-'+str(i+1)+'.png')
+            plt.close()
+            space = LagrangeFiniteElementSpace(smesh, p=1)
+            print('refinedof', space.number_of_global_dofs())
+            uh00 = space.function()
+            nn2e = smesh.newnode2edge
+            uh00[:NN0] = uh0
+            uh00[NN0:] = np.average(uh0[edge[nn2e]], axis=-1)
+            uh0 = space.function()
+            uh0[:] = uh00
+    #粗化网格并插值
+    isMarkedCell = smesh.refine_marker(eta, ctheta, 'COARSEN')
+    smesh.coarsen_triangle_rg(isMarkedCell)
+    i += 1
+    smesh.add_plot(plt)
+    plt.savefig('./test-'+str(i+1)+'.png')
+    plt.close()
+    space = LagrangeFiniteElementSpace(smesh, p=1)
+    print('coarsendof', space.number_of_global_dofs())
+    uh2 = space.function()
+    retain = smesh.retainnode
+    uh2[:] = uh1[retain]
+    uh1 = space.function()
+    uh0 = space.function()
+    uh1[:] = uh2
 
     # t1 时间层的误差
     @cartesian
@@ -132,11 +180,15 @@ for i in range(0, nt):
     error = space.integralalg.error(solution, uh1)
     print("error:", error)
 
+    #画数值解图像
+    if (t1 ==0.01) | (t1 == 0.49) | (t1==0.99):
+        fig = plt.figure()
+        axes = fig.add_subplot(1, 1, 1, projection='3d')
+        uh1.add_plot(axes, cmap='rainbow')
     uh0[:] = uh1
     uh1[:] = 0.0
 
     # 时间步进一层 
     tmesh.advance()
 
-
-
+plt.show()
