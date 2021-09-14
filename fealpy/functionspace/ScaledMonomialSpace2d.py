@@ -632,11 +632,11 @@ class ScaledMonomialSpace2d():
 
         其中 g 可以是标量函数也可以是向量函数, 当是标量函数的时候计算的是:
         
-        h_e^{-1}<g, [v]>_e
+        h_e^{hpower}<g, [v]>_e
 
         当是向量函数的时候计算的是:
 
-        h_e^{-1}<g_n, [v]>_e
+        h_e^{hpower}<g_n, [v]>_e
 
         
         """

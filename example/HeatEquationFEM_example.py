@@ -3,6 +3,8 @@
 
 import argparse
 
+
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -18,7 +20,7 @@ from fealpy.mesh import MeshFactory as MF
 from fealpy.timeintegratoralg import UniformTimeLine
 
 # 热传导 pde 模型
-from fealpy.pde.heatequation_model_2d import SinSinExpData
+from fealpy.pde.heatequation_model_2d import SinSinExpData, ExpCosData
 
 # Lagrange 有限元空间
 from fealpy.functionspace import LagrangeFiniteElementSpace

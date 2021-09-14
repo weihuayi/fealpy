@@ -220,7 +220,7 @@ class NonConformingVirtualElementSpace2d():
         b = np.bincount(self.dof.cell2dof, weights=bb, minlength=gdof)
         return b
 
-    def set_dirichlet_bc(self, uh, g, is_dirichlet_boundary=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
         """
         初始化解 uh  的第一类边界条件。
         """
@@ -229,8 +229,8 @@ class NonConformingVirtualElementSpace2d():
         NE = self.mesh.number_of_edges()
         end = p*NE
         ipoints = self.interpolation_points()
-        isDDof = self.boundary_dof(threshold=is_dirichlet_boundary)
-        uh[isDDof] = g(ipoints[isDDof[:end]])
+        isDDof = self.boundary_dof(threshold=threshold)
+        uh[isDDof] = gD(ipoints[isDDof[:end]])
         return isDDof
 
     def cell_to_dof(self):

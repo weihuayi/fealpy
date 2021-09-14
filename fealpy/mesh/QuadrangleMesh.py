@@ -1,4 +1,5 @@
 import numpy as np
+from .TriangleMesh import TriangleMesh
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import QuadrangleQuadrature
 from ..common import hash2map
@@ -163,3 +164,60 @@ class QuadrangleMesh(Mesh2d):
         cell = self.ds.cell
         p = np.einsum('...j, ijk->...ik', bc, node[cell])
         return p 
+
+    def to_trimesh(self):
+        cell = self.entity('cell')
+        node = self.entity('node')
+        hexCell2face = self.ds.cell_to_face()
+        localCell = np.array([[0, 1, 2], [0, 2, 3]], dtype=np.int_)
+        cell = cell[:, localCell].reshape(-1, 3)
+
+        celldata = self.celldata
+        nodedata = self.nodedata
+
+        mesh = TriangleMesh(node, cell)
+        for key in celldata:
+            mesh.celldata[key] = np.tile(celldata[key], (6, 1)).T.reshape(-1)
+        mesh.nodedata = nodedata
+        return mesh
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_Quad = 9
+            return VTK_Quad
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+
+
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
+        """
+        Parameters
+        ----------
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        NC = len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)

@@ -31,7 +31,7 @@ class DirichletBC():
         dim = A.shape[0]//gdof
         if uh is None:
             uh = self.space.function(dim=dim)
-        isDDof = space.set_dirichlet_bc(uh, gD, threshold=threshold)
+        isDDof = space.set_dirichlet_bc(gD, uh, threshold=threshold)
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
             F = F.T.flat
@@ -112,7 +112,7 @@ class NeumannBC():
         space = self.space
         gN = self.gN
         threshold = self.threshold if threshold is None else threshold
-        space.set_neumann_bc(F, gN, threshold=threshold, q=q)
+        F = space.set_neumann_bc(gN, F=F, threshold=threshold, q=q)
 
         if A is not None: # pure Neumann condtion
             c = space.integral_basis()
@@ -139,8 +139,8 @@ class RobinBC():
         space = self.space
         gR = self.gR
         threshold = self.threshold if threshold is None else threshold
-        A, F = space.set_robin_bc(A, F, gR, threshold=threshold, q=q)
-        return A, F
+        R, F = space.set_robin_bc(gR, F=F, threshold=threshold, q=q)
+        return A+R, F
 
 
 
