@@ -119,6 +119,64 @@ $$
 
 
 
+## chroin算法
+
+将时间导数做如下分裂
+$$
+\frac{1}{\Delta t}(u^{n+1}-u^{n}) = \frac{1}{\Delta t}(u^{n+1}-u^{*}) + \frac{1}{\Delta t}(u^{*}-u^{n})
+$$
+因此原式可以分裂为
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \\
+\frac{1}{\Delta t}( \boldsymbol u^{n+1}- \boldsymbol u^{*}) + \nabla p^{n+1} &= 0 \qquad \\
+\nabla \cdot \boldsymbol u^{n+1} &= 0\qquad \\ 
+\end{aligned}
+$$
+因此第一步计算$\boldsymbol u^*$
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \qquad in \quad \Omega \\
+\boldsymbol u^* &= 0 \qquad on \quad [0,1] \times \{0,1\}  \\ 
+\end{aligned}
+$$
+第二步计算$p^{n+1}$
+$$
+\begin{aligned}
+\Delta p^{n+1} &= \frac{1}{\Delta t} \nabla \cdot \boldsymbol u^* \\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
+\end{aligned}
+$$
+第三步计算$\boldsymbol u^{n+1}$
+$$
+\begin{aligned}
+\boldsymbol u^{n+1} = \boldsymbol u^* - \Delta t \nabla p^{n+1}
+\end{aligned}
+$$
+全离散可写为
+
+第一步
+$$
+\begin{aligned}
+(\frac{\boldsymbol u^*-\boldsymbol u^{n}}{\Delta t}, v ) &+ (\boldsymbol u^n \cdot \nabla \boldsymbol u^n, v)+(\nabla \boldsymbol u^*, \nabla v)=0 \\
+\boldsymbol u^* &= 0 \qquad on \quad [0,1] \times \{0,1\}  \\ 
+\end{aligned}
+$$
+第二步
+$$
+\begin{aligned}
+(\nabla p^{n+1}, \nabla q)&+\frac{1}{\Delta t}(\nabla \cdot \boldsymbol u^*, q)=0 \\
+p^{n+1} &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p^{n+1} &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
+\end{aligned}
+$$
+第三步骤
+$$
+\begin{aligned}
+(\boldsymbol u^{n+1}-\boldsymbol u^*, v)+\Delta t(\nabla p^{n+1}, v)=0
+\end{aligned}
+$$
 
 
 ## ipcs算法
@@ -159,6 +217,17 @@ $$
 $$
 \boldsymbol u^{n+1} = \boldsymbol u^* -  \Delta t \nabla(p^{n+1}-p^n)
 $$
+
+### 空间有限元离散
+
+- 第一步计算中间速度 $u_{h}^{*}$ 
+  $$
+  \begin{gathered}
+  \left\langle v, D_{t}^{n} u_{h}^{*}\right\rangle+\left\langle v, \nabla u_{h}^{n-1} \cdot u_{h}^{n-1}\right\rangle+\left\langle\epsilon(v), \sigma\left(\bar{u}_{h}^{*}, p_{h}^{n-1}\right)\right\rangle \\
+  +\left\langle v, p_{h}^{n-1} n\right\rangle_{\partial \Omega}-\left\langle v, \nu\left(\nabla \bar{u}_{h}^{*}\right)^{\top} n\right\rangle_{\partial \Omega}=\left\langle v, f^{n}\right\rangle
+  \end{gathered}
+  $$
+  
 
 
 
@@ -397,7 +466,6 @@ $$
 
 
 ## 矩阵表示
-
 $$
 \begin{equation}
     \boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
