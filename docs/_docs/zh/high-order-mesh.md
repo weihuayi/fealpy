@@ -37,17 +37,23 @@ $$
 曲面 $S$ 的**第二基本式**对应的二次微分式为
 
 $$
-II = -<\mathrm d\boldsymbol x,\mathrm d\boldsymbol n> = b_{00}\mathrm d\xi \mathrm d\xi + 2b_{01}\mathrm d\xi \mathrm d\eta + b_{11}\mathrm d\eta \mathrm d\eta
+II = -<\mathrm d\boldsymbol x,\mathrm d\boldsymbol n> = 
+b_{00}\mathrm d\xi \mathrm d\xi + 
+2b_{01}\mathrm d\xi \mathrm d\eta + 
+b_{11}\mathrm d\eta \mathrm d\eta
 $$
 
-其中 $\mathrm d\boldsymbol n = \boldsymbol n_{\xi} \mathrm d\xi + \boldsymbol n_{\eta}\mathrm d\eta$
+其中 $\mathrm d\boldsymbol n = \boldsymbol n_{\xi} \mathrm d\xi + \boldsymbol n_{\eta}\mathrm d\eta$.
 
 $$
 \begin{aligned}
-b_{00} = <\boldsymbol x_{\xi \xi},\boldsymbol n> &= -<\boldsymbol x_{\xi},\boldsymbol n_{\xi}> \\
-b_{01} = <\boldsymbol x_{\xi \eta},\boldsymbol n> &= -<\boldsymbol x_{\xi},\boldsymbol n_{\eta}> =
+b_{00} = <\boldsymbol x_{\xi \xi},\boldsymbol n> &= 
+-<\boldsymbol x_{\xi},\boldsymbol n_{\xi}> \\
+b_{01} = <\boldsymbol x_{\xi \eta},\boldsymbol n> &= 
+-<\boldsymbol x_{\xi},\boldsymbol n_{\eta}> =
 - <\boldsymbol x_{\eta},\boldsymbol n_{\xi}> \\
-b_{11} = <\boldsymbol x_{\eta \eta},\boldsymbol n> &= -<\boldsymbol x_{\eta},\boldsymbol n_{\eta}>
+b_{11} = <\boldsymbol x_{\eta \eta},\boldsymbol n> &= 
+-<\boldsymbol x_{\eta},\boldsymbol n_{\eta}>
 \end{aligned}
 $$
 
@@ -167,13 +173,16 @@ $$
 其关于 $\boldsymbol u$ 的梯度为
 
 $$
-\nabla_\boldsymbol u \lambda_0 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_0 = 
+\begin{bmatrix}
     -1 \\ -1
 \end{bmatrix},\quad
-\nabla_\boldsymbol u \lambda_1 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_1 = 
+\begin{bmatrix}
     1 \\ 0
 \end{bmatrix}, \quad
-\nabla_\boldsymbol u \lambda_2 = \begin{bmatrix}
+\nabla_\boldsymbol u \lambda_2 = 
+\begin{bmatrix}
     0 \\ 1
 \end{bmatrix}
 $$
@@ -345,182 +354,16 @@ $$
 \end{aligned}
 $$
 
-## 2.3 高阶四边形单元
+## 2.3 高阶四面体单元
 
-$\qquad$ 给定一个双 $p$ 次曲面四边形单元 $E$,  其上有 $n = (p+1)^2$ 
-插值点, 记为
+## 2.4 高阶四边形单元
 
-$$
-[\boldsymbol x_0, \boldsymbol x_1, \cdots, \boldsymbol x_{n}].
-$$
+$\qquad$ 高阶四边形单元，可以通过两个高阶一维单元做张量积的方式构造.
 
-取 $E$ 对应的参考单元为单位正方形, 记为 $\bar E$, 对应的参考坐标记为 
-$\boldsymbol u = (u, v)$ 
+## 2.5 高阶六面体单元
 
+$\qquad$ 高阶六面体单元，可以通过三个高阶一维单元做张量积的方式构造.
 
-基于曲线 可以构造定义在 $\tilde\tau$ 上的 $n$ 个 $p$ 次的拉格朗日形函数, 
-组成的向量函数记为
+## 2.6 高阶三棱柱单元
 
-$$
-\boldsymbol \phi(u, v) = [\phi_0(u, v), \phi_1(u, v), \cdots, \phi_n(u, v)].
-$$
-
-则 $p$ 次曲面 $\tau$ 上的任意一点 $\boldsymbol x$ 可表示为
-
-$$
-\boldsymbol x = \boldsymbol x_0 \phi_0 + \boldsymbol x_1\phi_1 + 
-\cdots + \boldsymbol x_n\phi_n,
-$$
-
-则 $\boldsymbol x$ 关于 $\boldsymbol u$ 的 Jacobi 矩阵为
-
-$$
-\nabla_\boldsymbol u \boldsymbol x = 
-\boldsymbol x_0 \nabla_\boldsymbol u^T \phi_0 + 
-\boldsymbol x_1\nabla_\boldsymbol u^T \phi_1 + 
-\cdots + 
-\boldsymbol x_n\nabla_\boldsymbol u^T\phi_n
-$$
-
-进一步 $\tau$ 上的第一基本形式为：
-
-$$
-I  = 
-\begin{bmatrix}
-    \mathrm d u , \mathrm dv
-\end{bmatrix}
-\boldsymbol G
-\begin{bmatrix}
-    \mathrm du \\ \mathrm dv
-\end{bmatrix} = 
-\begin{bmatrix}
-    \mathrm d u , \mathrm dv
-\end{bmatrix}
- \begin{bmatrix}
-    g_{00} & g_{01} \\
-    g_{10} & g_{11} 
-\end{bmatrix}   
-\begin{bmatrix}
-    \mathrm du \\ \mathrm dv
-\end{bmatrix} = 
-g_{00} \mathrm du \mathrm d u +
-2g_{01} \mathrm d u \mathrm d v + 
-g_{11} \mathrm d v \mathrm d v.
-$$
-
-其中
-
-$$
-\begin{aligned}
-g_{00} = & <\boldsymbol x_\xi, \boldsymbol x_\xi>, \\
-g_{01} = & <\boldsymbol x_\xi, \boldsymbol x_\eta> = g_{10},\\
-g_{11} = & <\boldsymbol x_\eta, \boldsymbol x_\eta>.
-\end{aligned}
-$$ 
-
-马上可得 $p$ 次曲面 $\tau$ 上的切梯度算子：
-
-$$
-\nabla_\tau \boldsymbol \phi = 
-\nabla_\boldsymbol u \boldsymbol x \boldsymbol G^{-1} 
-\nabla_\boldsymbol u \boldsymbol \phi.
-$$
-
-
-也可得 $\tau$ 的面积计算公式为:
-
-$$
-|\tau| = \int_\tau 1 \mathrm d\boldsymbol x =
-\int_{\bar \tau} |\boldsymbol x_u \times \boldsymbol x_v| 
-\mathrm d\boldsymbol u = 
-\int_{\bar \tau} \sqrt{|\boldsymbol G|}
-\mathrm d\boldsymbol u.
-$$
-
-上面用到了如下的关系式
-
-$$
-|\boldsymbol x_u \times \boldsymbol x_v|^2 = 
-|\boldsymbol x_u|^2 |\boldsymbol x_v|^2  \cos^2 \theta  = 
-|\boldsymbol x_u|^2 |\boldsymbol x_v|^2  -
-|\boldsymbol x_u|^2 |\boldsymbol x_{v}|^2 \sin^2 \theta = 
-|\boldsymbol G |.
-$$
-
-在 $p$ 次三角形曲面 $\tau$ 上可定义 $q$ 次的拉格朗日多项式空间
-(注意这里不要求 $q=p$)， 其基函数个数为 $m=(q+1)(q+2)/2$, 记为向量形式
-
-$$
-\boldsymbol \varphi(\boldsymbol x) = [\varphi_0, \varphi_1, \cdots, \varphi_m]
-$$
-
-对应的插值点记为
-
-$$
-[\boldsymbol y_0, \boldsymbol y_1, \cdots, \boldsymbol y_m]
-$$
-
-满足如下插值性质
-
-$$
-\varphi_i(\boldsymbol y_j) = 
-\begin{cases}
-1, & i = j \\
-0, & i\not=j
-\end{cases}
-$$
-
-则 $\boldsymbol\varphi$ 关于 $\boldsymbol x$ 的梯度计算公式为
-
-$$
-\nabla_{\boldsymbol x} \boldsymbol \varphi = 
-\boldsymbol x_{\boldsymbol u}\boldsymbol G^{-1}
-\nabla_{\boldsymbol u} \varphi
-$$
-
-Hessian 矩阵的计算公式为
-
-$$
-\nabla^2_\boldsymbol x \boldsymbol\varphi = 
-\nabla^2_u \boldsymbol x (\boldsymbol G^{-1})^2 \nabla_u \boldsymbol\varphi + 
-\nabla_u \boldsymbol x (\boldsymbol G^{-1})^2 
-\nabla_{uu}\boldsymbol\varphi\nabla_u \boldsymbol x.
-$$
-
-$p$ 次曲面 $\tau$ 上的第二基本形式为：
-
-$$
-II  =
-\begin{bmatrix}
-    \mathrm d u , \mathrm d v
-\end{bmatrix}
- \begin{bmatrix}
-    b_{00} & b_{01} \\
-    b_{10} & b_{11} 
-\end{bmatrix}   
-\begin{bmatrix}
-    \mathrm du \\ \mathrm dv
-\end{bmatrix} = 
-< \mathrm d\boldsymbol x, \mathrm d\boldsymbol n > =
-b_{00} \mathrm du \mathrm d u + 
-2b_{01} \mathrm d u \mathrm d v +
-b_{11} \mathrm d v \mathrm d v. 
-$$
-
-其中
-
-$$
-\begin{aligned}
-    \boldsymbol n =& \frac{\boldsymbol x_{u} \times \boldsymbol x_{v}}
-    {\|\boldsymbol x_{u} \times \boldsymbol x_{v}\|},\\
-	\mathrm d\boldsymbol x = & \boldsymbol x_u\mathrm du +\boldsymbol x_v\mathrm dv, \\
-	\mathrm d\boldsymbol n = & \boldsymbol n_u\mathrm du + \boldsymbol n_v\mathrm dv, \\
-	b_{00} = & <\boldsymbol x_{u u},\boldsymbol n> = 
-    -<\boldsymbol x_u,\boldsymbol n_u>, \\
-	b_{01} = & <\boldsymbol x_{u v},\boldsymbol n> = 
-    -<\boldsymbol x_u,\boldsymbol n_v> = 
-    - <\boldsymbol x_v,\boldsymbol n_u> = b_{10},\\
-	b_{11} = & <\boldsymbol x_{v v},\boldsymbol n> = 
-    -<\boldsymbol x_v,\boldsymbol n_v>.
-\end{aligned}
-$$
+$\qquad$ 高阶三棱柱单元, 可以通过高阶三角形单元和高阶一维单元做用张量积的方式构造.

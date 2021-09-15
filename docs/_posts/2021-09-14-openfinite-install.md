@@ -1,15 +1,19 @@
 ---
-title: WHYSC 安装
-permalink: /docs/zh/whysc-install
-key: docs-whysc-install-zh
+title: OpenFinite 安装
+tags: OpenFinite
+author: ccy
 ---
 
-## WHYSC 简介
-WHYSC 是一个 C++ 科学计算软件库,
+## OpenFinite 简介
+[OpenFinite](https://gitlab.com/weihuayi/openfinite) 是一个 C++ 科学计算软件库,
 致力于将计算数学中的高效算法应用到实际工业应用中, 现在已包含各种常见网格,
 并可以对网格优化.
 
 ## 安装
+**Openfinite 仓库**
+```bash
+git clone https://gitlab.com/weihuayi/openfinite.git
+```
 **安装依赖**
 ```bash
 sudo apt install libgmp-dev libmpfr-dev libboost-dev 

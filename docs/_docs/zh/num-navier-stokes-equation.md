@@ -5,7 +5,7 @@ key: docs-num-navier-stoke-equation-zh
 author: wpx
 ---
 
-## PDE 模型
+# 1. PDE 模型
 
 不可压的流体
 
@@ -24,22 +24,22 @@ $$
 $$
 
 $$
-\varepsilon(\boldsymbol u) = \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T)
+\varepsilon(\boldsymbol u) = \frac{1}{2} \left(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T\right)
 $$
 
 其中符号的物理意义分别为
 
 - $\boldsymbol u$ 代表速度
 - $p$ 代表单位面积上的压力
-- $f$ 单位质量流体微团的体积力
+- $\boldsymbol f$ 单位质量流体微团的体积力
 - $\mu$ 分子粘性系数
 
-#　变分格式
+# 2. 变分
 
-对两便乘上向量测试函数 $\boldsymbol v \in V$ 并在积分区域 $\Omega$ 上做积分
+对两边乘上向量测试函数 $\boldsymbol v \in V$ 并在积分区域 $\Omega$ 上做积分
 
 $$
-\begin{eqnarray}
+\begin{aligned}
 	\int_{\Omega} \rho \frac{\partial \boldsymbol u}{\partial t}\boldsymbol v
     \mathrm dx
 	+ \int_{\Omega} \rho \boldsymbol u \cdot \nabla \boldsymbol u \cdot \boldsymbol v \mathrm dx 
@@ -47,39 +47,39 @@ $$
 	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
 	+\mu \int_{\Omega}(\nabla \cdot (\nabla \boldsymbol u + \nabla (\boldsymbol u)^T)) \cdot \boldsymbol v \mathrm dx
 	+\int_{\Omega} \rho \boldsymbol f \cdot \boldsymbol v \mathrm dx
-\end{eqnarray}
+\end{aligned}
 $$
 
 对以下几项用散度定理来处理
 
 $$
-\begin{align}
+\begin{aligned}
 	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
 	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - \nabla \cdot (p\boldsymbol v) \mathrm dx\\
 	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol v \cdot \boldsymbol n \mathrm ds
-\end{align}
+\end{aligned}
 $$
 
 和
 
 $$
-\begin{align}
+\begin{aligned}
 	\int_{\Omega} (\nabla \cdot \nabla \boldsymbol u) \cdot \boldsymbol v \quad \mathrm dx 
 	&= \int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx\\
 	&= \int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds - \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx
-\end{align}
+\end{aligned}
 $$
 
-因此我们可得到其变分形式
+因此可得到其变分形式
 
 $$
-\begin{align}
+\begin{aligned}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
 	- ( p ,\nabla \cdot \boldsymbol v) + (p\boldsymbol n ,\boldsymbol v)_{\partial \Omega} \\
 	+( \sigma (\boldsymbol u  + (\boldsymbol u)^T) , \nabla \boldsymbol v) 
 	-( \sigma (\boldsymbol u + (\boldsymbol u)^T) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	 =  (\rho \boldsymbol f,\boldsymbol v)
-\end{align}
+\end{aligned}
 $$
 
 由于任何一个矩阵都可以分解成一个对称矩阵和反对称矩阵的求和，即
@@ -88,16 +88,80 @@ $$
 \nabla \boldsymbol v = \frac{\nabla \boldsymbol v + (\nabla \boldsymbol v)^T}{2} + \frac{\nabla \boldsymbol v - (\nabla\boldsymbol v)^T}{2}
 $$
 
-易证反对陈矩阵和对称矩阵求内积会消失，所以变分形式可以变为
+易证反对称矩阵和对称矩阵求内积会消失，所以变分形式可以变为
 
 $$
-\begin{align}
+\begin{aligned}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
 	- ( p ,\nabla \cdot \boldsymbol v) + (p\boldsymbol n ,\boldsymbol v)_{\partial \Omega} \\
 	+( \sigma(\boldsymbol u) , \varepsilon(\boldsymbol v)) 
 	-( \sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	=  (\rho \boldsymbol f,\boldsymbol v)
-\end{align}
+\end{aligned}
+$$
+
+# 3. 有限元求解算法
+
+$\qquad$ 说明一下空间如何离散.
+
+## 3.1 Chroin 算法
+
+$\qquad$ 将时间导数做如下分裂
+
+$$
+\frac{1}{\Delta t}(u^{n+1}-u^{n}) = \frac{1}{\Delta t}(u^{n+1}-u^{*}) + \frac{1}{\Delta t}(u^{*}-u^{n})
+$$
+因此原式可以分裂为
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \\
+\frac{1}{\Delta t}( \boldsymbol u^{n+1}- \boldsymbol u^{*}) + \nabla p^{n+1} &= 0 \qquad \\
+\nabla \cdot \boldsymbol u^{n+1} &= 0\qquad \\ 
+\end{aligned}
+$$
+因此第一步计算$\boldsymbol u^*$
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \qquad in \quad \Omega \\
+\boldsymbol u^* &= 0 \qquad on \quad [0,1] \times \{0,1\}  \\ 
+\end{aligned}
+$$
+第二步计算$p^{n+1}$
+$$
+\begin{aligned}
+\Delta p^{n+1} &= \frac{1}{\Delta t} \nabla \cdot \boldsymbol u^* \\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
+\end{aligned}
+$$
+第三步计算$\boldsymbol u^{n+1}$
+$$
+\begin{aligned}
+\boldsymbol u^{n+1} = \boldsymbol u^* - \Delta t \nabla p^{n+1}
+\end{aligned}
+$$
+全离散可写为
+
+第一步
+$$
+\begin{aligned}
+(\frac{\boldsymbol u^*-\boldsymbol u^{n}}{\Delta t}, v ) &+ (\boldsymbol u^n \cdot \nabla \boldsymbol u^n, v)+(\nabla \boldsymbol u^*, \nabla v)=0 \\
+\boldsymbol u^* &= 0 \qquad on \quad [0,1] \times \{0,1\}  \\ 
+\end{aligned}
+$$
+第二步
+$$
+\begin{aligned}
+(\nabla p^{n+1}, \nabla q)&+\frac{1}{\Delta t}(\nabla \cdot \boldsymbol u^*, q)=0 \\
+p^{n+1} &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p^{n+1} &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
+\end{aligned}
+$$
+第三步骤
+$$
+\begin{aligned}
+(\boldsymbol u^{n+1}-\boldsymbol u^*, v)+\Delta t(\nabla p^{n+1}, v)=0
+\end{aligned}
 $$
 
 ## Channel flow(Poisuille flow)
@@ -105,18 +169,19 @@ $$
 其是对两个板子见流动的一个模拟
 
 另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+
 $$
-\begin{align}
+\begin{aligned}
 \frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  &= -\nabla p +  \Delta \boldsymbol u \qquad in \quad \Omega\times(0,T) \\
 \nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u &= 0 \qquad on \quad \Omega\times\{0\} \\ 
 \boldsymbol u &= 0 \qquad on \quad [0,1] \times \{0,1\} \times[0,T]   \\ 
 p &= 8 \qquad  on \quad \{ 0 \} \times [0,1] \times[0,T] \\ 
 p &= 0 \qquad  on \quad \{ 1 \} \times [0,1] \times[0,T] \\ 
-\end{align}
+\end{aligned}
 $$
-其解析解为$u = (4y(1-y),0),p = 8(1-x)$
 
+其解析解为$u = (4y(1-y),0),p = 8(1-x)$
 
 
 
@@ -159,6 +224,17 @@ $$
 $$
 \boldsymbol u^{n+1} = \boldsymbol u^* -  \Delta t \nabla(p^{n+1}-p^n)
 $$
+
+### 空间有限元离散
+
+- 第一步计算中间速度 $u_{h}^{*}$ 
+  $$
+  \begin{gathered}
+  \left\langle v, D_{t}^{n} u_{h}^{*}\right\rangle+\left\langle v, \nabla u_{h}^{n-1} \cdot u_{h}^{n-1}\right\rangle+\left\langle\epsilon(v), \sigma\left(\bar{u}_{h}^{*}, p_{h}^{n-1}\right)\right\rangle \\
+  +\left\langle v, p_{h}^{n-1} n\right\rangle_{\partial \Omega}-\left\langle v, \nu\left(\nabla \bar{u}_{h}^{*}\right)^{\top} n\right\rangle_{\partial \Omega}=\left\langle v, f^{n}\right\rangle
+  \end{gathered}
+  $$
+  
 
 
 
@@ -397,7 +473,6 @@ $$
 
 
 ## 矩阵表示
-
 $$
 \begin{equation}
     \boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
