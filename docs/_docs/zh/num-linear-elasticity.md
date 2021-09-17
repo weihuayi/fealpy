@@ -50,7 +50,8 @@ $\partial \Omega_g$ 的边界条件。 因为一个对称张量和一个反对�
 因此上面的变分形式还可以变为
 
 $$
-\int_\Omega \boldsymbol{\sigma}(\boldsymbol{u}) : \boldsymbol{\varepsilon}(\boldsymbol{v}) ~ \mathrm{d}\boldsymbol{x} 
+\int_\Omega \boldsymbol{\sigma}(\boldsymbol{u}) : 
+\boldsymbol{\varepsilon}(\boldsymbol{v}) ~ \mathrm{d}\boldsymbol{x} 
 = \int_\Omega \boldsymbol{f}\cdot \boldsymbol{v} ~ \mathrm{d}\boldsymbol{x}
 + \int_{\partial \Omega_g} \boldsymbol{g}\cdot\boldsymbol{v} ~ \mathrm{d}\boldsymbol{x}
 $$
@@ -67,13 +68,14 @@ $$
 的对称性，可用向量的形式表示它们。其中 $\boldsymbol\varepsilon$ 的向量表示为 
 
 $$
-\boldsymbol{\varepsilon} = \begin{bmatrix}
+\boldsymbol{\varepsilon} = 
+\begin{bmatrix}
 u_x & \frac{v_x + u_y}{2} \\
 \frac{v_x + u_y}{2} & v_y \\
 \end{bmatrix}
 \rightarrow
 \begin{bmatrix}
-u_x \\ v_y \\\frac{v_x + u_y}{2}
+u_x \\ v_y \\ \frac{v_x + u_y}{2}
 \end{bmatrix}
 $$
 
