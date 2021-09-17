@@ -107,17 +107,13 @@ docs-zh:
       - title:  快速开始
         url:    /docs/zh/quick-start
   - title:     FEALPy 入门
-  - title:     WHYSC 入门
-    children:
-      - title: WHYSC 安装 
-        url:    /docs/zh/whysc-install
   - title:     网格数据结构与实现 
   - title:     有限维空间的构造与实现
     children:
       - title:  单纯形网格上的拉格朗日有限元空间 
         url:    /docs/zh/simplex-lagrange-space
       - title:  缩放单项式空间 
-        url:    /docs/zh/scaled-polynomial-space
+        url:    /docs/zh/scaled-monomial-space
   - title:     典型模型问题的数值解
     children:
       - title: 非线性 Poisson 方程

@@ -50,7 +50,8 @@ $\partial \Omega_g$ 的边界条件。 因为一个对称张量和一个反对�
 因此上面的变分形式还可以变为
 
 $$
-\int_\Omega \boldsymbol{\sigma}(\boldsymbol{u}) : \boldsymbol{\varepsilon}(\boldsymbol{v}) ~ \mathrm{d}\boldsymbol{x} 
+\int_\Omega \boldsymbol{\sigma}(\boldsymbol{u}) : 
+\boldsymbol{\varepsilon}(\boldsymbol{v}) ~ \mathrm{d}\boldsymbol{x} 
 = \int_\Omega \boldsymbol{f}\cdot \boldsymbol{v} ~ \mathrm{d}\boldsymbol{x}
 + \int_{\partial \Omega_g} \boldsymbol{g}\cdot\boldsymbol{v} ~ \mathrm{d}\boldsymbol{x}
 $$
@@ -67,13 +68,14 @@ $$
 的对称性，可用向量的形式表示它们。其中 $\boldsymbol\varepsilon$ 的向量表示为 
 
 $$
-\boldsymbol{\varepsilon} = \begin{bmatrix}
+\boldsymbol{\varepsilon} = 
+\begin{bmatrix}
 u_x & \frac{v_x + u_y}{2} \\
 \frac{v_x + u_y}{2} & v_y \\
 \end{bmatrix}
 \rightarrow
 \begin{bmatrix}
-u_x \\ v_y \\\frac{v_x + u_y}{2}
+u_x \\ v_y \\ \frac{v_x + u_y}{2}
 \end{bmatrix}
 $$
 
@@ -460,3 +462,392 @@ $$
 
 
 ## 1.3 混合变分形式
+
+由本构方程 $(3)$, 得到
+
+$$
+\frac{1}{2\mu}\left(\boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}\right)-\boldsymbol{\varepsilon} =0 \tag{27}
+$$
+
+记 $\mathcal{A}(\boldsymbol{\sigma})=\frac{1}{2\mu}\left(\boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}\right)$，对于 $\boldsymbol{\tau}\in H(\text{div};\mathbb{S})$，上式与$\boldsymbol{\tau}$做内积，并分部积分得
+
+$$
+\int_{\Omega}\mathcal{A}(\boldsymbol{\sigma}):\boldsymbol{\tau}~d\boldsymbol{x}+\int_{\Omega}(\nabla\cdot\boldsymbol{\tau})\cdot\boldsymbol{u}~d\boldsymbol{x} = \int_{\partial\Omega}(\boldsymbol{\tau}\cdot{\boldsymbol{n}})\cdot\boldsymbol{u}~d\boldsymbol{s},
+$$
+
+结合$(4)$,就有混合变分形式为: 
+$$
+\begin{aligned}
+\begin{cases}
+\text{Find }(\boldsymbol{\sigma},\boldsymbol{u})\in H(\text{div},\Omega,\mathbb{S})\times(L^2(\Omega))^d, \text{ such that}\\
+(\mathcal{A}(\boldsymbol{\sigma}),\boldsymbol{\tau})_{\Omega}+(\text{div}~\boldsymbol{\tau},\boldsymbol{u}) = (\boldsymbol{\tau}\cdot\boldsymbol{n},\boldsymbol{u})_{\partial\Omega},&\text{for all } \boldsymbol{\tau}\in H(\text{div},\Omega,\mathbb{S}),\\
+(\text{div}\boldsymbol{\sigma},\boldsymbol{v})_{\Omega} = (-\boldsymbol{f},\boldsymbol{v})_{\Omega},&\text{for all }\boldsymbol{v}\in(L^2(\Omega))^d.
+\end{cases}
+\end{aligned} 
+$$
+注：上述对应的是纯位移的边界条件的混合变分形式，对于一般含有应力的边界条件$\boldsymbol{g}_n=\boldsymbol{\sigma}\cdot\boldsymbol{n}$ on $\partial\Omega_{\boldsymbol{g}_n}$, $\boldsymbol{g}_d=\boldsymbol{u}$ on $\partial\Omega_{\boldsymbol{g}_d}$， 对应的混合变分形式为:
+$$
+\begin{aligned}
+\begin{cases}
+\text{Find }(\boldsymbol{\sigma},\boldsymbol{u})\in \Sigma_{\boldsymbol{g}_n}\times U, \text{ such that}\\
+(\mathcal{A}(\boldsymbol{\sigma}),\boldsymbol{\tau})_{\Omega}+(\text{div}~\boldsymbol{\tau},\boldsymbol{u}) = (\boldsymbol{\tau}\cdot\boldsymbol{n},\boldsymbol{g}_d)_{\partial\Omega_{\boldsymbol{g}_d}}&\text{for all } \boldsymbol{\tau}\in \Sigma_{\boldsymbol{0}},\\
+(\text{div}\boldsymbol{\sigma},\boldsymbol{v})_{\Omega} = (-\boldsymbol{f},\boldsymbol{v})_{\Omega},&\text{for all }\boldsymbol{v}\in U.
+\end{cases}
+\end{aligned}
+$$
+其中 $\Sigma_{\boldsymbol{\psi}}=\{\boldsymbol{\tau}\in H(\text{div},\Omega,\mathbb{S}):~\boldsymbol{\tau}\cdot\boldsymbol{n}=\boldsymbol{\psi} \text{ on } \partial\Omega_{\boldsymbol{g}_n}\},~ U=(L^2(\Omega))^d$.
+
+### 1.3.1 二维胡张有限元离散
+
+由应力函数 $\boldsymbol{\sigma}$ 有对称性，其向量表示为
+
+$$
+\boldsymbol{\sigma}=
+\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}&\boldsymbol{\sigma}_{0,1}\\
+\boldsymbol{\sigma}_{0,1}&\boldsymbol{\sigma}_{1,1}\\
+\end{bmatrix}\to\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}\\
+\boldsymbol{\sigma}_{1,1}\\
+\boldsymbol{\sigma}_{0,1}
+\end{bmatrix},
+$$
+
+这样 $\text{div}\boldsymbol{\sigma}$ 为
+
+$$
+\begin{aligned}
+\text{div}\boldsymbol{\sigma}&=
+\begin{bmatrix}
+\partial_{x}\boldsymbol{\sigma}_{0,0}+\partial_{y}\boldsymbol{\sigma}_{0,1}\\
+\partial_{x}\boldsymbol{\sigma}_{0,1}+\partial_{y}\boldsymbol{\sigma}_{1,1}
+\end{bmatrix}
+\\
+&=\boldsymbol{\mathcal{B}}^T\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}\\
+\boldsymbol{\sigma}_{1,1}\\
+\boldsymbol{\sigma}_{0,1}
+\end{bmatrix},
+\end{aligned}
+$$
+其中 $\boldsymbol{\mathcal{B}}$ 的定义见$(10)$.
+
+由$(27)$得到 $\boldsymbol{\varepsilon}$ 的向量表示形式
+$$
+\begin{aligned}
+\begin{bmatrix}
+\boldsymbol{\varepsilon}_{0,0}\\
+\boldsymbol{\varepsilon}_{1,1}\\
+2\boldsymbol{\varepsilon}_{0,1}\\
+\end{bmatrix}
+&=
+\begin{bmatrix}
+\frac{1}{2\mu}\left[\boldsymbol{\sigma}_{0,0}-(\boldsymbol{\sigma}_{0,0}+\boldsymbol{\sigma}_{1,1})/(2\mu+\lambda d)\right]\\
+\frac{1}{2\mu}\left[\boldsymbol{\sigma}_{1,1}-(\boldsymbol{\sigma}_{0,0}+\boldsymbol{\sigma}_{1,1})/(2\mu+\lambda d)\right]\\
+\frac{1}{\mu}\boldsymbol{\sigma}_{0,1}
+\end{bmatrix}\\
+&=\frac{1}{2\mu}\boldsymbol{A}
+\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}\\
+\boldsymbol{\sigma}_{1,1}\\
+\boldsymbol{\sigma}_{0,1}
+\end{bmatrix},
+\end{aligned}
+$$
+其中，
+$$
+\boldsymbol{A} = \begin{bmatrix}
+1-1/(2\mu+\lambda d)&-1/(2\mu+\lambda d)&0\\
+-1/(2\mu+\lambda d)&1-1/(2\mu+\lambda d)&0\\
+0&0&2
+\end{bmatrix}.
+$$
+
+在有限维胡张元空间中讨论线弹性矩阵组装问题，记胡张元空间基函数为
+$$
+\boldsymbol{\Sigma}=
+\begin{bmatrix}
+\boldsymbol{\varphi}_0,\boldsymbol{\varphi}_1,\cdots,\boldsymbol{\varphi}_{N_k-1}
+\end{bmatrix},
+$$
+
+其中 
+
+$$\boldsymbol{\varphi}_i=[\boldsymbol{\varphi}_{i,0},\boldsymbol{\varphi}_{i,1},\boldsymbol{\varphi}_{i,2}]^T,$$ 
+
+分别对应
+
+$$[\boldsymbol{\sigma}_{0,0},\boldsymbol{\sigma}_{1,1},\boldsymbol{\sigma}_{0,1}]^T.$$
+
+ 设应力有限元解的自由度向量为 $\boldsymbol{X}$，则
+$$\begin{aligned}
+\boldsymbol{\sigma}_h&=\boldsymbol{\Sigma}\boldsymbol{X},\\
+\text{div}\boldsymbol{\sigma}_h&=\boldsymbol{\mathcal{B}}^T\boldsymbol{\Sigma}\boldsymbol{X},
+\end{aligned}$$
+令矩阵 $\boldsymbol{B}$
+$$
+\begin{aligned}
+\boldsymbol{B}&=\boldsymbol{\mathcal{B}}^T\boldsymbol{\Sigma}\\
+&=
+\begin{bmatrix}\partial_{x}\boldsymbol{\Sigma_{0}}+\partial_{y}\boldsymbol{\Sigma_{2}}\\
+\partial_{y}\boldsymbol{\Sigma_{1}}+\partial_{x}\boldsymbol{\Sigma_{2}}
+\end{bmatrix}\\
+&=
+\begin{bmatrix}
+\boldsymbol{B}_0\\
+\boldsymbol{B}_1
+\end{bmatrix},
+\end{aligned}
+$$
+
+其中 $\boldsymbol{\Sigma}_i,\boldsymbol{B}_i$ 为 $\boldsymbol{\Sigma}, \boldsymbol{B}$ 的第 $i$ 行.
+
+位移有限元解表达式同 $(13)$, 不过 $\boldsymbol{\Phi}$ 为间断标量空间基函数.
+
+
+进而 $(\boldsymbol{\mathcal{A}}(\boldsymbol{\sigma}_h),\boldsymbol{\tau}_h)_{\Omega}$ 对应的矩阵形式为
+
+$$
+\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}~\boldsymbol{X},
+$$
+
+$(\text{div}\boldsymbol{\sigma}_h,\boldsymbol{v}_h)_{\Omega}$ 对应的矩阵形式为
+
+$$
+\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}~\boldsymbol{X}
+=
+\int_{\Omega}\begin{bmatrix}
+\boldsymbol{\Phi}^T\boldsymbol{B}_0\\
+\boldsymbol{\Phi}^T\boldsymbol{B}_1
+\end{bmatrix}~d\boldsymbol{x}~\boldsymbol{X},
+$$
+
+$(\text{div}\boldsymbol{\tau}_h,\boldsymbol{u}_h)_{\Omega}$ 对应的矩阵形式为
+
+$$
+\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T~\boldsymbol{U}.
+$$
+
+最终得到本构方程和静力平衡方程的离散矩阵形式
+
+$$
+\begin{bmatrix}
+\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}&\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T\\
+\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)&\boldsymbol{0}
+\end{bmatrix}
+\begin{bmatrix}
+\boldsymbol{X}\\
+\\
+\boldsymbol{U}
+\end{bmatrix}
+=
+\begin{bmatrix}
+\int_{\partial\Omega_{\boldsymbol{g}_d}}\left(\boldsymbol{\Sigma}^T\boldsymbol{C}\boldsymbol{n}\right)\boldsymbol{g}_d~d\boldsymbol{s}\\
+-\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{f}~d\boldsymbol{x}
+\end{bmatrix},
+$$
+
+其中
+
+$$\boldsymbol{C}=
+\begin{bmatrix}
+1&0\\
+0&1\\
+1&1
+\end{bmatrix}.
+$$
+
+由上面的推导过程可知，在程序实现过程中，只需要组装好下面三个子矩阵
+
+$$\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_0~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_1~d\boldsymbol{x}$$
+
+再拼起来就是最终的刚度矩阵。
+
+### 1.3.2 三维胡张有限元离散
+
+三维情形与二维情形类似，由应力函数 $\boldsymbol{\sigma}$ 有对称性，其向量表示为
+
+$$
+\boldsymbol{\sigma}=
+\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}&\boldsymbol{\sigma}_{0,1}&\boldsymbol{\sigma}_{0,2}\\
+\boldsymbol{\sigma}_{0,1}&\boldsymbol{\sigma}_{1,1}&\boldsymbol{\sigma}_{1,2}\\
+\boldsymbol{\sigma}_{0,2}&\boldsymbol{\sigma}_{1,2}&\boldsymbol{\sigma}_{2,2}\\
+\end{bmatrix}\to\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}\\
+\boldsymbol{\sigma}_{1,1}\\
+\boldsymbol{\sigma}_{2,2}\\
+\boldsymbol{\sigma}_{1,2}\\
+\boldsymbol{\sigma}_{0,2}\\
+\boldsymbol{\sigma}_{0,1}\\
+\end{bmatrix},
+$$
+
+这样 $\text{div}\boldsymbol{\sigma}$ 为
+
+$$
+\begin{aligned}
+\text{div}\boldsymbol{\sigma}&=
+\begin{bmatrix}
+\partial_{x}\boldsymbol{\sigma}_{0,0}+\partial_{y}\boldsymbol{\sigma}_{0,1}+\partial_{z}\boldsymbol{\sigma}_{0,2}\\
+\partial_{x}\boldsymbol{\sigma}_{0,1}+\partial_{y}\boldsymbol{\sigma}_{1,1}+\partial_{z}\boldsymbol{\sigma}_{1,2}\\
+\partial_{x}\boldsymbol{\sigma}_{0,2}+\partial_{y}\boldsymbol{\sigma}_{1,2}+\partial_{z}\boldsymbol{\sigma}_{2,2}
+\end{bmatrix}
+\\
+&=\boldsymbol{\mathcal{B}}^T\begin{bmatrix}
+\boldsymbol{\sigma}_{0,0}\\
+\boldsymbol{\sigma}_{1,1}\\
+\boldsymbol{\sigma}_{2,2}\\
+\boldsymbol{\sigma}_{1,2}\\
+\boldsymbol{\sigma}_{0,2}\\
+\boldsymbol{\sigma}_{0,1}\\
+\end{bmatrix},
+\end{aligned}
+$$
+其中 $\boldsymbol{\mathcal{B}}$ 的定义见 $(19)$.
+
+由 $(27)$ 得到 $\boldsymbol{\varepsilon}$ 的向量表示形式
+$$
+\begin{aligned}
+\begin{bmatrix}
+\boldsymbol{\varepsilon}_{0,0}\\
+\boldsymbol{\varepsilon}_{1,1}\\
+\boldsymbol{\varepsilon}_{2,2}\\
+2\boldsymbol{\varepsilon}_{1,2}\\
+2\boldsymbol{\varepsilon}_{0,2}\\
+2\boldsymbol{\varepsilon}_{0,1}\\
+\end{bmatrix}
+&=
+\begin{bmatrix}
+\frac{1}{2\mu}\left[\boldsymbol{\sigma}_{0,0}-(\boldsymbol{\sigma}_{0,0}+\boldsymbol{\sigma}_{1,1}+\boldsymbol{\sigma}_{2,2})/(2\mu+\lambda d)\right]\\
+\frac{1}{2\mu}\left[\boldsymbol{\sigma}_{1,1}-(\boldsymbol{\sigma}_{0,0}+\boldsymbol{\sigma}_{1,1}+\boldsymbol{\sigma}_{2,2})/(2\mu+\lambda d)\right]\\
+\frac{1}{2\mu}\left[\boldsymbol{\sigma}_{2,2}-(\boldsymbol{\sigma}_{0,0}+\boldsymbol{\sigma}_{1,1}+\boldsymbol{\sigma}_{2,2})/(2\mu+\lambda d)\right]\\
+\frac{1}{\mu}\boldsymbol{\sigma}_{1,2}\\
+\frac{1}{\mu}\boldsymbol{\sigma}_{0,2}\\
+\frac{1}{\mu}\boldsymbol{\sigma}_{0,1}\\
+\end{bmatrix}\\
+&=\frac{1}{2\mu}\boldsymbol{A}
+\begin{bmatrix}
+\boldsymbol{\varepsilon}_{0,0}\\
+\boldsymbol{\varepsilon}_{1,1}\\
+\boldsymbol{\varepsilon}_{2,2}\\
+2\boldsymbol{\varepsilon}_{1,2}\\
+2\boldsymbol{\varepsilon}_{0,2}\\
+2\boldsymbol{\varepsilon}_{0,1}\\
+\end{bmatrix},
+\end{aligned}
+$$
+其中，
+$$
+\boldsymbol{A} = \begin{bmatrix}
+1-1/(2\mu+\lambda d)&-1/(2\mu+\lambda d)&-1/(2\mu+\lambda d)&0&0&0\\
+-1/(2\mu+\lambda d)&1-1/(2\mu+\lambda d)&-1/(2\mu+\lambda d)&0&0&0\\
+-1/(2\mu+\lambda d)&-1/(2\mu+\lambda d)&1-1/(2\mu+\lambda d)&0&0&0\\
+0&0&0&2&0&0\\
+0&0&0&0&2&0\\
+0&0&0&0&0&2\\
+\end{bmatrix}.
+$$
+
+
+在有限维胡张元空间中讨论线弹性矩阵组装问题，记胡张元空间基函数为
+$$
+\boldsymbol{\Sigma}=
+\begin{bmatrix}
+\boldsymbol{\varphi}_0,\boldsymbol{\varphi}_1,\cdots,\boldsymbol{\varphi}_{N_k-1}
+\end{bmatrix},
+$$
+
+其中
+$$\boldsymbol{\varphi}_i=[\boldsymbol{\varphi}_{i,0},\boldsymbol{\varphi}_{i,1},\boldsymbol{\varphi}_{i,2},\boldsymbol{\varphi}_{i,3},\boldsymbol{\varphi}_{i,4},\boldsymbol{\varphi}_{i,5}]^T,$$ 
+
+分别对应 
+
+$$[\boldsymbol{\sigma}_{0,0},\boldsymbol{\sigma}_{1,1},\boldsymbol{\sigma}_{2,2},\boldsymbol{\sigma}_{1,2},\boldsymbol{\sigma}_{0,2},\boldsymbol{\sigma}_{0,2}]^T.$$
+
+设应力有限元解的自由度向量为 $\boldsymbol{X}$，则
+$$
+\begin{aligned}
+\boldsymbol{\sigma}_h&=\boldsymbol{\Sigma}\boldsymbol{X},\\
+\text{div}\boldsymbol{\sigma}_h&=\boldsymbol{\mathcal{B}}^T\boldsymbol{\Sigma}\boldsymbol{X}\\
+\end{aligned}
+$$
+令矩阵 $\boldsymbol{B}$
+$$
+\begin{aligned}
+\boldsymbol{B}&=\boldsymbol{\mathcal{B}}^T\boldsymbol{\Sigma}\\
+&=\begin{bmatrix}
+\partial_x\boldsymbol{\Sigma}_0+\partial_y\boldsymbol{\Sigma}_5+\partial_z\boldsymbol{\Sigma}_4\\
+\partial_x\boldsymbol{\Sigma}_5+\partial_y\boldsymbol{\Sigma}_1+\partial_z\boldsymbol{\Sigma}_3\\
+\partial_x\boldsymbol{\Sigma}_4+\partial_y\boldsymbol{\Sigma}_3+\partial_z\boldsymbol{\Sigma}_2
+\end{bmatrix}
+\boldsymbol{X}\\
+&=\begin{bmatrix}
+\boldsymbol{B}_0\\
+\boldsymbol{B}_1\\
+\boldsymbol{B}_2
+\end{bmatrix},
+\end{aligned}
+$$
+其中 $\boldsymbol{\Sigma}_i,\boldsymbol{B}_i$ 为 $\boldsymbol{\Sigma}, \boldsymbol{B}$ 的第 $i$ 行.
+
+位移有限元解表达式同 $(22)$ , 不过$\boldsymbol{\Phi}$为间断标量空间基函数.
+
+
+进而可得 $(\boldsymbol{\mathcal{A}}(\boldsymbol{\sigma}_h),\boldsymbol{\tau}_h)_{\Omega}$ 对应的矩阵形式为
+
+$$
+\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}~\boldsymbol{X}
+$$
+
+$(\text{div}\boldsymbol{\sigma}_h,\boldsymbol{v}_h)_{\Omega}$ 对应的矩阵形式为
+
+$$
+\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}~\boldsymbol{X}=\int_{\Omega}\begin{bmatrix}
+\boldsymbol{\Phi}^T\boldsymbol{B}_0\\
+\boldsymbol{\Phi}^T\boldsymbol{B}_1\\
+\boldsymbol{\Phi}^T\boldsymbol{B}_2
+\end{bmatrix}~d\boldsymbol{x}~\boldsymbol{X} 
+$$
+
+$(\text{div}\boldsymbol{\tau}_h,\boldsymbol{u}_h)_{\Omega}$对应的矩阵形式为
+
+$$
+\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T~\boldsymbol{U}.
+$$
+
+最终得到本构方程和静力平衡方程的离散矩阵形式
+
+$$
+\begin{bmatrix}
+\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}&\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T\\
+\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)&\boldsymbol{0}
+\end{bmatrix}
+\begin{bmatrix}
+\boldsymbol{X}\\
+\\
+\boldsymbol{U}
+\end{bmatrix}
+=
+\begin{bmatrix}
+\int_{\partial\Omega_{\boldsymbol{g}_d}}\left(\boldsymbol{\Sigma}^T\boldsymbol{C}\boldsymbol{n}\right)\boldsymbol{g}_d~d\boldsymbol{s}\\
+-\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{f}~d\boldsymbol{x}
+\end{bmatrix},
+$$
+其中
+$$\boldsymbol{C}=
+\begin{bmatrix}
+1&0&0\\
+0&1&0\\
+0&0&1\\
+0&1&1\\
+1&0&1\\
+1&1&0
+\end{bmatrix}.
+$$
+
+由上面的推导过程可知，在程序实现过程中，只需要组装好下面四个子矩阵
+
+$$\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_0~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_1~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_2~d\boldsymbol{x},$$
+
+再拼起来就是最终的刚度矩阵。

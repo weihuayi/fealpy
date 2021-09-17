@@ -4,8 +4,7 @@ permalink: /docs/zh/num-navier-stokes-equation
 key: docs-num-navier-stoke-equation-zh
 author: wpx
 ---
-
-## PDE 模型
+# 1. PDE 模型
 
 不可压的流体
 
@@ -23,63 +22,64 @@ $$
 \sigma(\boldsymbol u) = 2 \mu \varepsilon(\boldsymbol u)
 $$
 
+
 $$
-\varepsilon(\boldsymbol u) = \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T)
+\varepsilon(\boldsymbol u) = \frac{1}{2} \left(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T\right)
 $$
 
 其中符号的物理意义分别为
 
 - $\boldsymbol u$ 代表速度
 - $p$ 代表单位面积上的压力
-- $f$ 单位质量流体微团的体积力
+- $\boldsymbol f$ 单位质量流体微团的体积力
 - $\mu$ 分子粘性系数
 
-#　变分格式
+# 2. 有限元空间离散
 
-对两便乘上向量测试函数 $\boldsymbol v \in V$ 并在积分区域 $\Omega$ 上做积分
+对两边乘上向量测试函数 $\boldsymbol v \in V$ 并在积分区域 $\Omega$ 上做积分
 
 $$
-\begin{eqnarray}
-	\int_{\Omega} \rho \frac{\partial \boldsymbol u}{\partial t}\boldsymbol v
+\begin{aligned}
+	\int_{\Omega} \rho \frac{\partial \boldsymbol u}{\partial t} \cdot \boldsymbol v
     \mathrm dx
-	+ \int_{\Omega} \rho \boldsymbol u \cdot \nabla \boldsymbol u \cdot \boldsymbol v \mathrm dx 
+	+ \int_{\Omega} \rho (\boldsymbol u \cdot \nabla \boldsymbol u) \cdot \boldsymbol v \mathrm dx 
 	= 
 	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
 	+\mu \int_{\Omega}(\nabla \cdot (\nabla \boldsymbol u + \nabla (\boldsymbol u)^T)) \cdot \boldsymbol v \mathrm dx
 	+\int_{\Omega} \rho \boldsymbol f \cdot \boldsymbol v \mathrm dx
-\end{eqnarray}
+\end{aligned}
 $$
 
 对以下几项用散度定理来处理
 
 $$
-\begin{align}
+\begin{aligned}
 	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
 	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - \nabla \cdot (p\boldsymbol v) \mathrm dx\\
 	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol v \cdot \boldsymbol n \mathrm ds
-\end{align}
+\end{aligned}
 $$
 
 和
 
 $$
-\begin{align}
+\begin{aligned}
 	\int_{\Omega} (\nabla \cdot \nabla \boldsymbol u) \cdot \boldsymbol v \quad \mathrm dx 
 	&= \int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx\\
 	&= \int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds - \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx
-\end{align}
+\end{aligned}
 $$
 
-因此我们可得到其变分形式
+因此可得到其变分形式
 
 $$
-\begin{align}
+\begin{aligned}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
 	- ( p ,\nabla \cdot \boldsymbol v) + (p\boldsymbol n ,\boldsymbol v)_{\partial \Omega} \\
 	+( \sigma (\boldsymbol u  + (\boldsymbol u)^T) , \nabla \boldsymbol v) 
 	-( \sigma (\boldsymbol u + (\boldsymbol u)^T) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	 =  (\rho \boldsymbol f,\boldsymbol v)
-\end{align}
+\end{aligned}
 $$
 
 由于任何一个矩阵都可以分解成一个对称矩阵和反对称矩阵的求和，即
@@ -88,65 +88,76 @@ $$
 \nabla \boldsymbol v = \frac{\nabla \boldsymbol v + (\nabla \boldsymbol v)^T}{2} + \frac{\nabla \boldsymbol v - (\nabla\boldsymbol v)^T}{2}
 $$
 
-易证反对陈矩阵和对称矩阵求内积会消失，所以变分形式可以变为
+易证反对称矩阵和对称矩阵求内积会消失，所以变分形式可以变为
 
 $$
-\begin{align}
+\begin{aligned}
 	(\rho \frac{\partial \boldsymbol u}{\partial t},\boldsymbol v) + (\rho \boldsymbol u \cdot \nabla \boldsymbol u ,\boldsymbol v ) 
 	- ( p ,\nabla \cdot \boldsymbol v) + (p\boldsymbol n ,\boldsymbol v)_{\partial \Omega} \\
 	+( \sigma(\boldsymbol u) , \varepsilon(\boldsymbol v)) 
 	-( \sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	=  (\rho \boldsymbol f,\boldsymbol v)
-\end{align}
+\end{aligned}
 $$
 
-## Channel flow(Poisuille flow)
+# 3. 时间离散
 
-其是对两个板子见流动的一个模拟
+## 3.1 Chroin 算法
 
-另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+$\qquad$　对动量方程采取显式欧拉方法可得
+$$
+\begin{aligned}
+\frac{\boldsymbol u^{n+1} - \boldsymbol u^n}{\Delta t} = -\boldsymbol u^n \cdot \nabla \boldsymbol u^n - \frac{1}{\rho} \nabla p^n + \frac{\mu}{\rho} \Delta \boldsymbol u^n +  \boldsymbol f^n 
+\end{aligned}
+$$
+
+
+将时间导数做如下分裂
+$$
+\frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{n}) = \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{*}) + \frac{1}{\Delta t}(\boldsymbol u^{*}-\boldsymbol u^{n})
+$$
+因此原式可以分裂为
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \frac{\mu}{\rho}\Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \\
+\frac{1}{\Delta t}( \boldsymbol u^{n+1}- \boldsymbol u^{*}) + \frac{1}{\rho} \nabla p^{n+1} &=  \boldsymbol f \qquad \\
+\nabla \cdot \boldsymbol u^{n+1} &= 0\qquad \\ 
+\end{aligned}
+$$
+因此第一步计算$\boldsymbol u^*$
+$$
+\begin{aligned}
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \frac{\mu}{\rho}\Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= 0 \qquad in \quad \Omega \\
+\boldsymbol u^* &= 0 \qquad on \quad [0,1] \times \{0,1\}  \\ 
+\end{aligned}
+$$
+第二步计算$p^{n+1}$
+$$
+\begin{aligned}
+\frac{1}{\rho} \Delta p^{n+1} &= \frac{1}{\Delta t} \nabla \cdot \boldsymbol u^* \\
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
+\end{aligned}
+$$
+第三步计算$\boldsymbol u^{n+1}$
+$$
+\begin{aligned}
+\boldsymbol u^{n+1} = \boldsymbol u^* - \Delta t \nabla p^{n+1}
+\end{aligned}
+$$
+
+## 3.2 ipcs算法
+
+第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成$\sigma(u)$,Chorin算法第一步变为
 $$
 \begin{align}
-\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  &= -\nabla p +  \Delta \boldsymbol u \qquad in \quad \Omega\times(0,T) \\
-\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega\times(0,T)\\
-\boldsymbol u &= 0 \qquad on \quad \Omega\times\{0\} \\ 
-\boldsymbol u &= 0 \qquad on \quad [0,1] \times \{0,1\} \times[0,T]   \\ 
-p &= 8 \qquad  on \quad \{ 0 \} \times [0,1] \times[0,T] \\ 
-p &= 0 \qquad  on \quad \{ 1 \} \times [0,1] \times[0,T] \\ 
-\end{align}
-$$
-其解析解为$u = (4y(1-y),0),p = 8(1-x)$
-
-
-
-
-
-## ipcs算法
-
-### 一阶ipcs
-
-由于
-$$
-\frac{1}{\Delta t}(u^{n+1}-u^{n}) = \frac{1}{\Delta t}(u^{n+1}-u^{*}) + \frac{1}{\Delta t}(u^{*}-u^{n})
-$$
-第一步计算
-$$
-\begin{align}
-\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) - \nabla \cdot \sigma(\boldsymbol u^*) + \boldsymbol u^n \cdot \nabla\boldsymbol u^n + \nabla p^n &= f(t^{n+1}) \qquad in \quad \Omega\times(0,T)\\
+\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) - \frac{1}{\rho}\nabla \cdot \sigma(\boldsymbol u^*) + \boldsymbol u^n \cdot \nabla\boldsymbol u^n + \frac{1}{\rho} \nabla p^n &= \boldsymbol f(t^{n+1}) \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
 \end{align}
 $$
+
+
 第二步计算
-$$
-\begin{align}
-\frac{1}{ \Delta t}(\boldsymbol u^{n+1} - \boldsymbol u^*) + \nabla(p^{n+1}-p^{n}) &= 0  \qquad in \quad \Omega ,\\
-\nabla \cdot \boldsymbol u^{n+1} &= 0  \qquad in \quad \Omega , \\
-(\boldsymbol u^{n+1}-\boldsymbol u^*)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
-p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
-p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
-\end{align}
-$$
-其中第二步可以分为两步来计算
 $$
 \begin{align}
  \Delta (p^{n+1}-p^{n}) &= \frac{1}{ \Delta t} \nabla \cdot  \boldsymbol u^*   \qquad in \quad \Omega ,\\
@@ -156,13 +167,34 @@ p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\
 \end{align}
 $$
 
+第三步计算
 $$
 \boldsymbol u^{n+1} = \boldsymbol u^* -  \Delta t \nabla(p^{n+1}-p^n)
 $$
+# 4 Benchmark
+
+## 4.1 Channel flow(Poisuille flow)
+
+$\qquad$Channel flow是对壁面固定管道内流动情况的模拟
+
+另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+
+$$
+\begin{aligned}
+\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  &= -\nabla p +  \Delta \boldsymbol u \qquad in \quad \Omega\times(0,T) \\
+\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega\times(0,T)\\
+\boldsymbol u &= 0 \qquad on \quad \Omega\times\{0\} \\ 
+\boldsymbol u &= 0 \qquad on \quad [0,1] \times \{0,1\} \times[0,T]   \\ 
+p &= 8 \qquad  on \quad \{ 0 \} \times [0,1] \times[0,T] \\ 
+p &= 0 \qquad  on \quad \{ 1 \} \times [0,1] \times[0,T] \\ 
+\end{aligned}
+$$
+
+其解析解为$u = (4y(1-y),0),p = 8(1-x)$
 
 
 
-## 基函数表示
+# 5 基函数表示
 
 给定 $\Omega$​ 上一个单纯形网格离散 $\tau$, 构造连续的分p 次$Lgarange$多项式空间, 其基函数向量记为：
 
@@ -247,7 +279,7 @@ $$
 
 
 
-## 函数的表示
+## 5.1函数的表示
 
 - $\boldsymbol u = (u_x,u_y)$
 
@@ -396,7 +428,7 @@ $$
 
 
 
-## 矩阵表示
+## 5.2矩阵表示
 
 $$
 \begin{equation}
@@ -454,79 +486,6 @@ $$
 d\boldsymbol x
 $$
 
-## ipcs算法
-
-第一步计算$u^{*}$
-$$
-\begin{align*}
-	&\frac{\rho}{\Delta t} (\boldsymbol u^*,\boldsymbol v) + \mu (\epsilon(\boldsymbol u^*),\epsilon(\boldsymbol v)) 
-	- \frac{\mu}{2} (\nabla(\boldsymbol u^*) \cdot \boldsymbol n , \boldsymbol v)_{\partial \Omega} \\
-	&= \frac{\rho}{\Delta t}(\boldsymbol u^n,\boldsymbol v) - \rho(\boldsymbol u^n \cdot \nabla \boldsymbol u^n,\boldsymbol v) 
-	-\mu(\epsilon(\boldsymbol u^n),\epsilon(\boldsymbol v)) \\ &+ (p^n \boldsymbol I,\epsilon(\boldsymbol v)) - (p^n \boldsymbol n ,\boldsymbol v)_{\partial \Omega}
-	+ \frac{\mu}{2}(\nabla(\boldsymbol u^n) \cdot \boldsymbol n ,\boldsymbol v)_{\partial \Omega}的
-\end{align*}
-$$
-
-左边矩阵为
-
-$$
-\frac{\rho}{\Delta t}
-\begin{bmatrix}
-	\boldsymbol H & 0 \\
-	0 & \boldsymbol H
-\end{bmatrix}
-+\mu
-\begin{bmatrix}
-\boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
-\boldsymbol E_{1,0} & \boldsymbol E_{1, 1}\\
-\end{bmatrix}
-$$
-
-右边矩阵为
-
-$$
--\rho\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}
-\begin{bmatrix}
-\boldsymbol u^n_x \boldsymbol u^n_x\\
-\boldsymbol u^n_y \boldsymbol u^n_y\\
-\end{bmatrix}
--\rho\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}
-\begin{bmatrix}
-\boldsymbol u^n_x \boldsymbol u^n_y\\
-\boldsymbol u^n_x \boldsymbol u^n_y\\
-\end{bmatrix} \\
-+
-(\frac{\rho}{\Delta t}
-\begin{bmatrix}
-	\boldsymbol H & 0 \\
-	0 & \boldsymbol H
-\end{bmatrix}
--\mu
-\begin{bmatrix}
-\boldsymbol E_{0,0} & \boldsymbol E_{0, 1}\\
-\boldsymbol E_{1,0} & \boldsymbol E_{1, 1}\\
-\end{bmatrix}
-+\frac{\mu}{2}
-\begin{bmatrix}
-\boldsymbol G_{00} & \boldsymbol 0\\
-\boldsymbol 0 & \boldsymbol G_{11}\\
-\end{bmatrix}
-\begin{bmatrix}
-\boldsymbol n_x & \boldsymbol n_y\\
-\boldsymbol n_x & \boldsymbol n_y\\
-\end{bmatrix}
-)
-\begin{bmatrix}
-		u_{\boldsymbol x}\\
-		u_{\boldsymbol y}
-	\end{bmatrix}
-$$
 
 
 ## 参考文献
