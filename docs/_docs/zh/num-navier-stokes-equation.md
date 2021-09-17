@@ -150,21 +150,21 @@ $$
 
 第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成$\sigma(u)$,Chorin算法第一步变为
 $$
-\begin{align}
+\begin{aligned}
 \frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) - \frac{1}{\rho}\nabla \cdot \sigma(\boldsymbol u^*) + \boldsymbol u^n \cdot \nabla\boldsymbol u^n + \frac{1}{\rho} \nabla p^n &= \boldsymbol f(t^{n+1}) \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
-\end{align}
+\end{aligned}
 $$
 
 
 第二步计算
 $$
-\begin{align}
+\begin{aligned}
  \Delta (p^{n+1}-p^{n}) &= \frac{1}{ \Delta t} \nabla \cdot  \boldsymbol u^*   \qquad in \quad \Omega ,\\
 \nabla( p^{n+1}- p^n)\cdot \boldsymbol n &= 0 \qquad on \quad [0,1] \times \{0,1\}\\
 p &= 8 \qquad  on \quad \{ 0 \} \times [0,1]  \\ 
 p &= 0 \qquad  on \quad \{ 1 \} \times [0,1]  \\ 
-\end{align}
+\end{aligned}
 $$
 
 第三步计算
@@ -199,12 +199,15 @@ $$
 给定 $\Omega$​ 上一个单纯形网格离散 $\tau$, 构造连续的分p 次$Lgarange$多项式空间, 其基函数向量记为：
 
 $$
+\begin{aligned}
 \boldsymbol\phi := [\phi_0(\boldsymbol x), \phi_1(\boldsymbol x), \cdots, \phi_{l-1}(\boldsymbol x)],
 \forall \boldsymbol x \in \tau
+\end{aligned}
 $$
 
 
 $$
+\begin{aligned}
 \nabla \boldsymbol \phi = 
 \begin{bmatrix}
 	\frac{\partial \phi_0}{\partial x} & \frac{\partial \phi_1}{\partial x} & \cdots \frac{\partial \phi_{l-1}}{\partial x} \\
@@ -214,6 +217,7 @@ $$
 	\frac{\partial \boldsymbol \phi}{\partial x} \\
 	\frac{\partial \boldsymbol \phi}{\partial y}
 \end{bmatrix}
+\end{aligned}
 $$
 
 
@@ -221,13 +225,16 @@ $$
 则k次向量空间$\mathcal P_k(K;\mathcal R^2)$的基函数为
 
 $$
+\begin{aligned}
 \boldsymbol\Phi = \begin{bmatrix}
 \boldsymbol\phi & \boldsymbol0 \\
 \boldsymbol0 & \boldsymbol\phi
 \end{bmatrix}
+\end{aligned}
 $$
 
 $$
+\begin{aligned}
 \nabla \boldsymbol \Phi = 
 \begin{bmatrix}
 	\begin{bmatrix}
@@ -249,11 +256,13 @@ $$
 		0 & \frac{\partial \phi_{l-1}}{\partial y}
 	\end{bmatrix}
 \end{bmatrix}
+\end{aligned}
 $$
 
 
 
 $$
+\begin{aligned}
 \varepsilon(\boldsymbol\Phi) = 
 \begin{bmatrix}
 	\begin{bmatrix}
@@ -275,6 +284,7 @@ $$
 		\frac{1}{2}\frac{\partial \phi_{l-1}}{\partial x} & \frac{\partial \phi_{l-1}}{\partial y}
 	\end{bmatrix}
 \end{bmatrix}
+\end{aligned}
 $$
 
 
@@ -284,6 +294,7 @@ $$
 - $\boldsymbol u = (u_x,u_y)$
 
 $$
+\begin{aligned}
 \boldsymbol u = (u_x,u_y) = (\phi_{i},0)u_{x_i}+(0,\phi_{i})u_{y_i} = 
 \begin{bmatrix}
 	\boldsymbol\phi & 0 \\
@@ -306,12 +317,12 @@ $$
 	\boldsymbol u_{x}\\
 	\boldsymbol u_{y}
 \end{bmatrix}
-$$
 
 - $\nabla \boldsymbol u$
-
+\end{aligned}
 $$
-\begin{align*}
+$$
+\begin{aligned}
 	\nabla \boldsymbol u &=  
 			\begin{bmatrix}
 				 \frac{\partial u_x}{\partial x} & \frac{\partial u_y}{\partial x} \\
@@ -339,13 +350,13 @@ $$
 				\boldsymbol u_{x}\\
 				\boldsymbol u_{y}
 			\end{bmatrix}\\	
-\end{align*}
+\end{aligned}
 $$
 
 - $\boldsymbol u \cdot \nabla \boldsymbol u$
 
 $$
-\begin{align*}
+\begin{aligned}
 	\boldsymbol u \cdot \nabla \boldsymbol u &=  
 	[u_x,u_y]
 	\begin{bmatrix}
@@ -393,13 +404,13 @@ $$
 		\boldsymbol u_{x}\boldsymbol u_{y}\\
 		\boldsymbol u_{x}\boldsymbol u_{y}
 	\end{bmatrix}
-\end{align*}
+\end{aligned}
 $$
 
 - $\epsilon(\boldsymbol u) = \frac{1}{2}(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T) $
 
 $$
-\begin{align*}		
+\begin{aligned}		
 	\epsilon(\boldsymbol u) &= \frac{1}{2} (\nabla \boldsymbol u + (\nabla \boldsymbol u)^T) \\
 			 &= \frac{1}{2}
 			 \begin{bmatrix}
@@ -423,7 +434,7 @@ $$
 				\boldsymbol u_{x}\\
 				\boldsymbol u_{y}
 			\end{bmatrix}
-\end{align*}
+\end{aligned}
 $$
 
 
