@@ -183,6 +183,16 @@ class PlanetHeatConductionWithRotationSimulator():
         T[:-1] = uh0*Tss
         mesh.nodedata['uh'] = T
         
+        qf = mesh.integrator(self.args.nq, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bc = (np.array([np.mean(bcs[0], axis=0)]), np.array([np.mean(bcs[1],
+            axis=0)]))
+
+        uh0_grad = uh0.grad_value(bc)
+        
+        Tg = Tss*uh0_grad[0, ...]
+        mesh.celldata['uhgrad'] =Tg
+        
         scale = self.args.scale
         l = self.pde.options['l']
         

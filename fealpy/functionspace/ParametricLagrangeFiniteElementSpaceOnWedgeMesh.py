@@ -101,7 +101,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         return phi 
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:], variables='x'):
+    def grad_basis(self, bc, index=np.s_[:], etype='cell', ftype=None, variables='x'):
         """
 
         Notes
@@ -109,8 +109,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         计算空间基函数关于实际坐标点 x 的梯度。
         """
         p = self.p
-        gphi = self.mesh.grad_shape_function(bc, index=index, p=p,
-                variables=variables)
+        gphi = self.mesh.grad_shape_function(bc, index=index, p=p, etype=etype,
+                ftype=ftype, variables=variables)
         return gphi
 
     @barycentric
@@ -125,8 +125,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         return val
 
     @barycentric
-    def grad_value(self, uh, bc, index=np.s_[:]):
-        gphi = self.grad_basis(bc, index=index)
+    def grad_value(self, uh, bc, index=np.s_[:], etype='cell',
+            ftype=None):
+        gphi = self.grad_basis(bc, index=index, etype=etype, ftype=ftype)
         cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
