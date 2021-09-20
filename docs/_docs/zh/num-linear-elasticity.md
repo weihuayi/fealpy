@@ -463,29 +463,43 @@ $$
 
 ## 1.3 混合变分形式
 
-由本构方程 $(3)$, 得到
+对本构方程变形, 可得 
 
 $$
 \frac{1}{2\mu}\left(\boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}\right)-\boldsymbol{\varepsilon} =0 \tag{27}
 $$
 
-记 $\mathcal{A}(\boldsymbol{\sigma})=\frac{1}{2\mu}\left(\boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}\right)$，对于 $\boldsymbol{\tau}\in H(\text{div};\mathbb{S})$，上式与$\boldsymbol{\tau}$做内积，并分部积分得
+记 
+
+$$ 
+\mathcal{A}(\boldsymbol{\sigma})=
+\frac{1}{2\mu}\left(
+\boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}
+\right)
+$$
+
+对于 $\boldsymbol{\tau}\in H(\text{div};\mathbb{S})$，上式与$\boldsymbol{\tau}$做内积，并分部积分得
 
 $$
 \int_{\Omega}\mathcal{A}(\boldsymbol{\sigma}):\boldsymbol{\tau}~d\boldsymbol{x}+\int_{\Omega}(\nabla\cdot\boldsymbol{\tau})\cdot\boldsymbol{u}~d\boldsymbol{x} = \int_{\partial\Omega}(\boldsymbol{\tau}\cdot{\boldsymbol{n}})\cdot\boldsymbol{u}~d\boldsymbol{s},
 $$
 
 结合$(4)$,就有混合变分形式为: 
+
 $$
-\begin{aligned}
 \begin{cases}
 \text{Find }(\boldsymbol{\sigma},\boldsymbol{u})\in H(\text{div},\Omega,\mathbb{S})\times(L^2(\Omega))^d, \text{ such that}\\
 (\mathcal{A}(\boldsymbol{\sigma}),\boldsymbol{\tau})_{\Omega}+(\text{div}~\boldsymbol{\tau},\boldsymbol{u}) = (\boldsymbol{\tau}\cdot\boldsymbol{n},\boldsymbol{u})_{\partial\Omega},&\text{for all } \boldsymbol{\tau}\in H(\text{div},\Omega,\mathbb{S}),\\
 (\text{div}\boldsymbol{\sigma},\boldsymbol{v})_{\Omega} = (-\boldsymbol{f},\boldsymbol{v})_{\Omega},&\text{for all }\boldsymbol{v}\in(L^2(\Omega))^d.
-\end{cases}
 \end{aligned} 
 $$
-注：上述对应的是纯位移的边界条件的混合变分形式，对于一般含有应力的边界条件$\boldsymbol{g}_n=\boldsymbol{\sigma}\cdot\boldsymbol{n}$ on $\partial\Omega_{\boldsymbol{g}_n}$, $\boldsymbol{g}_d=\boldsymbol{u}$ on $\partial\Omega_{\boldsymbol{g}_d}$， 对应的混合变分形式为:
+
+注：上述对应的是纯位移的边界条件的混合变分形式，对于一般含有应力的边界条件
+
+$$
+\boldsymbol{g}_n=\boldsymbol{\sigma}\cdot\boldsymbol{n} 
+$$ 
+on $\partial\Omega_{\boldsymbol{g}_n}$, $\boldsymbol{g}_d=\boldsymbol{u}$ on $\partial\Omega_{\boldsymbol{g}_d}$， 对应的混合变分形式为:
 $$
 \begin{aligned}
 \begin{cases}

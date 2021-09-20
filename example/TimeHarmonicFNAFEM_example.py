@@ -243,6 +243,10 @@ elif args.pde == 'CS':
 
 mesh = pde.init_mesh(n=args.nrefine)
 
+mesh.add_plot(plt)
+plt.savefig('./test-' + str(0) + '.eps')
+plt.close()
+
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
              '$|| u - R_h[u_h]||_{\Omega,0}$',

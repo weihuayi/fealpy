@@ -328,7 +328,7 @@ class CVTPMesherTest:
             mesh.add_plot(axes)
             plt.show()
             voromesher = CVTPMesher(mesh)
-            vor = voromesher.voronoi_meshing(nb=3,adaptive = True)
+            vor = voromesher.voronoi_meshing(nb=4,adaptive = True)
 
         elif domain == 'partition1':
             vertices = np.array([
@@ -358,7 +358,7 @@ class CVTPMesherTest:
                 (1, 2),(1, 4),(3, 2),(4, 3)], dtype=np.int)
             mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
             voromesher = CVTPMesher(mesh)
-            vor = voromesher.voronoi_meshing(n=3)
+            vor = voromesher.voronoi_meshing(nb=3)
 
         elif domain == 'hole1': 
             vertices = np.array([
@@ -459,7 +459,7 @@ class CVTPMesherTest:
         while i<100:
             vor = avoro.lloyd_opt(vor)
             i+=1
-        en,ef = voromesher.energy(vor)
+        #en,ef = voromesher.energy(vor)
         avoro = VoroAlgorithm(voromesher)
         avoro.lloyd_opt(vor)
         pmesh = voromesher.to_polygonMesh(vor) 
@@ -508,7 +508,7 @@ if sys.argv[1] == "Lloyd":
 '''
 
 #test.uniform_boundary_meshing_test()
-test.uniform_meshing_test(domain='square',interior_nodes= False)
+#test.uniform_meshing_test(domain='square',interior_nodes= False)
 #test.uniform_meshing_test(domain='square2',interior_nodes = True)
 #test.uniform_meshing_test(domain='LShape', interior_nodes = False)
 #test.uniform_meshing_test(domain='triangle',interior_nodes = False)
@@ -524,7 +524,7 @@ test.uniform_meshing_test(domain='square',interior_nodes= False)
 #test.Lloyd_test(domain='circle_hole')
 #test.Lloyd_test(domain='partition1')
 #test.Lloyd_test(domain='partition2')
-#test.Lloyd_test(domain = 'hole1')
+test.Lloyd_test(domain = 'hole1')
 #test.Lloyd_test(domain='hole2')
 #test.Lloyd_test(domain='square2')
 #test.Lloyd_test(domain = 'hexagon')
