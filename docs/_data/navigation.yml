@@ -106,6 +106,8 @@ docs-zh:
     children:
       - title: 安装 
         url:    /docs/zh/fealpy-install
+      - title: 任意次有限元求解 Poisson 方程示例
+        url:    /docs/zh/poisson
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 
@@ -130,12 +132,26 @@ docs-zh:
         url:    /docs/zh/mesh-adaptive
       - title: 网格工厂
         url:    /docs/zh/mesh-factory
-  - title:     有限维空间的构造与实现
+  - title:     有限维空间与数值离散方法
     children:
       - title:  单纯形网格上的拉格朗日有限元空间 
         url:    /docs/zh/simplex-lagrange-space
       - title:  缩放单项式空间 
         url:    /docs/zh/scaled-monomial-space
+      - title:  协调虚单元方法
+        url:    /docs/zh/cvem
+      - title:  非协调虚单元方法
+        url:    /docs/zh/ncvem
+      - title:  Weak Galerkin 方法 
+        url:    /docs/zh/weak-galerkin-space
+  - title:    爱因斯坦求和与矩阵、向量组装 
+    children:
+      - title: 爱因斯坦求和
+        url:    /docs/zh/einsum
+      - title: 矩阵组装 
+        url:    /docs/zh/matrix
+      - title: 向量组装 
+        url:    /docs/zh/vector
   - title:     典型模型问题的数值解
     children:
       - title: 椭圆界面问题
@@ -159,7 +175,7 @@ docs-en:
         url:    /docs/en/quick-start
       - title: Numerrical Solution for Non-linear Poisson Equation 
         url:   /docs/en/num-non-linear-poisson
-      - title: TNumerrical Solution for linear-elasticity problem
+      - title: Numerrical Solution for linear-elasticity problem
         url:   /docs/en/num-linear-elasticity
       - title: Numerrical Solution for Navier-stokes 
         url:   /docs/en/num-navier-stokes-equation
