@@ -103,7 +103,9 @@ header:
 
 docs-zh:
   - title:  快速开始
-    url:    /docs/zh/quick-start
+    children:
+      - title: 安装 
+        url:    /docs/zh/fealpy-install
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 
@@ -124,10 +126,10 @@ docs-zh:
         url:    /docs/zh/polyhedron-mesh
       - title: 高阶网格 
         url:    /docs/zh/high-order-mesh
-      - title: 网格工厂
-        url:    /docs/zh/mesh-factory
       - title: 网格自适应
         url:    /docs/zh/mesh-adaptive
+      - title: 网格工厂
+        url:    /docs/zh/mesh-factory
   - title:     有限维空间的构造与实现
     children:
       - title:  单纯形网格上的拉格朗日有限元空间 
