@@ -449,7 +449,7 @@ $$
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_x\mathrm d\boldsymbol x,\quad 
 \int_\Omega \boldsymbol\Phi^T_y\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
 \int_\Omega \boldsymbol\Phi^T_z\boldsymbol\Phi_z\mathrm d\boldsymbol x,\quad 
-\int_\Omega \boldsymbol\Phi^T_z\boldsymbol\Phi_y\mathrm d\boldsymbol x,\quad
+\int_\Omega \boldsymbol\Phi^T_z\boldsymbol\Phi_y\mathrm d\boldsymbol x,\\
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_z\mathrm d\boldsymbol x,\quad
 \int_\Omega \boldsymbol\Phi^T_x\boldsymbol\Phi_y\mathrm d\boldsymbol x.
 $$
