@@ -404,7 +404,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
             uh[isqDDof] = gD(ipoints[isqDDof])
             return istDDof, isqDDof
     
-    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+    def set_neumann_bc(self, gN, F, threshold=None, q=None):
         self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
     
     def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
@@ -432,6 +432,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.tri_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = self.mesh.integrator(q, 'tface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -474,6 +477,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.quad_face_to_dof()[index]
+        
+        if q is None:
+            q = p+3
 
         qf = self.mesh.integrator(q, 'qface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -521,6 +527,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.tri_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = mesh.integrator(q, 'tface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -572,6 +581,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.quad_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = mesh.integrator(q, 'qface')
         bcs, ws = qf.get_quadrature_points_and_weights()
