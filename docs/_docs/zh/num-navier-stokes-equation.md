@@ -343,9 +343,11 @@ $$
 	\boldsymbol u_{y}
 \end{bmatrix}
 
-- $\nabla \boldsymbol u$
 \end{aligned}
 $$
+
+- $\nabla \boldsymbol u$
+
 $$
 \begin{aligned}
 	\nabla \boldsymbol u &=  
@@ -432,7 +434,7 @@ $$
 \end{aligned}
 $$
 
-- $\epsilon(\boldsymbol u) = \frac{1}{2}(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T) $
+- $\epsilon(\boldsymbol u) = \frac{1}{2}(\nabla \boldsymbol u + (\nabla \boldsymbol u)^T)$
 
 $$
 \begin{aligned}		
@@ -467,7 +469,7 @@ $$
 ## 5.2矩阵表示
 
 $$
-\begin{equation}
+\begin{aligned}
     \boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=
     \begin{bmatrix}
         (\phi_{0}, \phi_{0})_{\tau} & (\phi_{0}, \phi_{1})_{\tau} & \cdots & (\phi_{0}, \phi_{l-1})_{\tau} \\
@@ -475,7 +477,7 @@ $$
         \vdots & \vdots & \ddots & \vdots \\
         (\phi_{l-1}, \phi_{0})_{\tau} & (\phi_{l-1}, \phi_{1})_{\tau} & \cdots & (\phi_{l-1}, \phi_{l-1})_{\tau}
     \end{bmatrix}
-\end{equation}
+\end{aligned}
 $$
 
 
