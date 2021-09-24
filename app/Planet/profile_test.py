@@ -3,7 +3,8 @@ import argparse
 import numpy as np
 
 from fealpy.writer import VTKMeshWriter
-from PlanetHeatConductionSimulator import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
+from PlanetHeatConductionSimulator_newton import PlanetHeatConductionWithRotationSimulator
+#from PlanetHeatConductionSimulator_picard import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
 from TPMModel import TPMModel 
 
 from mumps import DMumpsContext
@@ -34,9 +35,9 @@ parser.add_argument('--accuracy',
         default=1e-7, type=float,
         help='picard 迭代的精度, 默认为 1e-7.')
 
-parser.add_argument('--npicard',
+parser.add_argument('--niteration',
         default=30, type=int,
-        help='picard 迭代的最大迭代次数, 默认为 30 次.')
+        help='迭代的最大迭代次数, 默认为 30 次.')
 
 parser.add_argument('--step',
         default=1, type=int,
