@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 
+from scipy.sparse import csr_matrix, coo_matrix
 from ..decorator import barycentric
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -449,24 +450,80 @@ class FirstKindNedelecFiniteElementSpace2d:
             uh[cell2dof[:, idof//2:]] = val[:, 1, :]
         return uh
 
-    def mass_matrix(self):
-        gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof, gdof0=gdof)
-        return M
+    def mass_matrix(self, c=None, q=None):
+        """
+        """
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-    def curl_matrix(self):
+        phi = self.basis(bcs)
+
+        if c is None:
+            M = np.einsum('i, ijkd, ijmd, j->jkm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs)
+                    c = c(ps)
+
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijkd, ijmd, j->jkm', c*ws, phi, phi,
+                        self.cellmeasure, optimize=True)
+            else:
+                M = np.einsum('i, ijdn, ijkn, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
+
+    def curl_matrix(self, c=None, q=None):
         """
 
         Notes:
 
-        组装 (\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
+        组装 (c*\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
         """
-        p = self.p
+
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi = self.curl_basis(bcs)
+
+        if c is None:
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs)
+                    c = c(ps)
+
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijk, ijm, j->jkm', c*ws, phi, phi, cellmeasure, optimize=True)
+            else:
+                M = np.einsum('i, ij, ijk, ijm, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
-        D = self.integralalg.construct_matrix(self.curl_basis, cell2dof0=cell2dof, gdof0=gdof)
-        return D 
+
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
 
     def source_vector(self, f):
         cell2dof = self.cell_to_dof()

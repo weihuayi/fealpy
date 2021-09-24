@@ -10,7 +10,7 @@ from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
 from fealpy.mesh import MeshFactory
-from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData
+from fealpy.pde.timeharmonic_2d import CosSinData, LShapeRSinData, InHomogeneousData
 from fealpy.functionspace import FirstKindNedelecFiniteElementSpace2d 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
@@ -198,20 +198,31 @@ def edge_curl_value(uh):
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        这是一个自适应求解时谐方程的程序
+        这是一个自适应求解时谐方程的程序, 里面有三种 pde 模型可选择
+        IH: InHomogeneousData
+        LS: LShapeRSinData
+        CS：CosSinData
         """)
+
+parser.add_argument('--pde',
+        default='IH', type=str,
+        help='pde 模型，默认是 IH 模型')
 
 parser.add_argument('--degree', 
         default=0, type=int,
         help='第一类 Nedlec 元的次数, 默认为 0!')
 
-parser.add_argument('--size', 
-        default=8, type=int,
-        help='初始网格的 x 和 y 方向剖分段数, 默认为 8 段')
+parser.add_argument('--nrefine', 
+        default=4, type=int,
+        help='网格的初始加密次数, 默认为 4 次')
 
 parser.add_argument('--maxit', 
         default=40, type=int,
         help='自适应迭代次数, 默认自适应迭代 40 次')
+
+parser.add_argument('--delta', 
+        default=0.02, type=float,
+        help='InHomogeneousData 模型的 delta 参数, 默认为  0.02')
 
 parser.add_argument('--theta', 
         default=0.3, type=float,
@@ -219,32 +230,27 @@ parser.add_argument('--theta',
 
 parser.print_help()
 args = parser.parse_args()
-print('程序参数为:', args)
 
 
 ## 开始计算
 
-pde = CosSinData()
-#pde = LShapeRSinData()
+if args.pde == 'IH':
+    pde =InHomogeneousData(delta=args.delta)
+elif args.pde == 'LS':
+    pde = LShapeRSinData()
+elif args.pde == 'CS': 
+    pde = CosSinData()
 
-mesh = pde.init_mesh()
+mesh = pde.init_mesh(n=args.nrefine)
 
-if False:
-    fig = plt.figure()
-    axes = fig.gca()
-    mesh.add_plot(axes)
-
-    fig = plt.figure()
-    axes = fig.gca()
-    bc = mesh.entity_barycenter('edge')
-    v = pde.solution(bc)
-    axes.quiver(bc[:, 0], bc[:, 1], v[:, 0], v[:, 1])
-    plt.show()
+mesh.add_plot(plt)
+plt.savefig('./test-' + str(0) + '.eps')
+plt.close()
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla\\times u - \\nabla\\times u_h||_{\Omega, 0}$',
-             '$|| u - R_h(u_h)||_{\Omega,0}$',
-             '$||\\nabla\\times u - R_h(\\nabla\\times u_h)||_{\Omega, 0}$',
+             '$|| u - R_h[u_h]||_{\Omega,0}$',
+             '$||\\nabla\\times u - R_h[\\nabla\\times u_h]||_{\Omega, 0}$',
              'eta'
              ]
 errorMatrix = np.zeros((len(errorType), args.maxit), dtype=np.float64)
@@ -258,7 +264,11 @@ for i in range(args.maxit):
     NDof[i] = gdof 
 
     uh = space.function()
-    A = space.curl_matrix() - space.mass_matrix()
+    if args.pde != 'IH':
+        A = space.curl_matrix() - space.mass_matrix()
+    else:
+        A = space.curl_matrix(c=pde.inv_mu) - space.mass_matrix(c=pde.epsilon)
+
     F = space.source_vector(pde.source)
 
     A, F = bc.apply(A, F, uh)
@@ -292,5 +302,6 @@ for i in range(args.maxit):
         plt.savefig('./test-' + str(i+1) + '.eps')
         plt.close()
 
-showmultirate(plt, args.maxit-10, NDof, errorMatrix,  errorType, propsize=20)
+showmultirate(plt, args.maxit-10, NDof, errorMatrix,  errorType, propsize=6)
+plt.savefig('./error.eps')
 plt.show()

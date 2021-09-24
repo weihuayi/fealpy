@@ -4,13 +4,13 @@ from fealpy.decorator import cartesian
 from fealpy.mesh import TriangleMesh
 
 class InHomogeneousData:
-    def __init__(self):
-        pass
+    def __init__(self, delta=0.02):
+        self.delta = delta
 
     def domain(self):
         return np.array([-1, 1, -1, 1])
 
-    def init_mesh(self, n=4, meshtype='tri', h=0.1):
+    def init_mesh(self, n=4):
         """ generate the initial mesh
         """
         node = np.array([
@@ -19,21 +19,11 @@ class InHomogeneousData:
             (1, 1),
             (-1, 1)], dtype=np.float64)
 
-        if meshtype == 'quadtree':
-            cell = np.array([(0, 1, 2, 3)], dtype=np.int_)
-            mesh = Quadtree(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'tri':
-            cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
-            mesh = TriangleMesh(node, cell)
-            mesh.uniform_refine(n)
-            return mesh
-        elif meshtype == 'squad':
-            mesh = StructureQuadMesh([0, 1, 0, 1], h)
-            return mesh
-        else:
-            raise ValueError("".format)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh
+
 
     @cartesian
     def solution(self, p):
@@ -48,14 +38,24 @@ class InHomogeneousData:
         p = np.array([0, 1], dtype=np.float64)
         p = np.array([[0, 1], [0.5, 0.5]], dtype=np.float64)
         """
+        
         x = p[..., 0]
         y = p[..., 1]
         val = np.zeros_like(p)
-        d = x**2 + y**2 + 0.02
+        d=x**2+y**2+self.delta
         val[..., 0] = y/d
-        val[..., 1] = -x/d 
+        val[..., 1] = (-x)/d
         return val 
 
+    @cartesian
+    def curl(self, p):
+        """ The curl of the exact solution 
+        """
+        x = p[..., 0]
+        y = p[..., 1]
+        val = -2*self.delta/(x**2+y**2+self.delta)**2
+        return val 
+    
     @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
@@ -64,22 +64,13 @@ class InHomogeneousData:
         """
         x = p[..., 0]
         y = p[..., 1]
-        pi = np.pi
+        mu=1+x**2+y**2
+        d=x**2+y**2+self.delta
         val = np.zeros_like(p)  
-        val[..., 0] = (2*pi**2 - 1)*np.cos(pi*x)*np.sin(pi*y)
-        val[..., 1] = (-2*pi**2+1)*np.sin(pi*x)*np.cos(pi*y)
+        val[..., 0] =(-2*self.delta)*(2*y*d**2-mu*2*d*2*y)/d**4- y/d
+        val[..., 1] = 2*self.delta*(2*x*d**2-mu*2*d*2*x)/d**4 - (-x)/d
         return val
-
-    @cartesian
-    def curl(self, p):
-        """ The curl of the exact solution 
-        """
-        x = p[..., 0]
-        y = p[..., 1]
-        pi = np.pi
-        val = -2*pi*np.cos(pi*x)*np.cos(pi*y)
-        return val 
-
+		
     @cartesian
     def dirichlet(self, p, t):
         """
@@ -89,7 +80,8 @@ class InHomogeneousData:
         t:  (NE, GD)
         """
         val = np.sum(self.solution(p)*t, axis=-1)
-        return val 
+        return val
+	 
 
     @cartesian
     def is_dirichlet_boundary(self, p):
@@ -112,15 +104,33 @@ class InHomogeneousData:
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
         return val
+
+    @cartesian
+    def inv_mu(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val=1+x**2+y**2
+        return val
+
+    @cartesian
+    def epsilon(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        shape = p.shape + (2, )
+        val = np.zeros(shape, dtype=p.dtype)
+        val[..., 0, 0] = 1 + x**2
+        val[..., 0, 1] = x*y
+        val[..., 1, 0] = x*y
+        val[..., 1, 1] = 1+y**2
+        return val
+
+
 class CosSinData:
     def __init__(self):
         pass
 
     def domain(self):
         return np.array([0, 1, 0, 1])
-
-    @cartesian
-    def solution(self, p):
 
     def init_mesh(self, n=4, meshtype='tri', h=0.1):
         """ generate the initial mesh

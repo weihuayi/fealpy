@@ -102,31 +102,68 @@ header:
     url: https://github.com/weihuayi/fealpy
 
 docs-zh:
-  - title:      开始
+  - title:  快速开始
     children:
-      - title:  快速开始
-        url:    /docs/zh/quick-start
-  - title:     FEALPy 入门
-  - title:     WHYSC 入门
+      - title: 安装 
+        url:    /docs/zh/fealpy-install
+      - title: 任意次有限元求解 Poisson 方程示例
+        url:    /docs/zh/poisson
+  - title:    网格数据结构与实现 
     children:
-      - title: WHYSC 安装 
-        url:    /docs/zh/whysc-install
-  - title:     网格数据结构与实现 
-  - title:     有限维空间的构造与实现
+      - title: 网格数据结构基础 
+        url:    /docs/zh/mesh-base
+      - title: 三角形网格 
+        url:    /docs/zh/tri-mesh
+      - title: 四边形网格 
+        url:    /docs/zh/quad-mesh
+      - title: 多边形网格 
+        url:    /docs/zh/polygon-mesh
+      - title: 半边网格 
+        url:    /docs/zh/halfedge-mesh
+      - title: 四面体网格 
+        url:    /docs/zh/tet-mesh
+      - title: 六面体网格 
+        url:    /docs/zh/hex-mesh
+      - title: 多面体网格 
+        url:    /docs/zh/polyhedron-mesh
+      - title: 高阶网格 
+        url:    /docs/zh/high-order-mesh
+      - title: 网格自适应
+        url:    /docs/zh/mesh-adaptive
+      - title: 网格工厂
+        url:    /docs/zh/mesh-factory
+  - title:     有限维空间与数值离散方法
     children:
       - title:  单纯形网格上的拉格朗日有限元空间 
         url:    /docs/zh/simplex-lagrange-space
       - title:  缩放单项式空间 
-        url:    /docs/zh/scaled-polynomial-space
+        url:    /docs/zh/scaled-monomial-space
+      - title:  协调虚单元方法
+        url:    /docs/zh/cvem
+      - title:  非协调虚单元方法
+        url:    /docs/zh/ncvem
+      - title:  Weak Galerkin 方法 
+        url:    /docs/zh/weak-galerkin-space
+  - title:    爱因斯坦求和与矩阵、向量组装 
+    children:
+      - title: 爱因斯坦求和
+        url:    /docs/zh/einsum
+      - title: 矩阵组装 
+        url:    /docs/zh/matrix
+      - title: 向量组装 
+        url:    /docs/zh/vector
   - title:     典型模型问题的数值解
     children:
+      - title: 椭圆界面问题
+        url:   /docs/zh/num-elliptic-interface
       - title: 非线性 Poisson 方程
         url:   /docs/zh/num-non-linear-poisson
-      - title:  线弹性方程的数值求解
+      - title:  线弹性方程
         url:   /docs/zh/num-linear-elasticity
       - title: Navier-stokes 方程
         url:   /docs/zh/num-navier-stokes-equation
-  - title:      其他语言
+  - title:     复杂应用问题 
+  - title:     其他语言
     children:
       - title:  English
         url:    /docs/en/quick-start
@@ -138,7 +175,7 @@ docs-en:
         url:    /docs/en/quick-start
       - title: Numerrical Solution for Non-linear Poisson Equation 
         url:   /docs/en/num-non-linear-poisson
-      - title: TNumerrical Solution for linear-elasticity problem
+      - title: Numerrical Solution for linear-elasticity problem
         url:   /docs/en/num-linear-elasticity
       - title: Numerrical Solution for Navier-stokes 
         url:   /docs/en/num-navier-stokes-equation

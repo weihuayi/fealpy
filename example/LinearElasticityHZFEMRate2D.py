@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 import sympy as sp
 import sys
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat
+from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, bmat, construct
 from scipy.sparse.linalg import spsolve
 
 import matplotlib.pyplot as plt
@@ -18,6 +18,9 @@ from fealpy.functionspace.LagrangeFiniteElementSpace import LagrangeFiniteElemen
 #linear elasticity model
 from fealpy.pde.linear_elasticity_model import QiModel3d, PolyModel3d, Model2d, HuangModel2d
 from fealpy.pde.linear_elasticity_model2D import GenLinearElasticitymodel2D
+
+#solver 
+from fealpy.solver.fast_solver import LinearElasticityHZFEMFastSolve
 
 
 
@@ -149,7 +152,7 @@ for i in range(maxit):
         F0[isBDdof] = sh[isBDdof]
         F1[:,0] -= B0@sh 
         F1[:,1] -= B1@sh
-        FF = np.r_[F0,F1.T.reshape(-1)]
+        
 
         bdIdx = np.zeros(tgdof, dtype=np.int)
         bdIdx[isBDdof] = 1
@@ -158,10 +161,21 @@ for i in range(maxit):
         M = T@M@T + Tbd
         B0 = B0@T
         B1 = B1@T
-        AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
+        
+
 
         #求解
-        x = spsolve(AA,FF)
+        #FF = np.r_[F0,F1.T.reshape(-1)]
+        #AA = bmat([[M, B0.transpose(), B1.transpose()],[B0, None, None],[B1,None,None]],format='csr')
+        #x = spsolve(AA,FF)
+
+        B = construct.vstack([B0,B1],format='csr')
+        A = [M,B]
+        F = [F0,F1]
+        Fast_slover = LinearElasticityHZFEMFastSolve(A,F,vspace)
+        x = Fast_slover.solve()
+
+
 
 
         sh[:] = x[:tgdof]
