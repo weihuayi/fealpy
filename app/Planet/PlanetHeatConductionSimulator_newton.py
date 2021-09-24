@@ -133,6 +133,7 @@ class PlanetHeatConductionWithRotationSimulator():
             R, b = self.nolinear_robin_boundary()
             
             index = self.mesh.ds.exterior_boundary_tface_index()
+
             bc = NeumannBC(self.space, self.nonlinear_boundarycondition, threshold=index)
             b = bc.apply(b)
 
