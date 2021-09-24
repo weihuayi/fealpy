@@ -1,6 +1,6 @@
 ---
 title: Doxygen 使用
-permalink: /docs/zh/doxygen-manual
+permalink: /docs/zh/start/doxygen-manual
 key: docs-doxygen
 ---
 
@@ -36,7 +36,7 @@ Doxygen 只会处理符合规则的注释.
     ```c++
     /** 注释内容 */
     ```
-**注意:** Doxygen 默认注释是说明下面的代码, 如:
+    **注意:** Doxygen 默认注释是说明下面的代码, 如:
     ```c++
     /**  两个整数相加
      *

@@ -1,6 +1,6 @@
 ---
 title: 非线性 Poisson 方程数值求解
-permalink: /docs/zh/num-non-linear-poisson
+permalink: /docs/zh/example/num-non-linear-poisson
 key: docs-num-non-linear-poisson-zh
 ---
 
