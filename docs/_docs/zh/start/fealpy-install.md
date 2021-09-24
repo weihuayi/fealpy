@@ -1,6 +1,6 @@
 ---
 title: FEALPy 的安装 
-permalink: /docs/zh/fealpy-install
+permalink: /docs/zh/start/fealpy-install
 key: docs-fealpy-install-zh
 ---
 
@@ -36,5 +36,4 @@ pip install -U fealpy
 ```
 
 但要注意，这样安装的 FEALPy 很可能不是最新版本.
-
 

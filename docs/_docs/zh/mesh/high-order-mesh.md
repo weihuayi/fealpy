@@ -1,6 +1,6 @@
 ---
 title: 高阶有限元网格 
-permalink: /docs/zh/high-order-mesh
+permalink: /docs/zh/mesh/high-order-mesh
 key: docs-high-order-mesh-zh
 ---
 
@@ -245,7 +245,7 @@ g_{00} = & <\boldsymbol x_\xi, \boldsymbol x_\xi>, \\
 g_{01} = & <\boldsymbol x_\xi, \boldsymbol x_\eta> = g_{10},\\
 g_{11} = & <\boldsymbol x_\eta, \boldsymbol x_\eta>.
 \end{aligned}
-$$ 
+$$
 
 马上可得 $p$ 次曲面 $\tau$ 上的切梯度算子：
 
