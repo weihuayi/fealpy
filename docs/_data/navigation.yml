@@ -108,8 +108,6 @@ docs-zh:
         url:    /docs/zh/start/fealpy-install
       - title: 任意次有限元求解 Poisson 方程示例
         url:    /docs/zh/start/poisson
-      - title: Doxygen 使用
-        url:    /docs/zh/start/doxygen-manual
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 
@@ -164,7 +162,7 @@ docs-zh:
         url:   /docs/zh/example/num-linear-elasticity
       - title: Navier-stokes 方程
         url:   /docs/zh/example/num-navier-stokes-equation
-  - title:     复杂应用问题 
+  - title:     成果展示 
   - title:     其他语言
     children:
       - title:  English
