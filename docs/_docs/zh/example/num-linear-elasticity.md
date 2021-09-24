@@ -1,6 +1,6 @@
 ---
 title: 线弹性问题数值求解
-permalink: /docs/zh/num-linear-elasticity
+permalink: /docs/zh/example/num-linear-elasticity
 key: docs-linear-elasticity-zh
 ---
 
@@ -471,7 +471,7 @@ $$
 
 记 
 
-$$ 
+$$
 \mathcal{A}(\boldsymbol{\sigma})=
 \frac{1}{2\mu}\left(
 \boldsymbol{\sigma}-\frac{tr\boldsymbol{\sigma}}{2\mu+\lambda d}\boldsymbol{I}
@@ -498,7 +498,7 @@ $$
 
 $$
 \boldsymbol{g}_n=\boldsymbol{\sigma}\cdot\boldsymbol{n} 
-$$ 
+$$
 on $\partial\Omega_{\boldsymbol{g}_n}$, $\boldsymbol{g}_d=\boldsymbol{u}$ on $\partial\Omega_{\boldsymbol{g}_d}$， 对应的混合变分形式为:
 $$
 \begin{aligned}
@@ -670,7 +670,6 @@ $$\boldsymbol{C}=
 1&1
 \end{bmatrix}.
 $$
-
 由上面的推导过程可知，在程序实现过程中，只需要组装好下面三个子矩阵
 
 $$\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_0~d\boldsymbol{x},~\int_{\Omega}\boldsymbol{\Phi}^T\boldsymbol{B}_1~d\boldsymbol{x}$$
@@ -680,7 +679,6 @@ $$\frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sig
 ### 1.3.2 三维胡张有限元离散
 
 三维情形与二维情形类似，由应力函数 $\boldsymbol{\sigma}$ 有对称性，其向量表示为
-
 $$
 \boldsymbol{\sigma}=
 \begin{bmatrix}
@@ -696,9 +694,7 @@ $$
 \boldsymbol{\sigma}_{0,1}\\
 \end{bmatrix},
 $$
-
 这样 $\text{div}\boldsymbol{\sigma}$ 为
-
 $$
 \begin{aligned}
 \text{div}\boldsymbol{\sigma}&=
@@ -763,7 +759,6 @@ $$
 \end{bmatrix}.
 $$
 
-
 在有限维胡张元空间中讨论线弹性矩阵组装问题，记胡张元空间基函数为
 $$
 \boldsymbol{\Sigma}=
@@ -771,7 +766,6 @@ $$
 \boldsymbol{\varphi}_0,\boldsymbol{\varphi}_1,\cdots,\boldsymbol{\varphi}_{N_k-1}
 \end{bmatrix},
 $$
-
 其中
 $$\boldsymbol{\varphi}_i=[\boldsymbol{\varphi}_{i,0},\boldsymbol{\varphi}_{i,1},\boldsymbol{\varphi}_{i,2},\boldsymbol{\varphi}_{i,3},\boldsymbol{\varphi}_{i,4},\boldsymbol{\varphi}_{i,5}]^T,$$ 
 
@@ -809,13 +803,10 @@ $$
 
 
 进而可得 $(\boldsymbol{\mathcal{A}}(\boldsymbol{\sigma}_h),\boldsymbol{\tau}_h)_{\Omega}$ 对应的矩阵形式为
-
 $$
 \frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}~\boldsymbol{X}
 $$
-
 $(\text{div}\boldsymbol{\sigma}_h,\boldsymbol{v}_h)_{\Omega}$ 对应的矩阵形式为
-
 $$
 \int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}~\boldsymbol{X}=\int_{\Omega}\begin{bmatrix}
 \boldsymbol{\Phi}^T\boldsymbol{B}_0\\
@@ -823,15 +814,11 @@ $$
 \boldsymbol{\Phi}^T\boldsymbol{B}_2
 \end{bmatrix}~d\boldsymbol{x}~\boldsymbol{X} 
 $$
-
 $(\text{div}\boldsymbol{\tau}_h,\boldsymbol{u}_h)_{\Omega}$对应的矩阵形式为
-
 $$
 \left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T~\boldsymbol{U}.
 $$
-
 最终得到本构方程和静力平衡方程的离散矩阵形式
-
 $$
 \begin{bmatrix}
 \frac{1}{2\mu}\int_{\Omega}\boldsymbol{\Sigma}^T\boldsymbol{A}\boldsymbol{\Sigma}~d\boldsymbol{x}&\left(\int_{\Omega}\boldsymbol{\Psi}^T\boldsymbol{B}~d\boldsymbol{x}\right)^T\\
