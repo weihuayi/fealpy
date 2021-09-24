@@ -1,6 +1,6 @@
 ---
 title: Navier-stokes 方程数值求解
-permalink: /docs/zh/num-navier-stokes-equation
+permalink: /docs/zh/example/num-navier-stokes-equation
 key: docs-num-navier-stoke-equation-zh
 author: wpx
 ---

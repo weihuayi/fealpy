@@ -1,5 +1,5 @@
 ---
 title: 多面体网格
-permalink: /docs/zh/polyhedron-mesh
+permalink: /docs/zh/mesh/polyhedron-mesh
 key: docs-polyhedron-mesh-zh
 ---

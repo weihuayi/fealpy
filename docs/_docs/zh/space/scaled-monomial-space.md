@@ -1,6 +1,6 @@
 ---
 title: 缩放单项式空间
-permalink: /docs/zh/scaled-monomial-space
+permalink: /docs/zh/space/scaled-monomial-space
 key: docs-scaled-monomial-space-zh
 ---
 
