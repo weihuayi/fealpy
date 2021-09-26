@@ -164,13 +164,15 @@ class PlanetHeatConductionWithRotationSimulator():
             R *= dt
             R += M
 
+            index = self.mesh.ds.exterior_boundary_tface_index()
+
             if ctx is None:
-                x = spsolve(R, b).reshape(-1)
+                x[index] = spsolve(R[index, :][:, index], b[index]).reshape(-1)
             else:
                 if ctx.myid == 0:
-                    ctx.set_centralized_sparse(R)
+                    ctx.set_centralized_sparse(R[index, :][:, index])
                     x = b.copy()
-                    ctx.set_rhs(x) # Modified in place
+                    ctx.set_rhs(x[index]) # Modified in place
                 ctx.set_silent()
                 ctx.run(job=6)
             uh[:] += x
