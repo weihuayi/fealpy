@@ -83,7 +83,7 @@ class PlanetHeatConductionWithRotationSimulator():
 
         measure = mesh.boundary_tri_face_area(index=index)
 
-        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
+#        n = mesh.boundary_tri_face_unit_normal(bcs, index=index)
 
         mu = self.init_mu(bcs)
         gR = mu/Phi # (NQ, NF, ...)
@@ -101,11 +101,35 @@ class PlanetHeatConductionWithRotationSimulator():
         R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
         return R+self.S, b
 
-    def nonlinear_boundarycondition(self, bcs, n):
-        Phi = self.pde.options['Phi']
+    def nl_bc(self, F):
+
+        """
+
+        Notes
+        -----
+        处理右端项中 
+        - <\frac{1}{\Phi} a(\bfu^0_l), v>_{\partial \Omega_1}  
+
+        """
+        mesh = self.mesh
         uh = self.uh
-        face2dof = self.space.tri_face_to_dof()
-        return -uh**4/Phi
+        Phi = self.pde.options['Phi']
+
+        index = mesh.ds.exterior_boundary_tface_index()
+        face2dof = self.space.tri_face_to_dof()[index]
+
+        qf = mesh.integrator(self.args.nq, etype='tface')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        phi = self.space.basis(bcs)
+
+        measure = mesh.boundary_tri_face_area(index=index)
+
+        val = np.einsum('qfi, fi->qf', phi, uh[face2dof])
+        val = -val**4/Phi
+
+        bb = np.einsum('m, mi..., mik, i->ik...', ws, val, phi, measure)
+        np.add.at(F, face2dof, bb)
+        return F
 
     @timer
     def newton(self, ctx=None):
@@ -132,11 +156,7 @@ class PlanetHeatConductionWithRotationSimulator():
         while error > self.args.accuracy:
             R, b = self.nolinear_robin_boundary()
             
-            index = self.mesh.ds.exterior_boundary_tface_index()
-
-            bc = NeumannBC(self.space, self.nonlinear_boundarycondition, threshold=index)
-            b = bc.apply(b)
-
+            b = self.nl_bc(b)
             b -=S@uh[:]
             b *= dt
             b += M@uh0[:]-M@uh[:]
@@ -160,7 +180,7 @@ class PlanetHeatConductionWithRotationSimulator():
             uh1[:] = uh
             
             k += 1
-            if k >= self.args.npicard: 
+            if k >= self.args.niteration: 
                 print('newton arrive max iteration with error:', error)
                 break
 
@@ -191,14 +211,15 @@ class PlanetHeatConductionWithRotationSimulator():
         Tg = Tss*uh0_grad[0, ...]
         mesh.celldata['uhgrad'] =Tg
         
+        scale = self.args.scale
         l = self.pde.options['l']
         
-        sd = np.zeros((len(T), 3), dtype=np.float64)
-        n = self.sun_direction()/l
-        sd = np.vstack((sd, -n))
+        sd = np.zeros((len(uh0), 3), dtype=np.float64)
+        n = self.sun_direction()
+        sd = np.vstack((sd, -n*1.8))
         mesh.nodedata['sd'] = sd
 
-        mesh.meshdata['p'] = n
+        mesh.meshdata['p'] = n*scale*1.3/l
 
     @timer
     def run(self, ctx=None, queue=None):
@@ -243,3 +264,5 @@ class PlanetHeatConductionWithRotationSimulator():
                 data = {'name':fname, 'mesh':self.mesh}
                 queue.put(data)
             queue.put(-1) # 发送模拟结束信号 
+
+

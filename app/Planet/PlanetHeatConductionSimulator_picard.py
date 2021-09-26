@@ -162,7 +162,7 @@ class PlanetHeatConductionWithRotationSimulator():
             uh1[:] = uh
             
             k += 1
-            if k >= self.args.npicard: 
+            if k >= self.args.niteration: 
                 print('picard iteration arrive max iteration with error:', error)
                 break
     
@@ -399,7 +399,7 @@ class PlanetHeatConductionWithIrrotationSimulator():
             uh1[:] = uh
             
             k += 1
-            if k >= self.args.npicard: 
+            if k >= self.args.niteration: 
                 print('picard iteration arrive max iteration with error:', error)
                 break
     
