@@ -155,7 +155,7 @@ class PlanetHeatConductionWithRotationSimulator():
             R += self.M00
 
             self.solver.set_matrix(R)
-            self.solver.solve(uh, F)
+            uh = self.solver.solve(uh, F)
 
             error = np.max(np.abs(uh[:] - uh1[:]))
             print(k, ":", error)

@@ -10,6 +10,8 @@ from fealpy.decorator import timer
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 
+from fast_solver import PlanetFastSovler
+
 class PlanetHeatConductionWithRotationSimulator():
     def __init__(self, pde, mesh, args):
 
@@ -34,6 +36,28 @@ class PlanetHeatConductionWithRotationSimulator():
 
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
+
+    @timer
+    def schur(self):
+        '''
+
+        舒尔补方法矩阵分块
+
+        '''
+        rdof = self.mesh.ds.NN//(self.args.nh+1)
+        self.rdof = rdof
+        
+        self.S00 = self.S[:rdof, :rdof]
+        S01 = self.S[:rdof, rdof:]
+        S11 = self.S[rdof:, rdof:]
+
+        self.M00 = self.M[:rdof, :rdof]
+        M01 = self.M[:rdof, rdof:]
+        M11 = self.M[rdof:, rdof:]
+
+        dt = self.timeline.current_time_step_length()
+        self.B = M01+dt*S01
+        self.D = M11+dt*S11
 
     def sun_direction(self):
         t = self.timeline.next_time_level()
@@ -65,7 +89,7 @@ class PlanetHeatConductionWithRotationSimulator():
 
         """
 
-        uh = self.uh # 临时的温度有限元函数
+        uh = self.uh 
         mesh = self.mesh
         Phi = self.pde.options['Phi']
 
@@ -98,8 +122,8 @@ class PlanetHeatConductionWithRotationSimulator():
         I = np.broadcast_to(face2dof[:, :, None], shape=FM.shape)
         J = np.broadcast_to(face2dof[:, None, :], shape=FM.shape)
 
-        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S.shape)
-        return R+self.S, b
+        R = csr_matrix((FM.flat, (I.flat, J.flat)), shape=self.S00.shape) #这里的 R 是分块后矩阵大小
+        return R+self.S00, b
 
     def nl_bc(self, F):
 
@@ -147,35 +171,33 @@ class PlanetHeatConductionWithRotationSimulator():
 
         uh1[:] = uh0
         
+        du = self.space.function()
+        du = uh0[:]
+            
         Tss = self.pde.options['Tss']
         i = timeline.current
         print(i, ",", uh0[:]*Tss)
-            
+        
         k = 0
         error = 1.0
         while error > self.args.accuracy:
-            R, b = self.nolinear_robin_boundary()
+            R, F = self.nolinear_robin_boundary()
             
-            b = self.nl_bc(b)
-            b -=S@uh[:]
-            b *= dt
-            b += M@uh0[:]-M@uh[:]
+            F = self.nl_bc(F)
+            F -= S@uh[:]
+            F *= dt
+            F += M@uh0[:]-M@uh[:]
 
             R *= dt
-            R += M
+            R += self.M00
 
-            if ctx is None:
-                x = spsolve(R, b).reshape(-1)
-            else:
-                if ctx.myid == 0:
-                    ctx.set_centralized_sparse(R)
-                    x = b.copy()
-                    ctx.set_rhs(x) # Modified in place
-                ctx.set_silent()
-                ctx.run(job=6)
-            uh[:] += x
+            self.solver.set_matrix(R)
+            
+            du = self.solver.solve(du, F)
 
-            error = np.max(np.abs(x))
+            uh[:] += du
+
+            error = np.max(np.abs(du))
             print(k, ":", error)
             uh1[:] = uh
             
@@ -232,6 +254,10 @@ class PlanetHeatConductionWithRotationSimulator():
         """
         timeline = self.timeline
         args = self.args
+        
+        self.schur()
+        
+        self.solver = PlanetFastSovler(self.D, self.B, ctx)
         
         if queue is not None:
             i = timeline.current
