@@ -8,7 +8,7 @@ from fealpy.boundarycondition.BoundaryCondition import NeumannBC
 from fealpy.decorator import timer
 
 from scipy.sparse import csr_matrix
-from scipy.sparse.linalg import spsolve
+from scipy.sparse.linalg import cg, LinearOperator, spsolve
 
 from fast_solver import PlanetFastSovler
 
@@ -167,13 +167,12 @@ class PlanetHeatConductionWithRotationSimulator():
 
         uh1[:] = uh0
         
-        du = self.space.function()
-        du = uh0[:]
+        x = self.space.function()
             
         Tss = self.pde.options['Tss']
         i = timeline.current
         print(i, ",", uh0[:]*Tss)
-        
+
         k = 0
         error = 1.0
         while error > self.args.accuracy:
@@ -186,14 +185,12 @@ class PlanetHeatConductionWithRotationSimulator():
             R *= dt
             R += self.M00
 
-            self.solver.set_matrix(R)
+            self.solver.set_matrix(R)            
+            x = self.solver.solve(x, F)
             
-            du = self.solver.solve(du, F)
+            uh += x
 
-            uh += du
-            print('du:', du)
-
-            error = np.max(np.abs(du))
+            error = np.max(np.abs(x))
             print(k, ":", error)
             uh1[:] = uh
             
