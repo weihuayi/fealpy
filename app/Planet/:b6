@@ -193,7 +193,9 @@ class PlanetHeatConductionWithRotationSimulator():
             uh += du
             print('du:', du)
 
-            error = np.max(np.abs(du))
+            e = self.space.
+            error = np.sqrt(du**2)
+#            error = np.max(np.abs(du))
             print(k, ":", error)
             uh1[:] = uh
             
