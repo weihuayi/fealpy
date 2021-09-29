@@ -331,6 +331,7 @@ class Mesh2dDataStructure():
             return cell2edge 
 
     def cell_to_edge_sign(self, return_sparse=False):
+        NE = self.NE
         NC = self.NC
         NEC = self.NEC
 

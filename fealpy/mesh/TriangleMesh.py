@@ -6,6 +6,10 @@ from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
+
+    #Mesh2dDataStructure是TriangleMeshDataStructure的父类
+    #--赵佳阔--   2021.9.16
+
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
@@ -19,6 +23,10 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
     def __init__(self, NN, cell):
         super(TriangleMeshDataStructure, self).__init__(NN, cell)
+
+        #这是Python2中的写法在Python3中只需写成
+        #super().__init__(NN,cell)
+        #--赵佳阔--   2021.9.16
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):

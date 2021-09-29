@@ -45,7 +45,7 @@ class PlanetFastSovler():
         return b
 
     @timer
-    def solve(self, uh, F):
+    def solve(self, u, F):
         rdof = self.rdof
         gdof = self.gdof
 
@@ -61,7 +61,8 @@ class PlanetFastSovler():
 
         a -= self.B@b
 
-        uh[:rdof].T.flat, info = cg(A, a, tol=1e-8)
+        u[:rdof].T.flat, info = cg(A, a, tol=1e-8)
 
         P = LinearOperator((gdof, gdof), matvec=self.linear_operator_2)
-        uh[rdof:].T.flat, info = cg(P, F[rdof:]-uh[:rdof]@self.B, tol=1e-8)
+        u[rdof:].T.flat, info = cg(P, F[rdof:]-u[:rdof]@self.B, tol=1e-8)
+        return u
