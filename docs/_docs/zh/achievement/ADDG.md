@@ -158,7 +158,7 @@ $$
 **定理2[先验误差估计]**
 令真解 $u \in C^0(\Omega)$, 离散问题的解 $u_h \in V_{DG}^{\ell}$, 假设在每个子域 $\Omega_j,\,j = 1,\cdots,n$ 中, $u \in H^{\ell +1}(\Omega_j)$ 则有
 $$
-||u-u_h||_{DG}\le C\left(\sum_{K \in \mathcal{T}_h}h^{2\ell}_K|a^{1/2}u|_{{\ell+1},K}^2\right)^{1/2}.
+||u-u_h||_{DG}\le C\left(\sum_{K \in \mathcal{T}_h}h^{2\ell}_K|a^{1/2}u|_{\ell+1, K}^2\right)^{1/2}.
 $$
 # 后验误差估计
 构造残量型后验误差估计：
