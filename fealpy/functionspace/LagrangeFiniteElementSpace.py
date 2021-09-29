@@ -1089,7 +1089,6 @@ class LagrangeFiniteElementSpace():
 
         TODO: 考虑更多 gN 的情况, 比如 gN 可以是一个数组
         """
-        p = self.p
         mesh = self.mesh
         gdof = self.number_of_global_dofs()
        

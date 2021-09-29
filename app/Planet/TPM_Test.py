@@ -5,7 +5,7 @@ import numpy as np
 
 from fealpy.writer import VTKMeshWriter
 #from PlanetHeatConductionSimulator_picard import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
-from PlanetHeatConductionSimulator_newton import PlanetHeatConductionWithRotationSimulator, PlanetHeatConductionWithIrrotationSimulator
+from PlanetHeatConductionSimulator_newton import PlanetHeatConductionWithRotationSimulator
 from TPMModel import TPMModel 
 
 from mumps import DMumpsContext

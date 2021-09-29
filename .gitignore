@@ -56,3 +56,4 @@ docs/.jekyll-cache
 docs/.jekyll-metadata
 docs/vendor
 *.eps
+.jekyll-cache

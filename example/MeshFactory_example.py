@@ -9,7 +9,7 @@ from mpl_toolkits.mplot3d import Axes3D
 from fealpy.mesh import MeshFactory
 from fealpy.geometry import CircleCurve, FoldCurve
 
-mf = MeshFactory()
+mf = MeshFactory
 
 
 # 2d mesh
