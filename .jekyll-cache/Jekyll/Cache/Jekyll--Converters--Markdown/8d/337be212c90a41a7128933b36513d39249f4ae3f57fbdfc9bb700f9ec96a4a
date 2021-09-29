@@ -1,0 +1,141 @@
+I"W<h2 id="简介">简介</h2>
+
+<p><a href="https://git-scm.com/">Git</a> 是一款分布式版本控制系统,可以更好的对文件进行管理、备份、回退等操作，优点是在不同的电脑上实现文件的实时更新和同步。FEALPy的管理和协同开发就是基于git来完成的。</p>
+
+<p>Git 有的三个工作区域和四个工作状态，了解这些才可以知道git的基本操作流程。三个工作区域是：</p>
+
+<ul>
+  <li>工作目录：可以看见的文件夹里的文件</li>
+  <li>仓库：看不见的（可以在 github 上看），这里边放的是你完成一个项目，要分享给别人东西</li>
+  <li>暂存区域：当你修改一个文件后，你要将他放到一个地方，这个地方放里的所用东西是准备要提交到 git 仓库中的</li>
+</ul>
+
+<p>四个工作状态分别未追踪，未修改，已修改，已暂存</p>
+
+<ul>
+  <li>
+    <p>当你新建一个文件就是属于未追踪，你需要通过 add 命令把他加到暂存区，这时他就被 git 追踪到了，之后的每一次修改 git 都会记录。未修改，已修改是看文件你有没有改动过。修改过得你可以通过add 加到加到暂存区。已暂存就是在暂存区里的东西。</p>
+  </li>
+  <li>
+    <p>git 的流程就是，将新建或者修改的文件通过 add 加到暂存区，然后通过 commit 将暂存区的东西放入 git 仓库。</p>
+
+    <p><img src="../assets/images/git-workflow.png" alt="workflow" style="zoom:50%;" /></p>
+  </li>
+</ul>
+
+<h2 id="基本使用方法">基本使用方法</h2>
+
+<h3 id="创建仓库和同步远程仓库">创建仓库和同步远程仓库</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  git init    <span class="c">#对本地文件用git进行管理</span>
+  git remote add origin <span class="o">[</span>远程仓库地址]　　#关联本地仓库和远程仓库
+  git clone <span class="o">[</span>远程仓库地址]  <span class="c">#将远程仓库建立到本地上</span>
+  git pull    <span class="c">#将远程仓库内容拉取到本地</span>
+</code></pre></div></div>
+
+<h3 id="提交到远程仓库的步骤">提交到远程仓库的步骤</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  git status　　#看现在文件的状态
+  git add <span class="nb">.</span>    <span class="c">#将所有文件放到暂存区，也就是说将文件状态变为已暂存</span>
+  git commit   <span class="c">#将暂存区的东西都提交到git仓库中</span>
+  git push     <span class="c">#将本地仓库推送到远程git服务器上</span>
+</code></pre></div></div>
+
+<h3 id="版本回退">版本回退</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  git log     <span class="c">#查看仓库中推送的版本号和信息</span>
+  git reset <span class="nt">--hard</span> <span class="o">[</span>commit <span class="nb">id</span><span class="o">]</span>  <span class="c">#将仓库回退到id的版本</span>
+</code></pre></div></div>
+
+<h3 id="分支管理">分支管理</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git checkout <span class="nt">-b</span> master2 <span class="c">#创建并切换到新建分支</span>
+git checkout master2    <span class="c">#切换分支</span>
+git branch <span class="nt">-d</span> fmaster2  <span class="c">#删除分支</span>
+</code></pre></div></div>
+
+<h2 id="fealpy的协作开发">FEALPy的协作开发</h2>
+
+<h3 id="gitlab">Gitlab</h3>
+<ul>
+  <li>
+    <p>在项目主分支上建立一个分支,点击原作者仓库 gitlab 右上角的 fork, 就会在自己的 gitlab 中新建一个同名仓库</p>
+
+    <p><img src="../assets/images/git-fork.png" alt="git-fork" style="zoom:50%;" /></p>
+  </li>
+  <li>
+    <p>在自己的分支上进行操作,将自己 gitlab 中的同名仓库 git clone 到自己的本地, 然后就可以进行一系列操作, git add, git commit, git pull, git push, 也就是和平常经常进行的操作并无二制.但注意pull的时候需要如下进行</p>
+
+    <div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git fetch <span class="nt">--all</span>
+git merge upstream/master origin/master
+</code></pre></div>    </div>
+  </li>
+  <li>
+    <p>向管理员提交 pull request,首先在自己的仓库页面, 点击左侧的 Merge Request,再点击 New Merge Request,</p>
+
+    <p><img src="../assets/images/git-merge.png" alt="git-merge" style="zoom:50%;" /></p>
+
+    <p>确定上传到哪个分支, 点击 Compare branches and continue, 写清楚提交的理由点击submit,之后等待管理员审核即可.</p>
+
+    <p><img src="../assets/images/git-merge-reuqest.png" alt="git-merge-reuqest" /></p>
+
+    <p><img src="../assets/images/git-submit.png" alt="git-submit" /></p>
+  </li>
+</ul>
+
+<h3 id="github">Github</h3>
+
+<ul>
+  <li>fork项目到自己的仓库中</li>
+</ul>
+
+<p><img src="../assets/images/github-fork.png" alt="github-fork" style="zoom:50%;" /></p>
+
+<ul>
+  <li>打开命令行，将项目下载到本地</li>
+</ul>
+
+<p><img src="../assets/images/github-clone.png" alt="github-clone" style="zoom:50%;" /></p>
+
+<ul>
+  <li>进入本地文件，并进行相应修改，同样pull时候要</li>
+</ul>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>  git fetch <span class="nt">--all</span>
+  git merge upstream/master origin/master
+</code></pre></div></div>
+
+<ul>
+  <li>上传到自己的GitHub仓库，并申请Pull Request</li>
+</ul>
+
+<p><img src="../assets/images/github-pull-request.png" alt="github-pull-request" style="zoom:50%;" /></p>
+
+<h2 id="常用技巧">常用技巧</h2>
+
+<h3 id="解决could-not-resolve-host-githubcom">解决Could not resolve host: github.com</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git config <span class="nt">--global</span> <span class="nt">--unset</span> http.proxy
+git config <span class="nt">--global</span> <span class="nt">--unset</span> https.proxy
+</code></pre></div></div>
+
+<h3 id="每次push的时候不用输入用户名和密码">每次push的时候不用输入用户名和密码</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c">#在用户主目录home下输入</span>
+<span class="nb">touch</span> .git-credentials
+vim .git-credentials
+https://<span class="o">{</span>username<span class="o">}</span>:<span class="o">{</span>password<span class="o">}</span>@github<span class="o">(</span>gitlab<span class="o">)</span>.com　#在git-cerdential里输入用户信息
+git config <span class="nt">--global</span> credential.helper store
+</code></pre></div></div>
+
+<h3 id="解决中文乱码">解决中文乱码</h3>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code> git config <span class="nt">--global</span> core.quotepath <span class="nb">false</span>
+</code></pre></div></div>
+
+<h1 id="附录">附录</h1>
+
+<p>1.<a href="https://git-scm.com/book/zh/v2">官方帮助文档</a></p>
+
+<p>2.<a href="https://www.liaoxuefeng.com/wiki/896043488029600">廖雪峰git使用网站</a></p>
+
+<p>3.<a href="https://www.bootcss.com/p/git-guide/">简易上手指南</a></p>
+
+<p>4.<a href="https://juejin.cn/post/6844903821521469448v">Pull Request 流程</a></p>
+
+:ET

@@ -1,0 +1,53 @@
+I"�<h2 id="openfinite-简介">OpenFinite 简介</h2>
+<p><a href="https://gitlab.com/weihuayi/openfinite">OpenFinite</a> 是一个 C++ 科学计算软件库,
+致力于将计算数学中的高效算法应用到实际工业应用中, 现在已包含各种常见网格,
+并可以对网格优化.</p>
+
+<h2 id="安装">安装</h2>
+<p><strong>Openfinite 仓库</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>git clone https://gitlab.com/weihuayi/openfinite.git
+</code></pre></div></div>
+<p><strong>安装依赖</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt <span class="nb">install </span>libgmp-dev libmpfr-dev libboost-dev 
+<span class="nb">sudo </span>apt <span class="nb">install </span>zlib1g-dev libblas-dev liblapack-dev
+<span class="nb">sudo </span>apt <span class="nb">install </span>libglu1-mesa-dev freeglut3-dev mesa-common-dev
+<span class="nb">sudo </span>apt <span class="nb">install </span>freeglut3-dev
+</code></pre></div></div>
+
+<p><strong>安装 ParMetis</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt <span class="nb">install </span>libparmetis-dev libmetis-dev
+</code></pre></div></div>
+
+<p><strong>安装 MPI</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">sudo </span>apt <span class="nb">install </span>libopenmpi-dev
+</code></pre></div></div>
+
+<p><strong>安装 VTK</strong></p>
+
+<p><a href="https://vtk.org/download/">下载vtk</a></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">mkdir</span> ~/opt
+<span class="nb">tar</span> <span class="nt">-xvf</span> VTK-9.0.1.tar.gz ~/opt/vtk
+<span class="nb">cd</span> ~/opt/vtk
+<span class="nb">mkdir</span> <span class="nt">-p</span> build/release
+<span class="nb">cd </span>build/release
+cmake <span class="nt">-DCMAKE_BUILD_TYPE</span><span class="o">=</span>Release <span class="nt">-DVTK_WRAP_PYTHON</span><span class="o">=</span>1 <span class="nt">-DVTK_PYTHON_VERSION</span><span class="o">=</span>3 <span class="nt">-DBUILD_TESTING</span><span class="o">=</span>0 <span class="nt">-DCMAKE_INSTALL_PREFIX</span><span class="o">=</span>~/.local/vtk ../..
+make <span class="nt">-j8</span>
+make <span class="nb">install</span>
+</code></pre></div></div>
+
+<p><strong>安装 cgal</strong></p>
+
+<p><a href="https://github.com/CGAL/cgal/archive/refs/tags/v5.3.tar.gz">下载cgal</a></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">tar</span> <span class="nt">-xvf</span> CGAL-5.2.tar.gz ~/opt/cgal
+<span class="nb">cd</span> ~/opt/cgal
+<span class="nb">mkdir</span> <span class="nt">-p</span> build/release
+<span class="nb">cd </span>build/release
+cmake <span class="nt">-DCMAKE_BUILD_TYPE</span><span class="o">=</span>Release <span class="nt">-DCMAKE_INSTALL_PREFIX</span><span class="o">=</span>~/.local/cgal ../..
+make <span class="nt">-j8</span>
+make <span class="nb">install</span>
+</code></pre></div></div>
+
+<p><strong>安装 gmsh</strong></p>
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pip3 <span class="nb">install</span> <span class="nt">--upgrade</span> gmsh
+</code></pre></div></div>
+:ET

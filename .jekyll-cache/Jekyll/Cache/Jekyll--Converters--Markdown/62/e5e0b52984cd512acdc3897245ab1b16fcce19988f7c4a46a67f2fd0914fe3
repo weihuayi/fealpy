@@ -1,0 +1,59 @@
+I"h<h1 id="1-安装-nvidia-显卡驱动">1. 安装 Nvidia 显卡驱动</h1>
+
+<p>安装 Nvidia 显卡驱动</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span><span class="nb">sudo </span>ubuntu-drivers autoinstall
+</code></pre></div></div>
+
+<p>查看驱动的安装情况：</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nv">$ </span>nvidia-smi
+Thu Aug 26 17:20:29 2021
++-----------------------------------------------------------------------------+
+| NVIDIA-SMI 470.57.02    Driver Version: 470.57.02    CUDA Version: 11.4     |
+|-------------------------------+----------------------+----------------------+
+| GPU  Name        Persistence-M| Bus-Id        Disp.A | Volatile Uncorr. ECC |
+| Fan  Temp  Perf  Pwr:Usage/Cap|         Memory-Usage | GPU-Util  Compute M. |
+|                               |                      |               MIG M. |
+|<span class="o">===============================</span>+<span class="o">======================</span>+<span class="o">======================</span>|
+|   0  NVIDIA GeForce ...  Off  | 00000000:01:00.0  On |                  N/A |
+| 32%   43C    P8    11W / 180W |    674MiB /  8117MiB |      0%      Default |
+|                               |                      |                  N/A |
++-------------------------------+----------------------+----------------------+
+
++-----------------------------------------------------------------------------+
+| Processes:                                                                  |
+|  GPU   GI   CI        PID   Type   Process name                  GPU Memory |
+|        ID   ID                                                   Usage      |
+|<span class="o">=============================================================================</span>|
+|    0   N/A  N/A      1293      G   /usr/lib/xorg/Xorg                 96MiB |
+|    0   N/A  N/A      1985      G   /usr/lib/xorg/Xorg                384MiB |
+|    0   N/A  N/A      2132      G   /usr/bin/gnome-shell               45MiB |
+|    0   N/A  N/A      2502      G   ...AAAAAAAAA<span class="o">=</span> <span class="nt">--shared-files</span>       95MiB |
+|    0   N/A  N/A      3281      G   ...AAAAAAAA<span class="o">==</span> <span class="nt">--shared-files</span>       39MiB |
++-----------------------------------------------------------------------------+
+</code></pre></div></div>
+
+<h1 id="2-安装-cuda-toolkit">2. 安装 CUDA ToolKit</h1>
+
+<p>从<a href="https://developer.nvidia.com/cuda-downloads">这里</a>下载 CUDA ToolKit,
+页面上需要根据你自己的系统情况选择合适的版本，最好选择 run file
+的版本，会下载所有的文件，包括驱动。</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>$ wget https://developer.download.nvidia.com/compute/cuda/11.4.1/local_installers/cuda_11.4.1_470.57.02_linux.run
+$ sudo sh cuda_11.4.1_470.57.02_linux.run
+</code></pre></div></div>
+
+<p>如果你已经安装了驱动，注意不要再选择安装 cuda 的驱动。</p>
+
+<p>安装完成后, 在家目录的 .bashrc 中加入</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>PATH=$PATH:/usr/local/cuda-11.4/bin
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-11.4/lib64
+</code></pre></div></div>
+
+<p>安装 cupy</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pip3 install cupy-cuda114
+python3 -m cupyx.tools.install_library --cuda 11.4 --library cutensor
+</code></pre></div></div>
+:ET
