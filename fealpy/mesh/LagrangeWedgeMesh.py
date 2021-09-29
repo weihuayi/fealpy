@@ -176,6 +176,10 @@ class LagrangeWedgeMesh(Mesh3d):
             return TensorProductQuadrature((qf0, qf1)) 
         elif etype in {'face', 2}:
             return qf0, TensorProductQuadrature((qf1, qf1))
+        elif etype in {'tface'}:
+            return qf0
+        elif etype in {'qface'}:
+            return TensorProductQuadrature((qf1, qf1))
         elif etype in {'edge', 1}:
             return qf1 
 
@@ -390,8 +394,7 @@ class LagrangeWedgeMesh(Mesh3d):
     def shape_function(self, bc, p=None):
         p = self.p if p is None else p
 
-        TD = len(bc)
-        if TD == 2:
+        if isinstance(bc, tuple):
             phi0 = lagrange_shape_function(bc[0], p)
             phi1 = lagrange_shape_function(bc[1], p)
             # i 是积分点
@@ -399,7 +402,7 @@ class LagrangeWedgeMesh(Mesh3d):
             # m 是基函数
             phi = np.einsum('im, kn->ikmn', phi0, phi1)
             shape = phi.shape[:-2] + (-1, )
-        else:
+        elif isinstance(bc, np.ndarray):
             phi = lagrange_shape_function(bc, p)
             shape = phi.shape[:-1] + (-1, )
         phi = phi.reshape(shape) # 展平自由度
@@ -546,6 +549,10 @@ class LagrangeWedgeMesh(Mesh3d):
         from .vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
+
+        if self.meshdata['p'] is not None:
+            node = np.vstack((node, self.meshdata['p']))
+
         GD = self.geo_dimension()
 
         cell = self.entity(etype)[index]

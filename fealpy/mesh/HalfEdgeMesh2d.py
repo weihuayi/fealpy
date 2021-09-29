@@ -10,6 +10,7 @@ Authors
 """
 import time
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse.csgraph import minimum_spanning_tree
 
@@ -23,7 +24,7 @@ from ..common import DynamicArray
 
 class HalfEdgeMesh2d(Mesh2d):
     def __init__(self, node, halfedge, subdomain, NV=None, nodedof=None,
-            initlevel=False):
+            initlevel=True):
         """
 
         Parameters
@@ -69,6 +70,8 @@ class HalfEdgeMesh2d(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
         self.hedgecolor = None
+        self.newnode2edge = {}
+        self.retainnode = {}
 
         # 网格节点的自由度标记数组
         # 0: 固定点
@@ -79,7 +82,6 @@ class HalfEdgeMesh2d(Mesh2d):
 
         if initlevel:
             self.init_level_info()
-
 
     @classmethod
     def from_mesh(cls, mesh, closed=False, NV=None):
@@ -677,6 +679,9 @@ class HalfEdgeMesh2d(Mesh2d):
         subdomain = self.ds.subdomain
         isMainHEdge = self.ds.main_halfedge_flag()
 
+        #新点到新半边的映射
+        self.newnode2edge, = np.where(isMarkedHEdge[hedge])
+
         # 即是主半边, 也是标记加密的半边
         flag0 = isMarkedHEdge & isMainHEdge
         idx = halfedge[flag0, 4]
@@ -742,6 +747,9 @@ class HalfEdgeMesh2d(Mesh2d):
         isRNode = np.zeros(NN, dtype=np.bool_)
         isRNode[halfedge[isMarkedHEdge, 0]] = True
 
+        #记录保留点
+        self.retainnode, = np.where(~isRNode)
+
         #更新节点
         node.adjust_size(isRNode)
         nn = (~isRNode).sum()
@@ -785,6 +793,7 @@ class HalfEdgeMesh2d(Mesh2d):
         hcell = self.ds.hcell
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
+
         NC1 = isMarkedHEdge.sum()
         NN1 = isMarked.sum()
         isMainHEdge = self.ds.main_halfedge_flag()
@@ -1563,6 +1572,7 @@ class HalfEdgeMesh2d(Mesh2d):
         NV = self.ds.number_of_vertices_of_all_cells()
         isBlueCell = NV == 4
         isNewCell = (NV == 4)|(NV == 6)
+        isNewCell[:cstart] = False
 
         NC+=NE1*2
         NNE+=NE1*2
@@ -1676,7 +1686,7 @@ class HalfEdgeMesh2d(Mesh2d):
         color[halfedge[color==2, 3]] = 1
         self.hedgecolor = color
 
-    def refine_triangle_nvb(self, isMarkedCell, options={}):
+    def refine_triangle_nvb(self, isMarkedCell=None, options={}):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -1685,13 +1695,17 @@ class HalfEdgeMesh2d(Mesh2d):
         node = self.entity('node')
         halfedge = self.ds.halfedge
 
-        if len(color[:])<NE*2:
+        if isMarkedCell is None:
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
+
+        if color is None:
             color = np.zeros(NE*2, dtype=np.int_)
             nex = halfedge[:, 2]
             pre = halfedge[:, 3]
             l = node[halfedge[:, 0]]-node[halfedge[pre, 0]]
             l = np.linalg.norm(l, axis=1)
-            color[(l>=l[nex]) & (l>=l[pre])] = 1
+            color[(l>l[nex]) & (l>l[pre])] = 1
+            self.hedgecolor = color
 
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
@@ -1795,7 +1809,7 @@ class HalfEdgeMesh2d(Mesh2d):
             self,
             method='mean',
             maxrefine=3,
-            maxcoarsen=3,
+            maxcoarsen=0,
             theta=1.0,
             maxsize=1e-2,
             minsize=1e-12,
@@ -1864,7 +1878,6 @@ class HalfEdgeMesh2d(Mesh2d):
         flag = options['numrefine'] < -options['maxcoarsen']
         options['numrefine'][flag] = -options['maxcoarsen']
 
-        # refine
         isMarkedCell = (options['numrefine'] > 0)
 
         while np.any(isMarkedCell):
@@ -1910,12 +1923,23 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedge[:, 2:] = idxmap[halfedge[:, 2:]]
 
     def uniform_refine(self, n=1):
-        for i in range(n):
-            self.refine_poly()
+        if self.ds.NV == 3:
+            for i in range(n):
+                self.refine_triangle_rg()
+        else:
+            for i in range(n):
+                self.refine_poly()
 
-    def tri_uniform_refine(self, n=1):
-        for i in range(n):
-            self.refine_triangle_rg()
+    def tri_uniform_refine(self, n=1, method="rg"):
+        if method == 'rg':
+            for i in range(n):
+                self.refine_triangle_rg()
+        elif method == 'nvb':
+            for i in range(n*2):
+                self.refine_triangle_nvb()
+        else:
+            raise ValueError("refine type error! \"rg\" or \" nvb\"")
+
 
 
     def halfedge_direction(self):
@@ -2168,6 +2192,7 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
+            print(len(self.hcell))
             cell2node = np.zeros([NC, 3], dtype = np.int_)
             current = halfedge[self.hcell[cstart:], 2]
             cell2node[:, 0] = halfedge[current, 0]

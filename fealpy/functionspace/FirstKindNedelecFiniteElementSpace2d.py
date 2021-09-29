@@ -1,6 +1,7 @@
 import numpy as np
 from numpy.linalg import inv
 
+from scipy.sparse import csr_matrix, coo_matrix
 from ..decorator import barycentric
 from .Function import Function
 from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
@@ -399,7 +400,7 @@ class FirstKindNedelecFiniteElementSpace2d:
     @barycentric
     def edge_value(self, uh, bc, index=np.s_[:], left=True):
         phi = self.edge_basis(bc, index=index, left=left)
-        edge2dof = self.dof.edge_to_dof() 
+        edge2dof = self.dof.edge_to_dof()[index] 
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
@@ -449,24 +450,80 @@ class FirstKindNedelecFiniteElementSpace2d:
             uh[cell2dof[:, idof//2:]] = val[:, 1, :]
         return uh
 
-    def mass_matrix(self):
-        gdof = self.number_of_global_dofs()
-        cell2dof = self.cell_to_dof()
-        M = self.integralalg.construct_matrix(self.basis, cell2dof0=cell2dof, gdof0=gdof)
-        return M
+    def mass_matrix(self, c=None, q=None):
+        """
+        """
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
 
-    def curl_matrix(self):
+        phi = self.basis(bcs)
+
+        if c is None:
+            M = np.einsum('i, ijkd, ijmd, j->jkm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs)
+                    c = c(ps)
+
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijkd, ijmd, j->jkm', c*ws, phi, phi,
+                        self.cellmeasure, optimize=True)
+            else:
+                M = np.einsum('i, ijdn, ijkn, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+
+        cell2dof = self.cell_to_dof()
+        gdof = self.number_of_global_dofs()
+
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
+
+    def curl_matrix(self, c=None, q=None):
         """
 
         Notes:
 
-        组装 (\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
+        组装 (c*\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
         """
-        p = self.p
+
+        mesh = self.mesh
+        cellmeasure = mesh.entity_measure('cell')
+        qf = self.integrator if q is None else mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        phi = self.curl_basis(bcs)
+
+        if c is None:
+            M = np.einsum('i, ijk..., ijm..., j->jkm', ws, phi, phi, cellmeasure, optimize=True)
+        else:
+            
+            if callable(c):
+                if c.coordtype == 'barycentric':
+                    c = c(bcs)
+                elif c.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs)
+                    c = c(ps)
+
+            if isinstance(c, (int, float)):
+                M = np.einsum('i, ijk, ijm, j->jkm', c*ws, phi, phi, cellmeasure, optimize=True)
+            else:
+                M = np.einsum('i, ij, ijk, ijm, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
-        D = self.integralalg.construct_matrix(self.curl_basis, cell2dof0=cell2dof, gdof0=gdof)
-        return D 
+
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return M 
 
     def source_vector(self, f):
         cell2dof = self.cell_to_dof()
@@ -474,7 +531,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
         return b
 
-    def set_dirichlet_bc(self, uh, g, threshold=None, q=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
         """
         p = self.p
@@ -495,7 +552,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
         t = mesh.edge_unit_tangent(index=index)
         ps = mesh.bc_to_point(bcs, index=index)
-        val = g(ps, t)
+        val = gD(ps, t)
         phi = self.smspace.edge_basis(ps, index=index)
 
         measure = self.integralalg.edgemeasure[index]

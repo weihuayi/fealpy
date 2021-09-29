@@ -379,11 +379,11 @@ class CrouzeixRaviartFiniteElementSpace():
             shape = (gdof, ) + dim
         return np.zeros(shape, dtype=self.ftype)
 
-    def set_dirichlet_bc(self, uh, g, threshold=None):
+    def set_dirichlet_bc(self, gD, uh, threshold=None):
         """
         初始化解 uh  的第一类边界条件。
         """
         ipoints = self.interpolation_points()
         isBdDof = self.is_boundary_dof(threshold=threshold)
-        uh[isBdDof] = g(ipoints[isBdDof])
+        uh[isBdDof] = gD(ipoints[isBdDof])
         return isBdDof

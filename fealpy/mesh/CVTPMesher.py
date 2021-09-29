@@ -3,13 +3,16 @@ from scipy.spatial import KDTree
 import pdb
 from scipy.spatial import Voronoi
 from .PolygonMesh import PolygonMesh
+import matplotlib.pyplot as plt
+from fealpy.mesh import TriangleMesh
 
 class CVTPMesher:
     def __init__(self, mesh,dof = None):
         """
         Parameters
         ----------
-        Mesh : mesh
+        Mesh : 利用HalfEdgeMesh2d生成的网格
+        dof : 输入是否为角点,True为角点, False为非角点
         """
         self.mesh = mesh
         if dof is not None:
@@ -17,22 +20,91 @@ class CVTPMesher:
         else :
             self.dof = np.ones(len(mesh.node))
 
-    def uniform_meshing(self, n=2, c=0.618, theta=100,times = None):
-        self.uniform_boundary_meshing(n=n, c=c, theta=theta,times = times)
-        self.uniform_init_interior_nodes()
-
-    def uniform_refine(self,n = 2,times = None):
+    def voronoi_meshing(self, nb=2, c=0.618, theta=100,adaptive = False,times = None):
         """
+        Parameters
+        ----------
+        nb : 边界一致加密次数
+        c : 参数, 控制voroCrust算法边界处圆的半径
+        theta : 对角度小于theta的角点处的角进行角点处理
+        times : 数组, 若不采用一致加密, 则输入times参数输入每个边的加密次数
+        ----------
+        该函数利用voroCrust算法确定边界重构所需要的种子点, 之后在内部撒入点, 并
+        生成初始voronoi网格
+        """
+        self.vorocrust_boundary_matching(n=nb, c=c, theta=theta,adaptive =
+                adaptive,times = times)
+        self.init_interior_nodes()
+        vor = self.voronoi()
+        return vor
+
+    def boundary_uniform_refine(self, n=2, times = None):
+        """
+        Parameters
+        ----------
+        n : 边界一致加密次数
+        times :数组, 若不采用一致加密, 则输入times参数输入每个边的加密次数
+        ----------
         该函数用于对输入的网格边界进行加密
-        n: 加密次数
         """
         mesh = self.mesh
+        for i in range(n):
+            node = mesh.node
+            halfedge = mesh.ds.halfedge
+            dof = self.dof
+            isMarkedHEdge = mesh.ds.main_halfedge_flag()
+            idx = halfedge[isMarkedHEdge,4]
+            ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
+            isMarkedHEdge[idx] = True
+
+            mesh.init_level_info()
+            mesh.refine_halfedge(isMarkedHEdge)
+            self.dof = np.r_['0',
+                    dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
+
+    def boundary_adaptive_refine(self, n = 2, times = None):
+        """
+        parameters
+        ----------
+        n : 最长边加密次数
+        times : 支持手动输入各边加密次数
+        ----------
+        边界自适应加密
+        """
+        mesh = self.mesh
+        halfedge = mesh.ds.halfedge
+        node = mesh.node
         if times is None:
-            for i in range(n):
-                node = mesh.node
-                halfedge = mesh.ds.halfedge
+            idx0 = halfedge[halfedge[:, 3], 0]
+            idx1 = halfedge[:, 0]
+            v = node[idx1] - node[idx0]
+            h = np.sqrt(np.sum(v**2, axis=-1))
+            minh = min(h)
+            maxh = max(h)
+            if min(h)/max(h)>0.9:
+                self.boundary_uniform_refine(n=n)
+                return
+            times = np.zeros(len(h))
+            uqh = np.unique(h)
+            t, = np.where(uqh == maxh)
+            uqh = np.delete(uqh,t)
+            times[h==maxh] = n
+            mh = maxh/2**n
+            for i in uqh:
+                i0 = i/mh
+                j = 0
+                while(i0>1):
+                    i0 /=2
+                    j += 1
+                times[h==i] = j
+            times = times[::2]
+        unique = np.unique(times)
+        for i in unique:
+            l = len(halfedge)
+            isMarkedHEdge = np.zeros(l,dtype = np.bool_)
+            isMarkedHEdge[::2] = (times == i)
+            for j in range(int(i)):
                 dof = self.dof
-                isMarkedHEdge = mesh.ds.main_halfedge_flag()
                 idx = halfedge[isMarkedHEdge,4]
                 ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
                 isMarkedHEdge[idx] = True
@@ -41,35 +113,34 @@ class CVTPMesher:
                 mesh.refine_halfedge(isMarkedHEdge)
                 self.dof = np.r_['0',
                         dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
-        else:
-            unique = np.unique(times)
-            for i in unique:
                 halfedge = mesh.ds.halfedge
+                times = np.hstack((times,i*np.ones(int((len(halfedge)-l)/2))))
                 l = len(halfedge)
                 isMarkedHEdge = np.zeros(l,dtype = np.bool_)
                 isMarkedHEdge[::2] = (times == i)
-                for j in range(int(i)):
-                    node = mesh.node
-                    dof = self.dof
-                    idx = halfedge[isMarkedHEdge,4]
-                    ec = (node[halfedge[isMarkedHEdge,0]]+node[halfedge[idx,0]])/2
-                    isMarkedHEdge[idx] = True
 
-                    mesh.init_level_info()
-                    mesh.refine_halfedge(isMarkedHEdge)
-                    self.dof = np.r_['0',
-                            dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
-                    halfedge = mesh.ds.halfedge
-                    times = np.hstack((times,i*np.ones(int((len(halfedge)-l)/2))))
-                    l = len(halfedge)
-                    isMarkedHEdge = np.zeros(l,dtype = np.bool_)
-                    isMarkedHEdge[::2] = (times == i)
-
-    def uniform_boundary_meshing(self, n=0, c=0.618, theta=100,times=None):
-        self.uniform_refine(n=n,times = times)
+    def vorocrust_boundary_matching(self, n=0, c=0.618, theta=100,adaptive =
+            False,times=None):
+        """
+        Parameters
+        ----------
+        n : 边界一致加密次数
+        c : 参数, 控制voroCrust算法边界处圆的半径
+        theta : 对角度小于theta的角点处的角进行角点处理
+        times : 数组, 若不采用一致加密, 则输入times参数输入每个边的加密次数
+        ----------
+        该函数对边界进行加密并利用voroCrust算法确定重构边界所需要的种子点
+        """
+        if adaptive == False:
+            self.boundary_uniform_refine(n=n)
+        else :
+            self.boundary_adaptive_refine(n=n,times=times)
         node = self.mesh.node
+        sdomain = self.mesh.ds.subdomain
         NN = len(node)
         halfedge = self.mesh.entity('halfedge')
+        cstart = self.mesh.ds.cellstart
+
         #halfedge = self.mesh.ds.halfedge
     
         # 这里假设所有边的尺寸是一样的
@@ -92,15 +163,24 @@ class CVTPMesher:
 
         # 修正角点相邻点的半径, 如果角点的角度小于 theta 的
         # 这里假设角点相邻的节点, 到角点的距离相等
-        isFixed = self.dof
-        hnode = np.zeros(NN,dtype = np.int_)
-        hnode[halfedge[:,0]] = np.arange(len(halfedge))
-        hnode1 = halfedge[halfedge[hnode,2],4]
+        if max(sdomain) == 1:
+            isFixed = self.dof
+            hnode = np.zeros(NN,dtype = np.int_)
+            hnode[halfedge[:,0]] = np.arange(len(halfedge))
+            hnode1 = halfedge[halfedge[hnode,2],4]
 
-        idx, = np.where(isFixed==1)
-        idx = np.hstack((hnode[idx],hnode1[idx]))
-        pre = halfedge[idx, 3]
-        nex = halfedge[idx, 2]
+            idx, = np.where(isFixed==1)
+            idx = np.hstack((hnode[idx],hnode1[idx]))
+            pre = halfedge[idx, 3]
+            nex = halfedge[idx, 2]
+        else:
+            isFixed, = np.where(self.dof==1)
+            idx = np.zeros(len(halfedge),dtype = np.bool_)
+            for i in isFixed:
+                idx[halfedge[:,0]==i] = True
+            idx, = np.where(idx == 1)
+            pre = halfedge[idx, 3]
+            nex = halfedge[idx, 2]
 
         p0 = node[halfedge[pre, 0]]
         p1 = node[halfedge[idx, 0]]
@@ -151,42 +231,47 @@ class CVTPMesher:
         idxmap = np.zeros(NG, dtype=np.int)
         idxmap[isKeepNode] = range(isKeepNode.sum())
 
-        self.bnode = bnode[isKeepNode] #
-        idxflag = halfedge[idx,1]<=0
-        self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] #
+        bnode = bnode[isKeepNode] #
+        idxflag = halfedge[idx,1]<cstart # 要处理的凹角点所对应的半边索引
+        self.cnode = node[halfedge[idx[idxflag], 0]] - v2[idxflag] 
+        NC = len(self.cnode)
         self.hedge2bnode = idxmap[index] # hedge2bnode[i]: the index of node in bnode
-        self.chedge = idx # the index of halfedge point on corner point
+        self.chedge = idx[idxflag] # the index of halfedge point on corner point
+        self.bnode = np.r_[bnode,self.cnode]
+        NB = len(bnode)
+        idx[idxflag] = np.arange(NB-NC,NB)
+        self.corner2node = idx # bnode中角点处bnode的索引
+        self.cnode2node = idx[idxflag]
+        # 完善数据结构 
+        self.bnode2subdomain = np.zeros(len(self.bnode),dtype = np.int_)
+        self.bnode2subdomain[self.hedge2bnode] = halfedge[:,1]
+        
+        NC = len(self.cnode)
+        if NC > 0:
+            self.bnode2subdomain[-NC:] = cstart
 
-    def uniform_init_interior_nodes(self):
+    def init_interior_nodes(self):
+        """
+        该函数对进行了边界重构的网格撒入内部点
+        """
         mesh = self.mesh
         node = self.mesh.node
         halfedge = self.mesh.entity('halfedge')
-
-        NNB = len(self.bnode)
-        NNC = len(self.cnode)
-        hcell = len(mesh.ds.hcell)# hcell[i] 是第i个单元其中一条边的索引
+        bnode2subdomain = self.bnode2subdomain
+        bnode = self.bnode
         cstart = mesh.ds.cellstart
-        bnode2subdomain = np.zeros(NNB+NNC, dtype=np.int)
-        bnode2subdomain[self.hedge2bnode] = halfedge[:, 1]
-        if NNC >0:
-            bnode2subdomain[-NNC:] = cstart # 将cnode对应的子区域记为内部区域
-        self.bnode2subdomain = bnode2subdomain
 
         idx0 = halfedge[halfedge[:, 3], 0]
         idx1 = halfedge[:, 0]
         v = node[idx1] - node[idx0]
         h = np.sqrt(np.sum(v**2, axis=-1))
 
-        if NNC > 0:
-            bd = np.r_[self.bnode, self.cnode]
-        else:
-            bd = self.bnode
-        tree = KDTree(bd)
+        tree = KDTree(bnode)
         #c = 6*np.sqrt(3*(h[0]/2)*(h(0)/2)**3)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.mesh.ds.subdomain):
-            p = bd[bnode2subdomain == index]
+            p = bnode[bnode2subdomain == index]
             xmin = min(p[:, 0])
             xmax = max(p[:, 0])
             ymin = min(p[:, 1])
@@ -206,7 +291,7 @@ class CVTPMesher:
                 pp *= np.array([xmax-xmin,ymax-ymin])
                 pp += np.array([xmin,ymin])
                 d, idx = tree.query(pp)
-                flag0 = d > (0.7*h[0])
+                flag0 = d > (0.8*h[0])
                 flag1 = (bnode2subdomain[idx] == cstart + index -1)
                 pp = pp[flag0 & flag1]# 筛选出符合要求的点
                 end = start + pp.shape[0]
@@ -217,21 +302,136 @@ class CVTPMesher:
                     start = end
             self.inode[index] = newNode
 
-    def voronoi(self):
+    def AFT_init_interior_nodes(self):
+        """
+        该函数仍在设计中, 目前只有圆形区域能正常运行
+        ------
+        该函数对进行了边界重构的网格利用波前法思想对内部点进行布点
+        """
+        mesh = self.mesh
+        node = self.mesh.node
+        halfedge = self.mesh.entity('halfedge')
+        hedge2bnode = self.hedge2bnode
+        corner2node = self.corner2node
+        cnode2node = self.cnode2node
         bnode = self.bnode
-        cnode = self.cnode
+        cstart = mesh.ds.cellstart
+        isMarkedHEdge = mesh.ds.main_halfedge_flag()
+        bnode2subdomain = self.bnode2subdomain
+        ihalfedge = NNhalfedge[halfedge[:,2]>=cstart]
+        w = np.array([[0, 1], [-1, 0]])
+        ihalfedge = halfedge
+
+        ihalfedge[:,4] = np.arange(len(halfedge))
+        ihalfedge = ihalfedge[ihalfedge[:,2]>=cstart]
+        flag = np.arange(len(ihalfedge))
+
+
+        NB = len(self.bnode)
+        NC = len(self.cnode)
+        hcell = len(mesh.ds.hcell)# hcell[i] 是第i个单元其中一条边的索引i
+        idx0 = halfedge[halfedge[:, 3], 0]
+        idx1 = halfedge[:, 0]
+        v = node[idx1] - node[idx0]
+        h = np.sqrt(np.sum(v**2, axis=-1))
+
+        self.inode = {} # 用一个字典来存储每个子区域的内部点
+        index = 0
+        self.inode[index] = bnode[bnode2subdomain>=cstart]
+        inode = self.inode[index]
+        nex = halfedge[halfedge[:,1]>=cstart,2]
+        inode2 = bnode[hedge2bnode[nex]]
+        bnode1 = bnode
+        index +=1
+        self.inode[index] = (inode + inode2)/2 + 0.86*(inode2-inode)@w
+        while True:
+            if index >=4:
+                break
+            inode = self.inode[index]
+            bnode1[hedge2bnode[halfedge[:,1]>=cstart]] = inode
+            inode2 = bnode1[hedge2bnode[nex]]
+            index +=1
+            self.inode[index] = (inode + inode2)/2 + 0.86*(inode2-inode)@w
+        node = self.inode[0]
+        l = len(node)
+        for i in range(1,len(self.inode)):
+            node1 = self.inode[i]
+            node = np.r_[node,node1]
+        self.inode = node
+        plt.figure()
+        plt.scatter(node[:,0],node[:,1])
+        plt.show()
+
+    def Background_grid_init_interior_nodes(self):
+        '''
+        利用背景网格方法对网格进行初始均匀布点
+        '''
+        halfedge = self.mesh.entity('halfedge')
+        bnode = self.bnode
+        bnode2subdomain = self.bnode2subdomain
+        cstart = self.mesh.ds.cellstart
+        
+
+        idx0 = halfedge[halfedge[:, 3], 0]
+        idx1 = halfedge[:, 0]
+        v = self.mesh.node[idx1] - self.mesh.node[idx0]
+        h = np.sqrt(np.sum(v**2, axis=-1))
+
+        xmin = min(self.mesh.node[:, 0])
+        xmax = max(self.mesh.node[:, 0])
+        ymin = min(self.mesh.node[:, 1])
+        ymax = max(self.mesh.node[:, 1])
+        node = np.array([[xmin,ymin],[xmax,ymin],[xmax,ymax],[xmin,ymax]])
+        cell = np.array([[0,1,2],[0,2,3]])
+        tmesh = TriangleMesh(node,cell)
+        inode = bnode[self.bnode2subdomain>=cstart]
+        
+        while True:
+            locate = tmesh.location(inode)
+            if len(locate) == len(set(locate)):
+                break
+            tmesh.uniform_refine()
+        fig = plt.figure()
+        axes = fig.gca()
+        tmesh.add_plot(axes)
+        tmesh.find_cell(axes)
+        plt.show()
+        tcell = range(len(tmesh.ds.cell))
+        tcell = np.setdiff1d(tcell,locate,assume_unique = True)# 数组取差集
+        tcell2node = tmesh.ds.cell_to_node()
+        tcell2node = tcell2node[tcell]
+        tnode = tmesh.node[tcell2node]
+
+        subdomain = self.mesh.ds.subdomain
+        area = self.mesh.cell_area(subdomain>cstart)
+        area = np.sum(area)
+        c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
+        number = int(area/c)-len(bnode[bnode2subdomain>=cstart])
+
+        inode = (tnode[:,0,:] + tnode[:,1,:] + tnode[:,2,:])/3
+        tree =KDTree(bnode)
+        d,idx = tree.query(inode)
+        ah = set(h)
+        ah = sum(h)/len(h)
+        flag0 = d>0.7*max(h)
+        flag1 = bnode2subdomain[idx]>=cstart
+        self.inode = inode[flag0 & flag1]
+
+    def voronoi(self):
+        """
+        对已经放置的种子点生成voronoi网格
+        """
+        bnode = self.bnode
         inode = self.inode
        
-        NNB = len(bnode) 
-        NNC = len(cnode)
-        NN = NNB + NNC
+        NB = len(bnode)
+        NN = len(bnode)
         for index, point in inode.items(): # inode is a dict
             NN += len(point)
         self.NN = NN
         points = np.zeros((NN, 2), dtype=bnode.dtype)
-        points[:NNB] = bnode
-        points[NNB:NNB+NNC] = cnode
-        start = NNB + NNC
+        points[:NB] = bnode
+        start = NB
         for index, point in inode.items():
             N = len(point)
             points[start:start+N] = point
@@ -239,13 +439,20 @@ class CVTPMesher:
 
         # construct voronoi diagram
         vor = Voronoi(points)
-        start = NNB+NNC
+        start = NB
         self.start = start
-        return vor, start
+        return vor
 
-    def Lloyd(self, vor, start):
-
+    def lloyd_opt(self, vor):
+        """
+        Parameters
+        ----------
+        vor : 利用voronoi函数生成的vorornoi网格
+        ----------
+        该函数对voronoi网格进行一次lloyd优化
+        """
         vertices = vor.vertices
+        start = self.start # 边界处重构边界的种子点数量
         NN = self.NN
         rp = vor.ridge_points
         rv = np.array(vor.ridge_vertices)
@@ -269,40 +476,48 @@ class CVTPMesher:
         vor = Voronoi(vor.points)
         return vor
     
-    def to_PolygonMesh(self,vor):
+    def to_polygonMesh(self, vor):
+        """
+        Parameters
+        ----------
+        vor : 利用voronoi函数生成的voronoi网格
+        ----------
+        将voronoi网格转换为polygonMesh数据结构
+        """
         bnode2subdomain = self.bnode2subdomain
         start = self.start
         cstart = self.mesh.ds.cellstart
         points = vor.points
         pnode = vor.vertices
         point_region = vor.point_region
-        regions = vor.regions
         ridge_vertices = vor.ridge_vertices
 
         bnode_region = point_region[:start]
         bnode_region = bnode_region[bnode2subdomain>=cstart]
-        point_region = np.hstack((bnode_region,point_region[start:]))
-        regions = np.array(regions)[point_region]
-        pcellLocation =[len(x) for x in regions]
-        pcell = sum(regions,[]) # 将列表合并为一个列表
-        pcellLocation = np.array(pcellLocation)
-        pcellLocation = pcellLocation.cumsum()
-        pcellLocation = np.hstack((np.array([0]),pcellLocation))
-        pcell = np.array(pcell)
-        return PolygonMesh(pnode,pcell,pcellLocation)
+        point_region = np.hstack((bnode_region, point_region[start:]))
+        regions = [vor.regions[i] for i in point_region]
+        pcellLocation =np.array([0] + [len(x) for x in regions],
+                dtype=np.int_)
+        np.cumsum(pcellLocation, out=pcellLocation)
+        pcell = np.array(sum(regions,[]), dtype=np.int_)
+        return PolygonMesh(pnode, pcell, pcellLocation)
 
     def energy(self,vor):
+        """
+        该函数计算voronoi网格的能量函数, 衡量网格质量
+        """
         points = vor.points
         vertices = vor.vertices
-        halfedge = self.domain.halfedge
-
+        halfedge = self.mesh.entity('halfedge')
+        cstart = self.mesh.ds.cellstart
+        
         NP = points.shape[0]
         area = np.zeros(NP,dtype=np.float)
         rp =vor.ridge_points
         rv = np.array(vor.ridge_vertices)
         isKeeped = (rv[:, 0]>=0)
         rp = rp[isKeeped]
-        rv = rv[isKeeped]
+        rv = rv[sKeeped]
         N = rp.shape[0]
         NN = 2*N
         p0 = np.zeros((NN,2),dtype = np.float)
@@ -330,29 +545,61 @@ class CVTPMesher:
         np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
         np.add.at(valence, rp[:, 0], 1)
         np.add.at(valence, rp[:, 1], 1)
-
-        bp = self.hedge2bnode[halfedge[:,1]<=0]#无界区域和洞的种子点编号
+        bp = self.hedge2bnode[halfedge[:,1]<cstart]#无界区域和洞的种子点编号
         ap = np.ones(NP,dtype = np.bool)
         ap[bp] = False
-        """
-        pointflag = (valence ==0)
-        valence[pointflag] +=1
-        """
         npoints[:] /= valence[:,None]
-        """
-        npoints[~pointflag] = points[~pointflag]
-        """
         energy = np.sum(np.sum((npoints[ap]-points[ap])**2,axis=1)*area[ap])
         aream = area[ap]
-        ef = 2*(points[ap]-npoints[ap])*aream[:,None]
+        ef = 2*(points[ap]-npoints[ap])*aream[:,None]# 能量函数的导数
         return energy, ef
 
     def cell_area(self,index = np.s_[:]):
         return self.mesh.cell_area(index)
+    def data(self):
+        pass
 
+    def print(self):
+        pass
 
+class VoroAlgorithm():
+    def __init__(self,voromesher):
+        self.voromesher = voromesher
 
+    def lloyd_opt(self,vor):
+        voromesher = self.voromesher
+        """
+        Parameters
+        ----------
+        vor : 利用voronoi函数生成的vorornoi网格
+        ----------
+        该函数对voronoi网格进行一次lloyd优化
+        """
+        voromesher = self.voromesher
+
+        vertices = vor.vertices
+        start = voromesher.start # 边界处重构边界的种子点数量
+        NN = voromesher.NN
+        rp = vor.ridge_points
+        rv = np.array(vor.ridge_vertices)
+        isKeeped = (rp[:, 0] >= start) | (rp[:, 1] >= start) 
+
+        rp = rp[isKeeped]
+        rv = rv[isKeeped]
+
+        npoints = np.zeros((NN, 2), dtype=voromesher.bnode.dtype)
+        valence = np.zeros(NN, dtype=np.int)
+
+        center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
+        area = np.zeros(NN,dtype=np.float)
+        np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
+        np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
+        np.add.at(valence, rp[:, 0], 1)
+        np.add.at(valence, rp[:, 1], 1)
+        npoints[start:] /= valence[start:, None]
         
-
+        vor.points[start:, :] = npoints[start:, :]
+        vor = Voronoi(vor.points)
+        return vor
 
         

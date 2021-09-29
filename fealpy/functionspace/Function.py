@@ -51,7 +51,7 @@ class Function(np.ndarray):
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
-            axes = fig.gca(projection='3d')
+            axes = plot.axes(projection='3d')
         else:
             axes = plot
 

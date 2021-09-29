@@ -507,16 +507,15 @@ class ScaledMonomialSpace3d():
 
 
         from .femdof import multi_index_matrix3d
-        from ..mesh import MeshFactory
+        from ..mesh import MeshFactory as MF
         from ..mesh import TetrahedronMesh
 
-        mfactory = MeshFactory()
         index = multi_index_matrix3d(p)
         phi = x**index[:, 1]*y**index[:, 2]*z**index[:, 3]
         phi = ['$'+x+'$' for x in map(sp.latex, phi)]
         bc = index/p
 
-        mesh0 = mfactory.one_tetrahedron_mesh(meshtype='equ') # 正四面体
+        mesh0 = MF.one_tetrahedron_mesh(meshtype='equ') # 正四面体
         node0 = mesh0.entity('node')
 
         # plot
@@ -591,9 +590,8 @@ class ScaledMonomialSpace3d():
         from ..mesh import MeshFactory
         from ..mesh import TriangleMesh
 
-        mfactory = MeshFactory()
         bc = multi_index_matrix2d(p)/p
-        mesh0 = mfactory.one_triangle_mesh(ttype='equ') # 正三角形 
+        mesh0 = MF.one_triangle_mesh(ttype='equ') # 正三角形 
 
         fig = plt.figure()
         axes = fig.add_subplot(121)

@@ -135,7 +135,8 @@ class CPLFEMDof1d():
             w[:,0] = np.arange(p-1, 0, -1)/p
             w[:,1] = w[-1::-1, 0]
             GD = mesh.geo_dimension()
-            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w, node[cell])
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                    node[cell]).reshape(-1, GD)
 
             return ipoint
 
@@ -691,7 +692,7 @@ class DPLFEMDof():
     def number_of_local_dofs(self):
         p = self.p
         TD = self.mesh.top_dimension()
-        numer = reduce(op.mul, range(p + TD, p + TD - 2, -1))
+        numer = reduce(op.mul, range(p + TD, p, -1))
         denom = reduce(op.mul, range(1, TD + 1))
         return numer//denom
 
