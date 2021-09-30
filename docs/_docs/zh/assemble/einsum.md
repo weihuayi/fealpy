@@ -8,6 +8,7 @@ author:wpx
 # 爱因斯坦求和约定
 
 在数学中，爱因斯坦求和约定是一种标记法，也称为Einstein Summation Convention。简单来说，爱因斯坦求和就是简化掉求和式中的求和符号，即 $\sum$  ,这样就会使公式更加简洁，如
+
 $$
 a_ib_i = \sum^N_{i=0}a_ib_i = a_0b_0 + a_1b_1 + \cdots + a_Nb_N
 $$

@@ -175,7 +175,8 @@ $$
 第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成$\sigma(u)$,Chorin算法第一步变为
 $$
 \begin{aligned}
-(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + \frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - \frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) &= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
+(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + \frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - \frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + (p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega}
+-( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
 \end{aligned}
 $$
@@ -193,7 +194,7 @@ $$
 第三步计算
 $$
 \begin{aligned}
-(\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla p^{n+1}, \boldsymbol v) \qquad in \quad \Omega 
+(\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla(p^{n+1}-p^{n}), \boldsymbol v) \qquad in \quad \Omega 
 \end{aligned}
 $$
 # 4 Benchmark
@@ -296,7 +297,7 @@ $$
 	\end{bmatrix}
 	& \cdots
 	& \begin{bmatrix}
-		\frac{\partial \phi_{l_1}}{\partial x} & \frac{1}{2}\frac{\partial \phi_{l-1}}{\partial y}\\
+		\frac{\partial \phi_{l-1}}{\partial x} & \frac{1}{2}\frac{\partial \phi_{l-1}}{\partial y}\\
 		\frac{1}{2}\frac{\partial \phi_{l-1}}{\partial y} & 0
 	\end{bmatrix}
 	& \begin{bmatrix}
@@ -523,6 +524,79 @@ $$
 \boldsymbol E_{0, 1} = \int_\tau \frac{1}{2}\frac{\partial\boldsymbol\phi^T}{\partial y}\frac{\partial\boldsymbol\phi}{\partial x}\mathrm
 d\boldsymbol x
 $$
+
+
+$$
+(p^n\boldsymbol n ,\boldsymbol v)_{\partial \tau} =
+\begin{bmatrix}
+G_0 \\
+G_1
+\end{bmatrix}
+$$
+
+$$
+G_0 =
+\int_{\partial \tau} 
+\boldsymbol\phi^T (p^nn_0)
+\boldsymbol d \boldsymbol x
+$$
+
+$$
+G_1 =
+\int_{\partial \tau} 
+\boldsymbol\phi^T (p^nn_1)
+\boldsymbol d \boldsymbol x
+$$
+
+
+$$
+( \epsilon(\boldsymbol \Phi) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \tau}
+=
+\int_{\partial \tau} 
+\begin{bmatrix}
+\boldsymbol\phi^T & \boldsymbol0 \\
+\boldsymbol0 & \boldsymbol\phi^T
+\end{bmatrix} 
+
+\begin{bmatrix}
+\frac{\partial \boldsymbol \phi}{\partial x}n_0+\frac{1}{2}\frac{\partial \boldsymbol \phi}{\partial y}n_1 & \frac{1}{2}\frac{\partial \boldsymbol \phi}{\partial x}n_1 \\
+\frac{1}{2}\frac{\partial \boldsymbol \phi}{\partial y}n_0 &\frac{1}{2}\frac{\partial \boldsymbol\phi}{\partial x}n_0+\frac{\partial \boldsymbol \phi}{\partial y}n_1 
+\end{bmatrix}
+\boldsymbol d \boldsymbol x
+\\=
+\begin{bmatrix}
+\boldsymbol D_{00} & \boldsymbol D_{01} \\
+\boldsymbol D_{10} & \boldsymbol D_{11} \\
+\end{bmatrix}
+$$
+
+$$
+\boldsymbol D_{00} = \int_\tau \boldsymbol\phi^T\frac{\partial\boldsymbol\phi}{\partial x}n_0
++\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_1\mathrm
+d\boldsymbol x
+$$
+
+$$
+\boldsymbol D_{11} = \int_\tau \boldsymbol\phi^T\frac{\partial\boldsymbol\phi}{\partial y}n_1
++\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_0\mathrm
+d\boldsymbol x
+$$
+
+$$
+\boldsymbol D_{01} = 
+\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_1\mathrm
+d\boldsymbol x
+$$
+
+
+$$
+\boldsymbol D_{10} = 
+\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_0\mathrm
+d\boldsymbol x
+$$
+
+
+
 
 
 
