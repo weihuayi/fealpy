@@ -163,6 +163,9 @@ docs-zh:
       - title: Navier-stokes 方程
         url:   /docs/zh/example/num-navier-stokes-equation
   - title:     成果展示 
+    children:
+      - title: ADDG求解椭圆问题
+        url:   /docs/zh/achievement/ADDG
   - title:     其他语言
     children:
       - title:  English
