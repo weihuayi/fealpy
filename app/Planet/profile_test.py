@@ -24,12 +24,12 @@ parser.add_argument('--nq',
         help='积分精度, 默认为 3.')
 
 parser.add_argument('--T',
-        default=10, type=float,
-        help='求解的最终时间, 默认为 10 天.')
+        default=0.125, type=float,
+        help='求解的最终时间, 默认为 0.125 天.')
 
 parser.add_argument('--DT',
-        default=60, type=int,
-        help='求解的时间步长, 默认为 60 秒.')
+        default=18, type=int,
+        help='求解的时间步长, 默认为 18 秒.')
 
 parser.add_argument('--accuracy',
         default=1e-7, type=float,
