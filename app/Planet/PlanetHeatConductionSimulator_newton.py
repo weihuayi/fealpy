@@ -189,7 +189,6 @@ class PlanetHeatConductionWithRotationSimulator():
             
         Tss = self.pde.options['Tss']
         i = timeline.current
-        print(i, ",", uh0[:]*Tss)
 
         k = 0
         error = 1.0
@@ -214,6 +213,7 @@ class PlanetHeatConductionWithRotationSimulator():
             error = np.max(np.abs(x))
             print(k, ":", error)
             uh1[:] = uh
+            print(i, ",", uh1[:]*Tss)
             
             k += 1
             if k >= self.args.niteration: 
@@ -286,12 +286,11 @@ class PlanetHeatConductionWithRotationSimulator():
             i = timeline.current
             print('i:', i)
 
-            if (i*self.args.DT) % self.pde.options['period'] == 0 and i!=0:
-                err = np.abs(np.min(self.uh1)-np.min(self.uh2))
-                print('aaaaaaaaa:', err)
+            if (i*args.DT) % self.pde.options['period'] == 0 and i!=0:
+                err = np.abs(np.max(self.uh1 - self.uh2))
                 self.uh2[:] = self.uh1
             
-            if err > 1:
+            if err > args.stable:
                 self.newton(ctx=ctx)
                 self.uh0[:] = self.uh1
                 
@@ -311,6 +310,8 @@ class PlanetHeatConductionWithRotationSimulator():
                         data = {'name':fname, 'mesh':self.mesh}
                         queue.put(data)
                     queue.put(-1) # 发送模拟结束信号 
+
+                print('The time when the state reache stability is:', i*args.DT)
                 break
         
         if queue is not None:
