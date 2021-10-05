@@ -101,7 +101,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         return phi 
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:], variables='x'):
+    def grad_basis(self, bc, index=np.s_[:], etype='cell', ftype=None, variables='x'):
         """
 
         Notes
@@ -109,8 +109,8 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         计算空间基函数关于实际坐标点 x 的梯度。
         """
         p = self.p
-        gphi = self.mesh.grad_shape_function(bc, index=index, p=p,
-                variables=variables)
+        gphi = self.mesh.grad_shape_function(bc, index=index, p=p, etype=etype,
+                ftype=ftype, variables=variables)
         return gphi
 
     @barycentric
@@ -125,8 +125,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
         return val
 
     @barycentric
-    def grad_value(self, uh, bc, index=np.s_[:]):
-        gphi = self.grad_basis(bc, index=index)
+    def grad_value(self, uh, bc, index=np.s_[:], etype='cell',
+            ftype=None):
+        gphi = self.grad_basis(bc, index=index, etype=etype, ftype=ftype)
         cell2dof = self.dof.cell2dof[index]
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -403,7 +404,7 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
             uh[isqDDof] = gD(ipoints[isqDDof])
             return istDDof, isqDDof
     
-    def set_neumann_bc(self, F, gN, threshold=None, q=None):
+    def set_neumann_bc(self, gN, F, threshold=None, q=None):
         self.set_tri_boundary_neumann_bc(F, gN, threshold=threshold, q=q)
     
     def set_tri_boundary_neumann_bc(self, F, gN, threshold=None, q=None):
@@ -431,6 +432,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.tri_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = self.mesh.integrator(q, 'tface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -473,6 +477,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.quad_face_to_dof()[index]
+        
+        if q is None:
+            q = p+3
 
         qf = self.mesh.integrator(q, 'qface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -520,6 +527,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.tri_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = mesh.integrator(q, 'tface')
         bcs, ws = qf.get_quadrature_points_and_weights()
@@ -571,6 +581,9 @@ class ParametricLagrangeFiniteElementSpaceOnWedgeMesh:
                 index = index[flag]
 
         face2dof = self.quad_face_to_dof()[index]
+
+        if q is None:
+            q = p+3
 
         qf = mesh.integrator(q, 'qface')
         bcs, ws = qf.get_quadrature_points_and_weights()

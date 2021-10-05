@@ -155,14 +155,14 @@ class PlanetHeatConductionWithRotationSimulator():
             R += self.M00
 
             self.solver.set_matrix(R)
-            self.solver.solve(uh, F)
+            uh = self.solver.solve(uh, F)
 
             error = np.max(np.abs(uh[:] - uh1[:]))
             print(k, ":", error)
             uh1[:] = uh
             
             k += 1
-            if k >= self.args.npicard: 
+            if k >= self.args.niteration: 
                 print('picard iteration arrive max iteration with error:', error)
                 break
     
@@ -182,6 +182,16 @@ class PlanetHeatConductionWithRotationSimulator():
         T = np.zeros(len(uh0)+1, dtype=np.float64)
         T[:-1] = uh0*Tss
         mesh.nodedata['uh'] = T
+        
+        qf = mesh.integrator(self.args.nq, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        bc = (np.array([np.mean(bcs[0], axis=0)]), np.array([np.mean(bcs[1],
+            axis=0)]))
+
+        uh0_grad = uh0.grad_value(bc)
+        
+        Tg = Tss*uh0_grad[0, ...]
+        mesh.celldata['uhgrad'] =Tg
         
         scale = self.args.scale
         l = self.pde.options['l']
@@ -389,7 +399,7 @@ class PlanetHeatConductionWithIrrotationSimulator():
             uh1[:] = uh
             
             k += 1
-            if k >= self.args.npicard: 
+            if k >= self.args.niteration: 
                 print('picard iteration arrive max iteration with error:', error)
                 break
     

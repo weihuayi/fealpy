@@ -19,7 +19,8 @@ import pyamg
 from timeit import default_timer as timer
 
 
-n = int(sys.argv[1])
+n = 1 
+scale = 1
 
 pde = BoxDomainData3d() 
 mesh = pde.init_mesh(n=n)
@@ -32,7 +33,8 @@ A = space.linear_elasticity_matrix(pde.lam, pde.mu, q=1)
 F = space.source_vector(pde.source, dim=3)
 A, F = bc.apply(A, F, uh)
 
-if False:
+
+if True:
     uh.T.flat[:] = spsolve(A, F)
 elif False:
     N = len(F)
@@ -81,8 +83,9 @@ else:
     end = timer()
     print('time:', end - start, 'dof:', A.shape)
 
+print(uh)
 
-if False:
+if True:
 # 原始网格
     mesh.add_plot(plt)
 
