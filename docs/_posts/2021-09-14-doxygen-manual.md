@@ -22,9 +22,9 @@ sudo apt install doxygen
 
 ## doxygen 注释规则
 
-Doxygen 只会处理符合规则的注释. 
+Doxygen 可以用于 C++ 和 Python 等语言的程序, 只会处理符合规则的注释.
 
-### 注释规则
+### C++ 注释规则
 
 - 多行注释
     ```c++
@@ -56,6 +56,12 @@ Doxygen 只会处理符合规则的注释.
     ```c++
     int a = 3; /**< 将 a 设为 3 */
     ```
+### Python 注释规则
+
+- 简单注释
+    ```python
+    '''! 注释内容'''
+    ```
 
 ### 常见注释标记
 
@@ -80,12 +86,13 @@ Doxygen 只会处理符合规则的注释.
     - `\f[` 输入 latex 公式
     - `\f]` 结束 latex 公式
 
+以上是 C++ 风格注释, Python 程序中将 `\` 改为 `@` 即可.
+
 ## 例子
 
-这里给出一个例子
+### C++ 程序例子
 
 ```c++
-
 /**
  * \file test_TetrahedronQuadrature.cpp
  * \author Chunyu Chen
@@ -173,6 +180,64 @@ int main(int args, char *argv[])
   test_integral(q, h);
 }
 
+```
+
+### Python 程序例子
+
+```python
+
+'''!
+@file test.py
+@author chenchunyu
+@date 10/03/2021
+@brief 一个测试文件
+'''
+
+import numpy as np
+
+class Test:
+    '''!
+    @brief 测试类
+    @todo 完善
+    '''
+    def __init__(self, a, b):
+        '''!
+        @brief 初始化函数, 构造对象时调用的函数.
+        @param a 第一个参数
+        @param b 第二个参数
+        '''
+        self.a = a
+        self.b = b
+
+    def add(self, k, b):
+        '''!
+        @brief 一个测试函数, 计算 @f[kx+by@f]
+        @param k 第一个参数
+        @param b 第一个参数
+        @return 返回 k*self.a + b*self.b
+        '''
+        return k*self.a + b*self.b
+```
+
+## 文件生成
+1. 生成 Doxyfile
+```bash
+doxygen -g
+```
+
+2. 修改设置, 打开 Doxyfile, 设置 
+    - `USE_MATHJAX = YES`
+    - `GENERATE_LATEX = NO`
+    - 文件位置
+
+3. 生成 HTML 文件
+```bash
+doxygen
+```
+
+4. 查看 HTML 文件
+```bash
+jekyll serve
 ```
 
 
