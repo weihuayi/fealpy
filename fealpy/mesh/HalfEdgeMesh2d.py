@@ -1756,6 +1756,8 @@ class HalfEdgeMesh2d(Mesh2d):
         clevel = self.celldata['level']
 
         color = self.hedgecolor
+        if color is None:
+            return 
         node = self.entity('node')
         halfedge = self.entity('halfedge')
         cstart = self.ds.cellstart
@@ -1778,9 +1780,10 @@ class HalfEdgeMesh2d(Mesh2d):
         color[halfedge[flag, 3]] = 1
 
         #进一步标记要移除的半边
+        NV = self.ds.number_of_vertices_of_all_cells()
         nex = halfedge[:, 2]
         opp = halfedge[:, 4]
-        flag = opp[nex[opp[nex]]] == np.arange(len(halfedge))
+        flag = (opp[nex[opp[nex]]] == np.arange(len(halfedge))) & (NV[halfedge[:, 1]]==4)
         flag = flag & (color==1)[halfedge[:, 2]]
         flag[opp[nex[flag]]]=True
 
