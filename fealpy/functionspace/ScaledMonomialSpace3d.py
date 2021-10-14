@@ -115,11 +115,12 @@ class ScaledMonomialSpace3d():
     def face_to_dof(self, p=None):
         return self.dof.face_to_dof(p=p)
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
+    def function(self, dim=None, array=None, dtype=np.float64):
+        f = Function(self, dim=dim, array=array, coordtype='cartesian',
+                dtype=dtype)
         return f
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim in {None, 1}:
             shape = gdof
@@ -127,7 +128,7 @@ class ScaledMonomialSpace3d():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def number_of_local_dofs(self, p=None, doftype='cell'):
         return self.dof.number_of_local_dofs(p=p, doftype=doftype)

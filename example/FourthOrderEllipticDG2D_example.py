@@ -98,6 +98,8 @@ for i in range(maxit):
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh, power=2)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value,
             power=2)
+    if i > 0:
+        print("order = ", np.log(errorMatrix[0, i]/errorMatrix[0, i-1])/np.log(NDof[i-1]/NDof[i]))
     
 # 显示误差
 show_error_table(NDof, errorType, errorMatrix)

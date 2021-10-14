@@ -15,9 +15,10 @@ class Function(np.ndarray):
     >> from fealpy.pde.poisson_2d import CosCosData
     >> from fealpy.functionspace import 
     """
-    def __new__(cls, space, dim=None, array=None, coordtype=None):
+    def __new__(cls, space, dim=None, array=None, coordtype=None,
+            dtype=np.float64):
         if array is None:
-            self = space.array(dim=dim).view(cls)
+            self = space.array(dim=dim, dtype=dtype).view(cls)
         else:
             self = array.view(cls)
         self.space = space

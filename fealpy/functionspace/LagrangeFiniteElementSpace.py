@@ -640,11 +640,11 @@ class LagrangeFiniteElementSpace():
             pass
         return uh
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array, coordtype='barycentric')
-        return f
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, 
+                coordtype='barycentric', dtype=dtype)
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim in {None, 1}:
             shape = gdof
@@ -652,7 +652,9 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=self.ftype)
+
+        return np.zeros(shape, dtype=dtype)
+
 
     def integral_basis(self):
         """
