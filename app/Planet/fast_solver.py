@@ -73,21 +73,20 @@ class PlanetFastSovler():
         Cx + Dy = b
         """
         rdof = self.rdof
-        gdof = self.gdof
 
         x = b[:rdof]
         y = b[rdof:]
 
-        r = b.copy
+        r = np.zeros_like(b)
 
         r[:rdof] = self.Ak@x + self.B@y
-        r[rodf:] = x@self.B + self.D@y
+        r[rdof:] = x@self.B + self.D@y
 
         return r
 
     @timer
     def solve_2(self, u, F):
-        dof = F.shape
+        dof = F.shape[0]
 
         A = LinearOperator((dof, dof), matvec=self.linear_operator_3)
 

@@ -170,15 +170,6 @@ class PlanetHeatConductionWithRotationSimulator():
         M = self.M
         S = self.S
 
-#        S0 = M+dt*S
-#        if ctx.myid == 0:
-#            ctx.set_centralized_sparse(S0)
-
-#        ctx.run(job=4) # Analysis + Factorization
-#        self.ctx = ctx
-
-#        dof = S0.shape[0] 
-        
         uh0 = self.uh0
         uh1 = self.uh1
         uh = self.uh
@@ -203,11 +194,8 @@ class PlanetHeatConductionWithRotationSimulator():
             R += self.M00
             
             self.solver.set_matrix(R)            
-            x = self.solver.solve(x, F)
+            x = self.solver.solve_2(x, F)
 
-#            P = LinearOperator((dof, dof), matvec=self.preconditioner)
-#            x.T.flat, info = cg(R, F.T.flat, M=P, tol=1e-8)
-            
             uh += x
 
             error = np.max(np.abs(x))
@@ -287,7 +275,8 @@ class PlanetHeatConductionWithRotationSimulator():
             print('i:', i)
 
             if (i*args.DT) % self.pde.options['period'] == 0 and i!=0:
-                err = np.abs(np.max(self.uh1 - self.uh2))
+                Tss = self.pde.options['Tss']
+                err = TSS*np.abs(np.max(self.uh1 - self.uh2))
                 self.uh2[:] = self.uh1
             
             if err > args.stable:
@@ -311,7 +300,8 @@ class PlanetHeatConductionWithRotationSimulator():
                         queue.put(data)
                     queue.put(-1) # 发送模拟结束信号 
 
-                print('The time when the state reache stability is:', i*args.DT)
+                print('The time when the state reache stability is:', i*args.DT,
+                        'error is', err)
                 break
         
         if queue is not None:
