@@ -411,9 +411,9 @@ class FirstKindNedelecFiniteElementSpace2d:
     def grad_value(self, uh, bc, index=np.s_[:]):
         pass
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array)
-        return f
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, coordtype='barycentric',
+                dtype=dtype)
 
     def project(self, u):
         return self.interpolation(u)
@@ -564,7 +564,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         return isDDof
 
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof
@@ -572,7 +572,8 @@ class FirstKindNedelecFiniteElementSpace2d:
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+
+        return np.zeros(shape, dtype=dtype)
 
     def show_basis(self, fig, index=0, box=None):
         """
