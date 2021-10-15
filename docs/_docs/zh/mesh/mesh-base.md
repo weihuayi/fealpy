@@ -15,8 +15,14 @@ $\quad$ 如可以用下面的两个 Numpy 数组表示一个包含 4 个节点�
 
 ```python
 import numpy as np
-node = np.array([[0.0, 0.0],[1.0, 0.0],[1.0, 1.0],[0.0, 1.0]],dtype=np.float)
-cell = np.array([[1,2,0],[3,0,2]],dtype=np.int)
+node = np.array(
+    [[0.0, 0.0],
+     [1.0, 0.0],
+     [1.0, 1.0],
+     [0.0, 1.0]],dtype=np.float64)
+cell = np.array([
+    [1,2,0],
+    [3,0,2]],dtype=np.int_)
 ```
 
 $\quad$ 很多时候，我们还需要获得**边数组(edge)**和**面数组(face)**, 其实它们都可以由
@@ -54,8 +60,8 @@ cell 数组快速生成. 下面我们以三角形网格为例, 来详细介绍 e
 $\quad$ FEALPy 把 node、edge、face 和 cell 统称为网格中的**实体(entity)**. FEALPy 约定
 node 和 cell 分别是网格中的**最低维**和**最高维**实体, 另外还约定
 
-* 在一维情形下，edge、face 和 cell 的意义是相同的.
-* 在二维情形下，edge 和 face 意义是相同的.
+* 对于一维网格，edge、face 和 cell 的意义是相同的.
+* 对于二维网格， edge 和 face 意义是相同的.
 
 $\quad$ FEALPy 除了上面的约定外, 还约定了一些常用变量名称的意义, 如 
 
@@ -136,7 +142,6 @@ $\quad$ds中的方法成员也有一些网格对象的信息
 |bdEdgeIdx = mesh.ds.boundary\_edge\_index() | 一维整数数组，边界边全局编号 |
 |bdFaceIdx = mesh.ds.boundary\_face\_index() | 一维整数数组，边界面全局编号 |
 |bdCellIdx = mesh.ds.boundary\_cell\_index() | 一维整数数组，边界单元全局编号 |
-
 
 
 
