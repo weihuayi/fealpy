@@ -16,8 +16,52 @@ class StructureQuadMesh1(Mesh2d):
         self.hy = hy
         self.data = {}
 
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.meshdata = {}
+
         self.itype = itype 
         self.ftype = ftype 
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_QUAD = 9
+            return VTK_QUAD
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+
+
+    def to_vtk(self, etype='cell', index=np.s_[:]):
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+
+        cell = self.entity(etype)[index]
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=np.int), cell]
+        cell[:, 0] = NV
+
+        return node, cell.flatten(), cellType, len(cell)
 
     @property 
     def node(self):
