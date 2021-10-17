@@ -5,7 +5,7 @@ key: docs-hex-mesh-zh
 ---
 
 ## 基本结构
-$\quad$ 在 FEALPy 中可以通过 StructureHexMesh 生成三维结构六面体网格,
+$\quad$ 在 FEALPy 中可以通过 StructureHexMesh 建立三维结构六面体网格对象,
 只需要给出每个方向的剖分段数以及剖分区域, 如下述代码所示:
 ```python
 import numpy as np
@@ -24,7 +24,9 @@ mesh = StructureHexMesh(box, nx, ny, nz)
 其中, $nx$, $ny$, $nz$ 分别表示 $x$, $y$, $z$ 三个方向的剖分段数, box
 表示区域范围. 
 
-$\quad$ 生成网格后, 可以通过 StructureHexMesh 中的方法进行加密:
+\textcolor{red}{约定(全局编号, 局部编号):}
+
+$\quad$ 生成网格后, 可以通过改变剖分段数对 StructureHexMesh 中的网格进行加密:
 ```python
 nx = 2*nx
 ny = 2*ny
@@ -35,9 +37,9 @@ mesh = StructureHexMesh(box, nx, ny, nz)
 
 <img src="../../../assets/images/mesh/Hex-mesh/Hex_refine.png" width="350" /><img src="../../../assets/images/mesh/Hex-mesh/Hex_refine1.png" width="350" />
 
-## 访问数据
+## 常用成员函数
 
-$\quad$ 生成网格后, 可以访问网格的各种数据:
+$\quad$ 生成网格后, 可以访问网格的常用成员函数:
 ```python
 NN = mesh.number_of_nodes() # 节点 node 个数
 NE = mesh.number_of_edges() # 边 edge 个数
@@ -47,13 +49,13 @@ NC = mesh.number_of_cells() # 单元 cell 个数
 node = mesh.entity('node') # 节点数组，规模为(NN,3), 储存节点坐标
 edge = mesh.entity('edge') # 边数组，规模为(NE,2), 储存每条边的两个节点的编号
 face = mesh.entity('face') # 面数组, 规模为(NF,4), 储存每个面的四个节点的编号
-cell = mesh.entity('cell') # 单元数组，规模为(NC,8), 储存构成六面体的八个节点编号
+cell = mesh.entity('cell') # 单元数组, 规模为(NC,8), 储存构成六面体的八个节点编号
 
 ec = mesh.entity_barycenter('edge') # (NE,3), 储存各边的重心坐标
 fc = mesh.entity_barycenter('face') # (NF,3), 储存各面的重心坐标
 bc = mesh.entity_barycenter('cell') # (NC,3), 储存各单元的重心坐标
 ```
-除此之外, 还可以获得 node, edge, face, cell 等实体间的关系,
+除此之外, 还可以获得 node, edge, face, cell 等实体间的邻接关系,
 以如下网格单元剖分为例结合输出进行说明
 
 ```python
