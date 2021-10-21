@@ -2,11 +2,6 @@ import platform
 
 from .solve import solve, active_set_solver
 from .amg import AMGSolver
-<<<<<<< HEAD
-from .matlab_solver import MatlabSolver
-#from .petsc_solver import PETScSolver
-=======
->>>>>>> upstream/master
 
 try:
     from .matlab_solver import MatlabSolver
