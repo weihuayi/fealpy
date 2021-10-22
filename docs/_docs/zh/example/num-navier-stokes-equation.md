@@ -625,15 +625,17 @@ d\boldsymbol x
 $$
 
 $$
+\begin{aligned}
 \boldsymbol D_{01} = 
-\int_{\partial\tau} \frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_1\mathrm
+\int_{\partial \tau} \frac{1}{2} \boldsymbol \omega^T \frac{\partial\boldsymbol\phi^T}{\partial x} n_1 \mathrm
 d\boldsymbol x
+\end{aligned}
 $$
 
 
 $$
 \boldsymbol D_{10} = 
-\int_{{\partial\tau} }\frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_0\mathrm
+\int_{ \partial\tau }\frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_0\mathrm
 d\boldsymbol x
 $$
 
@@ -650,4 +652,4 @@ $$
 
 1. [Fenics examples for the Navier-Stokes
    
-   equations](https://fenicsproject.org/pub/tutorial/sphinx1/._ftut1004.html#the-navier-stokes-equations)
+   equations](https://fenicsproject.org/pub/tutorial/sphinx1/._ftut1004.html#the-navier-stokes-equations):

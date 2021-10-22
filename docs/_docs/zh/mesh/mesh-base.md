@@ -4,6 +4,28 @@ permalink: /docs/zh/mesh/mesh-base
 key: docs-mesh-base-zh
 ---
 
+# 网格介绍
+$\quad$有限元分析可以用来建立现实世界场景的预测计算模型，而建立这些模型需要不少
+相关的信息，为了能够高效合理的使用这些信息，我们需要用到网格。所谓有限元网格，即将
+模型分割为很多较小的域，称其为网格单元。在这些单元上，我们求解一组方程，并通过在每个单元
+上定义的一组多项式函数来近似表示这些方程。随着网格的不断细化，这些单元变得越来越小，
+从而使求解的结果越来越接近真实解。
+
+网格可以分为不同的类型，根据网格点之间的邻接关系可分分为结构网格和非结构网格，根据
+网格形状的不同，可以分为三角形网格，四边形网格，多边形网格。同时，我们还可以发挥不同网格
+类型的优点，构造混合网格。
+
+<img src='../../../assets/images/mesh/mesh-base/cross.png' width='350'  title =
+'结构三角形网格'> 
+<img src='../../../assets/images/mesh/mesh-base/quad.png' width='350'  title = '结构四边形网格'>  
+<img src='../../../assets/images/mesh/mesh-base/polygon.png' width='350'  title = '结构多边形网格'> 
+<img src='../../../assets/images/mesh/mesh-base/circle_h.png' width='350'  title = '非结构多边形网格'> 
+<img src='../../../assets/images/mesh/mesh-base/nonuniform.png' width='350'  title = '非结构三角形网格'> 
+<img src='../../../assets/images/mesh/mesh-base/interface.png' width='350'  title = '混合网格'>
+
+$\quad$根据不同的情况，选择合适的网格，往往可以取得事半功倍的效果。
+
+# Fealpy中的网格
 
 $\quad$ 在偏微分方程数值计算程序设计中， **网格(mesh)**是最核心的数据结构， 
 是下一步实现数值离散方法的基础. FEALPy 中核心网格数据结构是用**数组**表示的.
@@ -15,47 +37,90 @@ $\quad$ 如可以用下面的两个 Numpy 数组表示一个包含 4 个节点�
 
 ```python
 import numpy as np
-node = np.array([[0.0, 0.0],[1.0, 0.0],[1.0, 1.0],[0.0, 1.0]],dtype=np.float)
-cell = np.array([[1,2,0],[3,0,2]],dtype=np.int)
+node = np.array([
+        [0.0, 0.0],
+        [1.0, 0.0],
+        [1.0, 1.0],
+        [0.0, 1.0]],dtype=np.float64)
+cell = np.array([
+        [1,2,0],
+        [3,0,2]],dtype=np.int_)
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes,showindex=True,fontsize=40)
+mesh.find_edge(axes, showindex=True,fontsize=40)
+mesh.find_cell(axes, showindex=True,fontsize=40)
+plt.show()
 ```
+
+网格图像为
+
+<img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
+
+$\quad$在上述算例中，cell 包含的两个单元为[1,2,0]与[3,0,2]，它存储的是构成网格单
+元的节点的编号，[1,2,0]即由node[1],node[2], 和node[0]三个节点构成的三角形网格单元。
 
 $\quad$ 很多时候，我们还需要获得**边数组(edge)**和**面数组(face)**, 其实它们都可以由
 cell 数组快速生成. 下面我们以三角形网格为例, 来详细介绍 edge 数组的生成算法.
 
 ```python
-    NEC = 3
-    localEdge = np.array([(1, 2), (2, 0), (0, 1)], dtype=np.int)
+    NEC = 3# 网格中每个cell包含的边的个数，三角形单元，故为3
+    localEdge = np.array(
+    [(1, 2), (2, 0), (0, 1)],dtype=np.int_)#各单元边的局部信息
 
-    totalEdge = cell[:, localEdge].reshape(-1, 2)
+    totalEdge = cell[:, localEdge].reshape(-1, 2)#边的全局信息
     stotalEdge = np.sort(totalEdge, axis=1)
     _, i0, j = np.unique(stotalEdge, return_index=True, return_inverse=True, axis=0)
+    # i0返回新数组元素在旧数组中的位置，j返回旧数组元素在新数组中的位置
 
-    edge = totalEdge[i0]
-    NE = i0.shape[0]
+    edge = totalEdge[i0] # 去除重复边
+    NE = i0.shape[0] # 边的数目
 
     i1 = np.zeros(NE, dtype=np.int)
-    NC = cell.shape[0]
+    NC = cell.shape[0]#单元数组
     i1[j] = np.arange(3*NC)
 
-    // 边与单元的拓扑关系数组
+    # 边与单元的拓扑关系数组
     edge2cell = np.zeros((NE, 4), dtype=np.int)
-    t0 = i0//3
-    t1 = i1//3
-    k0 = i0%3
-    k1 = i1%3
+    t0 = i0//3 # 全局编号
+    t1 = i1//3 # 全局编号
+    k0 = i0%3 # 局部编号
+    k1 = i1%3 # 局部编号
     edge2cell[:, 0] = t0
     edge2cell[:, 1] = t1
     edge2cell[:, 2] = k0
     edge2cell[:, 3] = k1
 ```
 
-注意, 三维网格的 face 数组的生成算法和上面 edge 数组的生成算法本质上是完全一样的.
+$\quad$所谓边的局部信息，指在各网格单元中边的信息，对于三角形就只有三条边的信息，
+用0,1,2三个编号即可记录; 边的全局信息指在整个网格中各边的信息，网格中总共有多少条
+边，就有多少边的信息，编号就记录到多少。
+
+$\quad$在上述代码中，我们通过localEdge获得了totalEdge，但由于网格单元存在共用边，故得到的
+totalEdge多于实际边的信息。因此我们通过np.sort()和np.unique()来获得i0，即实际边的
+编号信息，并由此得到edge。
+
+$\quad$最后我们得到数组 edge2cell，它存储的是边与单元的拓扑信息，edge2cell[:,0] 和edge2cell[:,1] 存储
+与每条边相邻的两个单元的编号，edge2cell[:,2] 和edge2cell[:,3] 存储相邻两个单元中边的局部编号。
+之所以能通过 i0,i1 来获得这些数据，是因为 i0 存储的是 totalEdge 中边的编号信息，而 totalEdge
+中各边就是按照 cell 顺序来排列的，前三条边是0号单元的，之后三条边是1号单元的，依次类推，因此用
+ i0//3 和 i0%3 就可以获得边与其中一个单元的相关信息。但i0由于去除了重复边信息，也就丢失了共用边中
+其中一个单元的相关信息，故我们通过 j 获得 i1，获得丢失的信息。因此 i1//3 和 i1%3 获得的是边与另一个单元的
+相关信息。不过对于边界边来说，其只与一个单元相邻，因此并不会丢失信息，故对于边界边来说，
+其两个单元的信息相同，也就是说，edge2cell[:,0]与edge2cell[:,1]相同，edge2cell[:,2]
+与edge2cell[:,1]相同。
+
+$\quad$注意, 三维网格的 face 数组的生成算法和上面 edge 数组的生成算法本质上是完全一样的.
 
 $\quad$ FEALPy 把 node、edge、face 和 cell 统称为网格中的**实体(entity)**. FEALPy 约定
 node 和 cell 分别是网格中的**最低维**和**最高维**实体, 另外还约定
 
-* 在一维情形下，edge、face 和 cell 的意义是相同的.
-* 在二维情形下，edge 和 face 意义是相同的.
+* 对于一维网格，edge、face 和 cell 的意义是相同的.
+* 对于二维网格， edge 和 face 意义是相同的.
+
+## 网格信息与网格拓扑关系
 
 $\quad$ FEALPy 除了上面的约定外, 还约定了一些常用变量名称的意义, 如 
 
@@ -136,7 +201,6 @@ $\quad$ds中的方法成员也有一些网格对象的信息
 |bdEdgeIdx = mesh.ds.boundary\_edge\_index() | 一维整数数组，边界边全局编号 |
 |bdFaceIdx = mesh.ds.boundary\_face\_index() | 一维整数数组，边界面全局编号 |
 |bdCellIdx = mesh.ds.boundary\_cell\_index() | 一维整数数组，边界单元全局编号 |
-
 
 
 
