@@ -5,7 +5,7 @@ key: docs-tri-mesh-zh
 ---
 
 ## 基本结构
-$\quad$在FEALPy中可以通过TriangleMesh来生成二维三角形网格，只需给出节点和单元，如下述代码所示
+$\quad$在 FEALPy 中可以通过 TriangleMesh 来建立三角形网格对象，只需给出节点数组 node 和单元数组 cell，如下述代码所示
 ```python
 import numpy as np
 from fealpy.mesh import TriangleMesh
@@ -14,9 +14,9 @@ node = np.array([
     [0.0, 0.0],
     [1.0, 0.0],
     [1.0, 1.0],
-    [0.0, 1.0]], dtype=np.float) # (NN, 2)
+    [0.0, 1.0]], dtype=np.float64) # (NN, 2)
 
-cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int) # (NC, 3)
+cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int_) # (NC, 3)
 
 mesh = TriangleMesh(node, cell)
 ```
@@ -39,7 +39,7 @@ mesh.uniform_refine(1)
 
 <img src="../../../assets/images/mesh/tri-mesh/uniform_refine.png"  />
 
-## 访问数据
+## 常用成员函数
 
 $\quad$生成网格后，可以访问网格的各种数据:
 ```python
@@ -58,7 +58,7 @@ area = mesh.entity_measure('cell') # (NC,1), 每个单元的面积
 eh = mesh.entity_measure('edge') # (NE,1), 每条边的长度
 ```
 
-除此以外，还可以获得node,edge,cell等实体间的关系，以如下网格单元剖分为例结合输
+除此以外，还可以获得node,edge,cell等实体间的邻接关系，以如下网格单元剖分为例结合输
 出进行说明
 <img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
 
@@ -86,8 +86,7 @@ cell2cell:
  [0 1 1]]
 ```
 $\quad$首先需要说明全局编号与局部编号的不同。在上面的网格剖分中，共有5条边，记为0到4号边，这是它们的全局编号，
-而在每个单元中，每条边又标记为0到2号边，例如，通过cell2edge可以看出，对于0号单元，1号边为它的0号边，0号边为它的
-1号边，3号边为它的2号边，这是它们的局部编号。
+而在每个单元中，每条边又标记为0到2号边，例如，通过cell2edge可以看出，对于0号单元，1号边为它的0号边，0号边为它的1号边，3号边为它的2号边，这是它们的局部编号。
 
 $\quad$还需要说明，cell2cell存储的是三条边相邻的单元编号，当相邻单元为无界区域时，存储的编号为该单元本身的编号。
 例如0号单元，其0号边与1号单元相邻，故cell2cell中储存其单元编号1，而1,2号边均与无界区域相邻，故储存的单元编号为其本身，即0。
@@ -134,8 +133,7 @@ edge2edge:
   (4, 1)	True
 \end{lstlisting}
 
-edge2cell存储了与每条边相邻的两个单元的信息，前两项为单元的编
-号，后两项为该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。以0号边为例，
+edge2cell存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。以0号边为例，
 因其与0号单元和无界区域相邻，故前两项均为0，又因在0号单元中，其为1号边，故后两项均为1；
 再以1号边为例，因其与0号单元和1号单元相邻，故前两项为0,1，又其在0号单元和1号单元中均为0号边，
 故后两项均为0。
@@ -155,7 +153,7 @@ print('node2cell:\n',node2cell)
 输出为
 ```python
 node2cell:
-   (0, 0)	True
+  (0, 0)	True
   (0, 1)	True
   (1, 0)	True
   (2, 0)	True
@@ -170,7 +168,7 @@ node2cell:
 isBdNode = mesh.ds.boundary_node_flag()
 # (NN, ), bool，判断是否为边界点
 isBdEdge = mesh.ds.boundary_edge_flag()
-# (NE, ), bool，判断师傅为边界边
+# (NE, ), bool，判断是否为边界边
 isBdCell = mesh.ds.boundary_cell_flag()
 # (NC, ), bool，判断是否为边界单元
 ```
@@ -186,10 +184,10 @@ isBdCell = mesh.ds.boundary_cell_flag()
 \boldsymbol{x_2}=(x_2,y_2)$，则三角形内任意一点(包含边界)$\boldsymbol{x} = (x,y)$
 可以写成这三点坐标的线性组合形式，即 $\boldsymbol{x}=\lambda_0\boldsymbol{x_0} 
 + \lambda_1\boldsymbol{x_1} +\lambda_2\boldsymbol{x_2}$ 且满足 
-$\lambda_0 + \lambda_1 +\lambda_2=1$和$\lambda_0,\lambda_1,\lambda_2$均大于等于0。
-则称此时三个坐标$\boldsymbol{x_0},\boldsymbol{x_1},\boldsymbol{x_2}$ 的权重, 
-$\lambda_0,\lambda_1,\lambda_2$ 为点$\boldsymbol{x}$的重心坐标，即为
-$(\lambda_0,\lambda_1,\lambda_2)$。
+  $\lambda_0 + \lambda_1 +\lambda_2=1$和$\lambda_0,\lambda_1,\lambda_2$均大于等于0。
+  则称此时三个坐标$\boldsymbol{x_0},\boldsymbol{x_1},\boldsymbol{x_2}$ 的权重, 
+  $\lambda_0,\lambda_1,\lambda_2$ 为点$\boldsymbol{x}$的重心坐标，即为
+  $(\lambda_0,\lambda_1,\lambda_2)$。
 
 下面从几何的角度来解释
 
@@ -270,5 +268,4 @@ Dlambda[:,2,:] = v2@W/length.reshape(-1, 1)
 <img src="../../../assets/images/mesh/tri-mesh/distmesh1.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/square_h.png" width="350"  />
 
 <img src="../../../assets/images/mesh/tri-mesh/distmesh2.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/distmesh3.png" width="350"  />
-
 
