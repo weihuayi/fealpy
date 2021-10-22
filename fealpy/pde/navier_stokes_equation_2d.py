@@ -50,3 +50,47 @@ class SinCosData:
     @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
+
+class Poisuille:
+    """
+    [0, 1]^2
+    u(x, y) = (4y(1-y), 0)
+    p = 8(1-x)
+    """
+    def __init__(self):
+        self.box = [0, 1, 0, 1]
+
+    def domain(self):
+        return self.box
+
+    @cartesian
+    def velocity(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        value = np.zeros(p.shape)
+        value[...,0] = 4*y*(1-y)
+    return value
+
+    @cartesian
+    def pressure(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        val = 8*(1-x) 
+        return val
+    
+    @cartesian
+    def source(self, p):
+        val = np.zeros(p.shape, dtype=np.float)
+        return val
+
+    @cartesian
+    def is_p_boundary(p):
+        return (np.abs(p[..., 0]) < eps) | (np.abs(p[..., 0] - 1.0) < eps)
+      
+    @cartesian
+    def is_wall_boundary(p):
+        return (np.abs(p[..., 1]) < eps) | (np.abs(p[..., 1] - 1.0) < eps)
+
+    @cartesian
+    def dirichlet(self, p):
+        return self.velocity(p)
