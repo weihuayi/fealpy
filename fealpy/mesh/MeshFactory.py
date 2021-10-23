@@ -104,7 +104,6 @@ def interval_mesh(interval=[0, 1], nx=1):
     return IntervalMesh(node, cell)
 
 
-@timer
 def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         returnnc=False, p=None):
     """
@@ -171,7 +170,6 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
 
-@timer
 def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
     """
     Notes
