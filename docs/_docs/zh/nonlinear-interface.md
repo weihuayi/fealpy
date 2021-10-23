@@ -35,25 +35,25 @@ $$
 满足如下齐次界面条件：
 $$
 [u]=u_{1}-u_{2}=0,\quad \text{on}\quad \Gamma\\
-[a\frac{\partial u}{\partial\bf n}] = a_{1}\frac{\part u_{1}}{\part \bf n_{1}}+a_{2}\frac{\part u_{2}}{\part \bf n_{2}}=g_{I,1}+g_{I,2}=g_{I},\quad \text{on}\quad \Gamma
+[a\frac{\partial u}{\partial\bf n}] = a_{1}\frac{\partial u_{1}}{\partial \bf n_{1}}+a_{2}\frac{\partial u_{2}}{\partial \bf n_{2}}=g_{I,1}+g_{I,2}=g_{I},\quad \text{on}\quad \Gamma
 $$
 
 ## Newton-Galerkin方法
 
 牛顿法是用来解决非线性问题的常用方法。以上面的方程为例，在方程两边同时乘上试探函数$v \in H_{D,0}^1(\Omega)$,利用分部积分法，可以得到**连续弱形式**
 $$
-(a_{1}\nabla u_{1},\nabla v)+(b_{1} u_{1}^3,v)+<\kappa u_{1},v>_{\Gamma_{R,1}} \\= (f_{1},v)+<g_{N,1},v>_{\Gamma_{N,1}}+<g_{R,1},v>_{\Gamma_{R,1}},\quad\text{in}\quad\Omega_{1}
+(a_{1}\nabla u_{1},\nabla v)+(b_{1} u_{1}^3,v)+<\kappa u_{1},v>_{\Gamma_{R,1}} \\= (f_{1},v)+<g_{I,1},v>_{\Gamma}+<g_{N,1},v>_{\Gamma_{N,1}}+<g_{R,1},v>_{\Gamma_{R,1}},\quad\text{in}\quad\Omega_{1}
 $$
 $$
-(a_{2}\nabla u_{2},\nabla v)+(b_{2} u_{2}^3,v)+<\kappa u_{2},v>_{\Gamma_{R,2}} \\= (f_{2},v)+<g_{N,2},v>_{\Gamma_{N,2}}+<g_{R,2},v>_{\Gamma_{R,2}},\quad \text{in}\quad\Omega_{2}
+(a_{2}\nabla u_{2},\nabla v)+(b_{2} u_{2}^3,v)+<\kappa u_{2},v>_{\Gamma_{R,2}} \\= (f_{2},v)+<g_{I,2},v>_{\Gamma}+<g_{N,2},v>_{\Gamma_{N,2}}+<g_{R,2},v>_{\Gamma_{R,2}},\quad \text{in}\quad\Omega_{2}
 $$
 
 设 $u^0$ 是 $u$ 的一个逼近，$u = u^{0}+\delta u$ ,代入弱形式中
 $$
-(a_{1}\nabla (u_{1}^{0}+\delta u_{1},\nabla v)+(b_{1} (u_{1}^{0}+\delta u_{1})^3,v)+<\kappa (u_{1}^{0}+\delta u_{1}),v>_{\Gamma_{R,1}} \\= (f_{1},v)+<g_{N,1},v>_{\Gamma_{N,1}}+<g_{R,1},v>_{\Gamma_{R,1}}
+(a_{1}\nabla (u_{1}^{0}+\delta u_{1},\nabla v)+(b_{1} (u_{1}^{0}+\delta u_{1})^3,v)+<\kappa (u_{1}^{0}+\delta u_{1}),v>_{\Gamma_{R,1}} \\= (f_{1},v)+<g_{I,1},v>_{\Gamma}+<g_{N,1},v>_{\Gamma_{N,1}}+<g_{R,1},v>_{\Gamma_{R,1}}
 $$
 $$
-(a_{2}\nabla (u_{2}^{0}+\delta u_{2}),\nabla v)+(b_{2} (u_{2}^{0}+\delta u_{2})^3,v)+<\kappa (u_{2}^{0}+\delta u_{2}),v>_{\Gamma_{R,2}} \\= (f_{2},v)+<g_{N,2},v>_{\Gamma_{N,2}}+<g_{R,2},v>_{\Gamma_{R,2}}
+(a_{2}\nabla (u_{2}^{0}+\delta u_{2}),\nabla v)+(b_{2} (u_{2}^{0}+\delta u_{2})^3,v)+<\kappa (u_{2}^{0}+\delta u_{2}),v>_{\Gamma_{R,2}} \\= (f_{2},v)+<g_{I,2},v>_{\Gamma}+<g_{N,2},v>_{\Gamma_{N,2}}+<g_{R,2},v>_{\Gamma_{R,2}}
 $$
 
 其中 $b (u^{0}+\delta u)^3$ 在 $u^0$ 处泰勒展开，可得
@@ -62,84 +62,84 @@ bu^{3}=b (u^{0}+\delta u)^3 = b(u^{0})^3+3b(u^{0})^{2}\delta u+O(\delta u)^{2}
 $$
 忽略高阶项 $O(\delta u)^{2}$，可得
 $$
-(a_{1}\nabla \delta u_{1},\nabla v_{1})+(3b_{1} (u_{1}^{0})^{2}\delta u_{1},v_{1})+<\kappa\delta u_{1},v_{1}>_{\Gamma_{R,1}}\\ = (f_{1},v_{1})+<g_{N,1},v_{1}>_{\Gamma_{N,1}}+<g_{R,1},v_{1}>_{\Gamma_{R,1}}-(a_{1}\nabla u_{1}^{0},\nabla v_{1})-(b_{1} ( u_{1}^{0})^3,v_{1})-<\kappa u_{1}^{0},v_{1}>_{\Gamma_{R,1}}
+(a_{1}\nabla \delta u_{1},\nabla v_{1})+(3b_{1} (u_{1}^{0})^{2}\delta u_{1},v_{1})+<\kappa\delta u_{1},v_{1}>_{\Gamma_{R,1}}\\ = (f_{1},v_{1})+<g_{I,1},v>_{\Gamma}+<g_{N,1},v_{1}>_{\Gamma_{N,1}}+<g_{R,1},v_{1}>_{\Gamma_{R,1}}-(a_{1}\nabla u_{1}^{0},\nabla v_{1})-(b_{1} ( u_{1}^{0})^3,v_{1})-<\kappa u_{1}^{0},v_{1}>_{\Gamma_{R,1}}
 $$
 $$
-(a_{2}\nabla \delta u_{2},\nabla v_{2})+(3b_{2} (u_{2}^{0})^{2}\delta u_{2},v_{2})+<\kappa\delta u_{2},v_{2}>_{\Gamma_{R,2}} \\= (f_{2},v_{2})+<g_{N,2},v_{2}>_{\Gamma_{N,2}}+<g_{R,2},v_{2}>_{\Gamma_{R,2}}-(a_{2}\nabla u_{2}^{0},\nabla v_{2})-(b_{2} ( u_{2}^{0})^3,v_{2})-<\kappa u_{2}^{0},v_{2}>_{\Gamma_{R,2}}
+(a_{2}\nabla \delta u_{2},\nabla v_{2})+(3b_{2} (u_{2}^{0})^{2}\delta u_{2},v_{2})+<\kappa\delta u_{2},v_{2}>_{\Gamma_{R,2}} \\= (f_{2},v_{2})+<g_{I,2},v>_{\Gamma}+<g_{N,2},v_{2}>_{\Gamma_{N,2}}+<g_{R,2},v_{2}>_{\Gamma_{R,2}}-(a_{2}\nabla u_{2}^{0},\nabla v_{2})-(b_{2} ( u_{2}^{0})^3,v_{2})-<\kappa u_{2}^{0},v_{2}>_{\Gamma_{R,2}}
 $$
 
 由此可得
 $$
-(a_{1}\nabla \delta u_{1},\nabla v_{1})+(a_{2}\nabla \delta u_{2},\nabla v_{2})+(3b_{1} (u_{1}^{0})^{2}\delta u_{1},v_{1})+(3b_{2} (u_{2}^{0})^{2}\delta u_{2},v_{2})\\+<\kappa\delta u_{1},v_{1}>_{\Gamma_{R,1}}+<\kappa\delta u_{2},v_{2}>_{\Gamma_{R,2}}=
+(a_{1}\nabla \delta u_{1},\nabla v_{1})+(a_{2}\nabla \delta u_{2},\nabla v_{2})+(3b_{1} (u_{1}^{0})^{2}\delta u_{1},v_{1})+(3b_{2} (u_{2}^{0})^{2}\delta u_{2},v_{2})\\+<\kappa\delta u_{1},v_{1}>_{\Gamma_{R,1}}+<\kappa\delta u_{2},v_{2}>_{\Gamma_{R,2}}
 $$
 
 $$
-(f_{1},v_{1})+(f_{2},v_{2})+<g_{N,1},v_{N,1}>_{\Gamma_{N,1}}+<g_{N,2},v_{N,2}>_{\Gamma_{N,2}}+\\<g_{R,1},v_{R,1}>_{\Gamma_{R,1}}+<g_{R,2},v_{R,2}>_{\Gamma_{R,2}}-(a_{1}\nabla u_{1}^{0},\nabla v_{1})-(a_{2}\nabla u_{2}^{0},\nabla v_{2})-(b_{1} ( u_{1}^{0})^3,v_{1})-(b_{2} ( u_{2}^{0})^3,v_{2})\\-<\kappa u_{1}^{0},v>_{\Gamma_{R,1}}-<\kappa u_{2}^{0},v>_{\Gamma_{R,2}}
+=(f_{1},v_{1})+(f_{2},v_{2})+<g_{N,1},v_{N,1}>_{\Gamma_{N,1}}+<g_{N,2},v_{N,2}>_{\Gamma_{N,2}}+<g_{I,1},v>_{\Gamma}+<g_{I,2},v>_{\Gamma}+\\<g_{R,1},v_{R,1}>_{\Gamma_{R,1}}+<g_{R,2},v_{R,2}>_{\Gamma_{R,2}}-(a_{1}\nabla u_{1}^{0},\nabla v_{1})-(a_{2}\nabla u_{2}^{0},\nabla v_{2})-(b_{1} ( u_{1}^{0})^3,v_{1})-(b_{2} ( u_{2}^{0})^3,v_{2})\\-<\kappa u_{1}^{0},v>_{\Gamma_{R,1}}-<\kappa u_{2}^{0},v>_{\Gamma_{R,2}}
 $$
 
 并且利用界面条件与$v_{I,1}=v_{I,2}$，由此可得
 $$
-(a\nabla \delta u,\nabla v)+(3b(u^{0})^{2}\delta u,v)+<\kappa \delta u,v>_{\Gamma_{R}}\\=(f,v)-<g_{I},v_{I}>_{\Gamma}+<g_{N},v_{N}>_{\Gamma_{N}}+<g_{R},v_{R}>_{\Gamma_{R}}-(a\nabla u^{0},\nabla v)-(b(u^{0})^{3},v)-<\kappa u^{0},v>_{\Gamma_{R}}
+(a\nabla \delta u,\nabla v)+(3b(u^{0})^{2}\delta u,v)+<\kappa \delta u,v>_{\Gamma_{R}}\\=(f,v)+<g_{I},v_{I}>_{\Gamma}+<g_{N},v_{N}>_{\Gamma_{N}}+<g_{R},v_{R}>_{\Gamma_{R}}-(a\nabla u^{0},\nabla v)-(b(u^{0})^{3},v)-<\kappa u^{0},v>_{\Gamma_{R}}
 $$
 其中
 $$
-a = \left\{\begin{bmatrix}
-a_{1} \\
+a_0 = \begin{bmatrix}
+a_{0} \\
 \vdots \\
-a_{1} \\
+a_{0} \\
+0\\
+\vdots\\
+0\\
+\end{bmatrix},\quad
+a_1 = \begin{bmatrix}
+0\\
+\vdots\\
+0\\
+a_{1}\\
+\vdots\\
+a_{1}\\
+\end{bmatrix},\quad
+$$
+
+
+$$
+b_0 =\begin{bmatrix}
+b_{0} \\
+\vdots \\
+b_{0} \\
 0\\
 \vdots\\
 0\\
 \end{bmatrix},
-\quad x \in \Omega_{1}\\
-\begin{bmatrix}
+\quad 
+b_{0} = \begin{bmatrix}
 0\\
 \vdots\\
 0\\
-a_{2}\\
+b_{1}\\
 \vdots\\
-a_{2}\\
-\end{bmatrix},\quad x \in \Omega_{2}\right.
+b_{1}\\
+\end{bmatrix},\quad 
 $$
 
 $$
-b = \left\{\begin{bmatrix}
-b_{1} \\
+f_0 = \begin{bmatrix}
+f_{0} \\
 \vdots \\
-b_{1} \\
+f_{0} \\
 0\\
 \vdots\\
 0\\
 \end{bmatrix},
-\quad x \in \Omega_{1}\\
-\begin{bmatrix}
+\quad 
+f_1 = \begin{bmatrix}
 0\\
 \vdots\\
 0\\
-b_{2}\\
+f_{1}\\
 \vdots\\
-b_{2}\\
-\end{bmatrix},\quad x \in \Omega_{2}\right.
-$$
-
-$$
-f = \left\{\begin{bmatrix}
-f_{1} \\
-\vdots \\
-f_{1} \\
-0\\
-\vdots\\
-0\\
-\end{bmatrix},
-\quad x \in \Omega_{1}\\
-\begin{bmatrix}
-0\\
-\vdots\\
-0\\
-f_{2}\\
-\vdots\\
-f_{2}\\
-\end{bmatrix},\quad x \in \Omega_{2}\right.
+f_{1}\\
+\end{bmatrix},\quad
 $$
 
 
@@ -275,11 +275,11 @@ $\Omega_{0}=[0,1]\times[0,1]$,
 
 $\Omega_{1}=[0,1]\times[1,2]$,
 
-$\Gamma = \{(x,y)|y=1\}$  
+界面为 $\Gamma = \{(x,y)|y=1\}$  ，
 
 网格图
 
-<img src="C:\Users\86188\Desktop\test3_mesh.png" style="zoom: 80%;" />
+<img src="C:\Users\86188\Desktop\test3_mesh.png"  />
 
 方程
 
@@ -387,8 +387,9 @@ class LineInterfaceData():
     #每个子区域对应的单元全局编号的布尔值
     @cartesian
     def subdomain(self, p):
-        sdflag = [self.interface(p) > 0, self.interface(p) < 0]
-        #sdflag是一个二元组，其中的每一项都是一个(NC,)的数组
+        sdflag = [self.interface(p) < 0, self.interface(p) > 0]
+        #sdflag是一个二元组，其中的每一项都是一个(NC,)的数组,
+        #sdflag[0]表示的是\Omega_0处的单元，sdflag[1]表示的是\Omega_!处的单元
         return sdflag
     
     #刚度矩阵的系数
@@ -511,7 +512,7 @@ class LineInterfaceData():
         n1[..., 1] = -1
         
         gI = np.zeros(p.shape[:,-1], dtype = np.float64)
-        gI = -a0*sum(grad0*n0,axis=-1)-a1*sum(grad1*n1,axis=-1)
+        gI = a0*sum(grad0*n0,axis=-1)+a1*sum(grad1*n1,axis=-1)
         #gI(NIE,)
         return gI
 ```
