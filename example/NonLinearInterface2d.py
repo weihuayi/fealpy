@@ -54,7 +54,7 @@ class LineInterfaceData():
     #根据不同的区域确定方程的系数项  
     @cartesian
     def subdomain(self, p):
-        sdflag = [self.interface(p) > 0, self.interface(p) < 0]
+        sdflag = [self.interface(p) < 0, self.interface(p) > 0]
         return sdflag
     
     @cartesian
@@ -185,7 +185,7 @@ class LineInterfaceData():
         n1[..., 1] = -1
         
         gI = np.zeros(p.shape[:-1], dtype = np.float64)
-        gI =-a0*np.sum(grad0*n0,axis=-1)-a1*np.sum(grad1*n1,axis=-1)
+        gI = a0*np.sum(grad0*n0,axis=-1)+a1*np.sum(grad1*n1,axis=-1)
         return gI
 
 class Line():
@@ -322,6 +322,17 @@ tol = 1e-8
 
 pde = LineInterfaceData()
 mesh = pde.mesh()
+
+index = mesh.interface_edge_index()
+print(index)
+fig3 = plt.figure()
+axes = fig3.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes, showindex=True)
+mesh.find_edge(axes, showindex=True)
+mesh.find_cell(axes, showindex=True)
+mesh.find_edge(axes, color='r',multiindex=index)
+plt.show()
 
 NDof = np.zeros(maxit, dtype=np.int_)
 errorMatrix = np.zeros((2, maxit), dtype=np.float64)
