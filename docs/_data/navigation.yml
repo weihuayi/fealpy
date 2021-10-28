@@ -166,6 +166,8 @@ docs-zh:
     children:
       - title: ADDG求解椭圆问题
         url:   /docs/zh/achievement/ADDG
+      - title: 基于FEALPy完成的论文
+        url:   /docs/zh/achievement/paper
   - title:     其他语言
     children:
       - title:  English

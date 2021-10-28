@@ -45,7 +45,7 @@ class PlanetFastSovler():
         return b
 
     @timer
-    def solve(self, u, F):
+    def solve_1(self, u, F):
         rdof = self.rdof
         gdof = self.gdof
 
@@ -65,4 +65,30 @@ class PlanetFastSovler():
 
         P = LinearOperator((gdof, gdof), matvec=self.linear_operator_2)
         u[rdof:].T.flat, info = cg(P, F[rdof:]-u[:rdof]@self.B, tol=1e-8)
+        return u
+    
+    def linear_operator_3(self, b):
+        """ 
+        Ax + By = a
+        Cx + Dy = b
+        """
+        rdof = self.rdof
+
+        x = b[:rdof]
+        y = b[rdof:]
+
+        r = np.zeros_like(b)
+
+        r[:rdof] = self.Ak@x + self.B@y
+        r[rdof:] = x@self.B + self.D@y
+
+        return r
+
+    @timer
+    def solve_2(self, u, F):
+        dof = F.shape[0]
+
+        A = LinearOperator((dof, dof), matvec=self.linear_operator_3)
+
+        u.T.flat, info = cg(A, F, tol=1e-8)
         return u
