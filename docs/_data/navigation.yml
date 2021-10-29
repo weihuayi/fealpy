@@ -162,6 +162,16 @@ docs-zh:
         url:   /docs/zh/example/num-linear-elasticity
       - title: Navier-stokes 方程
         url:   /docs/zh/example/num-navier-stokes-equation
+      - title: Stokes 方程
+        url:   /docs/zh/example/num-stokes-equation
+  - title: 网格生成
+    children:
+      - title:
+        url:
+  - title: 快速算法
+    children:
+      - title:
+        url:
   - title:     成果展示 
     children:
       - title: ADDG求解椭圆问题
