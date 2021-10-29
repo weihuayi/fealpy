@@ -154,8 +154,8 @@ docs-zh:
         url:    /docs/zh/assemble/vector
   - title:     典型模型问题的数值解
     children:
-      - title: 椭圆界面问题
-        url:   /docs/zh/example/num-elliptic-interface
+      - title: 半线性界面问题
+        url:   /docs/zh/example/num-nonlinear-interface
       - title: 非线性 Poisson 方程
         url:   /docs/zh/example/num-non-linear-poisson
       - title:  线弹性方程
@@ -166,6 +166,8 @@ docs-zh:
     children:
       - title: ADDG求解椭圆问题
         url:   /docs/zh/achievement/ADDG
+      - title: 基于FEALPy完成的论文
+        url:   /docs/zh/achievement/paper
   - title:     其他语言
     children:
       - title:  English

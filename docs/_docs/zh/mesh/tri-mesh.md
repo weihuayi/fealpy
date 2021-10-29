@@ -5,7 +5,8 @@ key: docs-tri-mesh-zh
 ---
 
 ## 基本结构
-$\quad$在FEALPy中可以通过TriangleMesh来生成二维三角形网格，只需给出节点和单元，如下述代码所示
+$\quad$在 FEALPy 中可以通过 TriangleMesh 来建立三角形网格对象，只需给出节点数组 node 和单元数组 cell，如下述代码所示
+
 ```python
 import numpy as np
 from fealpy.mesh import TriangleMesh
@@ -14,23 +15,48 @@ node = np.array([
     [0.0, 0.0],
     [1.0, 0.0],
     [1.0, 1.0],
-    [0.0, 1.0]], dtype=np.float) # (NN, 2)
+    [0.0, 1.0]], dtype=np.float64) # (NN, 2)
 
-cell = np.array([[1, 2, 0], [3, 0, 2]], dtype=np.int) # (NC, 3)
+cell = np.array([
+            [1, 2, 0], 
+            [3, 0, 2]], dtype=np.int_) # (NC, 3)
 
 mesh = TriangleMesh(node, cell)
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+mesh.find_node(axes,showindex=True,fontsize=40)
+mesh.find_edge(axes, showindex=True,fontsize=40)
+mesh.find_cell(axes, showindex=True,fontsize=40)
+plt.show()
 ```
 
 生成的网格图像为
 
 <img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
 
-$\quad$其中，node给出了节点的数据，cell给出了单元的数据。在上述算例中，cell包含两个单元，
-即[1,2,0]与[3,0,2]，这存储的是构成网格单元的节点的编号，[1,2,0]即由node[1],node[2],
-和node[0]三个节点构成的三角形网格单元。在FEALPy中，网格单元节点一般由逆时针方向给出，
-因此给出节点的顺序为[1,2,0]，而不是[1,0,2]。
+$\quad$其中，node 给出了节点的数据，cell 给出了单元的数据。在上述算例中，cell 
+包含两个单元，即[1,2,0]与[3,0,2]，存储的是构成网格单元的节点的编号，[1,2,0]即由
+ node[1],node[2],和 node[0] 三个节点构成的三角形网格单元。
 
-$\quad$生成网格后，可以通过TriangMesh中的方法进行一致加密:
+$\quad$在 Fealpy 中，我们约定左手方向为正方向，对于边界边来说，则要求左单元为内部单元，
+而不能是外部。以上图为例，其 edge 的数据为
+```python
+edge:
+ [[0 1]
+ [2 0]
+ [3 0]
+ [1 2]
+ [2 3]]
+```
+$\quad$想象你站在0号边，背朝0号点，面朝1号点，此时，你的左手边就是左单元，同时
+也是内部区域，而右手边为外部区域。
+
+$\quad$图中还给出了各边的编号，这些编号称为边的全局编号。除此以外，在每个单元上
+还有各边的局部编号，记录每个单元内各边的顺序，可以通过 cell2edge 或 edge2cell 来得知它。
+
+$\quad$生成网格后，还可以通过 TriangMesh 中的方法进行一致加密:
 ```python
 mesh.uniform_refine(1)
 ```
@@ -39,7 +65,7 @@ mesh.uniform_refine(1)
 
 <img src="../../../assets/images/mesh/tri-mesh/uniform_refine.png"  />
 
-## 访问数据
+# 网格拓扑关系
 
 $\quad$生成网格后，可以访问网格的各种数据:
 ```python
@@ -58,8 +84,10 @@ area = mesh.entity_measure('cell') # (NC,1), 每个单元的面积
 eh = mesh.entity_measure('edge') # (NE,1), 每条边的长度
 ```
 
-除此以外，还可以获得node,edge,cell等实体间的关系，以如下网格单元剖分为例结合输
+除此以外，还可以获得 node,edge,cell 等实体间的关系，以如下网格单元剖分为例结合输
 出进行说明
+## cell 与 node,edge,cell 间的关系
+
 <img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
 
 ```python
@@ -85,13 +113,14 @@ cell2cell:
  [[1 0 0]
  [0 1 1]]
 ```
-$\quad$首先需要说明全局编号与局部编号的不同。在上面的网格剖分中，共有5条边，记为0到4号边，这是它们的全局编号，
-而在每个单元中，每条边又标记为0到2号边，例如，通过cell2edge可以看出，对于0号单元，1号边为它的0号边，0号边为它的
-1号边，3号边为它的2号边，这是它们的局部编号。
+$\quad$通过 cell2edge 可以看出，对于0号单元，1号边为它的0号边，0号边为它的1号边，3
+号边为它的2号边，这就是它们的局部编号。
 
-$\quad$还需要说明，cell2cell存储的是三条边相邻的单元编号，当相邻单元为无界区域时，存储的编号为该单元本身的编号。
-例如0号单元，其0号边与1号单元相邻，故cell2cell中储存其单元编号1，而1,2号边均与无界区域相邻，故储存的单元编号为其本身，即0。
+$\quad$还需要说明，cell2cell 存储的是三条边相邻的单元编号，当相邻单元为无界区域时，
+存储的编号为该单元本身的编号。例如0号单元，其0号边与1号单元相邻，故 cell2cell 中储
+存其单元编号1，而1,2号边均与无界区域相邻，故储存的单元编号为其本身，即0。
 
+## edge与 node,edge,cell 间的关系
 ```python
 edge2cell = mesh.ds.edge_to_cell() 
 # (NE, 4),边与单元的邻接关系，储存与每条边相邻的两个单元的信息
@@ -132,16 +161,16 @@ edge2edge:
   (4, 4)	True
   (4, 3)	True
   (4, 1)	True
-\end{lstlisting}
+```
+$\quad$edge2cell 存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为
+该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。以0号边为例，因
+其与0号单元和无界区域相邻，故前两项均为0，又因在0号单元中，其为1号边，故后两项均为1；
+再以1号边为例，因其与0号单元和1号单元相邻，故前两项为0,1，又其在0号单元和1号单元
+中均为0号边，故后两项均为0。
 
-edge2cell存储了与每条边相邻的两个单元的信息，前两项为单元的编
-号，后两项为该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。以0号边为例，
-因其与0号单元和无界区域相邻，故前两项均为0，又因在0号单元中，其为1号边，故后两项均为1；
-再以1号边为例，因其与0号单元和1号单元相邻，故前两项为0,1，又其在0号单元和1号单元中均为0号边，
-故后两项均为0。
-
-edge2edge为稀疏矩阵，它判断两条边是否相邻，如0号边与3号边相邻，故矩阵在(0,3)处为True, 
-而未相邻的两条边在矩阵中的对应位置均为False。
+$\quad$edge2edge 为稀疏矩阵，它判断两条边是否相邻，如0号边与3号边相邻，故矩阵在
+(0,3)处为 True, 而未相邻的两条边在矩阵中的对应位置均为 False。
+## node与 node,edge,cell 间的关系
 ```python
 node2cell = mesh.ds.node_to_cell() 
 # 稀疏矩阵,(NN, NC),判断节点是否位于某单元中，位于则对应位置为True，否则为False
@@ -155,7 +184,7 @@ print('node2cell:\n',node2cell)
 输出为
 ```python
 node2cell:
-   (0, 0)	True
+  (0, 0)	True
   (0, 1)	True
   (1, 0)	True
   (2, 0)	True
@@ -163,14 +192,15 @@ node2cell:
   (3, 1)	True
 ```
 
-因为原理相同，故这里只输出了node2cell。以0号点为例，可以看出，由于0号点既位于0号
-单元，又位于1号单元，故在矩阵中，(00),(0,1)均为True。
+因为原理相同，故这里只输出了 node2cell。以0号点为例，可以看出，由于0号点既位于0号
+单元，又位于1号单元，故在矩阵中，(0,0),(0,1)均为 True。
 
+## node,edge,cell 与边界的关系
 ```python
 isBdNode = mesh.ds.boundary_node_flag()
 # (NN, ), bool，判断是否为边界点
 isBdEdge = mesh.ds.boundary_edge_flag()
-# (NE, ), bool，判断师傅为边界边
+# (NE, ), bool，判断是否为边界边
 isBdCell = mesh.ds.boundary_cell_flag()
 # (NC, ), bool，判断是否为边界单元
 ```
@@ -184,8 +214,8 @@ isBdCell = mesh.ds.boundary_cell_flag()
 
 给定三角形的三个顶点的坐标$\boldsymbol{x_0}=(x_0,y_0),\boldsymbol{x_1}=(x_1,y_1),
 \boldsymbol{x_2}=(x_2,y_2)$，则三角形内任意一点(包含边界)$\boldsymbol{x} = (x,y)$
-可以写成这三点坐标的线性组合形式，即 $\boldsymbol{x}=\lambda_0\boldsymbol{x_0} 
-+ \lambda_1\boldsymbol{x_1} +\lambda_2\boldsymbol{x_2}$ 且满足 
+可以写成这三点坐标的线性组合形式，即 
+$\boldsymbol{x}=\lambda_0\boldsymbol{x_0} + \lambda_1\boldsymbol{x_1} +\lambda_2\boldsymbol{x_2}$ 且满足 
 $\lambda_0 + \lambda_1 +\lambda_2=1$和$\lambda_0,\lambda_1,\lambda_2$均大于等于0。
 则称此时三个坐标$\boldsymbol{x_0},\boldsymbol{x_1},\boldsymbol{x_2}$ 的权重, 
 $\lambda_0,\lambda_1,\lambda_2$ 为点$\boldsymbol{x}$的重心坐标，即为
@@ -251,24 +281,100 @@ Dlambda[:,2,:] = v2@W/length.reshape(-1, 1)
 ```
 ## 三角形网格展示
 
-利用TriangleMesh，可以生成在不同区域下不同类型的三角形结构网格。
+$\quad$利用 TriangleMesh，可以生成在不同区域下不同类型的三角形结构网格。
+```python
+from fealpy.mesh import MeshFactory as mf 
 
-<img src="../../../assets/images/mesh/tri-mesh/lshape.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/cross.png" width="350"  />
+mesh = mf.lshape_mesh(n=4)# L型区域下的结构三角形网格
+```
+<img src="../../../assets/images/mesh/tri-mesh/lshape.png" />
 
-<img src="../../../assets/images/mesh/tri-mesh/fishbone.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/rice.png" width="350" />
+```python
+box = [0,1,0,1]
+mesh = mf.special_boxmesh2d(box, n=10, meshtype='fish')# 鱼型三角形网格
+```
 
-也可以生成非结构网格
+<img src="../../../assets/images/mesh/tri-mesh/fishbone.png" />
+
+```python
+box = [0,1,0,1]
+mesh = mf.special_boxmesh2d(box, n=10, meshtype='rice')# 米字型三角形网格
+```
+
+<img src="../../../assets/images/mesh/tri-mesh/rice.png" />
+
+
+$\quad$也可以生成非结构网格
+```python
+mesh = mf.special_boxmesh2d(box,n=10,meshtype='nonuniform')
+```
 
 <img src="../../../assets/images/mesh/tri-mesh/nonuniform.png" />
 
+```python
+mesh = mf.special_boxmesh2d(box,n=10,meshtype='nonuniform')
+```
+
+
 可以生成三角形网格的对偶多边形网格
+```python
+mesh = mf.triangle(box, h=0.1, meshtype='tri')#三角形非结构网格
+mesh = mf.triangle(box, h=0.1, meshtype='poly')#三角形的对偶多边形网格
+```
 
 <img src="../../../assets/images/mesh/tri-mesh/triangle.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/poly.png" width="350"/>  
-除这些外，fealpy还实现了matlab中distmesh工具箱中的部分功能，可以利用distmesh算法
+
+在 MeshFactory 中可以看到这些代码的实现细节。
+
+$\quad$除这些外，Fealpy 还实现了 matlab 中 distmesh 工具箱中的部分功能，可以利用distmesh算法
 生成非结构的三角形网格
+```python
+from fealpy.mesh.simple_mesh_generator import distmesh2d,unitcircledomainmesh
+from fealpy.geometry import huniform
+from fealpy.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.geometry import DistDomain2d
 
-<img src="../../../assets/images/mesh/tri-mesh/distmesh1.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/square_h.png" width="350"  />
+from fealpy.mesh import DistMesh2d
+from fealpy.mesh import PolygonMesh
+from fealpy.mesh import TriangleMeshWithInfinityNode
 
-<img src="../../../assets/images/mesh/tri-mesh/distmesh2.png" width="350"/><img src="../../../assets/images/mesh/tri-mesh/distmesh3.png" width="350"  />
+fd = lambda p: dcircle(p,[0,0],1)
+fh = huniform
+bbox = [-1,1,-1,1]
+domain = DistDomain2d(fd, fh, bbox)
+distmesh2d = DistMesh2d(domain,h0)
+distmesh2d.run()
+```
+<img src="../../../assets/images/mesh/tri-mesh/distmesh1.png" />
 
+```python
+fd = lambda p: ddiff(drectangle(p,[-1.0,1.0,-1.0,1.0]),dcircle(p,[0,0],0.4))
+def fh(p):
+    h = 4*np.sqrt(p[:,0]*p[:,0]+p[:,1]*p[:,1])-1
+    h[h>2] = 2
+    return h
+bbox = [-1,1,-1,1]
+pfix = np.array([(-1.0,-1.0),(1.0,-1.0),(1.0,-1.0),(1.0,1.0)],dtype=np.float)
+domain = DistDomain2d(fd,fh,bbox,pfix)
+distmesh2d = DistMesh2d(domain,h0)
+distmesh2d.run()
+```
+
+<img src="../../../assets/images/mesh/tri-mesh/square_h.png" />
+
+```python
+fd1 = lambda p: dcircle(p,[0,0],1)
+fd2 = lambda p: dcircle(p,[-0.4,0],0.55)
+fd = lambda p: ddiff(ddiff(fd1(p),fd2(p)),p[:,1])
+fh1 = lambda p: 0.15-0.2*fd1(p)
+fh2 = lambda p: 0.06+0.2*fd2(p)
+fh3 = lambda p: (fd2(p)-fd1(p))/3
+fh = lambda p: dmin(dmin(fh1(p),fh2(p)),fh3(p))
+bbox = [-1,1,0,1]
+pfix = np.array([(-1.0,0.0),(-0.95,0.0),(0.15,0.0),(1.0,0.0)],dtype = np.float)
+domain = DistDomain2d(fd,fh,bbox,pfix)
+distmesh2d = DistMesh2d(domain,h0)
+distmesh2d.run()
+```
+<img src="../../../assets/images/mesh/tri-mesh/distmesh2.png"/>
 

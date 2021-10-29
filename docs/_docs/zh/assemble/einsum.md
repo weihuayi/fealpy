@@ -1,8 +1,8 @@
 ---
 title: 爱因斯坦求和
 permalink: /docs/zh/assemble/einsum
-key: docs-einsum-zh
-author:wpx
+key : docs-einsum-zh
+author : wpx
 ---
 
 # 爱因斯坦求和约定
@@ -10,7 +10,7 @@ author:wpx
 在数学中，爱因斯坦求和约定是一种标记法，也称为Einstein Summation Convention。简单来说，爱因斯坦求和就是简化掉求和式中的求和符号，即 $\sum$  ,这样就会使公式更加简洁，如
 
 $$
-a_ib_i = \sum^N_{i=0}a_ib_i = a_0b_0 + a_1b_1 + \cdots + a_Nb_N
+a_ib_i := \sum^N_{i=0}a_ib_i = a_0b_0 + a_1b_1 + \cdots + a_Nb_N
 $$
 
 ## 自由标
@@ -41,9 +41,9 @@ $$
 $$
 u_iv_j = 
 \begin{bmatrix}
-u_1v_1 & u_1v_2 & u_1v_3 \\
-u_2v_1 & u_2v_2 & u_2v_3 \\
-u_3v_1 & u_3v_2 & u_3v_3 
+u_1v_1 + u_1v_2 + u_1v_3 \\
+u_2v_1 + u_2v_2 + u_2v_3 \\
+u_3v_1 + u_3v_2 + u_3v_3 
 \end{bmatrix}
 $$
 
@@ -72,9 +72,9 @@ $$
 $$
 \frac{\partial u_iv_j}{\partial x_j} = 
 \begin{bmatrix}
-\frac{\partial u_1v_1}{\partial x_1}  & \frac{\partial u_1v_2}{\partial x_2}  &\frac{\partial u_1v_3}{\partial x_3} \\ 
-\frac{\partial u_2v_1}{\partial x_1}  & \frac{\partial u_2v_2}{\partial x_2}  &\frac{\partial u_2v_3}{\partial x_3} \\ 
-\frac{\partial u_3v_1}{\partial x_1}  & \frac{\partial u_3v_2}{\partial x_2}  &\frac{\partial u_3v_3}{\partial x_3} \\ 
+\frac{\partial u_1v_1}{\partial x_1}  + \frac{\partial u_1v_2}{\partial x_2}  +\frac{\partial u_1v_3}{\partial x_3} \\ 
+\frac{\partial u_2v_1}{\partial x_1}  + \frac{\partial u_2v_2}{\partial x_2}  +\frac{\partial u_2v_3}{\partial x_3} \\ 
+\frac{\partial u_3v_1}{\partial x_1}  + \frac{\partial u_3v_2}{\partial x_2}  +\frac{\partial u_3v_3}{\partial x_3} \\ 
 \end{bmatrix}
 $$
 
@@ -91,6 +91,7 @@ $$
 
 <img src="./figures/einsum.png" alt="workflow" style="zoom:100%;" />
 
+说明:参数
 - 例子
 
 1. 转置
@@ -158,6 +159,7 @@ b: [[ 0  1  2  3]
  [ 8  9 10 11]]
 c: 506
 ```
+4.刚度矩阵组装
 
 - 加速
 
