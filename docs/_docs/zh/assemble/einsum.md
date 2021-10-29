@@ -72,9 +72,9 @@ $$
 $$
 \frac{\partial u_iv_j}{\partial x_j} = 
 \begin{bmatrix}
-\frac{\partial u_1v_1}{\partial x_1}  & \frac{\partial u_1v_2}{\partial x_2}  &\frac{\partial u_1v_3}{\partial x_3} \\ 
-\frac{\partial u_2v_1}{\partial x_1}  & \frac{\partial u_2v_2}{\partial x_2}  &\frac{\partial u_2v_3}{\partial x_3} \\ 
-\frac{\partial u_3v_1}{\partial x_1}  & \frac{\partial u_3v_2}{\partial x_2}  &\frac{\partial u_3v_3}{\partial x_3} \\ 
+\frac{\partial u_1v_1}{\partial x_1}  + \frac{\partial u_1v_2}{\partial x_2}  +\frac{\partial u_1v_3}{\partial x_3} \\ 
+\frac{\partial u_2v_1}{\partial x_1}  + \frac{\partial u_2v_2}{\partial x_2}  +\frac{\partial u_2v_3}{\partial x_3} \\ 
+\frac{\partial u_3v_1}{\partial x_1}  + \frac{\partial u_3v_2}{\partial x_2}  +\frac{\partial u_3v_3}{\partial x_3} \\ 
 \end{bmatrix}
 $$
 

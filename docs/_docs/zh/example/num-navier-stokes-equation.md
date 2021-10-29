@@ -224,14 +224,13 @@ $$
 其中
 $$
 \begin{aligned}
-E &=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x \\
+E &=\frac{1}{\Delta t}\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x \\
 A &= \int_{\tau}  \frac{\partial \boldsymbol \phi^T}{\partial x} \frac{\partial \boldsymbol \phi}{\partial x} + \frac{\partial \boldsymbol \phi^T}{\partial y} \frac{\partial \boldsymbol \phi}{\partial y}d \boldsymbol x \\
 D &=  \int_{\tau} \boldsymbol u_0^{n} \boldsymbol \phi^T  \frac{\partial \boldsymbol \phi}{\partial x} + \boldsymbol u_1^{n} \boldsymbol \phi^T  \frac{\partial \boldsymbol \phi}{\partial y}d \boldsymbol x \\
-B_1 &=  \int_{\tau} \frac{\partial \boldsymbol \varphi^T}{\partial x} \boldsymbol \phi d \boldsymbol x \\
-B_2 &=  \int_{\tau} \frac{\partial \boldsymbol \varphi^T}{\partial y} \boldsymbol \phi d \boldsymbol x 
+B_1 &=  \int_{\tau} \frac{\partial \boldsymbol \phi^T}{\partial x} \boldsymbol \varphi d \boldsymbol x \\
+B_2 &=  \int_{\tau} \frac{\partial \boldsymbol \phi^T}{\partial y} \boldsymbol \varphi d \boldsymbol x 
 \end{aligned}
 $$
-
 
 # 4 Benchmark
 
