@@ -1,4 +1,8 @@
-# 半线性界面问题
+---
+title: 半线性界面问题
+permalink: /docs/zh/example/num-nonlinear-interface
+key: docs-num-nonlinear-interface-zh
+---
 
 本文基于一个半线性非齐次界面问题所做的一个编程说明文档。原方程如下：
 $$
