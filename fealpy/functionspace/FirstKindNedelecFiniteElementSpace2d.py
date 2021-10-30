@@ -398,10 +398,18 @@ class FirstKindNedelecFiniteElementSpace2d:
         x = idx['x']
         y = idx['y']
 
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
-        phi[:] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 0], c[:, GD*cdof:, :])
+
+        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+
+        phi[..., 1, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1, 0] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
+        
+        phi[..., 1, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1, 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 1], c[:, GD*cdof:, :])
+
         return phi
 
     def cell_to_dof(self):
