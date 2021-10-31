@@ -25,12 +25,12 @@ parser.add_argument('--nq',
         help='积分精度, 默认为 3.')
 
 parser.add_argument('--T',
-        default=10, type=float,
-        help='求解的最终时间, 默认为 10 天.')
+        default=20, type=float,
+        help='求解的最终时间, 默认为 20 天.')
 
 parser.add_argument('--DT',
-        default=60, type=int,
-        help='求解的时间步长, 默认为 60 秒.')
+        default=18, type=int,
+        help='求解的时间步长, 默认为 18 秒.')
 
 parser.add_argument('--accuracy',
         default=1e-10, type=float,
@@ -39,6 +39,10 @@ parser.add_argument('--accuracy',
 parser.add_argument('--niteration',
         default=30, type=int,
         help='迭代的最大迭代次数, 默认为 30 次.')
+
+parser.add_argument('--stable',
+        default=1, type=float,
+        help='默认小行星达到稳定状态时两相邻周期同一相位的最大温差为 1.')
 
 parser.add_argument('--step',
         default=1, type=int,

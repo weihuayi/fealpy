@@ -37,6 +37,9 @@ class PlanetHeatConductionWithRotationSimulator():
         self.uh = self.space.function() # 临时数值解
         self.uh[:] = self.uh0
 
+        self.uh2 = self.space.function() # 上一周期 0 相位数值解
+        self.uh2[:] = self.uh0
+
     @timer
     def schur(self):
         '''
@@ -151,6 +154,12 @@ class PlanetHeatConductionWithRotationSimulator():
         np.add.at(b, face2dof, bb)
         return b
 
+    def preconditioner(self, b):
+        if self.ctx.myid == 0:
+            self.ctx.set_rhs(b)
+        self.ctx.run(job=3)
+        return b
+
     @timer
     def newton(self, ctx=None):
         '''  newton方法  向后欧拉方法 '''
@@ -166,12 +175,11 @@ class PlanetHeatConductionWithRotationSimulator():
         uh = self.uh
 
         uh1[:] = uh0
-        
+
         x = self.space.function()
             
         Tss = self.pde.options['Tss']
         i = timeline.current
-        print(i, ",", uh0[:]*Tss)
 
         k = 0
         error = 1.0
@@ -184,15 +192,16 @@ class PlanetHeatConductionWithRotationSimulator():
             R = self.nolinear_robin_boundary()
             R *= dt
             R += self.M00
-
-            self.solver.set_matrix(R)            
-            x = self.solver.solve(x, F)
             
+            self.solver.set_matrix(R)            
+            x = self.solver.solve_2(x, F)
+
             uh += x
 
             error = np.max(np.abs(x))
             print(k, ":", error)
             uh1[:] = uh
+            print(i, ",", uh1[:]*Tss)
             
             k += 1
             if k >= self.args.niteration: 
@@ -251,6 +260,8 @@ class PlanetHeatConductionWithRotationSimulator():
         self.schur()
         
         self.solver = PlanetFastSovler(self.D, self.B, ctx)
+
+        err = 2
         
         if queue is not None:
             i = timeline.current
@@ -262,18 +273,36 @@ class PlanetHeatConductionWithRotationSimulator():
         while not timeline.stop():
             i = timeline.current
             print('i:', i)
-            self.newton(ctx=ctx)
-#            self.picard_iteration(ctx=ctx)
-            self.uh0[:] = self.uh1
+
+            if (i*args.DT) % self.pde.options['period'] == 0 and i!=0:
+                Tss = self.pde.options['Tss']
+                err = TSS*np.abs(np.max(self.uh1 - self.uh2))
+                self.uh2[:] = self.uh1
             
-            timeline.advance()
-            
-            if i % args.step == 0:
+            if err > args.stable:
+                self.newton(ctx=ctx)
+                self.uh0[:] = self.uh1
+                
+                timeline.advance()
+                
+                if i % args.step == 0:
+                    if queue is not None:
+                        fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
+                        self.update_mesh_data()
+                        data = {'name':fname, 'mesh':self.mesh}
+                        queue.put(data)
+            else:
                 if queue is not None:
-                    fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
-                    self.update_mesh_data()
-                    data = {'name':fname, 'mesh':self.mesh}
-                    queue.put(data)
+                    if i % args.step != 0:
+                        fname = args.output + str(i*args.DT).zfill(10) + '.vtu'
+                        self.update_mesh_data()
+                        data = {'name':fname, 'mesh':self.mesh}
+                        queue.put(data)
+                    queue.put(-1) # 发送模拟结束信号 
+
+                print('The time when the state reache stability is:', i*args.DT,
+                        'error is', err)
+                break
         
         if queue is not None:
             i = timeline.current
