@@ -1173,3 +1173,82 @@ class ArctanData:
     def is_boundary(self, p):
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
+
+
+
+class CircleSinSinData():
+    def __init__(self):
+        from fealpy.geometry import CircleCurve
+        self.CircleCurve = CircleCurve()
+
+    def domain(self):
+        return self.CircleCurve
+
+    
+    def init_mesh(self, n=0, p=None):
+        t = self.CircleCurve.radius
+        c = np.sqrt(3.0)/2.0
+        node = np.array([
+            [0.0, 0.0],
+            [  t, 0.0],
+            [t/2.0, c*t],
+            [-t/2.0, c*t],
+            [-t, 0.0],
+            [-t/2.0, -c*t]
+            [t/2.0, -c*t]],dtype=np.float64)
+        cell = np.array([
+            [0,1,2],
+            [0,2,3],
+            [0,3,4],
+            [0,4,5],
+            [0,5,6],
+            [0,6,1]],dtype=np.int_)
+    
+        mesh = TriangleMesh(node, cell)
+        for i in range(n):
+            NN = mesh.number_of_nodes()
+            mesh.uniform_refine()
+            node = mesh.entity('node')
+            self.CircleCurve.project(node[NN:])
+
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        mesh = LagrangeTriangleMesh(node, cell, p=p)
+        isBdNode = mesh.ds.boundary_node_flag()
+        node = mesh.entity('node')
+        bdnode = node[isBdNode] 
+        self.CircleCurve.project(bdnode)
+        node[isBdNode] = bdnode
+        return mesh
+
+    @cartesian
+    def solution(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        u = np.sin(pi*x)*np.sin(pi*y)
+        return u
+    
+    @cartesian
+    def source(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        f = 2*pi**2*np.sin(pi*x)*np.sin(pi*y)
+        return f
+    
+    @cartesian
+    def gradient(self,p):
+        x = p[..., 0]
+        y = p[..., 1]
+        pi = np.pi
+        grad = np.zeros(p.shape,dtype=np.float_)
+        grad[...,0] = pi*np.cos(pi*x)*np.sin(pi*y)
+        grad[...,1] = pi*np.sin(pi*x)*np.cos(pi*y)
+        return grad
+
+    @cartesian
+    def dirichlet(self,p):
+        p = self.CircleCurve.project(p)
+        return self.solution(p)
+
