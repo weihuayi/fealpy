@@ -35,7 +35,7 @@ class StructureHexMesh(Mesh3d):
         VTK_HEXAHEDRON= 12
         return VTK_HEXAHEDRON
 
-    def to_vtk(self, etype='cell', index=np.s_[:]):
+    def to_vtk(self, etype='cell', index=np.s_[:], fname=None, celldata = None):
         """
 
         Parameters
@@ -49,23 +49,37 @@ class StructureHexMesh(Mesh3d):
         -----
         把网格转化为 VTK 的格式
         """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
         node = self.entity('node')
         GD = self.geo_dimension()
         
         cell = self.entity(etype)[index]
         NV = cell.shape[-1]
+        NC = len(cell)
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
         cell[:, 0] = NV
 
         if etype == 'cell':
             cellType = 12  # 六面体
+            if celldata is None:
+                celldata = self.celldata
         elif etype == 'face':
             cellType = 9  # 四边形
+            if celldata is None:
+                celldata = self.facedata
         elif etype == 'edge':
             cellType = 3  # segment
+            if celldata is None:
+                celldata = self.edgedata
 
-        return node, cell.flatten(), cellType, len(cell)
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=celldata)
 
 
     @property
