@@ -11,7 +11,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 box = [0,1,0,1]
-mesh = MF.polygon_mesh(meshtype='triquad')
+mesh = MF.unitcirclemesh(h=0.2,meshtype='poly',p=None)
 
 # 画图
 fig = plt.figure()

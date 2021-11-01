@@ -65,7 +65,7 @@ def one_quad_mesh(meshtype='square'):
             [1.0, 0.0],
             [1.0, 1.0],
             [0.0, 1.0]], dtype=np.float64)
-    elif mesthtype in {'rectangle', 'rec', 'juxing'}:
+    elif meshtype in {'rectangle', 'rec', 'juxing'}:
         node = np.array([
             [0.0, 0.0],
             [2.0, 0.0],
