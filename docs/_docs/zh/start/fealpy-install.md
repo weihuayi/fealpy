@@ -59,19 +59,7 @@ Windows 下 matplotlib 画图如果要支持 tex 公式的显示，需要系统�
 
   ```bash
   > cd Desktop # 进入主目录
-  > git clone https://gitlab.com/weihuayi/fealpy.git
-  ```
-
-  或者
-
-  ```bash
   > git clone https://github.com/weihuayi/fealpy.git
-  ```
-
-  或者
-
-  ```bash
-  > git clone https://gitee.com/whymath/fealpy.git # 这个就是国内的网站
   ```
 
 5. 进入 FEALPy, 运行下面的命令安装:
