@@ -7,8 +7,7 @@ key: docs-fealpy-install-zh
 
 # 源文件安装
 
-目前，首推的安装方式, 是直接从 [GitLab](https://gitlab.com/weihuayi/fealpy.git) 
-或者 [GitHub](https://github.com/weihuayi/fealpy.git) 克隆安装
+目前，首推的安装方式, 是直接从 [GitHub](https://github.com/weihuayi/fealpy.git) 克隆安装
 
 ```bash
 $ git clone https://github.com/weihuayi/fealpy.git
