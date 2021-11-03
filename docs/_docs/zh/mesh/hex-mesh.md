@@ -7,29 +7,47 @@ key: docs-hex-mesh-zh
 ## 基本结构
 $\quad$ 在 FEALPy 中可以通过 StructureHexMesh 建立三维结构六面体网格对象,
 只需要给出每个方向的剖分段数以及剖分区域, 如下述代码所示:
+
 ```python
 import numpy as np
 from fealpy.mesh import StructureHexMesh
-nx = 1
-ny = 1
-nz = 1
-box = np.array([0, 1, 0, 1, 0, 1])
-mesh = StructureHexMesh(box, nx, ny, nz) 
+nx = 1 # x 方向剖分段数
+ny = 1 # y 方向剖分段数
+nz = 1 # z 方向剖分段数
+box = np.array([0, 1, 0, 1, 0, 1]) # 剖分区域
+mesh = StructureHexMesh(box, nx, ny, nz) # 建立网格
+
+NN = mesh.number_of_nodes() # 节点 node 个数
+NE = mesh.number_of_edges() # 边 edge 个数
+NF = mesh.number_of_faces() # 面 face 个数
+NC = mesh.number_of_cells() # 单元 cell 个数
 ```
 
-生成的网格图像为
+生成的网格图像代码为
+
+```python
+fig = plt.figure()
+axes = Axes3D(fig)
+mesh.add_plot(axes,facecolor=[0.5, 0.9, 0.45])
+mesh.find_node(axes, showindex=True, markersize=25, fontsize=12)
+mesh.find_edge(axes, showindex=True, markersize=50, fontsize=12)
+mesh.find_face(axes, showindex=True, markersize=75, fontsize=12)
+axes.set_title('mesh')
+```
+
+图像如下图所示
 
 <img src="../../../assets/images/mesh/Hex-mesh/Hex.png" alt="Hexahedron"     style="zoom:50%;" />
 
-其中, $nx$, $ny$, $nz$ 分别表示 $x$, $y$, $z$ 三个方向的剖分段数, box
-表示区域范围. 
 
 ## 基本约定:
-在介绍六面体时, 使用一个单位正六面体来说明用到的基本约定. 以 $(0, 0, 0)$
+
+在介绍六面体时, 使用一个单位正六面体来说明用到的基本约定. 
+<!--以 $(0, 0, 0)$
 为原点引入笛卡尔直角坐标系, 其他七个点的坐标分别为 $(0, 0, 1)$, $(0, 1, 0)$,
 $(0, 1, 1)$, $(1, 0, 0)$, $(1, 0, 1)$, $(1, 1, 0)$, $(1, 1, 1)$.
-
-下面是上图的 node 和 edge 的 编号
+-->
+下图是一个单元 node 和 edge 的 编号
 
 <img src="../../../assets/images/mesh/Hex-mesh/hexmeshindex.png" alt="Hexahedron"     style="zoom:50%;" />
 
@@ -38,12 +56,22 @@ $(0, 1, 1)$, $(1, 0, 0)$, $(1, 0, 1)$, $(1, 1, 0)$, $(1, 1, 1)$.
 
 ### 全局编号
 
-<u1>
-<li> 点的全局编号: 按照 $z \to y \to x$ 的顺序编号, 且按照值从小到大的方向排列,
-以上面的网格为例:
-</u1>
+```
+edge = mesh.entity('edge') # 边数组，规模为(NE,2), 储存每条边的两个节点的编号
+face = mesh.entity('face') # 面数组, 规模为(NF,4), 储存每个面的四个节点的编号
+cell = mesh.entity('cell') # 单元数组, 规模为(NC,8), 储存构成六面体的八个节点编号
 
-```python 
+ec = mesh.entity_barycenter('edge') # (NE,3), 储存各边的重心坐标
+fc = mesh.entity_barycenter('face') # (NF,3), 储存各面的重心坐标
+bc = mesh.entity_barycenter('cell') # (NC,3), 储存各单元的重心坐标
+```
+
+
+* 点的全局编号: 按照 $z \to y \to x$ 的顺序编号, 且按照值从小到大的方向排列,
+以上面的网格为例:
+
+```python
+node = mesh.entity('node') # 节点数组，规模为(NN,3), 储存节点坐标
 node [[0. 0. 0.]
  [0. 0. 1.]
  [0. 1. 0.]
@@ -52,11 +80,12 @@ node [[0. 0. 0.]
  [1. 0. 1.]
  [1. 1. 0.]
  [1. 1. 1.]]
-``` 
-<u1>
-<li> 边的全局编号: 按照 $z \to y \to x$ 的顺序编号,
+```
+
+* 边的全局编号: 按照 $z \to y \to x$ 的顺序编号,
 与点的编号规则类似，且从小的节点编号指向大的节点编号(先排 $z$ 方向的边, 再排 $y$
 方向的边, 最后是 $x$ 方向的边).
+
 ```python
 edge [[0 1]
  [2 3]
@@ -83,10 +112,10 @@ ec:[[0.  0.  0.5]
  [0.5 1.  0. ]
  [0.5 1.  1. ]] # 边的中点坐标
  ```
-</u1> 
-<li> 面的全局编号: 按照 $z \to y \to x$ 的顺序编号(先排 $z$ 方向的面, 再排 $y$
+
+* 面的全局编号: 按照 $z \to y \to x$ 的顺序编号(先排 $z$ 方向的面, 再排 $y$
 方向的面, 最后是 $x$ 方向的面).
-</u1>
+
 ```python
 face [[0 1 3 2]
  [4 6 7 5]
@@ -100,18 +129,21 @@ face [[0 1 3 2]
 
 
 ### 局部编号
+
 局部编号记录单元, 面, 和边的所对应节点的个数, 可以用来得到单元, 面,
 边和点之间的对应关系.
 
 ## 网格加密
 
 $\quad$ 生成网格后, 可以通过改变剖分段数对 StructureHexMesh 中的网格进行加密:
+
 ```python
 nx = 2*nx
 ny = 2*ny
 nz = 2*nz
 mesh = StructureHexMesh(box, nx, ny, nz)
 ```
+
 加密一次, 结果如下:
 
 <img src="../../../assets/images/mesh/Hex-mesh/Hex_refine.png" width="350" /><img src="../../../assets/images/mesh/Hex-mesh/Hex_refine1.png" width="350" />
@@ -119,6 +151,7 @@ mesh = StructureHexMesh(box, nx, ny, nz)
 ## 常用成员函数
 
 $\quad$ 生成网格后, 可以访问网格的常用成员函数:
+
 ```python
 NN = mesh.number_of_nodes() # 节点 node 个数
 NE = mesh.number_of_edges() # 边 edge 个数
@@ -134,6 +167,7 @@ ec = mesh.entity_barycenter('edge') # (NE,3), 储存各边的重心坐标
 fc = mesh.entity_barycenter('face') # (NF,3), 储存各面的重心坐标
 bc = mesh.entity_barycenter('cell') # (NC,3), 储存各单元的重心坐标
 ```
+
 除此之外, 还可以获得 node, edge, face, cell 等实体间的邻接关系,
 以如下网格单元剖分为例结合输出进行说明
 
@@ -147,7 +181,9 @@ print('cell2edge:\n', cell2edge)
 print('cell2face:\n', cell2face)
 print('cell2cell:\n', cell2cell)
 ```
+
 输出为
+
 ```python
 cell2node:
    (0, 0)	True
@@ -247,7 +283,9 @@ print('face2node:\n', face2node)
 print('face2edge:\n', face2edge)
 print('face2cell:\n', face2cell)
 ```
+
 输出为
+
 ```python
 face2node:
  [[ 0  1  4  3]
@@ -364,6 +402,7 @@ face2cell:
 
 这里 编号信息与 cell2edge 是相同的. 这里就不具体解释了.
 同理, 六面体网格中还有
+
 ```python
 edge2node = mesh.ds.edge_to_node() # (NE, 2) 
 edge2edge = mesh.ds.edge_to_edge() # 需要修改程序
