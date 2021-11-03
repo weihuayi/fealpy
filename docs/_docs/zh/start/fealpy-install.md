@@ -4,11 +4,9 @@ permalink: /docs/zh/start/fealpy-install
 key: docs-fealpy-install-zh
 ---
 
-
 # 源文件安装
 
-目前，首推的安装方式, 是直接从 [GitLab](https://gitlab.com/weihuayi/fealpy.git) 
-或者 [GitHub](https://github.com/weihuayi/fealpy.git) 克隆安装
+目前，首推的安装方式, 是直接从 [GitHub](https://github.com/weihuayi/fealpy.git) 克隆安装
 
 ```bash
 $ git clone https://github.com/weihuayi/fealpy.git
@@ -55,7 +53,7 @@ Windows 下 matplotlib 画图如果要支持 tex 公式的显示，需要系统�
    ```
    在有些 Windows 系统中，可能默认进入的是管理员的目录，就没有 Desktop 目录。这样的 情况下，你可以找一下自己的 Desktop 目录， 然后再执行下面的安装步骤。当然， fealpy 最终 clone 到系统的任何地方都是可以的，你觉得方便就行。
 
-4. 进入 Desktop 目录, 然后从 gitlab、 github 或者 gitee 上克隆最新的 FEALPy
+4. 进入 Desktop 目录, 然后从github上克隆最新的 FEALPy
 
   ```bash
   > cd Desktop # 进入主目录
