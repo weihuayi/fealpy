@@ -1,8 +1,10 @@
 ---
-title: FEALPy 的安装 
+title: FEALPy 简介与安装 
 permalink: /docs/zh/start/fealpy-install
 key: docs-fealpy-install-zh
 ---
+
+# FEALPy 简介
 
 # 源文件安装
 
