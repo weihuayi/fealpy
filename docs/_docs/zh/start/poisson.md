@@ -226,11 +226,77 @@ $$
 \end{aligned}
 $$
 
-# 理论与编程实现
-
-在大多数讲有限元的书籍中, 一般都在算法理论
+$\quad$ 在大多数讲有限元的书籍中, 一般都在算法理论
 (如存在、唯一、稳定和误差分析等)的讲解上花了过多的功夫, 
-力求在数学上的严谨与无懈可击.
-把计算数学这门本来与实际应用紧密联系的学科用基础数学化的方式做相关的科研和人才培养. 
+力求在数学上的严谨与无懈可击. 严谨对算法理论来说当然很重要, 
+但完全忽略算法的实现以及与实际应用的联系来, 对计算数学这个学科的发展和应用来说, 
+是非常不利的. 所以上面介绍有限元算法的过程, 几乎没有介绍有限元的相关算法理论,
+更多是着眼于思想、动机和具体算法的实现. 当然还有更多实现的细节没有讲到,
+如边界条件处理等, 这些会在后面的文档中逐一介绍.
 
 
+# FEALPy 求解 Poisson 方程 
+
+给定一个真解为
+
+$$
+u  = \cos\pi x\cos\pi y
+$$
+Poisson  方程, 其定义域为 $[0, 1]^2$, 只有纯的 Dirichlet 边界条件, 下面演示基于
+FEALPy 求解这个算例的过程. 
+
+1. 导入创建 pde 模型.
+```python
+from fealpy.pde.poisson_2d import CosCosData # 导入二维 Poisson 模型实例
+pde = CosCosData() # 创建 pde 模型对象
+```
+2. 生成初始网格, 建立有限元空间. 代码中 `p=1` 也可以设为更大正整数, 表示建立
+$p$ 次元的空间.
+```python
+# 导入 Lagrange 有限元空间
+from fealpy.functionspace import LagrangeFiniteElementSpace 
+mesh = pde.init_mesh(n=4) # 生成初始网格, 其中 4 表示初始网格要加密 4 次
+space = LagrangeFiniteElementSpace(mesh, p=1)  # 线性元空间
+```
+3. 建立 Dirichlet 边界条件处理对象.
+```python
+# 导入 Dirichlet 边界处理
+from fealpy.boundarycondition import DirichletBC 
+bc = DirichletBC(space, pde.dirichlet) # 创建 Dirichlet 边界条件处理对象
+```
+4. 创建离散代数系统, 并进行边界条件处理. 
+```python
+uh = space.function() # 创建有限元函数对象
+A = space.stiff_matrix() # 组装刚度矩阵对象
+F = space.source_vector(pde.source) # 组装右端向量对象
+A, F = bc.apply(A, F, uh) # 应用 Dirichlet 边界条件
+```
+5. 求解离散系统.
+```python
+# 导入稀疏线性代数系统求解函数
+from scipy.sparse.linalg import spsolve
+uh[:] = spsolve(A, F).reshape(-1)
+```
+6. 计算 L2 和 H1 误差.
+```python
+L2Error = space.integralalg.error(pde.solution, uh)
+H1Error = space.integralalg.error(pde.gradient, uh.grad_value)
+```
+7. 画出解函数和网格图像
+```python
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+axes = fig.add_subplot(1, 2, 1, projection='3d')
+uh.add_plot(axes, cmap='rainbow')
+axes = fig.add_subplot(1, 2, 2)
+mesh.add_plot(axes)
+```
+
+上面是一个典型求解二维 Poisson 方程的例子, 经过简单修改就可以求解 1 维或者 3
+维的问题. 更多例子见
+
+1. [带纯 Dirichlet 边界的 Poisson 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithDirichletBC_example.py)
+1. [带纯 Neumann 边界的 Poisoon 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithNeumannBC_example.py)
+1. [带纯 Robin 边界的 Poisson 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithRobinBC_example.py)
+1. [带纯 Dirichlet 边界的一般椭圆方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/ConvectinDiffusionReactionFEMwithDirichletBC2d_example.py)
