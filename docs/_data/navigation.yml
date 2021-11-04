@@ -176,6 +176,8 @@ docs-zh:
         url:   /docs/zh/example/num-navier-stokes-equation
       - title: Stokes 方程
         url:   /docs/zh/example/num-stokes-equation
+      - title: 流动前沿不稳定模拟
+        url:   /docs/zh/example/fountain-flow-instability
   
   - title: 快速算法
     children:
