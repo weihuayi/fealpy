@@ -104,10 +104,11 @@ header:
 docs-zh:
   - title:  快速开始
     children:
-      - title: 安装 
+      - title: FEALPy 简介与安装 
         url:    /docs/zh/start/fealpy-install
-      - title: 任意次有限元求解 Poisson 方程示例
+      - title: 有限元求解 Poisson 方程示例
         url:    /docs/zh/start/poisson
+  
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 
@@ -128,10 +129,19 @@ docs-zh:
         url:    /docs/zh/mesh/polyhedron-mesh
       - title: 高阶网格 
         url:    /docs/zh/mesh/high-order-mesh
-      - title: 网格自适应
-        url:    /docs/zh/mesh/mesh-adaptive
       - title: 网格工厂
-        url:    /docs/zh/mesh/mesh-factory
+        url:    /docs/zh/mesh/mesh-factory    
+  
+  - title: 网格自适应
+    children:
+      - title:
+        url:    /docs/zh/mesh-adaptive/
+  
+  - title: 网格生成
+    children:
+      - title:
+        url:   /docs/zh/mesh-adaptive/
+  
   - title:     有限维空间与数值离散方法
     children:
       - title:  单纯形网格上的拉格朗日有限元空间 
@@ -144,6 +154,7 @@ docs-zh:
         url:    /docs/zh/space/ncvem
       - title:  Weak Galerkin 方法 
         url:    /docs/zh/space/weak-galerkin-space
+  
   - title:    爱因斯坦求和与矩阵、向量组装 
     children:
       - title: 爱因斯坦求和
@@ -152,6 +163,7 @@ docs-zh:
         url:    /docs/zh/assemble/matrix
       - title: 向量组装 
         url:    /docs/zh/assemble/vector
+  
   - title:     典型模型问题的数值解
     children:
       - title: 半线性界面问题
@@ -162,12 +174,21 @@ docs-zh:
         url:   /docs/zh/example/num-linear-elasticity
       - title: Navier-stokes 方程
         url:   /docs/zh/example/num-navier-stokes-equation
+      - title: Stokes 方程
+        url:   /docs/zh/example/num-stokes-equation
+  
+  - title: 快速算法
+    children:
+      - title:
+        url: /docs/zh/solver
+  
   - title:     成果展示 
     children:
       - title: ADDG求解椭圆问题
         url:   /docs/zh/achievement/ADDG
       - title: 基于FEALPy完成的论文
         url:   /docs/zh/achievement/paper
+  
   - title:     其他语言
     children:
       - title:  English
