@@ -19,7 +19,7 @@ $$
 若其为牛顿流体的话，流体的切应力与应变时间(速度梯度)成正比。其关系如下
 
 $$
-\sigma(\boldsymbol u ,p) = 2 \mu \varepsilon(\boldsymbol u) - p \boldsymbol I
+\sigma(\boldsymbol u ,p) = \mu \varepsilon(\boldsymbol u) + p \boldsymbol I
 $$
 
 
@@ -97,112 +97,9 @@ $$
 	+( \sigma(\boldsymbol u) , \varepsilon(\boldsymbol v)) 
 	-( \sigma(\boldsymbol u) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}
 	=  (\rho \boldsymbol f,\boldsymbol v)
-\end{aligned}
+\end{aligned}`1
 $$
 
-# 3. 时间离散
-
-## 3.1 Chroin 算法
-
-$\qquad$　首先对时间倒数做如下离散
-
-$$
-\begin{aligned}
- \frac{\boldsymbol u^{n+1} - \boldsymbol u^n}{\Delta t} + \boldsymbol u \cdot \nabla \boldsymbol u= -\frac{1}{\rho}\nabla p + \frac{1}{\rho}\nabla \sigma (u) + \boldsymbol f 
-\end{aligned}
-$$
-
-为了解离开 $\boldsymbol u$ 和 $p$ ，将时间导数做如下分裂
-
-$$
-\begin{aligned}
-\frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{n}) = \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{*}) + \frac{1}{\Delta t}(\boldsymbol u^{*}-\boldsymbol u^{n})
-\begin{aligned}
-$$
-
-由于连续性条件我们可以将 $\nabla \sigma(\boldsymbol u)$ 变为 $\mu \Delta \boldsymbol u $ ，我们对其它变量所在时间层做如下选取
-
-$$
-\begin{aligned}
-\frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \frac{\mu}{\rho}\Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= \boldsymbol f^{n+1}  \\
-\frac{1}{\Delta t}( \boldsymbol u^{n+1}- \boldsymbol u^{*}) + \frac{1}{\rho} \nabla p^{n+1} &=  0\qquad \\
-\nabla \cdot \boldsymbol u^{n+1} &= 0\qquad \\ 
-\end{aligned}
-$$
-
-我们再对上面的第二个式子两边乘以$\nabla \cdot$，由于连续性条件可以得到
-
-$$
-\begin{aligned}
-\frac{1}{\rho} \Delta  p^{n+1}  &= \frac{1}{\Delta t} \nabla \cdot \boldsymbol u^* \qquad 
-\end{aligned}
-$$
-
-再带入原式便可以计算出$\boldsymbol u^{n+1}$
-
-$$
-\begin{aligned}
-\boldsymbol u^{n+1} = \boldsymbol u^* - \Delta t \nabla p^{n+1}
-\end{aligned}
-$$
-
-
- 再通过变分得到如chorin求解Navier-Stokes的三步方法
-
-- 求解速度中间变量$\boldsymbol u^*$
-
-$$
-\begin{aligned}
-(\frac{\boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v )  + \frac{\mu}{\rho}(\nabla\boldsymbol u^*,\nabla \boldsymbol v) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n ,\boldsymbol v) &= (\boldsymbol f^{n+1},\boldsymbol v)  \qquad in \quad \Omega \\
-\boldsymbol u^* &= \boldsymbol g_D \qquad on \quad \partial \Omega  \\ 
-\end{aligned}
-$$
-
-- 求解$p^{n+1}$
-
-$$
-\begin{aligned}
-\frac{1}{\rho}( \nabla p^{n+1},\nabla q)  &= -\frac{1}{\Delta t} (\nabla \cdot \boldsymbol u^*,q) \qquad in \quad \Omega \\
-\frac{\partial p^{n+1}}{\partial n} &= 0 \qquad on \quad \partial \Omega
-\end{aligned}
-$$
-
-- 求解$u^{n+1}$
-
-$$
-\begin{aligned}
-(\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla p^{n+1}, \boldsymbol v) \qquad in \quad \Omega 
-\end{aligned}
-$$
-
-## 3.2 ipcs算法
-
-第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成 $\sigma(u)$ ,Chorin算法第一步变为
-
-$$
-\begin{aligned}
-(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + \frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - \frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + (p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega}
--( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
-\boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
-\end{aligned}
-$$
-
-第二步计算
-
-$$
-\begin{aligned}
- (\nabla(p^{n+1}-p^{n}),\nabla q) &= -\frac{1}{\Delta t} (\nabla \cdot \boldsymbol u^*,q)   \qquad in \quad \Omega ,\\
-\nabla( p^{n+1}- p^n)\cdot \boldsymbol n &= 0 \qquad on \quad \partial \Omega\\
-\end{aligned}
-$$
-
-第三步计算
-
-$$
-\begin{aligned}
-(\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla(p^{n+1}-p^{n}), \boldsymbol v) \qquad in \quad \Omega 
-\end{aligned}
-$$
 
 ## 3.3 Oseen算法
 

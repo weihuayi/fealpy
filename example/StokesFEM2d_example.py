@@ -19,7 +19,7 @@ from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.functionspace import ScaledMonomialSpace2d 
 from fealpy.boundarycondition import DirichletBC 
-from fealpy.pde.stokes_model_2d import StokesModelData_0 as PDE
+from fealpy.pde.stokes_model_2d import StokesModelData_6 as PDE
 
 from fealpy.decorator import cartesian,barycentric
 from fealpy.tools import showmultirate
