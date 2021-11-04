@@ -343,7 +343,7 @@ class FirstKindNedelecFiniteElementSpace2d:
             ps = mesh.bc_to_point(bc, index=index)
         else:
             ps = bc
-        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof)
+        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof, GD)
 
         shape = ps.shape[:-1] + (ldof, )
         phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
@@ -362,7 +362,55 @@ class FirstKindNedelecFiniteElementSpace2d:
 
     @barycentric
     def grad_basis(self, bc):
-        pass
+        """
+
+        Parameters
+        ----------
+
+        Notes
+        -----
+        curl [v_0, v_1] = \partial v_1/\partial x - \partial v_0/\partial y
+
+        curl [[ m_k, 0], [0, m_k]] 
+        = [-\partial m_k/\partial y,  \partial m_k/\partial x] 
+
+        """
+        p = self.p
+        ldof = self.number_of_local_dofs('all')
+        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
+        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
+
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        index = index if index is not None else np.s_[:]
+        if barycenter:
+            ps = mesh.bc_to_point(bc, index=index)
+        else:
+            ps = bc
+        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof, GD)
+
+        shape = ps.shape[:-1] + (ldof, GD, GD)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, GD, GD)
+
+        c = self.bcoefs[index] # (NC, ldof, ldof) 
+
+        idx = self.smspace.face_index_1(p=p+1)
+        x = idx['x']
+        y = idx['y']
+
+        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 0], c[:, GD*cdof:, :])
+
+        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
+        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+
+        phi[..., 1, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1, 0] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
+        
+        phi[..., 1, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 1*cdof:2*cdof, :])
+        phi[..., 1, 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 1], c[:, GD*cdof:, :])
+
+        return phi
 
     def cell_to_dof(self):
         return self.dof.cell2dof

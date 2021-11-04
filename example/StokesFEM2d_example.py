@@ -77,8 +77,6 @@ for i in range(maxit):
     B0, B1 = uspace.div_matrix(pspace)
     F = uspace.source_vector(pde.source, dim=dim)
     
-    
-
     AA = bmat([[A, None, -B0], [None, A, -B1], [-B0.T, -B1.T, None]], format='csr')
     FF = np.r_['0', F.T.flat, np.zeros(pgdof)]
 

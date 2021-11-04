@@ -1,7 +1,7 @@
 ---
-title: Navier-stokes 方程数值求解
-permalink: /docs/zh/example/num-navier-stokes-equation
-key: docs-num-navier-stoke-equation-zh
+title: Stokes 方程数值求解
+permalink: /docs/zh/example/num-stokes-equation
+key: docs-num-stokes-equation-zh
 author: wpx
 ---
 # 1. PDE 模型
@@ -10,17 +10,16 @@ author: wpx
 
 $$
 \begin{aligned}
-\frac{\partial \boldsymbol u}{\partial t}+\boldsymbol u \cdot \nabla\boldsymbol u  +\frac{1}{\rho}\nabla p - \frac{1}{\rho}\nabla \cdot \sigma(\boldsymbol u)&=  \boldsymbol f  \qquad in \quad \Omega \times (0,T) \\
-\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega \times (0,T)\\
-u &= \boldsymbol g_D \qquad on \quad \partial\Omega \times (0,T)\\
-u(\cdot ,0) &= u_0 \qquad in \quad \Omega
+- \nabla \cdot \sigma(\boldsymbol u,p) &=  \boldsymbol f  \qquad in \quad \Omega \\
+\nabla \cdot \boldsymbol u &= 0 \qquad in \quad \Omega \\
+u &= \boldsymbol g \qquad on \quad \partial\Omega\\
 \end{aligned}
 $$
 
 若其为牛顿流体的话，流体的切应力与应变时间(速度梯度)成正比。其关系如下
 
 $$
-\sigma(\boldsymbol u) = 2 \mu \varepsilon(\boldsymbol u)
+\sigma(\boldsymbol u ,p) = 2 \mu \varepsilon(\boldsymbol u) - p \boldsymbol I
 $$
 
 
@@ -113,14 +112,15 @@ $$
 \end{aligned}
 $$
 
-
-为了解离开$\boldsymbol u$和$p$，将时间导数做如下分裂
+为了解离开 $\boldsymbol u$ 和 $p$ ，将时间导数做如下分裂
 
 $$
+\begin{aligned}
 \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{n}) = \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{*}) + \frac{1}{\Delta t}(\boldsymbol u^{*}-\boldsymbol u^{n})
+\begin{aligned}
 $$
 
-由于连续性条件我们可以将$\nabla \sigma(\boldsymbol u)$变为$\mu \Delta \boldsymbol u $，我们对其它变量所在时间层做如下选取
+由于连续性条件我们可以将 $\nabla \sigma(\boldsymbol u)$ 变为 $\mu \Delta \boldsymbol u $ ，我们对其它变量所在时间层做如下选取
 
 $$
 \begin{aligned}
@@ -146,7 +146,8 @@ $$
 \end{aligned}
 $$
 
-再通过变分得到如chorin求解Navier-Stokes的三步方法
+
+ 再通过变分得到如chorin求解Navier-Stokes的三步方法
 
 - 求解速度中间变量$\boldsymbol u^*$
 
@@ -157,8 +158,6 @@ $$
 \end{aligned}
 $$
 
-
-
 - 求解$p^{n+1}$
 
 $$
@@ -167,8 +166,6 @@ $$
 \frac{\partial p^{n+1}}{\partial n} &= 0 \qquad on \quad \partial \Omega
 \end{aligned}
 $$
-
-
 
 - 求解$u^{n+1}$
 
@@ -180,21 +177,15 @@ $$
 
 ## 3.2 ipcs算法
 
-第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，
-因此粘性项可以写成$\sigma(u)$,因此将Chorin算法第一步变为
+第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成 $\sigma(u)$ ,Chorin算法第一步变为
 
 $$
 \begin{aligned}
-(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + 
-\frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + 
-(\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - 
-\frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + 
-(p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega} -
-( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
+(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + \frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - \frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + (p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega}
+-( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
 \end{aligned}
 $$
-
 
 第二步计算
 
@@ -202,7 +193,6 @@ $$
 \begin{aligned}
  (\nabla(p^{n+1}-p^{n}),\nabla q) &= -\frac{1}{\Delta t} (\nabla \cdot \boldsymbol u^*,q)   \qquad in \quad \Omega ,\\
 \nabla( p^{n+1}- p^n)\cdot \boldsymbol n &= 0 \qquad on \quad \partial \Omega\\
-
 \end{aligned}
 $$
 
@@ -216,7 +206,8 @@ $$
 
 ## 3.3 Oseen算法
 
-非线性项 $\boldsymbol u \cdot \nabla \boldsymbol u$ 进行线性化处理 $\boldsymbol u^n \cdot \nabla \boldsymbol u^{n+1}$
+非线性项 $\boldsymbol u \cdot \nabla \boldsymbol u $ 进行线性化处理 $ \boldsymbol u^n \cdot \nabla \boldsymbol u^{n+1}$
+
 $$
 \begin{aligned}
 	( \frac{ \boldsymbol u^{n+1}-\boldsymbol u^{n}}{\Delta t},\boldsymbol v) + ( \boldsymbol u^{n} \cdot \nabla \boldsymbol u^{n+1} ,\boldsymbol v ) 
@@ -256,7 +247,7 @@ $$
 
 $\qquad$Channel flow是对壁面固定管道内流动情况的模拟
 
-令$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
 
 $$
 \begin{aligned}
@@ -275,7 +266,7 @@ $$
 
 # 5 基函数表示
 
-给定 $\Omega$ 上一个单纯形网格离散 $\tau$, 构造连续的分k次$Lgarange$多项式空间, 其基函数向量记为：
+给定 $\Omega$​ 上一个单纯形网格离散 $\tau$, 构造连续的分k次$Lgarange$多项式空间, 其基函数向量记为：
 
 $$
 \begin{aligned}
@@ -525,7 +516,6 @@ $$
 
 
 ## 5.2矩阵表示
-
 $$
 \begin{aligned}
     \boldsymbol H=\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x=

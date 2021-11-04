@@ -65,7 +65,7 @@ def one_quad_mesh(meshtype='square'):
             [1.0, 0.0],
             [1.0, 1.0],
             [0.0, 1.0]], dtype=np.float64)
-    elif mesthtype in {'rectangle', 'rec', 'juxing'}:
+    elif meshtype in {'rectangle', 'rec', 'juxing'}:
         node = np.array([
             [0.0, 0.0],
             [2.0, 0.0],
@@ -229,8 +229,8 @@ def triangle(box, h, meshtype='tri'):
     mesh_info.set_points([(box[0], box[2]), (box[1], box[2]), (box[1], box[3]), (box[0], box[3])])
     mesh_info.set_facets([[0, 1], [1, 2], [2, 3], [3, 0]])
     mesh = build(mesh_info, max_volume=h**2)
-    node = np.array(mesh.points, dtype=np.float)
-    cell = np.array(mesh.elements, dtype=np.int)
+    node = np.array(mesh.points, dtype=np.float64)
+    cell = np.array(mesh.elements, dtype=np.int_)
     if meshtype in {'tri', 'triangle'}:
         return TriangleMesh(node, cell)
     elif meshtype in {'polygon', 'poly'}:
@@ -334,7 +334,7 @@ def lshape_mesh(n=4):
         (1, 0),
         (-1, 1),
         (0, 1),
-        (1, 1)], dtype=np.float)
+        (1, 1)], dtype=np.float64)
 
     cell = np.array([
         (1, 3, 0),
@@ -393,10 +393,10 @@ def polygon_mesh(meshtype='triquad'):
         node = np.array([
             (0.0, 0.0), (0.0, 1.0), (0.0, 2.0),
             (1.0, 0.0), (1.0, 1.0), (1.0, 2.0),
-            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float)
+            (2.0, 0.0), (2.0, 1.0), (2.0, 2.0)], dtype=np.float64)
         cell = np.array([0, 3, 4, 4, 1, 0,
-            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int)
-        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int)
+            1, 4, 5, 2, 3, 6, 7, 4, 4, 7, 8, 5], dtype=np.int_)
+        cellLocation = np.array([0, 3, 6, 10, 14, 18], dtype=np.int_)
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgeMesh2d.from_mesh(mesh)
         return mesh
