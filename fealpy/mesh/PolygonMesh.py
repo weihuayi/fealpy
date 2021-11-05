@@ -423,7 +423,7 @@ class PolygonMeshDataStructure():
 
     def edge_to_edge(self):
         edge2node = self.edge_to_node()
-        return edge2node*edge2node.tranpose()
+        return edge2node*edge2node.transpose()
 
     def edge_to_cell(self, return_sparse=False):
         NE = self.NE
