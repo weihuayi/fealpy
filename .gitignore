@@ -46,7 +46,7 @@ dist
 *.swo
 *.vtu
 
-
+*.pyc
 .vscode
 *.pickle
 
