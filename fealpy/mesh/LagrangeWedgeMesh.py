@@ -82,8 +82,6 @@ class LinearWedgeMeshDataStructure():
 
 class LagrangeWedgeMesh(Mesh3d):
     
-    # def __init__(self, *args, **keys):
-    # 
     def __init__(self, mesh, h, nh, p=1, surface=None):
 
         cell = mesh.entity('cell')
@@ -556,7 +554,7 @@ class LagrangeWedgeMesh(Mesh3d):
 
         node = self.entity('node')
 
-        if self.meshdata['p'] is not None:
+        if 'p' in self.meshdata:
             node = np.vstack((node, self.meshdata['p']))
 
         GD = self.geo_dimension()
