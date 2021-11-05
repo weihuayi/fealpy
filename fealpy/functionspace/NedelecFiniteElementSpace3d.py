@@ -7,7 +7,7 @@ from .Function import Function
 from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
 
-class NDof2d:
+class NDof3d:
     def __init__(self, mesh, spacetype='first'):
         """
         Parameters
@@ -92,7 +92,7 @@ class NDof2d:
         gdof = NE*edof
         return gdof 
 
-class NedelecFiniteElementSpace2d:
+class NedelecFiniteElementSpace3d:
     def __init__(self, mesh, spacetype='first', q=None, dof=None):
         """
         Parameters
