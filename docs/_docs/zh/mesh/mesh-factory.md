@@ -20,7 +20,8 @@ from fealpy.mesh import MeshFactory as MF
 import numpy as np
 import matplotlib.pyplot as plt
 
-mesh = MF.one_triangle_mesh(meshtype='iso')
+mesh = MF.one_triangle_mesh(meshtype='iso') 
+#mesh = MF.one_triangle_mesh(meshtype='equ') 
 
 fig = plt.figure()
 axes = fig.gca()
@@ -51,6 +52,8 @@ from fealpy.mesh import MeshFactory as MF
 import numpy as np
 import matplotlib.pyplot as plt
 
+#mesh = MF.one_quad_mesh(meshtype='square')
+#mesh = MF.one_quad_mesh(meshtype='rectangle')
 mesh = MF.one_quad_mesh(meshtype='rhombus')
 # 画图
 fig = plt.figure()
@@ -84,6 +87,7 @@ from fealpy.mesh import MeshFactory as MF
 import numpy as np
 import matplotlib.pyplot as plt
 
+#mesh = MF.one_tetrahedron_mesh(meshtype='equ')
 mesh = MF.one_tetrahedron_mesh(meshtype='iso')
 
 # 画图
@@ -137,12 +141,12 @@ plt.show()
 参数说明:
 
 - box：矩形网格的位置
-
 - nx：x方向剖分段数
-
 - ny：y方向剖分段数
-
 - meshtype：网格剖分类型，包含三角形`('tri')`，四边形`('quad')`，三角形对偶的多边形`('poly')`。
+- thershold: 以单元的重心为输入参数，返回一个逻辑数组，需要删除的单元标记为真.
+- returnnc: bool型，True为返回节点和单元的数组，False为返回网格类型
+- p：网格次数
 
 使用方法：
 
@@ -152,7 +156,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 box = [0,1,0,1]
-mesh = MF.boxmesh2d(box=box,nx=2,ny=2,meshtype='tri')
+#mesh = MF.boxmesh2d(box=box,nx=2,ny=2,meshtype='tri')
+#mesh = MF.boxmesh2d(box=box,nx=2,ny=2,meshtype='quad')
+mesh = MF.boxmesh2d(box=box,nx=2,ny=2,meshtype='poly')
 # 画图
 fig = plt.figure()
 axes = fig.gca()
@@ -187,6 +193,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 box = [0,1,0,1,0,1]
+#mesh = MF.boxmesh3d(box=box,nx=2,ny=2,nz=2,meshtype='tet')
 mesh = MF.boxmesh3d(box=box,nx=2,ny=2,nz=2,meshtype='hex')
 
 # 画图
@@ -217,6 +224,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 box = [0,1,0,1]
+#mesh = MF.special_boxmesh2d(box=box,n=2,meshtype='fishbone')
+#mesh = MF.special_boxmesh2d(box=box,n=2,meshtype='cross')
+#mesh = MF.special_boxmesh2d(box=box,n=2,meshtype='rice')
 mesh = MF.special_boxmesh2d(box=box,n=2,meshtype='nonuniform')
 
 # 画图
@@ -272,7 +282,7 @@ plt.show()
 
 - h：网格尺寸
 - meshtype:网格剖分类型，包含三角形`('tri')`，多边形`('poly')`。
-- p:
+- p:   网格次数
 
 使用方法：
 
@@ -341,3 +351,12 @@ plt.show()
 - node ：
 - cell：
 - threshold：
+
+
+
+# distmesh2d
+
+# polygon_mesh
+
+# interfacemesh2d
+
