@@ -13,7 +13,7 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix
 import matplotlib.pyplot as plt
-from icecream import ic
+
 
 from fealpy.mesh import TriangleMesh
 from fealpy.mesh import MeshFactory as mf
@@ -25,7 +25,6 @@ from fealpy.decorator import cartesian, barycentric
 from fealpy.tools.show import showmultirate, show_error_table
 import matplotlib.quiver
 import matplotlib as mpl
-from model import model
 import sympy
 
 
@@ -314,7 +313,7 @@ class PML_solution:
         aa = np.array([1 / 3, 1 / 3, 1 / 3])
         pp = mesh.bc_to_point(aa)
         value = uh(aa)
-        mesh.add_plot(plt, cellcolor=value[..., 0].real, linewidths=0)
+        mesh.add_plot(plt, cellcolor=value[..., 0].imag, linewidths=0)
         plt.show()
 
 
