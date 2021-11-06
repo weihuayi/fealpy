@@ -361,7 +361,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         return phi
 
     @barycentric
-    def grad_basis(self, bc):
+    def grad_basis(self, bc, index=np.s_[:], barycenter=True):
         """
 
         Parameters
