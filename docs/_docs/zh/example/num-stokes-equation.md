@@ -108,14 +108,19 @@ $$
 下面在有限维的 Lagrange 有限元空间中讨论矩阵组装的问题。
 
 记压力p的标量空间的基函数为 
+
 $$
 \boldsymbol \xi = [\xi_0, \xi_1, \cdots, \xi_{n_p-1}]
 $$
+
 速度 $ \boldsymbol u$ 的标量空间的基函数为 
+
 $$
 \boldsymbol\phi = [\phi_0, \phi_1, \cdots, \phi_{n_k-1}]
 $$
+
 对应向量空间的基为
+
 $$
 \boldsymbol\Phi = 
 \begin{bmatrix}
@@ -123,7 +128,9 @@ $$
 \boldsymbol 0 & \boldsymbol\phi
 \end{bmatrix}
 $$
+
 其梯度形式为
+
 $$
 \begin{aligned}
 \nabla \boldsymbol \Psi = 
@@ -148,8 +155,11 @@ $$
 	\end{bmatrix}
 \end{bmatrix}
 \end{aligned}
+
 $$
+
 散度形式为
+
 $$
 \begin{aligned}
 \nabla \cdot \boldsymbol \Phi = 
@@ -161,12 +171,15 @@ $$
 
 
 设速度有限元解 $\boldsymbol u_h$ 的自由度向量为 $\boldsymbol U$ , 压力有限元解 $ p_h $ 的自由度向量为 $\boldsymbol P$ ,则
+
 $$
 \boldsymbol u_h = \boldsymbol\Phi \boldsymbol U , p_h = \boldsymbol \xi \boldsymbol P
 $$
+
 注意这里实际上规定了向量 $\boldsymbol U$ 的分量的排列方式，即先排 $x$分量的自由度 $\boldsymbol U_x$，再排 $y$ 分量的自由度 $\boldsymbol U_y$。
 
-之后可得$ \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx $ 对应的矩阵形式为 
+则$ \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx $ 对应的矩阵形式为 
+
 $$
 \int_\Omega \boldsymbol (\nabla \boldsymbol \Phi)^T \nabla \boldsymbol \Phi
 dx \cdot 
@@ -183,7 +196,9 @@ A  & \boldsymbol 0 \\
 \end{bmatrix} 
 \cdot \boldsymbol U
 $$
+
 $\int_{\Omega} p (\nabla \cdot \boldsymbol v) dx $ 对应的矩阵形式为 
+
 $$
 \int_\Omega \boldsymbol (\nabla \cdot \boldsymbol \Phi)^T \boldsymbol \xi
 dx \cdot \boldsymbol P 
@@ -201,7 +216,9 @@ B_2 \\
 \end{bmatrix} 
 \cdot \boldsymbol P
 $$
+
 $\int_{\Omega} w \nabla \cdot \boldsymbol u$ 对应的矩阵形式为 
+
 $$
 \int_\Omega  \boldsymbol \xi^T \boldsymbol (\nabla \cdot \boldsymbol \Phi)
 dx \cdot \boldsymbol U
@@ -217,7 +234,9 @@ B_1^T , B_2^T \\
 \end{bmatrix} 
 \cdot \boldsymbol U
 $$
+
 因此最终我们右端所要组装的矩阵为
+
 $$
 \left[\begin{array}{lll}
 \frac{\mu}{2}A & 0 &B_{1} \\
@@ -229,7 +248,6 @@ B_{1}^{T} & B_{2}^{T} &0
 \boldsymbol{P}
 \end{array}\right]
 $$
-
 
 其中
 
@@ -245,4 +263,3 @@ $$
 ## 参考文献
 
 1. 
-   
