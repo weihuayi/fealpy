@@ -168,16 +168,33 @@ class NedelecFiniteElementSpace2d:
 
         cell2edgesign = mesh.ds.cell_to_edge_sign() # (NC, 3)
         
-        phi[..., 0::edof, :] =  
+        if stype == 'first':
+            phi[..., 0, :] = bc[..., 1, None, None]*glambda[..., 2] - bc[..., 2, None, None]*glambda[:, 1]
+            phi[..., 1, :] = bc[..., 2, None, None]*glambda[..., 0] - bc[..., 0, None, None]*glambda[:, 2]
+            phi[..., 2, :] = bc[..., 0, None, None]*glambda[..., 1] - bc[..., 1, None, None]*glambda[:, 0]
 
+            phi[..., ~cell2edgesign[:, 0], 0, :] *= -1
+            phi[..., ~cell2edgesign[:, 1], 1, :] *= -1
+            phi[..., ~cell2edgesign[:, 2], 2, :] *= -1
+        else:
+            phi[..., 0, :] = bc[..., 1, None, None]*glambda[..., 2] - bc[..., 2, None, None]*glambda[:, 1]
+            phi[..., 1, :] = bc[..., 1, None, None]*glambda[..., 2] + bc[..., 2, None, None]*glambda[:, 1]
+            phi[..., 2, :] = bc[..., 2, None, None]*glambda[..., 0] - bc[..., 0, None, None]*glambda[:, 2]
+            phi[..., 3, :] = bc[..., 2, None, None]*glambda[..., 0] + bc[..., 0, None, None]*glambda[:, 2]
+            phi[..., 4, :] = bc[..., 0, None, None]*glambda[..., 1] - bc[..., 1, None, None]*glambda[:, 0]
+            phi[..., 5, :] = bc[..., 0, None, None]*glambda[..., 1] + bc[..., 1, None, None]*glambda[:, 0]
+
+            phi[..., ~cell2edgesign[:, 0], 0, :] *= -1
+            phi[..., ~cell2edgesign[:, 1], 2, :] *= -1
+            phi[..., ~cell2edgesign[:, 2], 4, :] *= -1
         return phi
 
     @barycentric
-    def rot_basis(self, bc, index=np.s_[:], barycenter=True):
+    def rot_basis(self, bc, index=np.s_[:]):
         return self.curl_basis(bc, index, barycenter)
 
     @barycentric
-    def curl_basis(self, bc, index=np.s_[:], barycenter=True):
+    def curl_basis(self, bc, index=np.s_[:]):
         """
 
         Parameters
@@ -187,41 +204,41 @@ class NedelecFiniteElementSpace2d:
         -----
         curl [v_0, v_1] = \partial v_1/\partial x - \partial v_0/\partial y
 
-        curl [[ m_k, 0], [0, m_k]] 
-        = [-\partial m_k/\partial y,  \partial m_k/\partial x] 
-
         """
-        p = self.p
-        ldof = self.number_of_local_dofs('all')
-        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
-        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
+        stype = self.spacetype
+
+        # 每个单元上的全部自由度个数
+        ldof = self.number_of_local_dofs(doftype='all') 
+        edof = self.number_of_local_dofs(doftype='edge') 
 
         mesh = self.mesh
+        glambda = mesh.grad_lambda() # (NC, 3, 2)
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
-        if barycenter:
-            ps = mesh.bc_to_point(bc, index=index)
+
+        shape = bc.shape[:-1] + (ldof, )
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2)
+
+        cell2edgesign = mesh.ds.cell_to_edge_sign() # (NC, 3)
+
+        if stype == 'first':
+            phi[..., 0] = 2*(glambda[..., 1, 0]*glambda[..., 2, 1] - glambda[..., 1, 1]*glambda[..., 2, 0]])
+            phi[..., 1] = 2*(glambda[..., 2, 0]*glambda[..., 0, 1] - glambda[..., 2, 1]*glambda[..., 0, 0]])
+            phi[..., 2] = 2*(glambda[..., 0, 0]*glambda[..., 1, 1] - glambda[..., 0, 1]*glambda[..., 1, 0]])
+
+            phi[..., ~cell2edgesign[:, 0], 0] *= -1
+            phi[..., ~cell2edgesign[:, 1], 1] *= -1
+            phi[..., ~cell2edgesign[:, 2], 2] *= -1
         else:
-            ps = bc
-        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof, GD)
-
-        shape = ps.shape[:-1] + (ldof, )
-        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof)
-
-        c = self.bcoefs[index] # (NC, ldof, ldof) 
-        idx = self.smspace.face_index_1(p=p+1)
-
-        x = idx['x']
-        y = idx['y']
-
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
-        phi[:] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
-        phi[:] -= np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
+            phi[..., 0] = 2*(glambda[..., 1, 0]*glambda[..., 2, 1] - glambda[..., 1, 1]*glambda[..., 2, 0]])
+            phi[..., 2] = 2*(glambda[..., 2, 0]*glambda[..., 0, 1] - glambda[..., 2, 1]*glambda[..., 0, 0]])
+            phi[..., 4] = 2*(glambda[..., 0, 0]*glambda[..., 1, 1] - glambda[..., 0, 1]*glambda[..., 1, 0]])
+            phi[..., ~cell2edgesign[:, 0], 0] *= -1
+            phi[..., ~cell2edgesign[:, 1], 2] *= -1
+            phi[..., ~cell2edgesign[:, 2], 4] *= -1
         return phi
 
     @barycentric
-    def grad_basis(self, bc):
+    def grad_basis(self, bc, index=np.s_[:]):
         """
 
         Parameters
@@ -229,47 +246,51 @@ class NedelecFiniteElementSpace2d:
 
         Notes
         -----
-        curl [v_0, v_1] = \partial v_1/\partial x - \partial v_0/\partial y
-
-        curl [[ m_k, 0], [0, m_k]] 
-        = [-\partial m_k/\partial y,  \partial m_k/\partial x] 
 
         """
-        p = self.p
-        ldof = self.number_of_local_dofs('all')
-        cdof = self.smspace.number_of_local_dofs(p=p, doftype='cell')
-        edof = self.smspace.number_of_local_dofs(p=p, doftype='edge') 
+        stype = self.spacetype
+
+        # 每个单元上的全部自由度个数
+        ldof = self.number_of_local_dofs(doftype='all') 
+        edof = self.number_of_local_dofs(doftype='edge') 
 
         mesh = self.mesh
+        glambda = mesh.grad_lambda() # (NC, 3, 2)
         GD = mesh.geo_dimension()
-        index = index if index is not None else np.s_[:]
-        if barycenter:
-            ps = mesh.bc_to_point(bc, index=index)
+
+        shape = bc.shape[:-1] + (ldof, GD, GD)
+        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, 2, 2)
+
+        cell2edgesign = mesh.ds.cell_to_edge_sign() # (NC, 3)
+
+        if stype == 'first':
+            phi[..., 0, 0, 1] = glambda[..., 1, 1]*glambda[..., 2, 0] - glambda[..., 1, 0]*glambda[..., 2, 1]
+            phi[..., 0, 1, 0] = -1*phi[..., 0, 0, 1] 
+
+            phi[..., 1, 0, 1] = glambda[..., 2, 1]*glambda[..., 0, 0] - glambda[..., 2, 0]*glambda[..., 0, 1]
+            phi[..., 1, 1, 0] = -1*phi[..., 1, 0, 1] 
+
+            phi[..., 2, 0, 1] = glambda[..., 0, 1]*glambda[..., 1, 0] - glambda[..., 0, 0]*glambda[..., 1, 1]
+            phi[..., 2, 1, 0] = -1*phi[..., 2, 0, 1] 
+
+            phi[..., ~cell2edgesign[:, 0], 0, :, :] *= -1
+            phi[..., ~cell2edgesign[:, 1], 1, :, :] *= -1
+            phi[..., ~cell2edgesign[:, 2], 2, :, :] *= -1
         else:
-            ps = bc
-        val = self.smspace.grad_basis(ps, p=p+1, index=index) # (NQ, NC, ndof, GD)
+            phi[..., 0, 0, 1] = glambda[..., 1, 1]*glambda[..., 2, 0] - glambda[..., 1, 0]*glambda[..., 2, 1]
+            phi[..., 0, 1, 0] = -1*phi[..., 0, 0, 1] 
 
-        shape = ps.shape[:-1] + (ldof, GD, GD)
-        phi = np.zeros(shape, dtype=self.ftype) # (NQ, NC, ldof, GD, GD)
+            phi[..., 2, 0, 1] = glambda[..., 2, 1]*glambda[..., 0, 0] - glambda[..., 2, 0]*glambda[..., 0, 1]
+            phi[..., 2, 1, 0] = -1*phi[..., 2, 0, 1] 
 
-        c = self.bcoefs[index] # (NC, ldof, ldof) 
+            phi[..., 4, 0, 1] = glambda[..., 0, 1]*glambda[..., 1, 0] - glambda[..., 0, 0]*glambda[..., 1, 1]
+            phi[..., 4, 1, 0] = -1*phi[..., 4, 0, 1] 
 
-        idx = self.smspace.face_index_1(p=p+1)
-        x = idx['x']
-        y = idx['y']
+            # TODO
 
-        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0, 0] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 0], c[:, GD*cdof:, :])
-
-        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 0*cdof:1*cdof, :])
-        phi[..., 0, 1] += np.einsum('...jm, jmn->...jn', val[..., cdof+y, 1], c[:, GD*cdof:, :])
-
-        phi[..., 1, 0] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 0], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1, 0] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 0], c[:, GD*cdof:, :])
-        
-        phi[..., 1, 1] += np.einsum('...jm, jmn->...jn', val[..., :cdof, 1], c[:, 1*cdof:2*cdof, :])
-        phi[..., 1, 1] -= np.einsum('...jm, jmn->...jn', val[..., cdof+x, 1], c[:, GD*cdof:, :])
-
+            phi[..., ~cell2edgesign[:, 0], 0, :, :] *= -1
+            phi[..., ~cell2edgesign[:, 1], 1, :, :] *= -1
+            phi[..., ~cell2edgesign[:, 2], 2, :, :] *= -1
         return phi
 
     def cell_to_dof(self):
@@ -282,8 +303,8 @@ class NedelecFiniteElementSpace2d:
         return self.dof.number_of_local_dofs(doftype)
 
     @barycentric
-    def value(self, uh, bc, index=np.s_[:], barycenter=True):
-        phi = self.basis(bc, index=index, barycenter=barycenter)
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
@@ -292,12 +313,12 @@ class NedelecFiniteElementSpace2d:
         return val
 
     @barycentric
-    def rot_value(self, uh, bc, index=np.s_[:], barycenter=True):
-        return self.curl_value(uh, bc, index, barycenter=barycenter)
+    def rot_value(self, uh, bc, index=np.s_[:]):
+        return self.curl_value(uh, bc, index)
 
     @barycentric
-    def curl_value(self, uh, bc, index=np.s_[:], barycenter=True):
-        cphi = self.curl_basis(bc, index=index, barycenter=barycenter)
+    def curl_value(self, uh, bc, index=np.s_[:]):
+        cphi = self.curl_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
