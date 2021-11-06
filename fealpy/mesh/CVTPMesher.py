@@ -20,7 +20,8 @@ class CVTPMesher:
         else :
             self.dof = np.ones(len(mesh.node))
 
-    def voronoi_meshing(self, nb=2, c=0.618, theta=100,adaptive = False,times = None):
+    def voronoi_meshing(self, nb=2, c=0.618, theta=100,adaptive = False,times =
+            None,rho = None):
         """
         Parameters
         ----------
@@ -34,7 +35,10 @@ class CVTPMesher:
         """
         self.vorocrust_boundary_matching(n=nb, c=c, theta=theta,adaptive =
                 adaptive,times = times)
-        self.init_interior_nodes()
+        if rho is None:
+            def rho(p):
+                return np.ones(len(p))
+        self.init_interior_nodes(rho)
         vor = self.voronoi()
         return vor
 
@@ -250,7 +254,7 @@ class CVTPMesher:
         if NC > 0:
             self.bnode2subdomain[-NC:] = cstart
 
-    def init_interior_nodes(self):
+    def init_interior_nodes(self,rho = None):
         """
         该函数对进行了边界重构的网格撒入内部点
         """
@@ -266,8 +270,11 @@ class CVTPMesher:
         v = node[idx1] - node[idx0]
         h = np.sqrt(np.sum(v**2, axis=-1))
 
-        tree = KDTree(bnode)
+        tree = KDTree(bnode) 
         #c = 6*np.sqrt(3*(h[0]/2)*(h(0)/2)**3)
+        brho = rho(bnode)
+        brho[brho>1] = 1
+        #print(brho)
         c = 6*np.sqrt(3*(h[0]/2)*(h[0]/4)**3/2)
         self.inode = {} # 用一个字典来存储每个子区域的内部点
         for index in filter(lambda x: x > 0, self.mesh.ds.subdomain):
@@ -285,21 +292,40 @@ class CVTPMesher:
             start = 0
             newNode = np.zeros((N - N0, 2), dtype=node.dtype)
             NN = newNode.shape[0]
-            i = 0
+            #i = 0
+            pp = np.random.rand(NN-start, 2)
+            pp *= np.array([xmax-xmin,ymax-ymin])
+            pp += np.array([xmin,ymin])
+            d, idx = tree.query(pp)
+            flag0 = d > (h[0]/brho[idx])
+            flag1 = (bnode2subdomain[idx] == cstart + index -1)
+            pp = pp[flag0 & flag1]# 筛选出符合要求的点
+            end = start + pp.shape[0]
+            newNode[start:end] = pp
+            if end == NN:
+                break
+            else:
+                start = end
+            itree = KDTree(newNode[:start])
             while True:
+                irho = rho(newNode[:start])
                 pp = np.random.rand(NN-start, 2)
                 pp *= np.array([xmax-xmin,ymax-ymin])
                 pp += np.array([xmin,ymin])
                 d, idx = tree.query(pp)
-                flag0 = d > (0.8*h[0])
+                d2,idxi = itree.query(pp)
+                flag0 = d > (h[0]/brho[idx])
                 flag1 = (bnode2subdomain[idx] == cstart + index -1)
-                pp = pp[flag0 & flag1]# 筛选出符合要求的点
+                flag2 = d2 > (h[0]/irho[idxi])
+
+                pp = pp[flag0 & flag1 & flag2]# 筛选出符合要求的点
                 end = start + pp.shape[0]
                 newNode[start:end] = pp
                 if end == NN:
                     break
                 else:
                     start = end
+                itree = KDTree(newNode[:start])
             self.inode[index] = newNode
 
     def AFT_init_interior_nodes(self):
@@ -566,7 +592,7 @@ class VoroAlgorithm():
     def __init__(self,voromesher):
         self.voromesher = voromesher
 
-    def lloyd_opt(self,vor):
+    def lloyd_opt(self,vor,rho=None):
         voromesher = self.voromesher
         """
         Parameters
@@ -589,17 +615,36 @@ class VoroAlgorithm():
 
         npoints = np.zeros((NN, 2), dtype=voromesher.bnode.dtype)
         valence = np.zeros(NN, dtype=np.int)
+        if rho==None:
+            center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
+            area = np.zeros(NN,dtype=np.float)
+            np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
+            np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
+            np.add.at(valence, rp[:, 0], 1)
+            np.add.at(valence, rp[:, 1], 1)
+            npoints[start:] /= valence[start:, None]
+            
+            vor.points[start:, :] = npoints[start:, :]
+            vor = Voronoi(vor.points)
+            return vor
+        else:
+            d0 = rho(vertices[rv[:,0]])
+            d1 = rho(vertices[rv[:,1]])
+            d = d0+d1
+    
+            center1 = np.einsum('i,ij->ij', d0/d, vertices[rv[:, 0]]) 
+            center2 = np.einsum('i,ij->ij', d1/d, vertices[rv[:, 1]])
+            center = center1+center2
+            area = np.zeros(NN,dtype=np.float)
+            np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
+            np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
+            np.add.at(valence, rp[:, 0], 1)
+            np.add.at(valence, rp[:, 1], 1)
+            npoints[start:] /= valence[start:, None]
+            
+            vor.points[start:, :] = npoints[start:, :]
+            vor = Voronoi(vor.points)
+            return vor
 
-        center = (vertices[rv[:, 0]] + vertices[rv[:, 1]])/2
-        area = np.zeros(NN,dtype=np.float)
-        np.add.at(npoints, (rp[:, 0], np.s_[:]), center)
-        np.add.at(npoints, (rp[:, 1], np.s_[:]), center)
-        np.add.at(valence, rp[:, 0], 1)
-        np.add.at(valence, rp[:, 1], 1)
-        npoints[start:] /= valence[start:, None]
-        
-        vor.points[start:, :] = npoints[start:, :]
-        vor = Voronoi(vor.points)
-        return vor
 
         
