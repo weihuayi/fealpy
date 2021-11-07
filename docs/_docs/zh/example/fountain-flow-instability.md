@@ -84,6 +84,17 @@ $$
 - $\alpha$ :各项异性的滑移参数，设置为0
 - $r = \frac{\lambda_b}{\lambda_s}$ :用来衡量管段或者纠缠物的数量
 
+简化：
+$$
+\begin{aligned}
+	\boldsymbol \tau  = G(\boldsymbol c - \boldsymbol I)\\
+	\frac{\partial \boldsymbol c}{\partial t} + \boldsymbol u \cdot \nabla \boldsymbol c - (\nabla \boldsymbol u)^T \cdot \boldsymbol c
+	- \boldsymbol c \cdot \nabla \boldsymbol u + \boldsymbol f_{rel}(\boldsymbol c) = 0 \\ 
+		\boldsymbol f_{rel} = 2\frac{\exp(v(\sqrt{tr \boldsymbol c /3}-1))}{\lambda_s}(1-\frac{3}{tr \boldsymbol c})\boldsymbol c \\
+		+ \frac{1}{\lambda_b}(\alpha \boldsymbol c \cdot \boldsymbol c + \frac{3}{tr \boldsymbol c}
+		[1-\alpha -\frac{\alpha}{3}tr(\boldsymbol c \cdot \boldsymbol c)]\boldsymbol c+(\alpha-1)\boldsymbol I)
+\end{aligned}
+$$
 
 
 ## 尺度
@@ -128,7 +139,7 @@ $$
 
 
 
-# example
+# 参数选择
 
 基本设置
 
@@ -140,5 +151,31 @@ $$
 
 目的：用来寻找适当的粘度比和检查网格收敛性
 
-- R = 1000
+- R = 1000 当Ｒ>1000时流动前沿为半圆
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/R.png' width="500"> 
+</div>
+
 - 网格选取Ｍ２
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/mesh0.png' width="200" height="100"> 
+        <img src='../../../assets/images/example/fountain-flow/mesh1.png' width="200"> 
+        <img src='../../../assets/images/example/fountain-flow/mesh2.png' width="500"> 
+</div>
+
+## 融熔物是非牛顿流
+
+目的：确定参数，使得没有剪切变薄，或者切应力增长率保持不变。
+
+xpp参数设置
+
+- r = 2
+- q = 5
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/parameter.png' width="500"> 
+</div>
+
+- Wi=10　的时候有不对称的流动前沿，因此选择10　
