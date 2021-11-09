@@ -110,10 +110,10 @@ $$
 记压力p的标量空间的基函数为 
 
 $$
-\boldsymbol \xi = [\xi_0, \xi_1, \cdots, \xi_{n_p-1}]
+\boldsymbol \psi = [\psi_0, \psi_1, \cdots, \psi_{n_p-1}]
 $$
 
-速度 $ \boldsymbol u$ 的标量空间的基函数为 
+速度 $\boldsymbol u$ 的标量空间的基函数为 
 
 $$
 \boldsymbol\phi = [\phi_0, \phi_1, \cdots, \phi_{n_k-1}]
@@ -133,7 +133,7 @@ $$
 
 $$
 \begin{aligned}
-\nabla \boldsymbol \Psi = 
+\nabla \boldsymbol \Phi = 
 \begin{bmatrix}
 	\begin{bmatrix}
 		\frac{\partial \phi_0}{\partial x} & 0\\
@@ -170,15 +170,18 @@ $$
 $$
 
 
-设速度有限元解 $\boldsymbol u_h$ 的自由度向量为 $\boldsymbol U$ , 压力有限元解 $ p_h $ 的自由度向量为 $\boldsymbol P$ ,则
+设速度有限元解 $\boldsymbol u_h$ 的自由度向量为 $\boldsymbol U$ , 压力有限元解 
+$p_h$ 的自由度向量为 $\boldsymbol P$ ,则
 
 $$
-\boldsymbol u_h = \boldsymbol\Phi \boldsymbol U , p_h = \boldsymbol \xi \boldsymbol P
+\boldsymbol u_h = \boldsymbol\Phi \boldsymbol U , p_h = \boldsymbol \psi \boldsymbol P
 $$
 
-注意这里实际上规定了向量 $\boldsymbol U$ 的分量的排列方式，即先排 $x$分量的自由度 $\boldsymbol U_x$，再排 $y$ 分量的自由度 $\boldsymbol U_y$。
+注意这里实际上规定了向量 $\boldsymbol U$ 的分量的排列方式，即先排 $x$ 
+分量的自由度 $\boldsymbol U_x$，再排 $y$ 分量的自由度 $\boldsymbol U_y$。
 
-则$ \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx $ 对应的矩阵形式为 
+则 $\int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx$ 
+对应的矩阵形式为 
 
 $$
 \int_\Omega \boldsymbol (\nabla \boldsymbol \Phi)^T \nabla \boldsymbol \Phi
@@ -197,7 +200,7 @@ A  & \boldsymbol 0 \\
 \cdot \boldsymbol U
 $$
 
-$\int_{\Omega} p (\nabla \cdot \boldsymbol v) dx $ 对应的矩阵形式为 
+$\int_{\Omega} p (\nabla \cdot \boldsymbol v) \mathrm dx$ 对应的矩阵形式为 
 
 $$
 \int_\Omega \boldsymbol (\nabla \cdot \boldsymbol \Phi)^T \boldsymbol \xi
@@ -225,12 +228,12 @@ dx \cdot \boldsymbol U
 = 
 \int_\Omega
 \begin{bmatrix}
-\boldsymbol \xi^T \boldsymbol\phi_x & \boldsymbol \xi^T \boldsymbol\phi_y^T 
+\boldsymbol \psi^T \boldsymbol\phi_x & \boldsymbol \psi^T \boldsymbol\phi_y^T 
 \end{bmatrix} 
 \mathrm d\boldsymbol x \cdot \boldsymbol U
 :=
 \begin{bmatrix}
-B_1^T , B_2^T \\ 
+\boldsymbol B_1^T , \boldsymbol B_2^T \\ 
 \end{bmatrix} 
 \cdot \boldsymbol U
 $$
@@ -253,9 +256,18 @@ $$
 
 $$
 \begin{aligned}
-A &= \int_{\tau}  \frac{\partial \boldsymbol \phi^T}{\partial x} \frac{\partial \boldsymbol \phi}{\partial x} + \frac{\partial \boldsymbol \phi^T}{\partial y} \frac{\partial \boldsymbol \phi}{\partial y}d \boldsymbol x \\
-B_1 &=  \int_{\tau} (\frac{\partial \boldsymbol \phi}{\partial x})^T \boldsymbol \xi d \boldsymbol x \\
-B_2 &=  \int_{\tau} (\frac{\partial \boldsymbol \phi}{\partial y})^T \boldsymbol \xi d \boldsymbol x 
+A &= \int_{\tau}  
+\frac{\partial \boldsymbol \phi^T}{\partial x} 
+\frac{\partial \boldsymbol \phi}{\partial x} + 
+\frac{\partial \boldsymbol \phi^T}{\partial y} 
+\frac{\partial \boldsymbol \phi}{\partial y}
+\mathrm d \boldsymbol x \\
+B_1 &=  \int_{\tau} 
+(\frac{\partial \boldsymbol \phi}{\partial x})^T \boldsymbol \psi 
+\mathrm d \boldsymbol x \\
+B_2 &=  \int_{\tau} 
+(\frac{\partial \boldsymbol \phi}{\partial y})^T \boldsymbol \psi 
+\mathrm d \boldsymbol x 
 \end{aligned}
 $$
 
