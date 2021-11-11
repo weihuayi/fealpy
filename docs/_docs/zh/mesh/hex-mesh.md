@@ -43,7 +43,7 @@ axes.set_title('mesh')
 为原点引入笛卡尔直角坐标系, 其他七个点的坐标分别为 $(0, 0, 1)$, $(0, 1, 0)$,
 $(0, 1, 1)$, $(1, 0, 0)$, $(1, 0, 1)$, $(1, 1, 0)$, $(1, 1, 1)$.
 -->
-下图是一个单元 node 和 edge 的 编号
+下图是一个单元 `node` 和 `edge` 的 编号
 
 <img src="../../../assets/images/mesh/hex-mesh/hexmeshindex.png" alt="Hexahedron"     style="zoom:50%;" />
 
@@ -146,7 +146,7 @@ $\quad$ 每个面由四个节点构成, 因此面的局部编号为 $0$, $1$, $2
 `face[I, 3]` 为第 $I$ 个面的第 $3$ 个节点编号,
  ($I$ 为面的全局编号, 且 $I = 0, 1, \cdots, NF-1$).
 
- **注:** 由于网格中的 face 来说, 对于与 x 轴垂直的面来说, 第 $0$ 个节点编号是 x
+ **注:** 由于网格中的 `face` 来说, 对于与 x 轴垂直的面来说, 第 $0$ 个节点编号是 x
  最小点为起点, 从左单元看向这个面, 逆时针方向排序. 
  与 y 轴垂直的面, 从左单元看向这个面,
  逆时针方向排序. 其他类似.
@@ -192,10 +192,12 @@ fc = mesh.entity_barycenter('face') # (NF,3), 储存各面的重心坐标
 bc = mesh.entity_barycenter('cell') # (NC,3), 储存各单元的重心坐标
 ```
 
-$\quad$ 除此之外, 还可以获得 node, edge, face, cell 等实体间的邻接关系,
+$\quad$ 除此之外, 还可以获得 `node`, `edge`, `face`, `cell` 等实体间的邻接关系,
 以上面加密的网格单元剖分为例结合输出进行说明
 
 #### cell 与 node, edge, face, cell 间的关系
+
+**cell 与 node 的关系**
 
 ```python
 cell2node = mesh.ds.cell_to_node() #稀疏矩阵, (NC,NN), 判断单元中的节点, 若单元中有这个节点为 True, 否则为 False
@@ -259,6 +261,8 @@ cell2node:
   (7, 26)	True
 ```
 
+**cell 与 edge 的关系**
+
 ```python
 cell2edge = mesh.ds.cell_to_edge() 
 #(NC,12), 单元和边的邻接关系, 储存每个单元相邻的十二条边的编号, 实际也就是构成六面体单元的十二条边的编号
@@ -294,6 +298,7 @@ cell2edge 的排序为
 3) 与 z 轴垂直, z 值较大的面的边, 按照 `cell[:, 4:]`
 的节点排序连成的四条边的编号
 
+**cell 与 face 关系**
 
 ```python
 cell2face = mesh.ds.cell_to_face()  #(NC,6), 单元和面的邻接关系, 储存每个单元相邻的六个面的编号
@@ -314,7 +319,9 @@ cell2face:
  [31 35  7 11 19 23]]
 ```
 
-cell2face 先排与 y 轴垂直的面, 再排与 x 轴垂直的面, 最后排与 z 轴垂直的面.
+`cell2face` 先排与 y 轴垂直的面, 再排与 x 轴垂直的面, 最后排与 z 轴垂直的面.
+
+**cell 与 cell 关系**
 
 ```python
 cell2cell = mesh.ds.cell_to_cell() #(NC,6), 单元和单元的邻接关系, 储存每个单元相邻的六个单元的编号
@@ -335,9 +342,11 @@ print('cell2cell:\n', cell2cell)
  [6 7 3 7 5 7]]
 ```
 
-cell2cell 先排与 z 垂直的面所对应的非自身单元, 再排与 x 轴垂直的面所对应的非自身单元, 最后排与 y 轴垂直的面所对应的非自身单元, 若该单元为边界单元, 即边界边所对应的另一个单元也是自身单元.
+`cell2cell` 先排与 z 垂直的面所对应的非自身单元, 再排与 x 轴垂直的面所对应的非自身单元, 最后排与 y 轴垂直的面所对应的非自身单元, 若该单元为边界单元, 即边界边所对应的另一个单元也是自身单元.
 
 #### face 与 node, edge, cell 间的关系
+
+**face 与 node 关系**
 
 ```python
 face2node = mesh.ds.face_to_node() #(NC,4), 面和节点的邻接关系, 储存每个面相邻的四个节点的编号
@@ -386,6 +395,8 @@ face2node:
  [14 23 26 17]]
 ```
 
+**face 与 edge 关系**
+
 ```python
 face2edge = mesh.ds.face_to_edge() #(NC,4), 面和边的邻接关系, 储存每个面相邻的四个边的编号
 print('face2edge:\n', face2edge)
@@ -432,7 +443,9 @@ face2edge:
  [41 34 47 28]
  [47 35 53 29]]
 ```
-按照 face 中的节点排序, 依次首尾相连得到的四条边.
+按照 `face` 中的节点排序, 依次首尾相连得到的四条边.
+
+**face 与 cell 关系**
 
 ```python
 face2cell = mesh.ds.face_to_cell() #(NC,4), 面和单元的邻接关系, 储存每个面相邻的两个单元的编号
