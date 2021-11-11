@@ -69,7 +69,7 @@ class Aspect():
         self.special_nodes_flag = self.Find_node.read_mesh()
         
         self.angle = np.arange(0, 378, 18) # 绘制随旋转角度的变化情况
-        self.layer = np.arange(0, 5) # 绘制 5 层的温度变化情况
+        self.layer = np.arange(0, 101, 20) # 绘制 5 层的温度变化情况
         self.uh_all = self.read_data() # 一旋转周期内分层后的温度值
         self.depth = np.arange(0, 0.505, 0.005) # 每层的深度
 
@@ -206,6 +206,12 @@ class Aspect():
         绘制选取层的 vtu 文件
 
         '''
+        l = np.sqrt(0.02/(1400*1200*4*np.pi)) # 趋肤深度 l=(kappa/(rho*c*omega))^(1/2)
+        
+        sd = np.zeros((4532, 3), dtype=np.float_)
+        sd0 = [-1.57735, -0.867157, 0]
+        sd = np.vstack((sd, sd0))
+
         uh_all = self.uh_all
         layer = self.layer
         mesh = self.init_mesh()
@@ -217,16 +223,25 @@ class Aspect():
             cell0 = cell[:9060, ::2]
             
             mesh0 = LagrangeTriangleMesh(node0, cell0)
-            mesh0.nodedata['uh'] = uh_all[-1, layer[i], :]
+#            mesh0.nodedata['uh'] = uh_all[-1, layer[i], :]
+            
+            uh0 = uh_all[-1, layer[i], :]
+            T = np.zeros(len(uh0)+1, dtype=np.float64)
+            T[:-1] = uh0
+            mesh0.nodedata['uh'] = T
+            
+            mesh0.nodedata['sd'] = sd
 
-            fname = 'high/surface/surface' + str(i) + '.vtu'
+            mesh0.meshdata['p'] = -sd[-1]*500*1.3/(l*1.8)
+
+            fname = 'high/surface/surface_depth' + str(i) + '.vtu'
             mesh0.to_vtk(fname=fname) 
             print('The vtu of', layer[i], 'have been completed')
         print('All vtu have been completed')
   
 Aspect = Aspect()
-Aspect.draw_figure() # 绘制温度变化曲线
-#Aspect.surface_vtu() # 生成选取层的 vtu 文件 
+#Aspect.draw_figure() # 绘制温度变化曲线
+Aspect.surface_vtu() # 生成选取层的 vtu 文件 
 
 #fname = sys.argv[1]
 #vtkReader.meshio_read(fname, LagrangeTriangleMesh)
