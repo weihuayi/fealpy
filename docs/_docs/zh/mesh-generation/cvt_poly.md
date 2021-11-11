@@ -40,7 +40,7 @@ facets = np.array([
     (0, 1),(1, 2),(2, 3),(3, 0)], dtype=np.int)
 subdomain = np.array([
     (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
-mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
+mesh = HalfEdgeMesh2d.from_edges(nodes, facets, subdomain)
 voromesher = CVTPMesher(mesh)
 vor = voromesher.voronoi_meshing(nb=2)
 
@@ -54,12 +54,12 @@ fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
 mesh.find_node(axes, color='k', showindex=False)
-mesh.find_node(axes, node=vor.points, showindex=True)
+mesh.find_node(axes, node=vor.points, showindex=False)
 voronoi_plot_2d(vor, ax=axes,show_vertices = False,point_size = 0.3)
 plt.show()
 ```
 
-<img src='../../../assets/images/mesh-generation/cvt-poly/square.png' width='350'  title = '正方形区域'>
+<img src='../../../assets/images/mesh-generation/cvt-poly/square.png' width='500'  title = '正方形区域'>
 
 <!--
 简单介绍一下生成网格所需的数据结构以及各个步骤的作用
