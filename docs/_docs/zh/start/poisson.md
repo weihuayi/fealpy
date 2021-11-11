@@ -1,5 +1,5 @@
 ---
-title: 任意次有限元求解 Poisson 方程示例
+title: 有限元求解 Poisson 方程示例
 permalink: /docs/zh/start/poisson
 key: docs-quick-start-zh
 ---
@@ -7,16 +7,16 @@ key: docs-quick-start-zh
 # Poisson 方程
 
 $\quad$ 给定区域 $\Omega\subset\mathbb R^d$, 其边界 $\partial \Omega = \Gamma_D \cup \Gamma_N \cup \Gamma_R$.
-经典的 Poisson 方程形式如下(方便起见, 我们称其为 **A 问题**吧)
+经典的 Poisson 方程形式如下(方便起见, 我们称其为 **A 问题**)
 
 $$
 \begin{aligned}
     -\Delta u &= f, \quad\text{in }\Omega\\
-    u &= g_D, \quad\text{on }\Gamma_D \leftarrow \text{\bf Dirichlet }\\
+    u &= g_D, \quad\text{on }\Gamma_D \leftarrow \text{ Dirichlet }\\
     \frac{\partial u}{\partial\boldsymbol n} & = g_N, \quad\text{on
-    }\Gamma_N\leftarrow \text{\bf Neumann}\\
+    }\Gamma_N\leftarrow \text{ Neumann}\\
     \frac{\partial u}{\partial\boldsymbol n} + \kappa u& = g_R, \quad\text{on
-    }\Gamma_R\leftarrow \text{\bf Robin}
+    }\Gamma_R\leftarrow \text{ Robin}
 \end{aligned}
 $$
 
@@ -26,23 +26,21 @@ $$
 * 三维情形：$\Delta u(x, y, z) = u_{xx} + u_{yy} + u_{zz}$
 * $\frac{\partial u}{\partial\boldsymbol n} = \nabla u\cdot\boldsymbol n$
 
-对于绝大多数偏微分方程来说, 往往都找不到**解析形式**的解. 因此在实际应用问题当中,
-**数值求解偏微分方程**才是可行的手段.
-但这里要解决**偏微分方程方程的无限性**和**计算资源的有限性**这一对本质矛盾.
-这里的**无限性**有两个方面的含义, 一个是方程的解的无限性, 即要求区域 $\Omega$ 中
-**无穷多个点处的函数值**; 另一个是函数导数定义的无限性. 而我们所用的求解工具
-**计算机**, 从存储和计算速度上来说, 都是有限的.
-如何克服偏微分方程数值解的无限性, 设计出可以在计算机上高效运行的算法,
-是**偏微分方程数值解**的主要研究内容.  
-
+对于绝大多数偏微分方程来说, 往往都找不到**解析形式**的解. 
+因此在实际应用问题当中, **数值求解偏微分方程**才是可行的手段.
+但要首先解决**偏微分方程方程的无限性**和**计算资源的有限性**这一对本质矛盾.
+这里的**无限性**有两个方面的含义, 一个是方程解的无限性, 即要计算出 $\Omega$ 中
+**无穷多个点处的函数值**; 另一个是**函数导数**定义的无限性. 
+而我们所用的求解工具**计算机**, 从存储和计算速度上来说, 都是有限的.
+如何克服偏微分方程的无限性, 设计出可以在计算机上高效运行的求解算法,
+是**偏微分方程数值解**的主要研究内容.
 
 # 有限元方法
 
-$\quad$ 在原来方程的形式下, 要想解决无限性难题, 一个可行的办法是**有限差分**方法, 
-但这不是这里要讨论的内容. 这里我们主要讨论**有限元方法**, 
-它解决无限性难题的办法是**变分**. 
-
-$\quad$ 要想应用变分这一工具, 首先需引入适当的函数空间, 如
+$\quad$ 在原来的方程形式下, 要想解决无限性难题, 
+一个可行的办法是**有限差分**方法, 我们会另行讨论. 
+这里我们主要讨论**有限元方法**,  而它解决无限性难题的办法是**变分**. 
+要想应用变分这一工具, 首先需要引入适当的函数空间, 如
 
 $$
 H_{D,0}^1(\Omega) := \{ v\in L^2(\Omega): \nabla v \in L^2(\Omega;\mathbb R^d), v|_{\Gamma_D} = 0\}
@@ -69,10 +67,12 @@ $$
 \end{aligned}
 $$
 
-整理可得原问题的**连续弱形式**(我们称其为 **B 问题**): 寻找 
+整理可得 **A** 问题的**连续弱形式**(我们称其为 **B 问题**): 寻找 
+
 $$ 
 u\in H^1(\Omega) = \{ v\in L^2(\Omega): \nabla v \in L^2(\Omega;\mathbb R^d)\}
 $$
+
 既满足 Dirichlet 边界 $u|_{\Gamma_D} = g_D$, 又满足
 
 $$
@@ -83,12 +83,12 @@ $$
 注意, 因为测试函数在 Dirichlet 边界上取值为 0, 所以 $\Gamma_D$ 上积分项消失了. 
 上面的推导过程, 把一个逐点意义下成立的方程转化为一个**积分形式的方程**.
 
-$\quad$ 通过上面的**变分过程**把 **A 问题**变成了 **B 问题**, 里面的动机是什么?
+$\quad$ 上面的**变分过程**, 把 **A 问题**变成了 **B 问题**, 动机是什么?
 当然是想把原来无法解决的问题变成一个可以解决的问题, 或者说变成一个更容易解决的问题.
-那么 **B 问题**可以求解或者更容易求解了吗? 很容易看到, **B 问题**还是不可以直接求解,
+那么 **B 问题**可以求解或者更容易求解了吗? 当然, **B 问题**还是不可以直接求解,
 因为空间 $H_{D,0}^1(\Omega)$ 是无限维, 取遍所有的 $v$,
-可以得到无穷多个积分方程. 但相比于原来的方程, 解不在要求逐点存在了, 
-涉及的二阶导数也变成了一阶导数, 所以**可以说问题的难度降低了**.
+就得到无穷多个积分方程. 但相比于原来的方程, 不在要求解逐点存在了, 
+方程涉及的二阶导数也变成了一阶导数, 所以可以说**问题的难度降低了**.
 
 $\quad$ 当然, 把 **A 问题**转化为 **B 问题**, 还有一个重要的理论问题要回答, 即 **B
 问题**还和原来的 **A 问题**等价吗? 在一定条件下, 经典的偏微分方程理论可以证明, 
@@ -98,9 +98,9 @@ $\quad$ 更为重要的是, 方程形式的变化为我们提供了一条从无�
 对于**连续弱形式**来说, 核心问题还是出在无限性上. 那解决问题的办法只有一个,
 就是用有限维的空间替代无限维的空间 $H_{D,0}^1(\Omega)$.
 
-$\quad$ 这里先不讨论有限维空间如何构造, 这是编程要解决的核心问题, 
-后面一系列文章会详细展开.  这里我们先假设有一个 $N$ 维的有限维空间 
-$V_h = \operatorname{span}\{\phi_i\}_0^{N-1}$, 
+$\quad$ 这里先不讨论有限维空间如何构造(**这是编程要解决的核心问题**), 
+后面一系列文章会详细展开. 这里我们先假设有一个 $N$ 维的有限维空间 
+$V_h = \text{span}\\{{\phi_i\\}_0^{N-1}$, 
 并把**基函数**组成的向量记为
 
 $$
@@ -226,11 +226,77 @@ $$
 \end{aligned}
 $$
 
-# 理论与编程实现
-
-在大多数讲有限元的书籍中, 一般都在算法理论
+$\quad$ 在大多数讲有限元的书籍中, 一般都在算法理论
 (如存在、唯一、稳定和误差分析等)的讲解上花了过多的功夫, 
-力求在数学上的严谨与无懈可击.
-把计算数学这门本来与实际应用紧密联系的学科用基础数学化的方式做相关的科研和人才培养. 
+力求在数学上的严谨与无懈可击. 严谨对算法理论来说当然很重要, 
+但完全忽略算法的实现以及与实际应用的联系来, 对计算数学这个学科的发展和应用来说, 
+是非常不利的. 所以上面介绍有限元算法的过程, 几乎没有介绍有限元的相关算法理论,
+更多是着眼于思想、动机和具体算法的实现. 当然还有更多实现的细节没有讲到,
+如边界条件处理等, 这些会在后面的文档中逐一介绍.
 
 
+# FEALPy 求解 Poisson 方程 
+
+给定一个真解为
+
+$$
+u  = \cos\pi x\cos\pi y
+$$
+Poisson  方程, 其定义域为 $[0, 1]^2$, 只有纯的 Dirichlet 边界条件, 下面演示基于
+FEALPy 求解这个算例的过程. 
+
+1. 导入创建 pde 模型.
+```python
+from fealpy.pde.poisson_2d import CosCosData # 导入二维 Poisson 模型实例
+pde = CosCosData() # 创建 pde 模型对象
+```
+2. 生成初始网格, 建立有限元空间. 代码中 `p=1` 也可以设为更大正整数, 表示建立
+$p$ 次元的空间.
+```python
+# 导入 Lagrange 有限元空间
+from fealpy.functionspace import LagrangeFiniteElementSpace 
+mesh = pde.init_mesh(n=4) # 生成初始网格, 其中 4 表示初始网格要加密 4 次
+space = LagrangeFiniteElementSpace(mesh, p=1)  # 线性元空间
+```
+3. 建立 Dirichlet 边界条件处理对象.
+```python
+# 导入 Dirichlet 边界处理
+from fealpy.boundarycondition import DirichletBC 
+bc = DirichletBC(space, pde.dirichlet) # 创建 Dirichlet 边界条件处理对象
+```
+4. 创建离散代数系统, 并进行边界条件处理. 
+```python
+uh = space.function() # 创建有限元函数对象
+A = space.stiff_matrix() # 组装刚度矩阵对象
+F = space.source_vector(pde.source) # 组装右端向量对象
+A, F = bc.apply(A, F, uh) # 应用 Dirichlet 边界条件
+```
+5. 求解离散系统.
+```python
+# 导入稀疏线性代数系统求解函数
+from scipy.sparse.linalg import spsolve
+uh[:] = spsolve(A, F).reshape(-1)
+```
+6. 计算 L2 和 H1 误差.
+```python
+L2Error = space.integralalg.error(pde.solution, uh)
+H1Error = space.integralalg.error(pde.gradient, uh.grad_value)
+```
+7. 画出解函数和网格图像
+```python
+import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
+fig = plt.figure()
+axes = fig.add_subplot(1, 2, 1, projection='3d')
+uh.add_plot(axes, cmap='rainbow')
+axes = fig.add_subplot(1, 2, 2)
+mesh.add_plot(axes)
+```
+
+上面是一个典型求解二维 Poisson 方程的例子, 经过简单修改就可以求解 1 维或者 3
+维的问题. 更多例子见
+
+1. [带纯 Dirichlet 边界的 Poisson 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithDirichletBC_example.py)
+1. [带纯 Neumann 边界的 Poisson 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithNeumannBC_example.py)
+1. [带纯 Robin 边界的 Poisson 方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/PoissonFEMWithRobinBC_example.py)
+1. [带纯 Dirichlet 边界的一般椭圆方程算例.](https://github.com/weihuayi/fealpy/blob/master/example/ConvectinDiffusionReactionFEMwithDirichletBC2d_example.py)

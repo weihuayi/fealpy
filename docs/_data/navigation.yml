@@ -104,9 +104,9 @@ header:
 docs-zh:
   - title:  快速开始
     children:
-      - title: 安装 
+      - title: FEALPy 简介与安装 
         url:    /docs/zh/start/fealpy-install
-      - title: 任意次有限元求解 Poisson 方程示例
+      - title: 有限元求解 Poisson 方程示例
         url:    /docs/zh/start/poisson
   
   - title:    网格数据结构与实现 
@@ -176,6 +176,8 @@ docs-zh:
         url:   /docs/zh/example/num-navier-stokes-equation
       - title: Stokes 方程
         url:   /docs/zh/example/num-stokes-equation
+      - title: 流动前沿不稳定模拟
+        url:   /docs/zh/example/fountain-flow-instability
   
   - title: 快速算法
     children:

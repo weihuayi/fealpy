@@ -46,7 +46,7 @@ dist
 *.swo
 *.vtu
 
-
+*.cpython-38.pyc
 .vscode
 *.pickle
 
@@ -57,3 +57,4 @@ docs/.jekyll-metadata
 docs/vendor
 *.eps
 .jekyll-cache
+__pycache__
