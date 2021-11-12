@@ -4,17 +4,39 @@ tags: interpolation
 author: wx
 ---
 
-# 主旨
-在数值计算中我们经常用到自适应加密，但是网格加密后插值(新)点位置的值怎么得到是一个问题，最简单的办法是将插值点周围的值做一个线性组合，但这个方法的精度无疑是差的。这里我们基于三角形加密和重心坐标的概念来说明如何得到任意次基函数下的插值点的值。
 
-# 小单元内的点在大单元内的重心坐标表达
-这里我们称加密前的单元`\triangle_{{\bf x_0}{\bf x_1}{\bf x_2}}`为大单元，加密后得到的大单元的一个子单元`\triangle_{{\bf y_0}{\bf y_1}{\bf y_2}}`为小单元，如下图所示.
-我们目的是拿到小单元内部任意一点 `\bf y` 在大单元中的重心坐标.
+给定一个三角形单元 
+$\tau := (\boldsymbol x_0, \boldsymbol x_1, \boldsymbol x_2)$, 
+
+TODO: 加个图
+
+一致加密后, 得到四个子单元
+
+TODO: 图
+
+$$
+\tau_0 = \\
+\tau_1 = \\
+\tau_2 = \\
+\tau_3 = \\
+$$
+
+下面讨论给定子单元 $\tau_i$ 中的一个点的重心坐标 $\lambda_{i0}$, $\lambda_{i1}$, 
+$\lambda_{i2}$, 如何计算出该点在父单元 $\tau$ 中的重心坐标.
+
+$$
+\boldsymbol  
+$$
+
+
 <img src="../assets/images/interploation/refine.png" alt="refine" style="zoom:50%;" />
+
 - 首先小单元内`\bf y` 都可以写成小单元三个顶点的线性组合形式， 即
+
 $$
 \bf y = \lambda_0 \bf y_0 + \lambda_1 \bf y_1 + \lambda_2 \bf y_2,
 $$
+
 其中 `\lambda_0, \lambda_1, \lambda_2` 是点 `\bf y` 的重心坐标，且 `\lambda_0 + \lambda_1 + \lambda_2 = 1`， `\lambda_i \geq 0, i=0,1,2`。
 
 <img src="../assets/images/interploation/bcs.png" alt="refine" style="zoom:100%;" />
@@ -28,7 +50,9 @@ $$
 \lambda_2 &= \frac{S_2}{S_0+S_1+S_2}
 \end{aligned}
 $$
+
 同理， 因为`\bf y_0, \bf y_1, \bf y_2` 是大单元即三角形`\triangle_{{\bf x_0}{\bf x_1}{\bf x_2}}`内的点，所以同样可以用重心坐标的形式得到
+
 $$
 \begin{aligned}
 \bf y_0 &= \xi^0_0 \bf x_0 + \xi^0_1 \bf x_1 + \xi^0_2 \bf x_2,\\
@@ -36,10 +60,12 @@ $$
 \bf y_2 &= \xi^2_0 \bf x_0 + \xi^2_1 \bf x_1 + \xi^2_2 \bf x_2,
 \end{aligned}
 $$
+
 其中 `\xi^{j}_0, \xi^{j}_1, \xi^{j}_2` 是点 `\bf y_{j}` 的重心坐标，且 `\xi^{j}_0 + \xi^{j}_1 + \xi^{j}_2 = 1`， `\xi^{j}_i \geq 0, i, j= 0,1,2`。
 重心坐标`\bf \xi`也可以写成面积的形式，
 
 <img src="../assets/images/interploation/bc1.png" alt="refine" style="zoom:50%;" />
+
 $$
 \begin{aligned}
  \xi^0_0 &= \frac{M_0}{M_0+M_1+M_2} = \frac{M_0}{M_0+M_1} \\
@@ -49,6 +75,7 @@ $$
 $$
 
 <img src="../assets/images/interploation/bc2.png" alt="refine" style="zoom:50%;" />
+
 $$
 \begin{aligned}
  \xi^1_0 &= \frac{M_0}{M_0+M_1+M_2} = \frac{M_0}{M_0+M_2} \\
