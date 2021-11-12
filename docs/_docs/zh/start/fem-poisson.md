@@ -1,7 +1,7 @@
 ---
 title: 有限元求解 Poisson 方程示例
-permalink: /docs/zh/start/poisson
-key: docs-quick-start-zh
+permalink: /docs/zh/start/fem-poisson
+key: docs-quick-start-fem-poisson-zh
 author: why
 ---
 

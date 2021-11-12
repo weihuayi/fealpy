@@ -20,6 +20,7 @@ $$
 <img src="../assets/images/interploation/bcs.png" alt="refine" style="zoom:100%;" />
 
 几何角度上， 重心坐标可以写成面积的形式，即
+
 $$
 \begin{aligned}
  \lambda_0 &= \frac{S_0}{S_0+S_1+S_2} \\
@@ -58,6 +59,7 @@ $$
 
 <img src="../assets/images/interploation/bc3.png" alt="refine" style="zoom:50%;" />
 即
+
 $$
 \begin{aligned}
  \xi^2_0 &= \frac{M_0}{M_0+M_1+M_2} = 0 \\
@@ -65,7 +67,9 @@ $$
 \xi^2_2 &= \frac{M_2}{M_0+M_1+M_2} = \frac{M_0}{M_1+M_2}
 \end{aligned}
 $$
+
 结合上面各式可以得到
+
 $$
 \begin{aligned}
 \bf y &= \lambda_0 \bf y_0 + \lambda_1 \bf y_1 + \lambda_2 \bf y_2 \\
@@ -84,6 +88,7 @@ $$
       \left(\lambda_1 \xi^1_2 + \lambda_2 \xi^2_2 \right) \bf x_2
 \end{aligned}
 $$
+
 已知三角形ABC的顶点分别为`A(a_0, a_1), B(b_0, b_1), C(c_1, c_2)`,
 则该三角形的面积为 `\dfrac{|a_1b_2+b_1c_2+c_1a_2-a_1c_2-c_1b_2-b_1a_2|}{2}`
 
