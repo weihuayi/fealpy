@@ -104,7 +104,7 @@ header:
 docs-zh:
   - title:  快速开始
     children:
-      - title: FEALPy 简介与安装 
+      - title: FEALPy 安装 
         url:    /docs/zh/start/fealpy-install
       - title: 有限元求解 Poisson 方程
         url:    /docs/zh/start/fem-poisson
