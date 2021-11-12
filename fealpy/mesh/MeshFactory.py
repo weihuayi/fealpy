@@ -377,7 +377,7 @@ def unitcirclemesh(h=0.1, meshtype='tri', p=None):
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation) 
 
-def distmesh2d(fd, fh, bbox, pfix):
+def distmesh2d(fd, fh, h0, bbox, pfix):
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)
     distmesh2d.run()

@@ -6,7 +6,8 @@ author: wd
 ---
 
 ## 基本结构
-$\quad$在 FEALPy 中可以通过 TriangleMesh 来建立三角形网格对象，只需给出节点数组 node 和单元数组 cell，如下述代码所示
+$\quad$在 FEALPy 中可以通过 TriangleMesh 来建立三角形网格对象，只需给出节点数组 
+`node` 和单元数组 `cell`，如下述代码所示
 
 ```python
 import numpy as np
@@ -39,11 +40,11 @@ plt.show()
 
 <img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
 
-$\quad$如代码所示，node 给出了节点的数据，cell 给出了单元的数据。在上述算例中，cell 
+$\quad$如代码所示，`node` 给出了节点的数据，`cell` 给出了单元的数据。在上述算例中，`cell` 
 包含两个单元，即[1,2,0]与[3,0,2]，存储的是构成网格单元的节点的编号，[1,2,0]即由
 第1个节点，第2个节点和第0个节点三个节点构成的三角形网格单元。
 
-$\quad$建立网格后，我们可以通过entity来得到边的数据:
+$\quad$建立网格后，我们可以通过 `entity` 来得到边的数据:
 ```python
 edge = mesh.entity('edge')
 print(edge)
@@ -56,9 +57,9 @@ edge:
  [1 2]
  [2 3]]
 ```
-$\quad$edge 存储构成每条边的两个节点的编号。另外，我们从图中也可以看出各边的编号，
+$\quad$`edge` 存储构成每条边的两个节点的编号。另外，我们从图中也可以看出各边的编号，
 这些编号称为边的全局编号，除此以外，在每个单元上还有各边的局部编号，记录每个单元
-内各边的顺序，可以通过 cell2edge 或 edge2cell 来得知它。
+内各边的顺序，可以通过 `cell2edge` 或 `edge2cell` 来得知它。
 
 $\quad$在 Fealpy 中，我们约定左手方向为正方向，对于边界边来说，则要求左单元为内部单元，
 而不能是外部。以0号边为例，想象你站在0号边，背朝0号点，面朝1号点，此时，你的左手
@@ -94,12 +95,12 @@ area = mesh.entity_measure('cell') # (NC,1), 每个单元的面积
 eh = mesh.entity_measure('edge') # (NE,1), 每条边的长度
 ```
 
-除此以外，还可以获得 node,edge,cell 等实体间的关系，以如下网格单元剖分为例结合输
+除此以外，还可以获得 `node`,`edge`,`cell` 等实体间的关系，以如下网格单元剖分为例结合输
 出进行说明
 ## cell 与 node,edge,cell 间的关系
 
 <img src="../../../assets/images/mesh/tri-mesh/Triangle.png" alt="Triangle" style="zoom:50%;" />
-
+### cell 与 node 间的关系
 ```python
 cell2node = mesh.ds.cell_to_node()
 #(NC,3),单元和节点的邻接关系，储存每个单元相邻的三个节点编号，实际也就是构成三角形单元的三个顶点编号
@@ -110,7 +111,7 @@ cell2node:
  [[1 2 0]
  [3 0 2]]
 ```
-
+### cell 与 edge 间的关系
 ```python
 cell2edge = mesh.ds.cell_to_edge() # (NC, 3)
 #(NC,3),单元和边的邻接关系，储存每个单元相邻的三个边的编号，实际也为构成三角形三条边的编号
@@ -121,9 +122,10 @@ cell2edge:
  [[1 0 3]
  [1 4 2]]
 ```
-$\quad$通过 cell2edge 可以看出，对于0号单元，1号边为它的0号边，0号边为它的1号边，3
+$\quad$通过 `cell2edge` 可以看出，对于0号单元，1号边为它的0号边，0号边为它的1号边，3
 号边为它的2号边，这就是它们的局部编号。
 
+### cell 与 cell 间的关系
 ```python
 cell2cell = mesh.ds.cell_to_cell() # (NC, 3)
 # (NC,3),单元和单元的邻接关系，储存每个单元相邻的单元编号
@@ -135,11 +137,13 @@ cell2cell:
  [0 1 1]]
 ```
 
-$\quad$cell2cell 存储的是三条边相邻的单元编号，当相邻单元为无界区域时，
-存储的编号为该单元本身的编号。例如0号单元，其0号边与1号单元相邻，故 cell2cell 中储
+$\quad$`cell2cell` 存储的是三条边相邻的单元编号，当相邻单元为无界区域时，
+存储的编号为该单元本身的编号。例如0号单元，其0号边与1号单元相邻，故 `cell2cell` 中储
 存其单元编号1，而1,2号边均与无界区域相邻，故储存的单元编号为其本身，即0。
 
-## edge与 node,edge,cell 间的关系
+## edge 与 node,edge,cell 间的关系
+
+### edge 与 cell 间的关系
 ```python
 edge2cell = mesh.ds.edge_to_cell() 
 # (NE, 4),边与单元的邻接关系，储存与每条边相邻的两个单元的信息
@@ -149,12 +153,13 @@ print('edge2cell\n:',edge2cell)
 edge2cell:
  [[0 0 1 1],[0 1 0 0],[1 1 2 2],[0 0 2 2],[1 1 1 1]]
 ```
-$\quad$edge2cell 存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为
+$\quad$`edge2cell` 存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为
 该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。以0号边为例，因
 其与0号单元和无界区域相邻，故前两项均为0，又因在0号单元中，其为1号边，故后两项均为1；
 再以1号边为例，因其与0号单元和1号单元相邻，故前两项为0,1，又其在0号单元和1号单元
 中均为0号边，故后两项均为0。
 
+### edge 与 node 间的关系
 ```python
 edge2node = mesh.ds.edge_to_node() 
 # (NE,2),边与节点的邻接关系，储存每条边的两个端点的节点编号
@@ -164,6 +169,8 @@ print('edge2node:\n',edge2node)
 edge2node:
  [[0 1],[2 0],[3 0],[1 2],[2 3]]
 ```
+
+### edge 与 edge 间的关系
 ```python
 edge2edge = mesh.ds.edge_to_edge() # sparse, (NE, NE)
 # (NE,NE),稀疏矩阵，判断两条边是否相邻，相邻为True,否则为False
@@ -193,10 +200,11 @@ edge2edge:
   (4, 3)	True
   (4, 1)	True
 ```
-$\quad$edge2edge 为稀疏矩阵，它判断两条边是否相邻，如0号边与3号边相邻，故矩阵在
+$\quad$`edge2edge` 为稀疏矩阵，它判断两条边是否相邻，如0号边与3号边相邻，故矩阵在
 (0,3)处为 True, 而未相邻的两条边在矩阵中的对应位置均为 False。
 ## node与 node,edge,cell 间的关系
 
+### node 与 cell 间的关系
 ```python
 node2cell = mesh.ds.node_to_cell() 
 # 稀疏矩阵,(NN, NC),判断节点是否位于某单元中，位于则对应位置为True，否则为False
@@ -211,15 +219,17 @@ node2cell:
   (2, 1)	True
   (3, 1)	True
 ```
-$\quad$node2cell 为稀疏矩阵，与edge2edge原理相同，以0号点为例，可以看出，由于0号
+$\quad$`node2cell` 为稀疏矩阵，与 `edge2edge` 原理相同，以0号点为例，可以看出，由于0号
 点既位于0号单元，又位于1号单元，故在矩阵中，(0,0),(0,1)均为
-True。下面的node2edge和node2node原理也相同，故不再输出。
+True。下面的 `node2edge`和 `node2node` 原理也相同，故不再输出。
 
+### node 与 edge 间的关系
 ```python
 node2edge = mesh.ds.node_to_edge() # sparse, (NN, NE)
 # 稀疏矩阵，(NN,NE),判断节点是否为某边的端点，若是则对应位置为True,否则为False
-
 ```
+
+### node 与 node 间的关系
 ```python
 node2node = mesh.ds.node_to_node() # sparse, (NN, NN)
 # 稀疏矩阵，(NN,NN),判断某两个节点是否相邻，若是则对应位置为True,否则为False
