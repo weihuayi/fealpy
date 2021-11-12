@@ -1,5 +1,5 @@
 ---
-title: 有限差分求解 Poisson 方程示例
+title: 有限差分求解 Poisson 方程
 permalilink: /docs/zh/start/fdm-poisson
 key: docs-quick-start-fdm-poisson-zh
 author: la
