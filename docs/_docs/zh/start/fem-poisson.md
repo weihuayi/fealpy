@@ -72,8 +72,9 @@ $$
 
 整理可得 **A** 问题的**连续弱形式**(我们称其为 **B 问题**): 寻找 
 
-$$ 
+$$
 u\in H^1(\Omega) = \{ v\in L^2(\Omega): \nabla v \in L^2(\Omega;\mathbb R^m)\},
+>>>>>>> upstream/master:docs/_docs/zh/start/fem-poisson.md
 $$
 
 既要满足 Dirichlet 边界 $u|_{\Gamma_d} = g_d$, 又要满足
@@ -103,7 +104,13 @@ $\quad$ 更为重要的是, 方程形式的变化为我们提供了一条从无�
 
 $\quad$ 这里先不讨论有限维空间如何构造(**这是编程要解决的核心问题**), 
 后面一系列文章会详细展开. 这里我们先假设有一个 $N$ 维的有限维空间 
+<<<<<<< HEAD:docs/_docs/zh/start/poisson.md
+$V_h = \text{span} \{\phi_i\}_0^{N-1}$, 
+||||||| d3147428:docs/_docs/zh/start/poisson.md
+$V_h = \text{span}\\{{\phi_i\\}_0^{N-1}$, 
+=======
 $V_N = \text{span}\{ \phi_i \}_0^{N-1}$, 
+>>>>>>> upstream/master:docs/_docs/zh/start/fem-poisson.md
 并把**基函数**组成的向量记为
 
 $$
