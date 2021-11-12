@@ -107,8 +107,15 @@ docs-zh:
       - title: FEALPy 简介与安装 
         url:    /docs/zh/start/fealpy-install
       - title: 有限元求解 Poisson 方程示例
-        url:    /docs/zh/start/poisson
-  
+        url:    /docs/zh/start/fem-poisson
+      - title: 有限差分求解 Poisson 方程示例
+        url:    /docs/zh/start/fdm-poisson
+      - title: 有限体积求解 Poisson 方程示例
+        url:    /docs/zh/start/fvm-poisson
+      - title: WG 求解 Poisson 方程示例
+        url:    /docs/zh/start/wg-poisson
+      - title:  虚单元求解 Poisson 方程示例
+        url:    /docs/zh/start/vem-poisson
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 

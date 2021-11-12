@@ -2,7 +2,7 @@
 title: 网格工厂
 permalink: /docs/zh/mesh/mesh-factory
 key: docs-mesh-factory-zh
-author: wpx
+author: wpx,wd
 ---
 
 ​		FEALPy中的网格工厂模块是用来快速生成各种类型的常用网格，方便用户学习和使用FEALPy
@@ -355,7 +355,31 @@ plt.show()
 
 
 # distmesh2d
+$\quad$distmesh是Matlab中的一个网格生成器，我们在Fealpy中实现了其部分功能，
+MeshFactory里给出了单位圆的示例，可以直接调用
+```python
+from fealpy.mesh import MeshFactory as mf
+import numpy as np
+import matplotlib.pyplot as plt
 
+mesh = mf.unitcirclemesh()
+
+# 画图
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
+```
+<div align="center">
+    <img src='../../../assets/images/mesh/meshfactory/distmesh-tri.png' width="300"> 
+</div>
+<center style="text-decoration:underline">利用distmesh生成三角形网格</center>
+
+除了已经写好的示例，我们还可以调用函数 `distmesh2d`生成网格
+
+```python
+
+```
 # polygon_mesh
 
 # interfacemesh2d

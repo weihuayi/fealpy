@@ -4,7 +4,7 @@ permalink: /docs/zh/mesh/polygon-mesh
 key: docs-polygon-mesh-zh
 author: wx
 ---
-在FEALPy中可以通过 PolygonMesh 来建立二维多边形网格对象，只需要给出节点 node 和单元 cell，如下面代码所示。
+在`FEALPy`中可以通过 `PolygonMesh` 来建立二维多边形网格对象，只需要给出节点 `node` 和单元 `cell`，单元偏移量`cellLocation`， 如下面代码所示。
 
 ```python                                                                       
 import numpy as np                                                          
@@ -34,14 +34,14 @@ plt.show()
 ```
 生成的网格图像如下:
 <img src="../../../assets/images/mesh/polygon-mesh/polygon.png"alt="PolygonMesh" style="zoom:100%;" />
-其中，node 给出了节点的坐标，cell 和 cellLocation 两者结合给出所有单元的数据。
+其中，`node` 给出了节点的坐标，`cell` 和 `cellLocation` 两者结合给出所有单元的数据。
 
-在上述算例中，cell 存储的是构成所有网格单元的节点的编号，通过 cellLocation 可以得到具体的单元。
-例如，cellLocation 第一个元素为 0 , 第一个元素为5，代表 0 号单元从 cell 的第0个元素开始，1号单元从 cell的第5个元素开始，故组成0号单元的节点是cell的第0到4个节点，即 [0,1,3,6,5]。
+在上述算例中，`cell` 存储的是构成所有网格单元的节点的编号，通过 `cellLocation` 可以得到具体的单元。
+例如，`cellLocation`第一个元素为 `0` , 第一个元素为`5`，代表 `0` 号单元从 `cell` 的第`0`个元素开始，`1`号单元从 `cell`的第`5`个元素开始，故组成`0`号单元的节点是`cell`的第`0`到`4`个节点，即 `[0,1,3,6,5]`。
 
-值得说明的是，在 FealPy 中，我们约定逆时针方向为正方向。
+值得说明的是，在 `FealPy` 中，我们约定逆时针方向为正方向。
 
-建立网格后，我们可以通过entity来得到边的数据:
+建立网格后，我们可以通过`entity`来得到边的数据:
 ```python                                                                       
 edge = mesh.entity('edge')
 print("edge:\n", edge)
@@ -67,8 +67,8 @@ edge: #单元信息，给出构成每个边的两个点的编号，形状为(NE,
  [11 10]] #16号边
 
 ```
-上面边的编号和图中的编号一一对应，这些编号称为边的全局编号，除此以外，在每个单元上还有各边的局部编号，记录每个单元内各边的顺序，可以通过 cell_to_edge 得到。
-## 网格的各种数据
+上面边的编号和图中的编号一一对应，这些编号称为边的全局编号，除此以外，在每个单元上还有各边的局部编号，记录每个单元内各边的顺序，可以通过 `cell_to_edge` 得到。
+## 网格的属性函数
 ```python                                                                       
 NN = mesh.number_of_nodes() # 节点node个数                                  
 NE = mesh.number_of_edges() # 边edge个数                                    
@@ -85,6 +85,9 @@ eh = mesh.entity_measure('edge') # (NE,1), 每条边的长度
 ```
 
 ## cell 与 edge,node,cell之间的关系
+
+- `cell2edge`判断单元和边是否相邻，相邻为`True`，否则为`False`。
+
 ```python
 cell2edge = mesh.ds.cell_to_edge()                                
 #(NC,NE), 稀疏矩阵，判断单元和边是否相邻，相邻为True，否则为False
@@ -119,6 +122,8 @@ cell2edge:
   (5, 13)	True
   (5, 16)	True
 ```
+
+- `cell2node` 判断单元和节点是否相邻，相邻为`True`，否则为`False`。
 ```python
 cell2node = mesh.ds.cell_to_node()                                          
 #(NC,NN), 稀疏矩阵，判断单元和节点是否相邻，相邻为True，否则为False
@@ -153,6 +158,8 @@ cell2node:
   (5, 10)	True
   (5, 11)	True
 ```
+- `cell2cell`判断单元和单元是否相邻，相邻为`True`，否则为`False`。
+
 ```python
 cell2cell = mesh.ds.cell_to_cell()                            
 # (NC,NC), 稀疏矩阵，判断单元和单元是否相邻，相邻为True，否则为False
@@ -178,8 +185,10 @@ cell2cell:
   (4, 5)	True
   (5, 3)	True
   (5, 4)	True
-  ```
+```
 ## edge 与 cell,node,edge之间的关系
+
+- `edge2cell`边与单元的邻接关系，储存与每条边相邻的两个单元的信息。 
 ```python                                                                       
 edge2cell = mesh.ds.edge_to_cell()                                              
 # (NE, 4),边与单元的邻接关系，储存与每条边相邻的两个单元的信息                  
@@ -207,10 +216,11 @@ edge2cell:
  [4 4 0 0]
  [5 5 2 2]]
 ```
-edge2cell 存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。
-以 0 号边为例，因其与 0 号单元和无界区域相邻，故前两项均为 0，又因在 0 号单元中，其为 0 号边，故后两项均为 0；
-再以 9 号边为例，因其与 0 号单元和 4 号单元相邻，故前两项为 0, 4，又因为其在 0 号单元中为 3 号边，4 号单元中为 2 号边，故后两项为 3, 2。
+`edge2cell` 存储了与每条边相邻的两个单元的信息，前两项为单元的编号，后两项为该边在对应单元中的局部编号，若该边为边界边，则前两项的编号相同。
+以 `0` 号边为例，因其与 `0` 号单元和无界区域相邻，故前两项均为 `0`，又因在 `0` 号单元中，其为 `0` 号边，故后两项均为 `0`；
+再以 `9` 号边为例，因其与 `0` 号单元和 `4` 号单元相邻，故前两项为 `0`, `4`，又因为其在 `0` 号单元中为 `3` 号边，`4` 号单元中为 `2` 号边，故后两项为 `3`, `2`。
 
+- `edge2node` 边与节点的邻接关系，储存每条边的两个端点的节点编号, 实际也就是构成边的两个顶点编号。 
 ```python                                                                       
 edge2node = mesh.ds.edge_to_node()                                              
 # (NE,2),边与节点的邻接关系，储存每条边的两个端点的节点编号, 实际也就是构成边的两个顶点编号             
@@ -237,7 +247,7 @@ edge2node:
  [10  9]
  [11 10]]
 ```
-
+- `edge2edge` 判断两条边是否相邻，相邻为`True`,否则为`False`。 
 ```python                                                                       
 edge2edge = mesh.ds.edge_to_edge()                           
 # (NE,NE),稀疏矩阵，判断两条边是否相邻，相邻为True,否则为False                  
@@ -299,9 +309,11 @@ edge2edge:
   (11, 6)	True
  
 ```
-edge2edge 为稀疏矩阵，它判断两条边是否相邻，如0号边与9号边相邻，故矩阵在 
-(0,9)处为 True, 而未相邻的两条边在矩阵中的对应位置均为 False。
-## node与 node,edge,cell 间的关系                                               
+`edge2edge` 为稀疏矩阵，它判断两条边是否相邻，如`0`号边与`9`号边相邻，故矩阵在 
+`(0,9)`处为 `True`, 而未相邻的两条边在矩阵中的对应位置均为 `False`。
+## node与 node,edge,cell 间的关系
+- `node2cell`判断节点是否位于某单元中，位于则对应位置为`True`，否则为`False`。
+
 ```python                                                                       
 node2cell = mesh.ds.node_to_cell()                                              
 # 稀疏矩阵,(NN, NC),判断节点是否位于某单元中，位于则对应位置为True，否则为False
@@ -336,19 +348,24 @@ node2cell:
   (11, 3)	True
   (11, 5)	True
 ```
-node2cell 为稀疏矩阵，与edge2edge原理相同，以 0 号点为例，可以看出，由于 0 号点位于0号单元，所以矩阵 (0,0) 位置为 True。
+`node2cell` 为稀疏矩阵，与`edge2edge`原理相同，以 `0` 号点为例，可以看出，由于 `0` 号点位于`0`号单元，所以矩阵 `(0,0)` 位置为 `True`。
 
-下面的 node2edge 和 node2node 原理也相同，故不再输出。
+下面的 `node2edge` 和 `node2node` 原理也相同，故不再输出。
+- `node2edge` 判断节点是否为某边的端点，若是则对应位置为`True`, 否则为`False`。
 
 ```python                                                  
 node2edge = mesh.ds.node_to_edge()                          
 # 稀疏矩阵，(NN,NE),判断节点是否为某边的端点，若是则对应位置为True,否则为False  
 ```
+- `node2node` 判断两个节点是否相邻，若是则对应位置为`True`, 否则为`False`。
 ```python                                                                       
 node2node = mesh.ds.node_to_node()                           
 # 稀疏矩阵，(NN,NN),判断某两个节点是否相邻，若是则对应位置为True,否则为False    
-``` 
+```
 ## node,edge,cell 与边界的关系
+
+- `isBdNode` 判断节点是否为边界点。
+
 ```python
 isBdNode = mesh.ds.boundary_node_flag()
 # (NN, ), bool，判断是否为边界点
@@ -358,11 +375,17 @@ print('isBdNode:\n',isBdNode)
 isBdNode:
 [ True  True  True False False  True False False  True  True  True  True]
 ```
-isBdNode 是一组逻辑数据，用来判断节点是否为边界点。
-下面的 isBdEdge 和 isBdCell 原理也相同，故不再输出。
+`isBdNode` 是一组逻辑数据，用来判断节点是否为边界点。
+下面的 `isBdEdge` 和 `isBdCell` 原理也相同，故不再输出。
+
+- `isBdEdge` 判断边是否为边界边。
+
 ```python
 isBdEdge = mesh.ds.boundary_edge_flag()
 # (NE, ), bool，判断是否为边界边
+```
+- `isBdCell` 判断单元是否为边界单元。
+```python
 isBdCell = mesh.ds.boundary_cell_flag()
 # (NC, ), bool，判断是否为边界单元
 ```
