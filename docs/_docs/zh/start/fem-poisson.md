@@ -1,5 +1,5 @@
 ---
-title: 有限元求解 Poisson 方程示例
+title: 有限元求解 Poisson 方程
 permalink: /docs/zh/start/fem-poisson
 key: docs-quick-start-fem-poisson-zh
 author: why
@@ -72,7 +72,7 @@ $$
 
 整理可得 **A** 问题的**连续弱形式**(我们称其为 **B 问题**): 寻找 
 
-$$ 
+$$
 u\in H^1(\Omega) = \{ v\in L^2(\Omega): \nabla v \in L^2(\Omega;\mathbb R^m)\},
 $$
 

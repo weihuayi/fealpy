@@ -135,9 +135,17 @@ x(y)-x_c = \sqrt{(\frac{H}{2})^2-(y-\frac{H}{2})^2} \approx \sqrt{H} \sqrt{y} \q
 $$
 其中 $x_c$ 是接触点的位置。
 
-由于当y接近0时，不能通过
+由于ｙ接近０时候，会出现non-attaching flow(接触点离开墙壁，会有气体层在融熔物和墙壁之间)。因此需要把墙壁也用水平集，令其 $\phi=0$ ，由于双线性形函数，需要设置水平集函数两个值为０，另一个就是垂直于墙壁
 
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/wall.png' width="500"> 
+</div>
 
+由于设置墙壁为水平集，因此会出现融熔物和气体的转换，为了保持融体和气体的质量守恒，融体可以流出区域，容易泄漏建模在活塞与墙壁接触的地方，采取二次外流剖面，来保持速度平滑。其他角点处也是类似的操作。
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/leak.png' width="500"> 
+</div>
 
 # 参数选择
 
@@ -179,3 +187,33 @@ xpp参数设置
 </div>
 
 - Wi=10　的时候有不对称的流动前沿，因此选择10　
+
+
+
+## 不稳定流动前沿
+
+从四个方面来测试
+
+中线上y轴上速度分量的值，来观测对称性。分析出虚拟气体气泡不是引起不稳定行为的原因
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/u_y.png' width="500"> 
+</div>
+
+更进一步展现在中心点出$u_x,u_y$的变化,的出活塞位置对流动前沿的动态影响可以忽略
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/u.png' width="500"> 
+</div>
+
+第三个是功率谱
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/sptrum.png' width="500"> 
+</div>
+
+最后从流动前沿上下速度的差别,来观察涡流的运动，以及非线性的震荡运动
+
+<div align="center">
+    	<img src='../../../assets/images/example/fountain-flow/up-down.png' width="500"> 
+</div>
