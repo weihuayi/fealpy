@@ -344,7 +344,8 @@ plt.show()
 
 # delete_cell
 
-利用 threshhold 来删除一部分网格单元。threshold 以单元的重心为输入参数，返回一个逻辑数组，需要删除的单元标记为真。
+利用 threshhold 来删除一部分网格单元。
+threshold 以单元的重心为输入参数，返回一个逻辑数组，需要删除的单元标记为真。
 
 参数说明:
 
@@ -355,8 +356,8 @@ plt.show()
 
 
 # distmesh2d
-$\quad$distmesh是Matlab中的一个网格生成器，我们在Fealpy中实现了其部分功能，
-MeshFactory里给出了单位圆的示例，可以直接调用
+$\quad$distmesh 是 Matlab 中的一个网格生成器，我们在 Fealpy 中实现了其部分功能，
+MeshFactory 里给出了单位圆的示例，可以直接调用
 ```python
 from fealpy.mesh import MeshFactory as mf
 import numpy as np
@@ -371,15 +372,98 @@ mesh.add_plot(axes)
 plt.show()
 ```
 <div align="center">
-    <img src='../../../assets/images/mesh/meshfactory/distmesh-tri.png' width="300"> 
+    <img src='../../../assets/images/mesh/meshfactory/distmesh-tri.png' width="400"> 
 </div>
 <center style="text-decoration:underline">利用distmesh生成三角形网格</center>
 
-除了已经写好的示例，我们还可以调用函数 `distmesh2d`生成网格
+$\quad$除了已经写好的示例，我们还可以给定所需的参数，调用函数`distmesh2d`生成网格，
+其中所需的参数和 Matlab 中 `distmesh2d` 函数相同。
 
 ```python
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+from fealpy.geometry import huniform
+from fealpy.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.mesh import MeshFactory as mf
+
+fd = lambda p: dcircle(p,[0,0],1)
+fh = huniform            
+bbox = [-1,1,-1,1]       
+h0 = 0.1
+mesh = mf.distmesh2d(fd,fh,h0,bbox,pfix=None)
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
+```
+上述代码得到的网格图像也为圆形区域的三角形网格，即和上面的网格图像一样。
+
+```python
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+from fealpy.geometry import huniform
+from fealpy.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.mesh import MeshFactory as mf
+
+
+fd = lambda p:ddiff(dcircle(p,cxy=[0,0],r=1),dcircle(p,cxy=[0,0],r=0.4))
+fh = huniform
+h0 = 0.1
+bbox = [-1,1,-1,1]
+mesh = mf.distmesh2d(fd,fh,h0,bbox,pfix=None)
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
 
 ```
+上述代码生成一个带洞的圆形区域，其网格图像如下:
+
+<div align="center">
+    <img src='../../../assets/images/mesh/meshfactory/distmesh-circle_h.png' width="400"> 
+</div>
+<center style="text-decoration:underline">利用distmesh生成带洞网格</center>
+
+```python
+import numpy as np
+
+import matplotlib.pyplot as plt
+
+from fealpy.geometry import huniform
+from fealpy.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.mesh import MeshFactory as mf
+
+fd1 = lambda p: dcircle(p,[0,0],1)
+fd2 = lambda p: dcircle(p,[-0.4,0],0.55)
+fd = lambda p: ddiff(ddiff(fd1(p),fd2(p)),p[:,1])
+fh1 = lambda p: 0.15-0.2*fd1(p)
+fh2 = lambda p: 0.06+0.2*fd2(p)
+fh3 = lambda p: (fd2(p)-fd1(p))/3
+fh = lambda p: dmin(dmin(fh1(p),fh2(p)),fh3(p))
+h0 = 0.013
+bbox = [-1,1,0,1]
+pfix = np.array([(-1.0,0.0),(-0.95,0.0),(0.15,0.0),(1.0,0.0)],dtype = np.float64)
+
+mesh = mf.distmesh2d(fd,fh,h0,bbox,pfix=None)
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
+```
+上述代码生成的网格图像如下:
+
+<div align="center">
+    <img src='../../../assets/images/mesh/meshfactory/distmesh-adaptive.png' width="400"> 
+</div>
+<center style="text-decoration:underline">利用distmesh生成自适应网格</center>
+
 # polygon_mesh
 
 # interfacemesh2d
