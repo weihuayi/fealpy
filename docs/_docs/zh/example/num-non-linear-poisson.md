@@ -27,21 +27,27 @@ $$
 $$
 \begin{aligned}
 u =& g_D, \quad\text{on }\Gamma_D\leftarrow \text{Dirichlet } \\
-a(u)\frac{\partial u}{\partial\boldsymbol n}  =& g_N, \quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
-a(u)\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, \quad\text{on }\Gamma_R \leftarrow \text{ Robin}
+a(u)\frac{\partial u}{\partial\boldsymbol n}  =& g_N, 
+\quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
+a(u)\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, 
+\quad\text{on }\Gamma_R \leftarrow \text{ Robin}
 \end{aligned}
 $$
 
-在 Poisson 方程两端分别乘以测试函数 $v \in H_{D,0}^1(\Omega)$, 利用分部积分，可得到其对应的**连续弱形式**
+在 Poisson 方程两端分别乘以测试函数 $v \in H_{D,0}^1(\Omega)$, 利用分部积分，
+可得到其对应的**连续弱形式**
 
 $$
-(a(u)\nabla u,\nabla v)+<\kappa u,v>_{\Gamma_R} = (f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
+(a(u)\nabla u,\nabla v)+<\kappa u,v>_{\Gamma_R} = 
+(f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
 设 $u^0$ 是 $u$ 的一个逼近，记 $\delta u = u - u^0$, 代入连续弱形式
 
 $$
-(a(u^0+\delta u)\nabla (u^0+\delta u),\nabla v)+<\kappa (u^0+\delta u), v>_{\Gamma_R} = (f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
+(a(u^0+\delta u)\nabla (u^0+\delta u),\nabla v)+
+<\kappa (u^0+\delta u), v>_{\Gamma_R} = 
+(f,v)+<g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 $$
 
 其中 $a(u^0+\delta u)$ 在 $u^0$ 处 Taylor 展开，可得
@@ -50,21 +56,27 @@ $$
 a(u^0 + \delta u) = a(u^0) + a_u'(u^0)\delta u + \mathcal O(\delta u^2)
 $$
 
-替换连续弱形式中的 $a(u^0+\delta u)$, 并忽略掉其中 $\mathcal O(\delta u^2)$  可得
+替换连续弱形式中的 $a(u^0+\delta u)$, 并忽略掉其中 $\mathcal O(\delta u^2)$ 
+可得
 
 $$
 \begin{aligned}
 & (a(u^0)\nabla\delta u, \nabla v) + (a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v) 
 + <\kappa\delta u, v>_{\Gamma_R} \\
-=&  (f,v) - (a(u^0)\nabla u^0, \nabla v) - <\kappa u^0, v>_{\Gamma_R} + <g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
+=&  (f,v) - (a(u^0)\nabla u^0, \nabla v) - 
+<\kappa u^0, v>_{\Gamma_R} + <g_R,v>_{\Gamma_R}+<g_N,v>_{\Gamma_N}
 \end{aligned}
 $$
 
-给定求解区域 $\Omega$ 上的网格离散 $\mathcal T = \{\tau\}$, 构造 $N$ 维的有限维空间 $V_h$，
+给定求解区域 $\Omega$ 上的网格离散 $\mathcal T = \{\tau\}$, 
+构造 $N$ 维的有限维空间 $V_h$，
 其 $N$ 个**全局基函数**组成的**行向量函数**记为
 
 $$
-\boldsymbol\phi(\boldsymbol x) = \left[\phi_0(\boldsymbol x), \phi_1(\boldsymbol x), \cdots, \phi_{N-1}(\boldsymbol x)\right], \boldsymbol x \in \Omega 
+\boldsymbol\phi(\boldsymbol x) = 
+\left[
+\phi_0(\boldsymbol x), \phi_1(\boldsymbol x), \cdots, \phi_{N-1}(\boldsymbol x)
+\right], \boldsymbol x \in \Omega 
 $$
 
 对于有限元程序设计实现来说，并不会显式构造出**全局基函数**，实际基函数的求值计
@@ -72,13 +84,21 @@ $$
 $l$ 个，其组成的**行向量函数**记为
 
 $$
-\boldsymbol\varphi(\boldsymbol x) = \left[\varphi_0(\boldsymbol x), \varphi_1(\boldsymbol x), \cdots, \varphi_{l-1}(\boldsymbol x)\right], \boldsymbol x \in \tau
+\boldsymbol\varphi(\boldsymbol x) = 
+\left[
+\varphi_0(\boldsymbol x), \varphi_1(\boldsymbol x), 
+\cdots, \varphi_{l-1}(\boldsymbol x)
+\right], \boldsymbol x \in \tau
 $$
 
 所有基函数梯度对应的向量
 
 $$
-\nabla \boldsymbol\varphi(\boldsymbol x) = \left[\nabla \varphi_0(\boldsymbol x), \nabla \varphi_1(\boldsymbol x), \cdots, \nabla \varphi_{l-1}(\boldsymbol x)\right], \boldsymbol x \in \tau
+\nabla \boldsymbol\varphi(\boldsymbol x) = 
+\left[
+\nabla \varphi_0(\boldsymbol x), \nabla \varphi_1(\boldsymbol x), 
+\cdots, \nabla \varphi_{l-1}(\boldsymbol x)
+\right], \boldsymbol x \in \tau
 $$
 
 其中 
@@ -97,13 +117,18 @@ $$
 则 $(a(u^0)\nabla\delta u, \nabla v)$ 对应的单元矩阵为 
 
 $$
-\boldsymbol A_\tau = \int_\tau a(u^0)(\nabla \boldsymbol\varphi)^T\nabla\boldsymbol\varphi\mathrm d \boldsymbol x
+\boldsymbol A_\tau = 
+\int_\tau a(u^0)(\nabla \boldsymbol\varphi)^T\nabla\boldsymbol\varphi
+\mathrm d \boldsymbol x
 $$
 
 $(a_u'(u^0)\nabla u^0\cdot\delta u, \nabla v)$ 对应的单元矩阵为
 
 $$
-\boldsymbol B_\tau = \int_\tau a_u'(u^0)(\nabla\boldsymbol\varphi)^T\nabla u^0\boldsymbol\varphi\mathrm d \boldsymbol x
+\boldsymbol B_\tau = 
+\int_\tau 
+a_u'(u^0)(\nabla\boldsymbol\varphi)^T\nabla u^0\boldsymbol\varphi
+\mathrm d \boldsymbol x
 $$
 
 $(f, v)$ 对应的单元列向量为
@@ -112,30 +137,44 @@ $$
 \boldsymbol b = \int_\tau f\boldsymbol\varphi^T\mathrm d \boldsymbol x
 $$
 
-下面讨论边界条件相关的矩阵和向量组装。设网格边界边（2D)或边界面（3D)上的**局部基函数**个数为 $m$
-个，其组成的**行向量函数**记为
+下面讨论边界条件相关的矩阵和向量组装.
+设网格边界边（2D)或边界面（3D)上的**局部基函数**个数为
+$m$ 个，其组成的**行向量函数**记为
 
 $$
-\boldsymbol\omega (\boldsymbol x) = \left[\omega_0(\boldsymbol x), \omega_1(\boldsymbol x), \cdots, \omega_{m-1}(\boldsymbol x)\right]
+\boldsymbol\omega (\boldsymbol x) = 
+\left[
+\omega_0(\boldsymbol x), \omega_1(\boldsymbol x), 
+\cdots, \omega_{m-1}(\boldsymbol x)
+\right]
 $$
 
 设 $e$ 是一个边界边或边界面，则 $<\kappa\delta u, v>_e$ 对应的矩阵为
 
 $$
-\boldsymbol R_e = \int_e \kappa \boldsymbol\omega^T\boldsymbol\omega \mathrm d \boldsymbol s, \forall
-e\subset\Gamma_R.
+\boldsymbol R_e = 
+\int_e 
+\kappa \boldsymbol\omega^T\boldsymbol\omega 
+\mathrm d \boldsymbol s, \forall e\subset\Gamma_R.
 $$
 
 $<g_N, v>_e$  对应的向量为
 
 $$
-\boldsymbol b_N = \int_e g_N\boldsymbol\omega^T\mathrm d \boldsymbol x, \forall e \subset \Gamma_N
+\boldsymbol b_N = 
+\int_e 
+g_N\boldsymbol\omega^T
+\mathrm d \boldsymbol x, 
+\forall e \subset \Gamma_N
 $$
 
 $<g_R, v>_e$ 对应的向量为
 
 $$
-\boldsymbol b_R = \int_e g_R\boldsymbol\omega^T\mathrm d \boldsymbol x, \forall e \subset \Gamma_R 
+\boldsymbol b_R = 
+\int_e 
+g_R\boldsymbol\omega^T
+\mathrm d \boldsymbol x, \forall e \subset \Gamma_R 
 $$
 
 ### 基于 FEALPy 的程序实现
@@ -311,7 +350,9 @@ $$
 $$
 \begin{aligned}
 u =& g_D, \quad\text{on }\Gamma_D\leftarrow \text{Dirichlet } \\
-\frac{\partial u}{\partial\boldsymbol n}  =& g_N, \quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
-\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, \quad\text{on }\Gamma_R \leftarrow \text{ Robin}
+\frac{\partial u}{\partial\boldsymbol n}  =& g_N, 
+\quad\text{on }\Gamma_N \leftarrow \text{Neumann} \\
+\frac{\partial u}{\partial\boldsymbol n} + \kappa u =& g_R, 
+\quad\text{on }\Gamma_R \leftarrow \text{ Robin}
 \end{aligned}
 $$

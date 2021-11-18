@@ -76,7 +76,7 @@ $$
 u\in H^1(\Omega) = \{ v\in L^2(\Omega): \nabla v \in L^2(\Omega;\mathbb R^m)\},
 $$
 
-既要满足 Dirichlet 边界 $u|_{\Gamma_d} = g_d$, 又要满足
+既要满足 Dirichlet 边界 $u\|_{\Gamma_d} = g_d$, 又要满足
 
 $$
 (\nabla u,\nabla v)+<\kappa u,v>_{\Gamma_r} = 
