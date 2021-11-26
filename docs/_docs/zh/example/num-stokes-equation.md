@@ -62,8 +62,10 @@ $$
 $$
 \begin{aligned}
 	-\int_{\Omega} \nabla p \cdot \boldsymbol v \mathrm dx 
-	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - \nabla \cdot (p\boldsymbol v) \mathrm dx\\
-	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol n \cdot \boldsymbol v \mathrm ds
+	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) - 
+	\nabla \cdot (p\boldsymbol v) \mathrm dx\\
+	&= \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - 
+	\int_{\partial \Omega} p\boldsymbol n \cdot \boldsymbol v \mathrm ds
 \end{aligned}
 $$
 
@@ -72,8 +74,11 @@ $$
 $$
 \begin{aligned}
 	-\int_{\Omega} \Delta \boldsymbol u \cdot \boldsymbol v \quad \mathrm dx 
-	&= -\int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx\\
-	&= -\int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds + \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx
+	&= -\int_{\Omega} \nabla \cdot (\nabla \boldsymbol u \cdot \boldsymbol v) - 
+	\nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx\\
+	&= -\int_{\partial \Omega} 
+	\nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds + 
+	\int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx
 \end{aligned}
 $$
 
@@ -81,7 +86,11 @@ $$
 
 $$
 \begin{aligned}
-	-\frac{\mu}{2}\int_{\partial \Omega} \nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds + \frac{\mu}{2} \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx + \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - \int_{\partial \Omega} p\boldsymbol n \cdot \boldsymbol v \mathrm ds
+	-\frac{\mu}{2}\int_{\partial \Omega} 
+	\nabla \boldsymbol u \cdot \boldsymbol v  \cdot \boldsymbol n \mathrm ds + 
+	\frac{\mu}{2} \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx + 
+	\int_{\Omega} p (\nabla \cdot \boldsymbol v) dx - 
+	\int_{\partial \Omega} p\boldsymbol n \cdot \boldsymbol v \mathrm ds
 	 =  \int_{\Omega} \boldsymbol f \cdot \boldsymbol v \mathrm dx
 \end{aligned}
 $$
@@ -90,7 +99,9 @@ $$
 
 $$
 \begin{aligned}
-	\frac{\mu}{2} \int_{\Omega} \nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx + \int_{\Omega} p (\nabla \cdot \boldsymbol v) dx 
+	\frac{\mu}{2} \int_{\Omega} 
+	\nabla \boldsymbol v : \nabla \boldsymbol u \mathrm dx + 
+	\int_{\Omega} p (\nabla \cdot \boldsymbol v) dx 
 	 =   \int_{\Omega} \boldsymbol f \cdot \boldsymbol v \mathrm dx
 \end{aligned}
 $$
@@ -155,7 +166,6 @@ $$
 	\end{bmatrix}
 \end{bmatrix}
 \end{aligned}
-
 $$
 
 散度形式为
@@ -203,13 +213,13 @@ $$
 $\int_{\Omega} p (\nabla \cdot \boldsymbol v) \mathrm dx$ 对应的矩阵形式为 
 
 $$
-\int_\Omega \boldsymbol (\nabla \cdot \boldsymbol \Phi)^T \boldsymbol \xi
+\int_\Omega \boldsymbol (\nabla \cdot \boldsymbol \Phi)^T \boldsymbol \psi
 dx \cdot \boldsymbol P 
 = 
 \int_\Omega
 \begin{bmatrix}
-\boldsymbol\phi_x^T \boldsymbol \xi \\
-\boldsymbol\phi_y^T \boldsymbol \xi \\ 
+\boldsymbol\phi_x^T \boldsymbol \psi \\
+\boldsymbol\phi_y^T \boldsymbol \psi \\ 
 \end{bmatrix} 
 \mathrm d\boldsymbol x \cdot \boldsymbol P
 :=
@@ -223,7 +233,7 @@ $$
 $\int_{\Omega} w \nabla \cdot \boldsymbol u$ 对应的矩阵形式为 
 
 $$
-\int_\Omega  \boldsymbol \xi^T \boldsymbol (\nabla \cdot \boldsymbol \Phi)
+\int_\Omega  \boldsymbol \psi^T \boldsymbol (\nabla \cdot \boldsymbol \Phi)
 dx \cdot \boldsymbol U
 = 
 \int_\Omega
@@ -271,7 +281,5 @@ B_2 &=  \int_{\tau}
 \end{aligned}
 $$
 
-
 ## 参考文献
 
-1. 
