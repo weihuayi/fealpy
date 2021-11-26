@@ -381,12 +381,7 @@ def distmesh2d(fd, fh, h0, bbox, pfix):
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h0)
     distmesh2d.run()
-    if meshtype in {'tri', 'triangle'}:
-        return distmesh2d.mesh
-    elif meshtype in {'polygon', 'poly'}:
-        mesh = TriangleMeshWithInfinityNode(distmesh2d.mesh)
-        pnode, pcell, pcellLocation = mesh.to_polygonmesh()
-        return PolygonMesh(pnode, pcell, pcellLocation) 
+    return distmesh2d.mesh
 
 def polygon_mesh(meshtype='triquad'):
     if meshtype in {'triquad'}:

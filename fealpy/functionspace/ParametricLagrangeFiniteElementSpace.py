@@ -297,13 +297,14 @@ class ParametricLagrangeFiniteElementSpace:
                 if c.coordtype == 'barycentric':
                     c = c(bcs)
                 elif c.coordtype == 'cartesian':
+                    ps = self.mesh.bc_to_point(bcs)
                     c = c(ps)
             if isinstance(c, (int, float)):
                 M = np.einsum('q, qci, qcj, qc->cij', ws*rm*c, phi, phi, d) # (NC, ldof, ldof)
             elif isinstance(c, np.ndarray): 
-                if len(c.shape) == 1:  # (NC, )
+                if c.shape == (NC, ):  # (NC, )
                     M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
-                elif len(c.shape) == 2: # (NQ, NC)
+                elif c.shape == (NQ, NC): # (NQ, NC)
                     d *=c
                     M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
                 else:
