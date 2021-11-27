@@ -116,6 +116,7 @@ docs-zh:
         url:    /docs/zh/start/wg-poisson
       - title:  虚单元求解 Poisson 方程
         url:    /docs/zh/start/vem-poisson
+  - title:  PDE模型
   - title:    网格数据结构与实现 
     children:
       - title: 网格数据结构基础 
@@ -185,7 +186,7 @@ docs-zh:
         url:   /docs/zh/example/num-stokes-equation
       - title: 流动前沿不稳定模拟
         url:   /docs/zh/example/fountain-flow-instability
-  
+  - title: 边界条件处理
   - title: 快速算法
     children:
       - title:
