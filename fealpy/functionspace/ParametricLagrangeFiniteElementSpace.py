@@ -302,11 +302,11 @@ class ParametricLagrangeFiniteElementSpace:
             if isinstance(c, (int, float)):
                 M = np.einsum('q, qci, qcj, qc->cij', ws*rm*c, phi, phi, d) # (NC, ldof, ldof)
             elif isinstance(c, np.ndarray): 
-                if c.shape == (NC, ):  # (NC, )
+                if c.shape == (NC, ):  # (NC, ) 分片常数
                     M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d, c) # (NC, ldof, ldof)
-                elif c.shape == (NQ, NC): # (NQ, NC)
+                elif c.shape == (NQ, NC): # (NQ, NC) 
                     d *=c
-                    M = np.einsum('q, qci, qcj, qc, c->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
+                    M = np.einsum('q, qci, qcj, qc->cij', ws*rm, phi, phi, d) # (NC, ldof, ldof)
                 else:
                     raise ValueError("I can not deal with c.shape!")
             else:
