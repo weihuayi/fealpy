@@ -81,6 +81,7 @@ class LinearWedgeMeshDataStructure():
         return np.arange(self.NTF//2)
 
 class LagrangeWedgeMesh(Mesh3d):
+    
     def __init__(self, mesh, h, nh, p=1, surface=None):
 
         cell = mesh.entity('cell')
@@ -106,6 +107,9 @@ class LagrangeWedgeMesh(Mesh3d):
         self.celldata = {}
         self.meshdata = {}
         self.multi_index_matrix = multi_index_matrix
+
+    def from_vtk(self, fname):
+        pass
 
     def construct(self, node, cell, mesh, h, nh):
         p = self.p
@@ -550,7 +554,7 @@ class LagrangeWedgeMesh(Mesh3d):
 
         node = self.entity('node')
 
-        if self.meshdata['p'] is not None:
+        if 'p' in self.meshdata:
             node = np.vstack((node, self.meshdata['p']))
 
         GD = self.geo_dimension()

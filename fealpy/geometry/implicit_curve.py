@@ -63,6 +63,12 @@ class CircleCurve():
         return d, n
 
     def project(self, p):
+        """
+
+        Note
+        ----
+         注意，这里的 p[:] 意思是修改 p 的内容，这样外面的 p 也同时修改了
+        """
         p[:], d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
         return d, n
 

@@ -305,6 +305,10 @@ class Mesh3dDataStructure():
             return cell2edge
 
     def cell_to_edge_sign(self, cell):
+        """
+
+        TODO: check here
+        """
         NC = self.NC
         NEC = self.NEC
         cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)

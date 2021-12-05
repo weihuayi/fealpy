@@ -106,6 +106,7 @@ $$
 ## 3.1 Chroin 算法
 
 $\qquad$　首先对时间倒数做如下离散
+
 $$
 \begin{aligned}
  \frac{\boldsymbol u^{n+1} - \boldsymbol u^n}{\Delta t} + \boldsymbol u \cdot \nabla \boldsymbol u= -\frac{1}{\rho}\nabla p + \frac{1}{\rho}\nabla \sigma (u) + \boldsymbol f 
@@ -114,10 +115,13 @@ $$
 
 
 为了解离开$\boldsymbol u$和$p$，将时间导数做如下分裂
+
 $$
 \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{n}) = \frac{1}{\Delta t}(\boldsymbol u^{n+1}-\boldsymbol u^{*}) + \frac{1}{\Delta t}(\boldsymbol u^{*}-\boldsymbol u^{n})
 $$
+
 由于连续性条件我们可以将$\nabla \sigma(\boldsymbol u)$变为$\mu \Delta \boldsymbol u $，我们对其它变量所在时间层做如下选取
+
 $$
 \begin{aligned}
 \frac{1}{\Delta t}( \boldsymbol u^{*}- \boldsymbol u^{n}) -  \frac{\mu}{\rho}\Delta \boldsymbol u^* + \boldsymbol u^n \cdot \nabla\boldsymbol u^n &= \boldsymbol f^{n+1}  \\
@@ -125,21 +129,24 @@ $$
 \nabla \cdot \boldsymbol u^{n+1} &= 0\qquad \\ 
 \end{aligned}
 $$
+
 我们再对上面的第二个式子两边乘以$\nabla \cdot$，由于连续性条件可以得到
+
 $$
 \begin{aligned}
 \frac{1}{\rho} \Delta  p^{n+1}  &= \frac{1}{\Delta t} \nabla \cdot \boldsymbol u^* \qquad 
 \end{aligned}
 $$
+
 再带入原式便可以计算出$\boldsymbol u^{n+1}$
+
 $$
 \begin{aligned}
 \boldsymbol u^{n+1} = \boldsymbol u^* - \Delta t \nabla p^{n+1}
 \end{aligned}
 $$
 
-
- 再通过变分得到如chorin求解Navier-Stokes的三步方法
+再通过变分得到如chorin求解Navier-Stokes的三步方法
 
 - 求解速度中间变量$\boldsymbol u^*$
 
@@ -170,19 +177,27 @@ $$
 (\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla p^{n+1}, \boldsymbol v) \qquad in \quad \Omega 
 \end{aligned}
 $$
+
 ## 3.2 ipcs算法
 
-第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，因此粘性项可以写成$\sigma(u)$,Chorin算法第一步变为
+第一步计算中我们也希望利用p第n层的信息，并且由于第一步不涉及连续性方程，
+因此粘性项可以写成$\sigma(u)$,因此将Chorin算法第一步变为
+
 $$
 \begin{aligned}
-(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + \frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + (\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - \frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + (p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega}
--( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
+(\frac{ \boldsymbol u^{*}- \boldsymbol u^{n}}{\Delta t},\boldsymbol v) + 
+\frac{1}{\rho}(\sigma(\boldsymbol u^*),\epsilon(\boldsymbol v)) + 
+(\boldsymbol u^n \cdot \nabla\boldsymbol u^n,\boldsymbol v) - 
+\frac{1}{\rho}( p^n \boldsymbol I,\nabla \boldsymbol v) + 
+(p^{n}\boldsymbol n ,\boldsymbol v)_{\partial \Omega} -
+( \sigma(\boldsymbol u^*) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \Omega}&= (\boldsymbol f(t^{n+1}),\boldsymbol v) \qquad in \quad \Omega\times(0,T)\\
 \boldsymbol u^* &= 0\qquad on \quad [0,1] \times \{0,1\}\ \\ 
 \end{aligned}
 $$
 
 
 第二步计算
+
 $$
 \begin{aligned}
  (\nabla(p^{n+1}-p^{n}),\nabla q) &= -\frac{1}{\Delta t} (\nabla \cdot \boldsymbol u^*,q)   \qquad in \quad \Omega ,\\
@@ -192,18 +207,56 @@ $$
 $$
 
 第三步计算
+
 $$
 \begin{aligned}
 (\boldsymbol u^{n+1} , \boldsymbol v) = (\boldsymbol u^* , \boldsymbol v) - \Delta t (\nabla(p^{n+1}-p^{n}), \boldsymbol v) \qquad in \quad \Omega 
 \end{aligned}
 $$
+
+## 3.3 Oseen算法
+
+非线性项 $\boldsymbol u \cdot \nabla \boldsymbol u$ 进行线性化处理 $\boldsymbol u^n \cdot \nabla \boldsymbol u^{n+1}$
+$$
+\begin{aligned}
+	( \frac{ \boldsymbol u^{n+1}-\boldsymbol u^{n}}{\Delta t},\boldsymbol v) + ( \boldsymbol u^{n} \cdot \nabla \boldsymbol u^{n+1} ,\boldsymbol v ) 
+	- ( p^{n+1} ,\nabla \cdot \boldsymbol v) +  (\nabla  \boldsymbol u^{n+1}  , \nabla \boldsymbol v) 
+	 &=  ( \boldsymbol f^{n+1},\boldsymbol v) \\
+	 ( \nabla \cdot\boldsymbol u^{n+1}, q) &= 0
+\end{aligned}
+$$
+
+$$
+\left[\begin{array}{lll}
+E+A+D & 0 &-B_{1} \\
+0 & E+A+D&-B_{2}\\
+B_{1}^{T} & B_{2}^{T} &0
+\end{array}\right]\left[\begin{array}{l}
+\boldsymbol{u}_{0} \\
+\boldsymbol{u}_{1} \\
+\boldsymbol{p}
+\end{array}\right]
+$$
+
+其中
+
+$$
+\begin{aligned}
+E &=\frac{1}{\Delta t}\int_{\tau} \boldsymbol \phi^{T} \boldsymbol \phi d \boldsymbol x \\
+A &= \int_{\tau}  \frac{\partial \boldsymbol \phi^T}{\partial x} \frac{\partial \boldsymbol \phi}{\partial x} + \frac{\partial \boldsymbol \phi^T}{\partial y} \frac{\partial \boldsymbol \phi}{\partial y}d \boldsymbol x \\
+D &=  \int_{\tau} \boldsymbol u_0^{n} \boldsymbol \phi^T  \frac{\partial \boldsymbol \phi}{\partial x} + \boldsymbol u_1^{n} \boldsymbol \phi^T  \frac{\partial \boldsymbol \phi}{\partial y}d \boldsymbol x \\
+B_1 &=  \int_{\tau} \frac{\partial \boldsymbol \phi^T}{\partial x} \boldsymbol \varphi d \boldsymbol x \\
+B_2 &=  \int_{\tau} \frac{\partial \boldsymbol \phi^T}{\partial y} \boldsymbol \varphi d \boldsymbol x 
+\end{aligned}
+$$
+
 # 4 Benchmark
 
 ## 4.1 Channel flow(Poisuille flow)
 
 $\qquad$Channel flow是对壁面固定管道内流动情况的模拟
 
-另$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
+令$\Omega = [0,1]\times[0,1],\rho =1,\mu = 1,\boldsymbol f = 0$，方程可以变为
 
 $$
 \begin{aligned}
@@ -222,7 +275,7 @@ $$
 
 # 5 基函数表示
 
-给定 $\Omega$​ 上一个单纯形网格离散 $\tau$, 构造连续的分p 次$Lgarange$多项式空间, 其基函数向量记为：
+给定 $\Omega$ 上一个单纯形网格离散 $\tau$, 构造连续的分k次$Lgarange$多项式空间, 其基函数向量记为：
 
 $$
 \begin{aligned}
@@ -246,6 +299,10 @@ $$
 \end{aligned}
 $$
 
+设网格边界边（2D)或边界面（3D)上的**局部基函数**个数为 $m$ 个，其组成的**行向量函数**记为
+$$
+\boldsymbol\omega (\boldsymbol x) = \left[\omega_0(\boldsymbol x), \omega_1(\boldsymbol x), \cdots, \omega_{m-1}(\boldsymbol x)\right]
+$$
 
 
 则k次向量空间$\mathcal P_k(K;\mathcal R^2)$的基函数为
@@ -537,20 +594,20 @@ $$
 $$
 G_0 =
 \int_{\partial \tau} 
-\boldsymbol\phi^T (p^nn_0)
+\boldsymbol\omega^T (p^nn_0)
 \boldsymbol d \boldsymbol x
 $$
 
 $$
 G_1 =
 \int_{\partial \tau} 
-\boldsymbol\phi^T (p^nn_1)
+\boldsymbol\omega^T (p^nn_1)
 \boldsymbol d \boldsymbol x
 $$
 
 
 $$
-( \epsilon(\boldsymbol \Phi) \cdot \boldsymbol n ,  \boldsymbol v))_{\partial \tau}
+( \epsilon(\boldsymbol \Phi) \cdot \boldsymbol n ,  \boldsymbol \Phi))_{\partial \tau}
 =
 \int_{\partial \tau} 
 \begin{bmatrix}
@@ -570,29 +627,37 @@ $$
 \end{bmatrix}
 $$
 
+
 $$
-\boldsymbol D_{00} = \int_\tau \boldsymbol\phi^T\frac{\partial\boldsymbol\phi}{\partial x}n_0
-+\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_1\mathrm
+\boldsymbol D_{00} = \int_{\partial\tau} \boldsymbol\omega^T\frac{\partial\boldsymbol\phi}{\partial x}n_0
++\frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_1\mathrm
+d\boldsymbol x
+$$
+
+
+$$
+\boldsymbol D_{11} = \int_{\partial\tau}  \boldsymbol\omega^T\frac{\partial\boldsymbol\phi}{\partial y}n_1
++\frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_0\mathrm
 d\boldsymbol x
 $$
 
 $$
-\boldsymbol D_{11} = \int_\tau \boldsymbol\phi^T\frac{\partial\boldsymbol\phi}{\partial y}n_1
-+\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_0\mathrm
-d\boldsymbol x
-$$
-
-$$
+\begin{aligned}
 \boldsymbol D_{01} = 
-\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial x}n_1\mathrm
+\int_{\partial \tau} \frac{1}{2} \boldsymbol \omega^T \frac{\partial\boldsymbol\phi^T}{\partial x} n_1 \mathrm
 d\boldsymbol x
+\end{aligned}
 $$
 
 
 $$
 \boldsymbol D_{10} = 
-\frac{1}{2}\boldsymbol\phi^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_0\mathrm
+\int_{ \partial\tau }\frac{1}{2}\boldsymbol\omega^T\frac{\partial\boldsymbol\phi^T}{\partial y}n_0\mathrm
 d\boldsymbol x
+$$
+
+$$
+
 $$
 
 
@@ -604,4 +669,4 @@ $$
 
 1. [Fenics examples for the Navier-Stokes
    
-   equations](https://fenicsproject.org/pub/tutorial/sphinx1/._ftut1004.html#the-navier-stokes-equations)
+   equations](https://fenicsproject.org/pub/tutorial/sphinx1/._ftut1004.html#the-navier-stokes-equations):

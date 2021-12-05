@@ -347,11 +347,12 @@ class ScaledMonomialSpace2d():
         #TODO:
         pass
 
-    def function(self, dim=None, array=None):
-        f = Function(self, dim=dim, array=array, coordtype='cartesian')
+    def function(self, dim=None, array=None, dtype=np.float64):
+        f = Function(self, dim=dim, array=array, coordtype='cartesian',
+                dtype=np.float64)
         return f
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim in {None, 1}:
             shape = gdof
@@ -359,7 +360,7 @@ class ScaledMonomialSpace2d():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def dof_array(self, dim=None):
         gdof = self.number_of_global_dofs()
