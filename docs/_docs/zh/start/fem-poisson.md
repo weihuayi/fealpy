@@ -38,7 +38,7 @@ $\quad$ 对于绝大多数偏微分方程来说, 往往都找不到**解析形�
 如何克服偏微分方程的无限性, 设计出可以在计算机上高效运行的求解算法,
 是**偏微分方程数值解**的主要研究内容.
 
-# 有限元方法
+# 有限元方法简介
 
 $\quad$ 在原来的方程形式下, 要想解决无限性的困难, 
 一个可行的办法是**有限差分**方法, 我们会另行讨论. 
@@ -67,8 +67,8 @@ $$
 \begin{aligned} 
     (f,v)&=-(\Delta u, v)\\
          &=(\nabla u, \nabla v)-<\nabla u \cdot \boldsymbol n,v>_{\partial\Omega}\\
-         &=(\nabla u,\nabla v)-<g_N,v>_{\Gamma_N}
-         +<\kappa u,v>_{\Gamma_R}-<g_R,v>_{\Gamma_R},
+         &=(\nabla u,\nabla v)-<g_N,v>_{\Gamma_n}
+         +<\kappa u,v>_{\Gamma_r}-<g_R,v>_{\Gamma_r},
 \end{aligned}
 $$
 
