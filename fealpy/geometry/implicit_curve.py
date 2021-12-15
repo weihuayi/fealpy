@@ -40,6 +40,7 @@ class PolygonCurve():
         # 计算符号距离
         # (NP, 2) - (NE, 2)->(NP, NE, 2), (NE, 2) -> (NP, NE)  
         d = np.sum((p[..., None, :] - node[edge[:, 0]])*n, axis=-1)
+        return d
 
 class CircleCurve():
     def __init__(self, center=np.array([0.0, 0.0]), radius=1.0):
