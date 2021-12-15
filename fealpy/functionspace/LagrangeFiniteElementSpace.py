@@ -1,4 +1,4 @@
-mport numpy as np
+import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, spdiags, bmat
 from scipy.sparse.linalg import spsolve
 
