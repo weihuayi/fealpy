@@ -1,7 +1,7 @@
 import numpy as np
 from .TriangleMesh import TriangleMesh
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
-from ..quadrature import QuadrangleQuadrature
+from ..quadrature import QuadrangleQuadrature, GaussLegendreQuadrature
 from ..common import hash2map
 
 
