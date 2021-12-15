@@ -18,7 +18,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.decorator import cartesian, barycentric
 from fealpy.mesh import MeshFactory as MF
-from fealpy.functionspace import LagrangeFiniteElementSpace
+from fealpy.functionspace import  ParametricLagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC
 from fealpy.tools.show import showmultirate, show_error_table
 
@@ -120,12 +120,16 @@ TODO:
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        三角形网格上求解一般椭圆问题的任意次有限元方法
+        三角形, 四边形网格上求解一般椭圆问题的任意次有限元方法
         """)
 
 parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--mtype',
+        default='tri', type=str,
+        help='网格类型, 默认为 tri, 即三角形网格, 还可以选择 quad, 即四边形网格.')
 
 parser.add_argument('--ns',
         default=10, type=int,
@@ -140,18 +144,19 @@ args = parser.parse_args()
 degree = args.degree
 ns = args.ns
 maxit = args.maxit
+mtype = args.mtype
 	
 
 pde = PDE()
 domain = pde.domain()
-mesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
+mesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype=mtype, p=degree)
 
 errorType = ['$|| u  - u_h ||_0$', '$|| \\nabla u - \\nabla u_h||_0$']
 errorMatrix = np.zeros((2, maxit), dtype=mesh.ftype)
 NDof = np.zeros(maxit, dtype=mesh.itype)
 for i in range(maxit):
     print('Step:', i)
-    space = LagrangeFiniteElementSpace(mesh, p=degree)
+    space = ParametricLagrangeFiniteElementSpace(mesh, p=degree)
     NDof[i] = space.number_of_global_dofs()
     uh = space.function() 	# 返回一个有限元函数，初始自由度值全为 0
     A = space.stiff_matrix(c=pde.diffusion_coefficient)
