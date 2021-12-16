@@ -22,14 +22,14 @@ class HuZhangFiniteElementSpace():
         Initialize the othogonal symetric matrix basis.
         """
         mesh = self.mesh
-        gdim = self.geo_dimension()
+        GD = self.geo_dimension()
 
         NE = mesh.number_of_edges()
-        if gdim == 2:
+        if GD == 2:
             idx = np.array([(0, 0), (1, 1), (0, 1)])
             self.TE = np.zeros((NE, 3, 3), dtype=np.float)
             self.T = np.array([[(1, 0), (0, 0)], [(0, 0), (0, 1)], [(0, 1), (1, 0)]])
-        elif gdim == 3:
+        elif GD == 3:
             idx = np.array([(0, 0), (1, 1), (2, 2), (1, 2), (0, 2), (0, 1)])
             self.TE = np.zeros((NE, 6, 6), dtype=np.float)
             self.T = np.array([
@@ -122,7 +122,7 @@ class HuZhangFiniteElementSpace():
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
 
-        gdim = self.geo_dimension()
+        GD = self.geo_dimension()
         tdim = self.tensor_dimension() # 张量维数
         p = self.p
         dof = self.dof # 标量空间自由度管理对象 
@@ -130,6 +130,7 @@ class HuZhangFiniteElementSpace():
         c2d = dof.cell2dof[..., np.newaxis]
         ldof = dof.number_of_local_dofs() # ldof : 标量空间单元上自由度个数
         cell2dof = np.zeros((NC, ldof, tdim), dtype=np.int) # 每个标量自由度变成 tdim 个自由度
+
 
         dofFlags = self.dof_flags_1() # 把不同类型的自由度区分开来
         idx, = np.nonzero(dofFlags[0]) # 局部顶点自由度的编号
