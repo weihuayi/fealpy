@@ -22,6 +22,64 @@ from .distmesh import DistMesh2d
 
 from .interface_mesh_generator import InterfaceMesh2d
 
+def circle_interval_mesh(c, r, h, clock = 'w'):
+
+    n = int(2*np.pi*r/h)
+    dt = 2*np.pi/n
+    theta  = np.arange(0, 2*np.pi, dt)
+
+    node = np.zeros((n, 2),dtype = np.float64)
+    cell = np.zeros((n, 2),dtype = np.int_)
+
+    if clock == 'w':
+        node[:, 0] = r*np.cos(theta)
+        node[:, 1] = -r*np.sin(theta)
+
+    if clock == 'cw':
+        node[:, 0] = r*np.cos(theta)
+        node[:, 1] = r*np.sin(theta)
+
+    node[:,0] = node[:,0] + c[0]
+    node[:,1] = node[:,1] + c[1]
+
+    cell[:,0] = np.arange(n)
+    cell[:,1][:-1] = np.arange(1,n)
+
+
+    return node, cell
+
+def meshpy2d(points, facets, h, hole_points=None, facet_markers=None, point_markers=None, meshtype='tri'):
+    """
+    调用 meshpy 生成二维三角形或多边形网格
+    """
+    from meshpy.triangle import MeshInfo, build
+
+    mesh_info = MeshInfo()
+    mesh_info.set_points(points)
+    mesh_info.set_facets(facets)
+
+    if hole_points is not None:
+        mesh_info.set_holes(hole_points)
+
+    mesh = build(mesh_info, max_volume=h**2)
+
+    node = np.array(mesh.points, dtype=np.float64)
+    cell = np.array(mesh.elements, dtype=np.int_)
+
+    if meshtype in {'t', 'tri', 'triangle'}:
+        return TriangleMesh(node, cell)
+    elif meshtype in {'p', 'polygon', 'poly'}:
+        mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
+        pnode, pcell, pcellLocation = mesh.to_polygonmesh()
+        return PolygonMesh(pnode, pcell, pcellLocation)
+
+def split_mesh(mesh, entity='cell'):
+    from fealpy.graph import metis
+    edgecuts, parts = metis.part_mesh(tmesh, nparts=n, entity=entity)
+    return edgecuts, parts
+
+def meshpy3d(mesh_info, h):
+    pass
 
 def delete_cell(node, cell, threshold):
     """
