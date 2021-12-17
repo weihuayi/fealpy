@@ -126,7 +126,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
         cdata = mesh.GetCellData()
         for key, val in celldata.items():
             if val is not None:
-                if val.shape[1] == 2 and val.shape[1] == 2:
+                if len(val.shape) == 2 and val.shape[1] == 2:
                     shape = (val.shape[0], 3)
                     val1 = np.zeros(shape, dtype=val.dtype)
                     val1[:, 0:2] = val
