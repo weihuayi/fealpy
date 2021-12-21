@@ -218,6 +218,7 @@ class X2Y2Data:
             raise ValueError("".format)
 
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         Parameters
@@ -236,6 +237,7 @@ class X2Y2Data:
         return val # val.shape == x.shape
 
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -246,6 +248,7 @@ class X2Y2Data:
         val = -2*(x**2 + y**2) 
         return val
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -256,12 +259,15 @@ class X2Y2Data:
         val[..., 1] = 2*x**2*y 
         return val # val.shape == p.shape
 
+    @cartesian
     def flux(self, p):
         return -self.gradient(p)
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
+    @cartesian
     def neumann(self, p, n):
         """ 
         Neuman  boundary condition
@@ -278,6 +284,7 @@ class X2Y2Data:
         val = np.sum(grad*n, axis=-1) # (NQ, NE)
         return val
 
+    @cartesian
     def robin(self, p, n):
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
@@ -336,12 +343,14 @@ class TwoHolesData:
             pnode, pcell, pcellLocation = mesh.to_polygonmesh()
             return PolygonMesh(pnode, pcell, pcellLocation)
 
+    @cartesian
     def diffusion_coefficient(self, p):
         x = p[..., 0]
         y = p[..., 1]
         val = 1 + 10*x**2 + y**2
         return val
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         """
@@ -351,6 +360,7 @@ class TwoHolesData:
         val = 0.0 
         return val
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -361,6 +371,7 @@ class TwoHolesData:
         val = 1.0 
         return val
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -372,14 +383,17 @@ class TwoHolesData:
         val[..., 1] = 0.0
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return 0.0
 
+    @cartesian
     def neumann(self, p):
         """ Neuman  boundary condition
         """
         pass
 
+    @cartesian
     def robin(self, p):
         pass
 
@@ -413,15 +427,18 @@ class ffData:
         else:
             raise ValueError("I don't know the meshtype %s".format(meshtype))
 
+    @cartesian
     def solution(self, p):
         return np.zeros(p.shape[0:-1])
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
         val = np.zeros(p.shape, dtype=p.dtype)
         return val
 
+    @cartesian
     def source(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -432,6 +449,7 @@ class ffData:
         val[isMinus] = - 1
         return val
 
+    @cartesian
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
@@ -479,12 +497,14 @@ class KelloggData:
             raise ValueError("".format)
         return mesh
 
+    @cartesian
     def diffusion_coefficient(self, p):
         idx = (p[..., 0]*p[..., 1] > 0)
         k = np.ones(p.shape[:-1], dtype=np.float64)
         k[idx] = self.a
         return k
 
+    @cartesian
     def subdomain(self, p):
         """
         get the subdomain flag of the subdomain including point p.
@@ -492,6 +512,7 @@ class KelloggData:
         is_subdomain = [p[..., 0]*p[..., 1] > 0, p[..., 0]*p[..., 1] < 0]
         return is_subdomain
 
+    @cartesian
     def solution(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -512,6 +533,7 @@ class KelloggData:
         u = r**gamma*mu
         return u
 
+    @cartesian
     def gradient(self, p):
         """The gradient of the exact solution
         """
@@ -554,6 +576,7 @@ class KelloggData:
         val[..., 1] =  uy1+uy2+uy3+uy4
         return val
 
+    @cartesian
     def source(self, p):
         """the right hand side of Possion equation
         INPUT:
@@ -562,6 +585,7 @@ class KelloggData:
         rhs = np.zeros(p.shape[0:-1])
         return rhs
 
+    @cartesian
     def dirichlet(self, p):
         """Dilichlet boundary condition
         """
@@ -751,6 +775,7 @@ class CrackData:
     def domain(self, n):
         pass 
 
+    @cartesian
     def solution(self, p):
         x = p[..., 0]
         y = p[..., 1]
@@ -759,10 +784,12 @@ class CrackData:
         u = np.sqrt(1/2*(r - x)) - 1/4*r**2
         return u
 
+    @cartesian
     def source(self, p):
         rhs = np.ones(p.shape[0:-1])
         return rhs
 
+    @cartesian
     def gradient(self, p):
         """the gradient of the exact solution
         """
@@ -776,6 +803,7 @@ class CrackData:
 
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
@@ -809,6 +837,7 @@ class TwoSigularData:
         else:
             raise ValueError("".format)
 
+    @cartesian
     def solution(self, p):
         """ The exact solution
         """
@@ -818,6 +847,7 @@ class TwoSigularData:
         t1 = (x - 0.5)**2 + (y + 0.5)**2 + 0.01
         return 1/t0 - 1/t1
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -836,6 +866,7 @@ class TwoSigularData:
 
         return val
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -848,14 +879,17 @@ class TwoSigularData:
         val[..., 1] =(1.0 - 2*y)/t0**2 - (-2*y - 1.0)/t1**2
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
+    @cartesian
     def neuman(self, p):
         """ Neuman  boundary condition
         """
         pass
 
+    @cartesian
     def robin(self, p):
         pass
 
@@ -888,6 +922,7 @@ class CornerSigularData:
         else:
             raise ValueError("".format)
 
+    @cartesian
     def solution(self, p):
         """ The exact solution
         """
@@ -895,6 +930,7 @@ class CornerSigularData:
         y = p[..., 1]
         return (x**2 + y**2)**0.2 
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -905,6 +941,7 @@ class CornerSigularData:
         val = -0.16*(x**2 + y**2)**(-0.8)
         return val
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution
         """
@@ -915,14 +952,17 @@ class CornerSigularData:
         val[..., 1] = 0.4*y*(x**2 + y**2)**(-0.8)
         return val
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
+    @cartesian
     def neuman(self, p):
         """ Neuman  boundary condition
         """
         pass
 
+    @cartesian
     def robin(self, p):
         pass
 
@@ -957,6 +997,7 @@ class SinSinData:
         else:
             raise ValueError("".format)
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         """
@@ -966,6 +1007,7 @@ class SinSinData:
         u = np.sin(pi*x)*np.sin(pi*y)
         return u
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -978,11 +1020,13 @@ class SinSinData:
         return rhs
 
 
+    @cartesian
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
         return self.solution(p)
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -998,6 +1042,7 @@ class PolynomialData:
     def __init__(self):
         pass
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         """
@@ -1006,6 +1051,7 @@ class PolynomialData:
         u = (x-x**2)*(y-y**2)
         return u
 
+    @cartesian
     def init_mesh(self, n=4, meshtype='tri', h=0.1):
         """ generate the initial mesh
         """
@@ -1054,6 +1100,7 @@ class PolynomialData:
         else:
             raise ValueError("".format)
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -1065,11 +1112,13 @@ class PolynomialData:
         return rhs
 
 
+    @cartesian
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
         return self.solution(p)
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -1081,6 +1130,7 @@ class PolynomialData:
         uprime[..., 1] = (1-2*y)*(x-x**2)
         return uprime
 
+    @cartesian
     def is_boundary(self, p):
         eps = 1e-14 
         return (p[...,0] < eps) | (p[..., 1] < eps) | (p[..., 0] > 1.0 - eps) | (p[..., 1] > 1.0 - eps)
@@ -1090,6 +1140,7 @@ class ExpData:
     def __init__(self):
         pass
 
+    @cartesian
     def solution(self, p):
         """ The exact solution 
         """
@@ -1098,6 +1149,7 @@ class ExpData:
         u = np.exp(x**2+y**2)
         return u
 
+    @cartesian
     def source(self, p):
         """ The right hand side of Possion equation
         INPUT:
@@ -1109,11 +1161,13 @@ class ExpData:
         return rhs
 
 
+    @cartesian
     def dirichlet(self, p):
         """ Dilichlet boundary condition
         """
         return self.solution(p)
 
+    @cartesian
     def gradient(self, p):
         """ The gradient of the exact solution 
         """
@@ -1125,6 +1179,7 @@ class ExpData:
         uprime[..., 1] = 2*y*(np.exp(x**2+y**2))
         return uprime
 
+    @cartesian
     def is_boundary(self, p):
         eps = 1e-14 
         return (p[:,0] < eps) | (p[:,1] < eps) | (p[:, 0] > 1.0 - eps) | (p[:, 1] > 1.0 - eps)
