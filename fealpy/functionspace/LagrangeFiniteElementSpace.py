@@ -1008,6 +1008,9 @@ class LagrangeFiniteElementSpace():
 
 
     def convection_matrix(self, c=None, q=None):
+        """
+        (c \\cdot u, w)
+        """
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.grad_basis, cell2dof, gdof)

@@ -108,10 +108,17 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     if nodedata is not None:
         for key, val in nodedata.items():
             if val is not None:
-                if val.dtype == np.bool:
-                    d = vnp.numpy_to_vtk(val.astype(np.int_))
+                if len(val.shape) == 2 and val.shape[1] == 2:
+                    shape = (val.shape[0], 3)
+                    val1 = np.zeros(shape, dtype=val.dtype)
+                    val1[:, 0:2] = val
                 else:
-                    d = vnp.numpy_to_vtk(val[:])
+                    val1 = val
+
+                if val1.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val1[:])
                 d.SetName(key)
                 pdata.AddArray(d)
 
@@ -119,10 +126,18 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
         cdata = mesh.GetCellData()
         for key, val in celldata.items():
             if val is not None:
-                if val.dtype == np.bool:
-                    d = vnp.numpy_to_vtk(val.astype(np.int_))
+                if len(val.shape) == 2 and val.shape[1] == 2:
+                    shape = (val.shape[0], 3)
+                    val1 = np.zeros(shape, dtype=val.dtype)
+                    val1[:, 0:2] = val
                 else:
-                    d = vnp.numpy_to_vtk(val[:])
+                    val1 = val
+
+                if val1.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val1[:])
+
                 d.SetName(key)
                 cdata.AddArray(d)
     writer = vtk.vtkXMLUnstructuredGridWriter()
