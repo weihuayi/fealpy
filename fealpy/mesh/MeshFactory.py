@@ -40,6 +40,12 @@ def write_to_vtu(fname, mesh, nodedata=None, celldata=None, p=1):
         lmesh = LagrangeTriangleMesh(node, cell, p=p)
         lmesh.node = space.interpolation_points() 
         lmesh.ds.cell = space.cell_to_dof()
+        if nodedata is not None:
+            for key, val in nodedata.items():
+                lmesh.nodedata[key] = val
+        if celldata is not None:
+            for key, val in celldata.items():
+                lmesh.celldata[key] = val
         lmesh.to_vtk(fname=fname)
 
 def circle_interval_mesh(c, r, h, clock = 'w'):
