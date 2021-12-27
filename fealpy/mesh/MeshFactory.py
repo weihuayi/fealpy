@@ -8,6 +8,8 @@ from .HexahedronMesh import HexahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
 
+from fealpy.functionspace import LagrangeFiniteElementSpace
+
 from ..geometry import DistDomain2d, DistDomain3d
 from ..geometry import dcircle, drectangle
 from ..geometry import ddiff
@@ -21,6 +23,24 @@ from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .distmesh import DistMesh2d
 
 from .interface_mesh_generator import InterfaceMesh2d
+
+def write_to_vtu(fname, mesh, nodedata=None, celldata=None, p=1):
+    if p == 1:
+        if nodedata is not None:
+            for key, val in nodedata.items():
+                mesh.nodedata[key] = val
+        if celldata is not None:
+            for key, val in celldata.items():
+                mesh.celldata[key] = val
+        mesh.to_vtk(fname=fname)
+    else:
+        space = LagrangeFiniteElementSpace(mesh, p=p)
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+        lmesh = LagrangeTriangleMesh(node, cell, p=p)
+        lmesh.node = space.interpolation_points() 
+        lmesh.ds.cell = space.cell_to_dof()
+        lmesh.to_vtk(fname=fname)
 
 def circle_interval_mesh(c, r, h, clock = 'w'):
 

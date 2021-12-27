@@ -575,9 +575,16 @@ class LinearElasticityHZFEMFastSolve():
         return x
 
 
+class LevelSetFEMFastSolver():
+    def __init__(self, A):
+        self.A = A
 
+    @timer
+    def solve(self, b, tol=1e-8):
 
+        counter = IterationCounter(disp=False)
+        x, info = lgmres(self.A, b, tol=1e-8, callback=counter)
+        print("Convergence info:", info)
+        print("Number of iteration of gmres:", counter.niter)
 
-
-
-
+        return x
