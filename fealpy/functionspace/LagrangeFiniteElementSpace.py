@@ -179,7 +179,7 @@ class LagrangeFiniteElementSpace():
 
         # A\nabla u_h
         if c is not None:
-            if isinstance(c, {int, float}):
+            if isinstance(c, (int, float)):
                 grad *= c 
             elif isinstance(c, np.ndarray):
                 if c.shape == (GD, GD):
