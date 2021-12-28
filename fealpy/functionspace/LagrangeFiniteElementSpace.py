@@ -1104,6 +1104,7 @@ class LagrangeFiniteElementSpace():
         # 分块组装矩阵
         gdof = self.number_of_global_dofs()
         cellmeasure = self.cellmeasure
+        A = []
         for k, (i, j) in enumerate(idx):
             Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
             A.append(csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)))
