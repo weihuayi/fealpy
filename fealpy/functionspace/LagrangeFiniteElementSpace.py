@@ -1080,17 +1080,15 @@ class LagrangeFiniteElementSpace():
         return b
 
 
-    def grad_matrix(self):
+    def grad_component_matrix(self):
         """
-        计
+        计算基函数梯度各个分量之间张量积分形成矩阵
         """
         GD = self.GD
         if GD == 2:
             idx = [(0, 0), (0, 1),  (1, 1)]
-            imap = {(0, 0):0, (0, 1):1, (1, 1):2}
         elif GD == 3:
             idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
-            imap = {(0, 0):0, (0, 1):1, (0, 2):2, (1, 1):3, (1, 2):4, (2, 2):5}
 
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
