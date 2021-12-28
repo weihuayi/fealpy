@@ -16,5 +16,6 @@ except ImportError:
 from .fast_solver import HighOrderLagrangeFEMFastSolver
 from .fast_solver import SaddlePointFastSolver
 from .fast_solver import LinearElasticityLFEMFastSolver 
+from .fast_solver import LevelSetFEMFastSolver 
 
 from .LinearElasticityRLFEMFastSolver import LinearElasticityRLFEMFastSolver

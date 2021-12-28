@@ -117,7 +117,6 @@ for i in range(0, nt):
     print("error:", error)
 
     uh0[:] = uh1
-    uh1[:] = 0.0
 
     # 时间步进一层 
     tmesh.advance()
