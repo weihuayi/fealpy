@@ -1249,7 +1249,7 @@ class CircleSinSinData():
             [t/2.0, c*t],
             [-t/2.0, c*t],
             [-t, 0.0],
-            [-t/2.0, -c*t]
+            [-t/2.0, -c*t],
             [t/2.0, -c*t]],dtype=np.float64)
         cell = np.array([
             [0,1,2],

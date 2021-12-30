@@ -116,7 +116,7 @@ for i in range(nt):
 
     b = M@phi0 - dt/2*(C@phi0)
     
-    phi0[:] = solver.solve(b,tol=12-12)
+    phi0[:] = solver.solve(b,tol=1e-12)
     
     if output != 'None':
         fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
@@ -126,7 +126,6 @@ for i in range(nt):
     # 时间步进一层 
     timeline.advance()
 
-ctx.destroy()
 '''
 pickle_file = open('diff'+str(ns)+'-'+str(degree)+'.pkl','wb')
 pickle.dump(diff, pickle_file) # 写入文件
