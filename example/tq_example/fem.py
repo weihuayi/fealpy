@@ -2,6 +2,9 @@ import taichi as ti
 
 
 from fealpy.mesh import MeshFactory as MF
+from fealpy.ti import lagrange_cell_stiff_matrix_0
+
+ti.init(arch=ti.gpu)
 
 GD = 2
 
@@ -15,11 +18,18 @@ NC = mesh.number_of_cells()
 
 node = ti.field(ti.float64, (NN, 2))
 cell = ti.field(ti.int32, (NC, 3)) # 存储未知量
-gphi = ti.field(ti.float64, (NC, 3, 2))
+S = ti.field(ti.float64, (NC, 3, 3))
 
 node.from_numpy(mesh.entity('node'))
 cell.from_numpy(mesh.entity('cell'))
 
+lagrange_cell_stiff_matrix_0(node, cell, S)
+
+S1 = S.to_numpy()
+
+print(S1)
+
+"""
 # 计算每个单元上的重心坐标的梯度
 @ti.kernel
 def grad_lambda():
@@ -49,3 +59,4 @@ gphi0 = mesh.grad_lambda()
 gphi1 = gphi.to_numpy()
 
 print(gphi0 - gphi1)
+"""
