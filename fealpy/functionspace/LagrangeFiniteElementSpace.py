@@ -1006,7 +1006,6 @@ class LagrangeFiniteElementSpace():
         return M
 
 
-
     def convection_matrix(self, c=None, q=None):
         """
         (c \\cdot u, w)
@@ -1079,6 +1078,38 @@ class LagrangeFiniteElementSpace():
             b = np.einsum('i, ik..., k->k...', ws, fval, cellmeasure)
 
         return b
+
+
+    def grad_component_matrix(self):
+        """
+        计算基函数梯度各个分量之间张量积分形成矩阵
+        """
+        GD = self.GD
+        if GD == 2:
+            idx = [(0, 0), (0, 1),  (1, 1)]
+        elif GD == 3:
+            idx = [(0, 0), (0, 1), (0, 2), (1, 1), (1, 2), (2, 2)]
+
+        cellmeasure = self.cellmeasure
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        grad = self.grad_basis(bcs) # (NQ, NC, ldof, GD)
+
+        cell2dof = self.cell_to_dof() # (NC, ldof)
+        ldof = self.number_of_local_dofs()
+        NC = self.mesh.number_of_cells()
+        shape = (NC, ldof, ldof)
+        I = np.broadcast_to(cell2dof[:, :, None], shape=shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=shape)
+
+        # 分块组装矩阵
+        gdof = self.number_of_global_dofs()
+        cellmeasure = self.cellmeasure
+        A = []
+        for k, (i, j) in enumerate(idx):
+            Aij = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure)
+            A.append(csr_matrix((Aij.flat, (I.flat, J.flat)), shape=(gdof, gdof)))
+
+        return A
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """

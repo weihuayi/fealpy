@@ -19,7 +19,7 @@ from scipy.sparse.linalg import spsolve
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-            多边形网格上任意次 WG 有限元方法
+        多边形网格上任意次 WG 有限元方法
         """)
 
 parser.add_argument('--degree',
@@ -70,9 +70,6 @@ for i in range(maxit):
     if i < maxit-1:
         ns *= 2
         
-
-
-
 fig = plt.figure()
 axes = fig.add_subplot(1, 1, 1, projection='3d')
 uh.add_plot(axes, cmap='rainbow')

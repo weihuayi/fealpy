@@ -4,13 +4,11 @@ from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
 from .Function import Function
-from ..quadrature import GaussLegendreQuadrature
-from ..quadrature import PolygonMeshIntegralAlg
 from ..decorator import cartesian
-from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
+from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 
 
-class WGDof2d():
+class WGDof3d():
     """
     The dof manager of weak galerkin 2d space.
     """
@@ -18,51 +16,38 @@ class WGDof2d():
         self.p = p
         self.mesh = mesh
         self.cell2dof, self.cell2dofLocation = self.cell_to_dof()
-        self.multiIndex1d = self.multi_index_matrix1d()
+        self.multiIndex2d = self.multi_index_matrix2d()
 
-    def multi_index_matrix1d(self):
-        p = self.p
-        ldof = p + 1
-        multiIndex = np.zeros((ldof, 2), dtype=np.int)
-        multiIndex[:, 0] = np.arange(p, -1, -1)
-        multiIndex[:, 1] = p - multiIndex[:, 0]
+    def multi_index_matrix2d(self):
+        ldof = (p+1)*(p+2)//2
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+        multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:,1] = idx0 - multiIndex[:,2]
+        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
         return multiIndex
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
             index = threshold
         else:
-            index = self.mesh.ds.boundary_edge_index()
+            index = self.mesh.ds.boundary_face_index()
             if callable(threshold):
-                bc = self.mesh.entity_barycenter('edge', index=index)
+                bc = self.mesh.entity_barycenter('face', index=index)
                 flag = threshold(bc)
                 index = index[flag]
         gdof = self.number_of_global_dofs()
         isBdDof = np.zeros(gdof, dtype=np.bool)
-        edge2dof = self.edge_to_dof()
-        isBdDof[edge2dof[index]] = True
+        edge2dof = self.face_to_dof()
+        isBdDof[face2dof[index]] = True
         return isBdDof
 
-    def boundary_dof(self, threshold=None):
-        if type(threshold) is np.ndarray:
-            index = threshold
-        else:
-            index = self.mesh.ds.boundary_edge_index()
-            if callable(threshold):
-                bc = self.mesh.entity_barycenter('edge', index=index)
-                flag = threshold(bc)
-                index = index[flag]
-        gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
-        edge2dof = self.edge_to_dof()
-        isBdDof[edge2dof[index]] = True
-        return isBdDof
-
-    def edge_to_dof(self):
+    def face_to_dof(self):
         p = self.p
         mesh = self.mesh
-        NE = mesh.number_of_edges()
-        edge2dof = np.arange(NE*(p+1)).reshape(NE, p+1)
+        NF = mesh.number_of_faces()
+        edge2dof = np.arange(NF*(p+1)).reshape(NE, p+1)
         return edge2dof
 
     def cell_to_dof(self):
@@ -77,111 +62,83 @@ class WGDof2d():
         p = self.p
         mesh = self.mesh
         cellLocation = mesh.ds.cellLocation
-        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
+        cell2edge = mesh.ds.cell_to_face(return_sparse=False)
 
         NC = mesh.number_of_cells()
 
-        ldof = self.number_of_local_dofs()
+        ldof = self.number_of_local_dofs(doftype='all')
+        cdof = self.number_of_local_dofs(doftype='cell')
+        fdof = self.number_of_local_dofs(doftype='face')
         cell2dofLocation = np.zeros(NC+1, dtype=np.int)
         cell2dofLocation[1:] = np.add.accumulate(ldof)
-        cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
+        cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int_)
 
-        edge2dof = self.edge_to_dof()
-        edge2cell = mesh.ds.edge_to_cell()
-        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*(p+1) + np.arange(p+1)
-        cell2dof[idx] = edge2dof
+        face2dof = self.face_to_dof()
+        face2cell = mesh.ds.face_to_cell()
+        idx = cell2dofLocation[face2cell[:, [0]]] + face2cell[:, [2]]*fdof + np.arange(fdof)
+        cell2dof[idx] = face2dof
 
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge,
-            3]*(p+1)).reshape(-1, 1) + np.arange(p+1)
-        cell2dof[idx] = edge2dof[isInEdge]
+        isInFace = (face2cell[:, 0] != face2cell[:, 1])
+        idx = (cell2dofLocation[face2cell[isInFace, 1]] + face2cell[isInFace,
+            3]*fdof).reshape(-1, 1) + np.arange(fdof)
+        cell2dof[idx] = face2dof[isInFace]
 
-        NV = mesh.number_of_vertices_of_cells()
-        NE = mesh.number_of_edges()
-        idof = (p+1)*(p+2)//2
-        idx = (cell2dofLocation[:-1] + NV*(p+1)).reshape(-1, 1) + np.arange(idof)
-        cell2dof[idx] = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
+        NFC = mesh.number_of_faces_of_cells()
+        NF = mesh.number_of_faces()
+        idx = (cell2dofLocation[:-1] + NFC*fdof).reshape(-1, 1) + np.arange(cdof)
+        cell2dof[idx] = NF*fdof + np.arange(NC*cdof).reshape(NC, cdof)
         return cell2dof, cell2dofLocation
 
-    def cell_to_dof_1(self):
-        """
-        Construct the cell2dof array which are 1D array with a location array
-        cell2dofLocation.
-
-        The following code give the dofs of i-th cell.
-
-        cell2dof[cell2dofLocation[i]:cell2dofLocation[i+1]]
-        """
-        p = self.p
-        mesh = self.mesh
-        cellLocation = mesh.ds.cellLocation
-        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
-
-        NC = mesh.number_of_cells()
-
-        ldof = self.number_of_local_dofs()
-        cell2dofLocation = np.zeros(NC+1, dtype=np.int)
-        cell2dofLocation[1:] = np.add.accumulate(ldof)
-        cell2dof = np.zeros(cell2dofLocation[-1], dtype=np.int)
-
-        edge2dof = self.edge_to_dof()
-        edge2cell = mesh.ds.edge_to_cell()
-        idx = cell2dofLocation[edge2cell[:, [0]]] + edge2cell[:, [2]]*(p+1) + np.arange(p+1)
-        cell2dof[idx] = edge2dof
-
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        idx = (cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge,
-            3]*(p+1)).reshape(-1, 1) + np.arange(p+1)
-        cell2dof[idx] = edge2dof[isInEdge, p::-1]
-
-        NV = mesh.number_of_vertices_of_cells()
-        NE = mesh.number_of_edges()
-        idof = (p+1)*(p+2)//2
-        idx = (cell2dofLocation[:-1] + NV*(p+1)).reshape(-1, 1) + np.arange(idof)
-        cell2dof[idx] = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
-        return cell2dof, cell2dofLocation
 
     def number_of_global_dofs(self):
         p = self.p
         mesh = self.mesh
-        NE = mesh.number_of_edges()
+        NF = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        gdof = NE*(p+1) + NC*(p+1)*(p+2)//2
+        cdof = self.number_of_local_dofs(doftype='cell') # 单元内部的自由度
+        fdof = self.number_of_local_dofs(doftype='face') # 面内部的自由度
+        gdof = NF*fdof + NC*cdof
         return gdof
 
-    def number_of_local_dofs(self):
+    def number_of_local_dofs(self, doftype='all'):
         p = self.p
-        mesh = self.mesh
-        NCE = mesh.number_of_edges_of_cells()
-        ldofs = NCE*(p+1) + (p+1)*(p+2)//2
-        return ldofs
+        if doftype == 'all': # number of all dofs on a cell 
+            return (p+1)*(p+3) 
+        elif doftype in {'cell', 3}: # number of dofs inside the cell 
+            return (p+1)*(p+2)*(p+3)//6 
+        elif doftype in {'face', 2}: # number of dofs on each face 
+            return (p+1)*(p+2)//2
+        elif doftype in {'edge', 1}: # number of dofs on each edge
+            return 0
+        elif doftype in {'node', 0}: # number of dofs on each node
+            return 0
 
 
-class WeakGalerkinSpace2d:
+class WeakGalerkinSpace3d:
     def __init__(self, mesh, p=1, q=None):
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
+        self.smspace = ScaledMonomialSpace3d(mesh, p, q=q)
         self.mesh = mesh
         self.cellsize = self.smspace.cellsize
 
         self.ftype = self.mesh.ftype
         self.itype = self.mesh.itype
 
-        self.dof = WGDof2d(mesh, p)
+        self.dof = WGDof3d(mesh, p)
 
         self.integralalg = self.smspace.integralalg
 
         self.CM = self.smspace.cell_mass_matrix()
-        self.EM = self.smspace.edge_mass_matrix()
+        self.FM = self.smspace.face_mass_matrix()
 
         self.H0 = inv(self.CM)
-        self.H1 = inv(self.EM)
+        self.H1 = inv(self.FM)
         self.R = self.left_weak_matrix()
 
-        self.stype = 'wg' # 空间类型
+        self.stype = 'wg3d' # 空间类型
 
-    def number_of_local_dofs(self):
-        return self.dof.number_of_local_dofs()
+    def number_of_local_dofs(self, doftype='all'):
+        return self.dof.number_of_local_dofs(doftype=doftype)
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -189,21 +146,19 @@ class WeakGalerkinSpace2d:
     def is_boundary_dof(self, threshold=None):
         return self.dof.is_boundary_dof(threshold=None)
 
-    def boundary_dof(self, threshold=None):
-        return self.dof.boundary_dof(threshold=None)
-
-    def edge_to_dof(self):
-        return self.dof.edge_to_dof()
+    def face_to_dof(self):
+        return self.dof.face_to_dof()
 
     def cell_to_dof(self, doftype='all'):
         if doftype == 'all':
             return self.dof.cell2dof, self.dof.cell2dofLocation
         elif doftype == 'cell':
             p = self.p
-            NE = self.mesh.number_of_edges()
+            NF = self.mesh.number_of_faces()
             NC = self.mesh.number_of_cells()
-            idof = (p+1)*(p+2)//2
-            cell2dof = NE*(p+1) + np.arange(NC*idof).reshape(NC, idof)
+            fdof = self.number_of_local_dofs(doftype='face')
+            cdof = self.number_of_local_dofs(doftype='cell')
+            cell2dof = NF*fdof + np.arange(NC*cdof).reshape(NC, cdof)
             return cell2dof
 
     def weak_grad(self, uh):
@@ -211,11 +166,13 @@ class WeakGalerkinSpace2d:
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = np.hsplit(self.R[0], cell2dofLocation[1:-1])
         R1 = np.hsplit(self.R[1], cell2dofLocation[1:-1])
+        R2 = np.hsplit(self.R[2], cell2dofLocation[1:-1])
         ph = self.smspace.function(dim=2)
 
         f0 = lambda x: x[0]@(x[1]@uh[x[2]])
         ph[:, 0] = np.concatenate(list(map(f0, zip(self.H0, R0, cd))))
         ph[:, 1] = np.concatenate(list(map(f0, zip(self.H0, R1, cd))))
+        ph[:, 2] = np.concatenate(list(map(f0, zip(self.H0, R2, cd))))
         return ph
 
     def weak_div(self, ph):
@@ -223,6 +180,7 @@ class WeakGalerkinSpace2d:
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         R0 = np.hsplit(self.R[0], cell2dofLocation[1:-1])
         R1 = np.hsplit(self.R[1], cell2dofLocation[1:-1])
+        R2 = np.hsplit(self.R[2], cell2dofLocation[1:-1])
         dh = self.smspace.function()
         f0 = lambda x: x[0]@(x[1]@ph[x[3], 0] + x[2]@ph[x[3], 1])
         dh[:] = np.concatenate(list(map(f0, zip(self.H0, R0, R1, cd))))
