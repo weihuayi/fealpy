@@ -332,6 +332,12 @@ class WeakGalerkinSpace2d:
         pass
 
     def stabilizer_matrix(self):
+        """
+        Note
+        ----
+            WG 方法的稳定子矩阵
+        """
+
         mesh = self.mesh
 
         qf = self.integralalg.edgeintegrator
@@ -340,22 +346,20 @@ class WeakGalerkinSpace2d:
         edge2cell = mesh.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
-        ps = self.mesh.edge_bc_to_point(bcs)
-        phi0 = self.basis(ps, index=edge2cell[:, 0])
+        ps = self.mesh.edge_bc_to_point(bcs) # (NQ, NE, 2)
+        phi0 = self.basis(ps, index=edge2cell[:, 0]) # (NQ, NE, cldof)
         phi1 = self.basis(
                 ps[:, isInEdge, :],
                 index=edge2cell[isInEdge, 1]
                 )
-        phi = self.edge_basis(ps)
 
-        edge2dof = self.edge_to_dof()
-        cell2dof = self.cell_to_dof(doftype='cell')
+        phi = self.edge_basis(ps) # (NQ, NE, eldof)
 
         h = mesh.entity_measure('edge')
         cellsize = self.cellsize
         h0 = cellsize[edge2cell[:, 0]].reshape(-1, 1, 1)
         h1 = cellsize[edge2cell[isInEdge, 1]].reshape(-1, 1, 1)
-        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)/h0
+        F0 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi, h)/h0 # (NE, cldof, eldof)
         F1 = np.einsum('i, ijm, ijn, j->jmn', ws, phi1, phi[:, isInEdge, :], h[isInEdge])/h1
 
         F2 = np.einsum('i, ijm, ijn, j->jmn', ws, phi0, phi0, h)/h0

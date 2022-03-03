@@ -4,6 +4,8 @@
 ![Python package](https://github.com/weihuayi/fealpy/workflows/Python%20package/badge.svg)
 ![Upload Python Package](https://github.com/weihuayi/fealpy/workflows/Upload%20Python%20Package/badge.svg)
 
+![](./FEALPY.jpg)
+
 We want to develop an efficient and easy to use finite element software
 package to support our teach and research work. 
 

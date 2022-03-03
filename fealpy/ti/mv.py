@@ -47,8 +47,6 @@ def lagrange_shape_function(bc, p):
     计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
     Lagrange 形函数值, 以及关于 TD+1 个重心坐标处的 1 阶导数值.
 
-    TODO: 求关于
-    
     """
     TD = bc.shape[-1] - 1
     multiIndex = multi_index_matrix[TD](p) 
@@ -83,12 +81,13 @@ def lagrange_shape_function(bc, p):
         R1[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
     R0 = np.prod(Q, axis=-1)
-
     return R0, R1 
 
 
 @ti.kernel
-def lagrange_cell_stiff_matrix_1(node : ti.template(), cell : ti.template(),
+def lagrange_cell_stiff_matrix_1(
+        node : ti.template(), 
+        cell : ti.template(),
         S : ti.template()):
     """
     Note:
@@ -117,6 +116,8 @@ def lagrange_cell_stiff_matrix_1(node : ti.template(), cell : ti.template(),
 
 @ti.kernel
 def lagrange_cell_stiff_matrix_p(
+        ldof : ti.int32, 
+        NQ : ti.int32, 
         node : ti.template(),  # (NN, 2)
         cell : ti.template(),  # (NC, 3)
         ws : ti.template(), # (NQ, )
@@ -129,7 +130,7 @@ def lagrange_cell_stiff_matrix_p(
     """
     NC = cell.shape[0]
     NQ = R.shape[0]
-    ldof = R.sahpe[1]
+    ldof = R.shape[1]
     for c in range(cell.shape[0]):
         x0 = node[cell[c, 0], 0]
         y0 = node[cell[c, 0], 1]
@@ -146,21 +147,21 @@ def lagrange_cell_stiff_matrix_p(
             [(y2 - y0)/l, (x0 - x2)/l],
             [(y0 - y1)/l, (x1 - x0)/l]])
         l *= 0.5
-        for i in ti.static(range(ldof)):
-            S[c, i, j] = 0.0
-            for j in ti.static(range(i+1, ldof)):
-                for q in ti.static(range(NQ)):
+        for i in range(ldof):
+            for j in range(ldof):
+                S[c, i, j] = 0.0
+                for q in range(NQ):
                     vix = R[q, i, 0]*gphi[0, 0] + R[q, i, 1]*gphi[1, 0] + R[q, i, 2]*gphi[2, 0]
                     viy = R[q, i, 1]*gphi[0, 1] + R[q, i, 1]*gphi[1, 1] + R[q, i, 2]*gphi[2, 1]
                     vjx = R[q, j, 0]*gphi[0, 0] + R[q, j, 1]*gphi[1, 0] + R[q, j, 2]*gphi[2, 0]
                     vjy = R[q, j, 1]*gphi[0, 1] + R[q, j, 1]*gphi[1, 1] + R[q, j, 2]*gphi[2, 1]
-                    s[c, i, j] += ws*(vix*vjx + viy*vjy)
+                    S[c, i, j] += ws[q]*(vix*vjx + viy*vjy)
 
-                s[c, i, j] *= l
+                S[c, i, j] *= l
 
 
 @ti.kernel
-def lagrange_cell_stiff_matrix_1(cnode : ti.template(), S : ti.template()):
+def lagrange_cell_stiff_matrix_cnode(cnode : ti.template(), S : ti.template()):
     for c in range(cnode.shape[0]):
         x0 = cnode[c, 0, 0] 
         y0 = cnode[c, 0, 1]
