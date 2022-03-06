@@ -1,5 +1,6 @@
 import taichi as ti
 import numpy as np
+from scipy.sparse import csr_matrix
 
 class TriangleMeshDataStructure():
     localFace = ti.Matrix([(1, 2), (2, 0), (0, 1)])
@@ -29,7 +30,7 @@ def construct_edge(NN, cell):
     edge2cell = np.zeros((NE, 4), dtype=np.int_)
 
     i1 = np.zeros(NE, dtype=np.int_)
-    i1[j] = np.arange(NEC*NC, dtype=self.itype)
+    i1[j] = np.arange(NEC*NC, dtype=np.int_)
 
     edge2cell[:, 0] = i0//NEC
     edge2cell[:, 1] = i1//NEC
@@ -84,64 +85,154 @@ class TriangleMesh():
         else:
             raise ValueError("`etype` is wrong!")
 
+    @ti.func
+    def cell_measure(self, i: ti.i32) -> ti.f64:
+        x0 = self.node[self.cell[i, 0], 0]
+        y0 = self.node[self.cell[i, 0], 1]
+
+        x1 = self.node[self.cell[i, 1], 0]
+        y1 = self.node[self.cell[i, 1], 1]
+
+        x2 = self.node[self.cell[i, 2], 0]
+        y2 = self.node[self.cell[i, 2], 1]
+
+        l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
+        l *= 0.5
+        return l
+
+    @ti.func
+    def grad_lambda(self, i: ti.i32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
+        """
+        计算第 i 个单元上重心坐标函数的梯度，以及单元的面积
+        """
+        x0 = self.node[self.cell[i, 0], 0]
+        y0 = self.node[self.cell[i, 0], 1]
+
+        x1 = self.node[self.cell[i, 1], 0]
+        y1 = self.node[self.cell[i, 1], 1]
+
+        x2 = self.node[self.cell[i, 2], 0]
+        y2 = self.node[self.cell[i, 2], 1]
+
+        l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
+
+        gphi = ti.Matrix([
+            [(y1 - y2)/l, (x2 - x1)/l], 
+            [(y2 - y0)/l, (x0 - x2)/l],
+            [(y0 - y1)/l, (x1 - x0)/l]])
+
+        l *= 0.5
+        return gphi, l
+
+    @ti.func
+    def surface_grad_lambda(self, i: ti.i32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
+        """
+        计算第 i 个单元上重心坐标函数的梯度，以及单元的面积
+        """
+        x0 = self.node[self.cell[i, 0], 0]
+        y0 = self.node[self.cell[i, 0], 1]
+        z0 = self.node[self.cell[i, 0], 2]
+
+        x1 = self.node[self.cell[i, 1], 0]
+        y1 = self.node[self.cell[i, 1], 1]
+        z1 = self.node[self.cell[i, 0], 2]
+
+        x2 = self.node[self.cell[i, 2], 0]
+        y2 = self.node[self.cell[i, 2], 1]
+        z2 = self.node[self.cell[i, 0], 2]
+
+        gphi = ti.Matrix(3, 3, ti.f64)
+        #TODO:完善代码
+        return grad, l
+
     @ti.kernel
-    def grad_lambda(self, grad: ti.template()):
+    def cell_stiff_matrices(self, S: ti.template()):
         """
-        Note:
-        """
-        for c in range(cell.shape[0]):
-            x0 = node[cell[c, 0], 0]
-            y0 = node[cell[c, 0], 1]
-
-            x1 = node[cell[c, 1], 0]
-            y1 = node[cell[c, 1], 1]
-
-            x2 = node[cell[c, 2], 0]
-            y2 = node[cell[c, 2], 1]
-
-            l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
-            grad[c][0, 0] = (y1 - y2)/l
-            grad[c][0, 1] = (x2 - x1)/l 
-            grad[c][1, 0] = (y2 - y0)/l
-            grad[c][1, 1] = (x0 - x2)/l
-            grad[c][2, 0] = (y0 - y1)/l
-            grad[c][2, 1] = (x1 - x0)/l
-
-    @ti.kernel
-    def cell_stiff_matrix(self, S: ti.template()):
-        """
-        组装三角形网格上的最低次单元刚度矩阵
-
-        TODO:
-            考虑曲面三角形网格情形
+        计算网格上的所有单元刚度矩阵
         """
         for c in range(self.cell.shape[0]):
-            x0 = self.node[self.cell[c, 0], 0]
-            y0 = self.node[self.cell[c, 0], 1]
+            gphi, l = self.grad_lambda(c) 
 
-            x1 = self.node[self.cell[c, 1], 0]
-            y1 = self.node[self.cell[c, 1], 1]
+            S[c, 0, 0] = l*(gphi[0, 0]*gphi[0, 0] + gphi[0, 1]*gphi[0, 1])
+            S[c, 0, 1] = l*(gphi[0, 0]*gphi[1, 0] + gphi[0, 1]*gphi[1, 1])
+            S[c, 0, 2] = l*(gphi[0, 0]*gphi[2, 0] + gphi[0, 1]*gphi[2, 1])
 
-            x2 = self.node[self.cell[c, 2], 0]
-            y2 = self.node[self.cell[c, 2], 1]
+            S[c, 1, 0] = S[c, 0, 1]
+            S[c, 1, 1] = l*(gphi[1, 0]*gphi[1, 0] + gphi[1, 1]*gphi[1, 1])
+            S[c, 1, 2] = l*(gphi[1, 0]*gphi[2, 0] + gphi[1, 1]*gphi[2, 1])
 
-            l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
-            gphi = ti.Matrix([
-                [(y1 - y2)/l, (x2 - x1)/l], 
-                [(y2 - y0)/l, (x0 - x2)/l],
-                [(y0 - y1)/l, (x1 - x0)/l]])
-            l *= 0.5
-            for i in ti.static(range(3)):
-                for j in ti.static(range(3)):
-                    S[c, i, j] = l*(gphi[i, 0]*gphi[j, 0] + gphi[i, 1]*gphi[j, 1])
+            S[c, 2, 0] = S[c, 0, 2]
+            S[c, 2, 1] = S[c, 1, 2]
+            S[c, 2, 2] = l*(gphi[2, 0]*gphi[2, 0] + gphi[2, 1]*gphi[2, 1])
 
-    def stiff_matrix(self):
+    @ti.kernel
+    def cell_mass_matrices(self, S: ti.template()):
         """
-        组装三角形网格上最低次的总体刚度矩阵
+        计算网格上的所有单元质量矩阵
         """
-        K = 0;
-        return K 
+        for c in range(cell.shape[0]):
 
-    def mass_matrix(self):
-        M = 0;
+            l = self.cell_measure(c)
+            c0 = l/6.0
+            c1 = l/12.0
+
+            S[c, 0, 0] = c0 
+            S[c, 0, 1] = c1
+            S[c, 0, 2] = c1
+
+            S[c, 1, 0] = c1 
+            S[c, 1, 1] = c0  
+            S[c, 1, 2] = c1
+
+            S[c, 2, 0] = c1 
+            S[c, 2, 1] = c1 
+            S[c, 2, 2] = c0 
+
+    def stiff_matrix(self, c=None):
+        """
+        组装总体刚度矩阵
+        """
+        NN = self.node.shape[0]
+        NC = self.cell.shape[0]
+
+        K = ti.field(ti.f64, (NC, 3, 3))
+        self.cell_stiff_matrices(K)
+
+        M = K.to_numpy()
+        if c is not None:
+            M *= c # 目前假设 c 为一常数
+
+        cell = self.cell.to_numpy()
+        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
+        M = csr_matrix((K.to_numpy().flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
+
+    def mass_matrix(self, c=None):
+        """
+        组装总体质量矩阵
+        """
+        NC = cell.shape[0]
+
+        K = ti.field(ti.f64, (NC, 3, 3))
+        self.cell_mass_matrices(K)
+
+        M = K.to_numpy()
+        if c is not None:
+            M *= c
+
+        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
+
+        NN = node.shape[0]
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    @ti.kernel
+    def surface_cell_mass_matrix(self, S: ti.template()):
+        """
+        组装曲面三角形网格上的最低次单元刚度矩阵， 
+        这里的曲面是指三角形网格的节点几何维数为 3
+        """
+        pass
+
