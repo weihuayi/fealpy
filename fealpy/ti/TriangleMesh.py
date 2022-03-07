@@ -188,6 +188,32 @@ class TriangleMesh():
             S[c, 2, 1] = c1 
             S[c, 2, 2] = c0 
 
+    @ti.kernel
+    def cell_source_vectors(self, f:ti.template(), bc:ti.template(), ws:ti.template(), F:ti.template()):
+        """
+        计算所有单元载荷
+        """
+        for c in range(self.cell.shape[0]):
+            x0 = self.node[self.cell[c, 0], 0]
+            y0 = self.node[self.cell[c, 0], 1]
+
+            x1 = self.node[self.cell[c, 1], 0]
+            y1 = self.node[self.cell[c, 1], 1]
+
+            x2 = self.node[self.cell[c, 2], 0]
+            y2 = self.node[self.cell[c, 2], 1]
+            l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
+            l *= 0.5
+            for q in ti.static(range(bc.n)):
+                x = x0*bc[q, 0] + x1*bc[q, 1] + x2*bc[q, 1]
+                y = y0*bc[q, 0] + y1*bc[q, 1] + y2*bc[q, 1]
+                z = f(x, y)
+                for i in ti.static(range(3)):
+                    F[c, i] += ws[q]*bc[q, i]*z
+
+            for i in range(3):
+                F[c, i] *= l
+
     def stiff_matrix(self, c=None):
         """
         组装总体刚度矩阵
@@ -227,6 +253,28 @@ class TriangleMesh():
         NN = node.shape[0]
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
+
+    def source_vector(self, f):
+        """
+        组装总体载荷向量
+        """
+        NN = self.node.shape[0]
+        NC = self.cell.shape[0]
+        bc = ti.Matrix([
+            [0.6666666666666670,	0.1666666666666670,     0.1666666666666670],
+            [0.1666666666666670,	0.6666666666666670,     0.1666666666666670],
+            [0.1666666666666670,	0.1666666666666670, 0.6666666666666670]], dt=ti.f64)
+        ws = ti.Vector([0.3333333333333330, 0.3333333333333330, 0.3333333333333330], dt=ti.f64)
+
+        F = ti.field(ti.f64, (NC, 3))
+        self.cell_source_vectors(f, bc, ws, F)
+
+        bb = F.to_numpy()
+        F = np.zeros(NN, dtype=np.float64)
+        cell = self.cell.to_numpy()
+        np.add.at(F, cell, bb)
+        return F
+
 
     @ti.kernel
     def surface_cell_mass_matrix(self, S: ti.template()):
