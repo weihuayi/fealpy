@@ -3,7 +3,6 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 class TetrahedronMeshDataStructure():
-
     localFace = ti.Matrix([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     localEdge = ti.Matrix([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = ti.Matrix([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
@@ -148,37 +147,27 @@ class TetrahedronMesh():
         计算网格上的所有单元刚度矩阵
         """
         for c in range(self.cell.shape[0]):
-            gphi, l = self.grad_lambda(c) 
+            gphi, vol = self.grad_lambda(c) 
 
-            S[c, 0, 0] = l*(gphi[0, 0]*gphi[0, 0] + gphi[0, 1]*gphi[0, 1]+
-                    gphi[0, 2]*gphi[0, 2])
-            S[c, 0, 1] = l*(gphi[0, 0]*gphi[1, 0] + gphi[0, 1]*gphi[1, 1]+
-                    gphi[0, 2]*gphi[1, 2])
-            S[c, 0, 2] = l*(gphi[0, 0]*gphi[2, 0] + gphi[0, 1]*gphi[2, 1]+
-                    gphi[0, 2]*gphi[2, 2])
-            S[c, 0, 3] = l*(gphi[0, 0]*gphi[3, 0] + gphi[0, 1]*gphi[3, 1]+
-                    gphi[0, 2]*gphi[3, 2])
+            S[c, 0, 0] = vol*(gphi[0, 0]*gphi[0, 0] + gphi[0, 1]*gphi[0, 1]+ gphi[0, 2]*gphi[0, 2])
+            S[c, 0, 1] = vol*(gphi[0, 0]*gphi[1, 0] + gphi[0, 1]*gphi[1, 1]+ gphi[0, 2]*gphi[1, 2])
+            S[c, 0, 2] = vol*(gphi[0, 0]*gphi[2, 0] + gphi[0, 1]*gphi[2, 1]+ gphi[0, 2]*gphi[2, 2])
+            S[c, 0, 3] = vol*(gphi[0, 0]*gphi[3, 0] + gphi[0, 1]*gphi[3, 1]+ gphi[0, 2]*gphi[3, 2])
 
             S[c, 1, 0] = S[c, 0, 1]
-            S[c, 1, 1] = l*(gphi[1, 0]*gphi[1, 0] + gphi[1, 1]*gphi[1, 1]+
-                    gphi[1, 2]*gphi[1, 2])
-            S[c, 1, 2] = l*(gphi[1, 0]*gphi[2, 0] + gphi[1, 1]*gphi[2, 1]+
-                    gphi[1, 2]*gphi[2, 2])
-            S[c, 1, 3] = l*(gphi[1, 0]*gphi[3, 0] + gphi[1, 1]*gphi[3, 1]+
-                    gphi[1, 2]*gphi[3, 2])
+            S[c, 1, 1] = vol*(gphi[1, 0]*gphi[1, 0] + gphi[1, 1]*gphi[1, 1]+ gphi[1, 2]*gphi[1, 2])
+            S[c, 1, 2] = vol*(gphi[1, 0]*gphi[2, 0] + gphi[1, 1]*gphi[2, 1]+ gphi[1, 2]*gphi[2, 2])
+            S[c, 1, 3] = vol*(gphi[1, 0]*gphi[3, 0] + gphi[1, 1]*gphi[3, 1]+ gphi[1, 2]*gphi[3, 2])
 
             S[c, 2, 0] = S[c, 0, 2]
             S[c, 2, 1] = S[c, 1, 2]
-            S[c, 2, 2] = l*(gphi[2, 0]*gphi[2, 0] + gphi[2, 1]*gphi[2, 1]+
-                    gphi[2, 2]*gphi[2, 2])
-            S[c, 2, 3] = l*(gphi[2, 0]*gphi[3, 0] + gphi[2, 1]*gphi[3, 1]+
-                    gphi[2, 2]*gphi[3, 2])
+            S[c, 2, 2] = vol*(gphi[2, 0]*gphi[2, 0] + gphi[2, 1]*gphi[2, 1]+ gphi[2, 2]*gphi[2, 2])
+            S[c, 2, 3] = vol*(gphi[2, 0]*gphi[3, 0] + gphi[2, 1]*gphi[3, 1]+ gphi[2, 2]*gphi[3, 2])
 
             S[c, 3, 0] = S[c, 0, 3]
             S[c, 3, 1] = S[c, 1, 3]
             S[c, 3, 2] = S[c, 2, 3]
-            S[c, 3, 3] = l*(gphi[3, 0]*gphi[3, 0] + gphi[3, 1]*gphi[3, 1]+
-                    gphi[3, 2]*gphi[3, 2])
+            S[c, 3, 3] = l*(gphi[3, 0]*gphi[3, 0] + gphi[3, 1]*gphi[3, 1]+ gphi[3, 2]*gphi[3, 2])
 
     @ti.kernel
     def cell_mass_matrices(self, S: ti.template()):
@@ -187,9 +176,9 @@ class TetrahedronMesh():
         """
         for c in range(self.cell.shape[0]):
 
-            l = self.cell_measure(c)
-            c0 = l/10.0
-            c1 = l/20.0
+            vol = self.cell_measure(c)
+            c0 = vol/10.0
+            c1 = vol/20.0
 
             S[c, 0, 0] = c0 
             S[c, 0, 1] = c1
@@ -210,6 +199,47 @@ class TetrahedronMesh():
             S[c, 3, 1] = c1 
             S[c, 3, 2] = c1 
             S[c, 3, 3] = c0 
+
+    @ti.kernel
+    def cell_convection_matrices(self, u: ti.template(), S:ti.template()):
+        """
+        计算网格上所有单元的对流矩阵
+        """
+        for c in range(self.cell.shape[0]):
+            gphi, vol = self.grad_lambda(c) 
+
+            c0 = vol/10.0
+            c1 = vol/20.0
+
+            U = ti.zero(dt=ti.f64, 4, 3)
+
+            for i in ti.static(range(3)):
+                U[0, i] += u[self.cell[c, 0], i]*c0 
+                U[0, i] += u[self.cell[c, 1], i]*c1 
+                U[0, i] += u[self.cell[c, 2], i]*c1 
+                U[0, i] += u[self.cell[c, 3], i]*c1
+
+            for i in ti.static(range(3)):
+                U[1, i] += u[self.cell[c, 0], i]*c1 
+                U[1, i] += u[self.cell[c, 1], i]*c0 
+                U[1, i] += u[self.cell[c, 2], i]*c1 
+                U[1, i] += u[self.cell[c, 3], i]*c1
+
+            for i in ti.static(range(3)):
+                U[2, i] += u[self.cell[c, 0], i]*c1 
+                U[2, i] += u[self.cell[c, 1], i]*c1 
+                U[2, i] += u[self.cell[c, 2], i]*c0 
+                U[2, i] += u[self.cell[c, 3], i]*c1
+
+            for i in ti.static(range(3)):
+                U[3, i] += u[self.cell[c, 0], i]*c1 
+                U[3, i] += u[self.cell[c, 1], i]*c1 
+                U[3, i] += u[self.cell[c, 2], i]*c1 
+                U[3, i] += u[self.cell[c, 3], i]*c0
+
+            for i in ti.static(range(4)):
+                for j in ti.static(range(4)):
+                    S[c, i, j] = gphi[i, 0]*U[j, 0] + gphi[i, 1]*U[j, 1] + gphi[i, 2]*U[j, 2]
 
     @ti.kernel
     def cell_source_vectors(self, f:ti.template(), bc:ti.template(), ws:ti.template(), F:ti.template()):
@@ -287,6 +317,25 @@ class TetrahedronMesh():
         J = np.broadcast_to(cell[:, None, :], shape=M.shape)
 
         NN = self.node.shape[0]
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    def convection_matrix(self, u):
+        """
+        组装总体对流矩阵
+        """
+
+        NC = cell.shape[0]
+
+        C = ti.field(ti.f64, (NC, 4, 4))
+        self.cell_convection_matrices(u, C)
+
+        M = C.to_numpy()
+
+        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
+
+        NN = node.shape[0]
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
 

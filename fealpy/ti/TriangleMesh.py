@@ -189,6 +189,39 @@ class TriangleMesh():
             S[c, 2, 2] = c0 
 
     @ti.kernel
+    def cell_convection_matrices(self, u: ti.template, S: ti.template):
+        """
+        计算网格上所有单元的对流矩阵
+        """
+        for c in range(cell.shape[0]):
+            gphi, l = self.grad_lambda(c) 
+
+            c0 = l/6.0
+            c1 = l/12.0
+
+            U = ti.zero(dt=ti.f64, 3, 2)
+
+            for i in ti.static(range(2)):
+                U[0, i] += u[self.cell[c, 0], i]*c0 
+                U[0, i] += u[self.cell[c, 1], i]*c1 
+                U[0, i] += u[self.cell[c, 2], i]*c1 
+
+            for i in ti.static(range(2)):
+                U[1, i] += u[self.cell[c, 0], i]*c1 
+                U[1, i] += u[self.cell[c, 1], i]*c0 
+                U[1, i] += u[self.cell[c, 2], i]*c1 
+
+            for i in ti.static(range(2)):
+                U[2, i] += u[self.cell[c, 0], i]*c1 
+                U[2, i] += u[self.cell[c, 1], i]*c1 
+                U[2, i] += u[self.cell[c, 2], i]*c0 
+
+            for i in ti.static(range(3)):
+                for j in ti.static(range(3)):
+                    S[c, i, j] = gphi[i, 0]*U[j, 0] + gphi[i, 1]*U[j, 1]
+
+
+    @ti.kernel
     def cell_source_vectors(self, f:ti.template(), bc:ti.template(), ws:ti.template(), F:ti.template()):
         """
         计算所有单元载荷
@@ -254,6 +287,26 @@ class TriangleMesh():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
 
+    def convection_matrix(self, u):
+        """
+        组装总体对流矩阵
+        """
+
+        NC = cell.shape[0]
+
+        C = ti.field(ti.f64, (NC, 3, 3))
+        self.cell_convection_matrices(u, C)
+
+        M = C.to_numpy()
+
+        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
+
+        NN = node.shape[0]
+        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+
     def source_vector(self, f):
         """
         组装总体载荷向量
@@ -274,6 +327,9 @@ class TriangleMesh():
         cell = self.cell.to_numpy()
         np.add.at(F, cell, bb)
         return F
+
+    def interpolation(self, u):
+        pass
 
 
     @ti.kernel
