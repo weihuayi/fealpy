@@ -254,7 +254,8 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
 
-def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
+def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None,
+        returnnc=False):
     """
     Notes
     -----
@@ -288,7 +289,10 @@ def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
     if meshtype == 'hex':
         if threshold is not None:
             node, cell = delete_cell(node, cell, threshold)
-        return HexahedronMesh(node, cell)
+        if returnnc:
+            return node, cell
+        else:
+            return HexahedronMesh(node, cell)
     elif meshtype == 'tet':
         localCell = np.array([
             [0, 1, 2, 6],
@@ -300,7 +304,10 @@ def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None):
         cell = cell[:, localCell].reshape(-1, 4)
         if threshold is not None:
             node, cell = delete_cell(node, cell, threshold)
-        return TetrahedronMesh(node, cell)
+        if returnnc:
+            return node, cell
+        else:
+            return TetrahedronMesh(node, cell)
 
 def triangle(box, h, meshtype='tri'):
     """

@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import argparse 
-import taichi as ti
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -11,7 +10,9 @@ from fealpy.mesh import MeshFactory as MF
 from fealpy.ti import TriangleMesh 
 from fealpy.solver import LevelSetFEMFastSolver
 
-import pickle
+import taichi as ti
+import math 
+
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -46,7 +47,6 @@ parser.add_argument('--step',
 
 args = parser.parse_args()
 
-degree = args.degree
 nt = args.nt
 ns = args.ns
 T = args.T
@@ -54,76 +54,63 @@ output = args.output
 
 ti.init()
 
-@cartesian
-def velocity_field(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    u = np.zeros(p.shape)
-    u[..., 0] = np.sin((np.pi*x))**2 * np.sin(2*np.pi*y)
-    u[..., 1] = -np.sin((np.pi*y))**2 * np.sin(2*np.pi*x)
-    return u
+pi = math.pi
 
-@cartesian
-def circle(p):
-    x = p[...,0]
-    y = p[...,1]
-    val = np.sqrt((x-0.5)**2+(y-0.75)**2)-0.15
+@ti.func
+def velocity(x: ti.f64, y: ti.f64) -> ti.f64:
+    u0 = ti.sin(pi*x)**2*ti.sin(2*pi*y)
+    u1 =-ti.sin(pi*y)**2*ti.sin(2*pi*x)
+    return  u0, u1 
+
+@ti.func
+def circle(x: ti.f64, y: ti.f64) -> ti.f64:
+    val = ti.sqrt((x - 0.5)**2 + (y - 0.75)**2) - 0.15
     return val
 
-
+# 生成初始网格
 domain = [0, 1, 0, 1]
 node, cell = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri', returnnc=True)
 
+# 构建网格数据结构
 mesh = TriangleMesh(node, cell)
+
+NN = mesh.number_of_nodes()
+NC = mesh.number_of_cells()
+
+# 插值出速度场
+u = ti.field(ti.f64, (NN, 2))
+mesh.vector_interpolation(velocity, u)
+
+# 插值符号距离函数
+phi0 = ti.field(ti.f64, NN)
+mesh.scalar_interpolation(circle, phi0)
 
 timeline = UniformTimeLine(0, T, nt)
 dt = timeline.dt
 
-
 M = mesh.mass_matrix()
-C = mesh.convection_matrix(c = u).T 
+C = mesh.convection_matrix(u)
 A = M + dt/2*C
-
-diff = []
-measure = space.function()
 
 if output != 'None':
     fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
-    MF.write_to_vtu(fname, mesh, nodedata = {'phi':phi0, 'velocity':u},
-            p=degree)
+    mesh.to_vtk(fname, nodedata = {'phi':phi0.to_numpy(),
+        'velocity':u.to_numpy()})
 
 solver = LevelSetFEMFastSolver(A)
 
 for i in range(nt):
-        
     t1 = timeline.next_time_level()
     print("t1=", t1)
-    
-    #计算面积
-    measure[phi0 > 0] = 0
-    measure[phi0 <=0] = 1
-    diff.append(abs(space.integralalg.integral(measure) - (np.pi)*0.15**2))
-
-    b = M@phi0 - dt/2*(C@phi0)
-
-    phi0[:] = solver.solve(b, tol=1e-12)
+    b = M@phi0.to_numpy() - dt/2*(C@phi0.to_numpy())
+    phi = solver.solve(b, tol=1e-12)
+    phi0.from_numpy(phi)
     
     if output != 'None':
         fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-        MF.write_to_vtu(fname, mesh, nodedata = {'phi':phi0, 'velocity':u},
-                p=degree)
+        mesh.to_vtk(fname, nodedata = {'phi':phi0.to_numpy(), 'velocity':u.to_numpy()})
 
     # 时间步进一层 
     timeline.advance()
-
-pickle_file = open('diff'+str(ns)+'-'+str(degree)+'.pkl','wb')
-pickle.dump(diff, pickle_file) # 写入文件
-pickle_file.close()
-
-plt.figure()
-plt.plot(range(len(diff)), diff, '--', color='g', label='Measure Difference')
-plt.legend(loc='upper right')
-plt.savefig(fname = output+'measure'+'.png')
-plt.show()
 
 
