@@ -68,6 +68,10 @@ class TriangleMesh():
         self.cell2edge = ti.field(ti.i32, shape=(NC, 3))
         self.cell2edge.from_numpy(cell2edge)
 
+        self.glambda = ti.field(ti.f64, shape=(NC, 3, GD)) 
+        self.cellmeasure = ti.field(ti.f64, shape=(NC, ))
+        self.init_grad_lambdas()
+
     def number_of_nodes(self):
         return self.node.shape[0]
 
@@ -123,6 +127,34 @@ class TriangleMesh():
         write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                 nodedata=nodedata,
                 celldata=celldata)
+
+    @ti.kernel
+    def init_grad_lambdas(self):
+        """
+        初始化网格中每个单元上重心坐标函数的梯度，以及单元的面积
+        """
+        assert self.node.shape[1] == 2
+
+        for i in range(self.cell.shape[0]):
+            x0 = self.node[self.cell[i, 0], 0]
+            y0 = self.node[self.cell[i, 0], 1]
+
+            x1 = self.node[self.cell[i, 1], 0]
+            y1 = self.node[self.cell[i, 1], 1]
+
+            x2 = self.node[self.cell[i, 2], 0]
+            y2 = self.node[self.cell[i, 2], 1]
+
+            l = (x1 - x0)*(y2 - y0) - (y1 - y0)*(x2 - x0) 
+
+            self.cellmeasure[i] = 0.5*l
+            self.glambda[i, 0, 0] = (y1 - y2)/l
+            self.glambda[i, 0, 1] = (x2 - x1)/l 
+            self.glambda[i, 1, 0] = (y2 - y0)/l 
+            self.glambda[i, 1, 1] = (x0 - x2)/l
+            self.glambda[i, 2, 0] = (y0 - y1)/l
+            self.glambda[i, 2, 1] = (x1 - x0)/l
+
 
     @ti.func
     def cell_measure(self, i: ti.i32) -> ti.f64:
