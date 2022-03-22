@@ -57,7 +57,7 @@ class TetrahedronMesh():
         self.node.from_numpy(node)
 
         NC = cell.shape[0]
-        self.cell = ti.field(ti.i32, shape=(NC, 4))
+        self.cell = ti.field(ti.u32, shape=(NC, 4))
         self.cell.from_numpy(cell)
         self.ds = TetrahedronMeshDataStructure()
 
@@ -72,19 +72,19 @@ class TetrahedronMesh():
         NE = edge.shape[0]
         NF = face.shape[0]
 
-        self.edge = ti.field(ti.i32, shape=(NE, 2))
+        self.edge = ti.field(ti.u32, shape=(NE, 2))
         self.edge.from_numpy(edge)
 
-        self.face = ti.field(ti.i32, shape=(NF, 3))
+        self.face = ti.field(ti.u32, shape=(NF, 3))
         self.face.from_numpy(face)
 
-        self.face2cell = ti.field(ti.i32, shape=(NF, 4))
+        self.face2cell = ti.field(ti.u32, shape=(NF, 4))
         self.face2cell.from_numpy(face2cell)
 
-        self.cell2edge = ti.field(ti.i32, shape=(NC, 6))
+        self.cell2edge = ti.field(ti.u32, shape=(NC, 6))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.cell2face = ti.field(ti.i32, shape=(NC, 4))
+        self.cell2face = ti.field(ti.u32, shape=(NC, 4))
         self.cell2face.from_numpy(cell2face)
 
     def geo_dimension(self):
@@ -144,7 +144,7 @@ class TetrahedronMesh():
                 celldata=celldata)
 
     @ti.func
-    def cell_measure(self, c: ti.i32) -> ti.f64:
+    def cell_measure(self, c: ti.u32) -> ti.f64:
         """
         计算第i 个单元的体积测度
         """
@@ -156,7 +156,7 @@ class TetrahedronMesh():
         return vol 
 
     @ti.func
-    def grad_lambda(self, c: ti.i32) -> (ti.types.matrix(4, 3, ti.f64), ti.f64):
+    def grad_lambda(self, c: ti.u32) -> (ti.types.matrix(4, 3, ti.f64), ti.f64):
         """
         计算第 c 个单元上重心坐标函数的梯度，以及单元的面积
         """
