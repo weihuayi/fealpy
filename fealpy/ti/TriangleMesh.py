@@ -44,42 +44,51 @@ def construct_edge(NN, cell):
 
 @ti.data_oriented
 class TriangleMesh():
-    def __init__(self, node, cell):
+    def __init__(self, node, cell, itype=ti.u32, ftype=ti.f64):
         assert cell.shape[-1] == 3
+
+        self.itype = itype
+        self.ftype = ftype
 
         NN = node.shape[0]
         GD = node.shape[1]
-        self.node = ti.field(ti.f64, (NN, GD))
+        self.node = ti.field(self.ftype, (NN, GD))
         self.node.from_numpy(node)
 
         NC = cell.shape[0]
-        self.cell = ti.field(ti.i32, shape=(NC, 3))
+        self.cell = ti.field(self.itype, shape=(NC, 3))
         self.cell.from_numpy(cell)
 
         edge, edge2cell, cell2edge = construct_edge(NN, cell)
         NE = edge.shape[0]
 
-        self.edge = ti.field(ti.i32, shape=(NE, 2))
+        self.edge = ti.field(self.itype, shape=(NE, 2))
         self.edge.from_numpy(edge)
 
-        self.edge2cell = ti.field(ti.i32, shape=(NE, 4))
+        self.edge2cell = ti.field(self.itype, shape=(NE, 4))
         self.edge2cell.from_numpy(edge2cell)
 
-        self.cell2edge = ti.field(ti.i32, shape=(NC, 3))
+        self.cell2edge = ti.field(self.itype, shape=(NC, 3))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.glambda = ti.field(ti.f64, shape=(NC, 3, GD)) 
-        self.cellmeasure = ti.field(ti.f64, shape=(NC, ))
+        self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
+        self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
         self.init_grad_lambdas()
 
     def number_of_nodes(self):
         return self.node.shape[0]
+
+    def number_of_edges(self):
+        return self.edge.shape[0]
 
     def number_of_cells(self):
         return self.cell.shape[0]
 
     def geo_dimension(self):
         return self.node.shape[1]
+
+    def top_dimension(self):
+        return 2 
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
@@ -157,7 +166,7 @@ class TriangleMesh():
 
 
     @ti.func
-    def cell_measure(self, i: ti.i32) -> ti.f64:
+    def cell_measure(self, i: ti.u32) -> ti.f64:
         x0 = self.node[self.cell[i, 0], 0]
         y0 = self.node[self.cell[i, 0], 1]
 
@@ -172,7 +181,7 @@ class TriangleMesh():
         return l
 
     @ti.func
-    def grad_lambda(self, i: ti.i32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
+    def grad_lambda(self, i: ti.u32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
         """
         计算第 i 个单元上重心坐标函数的梯度，以及单元的面积
         """
@@ -202,7 +211,7 @@ class TriangleMesh():
         return gphi, l
 
     @ti.func
-    def surface_grad_lambda(self, i: ti.i32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
+    def surface_grad_lambda(self, i: ti.u32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
         """
         计算第 i 个单元上重心坐标函数的梯度，以及单元的面积
         """
