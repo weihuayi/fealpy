@@ -89,6 +89,10 @@ class TetrahedronMesh():
 
     def geo_dimension(self):
         return 3
+
+    def top_dimension(self):
+        return 3
+
     def number_of_nodes(self):
         return self.node.shape[0]
 
