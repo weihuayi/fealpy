@@ -780,7 +780,7 @@ class RaviartThomasFiniteElementSpace2d:
         isDDof[edge2dof[index]] = True
         return isDDof
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof
@@ -788,7 +788,7 @@ class RaviartThomasFiniteElementSpace2d:
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def dof_array(self, dim=None):
         gdof = self.number_of_global_dofs()
