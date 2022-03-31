@@ -7,7 +7,7 @@ class TetrahedronMeshDataStructure():
     localEdge = ti.Matrix([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = ti.Matrix([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
 
-def construct(NN, cell):
+def construct(cell):
     NC = cell.shape[0]
 
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -46,45 +46,47 @@ def construct(NN, cell):
 
 @ti.data_oriented
 class TetrahedronMesh():
-    def __init__(self, node, cell):
+    def __init__(self, node, cell, itype=ti.u32, ftype=ti.f64):
 
         assert cell.shape[-1] == 4
         assert node.shape[-1] == 3
 
-        NN = node.shape[0]
-        GD = node.shape[1]
-        self.node = ti.field(ti.f64, (NN, 3))
+        self.itype = itype
+        self.ftype = ftype
+
+        self.node = ti.field(self.ftype, (NN, 3))
         self.node.from_numpy(node)
 
         NC = cell.shape[0]
-        self.cell = ti.field(ti.u32, shape=(NC, 4))
+        self.cell = ti.field(self.ftype, shape=(NC, 4))
         self.cell.from_numpy(cell)
-        self.ds = TetrahedronMeshDataStructure()
+
+        self.construct_data_structure(cell)
 
 
-    def construct_data_structure(self):
+    def construct_data_structure(self, cell):
         """! 构造四面体网格的辅助数据结构
         """
 
-        NN = self.number_of_nodes()
-        cell = self.cell.to_numpy()
-        face, edge, cell2edge, cell2face, face2cell = construct(NN, cell)
+        face, edge, cell2edge, cell2face, face2cell = construct(cell)
+
         NE = edge.shape[0]
         NF = face.shape[0]
+        NC = cell.shape[0]
 
-        self.edge = ti.field(ti.u32, shape=(NE, 2))
+        self.edge = ti.field(self.itype, shape=(NE, 2))
         self.edge.from_numpy(edge)
 
-        self.face = ti.field(ti.u32, shape=(NF, 3))
+        self.face = ti.field(self.itype, shape=(NF, 3))
         self.face.from_numpy(face)
 
-        self.face2cell = ti.field(ti.u32, shape=(NF, 4))
+        self.face2cell = ti.field(self.itype, shape=(NF, 4))
         self.face2cell.from_numpy(face2cell)
 
-        self.cell2edge = ti.field(ti.u32, shape=(NC, 6))
+        self.cell2edge = ti.field(self.itype, shape=(NC, 6))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.cell2face = ti.field(ti.u32, shape=(NC, 4))
+        self.cell2face = ti.field(self.itype, shape=(NC, 4))
         self.cell2face.from_numpy(cell2face)
 
     def geo_dimension(self):

@@ -69,7 +69,7 @@ class LagrangeFiniteElementSpace():
         self.fdof = (p+1)*(p+2)//2
         self.vdof = (p+1)*(p+2)*(p+3)//6
 
-        self.edge2dof = ti.field(self.itype, shape=(NC, self.edof))
+        self.edge2dof = ti.field(self.itype, shape=(NE, self.edof))
         if TD == 2:
             self.cell2dof = ti.field(self.itype, shape=(NC, self.fdof))
         elif TD == 3:
@@ -78,19 +78,78 @@ class LagrangeFiniteElementSpace():
 
     @ti.kernel
     def edge_to_dof(self):
-        pass
+        n = self.p - 1
+        start = self.mesh.node.shape[0]
+        for i in range(self.mesh.edge.shape[0]):
+            self.edge2dof[i, 0] = self.mesh.edge[i, 0]
+            self.edge2dof[i, self.p] = self.mesh.edge[i, 1]
+            for j in ti.static(range(1, self.p)):
+                self.edge2dof[i, j] = start + i*n + j - 1
 
     @ti.kernel
     def tri_to_dof(self):
-        localEdge = ti.Matrix([[1, 2], [2, 0], [0, 1]])
+        NN = self.mesh.node.shape[0]
+        NE = self.mesh.edge.shape[0]
         for c in range(self.mesh.cell.shape[0]): 
+            # 三个顶点 
             self.cell2dof[c, 0] = self.mesh.cell[c, 0]
-            self.cell2dof[c, self.ldof - self.p] = self.mesh.cell[c, 1] # 不支持负数索引
-            self.cell2dof[c, self.ldof - 1] = self.mesh.cell[c, 2]
-            for i in ti.static(range(3)):
-                ei = self.mesh.cell2edge[c, i]
-                n0 = self.mesh.edge[ei,0]
+            self.cell2dof[c, self.fdof - self.p - 1] = self.mesh.cell[c, 1] # 不支持负数索引
+            self.cell2dof[c, self.fdof - 1] = self.mesh.cell[c, 2]
 
+            # 第 0 条边
+            ei = self.mesh.cell2edge[c, 0]
+            v0 = self.mesh.edge[ei, 0]
+            s0 = self.fdof - self.p
+            if v0 == self.mesh.cell[c, 1]:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
+                    s0 += 1
+            else:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i] 
+                    s0 += 1
+
+            # 第 1 条边
+            ei = self.mesh.cell2edge[c, 1]
+            v0 = self.mesh.edge[ei, 0]
+            s0 = 2
+            if v0 == self.mesh.cell[c, 0]:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
+                    s0 += i + 2
+            else:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i]
+                    s0 += i + 2 
+
+            # 第 2 条边
+            ei = self.mesh.cell2edge[c, 2]
+            v0 = self.mesh.edge[ei, 0]
+            s0 = 1
+            if v0 == self.mesh.cell[c, 0]:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
+                    s0 += i + 1
+            else:
+                for i in range(1, self.p):
+                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i]
+                    s0 += i + 1 
+
+            # 内部点
+            if self.p >= 3:
+                start = NN + (self.p-1)*NE
+                s0 = 4
+                level = self.p - 2 
+                nd = (self.p - 2)*(self.p - 1)//2
+                s1 = 0
+                for l in range(0, level):
+                    for i in range(0, l+1):
+                        print("s0:", s0, c, start, NN, NE)
+                        self.cell2dof[c, s0] = start + c*nd + s1 
+                        s0 += 1
+                        s1 += 1 
+                    s0 += 3
+                    
     @ti.kernel
     def tet_to_dof(self):
         pass
@@ -209,10 +268,10 @@ class LagrangeFiniteElementSpace():
         return M
 
     def pytest(self, bc):
-        print(self.mesh.cell)
-        R0, R1 = self.shape_function(bc)
+        self.edge_to_dof()
+        print("tiedge2dof:", self.edge2dof)
         self.tri_to_dof()
-        print("cell2dof:", self.cell2dof)
+        print("ticell2dof:", self.cell2dof)
 
     @ti.kernel
     def titest(self, bc: ti.template()):
