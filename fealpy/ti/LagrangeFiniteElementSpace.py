@@ -2,7 +2,6 @@ import taichi as ti
 import numpy as np
 
 from scipy.sparse import csr_matrix
-from .core import multi_index_matrix
 
 def multi_index_matrix0d(p):
     multiIndex = 1
@@ -62,6 +61,40 @@ class LagrangeFiniteElementSpace():
         self.multiIndex = ti.field(self.itype, shape=mi.shape)
         self.multiIndex.from_numpy(mi)
 
+        NN = self.mesh.number_of_nodes()
+        NE = self.mesh.number_of_edges()
+        NC = self.mesh.number_of_cells()
+
+        self.edof = p+1
+        self.fdof = (p+1)*(p+2)//2
+        self.vdof = (p+1)*(p+2)*(p+3)//6
+
+        self.edge2dof = ti.field(self.itype, shape=(NC, self.edof))
+        if TD == 2:
+            self.cell2dof = ti.field(self.itype, shape=(NC, self.fdof))
+        elif TD == 3:
+            self.face2dof = ti.field(self.itype, shape=(NC, self.fdof))
+            self.cell2dof = ti.field(self.itype, shape=(NC, self.vdof))
+
+    @ti.kernel
+    def edge_to_dof(self):
+        pass
+
+    @ti.kernel
+    def tri_to_dof(self):
+        localEdge = ti.Matrix([[1, 2], [2, 0], [0, 1]])
+        for c in range(self.mesh.cell.shape[0]): 
+            self.cell2dof[c, 0] = self.mesh.cell[c, 0]
+            self.cell2dof[c, self.ldof - self.p] = self.mesh.cell[c, 1] # 不支持负数索引
+            self.cell2dof[c, self.ldof - 1] = self.mesh.cell[c, 2]
+            for i in ti.static(range(3)):
+                ei = self.mesh.cell2edge[c, i]
+                n0 = self.mesh.edge[ei,0]
+
+    @ti.kernel
+    def tet_to_dof(self):
+        pass
+
 
     def geo_dimension(self):
         return self.mesh.node.shape[0]
@@ -72,16 +105,17 @@ class LagrangeFiniteElementSpace():
     def number_of_local_dofs(self):
         return self.multiIndex.shape[0]
 
-    def lagrange_shape_function(self, bc):
+    def shape_function(self, bc):
         """
 
-        Notes
-        -----
-        
-        计算形状为 (..., TD+1) 的重心坐标数组 bc 中的每一个重心坐标处的 p 次
-        Lagrange 形函数值, 以及关于 TD+1 个重心坐标处的 1 阶导数值.
+        @brief 给定一个或一组重心坐标，计算所有单元基函数在重心坐标处的值,
+        以及关于重心坐标的 1 阶导数值。
+
+        @param[in] bc numpy.ndarray 形状为 (..., TD+1)
 
         """
+
+        p = self.p
         TD = bc.shape[-1] - 1
         multiIndex = multi_index_matrix[TD](p) 
         ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
@@ -156,7 +190,7 @@ class LagrangeFiniteElementSpace():
         R0, _ = self.lagrange_shape_function(bc)
         B.from_numpy(R0)
 
-        W = ti.field(ti.f64. shape=(NQ, ))
+        W = ti.field(ti.f64, shape=(NQ, ))
         W.from_numpy(ws)
 
         K = ti.field(ti.f64, shape=(NC, ldof, ldof))
@@ -174,31 +208,14 @@ class LagrangeFiniteElementSpace():
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
 
-    @ti.func
-    def shape_function(self, bc: ti.template()) -> ti.template():
-        A = ti.Matrix.one(self.ftype, self.p+1, self.multiIndex.shape[1])
-        for i in ti.static(range(1, self.p+1)):
-            for j in ti.static(range(self.multiIndex.shape[1])):
-                k = i - 1
-                A[i, j] = A[i-1, j]*(self.p*bc[j] - k)
-
-        p = 1
-        for i in ti.static(range(2, self.p+1)):
-            p *= i
-            for j in ti.static(range(self.multiIndex.shape[1])):
-                A[i, j] /= p
-
-        
-        R0 = ti.Vector.one(self.ftype, self.multiIndex.shape[0])
-        for i in range(self.multiIndex.shape[0]):
-            for j in range(self.multiIndex.shape[1]):
-                R0[i] *= A[self.multiIndex[i, j], j] #TODO: can't not put 
-
-        return R0
+    def pytest(self, bc):
+        print(self.mesh.cell)
+        R0, R1 = self.shape_function(bc)
+        self.tri_to_dof()
+        print("cell2dof:", self.cell2dof)
 
     @ti.kernel
-    def test(self, bc: ti.template()):
-        R0 = self.shape_function(bc)
-        print(R0)
+    def titest(self, bc: ti.template()):
+        pass
 
 
