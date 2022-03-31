@@ -18,11 +18,8 @@ NC = mesh.number_of_cells()
 
 space = LagrangeFiniteElementSpace(mesh, p=3)
 
-bc = ti.field(self.ftype, shape=(1, 3))
-bc[0] = 1/3
-bc[1] = 1/3
-bc[2] = 1/3
-space.test()
+bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+space.pytest(bc)
 
 print(space.multiIndex)
 print(space.geo_dimension())
