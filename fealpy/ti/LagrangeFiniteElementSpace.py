@@ -3,43 +3,6 @@ import numpy as np
 
 from scipy.sparse import csr_matrix
 
-def multi_index_matrix0d(p):
-    multiIndex = 1
-    return multiIndex 
-
-def multi_index_matrix1d(p):
-    ldof = p+1
-    multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-    multiIndex[:, 0] = np.arange(p, -1, -1)
-    multiIndex[:, 1] = p - multiIndex[:, 0]
-    return multiIndex
-
-def multi_index_matrix2d(p):
-    ldof = (p+1)*(p+2)//2
-    idx = np.arange(0, ldof)
-    idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-    multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-    multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
-    multiIndex[:,1] = idx0 - multiIndex[:,2]
-    multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
-    return multiIndex
-
-def multi_index_matrix3d(p):
-    ldof = (p+1)*(p+2)*(p+3)//6
-    idx = np.arange(1, ldof)
-    idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
-    idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
-    idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
-    idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
-    multiIndex = np.zeros((ldof, 4), dtype=np.int_)
-    multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
-    multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
-    multiIndex[1:, 1] = idx0 - idx2
-    multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
-    return multiIndex
-
-multi_index_matrix = [multi_index_matrix0d, multi_index_matrix1d, multi_index_matrix2d, multi_index_matrix3d]
-
 @ti.data_oriented
 class LagrangeFiniteElementSpace():
     """
@@ -56,8 +19,7 @@ class LagrangeFiniteElementSpace():
 
         self.p = p
 
-        TD = self.mesh.top_dimension()
-        mi = multi_index_matrix[TD](p)
+        mi = mesh.multi_index_matrix(p)
         self.multiIndex = ti.field(self.itype, shape=mi.shape)
         self.multiIndex.from_numpy(mi)
 
@@ -86,69 +48,6 @@ class LagrangeFiniteElementSpace():
             for j in ti.static(range(1, self.p)):
                 self.edge2dof[i, j] = start + i*n + j - 1
 
-    @ti.kernel
-    def tri_to_dof(self):
-        NN = self.mesh.node.shape[0]
-        NE = self.mesh.edge.shape[0]
-        for c in range(self.mesh.cell.shape[0]): 
-            # 三个顶点 
-            self.cell2dof[c, 0] = self.mesh.cell[c, 0]
-            self.cell2dof[c, self.fdof - self.p - 1] = self.mesh.cell[c, 1] # 不支持负数索引
-            self.cell2dof[c, self.fdof - 1] = self.mesh.cell[c, 2]
-
-            # 第 0 条边
-            ei = self.mesh.cell2edge[c, 0]
-            v0 = self.mesh.edge[ei, 0]
-            s0 = self.fdof - self.p
-            if v0 == self.mesh.cell[c, 1]:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
-                    s0 += 1
-            else:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i] 
-                    s0 += 1
-
-            # 第 1 条边
-            ei = self.mesh.cell2edge[c, 1]
-            v0 = self.mesh.edge[ei, 0]
-            s0 = 2
-            if v0 == self.mesh.cell[c, 0]:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
-                    s0 += i + 2
-            else:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i]
-                    s0 += i + 2 
-
-            # 第 2 条边
-            ei = self.mesh.cell2edge[c, 2]
-            v0 = self.mesh.edge[ei, 0]
-            s0 = 1
-            if v0 == self.mesh.cell[c, 0]:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, i]
-                    s0 += i + 1
-            else:
-                for i in range(1, self.p):
-                    self.cell2dof[c, s0] = self.edge2dof[ei, self.p-i]
-                    s0 += i + 1 
-
-            # 内部点
-            if self.p >= 3:
-                start = NN + (self.p-1)*NE
-                s0 = 4
-                level = self.p - 2 
-                nd = (self.p - 2)*(self.p - 1)//2
-                s1 = 0
-                for l in range(0, level):
-                    for i in range(0, l+1):
-                        print("s0:", s0, c, start, NN, NE)
-                        self.cell2dof[c, s0] = start + c*nd + s1 
-                        s0 += 1
-                        s1 += 1 
-                    s0 += 3
                     
     @ti.kernel
     def tet_to_dof(self):

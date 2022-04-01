@@ -57,7 +57,7 @@ class TriangleMesh():
 
     def construct_data_structure(self, cell):
 
-        edge, edge2cell, cell2edge = construct_edge(NN, cell)
+        edge, edge2cell, cell2edge = construct_edge(cell)
         NE = edge.shape[0]
 
         self.edge = ti.field(self.itype, shape=(NE, 2))
@@ -66,9 +66,115 @@ class TriangleMesh():
         self.edge2cell = ti.field(self.itype, shape=(NE, 4))
         self.edge2cell.from_numpy(edge2cell)
 
+        NC = self.number_of_cells()
         self.cell2edge = ti.field(self.itype, shape=(NC, 3))
         self.cell2edge.from_numpy(cell2edge)
 
+    def multi_index_matrix(self, p):
+        ldof = (p+1)*(p+2)//2
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+        multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:,1] = idx0 - multiIndex[:,2]
+        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        return multiIndex
+
+    def number_of_local_interpolation_points(self, p):
+        return (p+1)*(p+2)//2
+
+    def number_of_global_interpolation_points(self, p):
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += (p-1)*NE
+        if p > 2:
+            NC = self.number_of_cells()
+            NP += (p-2)*(p-1)*NC//2
+        return NP
+
+    @ti.kernel 
+    def interpolation_points(self, p: ti.u32, ipoints: ti.template()):
+        NN = self.node.shape[0]
+        GD = self.node.shape[1]
+        for i in range(NN):
+            for j in range(GD):
+                ipoints[i, j] = self.node[i, j]
+        if p > 1:
+            NE = self.edge.shape[0]
+            for i in range(NE):
+                for j in range(0, p-1):
+                    I = NN + i*(p-1) + j
+                    for k in range(GD):
+                        ipoints[I, k] = ((p-j-1)*self.node[self.edge[i, 0], k] + (j+1)*self.node[self.edge[i, 0], k])/p
+        if p > 2:
+            NC = self.cell.shape[0]
+            for i in range(NC):
+                pass
+
+    @ti.kernel
+    def cell_to_dof(self, p: ti.u32, cell2dof: ti.template()):
+        cdof = (p+1)*(p+2)//2 
+        NN = self.node.shape[0]
+        NE = self.edge.shape[0]
+        for c in range(self.cell.shape[0]): 
+            # 三个顶点 
+            cell2dof[c, 0] = self.cell[c, 0]
+            cell2dof[c, cdof - p - 1] = self.cell[c, 1] # 不支持负数索引
+            cell2dof[c, cdof - 1] = self.cell[c, 2]
+
+            # 第 0 条边
+            e = self.cell2edge[c, 0]
+            v0 = self.edge[e, 0]
+            s0 = cdof - p
+            if v0 == self.cell[c, 1]:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + i 
+                    s0 += 1
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i
+                    s0 += 1
+
+            # 第 1 条边
+            e = self.cell2edge[c, 1]
+            v0 = self.edge[e, 0]
+            s0 = 2
+            if v0 == self.cell[c, 0]:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + i 
+                    s0 += i + 2
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i 
+                    s0 += i + 2 
+
+            # 第 2 条边
+            e = self.cell2edge[c, 2]
+            v0 = self.edge[e, 0]
+            s0 = 1
+            if v0 == self.cell[c, 0]:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + i 
+                    s0 += i + 1
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i 
+                    s0 += i + 1 
+
+            # 内部点
+            if p >= 3:
+                start = NN + (p-1)*NE
+                level = p - 2 
+                nd = (p - 2)*(p - 1)//2
+                s0 = 4
+                s1 = 0
+                for l in range(0, level):
+                    for i in range(0, l+1):
+                        cell2dof[c, s0] = start + c*nd + s1 
+                        s0 += 1
+                        s1 += 1 
+                    s0 += 3
 
     def number_of_nodes(self):
         return self.node.shape[0]
