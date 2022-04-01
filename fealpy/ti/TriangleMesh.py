@@ -2,18 +2,8 @@ import taichi as ti
 import numpy as np
 from scipy.sparse import csr_matrix
 
-class TriangleMeshDataStructure():
-    localFace = ti.Matrix([(1, 2), (2, 0), (0, 1)])
-    ccw = ti.Matrix([0, 1, 2])
 
-    NVC = 3
-    NVE = 2
-    NVF = 2
-
-    NEC = 3
-    NFC = 3
-
-def construct_edge(NN, cell):
+def construct_edge(cell):
     """ 
     """
     NC =  cell.shape[0] 
@@ -21,7 +11,7 @@ def construct_edge(NN, cell):
     NVE = 2 
 
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
-    totalEdge = cell[:, localEdge].reshape(-1, NVE)
+    totalEdge = cell[:, localEdge].reshape(-1, 2)
     _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
             return_index=True,
             return_inverse=True,
@@ -32,13 +22,13 @@ def construct_edge(NN, cell):
     i1 = np.zeros(NE, dtype=np.int_)
     i1[j] = np.arange(NEC*NC, dtype=np.int_)
 
-    edge2cell[:, 0] = i0//NEC
-    edge2cell[:, 1] = i1//NEC
-    edge2cell[:, 2] = i0%NEC
-    edge2cell[:, 3] = i1%NEC
+    edge2cell[:, 0] = i0//3
+    edge2cell[:, 1] = i1//3
+    edge2cell[:, 2] = i0%3
+    edge2cell[:, 3] = i1%3
 
     edge = totalEdge[i0, :]
-    cell2edge = np.reshape(j, (NC, NEC))
+    cell2edge = np.reshape(j, (NC, 3))
     return edge, edge2cell, cell2edge
 
 
@@ -59,6 +49,14 @@ class TriangleMesh():
         self.cell = ti.field(self.itype, shape=(NC, 3))
         self.cell.from_numpy(cell)
 
+        self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
+        self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
+        self.init_grad_lambdas()
+
+        self.construct_data_structure(cell)
+
+    def construct_data_structure(self, cell):
+
         edge, edge2cell, cell2edge = construct_edge(NN, cell)
         NE = edge.shape[0]
 
@@ -71,9 +69,6 @@ class TriangleMesh():
         self.cell2edge = ti.field(self.itype, shape=(NC, 3))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
-        self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
-        self.init_grad_lambdas()
 
     def number_of_nodes(self):
         return self.node.shape[0]
