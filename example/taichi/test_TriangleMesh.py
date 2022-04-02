@@ -10,13 +10,12 @@ from fealpy.functionspace import LagrangeFiniteElementSpace as LFESpace
 ti.init()
 
 
-p = 2
+p = 8
 node, cell = MF.boxmesh2d([0, 1, 0, 1], nx=1, ny=1, meshtype='tri', returnnc=True)
 mesh = TriangleMesh(node, cell)
 
 mi = mesh.multi_index_matrix(p)
 print(mi)
-
 
 NP = mesh.number_of_global_interpolation_points(p)
 ipoints = ti.field(ti.f64, shape=(NP, 2))

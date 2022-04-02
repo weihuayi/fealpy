@@ -75,9 +75,9 @@ class TriangleMesh():
         idx = np.arange(0, ldof)
         idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
         multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-        multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:,1] = idx0 - multiIndex[:,2]
-        multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:, 1] = idx0 - multiIndex[:,2]
+        multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
         return multiIndex
 
     def number_of_local_interpolation_points(self, p):
@@ -109,28 +109,28 @@ class TriangleMesh():
                 for i1 in range(1, p):
                     i0 = p - i1 # (i0, i1)
                     I = s1 + i1 - 1
-                    print(I)
+                    print(I, ":", i0, i1)
                     for d in range(GD):
                         ipoints[I, d] = (
                                 i0*self.node[self.edge[e, 0], d] + 
-                                i1*self.node[self.edge[e, 0], d])/p
+                                i1*self.node[self.edge[e, 1], d])/p
         if p > 2:
             cdof = (p-2)*(p-1)//2
             s0 = NN + (p-1)*NE
             for c in range(NC):
                 i0 = p-2
                 s1 = s0 + c*cdof
-                for level in range(0, p-1):
+                for level in range(0, p-2):
+                    i0 = p - 2 - level
                     for i2 in range(1, level+2):
                         i1 = p - i0 - i2 #(i0, i1, i2)
                         j = i1 + i2 - 2
                         I = s1 + j*(j+1)//2 + i2 - 1  
-                        print(I)
-                        for k in range(GD):
-                            ipoints[I, k] = (
-                                    i0*self.node[self.cell[c, 0], k] + 
-                                    i1*self.node[self.cell[c, 1], k] + 
-                                    i2*self.node[self.cell[c, 2], k])/p
+                        for d in range(GD):
+                            ipoints[I, d] = (
+                                    i0*self.node[self.cell[c, 0], d] + 
+                                    i1*self.node[self.cell[c, 1], d] + 
+                                    i2*self.node[self.cell[c, 2], d])/p
                         
 
     @ti.kernel
@@ -205,7 +205,7 @@ class TriangleMesh():
                         cell2dof[c, s1] = s0 + s2 
                         s1 += 1
                         s2 += 1 
-                    s1 += 3
+                    s1 += 2
 
     def number_of_nodes(self):
         return self.node.shape[0]
