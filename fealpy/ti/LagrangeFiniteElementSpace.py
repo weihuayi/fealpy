@@ -38,15 +38,6 @@ class LagrangeFiniteElementSpace():
             self.face2dof = ti.field(self.itype, shape=(NC, self.fdof))
             self.cell2dof = ti.field(self.itype, shape=(NC, self.vdof))
 
-    @ti.kernel
-    def edge_to_dof(self):
-        n = self.p - 1
-        start = self.mesh.node.shape[0]
-        for i in range(self.mesh.edge.shape[0]):
-            self.edge2dof[i, 0] = self.mesh.edge[i, 0]
-            self.edge2dof[i, self.p] = self.mesh.edge[i, 1]
-            for j in ti.static(range(1, self.p)):
-                self.edge2dof[i, j] = start + i*n + j - 1
 
                     
     @ti.kernel

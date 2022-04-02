@@ -96,21 +96,50 @@ class TriangleMesh():
     @ti.kernel 
     def interpolation_points(self, p: ti.u32, ipoints: ti.template()):
         NN = self.node.shape[0]
+        NE = self.edge.shape[0]
+        NC = self.cell.shape[0]
         GD = self.node.shape[1]
-        for i in range(NN):
-            for j in range(GD):
-                ipoints[i, j] = self.node[i, j]
+        for n in range(NN):
+            print(n)
+            for d in range(GD):
+                ipoints[n, d] = self.node[n, d]
         if p > 1:
-            NE = self.edge.shape[0]
-            for i in range(NE):
-                for j in range(0, p-1):
-                    I = NN + i*(p-1) + j
-                    for k in range(GD):
-                        ipoints[I, k] = ((p-j-1)*self.node[self.edge[i, 0], k] + (j+1)*self.node[self.edge[i, 0], k])/p
+            for e in range(NE):
+                s1 = NN + e*(p-1)
+                for i1 in range(1, p):
+                    i0 = p - i1 # (i0, i1)
+                    I = s1 + i1 - 1
+                    print(I)
+                    for d in range(GD):
+                        ipoints[I, d] = (
+                                i0*self.node[self.edge[e, 0], d] + 
+                                i1*self.node[self.edge[e, 0], d])/p
         if p > 2:
-            NC = self.cell.shape[0]
-            for i in range(NC):
-                pass
+            cdof = (p-2)*(p-1)//2
+            s0 = NN + (p-1)*NE
+            for c in range(NC):
+                i0 = p-2
+                s1 = s0 + c*cdof
+                for level in range(0, p-1):
+                    for i2 in range(1, level+2):
+                        i1 = p - i0 - i2 #(i0, i1, i2)
+                        j = i1 + i2 - 2
+                        I = s1 + j*(j+1)//2 + i2 - 1  
+                        print(I)
+                        for k in range(GD):
+                            ipoints[I, k] = (
+                                    i0*self.node[self.cell[c, 0], k] + 
+                                    i1*self.node[self.cell[c, 1], k] + 
+                                    i2*self.node[self.cell[c, 2], k])/p
+                        
+
+    @ti.kernel
+    def edge_to_dof(self, p: ti.u32, edge2dof: ti.template()):
+        for i in range(self.edge.shape[0]):
+            edge2dof[i, 0] = self.edge[i, 0]
+            edge2dof[i, p] = self.edge[i, 1]
+            for j in ti.static(range(1, p)):
+                edge2dof[i, j] = self.node.shape[0] + i*(p-1) + j - 1
 
     @ti.kernel
     def cell_to_dof(self, p: ti.u32, cell2dof: ti.template()):
@@ -126,55 +155,57 @@ class TriangleMesh():
             # 第 0 条边
             e = self.cell2edge[c, 0]
             v0 = self.edge[e, 0]
-            s0 = cdof - p
+            s0 = NN + e*(p-1)
+            s1 = cdof - p
             if v0 == self.cell[c, 1]:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + i 
-                    s0 += 1
+                    cell2dof[c, s1] = s0 + i
+                    s1 += 1
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i
-                    s0 += 1
+                    cell2dof[c, s1] = s0 + p - 2 - i
+                    s1 += 1
 
             # 第 1 条边
             e = self.cell2edge[c, 1]
             v0 = self.edge[e, 0]
-            s0 = 2
+            s0 = NN + e*(p-1)
+            s1 = 2
             if v0 == self.cell[c, 0]:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + i 
-                    s0 += i + 2
+                    cell2dof[c, s1] = s0 + i 
+                    s1 += i + 3
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i 
-                    s0 += i + 2 
+                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    s1 += i + 3 
 
             # 第 2 条边
             e = self.cell2edge[c, 2]
             v0 = self.edge[e, 0]
-            s0 = 1
+            s0 = NN + e*(p-1)
+            s1 = 1
             if v0 == self.cell[c, 0]:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + i 
-                    s0 += i + 1
+                    cell2dof[c, s1] = s0 + i 
+                    s1 += i + 2
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s0] = NN + e*(p-1) + p - 2 - i 
-                    s0 += i + 1 
+                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    s1 += i + 2 
 
             # 内部点
             if p >= 3:
-                start = NN + (p-1)*NE
                 level = p - 2 
-                nd = (p - 2)*(p - 1)//2
-                s0 = 4
-                s1 = 0
+                s0 = NN + (p-1)*NE + c*(p-2)*(p-1)//2
+                s1 = 4
+                s2 = 0
                 for l in range(0, level):
                     for i in range(0, l+1):
-                        cell2dof[c, s0] = start + c*nd + s1 
-                        s0 += 1
-                        s1 += 1 
-                    s0 += 3
+                        cell2dof[c, s1] = s0 + s2 
+                        s1 += 1
+                        s2 += 1 
+                    s1 += 3
 
     def number_of_nodes(self):
         return self.node.shape[0]
