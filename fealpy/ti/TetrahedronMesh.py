@@ -54,6 +54,7 @@ class TetrahedronMesh():
         self.itype = itype
         self.ftype = ftype
 
+        NN = node.shape[0]
         self.node = ti.field(self.ftype, (NN, 3))
         self.node.from_numpy(node)
 
@@ -108,18 +109,17 @@ class TetrahedronMesh():
 
     def number_of_global_interpolation_points(self, p):
         NP = self.number_of_nodes()
-
         if p > 1:
             NE = self.number_of_edges()
-            NP += (p-1)*NE
+            NP += NE*(p-1)
 
         if p > 2:
             NF = self.number_of_faces()
-            NP += (p-2)*(p-1)*NF//2
+            NP += NF*(p-2)*(p-1)//2
 
         if p > 3:
             NC = self.number_of_cells()
-            Np += (p-3)*(p-2)*(p-1)*NC//6 
+            NP += NC*(p-3)*(p-2)*(p-1)//6 
         return NP
 
     @ti.kernel 
@@ -130,9 +130,10 @@ class TetrahedronMesh():
         NC = self.cell.shape[0]
         GD = self.node.shape[1]
 
-        for n in range(NN):
+        for I in range(NN):
+            print(I, ":")
             for d in range(GD):
-                ipoints[n, d] = self.node[n, d]
+                ipoints[I, d] = self.node[I, d]
 
         if p > 1:
             for e in range(NE):
@@ -140,6 +141,7 @@ class TetrahedronMesh():
                 for i1 in range(1, p):
                     i0 = p - i1 # (i0, i1)
                     I = s1 + i1 - 1
+                    print(I, ":")
                     for d in range(GD):
                         ipoints[I, d] = (
                                 i0*self.node[self.edge[e, 0], d] + 
@@ -148,14 +150,14 @@ class TetrahedronMesh():
             fdof = (p-2)*(p-1)//2
             s0 = NN + (p-1)*NE
             for f in range(NF):
-                i0 = p-2
                 s1 = s0 + f*fdof
-                for level in range(0, p-2):
-                    i0 = p - 2 - level
-                    for i2 in range(1, level+2):
+                for line in range(0, p-2):
+                    i0 = p - 2 - line 
+                    for i2 in range(1, line+2):
                         i1 = p - i0 - i2 #(i0, i1, i2)
                         j = i1 + i2 - 2
                         I = s1 + j*(j+1)//2 + i2 - 1  
+                        print(I, ":")
                         for d in range(GD):
                             ipoints[I, d] = (
                                     i0*self.node[self.face[f, 0], d] + 
@@ -165,8 +167,23 @@ class TetrahedronMesh():
             cdof = (p-3)*(p-2)*(p-1)//6
             s0 = NN + NE*(p-1) + NF*(p-2)*(p-1)//2
             for c in range(NC):
-                i0 = p-3
                 s1 = s0 + c*cdof
+                for level in range(0, p-3):
+                    i0 = p - 3 - level
+                    for line in range(1, level+2):
+                        i1 = p - 2 - line
+                        for i3 in range(1, line+2):
+                            i2 = p - i0 - i1 - i3 #(i0, i1, i2, i3)
+                            j0 = i1 + i2 + i3 - 3
+                            j1 = i2 + i3 - 2
+                            I = s1 + j0*(j0+1)*(j0+2)//6 + j1*(j1+1)//2 + i3 - 1
+                            print(I, ":")
+                            for d in range(GD):
+                                ipoints[I, d] = (
+                                        i0*self.node[self.cell[c, 0], d] + 
+                                        i1*self.node[self.cell[c, 1], d] + 
+                                        i2*self.node[self.cell[c, 2], d] + 
+                                        i3*self.node[self.cell[c, 3], d])/p
 
 
     def geo_dimension(self):
