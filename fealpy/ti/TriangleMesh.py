@@ -607,5 +607,27 @@ class TriangleMesh():
         """
         pass
 
+    def add_plot(self, window):
+        NN = self.number_of_nodes()
+        vertices = ti.Vector.field(3, dtype=ti.f32, shape=NN)
+        self.to_vertices_3d(vertices)
+        canvas = window.get_canvas()
+        canvas.set_background_color((1.0, 1.0, 1.0))
+        canvas.triangles(vertices, indices=self.cell)
+
+    @ti.kernel
+    def to_vertices_3d(self, vertices: ti.template()):
+        if self.node.shape[1] == 2:
+            for i in range(self.node.shape[0]):
+                vertices[i][0] = self.node[i, 0]
+                vertices[i][1] = self.node[i, 1]
+                vertices[i][2] = 0.0
+        elif self.node.shape[1] == 3:
+            for i in range(self.node.shape[0]):
+                vertices[i][0] = self.node[i, 0]
+                vertices[i][1] = self.node[i, 1]
+                vertices[i][2] = self.node[i, 2] 
+
+
 
     
