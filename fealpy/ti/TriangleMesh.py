@@ -2,18 +2,8 @@ import taichi as ti
 import numpy as np
 from scipy.sparse import csr_matrix
 
-class TriangleMeshDataStructure():
-    localFace = ti.Matrix([(1, 2), (2, 0), (0, 1)])
-    ccw = ti.Matrix([0, 1, 2])
 
-    NVC = 3
-    NVE = 2
-    NVF = 2
-
-    NEC = 3
-    NFC = 3
-
-def construct_edge(NN, cell):
+def construct_edge(cell):
     """ 
     """
     NC =  cell.shape[0] 
@@ -21,7 +11,7 @@ def construct_edge(NN, cell):
     NVE = 2 
 
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
-    totalEdge = cell[:, localEdge].reshape(-1, NVE)
+    totalEdge = cell[:, localEdge].reshape(-1, 2)
     _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
             return_index=True,
             return_inverse=True,
@@ -32,13 +22,13 @@ def construct_edge(NN, cell):
     i1 = np.zeros(NE, dtype=np.int_)
     i1[j] = np.arange(NEC*NC, dtype=np.int_)
 
-    edge2cell[:, 0] = i0//NEC
-    edge2cell[:, 1] = i1//NEC
-    edge2cell[:, 2] = i0%NEC
-    edge2cell[:, 3] = i1%NEC
+    edge2cell[:, 0] = i0//3
+    edge2cell[:, 1] = i1//3
+    edge2cell[:, 2] = i0%3
+    edge2cell[:, 3] = i1%3
 
     edge = totalEdge[i0, :]
-    cell2edge = np.reshape(j, (NC, NEC))
+    cell2edge = np.reshape(j, (NC, 3))
     return edge, edge2cell, cell2edge
 
 
@@ -59,7 +49,15 @@ class TriangleMesh():
         self.cell = ti.field(self.itype, shape=(NC, 3))
         self.cell.from_numpy(cell)
 
-        edge, edge2cell, cell2edge = construct_edge(NN, cell)
+        self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
+        self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
+        self.init_grad_lambdas()
+
+        self.construct_data_structure(cell)
+
+    def construct_data_structure(self, cell):
+
+        edge, edge2cell, cell2edge = construct_edge(cell)
         NE = edge.shape[0]
 
         self.edge = ti.field(self.itype, shape=(NE, 2))
@@ -68,12 +66,146 @@ class TriangleMesh():
         self.edge2cell = ti.field(self.itype, shape=(NE, 4))
         self.edge2cell.from_numpy(edge2cell)
 
+        NC = self.number_of_cells()
         self.cell2edge = ti.field(self.itype, shape=(NC, 3))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
-        self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
-        self.init_grad_lambdas()
+    def multi_index_matrix(self, p):
+        ldof = (p+1)*(p+2)//2
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+        multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:, 1] = idx0 - multiIndex[:,2]
+        multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        return multiIndex
+
+    def number_of_local_interpolation_points(self, p):
+        return (p+1)*(p+2)//2
+
+    def number_of_global_interpolation_points(self, p):
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += (p-1)*NE
+        if p > 2:
+            NC = self.number_of_cells()
+            NP += (p-2)*(p-1)*NC//2
+        return NP
+
+    @ti.kernel 
+    def interpolation_points(self, p: ti.u32, ipoints: ti.template()):
+        NN = self.node.shape[0]
+        NE = self.edge.shape[0]
+        NC = self.cell.shape[0]
+        GD = self.node.shape[1]
+        for n in range(NN):
+            print(n)
+            for d in range(GD):
+                ipoints[n, d] = self.node[n, d]
+        if p > 1:
+            for e in range(NE):
+                s1 = NN + e*(p-1)
+                for i1 in range(1, p):
+                    i0 = p - i1 # (i0, i1)
+                    I = s1 + i1 - 1
+                    print(I, ":", i0, i1)
+                    for d in range(GD):
+                        ipoints[I, d] = (
+                                i0*self.node[self.edge[e, 0], d] + 
+                                i1*self.node[self.edge[e, 1], d])/p
+        if p > 2:
+            cdof = (p-2)*(p-1)//2
+            s0 = NN + (p-1)*NE
+            for c in range(NC):
+                i0 = p-2
+                s1 = s0 + c*cdof
+                for level in range(0, p-2):
+                    i0 = p - 2 - level
+                    for i2 in range(1, level+2):
+                        i1 = p - i0 - i2 #(i0, i1, i2)
+                        j = i1 + i2 - 2
+                        I = s1 + j*(j+1)//2 + i2 - 1  
+                        for d in range(GD):
+                            ipoints[I, d] = (
+                                    i0*self.node[self.cell[c, 0], d] + 
+                                    i1*self.node[self.cell[c, 1], d] + 
+                                    i2*self.node[self.cell[c, 2], d])/p
+                        
+
+    @ti.kernel
+    def edge_to_dof(self, p: ti.u32, edge2dof: ti.template()):
+        for i in range(self.edge.shape[0]):
+            edge2dof[i, 0] = self.edge[i, 0]
+            edge2dof[i, p] = self.edge[i, 1]
+            for j in ti.static(range(1, p)):
+                edge2dof[i, j] = self.node.shape[0] + i*(p-1) + j - 1
+
+    @ti.kernel
+    def cell_to_dof(self, p: ti.u32, cell2dof: ti.template()):
+        cdof = (p+1)*(p+2)//2 
+        NN = self.node.shape[0]
+        NE = self.edge.shape[0]
+        for c in range(self.cell.shape[0]): 
+            # 三个顶点 
+            cell2dof[c, 0] = self.cell[c, 0]
+            cell2dof[c, cdof - p - 1] = self.cell[c, 1] # 不支持负数索引
+            cell2dof[c, cdof - 1] = self.cell[c, 2]
+
+            # 第 0 条边
+            e = self.cell2edge[c, 0]
+            v0 = self.edge[e, 0]
+            s0 = NN + e*(p-1)
+            s1 = cdof - p
+            if v0 == self.cell[c, 1]:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + i
+                    s1 += 1
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + p - 2 - i
+                    s1 += 1
+
+            # 第 1 条边
+            e = self.cell2edge[c, 1]
+            v0 = self.edge[e, 0]
+            s0 = NN + e*(p-1)
+            s1 = 2
+            if v0 == self.cell[c, 0]:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + i 
+                    s1 += i + 3
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    s1 += i + 3 
+
+            # 第 2 条边
+            e = self.cell2edge[c, 2]
+            v0 = self.edge[e, 0]
+            s0 = NN + e*(p-1)
+            s1 = 1
+            if v0 == self.cell[c, 0]:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + i 
+                    s1 += i + 2
+            else:
+                for i in range(0, p-1):
+                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    s1 += i + 2 
+
+            # 内部点
+            if p >= 3:
+                level = p - 2 
+                s0 = NN + (p-1)*NE + c*(p-2)*(p-1)//2
+                s1 = 4
+                s2 = 0
+                for l in range(0, level):
+                    for i in range(0, l+1):
+                        cell2dof[c, s1] = s0 + s2 
+                        s1 += 1
+                        s2 += 1 
+                    s1 += 2
 
     def number_of_nodes(self):
         return self.node.shape[0]
@@ -475,3 +607,27 @@ class TriangleMesh():
         """
         pass
 
+    def add_plot(self, window):
+        NN = self.number_of_nodes()
+        vertices = ti.Vector.field(3, dtype=ti.f32, shape=NN)
+        self.to_vertices_3d(vertices)
+        canvas = window.get_canvas()
+        canvas.set_background_color((1.0, 1.0, 1.0))
+        canvas.triangles(vertices, indices=self.cell)
+
+    @ti.kernel
+    def to_vertices_3d(self, vertices: ti.template()):
+        if self.node.shape[1] == 2:
+            for i in range(self.node.shape[0]):
+                vertices[i][0] = self.node[i, 0]
+                vertices[i][1] = self.node[i, 1]
+                vertices[i][2] = 0.0
+        elif self.node.shape[1] == 3:
+            for i in range(self.node.shape[0]):
+                vertices[i][0] = self.node[i, 0]
+                vertices[i][1] = self.node[i, 1]
+                vertices[i][2] = self.node[i, 2] 
+
+
+
+    

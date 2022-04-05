@@ -7,7 +7,7 @@ class TetrahedronMeshDataStructure():
     localEdge = ti.Matrix([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = ti.Matrix([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
 
-def construct(NN, cell):
+def construct(cell):
     NC = cell.shape[0]
 
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
@@ -46,46 +46,145 @@ def construct(NN, cell):
 
 @ti.data_oriented
 class TetrahedronMesh():
-    def __init__(self, node, cell):
+    def __init__(self, node, cell, itype=ti.u32, ftype=ti.f64):
 
         assert cell.shape[-1] == 4
         assert node.shape[-1] == 3
 
+        self.itype = itype
+        self.ftype = ftype
+
         NN = node.shape[0]
-        GD = node.shape[1]
-        self.node = ti.field(ti.f64, (NN, 3))
+        self.node = ti.field(self.ftype, (NN, 3))
         self.node.from_numpy(node)
 
         NC = cell.shape[0]
-        self.cell = ti.field(ti.u32, shape=(NC, 4))
+        self.cell = ti.field(self.ftype, shape=(NC, 4))
         self.cell.from_numpy(cell)
-        self.ds = TetrahedronMeshDataStructure()
+
+        self.construct_data_structure(cell)
 
 
-    def construct_data_structure(self):
+    def construct_data_structure(self, cell):
         """! 构造四面体网格的辅助数据结构
         """
 
-        NN = self.number_of_nodes()
-        cell = self.cell.to_numpy()
-        face, edge, cell2edge, cell2face, face2cell = construct(NN, cell)
+        face, edge, cell2edge, cell2face, face2cell = construct(cell)
+
         NE = edge.shape[0]
         NF = face.shape[0]
+        NC = cell.shape[0]
 
-        self.edge = ti.field(ti.u32, shape=(NE, 2))
+        self.edge = ti.field(self.itype, shape=(NE, 2))
         self.edge.from_numpy(edge)
 
-        self.face = ti.field(ti.u32, shape=(NF, 3))
+        self.face = ti.field(self.itype, shape=(NF, 3))
         self.face.from_numpy(face)
 
-        self.face2cell = ti.field(ti.u32, shape=(NF, 4))
+        self.face2cell = ti.field(self.itype, shape=(NF, 4))
         self.face2cell.from_numpy(face2cell)
 
-        self.cell2edge = ti.field(ti.u32, shape=(NC, 6))
+        self.cell2edge = ti.field(self.itype, shape=(NC, 6))
         self.cell2edge.from_numpy(cell2edge)
 
-        self.cell2face = ti.field(ti.u32, shape=(NC, 4))
+        self.cell2face = ti.field(self.itype, shape=(NC, 4))
         self.cell2face.from_numpy(cell2face)
+
+    def multi_index_matrix(self, p):
+        ldof = (p+1)*(p+2)*(p+3)//6
+        idx = np.arange(1, ldof)
+        idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
+        idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+        idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+        idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+        multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+        multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+        multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+        multiIndex[1:, 1] = idx0 - idx2
+        multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+        return multiIndex
+
+    def number_of_local_interpolation_points(self, p):
+        return (p+1)*(p+2)*(p+3)//6
+
+    def number_of_global_interpolation_points(self, p):
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += NE*(p-1)
+
+        if p > 2:
+            NF = self.number_of_faces()
+            NP += NF*(p-2)*(p-1)//2
+
+        if p > 3:
+            NC = self.number_of_cells()
+            NP += NC*(p-3)*(p-2)*(p-1)//6 
+        return NP
+
+    @ti.kernel 
+    def interpolation_points(self, p: ti.u32, ipoints: ti.template()):
+        NN = self.node.shape[0]
+        NE = self.edge.shape[0]
+        NF = self.face.shape[0]
+        NC = self.cell.shape[0]
+        GD = self.node.shape[1]
+
+        for I in range(NN):
+            print(I, ":")
+            for d in range(GD):
+                ipoints[I, d] = self.node[I, d]
+
+        if p > 1:
+            for e in range(NE):
+                s1 = NN + e*(p-1)
+                for i1 in range(1, p):
+                    i0 = p - i1 # (i0, i1)
+                    I = s1 + i1 - 1
+                    print(I, ":")
+                    for d in range(GD):
+                        ipoints[I, d] = (
+                                i0*self.node[self.edge[e, 0], d] + 
+                                i1*self.node[self.edge[e, 1], d])/p
+        if p > 2:
+            fdof = (p-2)*(p-1)//2
+            s0 = NN + (p-1)*NE
+            for f in range(NF):
+                s1 = s0 + f*fdof
+                for line in range(0, p-2):
+                    i0 = p - 2 - line 
+                    for i2 in range(1, line+2):
+                        i1 = p - i0 - i2 #(i0, i1, i2)
+                        j = i1 + i2 - 2
+                        I = s1 + j*(j+1)//2 + i2 - 1  
+                        print(I, ":")
+                        for d in range(GD):
+                            ipoints[I, d] = (
+                                    i0*self.node[self.face[f, 0], d] + 
+                                    i1*self.node[self.face[f, 1], d] + 
+                                    i2*self.node[self.face[f, 2], d])/p
+        if p > 3:
+            cdof = (p-3)*(p-2)*(p-1)//6
+            s0 = NN + NE*(p-1) + NF*(p-2)*(p-1)//2
+            for c in range(NC):
+                s1 = s0 + c*cdof
+                for level in range(0, p-3):
+                    i0 = p - 3 - level
+                    for line in range(1, level+2):
+                        i1 = p - 2 - line
+                        for i3 in range(1, line+2):
+                            i2 = p - i0 - i1 - i3 #(i0, i1, i2, i3)
+                            j0 = i1 + i2 + i3 - 3
+                            j1 = i2 + i3 - 2
+                            I = s1 + j0*(j0+1)*(j0+2)//6 + j1*(j1+1)//2 + i3 - 1
+                            print(I, ":")
+                            for d in range(GD):
+                                ipoints[I, d] = (
+                                        i0*self.node[self.cell[c, 0], d] + 
+                                        i1*self.node[self.cell[c, 1], d] + 
+                                        i2*self.node[self.cell[c, 2], d] + 
+                                        i3*self.node[self.cell[c, 3], d])/p
+
 
     def geo_dimension(self):
         return 3
@@ -95,6 +194,12 @@ class TetrahedronMesh():
 
     def number_of_nodes(self):
         return self.node.shape[0]
+
+    def number_of_edges(self):
+        return self.edge.shape[0]
+
+    def number_of_faces(self):
+        return self.face.shape[0]
 
     def number_of_cells(self):
         return self.cell.shape[0]
