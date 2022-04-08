@@ -5,6 +5,7 @@ import sympy as sp
 class LagrangeFEMSpace2d:
     def __init__(self, N=20):
         self.l = sp.symbols('lambda_0, lambda_1, lambda_2', real=True)
+
         s = 'n_0'
         for i in range(1, N):
             s = s +', n_%d'%(i)
@@ -104,9 +105,8 @@ class LagrangeFEMSpace2d:
         return coef, (a0, a1, a2)
 
 
-
-
 if __name__ == "__main__":
+    p=1
     space = LagrangeFEMSpace2d()
-    M = space.mass_matrix(2)
+    M = space.mass_matrix(p)
     print(M)
