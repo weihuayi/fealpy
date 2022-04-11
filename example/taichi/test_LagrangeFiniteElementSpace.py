@@ -5,9 +5,9 @@ from fealpy.mesh import MeshFactory as MF
 
 from fealpy.decorator import cartesian
 import taichi as ti
-from fealpy.ti import TriangleMesh 
-from fealpy.ti import TetrahedronMesh
-from fealpy.ti import LagrangeFiniteElementSpace
+#from fealpy.ti import TriangleMesh 
+#from fealpy.ti import TetrahedronMesh
+#from fealpy.ti import LagrangeFiniteElementSpace
 from fealpy.functionspace import LagrangeFiniteElementSpace as LFESpace
 
 ti.init()
@@ -22,20 +22,25 @@ def usolution(p):
 node, cell = MF.boxmesh2d([0, 1, 0, 1], nx=1, ny=1, meshtype='tri', returnnc=True)
 
 lmesh = MF.boxmesh2d([0, 1, 0, 1], nx=1, ny=1, meshtype='tri')
-mesh = TriangleMesh(node, cell)
+#mesh = TriangleMesh(node, cell)
 
-space = LagrangeFiniteElementSpace(mesh, p=2)
-lspace = LFESpace(lmesh,p=2)
+#space = LagrangeFiniteElementSpace(mesh, p=2)
+lspace = LFESpace(lmesh,p=1)
 
 u0 = lspace.interpolation(usolution,dim=2)
 
 qf = lmesh.integrator(4)
 bcs,ws = qf.get_quadrature_points_and_weights()
-NN = mesh.number_of_nodes()
-NC = mesh.number_of_cells()
-NQ = len(ws)
-ldof = space.number_of_local_dofs()
+print(ws)
+print(bcs)
+#NN = mesh.number_of_nodes()
+#NC = mesh.number_of_cells()
+#NQ = len(ws)
+#ldof = space.number_of_local_dofs()
 
+print(bcs.shape)
+
+'''
 lgphi = lspace.grad_basis(bcs)
 lphi = lspace.basis(bcs)
 
@@ -59,6 +64,7 @@ A = result1.to_numpy()
 B = result2.to_numpy()
 B = np.einsum('jmn->jnm',B)
 print(A-B)
+'''
 ## 测试 \nabla u^T \cdot u
 '''
 D1 = np.einsum('i,ij,ijk,ijm,j->jkm',ws,u0(bcs)[...,0],lphi,lgphi[...,0],cellmeasure) 
