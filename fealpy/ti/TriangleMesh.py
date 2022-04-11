@@ -50,6 +50,7 @@ class TriangleMesh():
         self.cell.from_numpy(cell)
 
         self.glambda = ti.field(self.ftype, shape=(NC, 3, GD)) 
+        self.gglambda = ti.field(self.ftype, shape=(NC, 3, 3)) 
         self.cellmeasure = ti.field(self.ftype, shape=(NC, ))
         self.init_grad_lambdas()
 
@@ -302,7 +303,13 @@ class TriangleMesh():
             self.glambda[i, 1, 1] = (x0 - x2)/l
             self.glambda[i, 2, 0] = (y0 - y1)/l
             self.glambda[i, 2, 1] = (x1 - x0)/l
-
+        
+        for c in range(self.cell.shape[0]):
+            for i in ti.static(range(3)):
+                for j in ti.static(range(3)):
+                    for k in range(2):
+                        self.gglambda[c,i,j] += self.glambda[c,i,k]*self.glambda[c,j,k]
+                
 
     @ti.func
     def cell_measure(self, i: ti.u32) -> ti.f64:
@@ -497,32 +504,32 @@ class TriangleMesh():
                     S[c, i, j] = U[i, 0]*gphi[j, 0] + U[i, 1]*gphi[j, 1]
 
     @ti.kernel
-    def cell_div_matrices_11(self, S0: ti.template(), S1: ti.template):
+    def cell_div_matrices_11(self, S0: ti.template(), S1: ti.template()):
         """
         @brief 计算网格上所有单元上的一次元对流矩阵
 
         """
 
     @ti.kernel
-    def cell_div_matrices_22(self, S0: ti.template(), S1: ti.template):
+    def cell_div_matrices_22(self, S0: ti.template(), S1: ti.template()):
         """
         @brief 计算网格上所有单元上的二次元对流矩阵
         """
 
     @ti.kernel
-    def cell_div_matrices_21(self, S0: ti.template(), S1: ti.template):
+    def cell_div_matrices_21(self, S0: ti.template(), S1: ti.template()):
         """
         @brief 计算网格上所有单元上的二次元对流矩阵
         """
 
     @ti.kernel
-    def cell_div_matrices_10(self, S0: ti.template(), S1: ti.template):
+    def cell_div_matrices_10(self, S0: ti.template(), S1: ti.template()):
         """
         @brief 计算网格上所有单元上的二次元对流矩阵
         """
 
     @ti.kernel
-    def cell_div_matrices_20(self, S0: ti.template(), S1: ti.template):
+    def cell_div_matrices_20(self, S0: ti.template(), S1: ti.template()):
         """
         @brief 计算网格上所有单元上的二次元对流矩阵
         """
