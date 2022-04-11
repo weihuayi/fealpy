@@ -2,111 +2,140 @@
 import numpy as np
 import sympy as sp
 
-class LagrangeFEMSpace2d:
-    def __init__(self, N=20):
-        self.l = sp.symbols('lambda_0, lambda_1, lambda_2', real=True)
-
-        s = 'n_0'
-        for i in range(1, N):
-            s = s +', n_%d'%(i)
-        self.n = sp.symbols(s, real=True)
-
-        s = 'c_0'
-        for i in range(1, N):
-            s = s + ', c_%d'%(i)
-        self.c = sp.symbols(s, real=True)
-
-        self.n2num = {}
-        val = 1 
-        i = 1
-        for s in self.n:
-            self.n2num[s] = val
-            val *= i
-            i += 1
-
-        self.c2num = {}
-        i = 0
-        for s in self.c:
-            self.c2num[s] = i
-            i += 1
-
+class LagrangeFEMSpace:
+    def __init__(self, GD):
+        self.GD = int(GD)
+        t = 'l0'
+        for i in range(1, GD+1):
+            t = t+', l%d'%(i)   
+        self.l = sp.symbols(t, real=True)
+    
+    def number_of_dofs(self, p): 
+        GD = self.GD
+        val = 1
+        for i in range(1, GD+1):
+            val *= (i+p)//i 
+        return int(val) 
 
     def multi_index_matrix(self, p):
-        ldof = (p+1)*(p+2)//2
-        idx = np.arange(0, ldof)
-        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-        multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:, 1] = idx0 - multiIndex[:,2]
-        multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        ldof = self.number_of_dofs(p)
+        GD = self.GD
+        if GD==1:
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0] 
+        elif GD==2:
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:, 1] = idx0 - multiIndex[:,2]
+            multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        elif GD==3: 
+            idx = np.arange(1, ldof)
+            idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
+            idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+            idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+            idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+            multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+            multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+            multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+            multiIndex[1:, 1] = idx0 - idx2
+            multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
         return multiIndex
 
-    def number_of_dofs(self, p):
-        return (p+1)*(p+2)//2
 
-    def basis(self, p):
-        c = self.c
+    def basis(self,p):
         l = self.l
+        GD = self.GD
         ldof = self.number_of_dofs(p)
-        A = sp.ones(p+1, 3)
-        A[1, 0] = p*l[0]
-        A[1, 1] = p*l[1]
-        A[1, 2] = p*l[2]
-        for i in range(2, p+1):
-            for j in range(3):
-                A[i, j] = (p*l[j] - c[i-1])*A[i-1, j]*(1/sp.factorial(i))
+        A = sp.ones(p+1, GD+1)
+        for i in range(1, p+1):
+            for j in range(GD+1):
+                A[i, j] = (p*l[j] - (i-1))*A[i-1, j]
+        for i in range(1,p+1):
+            A[i,:] /= sp.factorial(i)
         mi = self.multi_index_matrix(p)
-        phi = sp.zeros(1, ldof)
+        phi = sp.ones(1, ldof)
         for i in range(ldof):
-            phi[i] = A[mi[i, 0], 0]*A[mi[i, 1], 1]*A[mi[i, 2], 2]
+            for j in range(GD+1):
+                phi[i] *= A[mi[i, j], j]
         return phi
+    
+    def multi_index(self, monoial):
+        """
+        @brief 幂指数多重指标
+        """
+        l = self.l
+        GD = self.GD
+        m = monoial.as_powers_dict()
+        a = np.zeros(GD+1, dtype=np.int_) #返回幂指标
+        for i in range(GD+1):
+            a[i] = int(m.get(l[i]) or 0)
+        return a
 
-    def mass_matrix(self, p=1):
+
+    def integrate(self, f):
+        GD = self.GD
+        f = f.expand()
+        r = 0    #积分值
+        for m in f.as_coeff_add()[1]:
+            c = m.as_coeff_mul()[0] #返回系数
+            a = self.multi_index(m) #返回单项式的幂指标
+            temp = 1
+            for i in range(d+1):
+                temp *= sp.factorial(a[i])
+            r += sp.factorial(GD)*c*temp/sp.factorial(sum(a)+sp.factorial(GD))
+        return r + f.as_coeff_add()[0]
+        
+    
+    def mass_matrix(self, p1, p2, p3=None):
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        M = sp.zeros(ldof1, ldof2)
+        p = max(p1,p2)
+        for i in range(ldof1):
+            for j in range(ldof2):
+                M[i, j] = self.integrate(phi1[i]*phi2[j])
+        return M
+
+    def stiff_matrix(self, p1, p2):
+        l = self.l
+        GD = self.GD
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        S = np.zeros(shape = (ldof1,ldof2,d+1,d+1))
+        p = max(p1, p2)
+        for i in range(ldof1):
+            for j in range(ldof2):
+                for m in range(GD + 1):
+                    for n in range(GD+1):
+                        temp= sp.diff(phi1[i],l[m])*sp.diff(phi2[j],l[n])
+                        S[i,j,m,n] = self.integrate(temp) 
+        return S
+
+
+    def A_matrix(self,p):
         ldof = self.number_of_dofs(p)
         M = sp.zeros(ldof, ldof)
-        n = self.n
         mi = self.multi_index_matrix(p)
         phi = self.basis(p)
         for i in range(ldof):
             for j in range(ldof):
                 M[i, j] = self.integrate(phi[i]*phi[j], p)
-                M[i, j] = M[i, j].subs(self.c2num).subs(self.n2num)
+        return M
+    
+    def B_matrix(self,p):
+        ldof = self.number_of_dofs(p)
+        M = sp.zeros(ldof, ldof)
+        mi = self.multi_index_matrix(p)
+        phi = self.basis(p)
+        for i in range(ldof):
+            for j in range(ldof):
+                M[i, j] = self.integrate(phi[i]*phi[j], p)
         return M
 
-    def integrate(self, f, p):
-        f = f.expand()
-        n = self.n
-        r = 0
-        #print('f=', f, 'f.as_coeff_add() = ', f.as_coeff_add())
-        for m in f.as_coeff_add()[1]:
-            c = m.as_coeff_mul()[0]
-            coef, a = self.multi_index(m, p)
-            #print("m:\n", m, c, coef, a)
-            r += c*coef*n[a[0]]*n[a[1]]*n[a[2]]/n[sum(a)+2]
-
-        return n[2]*r
-
-    def multi_index(self, monoial, p):
-        """
-        @brief 返回单项式的系数和幂指数多重指标
-        """
-        l = self.l
-        c = self.c
-        d = monoial.as_powers_dict()
-        a0 = int(d.get(l[0]) or 0)
-        a1 = int(d.get(l[1]) or 0)
-        a2 = int(d.get(l[2]) or 0)
-
-        coef = 1
-        for i in range(1, p):
-            val = d.get(c[i])
-            if val:
-                coef = coef*c[i]**val
-        return coef, (a0, a1, a2)
-
-
-if __name__ == "__main__":
-    p=1
-    space = LagrangeFEMSpace2d()
-    M = space.mass_matrix(p)
-    print(M)
