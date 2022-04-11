@@ -30,6 +30,8 @@ class LagrangeFiniteElementSpace():
         self.edof = p+1
         self.fdof = (p+1)*(p+2)//2
         self.vdof = (p+1)*(p+2)*(p+3)//6
+        
+        TD = self.top_dimension() 
 
         self.edge2dof = ti.field(self.itype, shape=(NE, self.edof))
         if TD == 2:
@@ -51,9 +53,19 @@ class LagrangeFiniteElementSpace():
     def top_dimension(self):
         return self.multiIndex.shape[1] - 1
 
+    def number_of_nodes(self):
+        return self.mesh.node.shape[0]
+    
     def number_of_local_dofs(self):
         return self.multiIndex.shape[0]
 
+    def number_of_cells(self):
+        return self.mesh.cell.shape[0]
+    
+    def number_of_global_dofs(self):
+        return self.mesh.number_of_global_interpolation_points(self.p)
+   
+    
     def shape_function(self, bc):
         """
 
@@ -66,7 +78,7 @@ class LagrangeFiniteElementSpace():
 
         p = self.p
         TD = bc.shape[-1] - 1
-        multiIndex = multi_index_matrix[TD](p) 
+        multiIndex = self.mesh.multi_index_matrix(p)
         ldof = multiIndex.shape[0] # p 次 Lagrange 形函数的个数 
 
         c = np.arange(1, p+1, dtype=np.int_)
@@ -98,19 +110,175 @@ class LagrangeFiniteElementSpace():
             R1[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
         R0 = np.prod(Q, axis=-1)
         return R0, R1 
-
+    
+    @ti.kernel
+    def cell_stiff_matrices(self, 
+            S: ti.template(), 
+            B: ti.template(),
+            W: ti.template()
+            ):
+        """
+        计算网格上的所有单元刚度矩阵
+        """ 
+        ldof = B.shape[1]
+        NQ = W.shape[0]
+        NC = self.mesh.cell.shape[0]
+     
+        for c in range(NC):
+            L,cm = self.mesh.grad_lambda(c)
+            for k in range(NQ):
+                for i in range(ldof):
+                    vix = B[k,i,0]*L[0,0]+B[k,i,1]*L[1,0]+B[k,i,2]*L[2,0]
+                    viy = B[k,i,0]*L[0,1]+B[k,i,1]*L[1,1]+B[k,i,2]*L[2,1]
+                    S[c,i,i] += cm*W[k]*(vix*vix+viy*viy)
+                    for j in range(i+1,ldof):
+                        vjx = B[k,j,0]*L[0,0]+B[k,j,1]*L[1,0]+B[k,j,2]*L[2,0]
+                        vjy = B[k,j,0]*L[0,1]+B[k,j,1]*L[1,1]+B[k,j,2]*L[2,1]
+                        S[c,i,j] += cm*W[k]*(vix*vjx+viy*vjy)
+                        S[c,j,i] = S[c,i,j]
+    
+    @ti.kernel
+    def cell_pTgpx_matrices(self, 
+            S: ti.template(), 
+            B: ti.template(), 
+            G: ti.template(),
+            W: ti.template(),
+            C: ti.template()
+            ):
+        """
+        计算网格上的所有单元刚度矩阵
+        """ 
+        ldofi = B.shape[1]
+        ldofj = G.shape[1]
+        NQ = W.shape[0]
+        NC = self.mesh.cell.shape[0]
+        if ti.static(C == None):
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        for j in range(ldofj):
+                            vjx = G[k,j,0]*L[0,0]+G[k,j,1]*L[1,0]+G[k,j,2]*L[2,0]
+                            S[c,i,j] += W[k]*cm*vjx*B[k,i]
+        else:
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        for j in range(ldofj):
+                            vjx = G[k,j,0]*L[0,0]+G[k,j,1]*L[1,0]+G[k,j,2]*L[2,0]
+                            S[c,i,j] += C[k,c]*W[k]*cm*vjx*B[k,i]
+    
+    @ti.kernel
+    def cell_pTgpy_matrices(self, 
+            S: ti.template(), 
+            B: ti.template(), 
+            G: ti.template(),
+            W: ti.template(),
+            C: ti.template()
+            ):
+        """
+        计算网格上的所有单元刚度矩阵
+        """ 
+        NQ = W.shape[0]
+        NC = self.mesh.cell.shape[0]
+        ldofi = B.shape[1]
+        ldofj = G.shape[1]
+        if ti.static(C == None):
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        for j in range(ldofj):
+                            vjy = G[k,j,0]*L[0,1]+G[k,j,1]*L[1,1]+G[k,j,2]*L[2,1]
+                            S[c,i,j] += W[k]*cm*vjy*B[k,i]
+        else :
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        for j in range(ldofj):
+                            vjy = G[k,j,0]*L[0,1]+G[k,j,1]*L[1,1]+G[k,j,2]*L[2,1]
+                            S[c,i,j] += C[k,c]*W[k]*cm*vjy*B[k,i]
+    
+    @ti.kernel
+    def cell_gpxTp_matrices(self, 
+            S: ti.template(), 
+            B: ti.template(), 
+            G: ti.template(), 
+            W: ti.template(),
+            C: ti.template()
+            ):
+        """
+        计算网格上的所有单元刚度矩阵
+        """ 
+        NQ = W.shape[0]
+        NC = self.mesh.cell.shape[0]
+     
+        ldofi = G.shape[1]
+        ldofj = B.shape[1]
+        if ti.static(C == None):
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        vix = G[k,i,0]*L[0,0]+G[k,i,1]*L[1,0]+G[k,i,2]*L[2,0]
+                        for j in range(ldofj):
+                            S[c,i,j] += W[k]*cm*vix*B[k,j]
+        else :
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        vix = G[k,i,0]*L[0,0]+G[k,i,1]*L[1,0]+G[k,i,2]*L[2,0]
+                        for j in range(ldofj):
+                            S[c,i,j] += C[k,c]*W[k]*cm*vix*B[k,j]
+    
+    @ti.kernel
+    def cell_gpyTp_matrices(self, 
+            S: ti.template(), 
+            B: ti.template(), 
+            G: ti.template(), 
+            W: ti.template(),
+            C: ti.template()
+            ):
+        """
+        计算网格上的所有单元刚度矩阵
+        """ 
+        ldof = B.shape[1]
+        NQ = W.shape[0]
+        NC = self.mesh.cell.shape[0]
+     
+        ldofi = G.shape[1]
+        ldofj = B.shape[1]
+        if ti.static(C == None):
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        viy = G[k,i,0]*L[0,1]+G[k,i,1]*L[1,1]+G[k,i,2]*L[2,1]
+                        for j in range(ldofj):
+                            S[c,i,j] += W[k]*cm*viy*B[k,j]
+        else :
+            for c in range(NC):
+                L,cm = self.mesh.grad_lambda(c)
+                for k in range(NQ):
+                    for i in range(ldofi):
+                        viy = G[k,i,0]*L[0,1]+G[k,i,1]*L[1,1]+G[k,i,2]*L[2,1]
+                        for j in range(ldofj):
+                            S[c,i,j] += C[k,c]*W[k]*cm*vix*B[k,j]
+    
     @ti.kernel
     def cell_mass_matrices(self, 
             S: ti.template(), 
             B: ti.template(), 
-            W: ti.template()
+            W: ti.template(),
+            val: ti.template()
             ):
         """
         计算网格上的所有单元质量矩阵
-        """
-       
+        """ 
         # 积分单元矩阵
-        val = ti.Matrix.zero(self.f64, B.shape[1], B.shape[1])
         for k in ti.static(range(B.shape[0])):
             for i in ti.static(range(B.shape[1])):
                 val[i, i] += W[k]*B[k, i]*B[k, i]
@@ -124,6 +292,7 @@ class LagrangeFiniteElementSpace():
                 for j in ti.static(range(i+1, B.shape[1])):
                     S[c, i, j] = cm*val[i, j]
                     S[c, j, i] = S[c, i, j]
+    
 
 
     def mass_matrix(self, bc, ws, c=None):
@@ -136,24 +305,30 @@ class LagrangeFiniteElementSpace():
         NQ = len(ws)
 
         B = ti.field(ti.f64, shape=(NQ, ldof))
-        R0, _ = self.lagrange_shape_function(bc)
+        R0,_ = self.shape_function(bc)
         B.from_numpy(R0)
 
         W = ti.field(ti.f64, shape=(NQ, ))
         W.from_numpy(ws)
-
+        
+        val = ti.field(ti.f64, shape=(ldof,ldof))
         K = ti.field(ti.f64, shape=(NC, ldof, ldof))
-        self.cell_mass_matrices(K, B, W)
+        self.cell_mass_matrices(K, B, W,val)
 
         M = K.to_numpy()
         if c is not None:
             M *= c # 目前假设 c 是常数
-
-        cell = self.cell.to_numpy()
-        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
-
-        NN = self.number_of_nodes() 
+        
+        
+        cell2dof = ti.field(ti.u32,shape=(NC,ldof))
+        self.mesh.cell_to_dof(self.p,cell2dof)
+        cell2dof = cell2dof.to_numpy()
+        
+        NN = self.number_of_global_dofs()
+        
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+        
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
         return M
 

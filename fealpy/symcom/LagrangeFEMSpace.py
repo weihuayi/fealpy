@@ -54,7 +54,7 @@ class LagrangeFEMSpace2d:
         A[1, 2] = p*l[2]
         for i in range(2, p+1):
             for j in range(3):
-                A[i, j] = (p*l[j] - c[i-1])*A[i-1, j]
+                A[i, j] = (p*l[j] - c[i-1])*A[i-1, j]*(1/sp.factorial(i))
         mi = self.multi_index_matrix(p)
         phi = sp.zeros(1, ldof)
         for i in range(ldof):
@@ -70,8 +70,6 @@ class LagrangeFEMSpace2d:
         for i in range(ldof):
             for j in range(ldof):
                 M[i, j] = self.integrate(phi[i]*phi[j], p)
-                M[i, j] /= n[mi[i, 0]]*n[mi[i, 1]]*n[mi[i, 2]]
-                M[i, j] /= n[mi[j, 0]]*n[mi[j, 2]]*n[mi[j, 2]]
                 M[i, j] = M[i, j].subs(self.c2num).subs(self.n2num)
         return M
 
@@ -79,14 +77,14 @@ class LagrangeFEMSpace2d:
         f = f.expand()
         n = self.n
         r = 0
-        print('f=', f, 'f.as_coeff_add() = ', f.as_coeff_add())
+        #print('f=', f, 'f.as_coeff_add() = ', f.as_coeff_add())
         for m in f.as_coeff_add()[1]:
             c = m.as_coeff_mul()[0]
             coef, a = self.multi_index(m, p)
-            print("m:\n", m, c, coef, a)
+            #print("m:\n", m, c, coef, a)
             r += c*coef*n[a[0]]*n[a[1]]*n[a[2]]/n[sum(a)+2]
 
-        return r*n[2]
+        return n[2]*r
 
     def multi_index(self, monoial, p):
         """
@@ -108,7 +106,7 @@ class LagrangeFEMSpace2d:
 
 
 if __name__ == "__main__":
-    p = 1
+    p=1
     space = LagrangeFEMSpace2d()
     M = space.mass_matrix(p)
     print(M)
