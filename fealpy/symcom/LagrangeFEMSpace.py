@@ -83,7 +83,7 @@ class LagrangeFEMSpace:
             c = m.as_coeff_mul()[0] #返回系数
             a = self.multi_index(m) #返回单项式的幂指标
             temp = 1
-            for i in range(d+1):
+            for i in range(GD+1):
                 temp *= sp.factorial(a[i])
             r += sp.factorial(GD)*c*temp/sp.factorial(sum(a)+sp.factorial(GD))
         return r + f.as_coeff_add()[0]
@@ -141,3 +141,9 @@ class LagrangeFEMSpace:
 
 
 
+if __name__ == "__main__":
+    from sympy import *
+    p=2
+    space = LagrangeFEMSpace(2)
+    M = space.mass_matrix(p, p)
+    print(latex(180*M))
