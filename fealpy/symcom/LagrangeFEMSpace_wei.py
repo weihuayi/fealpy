@@ -77,7 +77,6 @@ class LagrangeFEMSpace2d:
         f = f.expand()
         n = self.n
         r = 0
-        #print('f=', f, 'f.as_coeff_add() = ', f.as_coeff_add())
         for m in f.as_coeff_add()[1]:
             c = m.as_coeff_mul()[0]
             coef, a = self.multi_index(m, p)
@@ -106,7 +105,8 @@ class LagrangeFEMSpace2d:
 
 
 if __name__ == "__main__":
-    p=1
+    from sympy import *
+    p=4
     space = LagrangeFEMSpace2d()
     M = space.mass_matrix(p)
-    print(M)
+    print(latex(M))
