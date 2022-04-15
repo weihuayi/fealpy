@@ -69,7 +69,7 @@ class Poisuille:
         y = p[...,1]
         value = np.zeros(p.shape)
         value[...,0] = 4*y*(1-y)
-    return value
+        return value
 
     @cartesian
     def pressure(self, p):
@@ -94,3 +94,46 @@ class Poisuille:
     @cartesian
     def dirichlet(self, p):
         return self.velocity(p)
+
+class FlowPastCylinder:
+    """
+    [0, 1]^2
+    u(x, y) = (4y(1-y), 0)
+    p = 8(1-x)
+    """
+    def __init__(self,eps=1e-12):
+        self.eps = eps
+        self.box = [0, 1, 0, 1]
+
+    def domain(self):
+        return self.box
+
+
+    @cartesian
+    def is_outflow_boundary(self,p):
+        return np.abs(p[..., 0] - 2.2) < self.eps
+    
+    @cartesian
+    def is_inflow_boundary(self,p):
+        return np.abs(p[..., 0]) < self.eps
+    
+    @cartesian
+    def is_circle_boundary(self,p):
+        x = p[...,0]
+        y = p[...,1]
+        return (np.sqrt(x**2 + y**2) - 0.05) < self.eps
+      
+    @cartesian
+    def is_wall_boundary(self,p):
+        return (np.abs(p[..., 1] -0.41) < self.eps) | \
+               (np.abs(p[..., 1] ) < self.eps)
+
+    @cartesian
+    def u_inflow_dirichlet(self, p):
+        x = p[...,0]
+        y = p[...,1]
+        value = np.zeros(p.shape,dtype=np.float)
+        value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
+        value[...,1] = 0
+        return value
+    
