@@ -14,7 +14,7 @@ class LagrangeFEMSpace:
         GD = self.GD
         val = 1
         for i in range(1, GD+1):
-            val *= (i+p)//i 
+            val *= (i+p)/i 
         return int(val) 
 
     def multi_index_matrix(self, p):
@@ -83,59 +83,72 @@ class LagrangeFEMSpace:
             c = m.as_coeff_mul()[0] #返回系数
             a = self.multi_index(m) #返回单项式的幂指标
             temp = 1
-            for i in range(d+1):
+            for i in range(GD+1):
                 temp *= sp.factorial(a[i])
-            r += sp.factorial(GD)*c*temp/sp.factorial(sum(a)+sp.factorial(GD))
+            r += sp.factorial(GD)*c*temp/sp.factorial(sum(a)+GD)
         return r + f.as_coeff_add()[0]
         
     
-    def mass_matrix(self, p1, p2, p3=None):
+    def phi_phi_matrix(self, p1, p2, p3=None):
         ldof1 = self.number_of_dofs(p1)
         ldof2 = self.number_of_dofs(p2)
         phi1 = self.basis(p1)
         phi2 = self.basis(p2)
-        M = sp.zeros(ldof1, ldof2)
-        p = max(p1,p2)
+        M = sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2),(1,ldof1,ldof2))
         for i in range(ldof1):
             for j in range(ldof2):
-                M[i, j] = self.integrate(phi1[i]*phi2[j])
+                M[0,i, j] = self.integrate(phi1[i]*phi2[j])
         return M
 
-    def stiff_matrix(self, p1, p2):
+    def gphi_gphi_matrix(self, p1, p2):
         l = self.l
         GD = self.GD
         ldof1 = self.number_of_dofs(p1)
         ldof2 = self.number_of_dofs(p2)
         phi1 = self.basis(p1)
         phi2 = self.basis(p2)
-        S = np.zeros(shape = (ldof1,ldof2,d+1,d+1))
-        p = max(p1, p2)
+        S =sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*(GD+1))*(GD+1)\
+                , (ldof1,ldof2,GD+1,GD+1))
         for i in range(ldof1):
             for j in range(ldof2):
                 for m in range(GD + 1):
-                    for n in range(GD+1):
+                    for n in range(GD + 1):
                         temp= sp.diff(phi1[i],l[m])*sp.diff(phi2[j],l[n])
                         S[i,j,m,n] = self.integrate(temp) 
         return S
 
 
-    def A_matrix(self,p):
-        ldof = self.number_of_dofs(p)
-        M = sp.zeros(ldof, ldof)
-        mi = self.multi_index_matrix(p)
-        phi = self.basis(p)
-        for i in range(ldof):
-            for j in range(ldof):
-                M[i, j] = self.integrate(phi[i]*phi[j], p)
-        return M
+    def gphi_phi_matrix(self, p1, p2):
+        l = self.l
+        GD = self.GD
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        S = np.zeros(shape = (ldof1, ldof2, GD+1))
+        S =sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*(GD+1))\
+                ,(ldof1, ldof2 ,GD+1))
+        for i in range(ldof1):
+            for j in range(ldof2):
+                for n in range(GD + 1):
+                    temp= sp.diff(phi1[i],l[n])*phi2[j]
+                    S[i,j,n] = self.integrate(temp) 
+        return S
     
-    def B_matrix(self,p):
-        ldof = self.number_of_dofs(p)
-        M = sp.zeros(ldof, ldof)
-        mi = self.multi_index_matrix(p)
-        phi = self.basis(p)
-        for i in range(ldof):
-            for j in range(ldof):
-                M[i, j] = self.integrate(phi[i]*phi[j], p)
-        return M
+    def phi_gphi_phi_matrix(self, p1, p2):
+        l = self.l
+        GD = self.GD
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        S = np.zeros(shape = (ldof1, ldof2, GD+1))
+        S =sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*(GD+1))\
+                ,(ldof1, ldof2 ,GD+1))
+        for i in range(ldof1):
+            for j in range(ldof2):
+                for n in range(GD + 1):
+                    temp= sp.diff(phi1[i],l[n])*phi2[j]
+                    S[i,j,n] = self.integrate(temp) 
+        return S
 
