@@ -99,23 +99,35 @@ class StructureQuadMesh(Mesh2d):
         return F
 
     def laplace_operator(self):
-        n0 = self.ds.ny + 1
-        n1 = self.ds.nx + 1
-        hx = 1/(self.hx**2)
-        hy = 1/(self.hy**2)
+        """
+        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x 方向和 y
+        方向都均匀剖分，但步长可以不一样
+        @todo 处理带系数的情形
+        """
 
-        d0 = (2*hy)*np.ones(n0, dtype=self.ftype)
-        d1 = -hy*np.ones(n0-1, dtype=self.ftype)
-        T0 = diags([d0, d1, d1], [0, -1, 1])
-        I0 = eye(n0)
- 
-        d0 = (2*hx)*np.ones(n1, dtype=self.ftype)
-        d1 = -hx*np.ones(n1-1, dtype=self.ftype)
-        T1 = diags([d0, d1, d1], [0, -1, 1])
-        I1 = eye(n1)
+        n0 = self.ds.nx + 1
+        n1 = self.ds.ny + 1
+        cx = 1/(self.hx**2)
+        cy = 1/(self.hy**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN).reshape(n0, n1)
 
-        A = kron(I1, T0) + kron(T1, I0)
-        return A
+        A = diags([2*(cx+cy)], [0], shape=(NN, NN), format='coo')
+
+        val = np.full(NN-n1, -cx, dtype=self.ftype)
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.full(NN-n0, -cy, dtype=self.ftype)
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A.tocsr()
+
 
     def cell_location(self, px):
         """

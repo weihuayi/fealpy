@@ -1,8 +1,8 @@
 import taichi as ti
 import numpy as np
 from scipy.sparse import csr_matrix
-
-
+from fealpy.symcom  import LagrangeFEMSpace
+from fealpy.ti.TriangleMeshData import phiphi,gphigphi,gphiphi
 def construct_edge(cell):
     """ 
     """
@@ -45,6 +45,8 @@ class TriangleMesh():
         self.node = ti.field(self.ftype, (NN, GD))
         self.node.from_numpy(node)
 
+        self.cellspace = LagrangeFEMSpace(GD)
+        
         NC = cell.shape[0]
         self.cell = ti.field(self.itype, shape=(NC, 3))
         self.cell.from_numpy(cell)
@@ -95,12 +97,14 @@ class TriangleMesh():
 
     @ti.kernel 
     def interpolation_points(self, p: ti.u32, ipoints: ti.template()):
+        """
+        @brief 生成三角形网格上 p 次的插值点
+        """
         NN = self.node.shape[0]
         NE = self.edge.shape[0]
         NC = self.cell.shape[0]
         GD = self.node.shape[1]
         for n in range(NN):
-            print(n)
             for d in range(GD):
                 ipoints[n, d] = self.node[n, d]
         if p > 1:
@@ -109,7 +113,6 @@ class TriangleMesh():
                 for i1 in range(1, p):
                     i0 = p - i1 # (i0, i1)
                     I = s1 + i1 - 1
-                    print(I, ":", i0, i1)
                     for d in range(GD):
                         ipoints[I, d] = (
                                 i0*self.node[self.edge[e, 0], d] + 
@@ -134,7 +137,10 @@ class TriangleMesh():
                         
 
     @ti.kernel
-    def edge_to_dof(self, p: ti.u32, edge2dof: ti.template()):
+    def edge_to_ipoint(self, p: ti.u32, edge2ipoint: ti.template()):
+        """
+        @brief 返回每个边上对应 p 次插值点的全局编号
+        """
         for i in range(self.edge.shape[0]):
             edge2dof[i, 0] = self.edge[i, 0]
             edge2dof[i, p] = self.edge[i, 1]
@@ -142,15 +148,18 @@ class TriangleMesh():
                 edge2dof[i, j] = self.node.shape[0] + i*(p-1) + j - 1
 
     @ti.kernel
-    def cell_to_dof(self, p: ti.u32, cell2dof: ti.template()):
+    def cell_to_ipoint(self, p: ti.i32, cell2ipoint: ti.template()):
+        """
+        @brief 返回每个单元上对应 p 次插值点的全局编号
+        """
         cdof = (p+1)*(p+2)//2 
         NN = self.node.shape[0]
         NE = self.edge.shape[0]
         for c in range(self.cell.shape[0]): 
             # 三个顶点 
-            cell2dof[c, 0] = self.cell[c, 0]
-            cell2dof[c, cdof - p - 1] = self.cell[c, 1] # 不支持负数索引
-            cell2dof[c, cdof - 1] = self.cell[c, 2]
+            cell2ipoint[c, 0] = self.cell[c, 0]
+            cell2ipoint[c, cdof - p - 1] = self.cell[c, 1] # 不支持负数索引
+            cell2ipoint[c, cdof - 1] = self.cell[c, 2]
 
             # 第 0 条边
             e = self.cell2edge[c, 0]
@@ -159,11 +168,11 @@ class TriangleMesh():
             s1 = cdof - p
             if v0 == self.cell[c, 1]:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + i
+                    cell2ipoint[c, s1] = s0 + i
                     s1 += 1
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + p - 2 - i
+                    cell2ipoint[c, s1] = s0 + p - 2 - i
                     s1 += 1
 
             # 第 1 条边
@@ -173,11 +182,11 @@ class TriangleMesh():
             s1 = 2
             if v0 == self.cell[c, 0]:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + i 
+                    cell2ipoint[c, s1] = s0 + i 
                     s1 += i + 3
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    cell2ipoint[c, s1] = s0 + p - 2 - i 
                     s1 += i + 3 
 
             # 第 2 条边
@@ -187,11 +196,11 @@ class TriangleMesh():
             s1 = 1
             if v0 == self.cell[c, 0]:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + i 
+                    cell2ipoint[c, s1] = s0 + i 
                     s1 += i + 2
             else:
                 for i in range(0, p-1):
-                    cell2dof[c, s1] = s0 + p - 2 - i 
+                    cell2ipoint[c, s1] = s0 + p - 2 - i 
                     s1 += i + 2 
 
             # 内部点
@@ -202,7 +211,7 @@ class TriangleMesh():
                 s2 = 0
                 for l in range(0, level):
                     for i in range(0, l+1):
-                        cell2dof[c, s1] = s0 + s2 
+                        cell2ipoint[c, s1] = s0 + s2 
                         s1 += 1
                         s2 += 1 
                     s1 += 2
@@ -272,7 +281,7 @@ class TriangleMesh():
     @ti.kernel
     def init_grad_lambdas(self):
         """
-        初始化网格中每个单元上重心坐标函数的梯度，以及单元的面积
+        @brief 初始化网格中每个单元上重心坐标函数的梯度，以及单元的面积
         """
         assert self.node.shape[1] == 2
 
@@ -295,7 +304,7 @@ class TriangleMesh():
             self.glambda[i, 1, 1] = (x0 - x2)/l
             self.glambda[i, 2, 0] = (y0 - y1)/l
             self.glambda[i, 2, 1] = (x1 - x0)/l
-
+        
 
     @ti.func
     def cell_measure(self, i: ti.u32) -> ti.f64:
@@ -312,6 +321,7 @@ class TriangleMesh():
         l *= 0.5
         return l
 
+    
     @ti.func
     def grad_lambda(self, i: ti.u32) -> (ti.types.matrix(3, 2, ti.f64), ti.f64):
         """
@@ -365,9 +375,9 @@ class TriangleMesh():
         return grad, l
 
     @ti.kernel
-    def cell_stiff_matrices(self, S: ti.template()):
+    def cell_stiff_matrices_1(self, S: ti.template()):
         """
-        计算网格上的所有单元刚度矩阵
+        @brief 计算网格上的所有单元上的线性元刚度矩阵
         """
         for c in range(self.cell.shape[0]):
             gphi, cm = self.grad_lambda(c) 
@@ -384,11 +394,13 @@ class TriangleMesh():
             S[c, 2, 1] = S[c, 1, 2]
             S[c, 2, 2] = cm*(gphi[2, 0]*gphi[2, 0] + gphi[2, 1]*gphi[2, 1])
 
+
+
     @ti.kernel
-    def cell_mass_matrices(self, S: ti.template()):
+    def cell_mass_matrices_11(self, S: ti.template()):
         """
-        计算网格上的所有单元质量矩阵
-        """
+        @brief 计算网格上的所有单元上的线性元的质量矩阵
+        """        
         for c in range(self.cell.shape[0]):
             cm = self.cell_measure(c)
             c0 = cm/6.0
@@ -404,12 +416,246 @@ class TriangleMesh():
 
             S[c, 2, 0] = c1 
             S[c, 2, 1] = c1 
-            S[c, 2, 2] = c0 
+            S[c, 2, 2] = c0
+
+    def cell_to_dof(self, p):
+        NC = self.number_of_cells()
+        ldof = self.number_of_local_interpolation_points(p)
+        cell2ipoint = ti.field(self.itype, shape=(NC, ldof))
+        self.cell_to_ipoint(p, cell2ipoint)
+        cell2dof = cell2ipoint.to_numpy()
+        return cell2dof
+    '''
+    def cell_mass_matrix(self, p1, p2, c=None):
+        index = str(p1)+str(p2)
+        cellmeasure = self.cellmeasure.to_numpy()
+        c2f = self.cell_to_dof(p1)
+        NC = self.number_of_cells()
+        if c == None:
+            val = phiphi[index]
+            val = np.einsum('cij,c->cij', val, cellmeasure)
+        else:
+            pass
+            #val = phiphiphi[index]
+            #coff = c[c2f]
+            #val = np.einsum('cijk,c,ci->cjk', val, cellmeasure, coff)
+        return val
+    '''
+
+    def cell_mass_matrix(self, p1, p2, c=None):
+        index = str(p1)+str(p2)
+        return phiphi[index]
+
+
+    def cell_stiff_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphigphi[index]
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ckm, clm->cij', A, B ,B)
+        return val 
+    
+    def cell_gphix_phi_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphiphi[index]
+        B = self.glambda.to_numpy()
+        gx = np.einsum('ijk, ck ->cij', A, B[...,0])
+        return gy
+    
+    def cell_gphiy_phi_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphiphi[index]
+        B = self.glambda.to_numpy()
+        gy = np.einsum('ijk, ck ->cij', A, B[...,1])
+        return gy
+    
+    
+    def cell_gphix_gphix_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphigphi[index]
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ck, cl->cij', A, B[...,0] ,B[...,0])
+        return val 
+    
+    def cell_gphix_gphiy_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphigphi[index]
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ck, cl->cij', A, B[...,0] ,B[...,1])
+        return val 
+    
+    def cell_gphiy_gphix_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphigphi[index]
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ck, cl->cij', A, B[...,1] ,B[...,0])
+        return val 
+    
+    def cell_gphiy_gphiy_matrix(self, p1, p2):
+        index = str(p1)+str(p2)
+        A = gphigphi[index]
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ck, cl->cij', A, B[...,1], B[...,1])
+        return val 
+
+    '''
+    def cell_mass_matrix(self, p1, p2):
+        return self.cellspace.mass_matrix(p1, p2)
+
+    def cell_stiff_matrices(self, p1, p2):
+        A = np.array(self.cellspace.stiff_matrix(p1,p2).tolist(),dtype=np.float64)
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijkl, ckm, clm->cij', A, B ,B)
+        return val
+    
+    def cell_gphi_phi_matrices(self, p1, p2):
+        A = np.array(self.cellspace.gphi_phi_matrix(p1,p2).tolist(),dtype=np.float64)
+        B = self.glambda.to_numpy()
+        gx = np.einsum('ijk, ck ->cij', A, B[...,0])
+        gy = np.einsum('ijk, ck ->cij', A, B[...,1])
+        return gx,gy
+    '''
+    
+    def source_mass_vector(self, p1, p2 ,c):
+        index = str(p1)+str(p2)
+        val = phiphi[index]
+        c2f1 = self.cell_to_dof(p1)
+        c2f2 = self.cell_to_dof(p2)
+        gdof = self.number_of_global_interpolation_points(p2)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        val = np.einsum('cij, ci, c -> cj', val, c[c2f1], cellmeasure)
+        result = np.zeros((gdof))
+        np.add.at(result, c2f2, val)
+        return result
+    
+    def source_gphix_phi_vector(self, p1, p2 ,c):
+        index = str(p1)+str(p2)
+        val = gphiphi[index]
+        c2f1 = self.cell_to_dof(p1)
+        c2f2 = self.cell_to_dof(p2)
+        gdof = self.number_of_global_interpolation_points(p1)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijk,ck,cj,c -> ci', val,B[...,0], c[c2f2], cellmeasure)
+        result = np.zeros((gdof))
+        np.add.at(result, c2f1, val)
+        return result
+    
+    def source_gphixx_phi_vector(self, p1, p2 ,c):
+        index = str(p1)+str(p2)
+        val = gphiphi[index]
+        c2f1 = self.cell_to_dof(p1)
+        c2f2 = self.cell_to_dof(p2)
+        gdof = self.number_of_global_interpolation_points(p2)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijk,ck,ci,c -> cj', val,B[...,0], c[c2f1], cellmeasure)
+        result = np.zeros((gdof))
+        np.add.at(result, c2f2, val)
+        return result
+    
+    def source_gphiyy_phi_vector(self, p1, p2 ,c):
+        index = str(p1)+str(p2)
+        val = gphiphi[index]
+        c2f1 = self.cell_to_dof(p1)
+        c2f2 = self.cell_to_dof(p2)
+        gdof = self.number_of_global_interpolation_points(p2)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijk,ck,ci,c -> cj', val,B[...,1], c[c2f1], cellmeasure)
+        result = np.zeros((gdof))
+        np.add.at(result, c2f2, val)
+        return result
+    
+    def source_gphiy_phi_vector(self, p1, p2 ,c):
+        index = str(p1)+str(p2)
+        val = gphiphi[index]
+        c2f1 = self.cell_to_dof(p1)
+        c2f2 = self.cell_to_dof(p2)
+        gdof = self.number_of_global_interpolation_points(p1)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        B = self.glambda.to_numpy()
+        val = np.einsum('ijk,ck,cj,c -> ci', val,B[...,1], c[c2f2], cellmeasure)
+        result = np.zeros((gdof))
+        np.add.at(result, c2f1, val)
+        return result
+
+    def construct_matrix(self, p1, p2 ,matrixtype='mass'):
+        '''
+        '''
+        if matrixtype == 'mass' :
+            m = self.cell_mass_matrix(p1,p2)
+        elif matrixtype == 'stiff':
+            m = self.cell_stiff_matrix(p1,p2)
+        elif matrixtype == 'gpx_gpx':
+            m = self.cell_gphix_gphix_matrix(p1,p2)
+        elif matrixtype == 'gpx_gpy':
+            m = self.cell_gphix_gphiy_matrix(p1,p2)
+        elif matrixtype == 'gpy_gpx':
+            m = self.cell_gphiy_gphix_matrix(p1,p2)
+        elif matrixtype == 'gpy_gpy':
+            m = self.cell_gphiy_gphiy_matrix(p1,p2)
+        elif matrixtype == 'gpx_p':
+            m = self.cell_gphi_phi_matrix(p1,p2)
+        elif matrixtype == 'gpy_p':
+            m = self.cell_gphi_phi_matrix(p1,p2)
+        NC = self.number_of_cells()
+        cellmeasure = self.cellmeasure.to_numpy()
+        m = np.einsum('cij,c->cij', m, cellmeasure)
+        ldof1 = m.shape[-2]
+        ldof2 = m.shape[-1]
+        cell2dof1 = self.cell_to_dof(p1)
+        cell2dof2 = self.cell_to_dof(p2)
+        I = np.broadcast_to(cell2dof1[:, :, None], shape = m.shape)
+        J = np.broadcast_to(cell2dof2[:, None, :], shape = m.shape)
+        gdof1 = self.number_of_global_interpolation_points(p1)
+        gdof2 = self.number_of_global_interpolation_points(p2)
+        val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
+        return val
+    '''  
+    @ti.kernel
+    def cell_convection_matrices_1(self, u: ti.template(), S: ti.template()):
+        """
+        @brief 计算网格上所有单元上的线性元对流矩阵
+
+        (\\boldsymbol u \\cdot \\nabla \\phi, w)， 水平集函数中会用到
+        """
+        for c in range(self.cell.shape[0]):
+            gphi, cm = self.grad_lambda(c) 
+
+            c0 = cm/6.0
+            c1 = cm/12.0
+
+            U = ti.Matrix.zero(ti.f64, 3, 2)
+            for i in ti.static(range(2)):
+                U[0, i] += u[self.cell[c, 0], i]*c0 
+                U[0, i] += u[self.cell[c, 1], i]*c1 
+                U[0, i] += u[self.cell[c, 2], i]*c1 
+
+            for i in ti.static(range(2)):
+                U[1, i] += u[self.cell[c, 0], i]*c1 
+                U[1, i] += u[self.cell[c, 1], i]*c0 
+                U[1, i] += u[self.cell[c, 2], i]*c1 
+
+            for i in ti.static(range(2)):
+                U[2, i] += u[self.cell[c, 0], i]*c1 
+                U[2, i] += u[self.cell[c, 1], i]*c1 
+                U[2, i] += u[self.cell[c, 2], i]*c0 
+
+            for i in ti.static(range(3)):
+                for j in ti.static(range(3)):
+                    S[c, i, j] = U[i, 0]*gphi[j, 0] + U[i, 1]*gphi[j, 1]
 
     @ti.kernel
-    def cell_convection_matrices(self, u: ti.template(), S: ti.template()):
+    def cell_convection_matrices_2(self, u: ti.template(), S: ti.template()):
         """
-        计算网格上所有单元的对流矩阵
+        @brief 计算网格上所有单元上的二次元对流矩阵
+
+        (\\boldsymbol u \\cdot \\nabla \\phi, w)， 水平集函数中会用到
         """
         for c in range(self.cell.shape[0]):
             gphi, cm = self.grad_lambda(c) 
@@ -438,10 +684,11 @@ class TriangleMesh():
                     S[c, i, j] = U[i, 0]*gphi[j, 0] + U[i, 1]*gphi[j, 1]
 
 
+   
     @ti.kernel
-    def cell_source_vectors(self, f:ti.template(), bc:ti.template(), ws:ti.template(), F:ti.template()):
+    def cell_source_vectors_1(self, f:ti.template(), bc:ti.template(), ws:ti.template(), F:ti.template()):
         """
-        计算所有单元载荷
+        @brief 计算所有单元上的线性元载荷
         """
         for c in range(self.cell.shape[0]):
             x0 = self.node[self.cell[c, 0], 0]
@@ -488,68 +735,38 @@ class TriangleMesh():
         A = K.build()
         return A
 
-    def stiff_matrix(self, c=None):
+    def stiff_matrix(self, p=1, c=None):
         """
         组装总体刚度矩阵
         """
         NC = self.number_of_cells()
-        K = ti.field(ti.f64, (NC, 3, 3))
-        self.cell_stiff_matrices(K)
+        if p == 1:
+            K = ti.field(ti.f64, (NC, 3, 3))
+            self.cell_stiff_matrices_1(K)
+        elif p == 2:
+            K = ti.field(ti.f64, (NC, 6, 6))
+            self.cell_stiff_matrices_2(K)
 
         M = K.to_numpy()
         if c is not None:
             M *= c # 目前假设 c 为一常数
 
-        cell = self.cell.to_numpy()
-        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
+        if p == 1:
+            cell2dof = self.cell.to_numpy()
+            gdof = NN 
+        elif p == 2:
+            cell2ipoint = ti.field(self.itype, shape=(NC, 6))
+            self.cell_to_ipoint(p, cell2ipoint)
+            cell2dof = cell2ipoint.to_numpy()
 
-        NN = self.number_of_nodes()
-        M = csr_matrix((K.to_numpy().flat, (I.flat, J.flat)), shape=(NN, NN))
+        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+        gdof = self.number_of_global_interpolation_points()
+        M = csr_matrix((K.to_numpy().flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M
-
-    def mass_matrix(self, c=None):
-        """
-        组装总体质量矩阵
-        """
-        NC = self.number_of_cells() 
-
-        K = ti.field(ti.f64, (NC, 3, 3))
-        self.cell_mass_matrices(K)
-
-        M = K.to_numpy()
-        if c is not None:
-            M *= c
-
-        cell = self.cell.to_numpy()
-        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
-
-        NN = self.number_of_nodes() 
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return M
-
-    def convection_matrix(self, u):
-        """
-        组装总体对流矩阵
-        """
-
-        NC = self.number_of_cells()
-        C = ti.field(ti.f64, (NC, 3, 3))
-        self.cell_convection_matrices(u, C)
-
-        M = C.to_numpy()
-
-        cell = self.cell.to_numpy()
-        I = np.broadcast_to(cell[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell[:, None, :], shape=M.shape)
-
-        NN = self.number_of_nodes()
-        M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return M
-
-
-    def source_vector(self, f):
+    
+    def source_vector(self, f, p=1):
         """
         组装总体载荷向量
         """
@@ -558,11 +775,11 @@ class TriangleMesh():
         bc = ti.Matrix([
             [0.6666666666666670,	0.1666666666666670,     0.1666666666666670],
             [0.1666666666666670,	0.6666666666666670,     0.1666666666666670],
-            [0.1666666666666670,	0.1666666666666670, 0.6666666666666670]], dt=ti.f64)
+            [0.1666666666666670,	0.1666666666666670,     0.6666666666666670]], dt=ti.f64)
         ws = ti.Vector([0.3333333333333330, 0.3333333333333330, 0.3333333333333330], dt=ti.f64)
 
         F = ti.field(ti.f64, (NC, 3))
-        self.cell_source_vectors(f, bc, ws, F)
+        self.cell_source_vectors_1(f, bc, ws, F)
 
         bb = F.to_numpy()
         F = np.zeros(NN, dtype=np.float64)
@@ -627,7 +844,7 @@ class TriangleMesh():
                 vertices[i][0] = self.node[i, 0]
                 vertices[i][1] = self.node[i, 1]
                 vertices[i][2] = self.node[i, 2] 
-
+    '''
 
 
     
