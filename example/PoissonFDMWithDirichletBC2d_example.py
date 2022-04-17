@@ -12,6 +12,7 @@ from fealpy.mesh import StructureQuadMesh
 from fealpy.tools.show import showmultirate
 
 from scipy.sparse.linalg import spsolve
+from scipy.sparse import spdiags
 
 
 ## 参数解析
@@ -38,15 +39,12 @@ nx = args.nx
 ny = args.ny
 maxit = args.maxit
 
-
 pde = PDE()
 box = pde.domain()
 
-errorType = ['$|| u - u_h||_{\in,0}$',
-             '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$'
-             ]
-errorMatrix = np.zeros((2, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.int_)
+errorType = ['$|| u - u_h||_{\infty}$', '$|| u - u_h ||_{l_2}||$']
+errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
+ND = np.zeros(maxit, dtype=np.int_)
 hs = np.zeros(maxit, dtype=np.float64)
 
 for i in range(maxit):
@@ -60,39 +58,55 @@ for i in range(maxit):
     A = mesh.laplace_operator()
     F = mesh.interpolation(pde.source)
 
-    # 2. 创建解向量数组
+    # 2. 创建解向量数组, 内部节点对应的函数值初始化为 0，
+    #    边界节点对应的函数值初始化 Dirichlet 边界条件的值
     NN = mesh.number_of_nodes()
-    NDof[i] = NN
+    ND[i] = NN
     uh = np.zeros(NN, dtype=np.float64)
 
-    # 3. 处理 Dirichlet 边界条件
     node = mesh.entity('node')
-    isBdNode = mesh.ds.boundary_node_flag() # 所有边界点都设为 Drichlet 点
-    uh[isBdNode] = pde.dirichlet(node[isBdNode])
+    isBdNode = mesh.ds.boundary_node_flag() # 本例子中假设所有边界点都为 Drichlet 点
+    uh[isBdNode] = pde.dirichlet(node[isBdNode])  
 
-    isInNode = ~isBdNode
+    # 3. 处理 Dirichlet 边界条件
+
+    # 3.1 处理右端
     F -= A@uh
+    F[isBdNode] = uh[isBdNode]
 
+    # 3.2 处理矩阵，边界点对应的行和列，除对角线元素外取 1 外， 其它值设为 0
+    #     并保持矩阵的对称性
     bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-    bdIdx[isInNode] = 1
+    bdIdx[isBdNode] = 1
     Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
     T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
     A = T@A@T + Tbd
 
-    F[isBdNode] = uh[isBdNode]
+
+    # 4. 求解
+    uh[:] = spsolve(A, F)
 
     # 4. 计算误差
     uI = mesh.interpolation(pde.solution)
 
+    errorMatrix[0, i] = np.max(np.abs(uh - uI))
+    errorMatrix[1, i] = np.sqrt(np.sum((uh - uI)**2)/NN)
+
     if i < maxit-1:
-        mesh.uniform_refine()
+        nx *= 2
+        ny *= 2
 
 fig = plt.figure()
+nx = mesh.ds.nx
+ny = mesh.ds.ny
 axes = fig.add_subplot(1, 2, 1, projection='3d')
-uh.add_plot(axes, cmap='rainbow')
+axes.plot_surface(
+        node[:, 0].reshape(nx+1, ny+1), 
+        node[:, 1].reshape(nx+1, ny+1), 
+        uh.reshape(nx+1, ny+1),
+        cmap='rainbow')
 
 axes = fig.add_subplot(1, 2, 2)
-showmultirate(axes, 0, NDof, errorMatrix,  errorType, 
-        propsize=40)
+showmultirate(axes, 0, ND, errorMatrix,  errorType, propsize=20)
 
 plt.show()

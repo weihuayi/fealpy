@@ -10,7 +10,9 @@ class StructureHexMesh(Mesh3d):
         self.itype = itype
         self.ftype = ftype
         self.box = box
-        self.h = (box[1] - box[0])/nx
+        self.hx = (box[1] - box[0])/nx
+        self.hy = (box[3] - box[2])/ny
+        self.hz = (box[5] - box[4])/nz
         self.ds = StructureHexMeshDataStructure(nx, ny, nz)
 
         self.celldata = {}
@@ -81,7 +83,6 @@ class StructureHexMesh(Mesh3d):
                     nodedata=self.nodedata,
                     celldata=celldata)
 
-
     @property
     def node(self):
         NN = self.ds.NN
@@ -108,16 +109,44 @@ class StructureHexMesh(Mesh3d):
         return self.ds.NC
 
     def laplace_operator(self):
-        NX = self.ds.nx + 1
-        h = self.h
-        d = 2*np.ones(NX, dtype=np.float)
-        c = -np.ones(NX - 1, dtype=np.float)
-        A = diags([c, d, c], [-1, 0, 1])
-        A = A.tocsr()
+        """
+        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x, y, z
+        三个方向都是均匀剖分，但各自步长可以不一样
+        @todo 处理带系数的情形
+        """
 
-        I = eye(NX)
-        A = kron(kron(A, I), I) + kron(kron(I, A), I) + kron(kron(I, I), A)
-        return A, h**2
+        n0 = self.ds.nx + 1
+        n1 = self.ds.ny + 1
+        n2 = self.ds.nz + 1
+
+        cx = 1/(self.hx**2)
+        cy = 1/(self.hy**2)
+        cz = 1/(self.hz**2)
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN).reshape(n0, n1, n2)
+
+        A = diags([2*(cx + cy + cz)], [0], shape=(NN, NN), format='coo')
+
+        val = np.full(NN - n1*n2, -cx, dtype=self.ftype)
+        I = k[1:, :, :].flat
+        J = k[0:-1, :, :].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.full(NN-n0*n2, -cy, dtype=self.ftype)
+        I = k[:, 1:, :].flat
+        J = k[:, 0:-1, :].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.full(NN-n0*n1, -cy, dtype=self.ftype)
+        I = k[:, :, 1:].flat
+        J = k[:, :, 0:-1].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A.tocsr()
 
 
 
