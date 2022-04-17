@@ -11,17 +11,18 @@ class StructureIntervalMesh(object):
     [x_0, x_1, ...., x_N]
     """
 
-    def __init__(self, I, nx=2, h=None):
+    def __init__(self, I, nx=2, itype=np.int_, ftype=np.float64):
+
         self.I = I
-        if h is None:
-            self.h = (I[1] - I[0])/nx
-            self.NC = nx
-        else:
-            self.h = h
-            self.NC = int((I[1] - I[0])/h)
+        self.meshtype="interval"
+        self.hx = (I[1] - I[0])/nx
+        self.NC = nx
         self.NN = self.NC + 1
 
-        self.ds = StructureIntervalMeshDataStructure(self.NN, self.NC)
+        self.ds = StructureIntervalMeshDataStructure(nx+1, nx)
+
+        self.itype = itype
+        self.ftype = ftype
 
     def entity(self, etype):
         if etype in {'cell', 1}:
@@ -47,11 +48,18 @@ class StructureIntervalMesh(object):
         return 1
 
     def laplace_operator(self):
-        NN = self.NN
-        h = self.h
-        d = -2*np.ones(NN, dtype=np.float)/h**2
-        c = np.ones(NN - 1, dtype=np.float)/h**2
-        A = diags([c, d, c], [-1, 0, 1])
+        hx = self.hx
+        cx = 1/(self.hx**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([2*cx], [0], shape=(NN, NN), format='coo')
+
+        val = np.full(NN-1, -cx, dtype=self.ftype)
+        I = k[1:]
+        J = k[0:-1]
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
 
     def index(self):
@@ -117,10 +125,12 @@ class StructureIntervalMesh(object):
 
 class StructureIntervalMeshDataStructure():
     def __init__(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 
     def reinit(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 
