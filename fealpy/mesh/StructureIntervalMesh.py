@@ -33,10 +33,14 @@ class StructureIntervalMesh(object):
             cell[:, 1] = range(1, NN)
             return cell
         elif etype in {'node', 0}:
-            node = np.linspace(self.I[0], self.I[1], self.NN)
-            return node.reshape(-1, 1)
+            return self.node
         else:
             raise ValueError("`entitytype` is wrong!")
+
+    @property
+    def node(self):
+        node = np.linspace(self.I[0], self.I[1], self.NN)
+        return node.reshape(-1, 1)
 
     def number_of_nodes(self):
         return self.NN
@@ -61,6 +65,9 @@ class StructureIntervalMesh(object):
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
+
+    def interpolation(self, f):
+        return f(node)
 
     def index(self):
         NN = self.NN
