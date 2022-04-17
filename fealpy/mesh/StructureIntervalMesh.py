@@ -55,7 +55,7 @@ class StructureIntervalMesh(object):
 
         A = diags([2*cx], [0], shape=(NN, NN), format='coo')
 
-        val = np.full(NN-1, -cx, dtype=self.ftype)
+        val = np.broadcast_to(-cx, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
