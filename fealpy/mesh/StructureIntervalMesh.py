@@ -11,17 +11,18 @@ class StructureIntervalMesh(object):
     [x_0, x_1, ...., x_N]
     """
 
-    def __init__(self, I, nx=2, h=None):
+    def __init__(self, I, nx=2, itype=np.int_, ftype=np.float64):
+
         self.I = I
-        if h is None:
-            self.h = (I[1] - I[0])/nx
-            self.NC = nx
-        else:
-            self.h = h
-            self.NC = int((I[1] - I[0])/h)
+        self.meshtype="interval"
+        self.hx = (I[1] - I[0])/nx
+        self.NC = nx
         self.NN = self.NC + 1
 
-        self.ds = StructureIntervalMeshDataStructure(self.NN, self.NC)
+        self.ds = StructureIntervalMeshDataStructure(nx+1, nx)
+
+        self.itype = itype
+        self.ftype = ftype
 
     def entity(self, etype):
         if etype in {'cell', 1}:
@@ -32,10 +33,14 @@ class StructureIntervalMesh(object):
             cell[:, 1] = range(1, NN)
             return cell
         elif etype in {'node', 0}:
-            node = np.linspace(self.I[0], self.I[1], self.NN)
-            return node.reshape(-1, 1)
+            return self.node
         else:
             raise ValueError("`entitytype` is wrong!")
+
+    @property
+    def node(self):
+        node = np.linspace(self.I[0], self.I[1], self.NN)
+        return node.reshape(-1, 1)
 
     def number_of_nodes(self):
         return self.NN
@@ -47,12 +52,42 @@ class StructureIntervalMesh(object):
         return 1
 
     def laplace_operator(self):
-        NN = self.NN
-        h = self.h
-        d = -2*np.ones(NN, dtype=np.float)/h**2
-        c = np.ones(NN - 1, dtype=np.float)/h**2
-        A = diags([c, d, c], [-1, 0, 1])
+        hx = self.hx
+        cx = 1/(self.hx**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([2*cx], [0], shape=(NN, NN), format='coo')
+
+        val = np.broadcast_to(-cx, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
+
+    def interpolation(self, f):
+        node = self.node
+        return f(node)
+
+    def error(self, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+        
+        @param[in] u 
+        @param[in] uh
+        """
+        
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+        
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h*np.sum(e**2))
+        
+        de = e[1:] - e[0:-1]
+        e1 = np.sqrt(np.sum(de**2)/h + e0**2)
+        return emax, e0, e1
 
     def index(self):
         NN = self.NN
@@ -117,10 +152,12 @@ class StructureIntervalMesh(object):
 
 class StructureIntervalMeshDataStructure():
     def __init__(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 
     def reinit(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 

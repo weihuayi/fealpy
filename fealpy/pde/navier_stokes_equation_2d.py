@@ -1,7 +1,11 @@
 import numpy as np
 
 from fealpy.decorator import cartesian
-
+from fealpy.mesh import MeshFactory as MF
+from fealpy.geometry import DistDomain2d
+from fealpy.mesh import DistMesh2d
+from fealpy.geometry import dcircle,drectangle,ddiff,dmin
+from fealpy.geometry import huniform
 class SinCosData:
     """
     [0, 1]^2
@@ -96,19 +100,30 @@ class Poisuille:
         return self.velocity(p)
 
 class FlowPastCylinder:
-    """
-    [0, 1]^2
-    u(x, y) = (4y(1-y), 0)
-    p = 8(1-x)
-    """
-    def __init__(self,eps=1e-12):
+    '''
+    @brief 圆柱绕流
+    '''
+    def __init__(self, eps=1e-12, rho=1, mu=0.001):
         self.eps = eps
-        self.box = [0, 1, 0, 1]
+        self.rho = rho
+        self.mu = mu
 
-    def domain(self):
-        return self.box
+    def mesh(self,h): 
+        points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
+                dtype=np.float64)
+        facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
 
 
+        p, f = MF.circle_interval_mesh([0.2, 0.2], 0.05, 0.01) 
+
+        points = np.append(points, p, axis=0)
+        facets = np.append(facets, f+4, axis=0)
+
+        fm = np.array([0, 1, 2, 3])
+
+        smesh = MF.meshpy2d(points, facets, h, hole_points=[[0.2, 0.2]], facet_markers=fm, meshtype='tri')
+        return smesh
+    
     @cartesian
     def is_outflow_boundary(self,p):
         return np.abs(p[..., 0] - 2.2) < self.eps
