@@ -113,7 +113,7 @@ emeasure = mesh.entity_measure('face',index=index)
 face2dof = uspace.face_to_dof()[index]
 n = mesh.face_unit_normal(index=index)
 
-def edge_matrix(pfun,gfun,nfun): 
+def edge_matrix(pfun, gfun, nfun): 
     n = nfun(index=index)
 
     edge2cell = mesh.ds.edge2cell[index]
@@ -146,6 +146,7 @@ E00 = mesh.cell_gphix_gphix_matrix(udegree, udegree)
 E11 = mesh.cell_gphiy_gphiy_matrix(udegree, udegree)
 E01 = mesh.cell_gphix_gphiy_matrix(udegree, udegree)
 E10 = mesh.cell_gphiy_gphix_matrix(udegree, udegree)
+
 E00 = mesh.construct_matrix(udegree, udegree, E00)
 E11 = mesh.construct_matrix(udegree, udegree, E11)
 E01 = mesh.construct_matrix(udegree, udegree, E01)
