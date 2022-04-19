@@ -304,7 +304,7 @@ def show_mesh_2d(
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmap='gnuplot2', box=None):
+        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=1.0, cmap='jet', box=None):
 
     try:
         axes.set_aspect(aspect)
@@ -317,15 +317,15 @@ def show_mesh_2d(
         axes.set_axis_on()
 
     if (type(nodecolor) is np.ndarray) & np.isreal(nodecolor[0]):
-        cmax = nodecolor.max()
-        cmin = nodecolor.min()
+        cmax = cmax or nodecolor.max()
+        cmin = cmin or nodecolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
         mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         nodecolor = mapper.to_rgba(nodecolor)
 
     if isinstance(cellcolor, np.ndarray) & np.isreal(cellcolor[0]):
-        cmax = cellcolor.max()
-        cmin = cellcolor.min()
+        cmax = cmax or cellcolor.max()
+        cmin = cmin or cellcolor.min()
         norm = colors.Normalize(vmin=cmin, vmax=cmax)
         mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
         mapper.set_array(cellcolor)

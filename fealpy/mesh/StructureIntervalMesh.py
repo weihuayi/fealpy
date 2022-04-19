@@ -67,7 +67,27 @@ class StructureIntervalMesh(object):
         return A.tocsr()
 
     def interpolation(self, f):
+        node = self.node
         return f(node)
+
+    def error(self, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+        
+        @param[in] u 
+        @param[in] uh
+        """
+        
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+        
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h*np.sum(e**2))
+        
+        de = e[1:] - e[0:-1]
+        e1 = np.sqrt(np.sum(de**2)/h + e0**2)
+        return emax, e0, e1
 
     def index(self):
         NN = self.NN
