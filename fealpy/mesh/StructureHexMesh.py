@@ -134,7 +134,7 @@ class StructureHexMesh(Mesh3d):
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val - np.broadcast_to(-cy, (NN-n0*n2, ))
+        val = np.broadcast_to(-cy, (NN-n0*n2, ))
         I = k[:, 1:, :].flat
         J = k[:, 0:-1, :].flat
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
