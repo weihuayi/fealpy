@@ -35,12 +35,21 @@ class StructureIntervalMesh(object):
         elif etype in {'node', 0}:
             return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`etype` is wrong!")
+
+    def entity_barycenter(self, etype):
+        if etype in {'node', 0}:
+            return self.node 
+        elif etype in {'cell', 1}:
+            x = self.node
+            return (x[1:] + x[0:-1])/2.0
+        else:
+            raise ValueError("`etype` is wrong!")
 
     @property
     def node(self):
         node = np.linspace(self.I[0], self.I[1], self.NN)
-        return node.reshape(-1, 1)
+        return node
 
     def number_of_nodes(self):
         return self.NN
@@ -66,9 +75,35 @@ class StructureIntervalMesh(object):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
 
-    def interpolation(self, f):
-        node = self.node
-        return f(node)
+    def wave_equation(self, r, theta):
+        A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
+                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+        A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
+                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+        A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
+                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+
+        return A0, A1, A2
+
+    def function(self, etype='node'):
+        """
+        @brief 返回一个定义在节点或者单元上的数组，元素取值为 0
+        """
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'cell', 1}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+    def interpolation(self, f, etype='node'):
+        if etype in {'node', 0}:
+            x = self.node
+            return f(node)
+        elif etype in {'cell', 1}:
+            x = self.entity_barycenter(etype)
+            return f(x)
 
     def error(self, u, uh):
         """
@@ -94,6 +129,34 @@ class StructureIntervalMesh(object):
         index = [ '$x_{'+str(i)+'}$' for i in range(NN)]
         return index
 
+    def show_function(self, plot, uh):
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        node = self.node.flat
+        line = axes.plot(node, uh)
+        return line
+
+    def show_animation(self, fig, axes, box, advance, fname='test.mp4', 
+            frames=1000,  lw=2):
+
+        import matplotlib.animation as animation
+        line, = axes.plot([], [], lw=lw)
+        axes.set_xlim(box[0], box[1])
+        axes.set_ylim(box[2], box[3])
+        x = self.node.flat
+
+        def update(n): 
+            uh = adavance(n)
+            line.set_data((x, uh))
+            return line
+
+        ani = animation.FuncAnimation(fig, update, frames=frames)
+        ani.save(fname)
+        
     def add_plot(
             self, plot,
             nodecolor='r', cellcolor='k',
