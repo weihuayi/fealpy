@@ -1,36 +1,23 @@
-#!/usr/bin/python3
-'''!    	
-	@Author: wpx
-	@File Name: ti-navier.py
-	@Mail: wpx15673207315@gmail.com 
-	@Created Time: 2022年04月13日 星期三 12时06分13秒
-	@bref 
-	@ref 
-'''  
 import argparse
 import sys
 import numpy as np
+import matplotlib
+
+from scipy.sparse import spdiags, bmat
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix,hstack,vstack,spdiags,bmat
 from mumps import DMumpsContext
-import matplotlib.pyplot as plt
-import taichi as ti
-from scipy.sparse import bmat,csr_matrix,spdiags
 
-from fealpy.ti import TriangleMesh 
-from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.mesh import MeshFactory as MF
-from fealpy.geometry import DistDomain2d
-from fealpy.geometry import huniform
 from fealpy.functionspace import LagrangeFiniteElementSpace
-
-from fealpy.decorator import cartesian,barycentric
+from fealpy.timeintegratoralg import UniformTimeLine
 
 from fealpy.pde.navier_stokes_equation_2d import FlowPastCylinder as PDE
 
-ti.init()
 # 参数设置
 parser = argparse.ArgumentParser(description=
         """
-        有限元方法求解绕柱流问题
+        有限元方法求解NS方程
         """)
 
 parser.add_argument('--udegree',
@@ -57,6 +44,10 @@ parser.add_argument('--output',
         default='./', type=str,
         help='结果输出目录, 默认为 ./')
 
+parser.add_argument('--step',
+        default=10, type=int,
+        help='隔多少步输出一次')
+
 args = parser.parse_args()
 udegree = args.udegree
 pdegree = args.pdegree
@@ -64,63 +55,46 @@ nt = args.nt
 T = args.T
 h = args.h
 output = args.output
+step = args.step
+
+# 网格,空间,函数
 rho = 1
 mu=0.001
+udim = 2
+pde = PDE()
+mesh = pde.mesh(h)
+tmesh = UniformTimeLine(0,T,nt)
+dt = tmesh.dt
 
+uspace = LagrangeFiniteElementSpace(mesh,p=udegree)
+pspace = LagrangeFiniteElementSpace(mesh,p=pdegree)
 
-# 网格
-points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
-        dtype=np.float64)
-facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
-
-
-p, f = MF.circle_interval_mesh([0.2, 0.2], 0.05, 0.01) 
-
-points = np.append(points, p, axis=0)
-facets = np.append(facets, f+4, axis=0)
-
-fm = np.array([0, 1, 2, 3])
-
-smesh = MF.meshpy2d(points, facets, h, hole_points=[[0.2, 0.2]], facet_markers=fm, meshtype='tri')
-
-uspace = LagrangeFiniteElementSpace(smesh,p=udegree)
-pspace = LagrangeFiniteElementSpace(smesh,p=pdegree)
-
-u0 = uspace.function(dim=2)
-us = uspace.function(dim=2)
-u1 = uspace.function(dim=2)
+u0 = uspace.function(dim=udim)
+us = uspace.function(dim=udim)
+u1 = uspace.function(dim=udim)
 
 p0 = pspace.function()
 p1 = pspace.function()
 
-node = smesh.entity('node')
-cell = smesh.entity('cell')
-mesh = TriangleMesh(node,cell)
-tmesh = UniformTimeLine(0,T,nt)
-'''
-fig = plt.figure()
-axes = fig.gca()
-smesh.add_plot(axes)
-plt.show()
-'''
+fname = output + 'test_'+ str(0).zfill(10) + '.vtu'
+mesh.nodedata['velocity'] = u0 
+mesh.nodedata['pressure'] = p1
+mesh.to_vtk(fname=fname)
 
-dt = tmesh.dt
-pde = PDE()
-
-ugdof = mesh.number_of_global_interpolation_points(udegree)
-pgdof = mesh.number_of_global_interpolation_points(pdegree)
+ugdof = uspace.number_of_global_dofs()
+pgdof = pspace.number_of_global_dofs()
 gdof = pgdof+2*ugdof
 
 ##矩阵组装准备
-qf = smesh.integrator(4,'cell')
+qf = mesh.integrator(9,'cell')
 bcs,ws = qf.get_quadrature_points_and_weights()
-cellmeasure = smesh.entity_measure('cell')
+cellmeasure = mesh.entity_measure('cell')
 
 ## 速度空间
 uphi = uspace.basis(bcs)
 ugphi = uspace.grad_basis(bcs)
 ucell2dof = uspace.cell_to_dof()
-NC = smesh.number_of_cells()
+NC = mesh.number_of_cells()
 
 epqf = uspace.integralalg.edgeintegrator
 epbcs,epws = epqf.get_quadrature_points_and_weights()
@@ -130,21 +104,19 @@ pphi = pspace.basis(bcs)
 pgphi = pspace.grad_basis(bcs)
 pcell2dof = pspace.cell_to_dof()
 
-index = smesh.ds.boundary_face_index()
-ebc = smesh.entity_barycenter('face',index=index)
+index = mesh.ds.boundary_face_index()
+ebc = mesh.entity_barycenter('face',index=index)
 flag = pde.is_outflow_boundary(ebc)
 index = index[flag]# p边界条件的index
 
-epqf = uspace.integralalg.edgeintegrator
-epbcs,epws = epqf.get_quadrature_points_and_weights()
-emeasure = smesh.entity_measure('face',index=index)
+emeasure = mesh.entity_measure('face',index=index)
 face2dof = uspace.face_to_dof()[index]
-n = smesh.face_unit_normal(index=index)
-ucell2dof = uspace.cell_to_dof()
-def edge_matrix(pfun,gfun,nfun): 
+n = mesh.face_unit_normal(index=index)
+
+def edge_matrix(pfun, gfun, nfun): 
     n = nfun(index=index)
 
-    edge2cell = smesh.ds.edge2cell[index]
+    edge2cell = mesh.ds.edge2cell[index]
     egphi = gfun(epbcs,edge2cell[:,0],edge2cell[:,2])
     ephi = pfun(epbcs)
     
@@ -162,19 +134,28 @@ def edge_matrix(pfun,gfun,nfun):
     D01 = csr_matrix((pgy0.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
     D10 = csr_matrix((pgx1.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
 
-    matrix = bmat([[D00,D10],[D01,D11]],format='csr') 
+    matrix = vstack([hstack([D00,D10]),hstack([D01,D11])]) 
     return matrix
 
-# 组装第一个方程左端矩阵
-H =  mesh.construct_matrix(udegree,udegree,'mass')
-H = bmat([[H,None],[None,H]],format='csr')
-E00 = mesh.construct_matrix(udegree,udegree,'gpx_gpx')
-E01 = mesh.construct_matrix(udegree,udegree,'gpx_gpy')
-E10 = mesh.construct_matrix(udegree,udegree,'gpy_gpx')
-E11 = mesh.construct_matrix(udegree,udegree,'gpy_gpy')
-E = bmat([[E00+1/2*E11,1/2*E10],[1/2*E01,E11+1/2*E00]],format='csr')
-D = edge_matrix(uspace.face_basis,uspace.edge_grad_basis,smesh.face_unit_normal)
+#组装第一个方程的左端矩阵
+H = mesh.cell_phi_phi_matrix(udegree, udegree)
+H = mesh.construct_matrix(udegree, udegree, H)
+H = bmat([[H, None], [None, H]], format='csr')
+
+E00 = mesh.cell_gphix_gphix_matrix(udegree, udegree)
+E11 = mesh.cell_gphiy_gphiy_matrix(udegree, udegree)
+E01 = mesh.cell_gphix_gphiy_matrix(udegree, udegree)
+E10 = mesh.cell_gphiy_gphix_matrix(udegree, udegree)
+
+E00 = mesh.construct_matrix(udegree, udegree, E00)
+E11 = mesh.construct_matrix(udegree, udegree, E11)
+E01 = mesh.construct_matrix(udegree, udegree, E01)
+E10 = mesh.construct_matrix(udegree, udegree, E10)
+E = bmat([[E00+1/2*E11, 1/2*E10], [1/2*E01, E11+1/2*E00]], format='csr')
+
+D = edge_matrix(uspace.face_basis,uspace.edge_grad_basis,mesh.face_unit_normal)
 A = rho/dt*H + mu*E -1/2*mu*D
+
 ##边界处理
 xx = np.zeros(2*ugdof, np.float64)
 
@@ -183,14 +164,12 @@ u_isbddof_in = uspace.is_boundary_dof(threshold = pde.is_inflow_boundary)
 u_isbddof_out = uspace.is_boundary_dof(threshold = pde.is_outflow_boundary)
 
 u_isbddof_u0[u_isbddof_in] = False 
-u_isbddof_u0[u_isbddof_out] = False
-
+u_isbddof_u0[u_isbddof_out] = False 
 xx[0:ugdof][u_isbddof_u0] = 0
 xx[ugdof:2*ugdof][u_isbddof_u0] = 0
 
 u_isbddof = u_isbddof_u0
 u_isbddof[u_isbddof_in] = True
-ipoint = uspace.interpolation_points()[u_isbddof_in]
 
 ipoint = uspace.interpolation_points()[u_isbddof_in]
 uinfow = pde.u_inflow_dirichlet(ipoint)
@@ -203,46 +182,59 @@ bdIdx[isBdDof] = 1
 Tbd = spdiags(bdIdx, 0, 2*ugdof, 2*ugdof)
 T = spdiags(1-bdIdx, 0, 2*ugdof, 2*ugdof)
 A = T@A + Tbd
-# 组装第二个方程左端矩阵
-B1 = mesh.construct_matrix(pdegree,pdegree,'stiff')
+
+#组装第二个方程的左端矩阵
+B1 = mesh.cell_stiff_matrix(pdegree, pdegree)
+B1 = mesh.construct_matrix(pdegree, pdegree, B1)
+
 ispBDof = pspace.boundary_dof(threshold=pde.is_outflow_boundary)
-bdIdx = np.zeros((B1.shape[0],),np.int_)
+bdIdx = np.zeros((B1.shape[0],), np.int_)
 bdIdx[ispBDof] = 1
-Tbd = spdiags(bdIdx,0,B1.shape[0],B1.shape[0])
-T = spdiags(1-bdIdx,0,B1.shape[0],B1.shape[0])
+Tbd = spdiags(bdIdx, 0, B1.shape[0], B1.shape[0])
+T = spdiags(1-bdIdx, 0, B1.shape[0], B1.shape[0])
 B =  T@B1 + Tbd
-# 组转第三个方程左端矩阵
+
+#组装第三个方程的左端矩阵
 C = H
 
 ctx = DMumpsContext()
 ctx.set_silent()
 errorMatrix = np.zeros((4,nt),dtype=np.float64)
 
-for i in range(0,nt):
+for i in range(0, nt):
     # 下一个的时间层 t1
     t1 = tmesh.next_time_level()
     print("t1=", t1)
 
     #组装第一个方程的右端向量
-    cu0 = np.array(u0[:,0])
-    cu1 = np.array(u0[:,1])
-    fb10 = mesh.source_mass_vector(udegree,udegree,cu0)
-    fb11 = mesh.source_mass_vector(udegree,udegree,cu1)
-    fb1 = np.array([fb10,fb11]).T
+    cu0x = np.array(u0[...,0])
+    cu0y = np.array(u0[...,1])
+    cp0 = np.array(p0[:]) 
+    
+    fb1x = mesh.cell_phi_phi_matrix(udegree, udegree, cu0x)
+    fb1y = mesh.cell_phi_phi_matrix(udegree, udegree, cu0y)
+    fb1x = mesh.construct_vector(udegree, fb1x)
+    fb1y = mesh.construct_vector(udegree, fb1y)
+    fb1 = np.array([fb1x,fb1y]).T
 
-    fuu = u0(bcs)
-    fgu = u0.grad_value(bcs)
-    fbb2 = np.einsum('i,ijn,ijk,ijmk,j -> jnm',ws,uphi,fuu,fgu,cellmeasure)
-    fb2 = np.zeros((ugdof,2))
-    np.add.at(fb2,(ucell2dof,np.s_[:]),fbb2)
-    
+    fb2xxx = mesh.cell_phi_gphix_phi_matrix(udegree, udegree, udegree, cu0x, cu0x)
+    fb2yxy = mesh.cell_phi_gphiy_phi_matrix(udegree, udegree, udegree, cu0x, cu0y)
+    fb2xyx = mesh.cell_phi_gphix_phi_matrix(udegree, udegree, udegree, cu0y, cu0x)
+    fb2yyy = mesh.cell_phi_gphiy_phi_matrix(udegree, udegree, udegree, cu0y, cu0y)
+    fb2xxx = mesh.construct_vector(udegree, fb2xxx)
+    fb2yxy = mesh.construct_vector(udegree, fb2yxy)
+    fb2xyx = mesh.construct_vector(udegree, fb2xyx)
+    fb2yyy = mesh.construct_vector(udegree, fb2yyy)
+    fb2 = np.array([fb2xxx+fb2yxy,fb2xyx+fb2yyy]).T
+
     fb3 = E@u0.flatten(order='F')
-     
-    cp0 = np.array(p0)
-    fb4 =mesh.source_gphix_phi_vector(2,1,cp0)
-    fb5 =mesh.source_gphiy_phi_vector(2,1,cp0)
-    fb4 = np.hstack((fb4,fb5)) 
     
+    fb4x = mesh.cell_gphix_phi_matrix(udegree, pdegree, c2=cp0)    
+    fb4y = mesh.cell_gphiy_phi_matrix(udegree, pdegree, c2=cp0)
+    fb4x = mesh.construct_vector(udegree, fb4x)
+    fb4y = mesh.construct_vector(udegree, fb4y)
+    fb4 = np.hstack((fb4x, fb4y))
+
     ##p边界
     ep = p0(epbcs)[...,index]
     value = np.einsum('ij,jk->ijk',ep,n)
@@ -266,14 +258,16 @@ for i in range(0,nt):
     us[:,0] = x[0:ugdof]
     us[:,1] = x[ugdof:]
     #组装第二个方程的右端向量
-    
+    cusx = np.array(us[..., 0]) 
+    cusy = np.array(us[..., 1]) 
     b21 = B1@p0
-    cusx = np.array(us[:,0])
-    cusy = np.array(us[:,1])
-    b220 = mesh.source_gphixx_phi_vector(2,1,cusx)
-    b221 = mesh.source_gphiyy_phi_vector(2,1,cusy)
-    b22 = b220+b221
+    b22x = mesh.cell_gphix_phi_matrix(udegree, pdegree, c1=cusx)
+    b22y = mesh.cell_gphiy_phi_matrix(udegree, pdegree, c1=cusy)
+    b22x = mesh.construct_vector(pdegree, b22x) 
+    b22y = mesh.construct_vector(pdegree, b22y) 
+    b22 = b22x + b22y
     b2 = b21 -1/dt*b22
+    
     ispBDof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
     b2[ispBDof] = 0
 
@@ -285,10 +279,14 @@ for i in range(0,nt):
 
     #组装第三个方程的右端向量
     tb1 = C@us.flatten(order='F')
-    gp = p1.grad_value(bcs)-p0.grad_value(bcs)
-    tbb2 = np.einsum('i,ijk,ijm,j -> jkm',ws,uphi,gp,cellmeasure)
-    tb2 = np.zeros((ugdof,2))
-    np.add.at(tb2,(ucell2dof,np.s_[:]),tbb2)
+    
+    cp1p0 = np.array(p1[:]-p0[:])
+    tb2x = mesh.cell_gphix_phi_matrix(pdegree, udegree, c1=cp1p0)
+    tb2y = mesh.cell_gphiy_phi_matrix(pdegree, udegree, c1=cp1p0)
+    tb2x = mesh.construct_vector(udegree, tb2x)
+    tb2y = mesh.construct_vector(udegree, tb2y)
+    tb2 = np.array([tb2x, tb2y]).T
+    
     b3 = tb1 - dt*(tb2.flatten(order='F')) 
     
     ctx.set_centralized_sparse(C)
@@ -297,11 +295,11 @@ for i in range(0,nt):
     ctx.run(job=6)
     u1[:,0] = x[0:ugdof]
     u1[:,1] = x[ugdof:]
-    
-    fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
-    smesh.nodedata['velocity'] = u1
-    smesh.nodedata['pressure'] = p1
-    smesh.to_vtk(fname=fname) 
+    if i%step == 0:
+        fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
+        mesh.nodedata['velocity'] = u1
+        mesh.nodedata['pressure'] = p1
+        mesh.to_vtk(fname=fname) 
     
     u0[:] = u1 
     p0[:] = p1
@@ -309,4 +307,3 @@ for i in range(0,nt):
     tmesh.advance()
 
 ctx.destroy()
-

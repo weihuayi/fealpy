@@ -4,7 +4,7 @@ from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
-from fealpy.mesh.TriangleMeshData import phiphi,gphigphi,gphiphi
+from fealpy.mesh.TriangleMeshData import phiphi,gphigphi,gphiphi,phigphiphi
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
@@ -1176,154 +1176,162 @@ class TriangleMesh(Mesh2d):
                     s1 += 2
         return cell2ipoint
 
-    def cell_mass_matrix(self, p1, p2, c=None):
-        index = str(p1)+str(p2)
-        return phiphi[index]
+    def cell_phi_phi_matrix(self, p1, p2, c=None):
+        cellmeasure = self.cell_area()
+        index = str(p1) + str(p2)
+        val = phiphi[index]
+        if c is None:
+            val = np.einsum('c,cij->cij', cellmeasure, val)
+        else:
+            c2f2 = self.cell_to_ipoint(p2)
+            val = np.einsum('c,cij,cj->ci', cellmeasure, val, c[c2f2])
+        return val
 
 
-    def cell_stiff_matrix(self, p1, p2):
-        index = str(p1)+str(p2)
-        A = gphigphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkl, ckm, clm->cij', A, B ,B)
-        return val 
-    
-    def cell_gphix_phi_matrix(self, p1, p2):
-        index = str(p1)+str(p2)
-        A = gphiphi[index]
-        B = self.glambda 
-        gx = np.einsum('ijk, ck ->cij', A, B[...,0])
-        return gy
-    
-    def cell_gphiy_phi_matrix(self, p1, p2):
-        index = str(p1)+str(p2)
-        A = gphiphi[index]
-        B = self.glambda 
-        gy = np.einsum('ijk, ck ->cij', A, B[...,1])
-        return gy
-    
-    
     def cell_gphix_gphix_matrix(self, p1, p2):
+        cellmeasure = self.cell_area()
         index = str(p1)+str(p2)
         A = gphigphi[index]
         B = self.glambda 
-        val = np.einsum('ijkl, ck, cl->cij', A, B[...,0] ,B[...,0])
+        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,0] ,B[...,0], cellmeasure)
         return val 
     
     def cell_gphix_gphiy_matrix(self, p1, p2):
+        cellmeasure = self.cell_area()
         index = str(p1)+str(p2)
         A = gphigphi[index]
         B = self.glambda 
-        val = np.einsum('ijkl, ck, cl->cij', A, B[...,0] ,B[...,1])
+        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,0] ,B[...,1], cellmeasure)
         return val 
     
     def cell_gphiy_gphix_matrix(self, p1, p2):
+        cellmeasure = self.cell_area()
         index = str(p1)+str(p2)
         A = gphigphi[index]
         B = self.glambda 
-        val = np.einsum('ijkl, ck, cl->cij', A, B[...,1] ,B[...,0])
+        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1] ,B[...,0], cellmeasure)
         return val 
     
     def cell_gphiy_gphiy_matrix(self, p1, p2):
+        cellmeasure = self.cell_area()
         index = str(p1)+str(p2)
         A = gphigphi[index]
         B = self.glambda 
-        val = np.einsum('ijkl, ck, cl->cij', A, B[...,1], B[...,1])
+        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1], B[...,1], cellmeasure)
+        return val 
+    
+    def cell_stiff_matrix(self, p1, p2):
+        a = self.cell_gphix_gphix_matrix(p1, p2)
+        b = self.cell_gphiy_gphiy_matrix(p1, p2)
+        return a+b 
+    
+    def cell_gphix_phi_matrix(self, p1, p2, c1=None, c2=None):
+        '''
+        @brief  
+        @param p1 gphi的次数
+        @param p2 phi的次数 
+        @param c1 gphi的系数 
+        @param c2 phi的系数 
+        '''
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)
+        A = gphiphi[index]
+        B = self.glambda 
+        if c1 is not None:
+            c2f1 = self.cell_to_ipoint(p1)
+            val = np.einsum('ijk, ck, c, ci->cj', A, B[..., 0], cellmeasure, c1[c2f1])
+        elif c2 is not None:
+            c2f2 = self.cell_to_ipoint(p2)
+            val = np.einsum('ijk, ck, c, cj->ci', A, B[..., 0], cellmeasure, c2[c2f2])
+        else:
+            val = np.einsum('ijk, ck, c->cij', A, B[..., 0], cellmeasure)
+        return val 
+    
+    def cell_gphiy_phi_matrix(self, p1, p2, c1=None, c2=None):
+        '''
+        @brief  
+        @param p1 gphi的次数
+        @Param p2 phi的次数 
+        @param c1 gphi的系数 
+        @param c2 phi的系数 
+        '''
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)
+        A = gphiphi[index]
+        B = self.glambda
+        if c1 is not None:
+            c2f1 = self.cell_to_ipoint(p1)
+            val = np.einsum('ijk, ck, c, ci->cj', A, B[..., 1], cellmeasure, c1[c2f1])
+        elif c2 is not None:
+            c2f2 = self.cell_to_ipoint(p2)
+            val = np.einsum('ijk, ck, c, cj->ci', A, B[..., 1], cellmeasure, c2[c2f2])
+        else:
+            val = np.einsum('ijk, ck, c->cij', A, B[..., 1], cellmeasure)
+        return val 
+    
+    def cell_phi_gphix_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
+        '''
+        @brief  
+        @param p1 测试函数的次数
+        @Param p2 gphi的次数 
+        @Param p3 phi的次数 
+        @param c2 gphi的系数 
+        @param c3 phi的系数 
+        '''
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        A = phigphiphi[index]
+        B = self.glambda
+        c2f2 = self.cell_to_ipoint(p2)
+        c2f3 = self.cell_to_ipoint(p3)
+        if (c2 is not None) and (c3 is None):
+            val = np.einsum('ijkm,cm,c,cj,ck->cij', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
+        elif (c2 is None) and (c3 is not None):
+            val = np.einsum('ijkm,cm,c,cj,ck->cik', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
+        else:
+            val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
         return val 
 
-    def source_mass_vector(self, p1, p2 ,c):
-        index = str(p1)+str(p2)
-        val = phiphi[index]
-        c2f1 = self.cell_to_ipoint(p1)
-        c2f2 = self.cell_to_ipoint(p2)
-        gdof = self.number_of_global_interpolation_points(p2)
-        NC = self.number_of_cells()
+    def cell_phi_gphiy_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
+        '''
+        @brief  
+        @param p1 gphi的次数
+        @Param p2 phi的次数 
+        @param c1 gphi的系数 
+        @param c2 phi的系数 
+        '''
         cellmeasure = self.cell_area()
-        val = np.einsum('cij, ci, c -> cj', val, c[c2f1], cellmeasure)
-        result = np.zeros((gdof))
-        np.add.at(result, c2f2, val)
-        return result
+        index = str(p1)+str(p2)+str(p3)
+        A = phigphiphi[index]
+        B = self.glambda
+        c2f2 = self.cell_to_ipoint(p2)
+        c2f3 = self.cell_to_ipoint(p3)
+        if (c2 is not None) and (c3 is None):
+            val = np.einsum('ijkm,cm,c,cj,ck->cij', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
+        elif (c2 is None) and (c3 is not None):
+            val = np.einsum('ijkm,cm,c,cj,ck->cik', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
+        else:
+            val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
+        return val 
     
-    def source_gphix_phi_vector(self, p1, p2 ,c):
-        index = str(p1)+str(p2)
-        val = gphiphi[index]
-        c2f1 = self.cell_to_ipoint(p1)
-        c2f2 = self.cell_to_ipoint(p2)
-        gdof = self.number_of_global_interpolation_points(p1)
-        NC = self.number_of_cells()
-        cellmeasure = self.cell_area()
-        B = self.glambda 
-        val = np.einsum('ijk,ck,cj,c -> ci', val,B[...,0], c[c2f2], cellmeasure)
-        result = np.zeros((gdof))
-        np.add.at(result, c2f1, val)
-        return result
     
-    def source_gphixx_phi_vector(self, p1, p2 ,c):
-        index = str(p1)+str(p2)
-        val = gphiphi[index]
-        c2f1 = self.cell_to_ipoint(p1)
-        c2f2 = self.cell_to_ipoint(p2)
-        gdof = self.number_of_global_interpolation_points(p2)
-        NC = self.number_of_cells()
-        cellmeasure = self.cell_area()
-        B = self.glambda 
-        val = np.einsum('ijk,ck,ci,c -> cj', val,B[...,0], c[c2f1], cellmeasure)
+    def construct_vector(self, p ,m):
+        '''
+        @brief 单元向量到总体向量
+        '''
+        gdof = self.number_of_global_interpolation_points(p)
         result = np.zeros((gdof))
-        np.add.at(result, c2f2, val)
-        return result
-    
-    def source_gphiyy_phi_vector(self, p1, p2 ,c):
-        index = str(p1)+str(p2)
-        val = gphiphi[index]
-        c2f1 = self.cell_to_ipoint(p1)
-        c2f2 = self.cell_to_ipoint(p2)
-        gdof = self.number_of_global_interpolation_points(p2)
-        NC = self.number_of_cells()
-        cellmeasure = self.cell_area()
-        B = self.glambda 
-        val = np.einsum('ijk,ck,ci,c -> cj', val,B[...,1], c[c2f1], cellmeasure)
-        result = np.zeros((gdof))
-        np.add.at(result, c2f2, val)
-        return result
-    
-    def source_gphiy_phi_vector(self, p1, p2 ,c):
-        index = str(p1)+str(p2)
-        val = gphiphi[index]
-        c2f1 = self.cell_to_ipoint(p1)
-        c2f2 = self.cell_to_ipoint(p2)
-        gdof = self.number_of_global_interpolation_points(p1)
-        NC = self.number_of_cells()
-        cellmeasure = self.cell_area()
-        B = self.glambda 
-        val = np.einsum('ijk,ck,cj,c -> ci', val,B[...,1], c[c2f2], cellmeasure)
-        result = np.zeros((gdof))
-        np.add.at(result, c2f1, val)
+        c2f = self.cell_to_ipoint(p)
+        np.add.at(result, c2f, m)
         return result
 
-    def construct_matrix(self, p1, p2 ,matrixtype='mass'):
+    def construct_matrix(self, p1, p2 ,m):
         '''
+        @brief 单元矩阵到总体矩阵
         '''
-        if matrixtype == 'mass' :
-            m = self.cell_mass_matrix(p1,p2)
-        elif matrixtype == 'stiff':
-            m = self.cell_stiff_matrix(p1,p2)
-        elif matrixtype == 'gpx_gpx':
-            m = self.cell_gphix_gphix_matrix(p1,p2)
-        elif matrixtype == 'gpx_gpy':
-            m = self.cell_gphix_gphiy_matrix(p1,p2)
-        elif matrixtype == 'gpy_gpx':
-            m = self.cell_gphiy_gphix_matrix(p1,p2)
-        elif matrixtype == 'gpy_gpy':
-            m = self.cell_gphiy_gphiy_matrix(p1,p2)
-        elif matrixtype == 'gpx_p':
-            m = self.cell_gphi_phi_matrix(p1,p2)
-        elif matrixtype == 'gpy_p':
-            m = self.cell_gphi_phi_matrix(p1,p2)
         NC = self.number_of_cells()
-        cellmeasure = self.cell_area()
-        m = np.einsum('cij,c->cij', m, cellmeasure)
-        ldof1 = m.shape[-2]
-        ldof2 = m.shape[-1]
+        ldof1 = self.number_of_global_interpolation_points(p1)
+        ldof2 = self.number_of_global_interpolation_points(p2)
         cell2dof1 = self.cell_to_ipoint(p1)
         cell2dof2 = self.cell_to_ipoint(p2)
         I = np.broadcast_to(cell2dof1[:, :, None], shape = m.shape)

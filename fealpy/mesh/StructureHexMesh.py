@@ -134,7 +134,7 @@ class StructureHexMesh(Mesh3d):
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        val - np.broadcast_to(-cy, (NN-n0*n2, ))
+        val = np.broadcast_to(-cy, (NN-n0*n2, ))
         I = k[:, 1:, :].flat
         J = k[:, 0:-1, :].flat
         A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
@@ -147,6 +147,18 @@ class StructureHexMesh(Mesh3d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+
+    def interpolation(self, f, intertype='node'):
+        """
+        @brief 把一个已知函数插值到网格节点上或者单元上
+        """
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
 
 
 

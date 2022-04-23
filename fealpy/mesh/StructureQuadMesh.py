@@ -201,7 +201,6 @@ class StructureQuadMesh(Mesh2d):
         return Pi
 
 
-
     def cbar_interpolation(self, ch, cellidx, xbar):
         nx = self.ds.nx
         ny = self.ds.ny
