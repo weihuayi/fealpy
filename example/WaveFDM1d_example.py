@@ -1,8 +1,12 @@
+#!/usr/bin/env python3
+# 
 
 import argparse
 import numpy as np
+from scipy.sparse.linalg import spsolve
+import matplotlib.pyplot as plt
 from fealpy.mesh import StructureIntervalMesh
-from fealpy.timeintegratoralg import UniformTimeline 
+from fealpy.timeintegratoralg import UniformTimeLine 
 
 
 # 定义 PDE 模型
@@ -65,15 +69,15 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--NS',
-        default=10, type=int,
+        default=100, type=int,
         help='一维区间剖分段数， 默认为 10 段.')
 
 parser.add_argument('--NT',
-        default=100, type=int,
+        default=1000, type=int,
         help='时间剖分段数， 默认为 100 段')
 
 parser.add_argument('--T',
-        default=10, type=float,
+        default=5, type=float,
         help='终止时间， 默认取 10')
 
 parser.add_argument('--theta',
@@ -96,7 +100,7 @@ pde = WavePDE1d_0(L, R, T0, T1, a)
 I = pde.domain()
 
 mesh = StructureIntervalMesh(I, nx=NS)
-timeline = UniformTimeline(T0, T1, NT)
+timeline = UniformTimeLine(T0, T1, NT)
 
 hx = mesh.hx
 dt = timeline.dt
@@ -109,15 +113,17 @@ uh0 = mesh.interpolation(pde.init_solution, 'node')
 duh0 = mesh.interpolation(pde.diff_init_solution, 'node')
 uh1 = mesh.function('node')
 
-def adavance(n):
+uh1[0] = pde.left_solution(dt)
+uh1[-1] = pde.right_solution(dt)
+uh1[1:-1] = r**2*(uh0[0:-2] + uh0[2:])/2.0 + r**2*uh0[1:-1] + dt*duh0[1:-1]
+
+
+def forward(n, *args):
     t = T0 + n*dt 
     if n == 0:
-        return uh0
+        return uh0, t
     elif n == 1:
-        uh1[0] = pde.left_solution(t)
-        uh1[-1] = pde.right_solution(t)
-        uh1[1:-1] = r**2*(uh0[0:-1] + uh0[1:])/2.0 + r**2*uh0[1:-1] + dt*duh0[1:-1]
-        return uh1
+        return uh1, t
     else:
         F = A1@uh1[1:-1] + A2@uh0[1:-1]
         uh0[:] = uh1[:]
@@ -128,10 +134,9 @@ def adavance(n):
         F[-1] += r**2*theta*uh1[-1]
 
         uh1[1:-1] = spsolve(A0, F)
-        return uh1
+        return uh1, t
 
-
-fig = plt.figure()
-axes = fig.gca()
-mesh.show_animation(fig, axes, box, adavance, frames=NT+1)
+box = [0, 1, -1.4, 1.4]
+fig, axes = plt.subplots()
+mesh.show_animation(fig, axes, box, forward, frames=NT+1)
 plt.show()

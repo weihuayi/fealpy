@@ -76,12 +76,13 @@ class StructureIntervalMesh(object):
         return A.tocsr()
 
     def wave_equation(self, r, theta):
+        n0 = self.NC -1
         A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
-                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+                [0, 1, -1], shape=(n0, n0), format='csr')
         A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
-                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+                [0, 1, -1], shape=(n0, n0), format='csr')
         A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
-                [0, 1, -1], shape=(NS-1, NS-1), format='csr')
+                [0, 1, -1], shape=(n0, n0), format='csr')
 
         return A0, A1, A2
 
@@ -98,12 +99,8 @@ class StructureIntervalMesh(object):
         return uh
 
     def interpolation(self, f, etype='node'):
-        if etype in {'node', 0}:
-            x = self.node
-            return f(node)
-        elif etype in {'cell', 1}:
-            x = self.entity_barycenter(etype)
-            return f(x)
+        x = self.entity_barycenter(etype)
+        return f(x)
 
     def error(self, u, uh):
         """
@@ -140,21 +137,33 @@ class StructureIntervalMesh(object):
         line = axes.plot(node, uh)
         return line
 
-    def show_animation(self, fig, axes, box, advance, fname='test.mp4', 
-            frames=1000,  lw=2):
+    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+            init=None, fargs=None,
+            frames=1000,  lw=2, interval=50):
 
         import matplotlib.animation as animation
+
         line, = axes.plot([], [], lw=lw)
         axes.set_xlim(box[0], box[1])
         axes.set_ylim(box[2], box[3])
-        x = self.node.flat
+        x = self.node
 
-        def update(n): 
-            uh = adavance(n)
-            line.set_data((x, uh))
+        def init_func():
+            if callable(init):
+                init()
             return line
 
-        ani = animation.FuncAnimation(fig, update, frames=frames)
+        def func(n, *fargs):
+            uh, t = forward(n)
+            line.set_data((x, uh))
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            return line
+
+        ani = animation.FuncAnimation(fig, func, frames=frames,
+                init_func=init_func,
+                interval=interval)
         ani.save(fname)
         
     def add_plot(
