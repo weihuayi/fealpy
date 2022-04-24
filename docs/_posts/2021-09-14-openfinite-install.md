@@ -63,3 +63,11 @@ make install
 ```bash
 pip3 install --upgrade gmsh
 ```
+
+**安装 OpenBLAS**
+```bash
+cd ~/opt
+git clone https://github.com/xianyi/OpenBLAS.git
+cd OpenBLAS/
+make install PREFIX=~/.local/openblas
+```
