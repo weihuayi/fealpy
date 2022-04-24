@@ -78,6 +78,29 @@ class StructureQuadMesh(Mesh2d):
         a /=2
         return a
 
+    def function(self, etype='node'):
+        """
+        @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
+        """
+
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'edge', 1}:
+            NE = self.number_of_edges()
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgex'}:
+            NE = (self.ds.ny+1)*self.ds.nx
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'cell', 2}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+
     def interpolation(self, f, intertype='node'):
         node = self.node
         if intertype == 'node':
@@ -127,6 +150,27 @@ class StructureQuadMesh(Mesh2d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+
+    def show_function(self, plot, uh, cmap='jet'):
+        """
+        @brief 显示一个定义在网格节点上的函数
+        """
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            axes = fig.add_subplot(111, projection='3d')
+        else:
+            axes = plot
+        node = self.node
+        x = node[:, 0].reshape(self.ds.nx + 1, self.ds.ny + 1)
+        y = node[:, 1].reshape(self.ds.nx + 1, self.ds.ny + 1)
+        uh = uh.reshape(self.ds.nx + 1, self.ds.ny + 1)
+        return axes.plot_surface(x, y, uh, cmap=cmap)
+
+
+    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+            init=None, fargs=None,
+            frames=1000, lw=2, interval=50):
+        import matplotlib.animation as animation
 
 
     def cell_location(self, px):

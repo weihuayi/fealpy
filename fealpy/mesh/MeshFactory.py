@@ -7,6 +7,7 @@ from .TetrahedronMesh import TetrahedronMesh
 from .HexahedronMesh import HexahedronMesh
 from .PolygonMesh import PolygonMesh
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+from .StructureQuadMesh import StructureQuadMesh
 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
@@ -253,6 +254,41 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         mesh = TriangleMeshWithInfinityNode(TriangleMesh(node, cell))
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
+    elif meshtype == 'noconvex':
+        mesh = StructureQuadMesh(box, nx, ny)
+        edge = mesh.entity("edge")
+        node = mesh.entity("node")
+        cell = mesh.entity("cell")
+        NE = mesh.number_of_edges()
+        NC = mesh.number_of_cells()
+
+        cell2edge = mesh.ds.cell_to_edge()
+        isbdedge = mesh.ds.boundary_edge_flag() 
+        isbdcell = mesh.ds.boundary_cell_flag() 
+
+        nie = np.sum(~isbdedge)
+        hx = 1/nx
+        hy = 1/ny
+        newnode = np.zeros((NN+nie, 2), dtype=np.float_)
+        newnode[:NN] = node
+        newnode[NN:] = 0.5*node[edge[~isbdedge, 0]] + 0.5*node[edge[~isbdedge, 1]]
+        newnode[NN: NN+(nx-1)*ny] = newnode[NN: NN+(nx-1)*ny] + np.array([[0.2*hx, 0.1*hy]])
+        newnode[NN+(nx-1)*ny:] = newnode[NN+(nx-1)*ny:] + np.array([[0.1*hx, 0.2*hy]])
+
+        edge2newnode = -np.ones(NE, dtype=np.int_)
+        edge2newnode[~isbdedge] = np.arange(NN, newnode.shape[0])
+        newcell = np.zeros((NC, 8), dtype=np.int_)
+        newcell[:, ::2] = cell
+        newcell[:, 1::2] = edge2newnode[cell2edge]
+
+        flag = newcell>-1
+        num = np.zeros(NC+1, dtype=np.int_)
+        num[1:] = np.sum(flag, axis=-1)
+        newcell = newcell[flag]
+        cellLocation = np.cumsum(num)
+        print(cellLocation)
+        return PolygonMesh(newnode, newcell, cellLocation)
+
 
 def boxmesh3d(box, nx=10, ny=10, nz=10, meshtype='hex', threshold=None,
         returnnc=False):
