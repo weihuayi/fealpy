@@ -148,6 +148,18 @@ class StructureHexMesh(Mesh3d):
 
         return A.tocsr()
 
+    def interpolation(self, f, intertype='node'):
+        """
+        @brief 把一个已知函数插值到网格节点上或者单元上
+        """
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
 
 
 class StructureHexMeshDataStructure():
