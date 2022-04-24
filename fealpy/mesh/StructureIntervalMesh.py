@@ -98,6 +98,13 @@ class StructureIntervalMesh(object):
             uh = np.zeros(NC, dtype=self.ftype)
         return uh
 
+    def interpolation_matrix(self, nlevel):
+        """
+        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
+        这里要求最细网格的是由一个最粗的网格一致加密而来
+        """
+        pass
+
     def interpolation(self, f, etype='node'):
         x = self.entity_barycenter(etype)
         return f(x)
