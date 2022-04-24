@@ -58,3 +58,4 @@ docs/vendor
 *.eps
 .jekyll-cache
 __pycache__
+*.mp4
