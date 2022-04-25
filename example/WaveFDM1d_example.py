@@ -78,7 +78,7 @@ parser.add_argument('--NT',
 
 parser.add_argument('--T',
         default=5, type=float,
-        help='终止时间， 默认取 10')
+        help='终止时间， 默认取 5')
 
 parser.add_argument('--theta',
         default=0.5, type=float,
