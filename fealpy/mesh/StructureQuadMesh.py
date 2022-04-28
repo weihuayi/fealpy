@@ -26,6 +26,12 @@ class StructureQuadMesh(Mesh2d):
             self.hy = (self.box[3] - self.box[2])/ny
             self.data = {}
 
+    def interpolation_matrix(self, nlevel):
+        """
+        @brief  
+        """
+        pass
+
     def multi_index(self):
         NN = self.ds.NN
         nx = self.ds.nx
@@ -101,12 +107,6 @@ class StructureQuadMesh(Mesh2d):
         return uh
 
 
-    def interpolation_matrix(self, nlevel):
-        """
-        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
-        这里要求最细网格的是由一个最粗的网格一致加密而来
-        """
-        pass
 
     def interpolation(self, f, intertype='node'):
         node = self.node
