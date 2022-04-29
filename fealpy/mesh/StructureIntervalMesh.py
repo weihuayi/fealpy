@@ -11,17 +11,18 @@ class StructureIntervalMesh(object):
     [x_0, x_1, ...., x_N]
     """
 
-    def __init__(self, I, nx=2, h=None):
+    def __init__(self, I, nx=2, itype=np.int_, ftype=np.float64):
+
         self.I = I
-        if h is None:
-            self.h = (I[1] - I[0])/nx
-            self.NC = nx
-        else:
-            self.h = h
-            self.NC = int((I[1] - I[0])/h)
+        self.meshtype="interval"
+        self.hx = (I[1] - I[0])/nx
+        self.NC = nx
         self.NN = self.NC + 1
 
-        self.ds = StructureIntervalMeshDataStructure(self.NN, self.NC)
+        self.ds = StructureIntervalMeshDataStructure(nx+1, nx)
+
+        self.itype = itype
+        self.ftype = ftype
 
     def entity(self, etype):
         if etype in {'cell', 1}:
@@ -32,10 +33,23 @@ class StructureIntervalMesh(object):
             cell[:, 1] = range(1, NN)
             return cell
         elif etype in {'node', 0}:
-            node = np.linspace(self.I[0], self.I[1], self.NN)
-            return node.reshape(-1, 1)
+            return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`etype` is wrong!")
+
+    def entity_barycenter(self, etype):
+        if etype in {'node', 0}:
+            return self.node 
+        elif etype in {'cell', 1}:
+            x = self.node
+            return (x[1:] + x[0:-1])/2.0
+        else:
+            raise ValueError("`etype` is wrong!")
+
+    @property
+    def node(self):
+        node = np.linspace(self.I[0], self.I[1], self.NN)
+        return node
 
     def number_of_nodes(self):
         return self.NN
@@ -47,18 +61,118 @@ class StructureIntervalMesh(object):
         return 1
 
     def laplace_operator(self):
-        NN = self.NN
-        h = self.h
-        d = -2*np.ones(NN, dtype=np.float)/h**2
-        c = np.ones(NN - 1, dtype=np.float)/h**2
-        A = diags([c, d, c], [-1, 0, 1])
+        hx = self.hx
+        cx = 1/(self.hx**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([2*cx], [0], shape=(NN, NN), format='coo')
+
+        val = np.broadcast_to(-cx, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
+
+    def wave_equation(self, r, theta):
+        n0 = self.NC -1
+        A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
+                [0, 1, -1], shape=(n0, n0), format='csr')
+        A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
+                [0, 1, -1], shape=(n0, n0), format='csr')
+        A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
+                [0, 1, -1], shape=(n0, n0), format='csr')
+
+        return A0, A1, A2
+
+    def function(self, etype='node'):
+        """
+        @brief 返回一个定义在节点或者单元上的数组，元素取值为 0
+        """
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'cell', 1}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+    def interpolation_matrix(self, nlevel):
+        """
+        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
+        这里要求最细网格的是由一个最粗的网格一致加密而来
+        """
+        pass
+
+    def interpolation(self, f, etype='node'):
+        x = self.entity_barycenter(etype)
+        return f(x)
+
+    def error(self, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+        
+        @param[in] u 
+        @param[in] uh
+        """
+        
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+        
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h*np.sum(e**2))
+        
+        de = e[1:] - e[0:-1]
+        e1 = np.sqrt(np.sum(de**2)/h + e0**2)
+        return emax, e0, e1
 
     def index(self):
         NN = self.NN
         index = [ '$x_{'+str(i)+'}$' for i in range(NN)]
         return index
 
+    def show_function(self, plot, uh):
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        node = self.node.flat
+        line = axes.plot(node, uh)
+        return line
+
+    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+            init=None, fargs=None,
+            frames=1000,  lw=2, interval=50):
+
+        import matplotlib.animation as animation
+
+        line, = axes.plot([], [], lw=lw)
+        axes.set_xlim(box[0], box[1])
+        axes.set_ylim(box[2], box[3])
+        x = self.node
+
+        def init_func():
+            if callable(init):
+                init()
+            return line
+
+        def func(n, *fargs):
+            uh, t = forward(n)
+            line.set_data((x, uh))
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            return line
+
+        ani = animation.FuncAnimation(fig, func, frames=frames,
+                init_func=init_func,
+                interval=interval)
+        ani.save(fname)
+        
     def add_plot(
             self, plot,
             nodecolor='r', cellcolor='k',
@@ -117,10 +231,12 @@ class StructureIntervalMesh(object):
 
 class StructureIntervalMeshDataStructure():
     def __init__(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 
     def reinit(self, NN, NC):
+        self.nx = NC
         self.NN = NN
         self.NC = NC
 

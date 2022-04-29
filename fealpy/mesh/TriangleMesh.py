@@ -1107,6 +1107,12 @@ class TriangleMesh(Mesh2d):
         return cell2dof
     
     def cell_phi_phi_matrix(self, p1, p2, c=None):
+        '''
+        @brief
+        @param p1 检验函数的次数
+        @param p2 试探函数的次数
+        @param c  试探函数的系数
+        '''
         cellmeasure = self.cell_area()
         index = str(p1) + str(p2)
         val = phiphi[index]

@@ -10,7 +10,9 @@ class StructureHexMesh(Mesh3d):
         self.itype = itype
         self.ftype = ftype
         self.box = box
-        self.h = (box[1] - box[0])/nx
+        self.hx = (box[1] - box[0])/nx
+        self.hy = (box[3] - box[2])/ny
+        self.hz = (box[5] - box[4])/nz
         self.ds = StructureHexMeshDataStructure(nx, ny, nz)
 
         self.celldata = {}
@@ -81,7 +83,6 @@ class StructureHexMesh(Mesh3d):
                     nodedata=self.nodedata,
                     celldata=celldata)
 
-
     @property
     def node(self):
         NN = self.ds.NN
@@ -108,16 +109,103 @@ class StructureHexMesh(Mesh3d):
         return self.ds.NC
 
     def laplace_operator(self):
-        NX = self.ds.nx + 1
-        h = self.h
-        d = 2*np.ones(NX, dtype=np.float)
-        c = -np.ones(NX - 1, dtype=np.float)
-        A = diags([c, d, c], [-1, 0, 1])
-        A = A.tocsr()
+        """
+        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x, y, z
+        三个方向都是均匀剖分，但各自步长可以不一样
+        @todo 处理带系数的情形
+        """
 
-        I = eye(NX)
-        A = kron(kron(A, I), I) + kron(kron(I, A), I) + kron(kron(I, I), A)
-        return A, h**2
+        n0 = self.ds.nx + 1
+        n1 = self.ds.ny + 1
+        n2 = self.ds.nz + 1
+
+        cx = 1/(self.hx**2)
+        cy = 1/(self.hy**2)
+        cz = 1/(self.hz**2)
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN).reshape(n0, n1, n2)
+
+        A = diags([2*(cx + cy + cz)], [0], shape=(NN, NN), format='coo')
+
+        val = np.broadcast_to(-cx, (NN - n1*n2, ))
+        I = k[1:, :, :].flat
+        J = k[0:-1, :, :].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(-cy, (NN-n0*n2, ))
+        I = k[:, 1:, :].flat
+        J = k[:, 0:-1, :].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(-cz, (NN-n0*n1, )) 
+        I = k[:, :, 1:].flat
+        J = k[:, :, 0:-1].flat
+        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A.tocsr()
+
+    def function(self, etype='node'):
+        """
+        @brief 返回定义在节点、网格边、网格面、或网格单元上离散函数（数组），元素取值为0
+
+        @todo 明确需要定义的函数的实体集合
+        """
+
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'edge', 1}:
+            NE = self.number_of_edges()
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgex'}:
+            NE = (self.ds.ny+1)*self.ds.nx
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgez'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'face', 2}:
+            NF = self.number_of_faces()
+            uh = np.zeros(NF, dtype=self.ftype)
+        elif etype in {'facex'}:
+            NF = self.ds.nx*self.ds.ny*(self.ds.nz + 1) 
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'facey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'facez'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'cell', 3}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+
+    def interpolation_matrix(self, nlevel):
+        """
+        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
+        这里要求最细网格的是由一个最粗的网格一致加密而来
+        """
+        pass
+
+    def interpolation(self, f, intertype='node'):
+        """
+        @brief 把一个已知函数插值到网格节点上或者单元上
+        """
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
 
 
 

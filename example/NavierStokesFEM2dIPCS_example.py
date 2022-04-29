@@ -93,6 +93,59 @@ ugdof = uspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
 gdof = pgdof+2*ugdof
 mesh.grad_lambda()
+
+##矩阵组装准备
+qf = mesh.integrator(9,'cell')
+bcs,ws = qf.get_quadrature_points_and_weights()
+cellmeasure = mesh.entity_measure('cell')
+
+## 速度空间
+uphi = uspace.basis(bcs)
+ugphi = uspace.grad_basis(bcs)
+ucell2dof = uspace.cell_to_dof()
+NC = mesh.number_of_cells()
+
+epqf = uspace.integralalg.edgeintegrator
+epbcs,epws = epqf.get_quadrature_points_and_weights()
+
+## 压力空间
+pphi = pspace.basis(bcs)
+pgphi = pspace.grad_basis(bcs)
+pcell2dof = pspace.cell_to_dof()
+
+index = mesh.ds.boundary_face_index()
+ebc = mesh.entity_barycenter('face',index=index)
+flag = pde.is_outflow_boundary(ebc)
+index = index[flag]# p边界条件的index
+
+emeasure = mesh.entity_measure('face',index=index)
+face2dof = uspace.face_to_dof()[index]
+n = mesh.face_unit_normal(index=index)
+
+def edge_matrix(pfun, gfun, nfun): 
+    n = nfun(index=index)
+
+    edge2cell = mesh.ds.edge2cell[index]
+    egphi = gfun(epbcs,edge2cell[:,0],edge2cell[:,2])
+    ephi = pfun(epbcs)
+    
+    pgx0 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,0],n[:,0],emeasure)
+    pgy1 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,1],n[:,1],emeasure)
+    pgx1 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,0],n[:,1],emeasure)
+    pgy0 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,1],n[:,0],emeasure)
+
+    J1 = np.broadcast_to(face2dof[:,:,None],shape =pgx0.shape) 
+    tag = edge2cell[:,0]
+    I1 = np.broadcast_to(ucell2dof[tag][:,None,:],shape = pgx0.shape)
+    
+    D00 = csr_matrix((pgx0.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
+    D11 = csr_matrix((pgy1.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
+    D01 = csr_matrix((pgy0.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
+    D10 = csr_matrix((pgx1.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
+
+    matrix = vstack([hstack([D00,D10]),hstack([D01,D11])]) 
+    return matrix
+
 #组装第一个方程的左端矩阵
 H = mesh.cell_phi_phi_matrix(udegree, udegree)
 H = mesh.construct_matrix(udegree, udegree, H)
@@ -102,6 +155,7 @@ E00 = mesh.cell_gphix_gphix_matrix(udegree, udegree)
 E11 = mesh.cell_gphiy_gphiy_matrix(udegree, udegree)
 E01 = mesh.cell_gphix_gphiy_matrix(udegree, udegree)
 E10 = mesh.cell_gphiy_gphix_matrix(udegree, udegree)
+
 E00 = mesh.construct_matrix(udegree, udegree, E00)
 E11 = mesh.construct_matrix(udegree, udegree, E11)
 E01 = mesh.construct_matrix(udegree, udegree, E01)

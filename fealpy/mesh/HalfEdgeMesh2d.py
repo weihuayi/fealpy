@@ -70,8 +70,10 @@ class HalfEdgeMesh2d(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
         self.hedgecolor = None
+
         self.newnode2edge = {}
         self.retainnode = {}
+        self.deletnode2edge = {}
 
         # 网格节点的自由度标记数组
         # 0: 固定点
@@ -749,6 +751,8 @@ class HalfEdgeMesh2d(Mesh2d):
 
         #记录保留点
         self.retainnode, = np.where(~isRNode)
+        self.deletenode, = np.where(isRNode)
+        self.deletenode2edge = nex[isMainHEdge[nex]]
 
         #更新节点
         node.adjust_size(isRNode)
@@ -763,7 +767,12 @@ class HalfEdgeMesh2d(Mesh2d):
 
         # 对半边重新编号
         ne = np.sum(~isMarkedHEdge)//2
-        self.adjust_number(isMarkedHEdge, method='halfedge')
+        L = len(isMarkedHEdge)
+        l = (~isMarkedHEdge).sum()
+        idxmap = np.arange(L)
+        idxmap[~isMarkedHEdge] = np.arange(l)
+        halfedge[:, 2:] = idxmap[halfedge[:, 2:]]
+        self.deletnode2edge = idxmap[self.deletenode2edge]
 
         # 更新halfedge
         halfedge.adjust_size(isMarkedHEdge)

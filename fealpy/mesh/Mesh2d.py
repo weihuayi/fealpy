@@ -159,7 +159,9 @@ class Mesh2d(object):
             nodecolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect='equal',
             linewidths=1, markersize=50,
-            showaxis=False, showcolorbar=False, cmap='rainbow', box=None):
+            showaxis=False, showcolorbar=False, 
+            cmax=None, cmin=None, 
+            colorbarshrink=1.0, cmap='jet', box=None):
 
         if isinstance(plot, ModuleType):
             fig = plot.figure()
@@ -171,7 +173,8 @@ class Mesh2d(object):
                 nodecolor=nodecolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis, showcolorbar=showcolorbar, cmap=cmap, box=box)
+                showaxis=showaxis, showcolorbar=showcolorbar,
+                colorbarshrink=colorbarshrink, cmap=cmap, box=box)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
