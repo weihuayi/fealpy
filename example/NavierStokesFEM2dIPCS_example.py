@@ -8,6 +8,7 @@ from scipy.sparse.linalg import spsolve
 from scipy.sparse import csr_matrix,hstack,vstack,spdiags,bmat
 from mumps import DMumpsContext
 
+import matplotlib.pyplot as plt
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.timeintegratoralg import UniformTimeLine
@@ -45,7 +46,7 @@ parser.add_argument('--output',
         help='结果输出目录, 默认为 ./')
 
 parser.add_argument('--step',
-        default=10, type=int,
+        default=20, type=int,
         help='隔多少步输出一次')
 
 args = parser.parse_args()
@@ -57,14 +58,21 @@ h = args.h
 output = args.output
 step = args.step
 
+
 # 网格,空间,函数
 rho = 1
 mu=0.001
 udim = 2
 pde = PDE()
-mesh = pde.mesh(h)
+#mesh = pde.mesh()
+mesh = pde.mesh1(h)
 tmesh = UniformTimeLine(0,T,nt)
 dt = tmesh.dt
+
+fig = plt.figure()
+axes = fig.gca()
+mesh.add_plot(axes)
+plt.show()
 
 uspace = LagrangeFiniteElementSpace(mesh,p=udegree)
 pspace = LagrangeFiniteElementSpace(mesh,p=pdegree)
@@ -84,59 +92,7 @@ mesh.to_vtk(fname=fname)
 ugdof = uspace.number_of_global_dofs()
 pgdof = pspace.number_of_global_dofs()
 gdof = pgdof+2*ugdof
-
-##矩阵组装准备
-qf = mesh.integrator(9,'cell')
-bcs,ws = qf.get_quadrature_points_and_weights()
-cellmeasure = mesh.entity_measure('cell')
-
-## 速度空间
-uphi = uspace.basis(bcs)
-ugphi = uspace.grad_basis(bcs)
-ucell2dof = uspace.cell_to_dof()
-NC = mesh.number_of_cells()
-
-epqf = uspace.integralalg.edgeintegrator
-epbcs,epws = epqf.get_quadrature_points_and_weights()
-
-## 压力空间
-pphi = pspace.basis(bcs)
-pgphi = pspace.grad_basis(bcs)
-pcell2dof = pspace.cell_to_dof()
-
-index = mesh.ds.boundary_face_index()
-ebc = mesh.entity_barycenter('face',index=index)
-flag = pde.is_outflow_boundary(ebc)
-index = index[flag]# p边界条件的index
-
-emeasure = mesh.entity_measure('face',index=index)
-face2dof = uspace.face_to_dof()[index]
-n = mesh.face_unit_normal(index=index)
-
-def edge_matrix(pfun,gfun,nfun): 
-    n = nfun(index=index)
-
-    edge2cell = mesh.ds.edge2cell[index]
-    egphi = gfun(epbcs,edge2cell[:,0],edge2cell[:,2])
-    ephi = pfun(epbcs)
-    
-    pgx0 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,0],n[:,0],emeasure)
-    pgy1 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,1],n[:,1],emeasure)
-    pgx1 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,0],n[:,1],emeasure)
-    pgy0 = np.einsum('i,ijk,jim,j,j->jkm',epws,ephi,egphi[...,1],n[:,0],emeasure)
-
-    J1 = np.broadcast_to(face2dof[:,:,None],shape =pgx0.shape) 
-    tag = edge2cell[:,0]
-    I1 = np.broadcast_to(ucell2dof[tag][:,None,:],shape = pgx0.shape)
-    
-    D00 = csr_matrix((pgx0.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
-    D11 = csr_matrix((pgy1.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
-    D01 = csr_matrix((pgy0.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
-    D10 = csr_matrix((pgx1.flat,(J1.flat,I1.flat)),shape=(ugdof,ugdof))
-
-    matrix = vstack([hstack([D00,D10]),hstack([D01,D11])]) 
-    return matrix
-
+mesh.grad_lambda()
 #组装第一个方程的左端矩阵
 H = mesh.cell_phi_phi_matrix(udegree, udegree)
 H = mesh.construct_matrix(udegree, udegree, H)
@@ -152,30 +108,23 @@ E01 = mesh.construct_matrix(udegree, udegree, E01)
 E10 = mesh.construct_matrix(udegree, udegree, E10)
 E = bmat([[E00+1/2*E11, 1/2*E10], [1/2*E01, E11+1/2*E00]], format='csr')
 
-D = edge_matrix(uspace.face_basis,uspace.edge_grad_basis,mesh.face_unit_normal)
-A = rho/dt*H + mu*E -1/2*mu*D
+A = rho/dt*H + mu*E 
 
 ##边界处理
 xx = np.zeros(2*ugdof, np.float64)
 
-u_isbddof_u0 = uspace.is_boundary_dof()
-u_isbddof_in = uspace.is_boundary_dof(threshold = pde.is_inflow_boundary)
-u_isbddof_out = uspace.is_boundary_dof(threshold = pde.is_outflow_boundary)
+is_u_bdof = uspace.is_boundary_dof()
+is_uin_bdof = uspace.is_boundary_dof(threshold = pde.is_inflow_boundary)
+is_uout_bdof = uspace.is_boundary_dof(threshold = pde.is_outflow_boundary)
 
-u_isbddof_u0[u_isbddof_in] = False 
-u_isbddof_u0[u_isbddof_out] = False 
-xx[0:ugdof][u_isbddof_u0] = 0
-xx[ugdof:2*ugdof][u_isbddof_u0] = 0
+is_u_bdof[is_uout_bdof] = False 
 
-u_isbddof = u_isbddof_u0
-u_isbddof[u_isbddof_in] = True
-
-ipoint = uspace.interpolation_points()[u_isbddof_in]
+ipoint = uspace.interpolation_points()[is_uin_bdof]
 uinfow = pde.u_inflow_dirichlet(ipoint)
-xx[0:ugdof][u_isbddof_in] = uinfow[:,0]
-xx[ugdof:2*ugdof][u_isbddof_in] = uinfow[:,1]
+xx[0:ugdof][is_uin_bdof] = uinfow[:,0]
+xx[ugdof:2*ugdof][is_uin_bdof] = uinfow[:,1]
 
-isBdDof = np.hstack([u_isbddof, u_isbddof])
+isBdDof = np.hstack([is_u_bdof,is_u_bdof])
 bdIdx = np.zeros(2*ugdof, dtype=np.int_)
 bdIdx[isBdDof] = 1
 Tbd = spdiags(bdIdx, 0, 2*ugdof, 2*ugdof)
@@ -186,9 +135,9 @@ A = T@A + Tbd
 B1 = mesh.cell_stiff_matrix(pdegree, pdegree)
 B1 = mesh.construct_matrix(pdegree, pdegree, B1)
 
-ispBDof = pspace.boundary_dof(threshold=pde.is_outflow_boundary)
+is_p_bdof = pspace.boundary_dof(threshold=pde.is_outflow_boundary)
 bdIdx = np.zeros((B1.shape[0],), np.int_)
-bdIdx[ispBDof] = 1
+bdIdx[is_p_bdof] = 1
 Tbd = spdiags(bdIdx, 0, B1.shape[0], B1.shape[0])
 T = spdiags(1-bdIdx, 0, B1.shape[0], B1.shape[0])
 B =  T@B1 + Tbd
@@ -234,21 +183,11 @@ for i in range(0, nt):
     fb4y = mesh.construct_vector(udegree, fb4y)
     fb4 = np.hstack((fb4x, fb4y))
 
-    ##p边界
-    ep = p0(epbcs)[...,index]
-    value = np.einsum('ij,jk->ijk',ep,n)
-    ephi = uspace.face_basis(epbcs)
-    evalue = np.einsum('i,ijk,ijm,j->jkm',epws,ephi,value,emeasure)
-    fb5 = np.zeros((ugdof,2))
-    np.add.at(fb5,(face2dof,np.s_[:]),evalue)
-    
-    fb6 = D@u0.flatten(order='F') 
-
-    b1 = (rho/dt*fb1 - rho*fb2-dt*fb5).flatten(order='F')
-    b1 = b1 + fb4 - mu*fb3 + mu/2*fb6
+    b1 = (rho/dt*fb1 - rho*fb2).flatten(order='F')
+    b1 = b1 + fb4 - mu*fb3 
      
     b1[isBdDof] = xx[isBdDof]
-
+        
     ctx.set_centralized_sparse(A)
     x = b1.copy()
     ctx.set_rhs(x)
@@ -267,8 +206,7 @@ for i in range(0, nt):
     b22 = b22x + b22y
     b2 = b21 -1/dt*b22
     
-    ispBDof = pspace.is_boundary_dof(threshold=pde.is_outflow_boundary)
-    b2[ispBDof] = 0
+    b2[is_p_bdof] = 0
 
     ctx.set_centralized_sparse(B)
     x = b2.copy()
