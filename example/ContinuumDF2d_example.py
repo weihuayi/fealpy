@@ -9,7 +9,7 @@ class ContinummDFModel2d:
 
     def __init__(self, 
             ka=2.7e-3,  # kN/mm，临界能量释放率
-            l0=1.33e-2, # mm, 拉伸测试的尺度系数
+            l0=1.33e-2, # mm, 尺度系数
             la=121.15,  # kN/mm^{-2}， 拉梅第一参数
             mu=80.77    # kN/mm^{-2}，拉梅第二参数
             )
@@ -17,6 +17,17 @@ class ContinummDFModel2d:
         self.l0 = l0
         self.la = la
         self.mu = mu
+
+        self.index = np.array([
+            (0, 0, 0, 0, 0, 0),
+            (0, 1, 0, 0, 1, 1),
+            (0, 2, 0, 0, 0, 1),
+            (1, 0, 1, 1, 0, 0),
+            (1, 1, 1, 1, 1, 1),
+            (1, 2, 1, 1, 0, 1),
+            (2, 0, 0, 1, 0, 0),
+            (2, 1, 0, 1, 1, 1),
+            (2, 2, 0, 1, 0, 1)], dtype=np.int_)
 
     def init_mesh(self, n=4):
         node = np.array([
@@ -124,11 +135,62 @@ class ContinummDFModel2d:
         w, v = np.linalg.eigh(s)
         return w, v
 
-    def heaviside_function(self, x, k=1):
+    def heaviside(self, x, k=1):
         """
         @brief 
         """
-        pass
+        val = 1.0/(1.0 + np.exp(-2*k*x))
+        return val
+
+
+    def dsigma_depsilon(self, bcs, phi, s):
+        """
+        @brief 计算应力关于应变的导数矩阵
+        """
+
+        eps = 1e-10 
+
+        NQ = len(bcs)
+        NC = len(s)
+        D = np.zeros((NQ, NC, 3, 3), dtype=np.float64)
+
+        w, v = self.strain_eigs(s)
+        hwp = self.heaviside(w)
+        hwm = self.heaviside(-w)
+
+        flag = np.abs(w[:, 0] - w[:, 1]) < eps
+        c0 = np.abs(w[:, 0]) - np.abs(w[:, 1])
+        c1 = w[:, 0] - w[:, 1]
+
+        flag = np.abs(c1) < eps
+        cp = np.zeros_like(c0)
+        cm = np.zeros_like(c0)
+
+        cp[flag] = (hwp[flag, 0] + hwp[flag, 1])/2.0
+        cp[~flag] = (1 + c0[~flag]/c1[~flag])/4.0
+
+        cp[flag] = (hwm[flag, 0] + hwm[flag, 1])/2.0
+        cp[~flag] = (1 - c0[~flag]/c1[~flag])/4.0
+
+        ts = np.trace(s)
+        la = self.la
+        mu = self.mu
+
+        val0 = (1 - phi(bcs))**2 + eps
+
+        val1 = val0*self.heaviside(ts) # (NQ, NC) * (NC, )
+        val1 += self.heaviside(-ts)
+        val1 *= la
+
+        D[:, :, 0, 0] = val1
+        D[:, :, 0, 1] = val1
+        D[:, :, 1, 0] = val1
+        D[:, :, 1, 1] = val1
+
+
+        for m, n, i, j, k, l in self.index:
+            D[:, :, m, n] +=  
+
 
 
 
