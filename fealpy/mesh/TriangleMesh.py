@@ -4,7 +4,7 @@ from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
-from fealpy.mesh.TriangleMeshData import phiphi,gphigphi,gphiphi,phigphiphi
+from fealpy.mesh.TriangleMeshData import gphigphiphi,phiphi,gphigphi,gphiphi,phigphiphi,phiphiphi
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
@@ -1156,9 +1156,13 @@ class TriangleMesh(Mesh2d):
         val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1], B[...,1], cellmeasure)
         return val 
     
-    def cell_stiff_matrix(self, p1, p2):
-        a = self.cell_gphix_gphix_matrix(p1, p2)
-        b = self.cell_gphiy_gphiy_matrix(p1, p2)
+    def cell_stiff_matrix(self, p1, p2, p3=None, c=None):
+        if c is None:
+            a = self.cell_gphix_gphix_matrix(p1, p2)
+            b = self.cell_gphiy_gphiy_matrix(p1, p2)
+        else:
+            a = self.cell_gphix_gphix_phi_matrix(p1 ,p2 ,p3 , c)
+            b = self.cell_gphiy_gphiy_phi_matrix(p1 ,p2 ,p3 , c)
         return a+b 
     
     def cell_gphix_phi_matrix(self, p1, p2, c1=None, c2=None):
@@ -1228,6 +1232,26 @@ class TriangleMesh(Mesh2d):
             val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
         return val 
 
+    
+    def cell_phi_phi_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
+        '''
+        @brief  
+        @param c2 phi的系数 
+        '''
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        A = phiphiphi[index]
+        B = self.glambda
+        c2f2 = self.cell_to_ipoint(p2)
+        c2f3 = self.cell_to_ipoint(p3)
+        if (c2 is not None) and (c3 is None):
+            val = np.einsum('ijk, c, cj->cik', A, cellmeasure, c2[c2f2])
+        elif (c2 is None) and (c3 is not None):
+            val = np.einsum('ijk, c, ck->cij', A, cellmeasure, c3[c2f2])
+        else:
+            val = np.einsum('ijk , c, cj, ck->ci', A, cellmeasure, c2[c2f2], c3[c2f3])
+        return val
+
     def cell_phi_gphiy_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
         '''
         @brief  
@@ -1250,6 +1274,25 @@ class TriangleMesh(Mesh2d):
             val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
         return val 
     
+    def cell_gphix_gphix_phi_matrix(self, p1, p2, p3, c3):
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        c2f3 = self.cell_to_ipoint(p3)
+        A = gphigphiphi[index]
+        B = self.glambda 
+        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
+                A, B[...,0] ,B[...,0], cellmeasure, c3[c2f3]) 
+        return val 
+    
+    def cell_gphiy_gphiy_phi_matrix(self, p1, p2, p3, c3):
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        c2f3 = self.cell_to_ipoint(p3)
+        A = gphigphiphi[index]
+        B = self.glambda 
+        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
+                A, B[...,1] ,B[...,1], cellmeasure, c3[c2f3]) 
+        return val 
     
     def construct_vector(self, p ,m):
         '''
