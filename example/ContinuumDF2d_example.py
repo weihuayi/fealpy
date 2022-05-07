@@ -1,9 +1,12 @@
 
 import numpy as np
-import matplotlib.pyplot as plt
+from scipy.sparse import csr_array, bmat
+
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
+
+import matplotlib.pyplot as plt
 
 class ContinummDFModel2d:
 
@@ -77,6 +80,9 @@ class ContinummDFModel2d:
         s[:, 1, 0] = val 
         return s
 
+    def stress(self, s):
+        pass
+
     def strain_pm_eig_decomposition(self, s):
         """
         @brief 应变的正负特征分解
@@ -143,57 +149,137 @@ class ContinummDFModel2d:
         return val
 
 
-    def dsigma_depsilon(self, bcs, phi, s):
+    def dsigma_depsilon(self, phi, s):
         """
         @brief 计算应力关于应变的导数矩阵
+
+        @param phi 单元重心处的相场函数值, (NC, )
+        @param s 每个单元上的应变矩阵, （NC, 2, 2)
+
+        @return D 单元刚度系数矩阵
         """
 
         eps = 1e-10 
+        la = self.la
+        mu = self.mu
 
-        NQ = len(bcs)
         NC = len(s)
-        D = np.zeros((NQ, NC, 3, 3), dtype=np.float64)
+        D = np.zeros((NC, 3, 3), dtype=np.float64)
 
+        ts = np.trace(s)
         w, v = self.strain_eigs(s)
         hwp = self.heaviside(w)
         hwm = self.heaviside(-w)
 
-        flag = np.abs(w[:, 0] - w[:, 1]) < eps
-        c0 = np.abs(w[:, 0]) - np.abs(w[:, 1])
-        c1 = w[:, 0] - w[:, 1]
+        c0 = (1 - phi)**2 + eps
 
-        flag = np.abs(c1) < eps
-        cp = np.zeros_like(c0)
-        cm = np.zeros_like(c0)
+        c1 = np.zeros_like(c0)
+        c2 = np.zeros_like(c0)
 
-        cp[flag] = (hwp[flag, 0] + hwp[flag, 1])/2.0
-        cp[~flag] = (1 + c0[~flag]/c1[~flag])/4.0
+        flag = (w[:, 0] == w[:, 1])
+        c1[flag] = hwp[flag, 0]
+        c2[flag] = hwm[flag, 0]
 
-        cp[flag] = (hwm[flag, 0] + hwm[flag, 1])/2.0
-        cp[~flag] = (1 - c0[~flag]/c1[~flag])/4.0
+        r = np.sum(w[~flag], axis=-1)/np.sum(np.abs(w[~flag]), axis=-1)
+        c1[~flag] = (1 + r)/4.0 
+        c2[~flag] = (1 - r)/4.0
 
-        ts = np.trace(s)
-        la = self.la
-        mu = self.mu
+        d0 = 2*mu*(c0*hwp[:, 0] + hwm[:, 0])
+        d1 = 2*mu*(c0*hwp[:, 1] + hwm[:, 1])
+        d2 = 2*mu*(c0*c1 + c2)
 
-        val0 = (1 - phi(bcs))**2 + eps
-
-        val1 = val0*self.heaviside(ts) # (NQ, NC) * (NC, )
-        val1 += self.heaviside(-ts)
-        val1 *= la
-
-        D[:, :, 0, 0] = val1
-        D[:, :, 0, 1] = val1
-        D[:, :, 1, 0] = val1
-        D[:, :, 1, 1] = val1
-
+        val = lam*(c0*self.heaviside(ts) + self.heaviside(-ts))
+        D[:, 0, 0] = val
+        D[:, 0, 1] = val
+        D[:, 1, 0] = val
+        D[:, 1, 1] = val
 
         for m, n, i, j, k, l in self.index:
-            D[:, :, m, n] +=  
+            D[:, m, n] += d0*v[:, i, 0]*v[:, j, 0]*v[:, k, 0]*v[:, l, 0]  
+            D[:, m, n] += d1*v[:, i, 1]*v[:, j, 1]*v[:, k, 1]*v[:, l, 1]
+            val  = v[:, i, 0]*v[:, k, 0]*v[:, j, 1]*v[:, l, 1]
+            val += v[:, i, 0]*v[:, l, 0]*v[:, j, 1]*v[:, k, 1]
+            val += v[:, i, 1]*v[:, k, 1]*v[:, j, 0]*v[:, l, 0]
+            val += v[:, i, 1]*v[:, l, 1]*v[:, j, 0]*v[:, k, 0]
+            D[:, m, n] += d2*val
+
+        return D
 
 
+    def disp_matrix(self, mesh, D):
+
+        NN = mesh.number_of_cells()
+        cm = mesh.entity_measure('cell')
+        gphi = mesh.grad_lambda() # (NC, 3, 2)
+
+        C00 = np.einsum('ij, ik->ijk', gphi[:, :, 0], gphi[:, :, 0]) # (NC, 3, 3)
+        C11 = np.einsum('ij, ik->ijk', gphi[:, :, 1], gphi[:, :, 1]) # (NC, 3, 3)
+        C01 = np.einsum('ij, ik->ijk', gphi[:, :, 0], gphi[:, :, 1]) # (NC, 3, 3)
+        C10 = np.einsum('ij, ik->ijk', gphi[:, :, 1], gphi[:, :, 0])
 
 
+        D00  = D[:, 0, 0][:, None, None]*C00 
+        D00 += D[:, 0, 2][:, None, None]*(C01 + C10)
+        D00 += D[:, 2, 2][:, None, None]*C11
+
+        D00 *= cm
+
+        D01  = D[:, 0, 1][:, None, None]*C01
+        D01 += D[:, 1, 2][:, None, None]*C11
+        D01 += D[:, 0, 2][:, None, None]*C00
+        D01 += D[:, 2, 2][:, None, None]*C10
+
+        D01 *= cm
+
+
+        D11  = D[:, 1, 1][:, None, None]*C11
+        D11 += D[:, 1, 2][:, None, None]*(C01 + C10)
+        D11 += D[:, 2, 2][:, None, None]*C00
+
+        D11 *= cm
+
+        cell = mesh.entity('cell')
+        shape = D00.shape
+        I = np.broadcast_to(cell[:, None, :], shape=shape)
+        J = np.broadcast_to(cell[:, :, None], shape=shape)
+
+        D00 = csr_array((D00.flat, (I.flat, J.flat)), shape=(NN, NN))
+        D01 = csr_array((D01.flat, (I.flat, J.flat)), shape=(NN, NN))
+        D11 = csr_array((D11.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        return bmat([D00, D01], [D01.T, D11]], format='csr')
+
+
+    def phase_matrix(self, mesh, H):
+
+        ka = self.ka
+        l0 = self.l0
+
+        mat = np.array([
+            [1/6, 1/12, 1/12], 
+            [1/12, 1/6, 1/12], 
+            [1/12, 1/12, 1/6]]) 
+
+        NN = mesh.number_of_cells()
+        cm = mesh.entity_measure('cell')
+        gphi = mesh.grad_lambda() # (NC, 3, 2)
+
+        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
+        c = H.value(bc)
+
+        S = np.einsum('i, ijm, ikm->ijk', ka*l0*cm, gphi, gphi)
+        M = np.einsum('i, jk->ijk', cm*(ka/l0 + 2*c), mat)
+
+        S += M
+
+        cell = mesh.entity('cell')
+        shape = S.shape
+        I = np.broadcast_to(cell[:, None, :], shape=shape)
+        J = np.broadcast_to(cell[:, :, None], shape=shape)
+
+        A = csr_array((S.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        return A
 
 p = 1
 n = 0
