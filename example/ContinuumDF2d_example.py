@@ -60,6 +60,9 @@ class ContinummDFModel2d:
         mesh.uniform_bisect(n=n)
         return mesh
 
+    def is_disp_boundary(self, p):
+        return np.abs(p[..., 1] - 1) < 1e-12
+
     def strain(self, uh):
         """
         @brief 给定一个位移，计算相应的应变，这里假设是线性元
@@ -81,6 +84,16 @@ class ContinummDFModel2d:
         return s
 
     def stress(self, s):
+        """
+        @brief 给定应变计算相应的应力
+        """
+
+        mesh = uh.space.mesh
+        cell = mesh.entity('cell')
+        NC = mesh.number_of_cells()
+        gphi = mesh.grad_lambda() # NC x 3 x 2
+
+        s = np.zeros((NC, 2, 2), dtype=np.float64)
         pass
 
     def strain_pm_eig_decomposition(self, s):
@@ -116,7 +129,7 @@ class ContinummDFModel2d:
 
         sp, sm = self.strain_pm_eig_decomposition(s)
 
-        tp, tm = macaulay_operation(np.trace(s))
+        tp, tm = self.macaulay_operation(np.trace(s))
         tsp = np.sum(sp**2, axis=(1, 2)) 
         tsm = np.sum(sm**2, axis=(1, 2))
 
@@ -205,7 +218,6 @@ class ContinummDFModel2d:
 
         return D
 
-
     def disp_matrix(self, mesh, D):
 
         NN = mesh.number_of_cells()
@@ -264,11 +276,8 @@ class ContinummDFModel2d:
         cm = mesh.entity_measure('cell')
         gphi = mesh.grad_lambda() # (NC, 3, 2)
 
-        bc = np.array([1/3, 1/3, 1/3], dtype=np.float64)
-        c = H.value(bc)
-
         S = np.einsum('i, ijm, ikm->ijk', ka*l0*cm, gphi, gphi)
-        M = np.einsum('i, jk->ijk', cm*(ka/l0 + 2*c), mat)
+        M = np.einsum('i, jk->ijk', cm*(ka/l0 + 2*H), mat)
 
         S += M
 
@@ -281,21 +290,104 @@ class ContinummDFModel2d:
 
         return A
 
+
+    def disp_residual(self, uh, phi, K):
+        return -K@uh.T.flat
+
+
+    def phase_residual(self, uh, phi, H):
+
+        ka = self.ka
+        l0 = self.l0
+
+        mat = np.array([
+            [1/6, 1/12, 1/12], 
+            [1/12, 1/6, 1/12], 
+            [1/12, 1/12, 1/6]]) 
+
+        cell = mesh.entity('cell')
+
+        NN = mesh.number_of_cells()
+        cm = mesh.entity_measure('cell')
+        gphi = mesh.grad_lambda() # (NC, 3, 2)
+
+        M0 = np.einsum('i, jk->ijk', 2*H*cm, mat)
+        M1 = np.einsum('i, jk->ijk', ka/l0*cm, mat) 
+        M2 = np.einsum('i, ijm, ikm->ijk', cm*ka*l0, gphi, gphi)
+
+        M = M0 + M1 + M2
+        I = np.broadcast_to(cell[:, None, :], shape=shape)
+        J = np.broadcast_to(cell[:, :, None], shape=shape)
+
+        M = csr_array((M.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        F = -M@phi
+        bb = H*cm*np.array([1/3, 1/3, 1/3], dtype=np.float64)
+
+        np.add.at(F, cell, bb)
+
+        return F
+
+
+
 p = 1
 n = 0
 
+model = ContinummDFModel2d()
+
+mesh = model.init_mesh(4)
+
+node = mesh.entity('node')
+
+isBdNode = model.is_disp_boundary(node)
+
+isInDof = np.r_['0', np.ones(NN, dtype=np.bool_), ~isBdNode]
+
+NC = mesh.number_of_cells()
+
 space = LagrangeFiniteElementSpace(mesh, p=p)
+
+K = space.linear_elasticity_matrix(la, mu, q=1) # 线弹性刚度矩阵
 
 uh0 = space.function(dim=2)
 phi0 = space.funciion()
-H0 = space.function()
+H0 = np.zeros(NC, dtype=np.float64) # 分片常数 
 
 uh1 = space.function(dim=2)
 phi1 = space.function()
-H1 = space.function()
+H1 = np.zeros(NC, dtype=np.float64) # 分片常数
+
+for i in range(1000):
+    uh1[isBdNode, 1] += 1e-5 # 上边界 y 方向的位移增加
+
+
+    while True:
+        R0 = model.disp_residual(uh1, phi1, K)
+        
+        s = model.strain(uh1)
+        D = model.dsigma_depsilon(phi1, s)
+        A = model.disp_matrix(mesh, D)
+
+        du = spsolve(A[isInDof, :][:, isInDof], R0[isInDof])
+
+        uh1[isInDof] += du
+
+        s = model.strain(uh1)
+        phip, _ = model.strain_energy_density_decomposition(s)
+
+        H = np.fmax(H, phip)
+
+        R1 = model.phase_residual(uh1, phi1, H)
+        A = model.phase_matrix(mesh, H)
+
+        phi1 += spsolve(A, R1)
+
+
+    
+
+
 
 fig, axes = plt.subplots()
 mesh.add_plot(axes)
-#mesh.find_node(axes, showindex=True)
 plt.show()
 
