@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import diags
+from scipy.sparse import diags, coo_matrix
 from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
 
@@ -23,6 +23,53 @@ class StructureIntervalMesh(object):
 
         self.itype = itype
         self.ftype = ftype
+
+    def uniform_refine(self, n=1, returnim=False):
+        if returnim:
+            nodeImatrix = []
+        for i in range(n):
+            print('nx1', self.ds.nx)
+            nx = 2*self.ds.nx
+            self.ds = StructureIntervalMeshDataStructure(nx+1, nx)
+            self.hx = (self.I[1] - self.I[0])/nx
+            self.NC = nx
+            self.NN = self.NC+1
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
+
+
+
+    def interpolation_matrix(self):
+        """
+        @brief 加密一次生成的矩阵 
+        """
+        nx = self.ds.nx
+        NNH = int(nx/2 + 1)
+        NNh = self.number_of_nodes()
+        print('nx', nx, NNh, NNH)
+
+        I = np.arange(0, NNh, 2)
+        J = np.arange(NNH)
+        data = np.ones(NNH, dtype=np.float64)
+        A = coo_matrix((data, (I, J)), shape=(NNh, NNH))
+
+        I = np.arange(1, NNh, 2)
+        J = np.arange(NNH-1)
+        data = np.ones(NNH-1, dtype=np.float64)/2
+        A += coo_matrix((data, (I, J)), shape=(NNh, NNH))
+
+        J = np.arange(1, NNH)
+        data = np.ones(NNH-1, dtype=np.float64)/2
+        A += coo_matrix((data, (I, J)), shape=(NNh, NNH))
+
+        A = A.tocsr()
+        return A
+
 
     def entity(self, etype):
         if etype in {'cell', 1}:
@@ -97,14 +144,7 @@ class StructureIntervalMesh(object):
             NC = self.number_of_cells()
             uh = np.zeros(NC, dtype=self.ftype)
         return uh
-
-    def interpolation_matrix(self, nlevel):
-        """
-        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
-        这里要求最细网格的是由一个最粗的网格一致加密而来
-        """
-        pass
-
+    
     def interpolation(self, f, etype='node'):
         x = self.entity_barycenter(etype)
         return f(x)
