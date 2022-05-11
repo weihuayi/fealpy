@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 from fealpy.pde.poisson_2d import CosCosCosData as PDE
-from fealpy.mesh import StructureQuadMesh 
+from fealpy.mesh import StructureHexMesh 
 from fealpy.tools.show import showmultirate
 
 from scipy.sparse.linalg import spsolve
