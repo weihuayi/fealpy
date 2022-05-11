@@ -1,5 +1,7 @@
 import numpy as np
-
+import gmsh
+import meshio
+from fealpy.mesh import TriangleMesh
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory as MF
 from fealpy.geometry import DistDomain2d
@@ -107,8 +109,29 @@ class FlowPastCylinder:
         self.eps = eps
         self.rho = rho
         self.mu = mu
+    
+    def mesh2(self, h0):
+        fd1 = lambda p: dcircle(p,[0.2,0.2],0.05)
+        fd2 = lambda p: drectangle(p,[0.0,2.2,0.0,0.41])
+        fd = lambda p: ddiff(fd2(p),fd1(p))
 
-    def mesh(self,h): 
+        def fh(p):
+            h = 0.003 + 0.05*fd1(p)
+            h[h>0.01] = 0.01
+            return h
+
+        bbox = [0,3,0,1]
+        pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
+        domain = DistDomain2d(fd,fh,bbox,pfix)
+        distmesh2d = DistMesh2d(domain,h0)
+        distmesh2d.run()
+
+        mesh = distmesh2d.mesh
+        return mesh
+
+
+
+    def mesh1(self,h):
         points = np.array([[0.0, 0.0], [2.2, 0.0], [2.2, 0.41], [0.0, 0.41]],
                 dtype=np.float64)
         facets = np.array([[0, 1], [1, 2], [2, 3], [3, 0]], dtype=np.int_)
@@ -123,6 +146,56 @@ class FlowPastCylinder:
 
         smesh = MF.meshpy2d(points, facets, h, hole_points=[[0.2, 0.2]], facet_markers=fm, meshtype='tri')
         return smesh
+
+    def mesh(self): 
+        gmsh.initialize()
+
+        gmsh.model.add("gntest2")
+        lc = 0.01
+
+        gmsh.model.geo.addPoint(0.0,0.0,0.0,lc,1)
+        gmsh.model.geo.addPoint(2.2,0.0,0.0,lc,2)
+        gmsh.model.geo.addPoint(2.2,0.41,0.0,lc,3)
+        gmsh.model.geo.addPoint(0.0,0.41,0.0,lc,4)
+
+        gmsh.model.geo.addLine(1,2,1)
+        gmsh.model.geo.addLine(2,3,2)
+        gmsh.model.geo.addLine(3,4,3)
+        gmsh.model.geo.addLine(4,1,4)
+
+        gmsh.model.geo.addPoint(0.15,0.2,0.0,lc,5)
+        gmsh.model.geo.addPoint(0.25,0.2,0.0,lc,6)
+        gmsh.model.geo.addPoint(0.2,0.2,0.0,lc,7)
+
+        gmsh.model.geo.add_circle_arc(6,7,5,5)
+        gmsh.model.geo.add_circle_arc(5,7,6,6)
+
+        gmsh.model.geo.addCurveLoop([1,2,3,4],1)
+        gmsh.model.geo.add_curve_loop([5,6],2)
+
+        gmsh.model.geo.addPlaneSurface([1,2],1)
+        gmsh.model.geo.synchronize()
+
+        gmsh.model.mesh.field.add("Distance",1)
+        gmsh.model.mesh.field.setNumbers(1,"CurvesList",[5,6])
+        gmsh.model.mesh.field.setNumber(1,"Sampling",100)
+
+        gmsh.model.mesh.field.add("Threshold",2)
+        gmsh.model.mesh.field.setNumber(2,"InField",1)
+        gmsh.model.mesh.field.setNumber(2,"SizeMin",0.01)
+        gmsh.model.mesh.field.setNumber(2,"SizeMax",0.01)
+        gmsh.model.mesh.field.setNumber(2,"DistMin",0.01)
+        gmsh.model.mesh.field.setNumber(2,"DistMax",0.01)
+
+        #gmsh.model.mesh.field.setAsBackgroundMesh(2)
+        gmsh.option.setNumber('Mesh.Algorithm',6) 
+        gmsh.model.mesh.generate(2)
+        gmsh.write("gn.msh")
+        mesh = meshio.read('gn.msh',file_format = 'gmsh')
+        node = mesh.points[:,:2]
+        cell = mesh.cells_dict['triangle']
+        mesh = TriangleMesh(node,cell)
+        return mesh
     
     @cartesian
     def is_outflow_boundary(self,p):
@@ -149,6 +222,48 @@ class FlowPastCylinder:
         y = p[...,1]
         value = np.zeros(p.shape,dtype=np.float)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
+        value[...,1] = 0
+        return value
+    
+class ChannelFlowWithLevelSet:
+    '''
+    @brief 圆柱绕流
+    '''
+    def __init__(self, domain ,eps=1e-12, rho=1, mu=0.001):
+        self.eps = eps
+        self.rho = rho
+        self.mu = mu
+        self.domain = domain
+    
+    def mesh(self, nx ,ny):
+        domain = self.domain
+        mesh = MF.boxmesh2d([domain[0],domain[1],domain[2],domain[3]], nx, ny)
+        return mesh
+    
+    @cartesian
+    def is_outflow_boundary(self,p):
+        domain = self.domain
+        return np.abs(p[..., 0] - domain[1]) < self.eps
+    
+    @cartesian
+    def is_inflow_boundary(self,p):
+        domain = self.domain
+        return np.abs(p[..., 0] - domain[0]) < self.eps
+    
+      
+    @cartesian
+    def is_wall_boundary(self,p):
+        domain = self.domain
+        return (np.abs(p[..., 1] - domain[2]) < self.eps) | \
+               (np.abs(p[..., 1] - domain[3]) < self.eps)
+
+    @cartesian
+    def u_inflow_dirichlet(self, p):
+        domain = self.domain
+        x = p[...,0]
+        y = p[...,1]
+        value = np.zeros(p.shape,dtype=np.float)
+        value[...,0] = 1.5*4*y*(domain[3]-y)/(domain[3]**2)
         value[...,1] = 0
         return value
     

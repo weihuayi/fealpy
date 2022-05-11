@@ -16,7 +16,9 @@ class StructureQuadMesh(Mesh2d):
         self.itype = itype
         self.ftype = ftype
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, returnim=False):
+        if returnim:
+            nodeImatrix = []
         for i in range(n):
             nx = 2*self.ds.nx
             ny = 2*self.ds.ny
@@ -25,6 +27,66 @@ class StructureQuadMesh(Mesh2d):
             self.hx = (self.box[1] - self.box[0])/nx
             self.hy = (self.box[3] - self.box[2])/ny
             self.data = {}
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
+
+    def interpolation_matrix(self):
+        """
+        @brief  加密一次生成的矩阵
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+        NNH = (nx//2+1)*(ny//2+1)
+        NNh = self.number_of_nodes()
+
+        I = np.arange(NNh).reshape(nx+1, -1)
+        J = np.arange(NNH).reshape(nx//2+1, -1)
+
+        ## (2i, 2j)
+        I1 = I[::2, ::2].flatten()
+        J1 = J.flatten() #(i,j)
+        data = np.broadcast_to(1, (I1.shape[0],))
+        A = coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j)
+        I1 = I[1::2, ::2].flatten()
+        J1 = J[:-1, :].flatten() #(i,j)
+        data = np.broadcast_to(1/2, (I1.shape[0],))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        J1 = J[1:, :].flatten() #(i+1,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i, 2j+1)
+        I1 = I[::2, 1::2].flatten()
+        J1 = J[:, :-1].flatten() #(i,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        J1 = J[:, 1:].flatten() #(i,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j+1)
+        I1 = I[1::2, 1::2].flatten()
+        J1 = J[:-1, :-1].flatten() #{i,j}
+        data = np.broadcast_to(1/4, (I1.shape[0],))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[1:, :-1].flatten() # (i+1,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[:-1, 1:].flatten() # (i,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[1:, 1:].flatten() # (i+1,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+
+        return A
 
     def multi_index(self):
         NN = self.ds.NN
@@ -78,6 +140,30 @@ class StructureQuadMesh(Mesh2d):
         a /=2
         return a
 
+    def function(self, etype='node'):
+        """
+        @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
+        """
+
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'edge', 1}:
+            NE = self.number_of_edges()
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgex'}:
+            NE = (self.ds.ny+1)*self.ds.nx
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'cell', 2}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+
+
     def interpolation(self, f, intertype='node'):
         node = self.node
         if intertype == 'node':
@@ -127,6 +213,27 @@ class StructureQuadMesh(Mesh2d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+
+    def show_function(self, plot, uh, cmap='jet'):
+        """
+        @brief 显示一个定义在网格节点上的函数
+        """
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            axes = fig.add_subplot(111, projection='3d')
+        else:
+            axes = plot
+        node = self.node
+        x = node[:, 0].reshape(self.ds.nx + 1, self.ds.ny + 1)
+        y = node[:, 1].reshape(self.ds.nx + 1, self.ds.ny + 1)
+        uh = uh.reshape(self.ds.nx + 1, self.ds.ny + 1)
+        return axes.plot_surface(x, y, uh, cmap=cmap)
+
+
+    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+            init=None, fargs=None,
+            frames=1000, lw=2, interval=50):
+        import matplotlib.animation as animation
 
 
     def cell_location(self, px):
@@ -199,7 +306,6 @@ class StructureQuadMesh(Mesh2d):
         Pi[I[::2]] = (3*uh[J[::2]] - uh[L])/2
         
         return Pi
-
 
 
     def cbar_interpolation(self, ch, cellidx, xbar):

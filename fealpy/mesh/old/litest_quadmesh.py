@@ -3,7 +3,7 @@ import numpy as np
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import triu, tril
 
-from .Mesh2d import Mesh2d
+from fealpy.mesh.Mesh2d import Mesh2d
 
 class StructureQuadMesh1(Mesh2d):
     def __init__(self, box, hx, hy, itype=np.int32, ftype=np.float):
@@ -47,7 +47,7 @@ class StructureQuadMesh1(Mesh2d):
         -----
         把网格转化为 VTK 的格式
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
+        from fealpy.mesh.vtk_extent import vtk_cell_index, write_to_vtu
         node = self.entity('node')
         GD = self.geo_dimension()
         

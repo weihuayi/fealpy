@@ -4,7 +4,7 @@ from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
-from fealpy.mesh.TriangleMeshData import phiphi,gphigphi,gphiphi,phigphiphi
+from fealpy.mesh.TriangleMeshData import gphigphiphi,phiphi,gphigphi,gphiphi,phigphiphi,phiphiphi
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
@@ -997,34 +997,6 @@ class TriangleMesh(Mesh2d):
         entity = self.entity(etype=TD)[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
-
-    def construct_edge(self,cell):
-        """ 
-        """
-        NC =  cell.shape[0] 
-        NEC = 3 
-        NVE = 2 
-
-        localEdge = np.array([(1, 2), (2, 0), (0, 1)])
-        totalEdge = cell[:, localEdge].reshape(-1, 2)
-        _, i0, j = np.unique(np.sort(totalEdge, axis=-1),
-                return_index=True,
-                return_inverse=True,
-                axis=0)
-        NE = i0.shape[0]
-        edge2cell = np.zeros((NE, 4), dtype=np.int_)
-
-        i1 = np.zeros(NE, dtype=np.int_)
-        i1[j] = np.arange(NEC*NC, dtype=np.int_)
-
-        edge2cell[:, 0] = i0//3
-        edge2cell[:, 1] = i1//3
-        edge2cell[:, 2] = i0%3
-        edge2cell[:, 3] = i1%3
-
-        edge = totalEdge[i0, :]
-        cell2edge = np.reshape(j, (NC, 3))
-        return edge, edge2cell, cell2edge
         
     def multi_index_matrix(self, p):
             ldof = (p+1)*(p+2)//2
@@ -1051,132 +1023,96 @@ class TriangleMesh(Mesh2d):
 
     
     def interpolation_points(self, p):
-        """
-        @brief 生成三角形网格上 p 次的插值点
-        """
-        NN = self.node.shape[0]
-        NE = self.edge.shape[0]
-        NC = self.cell.shape[0]
-        GD = self.node.shape[1]
-        for n in range(NN):
-            for d in range(GD):
-                ipoints[n, d] = self.node[n, d]
+        cell = self.entity('cell')
+        node = self.entity('node')
+
+        if p == 1:
+            return node
         if p > 1:
-            for e in range(NE):
-                s1 = NN + e*(p-1)
-                for i1 in range(1, p):
-                    i0 = p - i1 # (i0, i1)
-                    I = s1 + i1 - 1
-                    for d in range(GD):
-                        ipoints[I, d] = (
-                                i0*self.node[self.edge[e, 0], d] + 
-                                i1*self.node[self.edge[e, 1], d])/p
+            N = node.shape[0]
+            dim = node.shape[-1]
+            gdof = self.number_of_global_interpolation_points(p)
+            ipoint = np.zeros((gdof, dim), dtype=np.float64)
+            ipoint[:N, :] = node
+            NE = self.number_of_edges()
+            edge = self.entity('edge')
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, dim)
         if p > 2:
-            cdof = (p-2)*(p-1)//2
-            s0 = NN + (p-1)*NE
-            for c in range(NC):
-                i0 = p-2
-                s1 = s0 + c*cdof
-                for level in range(0, p-2):
-                    i0 = p - 2 - level
-                    for i2 in range(1, level+2):
-                        i1 = p - i0 - i2 #(i0, i1, i2)
-                        j = i1 + i2 - 2
-                        I = s1 + j*(j+1)//2 + i2 - 1  
-                        for d in range(GD):
-                            ipoints[I, d] = (
-                                    i0*self.node[self.cell[c, 0], d] + 
-                                    i1*self.node[self.cell[c, 1], d] + 
-                                    i2*self.node[self.cell[c, 2], d])/p
-                        
-        return ipoints 
+            isEdgeDof = self.is_on_edge_local_dof()
+            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            w = self.multiIndex[isInCellDof, :]/p
+            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell,:]).reshape(-1, dim)
+
+        return ipoint
+    
     
     def edge_to_ipoint(self, p):
-        """
-        @brief 返回每个边上对应 p 次插值点的全局编号
-        """
-        for i in range(self.edge.shape[0]):
-            edge2dof[i, 0] = self.edge[i, 0]
-            edge2dof[i, p] = self.edge[i, 1]
-            for j in ti.static(range(1, p)):
-                edge2dof[i, j] = self.node.shape[0] + i*(p-1) + j - 1
-        return edge2ipoint
+        NE= self.number_of_edges()
+        NN = self.number_of_nodes()
+
+        edge = self.entity('edge')
+        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
+        edge2dof[:, [0, -1]] = edge
+        if p > 1:
+            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2dof
+    
+    def is_on_edge_local_ipoint(self, p):
+        return self.multi_index_matrix(p) == 0
     
     def cell_to_ipoint(self, p):
-        """
-        @brief 返回每个单元上对应 p 次插值点的全局编号
-        """
-        cdof = (p+1)*(p+2)//2 
-        NN = self.node.shape[0]
-        NE = self.entity('edge').shape[0]
-        NC = self.number_of_cells()
         cell = self.entity('cell')
+        N = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
         ldof = self.number_of_local_interpolation_points(p)
-        cell2ipoint = np.zeros(shape=(NC,ldof),dtype=int)
-        edge, edge2cell, cell2edge = self.construct_edge(cell)
-        for c in range(NC): 
-            # 三个顶点 
-            cell2ipoint[c, 0] = cell[c, 0]
-            cell2ipoint[c, cdof - p - 1] = cell[c, 1] # 不支持负数索引
-            cell2ipoint[c, cdof - 1] = cell[c, 2]
 
-            # 第 0 条边
-            e = cell2edge[c, 0]
-            v0 = edge[e, 0]
-            s0 = NN + e*(p-1)
-            s1 = cdof - p
-            if v0 == cell[c, 1]:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + i
-                    s1 += 1
-            else:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + p - 2 - i
-                    s1 += 1
+        if p == 1:
+            cell2dof = cell
 
-            # 第 1 条边
-            e = cell2edge[c, 1]
-            v0 = edge[e, 0]
-            s0 = NN + e*(p-1)
-            s1 = 2
-            if v0 == cell[c, 0]:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + i 
-                    s1 += i + 3
-            else:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + p - 2 - i 
-                    s1 += i + 3 
+        if p > 1:
+            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
 
-            # 第 2 条边
-            e = cell2edge[c, 2]
-            v0 = edge[e, 0]
-            s0 = NN + e*(p-1)
-            s1 = 1
-            if v0 == cell[c, 0]:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + i 
-                    s1 += i + 2
-            else:
-                for i in range(0, p-1):
-                    cell2ipoint[c, s1] = s0 + p - 2 - i 
-                    s1 += i + 2 
+            isEdgeDof = self.is_on_edge_local_ipoint(p)
+            edge2dof = self.edge_to_ipoint(p)
+            cell2edgeSign = self.ds.cell_to_edge_sign()
+            cell2edge = self.ds.cell_to_edge()
 
-            # 内部点
-            if p >= 3:
-                level = p - 2 
-                s0 = NN + (p-1)*NE + c*(p-2)*(p-1)//2
-                s1 = 4
-                s2 = 0
-                for l in range(0, level):
-                    for i in range(0, l+1):
-                        cell2ipoint[c, s1] = s0 + s2 
-                        s1 += 1
-                        s2 += 1 
-                    s1 += 2
-        return cell2ipoint
+            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
+            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
 
+            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
+            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
+
+            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
+            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
+        if p > 2:
+            base = N + (p-1)*NE
+            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            idof = ldof - 3*p
+            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2dof
+    
     def cell_phi_phi_matrix(self, p1, p2, c=None):
+        '''
+        @brief
+        @param p1 检验函数的次数
+        @param p2 试探函数的次数
+        @param c  试探函数的系数
+        '''
         cellmeasure = self.cell_area()
         index = str(p1) + str(p2)
         val = phiphi[index]
@@ -1220,9 +1156,13 @@ class TriangleMesh(Mesh2d):
         val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1], B[...,1], cellmeasure)
         return val 
     
-    def cell_stiff_matrix(self, p1, p2):
-        a = self.cell_gphix_gphix_matrix(p1, p2)
-        b = self.cell_gphiy_gphiy_matrix(p1, p2)
+    def cell_stiff_matrix(self, p1, p2, p3=None, c=None):
+        if c is None:
+            a = self.cell_gphix_gphix_matrix(p1, p2)
+            b = self.cell_gphiy_gphiy_matrix(p1, p2)
+        else:
+            a = self.cell_gphix_gphix_phi_matrix(p1 ,p2 ,p3 , c)
+            b = self.cell_gphiy_gphiy_phi_matrix(p1 ,p2 ,p3 , c)
         return a+b 
     
     def cell_gphix_phi_matrix(self, p1, p2, c1=None, c2=None):
@@ -1285,12 +1225,32 @@ class TriangleMesh(Mesh2d):
         c2f2 = self.cell_to_ipoint(p2)
         c2f3 = self.cell_to_ipoint(p3)
         if (c2 is not None) and (c3 is None):
-            val = np.einsum('ijkm,cm,c,cj,ck->cij', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
+            val = np.einsum('ijkm,cm,c,cj->cik', A, B[...,0], cellmeasure, c2[c2f2])
         elif (c2 is None) and (c3 is not None):
-            val = np.einsum('ijkm,cm,c,cj,ck->cik', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
+            val = np.einsum('ijkm,cm,c,ck->cij', A, B[...,0], cellmeasure, c3[c2f3])
         else:
             val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
         return val 
+
+    
+    def cell_phi_phi_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
+        '''
+        @brief  
+        @param c2 phi的系数 
+        '''
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        A = phiphiphi[index]
+        B = self.glambda
+        c2f2 = self.cell_to_ipoint(p2)
+        c2f3 = self.cell_to_ipoint(p3)
+        if (c2 is not None) and (c3 is None):
+            val = np.einsum('ijk, c, cj->cik', A, cellmeasure, c2[c2f2])
+        elif (c2 is None) and (c3 is not None):
+            val = np.einsum('ijk, c, ck->cij', A, cellmeasure, c3[c2f2])
+        else:
+            val = np.einsum('ijk , c, cj, ck->ci', A, cellmeasure, c2[c2f2], c3[c2f3])
+        return val
 
     def cell_phi_gphiy_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
         '''
@@ -1307,13 +1267,32 @@ class TriangleMesh(Mesh2d):
         c2f2 = self.cell_to_ipoint(p2)
         c2f3 = self.cell_to_ipoint(p3)
         if (c2 is not None) and (c3 is None):
-            val = np.einsum('ijkm,cm,c,cj,ck->cij', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
+            val = np.einsum('ijkm,cm,c,cj->cik', A, B[...,1], cellmeasure, c2[c2f2])
         elif (c2 is None) and (c3 is not None):
-            val = np.einsum('ijkm,cm,c,cj,ck->cik', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
+            val = np.einsum('ijkm,cm,c,ck->cij', A, B[...,1], cellmeasure, c3[c2f3])
         else:
             val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
         return val 
     
+    def cell_gphix_gphix_phi_matrix(self, p1, p2, p3, c3):
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        c2f3 = self.cell_to_ipoint(p3)
+        A = gphigphiphi[index]
+        B = self.glambda 
+        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
+                A, B[...,0] ,B[...,0], cellmeasure, c3[c2f3]) 
+        return val 
+    
+    def cell_gphiy_gphiy_phi_matrix(self, p1, p2, p3, c3):
+        cellmeasure = self.cell_area()
+        index = str(p1)+str(p2)+str(p3)
+        c2f3 = self.cell_to_ipoint(p3)
+        A = gphigphiphi[index]
+        B = self.glambda 
+        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
+                A, B[...,1] ,B[...,1], cellmeasure, c3[c2f3]) 
+        return val 
     
     def construct_vector(self, p ,m):
         '''

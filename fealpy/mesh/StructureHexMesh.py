@@ -32,7 +32,161 @@ class StructureHexMesh(Mesh3d):
         index[:, 1] = j.flat
         index[:, 2] = k.flat
         return index
-    
+ 
+    def uniform_refine(self, n=1, returnim=False):
+        """
+        2022.5.8 新加
+        """
+        if returnim:
+            nodeImatrix = []
+
+        for i in range(n):
+            nx = 2*self.ds.nx
+            ny = 2*self.ds.ny
+            nz = 2*self.ds.nz
+            self.ds = StructureHexMeshDataStructure(nx,ny,nz)
+            self.hx = (self.box[1] - self.box[0])/nx
+            self.hy = (self.box[3] - self.box[2])/ny
+            self.hz = (self.box[5] - self.box[4])/nz
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
+ 
+        
+
+    def interpolation_matrix(self):
+        """
+        @brief 加密一次的插值矩阵
+        """
+        
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+
+        nxH = nx//2
+        nyH = ny//2
+        nzH = nz//2
+
+
+        NNH = (nx//2+1)*(ny//2+1)*(nz//2+1)
+        NNh = self.number_of_nodes()
+
+        I = np.arange(NNh).reshape(nx+1, ny+1, nz+1)
+        J = np.arange(NNH).reshape(nx//2+1, ny//2+1, nz//2+1)
+        
+        ## (2i, 2j, 2k)
+        data = np.broadcast_to(1, (NNH, ))
+        I1 = I[::2, ::2, ::2].flatten()
+        J1 = J.flatten()
+        A = coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        ## (2i+1, 2j, 2k)
+        I1 = I[1::2, ::2, ::2].flatten()
+        J1 = J[:-1, :, :].flatten() # (i,j,k)
+        data = np.broadcast_to(1/2, (NNH-(nyH+1)*(nzH+1), ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[1:, :, :].flatten() # (i+1,j,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i, 2j+1, 2k)
+        I1 = I[::2, 1::2, ::2].flatten()
+        J1 = J[:, :-1, :].flatten() # (i,j,k)
+        data = np.broadcast_to(1/2, (NNH-(nxH+1)*(nzH+1), ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[:, 1:, :].flatten() # (i,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i, 2j, 2k+1)
+        I1 = I[::2, ::2, 1::2].flatten()
+        J1 = J[:, :, :-1].flatten() # (i,j,k)
+        data = np.broadcast_to(1/2, (NNH-(nxH+1)*(nyH+1), ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[:, :, 1:].flatten() # (i,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j+1, 2k)
+        I1 = I[1::2, 1::2, ::2].flatten()
+        J1 = J[:-1, :-1, :].flatten() # (i,j,k)
+        data = np.broadcast_to(1/4, (I1.shape[0], ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, :-1, :].flatten() # (j+1,j,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:-1, 1:, :].flatten() # (i,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, 1:, :].flatten() # (i+1,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i, 2j+1, 2k+1)
+        I1 = I[::2, 1::2, 1::2].flatten()
+        J1 = J[:, :-1, :-1].flatten() # (i,j,k)
+        data = np.broadcast_to(1/4, (I1.shape[0], ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:, 1:, :-1].flatten() # (i,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:, :-1, 1:].flatten() # (i,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:, 1:, 1:].flatten() # (i,j+1,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j, 2k+1)
+        I1 = I[1::2, ::2, 1::2].flatten()
+        J1 = J[:-1, :, :-1].flatten() # (i,j,k)
+        data = np.broadcast_to(1/4, (I1.shape[0], ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, :, :-1].flatten() # (i+1,j,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:-1, :, 1:].flatten() # (i,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, :, 1:].flatten() # (i+1,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j+1, 2k+1)
+        I1 = I[1::2, 1::2, 1::2].flatten()
+        J1 = J[:-1, :-1, :-1].flatten() # (i,j,k)
+        data = np.broadcast_to(1/8, (I1.shape[0], ))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, :-1, :-1].flatten() # (i+1,j,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:-1, 1:, :-1].flatten() # (i,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, 1:, :-1].flatten() # (i+1,j+1,k)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        J1 = J[:-1, :-1, 1:].flatten() # (i,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, :-1, 1:].flatten() # (i+1,j,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[:-1, 1:, 1:].flatten() # (i,j+1,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+       
+        J1 = J[1:, 1:, 1:].flatten() # (i+1,j+1,k+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+
+        return A
+
+   
     def vtk_cell_type(self):
         VTK_HEXAHEDRON= 12
         return VTK_HEXAHEDRON
@@ -147,6 +301,57 @@ class StructureHexMesh(Mesh3d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+
+    def function(self, etype='node'):
+        """
+        @brief 返回定义在节点、网格边、网格面、或网格单元上离散函数（数组），元素取值为0
+
+        @todo 明确需要定义的函数的实体集合
+        """
+
+        if etype in {'node', 0}:
+            NN = self.number_of_nodes()
+            uh = np.zeros(NN, dtype=self.ftype)
+        elif etype in {'edge', 1}:
+            NE = self.number_of_edges()
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgex'}:
+            NE = (self.ds.ny+1)*self.ds.nx
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'edgez'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'face', 2}:
+            NF = self.number_of_faces()
+            uh = np.zeros(NF, dtype=self.ftype)
+        elif etype in {'facex'}:
+            NF = self.ds.nx*self.ds.ny*(self.ds.nz + 1) 
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'facey'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'facez'}:
+            NE = self.ds.ny*(self.ds.nx + 1)
+            uh = np.zeros(NE, dtype=self.ftype)
+        elif etype in {'cell', 3}:
+            NC = self.number_of_cells()
+            uh = np.zeros(NC, dtype=self.ftype)
+        return uh
+
+    def interpolation(self, f, intertype='node'):
+        """
+        @brief 把一个已知函数插值到网格节点上或者单元上
+        """
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
 
 
 
