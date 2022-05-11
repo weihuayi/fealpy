@@ -9,7 +9,7 @@ class Find_node():
         pass
 
     def read_mesh(self):
-        fname = 'initial/file1.vtu'
+        fname = 'initial/file560.vtu'
         data = meshio.read(fname)
         node = data.points # 无量纲数值
         cell = data.cells[0][1]
@@ -41,24 +41,25 @@ class Find_node():
         a30 = np.argmin(np.abs(th-np.pi/6))
 
         # -30°
-        a_30 = np.argmin(np.abs(th+np.pi/6))
+#        a_30 = np.argmin(np.abs(th+np.pi/6))
 
         # 60°
         a60 = np.argmin(np.abs(th-np.pi/3))
 
         # -60°
-        a_60 = np.argmin(np.abs(th+np.pi/3))
+#        a_60 = np.argmin(np.abs(th+np.pi/3))
 
         # 90°
         a90 = np.argmin(np.abs(th-np.pi/2))
 
         # -90°
-        a_90 = np.argmin(np.abs(th+np.pi/2))
+#        a_90 = np.argmin(np.abs(th+np.pi/2))
 
-        print('0:', a0, node[a0, :], '30:', a30, node[a30, :], '-30:', a_30, node[a_30, :], '60:',
-                a60,node[a60, :], '-60:', a_60, node[a_60, :], '90:', a90,
-                node[a90, :], '-90:', a_90, node[a_90, :])
-        return np.array([a0, a30, a_30, a60, a_60, a90, a_90])
+#        print('0:', a0, node[a0, :], '30:', a30, node[a30, :], '-30:', a_30, node[a_30, :], '60:',
+#                a60,node[a60, :], '-60:', a_60, node[a_60, :], '90:', a90,
+#                node[a90, :], '-90:', a_90, node[a_90, :])
+#        return np.array([a0, a30, a_30, a60, a_60, a90, a_90])
+        return np.array([a0, a30, a60, a90])
 
 #a = Find_node()
 #a.read_mesh()
