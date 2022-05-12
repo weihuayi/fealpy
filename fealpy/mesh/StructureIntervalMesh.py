@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.sparse import diags
+from scipy.sparse import coo_matrix, csr_matrix, csc_matrix, diags, bmat
 from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
 
@@ -109,7 +109,7 @@ class StructureIntervalMesh(object):
         x = self.entity_barycenter(etype)
         return f(x)
 
-    def error(self, u, uh):
+    def error(self, h, u, uh):
         """
         @brief 计算真解在网格点处与数值解的误差
         
