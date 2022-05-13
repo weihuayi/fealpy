@@ -16,7 +16,9 @@ class StructureQuadMesh(Mesh2d):
         self.itype = itype
         self.ftype = ftype
 
-    def uniform_refine(self, n=1):
+    def uniform_refine(self, n=1, returnim=False):
+        if returnim:
+            nodeImatrix = []
         for i in range(n):
             nx = 2*self.ds.nx
             ny = 2*self.ds.ny
@@ -25,6 +27,66 @@ class StructureQuadMesh(Mesh2d):
             self.hx = (self.box[1] - self.box[0])/nx
             self.hy = (self.box[3] - self.box[2])/ny
             self.data = {}
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
+
+    def interpolation_matrix(self):
+        """
+        @brief  加密一次生成的矩阵
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+        NNH = (nx//2+1)*(ny//2+1)
+        NNh = self.number_of_nodes()
+
+        I = np.arange(NNh).reshape(nx+1, -1)
+        J = np.arange(NNH).reshape(nx//2+1, -1)
+
+        ## (2i, 2j)
+        I1 = I[::2, ::2].flatten()
+        J1 = J.flatten() #(i,j)
+        data = np.broadcast_to(1, (I1.shape[0],))
+        A = coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j)
+        I1 = I[1::2, ::2].flatten()
+        J1 = J[:-1, :].flatten() #(i,j)
+        data = np.broadcast_to(1/2, (I1.shape[0],))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        J1 = J[1:, :].flatten() #(i+1,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i, 2j+1)
+        I1 = I[::2, 1::2].flatten()
+        J1 = J[:, :-1].flatten() #(i,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        J1 = J[:, 1:].flatten() #(i,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+        ## (2i+1, 2j+1)
+        I1 = I[1::2, 1::2].flatten()
+        J1 = J[:-1, :-1].flatten() #{i,j}
+        data = np.broadcast_to(1/4, (I1.shape[0],))
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[1:, :-1].flatten() # (i+1,j)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[:-1, 1:].flatten() # (i,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+        
+        J1 = J[1:, 1:].flatten() # (i+1,j+1)
+        A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
+
+
+        return A
 
     def multi_index(self):
         NN = self.ds.NN
@@ -101,12 +163,6 @@ class StructureQuadMesh(Mesh2d):
         return uh
 
 
-    def interpolation_matrix(self, nlevel):
-        """
-        @brief 设当前网格为最细网格，粗化得到一系列的插值矩阵，
-        这里要求最细网格的是由一个最粗的网格一致加密而来
-        """
-        pass
 
     def interpolation(self, f, intertype='node'):
         node = self.node

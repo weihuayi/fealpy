@@ -161,6 +161,7 @@ class NonConformingVirtualElementSpace2d():
         def f(x):
             x[0, :] = 0
             return x
+
         tG = list(map(f, G))
 
         f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])

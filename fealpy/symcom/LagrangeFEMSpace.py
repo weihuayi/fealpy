@@ -125,7 +125,7 @@ class LagrangeFEMSpace:
         ldof2 = self.number_of_dofs(p2)
         phi1 = self.basis(p1)
         phi2 = self.basis(p2)
-        S = np.zeros(shape = (ldof1, ldof2, GD+1))
+        #S = np.zeros(shape = (ldof1, ldof2, GD+1))
         S =sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*(GD+1))\
                 ,(ldof1, ldof2 ,GD+1))
         for i in range(ldof1):
@@ -144,7 +144,7 @@ class LagrangeFEMSpace:
         phi1 = self.basis(p1)
         phi2 = self.basis(p2)
         phi3 = self.basis(p3)
-        S = np.zeros(shape = (ldof1, ldof2, ldof3, GD+1))
+        #S = np.zeros(shape = (ldof1, ldof2, ldof3, GD+1))
         S =sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*ldof3*(GD+1))\
                 ,(ldof1, ldof2 ,ldof3, GD+1))
         for i in range(ldof1):
@@ -156,9 +156,46 @@ class LagrangeFEMSpace:
         return S
 
 
+    def phi_phi_phi_matrix(self, p1, p2, p3):
+        l = self.l
+        GD = self.GD
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        ldof3 = self.number_of_dofs(p3)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        phi3 = self.basis(p3)
+        #S = np.zeros(shape = (ldof1, ldof2, ldof3))
+        S = sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof1*ldof2*ldof3)\
+                ,(ldof1, ldof2 ,ldof3))
+        for i in range(ldof1):
+            for j in range(ldof2):
+                for k in range(ldof3):
+                        temp= phi1[i]*phi2[j]*phi3[k]
+                        S[i, j, k] = self.integrate(temp) 
+        return S
 
+    def gphi_gphi_phi_matrix(self, p1, p2, p3):
+        l = self.l
+        GD = self.GD
+        ldof1 = self.number_of_dofs(p1)
+        ldof2 = self.number_of_dofs(p2)
+        ldof3 = self.number_of_dofs(p3)
+        phi1 = self.basis(p1)
+        phi2 = self.basis(p2)
+        phi3 = self.basis(p3)
+        S=sp.tensor.array.MutableDenseNDimArray(sp.zeros(ldof3*ldof1*ldof2*(GD+1)*(GD+1))\
+                , (ldof1,ldof2,ldof3,GD+1,GD+1))
+        for i in range(ldof1):
+            for j in range(ldof2):
+                for k in range(ldof3):
+                    for m in range(GD + 1):
+                        for n in range(GD + 1):
+                            temp = sp.diff(phi1[i],l[m])*sp.diff(phi2[j],l[n])*phi3[k]
+                            S[i,j,k,m,n] = self.integrate(temp) 
+        return S
 if __name__ == "__main__":
     from sympy import *
     space = LagrangeFEMSpace(2)
-    M = space.phi_gphi_phi_matrix(2, 2, 2)
+    M = space.gphi_gphi_phi_matrix(2, 2, 2)
     print(M)

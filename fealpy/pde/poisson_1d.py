@@ -1,15 +1,15 @@
 import numpy as np
-from fealpy.mesh import IntervalMesh
+from fealpy.mesh.StructureIntervalMesh import StructureIntervalMesh
 from fealpy.decorator import cartesian, barycentric
 
 class CosData:
-    def __init__(self):
-        pass
+    def __init__(self, box, nx):
+        self.box = box
+        self.nx = nx
+        
 
     def init_mesh(self, n=1):
-        node = np.array([[0], [1]], dtype=np.float64)
-        cell = np.array([(0, 1)], dtype=np.int_)
-        mesh = IntervalMesh(node, cell)
+        mesh = StructureIntervalMesh(self.box, nx = self.nx)
         mesh.uniform_refine(n)
         return mesh
     @cartesian
