@@ -18,7 +18,7 @@ from scipy.sparse import spdiags
 ## 参数解析
 parser = argparse.ArgumentParser(description=
         """
-        在一维笛卡尔网格上求解定义在矩形区域上带 Dirichlet 边界的 Poisson 方程
+        在一维笛卡尔网格上求解定义在区间[0,2]上带 Dirichlet 边界的 Poisson 方程
         """)
 
 parser.add_argument('--nx',
@@ -40,14 +40,12 @@ I = pde.domain()
 errorType = ['$|| u - u_h||_{\infty}$', '$|| u - u_h||_{0}$', '$|| u - u_h ||_{1}$']
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
 ND = np.zeros(maxit, dtype=np.int_)
-h = np.zeros(maxit, dtype=np.float64)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
     # 0. 创建结构网格对象
     mesh = StructureIntervalMesh(I, nx=nx)
-    h[i] = mesh.hx
 
     # 1. 组装矩阵和右端项
     A = mesh.laplace_operator()
@@ -82,7 +80,7 @@ for i in range(maxit):
 
     # 4. 计算误差
     u = lambda x:pde.solution(x)
-    emax, e0, e1 = mesh.error(h[i], u, uh)
+    emax, e0, e1 = mesh.error(mesh.hx, u, uh)
 
     errorMatrix[0, i] = emax
     errorMatrix[1, i] = e0
