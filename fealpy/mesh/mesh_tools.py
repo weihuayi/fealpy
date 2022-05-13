@@ -284,6 +284,9 @@ def show_mesh_1d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
+    if len(node.shape) == 1:
+        node = node[:, None]
+
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
 
