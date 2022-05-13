@@ -149,7 +149,7 @@ class StructureIntervalMesh(object):
         x = self.entity_barycenter(etype)
         return f(x)
 
-    def error(self, u, uh):
+    def error(self, h, u, uh):
         """
         @brief 计算真解在网格点处与数值解的误差
         
