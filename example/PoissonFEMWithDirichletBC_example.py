@@ -94,7 +94,7 @@ for i in range(maxit):
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
     A, F = bc.apply(A, F, uh)
-    uh[:] = spsolve(A, F).reshape(-1)
+    uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
@@ -112,6 +112,6 @@ elif dim == 3:
     print('The 3d function plot is not been implemented!')
 
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, 
-        propsize=40)
+        propsize=20)
 
 plt.show()
