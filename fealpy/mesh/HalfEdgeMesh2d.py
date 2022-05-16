@@ -1921,6 +1921,34 @@ class HalfEdgeMesh2d(Mesh2d):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
+    def adaptive_refine(self, isMarkedCell, method="nvb"):
+        cstart = self.ds.cellstart
+        NC = self.number_of_all_cells()
+        isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
+        isMarkedCell0[cstart:] = isMarkedCell
+        if method=='nvb':
+            self.refine_triangle_nvb(isMarkedCell0)
+        elif method=='rg':
+            self.refine_triangle_rg(isMarkedCell0)
+        elif method=='quad':
+            self.refine_quad(isMarkedCell0)
+        elif method=='poly':
+            self.refine_poly(isMarkedCell0)
+
+    def adaptive_coarsen(self, isMarkedCell, method="nvb"):
+        cstart = self.ds.cellstart
+        NC = self.number_of_all_cells()
+        isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
+        isMarkedCell0[cstart:] = isMarkedCell
+        if method=='nvb':
+            self.coarsen_triangle_nvb(isMarkedCell0)
+        elif method=='rg':
+            self.coarsen_triangle_rg(isMarkedCell0)
+        elif method=='quad':
+            self.coarsen_quad(isMarkedCell0)
+        elif method=='poly':
+            self.coarsen_poly(isMarkedCell0)
+
     def adjust_number(self, isMarked, method='node'):
         L = len(isMarked)
         l = (~isMarked).sum()
@@ -1951,7 +1979,6 @@ class HalfEdgeMesh2d(Mesh2d):
                 self.refine_triangle_nvb()
         else:
             raise ValueError("refine type error! \"rg\" or \" nvb\"")
-
 
 
     def halfedge_direction(self):
@@ -2132,8 +2159,11 @@ class HalfEdgeMesh2dDataStructure():
         NC = len(subdomain) # 实际单元个数, 包括外部无界区域和洞
 
         self.hcell = DynamicArray((NC, ), dtype=self.itype) # hcell[i] is the index of one face of i-th cell
+        self.hcell[halfedge[:, 1]] = np.arange(2*self.NE) # 的编号
 
-        self.hcell[halfedge[:, 1]] = range(2*self.NE) # 的编号
+        self.hnode = DynamicArray((NN, ), dtype=self.itype)
+        self.hnode[halfedge[:, 0]] = np.arange(2*self.NE)
+
         flag = halfedge[:, 4] - np.arange(2*self.NE) > 0
         self.hedge = DynamicArray(np.arange(self.NE*2)[flag])
         flag = subdomain[halfedge[self.hedge, 1]] < 1
@@ -2204,7 +2234,6 @@ class HalfEdgeMesh2dDataStructure():
                isNotOK = (NV0 < NV)
             return cell2node, cellLocation
         elif self.NV == 3: # tri mesh
-            print(len(self.hcell))
             cell2node = np.zeros([NC, 3], dtype = np.int_)
             current = halfedge[self.hcell[cstart:], 2]
             cell2node[:, 0] = halfedge[current, 0]
@@ -2469,7 +2498,7 @@ class HalfEdgeMesh2dDataStructure():
     def node_to_edge(self, return_sparse=True):
         pass
 
-    def node_to_cell(self, return_sparse=True):
+    def node_to_cell(self, return_sparse=False):
         NN = self.NN
         NC = self.NC
         halfedge =  self.halfedge
@@ -2477,11 +2506,90 @@ class HalfEdgeMesh2dDataStructure():
         cstart = self.cellstart
         hflag = subdomain[halfedge[:, 1]] > 0
 
-        val = np.ones(hflag.sum(), dtype=np.bool_)
-        I = halfedge[hflag, 0]
-        J = halfedge[hflag, 1] - cstart
-        node2cell = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NC), dtype=np.bool_)
-        return node2cell
+        if return_sparse:
+            val = np.ones(hflag.sum(), dtype=np.bool_)
+            I = halfedge[hflag, 0]
+            J = halfedge[hflag, 1] - cstart
+            node2cell = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NC), dtype=np.bool_)
+            return node2cell
+        else:
+            Location = np.zeros(NN+1, dtype=p.int_)
+            np.add.at(Location[1:], halfedge[:, 0], 1)
+            Location = np.cumsum(Location)
+            num = np.zeros(Location[-1], dtype=np.int_)
+            h2cellnum = self.halfedge_to_cell_location_number() # 每条半边所在单元的编号
+
+            node2cell = np.zeros(Location[-1], dtype=np.int_)
+            start = Location.copy()
+            hnode = self.hnode.copy()
+            isNotOK = np.ones(NN, dtype=np.bool_)
+            while np.any(isNotOK):
+                node2cell[start[isNotOK]] = halfedge[hnode[isNotOK], 1]-cstart
+                num[start[isNotOK]] = h2cellnum[hnode[isNotOK]]
+
+                start[isNotOK] = start[isNotOK]+1
+                hnode[isNotOK] = halfedge[hnode[isNotOK], 2]
+                isNotOK[isNotOK] = start[isNotOK]!=hcell[isNotOK]
+            return node2cell, Location, num 
+
+    def cell_to_node_with_num(self):
+        NN = self.NN
+        NC = self.NC
+        halfedge =  self.halfedge
+        subdomain = self.subdomain
+        cstart = self.cellstart
+        hflag = subdomain[halfedge[:, 1]] > 0
+
+        cell2nodeLocation = np.zeros(NC+1, dtype=np.int_)
+        cell2nodeLocation[1:] = self.NV
+        cell2nodeLocation = np.cumsum(cell2nodeLocation)
+        cell2nodenum = np.zeros(cell2nodeLocation[-1], dtype=np.int_)
+        h2nodenum = self.halfedge_to_node_location_number() 
+
+        cell2node = np.zeros(cell2nodeLocation[-1], dtype=np.int_)
+        start = cell2nodeLocation.copy()
+        hcell = self.hcell.copy()
+        isNotOK = np.ones(NC, dtype=np.bool_)
+        while np.any(isNotOK):
+            cell2node[start[isNotOK]] = halfedge[hcell[isNotOK], 0]
+            cell2nodnum[start[isNotOK]] = h2celnuml[hnode[isNotOK]]
+
+            start[isNotOK] = start[isNotOK]+1
+            hcell[isNotOK] = halfedge[hcell[isNotOK], 2]
+            isNotOK[isNotOK] = start[isNotOK]!=hcell[isNotOK]
+        return cell2node, Location, cell2nodenum
+
+    def halfedge_to_cell_location_number(self):
+        """!
+        @brief 半边在所属单元中的编号
+        """
+        N = len(self.halfedge)
+        halfedge2cellnum = np.zeros(N, dtype=np.int_) # 每条半边所在单元的编号
+        hcell = self.hcell.copy()
+        isNotOK = np.ones(NC, dtype=np.bool_)
+        i = 0
+        while np.any(isNotOK):
+            halfedge2cellnum[hcell[isNotOK]] = i
+            hcell[isNotOK] = halfedge[hcell[isNotOK], 2]
+            isNotOK[isNotOK] = start[isNotOK]!=hcell[isNotOK]
+            i += 1
+        return halfedge2cellnum
+
+    def halfedge_to_node_location_number(self):
+        """!
+        @brief 半边在所有指向顶点的半边中的编号
+        """
+        N = len(self.halfedge)
+        halfedge2cellnum = np.zeros(N, dtype=np.int_) # 每条半边所在单元的编号
+        hnode = self.hnode.copy()
+        isNotOK = np.ones(NC, dtype=np.bool_)
+        i = 0
+        while np.any(isNotOK):
+            halfedge2nodenum[hnode[isNotOK]] = i
+            hnode[isNotOK] = halfedge[hnode[isNotOK], 2]
+            isNotOK[isNotOK] = start[isNotOK]!=hnode[isNotOK]
+            i += 1
+        return halfedge2nodenum
 
     def boundary_node_flag(self):
         NN = self.NN
