@@ -22,7 +22,7 @@ class PETScSolverTest():
         from fealpy.boundarycondition import DirichletBC 
 
         pde = PDE()
-        mf = MeshFactory()
+        mf = MeshFactory
         m = 2**n
         box = [0, 1, 0, 1, 0, 1]
         mesh = mf.boxmesh3d(box, nx=m, ny=m, nz=m, meshtype='tet')
@@ -33,9 +33,9 @@ class PETScSolverTest():
         bc = DirichletBC(space, pde.dirichlet) 
         uh = space.function()
         A = space.stiff_matrix()
-        A = space.parallel_stiff_matrix(q=1)
+        #A = space.parallel_stiff_matrix(q=1)
         
-        M = space.parallel_mass_matrix(q=2)
+        #M = space.parallel_mass_matrix(q=2)
         M = space.mass_matrix()
 
         F = space.source_vector(pde.source)
@@ -43,7 +43,9 @@ class PETScSolverTest():
         A, F = bc.apply(A, F, uh)
 
         solver = PETScSolver()
+        print(111)
         solver.solve(A, F, uh)
+        print(211)
         error = space.integralalg.L2_error(pde.solution, uh)
         print(error)
 

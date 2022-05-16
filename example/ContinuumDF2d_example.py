@@ -6,7 +6,6 @@ from scipy.sparse.linalg import spsolve
 from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
-
 import matplotlib.pyplot as plt
 
 class ContinummDFModel2d:
@@ -357,6 +356,49 @@ class ContinummDFModel2d:
 
         return F
 
+def adaptive_mesh(mesh, d0 = 0.49, d1 = 0.75, h=0.005):
+    while True:
+        cell = mesh.entity("cell")
+        node = mesh.entity("node")
+        isMarkedCell = mesh.cell_area()>0.000001
+        isMarkedCell = isMarkedCell & (np.min(np.abs(node[cell, 1]-0.5),
+            axis=-1) < h)
+        isMarkedCell = isMarkedCell & (np.min(node[cell, 0], axis=-1)>d0) &(
+                np.min(node[cell, 0], axis=-1)<d1)
+        mesh.bisect(isMarkedCell=isMarkedCell)
+        if np.all(~isMarkedCell):
+            break;
+
+    isMarkedCell = (np.min(np.abs(node[cell, 1]-0.5),
+        axis=-1) < 0.001)
+    isMarkedCell = isMarkedCell & (np.min(node[cell, 0], axis=-1)>d0) &(
+        np.min(node[cell, 0], axis=-1)<d1)
+
+    NN = mesh.number_of_nodes()
+    cell = mesh.entity("cell")
+    edge = mesh.entity('edge')
+    node = mesh.entity('node')
+
+    crack = np.zeros(NN, dtype=np.float_)
+    crack[cell[isMarkedCell]] = 1.0
+    mesh.nodedata['crack'] = crack
+
+    n2cellnum = np.zeros(NN, dtype=np.int_)
+    np.add.at(n2cellnum, cell, 1)
+    for i in range(5):
+        celldata = np.average(crack[cell], axis=-1)
+        crack[:] = 0
+        np.add.at(crack, cell, celldata[:, None])
+        crack = crack/n2cellnum
+        crack[cell[isMarkedCell]] = 1.0
+    crack[cell[isMarkedCell]] = 1.0
+    mesh.nodedata['crack'] = crack
+
+    fig = plt.figure()
+    axes = fig.gca()
+    mesh.add_plot(axes)
+    plt.show()
+    mesh.to_vtk(fname='ad.vtu')
 
 
 p = 1
@@ -421,8 +463,8 @@ for i in range(1):
         
 
 
-
-fig, axes = plt.subplots()
-mesh.add_plot(axes)
-plt.show()
+adaptive_mesh(mesh, d0 = 0.499, d1=1, h=0.001)
+#fig, axes = plt.subplots()
+#mesh.add_plot(axes)
+#plt.show()
 
