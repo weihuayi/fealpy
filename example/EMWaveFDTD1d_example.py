@@ -29,7 +29,7 @@ class EMWaveData1D:
         self.loss = loss
         self.kappa = kappa  # 波数
 
-        self.ca = (2 - self.loss)/(2 + self.loss)
+        self.ca = (2 - loss)/(2 + loss)
         self.cb = 2/(2 + self.loss)
 
     def domian(self):
@@ -57,12 +57,12 @@ parser.add_argument('--NS',
         help='一维区间剖分段数， 默认为 200 段.')
 
 parser.add_argument('--NT',
-        default=100, type=int,
-        help='时间剖分段数， 默认为 100 段.')
+        default=1000, type=int,
+        help='时间剖分段数， 默认为 1000 段.')
 
 parser.add_argument('--loss',
-        default=0.005, type=float,
-        help='电损耗， 默认为 0.005 段.')
+        default=0.004, type=float,
+        help='电损耗， 默认为 0.004 段.')
 
 parser.add_argument('--kappa',
         default=20, type=float,
@@ -84,6 +84,9 @@ dt = timeline.dt
 
 e = mesh.function('node')
 h = mesh.function('cell') 
+
+print(e.shape)
+print(h.shape)
 
 def forward(n):
     t = T0 + n*dt
