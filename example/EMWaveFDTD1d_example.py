@@ -85,9 +85,6 @@ dt = timeline.dt
 e = mesh.function('node')
 h = mesh.function('cell') 
 
-print(e.shape)
-print(h.shape)
-
 def forward(n):
     t = T0 + n*dt
     if n == 0:
