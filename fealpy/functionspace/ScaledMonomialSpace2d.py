@@ -788,7 +788,7 @@ class ScaledMonomialSpace2d():
         F = self.function(array=F.reshape(-1))
         return F
 
-    def projection(self, f):
+    def projection(self, F):
         """
 
         Notes
