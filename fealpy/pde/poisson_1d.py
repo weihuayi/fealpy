@@ -3,13 +3,14 @@ from fealpy.mesh.StructureIntervalMesh import StructureIntervalMesh
 from fealpy.decorator import cartesian, barycentric
 
 class CosData:
-    def __init__(self, box, nx):
-        self.box = box
-        self.nx = nx
-        
+    def __init__(self):
+        pass
+    
+    def domain(self):
+        return np.array([0, 2])
 
     def init_mesh(self, n=1):
-        mesh = StructureIntervalMesh(self.box, nx = self.nx)
+        mesh = StructureIntervalMesh(self.I, nx = self.nx)
         mesh.uniform_refine(n)
         return mesh
     @cartesian
@@ -21,8 +22,7 @@ class CosData:
         p : numpy.ndarray
             (..., 1)
         """
-        x = p[..., 0]
-        val = np.cos(np.pi*x)
+        val = np.cos(np.pi*p)
         return val 
 
     @cartesian
@@ -40,8 +40,7 @@ class CosData:
 
     @cartesian
     def source(self, p):
-        x = p[..., 0]
-        val = np.pi**2*np.cos(np.pi*x)
+        val = np.pi**2*np.cos(np.pi*p)
         return val
 
     @cartesian
