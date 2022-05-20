@@ -10,6 +10,7 @@ from scipy.sparse.linalg import spsolve
 @pytest.mark.parametrize("degree, dim, nrefine", 
         [(1, 2, 4), (2, 2, 3), (3, 2, 2), (6, 2, 0),
          (1, 3, 3), (2, 3, 2), (3, 3, 1), (4, 3, 0)])
+
 def test_poisson_fem_2d(degree, dim, nrefine, maxit=2):
     from fealpy.functionspace import LagrangeFiniteElementSpace
     from fealpy.boundarycondition import DirichletBC 
