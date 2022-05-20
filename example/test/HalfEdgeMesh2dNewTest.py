@@ -596,9 +596,10 @@ class HalfEdgeMesh2dTest:
             halfedge = mesh.ds.halfedge
             cstart = mesh.ds.cellstart
             NE = mesh.ds.NE
-            color = np.zeros(NE*2, dtype=np.int_)
-            color[[2,3,10,11]] = 1
-            mesh.hedgecolor = color
+            print('hahahah')
+            #color = np.zeros(NE*2, dtype=np.int_)
+            #color[[2,3,10,11]] = 1
+            #mesh.hedgecolor = color
         elif method=='poly':
             node = np.array([
                 (0.0, 0.0), (0.0, 1.0), (1.0, 0.0), (1.0, 1.0),], dtype=np.float)

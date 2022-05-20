@@ -774,21 +774,26 @@ class ScaledMonomialSpace2d():
     def local_projection(self, f, q=None):
         """
 
-        Notes
-        -----
+        @brief 给定一个函数 f， 把它投影到缩放单项式空间
+        @param[in] f 关于（x, y) 的函数，注意输入是笛卡尔坐标  
 
-        结定一个函数 f， 把它投影到缩放单项式空间
         """
 
-        def u(x, index):
-            return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index))
-        b = self.integralalg.integral(u, celltype=True)
+        @cartesian
+        def u(x, *args):
+            if len(args) == 0:
+                return np.einsum('ij, ijm->ijm', f(x), self.basis(x))
+            elif len(args) == 1:
+                index, = args
+                return np.einsum('ij, ijm->ijm', f(x), self.basis(x, index=index))
+
+        b = self.integralalg.cell_integral(u)
         M = self.cell_mass_matrix()
         F = inv(M)@b[:, :, None]
         F = self.function(array=F.reshape(-1))
         return F
 
-    def projection(self, f):
+    def projection(self, F):
         """
 
         Notes

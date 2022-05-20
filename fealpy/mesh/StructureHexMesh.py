@@ -39,8 +39,8 @@ class StructureHexMesh(Mesh3d):
         """
         if returnim:
             nodeImatrix = []
+
         for i in range(n):
-            print('nxH', self.ds.nx)
             nx = 2*self.ds.nx
             ny = 2*self.ds.ny
             nz = 2*self.ds.nz
