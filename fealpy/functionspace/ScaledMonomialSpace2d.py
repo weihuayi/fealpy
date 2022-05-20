@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from numpy.linalg import inv
 from .Function import Function
-from ..decorator import cartesian
+from ..decorator import cartesian, barycentric
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
@@ -185,6 +185,27 @@ class ScaledMonomialSpace2d():
             phi[..., 1:] = val[..., np.newaxis]
             np.multiply.accumulate(phi, axis=-1, out=phi)
         return phi
+
+    @barycentric
+    def edge_basis_with_barycentric(self, bcs, p=None):
+        """!
+        @brief 边上的中心坐标函数和缩放单项式函数有一定的关系
+        @param bcs : (..., 2)
+        @return phi : (..., p+1)
+        """
+        p = self.p if p is None else p
+        if p == 0:
+            shape = len(bcs.shape)*(1, )
+            return np.array([[1.0]], dtype=np.float_).reshape(shape)
+        else:
+            shape = bcs.shape[:-1]+(p+1, )
+            phi = np.ones(shape, dtype=np.float_)
+            phi[..., 1:] = bcs[..., 0, None]-0.5
+            np.multiply.accumulate(phi, axis=-1, out=phi)
+            return phi
+
+
+
 
     @cartesian
     def basis(self, point, index=np.s_[:], p=None):

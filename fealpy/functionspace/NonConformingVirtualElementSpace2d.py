@@ -47,9 +47,9 @@ class NCVEMDof2d():
         p = self.p
         mesh = self.mesh
         cell, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         if p == 1:
+            cell2edge, _ = mesh.ds.cell_to_edge(return_sparse=False)
             return cell2edge, cellLocation
         else:
             NC = mesh.number_of_cells()
@@ -225,6 +225,7 @@ class NonConformingVirtualElementSpace2d():
         """
         初始化解 uh  的第一类边界条件。
         """
+        print(uh[:].shape)
         p = self.p
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -299,7 +300,7 @@ class NonConformingVirtualElementSpace2d():
     def projection(self, u, up):
         pass
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float_):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof
@@ -307,7 +308,7 @@ class NonConformingVirtualElementSpace2d():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def matrix_H(self):
         p = self.p
@@ -356,6 +357,7 @@ class NonConformingVirtualElementSpace2d():
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dof, cell2dofLocation = self.cell_to_dof()
+        print("cell2dof", cell2dof)
         D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
         qf = GaussLegendreQuadrature(p)
@@ -365,6 +367,10 @@ class NonConformingVirtualElementSpace2d():
         phi1 = self.smspace.basis(ps[p-1::-1, isInEdge, :], index=edge2cell[isInEdge, 1])
 
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
+        print(idx)
+        print(edge2cell)
+        print(D.shape)
+        print(phi0.shape)
         D[idx, :] = phi0
 
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
