@@ -89,7 +89,7 @@ def solve(dmodel, uh, dirichlet=None, solver='direct'):
     print("Construct linear system time:", end - start)
 
     if dirichlet is not None:
-        AD, b = dirichlet.apply(A, b)
+        AD, b = dirichlet.apply(A, b, uh)
     else:
         AD = A
 

@@ -20,6 +20,7 @@ from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
 from ..common.Tools import hash2map
 from ..common import DynamicArray
+from .TriangleMesh import TriangleMesh
 
 
 class HalfEdgeMesh2d(Mesh2d):
@@ -2019,6 +2020,25 @@ class HalfEdgeMesh2d(Mesh2d):
                 fontsize=fontsize, fontcolor=fontcolor, 
                 multiindex=multiindex, linewidth=linewidth)
 
+    def split_to_trimesh(self):
+        node = self.entity('node')
+        halfedge = self.entity('halfedge')
+        cstart = self.ds.cellstart
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        newnode = np.zeros((NC+NN, node.shape[1]), dtype=np.float_)
+        newnode[:NN] = node[:]
+        newnode[NN:] = self.entity_barycenter('cell')
+
+        flag = halfedge[:, 1]>=cstart
+        NTC = np.sum(flag)
+        newcell = np.zeros((NTC, 3), dtype=np.int_)
+        newcell[:, 2] = halfedge[flag, 0]
+        newcell[:, 1] = halfedge[halfedge[flag, 4], 0]
+        newcell[:, 0] = halfedge[flag, 1]-cstart+NN
+        return TriangleMesh(newnode, newcell), np.where(flag)[0]
+
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
 
@@ -2296,9 +2316,9 @@ class HalfEdgeMesh2dDataStructure():
         elif self.NV == 3: # tri mesh
             cell2edge = np.zeros([NC, 3], dtype = np.int_)
             current = self.hcell[cstart:]
-            cell2edge[:, 2] = J[current]
-            cell2edge[:, 0] = J[halfedge[current, 2]]
-            cell2edge[:, 1] = J[halfedge[current, 3]]
+            cell2edge[:, 0] = J[current]
+            cell2edge[:, 1] = J[halfedge[current, 2]]
+            cell2edge[:, 2] = J[halfedge[current, 3]]
             return cell2edge
         elif self.NV == 4: # quad mesh
             cell2edge = np.zeros([NC, 4], dtype=np.int_)
@@ -2313,6 +2333,22 @@ class HalfEdgeMesh2dDataStructure():
             return cell2edge
         else:
             raise ValueError('The property NV should be None, 3 or 4! But the NV is {}'.format(self.NV))
+
+    def cell_to_edge_sign(self, return_sparse=False):
+        NE = self.NE
+        NC = self.NC
+        NEC = self.number_of_edges_of_cells()
+
+        edge2cell = self.edge_to_cell()
+        if return_sparse == False:
+            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+            cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+        else:
+            val = np.ones(NE, dtype=np.bool_)
+            cell2edgeSign = csr_matrix(
+                    (val, (edge2cell[:, 0], range(NE))),
+                    shape=(NC, NE), dtype=np.bool_)
+        return cell2edgeSign
 
     def cell_to_face(self, return_sparse=True):
         return self.cell_to_edge(return_sparse=return_sparse)
@@ -2559,21 +2595,33 @@ class HalfEdgeMesh2dDataStructure():
             isNotOK[isNotOK] = start[isNotOK]!=hcell[isNotOK]
         return cell2node, Location, cell2nodenum
 
-    def halfedge_to_cell_location_number(self):
+    def cell_to_halfedge(self, returnLocalnum=False):
         """!
         @brief 半边在所属单元中的编号
         """
+        cstart = self.cellstart
+        halfedge = self.halfedge
+
+        Location = self.number_of_vertices_of_cells()
+        Location = np.r_[0, np.cumsum(Location)]
+        c2he = np.zeros(Location[-1], dtype=np.int_)
+
+        NC = self.NC 
         N = len(self.halfedge)
         halfedge2cellnum = np.zeros(N, dtype=np.int_) # 每条半边所在单元的编号
-        hcell = self.hcell.copy()
+        hcell = self.hcell[cstart:].copy()
         isNotOK = np.ones(NC, dtype=np.bool_)
         i = 0
         while np.any(isNotOK):
+            c2he[Location[:-1][isNotOK]+i] = hcell[isNotOK]
             halfedge2cellnum[hcell[isNotOK]] = i
             hcell[isNotOK] = halfedge[hcell[isNotOK], 2]
-            isNotOK[isNotOK] = start[isNotOK]!=hcell[isNotOK]
+            isNotOK[isNotOK] = self.hcell[cstart:][isNotOK]!=hcell[isNotOK]
             i += 1
-        return halfedge2cellnum
+        if returnLocalnum:
+            return c2he, Location, halfedge2cellnum
+        else:
+            return c2he, Location
 
     def halfedge_to_node_location_number(self):
         """!
@@ -2590,6 +2638,16 @@ class HalfEdgeMesh2dDataStructure():
             isNotOK[isNotOK] = start[isNotOK]!=hnode[isNotOK]
             i += 1
         return halfedge2nodenum
+
+    def halfedge_to_edge(self, index = np.s_[:]):
+        halfedge = self.halfedge
+        hedge = self.hedge
+        NE = halfedge.shape[0]//2
+
+        halfedge2edge = np.zeros(len(halfedge), dtype=np.int_)
+        halfedge2edge[hedge] = np.arange(NE)
+        halfedge2edge[halfedge[hedge, 4]] = np.arange(NE)
+        return halfedge2edge[index] 
 
     def boundary_node_flag(self):
         NN = self.NN

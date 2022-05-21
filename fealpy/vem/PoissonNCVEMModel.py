@@ -29,7 +29,7 @@ class PoissonNCVEMModel():
         self.mesh = self.space.mesh
         self.pde = pde
         self.uh = self.space.function()
-        self.area = self.space.smspace.area
+        self.area = self.mesh.entity_measure("cell")
 
         self.uI = self.space.interpolation(pde.solution)
 

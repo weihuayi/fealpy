@@ -31,6 +31,8 @@ class DirichletBC():
         dim = A.shape[0]//gdof
         if uh is None:
             uh = self.space.function(dim=dim)
+        
+        print(uh[:].shape)
         isDDof = space.set_dirichlet_bc(gD, uh, threshold=threshold)
         if dim > 1:
             isDDof = np.tile(isDDof, dim)
