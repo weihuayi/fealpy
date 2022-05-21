@@ -225,7 +225,6 @@ class NonConformingVirtualElementSpace2d():
         """
         初始化解 uh  的第一类边界条件。
         """
-        print(uh[:].shape)
         p = self.p
         NN = self.mesh.number_of_nodes()
         NE = self.mesh.number_of_edges()
@@ -357,7 +356,6 @@ class NonConformingVirtualElementSpace2d():
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
 
         cell2dof, cell2dofLocation = self.cell_to_dof()
-        print("cell2dof", cell2dof)
         D = np.ones((len(cell2dof), smldof), dtype=np.float)
 
         qf = GaussLegendreQuadrature(p)
@@ -367,10 +365,6 @@ class NonConformingVirtualElementSpace2d():
         phi1 = self.smspace.basis(ps[p-1::-1, isInEdge, :], index=edge2cell[isInEdge, 1])
 
         idx = cell2dofLocation[edge2cell[:, 0]] + edge2cell[:, 2]*p + np.arange(p).reshape(-1, 1)
-        print(idx)
-        print(edge2cell)
-        print(D.shape)
-        print(phi0.shape)
         D[idx, :] = phi0
 
         idx = cell2dofLocation[edge2cell[isInEdge, 1]] + edge2cell[isInEdge, 3]*p + np.arange(p).reshape(-1, 1)
