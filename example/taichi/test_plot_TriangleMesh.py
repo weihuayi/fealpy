@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import taichi as ti
 
 from fealpy.mesh import MeshFactory as MF
-from fealpy.ti import TriangleMesh 
+from fealpy.mesh.ti import TriangleMesh 
 
 ti.init()
 
