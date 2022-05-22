@@ -200,12 +200,9 @@ class ScaledMonomialSpace2d():
         else:
             shape = bcs.shape[:-1]+(p+1, )
             phi = np.ones(shape, dtype=np.float_)
-            phi[..., 1:] = bcs[..., 0, None]-0.5
+            phi[..., 1:] = bcs[..., 1, None]-0.5
             np.multiply.accumulate(phi, axis=-1, out=phi)
             return phi
-
-
-
 
     @cartesian
     def basis(self, point, index=np.s_[:], p=None):
