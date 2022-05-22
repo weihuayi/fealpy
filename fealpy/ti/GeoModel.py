@@ -15,7 +15,6 @@ class GeoModel:
     def line(self,startTag,endTag,tag):
         self.Line[tag] = [startTag,endTag]
     
-    #@ti.kernel
     def point_to_tifield(self,points):
         NN = len(points)
         tipoints = ti.Vector.field(3,dtype=ti.f32,shape=NN)
@@ -24,7 +23,6 @@ class GeoModel:
             tipoints[i] = ti.Vector(self.Point[tags[i]])
         return tipoints
     
-    #@ti.kernel
     def line_to_tifield(self,lines):
         NL = len(lines)
         tilines = ti.Vector.field(2,dtype = ti.i32,shape=NL)
