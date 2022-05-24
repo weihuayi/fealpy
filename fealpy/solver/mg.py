@@ -1,4 +1,5 @@
 import numpy as np
+from numpy.linalg import norm
 from scipy.sparse import spdiags, tril, triu
 from scipy.sparse.linalg import cg, dsolve, spsolve
 
@@ -55,10 +56,9 @@ class JacobiSmoother():
 
 
 class MG():
-    def __init__(self, Ah, bh, x0, P, R=None, c=None, options=None):
+    def __init__(self, Ah, bh, P, R=None, c=None, options=None):
         self.P = P
         self.bh = bh
-        self.x0 = x0
         if c:
             self.c = c
         if c is None:
@@ -150,10 +150,9 @@ class MG():
         return eh
  
 
-    def solve(self):
+    def solve(self, x0):
         A = self.A
         bh = self.bh
-        x0 = self.x0
         ## 前磨光
         r, x = self.pre_smoothing(A, bh, x0)
         
@@ -165,4 +164,26 @@ class MG():
         x0 = self.post_smoothing(A, r, x)
 
         return x0
+
+    def v_cycle(self):
+        
+        count = 0
+        ru = 1
+        tol = 1e-9
+        u0 = np.zeros(self.bh.shape[0], dtype=np.float64)
+
+        while ru > tol and count < 100:
+            uh = self.solve(u0)
+            if norm(self.bh) == 0:
+                ru = norm(self.bh - self.A[0]@uh)
+            else:
+                ru = norm(self.bh - self.A[0]@uh)/norm(self.bh)
+
+            u0[:] = uh[:]
+            count += 1
+
+            print('ru', ru)
+        print('count', count)
+
+        return uh
         
