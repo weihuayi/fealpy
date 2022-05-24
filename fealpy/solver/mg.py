@@ -55,13 +55,24 @@ class JacobiSmoother():
 
 
 class MG():
-    def __init__(self, A, b, P, R=None, c=None, options=None):
-        self.A = A
-        self.b = b
+    def __init__(self, Ah, bh, x0, P, R=None, c=None, options=None):
         self.P = P
+        self.bh = bh
+        self.x0 = x0
         if c:
             self.c = c
-            print('c', c)
+        if c is None:
+            self.c = 1
+        
+        self.A = []
+        self.A.append(Ah)
+        P = self.P
+        n = len(P) # 获得加密层数
+        for i in range(n):
+            P1 = P[n-1-i]
+            R1 = self.c*P1.T
+            Ah = R1@Ah@P1
+            self.A.append(Ah)
 
 
     def options(
@@ -72,6 +83,7 @@ class MG():
             theta=1.0,
             maxsize=1e-2,
             minsize=1e-12,
+            tol = 1e-9,
             data=None,
             HB=True,
             imatrix=False,
@@ -85,6 +97,7 @@ class MG():
                 'theta': theta,
                 'maxsize': maxsize,
                 'minsize': minsize,
+                'tol': tol,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -93,30 +106,63 @@ class MG():
         return options
 
     def pre_smoothing(self, A, b, x0):
-        GS = GaussSeidelSmoother(A)
-        GS.smooth(b, x0)
 
-        return x0
+        r = []
+        e = []
+        r.append(b)
+        n = len(A)
+        if n == 1:
+            raise Exception("网格已经足够粗")
+        
+        GS = GaussSeidelSmoother(A[0])
+        GS.smooth(b, x0)
+        e.append(x0)
+        rh = b - A[0]@x0
+        rH = self.c*self.P[n-2].T@rh
+        r.append(rH) 
+        e0 = np.zeros(rH.shape[0], dtype=np.float64)
+        if n == 2:
+            return r, e
+
+        for i in range(2,n):
+            GS = GaussSeidelSmoother(A[i-1])
+            GS.smooth(rH, e0)
+            e.append(e0)
+            rh = rH - A[i-1]@e0
+            rH = self.c*self.P[n-i-1].T@rh
+            r.append(rH)
+            e0 = np.zeros(rH.shape[0], dtype=np.float64)           
+#            e0 = self.c*self.P[n-i-1].T@e0
+
+        return r, e
+
+
+    def post_smoothing(self, A, b, x0):
+        n = len(A)
+        eh = x0[-1]
+        if n == 1:
+            raise Exception("网格已经足够粗")
+        for i in range(n-1):
+            eh = x0[n-i-2] + self.P[i]@eh
+            GS = GaussSeidelSmoother(A[n-i-2])
+            GS.smooth(b[n-i-2], eh, lower=False)
+ 
+        return eh
  
 
     def solve(self):
         A = self.A
-        b = self.b
-        P = self.P
-        n = len(P) # 获得加密层数
-        x0 = np.zeros((A.shape[0],), dtype=np.float64)
-        for i in range(n-1, -1, -1):
-            P1 = P[i]
-            R1 = self.c*P1.T
-            ## 前磨光
-            x0 = pre_smoothing(A, b, x0)
-            r = b - A@x0
-            print('P1', A.shape[0], P1.shape)
-            print('R1', R1.shape)
-            rH = R1@r
-            print('x0', x0.shape, x0)
+        bh = self.bh
+        x0 = self.x0
+        ## 前磨光
+        r, x = self.pre_smoothing(A, bh, x0)
+        
+        ## 最粗网格求解
+        x0 = spsolve(A[-1], r[-1])
+        x.append(x0)
 
-        print('P', len(P))
+        ## 后磨光
+        x0 = self.post_smoothing(A, r, x)
 
-        return A
+        return x0
         
