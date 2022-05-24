@@ -1,8 +1,10 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix
 from fealpy.mesh import TriangleMesh
+
+from fealpy.pde.poisson_2d import CosCosData
 
 node = np.array([
     [0.0, 0.0], # 0
@@ -28,12 +30,7 @@ cm = mesh.entity_measure('cell') # (NC, )
 
 gphi = mesh.grad_lambda() # (NC, 3, 2)
 
-M = np.zeros((NC, 3, 3), dtype=np.float64)
-
-
-
 A = np.einsum('i, ijm, ikm -> ijk', cm, gphi, gphi) # (NC, 3, 3 )
-
 
 # cell.shape == (NC, 3)
 
@@ -41,6 +38,35 @@ I = np.broadcast_to(cell[:, :, None], shape=A.shape) # (NC, 3, 3)
 J = np.broadcast_to(cell[:, None, :], shape=A.shape) # (NC, 3, 3)
 
 A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+M = np.array([
+    [2, 1, 1],
+    [1, 2, 1],
+    [1, 1, 1]], dtype=np.float64)
+M /=12.0
+M = cm[:, None, None]*M
+# M = np.einsum('i, jk->ijk', cm, M)
+M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+
+pde = CosCosData()
+qf = mesh.integrator(2)
+# bcs.shape == (NQ, 3)
+# ws.shape == (NQ, )
+bcs, ws = qf.get_quadrature_points_and_weights()
+
+phi = bcs # (NQ, 3)
+f = pde.source
+
+x = mesh.bc_to_point(bcs) # (NQ, NC, 2)
+
+val = f(x) # (NQ, NC)
+
+bb = np.einsum('qc, qi, q, c->ci', val, phi, ws, cm)  # (NC, 3)
+
+F = np.zeros(NN, dtype=np.float64)
+np.add.at(F, cell, bb)
+
 
 
 uh = np.zeros(NN, dtype=np.float64)

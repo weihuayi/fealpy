@@ -520,7 +520,7 @@ class FirstKindNedelecFiniteElementSpace2d:
 
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijkd, ijmd, j->jkm', c*ws, phi, phi,
-                        self.cellmeasure, optimize=True)
+                        cellmeasure, optimize=True)
             else:
                 M = np.einsum('i, ijdn, ijkn, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
 

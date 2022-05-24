@@ -5,7 +5,6 @@ from multiprocessing.pool import ThreadPool as Pool
 from ..decorator import timer
 
 
-
 class FEMeshIntegralAlg():
     def __init__(self, mesh, q, cellmeasure=None):
         """
