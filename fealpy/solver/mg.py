@@ -1,4 +1,6 @@
-import numpy 
+import numpy as np
+from scipy.sparse import spdiags, tril, triu
+from scipy.sparse.linalg import cg, dsolve, spsolve
 
 class GaussSeidelSmoother():
     def __init__(self, A):
@@ -53,8 +55,13 @@ class JacobiSmoother():
 
 
 class MG():
-    def __init__(self, A, P, R=None, c=None, options=None):
-        pass
+    def __init__(self, A, b, P, R=None, c=None, options=None):
+        self.A = A
+        self.b = b
+        self.P = P
+        if c:
+            self.c = c
+            print('c', c)
 
 
     def options(
@@ -85,6 +92,31 @@ class MG():
             }
         return options
 
+    def pre_smoothing(self, A, b, x0):
+        GS = GaussSeidelSmoother(A)
+        GS.smooth(b, x0)
+
+        return x0
+ 
 
     def solve(self):
-        pass
+        A = self.A
+        b = self.b
+        P = self.P
+        n = len(P) # 获得加密层数
+        x0 = np.zeros((A.shape[0],), dtype=np.float64)
+        for i in range(n-1, -1, -1):
+            P1 = P[i]
+            R1 = self.c*P1.T
+            ## 前磨光
+            x0 = pre_smoothing(A, b, x0)
+            r = b - A@x0
+            print('P1', A.shape[0], P1.shape)
+            print('R1', R1.shape)
+            rH = R1@r
+            print('x0', x0.shape, x0)
+
+        print('P', len(P))
+
+        return A
+        

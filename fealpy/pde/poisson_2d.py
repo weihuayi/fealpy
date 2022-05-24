@@ -65,7 +65,7 @@ class CosCosData:
             mesh.uniform_refine(n)
             return mesh
         elif meshtype == 'squad':
-            mesh = StructureQuadMesh([0, 1, 0, 1], h)
+            mesh = StructureQuadMesh([0, 1, 0, 1], int(1/h), int(1/h))
             return mesh
         else:
             raise ValueError("".format)
