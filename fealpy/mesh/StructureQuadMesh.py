@@ -48,41 +48,42 @@ class StructureQuadMesh(Mesh2d):
         J = np.arange(NNH).reshape(nx//2+1, -1)
 
         ## (2i, 2j)
-        I1 = I[::2, ::2].flatten()
-        J1 = J.flatten() #(i,j)
-        data = np.broadcast_to(1, (I1.shape[0],))
+        I1 = I[::2, ::2].flat
+        J1 = J.flat #(i,j)
+        data = np.broadcast_to(1, (len(I1),))
         A = coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
         ## (2i+1, 2j)
-        I1 = I[1::2, ::2].flatten()
-        J1 = J[:-1, :].flatten() #(i,j)
-        data = np.broadcast_to(1/2, (I1.shape[0],))
+        I1 = I[1::2, ::2].flat
+        J1 = J[:-1, :].flat #(i,j)
+        data = np.broadcast_to(1/2, (len(I1),))
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
-        J1 = J[1:, :].flatten() #(i+1,j)
+        J1 = J[1:, :].flat #(i+1,j)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
         ## (2i, 2j+1)
-        I1 = I[::2, 1::2].flatten()
-        J1 = J[:, :-1].flatten() #(i,j)
+        I1 = I[::2, 1::2].flat
+        J1 = J[:, :-1].flat #(i,j)
+        data = np.broadcast_to(1/2, (len(I1),))
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
-        J1 = J[:, 1:].flatten() #(i,j+1)
+        J1 = J[:, 1:].flat #(i,j+1)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
         ## (2i+1, 2j+1)
-        I1 = I[1::2, 1::2].flatten()
-        J1 = J[:-1, :-1].flatten() #{i,j}
-        data = np.broadcast_to(1/4, (I1.shape[0],))
+        I1 = I[1::2, 1::2].flat
+        J1 = J[:-1, :-1].flat #{i,j}
+        data = np.broadcast_to(1/4, (len(I1),))
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
         
-        J1 = J[1:, :-1].flatten() # (i+1,j)
+        J1 = J[1:, :-1].flat # (i+1,j)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
         
-        J1 = J[:-1, 1:].flatten() # (i,j+1)
+        J1 = J[:-1, 1:].flat # (i,j+1)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
         
-        J1 = J[1:, 1:].flatten() # (i+1,j+1)
+        J1 = J[1:, 1:].flat # (i+1,j+1)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
 
 
