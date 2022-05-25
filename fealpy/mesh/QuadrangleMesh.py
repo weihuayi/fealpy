@@ -23,7 +23,7 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
         (3, 0, 1, 2)])
 
     def __init__(self, NN, cell):
-        super(QuadrangleMeshDataStructure, self).__init__(NN, cell)
+        super().__init__(NN, cell)
 
 
 class QuadrangleMesh(Mesh2d):
@@ -103,22 +103,6 @@ class QuadrangleMesh(Mesh2d):
 
             self.node = np.r_['0', self.node, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
-
-
-    def refine_RB(self, markedCell):
-
-        hashR = np.array([
-            [1, 1, 1, 1],
-            [1, 1, 0, 0],
-            [0, 0, 1, 1]], dtype=np.int_)
-        mR, vR = hash2map(np.arange(16), hashR)
-        print(mR, vR)
-        cell2edge = self.ds.cell_to_edge()
-        NE = self.number_of_edges()
-        edge2flag = np.zeros(NE, dtype=np.bool_)
-        edge2flag[cell2edge[markedCell]] = True
-        print(edge2flag)
-        print(edge2flag[cell2edge])
 
 
     def angle(self):
