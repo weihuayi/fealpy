@@ -13,7 +13,7 @@ def distmesh(h, fd, fh, bbox, pfix=None):
 
     return distmesh2d.mesh
 
-def meshpy(points,facets,h,hole_points=None,refine_function=None):
+def meshpy(points, facets, h, hole_points=None, refine_function=None):
     from meshpy.triangle import MeshInfo, build
 
     mesh_info = triangle.MeshInfo()
@@ -30,16 +30,15 @@ def meshpy(points,facets,h,hole_points=None,refine_function=None):
     return TriangleMesh(node, cell)
 
 
-
-def gmsh(model,algorithm = 6,sizemax = 1e+22,sizemin=0):
+def gmsh(model, algorithm = 6, sizemax = 1e+22, sizemin=0):
     import gmsh
-    gmsh.option.setNumber("Mesh.MeshSizeMax",sizemax)
-    gmsh.option.setNumber("Mesh.MeshSizeMin",sizemin)
-    gmsh.option.setNumber("Mesh.Algorithm",algorithm)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", sizemax)
+    gmsh.option.setNumber("Mesh.MeshSizeMin", sizemin)
+    gmsh.option.setNumber("Mesh.Algorithm", algorithm)
 
     model.mesh.generate(2)
     
-    ntags,vxyz,_ = model.mesh.getNodes()
+    ntags, vxyz, _ = model.mesh.getNodes()
     node = vxyz.reshape((-1,3))
     node = node[:,:2]
     vmap = dict({j:i for i,j in enumerate(ntags)})

@@ -5,10 +5,10 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import TriMesher as tri
+from fealpy.mesh import TriMesher as TMesher 
 
-from fealpy.geometry import dcircle,drectangle
-from fealpy.geometry import ddiff,huniform
+from fealpy.geometry import dcircle, drectangle
+from fealpy.geometry import ddiff, huniform
 
 import gmsh
 
@@ -16,7 +16,11 @@ parser = argparse.ArgumentParser(description=
         """
         三角形网格生成示例
         """)
-parser.add_argument('--tool',default='distmesh',type=str,help='网格剖分使用的工具，默认distmesh,还有gmsh,meshpy')
+
+parser.add_argument('--tool', 
+        default='distmesh', type=str, 
+        help='网格剖分使用的工具，默认distmesh,还有gmsh,meshpy')
+
 args = parser.parse_args()
 tool = args.tool
 if tool == 'distmesh':
