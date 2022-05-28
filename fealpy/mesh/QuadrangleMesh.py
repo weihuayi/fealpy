@@ -1,12 +1,13 @@
 import numpy as np
 from .TriangleMesh import TriangleMesh
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
-from ..quadrature import QuadrangleQuadrature, GaussLegendreQuadrature
+from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 from ..common import hash2map
 
 
 class QuadrangleMeshDataStructure(Mesh2dDataStructure):
     localEdge = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
+    localFace = np.array([(0, 1), (1, 2), (2, 3), (3, 0)])
     ccw = np.array([0, 1, 2, 3])
 
     NVE = 2
@@ -27,6 +28,7 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
 
 
 class QuadrangleMesh(Mesh2d):
+
     def __init__(self, node, cell):
         assert cell.shape[-1] == 4
         self.node = node
@@ -42,6 +44,50 @@ class QuadrangleMesh(Mesh2d):
         self.celldata = {}
         self.nodedata = {}
         self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
+
+    def edge_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief  
+        """
+        node = self.node
+        entity = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+    def cell_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief  
+        """
+        assert len(bc) == 2
+        node = self.entity('node')
+        cell = self.entity('cell')[index]
+        bc0 = bc[0] # (NQ0, 2)
+        bc1 = bc[1] # (NQ1, 2)
+        bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+        # node[cell].shape == (NC, 4, 2)
+        # bc.shape == (NQ, 4)
+        p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+        return p
+
+    def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        """
+        node = self.entity('node')
+        if isinstance(bc, tuple):
+            assert len(bc) == 2
+            cell = self.entity('cell')[index]
+            bc0 = bc[0] # (NQ0, 2)
+            bc1 = bc[1] # (NQ1, 2)
+            bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+            # node[cell].shape == (NC, 4, 2)
+            # bc.shape == (NQ, 4)
+            p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+        else:
+            edge = self.entity('edge')[index]
+            p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p 
 
     def number_of_corner_nodes(self):
         return self.ds.NN
@@ -54,13 +100,11 @@ class QuadrangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
     def integrator(self, k, etype='cell'):
+        qf = GaussLegendreQuadrature(k)
         if etype in {'cell', 2}:
-            return QuadrangleQuadrature(k)
+            return TensorProductQuadrature((qf, qf)) 
         elif etype in {'edge', 'face', 1}:
-            return GaussLegendreQuadrature(k)
-
-    def area(self, index=np.s_[:]):
-        return self.cell_area(index=index)
+            return qf 
 
     def cell_area(self, index=np.s_[:]):
         NC = self.number_of_cells()
@@ -140,14 +184,6 @@ class QuadrangleMesh(Mesh2d):
     def cell_quality(self):
         jacobi = self.jacobi_at_corner()
         return jacobi.sum(axis=1)/4
-
-    def bc_to_point(self, bc):
-        bc0 = bc[0]
-        bc1 = bc[1]
-        node = self.node
-        cell = self.ds.cell
-        p = np.einsum('...j, ijk->...ik', bc, node[cell])
-        return p 
 
     def to_trimesh(self):
         cell = self.entity('cell')
