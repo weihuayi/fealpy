@@ -46,8 +46,201 @@ class TriangleMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
-    def number_of_corner_nodes(self):
-        return self.ds.NN
+    def integrator(self, q, etype='cell'):
+        if etype in {'cell', 2}:
+            return TriangleQuadrature(q)
+        elif etype in {'edge', 'face', 1}:
+            return GaussLegendreQuadrature(q)
+
+    def edge_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief  
+        """
+        node = self.node
+        entity = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+
+    def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把一组重心坐标点转化笛卡尔坐标点
+
+        @param[in] bc numpy.ndarray with shape (..., TD+1)
+
+        @return p numpy.ndarray with shape (..., NC, GD) or (..., NE, GD)
+        """
+        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
+        node = self.node
+        entity = self.entity(etype=TD)[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+    def grad_lambda(self):
+        node = self.node
+        cell = self.ds.cell
+        NC = self.number_of_cells()
+        v0 = node[cell[:, 2]] - node[cell[:, 1]]
+        v1 = node[cell[:, 0]] - node[cell[:, 2]]
+        v2 = node[cell[:, 1]] - node[cell[:, 0]]
+        GD = self.geo_dimension()
+        nv = np.cross(v1, v2)
+        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            W = np.array([[0, 1], [-1, 0]])
+            Dlambda[:, 0] = v0@W/length[:, None]
+            Dlambda[:, 1] = v1@W/length[:, None]
+            Dlambda[:, 2] = v2@W/length[:, None]
+        elif GD == 3:
+            length = np.sqrt(np.square(nv).sum(axis=1))
+            n = nv/length.reshape((-1, 1))
+            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
+            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
+            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
+        self.glambda = Dlambda
+        return Dlambda
+
+    def rot_lambda(self):
+        node = self.node
+        cell = self.ds.cell
+        NC = self.number_of_cells()
+        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
+        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
+        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        GD = self.geo_dimension()
+        nv = np.cross(v2, -v1)
+        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
+        if GD == 2:
+            length = nv
+            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+        elif GD == 3:
+            length = np.sqrt(np.square(nv).sum(axis=1))
+            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+        return Rlambda
+
+    def multi_index_matrix(self, p):
+        """
+        @brief 获取三角形上的 p 次的多重指标矩阵
+
+        @param[in] p positive integer 
+
+        @return multiIndex  ndarray with shape (ldof, 3)
+        """
+        ldof = (p+1)*(p+2)//2
+        idx = np.arange(0, ldof)
+        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+        multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
+        multiIndex[:, 1] = idx0 - multiIndex[:,2]
+        multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+        return multiIndex
+
+    def number_of_local_interpolation_points(self, p):
+        return (p+1)*(p+2)//2
+    
+    def number_of_global_interpolation_points(self, p):
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += (p-1)*NE
+        if p > 2:
+            NC = self.number_of_cells()
+            NP += (p-2)*(p-1)*NC//2
+        return NP
+    
+    def interpolation_points(self, p):
+        """
+        @brief 获取三角形网格上所有 p 次插值点
+        """
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p > 1:
+            N = node.shape[0]
+            dim = node.shape[-1]
+            gdof = self.number_of_global_interpolation_points(p)
+            ipoint = np.zeros((gdof, dim), dtype=np.float64)
+            ipoint[:N, :] = node
+            NE = self.number_of_edges()
+            edge = self.entity('edge')
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, dim)
+        if p > 2:
+            isEdgeDof = self.is_on_edge_local_dof()
+            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            w = self.multiIndex[isInCellDof, :]/p
+            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell,:]).reshape(-1, dim)
+
+        return ipoint
+    
+    
+    def edge_to_ipoint(self, p):
+        """
+        @brief 
+        """
+        NE= self.number_of_edges()
+        NN = self.number_of_nodes()
+
+        edge = self.entity('edge')
+        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
+        edge2dof[:, [0, -1]] = edge
+        if p > 1:
+            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2dof
+    
+    def is_on_edge_local_ipoint(self, p):
+        return self.multi_index_matrix(p) == 0
+    
+    def cell_to_ipoint(self, p):
+        cell = self.entity('cell')
+        N = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+
+        ldof = self.number_of_local_interpolation_points(p)
+
+        if p == 1:
+            cell2dof = cell
+
+        if p > 1:
+            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+
+            isEdgeDof = self.is_on_edge_local_ipoint(p)
+            edge2dof = self.edge_to_ipoint(p)
+            cell2edgeSign = self.ds.cell_to_edge_sign()
+            cell2edge = self.ds.cell_to_edge()
+
+            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
+            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+
+            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
+            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
+
+            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
+                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
+            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
+                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
+        if p > 2:
+            base = N + (p-1)*NE
+            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            idof = ldof - 3*p
+            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2dof
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
@@ -59,12 +252,7 @@ class TriangleMesh(Mesh2d):
 
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
-        Parameters
-        ----------
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
+        @brief 把网格转化为 vtk 的数据格式
         """
         from .vtk_extent import vtk_cell_index, write_to_vtu
 
@@ -89,11 +277,9 @@ class TriangleMesh(Mesh2d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
-    def integrator(self, q, etype='cell'):
-        if etype in {'cell', 2}:
-            return TriangleQuadrature(q)
-        elif etype in {'edge', 'face', 1}:
-            return GaussLegendreQuadrature(q)
+
+    def number_of_corner_nodes(self):
+        return self.ds.NN
 
     def copy(self):
         return TriangleMesh(self.node.copy(), self.ds.cell.copy());
@@ -149,11 +335,6 @@ class TriangleMesh(Mesh2d):
         cell[2*NC:3*NC, 2] = cell0[:, 1]
         cell[2*NC:3*NC, 3] = cell2edge[:, 0] + NN
         return QuadrangleMesh(node, cell)
-
-    def egde_merge(self, h0):
-        edge = self.entity('edge')
-        h = self.entity_measure('edge')
-        isShortEdge = h < h0
 
 
     def is_crossed_cell(self, point, segment):
@@ -896,30 +1077,6 @@ class TriangleMesh(Mesh2d):
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(NN, NN))
         return A
 
-    def grad_lambda(self):
-        node = self.node
-        cell = self.ds.cell
-        NC = self.number_of_cells()
-        v0 = node[cell[:, 2]] - node[cell[:, 1]]
-        v1 = node[cell[:, 0]] - node[cell[:, 2]]
-        v2 = node[cell[:, 1]] - node[cell[:, 0]]
-        GD = self.geo_dimension()
-        nv = np.cross(v1, v2)
-        Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
-        if GD == 2:
-            length = nv
-            W = np.array([[0, 1], [-1, 0]])
-            Dlambda[:, 0] = v0@W/length[:, None]
-            Dlambda[:, 1] = v1@W/length[:, None]
-            Dlambda[:, 2] = v2@W/length[:, None]
-        elif GD == 3:
-            length = np.sqrt(np.square(nv).sum(axis=1))
-            n = nv/length.reshape((-1, 1))
-            Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
-            Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
-            Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
-        self.glambda = Dlambda
-        return Dlambda
 
     def jacobi_matrix(self, index=np.s_[:]):
         """
@@ -934,27 +1091,6 @@ class TriangleMesh(Mesh2d):
         J = node[cell[index, [1, 2]]] - node[cell[index, [0]]]
         return J
 
-    def rot_lambda(self):
-        node = self.node
-        cell = self.ds.cell
-        NC = self.number_of_cells()
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
-        GD = self.geo_dimension()
-        nv = np.cross(v2, -v1)
-        Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
-        if GD == 2:
-            length = nv
-            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-        elif GD == 3:
-            length = np.sqrt(np.square(nv).sum(axis=1))
-            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
-        return Rlambda
 
     def cell_area(self, index=np.s_[:]):
         node = self.node
@@ -969,134 +1105,7 @@ class TriangleMesh(Mesh2d):
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
 
-    def edge_bc_to_point(self, bc, index=np.s_[:]):
-        node = self.node
-        entity = self.entity('edge')[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
-
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把一组重心坐标点转化笛卡尔坐标点
-
-        @param[in] bc numpy.ndarray with shape (..., TD+1)
-
-        @return p numpy.ndarray with shape (..., NC, GD) or (..., NE, GD)
-        """
-        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
-        node = self.node
-        entity = self.entity(etype=TD)[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
         
-    def multi_index_matrix(self, p):
-            ldof = (p+1)*(p+2)//2
-            idx = np.arange(0, ldof)
-            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-            multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
-            multiIndex[:, 1] = idx0 - multiIndex[:,2]
-            multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
-            return multiIndex
-
-    def number_of_local_interpolation_points(self, p):
-        return (p+1)*(p+2)//2
-    
-    def number_of_global_interpolation_points(self, p):
-        NP = self.number_of_nodes()
-        if p > 1:
-            NE = self.number_of_edges()
-            NP += (p-1)*NE
-        if p > 2:
-            NC = self.number_of_cells()
-            NP += (p-2)*(p-1)*NC//2
-        return NP
-
-    
-    def interpolation_points(self, p):
-        cell = self.entity('cell')
-        node = self.entity('node')
-
-        if p == 1:
-            return node
-        if p > 1:
-            N = node.shape[0]
-            dim = node.shape[-1]
-            gdof = self.number_of_global_interpolation_points(p)
-            ipoint = np.zeros((gdof, dim), dtype=np.float64)
-            ipoint[:N, :] = node
-            NE = self.number_of_edges()
-            edge = self.entity('edge')
-            w = np.zeros((p-1,2), dtype=np.float64)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    node[edge,:]).reshape(-1, dim)
-        if p > 2:
-            isEdgeDof = self.is_on_edge_local_dof()
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            w = self.multiIndex[isInCellDof, :]/p
-            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell,:]).reshape(-1, dim)
-
-        return ipoint
-    
-    
-    def edge_to_ipoint(self, p):
-        NE= self.number_of_edges()
-        NN = self.number_of_nodes()
-
-        edge = self.entity('edge')
-        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
-        edge2dof[:, [0, -1]] = edge
-        if p > 1:
-            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
-        return edge2dof
-    
-    def is_on_edge_local_ipoint(self, p):
-        return self.multi_index_matrix(p) == 0
-    
-    def cell_to_ipoint(self, p):
-        cell = self.entity('cell')
-        N = self.number_of_nodes()
-        NE = self.number_of_edges()
-        NC = self.number_of_cells()
-
-        ldof = self.number_of_local_interpolation_points(p)
-
-        if p == 1:
-            cell2dof = cell
-
-        if p > 1:
-            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
-
-            isEdgeDof = self.is_on_edge_local_ipoint(p)
-            edge2dof = self.edge_to_ipoint(p)
-            cell2edgeSign = self.ds.cell_to_edge_sign()
-            cell2edge = self.ds.cell_to_edge()
-
-            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
-
-            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
-
-            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
-        if p > 2:
-            base = N + (p-1)*NE
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            idof = ldof - 3*p
-            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
-
-        return cell2dof
     
     def cell_phi_phi_matrix(self, p1, p2, c=None):
         '''
