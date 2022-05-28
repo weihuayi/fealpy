@@ -237,6 +237,16 @@ class NonConformingVirtualElementSpace2d():
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
 
+    def edge_basis_to_integral_basis(self):
+        p = self.p
+        qf = GaussLegendreQuadrature(p)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        A = np.ones((p, p), dtype=np.float_)
+        A[:, 1:] = bcs[:, 1, None]-0.5
+        A[:] = np.cumprod(A, axis = 1)*ws[:, None]
+        return A 
+
     def boundary_dof(self, threshold=None):
         return self.dof.boundary_dof(threshold=threshold)
 
