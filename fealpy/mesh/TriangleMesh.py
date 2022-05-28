@@ -19,6 +19,11 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     NEC = 3
     NFC = 3
 
+    localCell = np.array([
+        (0, 1, 2),
+        (1, 2, 0),
+        (2, 0, 1)])
+
     def __init__(self, NN, cell):
         super().__init__(NN,cell)
 
@@ -58,6 +63,15 @@ class TriangleMesh(Mesh2d):
         """
         node = self.node
         entity = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+    def cell_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief  
+        """
+        node = self.node
+        entity = self.entity('cell')[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 

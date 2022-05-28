@@ -26,7 +26,7 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
     NEF = 4
 
     def __init__(self, NN, cell):
-        super(HexahedronMeshDataStructure, self).__init__(NN, cell)
+        super().__init__(NN, cell)
 
         
     def face_to_edge_sign(self):
@@ -48,6 +48,35 @@ class HexahedronMesh(Mesh3d):
 
         self.itype = cell.dtype
         self.ftype = node.dtype
+
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = {} 
+        self.meshdata = {}
+
+    def bc_to_point(self, bc, index=np.s_[:]):
+        node = self.entity('node')
+        if isinstance(bc, tuple):
+            if len(bc) == 2:
+                face = self.entity('face')[index]
+                bc0 = bc[0] # (NQ0, 2)
+                bc1 = bc[1] # (NQ1, 2)
+                bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+                # node[cell].shape == (NC, 4, 2)
+                # bc.shape == (NQ, 4)
+                p = np.einsum('...j, cjk->...ck', bc, node[face[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+            elif len(bc) == 3:
+                cell = self.entity('cell')[index]
+                bc0 = bc[0] # (NQ0, 2)
+                bc1 = bc[1] # (NQ1, 2)
+                bc2 = bc[2] # (NQ1, 2)
+                bc = np.einsum('im, jn, kl->ijkmnl', bc0, bc1, bc2).reshape(-1, 8) # (NQ0, NQ1, 2, 2)
+                p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+        else:
+            edge = self.entity('edge')[index]
+            p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p 
 
     def volume(self):
         pass
