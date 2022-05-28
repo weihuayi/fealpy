@@ -8,9 +8,6 @@ from fealpy.mesh.TriangleMeshData import gphigphiphi,phiphi,gphigphi,gphiphi,phi
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
-    #Mesh2dDataStructure是TriangleMeshDataStructure的父类
-    #--赵佳阔--   2021.9.16
-
     localEdge = np.array([(1, 2), (2, 0), (0, 1)])
     localFace = np.array([(1, 2), (2, 0), (0, 1)])
     ccw = np.array([0, 1, 2])
@@ -23,11 +20,7 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     NFC = 3
 
     def __init__(self, NN, cell):
-        super(TriangleMeshDataStructure, self).__init__(NN, cell)
-
-        #这是Python2中的写法在Python3中只需写成
-        #super().__init__(NN,cell)
-        #--赵佳阔--   2021.9.16
+        super().__init__(NN,cell)
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
@@ -985,12 +978,11 @@ class TriangleMesh(Mesh2d):
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
+        @brief 把一组重心坐标点转化笛卡尔坐标点
 
-        Notes
-        ----
-        node[cell].shape = (NC, 3, GD)
-        node[edge].shape = (NE, 2, GD)
-        bc.shape = (NQ, TD+1)
+        @param[in] bc numpy.ndarray with shape (..., TD+1)
+
+        @return p numpy.ndarray with shape (..., NC, GD) or (..., NE, GD)
         """
         TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
         node = self.node
