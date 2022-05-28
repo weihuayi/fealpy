@@ -52,14 +52,28 @@ class TriangleMesh(Mesh2d):
         self.meshdata = {}
 
     def integrator(self, q, etype='cell'):
+        """
+        @brief 获取不同维度网格实体上的积分公式 
+        """
         if etype in {'cell', 2}:
             return TriangleQuadrature(q)
         elif etype in {'edge', 'face', 1}:
             return GaussLegendreQuadrature(q)
 
+    def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把重心坐标积分点变换到实际网格实体上的笛卡尔坐标点
+        """
+
+        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
+        node = self.node
+        entity = self.entity(etype=TD)[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
     def edge_bc_to_point(self, bc, index=np.s_[:]):
         """
-        @brief  
+        @brief 把重心坐标积分点变换到实际网格边上的笛卡尔坐标点
         """
         node = self.node
         entity = self.entity('edge')[index]
@@ -68,27 +82,13 @@ class TriangleMesh(Mesh2d):
 
     def cell_bc_to_point(self, bc, index=np.s_[:]):
         """
-        @brief  
+        @brief 把重心坐标积分点变换到实际网格单元上的笛卡尔坐标点
         """
         node = self.node
         entity = self.entity('cell')[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
-
-    def bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把一组重心坐标点转化笛卡尔坐标点
-
-        @param[in] bc numpy.ndarray with shape (..., TD+1)
-
-        @return p numpy.ndarray with shape (..., NC, GD) or (..., NE, GD)
-        """
-        TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
-        node = self.node
-        entity = self.entity(etype=TD)[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
 
     def grad_lambda(self):
         node = self.node
@@ -137,6 +137,46 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
+    def uniform_refine(self, n=1, surface=None, returnim=False):
+        """
+        @brief 一致加密三角形网格
+        """
+
+        if returnim:
+            nodeIMatrix = []
+            cellIMatrix = []
+        for i in range(n):
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            NE = self.number_of_edges()
+            node = self.entity('node')
+            edge = self.entity('edge')
+            cell = self.entity('cell')
+            cell2edge = self.ds.cell_to_edge()
+            edge2newNode = np.arange(NN, NN+NE)
+            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
+
+            if returnim:
+                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
+                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
+                nodeIMatrix.append(A.tocsr())
+                B = eye(NC, dtype=self.ftype)
+                B = bmat([[B], [B], [B], [B]])
+                cellIMatrix.append(B.tocsr())
+
+            if surface is not None:
+                newNode, _ = surface.project(newNode)
+
+            self.node = np.concatenate((node, newNode), axis=0)
+            p = np.r_['-1', cell, edge2newNode[cell2edge]]
+            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
+            NN = self.node.shape[0]
+            self.ds.reinit(NN, cell)
+
+        if returnim:
+            return nodeIMatrix, cellIMatrix
+
     def multi_index_matrix(self, p):
         """
         @brief 获取三角形上的 p 次的多重指标矩阵
@@ -145,19 +185,26 @@ class TriangleMesh(Mesh2d):
 
         @return multiIndex  ndarray with shape (ldof, 3)
         """
-        ldof = (p+1)*(p+2)//2
-        idx = np.arange(0, ldof)
-        idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
-        multiIndex = np.zeros((ldof, 3), dtype=np.int_)
-        multiIndex[:, 2] = idx - idx0*(idx0 + 1)/2
-        multiIndex[:, 1] = idx0 - multiIndex[:,2]
-        multiIndex[:, 0] = p - multiIndex[:, 1] - multiIndex[:, 2]
-        return multiIndex
+        if etype in {'cell', 2}:
+            ldof = (p+1)*(p+2)//2
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:,1] = idx0 - multiIndex[:,2]
+            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            return multiIndex
+        elif etype in {'face', 'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
 
-    def number_of_local_interpolation_points(self, p):
+    def number_of_local_ipoints(self, p):
         return (p+1)*(p+2)//2
     
-    def number_of_global_interpolation_points(self, p):
+    def number_of_global_ipoints(self, p):
         NP = self.number_of_nodes()
         if p > 1:
             NE = self.number_of_edges()
@@ -176,85 +223,91 @@ class TriangleMesh(Mesh2d):
         if p == 1:
             return node
         if p > 1:
-            N = node.shape[0]
-            dim = node.shape[-1]
-            gdof = self.number_of_global_interpolation_points(p)
-            ipoint = np.zeros((gdof, dim), dtype=np.float64)
-            ipoint[:N, :] = node
-            NE = self.number_of_edges()
-            edge = self.entity('edge')
-            w = np.zeros((p-1,2), dtype=np.float64)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            ipoint[N:N+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
-                    node[edge,:]).reshape(-1, dim)
-        if p > 2:
-            isEdgeDof = self.is_on_edge_local_dof()
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
-            w = self.multiIndex[isInCellDof, :]/p
-            ipoint[N+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
-                    node[cell,:]).reshape(-1, dim)
+            NN = self.number_of_nodes() 
+            GD = self.geo_dimension()
 
-        return ipoint
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
+
+            NE = self.number_of_edges()
+
+            edge = self.entity('edge')
+
+            w = np.zeros((p-1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, GD)
+        if p > 2:
+            mutiIndex = self.multi_index_matrix(p, 'cell')
+            isEdgeIPoints = (multiIndex == 0)
+            isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
+                    isEdgeIPoints[:,2])
+            w = multiIndex[isInCellIPoints, :]/p
+            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell, :]).reshape(-1, GD)
+        return ipoints
     
     
     def edge_to_ipoint(self, p):
         """
-        @brief 
+        @brief 获取网格边与插值点的对应关系 
         """
-        NE= self.number_of_edges()
+        NE = self.number_of_edges()
         NN = self.number_of_nodes()
 
         edge = self.entity('edge')
-        edge2dof = np.zeros((NE, p+1), dtype=np.int_)
-        edge2dof[:, [0, -1]] = edge
+        edge2ipoints = np.zeros((NE, p+1), dtype=np.int_)
+        edge2ipoints[:, [0, -1]] = edge
         if p > 1:
-            edge2dof[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
-        return edge2dof
-    
-    def is_on_edge_local_ipoint(self, p):
-        return self.multi_index_matrix(p) == 0
+            edge2ipoints[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2ipoints
     
     def cell_to_ipoint(self, p):
+        """
+        @brief 获取网格中的三角形单元与插值点的对应关系 
+        """
         cell = self.entity('cell')
-        N = self.number_of_nodes()
+        NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
 
-        ldof = self.number_of_local_interpolation_points(p)
+        ldof = self.number_of_local_ipoints(p)
 
         if p == 1:
-            cell2dof = cell
+            cell2ipoint = cell
 
         if p > 1:
-            cell2dof = np.zeros((NC, ldof), dtype=np.int_)
+            cell2ipoint = np.zeros((NC, ldof), dtype=self.itype)
 
-            isEdgeDof = self.is_on_edge_local_ipoint(p)
-            edge2dof = self.edge_to_ipoint(p)
+            isEdgeIPoint = self.multi_index_matrix(p, 'cell') == 0
+            edge2ipoint = self.edge_to_ipoint(p)
+
             cell2edgeSign = self.ds.cell_to_edge_sign()
             cell2edge = self.ds.cell_to_edge()
 
-            cell2dof[np.ix_(cell2edgeSign[:, 0], isEdgeDof[:, 0])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 0], [0]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 0], isEdgeDof[:,0])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
+            cell2ipoint[np.ix_(cell2edgeSign[:, 0], isEdgeIPoint[:, 0])] = \
+                    edge2ipoint[cell2edge[cell2edgeSign[:, 0], [0]], :]
+            cell2ipoint[np.ix_(~cell2edgeSign[:, 0], isEdgeIPoint[:,0])] = \
+                    edge2ipoint[cell2edge[~cell2edgeSign[:, 0], [0]], -1::-1]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 1], isEdgeDof[:, 1])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
-            cell2dof[np.ix_(~cell2edgeSign[:, 1], isEdgeDof[:,1])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 1], [1]], :]
+            cell2ipoint[np.ix_(cell2edgeSign[:, 1], isEdgeIPoint[:, 1])] = \
+                    edge2ipoint[cell2edge[cell2edgeSign[:, 1], [1]], -1::-1]
+            cell2ipoint[np.ix_(~cell2edgeSign[:, 1], isEdgeIPoint[:,1])] = \
+                    edge2ipoint[cell2edge[~cell2edgeSign[:, 1], [1]], :]
 
-            cell2dof[np.ix_(cell2edgeSign[:, 2], isEdgeDof[:, 2])] = \
-                    edge2dof[cell2edge[cell2edgeSign[:, 2], [2]], :]
-            cell2dof[np.ix_(~cell2edgeSign[:, 2], isEdgeDof[:,2])] = \
-                    edge2dof[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
+            cell2ipoint[np.ix_(cell2edgeSign[:, 2], isEdgeIPoint[:, 2])] = \
+                    edge2ipoint[cell2edge[cell2edgeSign[:, 2], [2]], :]
+            cell2ipoint[np.ix_(~cell2edgeSign[:, 2], isEdgeIPoint[:,2])] = \
+                    edge2ipoint[cell2edge[~cell2edgeSign[:, 2], [2]], -1::-1]
         if p > 2:
-            base = N + (p-1)*NE
-            isInCellDof = ~(isEdgeDof[:,0] | isEdgeDof[:,1] | isEdgeDof[:,2])
+            base = NN + (p-1)*NE
+            isInCellIPoint = ~(isEdgeIPoint[:,0] | isEdgeIPoint[:,1] | isEdgeIPoint[:,2])
             idof = ldof - 3*p
-            cell2dof[:, isInCellDof] = base + np.arange(NC*idof).reshape(NC, idof)
+            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
 
-        return cell2dof
+        return cell2ipoint
 
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 2}:
@@ -590,41 +643,6 @@ class TriangleMesh(Mesh2d):
                 NN = self.number_of_nodes()
                 self.ds.reinit(NN, cell)
 
-    def uniform_refine(self, n=1, surface=None, returnim=False):
-        if returnim:
-            nodeIMatrix = []
-            cellIMatrix = []
-        for i in range(n):
-            NN = self.number_of_nodes()
-            NC = self.number_of_cells()
-            NE = self.number_of_edges()
-            node = self.entity('node')
-            edge = self.entity('edge')
-            cell = self.entity('cell')
-            cell2edge = self.ds.cell_to_edge()
-            edge2newNode = np.arange(NN, NN+NE)
-            newNode = (node[edge[:,0],:] + node[edge[:,1],:])/2.0
-
-            if returnim:
-                A = coo_matrix((np.ones(NN), (range(NN), range(NN))), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 0])), shape=(NN+NE, NN), dtype=self.ftype)
-                A += coo_matrix((0.5*np.ones(NE), (range(NN, NN+NE), edge[:, 1])), shape=(NN+NE, NN), dtype=self.ftype)
-                nodeIMatrix.append(A.tocsr())
-                B = eye(NC, dtype=self.ftype)
-                B = bmat([[B], [B], [B], [B]])
-                cellIMatrix.append(B.tocsr())
-
-            if surface is not None:
-                newNode, _ = surface.project(newNode)
-
-            self.node = np.concatenate((node, newNode), axis=0)
-            p = np.r_['-1', cell, edge2newNode[cell2edge]]
-            cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
-            NN = self.node.shape[0]
-            self.ds.reinit(NN, cell)
-
-        if returnim:
-            return nodeIMatrix, cellIMatrix
 
     def uniform_bisect(self, n=1):
         for i in range(n):
@@ -1313,7 +1331,7 @@ class TriangleMesh(Mesh2d):
         '''
         @brief 单元向量到总体向量
         '''
-        gdof = self.number_of_global_interpolation_points(p)
+        gdof = self.number_of_global_ipoints(p)
         result = np.zeros((gdof))
         c2f = self.cell_to_ipoint(p)
         np.add.at(result, c2f, m)
@@ -1324,14 +1342,14 @@ class TriangleMesh(Mesh2d):
         @brief 单元矩阵到总体矩阵
         '''
         NC = self.number_of_cells()
-        ldof1 = self.number_of_global_interpolation_points(p1)
-        ldof2 = self.number_of_global_interpolation_points(p2)
+        ldof1 = self.number_of_global_ipoints(p1)
+        ldof2 = self.number_of_global_ipoints(p2)
         cell2dof1 = self.cell_to_ipoint(p1)
         cell2dof2 = self.cell_to_ipoint(p2)
         I = np.broadcast_to(cell2dof1[:, :, None], shape = m.shape)
         J = np.broadcast_to(cell2dof2[:, None, :], shape = m.shape)
-        gdof1 = self.number_of_global_interpolation_points(p1)
-        gdof2 = self.number_of_global_interpolation_points(p2)
+        gdof1 = self.number_of_global_ipoints(p1)
+        gdof2 = self.number_of_global_ipoints(p2)
         val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
         return val
 

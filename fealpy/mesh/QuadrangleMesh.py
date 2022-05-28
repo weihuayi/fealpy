@@ -28,6 +28,9 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
 
 
 class QuadrangleMesh(Mesh2d):
+    """
+    @brief 非结构四边形网格数据结构对象
+    """
 
     def __init__(self, node, cell):
         assert cell.shape[-1] == 4
@@ -47,32 +50,16 @@ class QuadrangleMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
-    def edge_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief  
-        """
-        node = self.node
-        entity = self.entity('edge')[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
-
-    def cell_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief  
-        """
-        assert len(bc) == 2
-        node = self.entity('node')
-        cell = self.entity('cell')[index]
-        bc0 = bc[0] # (NQ0, 2)
-        bc1 = bc[1] # (NQ1, 2)
-        bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
-        # node[cell].shape == (NC, 4, 2)
-        # bc.shape == (NQ, 4)
-        p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
-        return p
+    def integrator(self, q, etype='cell'):
+        qf = GaussLegendreQuadrature(q)
+        if etype in {'cell', 2}:
+            return TensorProductQuadrature((qf, qf)) 
+        elif etype in {'edge', 'face', 1}:
+            return qf 
 
     def bc_to_point(self, bc, index=np.s_[:]):
         """
+        @brief 把积分点变换到实际网格实体上的笛卡尔坐标点
         """
         node = self.entity('node')
         if isinstance(bc, tuple):
@@ -89,39 +76,32 @@ class QuadrangleMesh(Mesh2d):
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
         return p 
 
-    def number_of_corner_nodes(self):
-        return self.ds.NN
+    def edge_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把边上积分点变换到网格边上的笛卡尔坐标点 
+        """
+        node = self.node
+        entity = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
 
-    def reorder_cell(self, idx):
-        NC = self.number_of_cells()
-        NN = self.number_of_nodes()
-        cell = self.entity('cell')
-        cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
-        self.ds.reinit(NN, cell)
-
-    def integrator(self, k, etype='cell'):
-        qf = GaussLegendreQuadrature(k)
-        if etype in {'cell', 2}:
-            return TensorProductQuadrature((qf, qf)) 
-        elif etype in {'edge', 'face', 1}:
-            return qf 
-
-    def cell_area(self, index=np.s_[:]):
-        NC = self.number_of_cells()
+    def cell_bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把单元上的积分点变换到网格单元上的笛卡尔坐标点 
+        """
+        assert len(bc) == 2
         node = self.entity('node')
-        edge = self.entity('edge')
-        edge2cell = self.ds.edge_to_cell()
-        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-        v = self.edge_normal()
-        val = np.sum(v*node[edge[:, 0], :], axis=1)
-
-        a = np.zeros(NC, dtype=self.ftype)
-        np.add.at(a, edge2cell[:, 0], val)
-        np.add.at(a, edge2cell[isInEdge, 1], -val[isInEdge])
-        a /=2
-        return a
+        cell = self.entity('cell')[index]
+        bc0 = bc[0] # (NQ0, 2)
+        bc1 = bc[1] # (NQ1, 2)
+        bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+        p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+        return p
 
     def uniform_refine(self, n=1):
+        """
+        @brief 一致加密四边形网格
+        """
         for i in range(n):
             N = self.number_of_nodes()
             NE = self.number_of_edges()
@@ -147,6 +127,78 @@ class QuadrangleMesh(Mesh2d):
 
             self.node = np.r_['0', self.node, edgeCenter, cellCenter]
             self.ds.reinit(N + NE + NC, cell)
+
+    def multi_index_matrix(self, p, etype='edge'):
+        """
+        @brief 获取网格边上的 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 2)
+        """
+        if etype in {'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+
+    def number_of_local_ipoints(self, p):
+        return (p+1)*(p+1)
+    
+    def number_of_global_ipoints(self, p):
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += (p-1)*NE
+        if p > 2:
+            NC = self.number_of_cells()
+            NP += (p-1)*(p-1)*NC
+        return NP
+
+    def interpolation_points(self, p):
+        """
+        @brief 获取四边形网格上所有 p 次插值点
+        """
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
+        if p > 1:
+            NN = self.number_of_nodes() 
+            GD = self.geo_dimension()
+
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
+
+            NE = self.number_of_edges()
+
+            edge = self.entity('edge')
+
+            w = np.zeros((p-1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
+                    node[edge,:]).reshape(-1, GD)
+        if p > 2:
+            mutiIndex = self.multi_index_matrix(p, 'edge')
+            bc = multiIndex[1:-1, :]/p
+            w = np.einsum('im, jn->ijmn', bc, bc).reshape(-1, 4)
+            ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell[0, 3, 1, 2]]).reshape(-1, GD)
+        return ipoints
+
+    def number_of_corner_nodes(self):
+        return self.ds.NN
+
+    def reorder_cell(self, idx):
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        cell = self.entity('cell')
+        cell = cell[np.arange(NC).reshape(-1, 1), self.ds.localCell[idx]]
+        self.ds.reinit(NN, cell)
+
 
 
     def angle(self):
