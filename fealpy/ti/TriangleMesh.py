@@ -616,7 +616,7 @@ class TriangleMesh():
         gdof2 = self.number_of_global_interpolation_points(p2)
         val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
         return val
-    '''  
+    #'''  
     @ti.kernel
     def cell_convection_matrices_1(self, u: ti.template(), S: ti.template()):
         """
@@ -830,7 +830,8 @@ class TriangleMesh():
         self.to_vertices_3d(vertices)
         canvas = window.get_canvas()
         canvas.set_background_color((1.0, 1.0, 1.0))
-        canvas.triangles(vertices, indices=self.cell)
+        canvas.triangles(vertices,indices=self.cell)
+        canvas.circles(vertices,radius=0.01,color=(1.0,0.0,0.0))
 
     @ti.kernel
     def to_vertices_3d(self, vertices: ti.template()):
@@ -844,7 +845,7 @@ class TriangleMesh():
                 vertices[i][0] = self.node[i, 0]
                 vertices[i][1] = self.node[i, 1]
                 vertices[i][2] = self.node[i, 2] 
-    '''
+    #'''
 
 
     
