@@ -17,6 +17,7 @@ from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
 from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d
 
 from .FirstKindNedelecFiniteElementSpace2d import FirstKindNedelecFiniteElementSpace2d
+from .FirstNedelecFiniteElementSpace2d import NedelecFiniteElementSpace2d
 
 #from .mixed_fem_space import RTFiniteElementSpace2d
 #from .PrismFiniteElementSpace import PrismFiniteElementSpace
