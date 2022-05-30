@@ -429,12 +429,12 @@ class HalfEdgeMesh2d(Mesh2d):
         @brief 
         """
         node = self.entity('node')
-        if self.ds.NV == 3
+        if self.ds.NV == 3:
             TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
             node = self.entity('node')
             entity = self.entity(etype=TD)[index] # default  cell
             p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        else self.ds.NV == 4:
+        elif self.ds.NV == 4:
             if isinstance(bc, tuple):
                 assert len(bc) == 2
                 cell = self.entity('cell')[index]
