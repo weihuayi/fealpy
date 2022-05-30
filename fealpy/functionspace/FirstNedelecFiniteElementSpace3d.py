@@ -67,15 +67,6 @@ class NDof3d:
 class FirstNedelecFiniteElementSpace3d:
     def __init__(self, mesh, q=None, dof=None):
         """
-        Parameters
-        ----------
-        mesh : TriangleMesh
-        q : the index of quadrature fromula
-        dof : the object for degree of freedom
-
-        Note
-        ----
-
         """
         self.mesh = mesh
 

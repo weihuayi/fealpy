@@ -85,7 +85,7 @@ class NDof2d:
         return gdof
 
 
-class NedelecFiniteElementSpace2d:
+class FirstNedelecFiniteElementSpace2d:
     def __init__(self, mesh, q=None, dof=None):
         """
         Parameters
