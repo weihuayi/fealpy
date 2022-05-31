@@ -89,6 +89,61 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
+    def shape_function(self, bc, p=1):
+        TD = bc.shape[-1] - 1 
+        multiIndex = self.multi_index_matrix(p)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi[..., np.newaxis, :]
+
+    def grad_shape_function(self, bc, p=None):
+
+        if p is None:
+            p= self.p
+
+        TD = self.top_dimension()
+
+        multiIndex = self.multi_index_matrix(p)
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_ipoints(p)
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.grad_lambda()
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
+        return gphi #(..., NC, ldof, GD)
 
     def grad_lambda(self):
         node = self.node
@@ -709,6 +764,9 @@ class TriangleMesh(Mesh2d):
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
+        if 'data' in options:
+            pass
+
         if 'IM' in options:
             nn = len(newNode)
             IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
@@ -767,6 +825,9 @@ class TriangleMesh(Mesh2d):
 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
+
+    def coarsen(self, isMarkedCell=None, options=None):
+        pass
 
     def label(self, node=None, cell=None, cellidx=None):
         """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
@@ -1073,8 +1134,6 @@ class TriangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
 
-    def coarsen_1(self, isMarkedCell=None, options=None):
-        pass
 
 
     def linear_stiff_matrix(self, c=None):
