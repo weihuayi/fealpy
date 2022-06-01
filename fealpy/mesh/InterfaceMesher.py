@@ -1,7 +1,7 @@
 import numpy as np
 
-class InterfaceMesher():
+def adaptive(mesh, interface):
     """
+    @brief 生成自适应的界面拟合网格 
     """
-    def __init__(self, interface):
-        self.interface = interface
+    pass

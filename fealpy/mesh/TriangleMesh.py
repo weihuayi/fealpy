@@ -102,7 +102,7 @@ class TriangleMesh(Mesh2d):
         A[..., 1:, :] *= P.reshape(-1, 1)
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi[..., np.newaxis, :]
+        return phi
 
     def grad_shape_function(self, bc, p=None):
 
@@ -192,7 +192,7 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def uniform_refine(self, n=1, surface=None, returnim=False):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         @brief 一致加密三角形网格
         """
@@ -222,6 +222,14 @@ class TriangleMesh(Mesh2d):
 
             if surface is not None:
                 newNode, _ = surface.project(newNode)
+
+            if interface is not None:
+                for key, levelset in interface:
+                    isInterfaceEdge = self.edgedata[key]
+                    p = newNode[isInterfaceEdge]
+                    levelset.project(p)
+                    newNode[isInterfaceEdge] = p
+
 
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]]
@@ -398,7 +406,6 @@ class TriangleMesh(Mesh2d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
-
 
     def number_of_corner_nodes(self):
         return self.ds.NN
@@ -805,6 +812,39 @@ class TriangleMesh(Mesh2d):
 
             L = idx
             R = np.arange(NC, NC+nc)
+
+            if ('data' in options) and (options['data'] is not None):
+                for key, value in options['data'].items():
+                    if len(value.shape) == 1: # 分片常数
+                        value = np.r_[value, value[idx]]
+                        options[key] = value
+                    else:
+                        ldof = value.shape[-1]
+                        p = int((np.sqrt(1+8*ldof)-3)//2)
+                        bc = self.multi_index_matrix(p, etype='cell')/p
+
+                        bcl = np.zeros_like(bc)
+                        bcl[:, 0] = bc[:, 1]
+                        bcl[:, 1] = 1/2*bc[:, 0] + bc[:,2]
+                        bcl[:, 2] = 1/2*bc[:, 0]
+
+                        bcr = np.zeros_like(bc)
+                        bcr[:, 0] = bc[:, 2]
+                        bcr[:, 1] = 1/2*bc[:, 0]
+                        bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
+
+                        value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
+                        
+                        phi = self.shape_function(bcr, p=p)
+                        value[NC:, :] = np.einsum('cj,kj->ck', value[idx], phi)
+                        
+                        phi = self.shape_function(bcl, p=p)
+                        value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
+
+                        options['data'][key] = value
+
+
+
             p0 = cell[idx,0]
             p1 = cell[idx,1]
             p2 = cell[idx,2]
@@ -840,24 +880,23 @@ class TriangleMesh(Mesh2d):
         node = self.entity('node')
 
         valence = np.zeros(NN, dtype=self.itype)
-        np.add.at(valence, cell)
+        np.add.at(valence, cell,1)
 
-        valenceNew = np.zeros(NN, dtype=self.itpye)
-        np.add.at(valenceNew, cell[:, 0])
+        valenceNew = np.zeros(NN, dtype=self.itype)
+        np.add.at(valenceNew, cell[:, 0],1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
 
-        cell2node = self.ds.cell_to_node(return_sparse=True)
+        node2cell = self.ds.node_to_cell()
 
-        I, J = cell2node[:, isIGoodNode].nonzero()
-        nodeStar = I.reshape(-1, 4)
+        I, J = node2cell[isIGoodNode, :].nonzero()
+        nodeStar = J.reshape(-1, 4)
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
         iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
-
-        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), [0, 2, 1, 3]]
-        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, [0, 3, 1, 2]]
+        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
+        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
 
         t0 = nodeStar[:, 0]
         t1 = nodeStar[:, 1]
@@ -867,7 +906,7 @@ class TriangleMesh(Mesh2d):
         p1 = cell[t0, 2]
         p2 = cell[t1, 1]
         p3 = cell[t0, 1]
-        p4 = cell[t2, 2]
+        p4 = cell[t2, 1]
 
         cell[t0, 0] = p3
         cell[t0, 1] = p1
@@ -879,13 +918,8 @@ class TriangleMesh(Mesh2d):
         cell[t2, 2] = p1
         cell[t3, 0] = -1
 
-        if ('data' in options) and (options['data'] is not None):
-            # value.shape == (NC, (p+1)*(p+2)//2)
-            for key, value in options['data'].items():
-
-
-        I, J = cell2node[:, isBGoodNode].nonzero()
-        nodeStar = I.reshape(-1, 2)
+        I, J = node2cell[isBGoodNode, :].nonzero()
+        nodeStar = J.reshape(-1, 2)
 
         t4 = nodeStar[:, 0]
         t5 = nodeStar[:, 1]
@@ -898,15 +932,35 @@ class TriangleMesh(Mesh2d):
         cell[t4, 2] = p2
         cell[t5, 0] = -1
 
+        isKeepCell = cell[:, 0] > -1
         if ('data' in options) and (options['data'] is not None):
             # value.shape == (NC, (p+1)*(p+2)//2)
+            lidx = np.r_[t0, t2, t4]
+            ridx = np.r_[t1, t3, t5] 
             for key, value in options['data'].items():
                 ldof = value.shape[1]
                 p = int((np.sqrt(8*ldof+1) - 3)/2)
-                multiIndex = self.multi_index_matrix(p=p)
+                bc = self.multi_index_matrix(p=p)/p
+                bcl = np.zeros_like(bc)
+                bcl[:, 0] = 2*bc[:, 2] 
+                bcl[:, 1] = bc[:, 0] 
+                bcl[:, 2] = bc[:, 1] - bc[:, 2] 
 
-        cell = cell[cell[:, 0] > -1]
-        isGoodNode = isIGoodNode | isBGoodNode 
+                bcr = np.zeros_like(bc)
+                bcr[:, 0] = 2*bc[:, 1] 
+                bcr[:, 1] = bc[:, 2] - bc[:, 1] 
+                bcr[:, 2] = bc[:, 0] 
+                
+                phi = self.shape_function(bcl, p=p) # (NQ, ldof)
+                value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi) 
+                
+                phi = self.shape_function(bcr, p=p) # (NQ, ldof)
+                value[lidx, :]+= np.einsum('ci, qi->cq', value[ridx, :], phi)
+                value[lidx] /= 2
+                options['data'][key] = value[isKeepCell]
+
+        cell = cell[isKeepCell]
+        isGoodNode = (isIGoodNode | isBGoodNode)
 
         idxMap = np.zeros(NN, dtype=self.itype)
         self.node = node[~isGoodNode]
@@ -916,8 +970,6 @@ class TriangleMesh(Mesh2d):
         cell = idxMap[cell]
 
         self.ds = TriangleMeshDataStructure(NN, cell)
-
-
 
 
     def label(self, node=None, cell=None, cellidx=None):
