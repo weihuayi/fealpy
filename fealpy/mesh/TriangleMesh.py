@@ -232,7 +232,7 @@ class TriangleMesh(Mesh2d):
         if returnim:
             return nodeIMatrix, cellIMatrix
 
-    def multi_index_matrix(self, p):
+    def multi_index_matrix(self, p, etype=2):
         """
         @brief 获取三角形上的 p 次的多重指标矩阵
 
@@ -826,8 +826,99 @@ class TriangleMesh(Mesh2d):
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
 
-    def coarsen(self, isMarkedCell=None, options=None):
-        pass
+    def coarsen(self, isMarkedCell=None, options={}):
+        """
+        @brief 
+
+        https://lyc102.github.io/ifem/afem/coarsen/
+        """
+        
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        cell = self.entity('cell')
+        node = self.entity('node')
+
+        valence = np.zeros(NN, dtype=self.itype)
+        np.add.at(valence, cell)
+
+        valenceNew = np.zeros(NN, dtype=self.itpye)
+        np.add.at(valenceNew, cell[:, 0])
+
+        isIGoodNode = (valence == valenceNew) & (valence == 4)
+        isBGoodNode = (valence == valenceNew) & (valence == 2)
+
+        cell2node = self.ds.cell_to_node(return_sparse=True)
+
+        I, J = cell2node[:, isIGoodNode].nonzero()
+        nodeStar = I.reshape(-1, 4)
+
+        ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
+        iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
+
+        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), [0, 2, 1, 3]]
+        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, [0, 3, 1, 2]]
+
+        t0 = nodeStar[:, 0]
+        t1 = nodeStar[:, 1]
+        t2 = nodeStar[:, 2]
+        t3 = nodeStar[:, 3]
+
+        p1 = cell[t0, 2]
+        p2 = cell[t1, 1]
+        p3 = cell[t0, 1]
+        p4 = cell[t2, 2]
+
+        cell[t0, 0] = p3
+        cell[t0, 1] = p1
+        cell[t0, 2] = p2
+        cell[t1, 0] = -1
+
+        cell[t2, 0] = p4
+        cell[t2, 1] = p2
+        cell[t2, 2] = p1
+        cell[t3, 0] = -1
+
+        if ('data' in options) and (options['data'] is not None):
+            # value.shape == (NC, (p+1)*(p+2)//2)
+            for key, value in options['data'].items():
+
+
+        I, J = cell2node[:, isBGoodNode].nonzero()
+        nodeStar = I.reshape(-1, 2)
+
+        t4 = nodeStar[:, 0]
+        t5 = nodeStar[:, 1]
+        p0 = cell[t4, 0]
+        p1 = cell[t4, 2]
+        p2 = cell[t5, 1]
+        p3 = cell[t4, 1]
+        cell[t4, 0] = p3
+        cell[t4, 1] = p1
+        cell[t4, 2] = p2
+        cell[t5, 0] = -1
+
+        if ('data' in options) and (options['data'] is not None):
+            # value.shape == (NC, (p+1)*(p+2)//2)
+            for key, value in options['data'].items():
+                ldof = value.shape[1]
+                p = int((np.sqrt(8*ldof+1) - 3)/2)
+                multiIndex = self.multi_index_matrix(p=p)
+
+        cell = cell[cell[:, 0] > -1]
+        isGoodNode = isIGoodNode | isBGoodNode 
+
+        idxMap = np.zeros(NN, dtype=self.itype)
+        self.node = node[~isGoodNode]
+
+        NN = self.node.shape[0]
+        idxMap[~isGoodNode] = range(NN)
+        cell = idxMap[cell]
+
+        self.ds = TriangleMeshDataStructure(NN, cell)
+
+
+
 
     def label(self, node=None, cell=None, cellidx=None):
         """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
