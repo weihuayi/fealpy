@@ -407,7 +407,6 @@ class TriangleMesh(Mesh2d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
-
     def number_of_corner_nodes(self):
         return self.ds.NN
 
