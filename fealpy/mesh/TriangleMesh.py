@@ -834,12 +834,14 @@ class TriangleMesh(Mesh2d):
                         bcr[:, 1] = 1/2*bc[:, 0]
                         bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
 
-                        value = np.r_['0', value, np.zeros((nc, ldof), dtype=np.ftype)]
-                        phi = self.shape_function(bcl, p=p)
-                        value[idx, :] = np.einsum('cj,klj->ck', value[idx], phi)
-
+                        value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
+                        
                         phi = self.shape_function(bcr, p=p)
-                        value[NC:, :] = np.einsum('cj,klj->ck', value[idx], phi)
+                        value[NC:, :] = np.einsum('cj,kj->ck', value[idx], phi)
+                        
+                        phi = self.shape_function(bcl, p=p)
+                        value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
+
                         options['data'][key] = value
 
 
@@ -879,24 +881,23 @@ class TriangleMesh(Mesh2d):
         node = self.entity('node')
 
         valence = np.zeros(NN, dtype=self.itype)
-        np.add.at(valence, cell)
+        np.add.at(valence, cell,1)
 
-        valenceNew = np.zeros(NN, dtype=self.itpye)
-        np.add.at(valenceNew, cell[:, 0])
+        valenceNew = np.zeros(NN, dtype=self.itype)
+        np.add.at(valenceNew, cell[:, 0],1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
 
-        node2cell = self.ds.node_to_cell(return_sparse=True)
+        node2cell = self.ds.node_to_cell()
 
         I, J = node2cell[isIGoodNode, :].nonzero()
         nodeStar = J.reshape(-1, 4)
 
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
         iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
-
-        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), [0, 2, 1, 3]]
-        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, [0, 3, 1, 2]]
+        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
+        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
 
         t0 = nodeStar[:, 0]
         t1 = nodeStar[:, 1]
@@ -906,7 +907,7 @@ class TriangleMesh(Mesh2d):
         p1 = cell[t0, 2]
         p2 = cell[t1, 1]
         p3 = cell[t0, 1]
-        p4 = cell[t2, 2]
+        p4 = cell[t2, 1]
 
         cell[t0, 0] = p3
         cell[t0, 1] = p1
@@ -950,10 +951,10 @@ class TriangleMesh(Mesh2d):
                 bcr[:, 0] = 2*bc[:, 1] 
                 bcr[:, 1] = bc[:, 2] - bc[:, 1] 
                 bcr[:, 2] = bc[:, 0] 
-
+                
                 phi = self.shape_function(bcl, p=p) # (NQ, ldof)
                 value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi) 
-
+                
                 phi = self.shape_function(bcr, p=p) # (NQ, ldof)
                 value[lidx, :]+= np.einsum('ci, qi->cq', value[ridx, :], phi)
                 value[lidx] /= 2
