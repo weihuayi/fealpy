@@ -192,7 +192,7 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def uniform_refine(self, n=1, surface=None, returnim=False):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         @brief 一致加密三角形网格
         """
@@ -222,6 +222,14 @@ class TriangleMesh(Mesh2d):
 
             if surface is not None:
                 newNode, _ = surface.project(newNode)
+
+            if interface is not None:
+                for key, levelset in interface:
+                    isInterfaceEdge = self.edgedata[key]
+                    p = newNode[isInterfaceEdge]
+                    levelset.project(p)
+                    newNode[isInterfaceEdge] = p
+
 
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]]
