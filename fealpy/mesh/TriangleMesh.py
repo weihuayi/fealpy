@@ -303,7 +303,7 @@ class TriangleMesh(Mesh2d):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                     node[edge,:]).reshape(-1, GD)
         if p > 2:
-            mutiIndex = self.multi_index_matrix(p, 'cell')
+            multiIndex = self.multi_index_matrix(p, 'cell')
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
                     isEdgeIPoints[:,2])

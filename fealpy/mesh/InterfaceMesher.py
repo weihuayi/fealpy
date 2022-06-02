@@ -37,6 +37,14 @@ def adaptive(mesh, interface):
     return isBigCurveCell
 
 
+def uniform_fitted_mesh(mesh, interface):
+    """
+    @brief 在笛卡尔网格上生成界面拟合网格
+    """
+    NN = mesh.number_of_nodes()
+    NC = mesh.number_of_cells()
+
+
 if __name__ == '__main__':
 
     import matplotlib.pyplot as plt
