@@ -48,6 +48,26 @@ class CircleCurve():
         self.radius = radius
         self.box = [-1.5, 1.5, -1.5, 1.5]
 
+    def init_mesh(self, n):
+        from ..mesh import IntervalMesh
+
+        dt = 2*np.pi/n
+        theta  = np.arange(0, 2*np.pi, dt)
+
+        node = np.zeros((n, 2), dtype = np.float64)
+        cell = np.zeros((n, 2), dtype = np.int_)
+
+        node[:, 0] = self.radius*np.cos(theta)
+        node[:, 1] = self.radius*np.sin(theta)
+        node += self.center
+
+        cell[:, 0] = np.arange(n)
+        cell[:, 1][:-1] = np.arange(1,n)
+
+        mesh = IntervalMesh(node, cell)
+
+        return mesh 
+
     def __call__(self, p):
         return np.sqrt(np.sum((p - self.center)**2, axis=-1))-self.radius
 
