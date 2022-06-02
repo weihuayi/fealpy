@@ -23,7 +23,18 @@ def adaptive(mesh, interface):
 
     # Step 2: 估计离散曲率
 
-    return mesh
+    isBigCurveCell = mesh.mark_interface_cell_with_curvature(phi)
+
+    k = 0
+    while np.any(isBigCurveCell) & (k < 20):
+        k += 1
+        mesh.bisect(isBigCurveCell)
+        node = mesh.entity('node')
+        phi = np.append(phi, interface(node[NN:]))
+        NN = mesh.number_of_nodes()
+        isBigCurveCell = mesh.mark_interface_cell_with_curvature(phi)
+
+    return isBigCurveCell
 
 
 if __name__ == '__main__':
@@ -38,12 +49,14 @@ if __name__ == '__main__':
     mesh = MF.boxmesh2d(box, nx=1, ny=1, meshtype='tri')
     interface = CircleCurve(radius=0.5)
 
-    adaptive(mesh, interface)
+    isBigCurveCell = adaptive(mesh, interface)
+
 
     imesh = interface.init_mesh(100)
 
     fig = plt.figure()
     axes = fig.gca()
     mesh.add_plot(axes)
+    mesh.find_cell(axes, index=isBigCurveCell)
     imesh.add_plot(axes, markersize=0, cellcolor='r')
     plt.show()

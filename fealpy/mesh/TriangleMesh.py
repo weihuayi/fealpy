@@ -1563,27 +1563,27 @@ class TriangleMesh(Mesh2d):
 
         cell = self.entity('cell')
 
-        s0 = np.sign(phi(cell[:, 0]))
-        s1 = np.sign(phi(cell[:, 1]))
-        s2 = np.sign(phi(cell[:, 2]))
+        s0 = np.sign(phi[cell[:, 0]])
+        s1 = np.sign(phi[cell[:, 1]])
+        s2 = np.sign(phi[cell[:, 2]])
 
         eta0 = np.abs(s0 + s1 + s2)
         eta1 = np.abs(s0) + np.abs(s1) + np.abs(s2)
 
-        isInterfaceCell = (eta0 == 1 & eta2 == 3) | (eta0 == 0 & eta1 == 2)
+        isInterfaceCell = ((eta0 == 1) & (eta1 == 3)) | ((eta0 == 0) & (eta1 == 2))
 
         return isInterfaceCell
 
     def mark_interface_cell_with_curvature(self, phi):
         """
-        @brief 
+        @brief 标记曲率大的单元 
         """
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
-        cell = self.entity(cell)
-        edge = self.entity(edge)
+        cell = self.entity('cell')
+        edge = self.entity('edge')
         edge2cell = self.ds.edge_to_cell()
 
         isInterfaceCell = self.mark_interface_cell(phi)
@@ -1593,24 +1593,46 @@ class TriangleMesh(Mesh2d):
 
         # case: Fig 2(a) in p6
         angle = np.zeros(NN, dtype=self.itype)
-        angle = np.add.at(angle, cell[isInterfaceCell, :], np.array([90, 45, 45]))
+        np.add.at(angle, cell[isInterfaceCell, :], np.array([90, 45, 45]))
         is360 = (angle == 360)
+
+        print('is360:', is360.sum())
 
         # case: Fig 2(b) in p6
         isInteriorEdge = ~self.ds.boundary_edge_flag()
-        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1) & isInteriorEdge
-        valence = np.zeros(NN, dtype=np.self.itype)
-        np.add.at(valence, edge[isInterfaceEdge])
-        isLinkNode = (valence > 2)
+        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1) 
+        valence = np.zeros(NN, dtype=self.itype)
+        if np.any(isInterfaceBEdge):
+            np.add.at(valence, edge[isInterfaceBEdge], 1)
+        isLinkNode = (valence > 2) & (phi != 0)
+
+        print("isLinkNode:", isLinkNode.sum())
 
         isInteriorNode = phi < 0
         tangle = np.zeros(NN, dtype=self.itype)
-        isIn = isInterfaceNode & isInteriorNode & ~is360 & ~isLinkNode
-        tangle[isIn] = 180 - (360 - angle[isIn]);
-        isOut = isInterfaceNode & ~isInteriorNode & ~is360 & ~isLinkNode
-        tangle[isOut] = (360 - angle[isOut]) - 180
+        isIn = isInterfaceNode & isInteriorNode & (~is360) & (~isLinkNode)
+        if np.any(isIn):
+            tangle[isIn] = 180 - (360 - angle[isIn]);
 
-        return is360
+        isOut = isInterfaceNode & (~isInteriorNode) & (~is360) & (~isLinkNode)
+        if np.any(isOut):
+            tangle[isOut] = (360 - angle[isOut]) - 180
+
+        isInterfaceEdge = isInterfaceCell[edge2cell[:, 0]] | isInterfaceCell[edge2cell[:, 1]]
+
+        ta = tangle[edge[isInterfaceEdge]]
+        np.add.at(tangle, edge[isInterfaceEdge], ta)
+
+        
+        flag = np.abs(tangle) > 170
+        print(tangle)
+        print("转角:", flag.sum())
+
+        isBigCurveNode = is360 | isLinkNode | (np.abs(tangle) > 170)
+
+        isBigCurveCell = (isBigCurveNode[cell].sum(axis=1) > 0) & isInterfaceCell
+
+        return isBigCurveCell
 
 
 class TriangleMeshWithInfinityNode:
