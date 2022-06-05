@@ -10,46 +10,7 @@ def adaptive(mesh, interface, hmax):
     @brief 生成自适应的界面拟合网格 
     """
 
-    NN = mesh.number_of_nodes()
-    node= mesh.entity('node')
-
-    phi = interface(node)
-
-    if np.all(phi < 0):
-        raise ValueError('初始网格在界面围成区域的内部，需要更换一个可以覆盖界面的网格')
-
-    # Step 1: 一致二分法加密网格
-    while np.all(phi>0):
-        mesh.uniform_bisect()
-        node = mesh.entity('node')
-        phi = np.append(phi, interface(node[NN:]))
-        NN = mesh.number_of_nodes()
-
-    # Step 2: 估计离散曲率
-
-    isBigCurveCell = mesh.mark_interface_cell_with_curvature(phi, hmax=hmax)
-
-    k = 0
-    while np.any(isBigCurveCell) & (k < 100):
-        k += 1
-        mesh.bisect(isBigCurveCell)
-        node = mesh.entity('node')
-        phi = np.append(phi, interface(node[NN:]))
-        NN = mesh.number_of_nodes()
-        isBigCurveCell = mesh.mark_interface_cell_with_curvature(phi, hmax=hmax)
-
-
-    isTypeBCell, cellType = mesh.mark_interface_cell_with_type(phi, interface)
-
-    k = 0
-    while np.any(isTypeBCell) & (k < 100):
-        k += 1
-        mesh.bisect(isTypeBCell)
-        node = mesh.entity('node')
-        phi = np.append(phi, interface(node[NN:]))
-        NN = mesh.number_of_nodes()
-        isTypeBCell, cellType = mesh.mark_interface_cell_with_type(phi, interface)
-
+    mesh.bisect_interface_cell_with_curvature(interface, hmax)
 
     NN = mesh.number_of_nodes()
     cell = mesh.entity('cell')

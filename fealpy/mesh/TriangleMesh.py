@@ -1751,6 +1751,50 @@ class TriangleMesh(Mesh2d):
         return isTypeBCell, cellType
 
 
+    def bisect_interface_cell_with_curvature(self, interface, hmax):
+        """
+        """
+        NN = self.number_of_nodes()
+        node= self.entity('node')
+
+        phi = interface(node)
+
+        if np.all(phi < 0):
+            raise ValueError('初始网格在界面围成区域的内部，需要更换一个可以覆盖界面的网格')
+
+        # Step 1: 一致二分法加密网格
+        while np.all(phi>0):
+            self.uniform_bisect()
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+
+        # Step 2: 估计离散曲率
+
+        isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+        k = 0
+        while np.any(isBigCurveCell) & (k < 100):
+            k += 1
+            self.bisect(isBigCurveCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+
+        isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
+        k = 0
+        while np.any(isTypeBCell) & (k < 100):
+            k += 1
+            self.bisect(isTypeBCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
+
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):
         edge = mesh.ds.edge
