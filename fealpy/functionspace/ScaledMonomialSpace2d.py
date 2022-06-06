@@ -696,13 +696,15 @@ class ScaledMonomialSpace2d():
 
     def source_vector0(self, f, celltype=False, q=None):
         """
-        (f, v)_T
+        @brief (f, v)_T
+        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
         """
 
         p = self.p
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
+        gdof = self.number_of_global_dofs(p=p)
 
         bc = mesh.entity_barycenter('cell')
         cell2dof = self.cell_to_dof()
@@ -715,10 +717,16 @@ class ScaledMonomialSpace2d():
         pp_0 = np.einsum('qj, jem->qem', bcs, tri_0)#每个三角形中高斯积分点对应的笛卡尔坐标点
         fval_0 = f(pp_0)
 
+        if len(fval_0.shape)>2:
+            shape = (gdof, fval_0.shape[-1])
+        else:
+            shape = (gdof, )
+
         phi_0 = self.basis(pp_0, edge2cell[:, 0])
-        gdof = self.number_of_global_dofs(p=p)
-        F = np.zeros(gdof, dtype=np.float64)
-        bb_0 = np.einsum('i, ij, ijk,j->jk', ws, fval_0, phi_0, a_0)
+
+        F = np.zeros(shape, dtype=np.float64)
+        bb_0 = np.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
+
         np.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if np.sum(isInEdge) > 0:
@@ -731,7 +739,56 @@ class ScaledMonomialSpace2d():
             pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
             fval_1 = f(pp_1)
             phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
-            bb_1 = np.einsum('i, ij, ijk,j->jk', ws, fval_1, phi_1, a_1)
+            bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
+            np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
+        return F 
+
+    def source_vector1(self, f, celltype=False, q=None):
+        """
+        @brief (f, v)_T
+        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
+        """
+
+        p = self.p
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        gdof = self.number_of_global_dofs(p=p)
+
+        bc = mesh.entity_barycenter('cell')
+        cell2dof = self.cell_to_dof()
+        edge2cell = mesh.ds.edge_to_cell()
+
+        qf = mesh.integrator(p+4)
+        bcs, ws = qf.quadpts, qf.weights
+        tri_0 = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
+        a_0 = self.triangle_measure(tri_0)#NE
+        pp_0 = np.einsum('qj, jem->qem', bcs, tri_0)#每个三角形中高斯积分点对应的笛卡尔坐标点
+        fval_0 = f(pp_0, edge2cell[:, 0])
+
+        if len(fval_0.shape)>2:
+            shape = (gdof, fval_0.shape[-1])
+        else:
+            shape = (gdof, )
+
+        phi_0 = self.basis(pp_0, edge2cell[:, 0])
+
+        F = np.zeros(shape, dtype=np.float64)
+        bb_0 = np.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
+
+        np.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        if np.sum(isInEdge) > 0:
+            tri_1 = [
+                    bc[edge2cell[isInEdge, 1]],
+                    node[edge[isInEdge, 1]],
+                    node[edge[isInEdge, 0]]
+                    ]
+            a_1 = self.triangle_measure(tri_1)
+            pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
+            fval_1 = f(pp_1, edge2cell[isInEdge, 1])
+            phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
+            bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
         return F 
 

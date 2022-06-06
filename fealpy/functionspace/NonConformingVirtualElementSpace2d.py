@@ -147,6 +147,19 @@ class NonConformingVirtualElementSpace2d():
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
+    def project_to_smspace_L2(self, uh):
+        """
+        Project a non conforming vem function uh into polynomial space.
+        """
+        p = self.p
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.smspace.function()
+        S[:] = np.concatenate(list(map(g, zip(self.PI0, cd))))
+        return S
+
     def stiff_matrix(self):
         p = self.p
         G = self.G

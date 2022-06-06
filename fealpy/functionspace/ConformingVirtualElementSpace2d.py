@@ -642,7 +642,7 @@ class ConformingVirtualElementSpace2d():
     def projection(self, u, up):
         pass
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float_):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof

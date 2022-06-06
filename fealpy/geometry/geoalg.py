@@ -1,5 +1,42 @@
 import numpy as np
 
+
+def find_cut_point(phi, p0, p1):
+    """ 
+    @brief Find cutted point between edge `(p0, p1)` and the curve `phi`
+
+    """
+    cutPoint = (p0+p1)/2.0
+    phi0 = phi(p0)
+    phi1 = phi(p1)
+    phic = phi(cutPoint)
+
+    isLeft = np.zeros(p0.shape[0], dtype=np.bool_)
+    isRight = np.zeros(p0.shape[0], dtype=np.bool_)
+    vec = p1 - p0
+    h = np.sqrt(np.sum(vec**2, axis=1))
+
+    eps = np.finfo(p0.dtype).eps
+    tol = np.sqrt(eps)*h*h
+    isNotOK = (h > tol) & (phic != 0)
+    while np.any(isNotOK):
+        cutPoint[isNotOK, :] = (p0[isNotOK, :] + p1[isNotOK,:])/2
+        phic[isNotOK] = phi(cutPoint[isNotOK, :])
+        isLeft[isNotOK] = phi0[isNotOK] * phic[isNotOK] > 0
+        isRight[isNotOK] = phi1[isNotOK] * phic[isNotOK] > 0
+        p0[isLeft, :] = cutPoint[isLeft, :]
+        p1[isRight, :] = cutPoint[isRight, :]
+
+        phi0[isLeft] = phic[isLeft]
+        phi1[isRight] = phic[isRight]
+        h[isNotOK] /= 2
+        isNotOK[isNotOK] = (h[isNotOK] > tol[isNotOK]) & (phic[isNotOK] != 0)
+        isLeft[:] = False
+        isRight[:] = False
+    return cutPoint
+
+
+
 def project(imfun, p0, maxit=200, tol=1e-13, returngrad=False, returnd=False):
 
     eps = np.finfo(float).eps

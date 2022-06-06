@@ -89,6 +89,61 @@ class TriangleMesh(Mesh2d):
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
+    def shape_function(self, bc, p=1):
+        TD = bc.shape[-1] - 1 
+        multiIndex = self.multi_index_matrix(p)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi
+
+    def grad_shape_function(self, bc, p=None):
+
+        if p is None:
+            p= self.p
+
+        TD = self.top_dimension()
+
+        multiIndex = self.multi_index_matrix(p)
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_ipoints(p)
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.grad_lambda()
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
+        return gphi #(..., NC, ldof, GD)
 
     def grad_lambda(self):
         node = self.node
@@ -137,7 +192,7 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
 
-    def uniform_refine(self, n=1, surface=None, returnim=False):
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         @brief 一致加密三角形网格
         """
@@ -168,6 +223,14 @@ class TriangleMesh(Mesh2d):
             if surface is not None:
                 newNode, _ = surface.project(newNode)
 
+            if interface is not None:
+                for key, levelset in interface:
+                    isInterfaceEdge = self.edgedata[key]
+                    p = newNode[isInterfaceEdge]
+                    levelset.project(p)
+                    newNode[isInterfaceEdge] = p
+
+
             self.node = np.concatenate((node, newNode), axis=0)
             p = np.r_['-1', cell, edge2newNode[cell2edge]]
             cell = np.r_['0', p[:, [0, 5, 4]], p[:, [5, 1, 3]], p[:, [4, 3, 2]], p[:, [3, 4, 5]]]
@@ -177,7 +240,7 @@ class TriangleMesh(Mesh2d):
         if returnim:
             return nodeIMatrix, cellIMatrix
 
-    def multi_index_matrix(self, p):
+    def multi_index_matrix(self, p, etype=2):
         """
         @brief 获取三角形上的 p 次的多重指标矩阵
 
@@ -240,7 +303,7 @@ class TriangleMesh(Mesh2d):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                     node[edge,:]).reshape(-1, GD)
         if p > 2:
-            mutiIndex = self.multi_index_matrix(p, 'cell')
+            multiIndex = self.multi_index_matrix(p, 'cell')
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
                     isEdgeIPoints[:,2])
@@ -343,7 +406,6 @@ class TriangleMesh(Mesh2d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
-
 
     def number_of_corner_nodes(self):
         return self.ds.NN
@@ -709,6 +771,9 @@ class TriangleMesh(Mesh2d):
         self.node = np.concatenate((node, newNode), axis=0)
         cell2edge0 = cell2edge[:, 0]
 
+        if 'data' in options:
+            pass
+
         if 'IM' in options:
             nn = len(newNode)
             IM = coo_matrix((np.ones(NN), (np.arange(NN), np.arange(NN))),
@@ -747,6 +812,39 @@ class TriangleMesh(Mesh2d):
 
             L = idx
             R = np.arange(NC, NC+nc)
+
+            if ('data' in options) and (options['data'] is not None):
+                for key, value in options['data'].items():
+                    if len(value.shape) == 1: # 分片常数
+                        value = np.r_[value, value[idx]]
+                        options[key] = value
+                    else:
+                        ldof = value.shape[-1]
+                        p = int((np.sqrt(1+8*ldof)-3)//2)
+                        bc = self.multi_index_matrix(p, etype='cell')/p
+
+                        bcl = np.zeros_like(bc)
+                        bcl[:, 0] = bc[:, 1]
+                        bcl[:, 1] = 1/2*bc[:, 0] + bc[:,2]
+                        bcl[:, 2] = 1/2*bc[:, 0]
+
+                        bcr = np.zeros_like(bc)
+                        bcr[:, 0] = bc[:, 2]
+                        bcr[:, 1] = 1/2*bc[:, 0]
+                        bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
+
+                        value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
+                        
+                        phi = self.shape_function(bcr, p=p)
+                        value[NC:, :] = np.einsum('cj,kj->ck', value[idx], phi)
+                        
+                        phi = self.shape_function(bcl, p=p)
+                        value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
+
+                        options['data'][key] = value
+
+
+
             p0 = cell[idx,0]
             p1 = cell[idx,1]
             p2 = cell[idx,2]
@@ -767,6 +865,112 @@ class TriangleMesh(Mesh2d):
 
         NN = self.node.shape[0]
         self.ds.reinit(NN, cell)
+
+    def coarsen(self, isMarkedCell=None, options={}):
+        """
+        @brief 
+
+        https://lyc102.github.io/ifem/afem/coarsen/
+        """
+        
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        cell = self.entity('cell')
+        node = self.entity('node')
+
+        valence = np.zeros(NN, dtype=self.itype)
+        np.add.at(valence, cell,1)
+
+        valenceNew = np.zeros(NN, dtype=self.itype)
+        np.add.at(valenceNew, cell[:, 0],1)
+
+        isIGoodNode = (valence == valenceNew) & (valence == 4)
+        isBGoodNode = (valence == valenceNew) & (valence == 2)
+
+        node2cell = self.ds.node_to_cell()
+
+        I, J = node2cell[isIGoodNode, :].nonzero()
+        nodeStar = J.reshape(-1, 4)
+
+        ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
+        iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
+        nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
+        nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
+
+        t0 = nodeStar[:, 0]
+        t1 = nodeStar[:, 1]
+        t2 = nodeStar[:, 2]
+        t3 = nodeStar[:, 3]
+
+        p1 = cell[t0, 2]
+        p2 = cell[t1, 1]
+        p3 = cell[t0, 1]
+        p4 = cell[t2, 1]
+
+        cell[t0, 0] = p3
+        cell[t0, 1] = p1
+        cell[t0, 2] = p2
+        cell[t1, 0] = -1
+
+        cell[t2, 0] = p4
+        cell[t2, 1] = p2
+        cell[t2, 2] = p1
+        cell[t3, 0] = -1
+
+        I, J = node2cell[isBGoodNode, :].nonzero()
+        nodeStar = J.reshape(-1, 2)
+
+        t4 = nodeStar[:, 0]
+        t5 = nodeStar[:, 1]
+        p0 = cell[t4, 0]
+        p1 = cell[t4, 2]
+        p2 = cell[t5, 1]
+        p3 = cell[t4, 1]
+        cell[t4, 0] = p3
+        cell[t4, 1] = p1
+        cell[t4, 2] = p2
+        cell[t5, 0] = -1
+
+        isKeepCell = cell[:, 0] > -1
+        if ('data' in options) and (options['data'] is not None):
+            # value.shape == (NC, (p+1)*(p+2)//2)
+            lidx = np.r_[t0, t2, t4]
+            ridx = np.r_[t1, t3, t5] 
+            for key, value in options['data'].items():
+                ldof = value.shape[1]
+                p = int((np.sqrt(8*ldof+1) - 3)/2)
+                bc = self.multi_index_matrix(p=p)/p
+                bcl = np.zeros_like(bc)
+                bcl[:, 0] = 2*bc[:, 2] 
+                bcl[:, 1] = bc[:, 0] 
+                bcl[:, 2] = bc[:, 1] - bc[:, 2] 
+
+                bcr = np.zeros_like(bc)
+                bcr[:, 0] = 2*bc[:, 1] 
+                bcr[:, 1] = bc[:, 2] - bc[:, 1] 
+                bcr[:, 2] = bc[:, 0] 
+                
+                phi = self.shape_function(bcl, p=p) # (NQ, ldof)
+                value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi) 
+                
+                phi = self.shape_function(bcr, p=p) # (NQ, ldof)
+                value[lidx, :]+= np.einsum('ci, qi->cq', value[ridx, :], phi)
+                value[lidx] /= 2
+                options['data'][key] = value[isKeepCell]
+
+        cell = cell[isKeepCell]
+        isGoodNode = (isIGoodNode | isBGoodNode)
+
+        idxMap = np.zeros(NN, dtype=self.itype)
+        self.node = node[~isGoodNode]
+
+        NN = self.node.shape[0]
+        idxMap[~isGoodNode] = range(NN)
+        cell = idxMap[cell]
+
+        self.ds = TriangleMeshDataStructure(NN, cell)
+
 
     def label(self, node=None, cell=None, cellidx=None):
         """单元顶点的重新排列，使得cell[:, [1, 2]] 存储了单元的最长边
@@ -1073,8 +1277,6 @@ class TriangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
 
-    def coarsen_1(self, isMarkedCell=None, options=None):
-        pass
 
 
     def linear_stiff_matrix(self, c=None):
@@ -1352,6 +1554,246 @@ class TriangleMesh(Mesh2d):
         gdof2 = self.number_of_global_ipoints(p2)
         val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
         return val
+
+
+    def mark_interface_cell(self, phi):
+        """
+        @brief 标记穿过界面的单元
+        """
+
+        if callable(phi):
+            node = self.entity('node')
+            phi = phi(node)
+
+        cell = self.entity('cell')
+
+        s0 = np.sign(phi[cell[:, 0]])
+        s1 = np.sign(phi[cell[:, 1]])
+        s2 = np.sign(phi[cell[:, 2]])
+
+        eta0 = np.abs(s0 + s1 + s2)
+        eta1 = np.abs(s0) + np.abs(s1) + np.abs(s2)
+
+        isInterfaceCell = ((eta0 == 1) & (eta1 == 3)) | ((eta0 == 0) & (eta1 == 2))
+
+        return isInterfaceCell
+
+    def mark_interface_cell_with_curvature(self, phi, hmax=None):
+        """
+        @brief 标记曲率大的单元 
+        """
+
+        if callable(phi):
+            node = self.entity('node')
+            phi = phi(node)
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell = self.entity('cell')
+        edge2cell = self.ds.edge_to_cell()
+
+        isInterfaceCell = self.mark_interface_cell(phi)
+        isInterfaceNode = np.zeros(NN, dtype=np.bool_)
+        # 界面单元的顶点称为界面节点
+        isInterfaceNode[cell[isInterfaceCell]] = True 
+
+        # case: Fig 2(a) in p6
+        # 一个网格点周围的单元全为界面单元，则周围这些单元以该网格节点为顶点的角度
+        # 之和为 360 
+        angle = np.zeros(NN, dtype=self.itype)
+        np.add.at(angle, cell[isInterfaceCell, :], np.array([90, 45, 45]))
+        is360 = (angle == 360)
+        print('is360:', is360.sum())
+
+        # case: Fig 2(b) in p6
+        isInteriorEdge = ~self.ds.boundary_edge_flag()
+        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1) 
+        valence = np.zeros(NN, dtype=self.itype)
+        if np.any(isInterfaceBEdge):
+            np.add.at(valence, edge[isInterfaceBEdge], 1)
+        isLinkNode = (valence > 2) & (phi != 0)
+        print("isLinkNode:", isLinkNode.sum())
+
+
+        # case：离散曲率
+        isInteriorNode = phi < 0
+        tangle = np.zeros(NN, dtype=self.itype) # 记录界面转角
+        isIn = isInterfaceNode & isInteriorNode & (~is360) & (~isLinkNode)
+        if np.any(isIn):
+            tangle[isIn] = 180 - (360 - angle[isIn]);
+
+        isOut = isInterfaceNode & (~isInteriorNode) & (~is360) & (~isLinkNode)
+        if np.any(isOut):
+            tangle[isOut] = (360 - angle[isOut]) - 180
+
+        isInterfaceEdge = isInterfaceCell[edge2cell[:, 0]] | isInterfaceCell[edge2cell[:, 1]]
+
+        ta = tangle[edge[isInterfaceEdge][:, 1::-1]]
+        np.add.at(tangle, edge[isInterfaceEdge], ta)
+
+        
+        flag = np.abs(tangle) > 170
+        print("转角:", flag.sum())
+
+        isBigCurveNode = is360 | isLinkNode | (np.abs(tangle) > 170)
+
+        isBigCurveCell = (isBigCurveNode[cell].sum(axis=1) > 0) & isInterfaceCell
+
+        v = node[cell[:, 2]] - node[cell[:, 1]]
+        l = np.sqrt(np.sum(v**2, axis=1))
+        if hmax is None: 
+            lmax = np.max(l)
+            isBigSizeCell = (l > lmax*lmax) & isInterfaceCell
+        else:
+            isBigSizeCell = (l > hmax) & isInterfaceCell
+
+
+        return isBigCurveCell | isBigSizeCell
+
+
+
+    def mark_interface_cell_with_type(self, phi, interface):
+        """
+        @brief 等腰直角三角形，可以分为两类
+            - Type A：两条直角边和坐标轴平行
+            - Type B: 最长边和坐标轴平行
+        """
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
+
+        v = node[cell[:, 2]] - node[cell[:, 1]]
+        cellType = (np.abs(v[:, 0]) > 0.0) & (np.abs(v[:, 1]) > 0.0) # TODO: 0.0-->eps
+        isInterfaceCell = self.mark_interface_cell(phi)
+
+        isMark = np.zeros(NC, dtype=np.bool_)
+        isMark[isInterfaceCell] = True
+        isMark[cell2cell[isInterfaceCell, 0]] = True
+
+        n0 = cell2cell[:, 0]
+        isTransitionTypeBCell = isInterfaceCell & isInterfaceCell[cell2cell[:,
+            0]] & (cell2cell[n0, 0] != range(NC)) & (~cellType)
+
+        # Case 1:
+        n1 = cell2cell[:, 1]
+        flag = isTransitionTypeBCell & isInterfaceCell[n1] & cellType[n1]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p0 = node[cell[idx, 0]]
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            p3 = node[cell[n1[idx], 0]]
+
+            m03 = (p0 + p3)/2
+            m23 = (p2 + p3)/2
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = ((phi[cell[idx, 2]]*interface(m0) > 0.0) &
+                    (interface(m03)*interface(m23) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 2:
+        n2 = cell2cell[:, 2] 
+        flag = isTransitionTypeBCell & isInterfaceCell[n2] & cellType[n2]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p0 = node[cell[idx, 0]]
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            p3 = node[cell[n2[idx], 0]]
+            m03 = (p0 + p3)/2
+            m13 = (p1 + p3)/2
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = ((phi[cell[idx, 1]]*interface(m1) > 0.0) &
+                    (interface(m03)*interface(m13) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 3:
+        n1 = cell2cell[:, 1]
+        flag = isTransitionTypeBCell & isInterfaceCell[n1] & ~cellType[n1]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p1 = node[cell[flag, 1]]
+            p2 = node[cell[flag, 2]]
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p2)/2
+            isNotTB = interface(m0)*interface(m1) < 0.0
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 4:
+        n2 = cell2cell[:, 2] 
+        flag = isTransitionTypeBCell & isInterfaceCell[n2] & (~cellType[n2])
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = interface(m0)*interface(m1) < 0.0
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        
+        isTypeBCell = isMark & (~cellType) & (~isTransitionTypeBCell)
+        return isTypeBCell, cellType
+
+
+    def bisect_interface_cell_with_curvature(self, interface, hmax):
+        """
+        """
+        NN = self.number_of_nodes()
+        node= self.entity('node')
+
+        phi = interface(node)
+
+        if np.all(phi < 0):
+            raise ValueError('初始网格在界面围成区域的内部，需要更换一个可以覆盖界面的网格')
+
+        # Step 1: 一致二分法加密网格
+        while np.all(phi>0):
+            self.uniform_bisect()
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+
+        # Step 2: 估计离散曲率
+
+        isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+        k = 0
+        while np.any(isBigCurveCell) & (k < 100):
+            k += 1
+            self.bisect(isBigCurveCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+
+        isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
+        k = 0
+        while np.any(isTypeBCell) & (k < 100):
+            k += 1
+            self.bisect(isTypeBCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
 
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):

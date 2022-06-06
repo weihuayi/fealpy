@@ -8,6 +8,7 @@ Authors
 -------
     Huayi Wei, Chunyu Chen, Xin Wang
 """
+
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -18,7 +19,6 @@ from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendre
 from .Mesh2d import Mesh2d
 from .adaptive_tools import mark
 from .mesh_tools import show_halfedge_mesh
-from ..common.Tools import hash2map
 from ..common import DynamicArray
 from .TriangleMesh import TriangleMesh
 
@@ -416,6 +416,37 @@ class HalfEdgeMesh2d(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return GaussLegendreQuadrature(k)
 
+    def edge_bc_to_point(self, bcs, index=np.s_[:]):
+        """
+        @brief 重心坐标积分点转化为网格边上笛卡尔坐标点
+        """
+        node = self.entity('node')
+        edge = self.entity('edge')[index]
+        ps = np.einsum('ij, kjm->ikm', bcs, node[edge])
+        return ps
+
+    def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 
+        """
+        node = self.entity('node')
+        if self.ds.NV == 3:
+            TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
+            node = self.entity('node')
+            entity = self.entity(etype=TD)[index] # default  cell
+            p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        elif self.ds.NV == 4:
+            if isinstance(bc, tuple):
+                assert len(bc) == 2
+                cell = self.entity('cell')[index]
+                bc0 = bc[0] # (NQ0, 2)
+                bc1 = bc[1] # (NQ1, 2)
+                bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+                p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+            else:
+                edge = self.entity('edge')[index]
+                p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        return p
 
     def entity(self, etype=2):
         if etype in {'cell', 2}:
@@ -559,29 +590,7 @@ class HalfEdgeMesh2d(Mesh2d):
             c /=3*a.reshape(-1, 1)
             return c
 
-    def bc_to_point(self, bc, etype='cell', index=None):
-        """
 
-        Parameters
-        ----------
-        bc : (3, ) or (NQ, 3)
-        etype : 'cell' or 'edge'
-        """
-        assert self.ds.NV == 3
-        node = self.entity('node')
-        entity = self.entity(etype) # default  cell
-        index = index if index is not None else np.s_[:]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
-        return p
-
-    def edge_bc_to_point(self, bcs, index=None):
-        """
-        """
-        node = self.entity('node')
-        edge = self.entity('edge')
-        index = index if index is not None else np.s_[:]
-        ps = np.einsum('ij, kjm->ikm', bcs, node[edge[index]])
-        return ps
 
     def mark_halfedge(self, isMarkedCell, method='poly'):
         cstart = self.ds.cellstart
@@ -1936,33 +1945,33 @@ class HalfEdgeMesh2d(Mesh2d):
                     break
                 isMarkedCell = (options['numrefine'] < 0)
 
-    def adaptive_refine(self, isMarkedCell, method="nvb"):
+    def adaptive_refine(self, isMarkedCell, method="nvb", options={}):
         cstart = self.ds.cellstart
         NC = self.number_of_all_cells()
         isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
         isMarkedCell0[cstart:] = isMarkedCell
         if method=='nvb':
-            self.refine_triangle_nvb(isMarkedCell0)
+            self.refine_triangle_nvb(isMarkedCell0, options=options)
         elif method=='rg':
-            self.refine_triangle_rg(isMarkedCell0)
+            self.refine_triangle_rg(isMarkedCell0, options=options)
         elif method=='quad':
-            self.refine_quad(isMarkedCell0)
+            self.refine_quad(isMarkedCell0, options=options)
         elif method=='poly':
-            self.refine_poly(isMarkedCell0)
+            self.refine_poly(isMarkedCell0, options=options)
 
-    def adaptive_coarsen(self, isMarkedCell, method="nvb"):
+    def adaptive_coarsen(self, isMarkedCell, method="nvb", options={}):
         cstart = self.ds.cellstart
         NC = self.number_of_all_cells()
         isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
         isMarkedCell0[cstart:] = isMarkedCell
         if method=='nvb':
-            self.coarsen_triangle_nvb(isMarkedCell0)
+            self.coarsen_triangle_nvb(isMarkedCell0, options=options)
         elif method=='rg':
-            self.coarsen_triangle_rg(isMarkedCell0)
+            self.coarsen_triangle_rg(isMarkedCell0, options=options)
         elif method=='quad':
-            self.coarsen_quad(isMarkedCell0)
+            self.coarsen_quad(isMarkedCell0, options=options)
         elif method=='poly':
-            self.coarsen_poly(isMarkedCell0)
+            self.coarsen_poly(isMarkedCell0, options=options)
 
     def adjust_number(self, isMarked, method='node'):
         L = len(isMarked)
