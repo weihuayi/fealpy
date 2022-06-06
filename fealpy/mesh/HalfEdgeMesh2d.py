@@ -874,6 +874,20 @@ class HalfEdgeMesh2d(Mesh2d):
 
                 options['numrefine'] = num[idx]
 
+            if ('HB' in options) and (options['HB'] is not None):
+                isNonMarkedCell = ~isMarkedCell
+                flag0 = isNonMarkedCell[cellstart:]
+                flag1 = isMarkedCell[cellstart:]
+                NHB0 = flag0.sum()
+                NHB = NHB0 + NHE
+                HB = np.zeros((NHB, 2), dtype=np.int)
+                HB[:, 0] = range(NHB)
+                HB[0:NHB0, 1] = np.arange(len(flag0))[flag0]
+                HB[NHB0:,  1] = cellidx - cellstart
+                HB0 = HB.copy()
+                HB0[:, 1] = options['HB'][HB0[:,1], 1]
+                options['HB'] = HB0
+
             #增加主半边
             hedge.extend(np.arange(NE*2, NE*2+NC1))
 
