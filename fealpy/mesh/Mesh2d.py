@@ -284,7 +284,7 @@ class Mesh2dDataStructure():
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
         i1 = np.zeros(NE, dtype=self.itype)
-        i1[j] = np.arange(NEC*NC, dtype=self.itype)
+        i1[j] = range(NEC*NC)
 
         self.edge2cell[:, 0] = i0//NEC
         self.edge2cell[:, 1] = i1//NEC

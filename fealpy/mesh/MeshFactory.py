@@ -72,7 +72,6 @@ def circle_interval_mesh(c, r, h, clock = 'w'):
     cell[:,0] = np.arange(n)
     cell[:,1][:-1] = np.arange(1,n)
 
-
     return node, cell
 
 def meshpy2d(points, facets, h, hole_points=None, facet_markers=None, point_markers=None, meshtype='tri'):

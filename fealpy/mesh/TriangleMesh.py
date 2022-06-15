@@ -303,7 +303,7 @@ class TriangleMesh(Mesh2d):
             ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, ...jm->...im', w,
                     node[edge,:]).reshape(-1, GD)
         if p > 2:
-            mutiIndex = self.multi_index_matrix(p, 'cell')
+            multiIndex = self.multi_index_matrix(p, 'cell')
             isEdgeIPoints = (multiIndex == 0)
             isInCellIPoints = ~(isEdgeIPoints[:,0] | isEdgeIPoints[:,1] |
                     isEdgeIPoints[:,2])
@@ -1554,6 +1554,246 @@ class TriangleMesh(Mesh2d):
         gdof2 = self.number_of_global_ipoints(p2)
         val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
         return val
+
+
+    def mark_interface_cell(self, phi):
+        """
+        @brief 标记穿过界面的单元
+        """
+
+        if callable(phi):
+            node = self.entity('node')
+            phi = phi(node)
+
+        cell = self.entity('cell')
+
+        s0 = np.sign(phi[cell[:, 0]])
+        s1 = np.sign(phi[cell[:, 1]])
+        s2 = np.sign(phi[cell[:, 2]])
+
+        eta0 = np.abs(s0 + s1 + s2)
+        eta1 = np.abs(s0) + np.abs(s1) + np.abs(s2)
+
+        isInterfaceCell = ((eta0 == 1) & (eta1 == 3)) | ((eta0 == 0) & (eta1 == 2))
+
+        return isInterfaceCell
+
+    def mark_interface_cell_with_curvature(self, phi, hmax=None):
+        """
+        @brief 标记曲率大的单元 
+        """
+
+        if callable(phi):
+            node = self.entity('node')
+            phi = phi(node)
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        edge = self.entity('edge')
+        cell = self.entity('cell')
+        edge2cell = self.ds.edge_to_cell()
+
+        isInterfaceCell = self.mark_interface_cell(phi)
+        isInterfaceNode = np.zeros(NN, dtype=np.bool_)
+        # 界面单元的顶点称为界面节点
+        isInterfaceNode[cell[isInterfaceCell]] = True 
+
+        # case: Fig 2(a) in p6
+        # 一个网格点周围的单元全为界面单元，则周围这些单元以该网格节点为顶点的角度
+        # 之和为 360 
+        angle = np.zeros(NN, dtype=self.itype)
+        np.add.at(angle, cell[isInterfaceCell, :], np.array([90, 45, 45]))
+        is360 = (angle == 360)
+        print('is360:', is360.sum())
+
+        # case: Fig 2(b) in p6
+        isInteriorEdge = ~self.ds.boundary_edge_flag()
+        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1) 
+        valence = np.zeros(NN, dtype=self.itype)
+        if np.any(isInterfaceBEdge):
+            np.add.at(valence, edge[isInterfaceBEdge], 1)
+        isLinkNode = (valence > 2) & (phi != 0)
+        print("isLinkNode:", isLinkNode.sum())
+
+
+        # case：离散曲率
+        isInteriorNode = phi < 0
+        tangle = np.zeros(NN, dtype=self.itype) # 记录界面转角
+        isIn = isInterfaceNode & isInteriorNode & (~is360) & (~isLinkNode)
+        if np.any(isIn):
+            tangle[isIn] = 180 - (360 - angle[isIn]);
+
+        isOut = isInterfaceNode & (~isInteriorNode) & (~is360) & (~isLinkNode)
+        if np.any(isOut):
+            tangle[isOut] = (360 - angle[isOut]) - 180
+
+        isInterfaceEdge = isInterfaceCell[edge2cell[:, 0]] | isInterfaceCell[edge2cell[:, 1]]
+
+        ta = tangle[edge[isInterfaceEdge][:, 1::-1]]
+        np.add.at(tangle, edge[isInterfaceEdge], ta)
+
+        
+        flag = np.abs(tangle) > 170
+        print("转角:", flag.sum())
+
+        isBigCurveNode = is360 | isLinkNode | (np.abs(tangle) > 170)
+
+        isBigCurveCell = (isBigCurveNode[cell].sum(axis=1) > 0) & isInterfaceCell
+
+        v = node[cell[:, 2]] - node[cell[:, 1]]
+        l = np.sqrt(np.sum(v**2, axis=1))
+        if hmax is None: 
+            lmax = np.max(l)
+            isBigSizeCell = (l > lmax*lmax) & isInterfaceCell
+        else:
+            isBigSizeCell = (l > hmax) & isInterfaceCell
+
+
+        return isBigCurveCell | isBigSizeCell
+
+
+
+    def mark_interface_cell_with_type(self, phi, interface):
+        """
+        @brief 等腰直角三角形，可以分为两类
+            - Type A：两条直角边和坐标轴平行
+            - Type B: 最长边和坐标轴平行
+        """
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+        cell2cell = self.ds.cell_to_cell()
+
+        v = node[cell[:, 2]] - node[cell[:, 1]]
+        cellType = (np.abs(v[:, 0]) > 0.0) & (np.abs(v[:, 1]) > 0.0) # TODO: 0.0-->eps
+        isInterfaceCell = self.mark_interface_cell(phi)
+
+        isMark = np.zeros(NC, dtype=np.bool_)
+        isMark[isInterfaceCell] = True
+        isMark[cell2cell[isInterfaceCell, 0]] = True
+
+        n0 = cell2cell[:, 0]
+        isTransitionTypeBCell = isInterfaceCell & isInterfaceCell[cell2cell[:,
+            0]] & (cell2cell[n0, 0] != range(NC)) & (~cellType)
+
+        # Case 1:
+        n1 = cell2cell[:, 1]
+        flag = isTransitionTypeBCell & isInterfaceCell[n1] & cellType[n1]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p0 = node[cell[idx, 0]]
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            p3 = node[cell[n1[idx], 0]]
+
+            m03 = (p0 + p3)/2
+            m23 = (p2 + p3)/2
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = ((phi[cell[idx, 2]]*interface(m0) > 0.0) &
+                    (interface(m03)*interface(m23) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 2:
+        n2 = cell2cell[:, 2] 
+        flag = isTransitionTypeBCell & isInterfaceCell[n2] & cellType[n2]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p0 = node[cell[idx, 0]]
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            p3 = node[cell[n2[idx], 0]]
+            m03 = (p0 + p3)/2
+            m13 = (p1 + p3)/2
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = ((phi[cell[idx, 1]]*interface(m1) > 0.0) &
+                    (interface(m03)*interface(m13) < 0.0)) | (interface(m0)*interface(m1) < 0.0)
+
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 3:
+        n1 = cell2cell[:, 1]
+        flag = isTransitionTypeBCell & isInterfaceCell[n1] & ~cellType[n1]
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p1 = node[cell[flag, 1]]
+            p2 = node[cell[flag, 2]]
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p2)/2
+            isNotTB = interface(m0)*interface(m1) < 0.0
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        # Case 4:
+        n2 = cell2cell[:, 2] 
+        flag = isTransitionTypeBCell & isInterfaceCell[n2] & (~cellType[n2])
+        if np.any(flag):
+            idx, = np.nonzero(flag)
+            p1 = node[cell[idx, 1]]
+            p2 = node[cell[idx, 2]]
+            m12 = (p1 + p2)/2
+            m0 = (m12 + p2)/2
+            m1 = (m12 + p1)/2
+            isNotTB = interface(m0)*interface(m1) < 0.0
+            isTransitionTypeBCell[idx[isNotTB]] = False
+
+        
+        isTypeBCell = isMark & (~cellType) & (~isTransitionTypeBCell)
+        return isTypeBCell, cellType
+
+
+    def bisect_interface_cell_with_curvature(self, interface, hmax):
+        """
+        """
+        NN = self.number_of_nodes()
+        node= self.entity('node')
+
+        phi = interface(node)
+
+        if np.all(phi < 0):
+            raise ValueError('初始网格在界面围成区域的内部，需要更换一个可以覆盖界面的网格')
+
+        # Step 1: 一致二分法加密网格
+        while np.all(phi>0):
+            self.uniform_bisect()
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+
+        # Step 2: 估计离散曲率
+
+        isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+        k = 0
+        while np.any(isBigCurveCell) & (k < 100):
+            k += 1
+            self.bisect(isBigCurveCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isBigCurveCell = self.mark_interface_cell_with_curvature(phi, hmax=hmax)
+
+
+        isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
+        k = 0
+        while np.any(isTypeBCell) & (k < 100):
+            k += 1
+            self.bisect(isTypeBCell)
+            node = self.entity('node')
+            phi = np.append(phi, interface(node[NN:]))
+            NN = self.number_of_nodes()
+            isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
+
 
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):

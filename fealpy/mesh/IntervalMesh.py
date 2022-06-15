@@ -110,6 +110,9 @@ class IntervalMesh():
                     celldata=self.celldata)
 
     def grad_lambda(self):
+        """
+        @brief 计算所有单元上重心坐标函数的导数
+        """
         node = self.entity('node')
         cell = self.entity('cell')
         NC = self.number_of_cells()
