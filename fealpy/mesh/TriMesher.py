@@ -13,7 +13,7 @@ def distmesh(h, fd, fh, bbox, pfix=None):
 
     return distmesh2d.mesh
 
-def meshpy(points, facets, h, hole_points=None, refine_function=None):
+def meshpy2d(points, facets, h, hole_points=None, refine_function=None):
     from meshpy.triangle import MeshInfo, build
 
     mesh_info = triangle.MeshInfo()
@@ -29,23 +29,15 @@ def meshpy(points, facets, h, hole_points=None, refine_function=None):
 
     return TriangleMesh(node, cell)
 
-
-def gmsh(model, algorithm = 6, sizemax = 1e+22, sizemin=0):
+def gmsh_to_TriangleMesh():
     import gmsh
-    gmsh.option.setNumber("Mesh.MeshSizeMax", sizemax)
-    gmsh.option.setNumber("Mesh.MeshSizeMin", sizemin)
-    gmsh.option.setNumber("Mesh.Algorithm", algorithm)
-
-    model.mesh.generate(2)
-    
-    ntags, vxyz, _ = model.mesh.getNodes()
+    ntags, vxyz, _ = gmsh.model.mesh.getNodes()
     node = vxyz.reshape((-1,3))
     node = node[:,:2]
     vmap = dict({j:i for i,j in enumerate(ntags)})
-    tris_tags,evtags = model.mesh.getElementsByType(2)
+    tris_tags,evtags = gmsh.model.mesh.getElementsByType(2)
     evid = np.array([vmap[j] for j in evtags])
     cell = evid.reshape((tris_tags.shape[-1],-1))
-
     return TriangleMesh(node,cell)
 
 def smoothing(self, mesh, stype='laplace'):
