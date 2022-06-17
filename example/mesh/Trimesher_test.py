@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import TriMesher as tri 
+from fealpy.mesh import TriMesher as Mesher 
 
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform

@@ -3,13 +3,16 @@ from .TriangleMesh import TriangleMesh
 
 import meshpy.triangle as triangle
 
-def distmesh(h, fd, fh, bbox, pfix=None):
+def distmesh(h, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
     from .distmesh import DistMesh2d
     from ..geometry import DistDomain2d
 
     domain = DistDomain2d(fd, fh, bbox, pfix)
     distmesh2d = DistMesh2d(domain, h)
-    distmesh2d.run()
+    if showanimation:
+        distmesh2d.show_animation(frames=maxit)
+    else:
+        distmesh2d.run()
 
     return distmesh2d.mesh
 
