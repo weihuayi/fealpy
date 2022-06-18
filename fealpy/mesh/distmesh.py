@@ -24,19 +24,92 @@ class DistMesh2d():
 
         self.time_elapsed = 0
         self.count = 0
-        self.set_init_mesh()
 
     def run(self, maxit=1000):
+        """
+        @brief 运行
+        """
+        dptol = self.params[1]
+        self.set_init_mesh()
         count = 0
         while count < maxit: 
-            try:
-                dt = self.step_length()
-                self.step(dt)
-                count += 1
-            except StopIteration:
+            dt = self.step_length()
+            self.step(dt)
+            count += 1
+            if self.maxmove < dptol:
                 break
 
+    def show_animation(self, plot=None, axes=None, fname='test.mp4',
+            fargs=None, frames=1000,  interval=50, 
+            edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
+        import matplotlib.animation as animation
+        from matplotlib.collections import LineCollection
+
+        if plot is None:
+            import matplotlib.pyplot as plt
+            fig, axes = plt.subplots()
+        else:
+            if isinstance(plot, ModuleType):
+                fig = plot.figure()
+                fig.set_facecolor('white')
+            else:
+                fig = plot
+                fig.set_facecolor('white')
+
+            if axes is None:
+                axes = fig.gca()
+
+        try:
+            axes.set_aspect(aspect)
+        except NotImplementedError:
+            pass
+
+        if showaxis == False:
+            axes.set_axis_off()
+        else:
+            axes.set_axis_on()
+
+        dptol = self.params[1]
+        lines = LineCollection([], linewidths=linewidths, color=edgecolor)
+
+        def init_func():
+            self.set_init_mesh()
+            node = self.mesh.entity('node')
+            box = np.zeros(4, dtype=np.float64)
+            box[0::2] = np.min(node, axis=0)
+            box[1::2] = np.max(node, axis=0)
+
+            tol = np.max(self.mesh.entity_measure('edge'))/10
+            axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
+            axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
+
+            edge = self.mesh.entity('edge')
+            lines.set_segments(node[edge])
+            axes.add_collection(lines)
+
+            return lines
+
+        def func(n, *fargs):
+            dt = self.step_length()
+            self.step(dt)
+
+            node = self.mesh.entity('node')
+            edge = self.mesh.entity('edge')
+            lines.set_segments(node[edge])
+            s = "step=%05d"%(n)
+            print(s)
+            axes.set_title(s)
+            return lines
+
+        ani = animation.FuncAnimation(fig, func, frames=frames,
+                init_func=init_func,
+                interval=interval)
+        ani.save(fname)
+
     def set_init_mesh(self): 
+        """
+        @brief 生成初始网格
+        """
 
         fd, fh, bbox, pfix, args = self.domain.params
         h, dptol, ttol, Fscale = self.params
@@ -87,8 +160,6 @@ class DistMesh2d():
             self.mesh = TriangleMesh(self.mesh.node, t)
 
 
-        if self.maxmove < dptol:
-            raise StopIteration
 
     def dx_dt(self, t):
 

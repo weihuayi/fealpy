@@ -10,8 +10,8 @@ class DistDomain3d():
         self.params = fd, fh, bbox, pfix, args
 
 def dcircle(p, cxy=[0, 0], r=1):
-    x = p[:, 0]
-    y = p[:, 1]
+    x = p[..., 0]
+    y = p[..., 1]
     return np.sqrt((x - cxy[0])**2 + (y - cxy[1])**2) - r
 
 def drectangle(p, box):
