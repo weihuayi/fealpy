@@ -10,7 +10,10 @@ from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
 class CosCosCosData:
     def __init__(self):
         pass
-
+    
+    def domain(self):
+        return np.array([0, 1, 0, 1, 0, 1])
+    
     def init_mesh(self, n=1, meshtype='tet'):
         node = np.array([
             [-1, -1, -1],
