@@ -21,7 +21,11 @@ class IntervalMesh():
         -----
 
         """
-        self.node = node
+        if node.ndim == 1:
+            self.node = node.reshape(-1, 1)
+        else:
+            self.node = node
+
         self.ds = IntervalMeshDataStructure(len(node), cell)
         self.meshtype = 'interval'
 
