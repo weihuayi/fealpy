@@ -3,7 +3,7 @@ from .TriangleMesh import TriangleMesh
 
 import meshpy.triangle as triangle
 
-def distmesh(hmin, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
+def distmesh2d(hmin, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
     from .distmesh import DistMesh2d
     from ..geometry import DistDomain2d
 
