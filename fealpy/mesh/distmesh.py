@@ -41,8 +41,7 @@ class DistMesh2d():
 
     def show_animation(self, plot=None, axes=None, fname='test.mp4',
             fargs=None, frames=1000,  interval=50, 
-            edgecolor='k', linewidth=2, aspect='equal',
-            box=None):
+            edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
         import matplotlib.animation as animation
         from matplotlib.collections import LineCollection
 
@@ -71,17 +70,23 @@ class DistMesh2d():
             axes.set_axis_on()
 
         dptol = self.params[1]
-        box = self.domain.params[2]
-        axes.set_xlim(box[0], box[1])
-        axes.set_ylim(box[2], box[3])
-        lines = LineCollection([], linewidths=lw, color=edgecolor)
+        lines = LineCollection([], linewidths=linewidths, color=edgecolor)
 
         def init_func():
             self.set_init_mesh()
             node = self.mesh.entity('node')
+            box = np.zeros(4, dtype=np.float64)
+            box[0::2] = np.min(node, axis=0)
+            box[1::2] = np.max(node, axis=0)
+
+            tol = np.max(self.mesh.entity_measure('edge'))/10
+            axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
+            axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
+
             edge = self.mesh.entity('edge')
             lines.set_segments(node[edge])
             axes.add_collection(lines)
+
             return lines
 
         def func(n, *fargs):
