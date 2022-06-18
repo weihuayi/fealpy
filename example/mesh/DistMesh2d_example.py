@@ -6,7 +6,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from fealpy.mesh.TriMesher import distmesh 
-
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform
 
@@ -25,20 +24,25 @@ parser.add_argument('--domain',
         1 : 带圆洞的矩形区域 [0.0, 2.2]*[0.0, 0.41]的非均匀网格\n
         """)
 
-parser.add_argument('--h', 
+parser.add_argument('--hmin', 
         default=0.05, type=float, 
-        help="最大网格尺寸值，默认 0.05")
+        help="最小网格尺寸值，默认 0.05")
+
+parser.add_argument('--hmax', 
+        default=0.1, type=float, 
+        help="最大网格尺寸值，默认 0.1")
 
 parser.add_argument('--animation', 
         default=True, type=bool, 
-        help="最大网格尺寸值，默认 0.05")
+        help="是否显示动画，默认显示动画")
 
 parser.add_argument('--maxit', 
         default=500, type=int, 
         help="最大迭代次数，默认 500 次")
 
 args = parser.parse_args()
-h = args.h
+hmin = args.hmin
+hmax = args.hmax
 domain = args.domain
 maxit = args.maxit
 
@@ -46,19 +50,42 @@ if domain == 0:
     fd = lambda p: drectangle(p, [0.0, 1.0, 0.0, 1.0])
     fh = huniform
     bbox = [-0.01, 1.01, -0.01, 1.01]
-    pfix = np.array([ (0.0, 0.0), (1.0, 0.0), (1.0, 1.0), (0.0, 1.0)], dtype=np.float64)
+    pfix = np.array([ 
+        (0.0, 0.0), 
+        (1.0, 0.0), 
+        (1.0, 1.0), 
+        (0.0, 1.0)], dtype=np.float64)
 elif domain == 1:
-    fd1 = lambda p: dcircle(p, [0.2, 0.2], 0.05)
-    fd2 = lambda p: drectangle(p,[0.0, 2.2, 0.0, 0.41])
-    fd = lambda p: ddiff(fd2(p),fd1(p))
+    bbox = [-1, 1, -1, 1]
+    fd = lambda p: dcircle(p, [0.0, 0.0], 1.0)
     def fh(p):
-        h = 0.003 + 0.05*fd1(p)
-        h[h>0.01] = 0.01
+        x = p[:, 0]
+        y = p[:, 1]
+        #h = 0.001 + np.sqrt(x**2 + y**2)*0.05
+        h = hmin + np.abs(fd(p))*0.05
+        h[h>hmax] = hmax 
         return h
-    bbox = [0,3,0,1]
-    pfix = np.array([(0.0,0.0),(2.2,0.0),(2.2,0.41),(0.0,0.41)],dtype=np.float64)
+    pfix = None
+elif domain == 2:
+    fd1 = lambda p: dcircle(p, [0.2, 0.2], 0.05)
+    fd2 = lambda p: drectangle(p, [0.0, 2.2, 0.0, 0.41])
+    fd = lambda p: ddiff(fd2(p), fd1(p))
 
-mesh = distmesh(h, fd, fh, bbox, pfix, showanimation=True, maxit=maxit)
+    def fh(p):
+        h = hmin + 0.05*np.abs(fd1(p))
+        h[h>hmax] =hmax 
+        return h
+
+    bbox = [0, 3, 0, 1]
+    pfix = np.array([
+        (0.0, 0.0), 
+        (2.2, 0.0), 
+        (2.2, 0.41),
+        (0.0,0.41)],dtype=np.float64)
+
+mesh = distmesh(hmin, fd, fh, bbox, pfix=pfix, 
+        showanimation=True, maxit=maxit)
+
 fig, axes = plt.subplots()
 mesh.add_plot(axes)
 plt.show()
