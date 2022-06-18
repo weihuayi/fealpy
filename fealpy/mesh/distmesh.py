@@ -79,7 +79,7 @@ class DistMesh2d():
             box[0::2] = np.min(node, axis=0)
             box[1::2] = np.max(node, axis=0)
 
-            tol = np.max(self.mesh.entity_measure('edge'))/10
+            tol = np.max(self.mesh.entity_measure('edge'))
             axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
             axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
 
