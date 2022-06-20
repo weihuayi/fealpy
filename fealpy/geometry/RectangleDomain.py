@@ -4,18 +4,21 @@ from .sizing_function import huniform
 from .signed_distance_function import dmin
 
 class RectangleDomain:
-    def __init__(self, box, fh=huniform):
+    def __init__(self, domain=[0, 1, 0, 1], fh=huniform):
         """
         """
         self.fh = fh
-        self.box = box
-        self.bbox = [box[0]-0.1, box[1]+0.1, box[2]-0.1, box[3]+0.1] 
+        self.domain = domain 
+
+        mx = (domain[1] - domain[0])/10
+        my = (domain[3] - domain[2])/10
+        self.box = [domain[0]-mx, domain[1]+mx, domain[2]-my, domain[3]+my] 
 
         vertices = np.array([
-            (box[0], box[2]),
-            (box[1], box[2]),
-            (box[1], box[3]),
-            (box[0], box[3]),
+            (domain[0], domain[2]),
+            (domain[1], domain[2]),
+            (domain[1], domain[3]),
+            (domain[0], domain[3]),
             ], dtype=np.float64)
 
         curves = np.array([
@@ -31,12 +34,12 @@ class RectangleDomain:
         """
         @brief 符号距离函数
         """
-        box = self.box
+        domain = self.domain
         x = p[..., 0]
         y = p[..., 1]
-        d = dmin(y - box[2], box[3] - y)
-        d = dmin(d, x - box[0])
-        d = dmin(d, box[1] - x)
+        d = dmin(y - domain[2], domain[3] - y)
+        d = dmin(d, x - domain[0])
+        d = dmin(d, domain[1] - x)
         return -d
 
     def signed_dist_function(self, p):

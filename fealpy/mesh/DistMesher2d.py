@@ -1,19 +1,19 @@
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.spatial import Delaunay, delaunay_plot_2d
+from scipy.spatial import Delaunay
 from .TriangleMesh import TriangleMesh
 
 class DistMesher2d():
     def __init__(self,
             domain, 
             hmin,
-            dptol = 0.001,
+            ptol = 0.001,
             ttol = 0.05,
             fscale = 1.2):
 
         self.domain = domain
         self.hmin = hmin
-        self.dptol = dptol
+        self.ptol = ptol
         self.ttol = ttol
         self.fscale = fscale
 
@@ -31,14 +31,14 @@ class DistMesher2d():
         """
         @brief 运行
         """
-        dptol = self.dptol
+        ptol = self.ptol
         self.set_init_mesh()
         count = 0
         while count < maxit: 
             dt = self.step_length()
             self.step(dt)
             count += 1
-            if self.maxmove < dptol:
+            if self.maxmove < ptol:
                 break
         self.mesh.edge_swap()
 
@@ -71,8 +71,8 @@ class DistMesher2d():
         else:
             axes.set_axis_on()
 
-        dptol = self.dptol 
-        bbox = self.domain.bbox
+        ptol = self.ptol 
+        box = self.domain.box
         lines = LineCollection([], linewidths=linewidths, color=edgecolor)
 
         def init_func():
@@ -80,8 +80,8 @@ class DistMesher2d():
             node = self.mesh.entity('node')
 
             tol = np.max(self.mesh.entity_measure('edge'))
-            axes.set_xlim(bbox[0:2])
-            axes.set_ylim(bbox[2:4])
+            axes.set_xlim(box[0:2])
+            axes.set_ylim(box[2:4])
 
             edge = self.mesh.entity('edge')
             lines.set_segments(node[edge])
@@ -112,17 +112,17 @@ class DistMesher2d():
         @brief 生成初始网格
         """
 
-        bbox = self.domain.bbox
+        box = self.domain.box
         fd = self.domain.signed_dist_function
         fh = self.domain.sizing_function 
         hmin = self.hmin
 
-        xh = bbox[1] - bbox[0]
-        yh = bbox[3] - bbox[2]
+        xh = box[1] - box[0]
+        yh = box[3] - box[2]
         N = int(xh/hmin)+1
         M = int(yh/(hmin*np.sqrt(3)/2)) + 1
 
-        mg = np.mgrid[bbox[2]:bbox[3]:complex(0, M), bbox[0]:bbox[1]:complex(0, N)]
+        mg = np.mgrid[box[2]:box[3]:complex(0, M), box[0]:box[1]:complex(0, N)]
         x = mg[1, :, :]
         y = mg[0, :, :]
         x[1::2, :] += hmin/2

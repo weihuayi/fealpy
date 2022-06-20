@@ -21,11 +21,14 @@ class ScaledSurface():
         return p1*self.scale, d*self.scale 
 
 class SphereSurface():
-    def __init__(self, center=np.array([0.0, 0.0, 0.0]), radius=1.0):
+    def __init__(self, center=[0.0, 0.0, 0.0], radius=1.0):
         self.center = center
         self.radius = radius
-        m=1.2
-        self.box = [-m, m, -m, m, -m, m]
+        r = radius + radius/10
+        x = center[0]
+        y = center[1]
+        z = center[2]
+        self.box = [x-r, x+r, y-r, y+r, z-r, z+r]
 
     def __call__(self, *args):
         if len(args) == 1:
