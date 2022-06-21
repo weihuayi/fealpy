@@ -1,18 +1,16 @@
 import numpy as np
 
 from .sizing_function import huniform
-from .signed_distance_function import dmin
+from .signed_distance_function import dmin, dcircle
 
 class CircleDomain:
-    def __init__(self, center=[0.0, 0.0], r=1.0, fh=huniform):
+    def __init__(self, center=[0.0, 0.0], radius=1.0, sfun=huniform):
         """
         """
-        self.center = center
-        self.r = r
-        self.fh = fh
-
-        margin = r/10
-        self.bbox = [c[0]-r-margin, c[0]+r+margin, c[1]-r-margin, c[1]+r+margin] 
+        self.dfun = lambda p: dcircle(p, center, radius)
+        self.sfun = sfun 
+        m = r + r/10
+        self.box = [center[0]-m, center[0]+m, center[1]-m, center[1]+m] 
 
         self.facets = {0:None, 1:None}
 
@@ -20,19 +18,13 @@ class CircleDomain:
         """
         @brief 符号距离函数
         """
-        box = self.box
-        x = p[..., 0]
-        y = p[..., 1]
-        d = dmin(y - box[2], box[3] - y)
-        d = dmin(d, x - box[0])
-        d = dmin(d, box[1] - x)
-        return -d
+        return self.dfun(p)
 
     def signed_dist_function(self, p):
-        return self(p)
+        return self.dfun(p) 
 
     def sizing_function(self, p):
-        return self.fh(p)
+        return self.sfun(p, self)
 
     def facet(self, dim):
         return self.facets[dim]
