@@ -87,8 +87,8 @@ class CircleCurve():
         """
         @brief 把曲线附近的点投影到曲线上
         """
-        p = project(self, p, maxit=200, tol=1e-8)
-        return p 
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
 
 class FoldCurve():
     def __init__(self, a=6):

@@ -44,3 +44,6 @@ from .FABFileReader import FABFileReader
 
 from .meshio import load_mat_mesh
 
+# Mesher
+from .DistMesher2d import DistMesher2d
+from .DistMesher3d import DistMesher3d
