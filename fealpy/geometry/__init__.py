@@ -35,4 +35,6 @@ from .implicit_surface import SquaredSurface
 from .implicit_surface import SphereSurface as Sphere
 from .implicit_curve import CircleCurve as Circle
 
+# Domain 
 from .RectangleDomain import RectangleDomain
+from .SphereDomain import SphereDomain

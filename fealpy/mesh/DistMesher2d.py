@@ -40,7 +40,6 @@ class DistMesher2d():
             count += 1
             if self.maxmove < ptol:
                 break
-        self.mesh.edge_swap()
 
     def meshing_with_animation(self, plot=None, axes=None, fname='test.mp4', frames=1000,  interval=50, 
             edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
@@ -105,7 +104,6 @@ class DistMesher2d():
                 init_func=init_func,
                 interval=interval)
         ani.save(fname)
-        self.mesh.edge_swap()
 
     def set_init_mesh(self): 
         """

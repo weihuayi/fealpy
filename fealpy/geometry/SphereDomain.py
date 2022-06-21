@@ -10,7 +10,7 @@ class SphereDomain():
         self.box = self.surface.box
         self.fh = fh
 
-        self.facets = {0:None, 1:None, 2:None}
+        self.facets = {0:None, 1:None, 2:self.surface}
 
     def __call__(self, p):
         """
@@ -26,4 +26,9 @@ class SphereDomain():
 
     def facet(self, dim):
         return self.facets[dim]
+
+    def projection(self, p):
+        p, d = self.surface.project(p)
+        return p
+
 

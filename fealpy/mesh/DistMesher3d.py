@@ -1,6 +1,7 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import Delaunay
+import matplotlib.pyplot as plt
+
 from .TetrahedronMesh import TetrahedronMesh 
 
 class DistMesher3d():
@@ -11,6 +12,16 @@ class DistMesher3d():
             ttol = 0.1,
             fscale = 1.1,
             dt = 0.1):
+        """
+        @brief 
+
+        @param[in] domain 三维区域
+        @param[in] hmin 最小的边长
+        @param[in] ptol
+        @param[in] ttol
+        @param[in] fscale
+        @param[in] dt
+        """
 
         self.domain = domain
         self.hmin = hmin
@@ -21,7 +32,7 @@ class DistMesher3d():
         eps = np.finfo(float).eps
         self.geps = 0.1*hmin
         self.deps = np.sqrt(eps)*hmin
-        self.dt = 0.1
+        self.dt = dt 
 
         self.maxmove = float('inf')
 
@@ -32,35 +43,37 @@ class DistMesher3d():
         """
         @brief 运行
         """
-        dptol = self.dptol
+        ptol = self.ptol
         self.set_init_mesh()
         count = 0
         while count < maxit: 
+            print('count = ', count)
             dt = self.step_length()
             self.step(dt)
             count += 1
-            if self.maxmove < dptol:
+            if self.maxmove < ptol:
                 break
-        self.mesh.edge_swap()
 
-    def meshing_with_animation(self, plot=None, axes=None, fname='test.mp4', frames=1000,  interval=50, 
+    def meshing_with_animation(self, plot=None, axes=None, 
+            fname='test.mp4', frames=1000,  interval=50, 
             edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
+
         import matplotlib.animation as animation
-        from matplotlib.collections import LineCollection
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
 
         if plot is None:
             import matplotlib.pyplot as plt
-            fig, axes = plt.subplots()
+            fig = plt.figure()
+            axes = plt.axes(projection='3d')
         else:
             if isinstance(plot, ModuleType):
-                fig = plot.figure()
-                fig.set_facecolor('white')
+                fig, axes = plt.subplots(projection='3d')
             else:
                 fig = plot
-                fig.set_facecolor('white')
+                if axes is None:
+                    axes = fig.gca(projection='3d')
 
-            if axes is None:
-                axes = fig.gca()
+        fig.set_facecolor('white')
 
         try:
             axes.set_aspect(aspect)
@@ -72,21 +85,19 @@ class DistMesher3d():
         else:
             axes.set_axis_on()
 
-        dptol = self.dptol 
-        bbox = self.domain.bbox
-        lines = LineCollection([], linewidths=linewidths, color=edgecolor)
+        ptol = self.ptol 
+        box = self.domain.box
+        lines = Line3DCollection([], linewidths=linewidths, color=edgecolor)
 
         def init_func():
             self.set_init_mesh()
             node = self.mesh.entity('node')
-
-            tol = np.max(self.mesh.entity_measure('edge'))
-            axes.set_xlim(bbox[0:2])
-            axes.set_ylim(bbox[2:4])
+            axes.set_xlim(box[0:2])
+            axes.set_ylim(box[2:4])
 
             edge = self.mesh.entity('edge')
             lines.set_segments(node[edge])
-            axes.add_collection(lines)
+            axes.add_collection3d(lines)
 
             return lines
 
@@ -106,7 +117,6 @@ class DistMesher3d():
                 init_func=init_func,
                 interval=interval)
         ani.save(fname)
-        self.mesh.edge_swap()
 
     def set_init_mesh(self): 
         """
@@ -115,8 +125,9 @@ class DistMesher3d():
 
         fd = self.domain.signed_dist_function
         fh = self.domain.sizing_function 
+        box = self.domain.box
+
         hmin = self.hmin
-        box = self.box
 
         xh = box[1] - box[0]
         yh = box[3] - box[2]
@@ -136,9 +147,10 @@ class DistMesher3d():
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        node = node[fd(node) < self.geps, :]
+        node = node[fd(node) < -self.geps, :]
+
         r0 = fh(node)**3
-        val = np.min(r0)/r0
+        val = r0/np.max(r0)
         NN = len(node)
         node = node[np.random.random(NN) < val]
 
@@ -154,7 +166,7 @@ class DistMesher3d():
 
     def step(self, dt):
         """
-        @brief 
+        @brief  
         """
 
         fd = self.domain.signed_dist_function
@@ -167,23 +179,17 @@ class DistMesher3d():
         node = self.mesh.entity('node')
         d = fd(node)
         idx = d > 0
-        depsx = np.array([self.deps, 0, 0])
-        depsy = np.array([0, self.deps, 0])
-        depsy = np.array([0, 0, self.deps])
-
-        dgradx = (fd(node[idx, :] + depsx) - d[idx])/self.deps
-        dgrady = (fd(node[idx, :] + depsy) - d[idx])/self.deps
-        dgradz = (fd(node[idx, :] + depsz) - d[idx])/self.deps
-
-        node[idx, 0] = node[idx, 0] - d[idx]*dgradx
-        node[idx, 1] = node[idx, 1] - d[idx]*dgrady
-        node[idx, 2] = node[idx, 2] - d[idx]*dgrady
-        self.maxmove = np.max(np.sqrt(np.sum(dt*dxdt[d < -self.geps,:]**2, axis=1))/hmin)
+        node[idx] = self.domain.projection(node[idx])
+        self.maxmove = np.max(dt*np.sqrt(np.sum(dxdt[d < -self.geps,:]**2, axis=1))/hmin)
         self.time_elapsed += dt
 
+        """
         if self.maxmove > self.ttol:
             cell = self.delaunay(self.mesh.node)
-            self.mesh = TriangleMesh(self.mesh.node, cell)
+            self.mesh = TetrahedronMesh(self.mesh.node, cell)
+        """
+        cell = self.delaunay(self.mesh.node)
+        self.mesh = TetrahedronMesh(self.mesh.node, cell)
 
     def dx_dt(self, t):
         """
@@ -204,7 +210,7 @@ class DistMesher3d():
         F = np.minimum(L0 - L, 0)
         FV = (F/L)[:, None]*v
 
-        dxdt = np.zeros((NN, 2), dtype=np.float64)
+        dxdt = np.zeros((NN, 3), dtype=np.float64)
         np.add.at(dxdt[:, 0], edge[:, 0], FV[:, 0])
         np.add.at(dxdt[:, 1], edge[:, 0], FV[:, 1])
         np.add.at(dxdt[:, 2], edge[:, 0], FV[:, 2])
@@ -222,5 +228,6 @@ class DistMesher3d():
         fd = self.domain.signed_dist_function
         d = Delaunay(node)
         cell = np.asarray(d.simplices, dtype=np.int_)
-        bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]])/3
+        bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
+                node[cell[:, 2]])/4
         return  cell[fd(bc) < -self.geps, :]

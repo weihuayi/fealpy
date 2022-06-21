@@ -343,7 +343,7 @@ def show_mesh_2d(
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
-            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccs], :])
+            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccw], :])
     else:
         if mesh.meshtype == 'polygon':
             cell, cellLocation = cell
