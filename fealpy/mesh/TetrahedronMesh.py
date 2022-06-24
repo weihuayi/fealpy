@@ -298,12 +298,14 @@ class TetrahedronMesh(Mesh3d):
         faceIdx = self.multi_index_matrix(p, 'face').T
 
         for i in range(4):
-            fi = face[cell2face[:, i]]
-            fj = cell[:, localFace[i]]
-            idxj = np.argsort(fj, axis=1)
-            idxjr = np.argsort(idxj, axis=1)
-            idxi = np.argsort(fi, axis=1)
-            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr]
+            fi = face[cell2face[:, i]] # 第 i 个全局面 
+            idxi = np.argsort(fi, axis=1) # 第 i 个全局面顶点做一个排序
+
+            fj = cell[:, localFace[i]] # 第 i 个局部面
+            idxj = np.argsort(fj, axis=1) # 第 i 个局部面的顶点编号做一个排序
+            idxjr = np.argsort(idxj, axis=1) # 第 i 个局部面
+            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr] # 
+
             isCase0 = (np.sum(idx == np.array([1, 2, 0]), axis=1) == 3)
             isCase1 = (np.sum(idx == np.array([2, 0, 1]), axis=1) == 3)
             idx[isCase0, :] = [2, 0, 1]

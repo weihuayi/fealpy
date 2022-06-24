@@ -1,97 +1,58 @@
 import numpy as np
-from scipy.special import jv
 import matplotlib.pyplot as plt
 
 from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
+from fealpy.pde.helmholtz_3d import HelmholtzData3d
+from fealpy.pde.helmholtz_2d import HelmholtzData2d
 
 
-class PDE():
+def penalty_matrix(space, q):
+    """
+    @brief 组装罚项矩阵
+    """
+    ldof = space.number_of_local_dofs()
 
-    def __init__(self, k=100):
-        """
-        @brief 
+    mesh = space.mesh
+    GD = mesh.geo_dimension()
+    TD = mesh.top_dimension()
+    NC = mesh.number_of_cells()
 
-        @param[in] k wave number
-        """
-        self.k = k
+    qf = mesh.integrator(q, 'face')
+    bcs, ws = qf.get_quadrature_points_and_weights()
+    NQ = len(ws)
 
-    def domain(self):
-        return [-0.5, 0.5, -0.5, 0.5]
+    gphi = np.zeros((TD+1, NQ, NC, ldof, GD), dtype=np.float64)
+    for i in range(TD+1):
+        b = np.insert(bcs, i, 0, axis=1)
+        gphi[i] = space.grad_basis(b)
 
-    @cartesian
-    def solution(self, p):
-        k = self.k
-        x = p[..., 0]
-        y = p[..., 1]
-        r = np.sqrt(x**2 + y**2)
+    face2cell = mesh.face_to_cell()
+    isBdFace = face2cell[:, 0] != face2cell[:, 1]
+    n = mesh.face_unit_normal()
+    measure = mesh.entity_measure('face')
 
-        val = np.zeros(x.shape, dtype=np.complex128)
-        val[:] = np.cos(k*r)/k
-        c = complex(np.cos(k), np.sin(k))/complex(jv(0, k), jv(1, k))/k
-        val -= c*jv(0, k*r)
-        return val
-
-    @cartesian
-    def gradient(self, p):
-        k = self.k
-        x = p[..., 0]
-        y = p[..., 1]
-        r = np.sqrt(x**2 + y**2)
-        val = np.zeros(p.shape, dtype=np.complex128)
-        t0 = k*np.sin(k*r)/(4*r)
-        c = complex(np.cos(k), np.sin(k))/complex(jv(0, k), jv(1, k))
-        t1 = c*jv(1, k*r)/r
-        t2 = t1 - t0
-        val[..., 0] = t2*x
-        val[..., 1] = t2*y
-        return val
-
-    @cartesian
-    def source(self, p):
-        k = self.k
-        x = p[..., 0]
-        y = p[..., 1]
-        r = np.sqrt(x**2 + y**2)
-        val = complex(np.sin(k*r)/r, 0.0)
-        return val
-
-    @cartesian
-    def robin(self, p, n):
-        k = self.k
-        grad = self.gradient(p) # (NQ, NE, 2)
-        val = np.sum(grad*n, axis=-1)
-        kappa = np.complex(0.0, k) 
-        val += kappa*self.solution(p) 
-        return val, kappa
+    return None
 
 
-    def symbolic_com(self):
-        import sympy as sp
-        x, y, k = sp.symbols('x, y, k', real=True)
-        r = sp.sqrt(x**2 + y**2)
-        J0k = sp.besselj(0, k)
-        J1k = sp.besselj(1, k)
-        J0kr = sp.besselj(0, k*r)
-        u = sp.cos(k*r)/4 - J0kr*(sp.cos(k) + sp.I*sp.sin(k))/(J0k + sp.I*J1k)/k
-        ux = u.diff(x)
-        print(u.diff(x))
-        print(u.diff(y))
 
 
-pde = PDE()
+pde = HelmholtzData2d() 
 domain = pde.domain()
 mesh = MF.boxmesh2d(domain, nx=100, ny=100, meshtype='tri')
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
 
+penalty_matrix(space, 3)
+
+
+
 uI = space.interpolation(pde.solution)
 
 bc = np.array([1/3, 1/3, 1/3])
 u = uI(bc)
-
 
 fig, axes = plt.subplots(1, 2)
 mesh.add_plot(axes[0], cellcolor=np.real(u))
