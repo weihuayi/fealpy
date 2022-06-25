@@ -322,6 +322,62 @@ class TetrahedronMesh(Mesh3d):
 
         return cell2ipoint
 
+    def cell_to_ipoint_1(self, p):
+        """
+        @brief 获取单元与插值点的对应关系
+
+        @param[in] p 正整数
+
+        @return  cell2ipoints 数组， 形状为 (NC, ldof)
+        """
+
+        edof = p+1
+        fdof = (p+1)*(p+2)//2
+        ldof = (p+1)*(p+2)*(p+3)//6 
+
+        localFace = self.localFace 
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        face = self.entity('face')
+        cell = self.entity('cell')
+        cell2face = self.ds.cell_to_face()
+
+        cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
+
+        face2ipoint = self.face_to_ipoint()
+        m = self.multi_index_matrix(p, 'cell').T
+        isFaceIPoint = (m == 0)
+
+        for i in range(4):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            fj = cell[:, idx] 
+            idxj = np.argsort(fj, axis=1) #  (NC, 3)
+
+            fi = face[cell2face[:, i]] # 第 i 个全局面 
+            idxi = np.argsort(fi, axis=1) # 第 i 个全局面顶点做一个排序
+            idxi = np.argsort(idxi, axis=1) # (NC, 3) 
+
+            idx = idxj[np.arange(NC).reshape(-1, 1), idxi] # 
+
+            mi = m[:, isFaceIPoint[:, i]][idx]  # (3, fdof)
+            mi = mi[idxj] # (NC, 3, fdof)
+
+            k = faceIdx[idx[:, 1], :] + faceIdx[idx[:, 2], :]
+            a = k*(k+1)//2 + faceIdx[idx[:, 2], :]
+            cell2ipoint[:, isFaceIPoint[:, i]] = face2ipoint[cell2face[:, [i]], a]
+
+        if p > 3:
+            base = NN + (p-1)*NE + (fdof - 3*p)*NF
+            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
+            isInCellIPoint = ~(isFaceIPoint[:, 0] | isFaceIPoint[:, 1] | isFaceIPoint[:, 2] | isFaceIPoint[:, 3])
+            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2ipoint
+
     def vtk_cell_type(self, etype='cell'):
         if etype in {'cell', 3}:
             VTK_TETRA = 10
