@@ -968,3 +968,14 @@ class ScaledMonomialSpace2d():
         ruh /= deg
         return ruh
 
+    def H1_error(self, u, uh):
+        """!
+        @brief 求 H1 误差
+        """
+
+        def f(p, index):
+            val = np.sum((u(p) - uh.grad_value(p, index))**2, axis=-1)
+            return val
+        err = np.sqrt(self.integralalg.integral(f))
+        return err
+
