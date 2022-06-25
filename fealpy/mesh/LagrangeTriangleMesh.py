@@ -29,7 +29,7 @@ class LinearTriangleMeshDataStructure(LinearMeshDataStructure):
 
 
 class LagrangeTriangleMesh(Mesh2d):
-    def __init__(self, node, cell, p=1, surface=None):
+    def __init__(self, node, cell, p=1, surface=None, boundary=None):
 
         self.p = p
         self.GD = node.shape[1]
@@ -38,6 +38,7 @@ class LagrangeTriangleMesh(Mesh2d):
         self.ftype = node.dtype
         self.itype = cell.dtype
         self.surface = surface
+        self.boundary = boundary
 
         ds = LinearTriangleMeshDataStructure(node.shape[0], cell) 
         self.ds = LagrangeTriangleMeshDataStructure(ds, p)
@@ -52,6 +53,11 @@ class LagrangeTriangleMesh(Mesh2d):
 
         if surface is not None:
             self.node, _ = surface.project(self.node)
+
+        if boundary is not None:
+            isBdNode = self.ds.boundary_node_flag()
+            self.node[isBdNode], _ = self.boundary.project(self.node[isBdNode])
+
    
         self.nodedata = {}
         self.edgedata = {}
@@ -143,6 +149,10 @@ class LagrangeTriangleMesh(Mesh2d):
             if self.surface is not None:
                 edgeCenter, _ = self.surface.project(edgeCenter)
 
+            if self.boundary is not None:
+                isBdEdge = self.ds.boundary_edge_flag()
+                edgeCenter[isBdEdge], _ = self.boundary.project(edgeCenter[isBdEdge])
+
             cp = [0, -p-1, -1]
             newCell = np.zeros((4*NC, 3), dtype=self.itype)
             newCell[0::4, 0] = cell[:, cp[0]] 
@@ -179,9 +189,14 @@ class LagrangeTriangleMesh(Mesh2d):
                 # q: 积分点或重心坐标点指标
                 # m, n: 空间或拓扑维数指标
                 self.node[self.ds.cell] = np.einsum('cvn, iv->cin', node[newCell], bc)
+
                 NCN = self.number_of_corner_nodes()
                 if self.surface is not None:
                     self.node[NCN:], _ = self.surface.project(self.node[NCN:]) 
+
+                if self.boundary is not None:
+                    isBdNode = self.ds.boundary_node_flag()
+                    self.node[isBdNode], _ = self.boundary.project(self.node[isBdNode])
 
 
     def integrator(self, q, etype='cell'):

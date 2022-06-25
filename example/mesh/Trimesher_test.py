@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import TriMesher as TMesher 
+from fealpy.mesh import TriMesher as Mesher 
 
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform
@@ -79,8 +79,10 @@ if tool =='gmsh':
     gmsh.model.mesh.field.setNumber(2,"DistMax",0.01)
 
     gmsh.model.mesh.field.setAsBackgroundMesh(2)
+    gmsh.option.setNumber("Mesh.Algorithm",7)
+    gmsh.model.mesh.generate(2)
 
-    mesh = tri.gmsh(gmsh.model,algorithm = 7,sizemax = 0.015)
+    mesh = tri.gmsh_to_TriangleMesh()
 if tool == 'meshpy':
     from fealpy.mesh.MeshFactory import circle_interval_mesh
     import math

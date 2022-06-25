@@ -104,9 +104,6 @@ def split_mesh(mesh, entity='cell'):
     edgecuts, parts = metis.part_mesh(tmesh, nparts=n, entity=entity)
     return edgecuts, parts
 
-def meshpy3d(mesh_info, h):
-    pass
-
 def delete_cell(node, cell, threshold):
     """
 

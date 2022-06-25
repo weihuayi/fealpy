@@ -270,9 +270,9 @@ class ScaledMonomialSpace3d():
             return np.array([1.0], dtype=self.ftype).reshape(shape)
 
         shape = point.shape[:-1]+(fdof,)
-        phi = np.ones(shape, dtype=np.float)  # (..., NF, fdof)
+        phi = np.ones(shape, dtype=self.ftype)  # (..., NF, fdof)
         p2 = (point - self.facebarycenter[index])/h[index].reshape(-1, 1)
-        phi[..., 1:3] = np.einsum('...jk, jnk->...jn', p2, frame[:, 1:, :])  
+        phi[..., 1:3] = np.einsum('...jk, jnk->...jn', p2, frame[index, 1:, :])  
         if p > 1:
             start = 3
             for i in range(2, p+1):
@@ -431,8 +431,8 @@ class ScaledMonomialSpace3d():
         p = self.p if p is None else p
         def f(x, index=None):
             phi = self.face_basis(x, index=index, p=p)
-            return np.einsum('ijkm, ijpm->ijkp', phi, phi)
-        M = self.integralalg.face_integral(f, celltype=True, q=p+3)
+            return np.einsum('ijk, ijp->ijkp', phi, phi)
+        M = self.integralalg.face_integral(f, q=p+3)
         return M
     
     def face_cell_mass_matrix(self, p=None):
