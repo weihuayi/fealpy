@@ -105,9 +105,9 @@ class DistMesher3d():
         self.maxmove = np.max(dt*np.sqrt(np.sum(dxdt[d < -self.geps,:]**2, axis=1))/hmin)
         self.time_elapsed += dt
 
-        if self.maxmove > self.ttol:
-            cell = self.delaunay(self.mesh.node)
-            self.mesh = TetrahedronMesh(self.mesh.node, cell)
+       # if self.maxmove > self.ttol:
+        cell = self.delaunay(self.mesh.node)
+        self.mesh = TetrahedronMesh(self.mesh.node, cell)
 
     def dx_dt(self, t):
         """
