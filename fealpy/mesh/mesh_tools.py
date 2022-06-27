@@ -307,7 +307,7 @@ def show_mesh_2d(
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=1.0, cmap='jet', box=None):
+        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=None, cmap='jet', box=None):
 
     try:
         axes.set_aspect(aspect)

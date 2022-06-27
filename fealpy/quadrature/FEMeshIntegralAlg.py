@@ -615,7 +615,7 @@ class FEMeshIntegralAlg():
         np.add.at(b, cell2dof, bb)
         return b
 
-    def construct_vector_v_v(self, f, basis, cell2dof, gdof=None, q=None):
+    def construct_vector_v_v(self, f, basis, cell2dof, gdof=None, q=None, dtype=None):
         """
         Notes
         -----
@@ -646,7 +646,8 @@ class FEMeshIntegralAlg():
         bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
 
         gdof = gdof or cell2dof.max()
-        b = np.zeros(gdof, dtype=phi.dtype)
+        dtype = phi.dtype if dtype is None else dtype
+        b = np.zeros(gdof, dtype=dtype)
         np.add.at(b, cell2dof, bb)
         return b
 
