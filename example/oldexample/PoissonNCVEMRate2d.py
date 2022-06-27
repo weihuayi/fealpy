@@ -3,20 +3,18 @@
 
 import numpy as np
 
-from fealpy.pde.poisson_model_2d import CosCosData
+from fealpy.pde.poisson_2d import CosCosData
 from fealpy.vem import PoissonNCVEMModel
 from fealpy.tools.show import showmultirate
-from fealpy.mesh.simple_mesh_generator import triangle
+from fealpy.mesh import MeshFactory
 
 import matplotlib.pyplot as plt
 
 
 pde = CosCosData()
-maxit = 4
-
-h = 0.2
-box = [0, 1, 0, 1]  # [0, 1]^2 domain
-mesh = triangle(box, h, meshtype='polygon')
+maxit = 5
+n = 2
+mesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=n, ny=n, meshtype='poly')
 
 Ndof = np.zeros((maxit,), dtype=np.int)
 errorType = ['$|| u - \Pi^\\nabla u_h||_0$ with p=1',
@@ -39,8 +37,8 @@ for i in range(maxit):
         errorMatrix[j, i] = vem.L2_error()
         errorMatrix[j+3, i] = vem.H1_semi_error()
     if i < maxit - 1:
-        h /= 2
-        mesh = triangle(box, h, meshtype='polygon')
+        n *= 2
+        mesh = MeshFactory.boxmesh2d([0, 1, 0, 1], nx=n, ny=n, meshtype='poly')
 
 print(errorMatrix)
 mesh.add_plot(plt, cellcolor='w')

@@ -462,7 +462,9 @@ for i in range(1):
         k += 1
         
 
-
+fig, axes = plt.subplots()
+mesh.add_plot(axes)
+plt.show()
 adaptive_mesh(mesh, d0 = 0.499, d1=1, h=0.001)
 #fig, axes = plt.subplots()
 #mesh.add_plot(axes)
