@@ -3,6 +3,7 @@ from .ScaledMonomialSpace2d import ScaledMonomialSpace2d
 from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 
 from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
+from .BernsteinFiniteElementSpace import BernsteinFiniteElementSpace
 
 from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
 

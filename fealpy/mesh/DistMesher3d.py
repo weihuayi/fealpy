@@ -9,7 +9,7 @@ class DistMesher3d():
             domain, 
             hmin,
             ptol = 0.001,
-            ttol = 0.1,
+            ttol = 0.01,
             fscale = 1.1,
             dt = 0.1):
         """
@@ -30,7 +30,7 @@ class DistMesher3d():
         self.fscale = fscale
 
         eps = np.finfo(float).eps
-        self.geps = 0.1*hmin
+        self.geps = 0.01*hmin
         self.deps = np.sqrt(eps)*hmin
         self.dt = dt 
 
@@ -38,6 +38,117 @@ class DistMesher3d():
 
         self.time_elapsed = 0
         self.count = 0
+
+
+    def set_init_mesh(self): 
+        """
+        @brief 生成初始网格
+        """
+
+        fd = self.domain.signed_dist_function
+        fh = self.domain.sizing_function 
+        box = self.domain.box
+
+        hmin = self.hmin
+
+        xh = box[1] - box[0]
+        yh = box[3] - box[2]
+        zh = box[5] - box[4]
+        nx = int(xh/hmin) + 1
+        ny = int(yh/hmin) + 1
+        nz = int(zh/hmin) + 1 
+
+        NN = (nx+1)*(ny+1)*(nz+1)
+        node = np.zeros((NN, 3), dtype=np.float64)
+        X, Y, Z = np.mgrid[
+                box[0]:box[1]:complex(0, nx+1), 
+                box[2]:box[3]:complex(0, ny+1),
+                box[4]:box[5]:complex(0, nz+1)
+                ]
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
+
+        node = node[fd(node) < -self.geps, :]
+
+        r0 = fh(node)**3
+        val = r0/np.max(r0)
+        NN = len(node)
+        node = node[np.random.random(NN) < val]
+
+        fnode = self.domain.facet(0) # 区域中的固定点
+        if fnode is not None:
+            node = np.concatenate((fnode, node), axis=0)
+
+        cell = self.delaunay(node)
+        self.mesh = TetrahedronMesh(node, cell)
+
+    def step_length(self):
+        return self.dt
+
+    def step(self, dt):
+        """
+        @brief  
+        """
+
+        fd = self.domain.signed_dist_function
+        fh = self.domain.sizing_function 
+        hmin = self.hmin
+        
+        dxdt = self.dx_dt(self.time_elapsed)
+        self.mesh.node = self.mesh.node + dt*dxdt
+
+        node = self.mesh.entity('node')
+        d = fd(node)
+        idx = d > 0
+        node[idx] = self.domain.projection(node[idx])
+        self.maxmove = np.max(dt*np.sqrt(np.sum(dxdt[d < -self.geps,:]**2, axis=1))/hmin)
+        self.time_elapsed += dt
+
+       # if self.maxmove > self.ttol:
+        cell = self.delaunay(self.mesh.node)
+        self.mesh = TetrahedronMesh(self.mesh.node, cell)
+
+    def dx_dt(self, t):
+        """
+        @brief 计算移动步长
+        """
+        fd = self.domain.signed_dist_function
+        fh = self.domain.sizing_function 
+        fscale = self.fscale
+
+        node = self.mesh.entity('node')
+        edge = self.mesh.entity('edge')
+        NN = self.mesh.number_of_nodes()
+
+        v = node[edge[:, 0]] - node[edge[:, 1]]
+        L = np.sqrt(np.sum(v**2, axis=1))
+        he = fh(node[edge[:, 1]] + v/2) 
+        L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*fscale*he
+        F = np.minimum(L0 - L, 0)
+        FV = (F/L)[:, None]*v
+
+        dxdt = np.zeros((NN, 3), dtype=np.float64)
+        np.add.at(dxdt[:, 0], edge[:, 0], FV[:, 0])
+        np.add.at(dxdt[:, 1], edge[:, 0], FV[:, 1])
+        np.add.at(dxdt[:, 2], edge[:, 0], FV[:, 2])
+        np.subtract.at(dxdt[:, 0], edge[:, 1], FV[:, 0])
+        np.subtract.at(dxdt[:, 1], edge[:, 1], FV[:, 1])
+        np.subtract.at(dxdt[:, 2], edge[:, 1], FV[:, 2])
+
+        fnode = self.domain.facet(0)
+        if fnode is not None:
+            n = len(fnode)
+            dxdt[0:n, :] = 0.0
+        return dxdt 
+
+    def delaunay(self, node):
+        fd = self.domain.signed_dist_function
+        d = Delaunay(node)
+        cell = np.asarray(d.simplices, dtype=np.int_)
+        bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
+                node[cell[:, 2]])/4
+        return  cell[fd(bc) < -self.geps, :]
 
     def meshing(self, maxit=1000):
         """
@@ -47,7 +158,9 @@ class DistMesher3d():
         self.set_init_mesh()
         count = 0
         while count < maxit: 
-            print('count = ', count)
+            fname = "mesh-%05d.vtu"%(count)
+            print(fname)
+            self.mesh.to_vtk(fname=fname)
             dt = self.step_length()
             self.step(dt)
             count += 1
@@ -117,117 +230,3 @@ class DistMesher3d():
                 init_func=init_func,
                 interval=interval)
         ani.save(fname)
-
-    def set_init_mesh(self): 
-        """
-        @brief 生成初始网格
-        """
-
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        box = self.domain.box
-
-        hmin = self.hmin
-
-        xh = box[1] - box[0]
-        yh = box[3] - box[2]
-        zh = box[5] - box[4]
-        nx = int(xh/hmin) + 1
-        ny = int(yh/hmin) + 1
-        nz = int(zh/hmin) + 1 
-
-        NN = (nx+1)*(ny+1)*(nz+1)
-        node = np.zeros((NN, 3), dtype=np.float64)
-        X, Y, Z = np.mgrid[
-                box[0]:box[1]:complex(0, nx+1), 
-                box[2]:box[3]:complex(0, ny+1),
-                box[4]:box[5]:complex(0, nz+1)
-                ]
-        node[:, 0] = X.flatten()
-        node[:, 1] = Y.flatten()
-        node[:, 2] = Z.flatten()
-
-        node = node[fd(node) < -self.geps, :]
-
-        r0 = fh(node)**3
-        val = r0/np.max(r0)
-        NN = len(node)
-        node = node[np.random.random(NN) < val]
-
-        fnode = self.domain.facet(0) # 区域中的固定点
-        if fnode is not None:
-            node = np.concatenate((fnode, node), axis=0)
-
-        cell = self.delaunay(node)
-        self.mesh = TetrahedronMesh(node, cell)
-
-    def step_length(self):
-        return self.dt
-
-    def step(self, dt):
-        """
-        @brief  
-        """
-
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        hmin = self.hmin
-        
-        dxdt = self.dx_dt(self.time_elapsed)
-        self.mesh.node = self.mesh.node + dt*dxdt
-
-        node = self.mesh.entity('node')
-        d = fd(node)
-        idx = d > 0
-        node[idx] = self.domain.projection(node[idx])
-        self.maxmove = np.max(dt*np.sqrt(np.sum(dxdt[d < -self.geps,:]**2, axis=1))/hmin)
-        self.time_elapsed += dt
-
-        """
-        if self.maxmove > self.ttol:
-            cell = self.delaunay(self.mesh.node)
-            self.mesh = TetrahedronMesh(self.mesh.node, cell)
-        """
-        cell = self.delaunay(self.mesh.node)
-        self.mesh = TetrahedronMesh(self.mesh.node, cell)
-
-    def dx_dt(self, t):
-        """
-        @brief 计算移动步长
-        """
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        fscale = self.fscale
-
-        node = self.mesh.entity('node')
-        edge = self.mesh.entity('edge')
-        NN = self.mesh.number_of_nodes()
-
-        v = node[edge[:, 0]] - node[edge[:, 1]]
-        L = np.sqrt(np.sum(v**2, axis=1))
-        he = fh(node[edge[:, 1]] + v/2) 
-        L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*fscale*he
-        F = np.minimum(L0 - L, 0)
-        FV = (F/L)[:, None]*v
-
-        dxdt = np.zeros((NN, 3), dtype=np.float64)
-        np.add.at(dxdt[:, 0], edge[:, 0], FV[:, 0])
-        np.add.at(dxdt[:, 1], edge[:, 0], FV[:, 1])
-        np.add.at(dxdt[:, 2], edge[:, 0], FV[:, 2])
-        np.subtract.at(dxdt[:, 0], edge[:, 1], FV[:, 0])
-        np.subtract.at(dxdt[:, 1], edge[:, 1], FV[:, 1])
-        np.subtract.at(dxdt[:, 2], edge[:, 1], FV[:, 2])
-
-        fnode = self.domain.facet(0)
-        if fnode is not None:
-            n = len(fnode)
-            dxdt[0:n, :] = 0.0
-        return dxdt 
-
-    def delaunay(self, node):
-        fd = self.domain.signed_dist_function
-        d = Delaunay(node)
-        cell = np.asarray(d.simplices, dtype=np.int_)
-        bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
-                node[cell[:, 2]])/4
-        return  cell[fd(bc) < -self.geps, :]
