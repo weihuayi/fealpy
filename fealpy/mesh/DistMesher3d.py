@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from .TetrahedronMesh import TetrahedronMesh 
 
 class DistMesher3d():
+
     def __init__(self,
             domain, 
             hmin,
@@ -23,10 +24,11 @@ class DistMesher3d():
         @param[in] dt
         """
 
+        self.localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
         self.domain = domain
         self.hmin = hmin
-        self.ptol = ptol
-        self.ttol = ttol
+        self.ptol = ptol # 初始点拒绝阈值
+        self.ttol = ttol # 单元删除阈值
         self.fscale = fscale
 
         eps = np.finfo(float).eps
@@ -34,91 +36,10 @@ class DistMesher3d():
         self.deps = np.sqrt(eps)*hmin
         self.dt = dt 
 
-        self.maxmove = float('inf')
+        self.NT = 0 # 记录三角化的次数
 
-        self.time_elapsed = 0
-        self.count = 0
 
-    def meshing(self, maxit=1000):
-        """
-        @brief 运行
-        """
-        ptol = self.ptol
-        self.set_init_mesh()
-        count = 0
-        while count < maxit: 
-            print('count = ', count)
-            dt = self.step_length()
-            self.step(dt)
-            count += 1
-            if self.maxmove < ptol:
-                break
-
-    def meshing_with_animation(self, plot=None, axes=None, 
-            fname='test.mp4', frames=1000,  interval=50, 
-            edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
-
-        import matplotlib.animation as animation
-        from mpl_toolkits.mplot3d.art3d import Line3DCollection
-
-        if plot is None:
-            import matplotlib.pyplot as plt
-            fig = plt.figure()
-            axes = plt.axes(projection='3d')
-        else:
-            if isinstance(plot, ModuleType):
-                fig, axes = plt.subplots(projection='3d')
-            else:
-                fig = plot
-                if axes is None:
-                    axes = fig.gca(projection='3d')
-
-        fig.set_facecolor('white')
-
-        try:
-            axes.set_aspect(aspect)
-        except NotImplementedError:
-            pass
-
-        if showaxis == False:
-            axes.set_axis_off()
-        else:
-            axes.set_axis_on()
-
-        ptol = self.ptol 
-        box = self.domain.box
-        lines = Line3DCollection([], linewidths=linewidths, color=edgecolor)
-
-        def init_func():
-            self.set_init_mesh()
-            node = self.mesh.entity('node')
-            axes.set_xlim(box[0:2])
-            axes.set_ylim(box[2:4])
-
-            edge = self.mesh.entity('edge')
-            lines.set_segments(node[edge])
-            axes.add_collection3d(lines)
-
-            return lines
-
-        def func(n):
-            dt = self.step_length()
-            self.step(dt)
-
-            node = self.mesh.entity('node')
-            edge = self.mesh.entity('edge')
-            lines.set_segments(node[edge])
-            s = "step=%05d"%(n)
-            print(s)
-            axes.set_title(s)
-            return lines
-
-        ani = animation.FuncAnimation(fig, func, frames=frames,
-                init_func=init_func,
-                interval=interval)
-        ani.save(fname)
-
-    def set_init_mesh(self): 
+    def init_nodes(self): 
         """
         @brief 生成初始网格
         """
@@ -147,82 +68,20 @@ class DistMesher3d():
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
 
-        node = node[fd(node) < -self.geps, :]
+        node = node[fd(node) < self.geps, :]
 
         r0 = fh(node)**3
-        val = r0/np.max(r0)
+        val = np.min(r0)/r0
         NN = len(node)
         node = node[np.random.random(NN) < val]
 
         fnode = self.domain.facet(0) # 区域中的固定点
         if fnode is not None:
+            #TODO: fnode 和 node 中可能存在重复点
             node = np.concatenate((fnode, node), axis=0)
 
-        cell = self.delaunay(node)
-        self.mesh = TetrahedronMesh(node, cell)
+        return node
 
-    def step_length(self):
-        return self.dt
-
-    def step(self, dt):
-        """
-        @brief  
-        """
-
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        hmin = self.hmin
-        
-        dxdt = self.dx_dt(self.time_elapsed)
-        self.mesh.node = self.mesh.node + dt*dxdt
-
-        node = self.mesh.entity('node')
-        d = fd(node)
-        idx = d > 0
-        node[idx] = self.domain.projection(node[idx])
-        self.maxmove = np.max(dt*np.sqrt(np.sum(dxdt[d < -self.geps,:]**2, axis=1))/hmin)
-        self.time_elapsed += dt
-
-        """
-        if self.maxmove > self.ttol:
-            cell = self.delaunay(self.mesh.node)
-            self.mesh = TetrahedronMesh(self.mesh.node, cell)
-        """
-        cell = self.delaunay(self.mesh.node)
-        self.mesh = TetrahedronMesh(self.mesh.node, cell)
-
-    def dx_dt(self, t):
-        """
-        @brief 计算移动步长
-        """
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        fscale = self.fscale
-
-        node = self.mesh.entity('node')
-        edge = self.mesh.entity('edge')
-        NN = self.mesh.number_of_nodes()
-
-        v = node[edge[:, 0]] - node[edge[:, 1]]
-        L = np.sqrt(np.sum(v**2, axis=1))
-        he = fh(node[edge[:, 1]] + v/2) 
-        L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*fscale*he
-        F = np.minimum(L0 - L, 0)
-        FV = (F/L)[:, None]*v
-
-        dxdt = np.zeros((NN, 3), dtype=np.float64)
-        np.add.at(dxdt[:, 0], edge[:, 0], FV[:, 0])
-        np.add.at(dxdt[:, 1], edge[:, 0], FV[:, 1])
-        np.add.at(dxdt[:, 2], edge[:, 0], FV[:, 2])
-        np.subtract.at(dxdt[:, 0], edge[:, 1], FV[:, 0])
-        np.subtract.at(dxdt[:, 1], edge[:, 1], FV[:, 1])
-        np.subtract.at(dxdt[:, 2], edge[:, 1], FV[:, 2])
-
-        fnode = self.domain.facet(0)
-        if fnode is not None:
-            n = len(fnode)
-            dxdt[0:n, :] = 0.0
-        return dxdt 
 
     def delaunay(self, node):
         fd = self.domain.signed_dist_function
@@ -231,3 +90,86 @@ class DistMesher3d():
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
                 node[cell[:, 2]])/4
         return  cell[fd(bc) < -self.geps, :]
+
+    def meshing(self, maxit=1000):
+        """
+        @brief 运行
+        """
+        fd = self.domain.signed_dist_function
+        fh = self.domain.sizing_function 
+        hmin = self.hmin
+        dt = self.dt
+        fscale = self.fscale
+
+        localEdge = self.localEdge
+        ptol = self.ptol
+        ttol = self.ttol
+        deps = self.deps
+        geps = self.geps
+
+        node = self.init_nodes()
+
+        NT = 0
+        mmove = 1e+10
+        count = 0 
+        while count < maxit: 
+            count += 1
+            if mmove > self.ttol*self.hmin:
+                p0 = node.copy()
+                cell = self.delaunay(node)
+                NT += 1
+                print("第 %05d 次三角化"%(NT))
+                totalEdge = cell[:, localEdge].reshape(-1, 2)
+                edge  = np.unique(np.sort(totalEdge, axis=1), axis=0)
+
+                fname = "mesh-%05d.vtu"%(NT)
+                mesh = TetrahedronMesh(node, cell)
+                mesh.to_vtk(fname=fname)
+
+            v = node[edge[:, 0]] - node[edge[:, 1]]
+            L = np.sqrt(np.sum(v**2, axis=1))
+            bc = (node[edge[:, 0]] + node[edge[:, 1]])/2.0
+            he = fh(bc) 
+            L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*fscale*he
+            F = np.minimum(L0 - L, 0)
+            FV = (F/L)[:, None]*v
+
+            dnode = np.zeros(node.shape, dtype=np.float64)
+
+            np.add.at(dnode[:, 0], edge[:, 0], FV[:, 0])
+            np.add.at(dnode[:, 1], edge[:, 0], FV[:, 1])
+            np.add.at(dnode[:, 2], edge[:, 0], FV[:, 2])
+            np.subtract.at(dnode[:, 0], edge[:, 1], FV[:, 0])
+            np.subtract.at(dnode[:, 1], edge[:, 1], FV[:, 1])
+            np.subtract.at(dnode[:, 2], edge[:, 1], FV[:, 2])
+
+            fnode = self.domain.facet(0)
+            if fnode is not None:
+                n = len(fnode)
+                dnode[0:n, :] = 0.0
+
+            node += dt*dnode
+
+            d = fd(node)
+            idx = d > 0
+            depsx = np.array([self.deps, 0, 0])
+            depsy = np.array([0, self.deps, 0])
+            depsz = np.array([0, 0, self.deps])
+            dgradx = (fd(node[idx, :] + depsx) - d[idx])/deps
+            dgrady = (fd(node[idx, :] + depsy) - d[idx])/deps
+            dgradz = (fd(node[idx, :] + depsz) - d[idx])/deps
+            node[idx, 0] = node[idx, 0] - d[idx]*dgradx
+            node[idx, 1] = node[idx, 1] - d[idx]*dgrady
+            node[idx, 2] = node[idx, 2] - d[idx]*dgradz
+
+            md = dt*np.max(np.sqrt(np.sum(dnode[d < -geps]**2, axis=1)))
+            if md < ptol*hmin:
+                break
+            else:
+                mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
+
+
+        cell = self.delaunay(node)
+        return TetrahedronMesh(node, cell)
+
+    
