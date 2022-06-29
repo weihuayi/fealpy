@@ -15,11 +15,11 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--hmin', 
-        default=0.2, type=float, 
-        help="最小网格尺寸值，默认 0.2")
+        default=0.1, type=float, 
+        help="最小网格尺寸值，默认 0.1")
 
 parser.add_argument('--hmax', 
-        default=0.2, type=float, 
+        default=0.1, type=float, 
         help="最大网格尺寸值，默认与最小网格尺寸相同")
 
 parser.add_argument('--animation', 

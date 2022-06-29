@@ -2,17 +2,17 @@ import numpy as np
 from scipy.spatial import Delaunay
 import matplotlib.pyplot as plt
 
-from .TetrahedronMesh import TetrahedronMesh 
+from .TriangleMesh import TriangleMesh 
 
-class DistMesher3d():
+class DistMesher2d():
 
     def __init__(self,
             domain, 
             hmin,
             ptol = 0.001,
             ttol = 0.1,
-            fscale = 1.1,
-            dt = 0.1,
+            fscale = 1.2,
+            dt = 0.2,
             output=True):
         """
         @brief 
@@ -34,7 +34,7 @@ class DistMesher3d():
         self.output = output
 
         eps = np.finfo(float).eps
-        self.geps = 0.01*hmin
+        self.geps = 0.001*hmin
         self.deps = np.sqrt(eps)*hmin
         self.dt = dt 
 
@@ -49,39 +49,30 @@ class DistMesher3d():
         fd = self.domain.signed_dist_function
         fh = self.domain.sizing_function 
         box = self.domain.box
-
         hmin = self.hmin
+
 
         xh = box[1] - box[0]
         yh = box[3] - box[2]
-        zh = box[5] - box[4]
-        nx = int(xh/hmin) + 1
-        ny = int(yh/hmin) + 1
-        nz = int(zh/hmin) + 1 
+        N = int(xh/hmin)+1
+        M = int(yh/(hmin*np.sqrt(3)/2)) + 1
 
-        NN = (nx+1)*(ny+1)*(nz+1)
-        node = np.zeros((NN, 3), dtype=np.float64)
-        X, Y, Z = np.mgrid[
-                box[0]:box[1]:complex(0, nx+1), 
-                box[2]:box[3]:complex(0, ny+1),
-                box[4]:box[5]:complex(0, nz+1)
-                ]
-        node[:, 0] = X.flatten()
-        node[:, 1] = Y.flatten()
-        node[:, 2] = Z.flatten()
-
-        node = node[fd(node) < self.geps, :]
-
-        r0 = fh(node)**3
-        val = np.min(r0)/r0
+        mg = np.mgrid[box[2]:box[3]:complex(0, M), box[0]:box[1]:complex(0, N)]
+        x = mg[1, :, :]
+        y = mg[0, :, :]
+        x[1::2, :] += hmin/2
+        node = np.concatenate(
+                (x.reshape(-1, 1), y.reshape((-1,1))), 
+                axis=1)
+        node = node[fd(node) < -self.geps, :]
+        r0 = 1/fh(node)**2
         NN = len(node)
-        node = node[np.random.random(NN) < val]
+        node = node[np.random.random((NN, )) < r0/np.max(r0),:]
 
         fnode = self.domain.facet(0) # 区域中的固定点
         if fnode is not None:
-            #TODO: fnode 和 node 中可能存在重复点
+            # TODO: 重复点的问题
             node = np.concatenate((fnode, node), axis=0)
-
         return node
 
 
