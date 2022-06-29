@@ -7,7 +7,7 @@ from .Function import Function
 from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
 
-class NDof3d:
+class FNDof3d:
     def __init__(self, mesh):
         """
         Parameters
@@ -24,32 +24,28 @@ class NDof3d:
         self.cell2dof = self.cell_to_dof() # 默认的自由度数组
 
     def boundary_dof(self, threshold=None):
-        """
-        """
-        pass
+        return self.mesh.ds.boundary_edge_flag()
 
     def is_boundary_dof(self, threshold=None):
-        """
-        """
-        pass
+        return self.mesh.ds.boundary_edge_flag()
 
     def edge_to_dof(self):
         mesh = self.mesh
         NE = mesh.number_of_edges()
-        edof = self.number_of_local_dofs('edge')
-        edge2dof = np.arange(NE*edof).reshape(NE, edof)
-        return edge2dof
+        return np.arange(NE) 
 
     def face_to_dof(self):
-        pass
+        mesh = self.mesh
+        return mesh.ds.face_to_edge()
 
     def cell_to_dof(self):
-        pass
+        mesh = self.mesh
+        return mesh.ds.cell_to_edge()
 
     def number_of_local_dofs(self, doftype='all'):
         stype = self.spacetype
         if doftype == 'all': # number of all dofs on a cell 
-            return 3
+            return 6
         elif doftype in {'cell', 3}: # number of dofs inside the cell 
             return 0 
         elif doftype in {'face', 2}: # number of dofs on a face 
@@ -60,14 +56,15 @@ class NDof3d:
             return 0
 
     def number_of_global_dofs(self):
-        pass
-
-
+        mesh = self.mesh
+        NE = mesh.number_of_edges()
+        return NE
 
 class FirstNedelecFiniteElementSpace3d:
-    def __init__(self, mesh, q=None, dof=None):
+    def __init__(self, mesh, p = 1, q=None, dof=None):
         """
         """
+        self.p = p
         self.mesh = mesh
 
         if dof is None:
@@ -75,7 +72,7 @@ class FirstNedelecFiniteElementSpace3d:
         else:
             self.dof = dof
 
-        self.integralalg = FEMeshIntegralAlg(self.mesh, q)
+        self.integralalg = FEMeshIntegralAlg(self.mesh, 3)
         self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
@@ -102,11 +99,11 @@ class FirstNedelecFiniteElementSpace3d:
         Parameters
         ----------
         bc : numpy.ndarray
-            the shape of `bc` can be `(3,)` or `(NQ, 3)`
+            the shape of `bc` can be `(4,)` or `(NQ, 4)`
         Returns
         -------
         phi : numpy.ndarray
-            the shape of 'phi' can be `(NC, ldof, 2)` or `(NQ, NC, ldof, 2)`
+            the shape of 'phi' can be `(NC, ldof, 3)` or `(NQ, NC, ldof, 3)`
 
 
 
@@ -120,19 +117,20 @@ class FirstNedelecFiniteElementSpace3d:
         """
 
         p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
 
         if p == 1:
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda() # (NC, 4, 3)
+            phi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                    localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                    localEdge[:, 0]]
+            c2es = mesh.ds.cell_to_edge_sign1().astype(np.float_)
+            c2es[c2es==0] = -1
+            return phi*c2es[..., None]
+        else:
             pass
-        elif p == 2:
-            pass
-        elif p == 3:
-            pass
-
-        return phi
-
-    @barycentric
-    def rot_basis(self, bc, index=np.s_[:]):
-        return self.curl_basis(bc, index, barycenter)
 
     @barycentric
     def curl_basis(self, bc, index=np.s_[:]):
@@ -145,6 +143,24 @@ class FirstNedelecFiniteElementSpace3d:
         -----
 
         """
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+
+        if p == 1:
+            localEdge = mesh.ds.localEdge
+            glambda = mesh.grad_lambda() # (NC, 4, 3)
+            cphi = np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
+
+            c2es = mesh.ds.cell_to_edge_sign1().astype(np.float_)
+            c2es[c2es==0] = -1
+            cphi = cphi*c2es[..., None]
+
+            shape = bc.shape[:-1] + cphi.shape
+            cphi = np.broadcast_to(cphi, shape)
+            return cphi
+        else:
+            pass
 
     @barycentric
     def grad_basis(self, bc, index=np.s_[:]):
@@ -179,16 +195,12 @@ class FirstNedelecFiniteElementSpace3d:
         return val
 
     @barycentric
-    def rot_value(self, uh, bc, index=np.s_[:]):
-        return self.curl_value(uh, bc, index)
-
-    @barycentric
     def curl_value(self, uh, bc, index=np.s_[:]):
         cphi = self.curl_basis(bc, index=index)
         cell2dof = self.cell_to_dof()
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
         val = np.einsum(s1, cphi, uh[cell2dof[index]])
         return val
 
@@ -217,7 +229,17 @@ class FirstNedelecFiniteElementSpace3d:
         pass
 
     def mass_matrix(self, c=None, q=None):
-        pass
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.basis(bcs) #(NQ, NC, 6, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        val = np.einsum("qclg, qcmg, q, c->clm", phi, phi, ws, cm)
+        I = np.broadcast_to(cell2dof[..., None], val.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+        gdof = self.dof.number_of_global_dofs()
+        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+                dtype=np.float_)
 
     def curl_matrix(self, c=None, q=None):
         """
@@ -226,17 +248,47 @@ class FirstNedelecFiniteElementSpace3d:
 
         组装 (c*\\nabla \\times u_h, \\nabla \\times u_h) 矩阵 
         """
-        pass
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.curl_basis(bcs) #(NQ, NC, 6, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        val = np.einsum("qclg, qcmg, q, c->clm", phi, phi, ws, cm)
+        I = np.broadcast_to(cell2dof[..., None], val.shape)
+        J = np.broadcast_to(cell2dof[:, None, :], val.shape)
+        gdof = self.dof.number_of_global_dofs()
+        return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
+                dtype=np.float_)
 
 
     def source_vector(self, f):
-        pass
+        bcs, ws = self.integrator.get_quadrature_points_and_weights()
+        phi = self.curl_basis(bcs) #(NQ, NC, 6, 3)
+        cm = self.mesh.cell_volume()
+        cell2dof = self.cell_to_dof()
+
+        point = self.mesh.bc_to_point(bcs) 
+        fval = f(point) #(NQ, NC, 3)
+
+        val = np.einsum("qclg, qcg, q, c->cl", phi, fval, ws, cm)
+        gdof = self.dof.number_of_global_dofs()
+        F = np.zeros(gdof, dtype=np.float_)
+        np.add.at(F, cell2dof, val)
+        return F
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
         """
         """
-        pass
+        mesh = self.mesh
+        node = mesh.entity("node")
+        edge = mesh.entity("edge")
+        isbdedge = mesh.ds.boundary_edge_flag()
+        et = mesh.edge_tangent()[isbdedge]
+        point = 0.5*node[edge[isbdedge, 0]] + 0.5*node[edge[isbdedge, 1]]
 
+        isDDof = self.boundary_dof(threshold=threshold)
+        uh[isDDof] = np.sum(gD(point)*et, axis=-1)
+        return isDDof
 
     def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
