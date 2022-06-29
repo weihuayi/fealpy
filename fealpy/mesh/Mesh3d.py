@@ -317,6 +317,20 @@ class Mesh3dDataStructure():
             cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
         return cell2edgeSign
 
+    def cell_to_edge_sign1(self):
+        """
+
+        TODO: check here
+        """
+        NC = self.NC
+        NEC = self.NEC
+        localEdge = self.localEdge
+        cell = self.cell
+        edge = self.edge
+        cell2edge = self.cell_to_edge()
+        cell2edgeSign = edge[cell2edge, 0]==cell[:, localEdge[:, 0]]
+        return cell2edgeSign
+
     def cell_to_face(self, return_sparse=False):
         NC = self.NC
         NF = self.NF
