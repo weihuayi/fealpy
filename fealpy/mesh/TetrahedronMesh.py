@@ -304,6 +304,7 @@ class TetrahedronMesh(Mesh3d):
             fj = cell[:, localFace[i]] # 第 i 个局部面
             idxj = np.argsort(fj, axis=1) # 第 i 个局部面的顶点编号做一个排序
             idxjr = np.argsort(idxj, axis=1) # 第 i 个局部面
+
             idx = idxi[np.arange(NC).reshape(-1, 1), idxjr] # 
 
             isCase0 = (np.sum(idx == np.array([1, 2, 0]), axis=1) == 3)
