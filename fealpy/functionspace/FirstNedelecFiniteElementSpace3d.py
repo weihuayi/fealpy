@@ -6,6 +6,7 @@ from ..decorator import barycentric
 from .Function import Function
 from ..quadrature import FEMeshIntegralAlg
 from ..decorator import timer
+from scipy.sparse.linalg import spsolve, cg
 
 class FNDof3d:
     def __init__(self, mesh):
@@ -104,8 +105,6 @@ class FirstNedelecFiniteElementSpace3d:
         -------
         phi : numpy.ndarray
             the shape of 'phi' can be `(NC, ldof, 3)` or `(NQ, NC, ldof, 3)`
-
-
 
         See Also
         --------
@@ -223,10 +222,23 @@ class FirstNedelecFiniteElementSpace3d:
                 dtype=dtype)
 
     def project(self, u):
-        return self.interpolation(u)
+        A = self.mass_matrix()
+        b = self.source_vector(u)
+        up = self.function()
+        up[:] = spsolve(A, b)
+        return up
 
     def interpolation(self, u):
-        pass
+        mesh = self.mesh
+        node = mesh.entity("node")
+        edge = mesh.entity("edge")
+
+        et = mesh.edge_tangent()
+        point = 0.5*node[edge[:, 0]] + 0.5*node[edge[:, 1]]
+
+        uI = self.function()
+        uI[:] = np.sum(u(point)*et, axis=-1)
+        return uI
 
     def mass_matrix(self, c=None, q=None):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()

@@ -97,6 +97,12 @@ class Mesh3d():
 
         return bc
 
+    def edge_tangent(self):
+        edge = self.ds.edge
+        node = self.node
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        return v
+
     def edge_unit_tangent(self):
         edge = self.ds.edge
         node = self.node
