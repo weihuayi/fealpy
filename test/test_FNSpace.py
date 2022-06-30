@@ -6,63 +6,71 @@ import sys
 import argparse 
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import TriangleMesh
+from fealpy.mesh import TetrahedronMesh
 from fealpy.functionspace import FirstNedelecFiniteElementSpace3d 
 from fealpy.decorator import cartesian, barycentric
-
-from fealpy.tools.show import showmultirate, show_error_table
-
-from fealpy.boundarycondition import DirichletBC #导入边界条件包
 # solver
-from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve, cg
-
-from fealpy.pde.MaxwellPDE import XXX3dData as PDE
-#from fealpy.pde.MaxwellPDE import Sin3dData as PDE
-#from fealpy.pde.MaxwellPDE import Bubble3dData as PDE
 
 import matplotlib.colors as colors
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-pde = PDE()
-mesh = pde.init_mesh(0)
+def ff(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    z = p[..., 2]
 
-maxit = 4
-errorType = ['$|| E - E_h||_{\Omega,0}$']
-errorMatrix = np.zeros((1, maxit), dtype=np.float64)
-NDof = np.zeros(maxit, dtype=np.int_)
+    val = np.zeros(p.shape, dtype=np.float_)
+    val[..., 0] = 0
+    val[..., 1] = 0
+    val[..., 2] = 3*z
+    return val
 
-for i in range(maxit):
-    print("The {}-th computation:".format(i))
+node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]],
+        dtype=np.float_)
+#cell = np.array([[0, 1, 2, 3], [0, 2, 1, 4]], dtype=np.int_)
+node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float_)
+cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+mesh = TetrahedronMesh(node, cell) 
 
-    s0 = time.time()
-    space = FirstNedelecFiniteElementSpace3d(mesh)
+space = FirstNedelecFiniteElementSpace3d(mesh)
 
-    gdof = space.dof.number_of_global_dofs()
-    NDof[i] = gdof
+M = space.mass_matrix()
+A = space.curl_matrix()
 
-    M = (pde.omega**2)*space.mass_matrix()
-    A = space.curl_matrix()
-    b = space.source_vector(pde.source)
-    B = A-M 
+fh = space.interpolation(ff)
+#fh = space.project(ff)
 
-    Eh = space.function()
-    s = time.time()
-    Eh[:] = spsolve(B, b)
-    e = time.time()
-    print("time = ", e-s)
-    print("time = ", s-s0)
-    # 计算误差
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)
+#fh[:] = 0
+#fh[0] = 1
 
-    if i < maxit-1:
-        mesh.uniform_refine()
+print(mesh.entity("edge"))
+print(mesh.grad_lambda())
+print(mesh.ds.localEdge)
 
-showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
-show_error_table(NDof, errorType, errorMatrix)
-print(errorMatrix)
+bcs = np.array([[0.5, 0.5, 0.0, 0.0]])
+phi = space.basis(bcs)
+glambda = mesh.grad_lambda()
+cell2edge = mesh.ds.cell_to_edge()
 
-fname = "Ord%i"%(int(sys.argv[1]))+".png"
-plt.savefig(fname, dpi=400)
+et = mesh.edge_tangent()[cell2edge[0]]
+
+val = np.einsum("ad, vd->av", phi[0, 0], et)
+print("val = ", val)
+
+
+
+
+
+print("fh = ", fh(bcs))
+
+print(phi)
+print(fh[:])
+
+# 计算误差
+err = space.integralalg.error(ff, fh)
+print(err)
+
+
