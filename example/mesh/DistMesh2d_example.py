@@ -55,6 +55,7 @@ if domain == 0:
         (1.0, 0.0), 
         (1.0, 1.0), 
         (0.0, 1.0)], dtype=np.float64)
+
 elif domain == 1:
     bbox = [-1, 1, -1, 1]
     fd = lambda p: dcircle(p, [0.0, 0.0], 1.0)
