@@ -619,7 +619,10 @@ class TriangleMesh(Mesh2d):
 
         return start 
 
-    def circumcenter(self):
+    def circumcenter(self, returnradius=False):
+        """
+        @brief 计算三角形外接圆的圆心和半径
+        """
         node = self.node
         cell = self.ds.cell
         GD = self.geo_dimension()
@@ -631,9 +634,9 @@ class TriangleMesh(Mesh2d):
         if GD == 2:
             area = nv/2.0
             x2 = np.sum(node**2, axis=1, keepdims=True)
-            w0 = x2[cell[:,2]] + x2[cell[:,1]]
-            w1 = x2[cell[:,0]] + x2[cell[:,2]]
-            w2 = x2[cell[:,1]] + x2[cell[:,0]]
+            w0 = x2[cell[:, 2]] + x2[cell[:, 1]]
+            w1 = x2[cell[:, 0]] + x2[cell[:, 2]]
+            w2 = x2[cell[:, 1]] + x2[cell[:, 0]]
             W = np.array([[0, -1],[1, 0]], dtype=self.ftype)
             fe0 = w0*v0@W
             fe1 = w1*v1@W
@@ -648,7 +651,11 @@ class TriangleMesh(Mesh2d):
             d = 0.5*(l02*np.cross(n, v2) + l01*np.cross(-v1, n))/length.reshape(-1, 1)
             c = node[cell[:, 0]] + d
             R = np.sqrt(np.sum(d**2, axis=1))
-        return c, R
+
+        if returnradius:
+            return c, R
+        else:
+            return c
 
     def angle(self):
         NC = self.number_of_cells()
