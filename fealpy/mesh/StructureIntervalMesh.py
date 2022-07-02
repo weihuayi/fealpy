@@ -49,22 +49,21 @@ class StructureIntervalMesh(object):
         @brief 加密一次生成的矩阵 
         """
         nx = self.ds.nx
-        NNH = int(nx/2 + 1)
+        NNH = nx//2 + 1
         NNh = self.number_of_nodes()
-        print('nx', nx, NNh, NNH)
 
         I = np.arange(0, NNh, 2)
         J = np.arange(NNH)
-        data = np.ones(NNH, dtype=np.float64)
+        data = np.broadcast_to(1, (len(J),))
         A = coo_matrix((data, (I, J)), shape=(NNh, NNH))
 
         I = np.arange(1, NNh, 2)
         J = np.arange(NNH-1)
+        data = np.broadcast_to(1/2, (len(J),))
         data = np.ones(NNH-1, dtype=np.float64)/2
         A += coo_matrix((data, (I, J)), shape=(NNh, NNH))
 
         J = np.arange(1, NNH)
-        data = np.ones(NNH-1, dtype=np.float64)/2
         A += coo_matrix((data, (I, J)), shape=(NNh, NNH))
 
         A = A.tocsr()
@@ -149,7 +148,7 @@ class StructureIntervalMesh(object):
         x = self.entity_barycenter(etype)
         return f(x)
 
-    def error(self, u, uh):
+    def error(self, h, u, uh):
         """
         @brief 计算真解在网格点处与数值解的误差
         

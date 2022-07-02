@@ -3,7 +3,7 @@ from .signed_distance_function import dcircle, drectangle, dpoly
 from .signed_distance_function import DistDomain2d, DistDomain3d
 from .sizing_function import huniform
 
-from .geoalg import project
+from .geoalg import project, find_cut_point
 
 from .implicit_curve import CircleCurve
 from .implicit_curve import FoldCurve
@@ -34,3 +34,8 @@ from .implicit_surface import SquaredSurface
 # rename 
 from .implicit_surface import SphereSurface as Sphere
 from .implicit_curve import CircleCurve as Circle
+
+# Domain 
+from .CircleDomain import CircleDomain
+from .RectangleDomain import RectangleDomain
+from .SphereDomain import SphereDomain

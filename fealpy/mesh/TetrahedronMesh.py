@@ -11,7 +11,7 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = np.array([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
-    index = np.array([
+    localCell = np.array([
        (0, 1, 2, 3), (0, 2, 3, 1), (0, 3, 1, 2),
        (1, 2, 0, 3), (1, 0, 3, 2), (1, 3, 2, 0),
        (2, 0, 1, 3), (2, 1, 3, 0), (2, 3, 0, 1),
@@ -23,7 +23,7 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     NEF = 3
 
     def __init__(self, N, cell):
-        super(TetrahedronMeshDataStructure, self).__init__(N, cell)
+        super().__init__(N, cell)
 
     def number_of_vertices_of_cells(self):
         return self.NVC
@@ -39,12 +39,13 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
 
 
 class TetrahedronMesh(Mesh3d):
-    def __init__(self, node, cell):
+    def __init__(self, node, cell, showmemory=False):
         self.node = node
         NN = node.shape[0]
         self.ds = TetrahedronMeshDataStructure(NN, cell)
 
         self.meshtype = 'tet'
+        self.p = 1  
 
         self.itype = cell.dtype
         self.ftype = node.dtype
@@ -55,33 +56,337 @@ class TetrahedronMesh(Mesh3d):
         self.nodedata = {}
         self.meshdata = {}
 
-        nsize = self.node.size*self.node.itemsize/2**30
-        csize = self.ds.cell.size*self.ds.cell.itemsize/2**30
-        fsize = self.ds.face.size*self.ds.face.itemsize/2**30
-        esize = self.ds.edge.size*self.ds.edge.itemsize/2**30
-        f2csize = self.ds.face2cell.size*self.ds.face2cell.itemsize/2**30
-        c2esize = self.ds.cell2edge.size*self.ds.cell2edge.itemsize/2**30 
-        total = nsize + csize + fsize + esize + f2csize + c2esize
-        print("memory size of node array (GB): ", nsize)
-        print("memory size of cell array (GB): ", csize)
-        print("memory size of face array (GB): ", fsize)
-        print("memory size of edge array (GB): ", esize)
-        print("memory size of face2cell array (GB): ", f2csize)
-        print("memory size of cell2edge array (GB): ", c2esize)
-        print("Total memory size (GB): ",  total)
+        if showmemory:
+            nsize = self.node.size*self.node.itemsize/2**30
+            csize = self.ds.cell.size*self.ds.cell.itemsize/2**30
+            fsize = self.ds.face.size*self.ds.face.itemsize/2**30
+            esize = self.ds.edge.size*self.ds.edge.itemsize/2**30
+            f2csize = self.ds.face2cell.size*self.ds.face2cell.itemsize/2**30
+            c2esize = self.ds.cell2edge.size*self.ds.cell2edge.itemsize/2**30 
+            total = nsize + csize + fsize + esize + f2csize + c2esize
+            print("memory size of node array (GB): ", nsize)
+            print("memory size of cell array (GB): ", csize)
+            print("memory size of face array (GB): ", fsize)
+            print("memory size of edge array (GB): ", esize)
+            print("memory size of face2cell array (GB): ", f2csize)
+            print("memory size of cell2edge array (GB): ", c2esize)
+            print("Total memory size (GB): ",  total)
 
-
-    def vtk_cell_type(self):
-        VTK_TETRA = 10
-        return VTK_TETRA
-
-    def integrator(self, k, etype=3):
+    def integrator(self, q, etype=3):
+        """
+        @brief 获取不同维度网格实体上的积分公式 
+        """
         if etype in {'cell', 3}:
-            return TetrahedronQuadrature(k)
+            return TetrahedronQuadrature(q)
         elif etype in {'face', 2}:
-            return TriangleQuadrature(k)
+            return TriangleQuadrature(q)
         elif etype in {'edge', 1}:
-            return GaussLegendreQuadrature(k)
+            return GaussLegendreQuadrature(q)
+
+    def bc_to_point(self, bc, index=np.s_[:]):
+        """
+        @brief 把重心坐标积分点变换到实际网格实体上的笛卡尔坐标点
+        """
+        TD = bc.shape[-1] - 1 #
+        node = self.node
+        entity = self.entity(etype=TD)[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[entity])
+        return p
+
+    def edge_bc_to_point(self, bc, index=np.s_[:]):
+        node = self.node
+        edge = self.entity('edge')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[edge])
+        return p
+
+    def face_bc_to_point(self, bc, index=np.s_[:]):
+        node = self.node
+        face = self.entity('face')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[face])
+        return p
+
+    def cell_bc_to_point(self, bc, index=np.s_[:]):
+        node = self.node
+        cell = self.entity('cell')[index]
+        p = np.einsum('...j, ijk->...ik', bc, node[cell])
+        return p
+
+    def multi_index_matrix(self, p, etype='cell'):
+        """
+        @brief 获取四面体上的 p 次的多重指标矩阵
+
+        @param[in] p 正整数 
+
+        @return multiIndex  ndarray with shape (ldof, 4)
+        """
+        if etype in {'cell', 3}:
+            ldof = (p+1)*(p+2)*(p+3)//6
+            idx = np.arange(1, ldof)
+            idx0 = (3*idx + np.sqrt(81*idx*idx - 1/3)/3)**(1/3)
+            idx0 = np.floor(idx0 + 1/idx0/3 - 1 + 1e-4) # a+b+c
+            idx1 = idx - idx0*(idx0 + 1)*(idx0 + 2)/6
+            idx2 = np.floor((-1 + np.sqrt(1 + 8*idx1))/2) # b+c
+            multiIndex = np.zeros((ldof, 4), dtype=np.int_)
+            multiIndex[1:, 3] = idx1 - idx2*(idx2 + 1)/2
+            multiIndex[1:, 2] = idx2 - multiIndex[1:, 3]
+            multiIndex[1:, 1] = idx0 - idx2
+            multiIndex[:, 0] = p - np.sum(multiIndex[:, 1:], axis=1)
+            return multiIndex
+        elif etype in {'face', 2}:
+            ldof = (p+1)*(p+2)//2
+            idx = np.arange(0, ldof)
+            idx0 = np.floor((-1 + np.sqrt(1 + 8*idx))/2)
+            multiIndex = np.zeros((ldof, 3), dtype=np.int_)
+            multiIndex[:,2] = idx - idx0*(idx0 + 1)/2
+            multiIndex[:,1] = idx0 - multiIndex[:,2]
+            multiIndex[:,0] = p - multiIndex[:, 1] - multiIndex[:, 2]
+            return multiIndex
+        elif etype in {'edge', 1}:
+            ldof = p+1
+            multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+            multiIndex[:, 0] = np.arange(p, -1, -1)
+            multiIndex[:, 1] = p - multiIndex[:, 0]
+            return multiIndex
+
+    def interpolation_points(self, p):
+        """
+        @brief 获取整个四面体网格上的全部插值点
+        """
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        if p == 1:
+            return node
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        GD = self.geo_dimension()
+
+        ldof = self.number_of_local_ipoints()
+        gdof = self.number_of_global_ipoints()
+        ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+        ipoints[:NN, :] = node
+
+        if p > 1:
+            NE = self.number_of_edges()
+            edge = self.entity('edge') 
+            w = np.zeros((p-1,2), dtype=self.ftype)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NE, :] = np.einsum('ij, kj...->ki...', w, node[edge,:]).reshape(-1, GD) 
+
+        if p > 2:
+            NF = self.number_of_faces()
+            fidof = (p+1)*(p+2)//2 - 3*p
+            face = self.entity('face') 
+            isEdgeIPoints = (self.multi_index_matrix(p, 'face') == 0)
+            isInFaceIPoints = ~(isEdgeIPoints[:, 0] | isEdgeIPoints[:, 1] | isEdgeIPoints[:, 2])
+            w = self.multi_index_matrix(p, 'face')[isInFaceDof, :]/p
+            ipoints[NN+(p-1)*NE:NN+(p-1)*NE+fidof*NF, :] = np.einsum('ij, kj...->ki...', w, node[face,:]).reshape(-1, GD)
+
+        if p > 3:
+            isFaceIPoints = self.multi_index_matrix(p, 'cell')
+            isInCellIPoints = ~(isFaceIPoints[:,0] | isFaceIPoints[:,1] | isFaceIPoints[:,2] | isFaceIPoints[:, 3])
+            w = self.multi_index_matrix(p, 'cell')[isInCellIPoints, :]/p
+            ipoints[NN+(p-1)*NE+fidof*NF:, :] = np.einsum('ij, kj...->ki...', w,
+                    node[cell,:]).reshape(-1, GD)
+        return ipoints
+
+    def number_of_local_ipoints(self, p):
+        """
+        @brief 每个四面体单元上插值点的个数
+        """
+        return (p+1)*(p+2)*(p+3)//6
+    
+    def number_of_global_ipoints(self, p):
+        """
+        @brief 四面体网格上插值点的总数
+        """
+        NP = self.number_of_nodes()
+        if p > 1:
+            NE = self.number_of_edges()
+            NP += (p-1)*NE
+        if p > 2:
+            NF = self.number_of_faces()
+            NP += (p-2)*(p-1)*NF//2
+        if p > 3:
+            NC = self.number_of_cells()
+            NP += (p-3)*(p-2)*(p-1)*NC//6
+        return NP
+    
+    def edge_to_ipoint(self, p):
+        """
+        @brief 获取网格中每条边与插值点的对应关系
+        """
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+
+        base = NN
+        edge = self.entity('edge')
+        edge2ipoint = np.zeros((NE, p+1), dtype=np.int_)
+        edge2ipoint[:, [0, -1]] = edge
+        if p > 1:
+            edge2ipoint[:,1:-1] = base + np.arange(NE*(p-1)).reshape(NE, p-1)
+        return edge2ipoint
+
+    def face_to_ipoint(self, p):
+        """
+        @brief 获取网格中每个三角形面与插值点的对应关系
+        """
+        fdof = (p+1)*(p+2)//2
+
+        edgeIdx = np.zeros((2, p+1), dtype=np.int_)
+        edgeIdx[0, :] = range(p+1)
+        edgeIdx[1, :] = edgeIdx[0, -1::-1]
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+
+        face = self.entity('face') 
+        edge = self.entity('edge') 
+        face2edge = self.ds.face_to_edge()
+        edge2ipoint = self.edge_to_ipoint(p)
+        face2ipoint = np.zeros((NF, fdof), dtype=np.int_)
+
+        faceIdx = self.multi_index_matrix(p, etype='face') 
+        isEdgeIPoint = (faceIdx == 0)
+
+        fe = np.array([1, 0, 0])
+        for i in range(3):
+            I = np.ones(NF, dtype=np.int_)
+            sign = (face[:, fe[i]] == edge[face2edge[:, i], 0])
+            I[sign] = 0
+            face2ipoint[:, isEdgeIPoint[:, i]] = edge2ipoint[face2edge[:, [i]], edgeIdx[I]]
+
+        if p > 2:
+            base = NN + (p-1)*NE
+            isInFaceIPoint = ~(isEdgeIPoint[:, 0] | isEdgeIPoint[:, 1] | isEdgeIPoint[:, 2])
+            fidof = fdof - 3*p
+            face2ipoint[:, isInFaceIPoint] = base + np.arange(NF*fidof).reshape(NF, fidof)
+
+        return face2ipoint
+
+    def cell_to_ipoint(self, p):
+        """
+        @brief 获取单元与插值点的对应关系
+
+        @param[in] p 正整数
+
+        @return  cell2ipoints 数组， 形状为 (NC, ldof)
+        """
+
+        edof = p+1
+        fdof = (p+1)*(p+2)//2
+        ldof = (p+1)*(p+2)*(p+3)//6 
+
+        localFace = self.ds.localFace 
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        face = self.entity('face')
+        cell = self.entity('cell')
+        cell2face = self.ds.cell_to_face()
+
+        cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
+
+        face2ipoint = self.face_to_ipoint(p)
+        isFaceIPoint = self.multi_index_matrix(p) == 0
+        faceIdx = self.multi_index_matrix(p, 'face').T
+
+        for i in range(4):
+            fi = face[cell2face[:, i]] # 第 i 个全局面 
+            idxi = np.argsort(fi, axis=1) # 第 i 个全局面顶点做一个排序
+
+            fj = cell[:, localFace[i]] # 第 i 个局部面
+            idxj = np.argsort(fj, axis=1) # 第 i 个局部面的顶点编号做一个排序
+            idxjr = np.argsort(idxj, axis=1) # 第 i 个局部面
+
+            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr] # 
+
+            isCase0 = (np.sum(idx == np.array([1, 2, 0]), axis=1) == 3)
+            isCase1 = (np.sum(idx == np.array([2, 0, 1]), axis=1) == 3)
+            idx[isCase0, :] = [2, 0, 1]
+            idx[isCase1, :] = [1, 2, 0]
+            k = faceIdx[idx[:, 1], :] + faceIdx[idx[:, 2], :]
+            a = k*(k+1)//2 + faceIdx[idx[:, 2], :]
+            cell2ipoint[:, isFaceIPoint[:, i]] = face2ipoint[cell2face[:, [i]], a]
+
+        if p > 3:
+            base = NN + (p-1)*NE + (fdof - 3*p)*NF
+            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
+            isInCellIPoint = ~(isFaceIPoint[:, 0] | isFaceIPoint[:, 1] | isFaceIPoint[:, 2] | isFaceIPoint[:, 3])
+            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2ipoint
+
+    def cell_to_ipoint_1(self, p):
+        """
+        @brief 获取单元与插值点的对应关系
+
+        @param[in] p 正整数
+
+        @return  cell2ipoints 数组， 形状为 (NC, ldof)
+        """
+
+        edof = p+1
+        fdof = (p+1)*(p+2)//2
+        ldof = (p+1)*(p+2)*(p+3)//6 
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        face = self.entity('face')
+        cell = self.entity('cell')
+        cell2face = self.ds.cell_to_face()
+
+        cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
+
+        face2ipoint = self.face_to_ipoint(p)
+        m2 = self.multi_index_matrix(p, 'face').T
+        m3 = self.multi_index_matrix(p, 'cell').T
+        isFaceIPoint = (m3 == 0)
+        
+        fidx = np.argsort(face, axis=1) # 第 i 个全局面顶点做一个排序
+        fidx = np.argsort(fidx, axis=1) 
+        for i in range(4):
+            idx = list(range(4))
+            idx.remove(i)
+            idxj = np.argsort(cell[:, idx], axis=1) #  (NC, 3)
+
+            idxi = fidx[cell2face[:, i]]
+
+            order = idxj[np.arange(NC).reshape(-1, 1), idxi] # (NC, 3) 
+            # order 满足条件: fi - fj[np.arange(NC)[:, None], idx] = 0
+
+            mi = m2[order]  # (NC, 3, fdof)
+            k = mi[:, 1] + mi[:, 2] # (NC, fdof)
+            a = k*(k+1)//2 + mi[:, 2] # (NC, fdof)
+            cell2ipoint[:, isFaceIPoint[i]] = face2ipoint[cell2face[:, [i]], a]
+
+        if p > 3:
+            base = NN + (p-1)*NE + (fdof - 3*p)*NF
+            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
+            isInCellIPoint = ~(isFaceIPoint[0] | isFaceIPoint[1] | isFaceIPoint[2] | isFaceIPoint[3])
+            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2ipoint
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 3}:
+            VTK_TETRA = 10
+            return VTK_TETRA
+        elif etype in {'face', 2}:
+            VTK_TRIANGLE = 5
+            return VTK_TRIANGLE
+        elif etype in {'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
 
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
@@ -209,7 +514,7 @@ class TetrahedronMesh(Mesh3d):
         """
         node = self.node
         cell = self.ds.cell
-        index = self.ds.index
+        index = self.ds.localCell
         v10 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 1]]]
         v20 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 2]]]
         v30 = node[cell[:, index[3*i, 0]]] - node[cell[:, index[3*i, 3]]]
@@ -276,14 +581,6 @@ class TetrahedronMesh(Mesh3d):
         return np.array(angle).T
 
 
-    def bc_to_point(self, bc, etype='cell', index=np.s_[:]):
-
-        TD = bc.shape[-1] - 1 #
-        node = self.node
-        entity = self.entity(etype=TD)
-        p = np.einsum('...j, ijk->...ik', bc, node[entity[index]])
-        return p
-
     def circumcenter(self):
         node = self.node
         cell = self.ds.cell
@@ -327,7 +624,7 @@ class TetrahedronMesh(Mesh3d):
         R = ld/vol/12.0
         r = 3.0*vol/ss
         q = R/r/3.0
-        index = self.ds.index
+        index = self.ds.localCell
         g = np.zeros((NC, 4, 3), dtype=self.ftype)
         w = np.zeros((NC, 4), dtype=self.ftype)
         for idx in range(12):
@@ -430,7 +727,6 @@ class TetrahedronMesh(Mesh3d):
 
         if rflag == True:
             self.ds.construct()
-
 
     def uniform_bisect(self, n=1):
         for i in range(n):

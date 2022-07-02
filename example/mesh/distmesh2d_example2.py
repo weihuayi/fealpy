@@ -12,8 +12,16 @@ from fealpy.mesh import PolygonMesh
 from fealpy.mesh import TriangleMeshWithInfinityNode
 
 parser = argparse.ArgumentParser(description='复杂二维区域distmesh网格生成示例')
-parser.add_argument('--domain', default='circle',type=str,help = '区域类型, 默认是circle, 还可以选择:circle_h,square_h,adaptive_geo,superellipse')
-parser.add_argument('--h0',default=0.1,type = float,help = '网格尺寸, 默认为0.1')
+parser.add_argument('--domain', 
+        default='circle', type=str, 
+        help = """
+        区域类型, 默认是 circle, 还可以选择:
+        circle_h, 
+        square_h, 
+        adaptive_geo, 
+        superellipse""")
+
+parser.add_argument('--h0', default=0.1, type=float, help='网格尺寸, 默认为0.1')
 
 args = parser.parse_args()
 domain = args.domain

@@ -5,7 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from scipy.sparse.linalg import spsolve
-import pyamg
 
 from fealpy.pde.poisson_2d import LShapeRSinData
 from fealpy.functionspace import LagrangeFiniteElementSpace
@@ -36,7 +35,7 @@ plt.close()
 for i in range(maxit):
     print('step:', i)
     space = LagrangeFiniteElementSpace(mesh, p=p)
-    A = space.stiff_matrix(q=1)
+    A = space.stiff_matrix()
     F = space.source_vector(pde.source)
 
     NDof[i] = space.number_of_global_dofs()
@@ -48,9 +47,9 @@ for i in range(maxit):
 
     rguh = space.grad_recovery(uh)
 
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)  
-    errorMatrix[2, i] = space.integralalg.error(pde.gradient, rguh.value) 
+    errorMatrix[2, i] = space.integralalg.error(pde.gradient, rguh) 
     eta = space.recovery_estimate(uh)
     errorMatrix[3, i] = np.sqrt(np.sum(eta**2))
 
@@ -64,5 +63,6 @@ for i in range(maxit):
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-showmultirate(plt, maxit - 5, NDof, errorMatrix, errorType)
+showmultirate(plt, maxit - 5, NDof, errorMatrix, errorType,
+        propsize=40)
 plt.show()

@@ -47,9 +47,9 @@ class NCVEMDof2d():
         p = self.p
         mesh = self.mesh
         cell, cellLocation = mesh.entity('cell')
-        cell2edge = mesh.ds.cell_to_edge(return_sparse=False)
 
         if p == 1:
+            cell2edge, _ = mesh.ds.cell_to_edge(return_sparse=False)
             return cell2edge, cellLocation
         else:
             NC = mesh.number_of_cells()
@@ -147,6 +147,19 @@ class NonConformingVirtualElementSpace2d():
         S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
         return S
 
+    def project_to_smspace_L2(self, uh):
+        """
+        Project a non conforming vem function uh into polynomial space.
+        """
+        p = self.p
+        cell2dof = self.dof.cell2dof
+        cell2dofLocation = self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        g = lambda x: x[0]@uh[x[1]]
+        S = self.smspace.function()
+        S[:] = np.concatenate(list(map(g, zip(self.PI0, cd))))
+        return S
+
     def stiff_matrix(self):
         p = self.p
         G = self.G
@@ -237,6 +250,16 @@ class NonConformingVirtualElementSpace2d():
     def cell_to_dof(self):
         return self.dof.cell2dof, self.dof.cell2dofLocation
 
+    def edge_basis_to_integral_basis(self):
+        p = self.p
+        qf = GaussLegendreQuadrature(p)
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        A = np.ones((p, p), dtype=np.float_)
+        A[:, 1:] = bcs[:, 1, None]-0.5
+        A[:] = np.cumprod(A, axis = 1)*ws[:, None]
+        return A 
+
     def boundary_dof(self, threshold=None):
         return self.dof.boundary_dof(threshold=threshold)
 
@@ -299,7 +322,7 @@ class NonConformingVirtualElementSpace2d():
     def projection(self, u, up):
         pass
 
-    def array(self, dim=None):
+    def array(self, dim=None, dtype=np.float_):
         gdof = self.number_of_global_dofs()
         if dim is None:
             shape = gdof
@@ -307,7 +330,7 @@ class NonConformingVirtualElementSpace2d():
             shape = (gdof, dim)
         elif type(dim) is tuple:
             shape = (gdof, ) + dim
-        return np.zeros(shape, dtype=np.float)
+        return np.zeros(shape, dtype=dtype)
 
     def matrix_H(self):
         p = self.p

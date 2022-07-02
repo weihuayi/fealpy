@@ -174,7 +174,7 @@ class Mesh2d(object):
                 cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis, showcolorbar=showcolorbar,
-                colorbarshrink=colorbarshrink, cmap=cmap, box=box)
+                colorbarshrink=colorbarshrink, cmap=cmap, box=box, cmax=cmax, cmin=cmin)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
@@ -284,7 +284,7 @@ class Mesh2dDataStructure():
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)
 
         i1 = np.zeros(NE, dtype=self.itype)
-        i1[j] = np.arange(NEC*NC, dtype=self.itype)
+        i1[j] = range(NEC*NC)
 
         self.edge2cell[:, 0] = i0//NEC
         self.edge2cell[:, 1] = i1//NEC
@@ -304,7 +304,7 @@ class Mesh2dDataStructure():
         if return_sparse:
             I = np.repeat(range(NC), NVC)
             val = np.ones(NVC*NC, dtype=np.bool_)
-            cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN),
+            cell2node = csr_matrix((val, (I, cell.flat)), shape=(NC, NN),
                     dtype=np.bool_)
             return cell2node
         else:

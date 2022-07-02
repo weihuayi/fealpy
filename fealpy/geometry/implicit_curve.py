@@ -48,6 +48,26 @@ class CircleCurve():
         self.radius = radius
         self.box = [-1.5, 1.5, -1.5, 1.5]
 
+    def init_mesh(self, n):
+        from ..mesh import IntervalMesh
+
+        dt = 2*np.pi/n
+        theta  = np.arange(0, 2*np.pi, dt)
+
+        node = np.zeros((n, 2), dtype = np.float64)
+        cell = np.zeros((n, 2), dtype = np.int_)
+
+        node[:, 0] = self.radius*np.cos(theta)
+        node[:, 1] = self.radius*np.sin(theta)
+        node += self.center
+
+        cell[:, 0] = np.arange(n)
+        cell[:, 1][:-1] = np.arange(1,n)
+
+        mesh = IntervalMesh(node, cell)
+
+        return mesh 
+
     def __call__(self, p):
         return np.sqrt(np.sum((p - self.center)**2, axis=-1))-self.radius
 
@@ -60,18 +80,15 @@ class CircleCurve():
         return n
 
     def distvalue(self, p):
-        p[:], d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
         return d, n
 
     def project(self, p):
         """
-
-        Note
-        ----
-         注意，这里的 p[:] 意思是修改 p 的内容，这样外面的 p 也同时修改了
+        @brief 把曲线附近的点投影到曲线上
         """
-        p[:], d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
-        return d, n
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
 
 class FoldCurve():
     def __init__(self, a=6):
@@ -121,12 +138,12 @@ class FoldCurve():
         return grad
 
     def distvalue(self, p):
-        p[:], d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
         return d, n
 
     def project(self, p):
-        p[:], d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
-        return d, n
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        return p 
 
 
 class Curve2():

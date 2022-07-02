@@ -284,6 +284,9 @@ def show_mesh_1d(
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
+    if len(node.shape) == 1:
+        node = node[:, None]
+
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
 
@@ -304,7 +307,7 @@ def show_mesh_2d(
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=1.0, cmap='jet', box=None):
+        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=None, cmap='jet', box=None):
 
     try:
         axes.set_aspect(aspect)
@@ -340,7 +343,7 @@ def show_mesh_2d(
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
-            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccs], :])
+            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccw], :])
     else:
         if mesh.meshtype == 'polygon':
             cell, cellLocation = cell
@@ -374,8 +377,9 @@ def show_mesh_2d(
         box[0::2] = np.min(node, axis=0)
         box[1::2] = np.max(node, axis=0)
 
-    axes.set_xlim([box[0], box[1]+0.01])
-    axes.set_ylim([box[2]-0.01, box[3]])
+    tol = np.max(mesh.entity_measure('edge'))/100
+    axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
+    axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
 
     if mesh.geo_dimension() == 3:
         axes.set_zlim(box[4:6])

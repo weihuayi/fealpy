@@ -573,10 +573,13 @@ class LagrangeFiniteElementSpace():
         else:
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
-    def interpolation(self, u, dim=None):
+    def interpolation(self, u, dim=None, dtype=None):
         ipoint = self.interpolation_points()
         uI = u(ipoint)
-        return self.function(dim=dim, array=uI)
+        if dtype is None:
+            return self.function(dim=dim, array=uI, dtype=uI.dtype)
+        else:
+            return self.function(dim=dim, array=uI, dtype=dtype)
 
     def linear_interpolation_matrix(self):
         """
