@@ -149,7 +149,7 @@ class FirstNedelecFiniteElementSpace3d:
         if p == 1:
             localEdge = mesh.ds.localEdge
             glambda = mesh.grad_lambda() # (NC, 4, 3)
-            cphi = np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
+            cphi = 2*np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
 
             c2es = mesh.ds.cell_to_edge_sign1().astype(np.float_)
             c2es[c2es==0] = -1
@@ -275,7 +275,7 @@ class FirstNedelecFiniteElementSpace3d:
 
     def source_vector(self, f):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
-        phi = self.curl_basis(bcs) #(NQ, NC, 6, 3)
+        phi = self.basis(bcs) #(NQ, NC, 6, 3)
         cm = self.mesh.cell_volume()
         cell2dof = self.cell_to_dof()
 
