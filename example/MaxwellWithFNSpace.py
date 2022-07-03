@@ -29,7 +29,7 @@ from mpl_toolkits.mplot3d import Axes3D
 pde = PDE()
 mesh = pde.init_mesh(0)
 
-maxit = 5
+maxit = 4
 errorType = ['$|| E - E_h||_{\Omega,0}$']
 errorMatrix = np.zeros((1, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)

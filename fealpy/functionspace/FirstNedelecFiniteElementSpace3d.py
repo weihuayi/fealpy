@@ -84,9 +84,28 @@ class FirstNedelecFiniteElementSpace3d:
         return self.dof.boundary_dof()
 
     @barycentric
-    def face_basis(self, bc, index=None, barycenter=True):
-        return self.edge_basis(bc, index, barycenter)
+    def face_basis(self, bc, index=np.s_[:], barycenter=True):
+        """!
+        @brief 因为基函数在面上法向不连续，切向连续，所以认为面上的基函数只有切向分量。
+        """
+        p = self.p
+        mesh = self.mesh
+        localEdge = mesh.ds.localFace2edge
 
+        n = mesh.face_normal()[index] #(NF, 3)
+        fm = mesh.entity_measure("face")
+        face = mesh.entity("face")[index]
+        node = mesh.entity("node")
+        e = node[face[:, localEdge[:, 1]]] - node[face[:, localEdge[:, 0]]] #(NF, 3, 3)
+
+        glambda = np.cross(n[:, None], e) #(NF, 3, 3)
+        if p==1:
+            fphi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
+                    localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
+                    localEdge[:, 0]]
+            f2es = mesh.ds.face_to_edge_sign().astype(np.float_)[index]
+            f2es[f2es==0] = -1
+            return fphi*c2es[..., None]
 
     @barycentric
     def edge_basis(self, bc, index=None, barycenter=True, left=True):
@@ -117,15 +136,13 @@ class FirstNedelecFiniteElementSpace3d:
 
         p = self.p
         mesh = self.mesh
-        NC = mesh.number_of_cells()
-
         if p == 1:
             localEdge = mesh.ds.localEdge
-            glambda = mesh.grad_lambda() # (NC, 4, 3)
+            glambda = mesh.grad_lambda()[index] # (NC, 4, 3)
             phi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
                     localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,
                     localEdge[:, 0]]
-            c2es = mesh.ds.cell_to_edge_sign1().astype(np.float_)
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)[index]
             c2es[c2es==0] = -1
             return phi*c2es[..., None]
         else:
@@ -151,7 +168,7 @@ class FirstNedelecFiniteElementSpace3d:
             glambda = mesh.grad_lambda() # (NC, 4, 3)
             cphi = 2*np.cross(glambda[:, localEdge[:, 0]], glambda[:, localEdge[:, 1]])
 
-            c2es = mesh.ds.cell_to_edge_sign1().astype(np.float_)
+            c2es = mesh.ds.cell_to_edge_sign().astype(np.float_)
             c2es[c2es==0] = -1
             cphi = cphi*c2es[..., None]
 
@@ -301,6 +318,43 @@ class FirstNedelecFiniteElementSpace3d:
         isDDof = self.boundary_dof(threshold=threshold)
         uh[isDDof] = np.sum(gD(point)*et, axis=-1)
         return isDDof
+
+    def set_neumann_bc(self, gN, F=None, threshold=None):
+        """
+
+        Notes
+        -----
+        设置 Neumann 边界条件到载荷向量 F 中
+
+        """
+        p = self.p
+        mesh = self.mesh
+        gdof = self.number_of_global_dofs()
+
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+
+        face2dof = self.dof.face_to_dof()[index]
+
+        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+
+        measure = mesh.entity_measure('face', index=index)
+
+        phi = self.face_basis(bcs)
+        pp = mesh.bc_to_point(bcs, index=index)
+        n = mesh.face_unit_normal(index=index)
+
+        val = gN(pp, n) # (NQ, NF, ...), 这里假设 gN 是一个函数
+
+        if F is None:
+            F = np.zeros((gdof, ), dtype=self.ftype)
+
+        bb = np.einsum('q, qfd, qfld, f->fl', ws, val, phi, measure)
+        np.add.at(F, face2dof, bb)
+        return F
 
     def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
