@@ -58,7 +58,10 @@ elif domain in {'circle'}:
 
 mesher = DistMesher2d(domain, hmin)
 mesh = mesher.meshing(maxit=maxit)
+
+c = mesh.circumcenter()
 fig, axes = plt.subplots()
 mesh.add_plot(axes)
+mesh.find_node(axes, node=c)
 plt.show()
 
