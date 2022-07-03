@@ -97,6 +97,12 @@ class Mesh3d():
 
         return bc
 
+    def edge_tangent(self):
+        edge = self.ds.edge
+        node = self.node
+        v = node[edge[:, 1], :] - node[edge[:, 0], :]
+        return v
+
     def edge_unit_tangent(self):
         edge = self.ds.edge
         node = self.node
@@ -315,6 +321,20 @@ class Mesh3dDataStructure():
         localEdge = self.localEdge
         for i, (j, k) in zip(range(E), localEdge):
             cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
+        return cell2edgeSign
+
+    def cell_to_edge_sign1(self):
+        """
+
+        TODO: check here
+        """
+        NC = self.NC
+        NEC = self.NEC
+        localEdge = self.localEdge
+        cell = self.cell
+        edge = self.edge
+        cell2edge = self.cell_to_edge()
+        cell2edgeSign = edge[cell2edge, 0]==cell[:, localEdge[:, 0]]
         return cell2edgeSign
 
     def cell_to_face(self, return_sparse=False):
