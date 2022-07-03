@@ -619,36 +619,43 @@ class TriangleMesh(Mesh2d):
 
         return start 
 
-    def circumcenter(self):
+    def circumcenter(self, index=np.s_[:], returnradius=False):
+        """
+        @brief 计算三角形外接圆的圆心和半径
+        """
         node = self.node
         cell = self.ds.cell
         GD = self.geo_dimension()
 
-        v0 = node[cell[:,2],:] - node[cell[:,1],:]
-        v1 = node[cell[:,0],:] - node[cell[:,2],:]
-        v2 = node[cell[:,1],:] - node[cell[:,0],:]
+        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
+        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
         nv = np.cross(v2, -v1)
         if GD == 2:
             area = nv/2.0
             x2 = np.sum(node**2, axis=1, keepdims=True)
-            w0 = x2[cell[:,2]] + x2[cell[:,1]]
-            w1 = x2[cell[:,0]] + x2[cell[:,2]]
-            w2 = x2[cell[:,1]] + x2[cell[:,0]]
+            w0 = x2[cell[index, 2]] + x2[cell[index, 1]]
+            w1 = x2[cell[index, 0]] + x2[cell[index, 2]]
+            w2 = x2[cell[index, 1]] + x2[cell[index, 0]]
             W = np.array([[0, -1],[1, 0]], dtype=self.ftype)
             fe0 = w0*v0@W
             fe1 = w1*v1@W
             fe2 = w2*v2@W
             c = 0.25*(fe0 + fe1 + fe2)/area.reshape(-1,1)
-            R = np.sqrt(np.sum((c-node[cell[:,0], :])**2,axis=1))
+            R = np.sqrt(np.sum((c-node[cell[index, 0], :])**2,axis=1))
         elif GD == 3:
             length = np.sqrt(np.sum(nv**2, axis=1))
             n = nv/length.reshape((-1, 1))
             l02 = np.sum(v1**2, axis=1, keepdims=True)
             l01 = np.sum(v2**2, axis=1, keepdims=True)
             d = 0.5*(l02*np.cross(n, v2) + l01*np.cross(-v1, n))/length.reshape(-1, 1)
-            c = node[cell[:, 0]] + d
+            c = node[cell[index, 0]] + d
             R = np.sqrt(np.sum(d**2, axis=1))
-        return c, R
+
+        if returnradius:
+            return c, R
+        else:
+            return c
 
     def angle(self):
         NC = self.number_of_cells()
