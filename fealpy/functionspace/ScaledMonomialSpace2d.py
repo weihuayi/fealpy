@@ -327,6 +327,26 @@ class ScaledMonomialSpace2d():
         else:
             return hphi
 
+    def PxMatrix(self):
+        p = self.p 
+        index = multi_index_matrix2d(p)
+        N = len(index)
+
+        I, = np.where(index[:, 1] > 1)
+        Px = np.zeros([N, N], dtype=np.float_)
+        Px[I, np.arange(len(I))] = index[I, 1]
+        return Px 
+
+    def PyMatrix(self):
+        p = self.p
+        index = multi_index_matrix2d(p)
+        N = len(index)
+
+        I, = np.where(index[:, 2] > 1)
+        Px = np.zeros([N, N], dtype=np.float_)
+        Px[I, np.arange(len(I))] = index[I, 2]
+        return Px 
+
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
         phi = self.basis(point, index=index)
