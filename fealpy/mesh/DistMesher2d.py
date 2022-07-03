@@ -108,10 +108,10 @@ class DistMesher2d():
         else:
             depsx = np.array([self.deps, 0])
             depsy = np.array([0, self.deps])
-            dgradx = (fd(node + depsx) - d)/deps
-            dgrady = (fd(node + depsy) - d)/deps
-            node[:, 0] = node[idx, 0] - d*dgradx
-            node[:, 1] = node[idx, 1] - d*dgrady
+            dgradx = (fd(node + depsx) - d)/self.deps
+            dgrady = (fd(node + depsy) - d)/self.deps
+            node[:, 0] = node[:, 0] - d*dgradx
+            node[:, 1] = node[:, 1] - d*dgrady
 
         return node
 
@@ -184,29 +184,7 @@ class DistMesher2d():
                 mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
                 p0[:] = node
 
-        self.post_processing(node)
-
-        count = 0 
-        while count < 20:
-            count += 1
-            if mmove > self.ttol*self.hmin:
-                edge = self.construct_edge(node)
-                NT += 1
-                print("第 %05d 次三角化"%(NT))
-
-            md = self.move(node, edge)
-
-            d = fd(node)
-            isOut = d > 0
-            if np.any(isOut):
-                node[isOut] = self.projection(node[isOut], d[isOut])
-             
-            if self.dt*np.max(md[~isOut]) < self.ptol*self.hmin:
-                break
-            else:
-                mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
-                p0[:] = node
-
+        #self.post_processing(node)
 
         cell = self.delaunay(node)
         return TriangleMesh(node, cell)
@@ -228,11 +206,12 @@ class DistMesher2d():
         lidx = edge2cell[isBdEdge, 2]
         nidx = cell[cidx, lidx]
 
-        c = mesh.circumcenter(index=cidx)
-        dc = fd(c)
-        isOut = (dc > -deps)
-        idx = nidx[isOut]
+        print(nidx)
 
+        c = mesh.circumcenter(index=cidx)
+        d = fd(c)
+        isOut = (d > -deps)
+        idx = nidx[isOut]
         if len(idx) > 0:
             p0 = node[idx]
             if hasattr(domain, 'projection'):
