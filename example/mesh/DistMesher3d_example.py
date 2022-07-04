@@ -37,7 +37,7 @@ maxit = args.maxit
 
 domain = SphereDomain()
 
-mesher = DistMesher3d(domain, hmin)
+mesher = DistMesher3d(domain, hmin, output=True)
 mesh = mesher.meshing(maxit)
 
 mesh.to_vtk(fname='test.vtu')

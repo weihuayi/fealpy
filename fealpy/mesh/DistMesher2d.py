@@ -90,6 +90,15 @@ class DistMesher2d():
         cell = self.delaunay(node)
         totalEdge = cell[:, localEdge].reshape(-1, 2)
         edge  = np.unique(np.sort(totalEdge, axis=1), axis=0)
+
+        if self.output:
+            fname = "mesh-%05d.vtu"%(self.NT)
+            mesh = TetrahedronMesh(node, cell)
+            bc = mesh.entity_barycenter('cell')
+            flag = bc[:, 0] < 0.0 
+            mesh.celldata['flag'] = flag 
+            mesh.to_vtk(fname=fname)
+
         return edge
 
     def projection(self, node, d):
@@ -160,7 +169,7 @@ class DistMesher2d():
 
         node = self.init_nodes()
         p0 = node.copy()
-        NT = 0
+        self.NT = 0
         mmove = 1e+10
         count = 0 
         while count < maxit:
@@ -168,8 +177,8 @@ class DistMesher2d():
 
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
-                NT += 1
-                print("第 %05d 次三角化"%(NT))
+                self.NT += 1
+                print("第 %05d 次三角化"%(self.NT))
 
             md = self.move(node, edge)
 
