@@ -34,6 +34,7 @@ node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]],
 node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float_)
 cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
 mesh = TetrahedronMesh(node, cell) 
+mesh.uniform_refine(2)
 
 space = FirstNedelecFiniteElementSpace3d(mesh)
 
