@@ -1,6 +1,78 @@
 import numpy as np
 from fealpy.mesh import TriangleMesh, MeshFactory
 from fealpy.decorator import cartesian, barycentric
+import sympy as sym
+from sympy.vector import CoordSys3D, Del, curl
+
+class MaxwellPDE():
+    def __init__(self, f):
+        C = CoordSys3D('C')
+        x = sym.symbols("x")
+        y = sym.symbols("y")
+        z = sym.symbols("z")
+
+        # 构造 f
+        fx = f.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
+        fy = f.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
+        fz = f.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
+        self.Fx = sym.lambdify(('x', 'y', 'z'), fx, "numpy")
+        self.Fy = sym.lambdify(('x', 'y', 'z'), fy, "numpy")
+        self.Fz = sym.lambdify(('x', 'y', 'z'), fz, "numpy")
+
+        # 构造 curl(f)
+        cf = curl(f)
+        cfx = cf.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
+        cfy = cf.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
+        cfz = cf.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
+        self.curlFx = sym.lambdify(('x', 'y', 'z'), cfx, "numpy")
+        self.curlFy = sym.lambdify(('x', 'y', 'z'), cfy, "numpy")
+        self.curlFz = sym.lambdify(('x', 'y', 'z'), cfz, "numpy")
+
+        # 构造 curl(curl(f))
+        ccf = curl(curl(f))
+        ccfx = ccf.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
+        ccfy = ccf.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
+        ccfz = ccf.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
+        self.curlcurlFx = sym.lambdify(('x', 'y', 'z'), ccfx, "numpy")
+        self.curlcurlFy = sym.lambdify(('x', 'y', 'z'), ccfy, "numpy")
+        self.curlcurlFz = sym.lambdify(('x', 'y', 'z'), ccfz, "numpy")
+
+    def solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        Fx = self.Fx(x, y, z)
+        Fy = self.Fy(x, y, z)
+        Fz = self.Fy(x, y, z)
+        f = np.c_[Fx, Fy, Fz] 
+        return f 
+
+    @cartesian
+    def source(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        ccFx = self.curlcurlFx(x, y, z)
+        ccFy = self.curlcurlFy(x, y, z)
+        ccFz = self.curlcurlFy(x, y, z)
+        ccf = np.c_[ccFx, ccFy, ccFz] 
+        return ccf - self.solution(p)
+
+    def dirichlet(self, p):
+        return self.solution(p)
+
+class SinData(MaxwellPDE):
+    def __init__(self):
+        C = CoordSys3D('C')
+        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + 0*C.k# + sym.sin(sym.pi*C.z)*C.k 
+        super(SinData, self).__init__(f)
+
+    def init_mesh(self, n=0):
+        box = [0, 1, 0, 1, 0, 1]
+        mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
+        mesh.uniform_refine(n)
+        return mesh
+
 
 class XXX2dData():
     def __init__(self, n=4):
@@ -31,8 +103,11 @@ class XXX2dData():
         mesh.uniform_refine(n)
         return mesh
 
+    def dirichlet(self, p):
+        return self.solution(p)
+
 class XXX3dData():
-    def __init__(self, n=6):
+    def __init__(self, n=2):
         self.n = n
         self.omega = -1
 
@@ -42,7 +117,8 @@ class XXX3dData():
         x = p[..., 0, None]
         y = p[..., 1, None]
         z = p[..., 2, None]
-        return np.c_[x**n, y**n, z**n]
+        #z[:] = 100
+        return np.c_[y**n, x**n, z]
 
     def mu(self, p):
         return 1
@@ -52,26 +128,34 @@ class XXX3dData():
 
     @cartesian
     def source(self, p):
-        return -self.solution(p)
+        n = self.n
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        z[:] = 0
+        return -n*(n-1)*np.c_[y**(n-2), x**(n-2), z]-self.solution(p)
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
         mesh.uniform_refine(n)
         return mesh
+
+    def dirichlet(self, p):
+        return self.solution(p)
+
 
 class Sin3dData():
-    def __init__(self, n=6):
-        self.n = n
+    def __init__(self):
         self.omega = -1
 
     @cartesian
     def solution(self, p):
-        n = self.n
         x = p[..., 0, None]
         y = p[..., 1, None]
         z = p[..., 2, None]
-        return np.c_[np.sin(np.pi*x), np.sin(np.pi*y), np.sin(np.pi*z)]
+        z[:] = 0
+        return np.c_[np.sin(np.pi*y), np.sin(np.pi*x), z]
 
     def mu(self, p):
         return 1
@@ -81,13 +165,28 @@ class Sin3dData():
 
     @cartesian
     def source(self, p):
-        return -self.solution(p)
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        z[:] = 0
+        return np.c_[np.pi**2*np.sin(np.pi*y), np.pi**2*np.sin(np.pi*x), z]-self.solution(p)
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
         mesh.uniform_refine(n)
         return mesh
+
+    def dirichlet(self, p):
+        return self.solution(p)
+
+    def neumann(self, p, n):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        z[:] = 0
+        val = np.c_[z, z, np.pi*(np.cos(np.pi*x)-np.cos(np.pi*y))]
+        return np.cross(n)
 
 class Bubble3dData():
     def __init__(self):
@@ -118,7 +217,10 @@ class Bubble3dData():
         return np.c_[X, Y, Z]-self.solution(p)
 
     def init_mesh(self, n=0):
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 2, 0, 2, 0, 2]
         mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
         mesh.uniform_refine(n)
         return mesh
+
+    def dirichlet(self, p):
+        return self.solution(p)

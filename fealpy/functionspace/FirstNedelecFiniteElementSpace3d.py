@@ -311,12 +311,38 @@ class FirstNedelecFiniteElementSpace3d:
         mesh = self.mesh
         node = mesh.entity("node")
         edge = mesh.entity("edge")
-        isbdedge = mesh.ds.boundary_edge_flag()
-        et = mesh.edge_tangent()[isbdedge]
-        point = 0.5*node[edge[isbdedge, 0]] + 0.5*node[edge[isbdedge, 1]]
+        face = mesh.entity("face")
 
-        isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = np.sum(gD(point)*et, axis=-1)
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_face_index()
+
+        face2edge = mesh.ds.face_to_edge()[index]
+
+        if 0: #节点型自由度
+            locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
+            point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
+            gval = gD(point) #(NF, 3, 3)
+
+            vec = mesh.edge_tangent()[face2edge]#(NF, 3, 3)
+
+            face2dof = self.dof.face_to_dof()[index]
+            uh[face2dof] = np.sum(gval*vec, axis=-1) 
+        else: #积分型自由度
+            bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
+            ps = mesh.bc_to_point(bcs)[:, face2edge]
+            gval = gD(ps)
+
+            vec = mesh.edge_tangent()[face2edge]
+            l = np.linalg.norm(vec, axis=-1)
+
+            face2dof = self.dof.face_to_dof()[index]
+            uh[face2dof] = np.einsum("qfed, fed, q->fe", gval, vec, ws) 
+
+        gdof = self.dof.number_of_global_dofs()
+        isDDof = np.zeros(gdof, dtype=np.bool_)
+        isDDof[face2dof] = True
         return isDDof
 
     def set_neumann_bc(self, gN, F=None, threshold=None):

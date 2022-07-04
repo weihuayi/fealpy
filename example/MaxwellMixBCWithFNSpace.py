@@ -18,9 +18,8 @@ from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve, cg
 
 #from fealpy.pde.MaxwellPDE import XXX3dData as PDE
-#from fealpy.pde.MaxwellPDE import Sin3dData as PDE
+from fealpy.pde.MaxwellPDE import Sin3dData as PDE
 #from fealpy.pde.MaxwellPDE import Bubble3dData as PDE
-from fealpy.pde.MaxwellPDE import SinData as PDE
 
 import matplotlib.colors as colors
 import matplotlib.cm as cm
@@ -30,7 +29,7 @@ from mpl_toolkits.mplot3d import Axes3D
 pde = PDE()
 mesh = pde.init_mesh(0)
 
-maxit = 4
+maxit = 5
 errorType = ['$|| E - E_h||_{\Omega,0}$']
 errorMatrix = np.zeros((1, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
@@ -45,7 +44,7 @@ for i in range(maxit):
 
     bc = DirichletBC(space, pde.dirichlet) 
 
-    M = space.mass_matrix()
+    M = (pde.omega**2)*space.mass_matrix()
     A = space.curl_matrix()
     b = space.source_vector(pde.source)
     B = A-M 
