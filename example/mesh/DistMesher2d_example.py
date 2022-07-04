@@ -23,8 +23,8 @@ parser.add_argument('--hmin',
         help="最小网格尺寸值，默认 0.05")
 
 parser.add_argument('--hmax', 
-        default=0.05, type=float, 
-        help="最大网格尺寸值，默认与最小网格尺寸相同")
+        default=0.2, type=float, 
+        help="最大网格尺寸值，默认0.2")
 
 parser.add_argument('--animation', 
         default=True, type=bool, 
@@ -45,6 +45,7 @@ if domain in {'square'}:
     box = [0, 1, 0, 1]
     domain = RectangleDomain(box)
 elif domain in {'circle'}:
+
     def sizing_function(p, *args):
         fd = args[0]
         x = p[:, 0]
@@ -52,11 +53,15 @@ elif domain in {'circle'}:
         h = hmin + np.abs(fd(p))*0.1
         h[h>hmax] = hmax 
         return h
-    domain = CircleDomain(fh=fh)
+
+    domain = CircleDomain(fh=sizing_function)
 
 mesher = DistMesher2d(domain, hmin)
-mesher.meshing_with_animation(frames=maxit)
+mesh = mesher.meshing(maxit=maxit)
+
+c = mesh.circumcenter()
 fig, axes = plt.subplots()
-mesher.mesh.add_plot(axes)
+mesh.add_plot(axes)
+mesh.find_node(axes, node=c)
 plt.show()
 

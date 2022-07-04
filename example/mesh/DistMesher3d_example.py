@@ -11,7 +11,7 @@ from fealpy.mesh import DistMesher3d
 
 parser = argparse.ArgumentParser(description=
         """
-        DisMesher2d 算法生成三角形网格。
+        DisMesher3d 算法生成四面体网格。
         """)
 
 parser.add_argument('--hmin', 
@@ -38,11 +38,7 @@ maxit = args.maxit
 domain = SphereDomain()
 
 mesher = DistMesher3d(domain, hmin)
+mesh = mesher.meshing(maxit)
 
-mesher.meshing(maxit)
-fig = plt.figure()
-axes = plt.axes(projection='3d')
-mesh = mesher.mesh
-mesh.add_plot(axes)
-plt.show()
+mesh.to_vtk(fname='test.vtu')
 

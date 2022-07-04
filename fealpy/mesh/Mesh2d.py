@@ -174,7 +174,7 @@ class Mesh2d(object):
                 cellcolor=cellcolor, aspect=aspect,
                 linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis, showcolorbar=showcolorbar,
-                colorbarshrink=colorbarshrink, cmap=cmap, box=box)
+                colorbarshrink=colorbarshrink, cmap=cmap, box=box, cmax=cmax, cmin=cmin)
 
     def find_node(self, axes, node=None,
             index=None, showindex=False,
