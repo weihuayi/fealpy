@@ -1,119 +1,56 @@
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.spatial import Delaunay
-from .TriangleMesh import TriangleMesh
+import matplotlib.pyplot as plt
+
+from .TriangleMesh import TriangleMesh 
 
 class DistMesher2d():
+
     def __init__(self,
             domain, 
             hmin,
             ptol = 0.001,
-            ttol = 0.05,
-            fscale = 1.2):
+            ttol = 0.1,
+            fscale = 1.2,
+            dt = 0.2,
+            output=True):
+        """
+        @brief 
 
+        @param[in] domain 三维区域
+        @param[in] hmin 最小的边长
+        @param[in] ptol
+        @param[in] ttol
+        @param[in] fscale
+        @param[in] dt
+        """
+
+        self.localEdge = np.array([(0, 1), (1, 2), (2, 0)])
         self.domain = domain
         self.hmin = hmin
-        self.ptol = ptol
-        self.ttol = ttol
+        self.ptol = ptol # 初始点拒绝阈值
+        self.ttol = ttol # 重新三角化阈值
         self.fscale = fscale
+        self.output = output
 
         eps = np.finfo(float).eps
         self.geps = 0.001*hmin
         self.deps = np.sqrt(eps)*hmin
-        self.dt = 0.2
+        self.dt = dt 
 
-        self.maxmove = float('inf')
+        self.NT = 0 # 记录三角化的次数
 
-        self.time_elapsed = 0
-        self.count = 0
 
-    def meshing(self, maxit=1000):
-        """
-        @brief 运行
-        """
-        ptol = self.ptol
-        self.set_init_mesh()
-        count = 0
-        while count < maxit: 
-            dt = self.step_length()
-            self.step(dt)
-            count += 1
-            if self.maxmove < ptol:
-                break
-
-    def meshing_with_animation(self, plot=None, axes=None, fname='test.mp4', frames=1000,  interval=50, 
-            edgecolor='k', linewidths=1, aspect='equal', showaxis=False):
-        import matplotlib.animation as animation
-        from matplotlib.collections import LineCollection
-
-        if plot is None:
-            import matplotlib.pyplot as plt
-            fig, axes = plt.subplots()
-        else:
-            if isinstance(plot, ModuleType):
-                fig = plot.figure()
-                fig.set_facecolor('white')
-            else:
-                fig = plot
-                fig.set_facecolor('white')
-
-            if axes is None:
-                axes = fig.gca()
-
-        try:
-            axes.set_aspect(aspect)
-        except NotImplementedError:
-            pass
-
-        if showaxis == False:
-            axes.set_axis_off()
-        else:
-            axes.set_axis_on()
-
-        ptol = self.ptol 
-        box = self.domain.box
-        lines = LineCollection([], linewidths=linewidths, color=edgecolor)
-
-        def init_func():
-            self.set_init_mesh()
-            node = self.mesh.entity('node')
-
-            tol = np.max(self.mesh.entity_measure('edge'))
-            axes.set_xlim(box[0:2])
-            axes.set_ylim(box[2:4])
-
-            edge = self.mesh.entity('edge')
-            lines.set_segments(node[edge])
-            axes.add_collection(lines)
-
-            return lines
-
-        def func(n):
-            dt = self.step_length()
-            self.step(dt)
-
-            node = self.mesh.entity('node')
-            edge = self.mesh.entity('edge')
-            lines.set_segments(node[edge])
-            s = "step=%05d"%(n)
-            print(s)
-            axes.set_title(s)
-            return lines
-
-        ani = animation.FuncAnimation(fig, func, frames=frames,
-                init_func=init_func,
-                interval=interval)
-        ani.save(fname)
-
-    def set_init_mesh(self): 
+    def init_nodes(self): 
         """
         @brief 生成初始网格
         """
 
-        box = self.domain.box
         fd = self.domain.signed_dist_function
         fh = self.domain.sizing_function 
+        box = self.domain.box
         hmin = self.hmin
+
 
         xh = box[1] - box[0]
         yh = box[3] - box[2]
@@ -134,77 +71,165 @@ class DistMesher2d():
 
         fnode = self.domain.facet(0) # 区域中的固定点
         if fnode is not None:
+            # TODO: 重复点的问题
             node = np.concatenate((fnode, node), axis=0)
-
-        cell = self.delaunay(node)
-        self.mesh = TriangleMesh(node, cell)
-
-    def step_length(self):
-        return self.dt
-
-    def step(self, dt):
-        """
-        @brief 
-        """
-
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        hmin = self.hmin
-        
-        dxdt = self.dx_dt(self.time_elapsed)
-        self.mesh.node = self.mesh.node + dt*dxdt
-
-        node = self.mesh.entity('node')
-        d = fd(node)
-        idx = d > 0
-        depsx = np.array([self.deps, 0])
-        depsy = np.array([0, self.deps])
-        dgradx = (fd(node[idx, :] + depsx) - d[idx])/self.deps
-        dgrady = (fd(node[idx, :] + depsy) - d[idx])/self.deps
-        node[idx, 0] = node[idx, 0] - d[idx]*dgradx
-        node[idx, 1] = node[idx, 1] - d[idx]*dgrady
-        self.maxmove = np.max(np.sqrt(np.sum(dt*dxdt[d < -self.geps,:]**2, axis=1))/hmin)
-        self.time_elapsed += dt
-
-        if self.maxmove > self.ttol:
-            cell = self.delaunay(self.mesh.node)
-            self.mesh = TriangleMesh(self.mesh.node, cell)
-
-    def dx_dt(self, t):
-        """
-        @brief 计算移动步长
-        """
-        fd = self.domain.signed_dist_function
-        fh = self.domain.sizing_function 
-        fscale = self.fscale
-
-        node = self.mesh.entity('node')
-        edge = self.mesh.entity('edge')
-        NN = self.mesh.number_of_nodes()
-
-        v = node[edge[:, 0]] - node[edge[:, 1]]
-        L = np.sqrt(np.sum(v**2, axis=1))
-        he = fh(node[edge[:, 1]] + v/2) 
-        L0 = np.sqrt(np.sum(L**2)/np.sum(he**2))*fscale*he
-        F = L0 - L
-        F[L0-L<0] = 0
-        FV = (F/L)[:, None]*v
-
-        dxdt = np.zeros((NN, 2), dtype=np.float64)
-        np.add.at(dxdt[:, 0], edge[:, 0], FV[:, 0])
-        np.add.at(dxdt[:, 1], edge[:, 0], FV[:, 1])
-        np.subtract.at(dxdt[:, 0], edge[:, 1], FV[:, 0])
-        np.subtract.at(dxdt[:, 1], edge[:, 1], FV[:, 1])
-
-        fnode = self.domain.facet(0)
-        n = len(fnode)
-        if fnode is not None:
-            dxdt[0:n, :] = 0.0
-        return dxdt 
+        return node
 
     def delaunay(self, node):
         fd = self.domain.signed_dist_function
         d = Delaunay(node)
         cell = np.asarray(d.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]])/3
-        return  cell[fd(bc) < -self.geps, :]
+        return  cell[fd(bc) < -self.geps]
+
+    def construct_edge(self, node):
+        """
+        @brief 生成网格的边
+        """
+        localEdge = self.localEdge
+        cell = self.delaunay(node)
+        totalEdge = cell[:, localEdge].reshape(-1, 2)
+        edge  = np.unique(np.sort(totalEdge, axis=1), axis=0)
+
+        if self.output:
+            fname = "mesh-%05d.vtu"%(self.NT)
+            mesh = TetrahedronMesh(node, cell)
+            bc = mesh.entity_barycenter('cell')
+            flag = bc[:, 0] < 0.0 
+            mesh.celldata['flag'] = flag 
+            mesh.to_vtk(fname=fname)
+
+        return edge
+
+    def projection(self, node, d):
+        """
+        @brief 把移动到区域外面的点投影到边界上
+
+        @param[in] node 移动到区域外面的点
+        @param[in] 
+        """
+
+        domain = self.domain
+        fd = domain.signed_dist_function
+
+        if hasattr(domain, 'projection'):
+            node = domain.projection(node)
+        else:
+            depsx = np.array([self.deps, 0])
+            depsy = np.array([0, self.deps])
+            dgradx = (fd(node + depsx) - d)/self.deps
+            dgrady = (fd(node + depsy) - d)/self.deps
+            node[:, 0] = node[:, 0] - d*dgradx
+            node[:, 1] = node[:, 1] - d*dgrady
+
+        return node
+
+    def move(self, node, edge):
+        """
+        @brief 移动节点
+        
+        @return md 每个节点移动的距离
+        """
+
+        fh = self.domain.sizing_function
+
+        v = node[edge[:, 0]] - node[edge[:, 1]]
+        L = np.sqrt(np.sum(v**2, axis=1))
+        bc = (node[edge[:, 0]] + node[edge[:, 1]])/2.0
+        he = fh(bc) 
+        L0 = np.sqrt(np.sum(L**2)/np.sum(he**2))*self.fscale*he
+        F = np.maximum(L0 - L, 0)
+        FV = (F/L)[:, None]*v
+
+        dnode = np.zeros(node.shape, dtype=np.float64)
+
+
+        np.add.at(dnode[:, 0], edge[:, 0], FV[:, 0])
+        np.add.at(dnode[:, 1], edge[:, 0], FV[:, 1])
+        np.subtract.at(dnode[:, 0], edge[:, 1], FV[:, 0])
+        np.subtract.at(dnode[:, 1], edge[:, 1], FV[:, 1])
+
+
+        fnode = self.domain.facet(0)
+        if fnode is not None:
+            n = len(fnode)
+            dnode[0:n, :] = 0.0
+
+        node += self.dt*dnode
+        md = np.sqrt(np.sum(dnode**2, axis=1))
+
+        return md 
+
+    def meshing(self, maxit=1000):
+        """
+        """
+
+        domain = self.domain
+        fd = domain.signed_dist_function
+
+        node = self.init_nodes()
+        p0 = node.copy()
+        self.NT = 0
+        mmove = 1e+10
+        count = 0 
+        while count < maxit:
+            count += 1
+
+            if mmove > self.ttol*self.hmin:
+                edge = self.construct_edge(node)
+                self.NT += 1
+                print("第 %05d 次三角化"%(self.NT))
+
+            md = self.move(node, edge)
+
+            d = fd(node)
+            isOut = d > 0
+            if np.any(isOut):
+                node[isOut] = self.projection(node[isOut], d[isOut])
+             
+            if self.dt*np.max(md[~isOut]) < self.ptol*self.hmin:
+                break
+            else:
+                mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
+                p0[:] = node
+
+        #self.post_processing(node)
+
+        cell = self.delaunay(node)
+        return TriangleMesh(node, cell)
+
+
+    def post_processing(self, node):
+        """
+        """
+        domain = self.domain
+        fd = domain.signed_dist_function
+        fh = domain.sizing_function 
+        deps = self.deps
+
+        cell = self.delaunay(node)
+        mesh = TriangleMesh(node, cell)
+        edge2cell = mesh.ds.edge_to_cell()
+        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
+        cidx = edge2cell[isBdEdge, 0]
+        lidx = edge2cell[isBdEdge, 2]
+        nidx = cell[cidx, lidx]
+
+        print(nidx)
+
+        c = mesh.circumcenter(index=cidx)
+        d = fd(c)
+        isOut = (d > -deps)
+        idx = nidx[isOut]
+        if len(idx) > 0:
+            p0 = node[idx]
+            if hasattr(domain, 'projection'):
+                node[idx] = domain.projection(node[idx])
+            else:
+                depsx = np.array([deps, 0])
+                depsy = np.array([0, deps])
+                dgradx = (fd(node[idx, :] + depsx) - d[idx])/deps
+                dgrady = (fd(node[idx, :] + depsy) - d[idx])/deps
+                node[idx, 0] = node[idx, 0] - d[idx]*dgradx
+                node[idx, 1] = node[idx, 1] - d[idx]*dgrady
+    
