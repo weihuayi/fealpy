@@ -13,7 +13,7 @@ class DistMesher3d():
             ttol = 0.1,
             fscale = 1.1,
             dt = 0.1,
-            output=True):
+            output=False):
         """
         @brief 
 
@@ -101,6 +101,15 @@ class DistMesher3d():
         cell = self.delaunay(node)
         totalEdge = cell[:, localEdge].reshape(-1, 2)
         edge  = np.unique(np.sort(totalEdge, axis=1), axis=0)
+
+        if self.output:
+            fname = "mesh-%05d.vtu"%(self.NT)
+            mesh = TetrahedronMesh(node, cell)
+            bc = mesh.entity_barycenter('cell')
+            flag = bc[:, 0] < 0.0 
+            mesh.celldata['flag'] = flag 
+            mesh.to_vtk(fname=fname)
+
         return edge
 
     def projection(self, node, d):
@@ -142,7 +151,7 @@ class DistMesher3d():
         L = np.sqrt(np.sum(v**2, axis=1))
         bc = (node[edge[:, 0]] + node[edge[:, 1]])/2.0
         he = fh(bc) 
-        L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*fscale*he
+        L0 = np.power(np.sum(L**3)/np.sum(he**3), 1/3)*self.fscale*he
         F = np.maximum(L0 - L, 0)
         FV = (F/L)[:, None]*v
 
@@ -175,10 +184,10 @@ class DistMesher3d():
 
         cell = self.delaunay(node)
         mesh = TetrahedronMesh(node, cell)
-        edge2cell = mesh.ds.edge_to_cell()
-        isBdEdge = (edge2cell[:, 0] == edge2cell[:, 1])
-        cidx = edge2cell[isBdEdge, 0]
-        lidx = edge2cell[isBdEdge, 2]
+        face2cell = mesh.ds.face_to_cell()
+        isBdFace = (face2cell[:, 0] == face2cell[:, 1])
+        cidx = face2cell[isBdFace, 0]
+        lidx = face2cell[isBdFace, 2]
         nidx = cell[cidx, lidx]
 
         c = mesh.circumcenter(index=cidx)
@@ -209,7 +218,7 @@ class DistMesher3d():
 
         node = self.init_nodes()
         p0 = node.copy()
-        NT = 0
+        self.NT = 0
         mmove = 1e+10
         count = 0 
         while count < maxit:
@@ -217,8 +226,8 @@ class DistMesher3d():
 
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
-                NT += 1
-                print("第 %05d 次三角化"%(NT))
+                self.NT += 1
+                print("第 %05d 次三角化"%(self.NT))
 
             md = self.move(node, edge)
 
@@ -233,10 +242,10 @@ class DistMesher3d():
                 mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
                 p0[:] = node
 
-        #self.post_processing(node)
+        self.post_processing(node)
 
         cell = self.delaunay(node)
-        return TriangleMesh(node, cell)
+        return TetrahedronMesh(node, cell)
 
 
 
