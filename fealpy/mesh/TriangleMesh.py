@@ -104,7 +104,7 @@ class TriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def grad_shape_function(self, bc, p=None):
+    def grad_shape_function(self, bc, index=np.s_[:], p=None):
 
         if p is None:
             p= self.p
@@ -142,7 +142,7 @@ class TriangleMesh(Mesh2d):
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
         Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index])
         return gphi #(..., NC, ldof, GD)
 
     def grad_lambda(self):
@@ -879,6 +879,10 @@ class TriangleMesh(Mesh2d):
 
         https://lyc102.github.io/ifem/afem/coarsen/
         """
+
+        if isMarkedCell is None:
+            return
+
         
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
@@ -890,7 +894,7 @@ class TriangleMesh(Mesh2d):
         np.add.at(valence, cell,1)
 
         valenceNew = np.zeros(NN, dtype=self.itype)
-        np.add.at(valenceNew, cell[:, 0],1)
+        np.add.at(valenceNew, cell[isMarkedCell][:, 0], 1)
 
         isIGoodNode = (valence == valenceNew) & (valence == 4)
         isBGoodNode = (valence == valenceNew) & (valence == 2)
