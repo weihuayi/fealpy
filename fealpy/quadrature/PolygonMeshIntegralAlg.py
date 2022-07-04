@@ -27,7 +27,7 @@ class PolygonMeshIntegralAlg():
         area = np.cross(v1, v2)/2
         return area
 
-    def edge_integral(self, u, edgetype=False, q=None, index=None):
+    def edge_integral(self, u, q=None, index=None):
         """
         Note:
 
@@ -51,10 +51,8 @@ class PolygonMeshIntegralAlg():
             e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure[index])
         return e
 
-    def face_integral(self, u, facetype=False, q=None, index=None):
+    def face_integral(self, u, q=None, index=None):
         """
-        TODO:
-            facetype 参数要去掉， 函数名字意味着是逐个实体上的积分
         """
         return self.edge_integral(u, facetype, q, index)
 

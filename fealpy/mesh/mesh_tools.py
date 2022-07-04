@@ -377,8 +377,9 @@ def show_mesh_2d(
         box[0::2] = np.min(node, axis=0)
         box[1::2] = np.max(node, axis=0)
 
-    axes.set_xlim([box[0], box[1]+0.01])
-    axes.set_ylim([box[2]-0.01, box[3]])
+    tol = np.max(mesh.entity_measure('edge'))/100
+    axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
+    axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
 
     if mesh.geo_dimension() == 3:
         axes.set_zlim(box[4:6])

@@ -1,22 +1,6 @@
 #!/usr/bin/env python3
 # 
 
-"""
-Lagrange 元求解 Poisson 方程, 
-
-.. math::
-    -\Delta u = f
-
-转化为
-
-.. math::
-    (\\nabla u, \\nabla v) = (f, v)
-
-Notes
------
-
-"""
-
 import argparse
 
 import numpy as np
@@ -25,7 +9,6 @@ from matplotlib import rc
 rc('text', usetex=True)
 from mpl_toolkits.mplot3d import Axes3D
 
-from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.tools.show import showmultirate
@@ -90,7 +73,7 @@ for i in range(maxit):
     NDof[i] = space.number_of_global_dofs()
     bc = DirichletBC(space, pde.dirichlet) 
 
-    uh = space.function()
+    uh = space.function() # uh 即是一个有限元函数，也是一个数组
     A = space.stiff_matrix()
     F = space.source_vector(pde.source)
     A, F = bc.apply(A, F, uh)

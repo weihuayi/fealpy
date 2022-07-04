@@ -3,17 +3,17 @@ import numpy as np
 from .Quadrature import Quadrature
 
 class TensorProductQuadrature(Quadrature):
+    """
+    @brief 张量积形式的积分公式
+    """
     def __init__(self, qfs, TD=None):
         """
 
-        Notes
-        -----
-
-        qfs 是一组积分公式
+        @param[in] qfs
         """
 
         if TD is None:
-            TD = len(qfs) # 积分公式的个数
+            TD = len(qfs) #积分公式的个数
             self.quadpts = () # 空元组
             weights = ()
             for i, qf in enumerate(qfs):
