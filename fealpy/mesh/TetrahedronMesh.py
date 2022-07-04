@@ -605,7 +605,7 @@ class TetrahedronMesh(Mesh3d):
         else:
             return c
 
-    def quality(self):
+    def cell_quality(self):
         """
         @brief  计算单元的质量，这里的质量定义单元外接球的半径比上 3 倍的内接球的半径
         """
@@ -623,11 +623,12 @@ class TetrahedronMesh(Mesh3d):
         """
         @brief 计算单元质量关于节点坐标的导数
         """
-        cell = self.ds.cell
-        node = self.node
 
-        N = self.number_of_nodes()
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
+
+        cell = self.entity('cell')
+        node = self.entity('node')
 
         s = self.face_area()
         cell2face = self.ds.cell_to_face()
