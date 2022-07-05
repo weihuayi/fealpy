@@ -29,7 +29,7 @@ class MaxwellPDE():
         self.curlFz = sym.lambdify(('x', 'y', 'z'), cfz, "numpy")
 
         # 构造 curl(curl(f))
-        ccf = curl(curl(f))
+        ccf = curl(cf)
         ccfx = ccf.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
         ccfy = ccf.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
         ccfz = ccf.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
@@ -44,6 +44,12 @@ class MaxwellPDE():
         Fx = self.Fx(x, y, z)
         Fy = self.Fy(x, y, z)
         Fz = self.Fy(x, y, z)
+        if type(Fx) is not np.ndarray:
+            Fx = np.ones(x.shape, dtype=np.float_)*Fx
+        if type(Fy) is not np.ndarray:
+            Fy = np.ones(x.shape, dtype=np.float_)*Fy
+        if type(Fz) is not np.ndarray:
+            Fz = np.ones(x.shape, dtype=np.float_)*Fz
         f = np.c_[Fx, Fy, Fz] 
         return f 
 
@@ -55,6 +61,12 @@ class MaxwellPDE():
         ccFx = self.curlcurlFx(x, y, z)
         ccFy = self.curlcurlFy(x, y, z)
         ccFz = self.curlcurlFy(x, y, z)
+        if type(ccFx) is not np.ndarray:
+            ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
+        if type(ccFy) is not np.ndarray:
+            ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
+        if type(ccFz) is not np.ndarray:
+            ccFz = np.ones(x.shape, dtype=np.float_)*ccFz
         ccf = np.c_[ccFx, ccFy, ccFz] 
         return ccf - self.solution(p)
 
@@ -64,11 +76,15 @@ class MaxwellPDE():
 class SinData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + 0*C.k# + sym.sin(sym.pi*C.z)*C.k 
+        #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
+
         super(SinData, self).__init__(f)
 
     def init_mesh(self, n=0):
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1.2, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
         mesh.uniform_refine(n)
         return mesh
