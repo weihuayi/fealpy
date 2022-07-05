@@ -18,7 +18,8 @@ from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve, cg
 
 #from fealpy.pde.MaxwellPDE import XXX3dData as PDE
-from fealpy.pde.MaxwellPDE import Sin3dData as PDE
+#from fealpy.pde.MaxwellPDE import Sin3dData as PDE
+from fealpy.pde.MaxwellPDE import SinData as PDE
 #from fealpy.pde.MaxwellPDE import Bubble3dData as PDE
 
 import matplotlib.colors as colors
@@ -48,10 +49,13 @@ for i in range(maxit):
 
     bc = DirichletBC(space, pde.dirichlet, threshold=dirichletBD) 
 
-    M = (pde.omega**2)*space.mass_matrix()
+    M = space.mass_matrix()
     A = space.curl_matrix()
     b = space.source_vector(pde.source)
     B = A-M 
+
+    neu = space.set_neumann_bc(pde.neumann, threshold=neumannBD)
+    b = b-neu
 
     Eh = space.function()
     B, b = bc.apply(B, b, Eh)

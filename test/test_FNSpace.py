@@ -35,7 +35,7 @@ node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [0, 0, -1]],
 node = np.array([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=np.float_)
 cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
 mesh = TetrahedronMesh(node, cell) 
-mesh.uniform_refine(1)
+#mesh.uniform_refine(1)
 
 space = FirstNedelecFiniteElementSpace3d(mesh)
 
@@ -44,16 +44,13 @@ A = space.curl_matrix()
 
 fh = space.interpolation(ff)
 fh = space.project(ff)
-print("fh = ", fh[:])
+
+# 计算误差
+err = space.integralalg.error(ff, fh)
+print(err)
 
 #fh[:] = 0
 #fh[0] = 1
-
-print(mesh.entity("edge"))
-print(mesh.grad_lambda())
-print(mesh.ds.localEdge)
-
-
 
 def test_basis():
     bcs = np.zeros([6, 4], dtype=np.float_)
@@ -78,11 +75,36 @@ def test_value():
     val = uh(bcs)
     print("val = ", val)
 
+def test_face_basis():
+    cell2dof = space.dof.cell_to_dof()
+    face2dof = space.dof.face_to_dof()
+    face = mesh.entity("face")
+    cell = mesh.entity("cell")
+
+    print("cell", cell)
+    print("face", face)
+    print("cell2dof", cell2dof)
+    print("face2dof", face2dof)
+
+    bcs = np.array([[0, 0.2, 0.2, 0.6]])
+    bcs0 = np.array([[0.2, 0.2, 0.6]])
+    p0 = mesh.bc_to_point(bcs)
+    p1 = mesh.bc_to_point(bcs0)
+    print(p0)
+    print(p1)
+
+    phi = space.basis(bcs)
+    fphi = space.face_basis(bcs0)
+    print("phi", phi)
+    print("fphi", fphi)
+
+
+
+
+
 #test_basis()
 #test_value()
+test_face_basis()
 
-# 计算误差
-err = space.integralalg.error(ff, fh)
-print(err)
 
 

@@ -29,7 +29,7 @@ class MaxwellPDE():
         self.curlFz = sym.lambdify(('x', 'y', 'z'), cfz, "numpy")
 
         # 构造 curl(curl(f))
-        ccf = curl(curl(f))
+        ccf = curl(cf)
         ccfx = ccf.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
         ccfy = ccf.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
         ccfz = ccf.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
@@ -44,6 +44,12 @@ class MaxwellPDE():
         Fx = self.Fx(x, y, z)
         Fy = self.Fy(x, y, z)
         Fz = self.Fy(x, y, z)
+        if type(Fx) is not np.ndarray:
+            Fx = np.ones(x.shape, dtype=np.float_)*Fx
+        if type(Fy) is not np.ndarray:
+            Fy = np.ones(x.shape, dtype=np.float_)*Fy
+        if type(Fz) is not np.ndarray:
+            Fz = np.ones(x.shape, dtype=np.float_)*Fz
         f = np.c_[Fx, Fy, Fz] 
         return f 
 
@@ -55,26 +61,43 @@ class MaxwellPDE():
         ccFx = self.curlcurlFx(x, y, z)
         ccFy = self.curlcurlFy(x, y, z)
         ccFz = self.curlcurlFy(x, y, z)
+        if type(ccFx) is not np.ndarray:
+            ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
+        if type(ccFy) is not np.ndarray:
+            ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
+        if type(ccFz) is not np.ndarray:
+            ccFz = np.ones(x.shape, dtype=np.float_)*ccFz
         ccf = np.c_[ccFx, ccFy, ccFz] 
         return ccf - self.solution(p)
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
 
+    @cartesian
     def neumann(self, p, n):
+        """!
+        @param p: (..., N, ldof, 3)
+        @param n: (N, 3)
+        """
         x = p[..., 0, None]
         y = p[..., 1, None]
         z = p[..., 2, None]
-        ccFx = self.curlcurlFx(x, y, z)
-        ccFy = self.curlcurlFy(x, y, z)
-        ccFz = self.curlcurlFy(x, y, z)
-        ccf = np.c_[ccFx, ccFy, ccFz] 
-        return ccf - self.solution(p)
-
+        cFx = self.curlFx(x, y, z)
+        cFy = self.curlFy(x, y, z)
+        cFz = self.curlFy(x, y, z)
+        if type(cFx) is not np.ndarray:
+            cFx = np.ones(x.shape, dtype=np.float_)*cFx
+        if type(cFy) is not np.ndarray:
+            cFy = np.ones(x.shape, dtype=np.float_)*cFy
+        if type(cFz) is not np.ndarray:
+            cFz = np.ones(x.shape, dtype=np.float_)*cFz
+        cf = np.c_[cFx, cFy, cFz] #(..., NC, ldof, 3)
+        return np.cross(n[None, :], cf)
 
     def boundary_type(self, mesh):
-        bdface = mesh.boundary_face_index()
-        f2n = mesh.face_normal()[bdface]
+        bdface = mesh.ds.boundary_face_index()
+        f2n = mesh.face_unit_normal()[bdface]
         neumannbd = np.abs(f2n[:, 2])>0.9
         bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
         return bd
@@ -82,7 +105,11 @@ class MaxwellPDE():
 class SinData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + 0*C.k# + sym.sin(sym.pi*C.z)*C.k 
+        #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
+
         super(SinData, self).__init__(f)
 
     def init_mesh(self, n=0):

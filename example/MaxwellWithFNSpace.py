@@ -62,6 +62,7 @@ for i in range(maxit):
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
 print(errorMatrix)
+plt.show()
 
 fname = "Ord.png"
 plt.show()
