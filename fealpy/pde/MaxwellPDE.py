@@ -61,6 +61,24 @@ class MaxwellPDE():
     def dirichlet(self, p):
         return self.solution(p)
 
+    def neumann(self, p, n):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        ccFx = self.curlcurlFx(x, y, z)
+        ccFy = self.curlcurlFy(x, y, z)
+        ccFz = self.curlcurlFy(x, y, z)
+        ccf = np.c_[ccFx, ccFy, ccFz] 
+        return ccf - self.solution(p)
+
+
+    def boundary_type(self, mesh):
+        bdface = mesh.boundary_face_index()
+        f2n = mesh.face_normal()[bdface]
+        neumannbd = np.abs(f2n[:, 2])>0.9
+        bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
+        return bd
+
 class SinData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
@@ -69,8 +87,7 @@ class SinData(MaxwellPDE):
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
-        mesh.uniform_refine(n)
+        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
 
@@ -102,6 +119,7 @@ class XXX2dData():
         mesh = TriangleMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
+
 
     def dirichlet(self, p):
         return self.solution(p)
@@ -137,8 +155,7 @@ class XXX3dData():
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
-        mesh.uniform_refine(n)
+        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
     def dirichlet(self, p):
@@ -173,8 +190,7 @@ class Sin3dData():
 
     def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
-        mesh.uniform_refine(n)
+        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
     def dirichlet(self, p):
@@ -187,6 +203,13 @@ class Sin3dData():
         z[:] = 0
         val = np.c_[z, z, np.pi*(np.cos(np.pi*x)-np.cos(np.pi*y))]
         return np.cross(n)
+
+    def boundary_type(self, mesh):
+        bdface = mesh.boundary_face_index()
+        f2n = mesh.face_normal()[bdface]
+        neumannbd = np.abs(f2n[:, 2])>0.9
+        bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
+        return bd
 
 class Bubble3dData():
     def __init__(self):
@@ -217,9 +240,8 @@ class Bubble3dData():
         return np.c_[X, Y, Z]-self.solution(p)
 
     def init_mesh(self, n=0):
-        box = [0, 2, 0, 2, 0, 2]
-        mesh = MeshFactory.boxmesh3d(box, nx=1, ny=1, nz=1, meshtype='tet')
-        mesh.uniform_refine(n)
+        box = [0, 1, 0, 1, 0, 1]
+        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
     def dirichlet(self, p):

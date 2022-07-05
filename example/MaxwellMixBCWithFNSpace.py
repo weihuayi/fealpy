@@ -27,9 +27,8 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 pde = PDE()
-mesh = pde.init_mesh(0)
 
-maxit = 5
+maxit = 4
 errorType = ['$|| E - E_h||_{\Omega,0}$']
 errorMatrix = np.zeros((1, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
@@ -37,12 +36,17 @@ NDof = np.zeros(maxit, dtype=np.int_)
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
+    mesh = pde.init_mesh(2**i)
+    bdtype = pde.boundary_type(mesh)
+    neumannBD = bdtype["neumann"]
+    dirichletBD = bdtype["dirichlet"]
+
     space = FirstNedelecFiniteElementSpace3d(mesh)
 
     gdof = space.dof.number_of_global_dofs()
     NDof[i] = gdof
 
-    bc = DirichletBC(space, pde.dirichlet) 
+    bc = DirichletBC(space, pde.dirichlet, threshold=dirichletBD) 
 
     M = (pde.omega**2)*space.mass_matrix()
     A = space.curl_matrix()
@@ -55,8 +59,6 @@ for i in range(maxit):
     # 计算误差
     errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)
 
-    if i < maxit-1:
-        mesh.uniform_refine()
 
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
