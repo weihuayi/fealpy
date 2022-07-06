@@ -28,8 +28,6 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 pde = PDE()
-mesh = pde.init_mesh(0)
-
 maxit = 4
 errorType = ['$|| E - E_h||_{\Omega,0}$']
 errorMatrix = np.zeros((1, maxit), dtype=np.float64)
@@ -38,6 +36,7 @@ NDof = np.zeros(maxit, dtype=np.int_)
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
+    mesh = pde.init_mesh(2**i)
     space = FirstNedelecFiniteElementSpace3d(mesh)
 
     gdof = space.dof.number_of_global_dofs()
@@ -55,9 +54,6 @@ for i in range(maxit):
     Eh[:] = spsolve(B, b)
     # 计算误差
     errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)
-
-    if i < maxit-1:
-        mesh.uniform_refine()
 
 showmultirate(plt, 2, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)
