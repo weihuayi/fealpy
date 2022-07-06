@@ -43,7 +43,7 @@ class MaxwellPDE():
         z = p[..., 2, None]
         Fx = self.Fx(x, y, z)
         Fy = self.Fy(x, y, z)
-        Fz = self.Fy(x, y, z)
+        Fz = self.Fz(x, y, z)
         if type(Fx) is not np.ndarray:
             Fx = np.ones(x.shape, dtype=np.float_)*Fx
         if type(Fy) is not np.ndarray:
@@ -60,7 +60,7 @@ class MaxwellPDE():
         z = p[..., 2, None]
         ccFx = self.curlcurlFx(x, y, z)
         ccFy = self.curlcurlFy(x, y, z)
-        ccFz = self.curlcurlFy(x, y, z)
+        ccFz = self.curlcurlFz(x, y, z)
         if type(ccFx) is not np.ndarray:
             ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
         if type(ccFy) is not np.ndarray:
@@ -85,7 +85,7 @@ class MaxwellPDE():
         z = p[..., 2, None]
         cFx = self.curlFx(x, y, z)
         cFy = self.curlFy(x, y, z)
-        cFz = self.curlFy(x, y, z)
+        cFz = self.curlFz(x, y, z)
         if type(cFx) is not np.ndarray:
             cFx = np.ones(x.shape, dtype=np.float_)*cFx
         if type(cFy) is not np.ndarray:
@@ -106,14 +106,15 @@ class SinData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
         #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.y*C.y)*C.i + sym.sin(sym.pi*C.x*C.z)*C.j + sym.sin(sym.pi*C.z*C.x)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
-        f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
-        #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
-
+        #f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        #f = C.y**2*C.i + C.z**2*C.j + C.y**2*C.k
+        #f = C.y*C.i + 2*C.x*C.j + C.z*C.k
         super(SinData, self).__init__(f)
 
     def init_mesh(self, n=0):
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1.23, 0, 0.87, 0, 0.99]
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
@@ -146,7 +147,6 @@ class XXX2dData():
         mesh = TriangleMesh(node, cell)
         mesh.uniform_refine(n)
         return mesh
-
 
     def dirichlet(self, p):
         return self.solution(p)
