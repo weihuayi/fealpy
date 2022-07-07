@@ -79,7 +79,6 @@ class FirstNedelecFiniteElementSpace3d:
         self.itype = self.mesh.itype
         self.ftype = self.mesh.ftype
 
-
     def boundary_dof(self):
         return self.dof.boundary_dof()
 
@@ -90,7 +89,7 @@ class FirstNedelecFiniteElementSpace3d:
         """
         p = self.p
         mesh = self.mesh
-        localEdge = mesh.ds.localFace2edge
+        localEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
 
         n = mesh.face_normal()[index] #(NF, 3)
         fm = mesh.entity_measure("face")
@@ -105,7 +104,7 @@ class FirstNedelecFiniteElementSpace3d:
                     localEdge[:, 0]]
             f2es = mesh.ds.face_to_edge_sign().astype(np.float_)[index]
             f2es[f2es==0] = -1
-            return fphi*c2es[..., None]
+            return fphi*f2es[..., None]
 
     @barycentric
     def edge_basis(self, bc, index=None, barycenter=True, left=True):
@@ -364,12 +363,12 @@ class FirstNedelecFiniteElementSpace3d:
 
         face2dof = self.dof.face_to_dof()[index]
 
-        qf = self.integralalg.faceintegrator if q is None else mesh.integrator(q, 'face')
+        qf = self.integralalg.faceintegrator 
         bcs, ws = qf.get_quadrature_points_and_weights()
 
         measure = mesh.entity_measure('face', index=index)
 
-        phi = self.face_basis(bcs)
+        phi = self.face_basis(bcs)[:, index]
         pp = mesh.bc_to_point(bcs, index=index)
         n = mesh.face_unit_normal(index=index)
 

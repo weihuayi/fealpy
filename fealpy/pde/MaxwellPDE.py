@@ -71,18 +71,48 @@ class MaxwellPDE():
         ccf = np.c_[ccFx, ccFy, ccFz] 
         return ccf - self.solution(p)
 
+    @cartesian
     def dirichlet(self, p):
         return self.solution(p)
+
+    @cartesian
+    def neumann(self, p, n):
+        """!
+        @param p: (..., N, ldof, 3)
+        @param n: (N, 3)
+        """
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        cFx = self.curlFx(x, y, z)
+        cFy = self.curlFy(x, y, z)
+        cFz = self.curlFz(x, y, z)
+        if type(cFx) is not np.ndarray:
+            cFx = np.ones(x.shape, dtype=np.float_)*cFx
+        if type(cFy) is not np.ndarray:
+            cFy = np.ones(x.shape, dtype=np.float_)*cFy
+        if type(cFz) is not np.ndarray:
+            cFz = np.ones(x.shape, dtype=np.float_)*cFz
+        cf = np.c_[cFx, cFy, cFz] #(..., NC, ldof, 3)
+        return np.cross(n[None, :], cf)
+
+    def boundary_type(self, mesh):
+        bdface = mesh.ds.boundary_face_index()
+        f2n = mesh.face_unit_normal()[bdface]
+        neumannbd = np.abs(f2n[:, 2])<0.9
+        bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
+        return bd
 
 class SinData(MaxwellPDE):
     def __init__(self):
         C = CoordSys3D('C')
         #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.x*sym.sin(sym.pi*C.z)*C.k 
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.z*C.k 
+        #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.z*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
+        f = C.y*C.i + 2*C.x*C.j + C.z*C.k
 
         #f = (C.x**2-C.x)**2*(C.y**2-C.y)**2*(C.z**2-C.z)**2
         #f = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
@@ -210,6 +240,13 @@ class Sin3dData():
         val = np.c_[z, z, np.pi*(np.cos(np.pi*x)-np.cos(np.pi*y))]
         return np.cross(n)
 
+    def boundary_type(self, mesh):
+        bdface = mesh.boundary_face_index()
+        f2n = mesh.face_normal()[bdface]
+        neumannbd = np.abs(f2n[:, 2])>0.9
+        bd = {"neumann": bdface[neumannbd], "dirichlet": bdface[~neumannbd]}
+        return bd
+
 class Bubble3dData():
     def __init__(self):
         self.omega = -1
@@ -238,7 +275,7 @@ class Bubble3dData():
         Z = -(2*x - 1)*(4*x - 2)*(y**2 - y)**2*(z**2 - z)**2*np.sin(y) + (4*x - 2)*(x**2 - x)*(y**2 - y)**2*(4*z - 2)*(z**2 - z) - (x**2 - x)**2*(2*y - 1)*(4*y - 2)*(z**2 - z)**2*np.sin(y) + (x**2 - x)**2*(4*y - 2)*(y**2 - y)*(4*z - 2)*(z**2 - z)*np.sin(x) - 2*(x**2 - x)**2*(4*y - 2)*(y**2 - y)*(z**2 - z)**2*np.cos(y) + (x**2 - x)**2*(y**2 - y)**2*(z**2 - z)**2*np.sin(y) - 4*(x**2 - x)**2*(y**2 - y)*(z**2 - z)**2*np.sin(y) - 4*(x**2 - x)*(y**2 - y)**2*(z**2 - z)**2*np.sin(y)
         return np.c_[X, Y, Z]-self.solution(p)
 
-    def init_mesh(self, n=1):
+    def init_mesh(self, n=0):
         box = [0, 1, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh

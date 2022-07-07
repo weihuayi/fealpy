@@ -31,6 +31,9 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
         edge = self.edge
+        face = self.face
+        NF = len(face2edge)
+        NEF = 3
         face2edgeSign = np.zeros((NF, NEF), dtype=np.bool_)
         n = [1, 2, 0]
         for i in range(3):
