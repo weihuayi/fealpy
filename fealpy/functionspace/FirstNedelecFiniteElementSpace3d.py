@@ -91,13 +91,13 @@ class FirstNedelecFiniteElementSpace3d:
         mesh = self.mesh
         localEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
 
-        n = mesh.face_normal()[index] #(NF, 3)
-        fm = mesh.entity_measure("face")
+        n = mesh.face_unit_normal()[index] #(NF, 3)
+        fm = mesh.entity_measure("face")[index]
         face = mesh.entity("face")[index]
         node = mesh.entity("node")
         e = node[face[:, localEdge[:, 1]]] - node[face[:, localEdge[:, 0]]] #(NF, 3, 3)
 
-        glambda = np.cross(n[:, None], e) #(NF, 3, 3)
+        glambda = np.cross(n[:, None], e)/(2*fm[:, None, None]) #(NF, 3, 3)
         if p==1:
             fphi = bc[..., None, localEdge[:, 0], None]*glambda[:, 
                     localEdge[:, 1]] - bc[..., None, localEdge[:, 1], None]*glambda[:,

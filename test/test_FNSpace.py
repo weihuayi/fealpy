@@ -95,8 +95,14 @@ def test_face_basis():
 
     phi = space.basis(bcs)
     fphi = space.face_basis(bcs0)
-    print("phi", phi)
-    print("fphi", fphi)
+    fn = mesh.face_unit_normal()[-1]
+    a = np.cross(np.array([fn]), fphi[0, -1])
+    b = np.cross(np.array([fn]), phi[0, 0])
+    print("phi", phi.shape)
+    print("fphi", fphi.shape)
+
+    print("phi", b)
+    print("fphi", a)
 
 
 

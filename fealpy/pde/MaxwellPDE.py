@@ -116,11 +116,10 @@ class SinData(MaxwellPDE):
 
         #f = (C.x**2-C.x)**2*(C.y**2-C.y)**2*(C.z**2-C.z)**2
         #f = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
-
         super(SinData, self).__init__(f)
 
     def init_mesh(self, n=1):
-        box = [0, 1, 0, 1, 0, 1]
+        box = [0, 1.23, 0, 0.87, 0, 0.99]
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
