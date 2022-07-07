@@ -55,7 +55,7 @@ for i in range(maxit):
     B = A-M 
 
     neu = space.set_neumann_bc(pde.neumann, threshold=neumannBD)
-    b = b+neu
+    b = b-neu
 
     Eh = space.function()
     B, b = bc.apply(B, b, Eh)
