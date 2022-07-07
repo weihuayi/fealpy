@@ -122,7 +122,7 @@ class FirstKindNedelecFiniteElementSpace2d:
         """
         self.mesh = mesh
         self.p = p
-        self.smspace = ScaledMonomialSpace2d(mesh, p, q=q)
+        self.smspace = ScaledMonomialSpace2d(mesh, p, q=p+2)
 
         if dof is None:
             self.dof = FKNDof2d(mesh, p)
