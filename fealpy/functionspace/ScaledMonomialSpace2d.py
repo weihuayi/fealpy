@@ -327,25 +327,33 @@ class ScaledMonomialSpace2d():
         else:
             return hphi
 
-    def PxMatrix(self):
-        p = self.p 
+    def partial_matrix(self, p=None):
+        p = p or self.p 
         index = multi_index_matrix2d(p)
         N = len(index)
+        cellarea = self.mesh.entity_measure("cell")
+        NC = self.mesh.number_of_cells()
+        h = np.sqrt(cellarea)
 
         I, = np.where(index[:, 1] > 1)
-        Px = np.zeros([N, N], dtype=np.float_)
-        Px[I, np.arange(len(I))] = index[I, 1]
-        return Px 
-
-    def PyMatrix(self):
-        p = self.p
-        index = multi_index_matrix2d(p)
-        N = len(index)
+        Px = np.zeros([NC, N, N], dtype=np.float_)
+        Px[:, I, np.arange(len(I))] = index[None, I, 1]/h[:, None]
 
         I, = np.where(index[:, 2] > 1)
-        Px = np.zeros([N, N], dtype=np.float_)
-        Px[I, np.arange(len(I))] = index[I, 2]
-        return Px 
+        Py = np.zeros([NC, N, N], dtype=np.float_)
+        Py[:, I, np.arange(len(I))] = index[None, I, 2]/h[:, None]
+        return Px, py 
+
+    def partial_matrix_on_edge(self, p=None):
+        p = p or self.p 
+        I = np.arange(p-1)
+
+        h = self.mesh.entity_measure("edge")
+        NE = self.mesh.number_of_edges()
+
+        P = np.zeros([NE, p, p], dtype=np.float_)
+        P[:, I, I+1] = np.arange(p)[None, :]/h[:, None]
+        return P
 
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
@@ -478,8 +486,8 @@ class ScaledMonomialSpace2d():
 
         @cartesian
         def f(x, index):
-            gphi = self.grad_basis(x, index=index, p=p)
-            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
+            hphi = self.hessian_basis(x, index=index, p=p) 
+            return np.einsum('qclij, qcmij->qclm', gphi, gphi)
 
         A = self.integralalg.cell_integral(f, q=p+3)
         cell2dof = self.cell_to_dof(p=p)
@@ -488,8 +496,7 @@ class ScaledMonomialSpace2d():
         J = I.swapaxes(-1, -2)
         gdof = self.number_of_global_dofs(p=p)
 
-
-        # Construct the stiffness matrix
+        # Construct the hessian matrix
         A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return A
 
@@ -791,7 +798,7 @@ class ScaledMonomialSpace2d():
     def source_vector1(self, f, celltype=False, q=None):
         """
         @brief (f, v)_T
-        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
+        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l), 即 f 可以是一个高维函数
         """
 
         p = self.p
@@ -837,6 +844,40 @@ class ScaledMonomialSpace2d():
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
         return F 
 
+    def coefficient_of_cell_basis_under_edge_basis(slef, p=None):
+        """!
+        @brief 计算单元上基函数在边界基函数上的系数
+        """
+        p = p or self.p
+        mesh = self.mesh
+        NC = self.mesh.number_of_cells()
+        cell2edge, cell2edgeloc = mesh.ds.cell_to_edge()
+        ldof = self.dof.number_of_local_dofs()
+
+        if p == 0:
+            bcs = np.array([[0.5, 0.5]])
+        else:
+            bcs = np.zeros((p+1, 2), dtype=np.float_)
+            bcs[:, 0] = np.arange(p)/p
+            bcs[:, 1] = 1-bcs[:, 1]
+
+        #M (NE, p+1, p+1) 是每个边上的 p+1 个基函数在 p+1 个点处的值组成矩阵的逆
+        M = np.linalg.inv(self.edge_basis_with_barycentric(bcs, p))
+        #C (N, ldof, p+1) 是每个单元基函数在每条边上基函数的系数
+        C = np.zeros((cell2edgeloc[-1], ldof, p+1), dtype=np.float_)
+
+        points = self.mesh.bc_to_point(bcs) #(p+1, NE, 2)
+        isNotOK = np.ones(NC, dtype=np.bool_)
+        start = cell2edgeloc[:-1].copy() 
+        while np.any(isNotOK):
+            index = start[isNotOK]
+            eidx = cell2edge[index]
+            phi = self.basis(points[:, eidx], index=isNotOK, p=p) #(p+1, NC, ldof)
+            C[index] = np.einsum("cij, jcl->cli", M[eidx], phi)
+            start[isNotOK] = start[isNotOK]+1
+            isNotOK = start<cell2edgeloc[1:]
+        return C
+
     def triangle_measure(self, tri):
         v1 = tri[1] - tri[0]
         v2 = tri[2] - tri[0]
@@ -845,9 +886,7 @@ class ScaledMonomialSpace2d():
 
     def source_vector(self, f, celltype=False, q=None):
         """
-
         """
-
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
         b = (self.basis, cell2dof, gdof)
