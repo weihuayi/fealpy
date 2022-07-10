@@ -335,24 +335,24 @@ class ScaledMonomialSpace2d():
         NC = self.mesh.number_of_cells()
         h = np.sqrt(cellarea)
 
-        I, = np.where(index[:, 1] > 1)
+        I, = np.where(index[:, 1] > 0)
         Px = np.zeros([NC, N, N], dtype=np.float_)
-        Px[:, I, np.arange(len(I))] = index[None, I, 1]/h[:, None]
+        Px[:, np.arange(len(I)), I] = index[None, I, 1]/h[:, None]
 
-        I, = np.where(index[:, 2] > 1)
+        I, = np.where(index[:, 2] > 0)
         Py = np.zeros([NC, N, N], dtype=np.float_)
-        Py[:, I, np.arange(len(I))] = index[None, I, 2]/h[:, None]
-        return Px, py 
+        Py[:, np.arange(len(I)), I] = index[None, I, 2]/h[:, None]
+        return Px, Py 
 
     def partial_matrix_on_edge(self, p=None):
         p = p or self.p 
-        I = np.arange(p-1)
+        I = np.arange(p)
 
         h = self.mesh.entity_measure("edge")
         NE = self.mesh.number_of_edges()
 
-        P = np.zeros([NE, p, p], dtype=np.float_)
-        P[:, I, I+1] = np.arange(p)[None, :]/h[:, None]
+        P = np.zeros([NE, p+1, p+1], dtype=np.float_)
+        P[:, I, I+1] = np.arange(1, p+1)[None, :]/h[:, None]
         return P
 
     @cartesian
@@ -456,8 +456,10 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 
-    def edge_cell_mass_matrix(self, p=None): 
-        p = self.p if p is None else p
+    def edge_cell_mass_matrix(self, p=None, p1=None): 
+        p = p or self.p
+        p1 = p1 or p+1
+
         mesh = self.mesh
 
         edge = mesh.entity('edge')
@@ -470,35 +472,37 @@ class ScaledMonomialSpace2d():
         ps = self.mesh.edge_bc_to_point(bcs)
 
         phi0 = self.edge_basis(ps, p=p)
-        phi1 = self.basis(ps, index=edge2cell[:, 0], p=p+1)
-        phi2 = self.basis(ps, index=edge2cell[:, 1], p=p+1)
+        phi1 = self.basis(ps, index=edge2cell[:, 0], p=p1)
+        phi2 = self.basis(ps, index=edge2cell[:, 1], p=p1)
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
 
-    def hessian_matrix(self, p=None):
+    def hessian_matrix(self, p=None, local=False):
         """
 
         Note:
             这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
         """
         p = self.p if p is None else p
-
         @cartesian
         def f(x, index):
             hphi = self.hessian_basis(x, index=index, p=p) 
-            return np.einsum('qclij, qcmij->qclm', gphi, gphi)
+            return np.einsum('qclij, qcmij->qclm', hphi, hphi)
 
         A = self.integralalg.cell_integral(f, q=p+3)
-        cell2dof = self.cell_to_dof(p=p)
-        ldof = self.number_of_local_dofs(p=p, doftype='cell')
-        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-        J = I.swapaxes(-1, -2)
-        gdof = self.number_of_global_dofs(p=p)
+        if local:
+            return A
+        else:
+            cell2dof = self.cell_to_dof(p=p)
+            ldof = self.number_of_local_dofs(p=p, doftype='cell')
+            I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+            J = I.swapaxes(-1, -2)
+            gdof = self.number_of_global_dofs(p=p)
 
-        # Construct the hessian matrix
-        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-        return A
+            # Construct the hessian matrix
+            A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            return A
 
     def stiff_matrix(self, p=None):
         """
