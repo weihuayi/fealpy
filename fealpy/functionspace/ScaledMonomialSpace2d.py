@@ -456,9 +456,9 @@ class ScaledMonomialSpace2d():
         H = np.einsum('i, ijk, ijm, j->jkm', ws, phi, phi, measure, optimize=True)
         return H
 
-    def edge_cell_mass_matrix(self, p=None, ep=None): 
+    def edge_cell_mass_matrix(self, p=None, cp=None): 
         p = p or self.p
-        p1 = p1 or p+1
+        cp = cp or p+1
 
         mesh = self.mesh
 
@@ -472,8 +472,8 @@ class ScaledMonomialSpace2d():
         ps = self.mesh.edge_bc_to_point(bcs)
 
         phi0 = self.edge_basis(ps, p=p)
-        phi1 = self.basis(ps, index=edge2cell[:, 0], p=ep)
-        phi2 = self.basis(ps, index=edge2cell[:, 1], p=ep)
+        phi1 = self.basis(ps, index=edge2cell[:, 0], p=cp)
+        phi2 = self.basis(ps, index=edge2cell[:, 1], p=cp)
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
