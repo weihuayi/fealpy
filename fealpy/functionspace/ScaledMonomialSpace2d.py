@@ -342,7 +342,7 @@ class ScaledMonomialSpace2d():
         I, = np.where(index[:, 2] > 0)
         Py = np.zeros([NC, N, N], dtype=np.float_)
         Py[:, np.arange(len(I)), I] = index[None, I, 2]/h[:, None]
-        return Px, Py 
+        return Px, Py
 
     def partial_matrix_on_edge(self, p=None):
         p = p or self.p 
