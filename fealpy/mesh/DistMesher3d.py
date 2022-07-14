@@ -91,7 +91,7 @@ class DistMesher3d():
         cell = np.asarray(d.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
                 node[cell[:, 2]])/4
-        return  cell[fd(bc) < -self.geps]
+        return  cell[fd(bc) < self.geps]
 
     def construct_edge(self, node):
         """
