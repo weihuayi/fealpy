@@ -5,7 +5,7 @@ from ..decorator import cartesian
 
 class HelmholtzData2d():
 
-    def __init__(self, k=100):
+    def __init__(self, k=1):
         """
         @brief 
 

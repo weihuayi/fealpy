@@ -413,6 +413,9 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def face_basis(self, bc):
+        """
+        @brief 计算 face 上的基函数在给定积分点处的函数值
+        """
         p = self.p   # the degree of polynomial basis function
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
@@ -731,10 +734,11 @@ class LagrangeFiniteElementSpace():
             isInFace = face2cell[:, 0] != face2cell[:, 1]
             measure = mesh.entity_measure('face', index=isInFace)
             f2d = face2dof[isInFace]
+            h = np.power(measure, 1/TD)
             
-            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], measure)
-            I = np.broadcast_to(f2d[:, None, :], shape=P.shape)
-            J = np.broadcast_to(f2d[:, :, None], shape=P.shape)
+            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], h*measure)
+            I = np.broadcast_to(f2d[:, :, None], shape=P.shape)
+            J = np.broadcast_to(f2d[:, None, :], shape=P.shape)
 
             gdof = self.dof.number_of_global_dofs()
             P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(gdof, gdof))
