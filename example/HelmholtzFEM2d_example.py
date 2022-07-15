@@ -23,11 +23,13 @@ def penalty_matrix(space, q):
     qf = mesh.integrator(q, 'face')
     bcs, ws = qf.get_quadrature_points_and_weights()
     NQ = len(ws)
+    n = mesh.face_unit_normal()
+    cell2face = mesh.ds.cell_to_face()
 
-    gphi = np.zeros((TD+1, NQ, NC, ldof, GD), dtype=np.float64)
+    gphi = np.zeros((TD+1, NQ, NC, ldof), dtype=np.float64)
     for i in range(TD+1):
         b = np.insert(bcs, i, 0, axis=1)
-        gphi[i] = space.grad_basis(b)
+        np.einsum('...ijm, im->...ij', space.grad_basis(b), n[cell2face[:, i]], out=gph[i])
 
     face2cell = mesh.face_to_cell()
     isBdFace = face2cell[:, 0] != face2cell[:, 1]
