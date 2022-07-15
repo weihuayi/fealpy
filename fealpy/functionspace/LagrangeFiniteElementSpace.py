@@ -701,45 +701,40 @@ class LagrangeFiniteElementSpace():
             n = mesh.face_unit_normal()
             cell2dof = self.cell_to_dof()
             # 每个积分点、在每个面上、每个基函数法向导数的取值
-            val = np.zeros((NQ, NF, ndof), dtype=self.ftype)  
+            val = np.zeros((NQ, NF, fdof + 2*ndof), dtype=self.ftype)  
 
             for i in range(TD+1): # 循环每个单元的四个面
-                isCFDof = isFaceDof[:, i] # 在当前面上的自由度
-                isLeft = cell2facesign[:, i] # 单元是否在全局面的左边
+
+                lidx, = np.nonzero( cell2facesign[:, i]) # 单元是全局面的左边单元
+                ridx, = np.nonzero(~cell2facesign[:, i]) # 单元是全局面的右边单元
+                idx0, = np.nonzero( isFaceDof[:, i])
+                idx1, = np.nonzero(~isFaceDof[:, i])
 
                 fidx = cell2face[:, i]
-                print(fidx.shape)
-                print(fidx[ isLeft].shape)
-                print(np.arange(fdof, fdof+ndof).shape)
-                print(face2dof.shape)
-                print(face2dof[fidx[ isLeft][:, None], np.arange(fdof,
-                    fdof+  ndof)])
-                print(cell2dof)
-                print(isLeft[:, None])
-                print(isCFDof)
-                face2dof[fidx[ isLeft][:, None], np.arange(fdof,      fdof+  ndof)] = cell2dof[ isLeft[:, None], ~isCFDof] 
-                face2dof[fidx[~isLeft][:, None], np.arange(fdof+ndof, fdof+2*ndof)] = cell2dof[~isLeft[:, None], ~isCFDof]
+                face2dof[fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cell2dof[lidx[:, None], idx1] 
+                face2dof[fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cell2dof[ridx[:, None], idx1]
 
-                idx = np.argsort(cell2dof[:, isCFDof], axis=1)
-                face2dof[fidx, 0:fdof] = cell2dof[:, isCFDof][:, idx] 
+                idx = np.argsort(cell2dof[:, isFaceDof[:, i]], axis=1)
+                face2dof[fidx, 0:fdof] = cell2dof[:, isFaceDof[:, i]][np.arange(NC)[:, None], idx] 
 
                 # 面上的积分点转化为体上的积分点
                 b = np.insert(bcs, i, 0, axis=1)
                 # (NQ, NC, cdof)
-                cval = np.einsum('...ijm, im->...ij', space.grad_basis(b), n[cell2face[:, i]])
-                val[:, fidx[ isLeft][:, None], np.arange(fdof,      fdof+  ndof)] = cval[:,  isLeft[:, None], ~isCFDof]
-                val[:, fidx[~isLeft][:, None], np.arange(fdof+ndof, fdof+2*ndof)] = cval[:, ~isLeft[:, None], ~isCFDof]
+                cval = np.einsum('...ijm, im->...ij', self.grad_basis(b), n[cell2face[:, i]])
+                val[:, fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cval[:, lidx[:, None], idx1]
+                val[:, fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cval[:, ridx[:, None], idx1]
 
-                val[:, fidx[ isLeft][:, None], 0:fdof] -= cval[:,  isLeft[:, None], isCFDof][..., idx[ isLeft]] 
-                val[:, fidx[~isLeft][:, None], 0:fdof]  = cval[:, ~isLeft[:, None], isCFDof][..., idx[~isLeft]]
+                val[:, fidx[lidx, None], np.arange(0, fdof)] -= cval[:, lidx[:, None], idx0[idx[lidx]]] 
+                val[:, fidx[ridx, None], np.arange(0, fdof)]  = cval[:, ridx[:, None], idx0[idx[ridx]]]
 
+            face2cell = mesh.ds.face_to_cell()
             isInFace = face2cell[:, 0] != face2cell[:, 1]
             measure = mesh.entity_measure('face', index=isInFace)
             f2d = face2dof[isInFace]
             
             P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], measure)
             I = np.broadcast_to(f2d[:, None, :], shape=P.shape)
-            J = np.broadcast_to(f2d[:, :, None], shpae=P.shape)
+            J = np.broadcast_to(f2d[:, :, None], shape=P.shape)
 
             gdof = self.dof.number_of_global_dofs()
             P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(gdof, gdof))
@@ -1102,6 +1097,9 @@ class LagrangeFiniteElementSpace():
         return A 
 
     def source_vector(self, f, dim=None, q=None):
+        """
+        @brief 组装刚度矩阵
+        """
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
@@ -1137,8 +1135,6 @@ class LagrangeFiniteElementSpace():
             ''')
 
         gdof = self.number_of_global_dofs()
-        shape = gdof if dim is None else (gdof, dim)
-        b = np.zeros(shape, dtype=self.ftype)
 
         if p > 0:
             if type(fval) in {float, int}:
@@ -1154,6 +1150,9 @@ class LagrangeFiniteElementSpace():
                 bb = np.einsum('m, mi..., mik, i->ik...',
                         ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
+
+            shape = gdof if dim is None else (gdof, dim)
+            b = np.zeros(shape, dtype=bb.dtype)
             if dim is None:
                 np.add.at(b, cell2dof, bb)
             else:
@@ -1298,11 +1297,11 @@ class LagrangeFiniteElementSpace():
         if len(val.shape) == 2:
             dim = 1
             if F is None:
-                F = np.zeros((gdof, ), dtype=self.ftype)
+                F = np.zeros((gdof, ), dtype=bb.dtype)
         else:
             dim = val.shape[-1]
             if F is None:
-                F = np.zeros((gdof, dim), dtype=self.ftype)
+                F = np.zeros((gdof, dim), dtype=bb.dtype)
 
         if dim == 1:
             np.add.at(F, face2dof, bb)
