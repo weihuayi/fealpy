@@ -665,6 +665,72 @@ class LagrangeFiniteElementSpace():
         return np.zeros(shape, dtype=dtype)
 
 
+    def penalty_matrix(self, q=None):
+        """
+        @brief 组装罚项矩阵 
+        """
+    
+        p = self.p
+
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
+
+        assert GD == TD
+        NC = mesh.number_of_cells()
+        NF = mesh.number_of_faces()
+
+        isFaceDof = mesh.multi_index_matrix(p) == 0
+
+        cell2face = mesh.ds.cell_to_face()
+        cell2facesign = mesh.ds.cell_to_face_sign()
+        n = mesh.face_unit_normal()
+        measure = mesh.entity_measure('face')
+
+        ldof = self.number_of_local_dofs() # 单元上的所有的自由度的个数
+        fdof = self.dof.number_of_local_dofs('face') # 每个单元面上的自由度
+
+        ndof = ldof - fdof
+        face2dof = np.zeros((NF, fdof + 2*ndof), dtype=self.itype)
+
+        if TD > 1:
+            q = p+3 if q is None else q
+            qf = mesh.integrator(q, 'face') # 面上的积分公式
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            NQ = len(ws)
+
+            cell2dof = self.cell_to_dof()
+            val = np.zeros((NQ, NF, ndof), dtype=self.ftype) 
+            for i in range(TD+1):
+                isCFDof = isFaceDof[:, i] # 在当前面上的自由度
+
+                face2dof[:, 0:fdof] 
+                isLeft = cell2facesign[:, i] # 单元是否在全局面的左边
+
+
+                fidx = cell2face[:, i]
+                lidx = np.zeros((NC, ndof), dtype=self.itype)
+                lidx[isLeft, :] = range(fdof       :fdof +   ndof)
+                lidx[~isLeft, :]= range(fdof + ndof:fdof + 2*ndof)
+                face2dof[fidx[isLeft][:, None], np.arange(fdof:fdof+ndof)] = cell2dof[isLeft[:, None], ~isCFDof] 
+                face2dof[fidx[~isLeft][:, None], np.arange(fdof+ndof:fdof+2*ndof)] = cell2dof[~isLeft[:, None], ~isCFDof]
+
+                idx = np.argsort(cell2dof[:, isCFDof], axis=1)
+                face2dof[fidx, 0:fdof] = cell2dof[:, isCFDof][:, idx] 
+
+                b = np.insert(bcs, i, 0, axis=1)
+                # (NQ, NC, cdof)
+                cval = np.einsum('...ijm, im->...ij', space.grad_basis(b), n[cell2face[:, i]])
+                val[:, fidx[isLeft][:, None], np.arange(fdof:fdof+ndof)] = cval[:, isLeft[:, None], ~isCFDof]
+                val[:, fidx[~isLeft][:, None], np.arange(fdof+ndof:fdof+2*ndof)] = cval[:, ~isLeft[:, None], ~isCFDof]
+
+                val[:, fidx[ isLeft][:, None], 0:fdof] -= cval[:, isLeft[:, None], isCFDof][:, idx[ isLeft]] 
+                val[:, fidx[~isLeft][:, None], 0:fdof]  = cval[:,~isLeft[:, None], isCFDof][:, idx[~isLeft]]
+
+
+        return None
+
+
     def integral_basis(self):
         """
         """
