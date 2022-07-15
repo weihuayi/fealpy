@@ -70,7 +70,7 @@ class IntervalMesh():
     def entity(self, etype=1):
         if etype in {'cell', 'edge', 1}:
             return self.ds.cell
-        elif etype in {'node', 'face', 0]:
+        elif etype in {'node', 'face', 0}:
             return self.node
         else:
             raise ValueError("`entitytype` is wrong!")

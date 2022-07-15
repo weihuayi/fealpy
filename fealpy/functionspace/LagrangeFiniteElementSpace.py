@@ -670,65 +670,80 @@ class LagrangeFiniteElementSpace():
         @brief 组装罚项矩阵 
         """
     
+        # 空间次数
         p = self.p
 
         mesh = self.mesh
         GD = mesh.geo_dimension()
         TD = mesh.top_dimension()
 
-        assert GD == TD
+        assert TD > 1   # 目前仅能处理 2D 和 3D 的问题
+        assert GD == TD # 仅适用于网格拓扑维数和几何维数相同的情形
+
         NC = mesh.number_of_cells()
         NF = mesh.number_of_faces()
 
-        isFaceDof = mesh.multi_index_matrix(p) == 0
-
+        isFaceDof = (mesh.multi_index_matrix(p) == 0) 
         cell2face = mesh.ds.cell_to_face()
         cell2facesign = mesh.ds.cell_to_face_sign()
-        n = mesh.face_unit_normal()
-        measure = mesh.entity_measure('face')
 
-        ldof = self.number_of_local_dofs() # 单元上的所有的自由度的个数
+        ldof = self.dof.number_of_local_dofs() # 单元上的所有的自由度的个数
         fdof = self.dof.number_of_local_dofs('face') # 每个单元面上的自由度
-
         ndof = ldof - fdof
         face2dof = np.zeros((NF, fdof + 2*ndof), dtype=self.itype)
 
-        if TD > 1:
+        if TD > 1: # 处理 2D 和 3D 情形
             q = p+3 if q is None else q
             qf = mesh.integrator(q, 'face') # 面上的积分公式
             bcs, ws = qf.get_quadrature_points_and_weights()
             NQ = len(ws)
 
+            n = mesh.face_unit_normal()
             cell2dof = self.cell_to_dof()
-            val = np.zeros((NQ, NF, ndof), dtype=self.ftype) 
-            for i in range(TD+1):
-                isCFDof = isFaceDof[:, i] # 在当前面上的自由度
+            # 每个积分点、在每个面上、每个基函数法向导数的取值
+            val = np.zeros((NQ, NF, ndof), dtype=self.ftype)  
 
-                face2dof[:, 0:fdof] 
+            for i in range(TD+1): # 循环每个单元的四个面
+                isCFDof = isFaceDof[:, i] # 在当前面上的自由度
                 isLeft = cell2facesign[:, i] # 单元是否在全局面的左边
 
-
                 fidx = cell2face[:, i]
-                lidx = np.zeros((NC, ndof), dtype=self.itype)
-                lidx[isLeft, :] = range(fdof       :fdof +   ndof)
-                lidx[~isLeft, :]= range(fdof + ndof:fdof + 2*ndof)
-                face2dof[fidx[isLeft][:, None], np.arange(fdof:fdof+ndof)] = cell2dof[isLeft[:, None], ~isCFDof] 
-                face2dof[fidx[~isLeft][:, None], np.arange(fdof+ndof:fdof+2*ndof)] = cell2dof[~isLeft[:, None], ~isCFDof]
+                print(fidx.shape)
+                print(fidx[ isLeft].shape)
+                print(np.arange(fdof, fdof+ndof).shape)
+                print(face2dof.shape)
+                print(face2dof[fidx[ isLeft][:, None], np.arange(fdof,
+                    fdof+  ndof)])
+                print(cell2dof)
+                print(isLeft[:, None])
+                print(isCFDof)
+                face2dof[fidx[ isLeft][:, None], np.arange(fdof,      fdof+  ndof)] = cell2dof[ isLeft[:, None], ~isCFDof] 
+                face2dof[fidx[~isLeft][:, None], np.arange(fdof+ndof, fdof+2*ndof)] = cell2dof[~isLeft[:, None], ~isCFDof]
 
                 idx = np.argsort(cell2dof[:, isCFDof], axis=1)
                 face2dof[fidx, 0:fdof] = cell2dof[:, isCFDof][:, idx] 
 
+                # 面上的积分点转化为体上的积分点
                 b = np.insert(bcs, i, 0, axis=1)
                 # (NQ, NC, cdof)
                 cval = np.einsum('...ijm, im->...ij', space.grad_basis(b), n[cell2face[:, i]])
-                val[:, fidx[isLeft][:, None], np.arange(fdof:fdof+ndof)] = cval[:, isLeft[:, None], ~isCFDof]
-                val[:, fidx[~isLeft][:, None], np.arange(fdof+ndof:fdof+2*ndof)] = cval[:, ~isLeft[:, None], ~isCFDof]
+                val[:, fidx[ isLeft][:, None], np.arange(fdof,      fdof+  ndof)] = cval[:,  isLeft[:, None], ~isCFDof]
+                val[:, fidx[~isLeft][:, None], np.arange(fdof+ndof, fdof+2*ndof)] = cval[:, ~isLeft[:, None], ~isCFDof]
 
-                val[:, fidx[ isLeft][:, None], 0:fdof] -= cval[:, isLeft[:, None], isCFDof][:, idx[ isLeft]] 
-                val[:, fidx[~isLeft][:, None], 0:fdof]  = cval[:,~isLeft[:, None], isCFDof][:, idx[~isLeft]]
+                val[:, fidx[ isLeft][:, None], 0:fdof] -= cval[:,  isLeft[:, None], isCFDof][..., idx[ isLeft]] 
+                val[:, fidx[~isLeft][:, None], 0:fdof]  = cval[:, ~isLeft[:, None], isCFDof][..., idx[~isLeft]]
 
+            isInFace = face2cell[:, 0] != face2cell[:, 1]
+            measure = mesh.entity_measure('face', index=isInFace)
+            f2d = face2dof[isInFace]
+            
+            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], measure)
+            I = np.broadcast_to(f2d[:, None, :], shape=P.shape)
+            J = np.broadcast_to(f2d[:, :, None], shpae=P.shape)
 
-        return None
+            gdof = self.dof.number_of_global_dofs()
+            P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            return P
 
 
     def integral_basis(self):
