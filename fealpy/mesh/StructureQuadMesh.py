@@ -593,6 +593,10 @@ class StructureQuadMeshDataStructure:
 
     @property
     def edge(self):
+        """
+        @brief 生成网格中所有的边
+        @todo 把顺序换为先 x 方向的边，后 y 方向的边。
+        """
         nx = self.nx
         ny = self.ny
 

@@ -4,17 +4,6 @@ import argparse
 
 from fealpy.mesh import StructureHexMesh
 
-class EMWaveData3D:
-    def __init__(self, kappa=None):
-        self.kappa = 20  # 波数
-        self.s = 0.5  # 网比(时间稳定因子)
-
-    def domian(self):
-        return [0, 100, 0, 100, 0, 100]
-
-    def dirichlet(self, n):
-        return np.sin(2 * np.pi * n * (self.s / self.kappa))
-
 
 parser = argparse.ArgumentParser(description=
                                  """
@@ -22,59 +11,69 @@ parser = argparse.ArgumentParser(description=
                                  并且没有ABC(吸收边界条件)
                                  """)
 
-parser.add_argument('--NX',
+parser.add_argument('--ND',
                     default=20, type=int,
-                    help='x轴剖分段数， 默认为 20 段.')
+                    help='每个波长剖分的网格数，默认 20 个网格.')
 
-parser.add_argument('--NY',
-                    default=20, type=int,
-                    help='y轴剖分段数， 默认为 20 段.')
+parser.add_argument('--R',
+                    default=0.5, type=int,
+                    help='网比（时间稳定因子）， 默认为 0.5，三维情形要小于等于 1/sqrt(3)')
 
-parser.add_argument('--NZ',
+parser.add_argument('--NS',
                     default=20, type=int,
-                    help='Z轴剖分段数， 默认为 20 段.')
+                    help='每个方向的网格数，默认为 20')
 
 parser.add_argument('--NT',
-                    default=100, type=int,
-                    help='时间剖分段数， 默认为 100 段.')
-
+                    default=150, type=int,
+                    help='时间步，默认为 150')
 
 args = parser.parse_args()
-nx = args.NX
-ny = args.NY
-nz = args.NZ
 
-nt = args.NT
+ND = args.ND
+R = args.R
+NT = args.NT
+NS = args.NS
 
-pde = EMWaveData3D()
-mesh = StructureHexMesh(pde.domian(), nx=nx, ny=ny, nz=nz)
+mesh = StructureHexMesh([0, NS, 0, NS, 0, NS], nx=NS, ny=NS, nz=NS)
 
-EX, EY, EZ = mesh.function(etype='edge')
-HX, HY, HZ = mesh.function(etype='face')
+Ex, Ey, Ez = mesh.function(etype='edge') # 网格边上的离散函数
+Hx, Hy, Hz = mesh.function(etype='face') # 网格面上的离散函数
 
 
-for n in range(nt):
-    # HX: (nx+1, ny, nz) EZ: (nx+1, ny+1, nz), EY: (nx+1, ny, nz+1) 
-    HX[:] -= pde.s * (np.diff(EZ[1:-1, :, :], axis=1) - np.diff(EY[1:-1, :, :], axis=2))
+for n in range(NT):
+    # HX: (nx+1, ny, nz) 
+    # EY: (nx+1, ny, nz+1) 
+    # EZ: (nx+1, ny+1, nz)
+    Hx[1:-1, :, :] += R*(np.diff(Ey[1:-1, :, :], axis=2) - np.diff(Ez[1:-1, :, :], axis=1))
 
-    # HY: (nx, ny+1, nz) EX: (nx, ny+1, nz+1), EZ: (nx+1, ny+1, nz) 
-    HY[:] -= pde.s * (np.diff(EX[:, 1:-1, :], axis=2) - np.diff(EZ[:, 1:-1, :], axis=0))
+    # HY: (nx, ny+1, nz) 
+    # EZ: (nx+1, ny+1, nz) 
+    # EX: (nx, ny+1, nz+1)
+    Hy[:, 1:-1, :] += R*(np.diff(Ez[:, 1:-1, :], axis=0) - np.diff(Ex[:, 1:-1, :], axis=2))
 
-    # HZ: (nx, ny, nz+1) EY: (nx+1, ny, nz+1), EX: (nx, ny+1, nz+1) 
-    HZ[:] -= pde.s * (np.diff(EY[:, :, 1:-1], axis=0) - np.diff(EX[:, :, 1:-1], axis=1))
+    # HZ: (nx, ny, nz+1) 
+    # EX: (nx, ny+1, nz+1) 
+    # EY: (nx+1, ny, nz+1)
+    Hz[:, :, 1:-1] += R*(np.diff(Ex[:, :, 1:-1], axis=1) - np.diff(Ey[:, :, 1:-1], axis=0))
 
-    # EX: (nx, ny+1, nz+1), HZ: (nx, ny, nz+1), HY: (nx, ny+1, nz)
-    EX[:, 1:-1, 1:-1] += pde.s * (np.diff(HZ, axis=1) - np.diff(HY, axis=2))
+    # EX: (nx, ny+1, nz+1)
+    # HZ: (nx, ny, nz+1)
+    # HY: (nx, ny+1, nz)
+    Ex[:, 1:-1, 1:-1] += R*(np.diff(Hz[:, :, 1:-1], axis=1) - np.diff(Hy[:, 1:-1, :], axis=2))
 
-    # EY: (nx+1, ny, nz+1), HX: (nx+1, ny, nz), HZ: (nx, ny, nz+1)
-    EY[1:-1, :, 1:-1] += pde.s * (np.diff(HX, axis=2) - np.diff(HZ, axis=0))
+    # EY: (nx+1, ny, nz+1), 
+    # HX: (nx+1, ny, nz)
+    # HZ: (nx, ny, nz+1)
+    Ey[1:-1, :, 1:-1] += R*(np.diff(Hx[1:-1, :, :], axis=2) - np.diff(Hz[:, :, 1:-1], axis=0))
 
-    # EZ: (nx+1, ny+1, nz), HY: (nx, ny+1, nz), HX: (nx+1, ny, nz)
-    EZ[1:-1, 1:-1, :] += pde.s * (np.diff(HY, axis=0) - np.diff(HX, axis=1))
+    # Ez: (nx+1, ny+1, nz)
+    # Hy: (nx, ny+1, nz)
+    # Hx: (nx+1, ny, nz)
+    Ez[1:-1, 1:-1, :] += R*(np.diff(Hy[:, 1:-1, :], axis=0) - np.diff(Hx[1:-1, :, :], axis=1))
 
-    ez[int(2*nx + 2), int(2*ny + 2), int(2*nz + 2)] += pde.dirichlet(n)
+    Ez[NS//2, NS//2, NS//2] += np.sin(2*n*np.pi*(R/ND))
 
-plt.title("dt=100")
-plt.imshow(ez[..., -1], cmap='jet', extent=pde.domian()[0:4])
+plt.title("t=100")
+plt.imshow(Ez[..., -1], cmap='jet', extent=[0, NS, 0, NS])
 plt.colorbar()
 plt.show()
