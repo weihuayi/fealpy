@@ -390,8 +390,10 @@ class ScaledMonomialSpace2d():
 
     @cartesian
     def hessian_value(self, uh, point, index=np.s_[:]):
-        #TODO:
-        pass
+        hphi = self.hessian_basis(point, index=index) #(NQ, NC, ldof, 2, 2)
+
+        cell2dof = self.dof.cell2dof
+        return np.einsum('...clij, cl->...cij', hphi, uh[cell2dof[index]])
 
     def function(self, dim=None, array=None, dtype=np.float64):
         f = Function(self, dim=dim, array=array, coordtype='cartesian',
@@ -1063,6 +1065,18 @@ class ScaledMonomialSpace2d():
 
         def f(p, index):
             val = np.sum((u(p) - uh.grad_value(p, index))**2, axis=-1)
+            return val
+        err = np.sqrt(self.integralalg.integral(f))
+        return err
+
+    def H2_error(self, u, uh):
+        """!
+        @brief 求 H2 误差
+        """
+
+        def f(p, index):
+            val = np.sum(np.sum((u(p) - uh.hessian_value(p, index))**2, axis=-1),
+                    axis=-1)
             return val
         err = np.sqrt(self.integralalg.integral(f))
         return err
