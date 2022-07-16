@@ -41,6 +41,9 @@ Hx, Hy, Hz = mesh.function(etype='face') # 网格面上的离散函数
 
 
 for n in range(NT):
+
+    Ez[NS//2, NS//2, NS//2] = np.sin(2*(n+1)*np.pi*(R/ND))
+
     # HX: (nx+1, ny, nz) 
     # EY: (nx+1, ny, nz+1) 
     # EZ: (nx+1, ny+1, nz)
@@ -71,7 +74,6 @@ for n in range(NT):
     # Hx: (nx+1, ny, nz)
     Ez[1:-1, 1:-1, :] += R*(np.diff(Hy[:, 1:-1, :], axis=0) - np.diff(Hx[1:-1, :, :], axis=1))
 
-    Ez[NS//2, NS//2, NS//2] += np.sin(2*n*np.pi*(R/ND))
 
 plt.title("t=100")
 plt.imshow(Ez[..., -1], cmap='jet', extent=[0, NS, 0, NS])
