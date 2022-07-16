@@ -141,28 +141,28 @@ class StructureQuadMesh(Mesh2d):
         a /=2
         return a
 
-    def function(self, etype='node'):
+    def function(self, etype='node', dtype=None):
         """
         @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
         """
 
-        if etype in {'node', 0}:
-            NN = self.number_of_nodes()
-            uh = np.zeros(NN, dtype=self.ftype)
-        elif etype in {'edge', 1}:
-            NE = self.number_of_edges()
-            uh = np.zeros(NE, dtype=self.ftype)
-        elif etype in {'edgex'}:
-            NE = (self.ds.ny+1)*self.ds.nx
-            uh = np.zeros(NE, dtype=self.ftype)
-        elif etype in {'edgey'}:
-            NE = self.ds.ny*(self.ds.nx + 1)
-            uh = np.zeros(NE, dtype=self.ftype)
-        elif etype in {'cell', 2}:
-            NC = self.number_of_cells()
-            uh = np.zeros(NC, dtype=self.ftype)
-        return uh
+        nx = self.ds.nx
+        ny = self.ds.ny
+        dtype = self.ftype if dtype is None else dtype
 
+        if etype in {'node', 0}:
+            uh = np.zeros((nx+1, ny+1), dtype=dtype)
+        elif etype in {'edge', 1}:
+            ex = np.zeros((nx, ny+1), dtype=dtype)
+            ey = np.zeros((nx+1, ny), dtype=dtype)
+            uh = (ex, ey)
+        elif etype in {'edgex'}:
+            uh = np.zeros((nx, ny+1), dtype=dtype)
+        elif etype in {'edgey'}:
+            uh = np.zeros((nx+1, ny), dtype=dtype)
+        elif etype in {'cell', 2}:
+            uh = np.zeros((nx, ny), dtype=dtype)
+        return uh
 
 
     def interpolation(self, f, intertype='node'):
@@ -593,6 +593,10 @@ class StructureQuadMeshDataStructure:
 
     @property
     def edge(self):
+        """
+        @brief 生成网格中所有的边
+        @todo 把顺序换为先 x 方向的边，后 y 方向的边。
+        """
         nx = self.nx
         ny = self.ny
 

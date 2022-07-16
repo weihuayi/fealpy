@@ -1697,7 +1697,7 @@ class TriangleMeshWithInfinityNode:
         return self.ds.NE
 
     def number_of_faces(self):
-        return self.ds.NC
+        return self.ds.NE
 
     def number_of_cells(self):
         return self.ds.NC

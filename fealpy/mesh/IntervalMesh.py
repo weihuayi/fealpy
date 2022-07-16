@@ -57,20 +57,20 @@ class IntervalMesh():
         return self.ds.NC
 
     def number_of_faces(self):
-        return self.ds.NC
+        return self.ds.NN
 
     def number_of_entities(self, etype):
-        if etype in {'cell', 'edge', 'face', 1}:
+        if etype in {'cell', 'edge', 1}:
             return self.ds.NC
-        elif etype in {'node', 0}:
+        elif etype in {'node', 'face', 0}:
             return self.ds.NN
         else:
             raise ValueError("`dim` must be 0 or 1!")
 
     def entity(self, etype=1):
-        if etype in {'cell', 'face', 'edge', 1}:
+        if etype in {'cell', 'edge', 1}:
             return self.ds.cell
-        elif etype in ['node', 0]:
+        elif etype in {'node', 'face', 0}:
             return self.node
         else:
             raise ValueError("`entitytype` is wrong!")
@@ -138,9 +138,9 @@ class IntervalMesh():
     def entity_measure(self, etype=1, index=np.s_[:], node=None):
         """
         """
-        if etype in {1, 'cell', 'face', 'edge'}:
+        if etype in {1, 'cell', 'edge'}:
             return self.cell_length(index=index, node=None)
-        elif etype in {0, 'node'}:
+        elif etype in {0, 'face', 'node'}:
             return 0
         else:
             raise ValueError("`etype` is wrong!")
@@ -155,10 +155,10 @@ class IntervalMesh():
             注意，这里用户可以提供一个新个网格节点数组。
         """
         node = self.entity('node') if node is None else node
-        if etype in {1, 'cell', 'face', 'edge'}:
+        if etype in {1, 'cell',  'edge'}:
             cell = self.ds.cell
             bc = np.sum(node[cell[index]], axis=1)/cell.shape[-1]
-        elif etype in {'node', 0}:
+        elif etype in {'node', 'face', 0}:
             bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
