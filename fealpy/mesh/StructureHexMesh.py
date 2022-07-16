@@ -302,43 +302,45 @@ class StructureHexMesh(Mesh3d):
 
         return A.tocsr()
 
-    def function(self, etype='node'):
+    def function(self, etype='node', dtype=None):
         """
         @brief 返回定义在节点、网格边、网格面、或网格单元上离散函数（数组），元素取值为0
 
         @todo 明确需要定义的函数的实体集合
         """
 
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+
+        dtype = self.ftype if dtype is None else dtype
+
         if etype in {'node', 0}:
-            NN = self.number_of_nodes()
-            uh = np.zeros(NN, dtype=self.ftype)
+            uh = np.zeros((nx+1, ny+1, nz+1), dtype=dtype)
         elif etype in {'edge', 1}:
-            NE = self.number_of_edges()
-            uh = np.zeros(NE, dtype=self.ftype)
+            ex = np.zeros((nx, ny+1, nz+1), dtype=dtype)
+            ey = np.zeros((nx+1, ny, nz+1), dtype=dtype)
+            ez = np.zeros((nx+1, ny+1, nz), dtype=dtype)
+            uh = (ex, ey, ez)
         elif etype in {'edgex'}:
-            NE = (self.ds.ny+1)*self.ds.nx
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx, ny+1, nz+1), dtype=dtype)
         elif etype in {'edgey'}:
-            NE = self.ds.ny*(self.ds.nx + 1)
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx+1, ny, nz+1), dtype=dtype)
         elif etype in {'edgez'}:
-            NE = self.ds.ny*(self.ds.nx + 1)
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx+1, ny+1, nz), dtype=dtype)
         elif etype in {'face', 2}:
-            NF = self.number_of_faces()
-            uh = np.zeros(NF, dtype=self.ftype)
+            fx = np.zeros((nx+1, ny, nz), dtype=dtype)
+            fy = np.zeros((nx, ny+1, nz), dtype=dtype)
+            fz = np.zeros((nx, ny, nz+1), dtype=dtype)
+            uh = (fx, fy, fz)
         elif etype in {'facex'}:
-            NF = self.ds.nx*self.ds.ny*(self.ds.nz + 1) 
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx+1, ny, nz), dtype=dtype)
         elif etype in {'facey'}:
-            NE = self.ds.ny*(self.ds.nx + 1)
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx, ny+1, nz), dtype=dtype)
         elif etype in {'facez'}:
-            NE = self.ds.ny*(self.ds.nx + 1)
-            uh = np.zeros(NE, dtype=self.ftype)
+            uh = np.zeros((nx, ny, nz+1), dtype=dtype)
         elif etype in {'cell', 3}:
-            NC = self.number_of_cells()
-            uh = np.zeros(NC, dtype=self.ftype)
+            uh = np.zeros((nx, ny, nz), dtype=dtype)
         return uh
 
     def interpolation(self, f, intertype='node'):
