@@ -200,7 +200,6 @@ class QuadrangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
 
-
     def angle(self):
         NC = self.number_of_cells()
         node = self.entity('node')

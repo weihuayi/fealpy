@@ -307,7 +307,7 @@ def show_mesh_2d(
         nodecolor='k', edgecolor='k',
         cellcolor='grey', aspect='equal',
         linewidths=1, markersize=20,
-        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=1.0, cmap='jet', box=None):
+        showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=None, cmap='jet', box=None):
 
     try:
         axes.set_aspect(aspect)
@@ -343,7 +343,7 @@ def show_mesh_2d(
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
-            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccs], :])
+            poly = a3.art3d.Poly3DCollection(node[cell[:, mesh.ds.ccw], :])
     else:
         if mesh.meshtype == 'polygon':
             cell, cellLocation = cell

@@ -104,9 +104,6 @@ def split_mesh(mesh, entity='cell'):
     edgecuts, parts = metis.part_mesh(tmesh, nparts=n, entity=entity)
     return edgecuts, parts
 
-def meshpy3d(mesh_info, h):
-    pass
-
 def delete_cell(node, cell, threshold):
     """
 
@@ -285,7 +282,6 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         num[1:] = np.sum(flag, axis=-1)
         newcell = newcell[flag]
         cellLocation = np.cumsum(num)
-        print(cellLocation)
         return PolygonMesh(newnode, newcell, cellLocation)
 
 

@@ -413,6 +413,9 @@ class LagrangeFiniteElementSpace():
 
     @barycentric
     def face_basis(self, bc):
+        """
+        @brief 计算 face 上的基函数在给定积分点处的函数值
+        """
         p = self.p   # the degree of polynomial basis function
         TD = bc.shape[1] - 1
         multiIndex = self.multi_index_matrix[TD](p)
@@ -573,10 +576,13 @@ class LagrangeFiniteElementSpace():
         else:
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
-    def interpolation(self, u, dim=None):
+    def interpolation(self, u, dim=None, dtype=None):
         ipoint = self.interpolation_points()
         uI = u(ipoint)
-        return self.function(dim=dim, array=uI)
+        if dtype is None:
+            return self.function(dim=dim, array=uI, dtype=uI.dtype)
+        else:
+            return self.function(dim=dim, array=uI, dtype=dtype)
 
     def linear_interpolation_matrix(self):
         """
@@ -660,6 +666,83 @@ class LagrangeFiniteElementSpace():
             shape = (gdof, ) + dim
 
         return np.zeros(shape, dtype=dtype)
+
+
+    def penalty_matrix(self, q=None):
+        """
+        @brief 组装罚项矩阵 
+        """
+    
+        # 空间次数
+        p = self.p
+
+        mesh = self.mesh
+        GD = mesh.geo_dimension()
+        TD = mesh.top_dimension()
+
+        assert TD > 1   # 目前仅能处理 2D 和 3D 的问题
+        assert GD == TD # 仅适用于网格拓扑维数和几何维数相同的情形
+
+        NC = mesh.number_of_cells()
+        NF = mesh.number_of_faces()
+
+        isFaceDof = (mesh.multi_index_matrix(p) == 0) 
+        cell2face = mesh.ds.cell_to_face()
+        cell2facesign = mesh.ds.cell_to_face_sign()
+
+        ldof = self.dof.number_of_local_dofs() # 单元上的所有的自由度的个数
+        fdof = self.dof.number_of_local_dofs('face') # 每个单元面上的自由度
+        ndof = ldof - fdof
+        face2dof = np.zeros((NF, fdof + 2*ndof), dtype=self.itype)
+
+        if TD > 1: # 处理 2D 和 3D 情形
+            q = p+3 if q is None else q
+            qf = mesh.integrator(q, 'face') # 面上的积分公式
+            bcs, ws = qf.get_quadrature_points_and_weights()
+            NQ = len(ws)
+
+            n = mesh.face_unit_normal()
+            cell2dof = self.cell_to_dof()
+            # 每个积分点、在每个面上、每个基函数法向导数的取值
+            val = np.zeros((NQ, NF, fdof + 2*ndof), dtype=self.ftype)  
+
+            for i in range(TD+1): # 循环每个单元的四个面
+
+                lidx, = np.nonzero( cell2facesign[:, i]) # 单元是全局面的左边单元
+                ridx, = np.nonzero(~cell2facesign[:, i]) # 单元是全局面的右边单元
+                idx0, = np.nonzero( isFaceDof[:, i])
+                idx1, = np.nonzero(~isFaceDof[:, i])
+
+                fidx = cell2face[:, i]
+                face2dof[fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cell2dof[lidx[:, None], idx1] 
+                face2dof[fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cell2dof[ridx[:, None], idx1]
+
+                idx = np.argsort(cell2dof[:, isFaceDof[:, i]], axis=1)
+                face2dof[fidx, 0:fdof] = cell2dof[:, isFaceDof[:, i]][np.arange(NC)[:, None], idx] 
+
+                # 面上的积分点转化为体上的积分点
+                b = np.insert(bcs, i, 0, axis=1)
+                # (NQ, NC, cdof)
+                cval = np.einsum('...ijm, im->...ij', self.grad_basis(b), n[cell2face[:, i]])
+                val[:, fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cval[:, lidx[:, None], idx1]
+                val[:, fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cval[:, ridx[:, None], idx1]
+
+                val[:, fidx[lidx, None], np.arange(0, fdof)] -= cval[:, lidx[:, None], idx0[idx[lidx]]] 
+                val[:, fidx[ridx, None], np.arange(0, fdof)]  = cval[:, ridx[:, None], idx0[idx[ridx]]]
+
+            face2cell = mesh.ds.face_to_cell()
+            isInFace = face2cell[:, 0] != face2cell[:, 1]
+            measure = mesh.entity_measure('face', index=isInFace)
+            f2d = face2dof[isInFace]
+            h = np.power(measure, 1/TD)
+            
+            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], h*measure)
+            I = np.broadcast_to(f2d[:, :, None], shape=P.shape)
+            J = np.broadcast_to(f2d[:, None, :], shape=P.shape)
+
+            gdof = self.dof.number_of_global_dofs()
+            P = csr_matrix((P.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            return P
 
 
     def integral_basis(self):
@@ -1018,6 +1101,9 @@ class LagrangeFiniteElementSpace():
         return A 
 
     def source_vector(self, f, dim=None, q=None):
+        """
+        @brief 组装刚度矩阵
+        """
         p = self.p
         cellmeasure = self.cellmeasure
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
@@ -1053,8 +1139,6 @@ class LagrangeFiniteElementSpace():
             ''')
 
         gdof = self.number_of_global_dofs()
-        shape = gdof if dim is None else (gdof, dim)
-        b = np.zeros(shape, dtype=self.ftype)
 
         if p > 0:
             if type(fval) in {float, int}:
@@ -1070,6 +1154,9 @@ class LagrangeFiniteElementSpace():
                 bb = np.einsum('m, mi..., mik, i->ik...',
                         ws, fval, phi, self.cellmeasure)
             cell2dof = self.cell_to_dof() #(NC, ldof)
+
+            shape = gdof if dim is None else (gdof, dim)
+            b = np.zeros(shape, dtype=bb.dtype)
             if dim is None:
                 np.add.at(b, cell2dof, bb)
             else:
@@ -1214,11 +1301,11 @@ class LagrangeFiniteElementSpace():
         if len(val.shape) == 2:
             dim = 1
             if F is None:
-                F = np.zeros((gdof, ), dtype=self.ftype)
+                F = np.zeros((gdof, ), dtype=bb.dtype)
         else:
             dim = val.shape[-1]
             if F is None:
-                F = np.zeros((gdof, dim), dtype=self.ftype)
+                F = np.zeros((gdof, dim), dtype=bb.dtype)
 
         if dim == 1:
             np.add.at(F, face2dof, bb)

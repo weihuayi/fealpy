@@ -7,9 +7,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-from fealpy.decorator import cartesian, barycentric
 from fealpy.pde.poisson_2d import CircleSinSinData as PDE
+from fealpy.mesh import LagrangeTriangleMesh
 from fealpy.functionspace import ParametricLagrangeFiniteElementSpace
+from fealpy.boundarycondition import DirichletBC
 from fealpy.tools.show import showmultirate, show_error_table
 
 from scipy.sparse.linalg import spsolve
@@ -46,7 +47,7 @@ maxit = args.maxit
 
 pde = PDE()
 
-mesh = pde.init_mesh(n=nrefine, p=mdegree)
+mesh = pde.init_mesh(n=nrefine)
 
 errorType = ['$|| u - u_h||_{\Omega,0}$',
              '$||\\nabla u - \\nabla u_h||_{\Omega, 0}$',
@@ -57,6 +58,11 @@ errorType = ['$|| u - u_h||_{\Omega,0}$',
 errorMatrix = np.zeros((len(errorType), maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
 
+
+node = mesh.entity('node')
+cell = mesh.entity('cell')
+mesh = LagrangeTriangleMesh(node, cell, p=mdegree, boundary=pde.curve)
+
 m = 4
 
 for i in range(maxit):
@@ -64,11 +70,11 @@ for i in range(maxit):
 
     space = ParametricLagrangeFiniteElementSpace(mesh, p=sdegree)
     NDof[i] = space.number_of_global_dofs()
+    bc = DirichletBC(space, pde.dirichlet) 
+
 
     uI = space.interpolation(pde.solution)
-
     A = space.stiff_matrix()
-    C = space.integral_basis()
     F = space.source_vector(pde.source)
 
     NN = mesh.number_of_corner_nodes()
@@ -76,8 +82,8 @@ for i in range(maxit):
 
 
     uh = space.function()
-    x = spsolve(A, F).reshape(-1)
-    uh[:] = x[:-1]
+    A, F = bc.apply(A, F, uh)
+    uh[:] = spsolve(A, F)
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value)
@@ -94,11 +100,6 @@ for i in range(maxit):
 
     if i < maxit-1:
         mesh.uniform_refine()
-        isBdNode = mesh.ds.boundary_node_flag()
-        node = mesh.entity('node')
-        bdnode = node[isBdNode] 
-        pde.CircleCurve.project(bdnode)
-        node[isBdNode] = bdnode
 
 
 show_error_table(NDof, errorType, errorMatrix)

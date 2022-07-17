@@ -1,15 +1,16 @@
 import numpy as np
 
 from ..decorator import cartesian, barycentric
-from ..mesh.TriangleMesh import TriangleMesh
-from ..mesh.Quadtree import Quadtree
-from ..mesh.QuadrangleMesh import QuadrangleMesh
-from ..mesh.Tritree import Tritree
-from ..mesh.StructureQuadMesh import StructureQuadMesh
-from ..mesh.TriangleMesh import TriangleMesh
-from ..mesh.TriangleMesh import TriangleMeshWithInfinityNode
-from ..mesh.PolygonMesh import PolygonMesh
-from ..mesh.HalfEdgeMesh2d import HalfEdgeMesh2d
+from ..mesh import TriangleMesh
+from ..mesh import Quadtree
+from ..mesh import QuadrangleMesh
+from ..mesh import Tritree
+from ..mesh import StructureQuadMesh
+from ..mesh import TriangleMeshWithInfinityNode
+from ..mesh import PolygonMesh
+from ..mesh import HalfEdgeMesh2d
+
+from ..mesh import LagrangeTriangleMesh
 
 class CosCosData:
     """
@@ -1389,14 +1390,14 @@ class ArctanData:
 class CircleSinSinData():
     def __init__(self):
         from fealpy.geometry import CircleCurve
-        self.CircleCurve = CircleCurve()
+        self.curve = CircleCurve()
 
     def domain(self):
-        return self.CircleCurve
+        return self.curve
 
     
-    def init_mesh(self, n=0, p=None):
-        t = self.CircleCurve.radius
+    def init_mesh(self, n=0):
+        t = self.curve.radius
         c = np.sqrt(3.0)/2.0
         node = np.array([
             [0.0, 0.0],
@@ -1419,16 +1420,8 @@ class CircleSinSinData():
             NN = mesh.number_of_nodes()
             mesh.uniform_refine()
             node = mesh.entity('node')
-            self.CircleCurve.project(node[NN:])
-
-        node = mesh.entity('node')
-        cell = mesh.entity('cell')
-        mesh = LagrangeTriangleMesh(node, cell, p=p)
-        isBdNode = mesh.ds.boundary_node_flag()
-        node = mesh.entity('node')
-        bdnode = node[isBdNode] 
-        self.CircleCurve.project(bdnode)
-        node[isBdNode] = bdnode
+            isBdNode = mesh.ds.boundary_node_flag()
+            node[isBdNode], _= self.curve.project(node[isBdNode])
         return mesh
 
     @cartesian
@@ -1459,6 +1452,6 @@ class CircleSinSinData():
 
     @cartesian
     def dirichlet(self,p):
-        p = self.CircleCurve.project(p)
+        p, _ = self.curve.project(p)
         return self.solution(p)
 

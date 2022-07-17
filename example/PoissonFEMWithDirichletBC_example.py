@@ -5,6 +5,9 @@ import argparse
 
 import numpy as np
 import matplotlib.pyplot as plt
+# solver
+from scipy.sparse.linalg import spsolve
+
 from matplotlib import rc
 rc('text', usetex=True)
 from mpl_toolkits.mplot3d import Axes3D
@@ -12,16 +15,8 @@ from mpl_toolkits.mplot3d import Axes3D
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import DirichletBC 
 from fealpy.tools.show import showmultirate
+from fealpy.tools.show import show_error_table
 
-# solver
-from scipy.sparse.linalg import spsolve
-
-
-
-"""
-TODO:
-    1. 可以选择不同的解法器
-"""
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -33,7 +28,7 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
-parser.add_argument('--dim',
+parser.add_argument('--GD',
         default=2, type=int,
         help='模型问题的维数, 默认求解 2 维问题.')
 
@@ -46,15 +41,14 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 args = parser.parse_args()
-
 degree = args.degree
-dim = args.dim
+GD = args.GD
 nrefine = args.nrefine
 maxit = args.maxit
 
-if dim == 2:
+if GD == 2:
     from fealpy.pde.poisson_2d import CosCosData as PDE
-elif dim == 3:
+elif GD == 3:
     from fealpy.pde.poisson_3d import CosCosCosData as PDE
 
 pde = PDE()
@@ -68,14 +62,13 @@ NDof = np.zeros(maxit, dtype=np.int_)
 
 for i in range(maxit):
     print("The {}-th computation:".format(i))
-
     space = LagrangeFiniteElementSpace(mesh, p=degree)
     NDof[i] = space.number_of_global_dofs()
     bc = DirichletBC(space, pde.dirichlet) 
 
     uh = space.function() # uh 即是一个有限元函数，也是一个数组
-    A = space.stiff_matrix()
-    F = space.source_vector(pde.source)
+    A = space.stiff_matrix() # (\nabla uh, \nabla v_h)
+    F = space.source_vector(pde.source) # (f, vh)
     A, F = bc.apply(A, F, uh)
     uh[:] = spsolve(A, F)
 
@@ -87,14 +80,16 @@ for i in range(maxit):
 
 
 
-if dim == 2:
+if GD == 2:
     fig = plt.figure()
     axes = fig.add_subplot(1, 1, 1, projection='3d')
     uh.add_plot(axes, cmap='rainbow')
-elif dim == 3:
+elif GD == 3:
     print('The 3d function plot is not been implemented!')
 
-showmultirate(plt, 0, NDof, errorMatrix,  errorType, 
+showmultirate(plt, 2, NDof, errorMatrix,  errorType, 
         propsize=20)
+
+show_error_table(NDof, errorType, errorMatrix)
 
 plt.show()

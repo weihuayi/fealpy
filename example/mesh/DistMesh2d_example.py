@@ -5,7 +5,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh.TriMesher import distmesh 
+from fealpy.mesh.TriMesher import distmesh2d
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform
 
@@ -37,8 +37,8 @@ parser.add_argument('--animation',
         help="是否显示动画，默认显示动画")
 
 parser.add_argument('--maxit', 
-        default=500, type=int, 
-        help="最大迭代次数，默认 500 次")
+        default=250, type=int, 
+        help="最大迭代次数，默认 250 次")
 
 args = parser.parse_args()
 hmin = args.hmin
@@ -55,14 +55,14 @@ if domain == 0:
         (1.0, 0.0), 
         (1.0, 1.0), 
         (0.0, 1.0)], dtype=np.float64)
+
 elif domain == 1:
     bbox = [-1, 1, -1, 1]
     fd = lambda p: dcircle(p, [0.0, 0.0], 1.0)
     def fh(p):
         x = p[:, 0]
         y = p[:, 1]
-        #h = 0.001 + np.sqrt(x**2 + y**2)*0.05
-        h = hmin + np.abs(fd(p))*0.05
+        h = hmin + np.abs(fd(p))*0.1
         h[h>hmax] = hmax 
         return h
     pfix = None
@@ -81,9 +81,9 @@ elif domain == 2:
         (0.0, 0.0), 
         (2.2, 0.0), 
         (2.2, 0.41),
-        (0.0,0.41)],dtype=np.float64)
+        (0.0, 0.41)],dtype=np.float64)
 
-mesh = distmesh(hmin, fd, fh, bbox, pfix=pfix, 
+mesh = distmesh2d(hmin, fd, fh, bbox, pfix=pfix, 
         showanimation=True, maxit=maxit)
 
 fig, axes = plt.subplots()

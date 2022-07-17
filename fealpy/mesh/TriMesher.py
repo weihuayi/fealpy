@@ -3,7 +3,9 @@ from .TriangleMesh import TriangleMesh
 
 import meshpy.triangle as triangle
 
-def distmesh(hmin, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
+
+
+def distmesh2d(hmin, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
     from .distmesh import DistMesh2d
     from ..geometry import DistDomain2d
 
@@ -13,7 +15,6 @@ def distmesh(hmin, fd, fh, bbox, pfix=None, maxit=200, showanimation=False):
         distmesh2d.show_animation(frames=maxit)
     else:
         distmesh2d.run()
-
     return distmesh2d.mesh
 
 def meshpy2d(points, facets, h, hole_points=None, refine_function=None):

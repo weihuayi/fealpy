@@ -28,12 +28,12 @@ class DirichletBC():
         threshold = self.threshold if threshold is None else threshold
 
         gdof = space.number_of_global_dofs()
-        dim = A.shape[0]//gdof
+        GD = A.shape[0]//gdof
         if uh is None:
-            uh = self.space.function(dim=dim)
+            uh = self.space.function(dim=GD)
         isDDof = space.set_dirichlet_bc(gD, uh, threshold=threshold)
-        if dim > 1:
-            isDDof = np.tile(isDDof, dim)
+        if GD > 1:
+            isDDof = np.tile(isDDof, GD)
             F = F.T.flat
         x = uh.T.flat # 把 uh 按列展平
         F -= A@x

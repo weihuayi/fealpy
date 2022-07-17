@@ -31,6 +31,9 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
         edge = self.edge
+        face = self.face
+        NF = len(face2edge)
+        NEF = 3
         face2edgeSign = np.zeros((NF, NEF), dtype=np.bool_)
         n = [1, 2, 0]
         for i in range(3):
@@ -247,7 +250,7 @@ class TetrahedronMesh(Mesh3d):
         face = self.entity('face') 
         edge = self.entity('edge') 
         face2edge = self.ds.face_to_edge()
-        edge2ipoint = self.edge_to_ipoint()
+        edge2ipoint = self.edge_to_ipoint(p)
         face2ipoint = np.zeros((NF, fdof), dtype=np.int_)
 
         faceIdx = self.multi_index_matrix(p, etype='face') 
@@ -258,7 +261,7 @@ class TetrahedronMesh(Mesh3d):
             I = np.ones(NF, dtype=np.int_)
             sign = (face[:, fe[i]] == edge[face2edge[:, i], 0])
             I[sign] = 0
-            face2ipoint[:, isEdgeIPoints[:, i]] = edge2ipoint[face2edge[:, [i]], edgeIdx[I]]
+            face2ipoint[:, isEdgeIPoint[:, i]] = edge2ipoint[face2edge[:, [i]], edgeIdx[I]]
 
         if p > 2:
             base = NN + (p-1)*NE
@@ -281,7 +284,7 @@ class TetrahedronMesh(Mesh3d):
         fdof = (p+1)*(p+2)//2
         ldof = (p+1)*(p+2)*(p+3)//6 
 
-        localFace = self.localFace 
+        localFace = self.ds.localFace 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NF = self.number_of_faces()
@@ -293,17 +296,20 @@ class TetrahedronMesh(Mesh3d):
 
         cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
 
-        face2ipoint = self.face_to_ipoint()
+        face2ipoint = self.face_to_ipoint(p)
         isFaceIPoint = self.multi_index_matrix(p) == 0
         faceIdx = self.multi_index_matrix(p, 'face').T
 
         for i in range(4):
-            fi = face[cell2face[:, i]]
-            fj = cell[:, localFace[i]]
-            idxj = np.argsort(fj, axis=1)
-            idxjr = np.argsort(idxj, axis=1)
-            idxi = np.argsort(fi, axis=1)
-            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr]
+            fi = face[cell2face[:, i]] # 第 i 个全局面 
+            idxi = np.argsort(fi, axis=1) # 第 i 个全局面顶点做一个排序
+
+            fj = cell[:, localFace[i]] # 第 i 个局部面
+            idxj = np.argsort(fj, axis=1) # 第 i 个局部面的顶点编号做一个排序
+            idxjr = np.argsort(idxj, axis=1) # 第 i 个局部面
+
+            idx = idxi[np.arange(NC).reshape(-1, 1), idxjr] # 
+
             isCase0 = (np.sum(idx == np.array([1, 2, 0]), axis=1) == 3)
             isCase1 = (np.sum(idx == np.array([2, 0, 1]), axis=1) == 3)
             idx[isCase0, :] = [2, 0, 1]
@@ -316,6 +322,60 @@ class TetrahedronMesh(Mesh3d):
             base = NN + (p-1)*NE + (fdof - 3*p)*NF
             idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
             isInCellIPoint = ~(isFaceIPoint[:, 0] | isFaceIPoint[:, 1] | isFaceIPoint[:, 2] | isFaceIPoint[:, 3])
+            cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
+
+        return cell2ipoint
+
+    def cell_to_ipoint_1(self, p):
+        """
+        @brief 获取单元与插值点的对应关系
+
+        @param[in] p 正整数
+
+        @return  cell2ipoints 数组， 形状为 (NC, ldof)
+        """
+
+        edof = p+1
+        fdof = (p+1)*(p+2)//2
+        ldof = (p+1)*(p+2)*(p+3)//6 
+
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        face = self.entity('face')
+        cell = self.entity('cell')
+        cell2face = self.ds.cell_to_face()
+
+        cell2ipoint = np.zeros((NC, ldof), dtype=np.int_)
+
+        face2ipoint = self.face_to_ipoint(p)
+        m2 = self.multi_index_matrix(p, 'face').T
+        m3 = self.multi_index_matrix(p, 'cell').T
+        isFaceIPoint = (m3 == 0)
+        
+        fidx = np.argsort(face, axis=1) # 第 i 个全局面顶点做一个排序
+        fidx = np.argsort(fidx, axis=1) 
+        for i in range(4):
+            idx = list(range(4))
+            idx.remove(i)
+            idxj = np.argsort(cell[:, idx], axis=1) #  (NC, 3)
+
+            idxi = fidx[cell2face[:, i]]
+
+            order = idxj[np.arange(NC).reshape(-1, 1), idxi] # (NC, 3) 
+            # order 满足条件: fi - fj[np.arange(NC)[:, None], idx] = 0
+
+            mi = m2[order]  # (NC, 3, fdof)
+            k = mi[:, 1] + mi[:, 2] # (NC, fdof)
+            a = k*(k+1)//2 + mi[:, 2] # (NC, fdof)
+            cell2ipoint[:, isFaceIPoint[i]] = face2ipoint[cell2face[:, [i]], a]
+
+        if p > 3:
+            base = NN + (p-1)*NE + (fdof - 3*p)*NF
+            idof = ldof - 4 - 6*(p - 1) - 4*(fdof - 3*p)
+            isInCellIPoint = ~(isFaceIPoint[0] | isFaceIPoint[1] | isFaceIPoint[2] | isFaceIPoint[3])
             cell2ipoint[:, isInCellIPoint] = base + np.arange(NC*idof).reshape(NC, idof)
 
         return cell2ipoint
@@ -375,16 +435,9 @@ class TetrahedronMesh(Mesh3d):
                     nodedata=self.nodedata,
                     celldata=celldata)
 
-    def is_crossed_cell(self, point, segment):
-        pass
-
     def location(self, points):
         """
-
-        Notes
-        ----
-
-        给定一个点, 找到这些点所在的单元
+        @brief 计算给定点所在的四面体单元
 
         这里假设：
 
@@ -486,6 +539,9 @@ class TetrahedronMesh(Mesh3d):
         return nv/length.reshape(-1, 1)
 
     def cell_volume(self, index=np.s_[:]):
+        """
+        @brief 计算网格单元的体积
+        """
         cell = self.ds.cell
         node = self.node
         v01 = node[cell[index, 1]] - node[cell[index, 0]]
@@ -495,6 +551,9 @@ class TetrahedronMesh(Mesh3d):
         return volume
 
     def face_area(self, index=np.s_[:]):
+        """
+        @brief 计算所有网格面的面积
+        """
         face = self.ds.face
         node = self.node
         v01 = node[face[index, 1], :] - node[face[index, 0], :]
@@ -504,39 +563,55 @@ class TetrahedronMesh(Mesh3d):
         return area
 
     def edge_length(self, index=np.s_[:]):
-        edge = self.ds.edge
-        node = self.node
+        """
+        @brief 计算网格边的长度
+        """
+        edge = self.entity('edge')
+        node = self.entity('node')
         v = node[edge[index, 1]] - node[edge[index, 0]]
         length = np.sqrt(np.sum(v**2, axis=-1))
         return length
 
 
     def dihedral_angle(self):
-        node = self.node
-        cell = self.ds.cell
+        """
+        @brief 计算所有单元的四个二面角
+        """
+        node = self.entity('node') 
+        cell = self.entity('cell') 
         localFace = self.ds.localFace
+
         n = [np.cross(node[cell[:, j],:] - node[cell[:, i],:],
             node[cell[:, k],:] - node[cell[:, i],:]) for i, j, k in localFace]
-        l =[ np.sqrt(np.sum(ni**2, axis=1)) for ni in n]
+        l =[np.sqrt(np.sum(ni**2, axis=1)) for ni in n]
         n = [ ni/li.reshape(-1, 1) for ni, li in zip(n, l)]
         localEdge = self.ds.localEdge
         angle = [(np.pi - np.arccos((n[i]*n[j]).sum(axis=1)))/np.pi*180 for i,j in localEdge[-1::-1]]
         return np.array(angle).T
 
 
-    def circumcenter(self):
+    def circumcenter(self, index=np.s_[:], returnradius=False):
+        """
+        @brief 计算外接圆圆心和半径
+        """
         node = self.node
         cell = self.ds.cell
-        v = [ node[cell[:,0],:] - node[cell[:,i],:] for i in range(1,4)]
+        v = [ node[cell[index, 0]] - node[cell[index, i]] for i in range(1,4)]
         l = [ np.sum(vi**2, axis=1, keepdims=True) for vi in v]
         d = l[2]*np.cross(v[0], v[1]) + l[0]*np.cross(v[1], v[2]) + l[1]*np.cross(v[2],v[0])
-        volume = self.cell_volume()
-        d /=12*volume.reshape(-1,1)
-        c = node[cell[:,0],:] + d
-        R = np.sqrt(np.sum(d**2,axis=1))
-        return c, R
+        volume = self.cell_volume(index)
+        d /=12*volume[:, None]
+        c = node[cell[index,0]] + d
+        R = np.sqrt(np.sum(d**2, axis=1))
+        if returnradius:
+            return c, R
+        else:
+            return c
 
-    def quality(self):
+    def cell_quality(self):
+        """
+        @brief  计算单元的质量，这里的质量定义单元外接球的半径比上 3 倍的内接球的半径
+        """
         s = self.face_area()
         cell2face = self.ds.cell_to_face()
         ss = np.sum(s[cell2face], axis=1)
@@ -548,11 +623,15 @@ class TetrahedronMesh(Mesh3d):
         return R/r/3.0
 
     def grad_quality(self):
-        cell = self.ds.cell
-        node = self.node
+        """
+        @brief 计算单元质量关于节点坐标的导数
+        """
 
-        N = self.number_of_nodes()
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
+
+        cell = self.entity('cell')
+        node = self.entity('node')
 
         s = self.face_area()
         cell2face = self.ds.cell_to_face()
@@ -615,13 +694,8 @@ class TetrahedronMesh(Mesh3d):
         return Dlambda
 
     def label(self, node=None, cell=None, cellidx=None):
-        """单元顶点的重新排列，使得cell[:, :2] 存储了单元的最长边
-        Parameter
-        ---------
-
-        Return
-        ------
-        cell ： in-place modify
+        """
+        @brief 单元顶点的重新排列，使得cell[:, :2] 存储了单元的最长边
 
         """
 

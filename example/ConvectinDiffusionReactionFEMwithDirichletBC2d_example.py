@@ -13,6 +13,7 @@
 import argparse 
 import numpy as np
 from scipy.sparse.linalg import spsolve
+
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
@@ -112,10 +113,6 @@ class PDE:
     def dirichlet(self, p):
         return self.solution(p)
 
-"""
-TODO:
-    1. 可以选择不同的解法器
-"""
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -146,7 +143,6 @@ ns = args.ns
 maxit = args.maxit
 mtype = args.mtype
 	
-
 pde = PDE()
 domain = pde.domain()
 mesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype=mtype, p=degree)
@@ -171,8 +167,8 @@ for i in range(maxit):
 
     uh[:] = spsolve(A, F)
 
-    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value, power=2)
-    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value, power=2) 
+    errorMatrix[0, i] = space.integralalg.error(pde.solution, uh.value)
+    errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value) 
     if i < maxit-1:
         mesh.uniform_refine()
 		

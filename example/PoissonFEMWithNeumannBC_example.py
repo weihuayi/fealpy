@@ -6,11 +6,10 @@ import numpy as np
 from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-
-from fealpy.pde.poisson_2d import CosCosData 
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import NeumannBC 
 from fealpy.tools.show import showmultirate
+from fealpy.tools.show import show_error_table
 
 ## 参数解析
 parser = argparse.ArgumentParser(description=
@@ -23,7 +22,7 @@ parser.add_argument('--degree',
         default=1, type=int,
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
-parser.add_argument('--dim',
+parser.add_argument('--GD',
         default=2, type=int,
         help='模型问题的维数, 默认求解 2 维问题.')
 
@@ -38,13 +37,13 @@ parser.add_argument('--maxit',
 args = parser.parse_args()
 
 degree = args.degree
-dim = args.dim
+GD = args.GD
 nrefine = args.nrefine
 maxit = args.maxit
 
-if dim == 2:
+if GD == 2:
     from fealpy.pde.poisson_2d import CosCosData as PDE
-elif dim == 3:
+elif GD == 3:
     from fealpy.pde.poisson_3d import CosCosCosData as PDE
 
 pde = PDE()
@@ -76,15 +75,16 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 
-if dim == 2:
+if GD == 2:
     fig = plt.figure()
     axes = fig.gca(projection='3d')
     uh.add_plot(axes, cmap='rainbow')
-elif dim == 3:
+elif GD == 3:
     from mpl_toolkits.mplot3d import Axes3D
     print('The 3d function plot is not been implemented!')
 
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
+show_error_table(NDof, errorType, errorMatrix)
 
 plt.show()
 

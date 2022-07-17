@@ -16,7 +16,6 @@ from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
-from .CVTPMesher import CVTPMesher, VoroAlgorithm
 
 from .LagrangeTriangleMesh import LagrangeTriangleMesh
 from .LagrangeQuadrangleMesh import LagrangeQuadrangleMesh
@@ -44,3 +43,7 @@ from .FABFileReader import FABFileReader
 
 from .meshio import load_mat_mesh
 
+# Mesher
+from .DistMesher2d import DistMesher2d
+from .DistMesher3d import DistMesher3d
+from .CVTPMesher import CVTPMesher, VoroAlgorithm

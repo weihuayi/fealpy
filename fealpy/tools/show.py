@@ -4,7 +4,9 @@ from types import ModuleType
 
 
 
-def show_error_table(N, errorType, errorMatrix, f='e', pre=4, sep=' & ', out=sys.stdout, end='\n'):
+def show_error_table(N, errorType, errorMatrix, 
+        f='e', pre=4, sep=' & ',
+        out=sys.stdout, end='\n'):
 
     flag = False
     if type(out) == type(''):

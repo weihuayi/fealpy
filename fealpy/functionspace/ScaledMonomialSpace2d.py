@@ -2,7 +2,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 from numpy.linalg import inv
 from .Function import Function
-from ..decorator import cartesian
+from ..decorator import cartesian, barycentric
 from ..quadrature import GaussLobattoQuadrature
 from ..quadrature import GaussLegendreQuadrature
 from ..quadrature import PolygonMeshIntegralAlg
@@ -186,6 +186,24 @@ class ScaledMonomialSpace2d():
             np.multiply.accumulate(phi, axis=-1, out=phi)
         return phi
 
+    @barycentric
+    def edge_basis_with_barycentric(self, bcs, p=None):
+        """!
+        @brief 边上的中心坐标函数和缩放单项式函数有一定的关系
+        @param bcs : (..., 2)
+        @return phi : (..., p+1)
+        """
+        p = self.p if p is None else p
+        if p == 0:
+            shape = len(bcs.shape)*(1, )
+            return np.array([[1.0]], dtype=np.float_).reshape(shape)
+        else:
+            shape = bcs.shape[:-1]+(p+1, )
+            phi = np.ones(shape, dtype=np.float_)
+            phi[..., 1:] = bcs[..., 1, None]-0.5
+            np.multiply.accumulate(phi, axis=-1, out=phi)
+            return phi
+
     @cartesian
     def basis(self, point, index=np.s_[:], p=None):
         """
@@ -309,6 +327,26 @@ class ScaledMonomialSpace2d():
         else:
             return hphi
 
+    def PxMatrix(self):
+        p = self.p 
+        index = multi_index_matrix2d(p)
+        N = len(index)
+
+        I, = np.where(index[:, 1] > 1)
+        Px = np.zeros([N, N], dtype=np.float_)
+        Px[I, np.arange(len(I))] = index[I, 1]
+        return Px 
+
+    def PyMatrix(self):
+        p = self.p
+        index = multi_index_matrix2d(p)
+        N = len(index)
+
+        I, = np.where(index[:, 2] > 1)
+        Px = np.zeros([N, N], dtype=np.float_)
+        Px[I, np.arange(len(I))] = index[I, 2]
+        return Px 
+
     @cartesian
     def value(self, uh, point, index=np.s_[:]):
         phi = self.basis(point, index=index)
@@ -429,6 +467,31 @@ class ScaledMonomialSpace2d():
         LM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi1, measure, optimize=True)
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
+
+    def hessian_matrix(self, p=None):
+        """
+
+        Note:
+            这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
+        """
+        p = self.p if p is None else p
+
+        @cartesian
+        def f(x, index):
+            gphi = self.grad_basis(x, index=index, p=p)
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
+
+        A = self.integralalg.cell_integral(f, q=p+3)
+        cell2dof = self.cell_to_dof(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs(p=p)
+
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
 
     def stiff_matrix(self, p=None):
         """
@@ -678,13 +741,15 @@ class ScaledMonomialSpace2d():
 
     def source_vector0(self, f, celltype=False, q=None):
         """
-        (f, v)_T
+        @brief (f, v)_T
+        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
         """
 
         p = self.p
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
+        gdof = self.number_of_global_dofs(p=p)
 
         bc = mesh.entity_barycenter('cell')
         cell2dof = self.cell_to_dof()
@@ -697,10 +762,16 @@ class ScaledMonomialSpace2d():
         pp_0 = np.einsum('qj, jem->qem', bcs, tri_0)#每个三角形中高斯积分点对应的笛卡尔坐标点
         fval_0 = f(pp_0)
 
+        if len(fval_0.shape)>2:
+            shape = (gdof, fval_0.shape[-1])
+        else:
+            shape = (gdof, )
+
         phi_0 = self.basis(pp_0, edge2cell[:, 0])
-        gdof = self.number_of_global_dofs(p=p)
-        F = np.zeros(gdof, dtype=np.float64)
-        bb_0 = np.einsum('i, ij, ijk,j->jk', ws, fval_0, phi_0, a_0)
+
+        F = np.zeros(shape, dtype=np.float64)
+        bb_0 = np.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
+
         np.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         if np.sum(isInEdge) > 0:
@@ -713,7 +784,56 @@ class ScaledMonomialSpace2d():
             pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
             fval_1 = f(pp_1)
             phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
-            bb_1 = np.einsum('i, ij, ijk,j->jk', ws, fval_1, phi_1, a_1)
+            bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
+            np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
+        return F 
+
+    def source_vector1(self, f, celltype=False, q=None):
+        """
+        @brief (f, v)_T
+        @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
+        """
+
+        p = self.p
+        mesh = self.mesh
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        gdof = self.number_of_global_dofs(p=p)
+
+        bc = mesh.entity_barycenter('cell')
+        cell2dof = self.cell_to_dof()
+        edge2cell = mesh.ds.edge_to_cell()
+
+        qf = mesh.integrator(p+4)
+        bcs, ws = qf.quadpts, qf.weights
+        tri_0 = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
+        a_0 = self.triangle_measure(tri_0)#NE
+        pp_0 = np.einsum('qj, jem->qem', bcs, tri_0)#每个三角形中高斯积分点对应的笛卡尔坐标点
+        fval_0 = f(pp_0, edge2cell[:, 0])
+
+        if len(fval_0.shape)>2:
+            shape = (gdof, fval_0.shape[-1])
+        else:
+            shape = (gdof, )
+
+        phi_0 = self.basis(pp_0, edge2cell[:, 0])
+
+        F = np.zeros(shape, dtype=np.float64)
+        bb_0 = np.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
+
+        np.add.at(F, cell2dof[edge2cell[:, 0]], bb_0)
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        if np.sum(isInEdge) > 0:
+            tri_1 = [
+                    bc[edge2cell[isInEdge, 1]],
+                    node[edge[isInEdge, 1]],
+                    node[edge[isInEdge, 0]]
+                    ]
+            a_1 = self.triangle_measure(tri_1)
+            pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
+            fval_1 = f(pp_1, edge2cell[isInEdge, 1])
+            phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
+            bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
         return F 
 
@@ -892,4 +1012,15 @@ class ScaledMonomialSpace2d():
         np.add.at(ruh, cell2dof, val.T)
         ruh /= deg
         return ruh
+
+    def H1_error(self, u, uh):
+        """!
+        @brief 求 H1 误差
+        """
+
+        def f(p, index):
+            val = np.sum((u(p) - uh.grad_value(p, index))**2, axis=-1)
+            return val
+        err = np.sqrt(self.integralalg.integral(f))
+        return err
 
