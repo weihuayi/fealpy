@@ -42,7 +42,7 @@ Hx, Hy, Hz = mesh.function(etype='face') # 网格面上的离散函数
 
 for n in range(NT):
 
-    Ez[NS//2, NS//2, NS//2] = np.sin(2*(n+1)*np.pi*(R/ND))
+    Ez[NS//2, NS//2, NS//2] = np.sin(2*n*np.pi*(R/ND))
 
     # HX: (nx+1, ny, nz) 
     # EY: (nx+1, ny, nz+1) 
