@@ -2325,7 +2325,7 @@ class HalfEdgeMesh2dDataStructure():
 
             cell2edge = np.zeros(cellLocation[-1], dtype=self.itype)
             current = self.hcell[cstart:].copy()
-            idx = cellLocation[:-1]
+            idx = cellLocation[:-1].copy()
             cell2edge[idx] = J[current]
             NV0 = np.ones(NC, dtype=self.itype)
             isNotOK = NV0 < NV
