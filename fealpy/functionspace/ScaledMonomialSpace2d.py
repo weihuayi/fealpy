@@ -752,20 +752,20 @@ class ScaledMonomialSpace2d():
         np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], S[isInEdge, ldof:])
         return F
 
-    def source_vector0(self, f, celltype=False, q=None):
+    def source_vector0(self, f, p = None, celltype=False, q=None):
         """
         @brief (f, v)_T
         @param f : (NQ, NC, 2) -> (NQ, NC) or (NQ, NC, l)
         """
 
-        p = self.p
+        p = p if p is not None else self.p
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
         gdof = self.number_of_global_dofs(p=p)
 
         bc = mesh.entity_barycenter('cell')
-        cell2dof = self.cell_to_dof()
+        cell2dof = self.cell_to_dof(p=p)
         edge2cell = mesh.ds.edge_to_cell()
 
         qf = mesh.integrator(p+4)
@@ -780,7 +780,7 @@ class ScaledMonomialSpace2d():
         else:
             shape = (gdof, )
 
-        phi_0 = self.basis(pp_0, edge2cell[:, 0])
+        phi_0 = self.basis(pp_0, edge2cell[:, 0], p=p)
 
         F = np.zeros(shape, dtype=np.float64)
         bb_0 = np.einsum('q, qe..., qel,e->el...', ws, fval_0, phi_0, a_0)
@@ -796,7 +796,7 @@ class ScaledMonomialSpace2d():
             a_1 = self.triangle_measure(tri_1)
             pp_1 = np.einsum('ij, jkm->ikm', bcs, tri_1)
             fval_1 = f(pp_1)
-            phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1])
+            phi_1 = self.basis(pp_1, edge2cell[isInEdge, 1], p=p)
             bb_1 = np.einsum('q, qe..., qel,e->el...', ws, fval_1, phi_1, a_1)
             np.add.at(F, cell2dof[edge2cell[isInEdge, 1]], bb_1)
         return F 
