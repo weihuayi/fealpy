@@ -480,7 +480,7 @@ class ScaledMonomialSpace2d():
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
 
-    def hessian_matrix(self, p=None, local=False):
+    def cell_hessian_matrix(self, p=None):
         """
 
         Note:
@@ -493,18 +493,17 @@ class ScaledMonomialSpace2d():
             return np.einsum('qclij, qcmij->qclm', hphi, hphi)
 
         A = self.integralalg.cell_integral(f, q=p+3)
-        if local:
-            return A
-        else:
-            cell2dof = self.cell_to_dof(p=p)
-            ldof = self.number_of_local_dofs(p=p, doftype='cell')
-            I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
-            J = I.swapaxes(-1, -2)
-            gdof = self.number_of_global_dofs(p=p)
-
-            # Construct the hessian matrix
-            A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
-            return A
+        if 0:
+            M = self.cell_mass_matrix()
+            Px, Py = self.partial_matrix()
+            Pxx = np.einsum("cij, cjk->cik", Px, Px)
+            Pxy = np.einsum("cij, cjk->cik", Px, Py)
+            Pyy = np.einsum("cij, cjk->cik", Py, Py)
+            v0 = np.einsum('cji, cjk, ckl->cil', Pxx, M, Pxx)
+            v1 = np.einsum('cji, cjk, ckl->cil', Pxy, M, Pxy)
+            v2 = np.einsum('cji, cjk, ckl->cil', Pyy, M, Pyy)
+            print("v1 = ", np.max(np.abs(A-v0-2*v1-v2)))
+        return A
 
     def stiff_matrix(self, p=None):
         """
