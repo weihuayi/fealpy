@@ -327,6 +327,23 @@ class ScaledMonomialSpace2d():
         else:
             return hphi
 
+    def grad_m_basis(self, m, point, index=np.s_[:], p=None, scaled=True):
+        """!
+        @brief m=3时导数排列顺序: [xxx, xxy, xyx, xyy, yxx, yxy, yyx, yyy]
+        """
+        #TODO test
+        phi = self.basis(point, index=index, p=p)
+        gmphi = np.zeros(phi.shape+(2**m, ), dtype=np.float_)
+        P = self.partial_matrix()
+        f = lambda x: np.array([int(ss) for ss in np.binary_repr(x, m)], dtype=np.int_)
+        idx = np.array(list(map(f, np.arange(2**m))))
+        for i in range(2**m):
+            M = P[idx[i, 0]].copy()
+            for j in range(1, m):
+                M = np.einsum("cij, cjk->cik", M, P[idx[i, j]])
+            gmphi[..., i] = np.einsum('cli, ...cl->...ci', M, phi)
+        return gmphi
+
     def partial_matrix(self, p=None):
         p = p or self.p 
         index = multi_index_matrix2d(p)
@@ -391,9 +408,15 @@ class ScaledMonomialSpace2d():
     @cartesian
     def hessian_value(self, uh, point, index=np.s_[:]):
         hphi = self.hessian_basis(point, index=index) #(NQ, NC, ldof, 2, 2)
-
         cell2dof = self.dof.cell2dof
         return np.einsum('...clij, cl->...cij', hphi, uh[cell2dof[index]])
+
+    @cartesian
+    def grad_3_value(self, uh, point, index=np.s_[:]):
+        #TODO
+        gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 2, 2)
+        cell2dof = self.dof.cell2dof
+        return np.einsum('...clij, cl->...cij', gmphi, uh[cell2dof[index]])
 
     def function(self, dim=None, array=None, dtype=np.float64):
         f = Function(self, dim=dim, array=array, coordtype='cartesian',
@@ -503,6 +526,21 @@ class ScaledMonomialSpace2d():
             v1 = np.einsum('cji, cjk, ckl->cil', Pxy, M, Pxy)
             v2 = np.einsum('cji, cjk, ckl->cil', Pyy, M, Pyy)
             print("v1 = ", np.max(np.abs(A-v0-2*v1-v2)))
+        return A
+
+    def cell_grad_m_matrix(self, m, p=None):
+        """
+
+        Note:
+            这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
+        """
+        p = self.p if p is None else p
+        @cartesian
+        def f(x, index):
+            gmphi = self.grad_m_basis(m, x, index=index, p=p) 
+            return np.einsum('qcli, qcmi->qclm', gmphi, gmphi)
+
+        A = self.integralalg.cell_integral(f, q=p+3)
         return A
 
     def stiff_matrix(self, p=None):
