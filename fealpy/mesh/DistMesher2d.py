@@ -10,7 +10,7 @@ class DistMesher2d():
             domain, 
             hmin,
             ptol = 0.001,
-            ttol = 0.1,
+            ttol = 0.01,
             fscale = 1.2,
             dt = 0.2,
             output=True):
@@ -93,7 +93,7 @@ class DistMesher2d():
 
         if self.output:
             fname = "mesh-%05d.vtu"%(self.NT)
-            mesh = TetrahedronMesh(node, cell)
+            mesh = TriangleMesh(node, cell)
             bc = mesh.entity_barycenter('cell')
             flag = bc[:, 0] < 0.0 
             mesh.celldata['flag'] = flag 
@@ -174,6 +174,8 @@ class DistMesher2d():
         count = 0 
         while count < maxit:
             count += 1
+            print(count)
+            print(mmove)
 
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
@@ -193,7 +195,7 @@ class DistMesher2d():
                 mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
                 p0[:] = node
 
-        #self.post_processing(node)
+        self.post_processing(node)
 
         cell = self.delaunay(node)
         return TriangleMesh(node, cell)
@@ -215,12 +217,11 @@ class DistMesher2d():
         lidx = edge2cell[isBdEdge, 2]
         nidx = cell[cidx, lidx]
 
-        print(nidx)
-
         c = mesh.circumcenter(index=cidx)
         d = fd(c)
         isOut = (d > -deps)
         idx = nidx[isOut]
+        print("node:", node[idx])
         if len(idx) > 0:
             p0 = node[idx]
             if hasattr(domain, 'projection'):
@@ -228,8 +229,8 @@ class DistMesher2d():
             else:
                 depsx = np.array([deps, 0])
                 depsy = np.array([0, deps])
-                dgradx = (fd(node[idx, :] + depsx) - d[idx])/deps
-                dgrady = (fd(node[idx, :] + depsy) - d[idx])/deps
-                node[idx, 0] = node[idx, 0] - d[idx]*dgradx
-                node[idx, 1] = node[idx, 1] - d[idx]*dgrady
-    
+                dgradx = (fd(node[idx, :] + depsx) - d[isOut])/deps
+                dgrady = (fd(node[idx, :] + depsy) - d[isOut])/deps
+                node[idx, 0] = node[idx, 0] - d[isOut]*dgradx
+                node[idx, 1] = node[idx, 1] - d[isOut]*dgrady
+
