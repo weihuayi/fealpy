@@ -334,7 +334,8 @@ class ScaledMonomialSpace2d():
         #TODO test
         phi = self.basis(point, index=index, p=p)
         gmphi = np.zeros(phi.shape+(2**m, ), dtype=np.float_)
-        P = self.partial_matrix()
+        print(index)
+        P = self.partial_matrix(index=index)
         f = lambda x: np.array([int(ss) for ss in np.binary_repr(x, m)], dtype=np.int_)
         idx = np.array(list(map(f, np.arange(2**m))))
         for i in range(2**m):
@@ -344,22 +345,22 @@ class ScaledMonomialSpace2d():
             gmphi[..., i] = np.einsum('cli, ...cl->...ci', M, phi)
         return gmphi
 
-    def partial_matrix(self, p=None):
+    def partial_matrix(self, p=None, index=np.s_[:]):
         p = p or self.p 
-        index = multi_index_matrix2d(p)
-        N = len(index)
+        mindex = multi_index_matrix2d(p)
+        N = len(mindex)
         cellarea = self.mesh.entity_measure("cell")
         NC = self.mesh.number_of_cells()
         h = np.sqrt(cellarea)
 
-        I, = np.where(index[:, 1] > 0)
+        I, = np.where(mindex[:, 1] > 0)
         Px = np.zeros([NC, N, N], dtype=np.float_)
-        Px[:, np.arange(len(I)), I] = index[None, I, 1]/h[:, None]
+        Px[:, np.arange(len(I)), I] = mindex[None, I, 1]/h[:, None]
 
-        I, = np.where(index[:, 2] > 0)
+        I, = np.where(mindex[:, 2] > 0)
         Py = np.zeros([NC, N, N], dtype=np.float_)
-        Py[:, np.arange(len(I)), I] = index[None, I, 2]/h[:, None]
-        return Px, Py
+        Py[:, np.arange(len(I)), I] = mindex[None, I, 2]/h[:, None]
+        return Px[index], Py[index]
 
     def partial_matrix_on_edge(self, p=None):
         p = p or self.p 

@@ -1,7 +1,7 @@
 import numpy as np
 
 from fealpy.decorator import cartesian, barycentric
-from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh, LagrangeWedgeMesh
+from fealpy.mesh import TriangleMesh, LagrangeTriangleMesh, LagrangeWedgeMesh, MeshFactory
 from fealpy.geometry.implicit_surface import SphereSurface
 
 from fealpy.mesh.TetrahedronMesh import TetrahedronMesh
@@ -14,6 +14,9 @@ class CosCosCosData:
         return np.array([0, 1, 0, 1, 0, 1])
 
     def init_mesh(self, n=1, meshtype='tet'):
+        """!
+        @brief 初始网格
+        """
         node = np.array([
             [-1, -1, -1],
             [1, -1, -1],
@@ -32,8 +35,9 @@ class CosCosCosData:
             [0, 3, 7, 6],
             [0, 2, 3, 6]], dtype=np.int_)
         mesh = TetrahedronMesh(node, cell)
-        mesh.uniform_refine(n)
-        mesh.label() # 标记最长边
+        #mesh.uniform_refine(n)
+        mesh = MeshFactory.boxmesh3d([0, 1, 0, 1, 0, 1], nx=n, ny=n, nz=n, meshtype="tet")
+        #mesh.label() # 标记最长边
         return mesh
 
     @cartesian

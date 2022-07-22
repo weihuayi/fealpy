@@ -109,10 +109,10 @@ class SinData(MaxwellPDE):
         #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.x*sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.z*C.k 
-        #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
-        f = C.y*C.i + 2*C.x*C.j + C.z*C.k
+        #f = C.y*C.i + 2*C.x*C.j + C.z*C.k
 
         #f = (C.x**2-C.x)**2*(C.y**2-C.y)**2*(C.z**2-C.z)**2
         #f = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
