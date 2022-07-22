@@ -198,12 +198,36 @@ class DistMesher2d():
         self.post_processing(node)
 
         cell = self.delaunay(node)
-        return TriangleMesh(node, cell)
+        mesh = TriangleMesh(node, cell)
+
+        # 把边界点投影到边界上
+        isBdNode = mesh.ds.boundary_node_flag()
+        fnode = self.domain.facet(0)
+        if fnode is not None:
+            n = len(fnode)
+            isBdNode[0:n] = False
+
+        depsx = np.array([self.deps, 0])
+        depsy = np.array([0, self.deps])
+        for i in range(2):
+            bnode = node[isBdNode]
+            d = fd(bnode)
+            dgradx = (fd(bnode + depsx) - d)/self.deps
+            dgrady = (fd(bnode + depsy) - d)/self.deps
+            dgrad2 = dgradx**2 + dgrady**2
+            dgradx /= dgrad2
+            dgrady /= dgrad2
+            node[isBdNode, 0] = bnode[:, 0] - d*dgradx
+            node[isBdNode, 1] = bnode[:, 1] - d*dgrady
+
+        return mesh 
 
 
     def post_processing(self, node):
         """
         """
+        ne = np.array([1, 2, 0])
+        pr = np.array([2, 0, 1])
         domain = self.domain
         fd = domain.signed_dist_function
         fh = domain.sizing_function 
@@ -220,17 +244,11 @@ class DistMesher2d():
         c = mesh.circumcenter(index=cidx)
         d = fd(c)
         isOut = (d > -deps)
-        idx = nidx[isOut]
-        print("node:", node[idx])
-        if len(idx) > 0:
-            p0 = node[idx]
-            if hasattr(domain, 'projection'):
-                node[idx] = domain.projection(node[idx])
-            else:
-                depsx = np.array([deps, 0])
-                depsy = np.array([0, deps])
-                dgradx = (fd(node[idx, :] + depsx) - d[isOut])/deps
-                dgrady = (fd(node[idx, :] + depsy) - d[isOut])/deps
-                node[idx, 0] = node[idx, 0] - d[isOut]*dgradx
-                node[idx, 1] = node[idx, 1] - d[isOut]*dgrady
+        nidx = nidx[isOut]
+        cidx = cidx[isOut]
+        lidx = lidx[isOut]
+        if len(nidx) > 0:
+            print(node[nidx])
+            node[nidx] = (node[cell[cidx, ne[lidx]]] + node[cell[cidx, pr[lidx]]])/2.0
+
 
