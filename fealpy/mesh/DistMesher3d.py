@@ -10,7 +10,7 @@ class DistMesher3d():
             domain, 
             hmin,
             ptol = 0.001,
-            ttol = 0.1,
+            ttol = 0.01,
             fscale = 1.1,
             dt = 0.1,
             output=False):
@@ -91,7 +91,7 @@ class DistMesher3d():
         cell = np.asarray(d.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
                 node[cell[:, 2]])/4
-        return  cell[fd(bc) < -self.geps]
+        return  cell[fd(bc) < self.geps]
 
     def construct_edge(self, node):
         """
@@ -245,7 +245,34 @@ class DistMesher3d():
         self.post_processing(node)
 
         cell = self.delaunay(node)
-        return TetrahedronMesh(node, cell)
+
+        mesh = TetrahedronMesh(node, cell)
+
+        # 把边界点投影到边界上
+        isBdNode = mesh.ds.boundary_node_flag()
+        fnode = self.domain.facet(0)
+        if fnode is not None:
+            n = len(fnode)
+            isBdNode[0:n] = False
+
+        depsx = np.array([self.deps, 0, 0])
+        depsy = np.array([0, self.deps, 0])
+        depsz = np.array([0, 0, self.deps])
+        for i in range(2):
+            bnode = node[isBdNode]
+            d = fd(bnode)
+            dgradx = (fd(bnode + depsx) - d)/self.deps
+            dgrady = (fd(bnode + depsy) - d)/self.deps
+            dgradz = (fd(bnode + depsz) - d)/self.deps
+            dgrad2 = dgradx**2 + dgrady**2 + dgradz**2
+            dgradx /= dgrad2
+            dgrady /= dgrad2
+            dgradz /= dgrad2
+            node[isBdNode, 0] = bnode[:, 0] - d*dgradx
+            node[isBdNode, 1] = bnode[:, 1] - d*dgrady
+            node[isBdNode, 2] = bnode[:, 2] - d*dgradz
+
+        return mesh 
 
 
 

@@ -5,7 +5,7 @@ from ..decorator import cartesian
 
 class HelmholtzData2d():
 
-    def __init__(self, k=100):
+    def __init__(self, k=1):
         """
         @brief 
 
@@ -50,15 +50,18 @@ class HelmholtzData2d():
         x = p[..., 0]
         y = p[..., 1]
         r = np.sqrt(x**2 + y**2)
-        val = complex(np.sin(k*r)/r, 0.0)
+        val = np.zeros(x.shape, dtype=np.complex128)
+        val[:] = np.sin(k*r)/r
         return val
 
     @cartesian
     def robin(self, p, n):
         k = self.k
+        x = p[..., 0]
+        y = p[..., 1]
         grad = self.gradient(p) # (NQ, NE, 2)
         val = np.sum(grad*n, axis=-1)
-        kappa = np.complex(0.0, k) 
+        kappa = np.broadcast_to(np.complex(0.0, k), shape=x.shape)
         val += kappa*self.solution(p) 
         return val, kappa
 

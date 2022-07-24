@@ -38,7 +38,7 @@ parser.add_argument('--animation',
 
 parser.add_argument('--maxit', 
         default=250, type=int, 
-        help="最大迭代次数，默认 500 次")
+        help="最大迭代次数，默认 250 次")
 
 args = parser.parse_args()
 hmin = args.hmin

@@ -333,21 +333,20 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool_)
             return cell2edge 
 
-    def cell_to_edge_sign(self, return_sparse=False):
+    def cell_to_edge_sign(self):
         NE = self.NE
         NC = self.NC
         NEC = self.NEC
 
         edge2cell = self.edge2cell
-        if return_sparse == False:
-            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-            cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
-        else:
-            val = np.ones(NE, dtype=np.bool_)
-            cell2edgeSign = csr_matrix(
-                    (val, (edge2cell[:, 0], range(NE))),
-                    shape=(NC, NE), dtype=np.bool_)
+
+        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+
         return cell2edgeSign
+
+    def cell_to_face_sign(self):
+        return self.cell_to_edge_sign()
 
     def cell_to_face(self, return_sparse=False):
         """ The neighbor information of cell to edge

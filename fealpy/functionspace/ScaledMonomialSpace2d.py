@@ -468,6 +468,31 @@ class ScaledMonomialSpace2d():
         RM = np.einsum('i, ijk, ijm, j->jkm', ws, phi0, phi2, measure, optimize=True)
         return LM, RM 
 
+    def hessian_matrix(self, p=None):
+        """
+
+        Note:
+            这个程序仅用于多边形网格上 (\nabla^2 u, \nabla^2 v)
+        """
+        p = self.p if p is None else p
+
+        @cartesian
+        def f(x, index):
+            gphi = self.grad_basis(x, index=index, p=p)
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi)
+
+        A = self.integralalg.cell_integral(f, q=p+3)
+        cell2dof = self.cell_to_dof(p=p)
+        ldof = self.number_of_local_dofs(p=p, doftype='cell')
+        I = np.einsum('k, ij->ijk', np.ones(ldof), cell2dof)
+        J = I.swapaxes(-1, -2)
+        gdof = self.number_of_global_dofs(p=p)
+
+
+        # Construct the stiffness matrix
+        A = csr_matrix((A.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+        return A
+
     def stiff_matrix(self, p=None):
         """
 

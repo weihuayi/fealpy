@@ -1,5 +1,6 @@
 import numpy as np
 from numpy.linalg import inv
+from scipy.sparse.linalg import spsolve, cg
 
 from scipy.sparse import csr_matrix, coo_matrix
 from ..decorator import barycentric
@@ -86,7 +87,7 @@ class NDof2d:
 
 
 class FirstNedelecFiniteElementSpace2d:
-    def __init__(self, mesh, q=None, dof=None):
+    def __init__(self, mesh, p=0, q=None, dof=None):
         """
         Parameters
         ----------
@@ -100,13 +101,14 @@ class FirstNedelecFiniteElementSpace2d:
 
         """
         self.mesh = mesh
+        self.p = p
 
         if dof is None:
             self.dof = NDof2d(mesh)
         else:
             self.dof = dof
 
-        self.integralalg = FEMeshIntegralAlg(self.mesh, q)
+        self.integralalg = FEMeshIntegralAlg(self.mesh, p+2)
         self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
@@ -296,7 +298,11 @@ class FirstNedelecFiniteElementSpace2d:
                         dtype=dtype)
 
     def project(self, u):
-        return self.interpolation(u)
+        A = self.mass_matrix()
+        b = self.source_vector(u)
+        up = self.function()
+        up[:] = spsolve(A, b)
+        return up
 
     def interpolation(self, u):
         p = self.p

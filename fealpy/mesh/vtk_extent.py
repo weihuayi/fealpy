@@ -97,6 +97,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     points.SetData(vnp.numpy_to_vtk(node))
 
     cells = vtk.vtkCellArray()
+    cell = cell.astype(np.int64)
     cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
 
     mesh =vtk.vtkUnstructuredGrid() 

@@ -193,7 +193,7 @@ class TriangleMesh(Mesh2d):
         return Rlambda
 
 
-    def quality(self):
+    def cell_quality(self):
         """
         @brief 计算单元质量
         """
@@ -212,6 +212,62 @@ class TriangleMesh(Mesh2d):
         area = np.cross(v[1], v[2])/2
         quality = p*q/(16*area**2)
         return quality
+
+    def grad_cell_quality(self):
+        """
+        @brief 计算
+        """
+
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+
+        localEdge = self.ds.localEdge
+        v = [node[cell[:, j], :] - node[cell[:, i], :] for i, j in localEdge]
+
+        l2 = np.zeros((NC, 3))
+        for i in range(3):
+            l2[:, i] = np.sum(v[i]**2, axis=1)
+
+        l = np.sqrt(l2)
+        p = l.sum(axis=1, keepdims=True)
+        q = l.prod(axis=1, keepdims=True)
+        mu = p*q/(16*area**2)
+        c = mu*(1/(p*l) + 1/l2)
+
+        val = np.zeros((NC, 3, 3), dtype=sefl.ftype)
+        val[:, 0, 0] = c[:, 1] + c[:, 2]
+        val[:, 0, 1] = -c[:, 2]
+        val[:, 0, 2] = -c[:, 1]
+
+        val[:, 1, 0] = -c[:, 2]
+        val[:, 1, 1] = c[:, 0] + c[:, 2]
+        val[:, 1, 2] = -c[:, 0]
+
+        val[:, 2, 0] = -c[:, 1]
+        val[:, 2, 1] = -c[:, 0]
+        val[:, 2, 2] = c[:, 0] + c[:, 1]
+
+        I = np.broadcast_to(cell[:, None, :], shape=(NC, 3, 3))
+        J = np.broadcast_to(cell[:, :, None], shape=(NC, 3, 3))
+        A = csr_matrix((val, (I, J)), shape=(NN, NN))
+
+        cn = mu/area
+        val[:, 0, 0] = 0
+        val[:, 0, 1] = -cn
+        val[:, 0, 2] = cn
+
+        val[:, 1, 0] = cn
+        val[:, 1, 1] = 0
+        val[:, 1, 2] = -cn
+
+        val[:, 2, 0] = -cn
+        val[:, 2, 1] = cn
+        val[:, 2, 2] = 0
+        B = csr_matrix((val, (I, J)), shape=(NN, NN))
+        return A, B
+
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
@@ -1641,7 +1697,7 @@ class TriangleMeshWithInfinityNode:
         return self.ds.NE
 
     def number_of_faces(self):
-        return self.ds.NC
+        return self.ds.NE
 
     def number_of_cells(self):
         return self.ds.NC
