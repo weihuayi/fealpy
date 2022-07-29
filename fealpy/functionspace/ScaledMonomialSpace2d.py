@@ -334,7 +334,6 @@ class ScaledMonomialSpace2d():
         #TODO test
         phi = self.basis(point, index=index, p=p)
         gmphi = np.zeros(phi.shape+(2**m, ), dtype=np.float_)
-        print(index)
         P = self.partial_matrix(index=index)
         f = lambda x: np.array([int(ss) for ss in np.binary_repr(x, m)], dtype=np.int_)
         idx = np.array(list(map(f, np.arange(2**m))))
@@ -415,9 +414,9 @@ class ScaledMonomialSpace2d():
     @cartesian
     def grad_3_value(self, uh, point, index=np.s_[:]):
         #TODO
-        gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 2, 2)
+        gmphi = self.grad_m_basis(3, point, index=index) #(NQ, NC, ldof, 8)
         cell2dof = self.dof.cell2dof
-        return np.einsum('...clij, cl->...cij', gmphi, uh[cell2dof[index]])
+        return np.einsum('...cli, cl->...ci', gmphi, uh[cell2dof[index]])
 
     def function(self, dim=None, array=None, dtype=np.float64):
         f = Function(self, dim=dim, array=array, coordtype='cartesian',
@@ -483,8 +482,8 @@ class ScaledMonomialSpace2d():
         return H
 
     def edge_cell_mass_matrix(self, p=None, cp=None): 
-        p = p or self.p
-        cp = cp or p+1
+        p = self.p if p is None else p
+        cp = p+1 if cp is None else cp
 
         mesh = self.mesh
 
@@ -526,7 +525,6 @@ class ScaledMonomialSpace2d():
             v0 = np.einsum('cji, cjk, ckl->cil', Pxx, M, Pxx)
             v1 = np.einsum('cji, cjk, ckl->cil', Pxy, M, Pxy)
             v2 = np.einsum('cji, cjk, ckl->cil', Pyy, M, Pyy)
-            print("v1 = ", np.max(np.abs(A-v0-2*v1-v2)))
         return A
 
     def cell_grad_m_matrix(self, m, p=None):
@@ -1115,6 +1113,17 @@ class ScaledMonomialSpace2d():
         def f(p, index):
             val = np.sum(np.sum((u(p) - uh.hessian_value(p, index))**2, axis=-1),
                     axis=-1)
+            return val
+        err = np.sqrt(self.integralalg.integral(f))
+        return err
+
+    def H3_error(self, u, uh):
+        """!
+        @brief 求 H3 误差
+        """
+
+        def f(p, index):
+            val = np.sum((u(p) - uh.grad_3_value(p, index))**2, axis=-1)
             return val
         err = np.sqrt(self.integralalg.integral(f))
         return err
