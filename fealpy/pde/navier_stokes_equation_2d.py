@@ -220,7 +220,7 @@ class FlowPastCylinder:
     def u_inflow_dirichlet(self, p):
         x = p[...,0]
         y = p[...,1]
-        value = np.zeros(p.shape,dtype=np.float)
+        value = np.zeros(p.shape,dtype=np.float64)
         value[...,0] = 1.5*4*y*(0.41-y)/(0.41**2)
         value[...,1] = 0
         return value

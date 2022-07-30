@@ -355,6 +355,38 @@ class StructureHexMesh(Mesh3d):
             F = f(bc)
         return F
 
+    def data_edge_to_node(self, Ex, Ey, Ez):
+        """
+        @brief 把定义在边上的数组转换到节点上
+        """
+        dx = self.function(etype='node') # (nx+1, ny+1, nz+1)
+        dy = self.function(etype='node')
+        dz = self.function(etype='node')
+
+        dx[0:-1, :, :] = Ex
+        dx[-1, :, :] = Ex[-1, :, :]
+        dx[1:-1, :, :] += Ex[1:, :, :]
+        dx[1:-1, :, :] /=2.0
+
+        dy[:, 0:-1, :] = Ey
+        dy[:, -1, :] = Ey[:, -1, :]
+        dy[:, 1:-1, :] += Ey[:, 1:, :]
+        dy[:, 1:-1, :] /=2.0
+
+        dz[:, :, 0:-1] = Ez
+        dz[:, :, -1] = Ez[:, :, -1]
+        dz[:, :, 1:-1] += Ez[:, :, 1:]
+        dz[:, :, 1:-1] /=2.0
+
+        NN = len(dx.flat)
+        data = np.zeros((NN, 3), dtype=Ex.dtype)
+        data[:, 0] = dx.flat
+        data[:, 1] = dy.flat
+        data[:, 2] = dz.flat
+
+        return data
+
+
 
 
 class StructureHexMeshDataStructure():
