@@ -87,6 +87,7 @@ class DistMesher3d():
 
     def delaunay(self, node):
         fd = self.domain.signed_dist_function
+        # 其中 Qz 是增加一个无穷远点
         tet = Delaunay(node, qhull_options='Qt Qbb Qc Qz')
         cell = np.asarray(tet.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]] +
@@ -255,7 +256,7 @@ class DistMesher3d():
         depsx = np.array([self.deps, 0, 0])
         depsy = np.array([0, self.deps, 0])
         depsz = np.array([0, 0, self.deps])
-        for i in range(2):
+        for i in range(3):
             bnode = node[isBdNode]
             d = fd(bnode)
             dgradx = (fd(bnode + depsx) - d)/self.deps

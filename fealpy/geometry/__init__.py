@@ -38,5 +38,7 @@ from .implicit_curve import CircleCurve as Circle
 # Domain 
 from .CircleDomain import CircleDomain
 from .RectangleDomain import RectangleDomain
+
+from .CuboidDomain import CuboidDomain
 from .SphereDomain import SphereDomain
 from .CylinderDomain import CylinderDomain
