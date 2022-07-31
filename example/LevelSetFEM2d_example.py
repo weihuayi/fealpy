@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.decorator import cartesian,barycentric
+from fealpy.decorator import cartesian, barycentric
 from fealpy.solver import LevelSetFEMFastSolver
 
 import pickle

@@ -242,9 +242,14 @@ class StructureQuadMesh(Mesh2d):
 
 
     def interpolation(self, f, intertype='node'):
+        nx = self.ds.nx
+        ny = self.ds.ny
         node = self.node
         if intertype == 'node':
             F = f(node)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx+1, ny+1) + shape
+            F = F.reshape()
         elif intertype == 'edge':
             ec = self.entity_barycenter('edge')
             F = f(ec)
@@ -260,6 +265,14 @@ class StructureQuadMesh(Mesh2d):
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F
+
+    def gradient(self, f):
+
+        hx = self.ds.hx
+        hy = self.ds.hy
+
+        fx, fy = np.gradient(f, hx, hy)
+        return fx, fy
 
     def laplace_operator(self):
         """
