@@ -29,6 +29,11 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
+        """
+        @brief TriangleMesh 对象的构造函数
+
+        @note Magic function
+        """
 
         assert cell.shape[-1] == 3
 

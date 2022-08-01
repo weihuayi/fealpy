@@ -54,10 +54,11 @@ class CuboidDomain():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return -dmin(
+        d = -dmin(
                 z - domain[4], domain[5] - z, 
                 y - domain[2], domain[3] - y, 
                 x - domain[0], domain[1] - x)
+        flag = (y - domain[2]) > 0
 
     def signed_dist_function(self, p):
         return self(p)

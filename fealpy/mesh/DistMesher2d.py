@@ -77,8 +77,8 @@ class DistMesher2d():
 
     def delaunay(self, node):
         fd = self.domain.signed_dist_function
-        d = Delaunay(node)
-        cell = np.asarray(d.simplices, dtype=np.int_)
+        tri = Delaunay(node, qhull_options='Qt Qbb Qc Qz')
+        cell = np.asarray(tri.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]])/3
         return  cell[fd(bc) < -self.geps]
 
