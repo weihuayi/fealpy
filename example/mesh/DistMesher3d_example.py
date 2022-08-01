@@ -5,6 +5,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
+from fealpy.geometry import CuboidDomain
 from fealpy.geometry import SphereDomain
 from fealpy.geometry import CylinderDomain
 from fealpy.mesh import DistMesher3d 
@@ -43,12 +44,12 @@ hmax = args.hmax
 maxit = args.maxit
 
 if domain == 0: # 球体
+    domain = CuboidDomain()
+elif domain == 1: # 圆柱
     domain = SphereDomain()
 elif domain == 1: # 圆柱
     domain = CylinderDomain()
 
 mesher = DistMesher3d(domain, hmin, output=True)
 mesh = mesher.meshing(maxit)
-
 mesh.to_vtk(fname='test.vtu')
-

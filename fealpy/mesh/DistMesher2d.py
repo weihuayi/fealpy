@@ -34,7 +34,7 @@ class DistMesher2d():
         self.output = output
 
         eps = np.finfo(float).eps
-        self.geps = 0.001*hmin
+        self.geps = 0.1*hmin
         self.deps = np.sqrt(eps)*hmin
         self.dt = dt 
 
@@ -174,9 +174,6 @@ class DistMesher2d():
         count = 0 
         while count < maxit:
             count += 1
-            print(count)
-            print(mmove)
-
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
                 self.NT += 1
