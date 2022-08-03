@@ -65,12 +65,17 @@ class QuadrangleMesh(Mesh2d):
         if isinstance(bc, tuple):
             assert len(bc) == 2
             cell = self.entity('cell')[index]
-            bc0 = bc[0] # (NQ0, 2)
-            bc1 = bc[1] # (NQ1, 2)
+
+            bc0 = bc[0].reshape(-1, 2) # (NQ0, 2)
+            bc1 = bc[1].reshape(-1, 2) # (NQ1, 2)
             bc = np.einsum('im, jn->ijmn', bc0, bc1).reshape(-1, 4) # (NQ0, NQ1, 2, 2)
+
             # node[cell].shape == (NC, 4, 2)
             # bc.shape == (NQ, 4)
             p = np.einsum('...j, cjk->...ck', bc, node[cell[:, [0, 3, 1, 2]]]) # (NQ, NC, 2)
+
+            if p.shape[0] == 1: # 如果只有一个积分点
+                p = p.reshape(-1, 2)
         else:
             edge = self.entity('edge')[index]
             p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
