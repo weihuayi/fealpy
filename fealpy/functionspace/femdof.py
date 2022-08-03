@@ -101,9 +101,9 @@ class CPLFEMDof1d():
             return cell2dof
 
     def number_of_local_dofs(self, doftype='cell'):
-        if doftype in {'cell', 1}:
+        if doftype in {'cell', 'edge', 1}:
             return self.p + 1
-        elif doftype in {'face', 'edge', 'node', 0}:
+        elif doftype in {'face', 'node', 0}:
             return 1
 
     def number_of_global_dofs(self):

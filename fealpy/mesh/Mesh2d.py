@@ -123,6 +123,20 @@ class Mesh2d(object):
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
+    def cell_area(self, index=None):
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]])
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+
     def edge_frame(self, index=np.s_[:]):
         t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])
@@ -333,21 +347,20 @@ class Mesh2dDataStructure():
                     shape=(NC, NE), dtype=np.bool_)
             return cell2edge 
 
-    def cell_to_edge_sign(self, return_sparse=False):
+    def cell_to_edge_sign(self):
         NE = self.NE
         NC = self.NC
         NEC = self.NEC
 
         edge2cell = self.edge2cell
-        if return_sparse == False:
-            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-            cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
-        else:
-            val = np.ones(NE, dtype=np.bool_)
-            cell2edgeSign = csr_matrix(
-                    (val, (edge2cell[:, 0], range(NE))),
-                    shape=(NC, NE), dtype=np.bool_)
+
+        cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+        cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+
         return cell2edgeSign
+
+    def cell_to_face_sign(self):
+        return self.cell_to_edge_sign()
 
     def cell_to_face(self, return_sparse=False):
         """ The neighbor information of cell to edge

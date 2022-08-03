@@ -143,7 +143,7 @@ class FoldCurve():
 
     def project(self, p):
         p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
-        return p 
+        return p, d
 
 
 class Curve2():
