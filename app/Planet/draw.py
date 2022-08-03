@@ -274,8 +274,12 @@ class Aspect():
         degree = np.array([0, 30, 60, 90])
         uh_all = self.uh_all
         angle = self.angle
+        color = ['b', 'g', 'r', 'c']
 
         fig, axes = plt.subplots()
+        
+        
+        ''' 1D 300K'''
         '''
         uh_all0 = np.zeros((21, self.nh+1, 282), dtype=np.float_)
         for i in range(21):
@@ -291,11 +295,27 @@ class Aspect():
             label0 = '1D 300K Latitude' + str(degree[i])
             axes.plot(angle, uh0, dashes=[6, 2], label=label0)
         '''
-
-        '''3D 300K'''
-        uh_all1 = np.zeros((21, self.nh+1, 282), dtype=np.float_)
+        
+        ''' 1D 150K'''
+        uh_all3 = np.zeros((21, self.nh+1, 282), dtype=np.float_)
         for i in range(21):
-            fname1 = '5_6_300K/test' + str(i).zfill(2) + '.vtu'
+            fname3 = '5m_100_150K_1D/test' + str(i+1).zfill(2) + '.vtu'
+            nodedata3 = vtkReader.vtk_read_data(fname3, ['uh'])
+            uh3 = nodedata3['uh']
+            uh_all3[i] = uh3[:-1].reshape(self.nh+1, -1)
+        
+        for i in range(4):
+            uh3 = np.zeros(uh_all3.shape[0], dtype=np.float_)
+            uh3[:] = uh_all3[:, 0, index[i]]
+
+            label3 = '1D 150K Latitude' + str(degree[i])
+            axes.plot(angle, uh3, dashes=[6, 2], label=label3, color=color[i])
+        
+        '''3D 300K'''
+        '''
+        uh_all1 = np.zeros((21, self.nh+1, 512), dtype=np.float_)
+        for i in range(21):
+            fname1 = '50_1000/test' + str(i).zfill(2) + '.vtu'
             nodedata1 = vtkReader.vtk_read_data(fname1, ['uh'])
             uh1 = nodedata1['uh']
             uh_all1[i] = uh1[:-1].reshape(self.nh+1, -1)
@@ -304,8 +324,9 @@ class Aspect():
             uh1 = np.zeros(uh_all1.shape[0], dtype=np.float_)
             uh1[:] = uh_all1[:, 0, index[i]]
 
-            label1 = '3D 300K Latitude' + str(degree[i])
-            axes.plot(angle, uh1, label=label1)
+            label1 = '3D 50m Latitude' + str(degree[i])
+            axes.plot(angle, uh1, label=label1, color=color[i])
+        '''
         
         '''3D 150K'''
         uh_all2 = np.zeros((21, self.nh+1, 282), dtype=np.float_)
@@ -320,8 +341,7 @@ class Aspect():
             uh2[:] = uh_all2[:, 0, index[i]]
 
             label2 = '3D 150K Latitude' + str(degree[i])
-            axes.plot(angle, uh2, dashes=[2, 2], label=label2)
-        
+            axes.plot(angle, uh2, dashes=[2, 2], label=label2, color=color[i])
         title = 'A Periodic Surface Temperature Change'
         axes.set(title=title, ylabel='Temperature (K)', xlabel='Rotation Angle (deg)')
 
@@ -389,7 +409,7 @@ class Aspect():
     def init_mesh(self):
         print("Generate the init mesh!...")
 
-        fname = 'initial/file1020.vtu'
+        fname = 'initial/file560.vtu'
         data = meshio.read(fname)
         node = data.points # 无量纲数值
         cell = data.cells[0][1]
