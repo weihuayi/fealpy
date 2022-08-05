@@ -5,10 +5,10 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
+from fealpy.geometry import CuboidDomain
 from fealpy.geometry import SphereDomain
 from fealpy.geometry import CylinderDomain
 from fealpy.mesh import DistMesher3d 
-from fealpy.mesh import MeshFactory as MF
 
 
 parser = argparse.ArgumentParser(description=
@@ -44,15 +44,12 @@ hmax = args.hmax
 maxit = args.maxit
 
 if domain == 0: # 球体
+    domain = CuboidDomain()
+elif domain == 1: # 圆柱
     domain = SphereDomain()
 elif domain == 1: # 圆柱
     domain = CylinderDomain()
 
-    #box = domain.box
-    #mesh = MF.boxmesh3d(box, nx=50, ny=50, nz=50, meshtype='tet')
-    #node = mesh.entity('node')
-    #mesh.nodedata['dist'] = domain(node)
-    #mesh.to_vtk(fname='test.vtu')
-
 mesher = DistMesher3d(domain, hmin, output=True)
 mesh = mesher.meshing(maxit)
+mesh.to_vtk(fname='test.vtu')
