@@ -8,7 +8,7 @@ class CylinderDomain():
             c=np.array([0.0, 0.0, 0.0]), 
             h=2.0, 
             r=1.0,
-            d=np.array([0.0, 0.0, 1.0]), fh=huniform):
+            d=np.array([0.0, 0.0, 1.0]), fh=huniform, pfix=None):
 
         self.center = c # 圆柱中心的位置
         self.height = h # 圆柱的长度
@@ -20,7 +20,7 @@ class CylinderDomain():
         self.box = [c[0]-h-r, c[0]+h+r, c[1]-h-r, c[1]+h+r, c[2]-h-r, c[2]+h+r]
 
         self.fh = fh
-        self.facets = {0:None, 1:None}
+        self.facets = {0:pfix, 1:None}
 
     def __call__(self, p):
         """
