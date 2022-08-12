@@ -72,10 +72,15 @@ class DistMesher3d():
 
         node = node[fd(node) < self.geps, :]
 
+        
+
         r0 = fh(node)**3
         val = np.min(r0)/r0
         NN = len(node)
         node = node[np.random.random(NN) < val]
+
+        NN = len(node)
+        node += (-1 + 2*np.random.random((NN, 3)))*hmin/10
 
         fnode = self.domain.facet(0) # 区域中的固定点
         if fnode is not None:
