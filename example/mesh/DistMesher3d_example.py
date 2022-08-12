@@ -12,6 +12,7 @@ from fealpy.geometry import CylinderDomain
 from fealpy.geometry import dunion
 from fealpy.geometry import huniform
 from fealpy.mesh import DistMesher3d 
+from fealpy.mesh import MeshFactory as MF
 
 
 parser = argparse.ArgumentParser(description=
@@ -38,7 +39,7 @@ parser.add_argument('--hmax',
 
 parser.add_argument('--maxit', 
         default=500, type=int, 
-        help="最大迭代次数，默认 250 次")
+        help="最大迭代次数，默认 500 次")
 
 args = parser.parse_args()
 domain = args.domain
@@ -120,6 +121,20 @@ elif domain == 3:
         h[h>hmax] = hmax 
         return h
     domain = TwoCylinderDomain(d0, d1, fh=fh)
+
+elif domain == 4: # 偶极子天线模型
+    l = 4 # 波长参数 [m]
+    a = 1 # 偶极天线臂长 [m]
+    r = 0.05 # 天线臂半径 [m]
+    g = 0.01 # 两臂之间的 Gap 宽度 [m]
+    h = 2*a + g # 整个圆柱的长度 
+    c = np.array([0.0, 0.0, 0.0]) # 圆柱中心点
+    d = np.array([0.0, 0.0, 1.0]) # 圆柱中心线方向
+    
+    hmin = g/2
+    n = np.ceil(2*np.pi*r/hmin)
+    dt = 2*np.pi/n
+    theta  = np.arange(0, 2*np.pi, dt)
 
 
 mesher = DistMesher3d(domain, hmin, output=True)

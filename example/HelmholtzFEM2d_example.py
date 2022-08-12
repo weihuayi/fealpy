@@ -8,15 +8,22 @@ from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import RobinBC 
 
-from fealpy.pde.helmholtz_3d import HelmholtzData3d
 from fealpy.pde.helmholtz_2d import HelmholtzData2d
+from fealpy.pde.helmholtz_3d import HelmholtzData3d
+
+import sys
 
 
+
+n = int(sys.argv[1])
 
 pde = HelmholtzData2d(k=1) 
 
+pde.symbolic_com()
+
 domain = pde.domain()
-mesh = MF.boxmesh2d(domain, nx=40, ny=40, meshtype='tri')
+
+mesh = MF.boxmesh2d(domain, nx=n, ny=n, meshtype='tri')
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
 
@@ -36,14 +43,15 @@ A, F = bc.apply(A, F)
 
 uh[:] = spsolve(A, F)
 
-print(np.linalg.norm(np.abs(A@uh-F)))
+print("残量：", np.linalg.norm(np.abs(A@uh-F)))
 
 
-print(A.dtype)
-print(F.dtype)
 
 
 uI = space.interpolation(pde.solution)
+
+e = space.integralalg.error(pde.solution, uI)
+print("interpolation L2:", e)
 
 bc = np.array([1/3, 1/3, 1/3])
 uI = uI(bc)
@@ -56,6 +64,9 @@ uh1 = np.imag(uh)
 
 print('real:', np.max(np.abs(uI0 - uh0)))
 print('imag:', np.max(np.abs(uI1 - uh1)))
+
+e = space.integralalg.error(pde.solution, uh)
+print(" fem L2:", e)
 
 
 
