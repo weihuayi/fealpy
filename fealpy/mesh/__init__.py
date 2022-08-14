@@ -36,6 +36,7 @@ from .mesh_tools import *
 
 from .HalfEdgeDomain import HalfEdgeDomain
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+from .DartMesh3d import DartMesh3d
 
 from .PolyFileReader import PolyFileReader
 from .InpFileReader import InpFileReader

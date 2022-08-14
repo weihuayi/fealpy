@@ -11,7 +11,7 @@ from .mesh_tools import show_halfedge_mesh
 from ..common import DynamicArray
 
 class DartMesh3d():
-    def __init__(self, dart, node):
+    def __init__(self, node, dart):
         """!
         @param dart : (v, e, f, c, b1, b2, b3)
         """
@@ -19,7 +19,7 @@ class DartMesh3d():
         self.ftype = node.dtype
 
         self.node = node
-        self.ds = DartMeshDataStructure(dart, NN = node.shape[0])
+        self.ds = DartMeshDataStructure(dart)
         self.meshtype = 'dart3d'
 
         self.dartdata = {}
@@ -42,18 +42,20 @@ class DartMesh3d():
         face = mesh.entity('face')
         cell = mesh.entity('cell')
 
-        locF2E = mesh.ds.localFace2Edge
+        locF2E = mesh.ds.localFace2edge
         locEdge = mesh.ds.localEdge
         cell2edge = mesh.ds.cell_to_edge()
         cell2face = mesh.ds.cell_to_face()
+        face2edge = mesh.ds.face_to_edge()
         face2cell = mesh.ds.face_to_cell()
 
         NEC = mesh.ds.NEC
         NFC = mesh.ds.NFC
+        NVF = mesh.ds.NVF
         locE2F = -np.ones([NEC, 2], dtype=np.int_)
         for i in range(NFC): 
             e = locF2E[i]
-            flag = locE2F[e] < 0
+            flag = locE2F[e, 0] < 0
             locE2F[e[flag], 0] = i
             locE2F[e[~flag], 1] = i
 
@@ -61,15 +63,15 @@ class DartMesh3d():
         dart = -np.ones([ND, 7], dtype=np.int_)
 
         ## 顶点
-        dart[::2, 0] = cell[locEdge[:, 1]]
-        dart[1::2, 0] = cell[locEdge[:, 0]]
+        dart[::2, 0] = cell[:, locEdge[:, 1]].flat
+        dart[1::2, 0] = cell[:, locEdge[:, 0]].flat
 
         ## 边
         dart[:, 1] = np.repeat(cell2edge.flat, 2)
 
         ## 面
-        dart[::2, 2] = cell2face[locE2F[:, 0]]
-        dart[1::2, 2] = cell2face[locE2F[:, 1]]
+        dart[::2, 2] = cell2face[:, locE2F[:, 0]].flat
+        dart[1::2, 2] = cell2face[:, locE2F[:, 1]].flat
 
         ## 单元
         dart[:, 3] = np.repeat(np.arange(NC), 2*NEC)
@@ -79,15 +81,15 @@ class DartMesh3d():
         dart[1::2, 5] = np.arange(ND)[::2]
 
         ## b1, b3
-        face2dart = np.zeros([NF, 2, 3], dtype=np.int_)
-        nex = np.array([1, 2, 0])
+        face2dart = -np.ones([NF, 2, NVF], dtype=np.int_)
+        nex = np.roll(np.arange(NVF), NVF-1)
         for i in range(NFC):
             f = cell2face[:, i]
-            lf2e = cell2edge[locF2E[i]] # 局部的 face2edge
+            lf2e = cell2edge[:, locF2E[i]] # 局部的 face2edge
             gf2e = face2edge[f] # 全局的 face2edge
 
-            flag = (locE2F[lf2e, 0]!=i).astype(np.int_).reshape(1, -1)
-            lf2dart = lf2e*2+np.arange(NC)*NEC*2+flag
+            flag = (locE2F[locF2E[i], 0]!=i).astype(np.int_).reshape(1, -1)
+            lf2dart = locF2E[i]*2+np.arange(NC)[:, None]*NEC*2+flag
             dart[lf2dart, 4] = lf2dart[:, nex]
 
             idx = np.argsort(lf2e, axis=1)
@@ -96,8 +98,13 @@ class DartMesh3d():
 
             ## 此时有 gf2e = lf2e[np.arange(NC)[:, None], idx]
             flag = face2cell[f, 0]==np.arange(NC)
-            face2dart[f[flag], 0] = lf2dart[np.arange(NC)[flag, None], idx]
-            face2dart[f[~flag], 1] = lf2dart[np.arange(NC)[~flag, None], idx]
+            if np.any(flag):
+                face2dart[f[flag], 0] = lf2dart[np.arange(NC)[flag, None], idx[flag]]
+            if np.any(~flag):
+                face2dart[f[~flag], 1] = lf2dart[np.arange(NC)[~flag, None], idx[~flag]]
+
+        flag = np.any(face2dart[:, 1]<0, axis=1)
+        face2dart[flag, 1] = face2dart[flag, 0]
 
         dart[face2dart[:, 0], -1] = face2dart[:, 1]
         dart[face2dart[:, 1], -1] = face2dart[:, 0]
@@ -105,6 +112,85 @@ class DartMesh3d():
         mesh =  cls(node, dart)
         return mesh
 
+    def number_of_nodes(self):
+        return len(self.node)
+
+    def number_of_edges(self):
+        return len(self.ds.hedge)
+
+    def number_of_faces(self):
+        return len(self.ds.hface)
+
+    def number_of_cells(self):
+        return len(self.ds.hcell)
+
+    def to_vtk(self):
+        NC = self.number_of_cells()
+
+        node = self.node
+        cell, cellLoc = self.ds.cell_to_node()
+        face, faceLoc = self.ds.face_to_node()
+        cell2face, cell2faceLoc = self.ds.cell_to_face()
+
+        points = vtk.vtkPoints()
+        points.SetData(vnp.numpy_to_vtk(node))
+
+        uGrid = vtkUnstructuredGrid()
+        uGrid.SetPoints(points)
+        for i in range(NC):
+            FacesIdList = vtkIdList()
+
+            F = cell2faceLoc[i+1]-cell2faceLoc[i]
+            FacesIdList.InsertNextId(F)
+
+            for j in range(F):
+                f = face[faceLoc[cell2face[i, j]]:faceLoc[cell2face[i, j]+1]]
+                FacesIdList.InsertNextId(len(f))
+                [FacesIdList.InsertNextId(k) for k in f]
+
+            uGrid.InsertNextCell(VTK_POLYHEDRON, FacesIdList)
+
+        pdata = mesh.GetPointData()
+        if nodedata is not None:
+            for key, val in nodedata.items():
+                if val is not None:
+                    if len(val.shape) == 2 and val.shape[1] == 2:
+                        shape = (val.shape[0], 3)
+                        val1 = np.zeros(shape, dtype=val.dtype)
+                        val1[:, 0:2] = val
+                    else:
+                        val1 = val
+
+                    if val1.dtype == np.bool:
+                        d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                    else:
+                        d = vnp.numpy_to_vtk(val1[:])
+                    d.SetName(key)
+                    pdata.AddArray(d)
+
+        if celldata is not None:
+            cdata = mesh.GetCellData()
+            for key, val in celldata.items():
+                if val is not None:
+                    if len(val.shape) == 2 and val.shape[1] == 2:
+                        shape = (val.shape[0], 3)
+                        val1 = np.zeros(shape, dtype=val.dtype)
+                        val1[:, 0:2] = val
+                    else:
+                        val1 = val
+
+                    if val1.dtype == np.bool:
+                        d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                    else:
+                        d = vnp.numpy_to_vtk(val1[:])
+
+                    d.SetName(key)
+                    cdata.AddArray(d)
+
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(uGrid)
+        writer.Write()
 
 class DartMeshDataStructure():
     def __init__(self, dart):
@@ -113,7 +199,7 @@ class DartMeshDataStructure():
         """
         self.dart = dart
         ND = dart.shape[0]
-        NN, NE, NF, NC = np.max(dart[:, :4])+1
+        NN, NE, NF, NC = np.max(dart[:, :4], axis=0)+1
 
         self.hnode = np.zeros(NN, dtype=np.int_)
         self.hedge = np.zeros(NE, dtype=np.int_)
