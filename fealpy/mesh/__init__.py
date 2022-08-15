@@ -11,6 +11,7 @@ from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
+from .HexahedronMesh import HexahedronMesh
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
@@ -35,6 +36,7 @@ from .mesh_tools import *
 
 from .HalfEdgeDomain import HalfEdgeDomain
 from .HalfEdgeMesh2d import HalfEdgeMesh2d
+from .DartMesh3d import DartMesh3d
 
 from .PolyFileReader import PolyFileReader
 from .InpFileReader import InpFileReader
