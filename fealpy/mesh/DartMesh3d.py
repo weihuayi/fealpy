@@ -1,4 +1,5 @@
 import numpy as np
+from icecream import ic
 
 class DartMesh3d():
     def __init__(self, node, dart):
@@ -104,6 +105,9 @@ class DartMesh3d():
         bnode = self.ds.boundary_node_index()
         bedge = self.ds.boundary_edge_index()
         bface = self.ds.boundary_face_index()
+        self.print()
+        for i in bdart:
+            print(i, ' : ', dart[i])
         
         ND = len(dart)
         NBD = len(bdart)
@@ -114,6 +118,7 @@ class DartMesh3d():
         NE = self.number_of_edges()
         NF = self.number_of_faces()
         NC = self.number_of_cells()
+        print(NN, NE, NF, NC)
 
         ######## 生成对偶网格的节点##########
         newnode = np.zeros([NC+NBN+NBE+NBF, 3], dtype=np.float_)
@@ -124,7 +129,6 @@ class DartMesh3d():
         ####################################
 
         ############## bdart 与对偶网格边界上的实体间的关系 #################
-
         # 1. 点边面与新节点的对应关系
         n2n = -np.ones(NN, dtype=np.int_)
         e2n = -np.ones(NE, dtype=np.int_)
@@ -150,10 +154,12 @@ class DartMesh3d():
         # 5. 边界 dart 作为边界 halfedge 网格中的 dart 的对边 
         bdopp = np.zeros(m, dtype=np.int_)
         index = np.argsort(dart[bdart, 1])
-        bdopp[index[::2]] = bdart[index[1::2]]
-        bdopp[index[1::2]] = bdart[index[::2]]
+        bdopp[bdart[index[::2]]] = bdart[index[1::2]]
+        bdopp[bdart[index[1::2]]] = bdart[index[::2]]
 
         bnoidx = bdIdxmap[bdopp[dart[bdart, 4]]] # bdart 下一条边的对边
+        ic(bdopp[dart[bdart, 4]])
+        ic(bnoidx[5])
         ##################################################################
 
         ############ 生成对偶网格中的 dart #############
@@ -166,18 +172,14 @@ class DartMesh3d():
         newdart[:ND, :4] = newdart[:ND, 3::-1]
         newdart[:ND, 4] = newdart[dart[:ND, 5], 6]
         newdart[:ND, 5] = newdart[dart[:ND, 4], 6]
-        #print(newdart[:ND])
 
         # 0
-        #print(np.arange(ND, ND+NBD))
-        print('dadada', newdart[bdart, 5])
         newdart[ND:ND+NBD, 0] = bdart2fn
-        newdart[ND:ND+NBD, 1:2] = newdart[bdart, 1:2]
+        newdart[ND:ND+NBD, 1:3] = newdart[bdart, 1:3]
         newdart[ND:ND+NBD, 3] = dart[dart[bdart, 5], 0]
         newdart[newdart[bdart, 5], 4] = np.arange(ND+NBD*6, ND+NBD*7) #TODO
         newdart[newdart[bdart, 5], 5] = bdart # TODO
         newdart[ND:ND+NBD, 6] = bdart
-        print('dada\n', newdart[ND:ND+NBD])
 
         # 1
         newdart[ND+NBD:ND+NBD*2, 0] = bdart2en
@@ -205,6 +207,9 @@ class DartMesh3d():
         newdart[ND+NBD*3:ND+NBD*4, 5] = np.arange(ND+NBD*2, ND+NBD*3)[bnoidx]
         newdart[ND+NBD*3:ND+NBD*4, 6] = np.arange(ND+NBD*3, ND+NBD*4) 
 
+        print(bnoidx)
+        print('aaa = ', newdart[ND+NBD*3:ND+NBD*4, 5])
+        print('bbb = ', np.arange(ND+NBD*2, ND+NBD*3))
         newdart[newdart[ND+NBD*3:ND+NBD*4, 5], 5] = np.arange(ND+NBD*3, ND+NBD*4)
 
         # 4
@@ -217,6 +222,8 @@ class DartMesh3d():
         newdart[ND+NBD*4:ND+NBD*5, 6] = np.arange(ND+NBD*4, ND+NBD*5) 
 
         # 5
+        print('a = ', np.arange(ND+NBD*5, ND+NBD*6))
+        print('b = ', bdart)
         newdart[ND+NBD*5:ND+NBD*6, 0] = bdart2fn
         newdart[ND+NBD*5:ND+NBD*6, 1] = np.arange(NF, NF+NBD)
         newdart[ND+NBD*5:ND+NBD*6, 2] = newdart[bdart, 2]
@@ -227,13 +234,12 @@ class DartMesh3d():
 
         # 6
         newdart[ND+NBD*6:ND+NBD*7, 0] = bdart2en[bnoidx]
-        newdart[ND+NBD*6:ND+NBD*7, 1] = newdart[ND+NBD*4:ND+NBD*5, 1] 
+        newdart[ND+NBD*6:ND+NBD*7, 1] = NF+bdIdxmap[dart[bdart, 4]]
         newdart[ND+NBD*6:ND+NBD*7, 2] = newdart[newdart[bdart, 5], 2]
         newdart[ND+NBD*6:ND+NBD*7, 3] = newdart[bdart, 3]
         newdart[ND+NBD*6:ND+NBD*7, 4] = np.arange(ND+NBD*5, ND+NBD*6)[bnoidx] 
         newdart[ND+NBD*6:ND+NBD*7, 5] = np.arange(ND+NBD*4, ND+NBD*5)
         newdart[newdart[ND+NBD*5:ND+NBD*6, 6], 6] = np.arange(ND+NBD*5, ND+NBD*6)
-        print(np.arange(ND+NBD*6, ND+NBD*7))
         print(newdart)
         return DartMesh3d(newnode, newdart)
 
