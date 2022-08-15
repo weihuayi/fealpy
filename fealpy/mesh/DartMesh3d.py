@@ -110,43 +110,51 @@ class DartMesh3d():
         NBN = len(bnode)
         NBE = len(bedge)
         NBF = len(bface)
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
         NC = self.number_of_cells()
 
         ######## 生成对偶网格的节点##########
         newnode = np.zeros([NC+NBN+NBE+NBF, 3], dtype=np.float_)
         newnode[:NC] = self.entity_barycenter('cell')
-        newnode[NC:NC+NBN] = node[isbnode]
-        newnode[NC+NBN:NC+NBN+NBE] = self.entity_barycenter('edge', index=isbedge)
-        newnode[-NBF:] = self.entity_barycenter('face', index=isbface)
+        newnode[NC:NC+NBN] = node[bnode]
+        newnode[NC+NBN:NC+NBN+NBE] = self.entity_barycenter('edge', index=bedge)
+        newnode[-NBF:] = self.entity_barycenter('face', index=bface)
         ####################################
 
-        # 点边面与新节点的对应关系
+        ############## bdart 与对偶网格边界上的实体间的关系 #################
+
+        # 1. 点边面与新节点的对应关系
         n2n = -np.ones(NN, dtype=np.int_)
         e2n = -np.ones(NE, dtype=np.int_)
         f2n = -np.ones(NF, dtype=np.int_)
         n2n[bnode] = np.arange(NC, NC+NBN) # node 对应的新节点编号
         e2n[bedge] = np.arange(NC+NBN, NC+NBN+NBE)# edge 上的新节点编号
-        f2n[bface] = np.arange(NC+NBN+NBE, NC+NBN+NBN+NBE+NBF)# face 上的新节点编号
+        f2n[bface] = np.arange(NC+NBN+NBE, NC+NBN+NBE+NBF)# face 上的新节点编号
 
-        # 边界 dart 与自身顺序的 map
-        m = np.max(bdart)
+        # 2. 边界 dart 与自身顺序的 map
+        m = np.max(bdart)+1
         bdIdxmap = np.zeros(m, dtype=np.int_)
         bdIdxmap[bdart] = np.arange(NBD)
 
-        # 边界 dart 与新节点的对应关系
+        # 3. 边界 dart 与新节点的对应关系
         bdart2nn = n2n[dart[bdart, 0]] # bdart 对应的节点上的新节点
         bdart2en = e2n[dart[bdart, 1]] # bdart 对应的边上的新节点
         bdart2fn = f2n[dart[bdart, 2]] # bdart 对应的面上的新节点
 
-        # 边界 dart 与新边的对应关系
+        # 4. 边界 dart 与新边的对应关系
         bdart2e = np.zeros([2, m], dtype=np.int_)
         bdart2e[:, bdart] = np.arange(NF, NF+NBD*2).reshape(2, -1)
 
-        # 边界 dart 作为边界 halfedge 网格中的 dart 的对边
+        # 5. 边界 dart 作为边界 halfedge 网格中的 dart 的对边 
         bdopp = np.zeros(m, dtype=np.int_)
         index = np.argsort(dart[bdart, 1])
         bdopp[index[::2]] = bdart[index[1::2]]
         bdopp[index[1::2]] = bdart[index[::2]]
+
+        bnoidx = bdIdxmap[bdopp[dart[bdart, 4]]] # bdart 下一条边的对边
+        ##################################################################
 
         ############ 生成对偶网格中的 dart #############
         newdart = np.zeros([ND+7*NBD, 7], dtype=np.int_)
@@ -156,16 +164,20 @@ class DartMesh3d():
         newdart[bdart, 6] = np.arange(ND, ND+NBD) # 给边界 dart 生成 b3
 
         newdart[:ND, :4] = newdart[:ND, 3::-1]
-        newdart[:ND, 4] = newdart[newdart[:ND, 5], 6]
-        newdart[:ND, 5] = newdart[newdart[:ND, 4], 6]
+        newdart[:ND, 4] = newdart[dart[:ND, 5], 6]
+        newdart[:ND, 5] = newdart[dart[:ND, 4], 6]
+        #print(newdart[:ND])
 
         # 0
+        #print(np.arange(ND, ND+NBD))
+        print('dadada', newdart[bdart, 5])
         newdart[ND:ND+NBD, 0] = bdart2fn
         newdart[ND:ND+NBD, 1:2] = newdart[bdart, 1:2]
         newdart[ND:ND+NBD, 3] = dart[dart[bdart, 5], 0]
         newdart[newdart[bdart, 5], 4] = np.arange(ND+NBD*6, ND+NBD*7) #TODO
         newdart[newdart[bdart, 5], 5] = bdart # TODO
         newdart[ND:ND+NBD, 6] = bdart
+        print('dada\n', newdart[ND:ND+NBD])
 
         # 1
         newdart[ND+NBD:ND+NBD*2, 0] = bdart2en
@@ -185,15 +197,45 @@ class DartMesh3d():
         newdart[ND+NBD*2:ND+NBD*3, 6] = np.arange(ND+NBD*2, ND+NBD*3) 
 
         # 3
-        newdart[ND+NBD*3:ND+NBD**4, 0] = bdart2en[bdidxmap[dart[bdart, 4]]]
-        newdart[ND+NBD*3:ND+NBD**4, 1] = np.arange(NE, NE+NBD)
-        newdart[ND+NBD*3:ND+NBD**4, 2] = np.arange(NE, NE+NBD)
-        newdart[ND+NBD*3:ND+NBD**4, 3] = newdart[bdart, 3]
-        newdart[ND+NBD*3:ND+NBD**4, 4] = np.arange(ND+NBD*2, ND+NBD*3)
+        newdart[ND+NBD*3:ND+NBD*4, 0] = bdart2en[bnoidx]
+        newdart[ND+NBD*3:ND+NBD*4, 1] = np.arange(NF+NBD, NF+NBD*2)[bnoidx]
+        newdart[ND+NBD*3:ND+NBD*4, 2] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD*3:ND+NBD*4, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*3:ND+NBD*4, 4] = np.arange(ND+NBD*4, ND+NBD*5)
+        newdart[ND+NBD*3:ND+NBD*4, 5] = np.arange(ND+NBD*2, ND+NBD*3)[bnoidx]
+        newdart[ND+NBD*3:ND+NBD*4, 6] = np.arange(ND+NBD*3, ND+NBD*4) 
 
-        dart
-        newdart[ND+NBD*3:ND+NBD**4, 5] = np.arange(ND+NBD*5, ND+NBD*6)
-        newdart[ND+NBD*3:ND+NBD**4, 6] = np.arange(ND+NBD, ND+NBD*2) 
+        newdart[newdart[ND+NBD*3:ND+NBD*4, 5], 5] = np.arange(ND+NBD*3, ND+NBD*4)
+
+        # 4
+        newdart[ND+NBD*4:ND+NBD*5, 0] = bdart2fn
+        newdart[ND+NBD*4:ND+NBD*5, 1] = np.arange(NF+NBD, NF+NBD*2)[bnoidx]
+        newdart[ND+NBD*4:ND+NBD*5, 2] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD*4:ND+NBD*5, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*4:ND+NBD*5, 4] = np.arange(ND+NBD, ND+NBD*2)
+        newdart[ND+NBD*4:ND+NBD*5, 5] = np.arange(ND+NBD*6, ND+NBD*7)
+        newdart[ND+NBD*4:ND+NBD*5, 6] = np.arange(ND+NBD*4, ND+NBD*5) 
+
+        # 5
+        newdart[ND+NBD*5:ND+NBD*6, 0] = bdart2fn
+        newdart[ND+NBD*5:ND+NBD*6, 1] = np.arange(NF, NF+NBD)
+        newdart[ND+NBD*5:ND+NBD*6, 2] = newdart[bdart, 2]
+        newdart[ND+NBD*5:ND+NBD*6, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*5:ND+NBD*6, 4] = bdart
+        newdart[ND+NBD*5:ND+NBD*6, 5] = np.arange(ND+NBD, ND+NBD*2)
+        newdart[ND+NBD*5:ND+NBD*6, 6] = newdart[ND:ND+NBD, 4] 
+
+        # 6
+        newdart[ND+NBD*6:ND+NBD*7, 0] = bdart2en[bnoidx]
+        newdart[ND+NBD*6:ND+NBD*7, 1] = newdart[ND+NBD*4:ND+NBD*5, 1] 
+        newdart[ND+NBD*6:ND+NBD*7, 2] = newdart[newdart[bdart, 5], 2]
+        newdart[ND+NBD*6:ND+NBD*7, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*6:ND+NBD*7, 4] = np.arange(ND+NBD*5, ND+NBD*6)[bnoidx] 
+        newdart[ND+NBD*6:ND+NBD*7, 5] = np.arange(ND+NBD*4, ND+NBD*5)
+        newdart[newdart[ND+NBD*5:ND+NBD*6, 6], 6] = np.arange(ND+NBD*5, ND+NBD*6)
+        print(np.arange(ND+NBD*6, ND+NBD*7))
+        print(newdart)
+        return DartMesh3d(newnode, newdart)
 
     def entity_barycenter(self, entityType, index=np.s_[:]):
         '''!
@@ -207,7 +249,7 @@ class DartMesh3d():
         elif entityType=='face':
             face, faceLoc = self.ds.face_to_node(index=index)
             NV = (faceLoc[1:] - faceLoc[:-1]).reshape(-1, 1)
-            NF = len(NV)-1
+            NF = len(NV)
 
             bary = np.zeros([NF, 3], dtype=np.float_)
             isNotOK = np.ones(NF, dtype=np.bool_)
@@ -294,7 +336,7 @@ class DartMesh3d():
 
         if self.celldata:
             celldata = self.celldata
-            cdata = mesh.GetCellData()
+            cdata = uGrid.GetCellData()
             for key, val in celldata.items():
                 if val is not None:
                     if len(val.shape) == 2 and val.shape[1] == 2:
@@ -478,7 +520,7 @@ class DartMeshDataStructure():
         f2nLocation = np.zeros(N+1, dtype=np.int_)
         f2nLocation[1:] = np.cumsum(NVF[index])
 
-        f2n = np.zeros(f2eLocation[-1], dtype=np.int_) 
+        f2n = np.zeros(f2nLocation[-1], dtype=np.int_) 
 
         current = self.hface[index].copy() #循环的dart
         idx = f2nLocation[:-1].copy() #循环的 f2n 索引
@@ -523,9 +565,9 @@ class DartMeshDataStructure():
         f2c[flag, 3] = f2c[flag, 2]
         return f2c
 
-    def edge_to_node(self):
+    def edge_to_node(self, index=np.s_[:]):
         dart = self.dart
-        hedge = self.hedge
+        hedge = self.hedge[index]
         NE = len(hedge)
 
         e2n = np.zeros([NE, 2], dtype=np.int_)
@@ -562,7 +604,7 @@ class DartMeshDataStructure():
         isBDNode = np.zeros(NN, dtype=np.bool_)
 
         isBDDart = self.boundary_dart_flag()
-        isBDNode[dart[isBDDart, 0]] = True
+        isBDNode[self.dart[isBDDart, 0]] = True
         return isBDNode
 
     def boundary_edge_flag(self):
@@ -570,7 +612,7 @@ class DartMeshDataStructure():
         isBDEdge = np.zeros(NE, dtype=np.bool_)
 
         isBDDart = self.boundary_dart_flag()
-        isBDEdge[dart[isBDDart, 1]] = True
+        isBDEdge[self.dart[isBDDart, 1]] = True
         return isBDEdge
 
     def boundary_face_flag(self):
@@ -578,7 +620,7 @@ class DartMeshDataStructure():
         isBDFace = np.zeros(NF, dtype=np.bool_)
 
         isBDDart = self.boundary_dart_flag()
-        isBDFace[dart[isBDDart, 2]] = True
+        isBDFace[self.dart[isBDDart, 2]] = True
         return isBDFace
 
     def boundary_cell_flag(self):
@@ -586,7 +628,7 @@ class DartMeshDataStructure():
         isBDCell = np.zeros(NC, dtype=np.bool_)
 
         isBDDart = self.boundary_dart_flag()
-        isBDCell[dart[isBDDart, 3]] = True
+        isBDCell[self.dart[isBDDart, 3]] = True
         return isBDCell
 
     def boundary_dart_index(self):
