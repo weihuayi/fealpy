@@ -1,14 +1,4 @@
-
 import numpy as np
-import matplotlib.pyplot as plt
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from scipy.sparse.csgraph import minimum_spanning_tree
-
-from ..quadrature import TriangleQuadrature, QuadrangleQuadrature, GaussLegendreQuadrature 
-from .Mesh2d import Mesh2d
-from .adaptive_tools import mark
-from .mesh_tools import show_halfedge_mesh
-from ..common import DynamicArray
 
 class DartMesh3d():
     def __init__(self, node, dart):
@@ -43,6 +33,7 @@ class DartMesh3d():
         cell = mesh.entity('cell')
 
         locF2E = mesh.ds.localFace2edge
+        locE2F = mesh.ds.localEdge2face
         locEdge = mesh.ds.localEdge
         cell2edge = mesh.ds.cell_to_edge()
         cell2face = mesh.ds.cell_to_face()
@@ -52,12 +43,6 @@ class DartMesh3d():
         NEC = mesh.ds.NEC
         NFC = mesh.ds.NFC
         NVF = mesh.ds.NVF
-        locE2F = -np.ones([NEC, 2], dtype=np.int_)
-        for i in range(NFC): 
-            e = locF2E[i]
-            flag = locE2F[e, 0] < 0
-            locE2F[e[flag], 0] = i
-            locE2F[e[~flag], 1] = i
 
         ND = 2*NEC*NC
         dart = -np.ones([ND, 7], dtype=np.int_)
@@ -112,6 +97,140 @@ class DartMesh3d():
         mesh =  cls(node, dart)
         return mesh
 
+    def dual_mesh(self):
+        dart = self.ds.dart
+        node = self.node
+        bdart = self.ds.boundary_dart_index()
+        bnode = self.ds.boundary_node_index()
+        bedge = self.ds.boundary_edge_index()
+        bface = self.ds.boundary_face_index()
+        
+        ND = len(dart)
+        NBD = len(bdart)
+        NBN = len(bnode)
+        NBE = len(bedge)
+        NBF = len(bface)
+        NC = self.number_of_cells()
+
+        ######## 生成对偶网格的节点##########
+        newnode = np.zeros([NC+NBN+NBE+NBF, 3], dtype=np.float_)
+        newnode[:NC] = self.entity_barycenter('cell')
+        newnode[NC:NC+NBN] = node[isbnode]
+        newnode[NC+NBN:NC+NBN+NBE] = self.entity_barycenter('edge', index=isbedge)
+        newnode[-NBF:] = self.entity_barycenter('face', index=isbface)
+        ####################################
+
+        # 点边面与新节点的对应关系
+        n2n = -np.ones(NN, dtype=np.int_)
+        e2n = -np.ones(NE, dtype=np.int_)
+        f2n = -np.ones(NF, dtype=np.int_)
+        n2n[bnode] = np.arange(NC, NC+NBN) # node 对应的新节点编号
+        e2n[bedge] = np.arange(NC+NBN, NC+NBN+NBE)# edge 上的新节点编号
+        f2n[bface] = np.arange(NC+NBN+NBE, NC+NBN+NBN+NBE+NBF)# face 上的新节点编号
+
+        # 边界 dart 与自身顺序的 map
+        m = np.max(bdart)
+        bdIdxmap = np.zeros(m, dtype=np.int_)
+        bdIdxmap[bdart] = np.arange(NBD)
+
+        # 边界 dart 与新节点的对应关系
+        bdart2nn = n2n[dart[bdart, 0]] # bdart 对应的节点上的新节点
+        bdart2en = e2n[dart[bdart, 1]] # bdart 对应的边上的新节点
+        bdart2fn = f2n[dart[bdart, 2]] # bdart 对应的面上的新节点
+
+        # 边界 dart 与新边的对应关系
+        bdart2e = np.zeros([2, m], dtype=np.int_)
+        bdart2e[:, bdart] = np.arange(NF, NF+NBD*2).reshape(2, -1)
+
+        # 边界 dart 作为边界 halfedge 网格中的 dart 的对边
+        bdopp = np.zeros(m, dtype=np.int_)
+        index = np.argsort(dart[bdart, 1])
+        bdopp[index[::2]] = bdart[index[1::2]]
+        bdopp[index[1::2]] = bdart[index[::2]]
+
+        ############ 生成对偶网格中的 dart #############
+        newdart = np.zeros([ND+7*NBD, 7], dtype=np.int_)
+
+        # -1: (v, e, f, c, b1, b2, b3) -> (v, e, f, c, b3(b2), b3(b1), b3)
+        newdart[:ND] = dart
+        newdart[bdart, 6] = np.arange(ND, ND+NBD) # 给边界 dart 生成 b3
+
+        newdart[:ND, :4] = newdart[:ND, 3::-1]
+        newdart[:ND, 4] = newdart[newdart[:ND, 5], 6]
+        newdart[:ND, 5] = newdart[newdart[:ND, 4], 6]
+
+        # 0
+        newdart[ND:ND+NBD, 0] = bdart2fn
+        newdart[ND:ND+NBD, 1:2] = newdart[bdart, 1:2]
+        newdart[ND:ND+NBD, 3] = dart[dart[bdart, 5], 0]
+        newdart[newdart[bdart, 5], 4] = np.arange(ND+NBD*6, ND+NBD*7) #TODO
+        newdart[newdart[bdart, 5], 5] = bdart # TODO
+        newdart[ND:ND+NBD, 6] = bdart
+
+        # 1
+        newdart[ND+NBD:ND+NBD*2, 0] = bdart2en
+        newdart[ND+NBD:ND+NBD*2, 1] = np.arange(NF, NF+NBD)
+        newdart[ND+NBD:ND+NBD*2, 2] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD:ND+NBD*2, 3] = newdart[bdart, 3]
+        newdart[ND+NBD:ND+NBD*2, 4] = np.arange(ND+NBD*2, ND+NBD*3)
+        newdart[ND+NBD:ND+NBD*2, 5] = np.arange(ND+NBD*5, ND+NBD*6)
+        newdart[ND+NBD:ND+NBD*2, 6] = np.arange(ND+NBD, ND+NBD*2) 
+
+        # 2 : b2 没有实现，在 3 中实现
+        newdart[ND+NBD*2:ND+NBD*3, 0] = bdart2nn
+        newdart[ND+NBD*2:ND+NBD*3, 1] = np.arange(NF+NBD, NF+NBD*2)
+        newdart[ND+NBD*2:ND+NBD*3, 2] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD*2:ND+NBD*3, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*2:ND+NBD*3, 4] = np.arange(ND+NBD*3, ND+NBD*4)
+        newdart[ND+NBD*2:ND+NBD*3, 6] = np.arange(ND+NBD*2, ND+NBD*3) 
+
+        # 3
+        newdart[ND+NBD*3:ND+NBD**4, 0] = bdart2en[bdidxmap[dart[bdart, 4]]]
+        newdart[ND+NBD*3:ND+NBD**4, 1] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD*3:ND+NBD**4, 2] = np.arange(NE, NE+NBD)
+        newdart[ND+NBD*3:ND+NBD**4, 3] = newdart[bdart, 3]
+        newdart[ND+NBD*3:ND+NBD**4, 4] = np.arange(ND+NBD*2, ND+NBD*3)
+
+        dart
+        newdart[ND+NBD*3:ND+NBD**4, 5] = np.arange(ND+NBD*5, ND+NBD*6)
+        newdart[ND+NBD*3:ND+NBD**4, 6] = np.arange(ND+NBD, ND+NBD*2) 
+
+    def entity_barycenter(self, entityType, index=np.s_[:]):
+        '''!
+        @brief 获取每个实体的重心
+        '''
+        node = self.node
+        if entityType=='edge':
+            edge = self.ds.edge_to_node(index=index)
+            bary = np.average(node[edge], axis=1)
+            return bary
+        elif entityType=='face':
+            face, faceLoc = self.ds.face_to_node(index=index)
+            NV = (faceLoc[1:] - faceLoc[:-1]).reshape(-1, 1)
+            NF = len(NV)-1
+
+            bary = np.zeros([NF, 3], dtype=np.float_)
+            isNotOK = np.ones(NF, dtype=np.bool_)
+            start = faceLoc[:-1].copy()
+            while np.any(isNotOK):
+                bary[isNotOK] = bary[isNotOK] + node[face[start[isNotOK]]]/NV[isNotOK]
+                start[isNotOK] = start[isNotOK] + 1
+                isNotOK = start < faceLoc[1:]
+            return bary
+        elif entityType=='cell':
+            cell, cellLoc = self.ds.cell_to_node()
+            NV = (cellLoc[1:] - cellLoc[:-1]).reshape(-1, 1)
+            NC = self.number_of_cells()
+
+            bary = np.zeros([NC, 3], dtype=np.float_)
+            isNotOK = np.ones(NC, dtype=np.bool_)
+            start = cellLoc[:-1].copy()
+            while np.any(isNotOK):
+                bary[isNotOK] = bary[isNotOK] + node[cell[start[isNotOK]]]/NV[isNotOK]
+                start[isNotOK] = start[isNotOK] + 1
+                isNotOK = start < cellLoc[1:]
+            return bary[index]
+
     def number_of_nodes(self):
         return len(self.node)
 
@@ -124,7 +243,10 @@ class DartMesh3d():
     def number_of_cells(self):
         return len(self.ds.hcell)
 
-    def to_vtk(self):
+    def to_vtk(self, fname):
+        import vtk
+        import vtk.util.numpy_support as vnp
+
         NC = self.number_of_cells()
 
         node = self.node
@@ -135,23 +257,25 @@ class DartMesh3d():
         points = vtk.vtkPoints()
         points.SetData(vnp.numpy_to_vtk(node))
 
-        uGrid = vtkUnstructuredGrid()
+        uGrid = vtk.vtkUnstructuredGrid()
         uGrid.SetPoints(points)
         for i in range(NC):
-            FacesIdList = vtkIdList()
+            FacesIdList = vtk.vtkIdList()
 
             F = cell2faceLoc[i+1]-cell2faceLoc[i]
             FacesIdList.InsertNextId(F)
 
+            fl = cell2faceLoc[i]
             for j in range(F):
-                f = face[faceLoc[cell2face[i, j]]:faceLoc[cell2face[i, j]+1]]
+                f = face[faceLoc[cell2face[fl+j]]:faceLoc[cell2face[fl+j]+1]]
                 FacesIdList.InsertNextId(len(f))
                 [FacesIdList.InsertNextId(k) for k in f]
 
-            uGrid.InsertNextCell(VTK_POLYHEDRON, FacesIdList)
+            uGrid.InsertNextCell(vtk.VTK_POLYHEDRON, FacesIdList)
 
-        pdata = mesh.GetPointData()
-        if nodedata is not None:
+        pdata = uGrid.GetPointData()
+        if self.nodedata:
+            nodedata = self.nodedata
             for key, val in nodedata.items():
                 if val is not None:
                     if len(val.shape) == 2 and val.shape[1] == 2:
@@ -168,7 +292,8 @@ class DartMesh3d():
                     d.SetName(key)
                     pdata.AddArray(d)
 
-        if celldata is not None:
+        if self.celldata:
+            celldata = self.celldata
             cdata = mesh.GetCellData()
             for key, val in celldata.items():
                 if val is not None:
@@ -191,6 +316,59 @@ class DartMesh3d():
         writer.SetFileName(fname)
         writer.SetInputData(uGrid)
         writer.Write()
+
+    def print(self):
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NF = self.number_of_faces()
+        NC = self.number_of_cells()
+
+        print("hcell:")
+        for i, val in enumerate(self.ds.hcell):
+            print(i, ':', val)
+
+        print("hedge:")
+        for i, val in enumerate(self.ds.hedge):
+            print(i, ":", val)
+
+        print("dart:")
+        for i, val in enumerate(self.ds.dart):
+            print(i, ":", val)
+
+        print("edge:")
+        edge = self.ds.edge_to_node()
+        for i, val in enumerate(edge):
+            print(i, ":", val)
+
+        print("face:")
+        face, faceLoc = self.ds.face_to_node()
+        for i in range(NF):
+            print(i, ":", face[faceLoc[i]:faceLoc[i+1]])
+
+        print("face2edge:")
+        face2edge, face2edgeLoc = self.ds.face_to_edge()
+        for i in range(NF):
+            print(i, ":", face2edge[face2edgeLoc[i]:face2edgeLoc[i+1]])
+
+        print("face2cell:")
+        face2cell = self.ds.face_to_cell()
+        for i, val in enumerate(face2cell):
+            print(i, ":", val)
+
+        print("cell:")
+        cell, cellLoc = self.ds.cell_to_node()
+        for i in range(NC):
+            print(i, ":", cell[cellLoc[i]:cellLoc[i+1]])
+
+        print("cell2edge:")
+        cell2edge, cell2edgeLoc = self.ds.cell_to_edge()
+        for i in range(NC):
+            print(i, ":", cell2edge[cell2edgeLoc[i]:cell2edgeLoc[i+1]])
+
+        print("cell2face:")
+        cell2face, cell2faceLoc = self.ds.cell_to_face()
+        for i in range(NC):
+            print(i, ":", cell2face[cell2faceLoc[i]:cell2faceLoc[i+1]])
 
 class DartMeshDataStructure():
     def __init__(self, dart):
@@ -268,7 +446,8 @@ class DartMeshDataStructure():
         f2e = np.unique(fe, axis=0) #没有定向的 face2edge
         np.add.at(NEF, f2e[:, 0], 1)
 
-        f2eLocation = np.zeros(NF+1, dtype=self.itype)
+        f2e = f2e[:, 1]
+        f2eLocation = np.zeros(NF+1, dtype=np.int_)
         f2eLocation[1:] = np.cumsum(NEF)
 
         f2e[:] = 0 
@@ -282,7 +461,7 @@ class DartMeshDataStructure():
             isNotOK = idx < f2eLocation[1:]
         return f2e, f2eLocation
 
-    def face_to_node(self):
+    def face_to_node(self, index=np.s_[:]):
         """!
         @brief 获得每个面的顶点，顶点按照面的定向逆时针排列.
         """
@@ -295,14 +474,17 @@ class DartMeshDataStructure():
         f2n = np.unique(fn, axis=0) #没有定向的 face2node
         np.add.at(NVF, f2n[:, 0], 1)
 
-        f2nLocation = np.zeros(NF+1, dtype=self.itype)
-        f2nLocation[1:] = np.cumsum(NVF)
+        N = len(self.hface[index])
+        f2nLocation = np.zeros(N+1, dtype=np.int_)
+        f2nLocation[1:] = np.cumsum(NVF[index])
 
-        current = self.hface.copy() #循环的dart
+        f2n = np.zeros(f2eLocation[-1], dtype=np.int_) 
+
+        current = self.hface[index].copy() #循环的dart
         idx = f2nLocation[:-1].copy() #循环的 f2n 索引
-        isNotOK = np.ones(NF, dtype=np.bool_)
+        isNotOK = np.ones(N, dtype=np.bool_)
         while np.any(isNotOK):
-            f2n[idx[isNotOK]] = dart[current[isNotOK], 1]
+            f2n[idx[isNotOK]] = dart[current[isNotOK], 0]
             current[isNotOK] = dart[current[isNotOK], 4]
             idx[isNotOK] += 1
             isNotOK = idx < f2nLocation[1:]
@@ -315,10 +497,11 @@ class DartMeshDataStructure():
         dart = self.dart
         hface = self.hface
         NF = len(hface)
+        NC = len(self.hcell)
 
         f2c = -np.ones([NF, 4], dtype=np.int_)
-        f2c[hface, 0] = dart[hface, 3]
-        f2c[hface, 1] = dart[dart[hface, 6], 3]
+        f2c[:, 0] = dart[hface, 3]
+        f2c[:, 1] = dart[dart[hface, 6], 3]
 
         cell2face, cell2faceLoc = self.cell_to_face()
 
@@ -346,8 +529,8 @@ class DartMeshDataStructure():
         NE = len(hedge)
 
         e2n = np.zeros([NE, 2], dtype=np.int_)
-        e2n[hedge, 1] = dart[hedge, 0]
-        e2n[hedge, 0] = dart[dart[hedge, 5], 0]
+        e2n[:, 1] = dart[hedge, 0]
+        e2n[:, 0] = dart[dart[hedge, 5], 0]
         return e2n
 
     def edge_to_face(self):
@@ -367,5 +550,65 @@ class DartMeshDataStructure():
 
     def node_to_cell(self):
         pass
+
+    def boundary_dart_flag(self):
+        ND = len(self.dart)
+        dart = self.dart
+        isBDDart = dart[:, -1] == np.arange(ND)
+        return isBDDart
+
+    def boundary_node_flag(self):
+        NN = len(self.hnode)
+        isBDNode = np.zeros(NN, dtype=np.bool_)
+
+        isBDDart = self.boundary_dart_flag()
+        isBDNode[dart[isBDDart, 0]] = True
+        return isBDNode
+
+    def boundary_edge_flag(self):
+        NE = len(self.hedge)
+        isBDEdge = np.zeros(NE, dtype=np.bool_)
+
+        isBDDart = self.boundary_dart_flag()
+        isBDEdge[dart[isBDDart, 1]] = True
+        return isBDEdge
+
+    def boundary_face_flag(self):
+        NF = len(self.hface)
+        isBDFace = np.zeros(NF, dtype=np.bool_)
+
+        isBDDart = self.boundary_dart_flag()
+        isBDFace[dart[isBDDart, 2]] = True
+        return isBDFace
+
+    def boundary_cell_flag(self):
+        NC = len(self.hcell)
+        isBDCell = np.zeros(NC, dtype=np.bool_)
+
+        isBDDart = self.boundary_dart_flag()
+        isBDCell[dart[isBDDart, 3]] = True
+        return isBDCell
+
+    def boundary_dart_index(self):
+        return np.where(self.boundary_dart_flag())[0]
+
+    def boundary_node_index(self):
+        return np.where(self.boundary_node_flag())[0]
+
+    def boundary_edge_index(self):
+        return np.where(self.boundary_edge_flag())[0]
+
+    def boundary_face_index(self):
+        return np.where(self.boundary_face_flag())[0]
+
+    def boundary_cell_flag(self):
+        return np.where(self.boundary_cell_flag())[0]
+
+
+
+
+
+
+
 
 

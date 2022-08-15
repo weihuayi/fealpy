@@ -19,6 +19,10 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
         (3,  2, 1, 0), (8, 9, 10, 11),
         (4, 11, 7, 3), (1, 6,  9,  5),
         (0,  5, 8, 4), (2, 7, 10,  6)])
+    localEdge2face = np.array([
+        [4, 0], [3, 0], [5, 0], [0, 2], 
+        [2, 4], [4, 3], [3, 5], [5, 2], 
+        [1, 4], [1, 3], [1, 5], [2, 1]])
     NVC = 8
     NEC = 12
     NFC = 6
