@@ -18,7 +18,7 @@ mesh.to_vtk('init.vtu')
 
 mesh = mesh.dual_mesh()
 mesh.celldata['idx'] = np.arange(mesh.number_of_cells())
-mesh.print()
+#mesh.print()
 #print(np.where(mesh.ds.dart[:, 2]==0))
 mesh.to_vtk('dual.vtu')
 
