@@ -9,9 +9,10 @@ class BSplineCurve:
 
     m = n + p + 1
     """
-    def __init__(self, p, knot, node):
+    def __init__(self, n, p, knot, node):
         """
-        @param[in] p
+        @param[in] n 控制点的个数
+        @param[in] p 样条基函数的次数
         @param[in] knot  结向量 
         @param[in] node  控制点数组
 
@@ -20,6 +21,11 @@ class BSplineCurve:
             knot[0:p+1] == 0
             knot[-p-1:] == 1
         """
+        assert n+p+1 == len(knot)
+        assert np.all(knot[0:p+1] == 0)
+        assert np.all(knot(-p-1:] == 1)
+
+        self.n = n 
         self.p = p
         self.knot = knot
         self.node = node
