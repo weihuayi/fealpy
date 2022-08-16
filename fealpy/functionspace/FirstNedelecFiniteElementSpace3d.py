@@ -256,7 +256,7 @@ class FirstNedelecFiniteElementSpace3d:
         uI[:] = np.sum(u(point)*et, axis=-1)
         return uI
 
-    def mass_matrix(self, c=None, q=None):
+    def mass_matrix(self, c=None, q=None, dtype=np.float_):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, 6, 3)
         cm = self.mesh.cell_volume()
@@ -267,9 +267,9 @@ class FirstNedelecFiniteElementSpace3d:
         J = np.broadcast_to(cell2dof[:, None, :], val.shape)
         gdof = self.dof.number_of_global_dofs()
         return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
-                dtype=np.float_)
+                dtype=dtype)
 
-    def curl_matrix(self, c=None, q=None):
+    def curl_matrix(self, c=None, q=None, dtype=np.float_):
         """
 
         Notes:
@@ -286,10 +286,10 @@ class FirstNedelecFiniteElementSpace3d:
         J = np.broadcast_to(cell2dof[:, None, :], val.shape)
         gdof = self.dof.number_of_global_dofs()
         return csr_matrix((val.flat, (I.flat, J.flat)), shape = (gdof, gdof),
-                dtype=np.float_)
+                dtype=dtype)
 
 
-    def source_vector(self, f):
+    def source_vector(self, f, dtype=np.float_):
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, 6, 3)
         cm = self.mesh.cell_volume()
@@ -300,7 +300,7 @@ class FirstNedelecFiniteElementSpace3d:
 
         val = np.einsum("qclg, qcg, q, c->cl", phi, fval, ws, cm)
         gdof = self.dof.number_of_global_dofs()
-        F = np.zeros(gdof, dtype=np.float_)
+        F = np.zeros(gdof, dtype=dtype)
         np.add.at(F, cell2dof, val)
         return F
 
@@ -331,9 +331,9 @@ class FirstNedelecFiniteElementSpace3d:
         else: #积分型自由度
             bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
             ps = mesh.bc_to_point(bcs)[:, face2edge]
-            gval = gD(ps)
 
             vec = mesh.edge_tangent()[face2edge]
+            gval = gD(ps, vec)
             l = np.linalg.norm(vec, axis=-1)
 
             face2dof = self.dof.face_to_dof()[index]
