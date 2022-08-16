@@ -1,5 +1,4 @@
 import numpy as np
-from icecream import ic
 
 class DartMesh3d():
     def __init__(self, node, dart):
@@ -105,9 +104,6 @@ class DartMesh3d():
         bnode = self.ds.boundary_node_index()
         bedge = self.ds.boundary_edge_index()
         bface = self.ds.boundary_face_index()
-        self.print()
-        for i in bdart:
-            print(i, ' : ', dart[i])
         
         ND = len(dart)
         NBD = len(bdart)
@@ -118,7 +114,6 @@ class DartMesh3d():
         NE = self.number_of_edges()
         NF = self.number_of_faces()
         NC = self.number_of_cells()
-        print(NN, NE, NF, NC)
 
         ######## 生成对偶网格的节点##########
         newnode = np.zeros([NC+NBN+NBE+NBF, 3], dtype=np.float_)
@@ -158,8 +153,6 @@ class DartMesh3d():
         bdopp[bdart[index[1::2]]] = bdart[index[::2]]
 
         bnoidx = bdIdxmap[bdopp[dart[bdart, 4]]] # bdart 下一条边的对边
-        ic(bdopp[dart[bdart, 4]])
-        ic(bnoidx[5])
         ##################################################################
 
         ############ 生成对偶网格中的 dart #############
@@ -207,9 +200,6 @@ class DartMesh3d():
         newdart[ND+NBD*3:ND+NBD*4, 5] = np.arange(ND+NBD*2, ND+NBD*3)[bnoidx]
         newdart[ND+NBD*3:ND+NBD*4, 6] = np.arange(ND+NBD*3, ND+NBD*4) 
 
-        print(bnoidx)
-        print('aaa = ', newdart[ND+NBD*3:ND+NBD*4, 5])
-        print('bbb = ', np.arange(ND+NBD*2, ND+NBD*3))
         newdart[newdart[ND+NBD*3:ND+NBD*4, 5], 5] = np.arange(ND+NBD*3, ND+NBD*4)
 
         # 4
@@ -222,8 +212,6 @@ class DartMesh3d():
         newdart[ND+NBD*4:ND+NBD*5, 6] = np.arange(ND+NBD*4, ND+NBD*5) 
 
         # 5
-        print('a = ', np.arange(ND+NBD*5, ND+NBD*6))
-        print('b = ', bdart)
         newdart[ND+NBD*5:ND+NBD*6, 0] = bdart2fn
         newdart[ND+NBD*5:ND+NBD*6, 1] = np.arange(NF, NF+NBD)
         newdart[ND+NBD*5:ND+NBD*6, 2] = newdart[bdart, 2]
@@ -240,7 +228,6 @@ class DartMesh3d():
         newdart[ND+NBD*6:ND+NBD*7, 4] = np.arange(ND+NBD*5, ND+NBD*6)[bnoidx] 
         newdart[ND+NBD*6:ND+NBD*7, 5] = np.arange(ND+NBD*4, ND+NBD*5)
         newdart[newdart[ND+NBD*5:ND+NBD*6, 6], 6] = np.arange(ND+NBD*5, ND+NBD*6)
-        print(newdart)
         return DartMesh3d(newnode, newdart)
 
     def entity_barycenter(self, entityType, index=np.s_[:]):
