@@ -1,20 +1,27 @@
+
 import numpy as np
 
-class CRSplineCurve:
+class CHSplineCurve:
     """
-    @brief Catmull-Rom Spline Curve 
+    @brief 三次 Hermite 样条曲线 
 
-    @note 该算法生成的曲线满足如下性质
-    1. p_i 点的切线方向和 p_{i+1} - p_{i-1} 平行
-    2. 穿过所有的控制点
-    
-    在每相邻两点之间，取四个条件：过两点，两点的切线
+    @note 注意三次 Hermite 样条曲线比 Catmull-Rom 样条更一般
 
-    三次 Hermite 样条
+
+    h_{00} = 2t^3 - 3t^2 + 1 = (1 + 2t)(1-t)^2 = B_0(t) + B_1(t)
+    h_{01} = -2t^3 + 3t^2    = t^2(3 - 2t)     = B_1(t)/3
+    h_{10} = t^3 - 2t^2 + t  = t(1 - t)^2      = B_3(t) + B_2(t)
+    h_{11} = t^3 - t^2       = t^2(t - 1)      = -B_2(t)/3
+    p(t) = h_{00} p_0 + h_{01} p_1 + h_{10} m_0 + h_{11} m_1
+
+
+    p(t) = p_0 + m_0 t + (-3p_0 + 3p_1 - 2m_0 - m_1) t^2 + (2p_0 - 2p_1 + m_0 + m_1)
+
     """
-    def __init__(self, node, tau=0.2):
+    def __init__(self, node, tang):
         """
         @param[in] node  控制点数组
+        @param[in] tangent 切线方向
         """
 
         self.ftype = node.dtype
@@ -23,17 +30,14 @@ class CRSplineCurve:
         assert NN >= 2
 
         GD = node.shape[-1]
-        self.node = np.zeros((NN+2, GD), dtype=self.ftype)
-        self.node[1:-1] = node
-        self.node[0] = 2*node[0] - node[1]
-        self.node[-1] = 2*node[-1] - node[-2]
-        self.tau = tau
+        self.node = node
+        self.tang = tang
 
         self.M = np.array([
-            [0, 1, 0, 0],
-            [-tau, 0, tau, 0],
-            [2*tau, tau-3, 3-2*tau, -tau],
-            [-tau, 2-tau, tau-2, tau]], dtype=self.ftype)
+            [1, 0, 0, 0],
+            [0, 0, 1, 0],
+            [-3, 3, -2, -1],
+            [2, -2, 1, 1]], dtype=self.ftype)
 
     def geom_dimension(self):
         return self.node.shape[-1]
@@ -56,17 +60,19 @@ class CRSplineCurve:
         np.cumprod(bc[..., 1:], axis=-1, out=bc[..., 1:])
         M = bc@self.M
 
-        NN = len(self.node) - 2
-        index = np.zeros((NN-1, 4), dtype=np.int_)
-        index[:, 0] = range(0, NN-1)
-        index[:, 1] = index[:, 0] + 1
-        index[:, 2] = index[:, 1] + 1
-        index[:, 3] = index[:, 2] + 1
+        NN = len(self.node)
 
         GD = self.geom_dimension() 
         # node[index].shape == (NN-1, 4, GD)
         # M.shape == (NQ, 4)
-        ps = np.einsum('...j, kjd->k...d', M, self.node[index]).reshape(-1, GD)
+
+        cnode = np.zeros((NN-1, 4, GD), dtype=self.ftype)
+        cnode[:, 0, :] = self.node[0:-1]
+        cnode[:, 1, :] = self.node[1:]
+        cnode[:, 2, :] = self.tang[0:-1]
+        cnode[:, 3, :] = self.tang[1:]
+        
+        ps = np.einsum('...j, kjd->k...d', M, cnode).reshape(-1, GD)
 
         return ps
 
@@ -85,8 +91,12 @@ if __name__ == '__main__':
         [40,60]], dtype=np.float64)
 
 
-    c0 = CRSplineCurve(node, 0.2)
-    c1 = CRSplineCurve(node, 0.5)
+    tang0 = np.zeros_like(node)
+    tang0[1:-1] = node[2:] - node[0:-2]
+    tang0[0] = 2*node[1] - 2*node[0]
+    tang0[-1] = 2*node[-1] - 2*node[-2]
+    c0 = CHSplineCurve(node, 0.2*tang0)
+    c1 = CHSplineCurve(node, 0.5*tang0)
 
     fig = plt.figure()
     axes = fig.gca()
