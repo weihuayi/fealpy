@@ -4,6 +4,15 @@ import numpy as np
 
 class BSplineCurve:
     """
+    @brief B 样条曲线，它是 Bezier 样条的一般化
+
+    一个 n 阶的样条是一个分段的 n-1 次多项式函数
+
+    结点向量，[t_0, t_1, t_2, \ldots, t_n],  元素单调非减
+    * 如果互不相同，则在结点处 n-2 阶导数都连续
+    * 如果 r 个结点相同，则跨过该结点处 n-r-1 阶导数连续
+
+    basis spline
 
     The open knot vectors, the first and last knots appear p+1 
 
