@@ -1,5 +1,4 @@
 import numpy as np
-from icecream import ic
 
 class DartMesh3d():
     def __init__(self, node, dart):
@@ -158,8 +157,6 @@ class DartMesh3d():
         bdopp[bdart[index[1::2]]] = bdart[index[::2]]
 
         bnoidx = bdIdxmap[bdopp[dart[bdart, 4]]] # bdart 下一条边的对边
-        ic(bdopp[dart[bdart, 4]])
-        ic(bnoidx[5])
         ##################################################################
 
         ############ 生成对偶网格中的 dart #############
