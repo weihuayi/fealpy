@@ -77,8 +77,6 @@ class DistMesher3d():
 
         node = node[fd(node) < self.geps, :]
 
-        
-
         r0 = fh(node)**3
         val = np.min(r0)/r0
         NN = len(node)
@@ -225,7 +223,11 @@ class DistMesher3d():
         domain = self.domain
         fd = domain.signed_dist_function
 
-        node = self.init_nodes()
+        if hasattr(domain, 'init_nodes'):
+            node = domain.init_nodes(self.geps)
+        else:
+            node = self.init_nodes()
+
         p0 = node.copy()
         self.NT = 0
         mmove = 1e+10
