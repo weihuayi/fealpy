@@ -1,4 +1,5 @@
 import numpy as np
+from ..common.Tools import angle
 
 class DartMesh3d():
     def __init__(self, node, dart):
@@ -97,7 +98,7 @@ class DartMesh3d():
         mesh =  cls(node, dart)
         return mesh
 
-    def dual_mesh(self):
+    def dual_mesh(self, dual_point='barycenter'):
         dart = self.ds.dart
         node = self.node
         bdart = self.ds.boundary_dart_index()
@@ -117,10 +118,15 @@ class DartMesh3d():
 
         ######## 生成对偶网格的节点##########
         newnode = np.zeros([NC+NBN+NBE+NBF, 3], dtype=np.float_)
-        newnode[:NC] = self.entity_barycenter('cell')
         newnode[NC:NC+NBN] = node[bnode]
-        newnode[NC+NBN:NC+NBN+NBE] = self.entity_barycenter('edge', index=bedge)
-        newnode[-NBF:] = self.entity_barycenter('face', index=bface)
+        if dual_point=='barycenter':
+            newnode[:NC] = self.entity_barycenter('cell')
+            newnode[NC+NBN:NC+NBN+NBE] = self.entity_barycenter('edge', index=bedge)
+            newnode[-NBF:] = self.entity_barycenter('face', index=bface)
+        elif dual_point=='circumcenter':
+            newnode[:NC] = self.entity_circumcenter('cell')
+            newnode[NC+NBN:NC+NBN+NBE] = self.entity_circumcenter('edge', index=bedge)
+            newnode[-NBF:] = self.entity_circumcenter('face', index=bface)
         ####################################
 
         ############## bdart 与对偶网格边界上的实体间的关系 #################
@@ -152,6 +158,7 @@ class DartMesh3d():
         bdopp[bdart[index[::2]]] = bdart[index[1::2]]
         bdopp[bdart[index[1::2]]] = bdart[index[::2]]
 
+        bnidx = bdIdxmap[dart[bdart, 4]] # bdart 下一条边的对边
         bnoidx = bdIdxmap[bdopp[dart[bdart, 4]]] # bdart 下一条边的对边
         ##################################################################
 
@@ -170,8 +177,8 @@ class DartMesh3d():
         newdart[ND:ND+NBD, 0] = bdart2fn
         newdart[ND:ND+NBD, 1:3] = newdart[bdart, 1:3]
         newdart[ND:ND+NBD, 3] = dart[dart[bdart, 5], 0]
-        newdart[newdart[bdart, 5], 4] = np.arange(ND+NBD*6, ND+NBD*7) #TODO
-        newdart[newdart[bdart, 5], 5] = bdart # TODO
+        newdart[newdart[bdart, 5], 4] = np.arange(ND+NBD*6, ND+NBD*7)
+        newdart[newdart[bdart, 5], 5] = bdart
         newdart[ND:ND+NBD, 6] = bdart
 
         # 1
@@ -204,7 +211,7 @@ class DartMesh3d():
 
         # 4
         newdart[ND+NBD*4:ND+NBD*5, 0] = bdart2fn
-        newdart[ND+NBD*4:ND+NBD*5, 1] = np.arange(NF+NBD, NF+NBD*2)[bnoidx]
+        newdart[ND+NBD*4:ND+NBD*5, 1] = np.arange(NF, NF+NBD)[bnidx]
         newdart[ND+NBD*4:ND+NBD*5, 2] = np.arange(NE, NE+NBD)
         newdart[ND+NBD*4:ND+NBD*5, 3] = newdart[bdart, 3]
         newdart[ND+NBD*4:ND+NBD*5, 4] = np.arange(ND+NBD, ND+NBD*2)
@@ -222,13 +229,118 @@ class DartMesh3d():
 
         # 6
         newdart[ND+NBD*6:ND+NBD*7, 0] = bdart2en[bnoidx]
-        newdart[ND+NBD*6:ND+NBD*7, 1] = NF+bdIdxmap[dart[bdart, 4]]
+        newdart[ND+NBD*6:ND+NBD*7, 1] = np.arange(NF, NF+NBD)[bnidx]
         newdart[ND+NBD*6:ND+NBD*7, 2] = newdart[newdart[bdart, 5], 2]
         newdart[ND+NBD*6:ND+NBD*7, 3] = newdart[bdart, 3]
         newdart[ND+NBD*6:ND+NBD*7, 4] = np.arange(ND+NBD*5, ND+NBD*6)[bnoidx] 
         newdart[ND+NBD*6:ND+NBD*7, 5] = np.arange(ND+NBD*4, ND+NBD*5)
         newdart[newdart[ND+NBD*5:ND+NBD*6, 6], 6] = np.arange(ND+NBD*5, ND+NBD*6)
         return DartMesh3d(newnode, newdart)
+
+    def combine_face(self):
+        '''!
+        @brief 将对偶网格的边界面合并
+        '''
+        #TODO
+        ############## 删除边界上多余的点 ##################
+        isDeleteNode = np.zeros(len(newnode), dtype=np.bool_)
+        isDeleteNode[NC:NC+NBN] = True
+
+        NN = mesh.number_of_nodes()
+        NE = mesh.number_of_edges()
+        NF = mesh.number_of_faces()
+        NC = mesh.number_of_cells()
+        ND = mesh.number_of_darts()
+
+        node = mesh.node
+        dart = mesh.ds.dart
+        bdart = mesh.ds.boundary_dart_index()
+        m = np.max(bdart)+1
+        NBD = len(bdart)
+
+        ## bdIdxmap
+        bdIdxmap = np.zeros(m, dtype=np.int_)
+        bdIdxmap[bdart] = np.arange(NBD)
+
+        ## 构造对边
+        opp = np.zeros(m, dtype=np.int_)
+        index = np.argsort(dart[bdart, 1])
+        opp[bdart[index[::2]]] = bdart[index[1::2]]
+        opp[bdart[index[1::2]]] = bdart[index[::2]]
+
+        for i, d in enumerate(dart):
+            print(i, ':', d)
+
+        ## 标记 dart
+        idx = bdIdxmap[dart[opp[dart[bdart, 4]], 4]]
+        v = node[dart[bdart, 0]] - node[dart[dart[bdart, 5], 0]]
+        ang = angle(v, v[idx])
+        isMarked = (np.abs(ang) < 1e-10) & (dart[bdart, 3]==dart[bdart[idx], 3]) &(
+                opp[bdart] != dart[bdart, 5])
+
+        ## 删除 dart, node, face, edge
+        isDeleteDart = np.zeros(ND, dtype=np.bool_)
+        isDeleteEdge = np.zeros(NE, dtype=np.bool_)
+        isDeleteFace = np.zeros(NF, dtype=np.bool_)
+
+        isDeleteDart[dart[bdart[isMarked], 4:6]] = True
+        isDeleteDart[dart[opp[dart[bdart[isMarked], 4]]]] = True
+        isDeleteDart[bdart[idx][isMarked]] = True
+
+        n = np.zeros([2, NN], dtype=np.int_)
+        np.add.at(n[0], dart[:, 0], 1)
+        np.add.at(n[1], dart[bdart, 0], isMarked)
+        isDeleteNode = isDeleteNode & (n[0]==n[1])
+        #isDeleteNode[dart[bdart[isMarked], 0]] = True
+        isDeleteNode[dart[bdart[idx][isMarked], 0]] = False
+        isDeleteNode[dart[dart[bdart[isMarked], 5], 0]] = False
+
+        b = bdart[isMarked].copy()
+        fidx = dart[b, 2] 
+        isNotOK = np.ones(len(b), dtype=np.bool_)
+        print('b = ', b)
+        while np.any(isNotOK):
+            isDeleteFace[dart[b, 2]] = True
+            b[isNotOK] = dart[dart[opp[dart[b[isNotOK], 4]], 4], 4]
+            fidx[isNotOK] = np.maximum(fidx[isNotOK], dart[b[isNotOK], 2])
+            isNotOK = isMarked[bdIdxmap[b]] & (b != bdart) 
+            fidx[~isMarked[bdIdxmap[b]]] = dart[b[~isMarked[bdIdxmap[b]]], 2]
+
+        isDeleteFace[fidx] = False
+
+        isDeleteEdge[dart[dart[bdart[isMarked], 4], 1]] = True
+        #isDeleteEdge[dart[isDeleteDart, 1]] = True
+        #isDeleteEdge[dart[bdart[isMarked], 1]] = False
+
+        #isDeleteFace[dart[bdart[isMarked], 2]] = True
+
+        ## 修改标记 dart 的拓扑
+        #dart[bdart[isMarked], 0] = dart[bdart[idx][isMarked], 0]
+        #dart[bdart[isMarked], 4:6] = dart[bdart[idx][isMarked], 4:6]
+        #dart[dart[bdart[idx][isMarked], 5], 0:2] = dart[dart[bdart[isMarked], 5], 0:2]
+        #dart[dart[bdart[idx][isMarked], 5], 4:] = dart[dart[bdart[isMarked], 5], 4:]
+
+        dart[bdart[isMarked], 4] = bdart[idx][isMarked]
+
+        ## map
+        didxmap = np.zeros(ND, dtype=np.int_)
+        nidxmap = np.zeros(NN, dtype=np.int_)
+        eidxmap = np.zeros(NE, dtype=np.int_)
+        fidxmap = np.zeros(NF, dtype=np.int_)
+
+        didxmap[~isDeleteDart] = np.arange(np.sum(~isDeleteDart))
+        nidxmap[~isDeleteNode] = np.arange(np.sum(~isDeleteNode))
+        eidxmap[~isDeleteEdge] = np.arange(np.sum(~isDeleteEdge))
+        fidxmap[~isDeleteFace] = np.arange(np.sum(~isDeleteFace))
+
+        print(isDeleteNode)
+
+        dart[:, 0] = nidxmap[dart[:, 0]]
+        dart[:, 1] = eidxmap[dart[:, 1]]
+        dart[:, 2] = fidxmap[dart[:, 2]]
+        dart[:, 4:] = didxmap[dart[:, 4:]]
+        node = node[~isDeleteNode]
+        dart = dart[~isDeleteDart]
 
     def entity_barycenter(self, entityType, index=np.s_[:]):
         '''!
@@ -265,6 +377,46 @@ class DartMesh3d():
                 start[isNotOK] = start[isNotOK] + 1
                 isNotOK = start < cellLoc[1:]
             return bary[index]
+    def entity_circumcenter(self, entityType='cell', index=np.s_[:]):
+        '''!
+        @brief 计算四面体, 三角形的外接球球心
+        '''
+        node = self.node
+        if entityType=='edge':
+            edge = self.ds.edge_to_node(index=index)
+            center = np.average(node[edge], axis=1)
+            return center
+        elif entityType=='face':
+            face, faceLoc = self.ds.face_to_node(index=index)
+            assert np.all(faceLoc[1:]-faceLoc[:-1]==3) #只能计算三角形的外心
+
+            a = np.sum((node[face[2::3]] - node[face[1::3]])**2, axis=1)[:, None] 
+            b = np.sum((node[face[0::3]] - node[face[2::3]])**2, axis=1)[:, None]
+            c = np.sum((node[face[1::3]] - node[face[0::3]])**2, axis=1)[:, None]
+            
+            center = a*(b+c-a)*node[face[::3]] + b*(c+a-b)*node[
+                    face[1::3]] + c*(a+b-c)*node[face[2::3]]
+            return center/(a*(b+c-a)+b*(c+a-b)+c*(a+b-c))
+        elif entityType=='cell':
+            cell, cellLoc = self.ds.cell_to_node()
+            assert np.all(cellLoc[1:]-cellLoc[:-1]==4) #只能计算三角形的外心
+
+            l = np.sum(node**2, axis=1)/2
+            NC = self.number_of_cells()
+            A = np.zeros([NC, 3, 3], dtype=np.float_)
+            A[:, :, 0] = node[cell[1::4]]-node[cell[::4]]
+            A[:, :, 1] = node[cell[2::4]]-node[cell[::4]]
+            A[:, :, 2] = node[cell[3::4]]-node[cell[::4]]
+            A = np.linalg.inv(A)
+            B = np.zeros([NC, 3], dtype=np.float_)
+            B[:, 0] = l[cell[1::4]] - l[cell[::4]]
+            B[:, 1] = l[cell[2::4]] - l[cell[::4]]
+            B[:, 2] = l[cell[3::4]] - l[cell[::4]]
+            center = np.einsum('cij, ci->cj', A, B)
+            return center
+
+    def number_of_darts(self):
+        return len(self.ds.dart)
 
     def number_of_nodes(self):
         return len(self.node)
