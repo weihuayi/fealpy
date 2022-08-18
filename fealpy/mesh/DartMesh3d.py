@@ -413,7 +413,7 @@ class DartMesh3d():
             B[:, 1] = l[cell[2::4]] - l[cell[::4]]
             B[:, 2] = l[cell[3::4]] - l[cell[::4]]
             center = np.einsum('cij, ci->cj', A, B)
-            return center
+            return center[index]
 
     def number_of_darts(self):
         return len(self.ds.dart)
@@ -576,7 +576,7 @@ class DartMeshDataStructure():
         self.hface[dart[:, 2]] = np.arange(ND)  
         self.hcell[dart[:, 3]] = np.arange(ND) 
 
-    def cell_to_face(self):
+    def cell_to_face(self, index=np.s_[:]):
         cf = self.dart[:, [3, 2]]
         NC = len(self.hcell)
 
@@ -788,14 +788,8 @@ class DartMeshDataStructure():
     def boundary_face_index(self):
         return np.where(self.boundary_face_flag())[0]
 
-    def boundary_cell_flag(self):
+    def boundary_cell_index(self):
         return np.where(self.boundary_cell_flag())[0]
-
-
-
-
-
-
 
 
 
