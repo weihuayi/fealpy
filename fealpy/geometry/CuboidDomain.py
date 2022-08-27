@@ -54,10 +54,84 @@ class CuboidDomain():
         x = p[..., 0]
         y = p[..., 1]
         z = p[..., 2]
-        return -dmin(
+        d = -dmin(
                 z - domain[4], domain[5] - z, 
                 y - domain[2], domain[3] - y, 
                 x - domain[0], domain[1] - x)
+
+        # (0, 1)
+        val0 = domain[2] - y
+        val1 = domain[4] - z
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (1, 2)
+        val0 = x - domain[1] 
+        val1 = domain[4] - z
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (2, 3)
+        val0 = y - domain[3] 
+        val1 = domain[4] - z
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (0, 3)
+        val0 = domain[0] - x
+        val1 = domain[4] - z
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (0, 4)
+        val0 = domain[0] - x
+        val1 = domain[2] - y 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (1, 5)
+        val0 = x - domain[1]
+        val1 = domain[2] - y 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (2, 6)
+        val0 = x - domain[1]
+        val1 = y - domain[3] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (3, 7)
+        val0 = domain[0] - x
+        val1 = y - domain[3] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (4, 5)
+        val0 = domain[2] - y 
+        val1 = z - domain[5] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (5, 6)
+        val0 = x - domain[1] 
+        val1 = z - domain[5] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (6, 7)
+        val0 = y - domain[3] 
+        val1 = z - domain[5] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        # (4, 7)
+        val0 = domain[0] - x 
+        val1 = z - domain[5] 
+        flag = (val0 > 0) & (val1 > 0)
+        d[flag] = np.sqrt(val0[flag]**2 + val1[flag]**2)
+
+        return d
 
     def signed_dist_function(self, p):
         return self(p)

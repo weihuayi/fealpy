@@ -13,6 +13,7 @@ def show_error_table(N, errorType, errorMatrix,
         flag = True
         out = open(out, 'w')
 
+    string = ''
     n = errorMatrix.shape[1] + 1
     print('\\begin{table}[!htdp]', file=out, end='\n')
     print('\\begin{tabular}[c]{|'+ n*'c|' + '}\hline', file=out, end='\n')

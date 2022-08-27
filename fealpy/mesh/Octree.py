@@ -15,42 +15,31 @@ class Octree(HexahedronMesh):
         (4, 0), (5, 1), (6, 2), (7, 3),
         (4, 5), (5, 6), (6, 7), (7, 4)], dtype=np.int_)
 
-    def __init__(self, node, cell, itype=np.int_, ftype=np.float64):
-        super(Octree, self).__init__(node, cell, ftype=ftype)
-        self.itype = itype 
-        self.ftype = ftype
+    def __init__(self, node, cell):
+        super().__init__(node, cell)
+        self.itype = cell.dtype 
+        self.ftype = node.dtype
         NC = self.number_of_cells()
-        self.parent = -np.ones((NC, 2), dtype=itype) 
-        self.child = -np.ones((NC, 8), dtype=itype)
+        self.parent = -np.ones((NC, 2), dtype=self.itype) 
+        self.child = -np.ones((NC, 8), dtype=self.itype)
 
-    def leaf_cell_index(self):
+    def leaf_cell_index(self, index=np.s_[:]):
         child = self.child
         idx, = np.nonzero(child[:, 0] == -1)
-        return idx
+        return idx[index]
 
-    def is_leaf_cell(self, idx=None):
-        if idx is None:
-            return self.child[:, 0] == -1
-        else:
-            return self.child[idx, 0] == -1
+    def is_leaf_cell(self, index=np.s_[:]):
+        return self.child[index, 0] == -1
 
-    def is_root_cell(self, idx=None):
-        if idx is None:
-            return self.parent[:, 0] == -1
-        else:
-            return self.parent[idx, 0] == -1
+    def is_root_cell(self, index=np.s_[:]):
+        return self.parent[index, 0] == -1
     
     def uniform_refine(self):
         self.refine()
 
-    def refine(self, marker=None):
-        if marker == None:
-            idx = self.leaf_cell_index()
-        else:
-            idx = marker.refine_marker(self)
+    def refine(self, isMarkedLeafCell):
 
-        if idx is None:
-            return False
+        idx = self.leaf_cell_index(index=isMarkedLeafCell)
 
         if len(idx) > 0:
             N = self.number_of_nodes()
