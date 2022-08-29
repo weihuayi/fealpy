@@ -1,6 +1,8 @@
 import numpy as np
 
 from ..decorator  import cartesian 
+from ..mesh import TriangleMesh
+
 
 class LinearElasticityTempalte():
     def __init__(self):
@@ -51,6 +53,137 @@ class LinearElasticityTempalte():
     @cartesian
     def is_fracture_boundary(self, p):
         pass
+
+
+class BoxDomainData2d():
+    def __init__(self, E=1e+5, nu=0.2):
+        self.E = E 
+        self.nu = nu
+        self.lam = self.nu*self.E/((1+self.nu)*(1-2*self.nu))
+        self.mu = self.E/(2*(1+self.nu))
+
+    def domain(self):
+        return [0, 1, 0, 1]
+
+    def init_mesh(self, n=1, meshtype='tri'):
+        node = np.array([
+            (0, 0),
+            (1, 0),
+            (1, 1),
+            (0, 1)], dtype=np.float64)
+        cell = np.array([(1, 2, 0), (3, 0, 2)], dtype=np.int_)
+        mesh = TriangleMesh(node, cell)
+        mesh.uniform_refine(n)
+        return mesh 
+
+    @cartesian
+    def displacement(self, p):
+        return 0.0
+
+    @cartesian
+    def jacobian(self, p):
+        return 0.0
+
+    @cartesian
+    def strain(self, p):
+        return 0.0
+
+    @cartesian
+    def stress(self, p):
+        return 0.0
+
+    @cartesian
+    def source(self, p):
+        val = np.array([0.0, 0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, ) + (2, )
+        return val.reshape(shape)
+
+    @cartesian
+    def dirichlet(self, p):
+        val = np.array([0.0, 0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, ) + (2, )
+        return val.reshape(shape)
+
+    @cartesian
+    def neumann(self, p, n):
+        val = np.array([-500, 0.0], dtype=np.float64)
+        shape = len(p.shape[:-1])*(1, ) + (2, )
+        return val.reshape(shape)
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = np.abs(x) < 1e-13
+        return flag
+
+    @cartesian
+    def is_neumann_boundary(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        flag = np.abs(x - 1) < 1e-13
+        return flag
+
+    @cartesian
+    def is_fracture_boundary(self, p):
+        pass
+
+class BoxDomainData3d():
+    def __init__(self):
+        self.L = 1
+        self.W = 0.2
+
+        self.mu = 1
+        self.rho = 1
+
+        delta = self.W/self.L
+        gamma = 0.4*delta**2
+        beta = 1.25
+
+        self.lam = beta
+        self.g = gamma
+        self.d = np.array([0.0, 0.0, -1.0])
+
+    def domain(self):
+        return [0.0, self.L, 0.0, self.W, 0.0, self.W]
+
+    def init_mesh(self, n=1):
+        from fealpy.mesh import MeshFactory as MF 
+        i = 2**n
+        domain = self.domain()
+        mesh = MF.boxmesh3d(domain, nx=5*i, ny=1*i, nz=1*i, meshtype='tet')
+        return mesh
+
+    @cartesian
+    def displacement(self, p):
+        pass
+
+    @cartesian
+    def jacobian(self, p):
+        pass
+
+    @cartesian
+    def strain(self, p):
+        pass
+
+    @cartesian
+    def stress(self, p):
+        pass
+
+    @cartesian
+    def source(self, p):
+        shape = len(p.shape[:-1])*(1,) + (-1, )
+        val = self.d*self.g*self.rho
+        return val.reshape(shape) 
+    @cartesian
+    def dirichlet(self, p):
+        shape = len(p.shape)*(1, )
+        val = np.array([0.0])
+        return val.reshape(shape)
+
+    @cartesian
+    def is_dirichlet_boundary(self, p):
+        return np.abs(p[..., 0]) < 1e-12
 
 class BeamData2d():
     def __init__(self, E = 2*10**6, nu = 0.3):
@@ -146,63 +279,6 @@ class BeamData2d():
     def is_neumann_boundary(self, p):
         eps = 1e-10
         return (np.abs(p[..., 1]-self.h/2) < eps)
-
-class BoxDomainData3d():
-    def __init__(self):
-        self.L = 1
-        self.W = 0.2
-
-        self.mu = 1
-        self.rho = 1
-
-        delta = self.W/self.L
-        gamma = 0.4*delta**2
-        beta = 1.25
-
-        self.lam = beta
-        self.g = gamma
-        self.d = np.array([0.0, 0.0, -1.0])
-
-    def domain(self):
-        return [0.0, self.L, 0.0, self.W, 0.0, self.W]
-
-    def init_mesh(self, n=1):
-        from fealpy.mesh.simple_mesh_generator import boxmesh3d
-        domain = self.domain()
-        mesh = boxmesh3d(domain, nx=5*n, ny=1*n, nz=1*n, meshtype='tet')
-        return mesh
-
-    @cartesian
-    def displacement(self, p):
-        pass
-
-    @cartesian
-    def jacobian(self, p):
-        pass
-
-    @cartesian
-    def strain(self, p):
-        pass
-
-    @cartesian
-    def stress(self, p):
-        pass
-
-    @cartesian
-    def source(self, p):
-        shape = len(p.shape[:-1])*(1,) + (-1, )
-        val = self.d*self.g*self.rho
-        return val.reshape(shape) 
-    @cartesian
-    def dirichlet(self, p):
-        shape = len(p.shape)*(1, )
-        val = np.array([0.0])
-        return val.reshape(shape)
-
-    @cartesian
-    def is_dirichlet_boundary(self, p):
-        return np.abs(p[..., 0]) < 1e-12
-
 
 class LShapeDomainData2d():
     def __init__(self, E=1e+5, nu=0.499):
