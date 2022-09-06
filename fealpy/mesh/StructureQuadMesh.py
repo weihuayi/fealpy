@@ -49,7 +49,7 @@ class StructureQuadMesh(Mesh2d):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
+    def to_vtk(self, etype='cell', fname=None):
         """
 
         Parameters
@@ -69,7 +69,8 @@ class StructureQuadMesh(Mesh2d):
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
         
-        cell = self.entity(etype)[index]
+        cell = self.entity(etype)
+        cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
         NC = len(cell)
 
