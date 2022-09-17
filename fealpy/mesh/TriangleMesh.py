@@ -1118,6 +1118,7 @@ class TriangleMesh(Mesh2d):
             maxrefine=5,
             maxcoarsen=0,
             theta=1.0,
+            tol=1e-6, # 目标误差
             HB=None,
             imatrix=False,
             data=None,
@@ -1129,6 +1130,7 @@ class TriangleMesh(Mesh2d):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'tol': tol,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -1154,6 +1156,12 @@ class TriangleMesh(Mesh2d):
         elif options['method'] == 'min':
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
+                )
+        elif options['method'] == 'target':
+            NT = self.number_of_cells()
+            e = options['tol']/np.sqrt(NT)
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*e)
                 )
         else:
             raise ValueError(
