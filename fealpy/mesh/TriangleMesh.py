@@ -1162,7 +1162,7 @@ class TriangleMesh(Mesh2d):
             e = options['tol']/np.sqrt(NT)
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*e)
-                )
+                ))
         else:
             raise ValueError(
                     "I don't know anyting about method %s!".format(options['method']))
