@@ -953,7 +953,7 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
-        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
+        M = self.integralalg.parallel_construct_matrix(b0, c=c, q=q)
         return M
 
     def parallel_source_vector(self, f, dim=None):
