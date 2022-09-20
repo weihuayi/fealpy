@@ -1208,10 +1208,10 @@ class TriangleMesh(Mesh2d):
 
         # allocate new memory for node and cell
         node = np.zeros((5*NN, GD), dtype=self.ftype)
-        cell = np.zeros((2*NC, 3), dtype=self.itype)
+        cell = np.zeros((3*NC, 3), dtype=self.itype)
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
-            options['numrefine'] = np.r_[options['numrefine'], np.zeros(NC)]
+            options['numrefine'] = np.r_[options['numrefine'], np.zeros(2*NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
