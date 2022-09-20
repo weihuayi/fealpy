@@ -104,7 +104,7 @@ for i in range(0, nt):
     def dirichlet(p):
         return pde.dirichlet(p, t1)
     bc = DirichletBC(space, dirichlet)
-    GD, F = bc.apply(G, F, uh1)
+    GD, F = bc.apply(G, F)
     
     # 代数系统求解
     uh1[:] = spsolve(GD, F).reshape(-1)
