@@ -41,6 +41,7 @@ parser.add_argument('--maxit',
         help='默认网格加密求解的次数, 默认加密求解 4 次')
 
 args = parser.parse_args()
+
 degree = args.degree
 GD = args.GD
 nrefine = args.nrefine

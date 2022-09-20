@@ -695,7 +695,7 @@ class LagrangeFiniteElementSpace():
         ndof = ldof - fdof
         face2dof = np.zeros((NF, fdof + 2*ndof), dtype=self.itype)
 
-        if TD > 1: # 处理 2D 和 3D 情形
+        if TD == 2: # 处理 2D 情形
             q = p+3 if q is None else q
             qf = mesh.integrator(q, 'face') # 面上的积分公式
             bcs, ws = qf.get_quadrature_points_and_weights()
@@ -706,37 +706,38 @@ class LagrangeFiniteElementSpace():
             # 每个积分点、在每个面上、每个基函数法向导数的取值
             val = np.zeros((NQ, NF, fdof + 2*ndof), dtype=self.ftype)  
 
-            for i in range(TD+1): # 循环每个单元的四个面
+            for i in range(TD+1): # 循环单元每个面
 
                 lidx, = np.nonzero( cell2facesign[:, i]) # 单元是全局面的左边单元
                 ridx, = np.nonzero(~cell2facesign[:, i]) # 单元是全局面的右边单元
-                idx0, = np.nonzero( isFaceDof[:, i])
-                idx1, = np.nonzero(~isFaceDof[:, i])
+                idx0, = np.nonzero( isFaceDof[:, i]) # 在面上的自由度
+                idx1, = np.nonzero(~isFaceDof[:, i]) # 不在面上的自由度
 
-                fidx = cell2face[:, i]
+                fidx = cell2face[:, i] # 第 i 个面的全局编号
                 face2dof[fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cell2dof[lidx[:, None], idx1] 
                 face2dof[fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cell2dof[ridx[:, None], idx1]
 
-                idx = np.argsort(cell2dof[:, isFaceDof[:, i]], axis=1)
+                # 面上的自由度按编号大小进行排序
+                idx = np.argsort(cell2dof[:, isFaceDof[:, i]], axis=1) 
                 face2dof[fidx, 0:fdof] = cell2dof[:, isFaceDof[:, i]][np.arange(NC)[:, None], idx] 
 
                 # 面上的积分点转化为体上的积分点
                 b = np.insert(bcs, i, 0, axis=1)
                 # (NQ, NC, cdof)
-                cval = np.einsum('...ijm, im->...ij', self.grad_basis(b), n[cell2face[:, i]])
-                val[:, fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = cval[:, lidx[:, None], idx1]
-                val[:, fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = cval[:, ridx[:, None], idx1]
+                cval = np.einsum('qijm, im->qij', self.grad_basis(b), n[cell2face[:, i]])
+                val[:, fidx[ridx, None], np.arange(fdof+ndof, fdof+2*ndof)] = +cval[:, ridx[:, None], idx1]
+                val[:, fidx[lidx, None], np.arange(fdof,      fdof+  ndof)] = -cval[:, lidx[:, None], idx1]
 
-                val[:, fidx[lidx, None], np.arange(0, fdof)] -= cval[:, lidx[:, None], idx0[idx[lidx]]] 
-                val[:, fidx[ridx, None], np.arange(0, fdof)]  = cval[:, ridx[:, None], idx0[idx[ridx]]]
+                val[:, fidx[ridx, None], np.arange(0, fdof)] += cval[:, ridx[:, None], idx0[idx[ridx, :]]]
+                val[:, fidx[lidx, None], np.arange(0, fdof)] -= cval[:, lidx[:, None], idx0[idx[lidx, :]]] 
 
             face2cell = mesh.ds.face_to_cell()
             isInFace = face2cell[:, 0] != face2cell[:, 1]
-            measure = mesh.entity_measure('face', index=isInFace)
+
+            h = mesh.entity_measure('face', index=isInFace)
             f2d = face2dof[isInFace]
-            h = np.power(measure, 1/TD)
             
-            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], h*measure)
+            P = np.einsum('q, qfi, qfj, f->fij', ws, val[:, isInFace], val[:, isInFace], h*h)
             I = np.broadcast_to(f2d[:, :, None], shape=P.shape)
             J = np.broadcast_to(f2d[:, None, :], shape=P.shape)
 

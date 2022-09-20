@@ -56,8 +56,8 @@ class DistMesher3d():
         yh = box[3] - box[2]
         zh = box[5] - box[4]
         nx = int(xh/hmin) + 1
-        ny = int(yh/hmin) + 1
-        nz = int(zh/hmin) + 1 
+        ny = int(yh/(hmin*np.sqrt(3)/2)) + 1
+        nz = int(zh/(hmin*np.sqrt(2/3))) + 1 
 
         NN = (nx+1)*(ny+1)*(nz+1)
         node = np.zeros((NN, 3), dtype=np.float64)
@@ -66,6 +66,11 @@ class DistMesher3d():
                 box[2]:box[3]:complex(0, ny+1),
                 box[4]:box[5]:complex(0, nz+1)
                 ]
+
+        X[:, 1::2, :] += hmin/2
+        Y[:, :, 0::2] += hmin*np.sqrt(3)/3
+
+
         node[:, 0] = X.flatten()
         node[:, 1] = Y.flatten()
         node[:, 2] = Z.flatten()
@@ -76,6 +81,7 @@ class DistMesher3d():
         val = np.min(r0)/r0
         NN = len(node)
         node = node[np.random.random(NN) < val]
+
 
         fnode = self.domain.facet(0) # 区域中的固定点
         if fnode is not None:
@@ -217,7 +223,11 @@ class DistMesher3d():
         domain = self.domain
         fd = domain.signed_dist_function
 
-        node = self.init_nodes()
+        if hasattr(domain, 'init_nodes'):
+            node = domain.init_nodes(self.geps)
+        else:
+            node = self.init_nodes()
+
         p0 = node.copy()
         self.NT = 0
         mmove = 1e+10
@@ -237,7 +247,7 @@ class DistMesher3d():
             if np.any(isOut):
                 node[isOut] = self.projection(node[isOut], d[isOut])
 
-            if self.dt*np.max(md[~isOut]) < self.ptol*self.hmin:
+            if self.dt*np.max(md) < self.ptol*self.hmin:
                 break
             else:
                 mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
