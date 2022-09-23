@@ -347,10 +347,23 @@ class StructureQuadMesh(Mesh2d):
         return axes.plot_surface(x, y, uh, cmap=cmap)
 
 
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
-            init=None, fargs=None,
-            frames=1000, lw=2, interval=50):
+    def show_animation(self, 
+            fig, axes, box, init, forward, 
+            fname='test.mp4',
+            fargs=None, frames=1000, lw=2, interval=50):
         import matplotlib.animation as animation
+
+        data = init(axes)
+        def func(n, *fargs):
+            Ez, t = forward(n)
+            data.set_data(Ez)
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            return data 
+
+        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
+        ani.save(fname)
 
 
     def cell_location(self, px):

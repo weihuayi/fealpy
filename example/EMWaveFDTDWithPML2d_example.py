@@ -1,5 +1,10 @@
+#!/usr/bin/env python3
+# 
+
+import argparse
 import numpy as np
 from fealpy.mesh import StructureQuadMesh
+from fealpy.timeintegratoralg import UniformTimeLine 
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
@@ -8,12 +13,12 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--NS',
-        default=200, type=int,
-        help='区域 x 和 y 方向的剖分段数， 默认为 200 段.')
+        default=201, type=int,
+        help='区域 x 和 y 方向的剖分段数（取奇数）， 默认为 201 段.')
 
 parser.add_argument('--NP',
         default=50, type=int,
-        help='PML 层的剖分段数， 默认为 50 段.')
+        help='PML 层的剖分段数（取偶数）， 默认为 50 段.')
 
 parser.add_argument('--NT',
         default=4000, type=int,
@@ -46,6 +51,8 @@ R = args.R
 m = args.m
 sigma = args.sigma
 
+T0 = 0
+T1 = NT
 domain = [0, 1, 0, 1] # 原始区域
 h = 1/NS
 delta = h*NP
@@ -73,6 +80,8 @@ def sigma_y(p):
 
 domain = [-delta, 1+delta, -delta, 1+delta] # 增加了 PML 层的区域
 mesh = StructureQuadMesh(domain, nx=NS+NP, ny=NS+NP) # 建立结构网格对象
+timeline = UniformTimeLine(T0, T1, NT)
+dt = timeline.dt
 
 sx0 = mesh.interpolation(sigma_x, intertype='cell')
 sy0 = mesh.interpolation(sigma_y, intertype='cell') 
@@ -83,51 +92,91 @@ sy1 = mesh.interpolation(sigma_y, intertype='edgey')
 sx2 = mesh.interpolation(sigma_x, intertype='edgex')
 sy2 = mesh.interpolation(sigma_y, intertype='edgex')
 
+Ez = mesh.function(etype='cell', dtype=np.float64)
+Bx0, By0 = mesh.function(etype='edge', dtype=np.float64)
+Bx1, By1 = mesh.function(etype='edge', dtype=np.float64)
+Hx, Hy = mesh.function(etype='edge', dtype=np.float64)
+Dz0 = mesh.function(etype='cell', dtype=np.float64)
+Dz1 = mesh.function(etype='cell', dtype=np.float64)
 
 
-Ez = np.zeros([2, NS, NS], dtype=np.float_)
-Dz = np.zeros([2, NS, NS], dtype=np.float_)
-Hx = np.zeros([2, NS, NS + 1], dtype=np.float_)
-Hy = np.zeros([2, NS + 1, NS], dtype=np.float_)
-Bx = np.zeros([2, NS, NS + 1], dtype=np.float_)
-By = np.zeros([2, NS + 1, NS], dtype=np.float_)
+c1 = (2 - sy2*R*h)/(2 - sy2*R*h)
+c2 = 2*R/(2+sy2*R*h)
 
-for i in range(NT):
+c3 = (2 - sx1*R*h)/(2 + sx1*R*h)
+c4 = 2*R/(2 + sx1*R*h)
 
-    Bx[1, :, 1:-1] = (2 - R * h * sigmaY_2[:, 1:-1]) / (2 + R * h * sigmaY_2[:, 1:-1]) \
-                     * Bx[0, :, 1:-1] - R * 2 / (2 + R * h * sigmaY_2[:, 1:-1]) \
-                     * (Ez[0, :, 1:] - Ez[0, :, 0:-1])
 
-    By[1, 1:-1, :] = (2 - R * h * sigmaX_1[1:-1, :]) / (2 + R * h * sigmaX_1[1:-1, :]) \
-                     * By[0, 1:-1, :] + R * 2 / (2 + R * h * sigmaX_1[1:-1, :]) \
-                     * (Ez[0, 1:, :] - Ez[0, 0:-1, :])
+c5 = (2 + sx2*R*h)/2
+c6 = (2 - sx2*R*h)/2
 
-    Hx[1, :, 1:-1] = Hx[0, :, 1:-1] + (2 + R * h * sigmaX_2[:, 1:-1]) / 2 * Bx[1, :, 1:-1] \
-                     - (2 - R * h * sigmaX_2[:, 1:-1]) / 2 * Bx[0, :, 1:-1]
+c7 = (2 + sy1*R*h)/2
+c8 = (2 - sy1*R*h)/2
 
-    Hy[1, 1:-1, :] = Hy[0, 1:-1, :] + (2 + R * h * sigmaY_1[1:-1, :]) / 2 * By[1, 1:-1, :] \
-                     - (2 - R * h * sigmaY_1[1:-1, :]) / 2 * By[0, 1:-1, :]
+c9 = (2 - sx0*R*h)/(2 + sx0*R*h)
+c10 = 2*R/(2 + sx0*R*h)
 
-    Dz[1, :, :] = (2 - R * h * sigmaX_0[:, :]) / (2 + R * h * sigmaX_0[:, :]) * Dz[0, :, :] \
-                  + R * 2 / (2 + R * h * sigmaX_0[:, :]) \
-                  * (Hy[1, 1:, :] - Hy[1, 0:-1, :] - Hx[1, :, 1:] + Hx[1, :, 0:-1])
+c11 = (2 - sy0*R*h)/(2 + sy0*R*h)
+c12 = 2/(2 + sy0*R*h)
 
-    Ez[1, :, :] = (2 - R * h * sigmaY_0[:, :]) / (2 + R * h * sigmaY_0[:, :]) * Ez[0, :, :] \
-                  + 2 / (2 + R * h * sigmaY_0[:, :]) * (Dz[1, :, :] - Dz[0, :, :])
 
-    Ez[1, 100, 100] = np.sin(2 * np.pi * i * (R / ND))
+i = (NS+NP)//2
 
-    Bx[0] = Bx[1].copy()
-    By[0] = By[1].copy()
-    Hx[0] = Hx[1].copy()
-    Hy[0] = Hy[1].copy()
-    Dz[0] = Dz[1].copy()
-    Ez[0] = Ez[1].copy()
+def init(axes):
+    data = axes.imshow(Ez, cmap='jet', vmin=0, vmax=1, extent=domain)
+    return data
+
+def forward(n):
+    t = T0 + n*dt
+    if n == 0:
+        return Ez, t
+    else:
+        Bx1[:, 1:-1] = c1[:, 1:-1]*Bx0[:, 1:-1] - c2[:, 1:-1]*(Ez[:, 1:] - Ez[:, 0:-1])
+        By1[1:-1, :] = c3[1:-1, :]*By0[1:-1, :] - c4[1:-1, :]*(Ez[1:, :] - Ez[0:-1, :])
+
+        Hx[:, 1:-1] += c5[:, 1:-1]*Bx1[:, 1:-1] - c6[:, 1:-1]*Bx0[:, 1:-1]
+        Hy[1:-1, :] += c7[1:-1, :]*By1[1:-1, :] - c8[1:-1, :]*By0[1:-1, :]
+
+        Dz1 = c9*Dz0 + c10*(Hy[1:, :] - Hy[0:-1, :] - Hx[:, 1:] + Hx[:, 0:-1])
+        Ez *= c11
+        Ez += c12*(Dz1 - Dz0)
+
+        Bx0[:] = Bx1
+        By0[:] = By1
+        Dz0[:] = Dz1
+
+        Ez[i, i] = np.sin(2 * np.pi * n * (R / ND))
+        return Ez, t
+
+
+for n in range(NT+1):
+    print("n=:", n)
+    Bx1[:, 1:-1] = c1[:, 1:-1]*Bx0[:, 1:-1] - c2[:, 1:-1]*(Ez[:, 1:] - Ez[:, 0:-1])
+    By1[1:-1, :] = c3[1:-1, :]*By0[1:-1, :] - c4[1:-1, :]*(Ez[1:, :] - Ez[0:-1, :])
+
+    Hx[:, 1:-1] += c5[:, 1:-1]*Bx1[:, 1:-1] - c6[:, 1:-1]*Bx0[:, 1:-1]
+    Hy[1:-1, :] += c7[1:-1, :]*By1[1:-1, :] - c8[1:-1, :]*By0[1:-1, :]
+
+    Dz1 = c9*Dz0 + c10*(Hy[1:, :] - Hy[0:-1, :] - Hx[:, 1:] + Hx[:, 0:-1])
+    Ez *= c11
+    Ez += c12*(Dz1 - Dz0)
+
+    Bx0[:] = Bx1
+    By0[:] = By1
+    Dz0[:] = Dz1
+
+    Ez[i, i] = np.sin(2 * np.pi * n * (R / ND))
 
     fig = plt.figure()
-    plt.imshow(Ez[0], cmap='jet', vmin=0, vmax=1, extent=domain)
-    plt.title('dt={}'.format(i))
+    plt.imshow(Ez, cmap='jet', vmin=0, vmax=1, extent=domain)
+    plt.title('dt={}'.format(n))
     plt.colorbar()
-    figname = "f" + ("%i" % (i)).zfill(4) + ".png"
+    figname = "f" + ("%i" % (n)).zfill(4) + ".png"
     plt.savefig(fname=figname)
     plt.close(fig)
+
+
+
+# fig, axes = plt.subplots()
+# mesh.show_animation(fig, axes, domain, init, forward, frames= NT+1)
+# plt.show()
