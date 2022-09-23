@@ -62,7 +62,7 @@ parser.add_argument('--NT',
 
 parser.add_argument('--loss',
         default=0.004, type=float,
-        help='电损耗， 默认为 0.004 段.')
+        help='电损耗， 默认为 0.004 .')
 
 parser.add_argument('--kappa',
         default=20, type=float,
