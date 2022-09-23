@@ -12,10 +12,14 @@ from fealpy.mesh.DistMesher2d import DistMesher2d
 parser = argparse.ArgumentParser(description=
         """
         DisMesher2d 算法生成三角形网格。
+
+        指定要运行的例子\n
+        0 : [0, 1]^2 区域上的均匀网格\n
+        1 :  
         """)
 
 parser.add_argument('--domain', 
-        default='square', type=str, 
+        default=0, type=int, 
         help="区域类型，默认 square")
 
 parser.add_argument('--hmin', 
@@ -41,10 +45,10 @@ hmax = args.hmax
 maxit = args.maxit
 
 
-if domain in {'square'}:
+if domain == 0:
     box = [0, 1, 0, 1]
     domain = RectangleDomain(box)
-elif domain in {'circle'}:
+elif domain == 1:
 
     def sizing_function(p, *args):
         fd = args[0]
@@ -62,6 +66,6 @@ mesh = mesher.meshing(maxit=maxit)
 c = mesh.circumcenter()
 fig, axes = plt.subplots()
 mesh.add_plot(axes)
-mesh.find_node(axes, node=c)
+#mesh.find_node(axes, node=c)
 plt.show()
 

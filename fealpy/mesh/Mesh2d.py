@@ -123,6 +123,20 @@ class Mesh2d(object):
         length = np.sqrt(np.sum(v**2,axis=1))
         return length
 
+    def cell_area(self, index=None):
+        NC = self.number_of_cells()
+        node = self.entity('node')
+        edge = self.entity('edge')
+        edge2cell = self.ds.edge_to_cell()
+        isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
+        w = np.array([[0, -1], [1, 0]])
+        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        val = np.sum(v*node[edge[:, 0], :], axis=1)
+        a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
+        a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)
+        a /=2
+        return a
+
     def edge_frame(self, index=np.s_[:]):
         t = self.edge_unit_tangent(index=index)
         w = np.array([(0,-1),(1,0)])

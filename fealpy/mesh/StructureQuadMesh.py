@@ -16,6 +16,12 @@ class StructureQuadMesh(Mesh2d):
         self.itype = itype
         self.ftype = ftype
 
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
+
     def uniform_refine(self, n=1, returnim=False):
         if returnim:
             nodeImatrix = []
@@ -34,6 +40,50 @@ class StructureQuadMesh(Mesh2d):
 
         if returnim:
             return nodeImatrix
+
+    def vtk_cell_type(self, etype='cell'):
+        if etype in {'cell', 2}:
+            VTK_Quad = 9
+            return VTK_Quad
+        elif etype in {'face', 'edge', 1}:
+            VTK_LINE = 3
+            return VTK_LINE
+
+    def to_vtk(self, etype='cell', fname=None):
+        """
+
+        Parameters
+        ----------
+        points: vtkPoints object
+        cells:  vtkCells object
+        pdata:
+        cdata:
+
+        Notes
+        -----
+        把网格转化为 VTK 的格式
+        """
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD == 2:
+            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
+        
+        cell = self.entity(etype)
+        cellType = self.vtk_cell_type(etype)
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
+        else:
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
 
     def interpolation_matrix(self):
         """
@@ -164,11 +214,40 @@ class StructureQuadMesh(Mesh2d):
             uh = np.zeros((nx, ny), dtype=dtype)
         return uh
 
+    def data_edge_to_node(self, Ex, Ey):
+        """
+        @brief 
+        """
+        dx = self.function(etype='node') # (nx+1, ny+1)
+        dy = self.function(etype='node') # (nx+1, ny+1)
+
+        dx[0:-1, :] = Ex
+        dx[-1, :] = Ex[-1, :]
+        dx[1:-1, :] += Ex[1:, :]
+        dx[1:-1, :] /=2.0
+
+        dy[:, 0:-1] = Ey
+        dy[:, -1] = Ey[:, -1]
+        dy[:, 1:-1] += Ey[:, 1:]
+        dy[:, 1:-1] /=2.0
+
+        NN = len(dx.flat)
+        data = np.zeros((NN, 2), dtype=Ex.dtype)
+        data[:, 0] = dx.flat
+        data[:, 1] = dy.flat
+
+        return data
+
 
     def interpolation(self, f, intertype='node'):
+        nx = self.ds.nx
+        ny = self.ds.ny
         node = self.node
         if intertype == 'node':
             F = f(node)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx+1, ny+1) + shape
+            F = F.reshape(shape)
         elif intertype == 'edge':
             ec = self.entity_barycenter('edge')
             F = f(ec)
@@ -184,6 +263,23 @@ class StructureQuadMesh(Mesh2d):
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F
+
+    def gradient(self, f):
+
+        
+        hx = self.hx
+        hy = self.hy
+
+        fx, fy = np.gradient(f, hx, hy)
+        return fx, fy
+        
+    def div(self,fx,fy):
+        hx = self.hx
+        hy = self.hy
+        fxx,fxy = np.gradient(fx,hx,hy)
+        fyx,fyy = np.gradient(fy,hx,hy)
+        f = fxx+fyy
+        return f
 
     def laplace_operator(self):
         """

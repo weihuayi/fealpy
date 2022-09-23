@@ -97,6 +97,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     points.SetData(vnp.numpy_to_vtk(node))
 
     cells = vtk.vtkCellArray()
+    cell = cell.astype(np.int64)
     cells.SetCells(NC, vnp.numpy_to_vtkIdTypeArray(cell))
 
     mesh =vtk.vtkUnstructuredGrid() 
@@ -145,3 +146,71 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
     writer.SetInputData(mesh)
     writer.Write()
 
+def write_polyhedron_mesh_to_vtu(fname, mesh, nodedata=None, celldata=None):
+    """
+
+    Notes 多面体网格 to VTK PolyhedronMesh
+    -----
+    """
+    points = vtk.vtkPoints()
+    points.SetData(vnp.numpy_to_vtk(node))
+
+    NC = len(cell)
+    cell = cell.astype(np.int64)
+    face = face.astype(np.int64)
+    cell2face = cellface.astype(np.int64)
+
+    uGrid = vtkUnstructuredGrid()
+    uGrid.SetPoints(points)
+    for i in range(NC):
+        FacesIdList = vtkIdList()
+        FacesIdList.InsertNextId(4)
+        Face = face[cell2face[i]]
+
+        for f in Face:
+            FacesIdList.InsertNextId(len(f))
+            [FacesIdList.InsertNextId(j) for j in f]
+
+        uGrid.InsertNextCell(VTK_POLYHEDRON, FacesIdList)
+
+    pdata = mesh.GetPointData()
+    if nodedata is not None:
+        for key, val in nodedata.items():
+            if val is not None:
+                if len(val.shape) == 2 and val.shape[1] == 2:
+                    shape = (val.shape[0], 3)
+                    val1 = np.zeros(shape, dtype=val.dtype)
+                    val1[:, 0:2] = val
+                else:
+                    val1 = val
+
+                if val1.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val1[:])
+                d.SetName(key)
+                pdata.AddArray(d)
+
+    if celldata is not None:
+        cdata = mesh.GetCellData()
+        for key, val in celldata.items():
+            if val is not None:
+                if len(val.shape) == 2 and val.shape[1] == 2:
+                    shape = (val.shape[0], 3)
+                    val1 = np.zeros(shape, dtype=val.dtype)
+                    val1[:, 0:2] = val
+                else:
+                    val1 = val
+
+                if val1.dtype == np.bool:
+                    d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                else:
+                    d = vnp.numpy_to_vtk(val1[:])
+
+                d.SetName(key)
+                cdata.AddArray(d)
+
+    writer = vtk.vtkXMLUnstructuredGridWriter()
+    writer.SetFileName(fname)
+    writer.SetInputData(uGrid)
+    writer.Write()

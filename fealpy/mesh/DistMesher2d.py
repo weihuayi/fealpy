@@ -10,7 +10,7 @@ class DistMesher2d():
             domain, 
             hmin,
             ptol = 0.001,
-            ttol = 0.1,
+            ttol = 0.01,
             fscale = 1.2,
             dt = 0.2,
             output=True):
@@ -34,7 +34,7 @@ class DistMesher2d():
         self.output = output
 
         eps = np.finfo(float).eps
-        self.geps = 0.001*hmin
+        self.geps = 0.1*hmin
         self.deps = np.sqrt(eps)*hmin
         self.dt = dt 
 
@@ -77,8 +77,8 @@ class DistMesher2d():
 
     def delaunay(self, node):
         fd = self.domain.signed_dist_function
-        d = Delaunay(node)
-        cell = np.asarray(d.simplices, dtype=np.int_)
+        tri = Delaunay(node, qhull_options='Qt Qbb Qc Qz')
+        cell = np.asarray(tri.simplices, dtype=np.int_)
         bc = (node[cell[:, 0]] + node[cell[:, 1]] + node[cell[:, 2]])/3
         return  cell[fd(bc) < -self.geps]
 
@@ -93,7 +93,7 @@ class DistMesher2d():
 
         if self.output:
             fname = "mesh-%05d.vtu"%(self.NT)
-            mesh = TetrahedronMesh(node, cell)
+            mesh = TriangleMesh(node, cell)
             bc = mesh.entity_barycenter('cell')
             flag = bc[:, 0] < 0.0 
             mesh.celldata['flag'] = flag 
@@ -174,7 +174,6 @@ class DistMesher2d():
         count = 0 
         while count < maxit:
             count += 1
-
             if mmove > self.ttol*self.hmin:
                 edge = self.construct_edge(node)
                 self.NT += 1
@@ -193,15 +192,39 @@ class DistMesher2d():
                 mmove = np.max(np.sqrt(np.sum((node - p0)**2, axis=1)))
                 p0[:] = node
 
-        #self.post_processing(node)
+        self.post_processing(node)
 
         cell = self.delaunay(node)
-        return TriangleMesh(node, cell)
+        mesh = TriangleMesh(node, cell)
+
+        # 把边界点投影到边界上
+        isBdNode = mesh.ds.boundary_node_flag()
+        fnode = self.domain.facet(0)
+        if fnode is not None:
+            n = len(fnode)
+            isBdNode[0:n] = False
+
+        depsx = np.array([self.deps, 0])
+        depsy = np.array([0, self.deps])
+        for i in range(2):
+            bnode = node[isBdNode]
+            d = fd(bnode)
+            dgradx = (fd(bnode + depsx) - d)/self.deps
+            dgrady = (fd(bnode + depsy) - d)/self.deps
+            dgrad2 = dgradx**2 + dgrady**2
+            dgradx /= dgrad2
+            dgrady /= dgrad2
+            node[isBdNode, 0] = bnode[:, 0] - d*dgradx
+            node[isBdNode, 1] = bnode[:, 1] - d*dgrady
+
+        return mesh 
 
 
     def post_processing(self, node):
         """
         """
+        ne = np.array([1, 2, 0])
+        pr = np.array([2, 0, 1])
         domain = self.domain
         fd = domain.signed_dist_function
         fh = domain.sizing_function 
@@ -215,21 +238,14 @@ class DistMesher2d():
         lidx = edge2cell[isBdEdge, 2]
         nidx = cell[cidx, lidx]
 
-        print(nidx)
-
         c = mesh.circumcenter(index=cidx)
         d = fd(c)
         isOut = (d > -deps)
-        idx = nidx[isOut]
-        if len(idx) > 0:
-            p0 = node[idx]
-            if hasattr(domain, 'projection'):
-                node[idx] = domain.projection(node[idx])
-            else:
-                depsx = np.array([deps, 0])
-                depsy = np.array([0, deps])
-                dgradx = (fd(node[idx, :] + depsx) - d[idx])/deps
-                dgrady = (fd(node[idx, :] + depsy) - d[idx])/deps
-                node[idx, 0] = node[idx, 0] - d[idx]*dgradx
-                node[idx, 1] = node[idx, 1] - d[idx]*dgrady
-    
+        nidx = nidx[isOut]
+        cidx = cidx[isOut]
+        lidx = lidx[isOut]
+        if len(nidx) > 0:
+            print(node[nidx])
+            node[nidx] = (node[cell[cidx, ne[lidx]]] + node[cell[cidx, pr[lidx]]])/2.0
+
+

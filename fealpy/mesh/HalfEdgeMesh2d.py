@@ -2062,6 +2062,96 @@ class HalfEdgeMesh2d(Mesh2d):
         newcell[:, 0] = halfedge[flag, 1]-cstart+NN
         return TriangleMesh(newnode, newcell), np.where(flag)[0]
 
+    def to_dual_mesh(self, projection=None):
+        isbdedge = self.ds.boundary_edge_flag()
+        isbdnode = self.ds.boundary_node_flag()
+
+        NE = self.number_of_edges()
+        NN = self.number_of_nodes()
+        cb = self.entity_barycenter('cell')
+        eb = self.entity_barycenter('edge')[isbdedge]
+        nb = self.entity('node')[isbdnode]
+        if projection is not None:
+            eb = projection(eb)
+            nb = projection(nb)
+        NN0 = len(cb)
+        NN1 = len(eb)
+        NN2 = len(nb)
+
+        e2newnode = -np.ones(NE, dtype=np.int_)
+        e2newnode[isbdedge] = np.arange(NN0, NN0+NN1)
+        h2e = self.ds.halfedge_to_edge()
+        h2newnode = e2newnode[h2e]
+
+        n2newnode = -np.ones(NN, dtype=np.int_)
+        n2newnode[isbdnode] = np.arange(NN0+NN1, NN0+NN1+NN2)
+
+        node = DynamicArray(np.r_[cb, eb, nb], dtype=self.ftype)
+        halfedge = self.entity('halfedge')
+        cstart = self.ds.cellstart
+        newHalfedge = DynamicArray(halfedge[:], dtype=np.int_)
+
+        v = halfedge[:, 0]
+        nex = halfedge[:, 2]
+        opp = halfedge[:, 4]
+        newHalfedge[:, 0] = halfedge[:, 1]-cstart
+        newHalfedge[:, 1] = v[opp] + cstart
+        newHalfedge[:, 2] = opp[halfedge[:, 3]] 
+        newHalfedge[:, 3] = nex[opp]
+
+        h0 = np.where(halfedge[:, 1] < cstart)[0]
+        h1 = opp[h0]
+        newHalfedge[h0, 0] = h2newnode[h0]
+
+        newHalfedge0 = newHalfedge.increase_size(4*NN1)
+        newHalfedge[h0, 2] = np.arange(NE*2, NE*2+NN1) 
+        newHalfedge[h1, 3] = np.arange(NE*2+NN1, NE*2+NN1*2)
+        
+        newHalfedge0[:NN1, 0] = n2newnode[v[h1]]
+        newHalfedge0[:NN1, 1] = newHalfedge[h0, 1]
+        newHalfedge0[:NN1, 2] = newHalfedge[opp[halfedge[h0, 3]], 3]
+        newHalfedge0[:NN1, 3] = h0
+        newHalfedge0[:NN1, 4] = np.arange(NE*2+NN1*2, NE*2+NN1*3)
+
+        newHalfedge0[NN1:NN1*2, 0] = h2newnode[h0]
+        newHalfedge0[NN1:NN1*2, 1] = newHalfedge[h1, 1]
+        newHalfedge0[NN1:NN1*2, 2] = h1
+        newHalfedge0[NN1:NN1*2, 3] = newHalfedge[nex[h0], 2]
+        newHalfedge0[NN1:NN1*2, 4] = np.arange(NE*2+NN1*3, NE*2+NN1*4)
+
+        newHalfedge0[NN1*2:NN1*3, 0] = h2newnode[h0]
+        newHalfedge0[NN1*2:NN1*3, 1] = halfedge[h0, 1]
+        newHalfedge0[NN1*2:NN1*3, 2] = np.arange(NE*2+NN1*3, NE*2+NN1*4)
+        newHalfedge0[NN1*2:NN1*3, 3] = newHalfedge[newHalfedge[NE*2:NE*2+NN1, 2], 4]
+        newHalfedge0[NN1*2:NN1*3, 4] = np.arange(NE*2, NE*2+NN1)
+
+        newHalfedge0[NN1*3:, 0] = n2newnode[v[h0]]
+        newHalfedge0[NN1*3:, 1] = halfedge[h0, 1]
+        newHalfedge0[NN1*3:, 2] = newHalfedge[newHalfedge[NE*2+NN1:NE*2+NN1*2, 3], 4]
+        newHalfedge0[NN1*3:, 3] = np.arange(NE*2+NN1*2, NE*2+NN1*3)
+        newHalfedge0[NN1*3:, 4] = np.arange(NE*2+NN1, NE*2+NN1*2)
+
+        newhedge = self.ds.hedge.increase_size(2*NN1)
+        newhedge[:] = np.arange(NE*2, NE*2+NN1*2)
+
+        self.ds.subdomain = DynamicArray(np.r_[self.ds.subdomain[:cstart],
+            np.ones(len(node))], dtype=np.int_)
+
+        self.ds.halfedge = newHalfedge
+        self.node = node
+
+        self.ds.NE = len(newHalfedge)//2
+        self.ds.NC = NN
+        self.ds.NN = len(node)
+
+        self.ds.hcell = DynamicArray((self.ds.NC+cstart, ), dtype=self.itype) 
+        self.ds.hcell[self.ds.halfedge[:, 1]] = np.arange(2*self.ds.NE) 
+
+        self.ds.hnode = DynamicArray((self.ds.NN, ), dtype=self.itype)
+        self.ds.hnode[self.ds.halfedge[:, 0]] = np.arange(2*self.ds.NE)
+
+
+
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
         """
 
@@ -2151,7 +2241,7 @@ class HalfEdgeMesh2d(Mesh2d):
         for i, val in enumerate(self.ds.halfedge):
             print(i, ":", val)
 
-        print("edge2cell:")
+        print("edge:")
         edge = self.entity('edge')
         for i, val in enumerate(edge):
             print(i, ":", val)
@@ -2325,7 +2415,7 @@ class HalfEdgeMesh2dDataStructure():
 
             cell2edge = np.zeros(cellLocation[-1], dtype=self.itype)
             current = self.hcell[cstart:].copy()
-            idx = cellLocation[:-1]
+            idx = cellLocation[:-1].copy()
             cell2edge[idx] = J[current]
             NV0 = np.ones(NC, dtype=self.itype)
             isNotOK = NV0 < NV
