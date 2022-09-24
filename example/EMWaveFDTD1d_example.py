@@ -62,18 +62,18 @@ parser.add_argument('--NT',
 
 parser.add_argument('--loss',
         default=0.004, type=float,
-        help='电损耗， 默认为 0.004 段.')
+        help='电损耗， 默认为 0.004 .')
 
-parser.add_argument('--kappa',
+parser.add_argument('--ND',
         default=20, type=float,
-        help='电磁波波数， 默认为 20 段.')
+        help='一个波长的网格数， 默认为 20 个网格.')
 
 args = parser.parse_args()
 
 NS = args.NS
 NT = args.NT
 loss = args.loss
-kappa = args.kappa
+ND = args.ND
 
 pde = EMWaveData1D(L, R, T0, T1, loss, kappa)
 

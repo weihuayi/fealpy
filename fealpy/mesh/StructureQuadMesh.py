@@ -251,17 +251,37 @@ class StructureQuadMesh(Mesh2d):
         elif intertype == 'edge':
             ec = self.entity_barycenter('edge')
             F = f(ec)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+
+            isXDEdge = self.ds.x_direction_edge_flag()
+            shape = (nx, ny+1) + shape
+            XF = F[isXDEdge].reshape(shape)
+
+            isYDEdge = self.ds.y_direction_edge_flag()
+            shape = (nx+1, ny) + shape
+            YF = F[isYDEdge].reshape(shape)
+            F = (XF, YF)
+
         elif intertype == 'edgex':
             isXDEdge = self.ds.x_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isXDEdge])
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx, ny+1) + shape
+            F = F.reshape(shape)
         elif intertype == 'edgey':
             isYDEdge = self.ds.y_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isYDEdge])
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx+1, ny) + shape
+            F = F.reshape(shape)
         elif intertype == 'cell':
             bc = self.entity_barycenter('cell')
             F = f(bc)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx, ny) + shape
+            F = F.reshape(shape)
         return F
 
     def gradient(self, f):
@@ -327,10 +347,23 @@ class StructureQuadMesh(Mesh2d):
         return axes.plot_surface(x, y, uh, cmap=cmap)
 
 
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
-            init=None, fargs=None,
-            frames=1000, lw=2, interval=50):
+    def show_animation(self, 
+            fig, axes, box, init, forward, 
+            fname='test.mp4',
+            fargs=None, frames=1000, lw=2, interval=50):
         import matplotlib.animation as animation
+
+        data = init(axes)
+        def func(n, *fargs):
+            Ez, t = forward(n)
+            data.set_data(Ez)
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            return data 
+
+        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
+        ani.save(fname)
 
 
     def cell_location(self, px):
