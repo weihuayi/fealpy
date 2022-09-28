@@ -360,6 +360,7 @@ class StructureQuadMesh(Mesh2d):
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)
+            #fig.colorbar(data)
             return data 
 
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
