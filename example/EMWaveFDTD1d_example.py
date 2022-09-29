@@ -49,7 +49,7 @@ timeline = UniformTimeLine(T0, T1, NT)
 dt = timeline.dt
 
 H = mesh.function(etype='cell', dtype=np.float64) # 定义在网格单元上的离散函数
-E = mesh.function(etype='node', dtype=np.float64) # 定义在网格单元上的离散函数
+E = mesh.function(etype='node', dtype=np.float64) # 定义在网格节点上的离散函数
 
 c1 = (2 - loss) / (2 + loss)
 c2 = 2 / (2 + loss)
