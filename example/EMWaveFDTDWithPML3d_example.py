@@ -7,6 +7,7 @@ from fealpy.mesh.StructureHexMesh1 import StructureHexMesh as StructureHexMesh1
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 from icecream import ic
+from scipy.constants import epsilon_0
 
 parser = argparse.ArgumentParser(description=
                                  """
@@ -14,7 +15,7 @@ parser = argparse.ArgumentParser(description=
                                  """)
 
 parser.add_argument('--NS',
-                    default=60, type=int,
+                    default=100, type=int,
                     help='区域 x、y 和 z 方向的剖分段数， 默认为 100 段.')
 
 parser.add_argument('--NP',
@@ -22,11 +23,11 @@ parser.add_argument('--NP',
                     help='PML 层的剖分段数（取偶数）， 默认为 50 段.')
 
 parser.add_argument('--NT',
-                    default=200, type=int,
-                    help='时间剖分段数， 默认为 4000 段.')
+                    default=500, type=int,
+                    help='时间剖分段数， 默认为 500 段.')
 
 parser.add_argument('--ND',
-                    default=10, type=int,
+                    default=20, type=int,
                     help='一个波长剖分的网格段数， 默认为 20 段.')
 
 parser.add_argument('--R',
@@ -41,6 +42,14 @@ parser.add_argument('--sigma',
                     default=100, type=float,
                     help='最大电导率，默认取 100.')
 
+parser.add_argument('--output',
+        default='./', type=str,
+        help='结果输出目录, 默认为 ./')
+        
+parser.add_argument('--step',
+        default=10, type=int,
+        help='')
+
 args = parser.parse_args()
 
 NS = args.NS
@@ -50,6 +59,9 @@ ND = args.ND
 R = args.R
 m = args.m
 sigma = args.sigma
+
+output = args.output
+step = args.step
 
 h = 1 / NS
 delta = h * NP
@@ -197,21 +209,16 @@ for n in range(NT):
     Ey0[:] = Ey1
     Ez0[:] = Ez1
 
-    # mesh.facedata['Ez0'] = Ez0
-    # fname = "f" + ("%i" % (n)).zfill(4) + '.vtu'
-    # mesh.to_vtk(fname=fname)
+    if (step != 0) and (n%step == 0):
+        eps = np.sqrt(epsilon_0)
+        fname = output + 'test_'+ str(n).zfill(10)
+        Ex, Ey, Ez = mesh.data_edge_to_cell(Ex0, Ey0, Ez0)
+        Em = np.sqrt(Ex**2 + Ey**2 + Ez**2)
 
-    print('drawing dt={}'.format(n))
-    fig = plt.figure()
+        celldata = {}
+        celldata['Ex'] = np.ascontiguousarray(Ex/eps) 
+        celldata['Ey'] = np.ascontiguousarray(Ey/eps) 
+        celldata['Ez'] = np.ascontiguousarray(Ez/eps) 
+        celldata['Em'] = np.ascontiguousarray(Em/eps)
+        mesh.to_vtk_file(fname, celldata=celldata)
 
-    plt.imshow(Ez0[..., i],
-               cmap='jet',
-               extent=[0 - delta, 1 + delta, 0 - delta, 1 + delta],
-               vmax=0.05,
-               vmin=-0.05)
-
-    plt.title('dt={}'.format(n))
-    plt.colorbar()
-    figname = "f" + ("%i" % (n)).zfill(4) + ".png"
-    plt.savefig(fname=figname)
-    plt.close(fig)
