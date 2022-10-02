@@ -196,7 +196,7 @@ class StructureHexMesh(Mesh3d):
                 VtkFile,
                 VtkRectilinearGrid,
                 )
-        from .vtkMeshIO import add_data_vtk_file
+        from .vtk_extent import add_data_to_vtk_file, append_data_to_vtk_file
 
         nx = self.ds.nx
         ny = self.ds.ny
@@ -220,14 +220,14 @@ class StructureHexMesh(Mesh3d):
         w.addData("z_coordinates", z)
         w.closeElement("Coordinates")
 
-        add_data_vtk_file(w, celldata, nodedata)
+        add_data_to_vtk_file(w, celldata, nodedata)
 
         w.closePiece()
         w.closeGrid()
 
         w.appendData(x).appendData(y).appendData(z)
 
-        append_data_to_file(w, celldata, nodedata)
+        append_data_to_vtk_file(w, celldata, nodedata)
         w.save()
 
         return w.getFileName()
