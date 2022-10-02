@@ -3,7 +3,7 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh import StructureHexMesh
+from fealpy.mesh.StructureHexMesh1 import StructureHexMesh as StructureHexMesh1
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 from icecream import ic
@@ -14,27 +14,27 @@ parser = argparse.ArgumentParser(description=
                                  """)
 
 parser.add_argument('--NS',
-                    default=1, type=int,
+                    default=60, type=int,
                     help='区域 x、y 和 z 方向的剖分段数， 默认为 100 段.')
 
 parser.add_argument('--NP',
-                    default=1, type=int,
+                    default=20, type=int,
                     help='PML 层的剖分段数（取偶数）， 默认为 50 段.')
 
 parser.add_argument('--NT',
-                    default=5, type=int,
+                    default=200, type=int,
                     help='时间剖分段数， 默认为 4000 段.')
 
 parser.add_argument('--ND',
-                    default=20, type=int,
+                    default=10, type=int,
                     help='一个波长剖分的网格段数， 默认为 20 段.')
 
 parser.add_argument('--R',
-                    default=0.3, type=int,
+                    default=0.5, type=int,
                     help='网比， 默认为 0.5.')
 
 parser.add_argument('--m',
-                    default=4, type=float,
+                    default=6, type=float,
                     help='')
 
 parser.add_argument('--sigma',
@@ -86,7 +86,7 @@ def sigma_z(p):
     return val
 
 domain = [0 - delta, 1 + delta, 0 - delta, 1 + delta, 0 - delta, 1 + delta]  # 增加了 PML 层的区域
-mesh = StructureHexMesh(domain, nx=NS + 2 * NP, ny=NS + 2 * NP, nz=NS + 2 * NP)  # 建立结构网格对象
+mesh = StructureHexMesh1(domain, nx=NS + 2 * NP, ny=NS + 2 * NP, nz=NS + 2 * NP)  # 建立结构网格对象
 
 sx0 = mesh.interpolation(sigma_x, intertype='facex')
 sy0 = mesh.interpolation(sigma_y, intertype='facex')
@@ -103,8 +103,6 @@ sz2 = mesh.interpolation(sigma_z, intertype='facez')
 sx3 = mesh.interpolation(sigma_x, intertype='edgex')
 sy3 = mesh.interpolation(sigma_y, intertype='edgex')
 sz3 = mesh.interpolation(sigma_z, intertype='edgex')
-ic(sx3)
-ic(sx3.shape)
 
 sx4 = mesh.interpolation(sigma_x, intertype='edgey')
 sy4 = mesh.interpolation(sigma_y, intertype='edgey')
@@ -184,7 +182,7 @@ for n in range(NT):
     Ey1[1:-1, :, 1:-1] = c25 * Ey0[1:-1, :, 1:-1] + c26 * Dy1[1:-1, :, 1:-1] - c27 * Dy0[1:-1, :, 1:-1]
     Ez1[1:-1, 1:-1, :] = c28 * Ez0[1:-1, 1:-1, :] + c29 * Dz1[1:-1, 1:-1, :] - c30 * Dz0[1:-1, 1:-1, :]
 
-    Ez1[i, i, i+1] = np.sin(2 * np.pi * n * (R / ND))
+    Ez1[i, i, i] = np.sin(2 * np.pi * n * (R / ND))
 
     Bx0[:] = Bx1
     By0[:] = By1
@@ -203,11 +201,17 @@ for n in range(NT):
     # fname = "f" + ("%i" % (n)).zfill(4) + '.vtu'
     # mesh.to_vtk(fname=fname)
 
-    # print('drawing dt={}'.format(n))
-    # fig = plt.figure()
-    # plt.imshow(Ez0[..., i+1], cmap='jet', extent=[0 - delta, 1 + delta, 0 - delta, 1 + delta])
-    # plt.title('dt={}'.format(n))
-    # plt.colorbar()
-    # figname = "f" + ("%i" % (n)).zfill(4) + ".png"
-    # plt.savefig(fname=figname)
-    # plt.close(fig)
+    print('drawing dt={}'.format(n))
+    fig = plt.figure()
+
+    plt.imshow(Ez0[..., i],
+               cmap='jet',
+               extent=[0 - delta, 1 + delta, 0 - delta, 1 + delta],
+               vmax=0.05,
+               vmin=-0.05)
+
+    plt.title('dt={}'.format(n))
+    plt.colorbar()
+    figname = "f" + ("%i" % (n)).zfill(4) + ".png"
+    plt.savefig(fname=figname)
+    plt.close(fig)
