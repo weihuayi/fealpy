@@ -201,7 +201,7 @@ class StructureHexMesh(Mesh3d):
         x = np.linspace(box[0], box[1], nx+1)
         y = np.linspace(box[2], box[3], ny+1)
         z = np.linspace(box[4], box[5], nz+1)
-        gridToVTK(filename, x, y, z, cellData=cellData, pointData=nodeData)
+        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
         return filename 
 
