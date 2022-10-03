@@ -192,45 +192,19 @@ class StructureHexMesh(Mesh3d):
 
 
         """
-        from vtk import (
-                VtkFile,
-                VtkRectilinearGrid,
-                )
-        from .vtk_extent import add_data_to_vtk_file, append_data_to_vtk_file
+        from pyevtk.hl import gridToVTK
 
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
+        box = self.box
 
         x = np.linspace(box[0], box[1], nx+1)
         y = np.linspace(box[2], box[3], ny+1)
         z = np.linspace(box[4], box[5], nz+1)
+        gridToVTK(filename, x, y, z, cellData=cellData, pointData=nodeData)
 
-        # 打开文件
-        w = VtkFile(path, VtkRectilinearGrid)
-
-        start = [0, 0, 0]
-        end = [nx, ny, nz]
-        w.openGrid(start=start, end=end)
-        w.openPiece(start=start, end=end)
-
-        w.openElement("Coordinates")
-        w.addData("x_coordinates", x)
-        w.addData("y_coordinates", y)
-        w.addData("z_coordinates", z)
-        w.closeElement("Coordinates")
-
-        add_data_to_vtk_file(w, celldata, nodedata)
-
-        w.closePiece()
-        w.closeGrid()
-
-        w.appendData(x).appendData(y).appendData(z)
-
-        append_data_to_vtk_file(w, celldata, nodedata)
-        w.save()
-
-        return w.getFileName()
+        return filename 
 
 
 

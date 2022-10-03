@@ -489,6 +489,62 @@ class TriangleMesh(Mesh2d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
+    def to_vtk_file(self, filename, celldata=None, nodedata=None):
+        """
+        @brief 把三角形网格输出为 vtk
+        """
+        from vtk import (
+                VtkFile,
+                VtkUnstructuredGrid,
+                )
+        from .vtk_extent import add_data_to_vtk_file, append_data_to_vtk_file
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        NV = self.ds.number_of_nodes_of_cells()
+        node = self.entity('node')
+        cell = self.entity('cell').reshape(-1)
+        cell_type = np.empty(NC, dtype='uint8') 
+        cell_type[:] = self.vtk_cell_type() 
+        offset = np.arange(start=NV, stop=NC*NV+1, step=NV, dtype='int32')
+        GD = self.geo_dimension()
+
+        x = node[:, 0]
+        y = node[:, 1]
+        if GD == 2:
+            z = np.zeros_like(x)
+        elif GD == 3:
+            z = node[:, 2]
+
+        w = VtkFile(filename, VtkUnstructuredGrid)
+        w.openGrid()
+        w.openPiece(ncells=NC, npoints=NN)
+
+        w.openElement("Points")
+        w.addData("Coordinates", (x, y, z))
+        w.closeElement("Points")
+
+        w.openElement("Cells")
+        w.addData("connectivity", cell)
+        w.addData("offsets", offset)
+        w.addData("types", cell_type)
+        w.closeElement("Cells")
+
+        add_data_to_vtk_file(w, cellData=celldata, pointData=nodedata)
+
+        w.closePiece()
+        w.closeGrid()
+
+        w.appendData((x, y, z))
+        w.appendData(cell).appendData(offset).appendData(cell_type)
+
+        append_data_to_vtk_file(w, cellData=celldata, pointData=nodedata)
+        w.save()
+        return w.getFileName()
+
+    
+
+
     def number_of_corner_nodes(self):
         return self.ds.NN
 
