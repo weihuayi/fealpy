@@ -8,6 +8,7 @@ Authors
 ------
 Huayi Wei, weihuayi@xtu.edu.cn
 """
+
 import numpy as np
 import vtk
 import vtk.util.numpy_support as vnp
@@ -214,3 +215,29 @@ def write_polyhedron_mesh_to_vtu(fname, mesh, nodedata=None, celldata=None):
     writer.SetFileName(fname)
     writer.SetInputData(uGrid)
     writer.Write()
+
+
+def mesh_to_vtu_file(mesh, filename, celldata=None, nodedata=None, fielddata=None):
+    from pyevtk.hl import unstructuredGridToVTK
+
+    NN = mesh.number_of_nodes()
+    NC = mesh.number_of_cells()
+    NV = mesh.ds.number_of_nodes_of_cells()
+    node = mesh.entity('node')
+    cell = mesh.entity('cell').reshape(-1)
+    cell_type = np.empty(NC, dtype=cell.dtype) 
+    cell_type[:] = mesh.vtk_cell_type() 
+    offset = np.arange(start=NV, stop=NC*NV+1, step=NV, dtype=cell.dtype)
+    GD = mesh.geo_dimension()
+
+    x = np.ascontiguousarray(node[:, 0])
+    y = np.ascontiguousarray(node[:, 1])
+    if GD == 2:
+        z = np.zeros_like(x)
+    elif GD == 3:
+        z = np.ascontiguousarray(node[:, 2])
+
+    unstructuredGridToVTK(filename, x, y, z, cell, offset, cell_type,
+            cellData=celldata, pointData=nodedata, fieldData=fielddata)
+
+    return filename 

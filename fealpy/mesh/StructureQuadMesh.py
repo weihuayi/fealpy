@@ -16,6 +16,12 @@ class StructureQuadMesh(Mesh2d):
         self.itype = itype
         self.ftype = ftype
 
+        self.celldata = {}
+        self.nodedata = {}
+        self.edgedata = {}
+        self.facedata = self.edgedata
+        self.meshdata = {}
+
     def uniform_refine(self, n=1, returnim=False):
         if returnim:
             nodeImatrix = []
@@ -43,7 +49,7 @@ class StructureQuadMesh(Mesh2d):
             VTK_LINE = 3
             return VTK_LINE
 
-    def to_vtk(self, etype='cell', index=np.s_[:], fname=None, celldata = None):
+    def to_vtk(self, etype='cell', fname=None):
         """
 
         Parameters
@@ -63,21 +69,13 @@ class StructureQuadMesh(Mesh2d):
         if GD == 2:
             node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
         
-        cell = self.entity(etype)[index]
+        cell = self.entity(etype)
+        cellType = self.vtk_cell_type(etype)
         NV = cell.shape[-1]
         NC = len(cell)
 
         cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
         cell[:, 0] = NV
-
-        if etype == 'cell':
-            cellType = 9  # 四边形 
-            if celldata is None:
-                celldata = self.celldata
-        elif etype == 'edge':
-            cellType = 3  # segment
-            if celldata is None:
-                celldata = self.edgedata
 
         if fname is None:
             return node, cell.flatten(), cellType, NC 
@@ -85,7 +83,7 @@ class StructureQuadMesh(Mesh2d):
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
-                    celldata=celldata)
+                    celldata=self.celldata)
 
     def interpolation_matrix(self):
         """
@@ -249,30 +247,59 @@ class StructureQuadMesh(Mesh2d):
             F = f(node)
             shape = tuple() if len(F.shape) == 1 else F.shape[1:]
             shape = (nx+1, ny+1) + shape
-            F = F.reshape()
+            F = F.reshape(shape)
         elif intertype == 'edge':
             ec = self.entity_barycenter('edge')
             F = f(ec)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+
+            isXDEdge = self.ds.x_direction_edge_flag()
+            shape = (nx, ny+1) + shape
+            XF = F[isXDEdge].reshape(shape)
+
+            isYDEdge = self.ds.y_direction_edge_flag()
+            shape = (nx+1, ny) + shape
+            YF = F[isYDEdge].reshape(shape)
+            F = (XF, YF)
+
         elif intertype == 'edgex':
             isXDEdge = self.ds.x_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isXDEdge])
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx, ny+1) + shape
+            F = F.reshape(shape)
         elif intertype == 'edgey':
             isYDEdge = self.ds.y_direction_edge_flag()
             ec = self.entity_barycenter('edge')
             F = f(ec[isYDEdge])
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx+1, ny) + shape
+            F = F.reshape(shape)
         elif intertype == 'cell':
             bc = self.entity_barycenter('cell')
             F = f(bc)
+            shape = tuple() if len(F.shape) == 1 else F.shape[1:]
+            shape = (nx, ny) + shape
+            F = F.reshape(shape)
         return F
 
     def gradient(self, f):
 
-        hx = self.ds.hx
-        hy = self.ds.hy
+        
+        hx = self.hx
+        hy = self.hy
 
         fx, fy = np.gradient(f, hx, hy)
         return fx, fy
+        
+    def div(self,fx,fy):
+        hx = self.hx
+        hy = self.hy
+        fxx,fxy = np.gradient(fx,hx,hy)
+        fyx,fyy = np.gradient(fy,hx,hy)
+        f = fxx+fyy
+        return f
 
     def laplace_operator(self):
         """
@@ -320,10 +347,24 @@ class StructureQuadMesh(Mesh2d):
         return axes.plot_surface(x, y, uh, cmap=cmap)
 
 
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
-            init=None, fargs=None,
-            frames=1000, lw=2, interval=50):
+    def show_animation(self, 
+            fig, axes, box, init, forward, 
+            fname='test.mp4',
+            fargs=None, frames=1000, lw=2, interval=50):
         import matplotlib.animation as animation
+
+        data = init(axes)
+        def func(n, *fargs):
+            Ez, t = forward(n)
+            data.set_data(Ez)
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            #fig.colorbar(data)
+            return data 
+
+        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
+        ani.save(fname)
 
 
     def cell_location(self, px):
