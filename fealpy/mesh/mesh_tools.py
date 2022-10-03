@@ -335,7 +335,7 @@ def show_mesh_2d(
         cellcolor = mapper.to_rgba(cellcolor)
         if showcolorbar:
             f = axes.get_figure()
-            f.colorbar(mapper, shrink=0.5, ax=axes)
+            f.colorbar(mapper, shrink=colorbarshrink, ax=axes)
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
