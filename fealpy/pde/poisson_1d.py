@@ -4,10 +4,10 @@ from fealpy.decorator import cartesian, barycentric
 
 class CosData:
     def __init__(self):
-        pass
+        self.I = np.array([0.0, 1.0])
     
     def domain(self):
-        return np.array([0, 1])
+        return self.I 
 
     def init_mesh(self, n=1):
         mesh = StructureIntervalMesh(self.I, nx = self.nx)
