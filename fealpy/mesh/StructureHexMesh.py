@@ -3,7 +3,6 @@ from .Mesh3d import Mesh3d
 
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, diags, kron
-from icecream import ic
 
 
 class StructureHexMesh(Mesh3d):
@@ -205,7 +204,6 @@ class StructureHexMesh(Mesh3d):
         gridToVTK(filename, x, y, z, cellData=cellData, pointData=nodeData)
 
         return filename 
-
 
 
     @property
