@@ -3,10 +3,9 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh.StructureHexMesh1 import StructureHexMesh as StructureHexMesh1
+from fealpy.mesh import StructureHexMesh
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
-from icecream import ic
 from scipy.constants import epsilon_0
 
 parser = argparse.ArgumentParser(description=
@@ -20,7 +19,7 @@ parser.add_argument('--NS',
 
 parser.add_argument('--NP',
                     default=20, type=int,
-                    help='PML 层的剖分段数（取偶数）， 默认为 50 段.')
+                    help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
 
 parser.add_argument('--NT',
                     default=500, type=int,
@@ -98,7 +97,7 @@ def sigma_z(p):
     return val
 
 domain = [0 - delta, 1 + delta, 0 - delta, 1 + delta, 0 - delta, 1 + delta]  # 增加了 PML 层的区域
-mesh = StructureHexMesh1(domain, nx=NS + 2 * NP, ny=NS + 2 * NP, nz=NS + 2 * NP)  # 建立结构网格对象
+mesh = StructureHexMesh(domain, nx=NS + 2 * NP, ny=NS + 2 * NP, nz=NS + 2 * NP)  # 建立结构网格对象
 
 sx0 = mesh.interpolation(sigma_x, intertype='facex')
 sy0 = mesh.interpolation(sigma_y, intertype='facex')
@@ -178,6 +177,7 @@ c30 = (2 - sz5[1:-1, 1:-1, :] * R * h) / (2 + sx5[1:-1, 1:-1, :] * R * h)
 i = (NS + 2 * NP) // 2
 
 for n in range(NT):
+    print('dt={}'.format(n))
     Bx1 = c1 * Bx0 - c2 * (Ez0[:, 1:, :] - Ez0[:, 0:-1, :] - Ey0[:, :, 1:] + Ey0[:, :, 0:-1])
     By1 = c3 * By0 - c4 * (Ex0[:, :, 1:] - Ex0[:, :, 0:-1] - Ez0[1:, :, :] + Ez0[0:-1, :, :])
     Bz1 = c5 * Bz0 - c6 * (Ey0[1:, :, :] - Ey0[0:-1, :, :] - Ex0[:, 1:, :] + Ex0[:, 0:-1, :])
@@ -194,7 +194,7 @@ for n in range(NT):
     Ey1[1:-1, :, 1:-1] = c25 * Ey0[1:-1, :, 1:-1] + c26 * Dy1[1:-1, :, 1:-1] - c27 * Dy0[1:-1, :, 1:-1]
     Ez1[1:-1, 1:-1, :] = c28 * Ez0[1:-1, 1:-1, :] + c29 * Dz1[1:-1, 1:-1, :] - c30 * Dz0[1:-1, 1:-1, :]
 
-    Ez1[i, i, i] = np.sin(2 * np.pi * n * (R / ND))
+    Ez1[i, i, i] = 0.1 * np.sin(2 * np.pi * n * (R / ND))
 
     Bx0[:] = Bx1
     By0[:] = By1
