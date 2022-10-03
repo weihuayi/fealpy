@@ -10,7 +10,7 @@ class CosData:
         return self.I 
 
     def init_mesh(self, n=1):
-        mesh = StructureIntervalMesh(self.I, nx = self.nx)
+        mesh = StructureIntervalMesh(self.I, nx = 1)
         mesh.uniform_refine(n)
         return mesh
 
