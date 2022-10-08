@@ -85,6 +85,24 @@ class StructureQuadMesh(Mesh2d):
                     nodedata=self.nodedata,
                     celldata=self.celldata)
 
+    def to_vtk_file(self, filename, celldata=None, nodedata=None):
+        """
+
+
+        """
+        from pyevtk.hl import gridToVTK
+
+        nx = self.ds.nx
+        ny = self.ds.ny
+        box = self.box
+
+        x = np.linspace(box[0], box[1], nx+1)
+        y = np.linspace(box[2], box[3], ny+1)
+        z = np.zeros_like(y)
+        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
+
+        return filename
+
     def interpolation_matrix(self):
         """
         @brief  加密一次生成的矩阵
@@ -135,7 +153,6 @@ class StructureQuadMesh(Mesh2d):
         
         J1 = J[1:, 1:].flat # (i+1,j+1)
         A += coo_matrix((data, (I1, J1)), shape=(NNh, NNH))
-
 
         return A
 
@@ -216,7 +233,7 @@ class StructureQuadMesh(Mesh2d):
 
     def data_edge_to_node(self, Ex, Ey):
         """
-        @brief 
+        @brief 把定义在边上的数组转换到节点上
         """
         dx = self.function(etype='node') # (nx+1, ny+1)
         dy = self.function(etype='node') # (nx+1, ny+1)
@@ -238,6 +255,17 @@ class StructureQuadMesh(Mesh2d):
 
         return data
 
+    def data_edge_to_cell(self, Ex, Ey, Ez):
+        """
+        @brief 把定义在边上的数组转换到单元上
+        """
+        dx = self.function(etype='cell')
+        dy = self.function(etype='cell')
+
+        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
+        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
+
+        return dx, dy
 
     def interpolation(self, f, intertype='node'):
         nx = self.ds.nx

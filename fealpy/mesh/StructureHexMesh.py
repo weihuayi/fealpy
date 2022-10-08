@@ -444,7 +444,7 @@ class StructureHexMesh(Mesh3d):
 
     def data_edge_to_cell(self, Ex, Ey, Ez):
         """
-        @brief 把定义在边上的数组转换到单元上 
+        @brief 把定义在边上的数组转换到单元上
         """
         dx = self.function(etype='cell')
         dy = self.function(etype='cell')
