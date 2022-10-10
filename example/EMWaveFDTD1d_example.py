@@ -1,55 +1,15 @@
 #!/usr/bin/env python3
-# 
-
-import argparse
-import numpy as np
-from scipy.sparse.linalg import spsolve
-import matplotlib.pyplot as plt
-from fealpy.mesh import StructureIntervalMesh
-from fealpy.timeintegratoralg import UniformTimeLine 
-
-#!/usr/bin/env python3
 #
 
-import numpy as np
-import matplotlib.pylab as plt
 import argparse
+import numpy as np
 from fealpy.mesh import StructureIntervalMesh
 from fealpy.timeintegratoralg import UniformTimeLine
-
-class EMWaveData1D:
-    def __init__(self, L, R, T0, T1, loss, kappa):
-
-        self.L = L
-        self.R = R
-
-        self.T0 = T0
-        self.T1 = T1
-
-        self.loss = loss
-        self.kappa = kappa  # 波数
-
-        self.ca = (2 - loss)/(2 + loss)
-        self.cb = 2/(2 + self.loss)
-
-    def domian(self):
-        return [self.L, self.R]
-
-    def dirichlet(self, t):
-        return np.sin(2 * np.pi * t * (0.5 / self.kappa))
-
-
-L = 0
-R = 200
-
-T0 = 0
-T1 = 1000
-
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
         """
-        在一维网格上用有限差分求解Maxwell方程, 这里考虑了损耗,
-        并且没有ABC(吸收边界条件)
+        在一维网格上用有限差分求解 Maxwell 方程
         """)
 
 parser.add_argument('--NS',
@@ -60,44 +20,52 @@ parser.add_argument('--NT',
         default=1000, type=int,
         help='时间剖分段数， 默认为 1000 段.')
 
+parser.add_argument('--ND',
+        default=20, type=int,
+        help='一个波长剖分的网格段数， 默认为 20 段.')
+
+parser.add_argument('--R',
+        default=0.5, type=int,
+        help='网比， 默认为 0.5.')
+
 parser.add_argument('--loss',
         default=0.004, type=float,
-        help='电损耗， 默认为 0.004 段.')
-
-parser.add_argument('--kappa',
-        default=20, type=float,
-        help='电磁波波数， 默认为 20 段.')
+        help='电损耗， 默认为 0.004 .')
 
 args = parser.parse_args()
 
 NS = args.NS
 NT = args.NT
+ND = args.ND
+R = args.R
 loss = args.loss
-kappa = args.kappa
 
-pde = EMWaveData1D(L, R, T0, T1, loss, kappa)
+T0 = 0
+T1 = NT
 
-mesh = StructureIntervalMesh([L, R], nx=NS)
+domain = [0, 100] # 笛卡尔坐标空间
+mesh = StructureIntervalMesh(domain, nx = NS) # 建立结构网格对象
 timeline = UniformTimeLine(T0, T1, NT)
-
 dt = timeline.dt
 
-e = mesh.function('node')
-h = mesh.function('cell') 
+H = mesh.function(etype='cell', dtype=np.float64) # 定义在网格单元上的离散函数
+E = mesh.function(etype='node', dtype=np.float64) # 定义在网格节点上的离散函数
+
+c1 = (2 - loss) / (2 + loss)
+c2 = 2 / (2 + loss)
 
 def forward(n):
     t = T0 + n*dt
     if n == 0:
-        return e, t
+        return E, t
     else:
-        h[:] = h - 0.5*np.diff(e)
-        e[1:-1] = pde.ca*e[1:-1] - 0.5*pde.cb*np.diff(h)
-        e[0] = pde.dirichlet(t)
-        return e, t
+        H[:] -= R * (E[1:] - E[0:-1])
+        E[1:-1] *= c1
+        E[1:-1] -= R * c2 * (H[1:] - H[0:-1])
+        E[0] = np.sin(2 * np.pi * n * (R / ND))
+        return E, t
 
-
-box = [L, R, -2, 2]
+box = [0, 100, -2, 2]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, forward, frames=NT + 1)
 plt.show()
-

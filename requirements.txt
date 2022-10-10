@@ -2,6 +2,7 @@ numpy
 scipy
 matplotlib
 vtk
+pyevtk
 pytest>=3.6
 pytest-cov
 codecov

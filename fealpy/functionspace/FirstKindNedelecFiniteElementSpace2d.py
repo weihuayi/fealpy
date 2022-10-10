@@ -573,10 +573,10 @@ class FirstKindNedelecFiniteElementSpace2d:
         M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
-    def source_vector(self, f):
+    def source_vector(self, f, dtype=None):
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
-        b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof) 
+        b = self.integralalg.construct_vector_v_v(f, self.basis, cell2dof, gdof=gdof, dtype=dtype)
         return b
 
     def set_dirichlet_bc(self, gD, uh, threshold=None, q=None):
