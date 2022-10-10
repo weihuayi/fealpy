@@ -12,6 +12,8 @@ class StructureQuadMesh(Mesh2d):
         self.hx = (box[1] - box[0])/nx
         self.hy = (box[3] - box[2])/ny
         self.data = {}
+        self.celldata = {}
+        self.nodedata = {}
 
         self.itype = itype
         self.ftype = ftype
