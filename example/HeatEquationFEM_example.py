@@ -4,7 +4,7 @@
 import argparse
 
 
-
+import copy
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -64,25 +64,30 @@ dim = args.dim
 ns = args.ns
 nt = args.nt
 
-pde = SinSinExpData()
+pde = SinSinExpData(k=1/16)
 domain = pde.domain()
 smesh = MF.boxmesh2d(domain, nx=ns, ny=ns, meshtype='tri')
 tmesh = UniformTimeLine(0, 1, nt) # 均匀时间剖分
 
 space = LagrangeFiniteElementSpace(smesh, p=degree)
 
+mmesh = smesh.copy()
+NN = mmesh.number_of_nodes()
+cell = mmesh.entity("cell")
+mmesh.node = np.c_[mmesh.node, np.zeros((NN, 1), dtype=np.float_)]
+node = mmesh.node
+
 c = pde.diffusionCoefficient
-A = c*space.stiff_matrix() # 刚度矩阵
+A = space.stiff_matrix() # 刚度矩阵
 M = space.mass_matrix() # 质量矩阵
 dt = tmesh.current_time_step_length() # 时间步长
-G = M + dt*A # 隐式迭代矩阵
+G = M + c*dt*A # 隐式迭代矩阵
 
 # 当前时间步的有限元解
 uh0 = space.interpolation(pde.init_value)
 
 # 下一层时间步的有限元解
 uh1 = space.function()
-
 
 for i in range(0, nt): 
     
@@ -104,7 +109,7 @@ for i in range(0, nt):
     def dirichlet(p):
         return pde.dirichlet(p, t1)
     bc = DirichletBC(space, dirichlet)
-    GD, F = bc.apply(G, F, uh1)
+    GD, F = bc.apply(G, F)
     
     # 代数系统求解
     uh1[:] = spsolve(GD, F).reshape(-1)
@@ -116,10 +121,20 @@ for i in range(0, nt):
     error = space.integralalg.error(solution, uh1)
     print("error:", error)
 
-    uh0[:] = uh1
+    uh0[:] = uh1[:].copy()
+    #uh1[:] = 0
 
     # 时间步进一层 
     tmesh.advance()
+
+    node[cell[:, 0], 2] = uh0(np.array([[1, 0, 0]]))
+    node[cell[:, 1], 2] = uh0(np.array([[0, 1, 0]]))
+    node[cell[:, 2], 2] = uh0(np.array([[0, 0, 1]]))
+
+    mmesh.nodedata["u"] = uh0[:]
+    s = ("%i"%(i)).zfill(3)
+    mmesh.to_vtk(fname="u" + s + ".vtu")
+
 
 
 

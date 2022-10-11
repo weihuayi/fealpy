@@ -1399,11 +1399,23 @@ class HalfEdgeMesh2d(Mesh2d):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
+        halfedge = self.ds.halfedge
+
+        if self.hedgecolor is None:
+            color = 3*np.ones(NE*2, dtype = np.int_)
+            color[1]=1
+            while (color==3).any():
+                red = color == 1
+                gre = color == 0
+                color[halfedge[red][:, [2,3,4]]] = 0
+                color[halfedge[gre][:, [2,3,4]]] = 1
+            colorlevel = ((color==1) | (color==2)).astype(np.int_)
+            self.hedgecolor = {'color':color, 'level':colorlevel}
 
         color = self.hedgecolor['color']
         colorlevel = self.hedgecolor['level']
+
         node = self.entity('node')
-        halfedge = self.ds.halfedge
         cstart = self.ds.cellstart
         subdomain = self.ds.subdomain
         hedge = self.ds.hedge
@@ -2183,14 +2195,19 @@ class HalfEdgeMesh2d(Mesh2d):
         elif etype == 'edge':
             cellType = 3
 
+        nodedata = self.nodedata.copy()
+        nodedata.pop('level')
+        celldata = self.celldata.copy()
+        celldata.pop('level')
+
         NC = len(cell)
         if fname is None:
             return node, cell.flatten(), cellType, NC 
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
+                    nodedata=nodedata,
+                    celldata=celldata)
 
     def grad_lambda(self):
         """

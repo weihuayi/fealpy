@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+# 
 
 import argparse
 
@@ -6,7 +8,6 @@ import matplotlib.pyplot as plt
 
 from scipy.sparse.linalg import spsolve
 
-from fealpy.decorator import cartesian
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
 from fealpy.boundarycondition import RobinBC 
@@ -94,16 +95,19 @@ for i in range(maxit):
 
 
 bc = np.array([1/3, 1/3, 1/3])
+ps = mesh.bc_to_point(bc)
+u = pde.solution(ps)
 uI = uI(bc)
 uh = uh(bc)
+
+
+fig, axes = plt.subplots(2, 2)
+mesh.add_plot(axes[0, 0], cellcolor=np.real(u), linewidths=0)
+mesh.add_plot(axes[0, 1], cellcolor=np.imag(u), linewidths=0) 
+mesh.add_plot(axes[1, 0], cellcolor=np.real(uh), linewidths=0)
+mesh.add_plot(axes[1, 1], cellcolor=np.imag(uh), linewidths=0) 
+plt.show()
 
 if maxit > 1:
     showmultirate(plt, maxit-2, NDof, errorMatrix,  errorType, propsize=20)
     show_error_table(NDof, errorType, errorMatrix)
-
-fig, axes = plt.subplots(2, 2)
-mesh.add_plot(axes[0, 0], cellcolor=np.real(uI), linewidths=0)
-mesh.add_plot(axes[0, 1], cellcolor=np.imag(uI), linewidths=0) 
-mesh.add_plot(axes[1, 0], cellcolor=np.real(uh), linewidths=0)
-mesh.add_plot(axes[1, 1], cellcolor=np.imag(uh), linewidths=0) 
-plt.show()

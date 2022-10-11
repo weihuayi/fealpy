@@ -62,4 +62,3 @@ def write_vtk_mesh(mesh, fileName):
     ug.set_cells(cell_type, cell) 
     write_data(ug, fileName)
 
-

@@ -288,7 +288,7 @@ class LagrangeTriangleMesh(Mesh2d):
 
         TD = bc.shape[-1] - 1
         entity = self.entity(etype=TD)[index]
-        gphi = self.grad_shape_function(bc)
+        gphi = self.grad_shape_function(bc, index=index)
         J = np.einsum(
                 'cin, ...cim->...cnm',
                 self.node[entity[index], :], gphi) #(NC,ldof,GD),(NQ,NC,ldof,TD)

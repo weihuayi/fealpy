@@ -1118,6 +1118,7 @@ class TriangleMesh(Mesh2d):
             maxrefine=5,
             maxcoarsen=0,
             theta=1.0,
+            tol=1e-6, # 目标误差
             HB=None,
             imatrix=False,
             data=None,
@@ -1129,6 +1130,7 @@ class TriangleMesh(Mesh2d):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'tol': tol,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -1155,6 +1157,12 @@ class TriangleMesh(Mesh2d):
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
+        elif options['method'] == 'target':
+            NT = self.number_of_cells()
+            e = options['tol']/np.sqrt(NT)
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*e)
+                ))
         else:
             raise ValueError(
                     "I don't know anyting about method %s!".format(options['method']))
@@ -1200,10 +1208,10 @@ class TriangleMesh(Mesh2d):
 
         # allocate new memory for node and cell
         node = np.zeros((5*NN, GD), dtype=self.ftype)
-        cell = np.zeros((2*NC, 3), dtype=self.itype)
+        cell = np.zeros((3*NC, 3), dtype=self.itype)
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
-            options['numrefine'] = np.r_[options['numrefine'], np.zeros(NC)]
+            options['numrefine'] = np.r_[options['numrefine'], np.zeros(2*NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')

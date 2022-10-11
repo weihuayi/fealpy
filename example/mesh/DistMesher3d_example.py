@@ -47,7 +47,7 @@ hmin = args.hmin
 hmax = args.hmax
 maxit = args.maxit
 
-if domain == 0: # 球体
+if domain == 0: # 立方体 
 
     def fh(p, *args):
         x = p[:, 0]

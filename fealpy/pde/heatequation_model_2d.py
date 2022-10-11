@@ -154,8 +154,8 @@ class SinSinExpData:
 
 
     """
-    def __init__(self):
-        self.diffusionCoefficient = 1/16
+    def __init__(self, k=1/16):
+        self.diffusionCoefficient = k
 
     def domain(self):
         return [0, 1, 0, 1]
