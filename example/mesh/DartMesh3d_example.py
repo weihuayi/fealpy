@@ -23,4 +23,11 @@ domain = CuboidDomain()
 
 mesher = DistMesher3d(domain, hmin, output=True)
 mesh = mesher.meshing(maxit)
+mesh = DartMesh3d.from_mesh(mesh)
+mesh.celldata['cidx'] = np.arange(mesh.number_of_cells())
 mesh.to_vtk(fname='cube.vtu')
+
+mesh = mesh.dual_mesh(dual_point='circumcenter')
+mesh.celldata['cidx'] = np.arange(mesh.number_of_cells())
+mesh.to_vtk(fname='dual.vtu')
+

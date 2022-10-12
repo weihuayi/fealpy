@@ -43,3 +43,4 @@ from .RectangleDomain import RectangleDomain
 from .CuboidDomain import CuboidDomain
 from .SphereDomain import SphereDomain
 from .CylinderDomain import CylinderDomain
+from .TorusDomain import TorusDomain

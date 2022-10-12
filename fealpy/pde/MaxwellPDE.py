@@ -55,6 +55,26 @@ class MaxwellPDE():
         return f 
 
     @cartesian
+    def curl_solution(self, p):
+        """!
+        @param p: (..., N, ldof, 3)
+        """
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        z = p[..., 2, None]
+        cFx = self.curlFx(x, y, z)
+        cFy = self.curlFy(x, y, z)
+        cFz = self.curlFz(x, y, z)
+        if type(cFx) is not np.ndarray:
+            cFx = np.ones(x.shape, dtype=np.float_)*cFx
+        if type(cFy) is not np.ndarray:
+            cFy = np.ones(x.shape, dtype=np.float_)*cFy
+        if type(cFz) is not np.ndarray:
+            cFz = np.ones(x.shape, dtype=np.float_)*cFz
+        cf = np.c_[cFx, cFy, cFz] #(..., NC, ldof, 3)
+        return cf 
+
+    @cartesian
     def source(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]
@@ -119,7 +139,7 @@ class SinData(MaxwellPDE):
         super(SinData, self).__init__(f)
 
     def init_mesh(self, n=1):
-        box = [0, 1.23, 0, 0.87, 0, 0.99]
+        box = [0, 1, 0, 1, 0, 1]
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
