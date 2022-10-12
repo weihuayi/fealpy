@@ -7,11 +7,11 @@ class UniformMesh3d():
     @brief 
     """
     def __init__(self, extent, 
-            spacing=(1.0, 1.0, 1.0), 
+            h=(1.0, 1.0, 1.0), 
             origin=(0.0, 0.0, 0.0)
             ):
         self.extent = extent
-        self.spacing = spacing 
+        self.h = h 
         self.origin = origin
 
         nx = extent[1] - extent[0]
@@ -29,7 +29,7 @@ class UniformMesh3d():
         ny = self.ds.ny
         nz = self.ds.nz
         extent = self.extent
-        hx, hy, hz = self.spacing
+        hx, hy, hz = self.h
         node = np.zeros((NN, 3), dtype=np.float64)
         X, Y, Z = np.mgrid[
                   extent[0]:extent[1]:complex(0, nx + 1),

@@ -6,8 +6,8 @@ import matplotlib.pyplot as plt
 from fealpy.mesh import StructureQuadMesh
 
 
-def FSM(phi, hx):
-    phi[phi>np.sqrt(2*hx**2)] = 100
+def FSM(phi, h):
+    phi[phi>np.sqrt(2*h**2)] = 100
     #print('0',phi)
     for i in range(0,ns+1):
         for j in range(0,ns+1):
@@ -24,10 +24,10 @@ def FSM(phi, hx):
             else:
                 b = min(phi[i,j-1],phi[i,j+1])
             #print(a,b)
-            if np.abs(a-b)>=hx:
-                c = min(a,b)+hx
+            if np.abs(a-b)>=h:
+                c = min(a,b)+h
             else:
-                c = (a+b+np.sqrt(2*hx*hx-(a-b)**2))/2
+                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
             #print(c)
             phi[i,j] = min(c,phi[i,j])
     #print('1',phi)
@@ -45,10 +45,10 @@ def FSM(phi, hx):
                 b = phi[i,ns-1]
             else:
                 b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=hx:
-                c = min(a,b)+hx
+            if np.abs(a-b)>=h:
+                c = min(a,b)+h
             else:
-                c = (a+b+np.sqrt(2*hx*hx-(a-b)**2))/2
+                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
             phi[i,j] = min(c,phi[i,j])
     #print('2',phi)
     for i in range(ns,-1,-1):
@@ -65,10 +65,10 @@ def FSM(phi, hx):
                 b = phi[i,ns-1]
             else:
                 b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=hx:
-                c = min(a,b)+hx
+            if np.abs(a-b)>=h:
+                c = min(a,b)+h
             else:
-                c = (a+b+np.sqrt(2*hx*hx-(a-b)**2))/2
+                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
             phi[i,j] = min(c,phi[i,j])
     #print('3',phi)
 
@@ -86,9 +86,9 @@ def FSM(phi, hx):
                 b = phi[i,ns-1]
             else:
                 b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=hx:
-                c = min(a,b)+hx
+            if np.abs(a-b)>=h:
+                c = min(a,b)+h
             else:
-                c = (a+b+np.sqrt(2*hx*hx-(a-b)**2))/2
+                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
             phi[i,j] = min(c,phi[i,j])
     #print('4',phi)
