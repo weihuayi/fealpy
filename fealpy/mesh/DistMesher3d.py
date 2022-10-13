@@ -12,7 +12,7 @@ class DistMesher3d():
             ptol = 0.001,
             ttol = 0.01,
             fscale = 1.1,
-            dt = 0.1,
+            dt = 0.05,
             output=False):
         """
         @brief 
