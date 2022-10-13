@@ -4,7 +4,6 @@ from .Mesh3d import Mesh3d
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, diags, kron
 
-
 class StructureHexMesh(Mesh3d):
     def __init__(self, box, nx, ny, nz, itype=np.int_, ftype=np.float64):
         self.itype = itype
@@ -189,7 +188,6 @@ class StructureHexMesh(Mesh3d):
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
 
-
         """
         from pyevtk.hl import gridToVTK
 
@@ -203,8 +201,7 @@ class StructureHexMesh(Mesh3d):
         z = np.linspace(box[4], box[5], nz+1)
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
-        return filename 
-
+        return filename
 
     @property
     def node(self):
@@ -459,36 +456,34 @@ class StructureHexMesh(Mesh3d):
 
         return dx, dy, dz
 
-         
-
-
-
 class StructureHexMeshDataStructure():
     # The following local data structure should be class properties
-    localEdge = np.array([
-        (0, 1), (3, 2), (5, 4), (6, 7),
-        (2, 0), (1, 3), (4, 6), (7, 5),
-        (0, 4), (5, 1), (6, 2), (3, 7)])
-    localFace = np.array([
-        (0, 2, 6, 4), (1, 5, 7, 3),  # bottom and top faces
-        (0, 4, 5, 1), (2, 3, 7, 6),  # left and right faces
-        (0, 1, 3, 2), (4, 6, 7, 5)])  # front and back faces
-    localFace2edge = np.array([
-        (4, 10, 6, 8), (5, 9, 7, 11),
-        (0, 8, 2, 9), (1, 11, 3, 10),
-        (0, 5, 1, 2), (2, 6, 3, 7)])
     # localEdge = np.array([
-    #     (0, 1), (1, 2), (2, 3), (3, 0),
-    #     (0, 4), (1, 5), (2, 6), (3, 7),
-    #     (4, 5), (5, 6), (6, 7), (7, 4)])
+    #     (0, 1), (3, 2), (5, 4), (6, 7),
+    #     (2, 0), (1, 3), (4, 6), (7, 5),
+    #     (0, 4), (5, 1), (6, 2), (3, 7)])
+    #
     # localFace = np.array([
-    #     (0, 3, 2, 1), (4, 5, 6, 7),  # bottom and top faces
-    #     (0, 4, 7, 3), (1, 2, 6, 5),  # left and right faces
-    #     (0, 1, 5, 4), (2, 3, 7, 6)])  # front and back faces
+    #     (0, 2, 6, 4), (1, 5, 7, 3),  # bottom and top faces
+    #     (0, 4, 5, 1), (2, 3, 7, 6),  # left and right faces
+    #     (0, 1, 3, 2), (4, 6, 7, 5)])  # front and back faces
     # localFace2edge = np.array([
-    #     (0, 1, 2, 3), (8, 9, 10, 11),
-    #     (4, 11, 7, 3), (1, 6, 9, 5),
-    #     (0, 5, 8, 4), (2, 7, 10, 6)])
+    #     (4, 10, 6, 8), (5, 9, 7, 11),
+    #     (0, 8, 2, 9), (1, 11, 3, 10),
+    #     (0, 5, 1, 2), (2, 6, 3, 7)])
+
+    localEdge = np.array([
+        (0, 1), (1, 2), (2, 3), (3, 0),
+        (0, 4), (1, 5), (2, 6), (3, 7),
+        (4, 5), (5, 6), (6, 7), (7, 4)])
+    localFace = np.array([
+        (0, 3, 2, 1), (4, 5, 6, 7),  # bottom and top faces
+        (0, 4, 7, 3), (1, 2, 6, 5),  # left and right faces
+        (0, 1, 5, 4), (2, 3, 7, 6)])  # front and back faces
+    localFace2edge = np.array([
+        (0, 1, 2, 3), (8, 9, 10, 11),
+        (4, 11, 7, 3), (1, 6, 9, 5),
+        (0, 5, 8, 4), (2, 7, 10, 6)])
     V = 8
     E = 12
     F = 6
@@ -535,14 +530,6 @@ class StructureHexMeshDataStructure():
         nz = self.nz
         idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
         face = np.zeros((NF, 4), dtype=np.int)
-        # NF0 = 0
-        # NF1 = (nx + 1) * ny * nz
-        # c = idx[:, :-1, :-1]
-        # face[NF0:NF1, 0] = c.flatten()
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
-        # face[NF0:NF1, 2] = face[NF0:NF1, 1] + 1
-        # face[NF0:NF1, 3] = face[NF0:NF1, 0] + 1
-        # face[0:ny * nz, :] = face[0:ny * nz, [0, 3, 2, 1]]
 
         NF0 = 0
         NF1 = nx * ny * (nz + 1)
@@ -553,15 +540,6 @@ class StructureHexMeshDataStructure():
         face[NF0:NF1, 3] = face[NF0:NF1, 0] + nz + 1
         face[0:nx * ny, :] = face[0:nx * ny, [0, 3, 2, 1]]
 
-        # NF0 = NF1
-        # NF1 += nx * (ny + 1) * nz
-        # c = np.transpose(idx, (1, 2, 0))[:, :-1, :-1]
-        # face[NF0:NF1, 0] = c.flatten()
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        # face[NF0:NF1, 2] = face[NF0:NF1, 1] + 1
-        # face[NF0:NF1, 3] = face[NF0:NF1, 0] + 1
-        # face[(NF1 - nx * nz):NF1, :] = face[(NF1 - nx * nz):NF1, [1, 0, 3, 2]]
-
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
         c = np.transpose(idx, (0, 1, 2))[:-1, :, :-1]
@@ -570,15 +548,6 @@ class StructureHexMeshDataStructure():
         face[NF0:NF1, 2] = face[NF0:NF1, 1] + 1
         face[NF0:NF1, 3] = face[NF0:NF1, 0] + 1
         face[(NF1 - nx * ny):NF1, :] = face[(NF1 - nx * ny):NF1, [1, 0, 3, 2]]
-
-        # NF0 = NF1
-        # NF1 += (nz + 1) * nx * ny
-        # c = np.transpose(idx, (2, 0, 1))[:, :-1, :-1]
-        # face[NF0:NF1, 0] = c.flatten()
-        # face[NF0:NF1, 1] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        # face[NF0:NF1, 2] = face[NF0:NF1, 1] + nz + 1
-        # face[NF0:NF1, 3] = face[NF0:NF1, 0] + nz + 1
-        # face[NF0:NF0 + nx * ny, :] = face[NF0:NF0 + nx * ny, [0, 3, 2, 1]]
 
         NF0 = NF1
         NF1 += (nx + 1) * ny * nz
@@ -601,6 +570,7 @@ class StructureHexMeshDataStructure():
         nz = self.nz
         idx = np.arange(NC).reshape(nx, ny, nz)
         face2cell = np.zeros((NF, 4), dtype=np.int)
+
         # x direction
         NF0 = 0
         NF1 = ny * nz
@@ -618,7 +588,7 @@ class StructureHexMeshDataStructure():
         face2cell[NF1 - ny * nz:NF1, 3] = 3
 
         # y direction
-        c = np.transpose(idx, (1, 2, 0))
+        c = np.transpose(idx, (1, 0, 2))
         NF0 = NF1
         NF1 += nx * nz
         face2cell[NF0:NF1, 0] = c[0].flatten()
@@ -664,12 +634,6 @@ class StructureHexMeshDataStructure():
         idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
         edge = np.zeros((NE, 2), dtype=np.int)
 
-        # NE0 = 0
-        # NE1 = (ny + 1) * nz * (nx + 1)
-        # J = np.ones(nz + 1, dtype=np.int)
-        # J[1:-1] = 2
-        # I = np.repeat(range(nz + 1), J)
-        # edge[NE0:NE1, :] = idx[:, :, I].reshape(-1, 2)
         NE0 = 0
         NE1 = (nx + 1) * (ny + 1) * nz
         c = np.transpose(idx, (0, 1, 2))[:, :, :-1]
@@ -677,12 +641,6 @@ class StructureHexMeshDataStructure():
         edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + 1
         edge[0:(ny + 1) * nz, :] = edge[0:(ny + 1) * nz, [0, 1]]
 
-        # NE0 = NE1
-        # NE1 += (nx + 1) * ny * (nz + 1)
-        # J = np.ones(ny + 1, dtype=np.int)
-        # J[1:-1] = 2
-        # I = np.repeat(range(ny + 1), J)
-        # edge[NE0:NE1, :] = idx.transpose(0, 2, 1)[:, :, I].reshape(-1, 2)
         NE0 = NE1
         NE1 += (nx + 1) * ny * (nz + 1)
         c = np.transpose(idx, (0, 1, 2))[:, :-1, :]
@@ -690,12 +648,6 @@ class StructureHexMeshDataStructure():
         edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + nz + 1
         edge[(NE1 - (ny + 1) * nz):NE1, :] = edge[(NE1 - (ny + 1) * nz):NE1, [0, 1]]
 
-        # NE0 = NE1
-        # NE1 += nx * (ny + 1) * (nz + 1)
-        # J = np.ones(nx + 1, dtype=np.int)
-        # J[1:-1] = 2
-        # I = np.repeat(range(nx + 1), J)
-        # edge[NE0:NE1, :] = idx.transpose(1, 2, 0)[:, :, I].reshape(-1, 2)
         NE0 = NE1
         NE1 += (nx + 1) * (ny + 1) * nz
         c = np.transpose(idx, (0, 1, 2))[:-1, :, :]
@@ -1010,6 +962,11 @@ class StructureHexMeshDataStructure():
         idx, = np.nonzero(isBdFace)
         return idx
 
+    def boundary_cell_index(self):
+        isBdCell = self.boundary_cell_flag()
+        idx, = np.nonzero(isBdCell)
+        return idx
+
     def z_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
@@ -1101,8 +1058,3 @@ class StructureHexMeshDataStructure():
         isZDFace = np.zeros(NF, dtype=np.bool)
         isZDFace[-(nx + 1) * ny * nz:] = True
         return isZDFace
-
-    def boundary_cell_index(self):
-        isBdCell = self.boundary_cell_flag()
-        idx, = np.nonzero(isBdCell)
-        return idx

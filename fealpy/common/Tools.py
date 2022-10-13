@@ -23,3 +23,14 @@ def hash2map(dec, ha):
             v[i] = pos[mdx]+1
 
     return m, v
+
+def angle(v0, v1):
+    a = v0/np.linalg.norm(v0, axis=-1)[:, None]
+    b = v1/np.linalg.norm(v1, axis=-1)[:, None]
+    cos = np.sum(a*b, axis=-1)
+    if a.shape[-1]==2:
+        sin = np.cross(a, b)
+    elif a.shape[-1]==3:
+        sin = np.linalg.norm(np.cross(a, b), axis=-1)
+    return np.arctan2(sin, cos)
+
