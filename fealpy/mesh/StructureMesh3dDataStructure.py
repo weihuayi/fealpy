@@ -2,6 +2,7 @@ import numpy as np
 
 class StructureHexMeshDataStructure():
     # The following local data structure should be class properties
+    ccw = [0, 2, 3, 1]
     localEdge = np.array([
         (0, 1), (2, 3), (4, 5), (6, 7),
         (0, 2), (1, 3), (4, 6), (5, 7),

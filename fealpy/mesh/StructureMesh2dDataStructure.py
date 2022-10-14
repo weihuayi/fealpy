@@ -1,14 +1,36 @@
 import numpy as np
 
+
+"""
+结构四边形网格的拓扑数据结构
+
+单元节点的排序如下：
+
+1 ------- 3
+|         |
+|         |
+|         |
+0 ------- 2
+
+整个网格中实体的排序规则：
+
+* 节点的编号规则，先排 y 方向，再排 x 方向
+* 边的编号规则，先排 y 方向，再排 x 方向
+* 单元的编号规则，先排 y 方向，再排 x 方向
+
+"""
+
 class StructureMesh2dDataStructure:
+    cw = np.array([0, 1, 3, 2])
+    ccw = np.array([0, 2, 3, 1])  
     localEdge = np.array([(0, 1), (2, 3), (0, 2), (1, 3)])
-    ccw = np.array([0, 1, 2, 3])
+
     V = 4
     E = 4
     F = 1
     def __init__(self, nx, ny, itype):
-        self.nx = nx
-        self.ny = ny
+        self.nx = nx # x 方向剖分的段数
+        self.ny = ny # y 方向剖分的段数
         self.NN = (nx+1)*(ny+1)
         self.NE = ny*(nx+1) + nx*(ny+1)
         self.NC = nx*ny
@@ -28,6 +50,9 @@ class StructureMesh2dDataStructure:
 
     @property
     def cell(self):
+        """
+        @brief 
+        """
 
         nx = self.nx
         ny = self.ny
@@ -38,16 +63,15 @@ class StructureMesh2dDataStructure:
         idx = np.arange(NN).reshape(nx + 1, ny + 1)
         c = idx[:-1, :-1]
         cell[:, 0] = c.flat
-        cell[:, 1] = cell[:, 0] + ny + 1
-        cell[:, 2] = cell[:, 1] + 1
-        cell[:, 3] = cell[:, 0] + 1
+        cell[:, 1] = cell[:, 0] + 1 
+        cell[:, 2] = cell[:, 0] + ny + 1 
+        cell[:, 3] = cell[:, 2] + 1
         return cell
 
     @property
     def edge(self):
         """
         @brief 生成网格中所有的边
-        @todo 把顺序换为先 y 方向的边，后 x 方向的边。
         """
         nx = self.nx
         ny = self.ny
