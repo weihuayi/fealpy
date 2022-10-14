@@ -1,5 +1,6 @@
 import numpy as np
 
+from types import ModuleType
 from scipy.sparse import coo_matrix, csr_matrix
 from scipy.sparse import triu, tril, diags, kron, eye
 from .Mesh2d import Mesh2d
