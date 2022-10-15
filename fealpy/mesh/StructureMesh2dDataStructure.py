@@ -28,7 +28,7 @@ class StructureMesh2dDataStructure:
     E = 4
     F = 1
 
-    def __init__(self, nx, ny, itype):
+    def __init__(self, nx, ny, itype=np.int_):
         self.nx = nx  # x 方向剖分的段数
         self.ny = ny  # y 方向剖分的段数
         self.NN = (nx + 1) * (ny + 1)

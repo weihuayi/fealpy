@@ -6,15 +6,20 @@ This module provide mesh
 
 '''
 
+# 结构化网格
+from .UniformMesh2d import UniformMesh2d
+from .UniformMesh3d import UniformMesh3d
+from .StructureIntervalMesh import StructureIntervalMesh
+from .StructureQuadMesh import StructureQuadMesh
+from .StructureHexMesh import StructureHexMesh
+
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
 from .HexahedronMesh import HexahedronMesh
-from .StructureIntervalMesh import StructureIntervalMesh
-from .StructureQuadMesh import StructureQuadMesh
-from .StructureHexMesh import StructureHexMesh
+
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
 

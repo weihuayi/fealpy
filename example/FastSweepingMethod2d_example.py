@@ -3,7 +3,7 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import StructureQuadMesh
+from fealpy.mesh import UniformMesh2d 
 from fealpy.geometry import FoldCurve
 from fealpy.geometry.geoalg import project
 
@@ -25,18 +25,15 @@ parser.add_argument('--curve',
         default='fold', type=str,
         help='隐式曲线， 默认为 fold .')
 
+parser.add_argument('--output',
+        default='./', type=str,
+        help='结果输出目录, 默认为 ./')
+
 args = parser.parse_args()
 ns = args.NS
 curve = args.curve
 m = args.M
-
-def update(val, a, b, c, h):
-    flag = np.abs(a-b) >= h 
-    c[flag] = np.minimum(a[flag], b[flag]) + h 
-    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-    val = np.minimum(c, val)
-    return val
-
+output = args.output
 
 if curve == 'fold': 
     curve  = FoldCurve(6)
@@ -44,140 +41,92 @@ else:
     pass
 
 
-domain = curve.box
-mesh = StructureQuadMesh(domain, nx=ns, ny=ns) # 建立结构网格对象
-h = mesh.hx
+box = curve.box # 这里假定 box 是一个正方形区域
+origin = (box[0], box[2])
+extent = [0, ns, 0, ns]
+h = (box[1] - box[0])/ns # 两个方向的步长一致
+mesh = UniformMesh2d(extent, h=(h, h), origin=origin) # 建立结构网格对象
 
-phi = mesh.interpolation(curve).reshape(-1)
-sign = np.sign(phi)
+# 注意这里的网格函数比实际的网格函数多了一圈，可以方便后续程序实现
+phi = mesh.function(ex=1) 
+isNearNode = mesh.function(dtype=np.bool_, ex=1)
 
+# 把水平集函数转化为离散的网格函数
 node = mesh.entity('node')
-edge = mesh.entity('edge')
+phi[1:-1, 1:-1] = curve(node)
+sign = np.sign(phi[1:-1, 1:-1])
 
-NN = mesh.number_of_nodes()
-isNearNode = np.zeros(NN, dtype=np.bool_)
-isCutEdge = np.prod(sign[edge], axis=-1) <= 0
+# 标记界面附近的点
+isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
 
-isNearNode[edge[isCutEdge]] = True
-
-p, d = curve.project(node[isNearNode])
-phi[isNearNode] = np.abs(d)
-phi[~isNearNode] = m 
-
-phi.reshape(ns+1, ns+1)
-
-a = np.zeros(NS+1, dtype=np.float64) 
-b = np.zeros(NS+1, dtype=np.float64)
-c = np.zeros(NS+1, dtype=np.float64)
-
-a[:] = phi[1, :]
-b[0] = phi[0, 1]
-b[-1] = phi[0, -2]
-b[1:-1] = np.minimum(phi[0, 0:-1], phi[0, 1:])
-p[0, :] = update(p[0, :], a, b, c, h)
-for i in range(1, ns):
-    a[:] = np.minimum(phi[i-1, :], phi[i+1, :])
-    b[0] = phi[i, 1]
-    b[-1] = phi[i, -2]
-    b[1:-1] = np.minimum(phi[i, 0:-1], phi[0, 1:])
-    p[i, :] = update(p[i, :], a, b, c, h)
-
-a[:] = phi[-2, :]
-b[0] = phi[ns, 1]
-b[-1] = phi[ns, -2]
-b[1:-1] = np.minimum(phi[ns, 0:-1], phi[NS, 1:])
-p[ns, :] = update(p[ns, :], a, b, c, h)
+_, d = curve.project(node[isNearNode[1:-1, 1:-1]])
+phi[isNearNode] = np.abs(d) #界面附近的点用精确值
+phi[~isNearNode] = m  # 其它点用一个比较大的值
 
 
+a = np.zeros(ns+1, dtype=np.float64) 
+b = np.zeros(ns+1, dtype=np.float64)
+c = np.zeros(ns+1, dtype=np.float64)
+
+n = 0
+for i in range(1, ns+2):
+    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+    flag = np.abs(a-b) >= h 
+    c[flag] = np.minimum(a[flag], b[flag]) + h 
+    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+
+    fname = output + 'test'+ str(n).zfill(10)
+    data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+    nodedata = {'phi':data}
+    mesh.to_vtk_file(fname, nodedata=nodedata)
+    n += 1
 
 
+for i in range(ns+1, 0, -1):
+    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+    flag = np.abs(a-b) >= h 
+    c[flag] = np.minimum(a[flag], b[flag]) + h 
+    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
 
-mesh.show_function(plt, phi)
+    fname = output + 'test'+ str(n).zfill(10)
+    data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+    nodedata = {'phi':data}
+    mesh.to_vtk_file(fname, nodedata=nodedata)
+    n += 1
+
+for j in range(1, ns+2):
+    a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+    b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+    flag = np.abs(a-b) >= h 
+    c[flag] = np.minimum(a[flag], b[flag]) + h 
+    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+    fname = output + 'test'+ str(n).zfill(10)
+    data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+    nodedata = {'phi':data}
+    mesh.to_vtk_file(fname, nodedata=nodedata)
+    n += 1
+
+for j in range(ns+1, 0, -1):
+    a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+    b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+    flag = np.abs(a-b) >= h 
+    c[flag] = np.minimum(a[flag], b[flag]) + h 
+    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+    fname = output + 'test'+ str(n).zfill(10)
+    data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+    nodedata = {'phi':data}
+    mesh.to_vtk_file(fname, nodedata=nodedata)
+    n += 1
+
+
+mesh.show_function(plt, phi[1:-1, 1:-1])
 plt.show()
 
-def FSM(phi, h):
-    phi[phi>np.sqrt(2*h**2)] = 100
-    #print('0',phi)
-    for i in range(0,ns+1):
-        for j in range(0,ns+1):
-            if i== 0:
-                a = phi[1,j]
-            elif i == ns:
-                a = phi[ns-1,j]
-            else:
-                a = min(phi[i+1,j],phi[i-1,j])
-            if j == 0:
-                b = phi[i,1]
-            elif j == ns:
-                b = phi[i,ns-1]
-            else:
-                b = min(phi[i,j-1],phi[i,j+1])
-            #print(a,b)
-            if np.abs(a-b)>=h:
-                c = min(a,b)+h
-            else:
-                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
-            #print(c)
-            phi[i,j] = min(c,phi[i,j])
-    #print('1',phi)
-    for i in range(ns,-1,-1):
-        for j in range(0,ns+1):
-            if i == 0 :
-                a = phi[1,j]
-            elif i == ns:
-                a = phi[ns-1,j]
-            else:
-                a = min(phi[i+1,j],phi[i-1,j])
-            if j == 0:
-                b = phi[i,1]
-            elif j == ns:
-                b = phi[i,ns-1]
-            else:
-                b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=h:
-                c = min(a,b)+h
-            else:
-                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
-            phi[i,j] = min(c,phi[i,j])
-    #print('2',phi)
-    for i in range(ns,-1,-1):
-        for j in range(ns,-1,-1):
-            if i == 0 :
-                a = phi[1,j]
-            elif i == ns:
-                a = phi[ns-1,j]
-            else:
-                a = min(phi[i+1,j],phi[i-1,j])
-            if j == 0:
-                b = phi[i,1]
-            elif j == ns:
-                b = phi[i,ns-1]
-            else:
-                b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=h:
-                c = min(a,b)+h
-            else:
-                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
-            phi[i,j] = min(c,phi[i,j])
-    #print('3',phi)
-
-    for i in range(0,ns+1):
-        for j in range(ns,-1,-1):
-            if i ==0 :
-                a = phi[1,j]
-            elif i == ns:
-                a = phi[ns-1,j]
-            else:
-                a = min(phi[i+1,j],phi[i-1,j])
-            if j == 0:
-                b = phi[i,1]
-            elif j == ns:
-                b = phi[i,ns-1]
-            else:
-                b = min(phi[i,j-1],phi[i,j+1])
-            if np.abs(a-b)>=h:
-                c = min(a,b)+h
-            else:
-                c = (a+b+np.sqrt(2*h*hx-(a-b)**2))/2
-            phi[i,j] = min(c,phi[i,j])
-    #print('4',phi)

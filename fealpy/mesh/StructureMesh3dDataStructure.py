@@ -31,7 +31,7 @@ class StructureHexMeshDataStructure():
     E = 12
     F = 6
 
-    def __init__(self, nx, ny, nz):
+    def __init__(self, nx, ny, nz, itype=np.int_):
         self.nx = nx
         self.ny = ny
         self.nz = nz
@@ -40,6 +40,7 @@ class StructureHexMeshDataStructure():
         self.NE = (nx + 1) * (ny + 1) * nz + (nx + 1) * ny * (nz + 1) + nx * (ny + 1) * (nz + 1)
         self.NF = nx * ny * (nz + 1) + nx * (ny + 1) * nz + (nx + 1) * ny * nz
         self.NC = nx * ny * nz
+        self.itype = itype
 
     @property
     def cell(self):

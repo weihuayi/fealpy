@@ -316,7 +316,6 @@ class StructureQuadMesh(Mesh2d):
         return F
 
     def gradient(self, f):
-
         
         hx = self.hx
         hy = self.hy
