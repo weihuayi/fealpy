@@ -5,6 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from fealpy.mesh import StructureQuadMesh
 from fealpy.geometry import FoldCurve
+from fealpy.geometry.geoalg import project
 
 parser = argparse.ArgumentParser(description=
         """
@@ -16,13 +17,26 @@ parser.add_argument('--NS',
         default=200, type=int,
         help='区域 x 和 y 方向的剖分段数， 默认为 200 段.')
 
+parser.add_argument('--M',
+        default= 2, type=int,
+        help='填充的默认最大值， 默认为 2.')
+
 parser.add_argument('--curve',
         default='fold', type=str,
         help='隐式曲线， 默认为 fold .')
 
 args = parser.parse_args()
-NS = args.NS
+ns = args.NS
 curve = args.curve
+m = args.M
+
+def update(val, a, b, c, h):
+    flag = np.abs(a-b) >= h 
+    c[flag] = np.minimum(a[flag], b[flag]) + h 
+    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    val = np.minimum(c, val)
+    return val
+
 
 if curve == 'fold': 
     curve  = FoldCurve(6)
@@ -31,10 +45,52 @@ else:
 
 
 domain = curve.box
-mesh = StructureQuadMesh(domain, nx=NS, ny=NS) # 建立结构网格对象
+mesh = StructureQuadMesh(domain, nx=ns, ny=ns) # 建立结构网格对象
+h = mesh.hx
 
-phi = mesh.interpolation(curve)
+phi = mesh.interpolation(curve).reshape(-1)
 sign = np.sign(phi)
+
+node = mesh.entity('node')
+edge = mesh.entity('edge')
+
+NN = mesh.number_of_nodes()
+isNearNode = np.zeros(NN, dtype=np.bool_)
+isCutEdge = np.prod(sign[edge], axis=-1) <= 0
+
+isNearNode[edge[isCutEdge]] = True
+
+p, d = curve.project(node[isNearNode])
+phi[isNearNode] = np.abs(d)
+phi[~isNearNode] = m 
+
+phi.reshape(ns+1, ns+1)
+
+a = np.zeros(NS+1, dtype=np.float64) 
+b = np.zeros(NS+1, dtype=np.float64)
+c = np.zeros(NS+1, dtype=np.float64)
+
+a[:] = phi[1, :]
+b[0] = phi[0, 1]
+b[-1] = phi[0, -2]
+b[1:-1] = np.minimum(phi[0, 0:-1], phi[0, 1:])
+p[0, :] = update(p[0, :], a, b, c, h)
+for i in range(1, ns):
+    a[:] = np.minimum(phi[i-1, :], phi[i+1, :])
+    b[0] = phi[i, 1]
+    b[-1] = phi[i, -2]
+    b[1:-1] = np.minimum(phi[i, 0:-1], phi[0, 1:])
+    p[i, :] = update(p[i, :], a, b, c, h)
+
+a[:] = phi[-2, :]
+b[0] = phi[ns, 1]
+b[-1] = phi[ns, -2]
+b[1:-1] = np.minimum(phi[ns, 0:-1], phi[NS, 1:])
+p[ns, :] = update(p[ns, :], a, b, c, h)
+
+
+
+
 
 mesh.show_function(plt, phi)
 plt.show()
