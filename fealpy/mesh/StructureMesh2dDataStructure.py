@@ -1,6 +1,5 @@
 import numpy as np
 
-
 """
 结构四边形网格的拓扑数据结构
 
@@ -28,14 +27,15 @@ class StructureMesh2dDataStructure:
     V = 4
     E = 4
     F = 1
+
     def __init__(self, nx, ny, itype):
-        self.nx = nx # x 方向剖分的段数
-        self.ny = ny # y 方向剖分的段数
-        self.NN = (nx+1)*(ny+1)
-        self.NE = ny*(nx+1) + nx*(ny+1)
-        self.NC = nx*ny
+        self.nx = nx  # x 方向剖分的段数
+        self.ny = ny  # y 方向剖分的段数
+        self.NN = (nx + 1) * (ny + 1)
+        self.NE = ny * (nx + 1) + nx * (ny + 1)
+        self.NC = nx * ny
         self.itype = itype
- 
+
     def number_of_nodes_of_cells(self):
         return self.V
 
@@ -51,7 +51,7 @@ class StructureMesh2dDataStructure:
     @property
     def cell(self):
         """
-        @brief 
+        @brief 生成网格中所有的单元
         """
 
         nx = self.nx
@@ -63,8 +63,8 @@ class StructureMesh2dDataStructure:
         idx = np.arange(NN).reshape(nx + 1, ny + 1)
         c = idx[:-1, :-1]
         cell[:, 0] = c.flat
-        cell[:, 1] = cell[:, 0] + 1 
-        cell[:, 2] = cell[:, 0] + ny + 1 
+        cell[:, 1] = cell[:, 0] + 1
+        cell[:, 2] = cell[:, 0] + ny + 1
         cell[:, 3] = cell[:, 2] + 1
         return cell
 
@@ -73,6 +73,7 @@ class StructureMesh2dDataStructure:
         """
         @brief 生成网格中所有的边
         """
+
         nx = self.nx
         ny = self.ny
 
@@ -92,12 +93,13 @@ class StructureMesh2dDataStructure:
         NE1 += nx * (ny + 1)
         edge[NE0:NE1, 0] = idx[:-1, :].flat
         edge[NE0:NE1, 1] = idx[1:, :].flat
-        edge[NE1:NE0:-nx - 1, :] = edge[NE1:NE0:-nx - 1, -1::-1]
+        edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
         return edge
 
     @property
     def edge2cell(self):
         """
+        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
         """
 
         nx = self.nx
@@ -143,6 +145,7 @@ class StructureMesh2dDataStructure:
 
     def cell_to_node(self):
         """
+        @brief 单元和节点的邻接关系，储存每个单元相邻的节点编号
         """
         NN = self.NN
         NC = self.NC
@@ -156,7 +159,9 @@ class StructureMesh2dDataStructure:
         return cell2node
 
     def cell_to_edge(self, sparse=False):
-        """ The neighbor information of cell to edge
+        """
+        The neighbor information of cell to edge
+        @brief 单元和边的邻接关系，储存每个单元相邻的边的编号
         """
         NE = self.NE
         NC = self.NC
@@ -181,7 +186,9 @@ class StructureMesh2dDataStructure:
             return cell2edge
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
-        """ Consctruct the neighbor information of cells
+        """
+        Consctruct the neighbor information of cells
+        @brief 单元和单元的邻接关系，储存每个单元相邻的单元编号
         """
         if return_array:
             return_sparse = False
@@ -225,6 +232,9 @@ class StructureMesh2dDataStructure:
                 return adj.astype(np.int32), adjLocation
 
     def edge_to_node(self, sparse=False):
+        """
+        @brief 边与节点的邻接关系，储存每条边的两个端点的节点编号
+        """
         NN = self.NN
         NE = self.NE
 
@@ -240,10 +250,16 @@ class StructureMesh2dDataStructure:
             return edge2node
 
     def edge_to_edge(self, sparse=False):
+        """
+        @brief 判断两条边是否相邻，相邻为 True, 否则为 False
+        """
         node2edge = self.node_to_edge()
-        return node2edge @ node2edge.transpose()
+        return node2edge * node2edge.transpose()
 
     def edge_to_cell(self, sparse=False):
+        """
+        @brief 边与单元的邻接关系，储存与每条边相邻的两个单元的信息
+        """
         if sparse == False:
             return self.edge2cell
         else:
@@ -256,7 +272,9 @@ class StructureMesh2dDataStructure:
             return face2cell
 
     def node_to_node(self):
-        """ The neighbor information of nodes
+        """
+        The neighbor information of nodes
+        @brief 判断某两个节点是否相邻，若是则对应位置为True，否则为False
         """
         NN = self.NN
         NE = self.NE
@@ -268,6 +286,9 @@ class StructureMesh2dDataStructure:
         return node2node
 
     def node_to_edge(self):
+        """
+        @brief 判断节点是否为某边的端点，若是则对应位置为 True,否则为 False
+        """
         NN = self.NN
         NE = self.NE
 
@@ -280,6 +301,7 @@ class StructureMesh2dDataStructure:
 
     def node_to_cell(self, localidx=False):
         """
+        @brief 判断节点是否位于某单元中，位于则对应位置为True，否则为False
         """
         NN = self.NN
         NC = self.NC
@@ -287,7 +309,7 @@ class StructureMesh2dDataStructure:
 
         cell = self.cell
 
-        I = cell.flat
+        I = cell.flatten()
         J = np.repeat(range(NC), V)
 
         if localidx == True:
@@ -299,6 +321,9 @@ class StructureMesh2dDataStructure:
         return node2cell
 
     def boundary_node_flag(self):
+        """
+        @brief 判断是否为边界点
+        """
         NN = self.NN
         edge = self.edge
         isBdEdge = self.boundary_edge_flag()
@@ -307,14 +332,15 @@ class StructureMesh2dDataStructure:
         return isBdPoint
 
     def boundary_edge_flag(self):
+        """
+        @brief 判断边是否为边界边
+        """
         edge2cell = self.edge2cell
         return edge2cell[:, 0] == edge2cell[:, 1]
 
     def boundary_cell_flag(self, bctype=None):
         """
-        Parameters
-        ----------
-        bctype : None or 0, 1, 2 ,3
+        @brief 判断单元是否为边界单元
         """
         NC = self.NC
 
@@ -396,7 +422,7 @@ class StructureMesh2dDataStructure:
 
     def peoriod_matrix(self):
         """
-        we can get a matarix under periodic boundary condition 
+        we can get a matarix under periodic boundary condition
         """
         nx = self.nx
         ny = self.ny
@@ -409,23 +435,22 @@ class StructureMesh2dDataStructure:
 
         isPNode[ridx] = True
         isPNode[uidx] = True
-        NC = nx*ny
-        #First, we get the inner elements , the left boundary and the lower boundary of the matrix.
-        val = np.ones(NC, dtype = np.bool)
+        NC = nx * ny
+        # First, we get the inner elements , the left boundary and the lower boundary of the matrix.
+        val = np.ones(NC, dtype=np.bool)
         I = np.arange(NN)[~isPNode]
-        J = range(NC) 
+        J = range(NC)
         C = coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
-        #second,  we make the upper boundary equal to the lower boundary.
-        val = np.ones(nx, dtype=np.bool) 
+        # second,  we make the upper boundary equal to the lower boundary.
+        val = np.ones(nx, dtype=np.bool)
         I = np.arange(NN)[uidx[:-1]]
-        J = np.arange(0, NC-ny+1, ny)
+        J = np.arange(0, NC - ny + 1, ny)
         C += coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
-        #thrid, we make the right boundary equal to the left boundary.
-        val = np.ones(ny+1, dtype=np.bool)
+        # thrid, we make the right boundary equal to the left boundary.
+        val = np.ones(ny + 1, dtype=np.bool)
         I = np.arange(NN)[ridx]
-        J = np.arange(ny+1)
+        J = np.arange(ny + 1)
         J[-1] = 0
-        C += coo_matrix((val,(I, J)), shape=(NN, NC), dtype=np.bool)
+        C += coo_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
 
         return C
-
