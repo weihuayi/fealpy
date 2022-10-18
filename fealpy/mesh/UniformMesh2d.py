@@ -149,6 +149,17 @@ class UniformMesh2d(Mesh2d):
 
         return dx, dy
 
+
+    def value(self, p, f):
+        """
+        @brief 
+
+        f: (nx+1, ny+1)
+        """
+        i, j = self.mesh.cell_location(p)
+
+        pass
+
     def interpolation(self, f, intertype='node'):
         nx = self.ds.nx
         ny = self.ds.ny
@@ -307,7 +318,6 @@ class UniformMesh2dFunction():
         pass
 
     def value(self, p):
-        i, j = self.mesh.cell_location(p)
         pass
 
     def gradient(self, p):
