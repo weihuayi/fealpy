@@ -21,14 +21,14 @@ import numpy as np
 
 class StructureMesh2dDataStructure:
     cw = np.array([0, 1, 3, 2])
-    ccw = np.array([0, 2, 3, 1])  
-    localEdge = np.array([(0, 1), (2, 3), (0, 2), (1, 3)])
+    ccw = np.array([0, 2, 3, 1])
+    localEdge = np.array([(0, 2), (1, 3), (0, 1), (2, 3)])
 
     V = 4
     E = 4
     F = 1
 
-    def __init__(self, nx, ny, itype=np.int_):
+    def __init__(self, nx, ny, itype):
         self.nx = nx  # x 方向剖分的段数
         self.ny = ny  # y 方向剖分的段数
         self.NN = (nx + 1) * (ny + 1)
@@ -84,16 +84,16 @@ class StructureMesh2dDataStructure:
         edge = np.zeros((NE, 2), dtype=self.itype)
 
         NE0 = 0
-        NE1 = ny * (nx + 1)
-        edge[NE0:NE1, 0] = idx[:, :-1].flat
-        edge[NE0:NE1, 1] = idx[:, 1:].flat
-        edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
-
-        NE0 = NE1
-        NE1 += nx * (ny + 1)
+        NE1 = nx * (ny + 1)
         edge[NE0:NE1, 0] = idx[:-1, :].flat
         edge[NE0:NE1, 1] = idx[1:, :].flat
         edge[NE0 + ny:NE1:ny + 1, :] = edge[NE0 + ny:NE1:ny + 1, -1::-1]
+
+        NE0 = NE1
+        NE1 += ny * (nx + 1)
+        edge[NE0:NE1, 0] = idx[:, :-1].flat
+        edge[NE0:NE1, 1] = idx[:, 1:].flat
+        edge[NE0:NE0 + ny, :] = edge[NE0:NE0 + ny, -1::-1]
         return edge
 
     @property
@@ -112,34 +112,34 @@ class StructureMesh2dDataStructure:
 
         idx = np.arange(NC).reshape(nx, ny).T
 
-        # y direction
-        idx0 = np.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
-        # left element
-        edge2cell[idx0[:, 1:], 0] = idx
-        edge2cell[idx0[:, 1:], 2] = 1
-        edge2cell[idx0[:, 0], 0] = idx[:, 0]
-        edge2cell[idx0[:, 0], 2] = 0
-
-        # right element
-        edge2cell[idx0[:, :-1], 1] = idx
-        edge2cell[idx0[:, :-1], 3] = 0
-        edge2cell[idx0[:, -1], 1] = idx[:, -1]
-        edge2cell[idx0[:, -1], 3] = 1
-
         # x direction
-        idx1 = np.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
-        NE0 = ny * (nx + 1)
+        idx0 = np.arange(nx * (ny + 1), dtype=self.itype).reshape(nx, ny + 1).T
         # left element
-        edge2cell[NE0 + idx1[:-1], 0] = idx
-        edge2cell[NE0 + idx1[:-1], 2] = 2
-        edge2cell[NE0 + idx1[-1], 0] = idx[-1]
-        edge2cell[NE0 + idx1[-1], 2] = 3
+        edge2cell[idx0[:-1], 0] = idx
+        edge2cell[idx0[:-1], 2] = 0
+        edge2cell[idx0[-1], 0] = idx[-1]
+        edge2cell[idx0[-1], 2] = 1
 
         # right element
-        edge2cell[NE0 + idx1[1:], 1] = idx
-        edge2cell[NE0 + idx1[1:], 3] = 3
-        edge2cell[NE0 + idx1[0], 1] = idx[0]
-        edge2cell[NE0 + idx1[0], 3] = 2
+        edge2cell[idx0[1:], 1] = idx
+        edge2cell[idx0[1:], 3] = 1
+        edge2cell[idx0[0], 1] = idx[0]
+        edge2cell[idx0[0], 3] = 0
+
+        # y direction
+        idx1 = np.arange((nx + 1) * ny, dtype=self.itype).reshape(nx + 1, ny).T
+        NE0 = nx * (ny + 1)
+        # left element
+        edge2cell[NE0 + idx1[:, 1:], 0] = idx
+        edge2cell[NE0 + idx1[:, 1:], 2] = 3
+        edge2cell[NE0 + idx1[:, 0], 0] = idx[:, 0]
+        edge2cell[NE0 + idx1[:, 0], 2] = 2
+
+        # right element
+        edge2cell[NE0 + idx1[:, :-1], 1] = idx
+        edge2cell[NE0 + idx1[:, :-1], 3] = 2
+        edge2cell[NE0 + idx1[:, -1], 1] = idx[:, -1]
+        edge2cell[NE0 + idx1[:, -1], 3] = 3
 
         return edge2cell
 
@@ -254,7 +254,7 @@ class StructureMesh2dDataStructure:
         @brief 判断两条边是否相邻，相邻为 True, 否则为 False
         """
         node2edge = self.node_to_edge()
-        return node2edge * node2edge.transpose()
+        return node2edge.T * node2edge.transpose().T
 
     def edge_to_cell(self, sparse=False):
         """
@@ -370,32 +370,33 @@ class StructureMesh2dDataStructure:
         idx, = np.nonzero(isBdCell)
         return idx
 
-    def y_direction_edge_index(self):
-        nx = self.nx
-        ny = self.ny
-        return np.arange(ny * (nx + 1))
-
     def x_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
         NE = self.NE
-        return np.arange(ny * (nx + 1), NE)
+        return np.arange(nx * (ny + 1))
 
-    def y_direction_edge_flag(self):
+    def y_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
         NE = self.NE
-        isYDEdge = np.zeros(NE, dtype=np.bool)
-        isYDEdge[:ny * (nx + 1)] = True
-        return isYDEdge
+        return np.arange(nx * (ny + 1), NE)
 
     def x_direction_edge_flag(self):
         nx = self.nx
         ny = self.ny
         NE = self.NE
         isXDEdge = np.zeros(NE, dtype=np.bool)
-        isXDEdge[ny * (nx + 1):] = True
+        isXDEdge[:nx * (ny + 1)] = True
         return isXDEdge
+
+    def y_direction_edge_flag(self):
+        nx = self.nx
+        ny = self.ny
+        NE = self.NE
+        isYDEdge = np.zeros(NE, dtype=np.bool)
+        isYDEdge[nx * (ny + 1):] = True
+        return isYDEdge
 
     def left_boundary_node_index(self):
         nx = self.nx
