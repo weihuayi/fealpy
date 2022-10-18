@@ -293,3 +293,27 @@ class UniformMesh2d(Mesh2d):
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
         return filename
+
+
+
+class UniformMesh2dFunction():
+
+    def __init__(self, mesh, f):
+        self.mesh = mesh # (nx+1, ny+1)
+        self.f = f   # (nx+1, ny+1)
+        self.fx, self.fy = mesh.gradient(f)
+
+    def __call__(self, p):
+        pass
+
+    def value(self, p):
+        i, j = self.mesh.cell_location(p)
+        pass
+
+    def gradient(self, p):
+        pass
+
+
+
+
+
