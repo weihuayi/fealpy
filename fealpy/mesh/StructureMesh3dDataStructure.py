@@ -1,6 +1,6 @@
 import numpy as np
 
-class StructureHexMeshDataStructure():
+class StructureMesh3dDataStructure():
     # The following local data structure should be class properties
     ccw = [0, 2, 3, 1]
     localEdge = np.array([

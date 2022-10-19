@@ -26,11 +26,11 @@ parser.add_argument('--degree',
         help='Lagrange 有限元空间的次数, 默认为 1 次.')
 
 parser.add_argument('--ns',
-        default=100, type=int,
+        default=128, type=int,
         help='空间各个方向剖分段数， 默认剖分 100 段.')
 
 parser.add_argument('--nt',
-        default=100, type=int,
+        default=1000, type=int,
         help='时间剖分段数，默认剖分 100 段.')
 
 parser.add_argument('--T',
@@ -129,6 +129,7 @@ for i in range(nt):
     measure[phi0 <=0] = 1
     diff.append(abs(space.integralalg.integral(measure) - (np.pi)*0.15**2))
     b = M@phi0 - dt/2*(C@phi0)
+    print(b.shape)
     if DR == 1:
         S = space.stiff_matrix(c=single_well)
         b -= mu*dt*S@phi0
