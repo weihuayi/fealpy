@@ -216,7 +216,7 @@ class UniformMesh2d(Mesh2d):
         hx = self.h[0]
         hy = self.h[1]
         f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
-        f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
+        f_yx,fyy = np.gradient(f_y, hy, edge_order=order)
         return fxx + fyy
 
     def laplace(self, f, order=1):
