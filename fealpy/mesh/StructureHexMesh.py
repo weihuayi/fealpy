@@ -4,6 +4,7 @@ from .Mesh3d import Mesh3d
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix
 from scipy.sparse import spdiags, eye, tril, triu, diags, kron
 
+
 class StructureHexMesh(Mesh3d):
     def __init__(self, box, nx, ny, nz, itype=np.int_, ftype=np.float64):
         self.itype = itype
@@ -196,9 +197,9 @@ class StructureHexMesh(Mesh3d):
         nz = self.ds.nz
         box = self.box
 
-        x = np.linspace(box[0], box[1], nx+1)
-        y = np.linspace(box[2], box[3], ny+1)
-        z = np.linspace(box[4], box[5], nz+1)
+        x = np.linspace(box[0], box[1], nx + 1)
+        y = np.linspace(box[2], box[3], ny + 1)
+        z = np.linspace(box[4], box[5], nz + 1)
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
         return filename
@@ -450,40 +451,30 @@ class StructureHexMesh(Mesh3d):
         dy = self.function(etype='cell')
         dz = self.function(etype='cell')
 
-        dx[:] = (Ex[:, :-1, :-1] + Ex[:, :-1, 1:] + Ex[:, 1:, :-1] + Ex[:, 1:, 1:])/4.0
-        dy[:] = (Ey[:-1, :, :-1] + Ey[1:, :, :-1] + Ey[:-1, :, 1:] + Ey[1:, :, 1:])/4.0
-        dz[:] = (Ez[:-1, :-1, :] + Ez[1:, :-1, :] + Ez[:-1, 1:, :] + Ez[1:, 1:, :])/4.0
+        dx[:] = (Ex[:, :-1, :-1] + Ex[:, :-1, 1:] + Ex[:, 1:, :-1] + Ex[:, 1:, 1:]) / 4.0
+        dy[:] = (Ey[:-1, :, :-1] + Ey[1:, :, :-1] + Ey[:-1, :, 1:] + Ey[1:, :, 1:]) / 4.0
+        dz[:] = (Ez[:-1, :-1, :] + Ez[1:, :-1, :] + Ez[:-1, 1:, :] + Ez[1:, 1:, :]) / 4.0
 
         return dx, dy, dz
 
+
 class StructureHexMeshDataStructure():
     # The following local data structure should be class properties
-    # localEdge = np.array([
-    #     (0, 1), (3, 2), (5, 4), (6, 7),
-    #     (2, 0), (1, 3), (4, 6), (7, 5),
-    #     (0, 4), (5, 1), (6, 2), (3, 7)])
-    #
-    # localFace = np.array([
-    #     (0, 2, 6, 4), (1, 5, 7, 3),  # bottom and top faces
-    #     (0, 4, 5, 1), (2, 3, 7, 6),  # left and right faces
-    #     (0, 1, 3, 2), (4, 6, 7, 5)])  # front and back faces
-    # localFace2edge = np.array([
-    #     (4, 10, 6, 8), (5, 9, 7, 11),
-    #     (0, 8, 2, 9), (1, 11, 3, 10),
-    #     (0, 5, 1, 2), (2, 6, 3, 7)])
-
+    cw = np.array([0, 1, 3, 2])
+    ccw = np.array([0, 2, 3, 1])
     localEdge = np.array([
-        (0, 1), (1, 2), (2, 3), (3, 0),
         (0, 4), (1, 5), (2, 6), (3, 7),
-        (4, 5), (5, 6), (6, 7), (7, 4)])
+        (0, 2), (1, 3), (4, 6), (5, 7),
+        (0, 1), (2, 3), (4, 5), (6, 7)])
     localFace = np.array([
-        (0, 3, 2, 1), (4, 5, 6, 7),  # bottom and top faces
-        (0, 4, 7, 3), (1, 2, 6, 5),  # left and right faces
-        (0, 1, 5, 4), (2, 3, 7, 6)])  # front and back faces
+        (0, 1, 2, 3), (4, 5, 6, 7),  # left and right faces
+        (0, 1, 4, 5), (2, 3, 6, 7),  # front and back faces
+        (0, 2, 4, 6), (1, 3, 5, 7)]) # bottom and top faces
     localFace2edge = np.array([
-        (0, 1, 2, 3), (8, 9, 10, 11),
-        (4, 11, 7, 3), (1, 6, 9, 5),
-        (0, 5, 8, 4), (2, 7, 10, 6)])
+        (4, 5, 8, 9), (6, 7, 10, 11),
+        (0, 1, 8, 10), (2, 3, 9, 11),
+        (0, 2, 4, 6), (1, 3, 5, 7)])
+
     V = 8
     E = 12
     F = 6
@@ -500,6 +491,9 @@ class StructureHexMeshDataStructure():
 
     @property
     def cell(self):
+        """
+        @brief 生成网格中所有的单元
+        """
         NN = self.NN
         nx = self.nx
         ny = self.ny
@@ -511,17 +505,20 @@ class StructureHexMeshDataStructure():
         cell = np.zeros((NC, 8), dtype=np.int)
         nyz = (ny + 1) * (nz + 1)
         cell[:, 0] = c.flatten()
-        cell[:, 1] = cell[:, 0] + nyz
-        cell[:, 2] = cell[:, 1] + nz + 1
-        cell[:, 3] = cell[:, 0] + nz + 1
-        cell[:, 4] = cell[:, 0] + 1
-        cell[:, 5] = cell[:, 4] + nyz
-        cell[:, 6] = cell[:, 5] + nz + 1
-        cell[:, 7] = cell[:, 4] + nz + 1
+        cell[:, 1] = cell[:, 0] + 1
+        cell[:, 2] = cell[:, 0] + nz + 1
+        cell[:, 3] = cell[:, 2] + 1
+        cell[:, 4] = cell[:, 0] + nyz
+        cell[:, 5] = cell[:, 4] + 1
+        cell[:, 6] = cell[:, 2] + nyz
+        cell[:, 7] = cell[:, 6] + 1
         return cell
 
     @property
     def face(self):
+        """
+        @brief 生成网格中所有的面
+        """
         NN = self.NN
         NF = self.NF
 
@@ -532,31 +529,44 @@ class StructureHexMeshDataStructure():
         face = np.zeros((NF, 4), dtype=np.int)
 
         NF0 = 0
-        NF1 = nx * ny * (nz + 1)
-        c = np.transpose(idx, (0, 1, 2))[:-1, :-1, :]
+        NF1 = (nx + 1) * ny * nz
+        c = idx[:, :-1, :-1]
         face[NF0:NF1, 0] = c.flatten()
-        face[NF0:NF1, 1] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        face[NF0:NF1, 2] = face[NF0:NF1, 1] + nz + 1
-        face[NF0:NF1, 3] = face[NF0:NF1, 0] + nz + 1
-        face[0:nx * ny, :] = face[0:nx * ny, [0, 3, 2, 1]]
+        face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + nz + 1
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+        face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [1, 0, 3, 2]]
+
 
         NF0 = NF1
         NF1 += nx * (ny + 1) * nz
         c = np.transpose(idx, (0, 1, 2))[:-1, :, :-1]
         face[NF0:NF1, 0] = c.flatten()
-        face[NF0:NF1, 1] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
-        face[NF0:NF1, 2] = face[NF0:NF1, 1] + 1
-        face[NF0:NF1, 3] = face[NF0:NF1, 0] + 1
-        face[(NF1 - nx * ny):NF1, :] = face[(NF1 - nx * ny):NF1, [1, 0, 3, 2]]
+        face[NF0:NF1, 1] = face[NF0:NF1, 0] + 1
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
+        NF2 = NF0 + ny * nz
+        N = nz * (ny + 1)
+        idx1 = np.zeros((nx, nz), dtype=np.int)
+        idx1 = np.arange(NF2, NF2 + nz)
+        idx1 = idx1 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+        face[idx1] = face[idx1][:, [1, 0, 3, 2]]
 
         NF0 = NF1
-        NF1 += (nx + 1) * ny * nz
-        c = idx[:, :-1, :-1]
+        NF1 += nx * ny * (nz + 1)
+        c = np.transpose(idx, (0, 1, 2))[:-1, :-1, :]
         face[NF0:NF1, 0] = c.flatten()
         face[NF0:NF1, 1] = face[NF0:NF1, 0] + nz + 1
-        face[NF0:NF1, 2] = face[NF0:NF1, 1] + 1
-        face[NF0:NF1, 3] = face[NF0:NF1, 0] + 1
-        face[NF0:NF0 + ny * nz, :] = face[NF0:NF0 + ny * nz, [0, 3, 2, 1]]
+        face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
+        face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
+        N = ny * (nz + 1)
+        idx2 = np.zeros((nx, ny), dtype=np.int)
+        idx2 = np.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
+        idx2 = idx2 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+        face[idx2] = face[idx2][:, [1, 0, 3, 2]]
+
         return face
 
     @property
@@ -576,21 +586,39 @@ class StructureHexMeshDataStructure():
         NF1 = ny * nz
         face2cell[NF0:NF1, 0] = idx[0].flatten()
         face2cell[NF0:NF1, 1] = idx[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 2
+        face2cell[NF0:NF1, 2:4] = 0
 
         NF0 = NF1
         NF1 += nx * ny * nz
         face2cell[NF0:NF1, 0] = idx.flatten()
-        face2cell[NF0:NF1, 2] = 3
+        face2cell[NF0:NF1, 2] = 1
         face2cell[NF0:NF1 - ny * nz, 1] = idx[1:].flatten()
-        face2cell[NF0:NF1 - ny * nz, 3] = 2
+        face2cell[NF0:NF1 - ny * nz, 3] = 0
         face2cell[NF1 - ny * nz:NF1, 1] = idx[-1].flatten()
-        face2cell[NF1 - ny * nz:NF1, 3] = 3
+        face2cell[NF1 - ny * nz:NF1, 3] = 1
 
         # y direction
         c = np.transpose(idx, (1, 0, 2))
         NF0 = NF1
         NF1 += nx * nz
+        face2cell[NF0:NF1, 0] = c[0].flatten()
+        face2cell[NF0:NF1, 1] = c[0].flatten()
+        face2cell[NF0:NF1, 2:4] = 2
+
+        NF0 = NF1
+        NF1 += nx * ny * nz
+        face2cell[NF0:NF1, 0] = c.flatten()
+        face2cell[NF0:NF1, 2] = 3
+        face2cell[NF0:NF1 - nx * nz, 1] = c[1:].flatten()
+        face2cell[NF0:NF1 - nx * nz, 3] = 2
+        face2cell[NF1 - nx * nz:NF1, 1] = c[-1].flatten()
+        face2cell[NF1 - nx * nz:NF1, 3] = 3
+
+
+        # z direction
+        c = np.transpose(idx, (2, 0, 1))
+        NF0 = NF1
+        NF1 += nx * ny
         face2cell[NF0:NF1, 0] = c[0].flatten()
         face2cell[NF0:NF1, 1] = c[0].flatten()
         face2cell[NF0:NF1, 2:4] = 4
@@ -599,32 +627,18 @@ class StructureHexMeshDataStructure():
         NF1 += nx * ny * nz
         face2cell[NF0:NF1, 0] = c.flatten()
         face2cell[NF0:NF1, 2] = 5
-        face2cell[NF0:NF1 - nx * nz, 1] = c[1:].flatten()
-        face2cell[NF0:NF1 - nx * nz, 3] = 4
-        face2cell[NF1 - nx * nz:NF1, 1] = c[-1].flatten()
-        face2cell[NF1 - nx * nz:NF1, 3] = 5
-
-        # z direction
-        c = np.transpose(idx, (2, 0, 1))
-        NF0 = NF1
-        NF1 += nx * ny
-        face2cell[NF0:NF1, 0] = c[0].flatten()
-        face2cell[NF0:NF1, 1] = c[0].flatten()
-        face2cell[NF0:NF1, 2:4] = 0
-
-        NF0 = NF1
-        NF1 += nx * ny * nz
-        face2cell[NF0:NF1, 0] = c.flatten()
-        face2cell[NF0:NF1, 2] = 1
         face2cell[NF0:NF1 - nx * ny, 1] = c[1:].flatten()
-        face2cell[NF0:NF1 - nx * ny, 3] = 0
+        face2cell[NF0:NF1 - nx * ny, 3] = 4
         face2cell[NF1 - nx * ny:NF1, 1] = c[-1].flatten()
-        face2cell[NF1 - nx * ny:NF1, 3] = 1
+        face2cell[NF1 - nx * ny:NF1, 3] = 5
 
         return face2cell
 
     @property
     def edge(self):
+        """
+        @brief 生成网格中所有的边
+        """
         NN = self.NN
         NE = self.NE
 
@@ -635,25 +649,23 @@ class StructureHexMeshDataStructure():
         edge = np.zeros((NE, 2), dtype=np.int)
 
         NE0 = 0
-        NE1 = (nx + 1) * (ny + 1) * nz
-        c = np.transpose(idx, (0, 1, 2))[:, :, :-1]
+        NE1 = nx * (ny + 1) * (nz + 1)
+        c = np.transpose(idx, (0, 1, 2))[:-1, :, :]
         edge[NE0:NE1, 0] = c.flatten()
-        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + 1
-        edge[0:(ny + 1) * nz, :] = edge[0:(ny + 1) * nz, [0, 1]]
+        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + (ny + 1) * (nz + 1)
 
         NE0 = NE1
         NE1 += (nx + 1) * ny * (nz + 1)
         c = np.transpose(idx, (0, 1, 2))[:, :-1, :]
         edge[NE0:NE1, 0] = c.flatten()
         edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + nz + 1
-        edge[(NE1 - (ny + 1) * nz):NE1, :] = edge[(NE1 - (ny + 1) * nz):NE1, [0, 1]]
 
         NE0 = NE1
         NE1 += (nx + 1) * (ny + 1) * nz
-        c = np.transpose(idx, (0, 1, 2))[:-1, :, :]
+        c = np.transpose(idx, (0, 1, 2))[:, :, :-1]
         edge[NE0:NE1, 0] = c.flatten()
-        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + (ny + 1) * (nz + 1)
-        edge[NE0:NE0 + (ny + 1) * (nz + 1), :] = edge[NE0:NE0 + (ny + 1) * (nz + 1), [0, 1]]
+        edge[NE0:NE1, 1] = edge[NE0:NE1, 0] + 1
+
         return edge
 
     @property
@@ -669,6 +681,9 @@ class StructureHexMeshDataStructure():
         return cell2edge - 1
 
     def total_edge(self):
+        """
+        @brief 储存每个单元的所有边的节点编号
+        """
         NC = self.NC
         cell = self.cell
         localEdge = self.localEdge
@@ -677,6 +692,7 @@ class StructureHexMeshDataStructure():
 
     def cell_to_node(self):
         """
+        @brief 判断单元中的节点, 若单元中有这个节点为 True, 否则为 False
         """
         NN = self.NN
         NC = self.NC
@@ -690,7 +706,9 @@ class StructureHexMeshDataStructure():
         return cell2node
 
     def cell_to_edge(self, sparse=False):
-        """ The neighbor information of cell to edge
+        """
+        The neighbor information of cell to edge
+        @brief 单元和边的邻接关系, 储存每个单元相邻的边的编号
         """
         if sparse == False:
             return self.cell2edge
@@ -704,16 +722,10 @@ class StructureHexMeshDataStructure():
             cell2edge = csr_matrix((val, (I, self.cell2edge.flatten())), shape=(NC, NE), dtype=np.bool)
             return cell2edge
 
-    def cell_to_edge_sign(self, cell):
-        NC = self.NC
-        E = self.E
-        cell2edgeSign = np.zeros((NC, E), dtype=np.bool)
-        localEdge = self.localEdge
-        for i, (j, k) in zip(range(E), localEdge):
-            cell2edgeSign[:, i] = cell[:, j] < cell[:, k]
-        return cell2edgeSign
-
     def cell_to_face(self, sparse=False):
+        """
+        @brief 单元和面的邻接关系, 储存每个单元相邻的六个面的编号
+        """
         NC = self.NC
         NF = self.NF
         face2cell = self.face2cell
@@ -732,7 +744,9 @@ class StructureHexMeshDataStructure():
 
     def cell_to_cell(self, return_sparse=False,
                      return_boundary=True, return_array=False):
-        """ Get the adjacency information of cells
+        """
+        Get the adjacency information of cells
+        @brief 单元和单元的邻接关系, 储存每个单元相邻的六个单元的编号
         """
         if return_array:
             return_sparse = False
@@ -776,7 +790,9 @@ class StructureHexMeshDataStructure():
                 return adj.astype(np.int32), adjLocation
 
     def face_to_node(self, return_sparse=False):
-
+        """
+        @brief 面和节点的邻接关系, 储存每个面相邻的四个节点的编号
+        """
         face = self.face
         FE = self.localFace.shape[1]
         if return_sparse == False:
@@ -790,6 +806,9 @@ class StructureHexMeshDataStructure():
             return face2node
 
     def face_to_edge(self, return_sparse=False):
+        """
+        @brief 面和边的邻接关系, 储存每个面相邻的四个边的编号
+        """
         cell2edge = self.cell2edge
         face2cell = self.face2cell
         localFace2edge = self.localFace2edge
@@ -807,10 +826,16 @@ class StructureHexMeshDataStructure():
             return f2e
 
     def face_to_face(self):
-        face2edge = self.face_to_edge()
-        return face2edge * face2edge.transpose()
+        """
+        @brief 判断两个面是否相邻，相邻为 True, 否则为 False
+        """
+        edge2face = self.edge_to_face()
+        return edge2face.T * edge2face.transpose().T
 
     def face_to_cell(self, return_sparse=False):
+        """
+        @brief 面和单元的邻接关系, 储存每个面相邻的两个单元的编号
+        """
         if return_sparse == False:
             return self.face2cell
         else:
@@ -823,6 +848,9 @@ class StructureHexMeshDataStructure():
             return face2cell
 
     def edge_to_node(self, return_sparse=False):
+        """
+        @brief 边和节点的邻接关系, 储存每个边相邻的两个节点的编号
+        """
         NN = self.NN
         NE = self.NE
         edge = self.edge
@@ -837,10 +865,16 @@ class StructureHexMeshDataStructure():
             return edge2node
 
     def edge_to_edge(self):
-        edge2node = self.edge_to_node()
-        return edge2node * edge2node.transpose()
+        """
+        @brief 判断两条边是否相邻，相邻为 True, 否则为 False
+        """
+        node2edge = self.node_to_edge()
+        return node2edge.T * node2edge.transpose().T
 
     def edge_to_face(self):
+        """
+        @brief 判断边是否为某面的边，若是则对应位置为 True,否则为 False
+        """
         NF = self.NF
         NE = self.NE
         face2edge = self.face_to_edge()
@@ -852,6 +886,9 @@ class StructureHexMeshDataStructure():
         return edge2face
 
     def edge_to_cell(self, localidx=False):
+        """
+        @brief 判断边是否为某单元的边，若是则对应位置为 True,否则为 False
+        """
         NC = self.NC
         NE = self.NE
         cell2edge = self.cell2edge
@@ -863,7 +900,9 @@ class StructureHexMeshDataStructure():
         return edge2cell
 
     def node_to_node(self):
-        """ The neighbor information of nodes
+        """
+        The neighbor information of nodes
+        @brief 判断某两个节点是否相邻，若是则对应位置为True，否则为False
         """
         NN = self.NN
         NE = self.NE
@@ -875,6 +914,9 @@ class StructureHexMeshDataStructure():
         return node2node
 
     def node_to_edge(self):
+        """
+        @brief 判断节点是否为某边的端点，若是则对应位置为 True,否则为 False
+        """
         NN = self.NN
         NE = self.NE
 
@@ -882,10 +924,13 @@ class StructureHexMeshDataStructure():
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
         val = np.ones(2 * NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
+        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE), dtype=np.bool)
         return node2edge
 
     def node_to_face(self):
+        """
+        @brief 判断节点是否为某面的端点，若是则对应位置为 True,否则为 False
+        """
         NN = self.NN
         NF = self.NF
 
@@ -895,11 +940,12 @@ class StructureHexMeshDataStructure():
         I = face.flatten()
         J = np.repeat(range(NF), FV)
         val = np.ones(FV * NF, dtype=np.bool)
-        node2face = csr_matrix((val, (I, J)), shape=(NF, NN), dtype=np.bool)
+        node2face = csr_matrix((val, (I, J)), shape=(NN, NF), dtype=np.bool)
         return node2face
 
     def node_to_cell(self, return_local_index=False):
         """
+        @brief 判断节点是否为某单元的端点，若是则对应位置为 True,否则为 False
         """
         NN = self.NN
         NC = self.NC
@@ -919,6 +965,9 @@ class StructureHexMeshDataStructure():
         return node2cell
 
     def boundary_node_flag(self):
+        """
+        @brief 判断是否为边界点
+        """
         NN = self.NN
         face = self.face
         isBdFace = self.boundary_face_flag()
@@ -927,6 +976,9 @@ class StructureHexMeshDataStructure():
         return isBdPoint
 
     def boundary_edge_flag(self):
+        """
+        @brief 判断边是否为边界边
+        """
         NE = self.NE
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
@@ -935,11 +987,17 @@ class StructureHexMeshDataStructure():
         return isBdEdge
 
     def boundary_face_flag(self):
+        """
+        @brief 判断单元是否为边界面
+        """
         NF = self.NF
         face2cell = self.face_to_cell()
         return face2cell[:, 0] == face2cell[:, 1]
 
     def boundary_cell_flag(self):
+        """
+        @brief 判断单元是否为边界单元
+        """
         NC = self.NC
         face2cell = self.face_to_cell()
         isBdFace = self.boundary_face_flag()
@@ -967,42 +1025,24 @@ class StructureHexMeshDataStructure():
         idx, = np.nonzero(isBdCell)
         return idx
 
-    def z_direction_edge_index(self):
+    def x_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        return np.arange((nx+1) * (ny+1) * nz)
+        return np.arange(nx * (ny + 1) * (nz + 1))
 
     def y_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        return np.arange((nx+1) * (ny+1) * nz, (nx+1) * (ny+1) * nz + (nx+1) * ny * (nz+1))
+        return np.arange(nx * (ny + 1) * (nz + 1), nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1))
 
-    def x_direction_edge_index(self):
+    def z_direction_edge_index(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
         NE = self.NE
-        return np.arange((nx+1) * (ny+1) * nz + (nx+1) * ny * (nz+1), NE)
-
-    def z_direction_edge_flag(self):
-        nx = self.nx
-        ny = self.ny
-        nz = self.nz
-        NE = self.NE
-        isZDEdge = np.zeros(NE, dtype=np.bool)
-        isZDEdge[:(nx + 1) * (ny + 1) * nz] = True
-        return isZDEdge
-
-    def y_direction_edge_flag(self):
-        nx = self.nx
-        ny = self.ny
-        nz = self.nz
-        NE = self.NE
-        isYDEdge = np.zeros(NE, dtype=np.bool)
-        isYDEdge[(nx + 1) * (ny + 1) * nz:-nx * (ny + 1) * (nz + 1)] = True
-        return isYDEdge
+        return np.arange(nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1), NE)
 
     def x_direction_edge_flag(self):
         nx = self.nx
@@ -1010,45 +1050,45 @@ class StructureHexMeshDataStructure():
         nz = self.nz
         NE = self.NE
         isXDEdge = np.zeros(NE, dtype=np.bool)
-        isXDEdge[-nx * (ny + 1) * (nz + 1):] = True
+        isXDEdge[:nx * (ny + 1) * (nz + 1)] = True
         return isXDEdge
 
-    def z_direction_face_index(self):
+    def y_direction_edge_flag(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        return np.arange(nx * ny * (nz + 1))
+        NE = self.NE
+        isYDEdge = np.zeros(NE, dtype=np.bool)
+        isYDEdge[nx * (ny + 1) * (nz + 1):-(nx + 1) * (ny + 1) * nz] = True
+        return isYDEdge
 
-    def y_direction_face_index(self):
+    def z_direction_edge_flag(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        return np.arange(nx * ny * (nz + 1), nx * ny * (nz + 1) + nx * (ny + 1) * nz)
+        NE = self.NE
+        isZDEdge = np.zeros(NE, dtype=np.bool)
+        isZDEdge[-(nx + 1) * (ny + 1) * nz:] = True
+        return isZDEdge
 
     def x_direction_face_index(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        NF = self.NF
-        return np.arange(nx * ny * (nz + 1) + nx * (ny + 1) * nz, NF)
+        return np.arange((nx + 1) * ny * nz)
 
-    def z_direction_face_flag(self):
+    def y_direction_face_index(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        return np.arange((nx + 1) * ny * nz, (nx + 1) * ny * nz + nx * (ny + 1) * nz)
+
+    def z_direction_face_index(self):
         nx = self.nx
         ny = self.ny
         nz = self.nz
         NF = self.NF
-        isXDFace = np.zeros(NF, dtype=np.bool)
-        isXDFace[:nx * ny * (nz + 1)] = True
-        return isXDFace
-
-    def y_direction_face_flag(self):
-        nx = self.nx
-        ny = self.ny
-        nz = self.nz
-        NF = self.NF
-        isYDFace = np.zeros(NF, dtype=np.bool)
-        isYDFace[nx * ny * (nz + 1):-(nx + 1) * ny * nz] = True
-        return isYDFace
+        return np.arange((nx + 1) * ny * nz + nx * (ny + 1) * nz, NF)
 
     def x_direction_face_flag(self):
         nx = self.nx
@@ -1056,5 +1096,23 @@ class StructureHexMeshDataStructure():
         nz = self.nz
         NF = self.NF
         isZDFace = np.zeros(NF, dtype=np.bool)
-        isZDFace[-(nx + 1) * ny * nz:] = True
+        isZDFace[:(nx + 1) * ny * nz] = True
         return isZDFace
+
+    def y_direction_face_flag(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        isYDFace = np.zeros(NF, dtype=np.bool)
+        isYDFace[(nx + 1) * ny * nz:-nx * ny * (nz + 1)] = True
+        return isYDFace
+
+    def z_direction_face_flag(self):
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        NF = self.NF
+        isXDFace = np.zeros(NF, dtype=np.bool)
+        isXDFace[-nx * ny * (nz + 1):] = True
+        return isXDFace
