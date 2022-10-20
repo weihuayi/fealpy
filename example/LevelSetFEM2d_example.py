@@ -113,7 +113,7 @@ for i in range(nt):
     b = M@phi0 - dt/2*(C@phi0)
 
     phi0[:] = solver.solve(b, tol=1e-12)
-    print(phi0.shape)
+
     
     if output != 'None':
         fname = output + 'test_'+ str(i+1).zfill(10) + '.vtu'
