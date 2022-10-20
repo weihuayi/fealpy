@@ -208,17 +208,41 @@ class StructureHexMeshDataStructure():
 
         return edge
 
-    @property
-    def cell2edge(self):
-        NN = self.NN
+    def cell_to_edge(self):
+        """
+        The neighbor information of cell to edge
+        @brief 单元和边的邻接关系, 储存每个单元相邻的边的编号
+        """
+        NC = self.NC
         NE = self.NE
-        edge = self.edge
-        idx = range(1, NE + 1)
-        p2p = csr_matrix((idx, (edge[:, 0], edge[:, 1])), shape=(NN, NN),
-                         dtype=np.int)
-        totalEdge = self.total_edge()
-        cell2edge = np.asarray(p2p[totalEdge[:, 0], totalEdge[:, 1]]).reshape(-1, 12)
-        return cell2edge - 1
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+
+        cell2edge = np.zeros((NC, 12), dtype=np.int)
+
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
+        cell2edge[:, 1] = idx0[:, :-1, 1:].flatten()
+        cell2edge[:, 2] = idx0[:, 1:, :-1].flatten()
+        cell2edge[:, 3] = idx0[:, 1:, 1:].flatten()
+
+        NE0 = nx * (ny + 1) * (nz + 1)
+        idx1 = np.arange((nx + 1) * ny * (nz + 1)).reshape(nx + 1, ny, nz + 1)
+        cell2edge[:, 4] = (NE0 + idx1[:-1, :, :-1]).flatten()
+        cell2edge[:, 5] = (NE0 + idx1[:-1, :, 1:]).flatten()
+        cell2edge[:, 6] = (NE0 + idx1[1:, :, :-1]).flatten()
+        cell2edge[:, 7] = (NE0 + idx1[1:, :, 1:]).flatten()
+
+        NE1 = nx * (ny + 1) * (nz + 1) + (nx + 1) * ny * (nz + 1)
+        idx2 = np.arange((nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny + 1, nz)
+        cell2edge[:, 8] = (NE1 + idx2[:-1, :-1, :]).flatten()
+        cell2edge[:, 9] = (NE1 + idx2[:-1, 1:, :]).flatten()
+        cell2edge[:, 10] = (NE1 + idx2[1:, :-1, :]).flatten()
+        cell2edge[:, 11] = (NE1 + idx2[1:, 1:, :]).flatten()
+
+        return cell2edge
 
     def total_edge(self):
         """
@@ -245,22 +269,15 @@ class StructureHexMeshDataStructure():
         cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
         return cell2node
 
-    def cell_to_edge(self, sparse=False):
+    def total_face(self):
         """
-        The neighbor information of cell to edge
-        @brief 单元和边的邻接关系, 储存每个单元相邻的边的编号
+        @brief 储存每个单元的所有面的节点编号
         """
-        if sparse == False:
-            return self.cell2edge
-        else:
-            NC = self.NC
-            NE = self.NE
-            cell2edge = coo_matrix((NC, NE), dtype=np.bool)
-            E = self.E
-            I = np.repeat(range(NC), E)
-            val = np.ones(E * NC, dtype=np.bool)
-            cell2edge = csr_matrix((val, (I, self.cell2edge.flatten())), shape=(NC, NE), dtype=np.bool)
-            return cell2edge
+        NC = self.NC
+        cell = self.cell
+        localFace = self.localFace
+        totalFace = cell[:, localFace].reshape(-1, localFace.shape[1])
+        return np.sort(totalFace, axis=1)
 
     def cell_to_face(self, sparse=False):
         """
@@ -268,19 +285,31 @@ class StructureHexMeshDataStructure():
         """
         NC = self.NC
         NF = self.NF
-        face2cell = self.face2cell
-        if sparse == False:
-            F = self.F
-            cell2face = np.zeros((NC, F), dtype=np.int)
-            cell2face[face2cell[:, 0], face2cell[:, 2]] = range(NF)
-            cell2face[face2cell[:, 1], face2cell[:, 3]] = range(NF)
-            return cell2face
-        else:
-            val = np.ones((2 * NF,), dtype=np.bool)
-            I = face2cell[:, [0, 1]].flatten()
-            J = np.repeat(range(NF), 2)
-            cell2face = csr_matrix((val, (I, J)), shape=(NC, NF), dtype=np.bool)
-            return cell2face
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+
+        cell2face = np.zeros((NC, 6), dtype=np.int)
+
+        # x direction
+        idx0 = np.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
+        cell2face[:, 0] = idx0[:-1, :, :].flatten()
+        cell2face[:, 1] = idx0[1:, :, :].flatten()
+
+        # y direction
+        NE0 = (nx + 1) * ny * nz
+        idx1 = np.arange(nx * (ny + 1) * nz).reshape(nx, ny + 1, nz)
+        cell2face[:, 2] = (NE0 + idx1[:, :-1, :]).flatten()
+        cell2face[:, 3] = (NE0 + idx1[:, 1:, :]).flatten()
+
+        # z direction
+        NE1 = (nx + 1) * ny * nz + nx * (ny + 1) * nz
+        idx2 = np.arange(nx * ny * (nz + 1)).reshape(nx, ny, nz + 1)
+        cell2face[:, 4] = (NE1 + idx2[:, :, :-1]).flatten()
+        cell2face[:, 5] = (NE1 + idx2[:, :, 1:]).flatten()
+
+        return cell2face
 
     def cell_to_cell(self, return_sparse=False,
                      return_boundary=True, return_array=False):
@@ -288,82 +317,130 @@ class StructureHexMeshDataStructure():
         Get the adjacency information of cells
         @brief 单元和单元的邻接关系, 储存每个单元相邻的六个单元的编号
         """
-        if return_array:
-            return_sparse = False
-            return_boundary = False
-
+        NN = self.NN
         NC = self.NC
-        NF = self.NF
-        face2cell = self.face2cell
-        if (return_sparse == False) & (return_array == False):
-            F = self.F
-            cell2cell = np.zeros((NC, F), dtype=np.int)
-            cell2cell[face2cell[:, 0], face2cell[:, 2]] = face2cell[:, 1]
-            cell2cell[face2cell[:, 1], face2cell[:, 3]] = face2cell[:, 0]
-            return cell2cell
 
-        val = np.ones((NF,), dtype=np.bool)
-        if return_boundary:
-            cell2cell = coo_matrix(
-                (val, (face2cell[:, 0], face2cell[:, 1])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell += coo_matrix(
-                (val, (face2cell[:, 1], face2cell[:, 0])),
-                shape=(NC, NC), dtype=np.bool)
-            return cell2cell.tocsr()
-        else:
-            isInFace = (face2cell[:, 0] != face2cell[:, 1])
-            cell2cell = coo_matrix(
-                (val[isInFace], (face2cell[isInFace, 0], face2cell[isInFace, 1])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell += coo_matrix(
-                (val[isInFace], (face2cell[isInFace, 1], face2cell[isInFace, 0])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell = cell2cell.tocsr()
-            if return_array == False:
-                return cell2cell
-            else:
-                nn = cell2cell.sum(axis=1).reshape(-1)
-                _, adj = cell2cell.nonzero()
-                adjLocation = np.zeros(NC + 1, dtype=np.int32)
-                adjLocation[1:] = np.cumsum(nn)
-                return adj.astype(np.int32), adjLocation
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        idx = np.arange(NC).reshape(nx, ny, nz)
+        cell2cell = np.zeros((NC, 6), dtype=np.int)
+
+        # x direction
+        NE0 = 0
+        NE1 = ny * nz
+        NE2 = nx * ny * nz
+        cell2cell[NE0: NE1, 0] = idx[0, :, :].flatten()
+        cell2cell[NE1: NE2, 0] = idx[:-1, :, :].flatten()
+        cell2cell[NE0: NE2 - NE1, 1] = idx[1:, :, :].flatten()
+        cell2cell[NE2 - NE1: NE2, 1] = idx[-1, :, :].flatten()
+
+        # y direction
+        N = ny * nz
+        idx0 = np.zeros((nx, nz), dtype=np.int)
+        idx0 = np.arange(NE0, NE0 + nz)
+        idx0 = idx0 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx0 = idx0.flatten()
+
+        NE1 = NE0 + nz * (ny - 1)
+        idx1 = np.zeros((nx, nz), dtype=np.int)
+        idx1 = np.arange(NE1, NE1 + nz)
+        idx1 = idx1 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx1 = idx1.flatten()
+
+        cell2cell[idx0, 2] = idx0
+        ii = np.setdiff1d(idx.flatten(), idx0)
+        cell2cell[ii, 2] = ii - nz
+
+        cell2cell[idx1, 3] = idx1
+        ii = np.setdiff1d(idx.flatten(), idx1)
+        cell2cell[ii, 3] = ii + nz
+
+        # z direction
+        N = ny * nz
+        idx2 = np.zeros((nx, ny), dtype=np.int)
+        idx2 = np.arange(NE0, NE0 + N, nz)
+        idx2 = idx2 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx2 = idx2.flatten()
+
+        NE1 = NE0 + (nz - 1)
+        idx3 = np.zeros((nx, ny), dtype=np.int)
+        idx3 = np.arange(NE1, NE1 + N, nz)
+        idx3 = idx3 + np.arange(0, N * nx, N).reshape(nx, 1)
+        idx3 = idx3.flatten()
+
+        cell2cell[idx2, 4] = idx2
+        ii = np.setdiff1d(idx.flatten(), idx2)
+        cell2cell[ii, 4] = ii - 1
+
+        cell2cell[idx3, 5] = idx3
+        ii = np.setdiff1d(idx.flatten(), idx3)
+        cell2cell[ii, 5] = ii + 1
+
+        return cell2cell
 
     def face_to_node(self, return_sparse=False):
         """
         @brief 面和节点的邻接关系, 储存每个面相邻的四个节点的编号
         """
         face = self.face
-        FE = self.localFace.shape[1]
         if return_sparse == False:
             return face
         else:
             N = self.N
             NF = self.NF
-            I = np.repeat(range(NF), FE)
-            val = np.ones(FE * NF, dtype=np.bool)
-            face2node = csr_matrix((val, (I, face)), shape=(NF, N), dtype=np.bool)
+            I = np.repeat(range(NF), 4)
+            val = np.ones(4 * NF, dtype=np.bool)
+            face2node = csr_matrix((val, (I, face.flat)), shape=(NF, N), dtype=np.bool)
             return face2node
 
     def face_to_edge(self, return_sparse=False):
         """
         @brief 面和边的邻接关系, 储存每个面相邻的四个边的编号
         """
-        cell2edge = self.cell2edge
-        face2cell = self.face2cell
-        localFace2edge = self.localFace2edge
-        FE = localFace2edge.shape[1]
-        face2edge = cell2edge[face2cell[:, [0]], localFace2edge[face2cell[:, 2]]]
-        if return_sparse == False:
-            return face2edge
-        else:
-            NF = self.NF
-            NE = self.NE
-            I = np.repeat(range(NF), FE)
-            J = face2edge.flatten()
-            val = np.ones(FE * NF, dtype=np.bool)
-            f2e = csr_matrix((val, (I, J)), shape=(NF, NE), dtype=np.bool)
-            return f2e
+
+        NE = self.NE
+        NF = self.NF
+
+        nx = self.nx
+        ny = self.ny
+        nz = self.nz
+        face2edge = np.zeros((NF, 4), dtype=np.int)
+
+        # x direction
+        NE0 = 0
+        NE1 = (nx + 1) * ny * nz
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+        idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge[NE0:NE1, 2] = idx1[:, :-1, :].flatten()
+        face2edge[NE0:NE1, 3] = idx1[:, 1:, :].flatten()
+
+        # y direction
+        NE0 = NE1
+        NE1 += nx * (ny + 1) * nz
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge[NE0:NE1, 0] = idx0[:, :, :-1].flatten()
+        face2edge[NE0:NE1, 1] = idx0[:, :, 1:].flatten()
+
+        idx1 = np.arange(NE - (nx + 1) * (ny + 1) * nz, NE).reshape(nx + 1, ny + 1, nz)
+        face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+        # z direction
+        NE0 = NE1
+        NE1 += nx * ny * (nz + 1)
+        idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
+        face2edge[NE0:NE1, 0] = idx0[:, :-1, :].flatten()
+        face2edge[NE0:NE1, 1] = idx0[:, 1:, :].flatten()
+
+        idx1 = np.arange(nx * (ny + 1) * (nz + 1), NE - (nx + 1) * (ny + 1) * nz).reshape(nx + 1, ny, nz + 1)
+        face2edge[NE0:NE1, 2] = idx1[:-1, :, :].flatten()
+        face2edge[NE0:NE1, 3] = idx1[1:, :, :].flatten()
+
+        return face2edge
 
     def face_to_face(self):
         """
