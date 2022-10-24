@@ -20,7 +20,7 @@ class UniformMesh2d(Mesh2d):
 
         nx = extent[1] - extent[0]
         ny = extent[3] - extent[2]
-        self.ds = StructureMesh2dDataStructure(nx, ny)
+        self.ds = StructureMesh2dDataStructure(nx, ny,itype = itype)
 
         self.itype = itype 
         self.ftype = ftype 
@@ -152,11 +152,30 @@ class UniformMesh2d(Mesh2d):
 
     def value(self, p, f):
         """
-        @brief 
+        @brief 根据已知网格节点上的值，构造函数，求出非网格节点处的值
 
         f: (nx+1, ny+1)
         """
-        i, j = self.mesh.cell_location(p)
+        nx = self.ds.nx
+        ny = self.ds.ny
+        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+               self.origin[1], self.origin[1] + ny*self.h[1]]
+
+        hx = self.h[0]
+        hy = self.h[1]       
+        
+        i, j = self.cell_location(p)
+        i = i.astype(int)
+        j = j.astype(int)
+        x0 = i*hx+box[0]
+        y0 = j*hy+box[2]
+        F = f[i,j]*(1-(p[...,0]-x0)/hx)*(1-(p[...,1]-y0)/hy)\
+          + f[i+1,j]*(1-(x0+hx-p[...,0])/hx)*(1-(p[...,1]-y0)/hy)\
+          + f[i,j+1]*(1-(p[...,0]-x0)/hx)*(1-(y0+hy-p[...,1])/hy)\
+          + f[i+1,j+1]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)
+        return F
+        
+        
 
         pass
 
@@ -189,23 +208,23 @@ class UniformMesh2d(Mesh2d):
         fx, fy = np.gradient(f, hx, hy, edge_order=order)
         return fx, fy
         
-    def div(self, fx, fy, order=1):
+    def div(self, f_x, f_y, order=1):
         """
         @brief 求向量网格函数 (fx, fy) 的散度
         """
 
         hx = self.h[0]
         hy = self.h[1]
-        fxx = np.gradient(fx, hx, edge_order=order)
-        fyy = np.gradient(fy, hy, edge_order=order)
+        f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
+        f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
         return fxx + fyy
 
     def laplace(self, f, order=1):
         hx = self.h[0]
         hy = self.h[1]
         fx, fy = np.gradient(f, hx, hy, edge_order=order)
-        fxx= np.gradient(fx, hx, edge_order=order)
-        fyy = np.gradient(fy, hy, edge_order=order)
+        fxx,fxy = np.gradient(fx, hx, edge_order=order)
+        fyx,fyy = np.gradient(fy, hy, edge_order=order)
         return fxx + fyy 
 
     def laplace_operator(self):
@@ -297,7 +316,7 @@ class UniformMesh2d(Mesh2d):
         ny = self.ds.ny
         box = [self.origin[0], self.origin[0] + nx*self.h[0], 
                self.origin[1], self.origin[1] + ny*self.h[1]]
-
+	
         x = np.linspace(box[0], box[1], nx+1)
         y = np.linspace(box[2], box[3], ny+1)
         z = np.zeros(1)
@@ -312,16 +331,39 @@ class UniformMesh2dFunction():
     def __init__(self, mesh, f):
         self.mesh = mesh # (nx+1, ny+1)
         self.f = f   # (nx+1, ny+1)
-        self.fx, self.fy = mesh.gradient(f)
+        self.fx, self.fy = mesh.gradient(f) 
+        
+        
 
     def __call__(self, p):
+    
         pass
 
-    def value(self, p):
-        pass
+    def value(self, p, f):
+        mesh = self.mesh
+        F = mesh.value(p,f)
+        return F
+        
 
-    def gradient(self, p):
-        pass
+    def gradient(self, p, f):
+        mesh = self.mesh
+        fx = self.fx
+        fy = self.fy
+
+        gf = np.zeros((p.shape[0],p.shape[1]))
+        gf[...,0] = mesh.value(p,fx)
+        gf[...,1] = mesh.value(p,fy)
+        return gf
+        
+    def laplace(self, p, f):
+        mesh = self.mesh
+        fx = self.fx
+        fy = self.fy
+        lf = mesh.laplace(f)
+        F = mesh.value(p,lf)
+        return F
+         
+
 
 
 
