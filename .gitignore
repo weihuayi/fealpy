@@ -60,3 +60,4 @@ docs/vendor
 __pycache__
 *.mp4
 *.vtr
+*.pkl
