@@ -163,73 +163,62 @@ class StructureMesh2dDataStructure:
         The neighbor information of cell to edge
         @brief 单元和边的邻接关系，储存每个单元相邻的边的编号
         """
-        NE = self.NE
         NC = self.NC
-        E = self.E
+        NE = self.NE
 
-        edge2cell = self.edge2cell
+        nx = self.nx
+        ny = self.ny
 
-        if sparse == False:
-            cell2edge = np.zeros((NC, E), dtype=self.itype)
-            cell2edge[edge2cell[:, 0], edge2cell[:, 2]] = np.arange(NE,
-                                                                    dtype=self.itype)
-            cell2edge[edge2cell[:, 1], edge2cell[:, 3]] = np.arange(NE,
-                                                                    dtype=self.itype)
-            return cell2edge
-        else:
-            val = np.ones(2 * NE, dtype=np.bool)
-            I = edge2cell[:, [0, 1]].flatten()
-            J = np.repeat(range(NE), 2)
-            cell2edge = csr_matrix(
-                (val, (I, J)),
-                shape=(NC, NE), dtype=np.bool)
-            return cell2edge
+        cell2edge = np.zeros((NC, 4), dtype=np.int)
+
+        idx0 = np.arange(nx * (ny + 1)).reshape(nx, ny + 1)
+        cell2edge[:, 0] = idx0[:, :-1].flatten()
+        cell2edge[:, 1] = idx0[:, 1:].flatten()
+
+        idx1 = np.arange(nx * (ny + 1), NE).reshape(nx + 1, ny)
+        cell2edge[:, 2] = idx1[:-1, :].flatten()
+        cell2edge[:, 3] = idx1[1:, :].flatten()
+
+        return cell2edge
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
         """
         Consctruct the neighbor information of cells
         @brief 单元和单元的邻接关系，储存每个单元相邻的单元编号
         """
-        if return_array:
-            return_sparse = False
-            return_boundary = False
-
+        NN = self.NN
         NC = self.NC
-        E = self.E
-        edge2cell = self.edge2cell
-        if (return_sparse == False) & (return_array == False):
-            E = self.E
-            cell2cell = np.zeros((NC, E), dtype=np.int)
-            cell2cell[edge2cell[:, 0], edge2cell[:, 2]] = edge2cell[:, 1]
-            cell2cell[edge2cell[:, 1], edge2cell[:, 3]] = edge2cell[:, 0]
-            return cell2cell
-        NE = self.NE
-        val = np.ones((NE,), dtype=np.bool)
-        if return_boundary:
-            cell2cell = coo_matrix(
-                (val, (edge2cell[:, 0], edge2cell[:, 1])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell += coo_matrix(
-                (val, (edge2cell[:, 1], edge2cell[:, 0])),
-                shape=(NC, NC), dtype=np.bool)
-            return cell2cell.tocsr()
-        else:
-            isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
-            cell2cell = coo_matrix(
-                (val[isInEdge], (edge2cell[isInEdge, 0], edge2cell[isInEdge, 1])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell += coo_matrix(
-                (val[isInEdge], (edge2cell[isInEdge, 1], edge2cell[isInEdge, 0])),
-                shape=(NC, NC), dtype=np.bool)
-            cell2cell = cell2cell.tocsr()
-            if return_array == False:
-                return cell2cell
-            else:
-                nn = cell2cell.sum(axis=1).reshape(-1)
-                _, adj = cell2cell.nonzero()
-                adjLocation = np.zeros(NC + 1, dtype=np.int32)
-                adjLocation[1:] = np.cumsum(nn)
-                return adj.astype(np.int32), adjLocation
+
+        nx = self.nx
+        ny = self.ny
+        idx = np.arange(NC).reshape(nx, ny)
+        cell2cell = np.zeros((NC, 4), dtype=np.int)
+
+        # x direction
+        NE0 = 0
+        NE1 = ny
+        NE2 = nx * ny
+        cell2cell[NE0: NE1, 0] = idx[0, :].flatten()
+        cell2cell[NE1: NE2, 0] = idx[:-1, :].flatten()
+        cell2cell[NE0: NE2 - NE1, 1] = idx[1:, :].flatten()
+        cell2cell[NE2 - NE1: NE2, 1] = idx[-1, :].flatten()
+
+        # y direction
+        idx0 = np.arange(0, nx * ny, ny).reshape(nx, 1)
+        idx0 = idx0.flatten()
+
+        idx1 = idx0 + ny - 1
+        idx1 = idx1.flatten()
+
+        cell2cell[idx0, 2] = idx0
+        ii = np.setdiff1d(idx.flatten(), idx0)
+        cell2cell[ii, 2] = ii - 1
+
+        cell2cell[idx1, 3] = idx1
+        ii = np.setdiff1d(idx.flatten(), idx1)
+        cell2cell[ii, 3] = ii + 1
+
+        return cell2cell
 
     def edge_to_node(self, sparse=False):
         """
