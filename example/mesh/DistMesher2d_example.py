@@ -57,7 +57,6 @@ elif domain == 1:
         h = hmin + np.abs(fd(p))*0.1
         h[h>hmax] = hmax 
         return h
-
     domain = CircleDomain(fh=sizing_function)
 
 mesher = DistMesher2d(domain, hmin)
