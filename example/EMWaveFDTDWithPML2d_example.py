@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-# 
+#
 
 import argparse
 import numpy as np
 from fealpy.mesh import StructureQuadMesh
-from fealpy.timeintegratoralg import UniformTimeLine 
+from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
@@ -21,7 +21,7 @@ parser.add_argument('--NP',
         help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
 
 parser.add_argument('--NT',
-        default=500, type=int,
+        default=100, type=int,
         help='时间剖分段数， 默认为 500 段.')
 
 parser.add_argument('--ND',
@@ -82,7 +82,7 @@ timeline = UniformTimeLine(T0, T1, NT)
 dt = timeline.dt
 
 sx0 = mesh.interpolation(sigma_x, intertype='cell')
-sy0 = mesh.interpolation(sigma_y, intertype='cell') 
+sy0 = mesh.interpolation(sigma_y, intertype='cell')
 
 sx1 = mesh.interpolation(sigma_x, intertype='edgey')
 sy1 = mesh.interpolation(sigma_y, intertype='edgey')
@@ -115,7 +115,17 @@ c10 = 2 * R / (2 + sx0 * R * h)
 c11 = (2 - sy0 * R * h) / (2 + sy0 * R * h)
 c12 = 2 / (2 + sy0 * R * h)
 
-i = (NS+2*NP)//2
+def is_source(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    idx = (x > 0) & (x < 0.1) & (y > 0.1) & (y < 0.5)
+    return idx
+
+bc = mesh.entity_barycenter('cell')
+flag = is_source(bc)
+idx = mesh.cell_location(bc[flag])
+i = idx // mesh.ds.ny
+j = idx % mesh.ds.ny
 
 def init(axes):
     data = axes.imshow(Ez, cmap='jet', vmin=-0.5, vmax=0.5, extent=domain)
@@ -138,7 +148,7 @@ def forward(n):
         Ez *= c11
         Ez += c12 * (Dz1 - Dz0)
 
-        Ez[i, i] = np.sin(2 * np.pi * n * (R / ND))
+        Ez[i+1, j+1] = np.sin(2 * np.pi * n * (R / ND))
 
         Bx0[:] = Bx1
         By0[:] = By1
