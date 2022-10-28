@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# 
+#
 
 import argparse
 import numpy as np
@@ -25,7 +25,7 @@ parser.add_argument('--NP',
         help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
 
 parser.add_argument('--NT',
-        default=500, type=int,
+        default=100, type=int,
         help='时间剖分段数， 默认为 500 段.')
 
 parser.add_argument('--ND',
@@ -86,7 +86,7 @@ domain = [0-delta, 1+delta, 0-delta, 1+delta] # 增加了 PML 层的区域
 mesh = UniformMesh2d((0, NS+2*NP, 0, NS+2*NP), h=(h, h), origin=(-delta, -delta))
 
 sx0 = mesh.interpolation(sigma_x, intertype='cell')
-sy0 = mesh.interpolation(sigma_y, intertype='cell') 
+sy0 = mesh.interpolation(sigma_y, intertype='cell')
 
 sx1 = mesh.interpolation(sigma_x, intertype='edgey')
 sy1 = mesh.interpolation(sigma_y, intertype='edgey')
