@@ -3,7 +3,7 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh import StructureQuadMesh
+from fealpy.mesh import  UniformMesh2d
 from fealpy.timeintegratoralg import UniformTimeLine 
 import matplotlib.pyplot as plt
 
@@ -15,6 +15,10 @@ parser = argparse.ArgumentParser(description=
 parser.add_argument('--NS',
         default=101, type=int,
         help='区域 x 和 y 方向的剖分段数（取奇数）， 默认为 101 段.')
+
+parser.add_argument('--p',
+        default=(0.5, 0.5), type=float, nargs=2,
+        help='激励位置，默认是 (0.5, 0.5).')
 
 parser.add_argument('--NP',
         default=20, type=int,
@@ -49,9 +53,11 @@ ND = args.ND
 R = args.R
 m = args.m
 sigma = args.sigma
+p = np.array(args.p)
 
 T0 = 0
 T1 = NT
+dt = 1
 h = 1/NS
 delta = h*NP
 domain = [0, 1, 0, 1] # 原来的区域
@@ -77,9 +83,7 @@ def sigma_y(p):
     return val
 
 domain = [0-delta, 1+delta, 0-delta, 1+delta] # 增加了 PML 层的区域
-mesh = StructureQuadMesh(domain, nx=NS+2*NP, ny=NS+2*NP) # 建立结构网格对象
-timeline = UniformTimeLine(T0, T1, NT)
-dt = timeline.dt
+mesh = UniformMesh2d((0, NS+2*NP, 0, NS+2*NP), h=(h, h), origin=(-delta, -delta))
 
 sx0 = mesh.interpolation(sigma_x, intertype='cell')
 sy0 = mesh.interpolation(sigma_y, intertype='cell') 
@@ -115,7 +119,8 @@ c10 = 2 * R / (2 + sx0 * R * h)
 c11 = (2 - sy0 * R * h) / (2 + sy0 * R * h)
 c12 = 2 / (2 + sy0 * R * h)
 
-i = (NS+2*NP)//2
+i, j = mesh.cell_location(p)
+print(i, j)
 
 def init(axes):
     data = axes.imshow(Ez, cmap='jet', vmin=-0.5, vmax=0.5, extent=domain)
@@ -138,7 +143,7 @@ def forward(n):
         Ez *= c11
         Ez += c12 * (Dz1 - Dz0)
 
-        Ez[i, i] = np.sin(2 * np.pi * n * (R / ND))
+        Ez[i, j] = np.sin(2 * np.pi * n * (R / ND))
 
         Bx0[:] = Bx1
         By0[:] = By1

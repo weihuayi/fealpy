@@ -7,7 +7,6 @@ from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
 """
 二维 x 和 y 方向均匀离散的结构网格
-
 """
 
 class UniformMesh2d(Mesh2d):
@@ -77,12 +76,12 @@ class UniformMesh2d(Mesh2d):
             return xbc, ybc 
 
         elif etype in {'edgex'}:
-            box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
-            bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
+                   self.origin[1],               self.origin[1] + ny*self.h[1]]
+            bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
             bc[..., 0], bc[..., 1] = np.mgrid[
-                    box[0]:box[1]:complex(0, nx+1),
-                    box[2]:box[3]:complex(0, ny)]
+                    box[0]:box[1]:complex(0, nx),
+                    box[2]:box[3]:complex(0, ny+1)]
             return bc
 
         elif etype in {'edgey'}:
@@ -303,7 +302,7 @@ class UniformMesh2d(Mesh2d):
         n0 = v[..., 0]//hx
         n1 = v[..., 1]//hy
 
-        return n0, n1 
+        return int(n0), int(n1)
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
