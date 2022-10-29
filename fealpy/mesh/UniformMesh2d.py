@@ -281,6 +281,7 @@ class UniformMesh2d(Mesh2d):
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)
+            axes.set_aspect('equal')
             #fig.colorbar(data)
             return data 
 
@@ -302,7 +303,7 @@ class UniformMesh2d(Mesh2d):
         n0 = v[..., 0]//hx
         n1 = v[..., 1]//hy
 
-        return int(n0), int(n1)
+        return n0, n1
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
