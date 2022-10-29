@@ -303,7 +303,7 @@ class UniformMesh2d(Mesh2d):
         n0 = v[..., 0]//hx
         n1 = v[..., 1]//hy
 
-        return n0, n1
+        return n0.astype('int64'), n1.astype('int64')
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
