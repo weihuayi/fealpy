@@ -8,9 +8,9 @@ from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
-                                 """
-                                 在二维网格上用有限差分求解带 PML 层的 Maxwell 方程 
-                                 """)
+         """
+         在二维网格上用有限差分求解带 UPML 层的 Maxwell 方程 
+         """)
 
 parser.add_argument('--NS',
                     default=100, type=int,
