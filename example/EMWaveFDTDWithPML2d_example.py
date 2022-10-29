@@ -13,24 +13,24 @@ parser = argparse.ArgumentParser(description=
         """)
 
 parser.add_argument('--NS',
-        default=101, type=int,
-        help='区域 x 和 y 方向的剖分段数（取奇数）， 默认为 101 段.')
+        default=100, type=int,
+        help='区域 x 和 y 方向的剖分段数（取奇数）， 默认为 100 段.')
 
 parser.add_argument('--p',
-        default=(0.5, 0.5), type=float, nargs=2,
-        help='激励位置，默认是 (0.5, 0.5).')
+        default=(0.8, 0.3), type=float, nargs=2,
+        help='激励位置，默认是 (0.8, 0.3).')
 
 parser.add_argument('--NP',
         default=20, type=int,
         help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
 
 parser.add_argument('--NT',
-        default=100, type=int,
+        default=500, type=int,
         help='时间剖分段数， 默认为 500 段.')
 
 parser.add_argument('--ND',
-        default=20, type=int,
-        help='一个波长剖分的网格段数， 默认为 20 段.')
+        default=10, type=int,
+        help='一个波长剖分的网格段数， 默认为 10 段.')
 
 parser.add_argument('--R',
         default=0.5, type=int,
@@ -83,7 +83,7 @@ def sigma_y(p):
     return val
 
 domain = [0-delta, 1+delta, 0-delta, 1+delta] # 增加了 PML 层的区域
-mesh = UniformMesh2d((0, NS+2*NP, 0, NS+2*NP), h=(h, h), origin=(-delta, -delta))
+mesh = UniformMesh2d((0, NS+2*NP, 0, NS+2*NP), h=(h, h), origin=(-delta, -delta)) # 建立结构网格对象
 
 sx0 = mesh.interpolation(sigma_x, intertype='cell')
 sy0 = mesh.interpolation(sigma_y, intertype='cell')
@@ -119,15 +119,26 @@ c10 = 2 * R / (2 + sx0 * R * h)
 c11 = (2 - sy0 * R * h) / (2 + sy0 * R * h)
 c12 = 2 / (2 + sy0 * R * h)
 
-i, j = mesh.cell_location(p)
-print(i, j)
+def is_source(p):
+    x = p[..., 0]
+    y = p[..., 1]
+    idx = (x > 0) & (x < 0.01) & (y > 0.1) & (y < 0.9)
+    return idx
+
+bc = mesh.entity_barycenter('cell')
+flag = is_source(bc)
+i, j = mesh.cell_location(bc[flag])
 
 def init(axes):
-    data = axes.imshow(Ez, cmap='jet', vmin=-0.5, vmax=0.5, extent=domain)
+    axes.set_xlabel('x')
+    axes.set_ylabel('y')
+
+    node = mesh.entity('node')
+    data = axes.pcolormesh(node[..., 0], node[..., 1], Ez, cmap='jet', vmax=0.5, vmin=-0.5)
     return data
 
 def forward(n):
-    global Ez
+    global Ez, i, j
     t = T0 + n*dt
     if n == 0:
         return Ez, t
@@ -143,8 +154,7 @@ def forward(n):
         Ez *= c11
         Ez += c12 * (Dz1 - Dz0)
 
-        Ez[i, j] = np.sin(2 * np.pi * n * (R / ND))
-
+        Ez[i.astype('int64'), j.astype('int64')] = np.sin(2 * np.pi * n * (R / ND))
         Bx0[:] = Bx1
         By0[:] = By1
         Dz0[:] = Dz1
