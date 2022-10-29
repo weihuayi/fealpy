@@ -277,7 +277,7 @@ class UniformMesh2d(Mesh2d):
         data = init(axes)
         def func(n, *fargs):
             Ez, t = forward(n)
-            data.set_data(Ez)
+            data.set_array(Ez)
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)
