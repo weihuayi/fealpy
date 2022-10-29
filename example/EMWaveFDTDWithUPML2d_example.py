@@ -8,41 +8,49 @@ from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
-        """
-        在二维网格上用有限差分求解带 PML 层的 Maxwell 方程 
-        """)
+                                 """
+                                 在二维网格上用有限差分求解带 PML 层的 Maxwell 方程 
+                                 """)
 
 parser.add_argument('--NS',
-        default=100, type=int,
-        help='区域 x 和 y 方向的剖分段数（取奇数）， 默认为 100 段.')
+                    default=100, type=int,
+                    help='区域 x 和 y 方向的剖分段数， 默认为 100 段.')
+
+parser.add_argument('--wave_type',
+                    default='point_wave', type=str,
+                    help='波的类型')
 
 parser.add_argument('--p',
-        default=(0.8, 0.3), type=float, nargs=2,
-        help='激励位置，默认是 (0.8, 0.3).')
+                    default=(0.8, 0.3), type=float, nargs=2,
+                    help='激励位置，默认是 (0.8, 0.3).')
+
+parser.add_argument('--plane_wave_x',
+                    default=0.5, type=float,
+                    help='平面波的位置')
 
 parser.add_argument('--NP',
-        default=20, type=int,
-        help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
+                    default=20, type=int,
+                    help='PML 层的剖分段数， 默认为 20 段.')
 
 parser.add_argument('--NT',
-        default=500, type=int,
-        help='时间剖分段数， 默认为 500 段.')
+                    default=500, type=int,
+                    help='时间剖分段数， 默认为 500 段.')
 
 parser.add_argument('--ND',
-        default=10, type=int,
-        help='一个波长剖分的网格段数， 默认为 10 段.')
+                    default=10, type=int,
+                    help='一个波长剖分的网格段数， 默认为 10 段.')
 
 parser.add_argument('--R',
-        default=0.5, type=int,
-        help='网比， 默认为 0.5.')
+                    default=0.5, type=int,
+                    help='网比， 默认为 0.5.')
 
 parser.add_argument('--m',
-        default=6, type=float,
-        help='')
+                    default=6, type=float,
+                    help='')
 
 parser.add_argument('--sigma',
-        default=100, type=float,
-        help='最大电导率，默认取 100.')
+                    default=100, type=float,
+                    help='最大电导率，默认取 100.')
 
 args = parser.parse_args()
 
@@ -53,7 +61,7 @@ ND = args.ND
 R = args.R
 m = args.m
 sigma = args.sigma
-p = np.array(args.p)
+wave_type = args.wave_type
 
 T0 = 0
 T1 = NT
@@ -119,15 +127,16 @@ c10 = 2 * R / (2 + sx0 * R * h)
 c11 = (2 - sy0 * R * h) / (2 + sy0 * R * h)
 c12 = 2 / (2 + sy0 * R * h)
 
-def is_source(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    idx = (x > 0) & (x < 0.01) & (y > 0.1) & (y < 0.9)
-    return idx
+if wave_type == 'point_wave':
+    p = np.array(args.p)
+    i, j = mesh.cell_location(p)
 
-bc = mesh.entity_barycenter('cell')
-flag = is_source(bc)
-i, j = mesh.cell_location(bc[flag])
+elif wave_type == 'plane_wave':
+    xx = args.plane_wave_x
+    is_source = lambda p: (p[..., 0] > xx) & (p[..., 0] < xx + 0.01) & (p[..., 1] > 0) & (p[..., 1] < 1)
+    bc = mesh.entity_barycenter('cell')
+    flag = is_source(bc)
+    i, j = mesh.cell_location(bc[flag])
 
 def init(axes):
     axes.set_xlabel('x')
@@ -153,7 +162,6 @@ def forward(n):
         Dz1 = c9 * Dz0 + c10 * (Hy[1:, :] - Hy[0:-1, :] - Hx[:, 1:] + Hx[:, 0:-1])
         Ez *= c11
         Ez += c12 * (Dz1 - Dz0)
-
         Ez[i.astype('int64'), j.astype('int64')] = np.sin(2 * np.pi * n * (R / ND))
         Bx0[:] = Bx1
         By0[:] = By1
