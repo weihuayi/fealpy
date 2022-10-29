@@ -162,7 +162,7 @@ def forward(n):
         Dz1 = c9 * Dz0 + c10 * (Hy[1:, :] - Hy[0:-1, :] - Hx[:, 1:] + Hx[:, 0:-1])
         Ez *= c11
         Ez += c12 * (Dz1 - Dz0)
-        Ez[i.astype('int64'), j.astype('int64')] = np.sin(2 * np.pi * n * (R / ND))
+        Ez[i, j] = np.sin(2 * np.pi * n * (R / ND))
         Bx0[:] = Bx1
         By0[:] = By1
         Dz0[:] = Dz1
