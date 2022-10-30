@@ -143,6 +143,19 @@ class SinData(MaxwellPDE):
         mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
         return mesh
 
+class BubbleData(MaxwellPDE):
+    def __init__(self):
+        C = CoordSys3D('C')
+        f = (C.x**2-C.x)*(C.y**2-C.y)*(C.z**2-C.z)
+        u = f*C.i + sym.sin(C.x)*f*C.j + sym.sin(C.y)*f*C.k
+        super(BubbleData, self).__init__(u)
+
+    def init_mesh(self, n=1):
+        box = [0, 1, 0, 1, 0, 1]
+        mesh = MeshFactory.boxmesh3d(box, nx=n, ny=n, nz=n, meshtype='tet')
+        return mesh
+
+
 class XXX3dData():
     def __init__(self, n=2):
         self.n = n

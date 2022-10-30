@@ -8,6 +8,9 @@ from ..quadrature import TetrahedronQuadrature, TriangleQuadrature, GaussLegendr
 from ..decorator import timer
 
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
+    OFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
+    SFace = np.array([(1, 2, 3),  (0, 2, 3), (0, 1, 3), (0, 1, 2)])  
+
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
     localFace2edge = np.array([(5, 4, 3), (5, 1, 2), (4, 2, 0), (3, 0, 1)])
