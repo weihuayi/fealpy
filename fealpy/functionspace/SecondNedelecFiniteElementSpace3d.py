@@ -506,8 +506,15 @@ class SecondNedelecFiniteElementSpace3d():
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         c2d = self.dof.cell_to_dof() #(NC, ldof)
 
-        p = mesh.bc_to_point(bcs) #(NQ, NC, GD)
-        fval = f(p) #(NQ, NC, GD)
+        if hasattr(f, 'coordtype'):
+            if f.coordtype == 'cartesian':
+                pp = self.mesh.bc_to_point(bcs)
+                fval = f(pp)
+            elif f.coordtype == 'barycentric':
+                fval = f(bcs)
+        else:
+            pp = mesh.bc_to_point(bcs) #(NQ, NC, GD)
+            fval = f(pp) #(NQ, NC, GD)
 
         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
         val = np.einsum("qcg, qclg, q, c->cl", fval, phi, ws, cm)# (NC, ldof)
