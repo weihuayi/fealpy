@@ -65,22 +65,129 @@ class UniformMesh3d(Mesh3d):
                     box[2]:box[3]:complex(0, ny),
                     box[4]:box[5]:complex(0, nz)]
             return bc
+
         elif etype in {'facex'}: # 法线和 x 轴平行的面
-            pass
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            bc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny),
+                                                 box[2]:box[3]:complex(0, nz)]
+            return bc
+
         elif etype in {'facey'}: # 法线和 y 轴平行的面
-            pass
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            bc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz)]
+            return bc
+
         elif etype in {'facez'}: # 法线和 z 轴平行的面
-            pass
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
+                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            bc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx),
+                                                 box[2]:box[3]:complex(0, ny),
+                                                 box[2]:box[3]:complex(0, nz + 1)]
+            return bc
+
         elif etype in {'face', 2}: # 所有的面
-            pass
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            xbc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
+            xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny),
+                                                 box[2]:box[3]:complex(0, nz)]
+
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            ybc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
+            ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz)]
+
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
+                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            zbc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
+            zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx),
+                                                 box[2]:box[3]:complex(0, ny),
+                                                 box[2]:box[3]:complex(0, nz + 1)]
+
+            return xbc, ybc, zbc
+
         elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            pass 
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            bc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                     box[0]:box[1]:complex(0, nx),
+                                     box[2]:box[3]:complex(0, ny + 1),
+                                     box[2]:box[3]:complex(0, nz + 1)]
+            return bc
         elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            pass
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1]+ self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
+                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            bc = np.zeros((nx + 1, ny, nz + 1, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny),
+                                                 box[2]:box[3]:complex(0, nz + 1)]
+            return bc
         elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            pass
-        elif etype in {'edge', 1}: # 所有的边 
-            pass
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            bc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
+            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz)]
+            return bc
+        elif etype in {'edge', 1}: # 所有的边
+            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            xbc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
+            xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz + 1)]
+
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            ybc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
+            ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz)]
+
+            box = [self.origin[0], self.origin[0] + nx * self.h[0],
+                   self.origin[1], self.origin[1] + ny * self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            zbc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
+            zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
+                                                 box[0]:box[1]:complex(0, nx + 1),
+                                                 box[2]:box[3]:complex(0, ny + 1),
+                                                 box[2]:box[3]:complex(0, nz)]
+
+            return xbc, ybc, zbc
         elif etype in {'node', 0}:
             return node
         else:
@@ -113,25 +220,32 @@ class UniformMesh3d(Mesh3d):
 
         nx = self.ds.nx
         ny = self.ds.ny
+        nz = self.ds.nz
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
             uh = np.zeros((nx+1+2*ex, ny+1+2*ex, nz+1+2*ex), dtype=dtype)
         elif etype in {'facex'}: # 法线和 x 轴平行的面
-            pass
+            uh = np.zeros((nx+1, ny, nz), dtype=dtype)
         elif etype in {'facey'}: # 法线和 y 轴平行的面
-            pass
+            uh = np.zeros((nx, ny+1, nz), dtype=dtype)
         elif etype in {'facez'}: # 法线和 z 轴平行的面
-            pass
+            uh = np.zeros((nx, ny, nz+1), dtype=dtype)
         elif etype in {'face', 2}: # 所有的面
-            pass
+            ex = np.zeros((nx+1, ny, nz), dtype=dtype)
+            ey = np.zeros((nx, ny+1, nz), dtype=dtype)
+            ez = np.zeros((nx, ny, nz+1), dtype=dtype)
+            uh = (ex, ey, ez)
         elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            pass 
+            uh = np.zeros((nx, ny+1, nz+1), dtype=dtype)
         elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            pass
+            uh = np.zeros((nx+1, ny, nz+1), dtype=dtype)
         elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            pass
+            uh = np.zeros((nx+1, ny+1, nz), dtype=dtype)
         elif etype in {'edge', 1}: # 所有的边 
-            pass
+            ex = np.zeros((nx, ny+1, nz+1), dtype=dtype)
+            ey = np.zeros((nx+1, ny, nz+1), dtype=dtype)
+            ez = np.zeros((nx+1, ny+1, nz), dtype=dtype)
+            uh = (ex, ey, ez)
         elif etype in {'cell', 2}:
             uh = np.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
         else:
@@ -158,22 +272,30 @@ class UniformMesh3d(Mesh3d):
         node = self.node
         if intertype == 'node':
             F = f(node)
-        elif etype in {'facex'}: # 法线和 x 轴平行的面
-            pass
-        elif etype in {'facey'}: # 法线和 y 轴平行的面
-            pass
-        elif etype in {'facez'}: # 法线和 z 轴平行的面
-            pass
-        elif etype in {'face', 2}: # 所有的面
-            pass
-        elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            pass 
-        elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            pass
-        elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            pass
-        elif etype in {'edge', 1}: # 所有的边 
-            pass
+        elif intertype in {'facex'}: # 法线和 x 轴平行的面
+            xbc = self.entity_barycenter('facex')
+            F = f(xbc)
+        elif intertype in {'facey'}: # 法线和 y 轴平行的面
+            ybc = self.entity_barycenter('facey')
+            F = f(ybc)
+        elif intertype in {'facez'}: # 法线和 z 轴平行的面
+            zbc = self.entity_barycenter('facez')
+            F = f(zbc)
+        elif intertype in {'face', 2}: # 所有的面
+            xbc, ybc, zbc = self.entity_barycenter('face')
+            F = f(xbc), f(ybc), f(zbc)
+        elif intertype in {'edgex'}: # 切向与 x 轴平行的边
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype in {'edgey'}: # 切向与 y 轴平行的边
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype in {'edgez'}: # 切向与 z 轴平行的边
+            zbc = self.entity_barycenter('edgez')
+            F = f(zbc)
+        elif intertype in {'edge', 1}: # 所有的边
+            xbc, ybc, zbc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc), f(zbc)
         elif intertype == 'cell':
             bc = self.entity_barycenter('cell')
             F = f(bc)
@@ -312,7 +434,7 @@ class UniformMesh3d(Mesh3d):
 
         nx = self.ds.nx
         ny = self.ds.ny
-        nz = self.da.nz
+        nz = self.ds.nz
         box = [self.origin[0], self.origin[0] + nx*self.h[0], 
                self.origin[1], self.origin[1] + ny*self.h[1],
                self.origin[2], self.origin[2] + ny*self.h[2],

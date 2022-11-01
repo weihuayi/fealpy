@@ -7,7 +7,6 @@ from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
 """
 二维 x 和 y 方向均匀离散的结构网格
-
 """
 
 class UniformMesh2d(Mesh2d):
@@ -64,25 +63,25 @@ class UniformMesh2d(Mesh2d):
             box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             xbc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-            xbc[..., 0], bc[..., 1] = np.mgrid[
+            xbc[..., 0], xbc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx),
                     box[2]:box[3]:complex(0, ny+1)]
 
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
                    self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
             ybc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-            ybc[..., 0], bc[..., 1] = np.mgrid[
+            ybc[..., 0], ybc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx+1),
                     box[2]:box[3]:complex(0, ny)]
             return xbc, ybc 
 
         elif etype in {'edgex'}:
-            box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
-            bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
+                   self.origin[1],               self.origin[1] + ny*self.h[1]]
+            bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
             bc[..., 0], bc[..., 1] = np.mgrid[
-                    box[0]:box[1]:complex(0, nx+1),
-                    box[2]:box[3]:complex(0, ny)]
+                    box[0]:box[1]:complex(0, nx),
+                    box[2]:box[3]:complex(0, ny+1)]
             return bc
 
         elif etype in {'edgey'}:
@@ -278,10 +277,11 @@ class UniformMesh2d(Mesh2d):
         data = init(axes)
         def func(n, *fargs):
             Ez, t = forward(n)
-            data.set_data(Ez)
+            data.set_array(Ez)
             s = "frame=%05d, time=%0.8f"%(n, t)
             print(s)
             axes.set_title(s)
+            axes.set_aspect('equal')
             #fig.colorbar(data)
             return data 
 
@@ -303,7 +303,7 @@ class UniformMesh2d(Mesh2d):
         n0 = v[..., 0]//hx
         n1 = v[..., 1]//hy
 
-        return n0, n1 
+        return n0.astype('int64'), n1.astype('int64')
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
