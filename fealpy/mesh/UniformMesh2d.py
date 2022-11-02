@@ -63,14 +63,14 @@ class UniformMesh2d(Mesh2d):
             box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             xbc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-            xbc[..., 0], bc[..., 1] = np.mgrid[
+            xbc[..., 0], xbc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx),
                     box[2]:box[3]:complex(0, ny+1)]
 
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
                    self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
             ybc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-            ybc[..., 0], bc[..., 1] = np.mgrid[
+            ybc[..., 0], ybc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx+1),
                     box[2]:box[3]:complex(0, ny)]
             return xbc, ybc 
