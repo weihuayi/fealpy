@@ -335,7 +335,7 @@ def show_mesh_2d(
         cellcolor = mapper.to_rgba(cellcolor)
         if showcolorbar:
             f = axes.get_figure()
-            f.colorbar(mapper, shrink=0.5, ax=axes)
+            f.colorbar(mapper, shrink=colorbarshrink, ax=axes)
     node = mesh.entity('node')
     cell = mesh.entity('cell')
 
@@ -426,6 +426,19 @@ def show_mesh_3d(
         return axes.add_collection3d(edges)
 
     face = mesh.boundary_face(threshold=threshold)
+
+    face = mesh.entity('face')
+    isBdFace = mesh.ds.boundary_face_flag()
+    if threshold is None:
+        face = face[isBdFace][:, mesh.ds.ccw]
+    else:
+        bc = self.entity_barycenter('cell')
+        isKeepCell = threshold(bc)
+        face2cell = mesh.ds.face_to_cell()
+        isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1
+        isBdFace = (np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 2) & isBdFace
+        face = face[isBdFace | isInterfaceFace][:, mesh.ds.ccw]
+
     faces = a3.art3d.Poly3DCollection(
             node[face],
             facecolor=facecolor,

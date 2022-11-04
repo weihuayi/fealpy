@@ -37,24 +37,6 @@ class Mesh3d():
     def top_dimension(self):
         return 3
 
-    def boundary_face(self, threshold=None):
-        face = self.entity('face')
-        isBdFace = self.ds.boundary_face_flag()
-        if threshold is None:
-            return face[isBdFace]
-        else:
-            bc = self.entity_barycenter('cell')
-            isKeepCell = threshold(bc)
-            face2cell = self.ds.face_to_cell()
-            isInterfaceFace = np.sum(
-                    isKeepCell[face2cell[:, 0:2]],
-                    axis=-1) == 1
-            isBdFace = (np.sum(
-                    isKeepCell[face2cell[:, 0:2]],
-                    axis=-1) == 2) & isBdFace
-            return face[isBdFace | isInterfaceFace]
-
-
     def entity(self, etype='cell'):
         if etype in {'cell', 3}:
             return self.ds.cell

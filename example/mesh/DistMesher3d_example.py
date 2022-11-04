@@ -136,7 +136,9 @@ elif domain == 4: # 偶极子天线模型
     dt = 2*np.pi/n
     theta  = np.arange(0, 2*np.pi, dt)
 
-
+elif domain == 5:
+    domain = TorusDomain()
+    
 mesher = DistMesher3d(domain, hmin, output=True)
 mesh = mesher.meshing(maxit)
 mesh.to_vtk(fname='test.vtu')

@@ -1,69 +1,71 @@
 #!/usr/bin/env python3
 #
 
-import numpy as np
-import matplotlib.pylab as plt
 import argparse
-
+import numpy as np
 from fealpy.mesh import StructureQuadMesh
-
-class EMWaveData2D:
-    def __init__(self, kappa=None):
-        self.kappa = 20  # 波数
-        self.s = 0.5     # 网比(时间稳定因子)
-
-    def domian(self):
-        return [0, 100, 0, 100]
-
-    def dirichlet(self, n):
-        return np.sin(2 * np.pi * n * (0.5 / self.kappa))
-
+from fealpy.timeintegratoralg import UniformTimeLine
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser(description=
         """
-        在二维Yee网格上用有限差分(FDTD)求解Maxwell方程,
-        并且没有ABC(吸收边界条件)
+        在二维网格上用有限差分求解 Maxwell 方程,
         """)
 
-parser.add_argument('--NX',
+parser.add_argument('--NS',
         default=200, type=int,
-        help='x轴剖分段数， 默认为 200 段.')
-
-parser.add_argument('--NY',
-        default=200, type=int,
-        help='y轴剖分段数， 默认为 200 段.')
+        help='区域 x 和 y 方向的剖分段数， 默认为 200 段.')
 
 parser.add_argument('--NT',
-        default=200, type=int,
-        help='时间剖分段数， 默认为 200 段.')
+        default=500, type=int,
+        help='时间剖分段数， 默认为 500 段.')
+
+parser.add_argument('--ND',
+        default=20, type=int,
+        help='一个波长剖分的网格段数， 默认为 20 段.')
+
+parser.add_argument('--R',
+        default=0.5, type=int,
+        help='网比， 默认为 0.5.')
 
 args = parser.parse_args()
-nx = args.NX
-ny = args.NY
-nt = args.NT
 
-pde = EMWaveData2D()
-mesh = StructureQuadMesh(pde.domian(), nx=nx, ny=ny)
+NS = args.NS
+NT = args.NT
+ND = args.ND
+R = args.R
 
-NN = mesh.number_of_nodes()
-NC = mesh.number_of_cells()
+T0 = 0
+T1 = NT
 
-Nshape = int(np.sqrt(NN))
-Cshape = int(np.sqrt(NC))
+domain = [0, 100, 0, 100] # 笛卡尔坐标空间
+mesh = StructureQuadMesh(domain, nx = NS, ny = NS) # 建立结构网格对象
+timeline = UniformTimeLine(T0, T1, NT)
+dt = timeline.dt
 
-e = np.zeros([Nshape, Nshape])
-hx = np.zeros([Cshape-1, Cshape])
-hy = np.zeros([Cshape, Cshape-1])
+Hx, Hy = mesh.function(etype='edge', dtype=np.float64) # 定义在网格边上的离散函数
+Ez = mesh.function(etype='cell', dtype=np.float64) # 定义在网格单元上的离散函数
 
-for n in range(nt):
-    hx[:] -= pde.s * np.diff(e[1:-1, :], axis=1)
-    hy[:] += pde.s * np.diff(e[:, 1:-1], axis=0)
+i = NS // 2
 
-    e[1:-1, 1:-1] += pde.s * (np.diff(hy, axis=0) - np.diff(hx, axis=1))
-    e[int(nx / 2 + 1), int(ny / 2 + 1)] += pde.dirichlet(n)
+def init(axes):
+    data = axes.imshow(Ez, cmap='jet', vmin=-0.2, vmax=0.2, extent=domain)
+    return data
 
+def forward(n):
+    global Ez
+    t = T0 + n*dt
+    if n == 0:
+        return Ez, t
+    else:
+        Hx[:, 1:-1] -= R * (Ez[:, 1:] - Ez[:, 0:-1])
+        Hy[1:-1, :] += R * (Ez[1:, :] - Ez[0:-1, :])
+        Ez += R * (Hy[1:, :] - Hy[0:-1, :] - Hx[:, 1:] + Hx[:, 0:-1])
 
-plt.imshow(e, cmap='jet', extent=pde.domian())
-plt.colorbar()
+        Ez[i, i] = np.sin(2 * np.pi * n * (R / ND))
+        return Ez, t
+
+fig, axes = plt.subplots()
+mesh.show_animation(fig, axes, domain, init, forward, frames=NT + 1)
 plt.show()
 

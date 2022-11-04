@@ -59,3 +59,5 @@ docs/vendor
 .jekyll-cache
 __pycache__
 *.mp4
+*.vtr
+*.pkl

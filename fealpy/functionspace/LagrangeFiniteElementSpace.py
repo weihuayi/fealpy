@@ -953,7 +953,7 @@ class LagrangeFiniteElementSpace():
         gdof = self.number_of_global_dofs()
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
-        M = self.integralalg.parallel_construct_matrix(b0, cfun=cfun, q=q)
+        M = self.integralalg.parallel_construct_matrix(b0, c=c, q=q)
         return M
 
     def parallel_source_vector(self, f, dim=None):
@@ -984,6 +984,8 @@ class LagrangeFiniteElementSpace():
             Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
             A = T@A@T + Tbd
+
+        A.eliminate_zeros()
         return A 
 
     def mass_matrix(self, c=None, q=None):
@@ -991,6 +993,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
+        A.eliminate_zeros()
         return A 
 
     def div_matrix(self, pspace, q=None):

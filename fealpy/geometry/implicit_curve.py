@@ -294,7 +294,7 @@ class Curve3():
 
 class BicornCurve():
     '''
-        http://www-gap.dcs.st-and.ac.uk/~history/Curves/Bicorn.html
+    Bicorn curve
     '''
     def __init__(self, a):
         self.a = a
