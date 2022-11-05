@@ -9,26 +9,29 @@ class BilinearForm(Operator):
     def __init__(self, space):
         self.space = space
         self.M = None # 
-        self.domain_integrators = [] #
-        self.boundary_integrators = [] #
+        self.dints = [] # 区域积分子
+        self.bints = [] # 边界积分子
 
     def add_domain_integrator(self, I):
         """
         @brief 增加一个区域积分对象
         """
-        self.domain_integrators.append(integ)
+        self.dints.append(I)
 
 
     def add_boundary_integrator(self, I):
         """
         @brief 增加一个边界积分对象
         """
-        self.boundary_integrators.append(I)
+        self.bints.append(I)
 
-    def mult(self, x):
+    def mult(self, x, out=None):
         """
         """
-        return self.M@x
+        if out is None:
+            return self.M@x
+        else:
+            out[:] = self.M@x
 
     def add_mult(self, x, y, a=1.0):
         y += a*(self.M@x)
