@@ -3,7 +3,7 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh import StructureHexMesh
+from fealpy.mesh import UniformMesh3d
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 from scipy.constants import epsilon_0
@@ -17,9 +17,21 @@ parser.add_argument('--NS',
                     default=100, type=int,
                     help='区域 x、y 和 z 方向的剖分段数， 默认为 100 段.')
 
+parser.add_argument('--wave_type',
+                    default='plane_wave', type=str,
+                    help='波的类型')
+
+parser.add_argument('--p',
+                    default=(0.8, 0.3, 0.5), type=float, nargs=2,
+                    help='激励位置，默认是 (0.8, 0.3, 0.5).')
+
+parser.add_argument('--plane_wave_x',
+                    default=0.5, type=float,
+                    help='平面波的位置')
+
 parser.add_argument('--NP',
                     default=20, type=int,
-                    help='PML 层的剖分段数（取偶数）， 默认为 20 段.')
+                    help='PML 层的剖分段数， 默认为 20 段.')
 
 parser.add_argument('--NT',
                     default=500, type=int,
@@ -30,8 +42,8 @@ parser.add_argument('--ND',
                     help='一个波长剖分的网格段数， 默认为 20 段.')
 
 parser.add_argument('--R',
-                    default=0.5, type=int,
-                    help='网比， 默认为 0.5.')
+                    default=0.3, type=int,
+                    help='网比， 默认为 0.3.')
 
 parser.add_argument('--m',
                     default=6, type=float,
@@ -58,6 +70,7 @@ ND = args.ND
 R = args.R
 m = args.m
 sigma = args.sigma
+wave_type = args.wave_type
 
 output = args.output
 step = args.step
@@ -97,7 +110,7 @@ def sigma_z(p):
     return val
 
 domain = [0 - delta, 1 + delta, 0 - delta, 1 + delta, 0 - delta, 1 + delta]  # 增加了 PML 层的区域
-mesh = StructureHexMesh(domain, nx=NS + 2 * NP, ny=NS + 2 * NP, nz=NS + 2 * NP)  # 建立结构网格对象
+mesh = UniformMesh3d((0, NS+2*NP, 0, NS+2*NP, 0, NS+2*NP), h=(h, h, h), origin=(-delta, -delta, -delta))  # 建立结构网格对象
 
 sx0 = mesh.interpolation(sigma_x, intertype='facex')
 sy0 = mesh.interpolation(sigma_y, intertype='facex')
@@ -174,7 +187,17 @@ c28 = (2 - sx5[1:-1, 1:-1, :] * R * h) / (2 + sx5[1:-1, 1:-1, :] * R * h)
 c29 = (2 + sz5[1:-1, 1:-1, :] * R * h) / (2 + sx5[1:-1, 1:-1, :] * R * h)
 c30 = (2 - sz5[1:-1, 1:-1, :] * R * h) / (2 + sx5[1:-1, 1:-1, :] * R * h)
 
-i = (NS + 2 * NP) // 2
+if wave_type == 'point_wave':
+    p = np.array(args.p)
+    i, j, k = mesh.cell_location(p)
+
+elif wave_type == 'plane_wave':
+    xx = args.plane_wave_x
+    is_source = lambda p: (p[..., 0] > xx) & (p[..., 0] < xx + 0.01) & (p[..., 1] > 0) & (p[..., 1] < 1) \
+                         & (p[..., 2] > 0) & (p[..., 2] < 0.01)
+    bc = mesh.entity_barycenter('cell')
+    flag = is_source(bc)
+    i, j, k = mesh.cell_location(bc[flag])
 
 for n in range(NT):
     print('dt={}'.format(n))
@@ -194,7 +217,7 @@ for n in range(NT):
     Ey1[1:-1, :, 1:-1] = c25 * Ey0[1:-1, :, 1:-1] + c26 * Dy1[1:-1, :, 1:-1] - c27 * Dy0[1:-1, :, 1:-1]
     Ez1[1:-1, 1:-1, :] = c28 * Ez0[1:-1, 1:-1, :] + c29 * Dz1[1:-1, 1:-1, :] - c30 * Dz0[1:-1, 1:-1, :]
 
-    Ez1[i, i, i] = 0.1 * np.sin(2 * np.pi * n * (R / ND))
+    Ez1[i, j, k] = 0.1 * np.sin(2 * np.pi * n * (R / ND))
 
     Bx0[:] = Bx1
     By0[:] = By1
