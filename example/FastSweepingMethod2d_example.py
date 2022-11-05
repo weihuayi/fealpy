@@ -3,9 +3,9 @@
 import argparse
 import numpy as np
 import matplotlib.pyplot as plt
-from fealpy.mesh import UniformMesh2d 
+from fealpy.mesh import UniformMesh2d, UniformMesh2dFunction
 from fealpy.geometry import FoldCurve
-from fealpy.geometry.geoalg import project
+
 
 parser = argparse.ArgumentParser(description=
         """
@@ -35,12 +35,7 @@ curve = args.curve
 m = args.M
 output = args.output
 
-if curve == 'fold': 
-    curve  = FoldCurve(6)
-else:
-    pass
-
-
+curve  = FoldCurve(6)
 box = curve.box # 这里假定 box 是一个正方形区域
 origin = (box[0], box[2])
 extent = [0, ns, 0, ns]
@@ -59,7 +54,14 @@ sign = np.sign(phi[1:-1, 1:-1])
 # 标记界面附近的点
 isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
 
+lsfun = UniformMesh2dFunction(mesh, phi[1:-1, 1:-1])
+
 _, d = curve.project(node[isNearNode[1:-1, 1:-1]])
+#_, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
+
+print(d)
+
+
 phi[isNearNode] = np.abs(d) #界面附近的点用精确值
 phi[~isNearNode] = m  # 其它点用一个比较大的值
 
