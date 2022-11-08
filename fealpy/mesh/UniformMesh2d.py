@@ -5,6 +5,8 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .Mesh2d import Mesh2d
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
+from ..geometry import project
+
 """
 二维 x 和 y 方向均匀离散的结构网格
 """
@@ -63,14 +65,14 @@ class UniformMesh2d(Mesh2d):
             box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             xbc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-            xbc[..., 0], bc[..., 1] = np.mgrid[
+            xbc[..., 0], xbc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx),
                     box[2]:box[3]:complex(0, ny+1)]
 
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
                    self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
             ybc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-            ybc[..., 0], bc[..., 1] = np.mgrid[
+            ybc[..., 0], ybc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx+1),
                     box[2]:box[3]:complex(0, ny)]
             return xbc, ybc 
@@ -164,8 +166,6 @@ class UniformMesh2d(Mesh2d):
         hy = self.h[1]       
         
         i, j = self.cell_location(p)
-        i = i.astype(int)
-        j = j.astype(int)
         x0 = i*hx+box[0]
         y0 = j*hy+box[2]
         F = f[i,j]*(1-(p[...,0]-x0)/hx)*(1-(p[...,1]-y0)/hy)\
@@ -174,9 +174,6 @@ class UniformMesh2d(Mesh2d):
           + f[i+1,j+1]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)
         return F
         
-        
-
-        pass
 
     def interpolation(self, f, intertype='node'):
         nx = self.ds.nx
@@ -324,44 +321,107 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
+    def fast_sweeping_method(self):
+        """
+        @brief 均匀网格上的 fast sweeping method
+
+        @note 注意，我们这里假设 x 和 y 方向剖分的段数相等
+        """
+        a = np.zeros(ns+1, dtype=np.float64) 
+        b = np.zeros(ns+1, dtype=np.float64)
+        c = np.zeros(ns+1, dtype=np.float64)
+
+        n = 0
+        for i in range(1, ns+2):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+
+        for i in range(ns+1, 0, -1):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+        for j in range(1, ns+2):
+            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+        for j in range(ns+1, 0, -1):
+            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
 
 
 class UniformMesh2dFunction():
-
     def __init__(self, mesh, f):
         self.mesh = mesh # (nx+1, ny+1)
         self.f = f   # (nx+1, ny+1)
         self.fx, self.fy = mesh.gradient(f) 
-        
-        
 
     def __call__(self, p):
-    
-        pass
-
-    def value(self, p, f):
         mesh = self.mesh
-        F = mesh.value(p,f)
+        F = mesh.value(p, self.f)
         return F
-        
+    
+    def value(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
 
-    def gradient(self, p, f):
+    def gradient(self, p):
         mesh = self.mesh
         fx = self.fx
         fy = self.fy
-
-        gf = np.zeros((p.shape[0],p.shape[1]))
-        gf[...,0] = mesh.value(p,fx)
-        gf[...,1] = mesh.value(p,fy)
+        gf = np.zeros_like(p)
+        gf[..., 0] = mesh.value(p, fx)
+        gf[..., 1] = mesh.value(p, fy)
         return gf
         
-    def laplace(self, p, f):
-        mesh = self.mesh
-        fx = self.fx
-        fy = self.fy
-        lf = mesh.laplace(f)
-        F = mesh.value(p,lf)
-        return F
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
          
 
 
