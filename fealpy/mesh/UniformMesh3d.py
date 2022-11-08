@@ -5,6 +5,8 @@ from scipy.sparse import coo_matrix, csr_matrix
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
+from ..geometry import project
+
 class UniformMesh3d(Mesh3d):
     """
     @brief 
@@ -267,7 +269,37 @@ class UniformMesh3d(Mesh3d):
 
         return dx, dy, dz
 
+    def value(self, p, f):
+        """
+        @brief 根据已知网格节点上的值，构造函数，求出非网格节点处的值
 
+        f: (nx+1, ny+1)
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+               self.origin[1], self.origin[1] + ny*self.h[1],
+               self.origin[2], self.origin[2] + nz*self.h[2]]
+
+        hx = self.h[0]
+        hy = self.h[1]     
+        hz = self.h[2]  
+        
+        i, j, k = self.cell_location(p)
+        x0 = i*hx+box[0]
+        y0 = j*hy+box[2]
+        z0 = k*hz+box[4]
+        F = f[i, j, k]*(1-(p[..., 0]-x0)/hx)*(1-(p[..., 1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
+	  + f[i+1, j, k]*(1-(x0+hx-p[...,0])/hx)*(1-(p[...,1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
+	  + f[i, j+1, k]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
+	  + f[i+1, j+1, k]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
+	  + f[i, j, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(p[...,1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
+	  + f[i+1, j, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(p[..., 1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
+	  + f[i, j+1, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)\
+	  + f[i+1, j+1, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)
+        return F
+        
     def interpolation(self, f, intertype='node'):
         node = self.node
         if intertype == 'node':
@@ -311,7 +343,7 @@ class UniformMesh3d(Mesh3d):
         fx, fy, fz= np.gradient(f, hx, hy, hz, edge_order=order)
         return fx, fy, fz
         
-    def div(self, fx, fy, fz, order=1):
+    def div(self, f_x, f_y, f_z, order=1):
         """
         @brief 求向量网格函数 (fx, fy) 的散度
         """
@@ -319,19 +351,19 @@ class UniformMesh3d(Mesh3d):
         hx = self.h[0]
         hy = self.h[1]
         hz = self.h[2]
-        fxx = np.gradient(fx, hx, edge_order=order)
-        fyy = np.gradient(fy, hy, edge_order=order)
-        fzz = np.gradient(fz, hz, edge_order=order)
-        return fxx + fyy + fzz
+        f_xx, f_xy, f_xz = np.gradient(f_x, hx, hy, hz, edge_order=order)
+        f_yx, f_yy, f_yz = np.gradient(f_y, hx, hy, hz, edge_order=order)
+        f_zx, f_zy, f_zz = np.gradient(f_z, hx, hy, hz, edge_order=order)
+        return f_xx + f_yy + f_zz
 
     def laplace(self, f, order=1):
         hx = self.h[0]
         hy = self.h[1]
         hz = self.h[2]
         fx, fy, fz = np.gradient(f, hx, hy, hz, edge_order=order)
-        fxx= np.gradient(fx, hx, edge_order=order)
-        fyy = np.gradient(fy, hy, edge_order=order)
-        fzz = np.gradient(fz, hz, edge_order=order)
+        fxx, fxy, fxz = np.gradient(fx, hx, hy, hz, edge_order=order)
+        fyx, fyy, fyz = np.gradient(fy, hx, hy, hz, edge_order=order)
+        fzx, fzy, fzz = np.gradient(fz, hx, hy ,hz, edge_order=order)
         return fxx + fyy + fzz
 
     def laplace_operator(self):
@@ -424,7 +456,7 @@ class UniformMesh3d(Mesh3d):
         n1 = v[..., 1]//hy
         n2 = v[..., 2]//hz
 
-        return n0, n1, n2
+        return n0.astype('int64'), n1.astype('int64'), n2.astype('int64')
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
@@ -446,3 +478,39 @@ class UniformMesh3d(Mesh3d):
         gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
 
         return filename
+        
+        
+        
+class UniformMesh3dFunction():
+    def __init__(self, mesh, f):
+        self.mesh = mesh # (nx+1, ny+1, nz+1)
+        self.f = f   # (nx+1, ny+1, nz+1)
+        self.fx, self.fy ,self.fz = mesh.gradient(f) 
+
+    def __call__(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
+    
+    def value(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
+
+    def gradient(self, p):
+        mesh = self.mesh
+        fx = self.fx
+        fy = self.fy
+        fz = self.fz
+        gf = np.zeros_like(p)
+        gf[..., 0] = mesh.value(p, fx)
+        gf[..., 1] = mesh.value(p, fy)
+        gf[..., 2] = mesh.value(p, fz)
+        return gf
+        
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
