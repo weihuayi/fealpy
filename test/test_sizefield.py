@@ -7,7 +7,7 @@ from fealpy.mesh import UniformMesh2d, MeshFactory
 def ff(x):
     y = np.linalg.norm(x - np.array([[-0.1, -0.1]]), axis=-1)
     #y[:] = 1
-    return 1/y**4
+    return (2*y)**2
 
 
 def t2b(mesht, meshb, tf):
@@ -33,6 +33,8 @@ def t2b(mesht, meshb, tf):
                 numf[base[k, 0]+i, base[k, 1]+j] += weight[k]
     flag = numf > 0
     bf[flag] = bf[flag]/numf[flag]
+    pnode = meshb.entity('node')
+    print(np.max(np.abs(bf[1:-1, 1:-1]-ff(pnode[1:-1, 1:-1]))))
 
 
 box = [0, 1, 0, 1]
@@ -43,11 +45,12 @@ origin = [0, 0]
 extend = [0, N+1, 0, N+1]
 
 meshb = UniformMesh2d(extend, h, origin) # 背景网格
-mesht = MeshFactory.triangle([0, 1, 0, 1], 0.005)
+mesht = MeshFactory.triangle([0, 1, 0, 1], 0.1)
 tnode = mesht.entity('node')
 tval = ff(tnode)
 
 t2b(mesht, meshb, tval)
+meshb.stiff_matrix()
 
 
 

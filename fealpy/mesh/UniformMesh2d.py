@@ -154,10 +154,11 @@ class UniformMesh2d(Mesh2d):
     def mass_matrix(self):
         h = self.h
         Mc = np.array([[4., 2., 1., 2.],
-                      [2., 4., 2., 1.],
-                      [1., 2., 4., 2.],
-                      [2., 1., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
+                       [2., 4., 2., 1.],
+                       [1., 2., 4., 2.],
+                       [2., 1., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
         cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
         data = np.broadcast_to(Mc, (NC, 4, 4))
@@ -165,6 +166,34 @@ class UniformMesh2d(Mesh2d):
         J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
         M = csr_matrix((data, (I, J)), shape=(NN, NN))
         return M
+
+    def stiff_matrix(self):
+        h = self.h
+        S0c = np.array([[ 2., -2., -1.,  1.],
+                        [-2.,  2.,  1., -1.],
+                        [-1.,  1.,  2., -2.],
+                        [ 1., -1., -2.,  2.]], dtype=np.float_)*h[1]/h[0]/6
+        S1c = np.array([[ 2.,  1., -1., -2.],
+                        [ 1.,  2., -2., -1.],
+                        [-1., -2.,  2.,  1.],
+                        [-2., -1.,  1.,  2.]], dtype=np.float_)*h[0]/h[1]/6
+        Sc = S0c + S1c
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Sc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        M = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    def source_vector(self, f):
+        cellbar = self.entity_barycenter('cell')
+        fval = f(cellbar).reshape(-1) # (nx, ny)
+        
+
+
 
     def value(self, p, f):
         """
