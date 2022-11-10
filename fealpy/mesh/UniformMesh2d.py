@@ -25,6 +25,7 @@ class UniformMesh2d(Mesh2d):
 
         self.itype = itype 
         self.ftype = ftype 
+        self.meshtype = 'StructureQuadMesh2d'
 
     def geo_dimension(self):
         return 2
@@ -105,7 +106,7 @@ class UniformMesh2d(Mesh2d):
         """
         return self.h[0]*self.h[1]
 
-    def edge_length(self):
+    def edge_length(self, index=np.s_[:]):
         """
         @brief 返回边长，注意这里返回两个值，一个 x 方向，一个 y 方向
         """
@@ -150,6 +151,20 @@ class UniformMesh2d(Mesh2d):
 
         return dx, dy
 
+    def mass_matrix(self):
+        h = self.h
+        Mc = np.array([[4., 2., 1., 2.],
+                      [2., 4., 2., 1.],
+                      [1., 2., 4., 2.],
+                      [2., 1., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
+        cell2node = self.entity('cell')
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Mc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        M = csr_matrix((data, (I, J)), shape=(NN, NN))
+        return M
 
     def value(self, p, f):
         """
