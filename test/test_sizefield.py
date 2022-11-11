@@ -1,13 +1,14 @@
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
 
 from fealpy.mesh import UniformMesh2d, MeshFactory
 
 def ff(x):
     y = np.linalg.norm(x - np.array([[-0.1, -0.1]]), axis=-1)
     #y[:] = 1
-    return (2*y)**2
+    return (2*y)**1
 
 
 def t2b(mesht, meshb, tf):
@@ -34,7 +35,7 @@ def t2b(mesht, meshb, tf):
     flag = numf > 0
     bf[flag] = bf[flag]/numf[flag]
     pnode = meshb.entity('node')
-    print(np.max(np.abs(bf[1:-1, 1:-1]-ff(pnode[1:-1, 1:-1]))))
+    #print(np.max(np.abs(bf[1:-1, 1:-1]-ff(pnode[1:-1, 1:-1]))))
 
 
 box = [0, 1, 0, 1]
@@ -45,21 +46,27 @@ origin = [0, 0]
 extend = [0, N+1, 0, N+1]
 
 meshb = UniformMesh2d(extend, h, origin) # 背景网格
-mesht = MeshFactory.triangle([0, 1, 0, 1], 0.1)
+mesht = MeshFactory.triangle([0, 1, 0, 1], 1)
 tnode = mesht.entity('node')
 tval = ff(tnode)
 
 t2b(mesht, meshb, tval)
 meshb.stiff_matrix()
+v = meshb.source_vector(ff)
+M = meshb.mass_matrix()
+u = spsolve(M, v)
+A = meshb.stiff_matrix()
+print(np.max(u - ff(meshb.node).reshape(-1)))
 
 
 
-fig = plt.figure()
-axes = fig.gca()
-mesht.add_plot(axes)
 
-fig = plt.figure()
-axes = fig.gca()
-meshb.add_plot(axes)
+#fig = plt.figure()
+#axes = fig.gca()
+#mesht.add_plot(axes)
+
+#fig = plt.figure()
+#axes = fig.gca()
+#meshb.add_plot(axes)
 #plt.show()
 
