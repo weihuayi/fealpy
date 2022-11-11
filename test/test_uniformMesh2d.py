@@ -33,5 +33,41 @@ def test_stiff_matrix()
     print(f)
     print(nf)
 
+def test_poisson():
+
+    box = [0, 1, 0, 1]
+    N = int(sys.argv[1])
+    h = [1/N, 1/N]
+    origin = [-1/4/N, -1/4/N]
+    origin = [0, 0]
+    extend = [0, N+1, 0, N+1]
+
+    meshb = UniformMesh2d(extend, h, origin) # 背景网格
+    mesht = MeshFactory.triangle([0, 1, 0, 1], 1)
+    tnode = mesht.entity('node')
+    tval = ff(tnode)
+
+    t2b(mesht, meshb, tval)
+    meshb.stiff_matrix()
+    pnode = meshb.entity('node').reshape(-1, 2)
+
+    F = meshb.source_vector(source)
+    A = meshb.stiff_matrix()
+    x = meshb.function().reshape(-1)
+
+    isDDof = meshb.ds.boundary_node_flag()
+    x[isDDof] = exu(pnode[isDDof])
+
+    F -= A@x
+    bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+    bdIdx[isDDof] = 1
+    Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+    T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+    A = T@A@T + Tbd
+    F[isDDof] = x[isDDof]
+
+    x = spsolve(A, F)
+    print(np.max(np.abs(x - exu(pnode))))
+
 
 

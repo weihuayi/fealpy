@@ -188,6 +188,23 @@ class UniformMesh2d(Mesh2d):
         S = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
         return S
 
+    def nabla_2_matrix(self):
+        h = self.h
+        N2c = np.array([[ 1., -1., -1.,  1.],
+                        [-1.,  1.,  1., -1.],
+                        [-1.,  1.,  1., -1.],
+                        [ 1., -1., -1.,  1.]], dtype=np.float_)*4/(h[1]*h[0])
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(N2c, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return N2
+
+
     def source_vector(self, f):
         cellarea = self.cell_area()
         cell2node = self.entity('cell')
@@ -195,6 +212,11 @@ class UniformMesh2d(Mesh2d):
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        #fval = f(node[cell])*cellarea/4 # (NC, )
 
         fval = f(cellbar).reshape(-1) # (NC, )
         fval = fval*cellarea/4
