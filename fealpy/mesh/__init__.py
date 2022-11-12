@@ -8,7 +8,7 @@ This module provide mesh
 
 # 结构化网格
 from .UniformMesh2d import UniformMesh2d,UniformMesh2dFunction
-from .UniformMesh3d import UniformMesh3d
+from .UniformMesh3d import UniformMesh3d,UniformMesh3dFunction
 from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
