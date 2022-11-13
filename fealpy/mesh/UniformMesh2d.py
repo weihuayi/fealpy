@@ -2,6 +2,7 @@
 import numpy as np
 from types import ModuleType
 from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.linalg import spsolve
 from .Mesh2d import Mesh2d
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
@@ -204,6 +205,41 @@ class UniformMesh2d(Mesh2d):
         N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
         return N2
 
+    def nabla_jump_matrix(self):
+        h, nx, ny = self.h, self.ds.nx, self.ds.ny
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        Jumpe = np.array([[ 2.,  1., -4., -2.,  2.,  1.],
+                          [ 1.,  2., -2., -4.,  1.,  2.],
+                          [-4., -2.,  8.,  4., -4., -2.],
+                          [-2., -4.,  4.,  8., -2., -4.],
+                          [ 2.,  1., -4., -2.,  2.,  1.],
+                          [ 1.,  2., -2., -4.,  1.,  2.]])*(h[1]/h[0]/h[0]/6)
+        edge = self.entity('edge')
+        edgex = edge[:nx*(ny+1)].reshape(nx, ny+1, 2)
+        edgey = edge[nx*(ny+1):].reshape(nx+1, ny, 2)
+
+        edgey2dof = np.zeros([nx-1, ny, 6], dtype=np.int_)
+        edgey2dof[..., 0:2] = edgey[1:-1]-ny-1
+        edgey2dof[..., 2:4] = edgey[1:-1]
+        edgey2dof[..., 4:6] = edgey[1:-1]+ny+1
+
+        data = np.broadcast_to(Jumpe, (nx-1, ny, 6, 6))
+        I = np.broadcast_to(edgey2dof[..., None], data.shape)
+        J = np.broadcast_to(edgey2dof[..., None, :], data.shape)
+        Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        edgex2dof = np.zeros([nx, ny-1, 6], dtype=np.int_)
+        edgex2dof[..., 0:2] = edgex[:, 1:-1]-1
+        edgex2dof[..., 2:4] = edgex[:, 1:-1]
+        edgex2dof[..., 4:6] = edgex[:, 1:-1]+1
+
+        data = np.broadcast_to(Jumpe, (nx, ny-1, 6, 6))
+        I = np.broadcast_to(edgex2dof[..., None], data.shape)
+        J = np.broadcast_to(edgex2dof[..., None, :], data.shape)
+        Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return Jump
 
     def source_vector(self, f):
         cellarea = self.cell_area()
@@ -464,7 +500,39 @@ class UniformMesh2d(Mesh2d):
             mesh.to_vtk_file(fname, nodedata=nodedata)
             n += 1
 
+    def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
+        '''!
+        @brief 将 x, y 插值为网格函数
+        @param x : 样本点
+        @param y : 样本点的值
+        '''
+        h, origin, nx, ny = self.h, self.origin, self.ds.nx, self.ds.ny
+        cell = self.entity('cell').reshape(nx, ny, 4)
 
+        NS = len(x) 
+        NN = self.number_of_nodes()
+
+        Xp = (x-origin)/h # (NS, 2)
+        cellIdx = Xp.astype(np.int_) # 样本点所在单元
+        val = Xp - cellIdx 
+
+        I = np.repeat(np.arange(NS), 4)
+        J = cell[cellIdx[:, 0], cellIdx[:, 1]]
+        data = np.zeros([NS, 4], dtype=np.float_)
+        data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
+        data[:, 1] = (1-val[:, 0])*val[:, 1]
+        data[:, 2] = val[:, 0]*val[:, 1]
+        data[:, 3] = val[:, 0]*(1-val[:, 1])
+
+        A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
+        B = self.stiff_matrix()
+        C = self.nabla_2_matrix()
+        D = self.nabla_jump_matrix()
+
+        S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+        F = alpha[0]*A.T@y
+        f = spsolve(S, F).reshape(nx+1, ny+1)
+        return UniformMesh2dFunction(self, f)
 
 class UniformMesh2dFunction():
     def __init__(self, mesh, f):
@@ -497,10 +565,18 @@ class UniformMesh2dFunction():
         """
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
         return p, d 
-         
 
+    @classmethod
+    def from_sample_points(self, x, y, nx=10, ny=10):
+        '''!
+        @param x, y : 样本点和值
+        '''
+        minx, miny = np.min(x[..., 0]), np.min(x[..., 1])
+        maxx, maxy = np.max(x[..., 0]), np.max(x[..., 1])
 
-
+        h = np.array([(maxx-minx)/nx, (maxy-miny)/ny])
+        mesh = UniformMesh2d([0, nx+1, 0, ny+1], h, np.array([minx, miny])) 
+        return mesh.interpolation_with_sample_points(x, y)
 
 
 
