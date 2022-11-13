@@ -9,8 +9,8 @@ class BilinearForm(Operator):
     def __init__(self, space):
         self.space = space
         self.M = None # 
-        self.dints = [] # 区域积分子
-        self.bints = [] # 边界积分子
+        self.dintegrators = [] # 区域积分子
+        self.bintegrators = [] # 边界积分子
 
     def add_domain_integrator(self, I):
         """
