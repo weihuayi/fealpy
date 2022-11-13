@@ -65,7 +65,6 @@ uh = space.function()
 
 # 组装刚度矩阵
 A = space.stiff_matrix()
-print(A.toarray())
 
 # 右端载荷
 F = space.source_vector(pde.source)
