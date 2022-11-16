@@ -2,8 +2,11 @@
 import numpy as np
 from types import ModuleType
 from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.linalg import spsolve
 from .Mesh2d import Mesh2d
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
+
+from ..geometry import project
 
 """
 二维 x 和 y 方向均匀离散的结构网格
@@ -23,6 +26,7 @@ class UniformMesh2d(Mesh2d):
 
         self.itype = itype 
         self.ftype = ftype 
+        self.meshtype = 'StructureQuadMesh2d'
 
     def geo_dimension(self):
         return 2
@@ -103,7 +107,7 @@ class UniformMesh2d(Mesh2d):
         """
         return self.h[0]*self.h[1]
 
-    def edge_length(self):
+    def edge_length(self, index=np.s_[:]):
         """
         @brief 返回边长，注意这里返回两个值，一个 x 方向，一个 y 方向
         """
@@ -148,6 +152,115 @@ class UniformMesh2d(Mesh2d):
 
         return dx, dy
 
+    def mass_matrix(self):
+        h = self.h
+        Mc = np.array([[4., 2., 2., 1.],
+                       [2., 4., 1., 2.],
+                       [2., 1., 4., 2.],
+                       [1., 2., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Mc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        M = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    def stiff_matrix(self):
+        h = self.h
+        S0c = np.array([[ 2.,  1., -2., -1.],
+                        [ 1.,  2., -1., -2.],
+                        [-2., -1.,  2.,  1.],
+                        [-1., -2.,  1.,  2.]], dtype=np.float_)*h[1]/h[0]/6
+        S1c = np.array([[ 2., -2.,  1., -1.],
+                        [-2.,  2., -1.,  1.],
+                        [ 1., -1.,  2., -2.],
+                        [-1.,  1., -2.,  2.]], dtype=np.float_)*h[0]/h[1]/6
+        Sc = S0c + S1c
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Sc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        S = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return S
+
+    def nabla_2_matrix(self):
+        h = self.h
+        N2c = np.array([[ 1., -1., -1.,  1.],
+                        [-1.,  1.,  1., -1.],
+                        [-1.,  1.,  1., -1.],
+                        [ 1., -1., -1.,  1.]], dtype=np.float_)*4/(h[1]*h[0])
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(N2c, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return N2
+
+    def nabla_jump_matrix(self):
+        h, nx, ny = self.h, self.ds.nx, self.ds.ny
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        Jumpe = np.array([[ 2.,  1., -4., -2.,  2.,  1.],
+                          [ 1.,  2., -2., -4.,  1.,  2.],
+                          [-4., -2.,  8.,  4., -4., -2.],
+                          [-2., -4.,  4.,  8., -2., -4.],
+                          [ 2.,  1., -4., -2.,  2.,  1.],
+                          [ 1.,  2., -2., -4.,  1.,  2.]])*(h[1]/h[0]/h[0]/6)
+        edge = self.entity('edge')
+        edgex = edge[:nx*(ny+1)].reshape(nx, ny+1, 2)
+        edgey = edge[nx*(ny+1):].reshape(nx+1, ny, 2)
+
+        edgey2dof = np.zeros([nx-1, ny, 6], dtype=np.int_)
+        edgey2dof[..., 0:2] = edgey[1:-1]-ny-1
+        edgey2dof[..., 2:4] = edgey[1:-1]
+        edgey2dof[..., 4:6] = edgey[1:-1]+ny+1
+
+        data = np.broadcast_to(Jumpe, (nx-1, ny, 6, 6))
+        I = np.broadcast_to(edgey2dof[..., None], data.shape)
+        J = np.broadcast_to(edgey2dof[..., None, :], data.shape)
+        Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        edgex2dof = np.zeros([nx, ny-1, 6], dtype=np.int_)
+        edgex2dof[..., 0:2] = edgex[:, 1:-1]-1
+        edgex2dof[..., 2:4] = edgex[:, 1:-1]
+        edgex2dof[..., 4:6] = edgex[:, 1:-1]+1
+
+        data = np.broadcast_to(Jumpe, (nx, ny-1, 6, 6))
+        I = np.broadcast_to(edgex2dof[..., None], data.shape)
+        J = np.broadcast_to(edgex2dof[..., None, :], data.shape)
+        Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return Jump
+
+    def source_vector(self, f):
+        cellarea = self.cell_area()
+        cell2node = self.entity('cell')
+        cellbar = self.entity_barycenter('cell')
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        #fval = f(node[cell])*cellarea/4 # (NC, )
+
+        fval = f(cellbar).reshape(-1) # (NC, )
+        fval = fval*cellarea/4
+        fval = np.broadcast_to(fval[:, None], (NC, 4))
+
+        F = np.zeros(NN, dtype=np.float_)
+        np.add.at(F, cell2node, fval)
+        return F
 
     def value(self, p, f):
         """
@@ -164,8 +277,6 @@ class UniformMesh2d(Mesh2d):
         hy = self.h[1]       
         
         i, j = self.cell_location(p)
-        i = i.astype(int)
-        j = j.astype(int)
         x0 = i*hx+box[0]
         y0 = j*hy+box[2]
         F = f[i,j]*(1-(p[...,0]-x0)/hx)*(1-(p[...,1]-y0)/hy)\
@@ -174,9 +285,6 @@ class UniformMesh2d(Mesh2d):
           + f[i+1,j+1]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)
         return F
         
-        
-
-        pass
 
     def interpolation(self, f, intertype='node'):
         nx = self.ds.nx
@@ -324,48 +432,151 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
+    def fast_sweeping_method(self):
+        """
+        @brief 均匀网格上的 fast sweeping method
 
+        @note 注意，我们这里假设 x 和 y 方向剖分的段数相等
+        """
+        a = np.zeros(ns+1, dtype=np.float64) 
+        b = np.zeros(ns+1, dtype=np.float64)
+        c = np.zeros(ns+1, dtype=np.float64)
+
+        n = 0
+        for i in range(1, ns+2):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+
+        for i in range(ns+1, 0, -1):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+        for j in range(1, ns+2):
+            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+        for j in range(ns+1, 0, -1):
+            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
+            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(a-b) >= h 
+            c[flag] = np.minimum(a[flag], b[flag]) + h 
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
+
+            fname = output + 'test'+ str(n).zfill(10)
+            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
+            nodedata = {'phi':data}
+            mesh.to_vtk_file(fname, nodedata=nodedata)
+            n += 1
+
+    def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
+        '''!
+        @brief 将 x, y 插值为网格函数
+        @param x : 样本点
+        @param y : 样本点的值
+        '''
+        h, origin, nx, ny = self.h, self.origin, self.ds.nx, self.ds.ny
+        cell = self.entity('cell').reshape(nx, ny, 4)
+
+        NS = len(x) 
+        NN = self.number_of_nodes()
+
+        Xp = (x-origin)/h # (NS, 2)
+        cellIdx = Xp.astype(np.int_) # 样本点所在单元
+        val = Xp - cellIdx 
+
+        I = np.repeat(np.arange(NS), 4)
+        J = cell[cellIdx[:, 0], cellIdx[:, 1]]
+        data = np.zeros([NS, 4], dtype=np.float_)
+        data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
+        data[:, 1] = (1-val[:, 0])*val[:, 1]
+        data[:, 2] = val[:, 0]*val[:, 1]
+        data[:, 3] = val[:, 0]*(1-val[:, 1])
+
+        A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
+        B = self.stiff_matrix()
+        C = self.nabla_2_matrix()
+        D = self.nabla_jump_matrix()
+
+        S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+        F = alpha[0]*A.T@y
+        f = spsolve(S, F).reshape(nx+1, ny+1)
+        return UniformMesh2dFunction(self, f)
 
 class UniformMesh2dFunction():
-
     def __init__(self, mesh, f):
         self.mesh = mesh # (nx+1, ny+1)
         self.f = f   # (nx+1, ny+1)
         self.fx, self.fy = mesh.gradient(f) 
-        
-        
 
     def __call__(self, p):
-    
-        pass
-
-    def value(self, p, f):
         mesh = self.mesh
-        F = mesh.value(p,f)
+        F = mesh.value(p, self.f)
         return F
-        
+    
+    def value(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
 
-    def gradient(self, p, f):
+    def gradient(self, p):
         mesh = self.mesh
         fx = self.fx
         fy = self.fy
-
-        gf = np.zeros((p.shape[0],p.shape[1]))
-        gf[...,0] = mesh.value(p,fx)
-        gf[...,1] = mesh.value(p,fy)
+        gf = np.zeros_like(p)
+        gf[..., 0] = mesh.value(p, fx)
+        gf[..., 1] = mesh.value(p, fy)
         return gf
         
-    def laplace(self, p, f):
-        mesh = self.mesh
-        fx = self.fx
-        fy = self.fy
-        lf = mesh.laplace(f)
-        F = mesh.value(p,lf)
-        return F
-         
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
 
+    @classmethod
+    def from_sample_points(self, x, y, nx=10, ny=10):
+        '''!
+        @param x, y : 样本点和值
+        '''
+        minx, miny = np.min(x[..., 0]), np.min(x[..., 1])
+        maxx, maxy = np.max(x[..., 0]), np.max(x[..., 1])
 
-
+        h = np.array([(maxx-minx)/nx, (maxy-miny)/ny])
+        mesh = UniformMesh2d([0, nx+1, 0, ny+1], h, np.array([minx, miny])) 
+        return mesh.interpolation_with_sample_points(x, y)
 
 
 
