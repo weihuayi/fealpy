@@ -186,7 +186,7 @@ elif False:
     end = timer()
     print('time:', end - start)
 else:
-    isBdDof = space.set_dirichlet_bc(uh, pde.dirichlet,
+    isBdDof = space.set_dirichlet_bc(pde.dirichlet, uh,
             threshold=pde.is_dirichlet_boundary)
     solver = LinearElasticityLFEMFastSolver(A, P, isBdDof) 
     start = timer()

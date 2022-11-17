@@ -48,6 +48,12 @@ class LagrangeFiniteElementSpace():
                 elif mesh.meshtype == 'tet':
                     self.dof = CPLFEMDof3d(mesh, p)
                     self.TD = 3
+                else:
+                    raise ValueError("""
+                    This space don't support this meshtype: {0}. 
+                    Please check mesh.meshtype, which should be 'interval',
+                    'tri', 'halfedge2d', 'stri' and 'tet'.
+                    """.format(mesh.meshtype))
             elif spacetype == 'D':
                 if mesh.meshtype == 'interval':
                     self.dof = DPLFEMDof1d(mesh, p)
@@ -58,6 +64,12 @@ class LagrangeFiniteElementSpace():
                 elif mesh.meshtype == 'tet':
                     self.dof = DPLFEMDof3d(mesh, p)
                     self.TD = 3
+                else:
+                    raise ValueError("""
+                    This space don't support this meshtype: {0}. 
+                    Please check mesh.meshtype, which should be interval, tri, 
+                    halfedge2d, stri, tet.
+                    """.format(mesh.meshtype))
         else:
             self.dof = dof
             self.TD = mesh.top_dimension() 
@@ -985,7 +997,7 @@ class LagrangeFiniteElementSpace():
             T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
             A = T@A@T + Tbd
 
-        A.eliminate_zeros()
+        #A.eliminate_zeros()
         return A 
 
     def mass_matrix(self, c=None, q=None):
@@ -993,7 +1005,7 @@ class LagrangeFiniteElementSpace():
         cell2dof = self.cell_to_dof()
         b0 = (self.basis, cell2dof, gdof)
         A = self.integralalg.serial_construct_matrix(b0, c=c, q=q)
-        A.eliminate_zeros()
+        #A.eliminate_zeros()
         return A 
 
     def div_matrix(self, pspace, q=None):
@@ -1147,7 +1159,7 @@ class LagrangeFiniteElementSpace():
         if p > 0:
             if type(fval) in {float, int}:
                 if fval == 0.0:
-                    return b
+                    return 0.0 
                 else:
                     phi = self.basis(bcs)
                     bb = np.einsum('m, mik, i->ik...', 
