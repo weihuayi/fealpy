@@ -1895,8 +1895,11 @@ class HalfEdgeMesh2d(Mesh2d):
         cellstart = self.ds.cellstart
         if options['method'] == 'mean':
             options['numrefine'][cellstart:] = np.around(
-                    np.log2(eta/(theta*np.mean(eta)))
+                    np.log2(eta/(theta*np.mean(eta)))/1
                 )
+            #options['numrefine'][cellstart:] = np.around(
+            #        np.log2(eta/(theta*np.mean(eta)))
+            #    )
         elif options['method'] == 'max':
             options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
