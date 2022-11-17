@@ -49,16 +49,19 @@ for i in range(maxit):
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value) 
     eta = space.residual_estimate(uh)
     errorMatrix[2, i] = np.sqrt(np.sum(eta**2))
+    if(mesh.number_of_cells()>10000):
+        break
 
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
         mesh.bisect(isMarkedCell)
-        mesh.add_plot(plt)
-        plt.savefig('./test-' + str(i+1) + '.png')
-        plt.close()
+        #mesh.add_plot(plt)
+        #plt.savefig('./test-' + str(i+1) + '.png')
+        #plt.close()
 
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-showmultirate(plt, maxit - 5, NDof, errorMatrix, errorType)
+mesh.to_vtk(fname='aaa.vtu')
+#showmultirate(plt, maxit - 3, NDof, errorMatrix, errorType)
 plt.show()

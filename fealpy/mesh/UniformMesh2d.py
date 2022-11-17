@@ -521,17 +521,28 @@ class UniformMesh2d(Mesh2d):
         data = np.zeros([NS, 4], dtype=np.float_)
         data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
         data[:, 1] = (1-val[:, 0])*val[:, 1]
-        data[:, 2] = val[:, 0]*val[:, 1]
-        data[:, 3] = val[:, 0]*(1-val[:, 1])
+        data[:, 2] = val[:, 0]*(1-val[:, 1])
+        data[:, 3] = val[:, 0]*val[:, 1]
 
         A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
         B = self.stiff_matrix()
         C = self.nabla_2_matrix()
         D = self.nabla_jump_matrix()
 
-        S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
-        F = alpha[0]*A.T@y
-        f = spsolve(S, F).reshape(nx+1, ny+1)
+        ### 标准化残量
+        if 1:
+            y = y-np.min(y)+0.01
+            from scipy.sparse import spdiags
+            Diag = spdiags(1/y, 0, NS, NS)
+            A = Diag@A
+
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@np.ones(NS, dtype=np.float_)
+            f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(y)-0.01
+        else:
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@y
+            f = spsolve(S, F).reshape(nx+1, ny+1)
         return UniformMesh2dFunction(self, f)
 
 class UniformMesh2dFunction():
