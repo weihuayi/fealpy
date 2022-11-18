@@ -89,17 +89,15 @@ class TrussMesh():
             scale=1.0
             ):
 
+        import mpl_toolkits.mplot3d as a3
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
         try:
             axes.set_aspect(aspect)
         except NotImplementedError:
             pass
 
         GD = self.geo_dimension()
-        if GD == 2:
-            from matplotlib.collections import LineCollection
-        elif GD == 3:
-            from mpl_toolkits.mplot3d.art3d import Line3DCollection as LineCollection
-
         node = self.entity('node')
         if GD == 2:
             axes.scatter(node[:, 0], node[:, 1], c=nodecolor, s=markersize)
@@ -124,7 +122,7 @@ class TrussMesh():
             axes.set_zlim(box[4:6])
 
         vts = node[edge]
-        edges = LineCollection(
+        edges = a3.art3d.Line3DCollection(
                vts,
                linewidths=linewidths,
                color=edgecolor)

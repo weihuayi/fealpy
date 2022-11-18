@@ -1,18 +1,10 @@
 import numpy as np
-import matplotlib.pyplot as plt
-
-from TrussModel import Truss_3d
 
 from fealpy.functionspace.Function import Function
-from fealpy.boundarycondition import DirichletBC
-from fealpy.tools.show import showmultirate
-
 from scipy.sparse import csr_matrix, spdiags
-from scipy.sparse.linalg import spsolve
 
 class TrussSimulator():
-    def __init__(self, pde, mesh):
-        self.pde = pde
+    def __init__(self, mesh):
         self.mesh = mesh
         self.GD = mesh.geo_dimension()
 
@@ -27,7 +19,7 @@ class TrussSimulator():
             edge2dof[:, i::GD] = edge + NN*i
         return edge2dof
 
-    def striff_matix(self):
+    def striff_matix(self, A, E):
         """
 
         Notes
@@ -40,8 +32,6 @@ class TrussSimulator():
         NN = mesh.number_of_nodes()
         NE= mesh.number_of_edges()
 
-        E = self.pde.E
-        A = self.pde.A
         l = self.mesh.edge_length().reshape(-1, 1)
         
         k = np.array([[1, -1], [-1, 1]], dtype=np.float64)
@@ -61,15 +51,13 @@ class TrussSimulator():
         M = csr_matrix((K.flat, (I.flat, J.flat)), shape=(NN*GD, NN*GD))
         return M
 
-    def source_vector(self):
+    def source_vector(self, isDof, force):
         NN = self.mesh.number_of_nodes()
         GD = self.GD
         shape = (NN, GD)
         b = np.zeros(shape, dtype=np.float64)
         
-        node = self.mesh.entity('node')
-        isDof = self.pde.is_force_boundary(node)
-        b[isDof] = self.pde.force()
+        b[isDof] = force
         return b
 
     def function(self, dtype=np.float64):
@@ -79,14 +67,12 @@ class TrussSimulator():
         return Function(self, dim=dim, array=array, 
                 coordtype='barycentric', dtype=dtype)
 
-    def dirichlet_bc(self, M, F):
+    def dirichlet_bc(self, M, F, isDDof):
         NN = self.mesh.number_of_nodes()
         GD = self.GD
         shape = (NN, GD)
         uh = self.function()
         
-        node = self.mesh.entity('node')
-        isDDof = self.pde.is_dirichlet_boundary(node)
         isDDof = np.tile(isDDof, GD)
         F = F.T.flat
         x = uh.T.flat
@@ -99,22 +85,3 @@ class TrussSimulator():
         F[isDDof] = x[isDDof]
         return M, F 
 
-scale = 1
-pde = Truss_3d()
-mesh = pde.init_mesh()
-simulator = TrussSimulator(pde, mesh)
-
-uh = simulator.function()
-M = simulator.striff_matix()
-F = simulator.source_vector()
-M, F = simulator.dirichlet_bc(M, F)
-uh.T.flat[:] = spsolve(M, F)
-
-print('uh:', uh)
-fig = plt.figure()
-axes = fig.add_subplot(1, 1, 1, projection='3d') 
-mesh.add_plot(axes)
-
-mesh.node += scale*uh
-mesh.add_plot(axes, nodecolor='b', edgecolor='m')
-plt.show()
