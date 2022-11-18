@@ -76,8 +76,7 @@ class TrussMesh():
         v = node[edge[:, 0]] - node[edge[:, 1]]
         h = np.sqrt(np.sum(v**2, axis=1))
         return v/h[:, None]
-
-
+    
     def add_plot(self, axes, 
             nodecolor='r',
             edgecolor='k', 

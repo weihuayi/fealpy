@@ -1,9 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+from fealpy.functionspace.Function import Function
 from fealpy.mesh.TrussMesh import TrussMesh
-from TrussSimulator import TrussSimulator
 
+from scipy.sparse import csr_matrix, spdiags
 from scipy.sparse.linalg import spsolve
 
 A = 2000 # 横截面积 mm^2
@@ -26,15 +27,71 @@ edge = np.array([
     [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=np.int_)
 mesh = TrussMesh(node, edge)
 
-simulator = TrussSimulator(mesh)
+GD = mesh.geo_dimension()
+NN = mesh.number_of_nodes()
+NE= mesh.number_of_edges()
 
-uh = simulator.function()
-M = simulator.striff_matix(A, E)
-F = simulator.source_vector(np.abs(node[..., 2]) == 5080, force=np.array([0,
+def striff_matix(A, E):
+    """
+
+    Notes
+    -----
+    组装刚度矩阵
+
+    """
+    l = mesh.edge_length().reshape(-1, 1)
+    
+    k = np.array([[1, -1], [-1, 1]], dtype=np.float64)
+    R = np.zeros((NE, 2, GD*2), dtype=np.float64)
+    tan = mesh.unit_edge_tangent()
+    R[:, 0, :GD] = tan
+    R[:, 1, -GD:] = tan
+    K = np.einsum('ijk, jm, imn->ikn', R, k, R)
+    K *= E*A
+    K /= l[:, None]
+
+    edge = mesh.entity('edge')
+
+    edge2dof = np.zeros((edge.shape[0], 2*GD), dtype=np.int_)
+    for i in range(GD):
+        edge2dof[:, i::GD] = edge + NN*i
+
+    I = np.broadcast_to(edge2dof[:, :, None], shape=K.shape)
+    J = np.broadcast_to(edge2dof[:, None, :], shape=K.shape)
+
+    M = csr_matrix((K.flat, (I.flat, J.flat)), shape=(NN*GD, NN*GD))
+    return M
+
+def source_vector(isDof, force):
+    shape = (NN, GD)
+    b = np.zeros(shape, dtype=np.float64)
+    
+    b[isDof] = force
+    return b
+
+def dirichlet_bc(M, F, isDDof):
+    shape = (NN, GD)
+    uh = np.zeros(shape, dtype=np.float64)
+    
+    isDDof = np.tile(isDDof, GD)
+    F = F.T.flat
+    x = uh.T.flat
+    F -=M@x
+    bdIdx = np.zeros(M.shape[0], dtype=np.int_)
+    bdIdx[isDDof] = 1
+    Tbd = spdiags(bdIdx, 0, M.shape[0], M.shape[0])
+    T = spdiags(1-bdIdx, 0, M.shape[0], M.shape[0])
+    M = T@M@T + Tbd
+    F[isDDof] = x[isDDof]
+    return M, F 
+
+uh = np.zeros((NN, GD), dtype=np.float64)
+M = striff_matix(A, E)
+F = source_vector(np.abs(node[..., 2]) == 5080, force=np.array([0,
     900, 0]))
 
-M, F = simulator.dirichlet_bc(M, F, np.abs(node[..., 2]) < 1e-12)
-uh.T.flat[:] = spsolve(M, F)
+M, F = dirichlet_bc(M, F, np.abs(node[..., 2]) < 1e-12)
+uh.T.flat = spsolve(M, F)
 
 fig = plt.figure()
 axes = fig.add_subplot(1, 1, 1, projection='3d') 
@@ -43,4 +100,5 @@ mesh.add_plot(axes)
 mesh.node += uh
 mesh.add_plot(axes, nodecolor='b', edgecolor='m')
 plt.show()
+
 
