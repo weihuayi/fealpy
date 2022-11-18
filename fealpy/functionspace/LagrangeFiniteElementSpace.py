@@ -48,6 +48,12 @@ class LagrangeFiniteElementSpace():
                 elif mesh.meshtype == 'tet':
                     self.dof = CPLFEMDof3d(mesh, p)
                     self.TD = 3
+                else:
+                    raise ValueError("""
+                    This space don't support this meshtype: {0}. 
+                    Please check mesh.meshtype, which should be 'interval',
+                    'tri', 'halfedge2d', 'stri' and 'tet'.
+                    """.format(mesh.meshtype))
             elif spacetype == 'D':
                 if mesh.meshtype == 'interval':
                     self.dof = DPLFEMDof1d(mesh, p)
@@ -58,6 +64,12 @@ class LagrangeFiniteElementSpace():
                 elif mesh.meshtype == 'tet':
                     self.dof = DPLFEMDof3d(mesh, p)
                     self.TD = 3
+                else:
+                    raise ValueError("""
+                    This space don't support this meshtype: {0}. 
+                    Please check mesh.meshtype, which should be interval, tri, 
+                    halfedge2d, stri, tet.
+                    """.format(mesh.meshtype))
         else:
             self.dof = dof
             self.TD = mesh.top_dimension() 
