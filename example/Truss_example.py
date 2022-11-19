@@ -41,12 +41,13 @@ def striff_matix(A, E):
     """
     l = mesh.edge_length().reshape(-1, 1)
     
-    k = np.array([[1, -1], [-1, 1]], dtype=np.float64)
-    R = np.zeros((NE, 2, GD*2), dtype=np.float64)
     tan = mesh.unit_edge_tangent()
-    R[:, 0, :GD] = tan
-    R[:, 1, -GD:] = tan
-    K = np.einsum('ijk, jm, imn->ikn', R, k, R)
+    R = np.einsum('ik, im->ikm', tan, tan)
+    K = np.zeros((NE, GD*2, GD*2), dtype=np.float64)
+    K[:, :GD, :GD] = R
+    K[:, -GD:, :GD] = -R
+    K[:, :GD, -GD:] = -R
+    K[:, -GD:, -GD:] = R
     K *= E*A
     K /= l[:, None]
 
