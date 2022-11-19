@@ -313,6 +313,22 @@ class StructureQuadMesh(Mesh2d):
             shape = (nx, ny) + shape
             F = F.reshape(shape)
         return F
+        
+    def error(self, hx, hy, nx, ny, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+
+        @param[in] u
+        @param[in] uh
+        """
+        e = u - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(hx * hy * np.sum(e ** 2))
+
+        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
+
+        return emax, e0, el2
 
     def gradient(self, f):
 

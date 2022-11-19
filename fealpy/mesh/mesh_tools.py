@@ -340,6 +340,8 @@ def show_mesh_2d(
     cell = mesh.entity('cell')
 
     if mesh.meshtype not in {'polygon', 'hepolygon', 'halfedge', 'halfedge2d'}:
+        if mesh.meshtype == 'StructureQuadMesh2d':
+            node = node.reshape(-1, 2)
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])
         else:
