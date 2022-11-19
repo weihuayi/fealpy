@@ -1,7 +1,7 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.functionspace.Function import Function
 from fealpy.mesh.TrussMesh import TrussMesh
 
 from scipy.sparse import csr_matrix, spdiags
@@ -28,14 +28,11 @@ A = args.csection
 E = args.modulus
 
 # 构造网格
-d1 = 952.5 # 单位 mm
-d2 = 2540
-h1 = 5080
-h2 = 2540
 node = np.array([
-    [-d1, 0, h1], [d1, 0, h1], [-d1, d1, h2], [d1, d1, h2],
-    [d1, -d1, h2], [-d1, -d1, h2], [-d2, d2, 0], [d2, d2, 0],
-    [d2, -d2, 0], [-d2, -d2, 0]], dtype=np.float64)
+    [-950, 0, 5080], [950, 0, 5080], [-950, 950, 2540], 
+    [950, 950, 2540], [950, -950, 2540], [-950, -950, 2540],
+    [-2540, 2540, 0], [2540, 2540, 0], [2540, -2540, 0], 
+    [-2540, -2540, 0]], dtype=np.float64)
 edge = np.array([
     [0, 1], [3, 0], [1, 2], [1, 5], [0, 4], 
     [1, 3], [1, 4], [0, 2], [0, 5], [2, 5],
@@ -55,53 +52,43 @@ for i in range(GD):
     edge2dof[:, i::GD] = edge + NN*i
 
 # 组装刚度矩阵
-
-l = mesh.edge_length()
+l = mesh.edge_length().reshape(-1, 1)
 tan = mesh.unit_edge_tangent()
-R = np.zeros((NE, 2, GD*2), dtype=np.float64)
-R[:, 0, :GD] = tan
-R[:, 1, -GD:] = tan
-K = np.einsum('ijk, jm, imn->ikn', R, k, R)
+
+R = np.einsum('ik, im->ikm', tan, tan)
+K = np.zeros((NE, GD*2, GD*2), dtype=np.float64)
+K[:, :GD, :GD] = R
+K[:, -GD:, :GD] = -R
+K[:, :GD, -GD:] = -R
+K[:, -GD:, -GD:] = R
 K *= E*A
 K /= l[:, None]
-
 
 I = np.broadcast_to(edge2dof[:, :, None], shape=K.shape)
 J = np.broadcast_to(edge2dof[:, None, :], shape=K.shape)
 
 K = csr_matrix((K.flat, (I.flat, J.flat)), shape=(NN*GD, NN*GD))
 
+# 右端项
+shape = (NN, GD)
+F = np.zeros(shape, dtype=np.float64)
+F[node[..., 2] == 5080] = np.array([0, 900, 0])
 
-def source_vector(isDof, force):
-    shape = (NN, GD)
-    b = np.zeros(shape, dtype=np.float64)
-    
-    b[isDof] = force
-    return b
+# 边界条件处理
+uh = np.zeros(shape, dtype=np.float64)
+isDDof = np.tile(node[..., 2] < 1e-12, GD)
+F = F.T.flat
+x = uh.T.flat
+F -=K@x
+bdIdx = np.zeros(K.shape[0], dtype=np.int_)
+bdIdx[isDDof] = 1
+Tbd = spdiags(bdIdx, 0, K.shape[0], K.shape[0])
+T = spdiags(1-bdIdx, 0, K.shape[0], K.shape[0])
+K = T@K@T + Tbd
+F[isDDof] = x[isDDof]
 
-def dirichlet_bc(M, F, isDDof):
-    shape = (NN, GD)
-    uh = np.zeros(shape, dtype=np.float64)
-    
-    isDDof = np.tile(isDDof, GD)
-    F = F.T.flat
-    x = uh.T.flat
-    F -=M@x
-    bdIdx = np.zeros(M.shape[0], dtype=np.int_)
-    bdIdx[isDDof] = 1
-    Tbd = spdiags(bdIdx, 0, M.shape[0], M.shape[0])
-    T = spdiags(1-bdIdx, 0, M.shape[0], M.shape[0])
-    M = T@M@T + Tbd
-    F[isDDof] = x[isDDof]
-    return M, F 
-
-uh = np.zeros((NN, GD), dtype=np.float64)
-M = striff_matix(A, E)
-F = source_vector(np.abs(node[..., 2]) == 5080, force=np.array([0,
-    900, 0]))
-
-M, F = dirichlet_bc(M, F, np.abs(node[..., 2]) < 1e-12)
-uh.T.flat = spsolve(M, F)
+# 求解
+uh.T.flat = spsolve(K, F)
 
 fig = plt.figure()
 axes = fig.add_subplot(1, 1, 1, projection='3d') 
