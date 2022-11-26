@@ -7,6 +7,7 @@ This module provide mesh
 '''
 
 # 结构化网格
+from .UniformMesh1d import UniformMesh1d
 from .UniformMesh2d import UniformMesh2d,UniformMesh2dFunction
 from .UniformMesh3d import UniformMesh3d,UniformMesh3dFunction
 from .StructureIntervalMesh import StructureIntervalMesh
