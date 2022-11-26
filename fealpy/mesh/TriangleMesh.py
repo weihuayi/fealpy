@@ -29,6 +29,11 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
 
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
+        """
+        @brief TriangleMesh 对象的构造函数
+
+        @note Magic function
+        """
 
         assert cell.shape[-1] == 3
 
@@ -191,6 +196,83 @@ class TriangleMesh(Mesh2d):
             Rlambda[:,1,:] = v1/length.reshape((-1, 1))
             Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         return Rlambda
+
+
+    def cell_quality(self):
+        """
+        @brief 计算单元质量
+        """
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells()
+
+        localEdge = self.ds.localEdge
+        v = [node[cell[:, j], :] - node[cell[:, i], :] for i, j in localEdge]
+        l2 = np.zeros((NC, 3))
+        for i in range(3):
+            l2[:, i] = np.sum(v[i]**2, axis=1)
+        l = np.sqrt(l2)
+        p = l.sum(axis=1)
+        q = l.prod(axis=1)
+        area = np.cross(v[1], v[2])/2
+        quality = p*q/(16*area**2)
+        return quality
+
+    def grad_cell_quality(self):
+        """
+        @brief 计算
+        """
+
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+
+        localEdge = self.ds.localEdge
+        v = [node[cell[:, j], :] - node[cell[:, i], :] for i, j in localEdge]
+
+        l2 = np.zeros((NC, 3))
+        for i in range(3):
+            l2[:, i] = np.sum(v[i]**2, axis=1)
+
+        l = np.sqrt(l2)
+        p = l.sum(axis=1, keepdims=True)
+        q = l.prod(axis=1, keepdims=True)
+        mu = p*q/(16*area**2)
+        c = mu*(1/(p*l) + 1/l2)
+
+        val = np.zeros((NC, 3, 3), dtype=sefl.ftype)
+        val[:, 0, 0] = c[:, 1] + c[:, 2]
+        val[:, 0, 1] = -c[:, 2]
+        val[:, 0, 2] = -c[:, 1]
+
+        val[:, 1, 0] = -c[:, 2]
+        val[:, 1, 1] = c[:, 0] + c[:, 2]
+        val[:, 1, 2] = -c[:, 0]
+
+        val[:, 2, 0] = -c[:, 1]
+        val[:, 2, 1] = -c[:, 0]
+        val[:, 2, 2] = c[:, 0] + c[:, 1]
+
+        I = np.broadcast_to(cell[:, None, :], shape=(NC, 3, 3))
+        J = np.broadcast_to(cell[:, :, None], shape=(NC, 3, 3))
+        A = csr_matrix((val, (I, J)), shape=(NN, NN))
+
+        cn = mu/area
+        val[:, 0, 0] = 0
+        val[:, 0, 1] = -cn
+        val[:, 0, 2] = cn
+
+        val[:, 1, 0] = cn
+        val[:, 1, 1] = 0
+        val[:, 1, 2] = -cn
+
+        val[:, 2, 0] = -cn
+        val[:, 2, 1] = cn
+        val[:, 2, 2] = 0
+        B = csr_matrix((val, (I, J)), shape=(NN, NN))
+        return A, B
+
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
@@ -903,11 +985,12 @@ class TriangleMesh(Mesh2d):
 
         I, J = node2cell[isIGoodNode, :].nonzero()
         nodeStar = J.reshape(-1, 4)
+
         ix = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 3], 1])
         iy = (cell[nodeStar[:, 1], 1] == cell[nodeStar[:, 2], 2])
         nodeStar[ ix & (~iy), :] = nodeStar[ix & (~iy), :][:, [0, 2, 1, 3]]
         nodeStar[ (~ix) & iy, :] = nodeStar[(~ix) & iy, :][:, [0, 3, 1, 2]]
-        
+
         t0 = nodeStar[:, 0]
         t1 = nodeStar[:, 1]
         t2 = nodeStar[:, 2]
@@ -932,7 +1015,7 @@ class TriangleMesh(Mesh2d):
         nodeStar = J.reshape(-1, 2)
         idx = (cell[nodeStar[:, 0], 2] == cell[nodeStar[:, 1], 1])
         nodeStar[idx, :] = nodeStar[idx, :][:, [1,0]]
-        
+
         t4 = nodeStar[:, 0]
         t5 = nodeStar[:, 1]
         p0 = cell[t4, 0]
@@ -1035,6 +1118,7 @@ class TriangleMesh(Mesh2d):
             maxrefine=5,
             maxcoarsen=0,
             theta=1.0,
+            tol=1e-6, # 目标误差
             HB=None,
             imatrix=False,
             data=None,
@@ -1046,6 +1130,7 @@ class TriangleMesh(Mesh2d):
                 'maxrefine': maxrefine,
                 'maxcoarsen': maxcoarsen,
                 'theta': theta,
+                'tol': tol,
                 'data': data,
                 'HB': HB,
                 'imatrix': imatrix,
@@ -1072,6 +1157,12 @@ class TriangleMesh(Mesh2d):
             options['numrefine'] = np.around(
                     np.log2(eta/(theta*np.min(eta)))
                 )
+        elif options['method'] == 'target':
+            NT = self.number_of_cells()
+            e = options['tol']/np.sqrt(NT)
+            options['numrefine'] = np.around(
+                    np.log2(eta/(theta*e)
+                ))
         else:
             raise ValueError(
                     "I don't know anyting about method %s!".format(options['method']))
@@ -1117,10 +1208,10 @@ class TriangleMesh(Mesh2d):
 
         # allocate new memory for node and cell
         node = np.zeros((5*NN, GD), dtype=self.ftype)
-        cell = np.zeros((2*NC, 3), dtype=self.itype)
+        cell = np.zeros((3*NC, 3), dtype=self.itype)
 
         if ('numrefine' in options) and (options['numrefine'] is not None):
-            options['numrefine'] = np.r_[options['numrefine'], np.zeros(NC)]
+            options['numrefine'] = np.r_[options['numrefine'], np.zeros(2*NC)]
 
         node[:NN] = self.entity('node')
         cell[:NC] = self.entity('cell')
@@ -1289,8 +1380,6 @@ class TriangleMesh(Mesh2d):
         self.ds.reinit(NN, cell)
 
 
-
-
     def linear_stiff_matrix(self, c=None):
         """
         Notes
@@ -1350,222 +1439,6 @@ class TriangleMesh(Mesh2d):
         elif GD == 3:
             a = np.sqrt(np.square(nv).sum(axis=1))/2.0
         return a
-
-        
-    
-    def cell_phi_phi_matrix(self, p1, p2, c=None):
-        '''
-        @brief
-        @param p1 检验函数的次数
-        @param p2 试探函数的次数
-        @param c  试探函数的系数
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1) + str(p2)
-        val = phiphi[index]
-        if c is None:
-            val = np.einsum('c,cij->cij', cellmeasure, val)
-        else:
-            c2f2 = self.cell_to_ipoint(p2)
-            val = np.einsum('c,cij,cj->ci', cellmeasure, val, c[c2f2])
-        return val
-
-
-    def cell_gphix_gphix_matrix(self, p1, p2):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphigphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,0] ,B[...,0], cellmeasure)
-        return val 
-    
-    def cell_gphix_gphiy_matrix(self, p1, p2):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphigphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,0] ,B[...,1], cellmeasure)
-        return val 
-    
-    def cell_gphiy_gphix_matrix(self, p1, p2):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphigphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1] ,B[...,0], cellmeasure)
-        return val 
-    
-    def cell_gphiy_gphiy_matrix(self, p1, p2):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphigphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkl, ck, cl, c->cij', A, B[...,1], B[...,1], cellmeasure)
-        return val 
-    
-    def cell_stiff_matrix(self, p1, p2, p3=None, c=None):
-        if c is None:
-            a = self.cell_gphix_gphix_matrix(p1, p2)
-            b = self.cell_gphiy_gphiy_matrix(p1, p2)
-        else:
-            a = self.cell_gphix_gphix_phi_matrix(p1 ,p2 ,p3 , c)
-            b = self.cell_gphiy_gphiy_phi_matrix(p1 ,p2 ,p3 , c)
-        return a+b 
-    
-    def cell_gphix_phi_matrix(self, p1, p2, c1=None, c2=None):
-        '''
-        @brief  
-        @param p1 gphi的次数
-        @param p2 phi的次数 
-        @param c1 gphi的系数 
-        @param c2 phi的系数 
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphiphi[index]
-        B = self.glambda 
-        if c1 is not None:
-            c2f1 = self.cell_to_ipoint(p1)
-            val = np.einsum('ijk, ck, c, ci->cj', A, B[..., 0], cellmeasure, c1[c2f1])
-        elif c2 is not None:
-            c2f2 = self.cell_to_ipoint(p2)
-            val = np.einsum('ijk, ck, c, cj->ci', A, B[..., 0], cellmeasure, c2[c2f2])
-        else:
-            val = np.einsum('ijk, ck, c->cij', A, B[..., 0], cellmeasure)
-        return val 
-    
-    def cell_gphiy_phi_matrix(self, p1, p2, c1=None, c2=None):
-        '''
-        @brief  
-        @param p1 gphi的次数
-        @Param p2 phi的次数 
-        @param c1 gphi的系数 
-        @param c2 phi的系数 
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)
-        A = gphiphi[index]
-        B = self.glambda
-        if c1 is not None:
-            c2f1 = self.cell_to_ipoint(p1)
-            val = np.einsum('ijk, ck, c, ci->cj', A, B[..., 1], cellmeasure, c1[c2f1])
-        elif c2 is not None:
-            c2f2 = self.cell_to_ipoint(p2)
-            val = np.einsum('ijk, ck, c, cj->ci', A, B[..., 1], cellmeasure, c2[c2f2])
-        else:
-            val = np.einsum('ijk, ck, c->cij', A, B[..., 1], cellmeasure)
-        return val 
-    
-    def cell_phi_gphix_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
-        '''
-        @brief  
-        @param p1 测试函数的次数
-        @Param p2 gphi的次数 
-        @Param p3 phi的次数 
-        @param c2 gphi的系数 
-        @param c3 phi的系数 
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)+str(p3)
-        A = phigphiphi[index]
-        B = self.glambda
-        c2f2 = self.cell_to_ipoint(p2)
-        c2f3 = self.cell_to_ipoint(p3)
-        if (c2 is not None) and (c3 is None):
-            val = np.einsum('ijkm,cm,c,cj->cik', A, B[...,0], cellmeasure, c2[c2f2])
-        elif (c2 is None) and (c3 is not None):
-            val = np.einsum('ijkm,cm,c,ck->cij', A, B[...,0], cellmeasure, c3[c2f3])
-        else:
-            val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,0], cellmeasure, c2[c2f2], c3[c2f3])
-        return val 
-
-    
-    def cell_phi_phi_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
-        '''
-        @brief  
-        @param c2 phi的系数 
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)+str(p3)
-        A = phiphiphi[index]
-        B = self.glambda
-        c2f2 = self.cell_to_ipoint(p2)
-        c2f3 = self.cell_to_ipoint(p3)
-        if (c2 is not None) and (c3 is None):
-            val = np.einsum('ijk, c, cj->cik', A, cellmeasure, c2[c2f2])
-        elif (c2 is None) and (c3 is not None):
-            val = np.einsum('ijk, c, ck->cij', A, cellmeasure, c3[c2f2])
-        else:
-            val = np.einsum('ijk , c, cj, ck->ci', A, cellmeasure, c2[c2f2], c3[c2f3])
-        return val
-
-    def cell_phi_gphiy_phi_matrix(self, p1, p2, p3, c2=None, c3=None):
-        '''
-        @brief  
-        @param p1 gphi的次数
-        @Param p2 phi的次数 
-        @param c1 gphi的系数 
-        @param c2 phi的系数 
-        '''
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)+str(p3)
-        A = phigphiphi[index]
-        B = self.glambda
-        c2f2 = self.cell_to_ipoint(p2)
-        c2f3 = self.cell_to_ipoint(p3)
-        if (c2 is not None) and (c3 is None):
-            val = np.einsum('ijkm,cm,c,cj->cik', A, B[...,1], cellmeasure, c2[c2f2])
-        elif (c2 is None) and (c3 is not None):
-            val = np.einsum('ijkm,cm,c,ck->cij', A, B[...,1], cellmeasure, c3[c2f3])
-        else:
-            val = np.einsum('ijkm,cm,c,cj,ck->ci', A, B[...,1], cellmeasure, c2[c2f2], c3[c2f3])
-        return val 
-    
-    def cell_gphix_gphix_phi_matrix(self, p1, p2, p3, c3):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)+str(p3)
-        c2f3 = self.cell_to_ipoint(p3)
-        A = gphigphiphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
-                A, B[...,0] ,B[...,0], cellmeasure, c3[c2f3]) 
-        return val 
-    
-    def cell_gphiy_gphiy_phi_matrix(self, p1, p2, p3, c3):
-        cellmeasure = self.cell_area()
-        index = str(p1)+str(p2)+str(p3)
-        c2f3 = self.cell_to_ipoint(p3)
-        A = gphigphiphi[index]
-        B = self.glambda 
-        val = np.einsum('ijkmn, cm, cn, c, ck->cij', 
-                A, B[...,1] ,B[...,1], cellmeasure, c3[c2f3]) 
-        return val 
-    
-    def construct_vector(self, p ,m):
-        '''
-        @brief 单元向量到总体向量
-        '''
-        gdof = self.number_of_global_ipoints(p)
-        result = np.zeros((gdof))
-        c2f = self.cell_to_ipoint(p)
-        np.add.at(result, c2f, m)
-        return result
-
-    def construct_matrix(self, p1, p2 ,m):
-        '''
-        @brief 单元矩阵到总体矩阵
-        '''
-        NC = self.number_of_cells()
-        ldof1 = self.number_of_global_ipoints(p1)
-        ldof2 = self.number_of_global_ipoints(p2)
-        cell2dof1 = self.cell_to_ipoint(p1)
-        cell2dof2 = self.cell_to_ipoint(p2)
-        I = np.broadcast_to(cell2dof1[:, :, None], shape = m.shape)
-        J = np.broadcast_to(cell2dof2[:, None, :], shape = m.shape)
-        gdof1 = self.number_of_global_ipoints(p1)
-        gdof2 = self.number_of_global_ipoints(p2)
-        val = csr_matrix((m.flat, (I.flat, J.flat)), shape=(gdof1, gdof2))
-        return val
 
 
     def mark_interface_cell(self, phi):
@@ -1837,7 +1710,7 @@ class TriangleMeshWithInfinityNode:
         return self.ds.NE
 
     def number_of_faces(self):
-        return self.ds.NC
+        return self.ds.NE
 
     def number_of_cells(self):
         return self.ds.NC
