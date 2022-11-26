@@ -1,7 +1,7 @@
 
 import numpy as np
 
-class UniformMesh3d():
+class UniformMesh1d():
     """
     @brief 
     """
@@ -12,5 +12,4 @@ class UniformMesh3d():
         self.extent = extent
         self.h = h 
         self.origin = origin
-
         nx = extent[1] - extent[0]
