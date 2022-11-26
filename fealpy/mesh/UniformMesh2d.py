@@ -152,6 +152,25 @@ class UniformMesh2d(Mesh2d):
 
         return dx, dy
 
+    def function_remap(self, tmesh, p=2):
+        """
+        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
+
+        @example 
+        phi.flat[idxMap] = uh
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        NN = self.number_of_nodes()
+        idxMap = np.arange(NN)
+
+        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
+                ny+1, 2)
+        idxMap[idx] = range(tmesh.number_of_nodes())
+
+        return idxMap
+
     def mass_matrix(self):
         h = self.h
         Mc = np.array([[4., 2., 2., 1.],
