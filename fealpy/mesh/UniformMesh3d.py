@@ -406,6 +406,59 @@ class UniformMesh3d(Mesh3d):
 
         return A.tocsr()
 
+    def mass_matrix(self):
+        h = self.h
+        Mc = np.array([[4., 2., 2., 1.],
+                       [2., 4., 1., 2.],
+                       [2., 1., 4., 2.],
+                       [1., 2., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Mc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        M = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    def stiff_matrix(self):
+        h = self.h
+        S0c = np.array([[ 2.,  1., -2., -1.],
+                        [ 1.,  2., -1., -2.],
+                        [-2., -1.,  2.,  1.],
+                        [-1., -2.,  1.,  2.]], dtype=np.float_)*h[1]/h[0]/6
+        S1c = np.array([[ 2., -2.,  1., -1.],
+                        [-2.,  2., -1.,  1.],
+                        [ 1., -1.,  2., -2.],
+                        [-1.,  1., -2.,  2.]], dtype=np.float_)*h[0]/h[1]/6
+        Sc = S0c + S1c
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Sc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        S = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return S
+
+    def nabla_2_matrix(self):
+        h = self.h
+        N2c = np.array([[ 1., -1., -1.,  1.],
+                        [-1.,  1.,  1., -1.],
+                        [-1.,  1.,  1., -1.],
+                        [ 1., -1., -1.,  1.]], dtype=np.float_)*4/(h[1]*h[0])
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(N2c, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return N2
+
     def show_function(self, plot, uh, cmap='jet'):
         """
         @brief 显示一个定义在网格节点上的函数
