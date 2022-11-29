@@ -589,12 +589,28 @@ class LagrangeFiniteElementSpace():
             raise ValueError("The shape of uh should be (gdof, gdim)!")
 
     def interpolation(self, u, dim=None, dtype=None):
-        ipoint = self.interpolation_points()
-        uI = u(ipoint)
-        if dtype is None:
-            return self.function(dim=dim, array=uI, dtype=uI.dtype)
+        """
+        @brief 
+        """
+        assert callable(u)
+
+        if not hasattr(u, 'coordtype'): 
+            ips = self.interpolation_points()
+            uI = u(ips)
         else:
-            return self.function(dim=dim, array=uI, dtype=dtype)
+            if u.coordtype == 'cartesian':
+                ips = self.interpolation_points()
+                uI = u(ips)
+            elif u.coordtype == 'barycentric':
+                TD = self.top_dimension()
+                p = self.p
+                bcs = multi_index_matrix[TD](p)/p
+                uI = u(bcs)
+
+        if dtype is None:
+            return self.function(dim=dim, array=u, dtype=uI.dtype)
+        else:
+            return self.function(dim=dim, array=u, dtype=dtype)
 
     def linear_interpolation_matrix(self):
         """

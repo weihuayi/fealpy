@@ -287,17 +287,26 @@ class UniformMesh3d(Mesh3d):
         hz = self.h[2]  
         
         i, j, k = self.cell_location(p)
+        i[i==nx] = i[i==nx]-1
+        j[j==ny] = j[j==ny]-1
+        k[k==nz] = k[k==nz]-1
         x0 = i*hx+box[0]
         y0 = j*hy+box[2]
         z0 = k*hz+box[4]
-        F = f[i, j, k]*(1-(p[..., 0]-x0)/hx)*(1-(p[..., 1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i+1, j, k]*(1-(x0+hx-p[...,0])/hx)*(1-(p[...,1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i, j+1, k]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i+1, j+1, k]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i, j, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(p[...,1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i+1, j, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(p[..., 1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i, j+1, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i+1, j+1, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)
+        a = (p[..., 0]-x0)/hx
+        b = (p[..., 1]-y0)/hy
+        c = (p[..., 2]-z0)/hz
+        d = (x0+hx-p[...,0])/hx
+        e = (y0+hy-p[...,1])/hy
+        f = (z0+hy-p[...,2])/hz
+        F = f[i, j, k]*(1-a)*(1-b)*(1-c)\
+	  + f[i+1, j, k]*(1-d)*(1-b)*(1-c)\
+	  + f[i, j+1, k]*(1-a)*(1-e)*(1-c)\
+	  + f[i+1, j+1, k]*(1-d)*(1-e)*(1-c)\
+	  + f[i, j, k+1]*(1-a)*(1-b)*(1-f)\
+	  + f[i+1, j, k+1]*(1-d)*(1-b)*(1-f)\
+	  + f[i, j+1, k+1]*(1-a)*(1-e)*(1-f)\
+	  + f[i+1, j+1, k+1]*(1-d)*(1-e)*(1-f)
         return F
         
     def interpolation(self, f, intertype='node'):
@@ -405,6 +414,59 @@ class UniformMesh3d(Mesh3d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+
+    def mass_matrix(self):
+        h = self.h
+        Mc = np.array([[4., 2., 2., 1.],
+                       [2., 4., 1., 2.],
+                       [2., 1., 4., 2.],
+                       [1., 2., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Mc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        M = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return M
+
+    def stiff_matrix(self):
+        h = self.h
+        S0c = np.array([[ 2.,  1., -2., -1.],
+                        [ 1.,  2., -1., -2.],
+                        [-2., -1.,  2.,  1.],
+                        [-1., -2.,  1.,  2.]], dtype=np.float_)*h[1]/h[0]/6
+        S1c = np.array([[ 2., -2.,  1., -1.],
+                        [-2.,  2., -1.,  1.],
+                        [ 1., -1.,  2., -2.],
+                        [-1.,  1., -2.,  2.]], dtype=np.float_)*h[0]/h[1]/6
+        Sc = S0c + S1c
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(Sc, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        S = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return S
+
+    def nabla_2_matrix(self):
+        h = self.h
+        N2c = np.array([[ 1., -1., -1.,  1.],
+                        [-1.,  1.,  1., -1.],
+                        [-1.,  1.,  1., -1.],
+                        [ 1., -1., -1.,  1.]], dtype=np.float_)*4/(h[1]*h[0])
+        cell2node = self.entity('cell')
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        data = np.broadcast_to(N2c, (NC, 4, 4))
+        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
+        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
+        N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return N2
 
     def show_function(self, plot, uh, cmap='jet'):
         """

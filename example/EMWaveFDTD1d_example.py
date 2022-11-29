@@ -3,7 +3,7 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh import StructureIntervalMesh
+from fealpy.mesh import UniformMesh1d
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 
@@ -43,8 +43,9 @@ loss = args.loss
 T0 = 0
 T1 = NT
 
-domain = [0, 100] # 笛卡尔坐标空间
-mesh = StructureIntervalMesh(domain, nx = NS) # 建立结构网格对象
+h = 1/NS
+
+mesh = UniformMesh1d(extent=(0, NS), h=h, origin=0) # 建立结构网格对象
 timeline = UniformTimeLine(T0, T1, NT)
 dt = timeline.dt
 
@@ -65,7 +66,7 @@ def forward(n):
         E[0] = np.sin(2 * np.pi * n * (R / ND))
         return E, t
 
-box = [0, 100, -2, 2]
+box = [0, 1, -2, 2]
 fig, axes = plt.subplots()
 mesh.show_animation(fig, axes, box, forward, frames=NT + 1)
 plt.show()
