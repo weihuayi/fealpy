@@ -152,6 +152,25 @@ class UniformMesh2d(Mesh2d):
 
         return dx, dy
 
+    def function_remap(self, tmesh, p=2):
+        """
+        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
+
+        @example 
+        phi.flat[idxMap] = uh
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        NN = self.number_of_nodes()
+        idxMap = np.arange(NN)
+
+        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
+                ny+1, 2)
+        idxMap[idx] = range(tmesh.number_of_nodes())
+
+        return idxMap
+
     def mass_matrix(self):
         h = self.h
         Mc = np.array([[4., 2., 2., 1.],
@@ -277,12 +296,18 @@ class UniformMesh2d(Mesh2d):
         hy = self.h[1]       
         
         i, j = self.cell_location(p)
+        i[i==nx] = i[i==nx]-1
+        j[j==ny] =j[j==ny]-1
         x0 = i*hx+box[0]
         y0 = j*hy+box[2]
-        F = f[i,j]*(1-(p[...,0]-x0)/hx)*(1-(p[...,1]-y0)/hy)\
-          + f[i+1,j]*(1-(x0+hx-p[...,0])/hx)*(1-(p[...,1]-y0)/hy)\
-          + f[i,j+1]*(1-(p[...,0]-x0)/hx)*(1-(y0+hy-p[...,1])/hy)\
-          + f[i+1,j+1]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)
+        a = (p[...,0]-x0)/hx
+        b = (p[...,1]-y0)/hy
+        c = (x0+hx-p[...,0])/hx
+        d = (y0+hy-p[...,1])/hy
+        F = f[i,j]*(1-a)*(1-b)\
+          + f[i+1,j]*(1-c)*(1-b)\
+          + f[i,j+1]*(1-a)*(1-d)\
+          + f[i+1,j+1]*(1-c)*(1-d)
         return F
         
 

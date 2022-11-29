@@ -56,8 +56,8 @@ isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
 
 lsfun = UniformMesh2dFunction(mesh, phi[1:-1, 1:-1])
 
-_, d = curve.project(node[isNearNode[1:-1, 1:-1]])
-#_, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
+#_, d = curve.project(node[isNearNode[1:-1, 1:-1]])
+_, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
 print(d)
 
 
