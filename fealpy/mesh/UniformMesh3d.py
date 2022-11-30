@@ -287,17 +287,26 @@ class UniformMesh3d(Mesh3d):
         hz = self.h[2]  
         
         i, j, k = self.cell_location(p)
+        i[i==nx] = i[i==nx]-1
+        j[j==ny] = j[j==ny]-1
+        k[k==nz] = k[k==nz]-1
         x0 = i*hx+box[0]
         y0 = j*hy+box[2]
         z0 = k*hz+box[4]
-        F = f[i, j, k]*(1-(p[..., 0]-x0)/hx)*(1-(p[..., 1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i+1, j, k]*(1-(x0+hx-p[...,0])/hx)*(1-(p[...,1]-y0)/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i, j+1, k]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i+1, j+1, k]*(1-(x0+hx-p[...,0])/hx)*(1-(y0+hy-p[...,1])/hy)*(1-(p[..., 2]-z0)/hz)\
-	  + f[i, j, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(p[...,1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i+1, j, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(p[..., 1]-y0)/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i, j+1, k+1]*(1-(p[..., 0]-x0)/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)\
-	  + f[i+1, j+1, k+1]*(1-(x0+hx-p[..., 0])/hx)*(1-(y0+hy-p[..., 1])/hy)*(1-(z0+hy-p[..., 2])/hz)
+        a = (p[..., 0]-x0)/hx
+        b = (p[..., 1]-y0)/hy
+        c = (p[..., 2]-z0)/hz
+        d = (x0+hx-p[...,0])/hx
+        e = (y0+hy-p[...,1])/hy
+        f = (z0+hy-p[...,2])/hz
+        F = f[i, j, k]*(1-a)*(1-b)*(1-c)\
+	  + f[i+1, j, k]*(1-d)*(1-b)*(1-c)\
+	  + f[i, j+1, k]*(1-a)*(1-e)*(1-c)\
+	  + f[i+1, j+1, k]*(1-d)*(1-e)*(1-c)\
+	  + f[i, j, k+1]*(1-a)*(1-b)*(1-f)\
+	  + f[i+1, j, k+1]*(1-d)*(1-b)*(1-f)\
+	  + f[i, j+1, k+1]*(1-a)*(1-e)*(1-f)\
+	  + f[i+1, j+1, k+1]*(1-d)*(1-e)*(1-f)
         return F
         
     def interpolation(self, f, intertype='node'):

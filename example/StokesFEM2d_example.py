@@ -57,7 +57,7 @@ for i in range(maxit):
     F = uspace.source_vector(pde.source, dim=dim)    
     C = pspace.mass_matrix()
     
-    qf = mesh.integrator(4,'cell')
+    qf = mesh.integrator(4, 'cell')
     bcs,ws = qf.get_quadrature_points_and_weights()
     cellmeasure = mesh.entity_measure('cell')
 

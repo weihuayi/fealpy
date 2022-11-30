@@ -56,7 +56,7 @@ for i in range(maxit):
 
     # 1. 组装矩阵和右端项 
     A = mesh.laplace_operator()
-    F = mesh.interpolation(pde.source)
+    F = mesh.interpolation(pde.source).flat
 
     # 2. 创建解向量数组, 内部节点对应的函数值初始化为 0，
     #    边界节点对应的函数值初始化 Dirichlet 边界条件的值
@@ -87,7 +87,7 @@ for i in range(maxit):
     uh[:] = spsolve(A, F)
 
     # 4. 计算误差
-    uI = mesh.interpolation(pde.solution)
+    uI = mesh.interpolation(pde.solution).flat
 
     errorMatrix[0, i] = np.max(np.abs(uh - uI))
     errorMatrix[1, i] = np.sqrt(np.sum((uh - uI)**2)/NN)
