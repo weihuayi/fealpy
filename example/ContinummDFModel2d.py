@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 from scipy.sparse import csr_matrix, bmat
 from scipy.sparse.linalg import spsolve
@@ -6,7 +7,6 @@ from fealpy.mesh import TriangleMesh
 from fealpy.functionspace import LagrangeFiniteElementSpace
 
 import matplotlib.pyplot as plt
-
 
 class ContinummDFModel2d:
     def __init__(self, ka=2.7e-3, l0=1.33e-2, la=121.15, mu=80.77):
@@ -91,26 +91,37 @@ class ContinummDFModel2d:
         s[:, 1, 0] = val
         return s
 
-    def stress(self, s):
+    def stress(self, phi, s):
         """
         @brief 给定应变计算相应的应力
         @param[in] s 单元应变数组，（NC, 2, 2)
         """
+        eps = 1e-10
+
+        ts = np.trace(s, axis1=1, axis2=2)
+        w, v = self.strain_eigs(s)
+        
+        # 应变正负分解
+        sp, sm = self.strain_pm_eig_decomposition(s)
+
+        ts = np.trace(s, axis1=1, axis2=2)
+        tp, tm = self.macaulay_operation(ts)
 
         la = self.la
         mu = self.mu
 
-        mesh = uh.space.mesh
-        cell = mesh.entity('cell')
-        NC = mesh.number_of_cells()
-        gphi = mesh.grad_lambda()  # NC x 3 x 2
+        NC = len(s)
 
-        S = np.zeros((NC, 2, 2), dtype=np.float64)
-
-        S[:, 0, 0] = (2 * mu + la) * s[:, 0, 0] + la * s[:, 1, 1]
-        S[:, 1, 1] = la * s[:, 0, 0] + (2 * mu + la) * s[:, 1, 1]
-        S[:, 0, 1] = 2 * mu * s[:, 0, 1]
-        S[:, 1, 0] = S[:, 0, 1]
+        bc = np.array([1 / 3, 1 / 3, 1 / 3], dtype=np.float64)
+        c0 = (1 - phi(bc)) ** 2 + eps
+        
+        S = np.einsum('i, ijk -> ijk', 2*mu*c0, sp)
+        S += 2*mu*sm
+        val = c0*la*tp + la*tm
+        S[:, 0, 0] = val
+        S[:, 0, 1] = val
+        S[:, 1, 0] = val
+        S[:, 1, 1] = val
         return S
 
     def macaulay_operation(self, alpha):
@@ -240,7 +251,7 @@ class ContinummDFModel2d:
 
     def disp_matrix(self, mesh, D):
 
-        NN = mesh.number_of_cells()
+        NN = mesh.number_of_nodes()
         cm = mesh.entity_measure('cell')
         gphi = mesh.grad_lambda()  # (NC, 3, 2)
 
@@ -315,8 +326,8 @@ class ContinummDFModel2d:
 
         return A
 
-    def disp_residual(self, uh, phi, K):
-        return -K @ uh.T.flat
+    def disp_residual(self, A, uh):
+        return -A@uh.T.flat
 
     def phase_residual(self, uh, phi, H):
         """
@@ -400,16 +411,43 @@ def adaptive_mesh(mesh, d0=0.49, d1=0.75, h=0.005):
     mesh.to_vtk(fname='ad.vtu')
 
 
-#model = ContinummDFModel2d()
-#print(model.dsigma_depsilon(np.array([0.1]), np.array([[[2, 1], [3, 1]]])))
+## 参数解析
+parser = argparse.ArgumentParser(description=
+        """
+        三角形网格上任意次有限元方法求解连续体断裂模型
+        """)
 
-p = 1
-n = 0
-maxit = 1
+parser.add_argument('--degree',
+        default=1, type=int,
+        help='Lagrange 有限元空间的次数, 默认为 1 次.')
+
+parser.add_argument('--GD',
+        default=2, type=int,
+        help='模型问题的维数, 默认求解 2 维问题.')
+
+parser.add_argument('--nrefine',
+        default=4, type=int,
+        help='初始网格加密的次数, 默认初始加密 4 次.')
+
+parser.add_argument('--maxit',
+        default=20, type=int,
+        help='默认牛顿迭代次数, 默认迭代 20 次')
+
+parser.add_argument('--accuracy',
+        default=1e-10, type=float,
+        help='默认牛顿迭代精度, 默认精度 1e-10')
+
+args = parser.parse_args()
+
+p = args.degree
+GD = args.GD
+n = args.nrefine
+maxit = args.maxit
+accuracy = args.accuracy
 
 model = ContinummDFModel2d()
 
-mesh = model.init_mesh(4)
+mesh = model.init_mesh(n)
 NC = mesh.number_of_cells()
 NN = mesh.number_of_nodes()
 node = mesh.entity('node')
@@ -422,20 +460,23 @@ space = LagrangeFiniteElementSpace(mesh, p=p)
 
 K = space.linear_elasticity_matrix(model.la, model.mu, q=1)  # 线弹性刚度矩阵
 
-uh = space.function(dim=2)
+uh = space.function(dim=GD)
 phi = space.function()
 H = np.zeros(NC, dtype=np.float64)  # 分片常数
 
-for i in range(1):
+for i in range(20):
     uh[isBdNode, 1] += 1e-5
 
     k = 0
     while k < maxit:
-        R0 = model.disp_residual(uh, phi, K)
-
+        print('i:', i)
+        print('k:', k)
+        
         s = model.strain(uh)
         D = model.dsigma_depsilon(phi, s)
         A = model.disp_matrix(mesh, D)
+        
+        R0 = model.disp_residual(A, uh)
 
         print("求解位移增量")
         du = spsolve(A[isInDof, :][:, isInDof], R0[isInDof])
@@ -454,19 +495,19 @@ for i in range(1):
         phi += spsolve(A, R1)
 
         error = max(np.max(np.abs(R0)), np.max(np.abs(R1)))
-        print("误差:", error)
-        if error < 1e-5:
+        print("error:", error)
+        if error < accuracy:
             break
-        print('i:', i)
-        print('k:', k)
         k += 1
+#mesh.to_vtk(fname='test.vtu')
 
-'''
 fig, axes = plt.subplots()
+mesh.node += uh
 mesh.add_plot(axes)
 plt.show()
+'''
 adaptive_mesh(mesh, d0=0.499, d1=1, h=0.001)
 '''
-# fig, axes = plt.subplots()
-# mesh.add_plot(axes)
-# plt.show()
+#fig, axes = plt.subplots()
+#mesh.add_plot(axes)
+#plt.show()
