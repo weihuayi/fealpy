@@ -190,8 +190,6 @@ def test_jump_x(hx, hy, hz):
     #print(N1*hy)
     #print(N10*hx**2*hy)
     print(N0*36*hx**2/(hy*hz))
-    print(N1*36*hx**2/(hy*hz))
-    print(N2*36*hx**2/(hy*hz))
 
 
 def test_jump_y(hx, hy, hz):
@@ -246,9 +244,7 @@ def test_jump_y(hx, hy, hz):
     #print(N0*6*(hx**2)/hy)
     #print(N1*hy)
     #print(N10*hx**2*hy)
-    print(N0*36*hx/hz)
-    print(N1*36*hx/hz)
-    print(N2*36*hx/hz)
+    print(N1*36*hy**2/(hz*hx))
 
 
 def test_jump_z(hx, hy, hz):
@@ -269,8 +265,9 @@ def test_jump_z(hx, hy, hz):
 
     F1 = [F0[i].subs({z:z+hz}) for i in range(8)] # 将 z 替换成 z+hz
 
-    f_l = F1 + [0*z, 0*z, 0*z, 0*z]
-    f_r = [0*z, 0*z, 0*z, 0*z] + F0
+    f_l = [F1[0], F1[2], F1[4], F1[6], F1[1], F1[3], F1[5], F1[7], 0*y, 0*y,
+            0*y, 0*y] 
+    f_r = [0*y, 0*y, 0*y, 0*y, F0[0], F0[2], F0[4], F0[6], F0[1], F0[3], F0[5], F0[7]] 
 
     nf_r = []
     nf_l = []
@@ -309,7 +306,7 @@ def test_jump_z(hx, hy, hz):
     #print(N0*6*(hx**2)/hy)
     #print(N1*hy)
     #print(N10*hx**2*hy)
-    print(N0*6*hx/hy)
+    print(N2*36*hz**2/hx/hy)
 
 
 hx = float(sys.argv[1])
@@ -317,9 +314,9 @@ hy = float(sys.argv[2])
 hz = float(sys.argv[3])
 
 #test_stiff_matrix(hx, hy, hz)
-test_nabla2_matrix(hx, hy, hz)
-#test_jump_x(hx, hy, hz)
-#test_jump_y(hx, hy, hz)
-#test_jump_z(hx, hy, hz)
+#test_nabla2_matrix(hx, hy, hz)
+test_jump_x(hx, hy, hz)
+test_jump_y(hx, hy, hz)
+test_jump_z(hx, hy, hz)
 
 

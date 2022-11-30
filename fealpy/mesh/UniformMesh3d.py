@@ -33,6 +33,12 @@ class UniformMesh3d(Mesh3d):
     def top_dimension(self):
         return 3
 
+    def number_of_nodes(self):
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+        return (nx+1)*(ny+1)*(nz+1)
+
     @property
     def node(self):
         GD = self.geo_dimension()
@@ -467,6 +473,66 @@ class UniformMesh3d(Mesh3d):
         J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
         N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
         return N2
+
+    def grad_jump_matrix(self):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        h, nx, ny, nz = self.h, self.ds.nx, self.ds.ny, self.ds.nz
+
+        face = self.entity('face')
+        facex = face[:(nx + 1)*ny*nz].reshape(nx+1, ny, nz, 4)
+        facey = face[(nx + 1)*ny*nz:(nx+1)*ny*nz+nx*(ny+1)*nz].reshape(nx, ny+1,
+                nz, 4)
+        facez = face[(nx+1)*ny*nz+nx*(ny+1)*nz:].reshape(nx, ny, nz+1, 4)
+
+        Jumpf = np.array([[ 4.,  2.,  2.,  1., -8., -4., -4., -2.,  4.,  2.,  2.,  1.],
+                          [ 2.,  4.,  1.,  2., -4., -8., -2., -4.,  2.,  4.,  1.,  2.],
+                          [ 2.,  1.,  4.,  2., -4., -2., -8., -4.,  2.,  1.,  4.,  2.],
+                          [ 1.,  2.,  2.,  4., -2., -4., -4., -8.,  1.,  2.,  2.,  4.],
+                          [-8., -4., -4., -2., 16.,  8.,  8.,  4., -8., -4., -4., -2.],
+                          [-4., -8., -2., -4.,  8., 16.,  4.,  8., -4., -8., -2., -4.],
+                          [-4., -2., -8., -4.,  8.,  4., 16.,  8., -4., -2., -8., -4.],
+                          [-2., -4., -4., -8.,  4.,  8.,  8., 16., -2., -4., -4., -8.],
+                          [ 4.,  2.,  2.,  1., -8., -4., -4., -2.,  4.,  2.,  2.,  1.],
+                          [ 2.,  4.,  1.,  2., -4., -8., -2., -4.,  2.,  4.,  1.,  2.],
+                          [ 2.,  1.,  4.,  2., -4., -2., -8., -4.,  2.,  1.,  4.,  2.],
+                          [ 1.,  2.,  2.,  4., -2., -4., -4., -8.,  1.,  2.,  2.,  4.]])
+        Jumpfx = Jumpf * (h[1]*h[2]/h[0]**2/36) 
+
+        facex2dof = np.zeros([nx-1, ny, nz, 12], dtype=np.int_)
+        facex2dof[..., 0: 4] = facex[1:-1]-(ny+1)*(nz+1)
+        facex2dof[..., 4: 8] = facex[1:-1]
+        facex2dof[..., 8:12] = facex[1:-1]+(ny+1)*(nz+1)
+        print(np.max(facex2dof))
+        print(NN)
+
+        data = np.broadcast_to(Jumpfx, (nx-1, ny, nz, 12, 12))
+        I = np.broadcast_to(facex2dof[..., None], data.shape)
+        J = np.broadcast_to(facex2dof[..., None, :], data.shape)
+        Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        Jumpfy = Jumpf * (h[0]*h[2]/h[1]**2/36) 
+        facey2dof = np.zeros([nx, ny-1, nz, 12], dtype=np.int_)
+        facey2dof[..., 4: 8] = facey[:, 1:-1, :, [0, 2, 1, 3]]
+        facey2dof[..., 0: 4] = facey2dof[..., 4:8]-(nz+1)
+        facey2dof[..., 8:12] = facey2dof[..., 4:8]+(nz+1)
+
+        data = np.broadcast_to(Jumpfy, (nx, ny-1, nz, 12, 12))
+        I = np.broadcast_to(facey2dof[..., None], data.shape)
+        J = np.broadcast_to(facey2dof[..., None, :], data.shape)
+        Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+
+        Jumpfz = Jumpf * (h[0]*h[1]/h[2]**2/36) 
+        facez2dof = np.zeros([nx, ny, nz-1, 12], dtype=np.int_)
+        facez2dof[..., 4: 8] = facez[:, :, 1:-1]
+        facez2dof[..., 0: 4] = facez2dof[..., 4:8]-1
+        facez2dof[..., 8:12] = facez2dof[..., 4:8]+1
+
+        data = np.broadcast_to(Jumpfz, (nx, ny, nz-1, 12, 12))
+        I = np.broadcast_to(facez2dof[..., None], data.shape)
+        J = np.broadcast_to(facez2dof[..., None, :], data.shape)
+        Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
+        return Jump
 
     def show_function(self, plot, uh, cmap='jet'):
         """

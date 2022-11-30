@@ -234,7 +234,8 @@ class UniformMesh2d(Mesh2d):
                           [-4., -2.,  8.,  4., -4., -2.],
                           [-2., -4.,  4.,  8., -2., -4.],
                           [ 2.,  1., -4., -2.,  2.,  1.],
-                          [ 1.,  2., -2., -4.,  1.,  2.]])*(h[1]/h[0]/h[0]/6)
+                          [ 1.,  2., -2., -4.,  1.,  2.]])
+        Jumpey = Jumpe*(h[1]/h[0]/h[0]/6)
         edge = self.entity('edge')
         edgex = edge[:nx*(ny+1)].reshape(nx, ny+1, 2)
         edgey = edge[nx*(ny+1):].reshape(nx+1, ny, 2)
@@ -244,17 +245,18 @@ class UniformMesh2d(Mesh2d):
         edgey2dof[..., 2:4] = edgey[1:-1]
         edgey2dof[..., 4:6] = edgey[1:-1]+ny+1
 
-        data = np.broadcast_to(Jumpe, (nx-1, ny, 6, 6))
+        data = np.broadcast_to(Jumpey, (nx-1, ny, 6, 6))
         I = np.broadcast_to(edgey2dof[..., None], data.shape)
         J = np.broadcast_to(edgey2dof[..., None, :], data.shape)
         Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
 
+        Jumpex = Jumpe*(h[0]/h[1]/h[1]/6)
         edgex2dof = np.zeros([nx, ny-1, 6], dtype=np.int_)
         edgex2dof[..., 0:2] = edgex[:, 1:-1]-1
         edgex2dof[..., 2:4] = edgex[:, 1:-1]
         edgex2dof[..., 4:6] = edgex[:, 1:-1]+1
 
-        data = np.broadcast_to(Jumpe, (nx, ny-1, 6, 6))
+        data = np.broadcast_to(Jumpex, (nx, ny-1, 6, 6))
         I = np.broadcast_to(edgex2dof[..., None], data.shape)
         J = np.broadcast_to(edgex2dof[..., None, :], data.shape)
         Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
