@@ -608,9 +608,9 @@ class LagrangeFiniteElementSpace():
                 uI = u(bcs)
 
         if dtype is None:
-            return self.function(dim=dim, array=u, dtype=uI.dtype)
+            return self.function(dim=dim, array=uI, dtype=uI.dtype)
         else:
-            return self.function(dim=dim, array=u, dtype=dtype)
+            return self.function(dim=dim, array=uI, dtype=dtype)
 
     def linear_interpolation_matrix(self):
         """
