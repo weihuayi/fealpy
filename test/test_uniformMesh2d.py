@@ -1,9 +1,27 @@
 import numpy as np
+import sys
+import matplotlib.pyplot as plt
+from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
+
+from fealpy.mesh import UniformMesh2d, MeshFactory, QuadrangleMesh, TriangleMesh
+import time
 
 a = np.array([[ 2.,  1., -1., -2.],
               [ 1.,  2., -2., -1.],
               [-1., -2.,  2.,  1.],
               [-2., -1.,  1.,  2.]])
+def ff(x):
+    y = np.linalg.norm(x - np.array([[-0.1, -0.1]]), axis=-1)
+    #return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
+    return np.sin(2*np.pi*x[..., 0])*np.sin(2*np.pi*x[..., 1])+1
+    #return y**2
+
+def exu(x):
+    return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
+
+def source(x):
+    return 2*np.pi**2*exu(x)
 
 def test_stiff_matrix():
     hx, hy = 2.9811, 3.124818 
@@ -35,26 +53,20 @@ def test_stiff_matrix():
     print(f)
     print(nf)
 
-def test_poisson():
+def test_poisson(N):
 
     box = [0, 1, 0, 1]
-    N = int(sys.argv[1])
     h = [1/N, 1/N]
     origin = [-1/4/N, -1/4/N]
     origin = [0, 0]
-    extend = [0, N+1, 0, N+1]
+    extend = [0, N, 0, N]
 
     meshb = UniformMesh2d(extend, h, origin) # 背景网格
-    mesht = MeshFactory.triangle([0, 1, 0, 1], 1)
-    tnode = mesht.entity('node')
-    tval = ff(tnode)
-
-    t2b(mesht, meshb, tval)
-    meshb.stiff_matrix()
     pnode = meshb.entity('node').reshape(-1, 2)
 
     F = meshb.source_vector(source)
     A = meshb.stiff_matrix()
+    M = meshb.mass_matrix()
     x = meshb.function().reshape(-1)
 
     isDDof = meshb.ds.boundary_node_flag()
@@ -70,6 +82,11 @@ def test_poisson():
 
     x = spsolve(A, F)
     print(np.max(np.abs(x - exu(pnode))))
+
+    ff = meshb.function().reshape(-1)
+    F = meshb.source_vector(exu)
+    ff[:] = spsolve(M, F)
+    print(np.max(np.abs(ff - exu(pnode))))
 
 def test_jump_y():
     hx, hy = 1, 1
@@ -202,5 +219,7 @@ def test_jump_x():
 
 #test_jump_y()
 #test_jump_x()
-test_stiff_matrix()
+#test_stiff_matrix()
+N = int(sys.argv[1])
+test_poisson(N)
 

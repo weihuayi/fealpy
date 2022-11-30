@@ -491,7 +491,7 @@ class UniformMesh3d(Mesh3d):
                          [-2.,  2.,  1., -1.,  2., -2., -1.,  1.],
                          [ 2., -2., -1.,  1., -2.,  2.,  1., -1.],
                          [ 1., -1., -2.,  2., -1.,  1.,  2., -2.],
-                         [-1.,  1.,  2., -2.,  1., -1., -2.,  2.]]) 
+                         [-1.,  1.,  2., -2.,  1., -1., -2.,  2.]])
         N202 = np.array([[ 2.,  1., -1., -2., -2., -1.,  1.,  2.],
                          [ 1.,  2., -2., -1., -1., -2.,  2.,  1.],
                          [-1., -2.,  2.,  1.,  1.,  2., -2., -1.],
@@ -499,7 +499,7 @@ class UniformMesh3d(Mesh3d):
                          [-2., -1.,  1.,  2.,  2.,  1., -1., -2.],
                          [-1., -2.,  2.,  1.,  1.,  2., -2., -1.],
                          [ 1.,  2., -2., -1., -1., -2.,  2.,  1.],
-                         [ 2.,  1., -1., -2., -2., -1.,  1.,  2.]]) 
+                         [ 2.,  1., -1., -2., -2., -1.,  1.,  2.]])
         N212 = np.array([[ 2., -2.,  2., -2.,  1., -1.,  1., -1.],
                          [-2.,  2., -2.,  2., -1.,  1., -1.,  1.],
                          [ 2., -2.,  2., -2.,  1., -1.,  1., -1.],
@@ -507,7 +507,7 @@ class UniformMesh3d(Mesh3d):
                          [ 1., -1.,  1., -1.,  2., -2.,  2., -2.],
                          [-1.,  1., -1.,  1., -2.,  2., -2.,  2.],
                          [ 1., -1.,  1., -1.,  2., -2.,  2., -2.],
-                         [-1.,  1., -1.,  1., -2.,  2., -2.,  2.]]) 
+                         [-1.,  1., -1.,  1., -2.,  2., -2.,  2.]])
         N201 *= h[2]/h[0]/h[1]/6
         N202 *= h[1]/h[0]/h[2]/6
         N212 *= h[0]/h[1]/h[2]/6
@@ -551,8 +551,6 @@ class UniformMesh3d(Mesh3d):
         facex2dof[..., 0: 4] = facex[1:-1]-(ny+1)*(nz+1)
         facex2dof[..., 4: 8] = facex[1:-1]
         facex2dof[..., 8:12] = facex[1:-1]+(ny+1)*(nz+1)
-        print(np.max(facex2dof))
-        print(NN)
 
         data = np.broadcast_to(Jumpfx, (nx-1, ny, nz, 12, 12))
         I = np.broadcast_to(facex2dof[..., None], data.shape)
@@ -581,6 +579,76 @@ class UniformMesh3d(Mesh3d):
         J = np.broadcast_to(facez2dof[..., None, :], data.shape)
         Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
         return Jump
+
+    def source_vector(self, f):
+        cellvol = self.cell_volume()
+        cell2node = self.entity('cell')
+        cellbar = self.entity_barycenter('cell')
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell = self.entity('cell')
+
+        #fval = f(node[cell])*cellarea/4 # (NC, )
+
+        fval = f(cellbar).reshape(-1) # (NC, )
+        fval = fval*cellvol/8
+        fval = np.broadcast_to(fval[:, None], (NC, 8))
+
+        F = np.zeros(NN, dtype=np.float_)
+        np.add.at(F, cell2node, fval)
+        return F
+
+    def interpolation_with_sample_points(self, point, val, alpha=[10, 0.001, 0.01, 0.1]):
+        '''!
+        @brief 将 point, val 插值为网格函数
+        @param point : 样本点
+        @param val : 样本点的值
+        '''
+        h, origin, nx, ny, nz = self.h, self.origin, self.ds.nx, self.ds.ny, self.nz
+        cell = self.entity('cell').reshape(nx, ny, nz, 8)
+
+        NS = len(point) 
+        NN = self.number_of_nodes()
+
+        Xp = (point-origin)/h # (NS, 3)
+        cellIdx = Xp.astype(np.int_) # 样本点所在单元
+        xval = Xp - cellIdx 
+
+        I = np.repeat(np.arange(NS), 8)
+        J = cell[cellIdx[:, 0], cellIdx[:, 1]]
+        data = np.zeros([NS, 8], dtype=np.float_)
+        data[:, 0] = (1-xval[:, 0])*(1-xval[:, 1])*(1-xval[:, 2])
+        data[:, 1] = (1-xval[:, 0])*(1-xval[:, 1])*xval[:, 2]
+        data[:, 2] = (1-xval[:, 0])*xval[:, 1]*(1-xval[:, 2])
+        data[:, 3] = (1-xval[:, 0])*xval[:, 1]*xval[:, 2]
+        data[:, 4] = xval[:, 0]*(1-xval[:, 1])*(1-xval[:, 2])
+        data[:, 5] = xval[:, 0]*(1-xval[:, 1])*xval[:, 2]
+        data[:, 6] = xval[:, 0]*xval[:, 1]*(1-xval[:, 2])
+        data[:, 7] = xval[:, 0]*xval[:, 1]*xval[:, 2]
+
+        A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
+        B = self.stiff_matrix()
+        C = self.grad_2_matrix()
+        D = self.grad_jump_matrix()
+
+        ### 标准化残量
+        if 0:
+            y = val-np.min(val)+0.01
+            from scipy.sparse import spdiags
+            Diag = spdiags(1/y, 0, NS, NS)
+            A = Diag@A
+
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@np.ones(NS, dtype=np.float_)
+            f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(y)-0.01
+        else:
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@y
+            f = spsolve(S, F).reshape(nx+1, ny+1)
+        return UniformMesh2dFunction(self, f)
 
     def show_function(self, plot, uh, cmap='jet'):
         """
@@ -614,6 +682,14 @@ class UniformMesh3d(Mesh3d):
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
 
+    def boundary_node_flag(self):
+        nx = self.ds.nx
+        ny = self.ds.ny
+        nz = self.ds.nz
+        shape = (nx+1, ny+1, nz+1)
+        isBdNode = np.ones(shape, dtype=np.bool)
+        isBdNode[1:-1, 1:-1, 1:-1] = False
+        return isBdNode.flat
 
     def cell_location(self, p):
         """

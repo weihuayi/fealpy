@@ -527,29 +527,29 @@ class UniformMesh2d(Mesh2d):
             mesh.to_vtk_file(fname, nodedata=nodedata)
             n += 1
 
-    def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
+    def interpolation_with_sample_points(self, point, val, alpha=[10, 0.001, 0.01, 0.1]):
         '''!
-        @brief 将 x, y 插值为网格函数
-        @param x : 样本点
-        @param y : 样本点的值
+        @brief 将 point, val 插值为网格函数
+        @param point : 样本点
+        @param val : 样本点的值
         '''
         h, origin, nx, ny = self.h, self.origin, self.ds.nx, self.ds.ny
         cell = self.entity('cell').reshape(nx, ny, 4)
 
-        NS = len(x) 
+        NS = len(point) 
         NN = self.number_of_nodes()
 
-        Xp = (x-origin)/h # (NS, 2)
+        Xp = (point-origin)/h # (NS, 2)
         cellIdx = Xp.astype(np.int_) # 样本点所在单元
-        val = Xp - cellIdx 
+        xval = Xp - cellIdx 
 
         I = np.repeat(np.arange(NS), 4)
         J = cell[cellIdx[:, 0], cellIdx[:, 1]]
         data = np.zeros([NS, 4], dtype=np.float_)
-        data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
-        data[:, 1] = (1-val[:, 0])*val[:, 1]
-        data[:, 2] = val[:, 0]*(1-val[:, 1])
-        data[:, 3] = val[:, 0]*val[:, 1]
+        data[:, 0] = (1-xval[:, 0])*(1-xval[:, 1])
+        data[:, 1] = (1-xval[:, 0])*xval[:, 1]
+        data[:, 2] = xval[:, 0]*(1-xval[:, 1])
+        data[:, 3] = xval[:, 0]*xval[:, 1]
 
         A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
         B = self.stiff_matrix()
@@ -558,7 +558,7 @@ class UniformMesh2d(Mesh2d):
 
         ### 标准化残量
         if 1:
-            y = y-np.min(y)+0.01
+            y = val-np.min(val)+0.01
             from scipy.sparse import spdiags
             Diag = spdiags(1/y, 0, NS, NS)
             A = Diag@A

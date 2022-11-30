@@ -313,10 +313,10 @@ hx = float(sys.argv[1])
 hy = float(sys.argv[2])
 hz = float(sys.argv[3])
 
-#test_stiff_matrix(hx, hy, hz)
+test_stiff_matrix(hx, hy, hz)
 #test_nabla2_matrix(hx, hy, hz)
-test_jump_x(hx, hy, hz)
-test_jump_y(hx, hy, hz)
-test_jump_z(hx, hy, hz)
+#test_jump_x(hx, hy, hz)
+#test_jump_y(hx, hy, hz)
+#test_jump_z(hx, hy, hz)
 
 
