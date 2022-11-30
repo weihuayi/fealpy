@@ -6,7 +6,7 @@ a = np.array([[ 2.,  1., -1., -2.],
               [-2., -1.,  1.,  2.]])
 
 def test_stiff_matrix():
-    hx, hy = 1.123414, 3.340984
+    hx, hy = 2.9811, 3.124818 
     from sympy import symbols, diff, integrate
     x, y = symbols('x, y')
     x0, y0 = x/hx, y/hy
@@ -28,9 +28,9 @@ def test_stiff_matrix():
             M[i, j] = integrate(f[i]*f[j], (x, 0, hx), (y, 0, hy))
             S0[i, j] = integrate(nf[i][0]*nf[j][0], (x, 0, hx), (y, 0, hy))
             S1[i, j] = integrate(nf[i][1]*nf[j][1], (x, 0, hx), (y, 0, hy))
-    print(M*36)
-    print(S0*6*hx/hy)
-    print(S1*6*hy/hx)
+    print(M*36/hx/hy)
+    #print(S0*6*hx/hy)
+    #print(S1*6*hy/hx)
 
     print(f)
     print(nf)
@@ -200,6 +200,7 @@ def test_jump_x():
     print(N1*6*hy**2/hx)
     print(N10*hy**2*hx)
 
-test_jump_y()
-test_jump_x()
+#test_jump_y()
+#test_jump_x()
+test_stiff_matrix()
 
