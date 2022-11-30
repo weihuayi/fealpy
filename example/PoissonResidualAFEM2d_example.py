@@ -19,7 +19,7 @@ pde = LShapeRSinData()
 mesh = pde.init_mesh(n=4, meshtype='tri')
 
 theta = 0.2
-maxit = 40 
+maxit = 30
 p = 1
 errorType = ['$|| u - u_h||_{0}$',
              '$||\\nabla u - \\nabla u_h||_{0}$',
@@ -49,8 +49,6 @@ for i in range(maxit):
     errorMatrix[1, i] = space.integralalg.error(pde.gradient, uh.grad_value) 
     eta = space.residual_estimate(uh)
     errorMatrix[2, i] = np.sqrt(np.sum(eta**2))
-    if(mesh.number_of_cells()>10000):
-        break
 
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
@@ -63,5 +61,5 @@ fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
 mesh.to_vtk(fname='aaa.vtu')
-#showmultirate(plt, maxit - 3, NDof, errorMatrix, errorType)
+showmultirate(plt, maxit - 10, NDof, errorMatrix, errorType)
 plt.show()
