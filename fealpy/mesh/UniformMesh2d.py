@@ -457,9 +457,10 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
-    def fast_sweeping_method(self):
+    def fast_sweeping_method(self, phi):
         """
         @brief 均匀网格上的 fast sweeping method
+        @param[in] phi 是一个离散的水平集函数
 
         @note 注意，我们这里假设 x 和 y 方向剖分的段数相等
         """
