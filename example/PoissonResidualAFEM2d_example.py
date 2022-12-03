@@ -19,7 +19,7 @@ pde = LShapeRSinData()
 mesh = pde.init_mesh(n=4, meshtype='tri')
 
 theta = 0.2
-maxit = 40 
+maxit = 30
 p = 1
 errorType = ['$|| u - u_h||_{0}$',
              '$||\\nabla u - \\nabla u_h||_{0}$',
@@ -53,12 +53,13 @@ for i in range(maxit):
     if i < maxit - 1:
         isMarkedCell = mark(eta, theta=theta)
         mesh.bisect(isMarkedCell)
-        mesh.add_plot(plt)
-        plt.savefig('./test-' + str(i+1) + '.png')
-        plt.close()
+        #mesh.add_plot(plt)
+        #plt.savefig('./test-' + str(i+1) + '.png')
+        #plt.close()
 
 fig = plt.figure()
 axes = fig.gca()
 mesh.add_plot(axes)
-showmultirate(plt, maxit - 5, NDof, errorMatrix, errorType)
+mesh.to_vtk(fname='aaa.vtu')
+showmultirate(plt, maxit - 10, NDof, errorMatrix, errorType)
 plt.show()

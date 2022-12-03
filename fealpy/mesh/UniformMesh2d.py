@@ -234,7 +234,8 @@ class UniformMesh2d(Mesh2d):
                           [-4., -2.,  8.,  4., -4., -2.],
                           [-2., -4.,  4.,  8., -2., -4.],
                           [ 2.,  1., -4., -2.,  2.,  1.],
-                          [ 1.,  2., -2., -4.,  1.,  2.]])*(h[1]/h[0]/h[0]/6)
+                          [ 1.,  2., -2., -4.,  1.,  2.]])
+        Jumpey = Jumpe*(h[1]/h[0]/h[0]/6)
         edge = self.entity('edge')
         edgex = edge[:nx*(ny+1)].reshape(nx, ny+1, 2)
         edgey = edge[nx*(ny+1):].reshape(nx+1, ny, 2)
@@ -244,17 +245,18 @@ class UniformMesh2d(Mesh2d):
         edgey2dof[..., 2:4] = edgey[1:-1]
         edgey2dof[..., 4:6] = edgey[1:-1]+ny+1
 
-        data = np.broadcast_to(Jumpe, (nx-1, ny, 6, 6))
+        data = np.broadcast_to(Jumpey, (nx-1, ny, 6, 6))
         I = np.broadcast_to(edgey2dof[..., None], data.shape)
         J = np.broadcast_to(edgey2dof[..., None, :], data.shape)
         Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
 
+        Jumpex = Jumpe*(h[0]/h[1]/h[1]/6)
         edgex2dof = np.zeros([nx, ny-1, 6], dtype=np.int_)
         edgex2dof[..., 0:2] = edgex[:, 1:-1]-1
         edgex2dof[..., 2:4] = edgex[:, 1:-1]
         edgex2dof[..., 4:6] = edgex[:, 1:-1]+1
 
-        data = np.broadcast_to(Jumpe, (nx, ny-1, 6, 6))
+        data = np.broadcast_to(Jumpex, (nx, ny-1, 6, 6))
         I = np.broadcast_to(edgex2dof[..., None], data.shape)
         J = np.broadcast_to(edgex2dof[..., None, :], data.shape)
         Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
@@ -526,38 +528,49 @@ class UniformMesh2d(Mesh2d):
             mesh.to_vtk_file(fname, nodedata=nodedata)
             n += 1
 
-    def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
+    def interpolation_with_sample_points(self, point, val, alpha=[10, 0.001, 0.01, 0.1]):
         '''!
-        @brief 将 x, y 插值为网格函数
-        @param x : 样本点
-        @param y : 样本点的值
+        @brief 将 point, val 插值为网格函数
+        @param point : 样本点
+        @param val : 样本点的值
         '''
         h, origin, nx, ny = self.h, self.origin, self.ds.nx, self.ds.ny
         cell = self.entity('cell').reshape(nx, ny, 4)
 
-        NS = len(x) 
+        NS = len(point) 
         NN = self.number_of_nodes()
 
-        Xp = (x-origin)/h # (NS, 2)
+        Xp = (point-origin)/h # (NS, 2)
         cellIdx = Xp.astype(np.int_) # 样本点所在单元
-        val = Xp - cellIdx 
+        xval = Xp - cellIdx 
 
         I = np.repeat(np.arange(NS), 4)
         J = cell[cellIdx[:, 0], cellIdx[:, 1]]
         data = np.zeros([NS, 4], dtype=np.float_)
-        data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
-        data[:, 1] = (1-val[:, 0])*val[:, 1]
-        data[:, 2] = val[:, 0]*val[:, 1]
-        data[:, 3] = val[:, 0]*(1-val[:, 1])
+        data[:, 0] = (1-xval[:, 0])*(1-xval[:, 1])
+        data[:, 1] = (1-xval[:, 0])*xval[:, 1]
+        data[:, 2] = xval[:, 0]*(1-xval[:, 1])
+        data[:, 3] = xval[:, 0]*xval[:, 1]
 
         A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
         B = self.stiff_matrix()
         C = self.nabla_2_matrix()
         D = self.nabla_jump_matrix()
 
-        S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
-        F = alpha[0]*A.T@y
-        f = spsolve(S, F).reshape(nx+1, ny+1)
+        ### 标准化残量
+        if 1:
+            y = val-np.min(val)+0.01
+            from scipy.sparse import spdiags
+            Diag = spdiags(1/y, 0, NS, NS)
+            A = Diag@A
+
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@np.ones(NS, dtype=np.float_)
+            f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(y)-0.01
+        else:
+            S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
+            F = alpha[0]*A.T@y
+            f = spsolve(S, F).reshape(nx+1, ny+1)
         return UniformMesh2dFunction(self, f)
 
 class UniformMesh2dFunction():
