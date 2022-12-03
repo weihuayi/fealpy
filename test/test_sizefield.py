@@ -80,7 +80,7 @@ def t2b(mesht, meshb, tf):
             mesh1.to_vtk(fname='111.vtu')
 
 
-    #print(np.max(np.abs(bf[:-1, :-1] - ff(meshb.entity('node')[:-1, :-1]))))
+    print(np.max(np.abs(bf[:-1, :-1] - ff(meshb.entity('node')[:-1, :-1]))))
 
 
 

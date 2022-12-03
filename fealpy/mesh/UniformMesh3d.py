@@ -2,6 +2,7 @@
 import numpy as np
 from types import ModuleType
 from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse.linalg import spsolve
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
@@ -491,7 +492,7 @@ class UniformMesh3d(Mesh3d):
                          [-2.,  2.,  1., -1.,  2., -2., -1.,  1.],
                          [ 2., -2., -1.,  1., -2.,  2.,  1., -1.],
                          [ 1., -1., -2.,  2., -1.,  1.,  2., -2.],
-                         [-1.,  1.,  2., -2.,  1., -1., -2.,  2.]])
+                         [-1.,  1.,  2., -2.,  1., -1., -2.,  2.]])*2
         N202 = np.array([[ 2.,  1., -1., -2., -2., -1.,  1.,  2.],
                          [ 1.,  2., -2., -1., -1., -2.,  2.,  1.],
                          [-1., -2.,  2.,  1.,  1.,  2., -2., -1.],
@@ -499,7 +500,7 @@ class UniformMesh3d(Mesh3d):
                          [-2., -1.,  1.,  2.,  2.,  1., -1., -2.],
                          [-1., -2.,  2.,  1.,  1.,  2., -2., -1.],
                          [ 1.,  2., -2., -1., -1., -2.,  2.,  1.],
-                         [ 2.,  1., -1., -2., -2., -1.,  1.,  2.]])
+                         [ 2.,  1., -1., -2., -2., -1.,  1.,  2.]])*2
         N212 = np.array([[ 2., -2.,  2., -2.,  1., -1.,  1., -1.],
                          [-2.,  2., -2.,  2., -1.,  1., -1.,  1.],
                          [ 2., -2.,  2., -2.,  1., -1.,  1., -1.],
@@ -507,7 +508,7 @@ class UniformMesh3d(Mesh3d):
                          [ 1., -1.,  1., -1.,  2., -2.,  2., -2.],
                          [-1.,  1., -1.,  1., -2.,  2., -2.,  2.],
                          [ 1., -1.,  1., -1.,  2., -2.,  2., -2.],
-                         [-1.,  1., -1.,  1., -2.,  2., -2.,  2.]])
+                         [-1.,  1., -1.,  1., -2.,  2., -2.,  2.]])*2
         N201 *= h[2]/h[0]/h[1]/6
         N202 *= h[1]/h[0]/h[2]/6
         N212 *= h[0]/h[1]/h[2]/6
@@ -607,7 +608,7 @@ class UniformMesh3d(Mesh3d):
         @param point : 样本点
         @param val : 样本点的值
         '''
-        h, origin, nx, ny, nz = self.h, self.origin, self.ds.nx, self.ds.ny, self.nz
+        h, origin, nx, ny, nz = self.h, self.origin, self.ds.nx, self.ds.ny, self.ds.nz
         cell = self.entity('cell').reshape(nx, ny, nz, 8)
 
         NS = len(point) 
@@ -618,7 +619,7 @@ class UniformMesh3d(Mesh3d):
         xval = Xp - cellIdx 
 
         I = np.repeat(np.arange(NS), 8)
-        J = cell[cellIdx[:, 0], cellIdx[:, 1]]
+        J = cell[cellIdx[:, 0], cellIdx[:, 1], cellIdx[:, 2]]
         data = np.zeros([NS, 8], dtype=np.float_)
         data[:, 0] = (1-xval[:, 0])*(1-xval[:, 1])*(1-xval[:, 2])
         data[:, 1] = (1-xval[:, 0])*(1-xval[:, 1])*xval[:, 2]
@@ -628,6 +629,9 @@ class UniformMesh3d(Mesh3d):
         data[:, 5] = xval[:, 0]*(1-xval[:, 1])*xval[:, 2]
         data[:, 6] = xval[:, 0]*xval[:, 1]*(1-xval[:, 2])
         data[:, 7] = xval[:, 0]*xval[:, 1]*xval[:, 2]
+        print(I.shape)
+        print(J.shape)
+        print(data.shape)
 
         A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
         B = self.stiff_matrix()
@@ -646,9 +650,9 @@ class UniformMesh3d(Mesh3d):
             f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(y)-0.01
         else:
             S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
-            F = alpha[0]*A.T@y
-            f = spsolve(S, F).reshape(nx+1, ny+1)
-        return UniformMesh2dFunction(self, f)
+            F = alpha[0]*A.T@val
+            f = spsolve(S, F).reshape(nx+1, ny+1, nz+1)
+        return UniformMesh3dFunction(self, f)
 
     def show_function(self, plot, uh, cmap='jet'):
         """
