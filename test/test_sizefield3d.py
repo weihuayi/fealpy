@@ -9,8 +9,8 @@ import time
 
 def ff(x):
     y = np.linalg.norm(x - np.array([[-0.1, -0.1, -0.1]]), axis=-1)
-    #return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
-    return np.sin(x[..., 0])*np.sin(x[..., 1])+1
+    return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
+    #return np.sin(x[..., 0])*np.sin(x[..., 1])+1
     #return y**2
 
 def exu(x):

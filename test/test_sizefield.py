@@ -9,8 +9,8 @@ import time
 
 def ff(x):
     y = np.linalg.norm(x - np.array([[-0.1, -0.1]]), axis=-1)
-    #return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
-    return np.sin(2*np.pi*x[..., 0])*np.sin(2*np.pi*x[..., 1])+1
+    return np.sin(np.pi*x[..., 0])*np.sin(np.pi*x[..., 1])
+    #return np.sin(x[..., 0])*np.sin(x[..., 1])+1
     #return y**2
 
 def exu(x):
@@ -92,7 +92,7 @@ origin = [0, 0]
 extend = [0, N+1, 0, N+1]
 
 meshb = UniformMesh2d(extend, h, origin) # 背景网格
-mesht = MeshFactory.triangle([0, 1, 0, 1], 0.1)
+mesht = MeshFactory.triangle([0, 1, 0, 1], 0.2)
 tnode = mesht.entity('node')
 tval = ff(tnode)
 
@@ -101,7 +101,6 @@ tval = ff(tnode)
 t0 = time.time()
 f = meshb.interpolation_with_sample_points(tnode, tval)
 t1 = time.time()
-print(t1-t0)
 
 pnode = meshb.entity('node').reshape(-1, 2)
 
@@ -117,6 +116,26 @@ mesh0.to_vtk(fname='000.vtu')
 mesh1.to_vtk(fname='111.vtu')
 
 print(np.max(np.abs(f.f[:-1, :-1] - ff(meshb.entity('node')[:-1, :-1]))))
+
+
+box = [0, 1, 0, 1]
+N = int(sys.argv[1])
+h = [1/N, 1/N]
+origin = [0, 0]
+extend = [0, N+1, 0, N+1]
+
+meshb = UniformMesh2d(extend, h, origin) # 背景网格
+pnode = meshb.entity('node')
+
+mesht = MeshFactory.boxmesh2d(box, 5, 5, meshtype='tri')
+tnode = mesht.entity('node')
+
+tval = ff(tnode)
+
+f = meshb.interpolation_with_sample_points(tnode, tval)
+print(pnode.shape)
+print(np.max(np.abs(f.f[:-1, :-1] - ff(pnode[:-1, :-1]))))
+
 
 
 

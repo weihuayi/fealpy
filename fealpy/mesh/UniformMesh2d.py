@@ -566,10 +566,10 @@ class UniformMesh2d(Mesh2d):
 
             S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
             F = alpha[0]*A.T@np.ones(NS, dtype=np.float_)
-            f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(y)-0.01
+            f = spsolve(S, F).reshape(nx+1, ny+1)+np.min(val)-0.01
         else:
             S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
-            F = alpha[0]*A.T@y
+            F = alpha[0]*A.T@val
             f = spsolve(S, F).reshape(nx+1, ny+1)
         return UniformMesh2dFunction(self, f)
 
