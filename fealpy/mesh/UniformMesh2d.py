@@ -8,11 +8,11 @@ from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
 from ..geometry import project
 
-"""
-二维 x 和 y 方向均匀离散的结构网格
-"""
 
 class UniformMesh2d(Mesh2d):
+    """
+    @brief 二维 x 和 y 方向均匀离散的结构网格
+    """
     def __init__(self, extent, 
             h=(1.0, 1.0), origin=(0.0, 0.0),
             itype=np.int_, ftype=np.float64):
