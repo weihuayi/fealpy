@@ -8,11 +8,11 @@ Address: 湘潭大学  数学与计算科学学院
 '''
 
 import numpy as np
-from scipy.sparse import csr_matrix, diags
+from scipy.sparse import diags
 from scipy.sparse.linalg import inv
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import StructureIntervalMesh
+from fealpy.mesh import UniformMesh1d
 from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.tools.show import showmultirate, show_error_table
 
@@ -29,9 +29,10 @@ class moudle:
 
         self.NS = NS
         self.NT = NT
+        self.h = (self.R - self.L) / self.NS
 
     def space_mesh(self):
-        mesh = StructureIntervalMesh([self.L, self.R], self.NS)
+        mesh = UniformMesh1d((0, self.NS), h=self.h, origin=0.0)
         return mesh
 
     def time_mesh(self):
@@ -59,7 +60,7 @@ def parabolic_fd1d_CrankNicholson(pde, mesh, time):
     NS = mesh.NC
     NT = time.NL - 1
     dt = time.dt
-    h = mesh.hx
+    h = mesh.h
 
     r = pde.a * dt / h ** 2
     x = mesh.entity('node')
@@ -134,7 +135,7 @@ if __name__ == '__main__':
     for n in range(maxit):
         uh = parabolic_fd1d_CrankNicholson(pde, mesh, time)
 
-        emax, e0, e1 = mesh.error(h=mesh.hx,
+        emax, e0, e1 = mesh.error(h=mesh.h,
                                   u=lambda x: pde.solution(x, t=T1),
                                   uh=uh[-1, :])
 
