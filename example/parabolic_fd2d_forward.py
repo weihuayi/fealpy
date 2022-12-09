@@ -1,5 +1,5 @@
 '''
-Title: 2D 抛物方程基于向前Euler格式的有限差分
+Title: 2D 抛物方程基于向前Euler格式的有限差分方法
 
 Author:  梁一茹
 
@@ -8,27 +8,27 @@ Address: 湘潭大学  数学与计算科学学院
 '''
 
 import numpy as np
-from scipy.sparse import csr_matrix, diags, coo_matrix
+from scipy.sparse import diags, coo_matrix
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import StructureQuadMesh
+from fealpy.mesh import UniformMesh2d
 from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.tools.show import showmultirate, show_error_table
 
 
 # 准备模型数据
 class moudle:
-    def __init__(self, T0, T1, nx, ny, NT):
+    def __init__(self, T0, T1, NS, NT):
         self.T0 = T0
         self.T1 = T1
 
-        self.nx = nx
-        self.ny = ny
+        self.NS = NS
         self.NT = NT
-        self.domain = domain
+
+        self.h = 1 / self.NS
 
     def space_mesh(self):
-        mesh = StructureQuadMesh(domain, nx=self.nx, ny=self.ny)
+        mesh = UniformMesh2d((0, self.NS, 0, self.NS), (self.h, self.h), origin=(0.0, 0.0))
         return mesh
 
     def time_mesh(self):
@@ -50,7 +50,7 @@ class moudle:
 
     def is_dirichlet_boundary(self, p):
         eps = 1e-12
-        x0, x1, y0, y1 = self.domain
+        x0, x1, y0, y1 = 0, 1, 0, 1
         x = p[..., 0]
         y = p[..., 1]
         flag0 = np.abs(x - x0) < eps
@@ -64,42 +64,40 @@ class moudle:
 def parabolic_fd2d_forward(pde, mesh, time):
     NT = time.NL - 1
     dt = time.dt
-    hx = mesh.hx
-    hy = mesh.hy
+    h = 1 / pde.NS
 
-    n0 = pde.nx + 1
-    n1 = pde.ny + 1
-    cx = 1 / (hx ** 2)
-    cy = 1 / (hy ** 2)
+    n0 = pde.NS + 1
+    n1 = pde.NS + 1
 
-    assert dt <= 1 / (2 * (1 / hx ** 2 + 1 / hy ** 2)), 'dt should be smaller than 1/(2*(1/hx**2+1/hy**2))! Now its value is {}'.format(dt)
+    c = dt / (h ** 2)
+
+    assert dt <= 1 / (4 / h ** 2), 'dt should be smaller than 1/(4/h**2)! Now its value is {}'.format(dt)
 
     # 组装矩阵
     NN = n0 * n1
 
     k = np.arange(NN).reshape(n0, n1)
 
-    A = diags([1 - 2 * dt * (cx + cy)], [0], shape=(NN, NN), format='coo')
+    A = diags([1 - 4 * c], [0], shape=(NN, NN), format='coo')
 
-    val = np.broadcast_to(dt * cy, (NN - n1,))
+    val = np.broadcast_to(c, (NN - n1,))
     I = k[1:, :].flat
     J = k[0:-1, :].flat
     A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=np.float64)
     A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=np.float64)
 
-    val = np.broadcast_to(dt * cx, (NN - n0,))
+    val = np.broadcast_to(c, (NN - n0,))
     I = k[:, 1:].flat
     J = k[:, 0:-1].flat
     A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=np.float64)
     A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=np.float64)
-    A = A.toarray()
 
     F = np.zeros(NN, dtype=np.float64)
 
     uh = np.zeros((NT + 1, NN), dtype=np.float64)
     u = np.zeros((NT + 1, NN), dtype=np.float64)
 
-    p = mesh.entity('node')
+    p = mesh.entity('node').reshape(NN,2)
     uh[0] = pde.solution(p, t=0)
 
     for i in range(NT):
@@ -122,12 +120,10 @@ if __name__ == '__main__':
     T0 = 0
     T1 = 1
 
-    nx = 10
-    ny = 10
+    NS = 10
     NT = 500
-    domain = [0, 1, 0, 1]
 
-    pde = moudle(T0, T1, nx, ny, NT)
+    pde = moudle(T0, T1, NS, NT)
     mesh = pde.space_mesh()
     time = pde.time_mesh()
 
@@ -139,18 +135,18 @@ if __name__ == '__main__':
     for n in range(maxit):
         uh, u = parabolic_fd2d_forward(pde, mesh, time)
 
-        emax, e0, e1 = mesh.error(mesh.hx, mesh.hy, nx, ny,
+        emax, e0, e1 = mesh.error(mesh.h[0], mesh.nx, mesh.ny,
                                   u=u[-1], uh=uh[-1])
 
         errorMatrix[0, n] = emax
         errorMatrix[1, n] = e0
         errorMatrix[2, n] = e1
 
-        NDof[n] = (nx + 1) * (ny + 1)
+        NDof[n] = (mesh.nx + 1) * (mesh.ny + 1)
 
         if n < maxit - 1:
-            nx *= 2
-            ny *= 2
+            mesh.nx *= 2
+            mesh.ny *= 2
 
             time.uniform_refine()
 
