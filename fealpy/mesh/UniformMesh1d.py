@@ -27,10 +27,30 @@ class UniformMesh1d():
         self.h = h 
         self.origin = origin
 
-        nx = extent[1] - extent[0]
+        self.nx = extent[1] - extent[0]
+        self.NC = self.nx
+        self.NN = self.NC + 1
 
         self.itype = itype
         self.ftype = ftype
+
+    def uniform_refine(self, n=1, returnim=False):
+        if returnim:
+            nodeImatrix = []
+        for i in range(n):
+            print('h1', self.h)
+            self.extent = [i * 2 for i in self.extent]
+            self.h = self.h/2
+            self.nx = self.extent[1] - self.extent[0]
+            self.NC = self.nx
+            self.NN = self.NC + 1
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
 
     def geo_dimension(self):
         return 1
@@ -38,13 +58,26 @@ class UniformMesh1d():
     @property
     def node(self):
         GD = self.geo_dimension()
-        nx = int(1/self.h)
+        nx = self.nx
         node = np.linspace(self.origin, self.origin + nx * self.h, nx+1)
         return node
 
+    def entity(self, etype):
+        if etype in {'cell', 1}:
+            NN = self.NN
+            NC = self.NC
+            cell = np.zeros((NC, 2), dtype=np.int)
+            cell[:, 0] = range(NC)
+            cell[:, 1] = range(1, NN)
+            return cell
+        elif etype in {'node', 0}:
+            return self.node
+        else:
+            raise ValueError("`etype` is wrong!")
+
     def entity_barycenter(self, etype):
         GD = self.geo_dimension()
-        nx = int(1/self.h)
+        nx = self.nx
         if etype in {'cell', 1}:
             box = [self.origin + self.h / 2, self.origin + (nx - 1) * self.h]
             bc = np.linspace(box[0], box[1], nx)
@@ -60,7 +93,7 @@ class UniformMesh1d():
 
         @param[in] ex 非负整数，把离散函数向外扩展一定宽度  
         """
-        nx = int(1/self.h)
+        nx = self.nx
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
             uh = np.zeros(nx + 1, dtype=dtype)
@@ -71,7 +104,7 @@ class UniformMesh1d():
         return uh
 
     def interpolation(self, f, intertype='node'):
-        nx = int(1/self.h)
+        nx = self.nx
         node = self.node
         if intertype == 'node':
             F = f(node)
@@ -79,6 +112,25 @@ class UniformMesh1d():
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F
+
+    def error(self, h, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+
+        @param[in] u
+        @param[in] uh
+        """
+
+        node = self.node
+        uI = u(node)
+        e = uI - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h * np.sum(e ** 2))
+
+        de = e[1:] - e[0:-1]
+        e1 = np.sqrt(np.sum(de ** 2) / h + e0 ** 2)
+        return emax, e0, e1
 
     def elliptic_operator(self, d=1, c=None, r=None):
         """

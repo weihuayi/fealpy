@@ -1,5 +1,5 @@
 '''
-Title: 一维波动方程基于蛙跳格式的有限差分
+Title: 一维波动方程基于蛙跳格式的有限差分方法
 
 Author:  梁一茹
 
@@ -8,11 +8,11 @@ Address: 湘潭大学  数学与计算科学学院
 '''
 
 import numpy as np
-from scipy.sparse import csr_matrix, diags
+from scipy.sparse import diags
 
 import matplotlib.pyplot as plt
 
-from fealpy.mesh import StructureIntervalMesh
+from fealpy.mesh import UniformMesh1d
 from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.tools.show import showmultirate, show_error_table
 
@@ -29,9 +29,10 @@ class moudle:
 
         self.NS = NS
         self.NT = NT
+        self.h = (self.R-self.L)/self.NS
 
     def space_mesh(self):
-        mesh = StructureIntervalMesh([self.L, self.R], self.NS)
+        mesh = UniformMesh1d((0, self.NS), h=self.h, origin=0.0)
         return mesh
 
     def time_mesh(self):
@@ -56,7 +57,7 @@ def wave_fd1d_leapfrog(pde, mesh, time):
     NS = mesh.NC
     NT = time.NL - 1
     dt = time.dt
-    h = mesh.hx
+    h = mesh.h
 
     r = pde.a * dt / h
     x = mesh.entity('node')
@@ -79,6 +80,7 @@ def wave_fd1d_leapfrog(pde, mesh, time):
 
     uh[0] = pde.solution(x, t=0)
     uh[1] = pde.solution(x, t=dt)
+
 
     for i in range(NT):
         nt = time.next_time_level()
@@ -118,9 +120,9 @@ if __name__ == '__main__':
     NDof = np.zeros(maxit, dtype=np.int_)
 
     for n in range(maxit):
-        uh = parabolic_fd1d_leapfrog(pde, mesh, time)
+        uh = wave_fd1d_leapfrog(pde, mesh, time)
 
-        emax, e0, e1 = mesh.error(h=mesh.hx,
+        emax, e0, e1 = mesh.error(h=mesh.h,
                                   u=lambda x: pde.solution(x, t=T1),
                                   uh=uh[-1, :])
 
@@ -129,6 +131,7 @@ if __name__ == '__main__':
         errorMatrix[2, n] = e1
 
         NDof[n] = mesh.NN
+        print(NDof)
 
         if n < maxit - 1:
             mesh.uniform_refine()

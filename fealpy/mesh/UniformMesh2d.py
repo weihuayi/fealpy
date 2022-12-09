@@ -20,13 +20,36 @@ class UniformMesh2d(Mesh2d):
         self.h = h 
         self.origin = origin
 
-        nx = extent[1] - extent[0]
-        ny = extent[3] - extent[2]
-        self.ds = StructureMesh2dDataStructure(nx, ny,itype = itype)
+        self.nx = self.extent[1] - self.extent[0]
+        self.ny = self.extent[3] - self.extent[2]
+        self.NC = self.nx * self.ny
+        self.NN = (self.nx + 1) * (self.ny + 1)
+        self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
         self.itype = itype 
         self.ftype = ftype 
         self.meshtype = 'StructureQuadMesh2d'
+
+    def uniform_refine(self, n=1, returnim=False):
+        if returnim:
+            nodeImatrix = []
+        for i in range(n):
+            print('h1', self.h[0])
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [i / 2 for i in self.h]
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+
+            self.NC = self.nx * self.ny
+            self.NN = (self.nx + 1) * (self.ny + 1)
+            self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
 
     def geo_dimension(self):
         return 2
@@ -39,12 +62,12 @@ class UniformMesh2d(Mesh2d):
         GD = self.geo_dimension()
         nx = self.ds.nx
         ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
-               self.origin[1], self.origin[1] + ny*self.h[1]]
-        node = np.zeros((nx+1, ny+1, GD), dtype=self.ftype)
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
+        node = np.zeros((nx + 1, ny + 1, GD), dtype=self.ftype)
         node[..., 0], node[..., 1] = np.mgrid[
-                box[0]:box[1]:complex(0, nx+1),
-                box[2]:box[3]:complex(0, ny+1)]
+                                     box[0]:box[1]:complex(0, nx + 1),
+                                     box[2]:box[3]:complex(0, ny + 1)]
         return node
 
     def entity_barycenter(self, etype=2):
@@ -99,7 +122,23 @@ class UniformMesh2d(Mesh2d):
         elif etype in {'node', 0}:
             return node
         else:
-            raise ValueError('the entity type `{}` is not correct!'.format(etype)) 
+            raise ValueError('the entity type `{}` is not correct!'.format(etype))
+
+    def error(self, h, nx, ny, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+
+        @param[in] u
+        @param[in] uh
+        """
+        e = u - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+
+        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
+
+        return emax, e0, el2
 
     def cell_area(self):
         """
