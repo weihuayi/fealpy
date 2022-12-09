@@ -457,75 +457,90 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
-    def fast_sweeping_method(self, phi):
-        """
+    def fast_sweeping_method(self, phi0):
+    	"""
         @brief 均匀网格上的 fast sweeping method
         @param[in] phi 是一个离散的水平集函数
 
         @note 注意，我们这里假设 x 和 y 方向剖分的段数相等
-        """
-        a = np.zeros(ns+1, dtype=np.float64) 
-        b = np.zeros(ns+1, dtype=np.float64)
-        c = np.zeros(ns+1, dtype=np.float64)
-
-        n = 0
-        for i in range(1, ns+2):
-            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-            flag = np.abs(a-b) >= h 
-            c[flag] = np.minimum(a[flag], b[flag]) + h 
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
-
-            fname = output + 'test'+ str(n).zfill(10)
-            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
-            nodedata = {'phi':data}
-            mesh.to_vtk_file(fname, nodedata=nodedata)
-            n += 1
-
-
-        for i in range(ns+1, 0, -1):
-            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-            flag = np.abs(a-b) >= h 
-            c[flag] = np.minimum(a[flag], b[flag]) + h 
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
-
-            fname = output + 'test'+ str(n).zfill(10)
-            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
-            nodedata = {'phi':data}
-            mesh.to_vtk_file(fname, nodedata=nodedata)
-            n += 1
-
-        for j in range(1, ns+2):
-            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
-            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-            flag = np.abs(a-b) >= h 
-            c[flag] = np.minimum(a[flag], b[flag]) + h 
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
-
-            fname = output + 'test'+ str(n).zfill(10)
-            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
-            nodedata = {'phi':data}
-            mesh.to_vtk_file(fname, nodedata=nodedata)
-            n += 1
-
-        for j in range(ns+1, 0, -1):
-            a[:] = np.minimum(phi[0:ns+1, j], phi[2:, j])
-            b[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-            flag = np.abs(a-b) >= h 
-            c[flag] = np.minimum(a[flag], b[flag]) + h 
-            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-            phi[1:-1, j] = np.minimum(c, phi[1:-1, j])
-
-            fname = output + 'test'+ str(n).zfill(10)
-            data = (sign*phi[1:-1, 1:-1]).reshape(ns+1, ns+1, 1)
-            nodedata = {'phi':data}
-            mesh.to_vtk_file(fname, nodedata=nodedata)
-            n += 1
-
+    	"""
+    	m = 2
+    	nx = self.ds.nx
+    	ny = self.ds.ny
+    	k = nx/ny
+    	ns = ny
+    	h = self.h[0]
+    	
+    	phi = self.function(ex=1)
+    	isNearNode = self.function(dtype=np.bool_, ex=1)
+    	
+    	# 把水平集函数转化为离散的网格函数
+    	node = self.entity('node')
+    	phi[1:-1, 1:-1] = phi0
+    	sign = np.sign(phi[1:-1, 1:-1])
+    	
+    	# 标记界面附近的点
+    	isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
+    	lsfun = UniformMesh2dFunction(self, phi[1:-1, 1:-1])
+    	_, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
+    	phi[isNearNode] = np.abs(d) #界面附近的点用精确值
+    	phi[~isNearNode] = m  # 其它点用一个比较大的值
+    	
+    	
+    	
+    	a = np.zeros(ns+1, dtype=np.float64)
+    	b = np.zeros(ns+1, dtype=np.float64)
+    	c = np.zeros(ns+1, dtype=np.float64)
+    	d = np.zeros(int(k*ns+1), dtype=np.float64)
+    	e = np.zeros(int(k*ns+1), dtype=np.float64)
+    	f = np.zeros(int(k*ns+1), dtype=np.float64)
+    	
+    	
+    	n = 0
+    	for i in range(1, int(k*ns+2)):
+    	    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+    	    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+    	    flag = np.abs(a-b) >= h
+    	    c[flag] = np.minimum(a[flag], b[flag]) + h
+    	    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+    	    n += 1
+    	    
+    	    
+    	for i in range(int(k*ns+1), 0, -1):
+    	    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+    	    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+    	    flag = np.abs(a-b) >= h 
+    	    c[flag] = np.minimum(a[flag], b[flag]) + h
+    	    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+    	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+    	    n += 1
+    	    
+    	    
+    	for j in range(1, ns+2):
+    	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
+    	    e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+    	    flag = np.abs(d-e) >= h 
+    	    f[flag] = np.minimum(d[flag], e[flag]) + h
+    	    f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+    	    phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
+    	    n += 1
+    	    
+    	    
+    	for j in range(ns+1, 0, -1):
+    	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
+    	    e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+    	    flag = np.abs(d-e) >= h
+    	    f[flag] = np.minimum(d[flag], e[flag]) + h
+    	    f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+    	    phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
+    	    n += 1
+    	    
+    	return sign*phi[1:-1, 1:-1]
+        
+    
+        
+    
     def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
         '''!
         @brief 将 x, y 插值为网格函数
@@ -559,7 +574,49 @@ class UniformMesh2d(Mesh2d):
         F = alpha[0]*A.T@y
         f = spsolve(S, F).reshape(nx+1, ny+1)
         return UniformMesh2dFunction(self, f)
+    def t2sidx(self):
+        """
+        @brief 已知结构三角形网格点的值，将其排列到结构四边形网格上
+        @example a[s2tidx] = uh
+        """
+        snx = self.ds.nx
+        sny = self.ds.ny
+        idx1= np.arange(0,sny+1,2)+np.arange(0,(sny+1)*(snx+1),2*(sny+1)).reshape(-1,1)
+        idx1 = idx1.flatten()
+        a = np.array([1,sny+1,sny+2])
+        b = np.arange(0,sny,2).reshape(-1,1)
+        c = np.append(a+b,[(sny+1)*2-1])
+        e = np.arange(0,(sny+1)*snx,2*(sny+1)).reshape(-1,1)
+        idx2 = (e+c).flatten()
+        idx3  = np.arange((sny+1)*snx+1,(snx+1)*(sny+1),2)
+        idx = np.r_[idx1,idx2,idx3]
+        return idx
 
+    def  s2tidx(self):
+    	"""
+    	@brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
+    	@example a[s2tidx] = uh
+    	"""
+    	tnx = int(self.ds.nx/2)
+    	tny = int(self.ds.ny/2)
+    	a = np.arange(tny+1)
+    	b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
+    	idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
+    	idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
+    	idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
+    	idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
+    	c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
+    	d = np.arange(tny)*3
+    	d = 3*np.arange(tny).reshape(-1,1)+c
+    	e = np.append(d.flatten(),[d.flatten()[-1]+1])
+    	idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
+    	
+    	idx = np.c_[idx1[:tnx],idx2]
+    	idx = np.append(idx.flatten(),[idx1[-1,:]])
+    	idx = idx.astype(int)
+    	return idx
+    	
+    	
 class UniformMesh2dFunction():
     def __init__(self, mesh, f):
         self.mesh = mesh # (nx+1, ny+1)
