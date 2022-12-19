@@ -95,6 +95,9 @@ class TriangleMesh(Mesh2d):
         return p
 
     def shape_function(self, bc, p=1):
+        """
+        @brief 
+        """
         TD = bc.shape[-1] - 1 
         multiIndex = self.multi_index_matrix(p)
         c = np.arange(1, p+1, dtype=np.int_)
