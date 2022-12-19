@@ -2,7 +2,7 @@
 # 
 
 """
-IPDG 方法求解二维 Poisson 方程, 
+IPDG 方法求解四阶问题, 
 
 .. math::
     \Delta^2 u - \Delta u = f
