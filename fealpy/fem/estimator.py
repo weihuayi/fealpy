@@ -4,11 +4,12 @@ from ..functionspace import LagrangeFiniteElementSpace
 
 
 class MaxwellNedelecFEMResidualEstimator2d():
-    def __init__(self, uh, pde):
+    def __init__(self, uh, pde, dtype=None):
         self.uh = uh
         self.space = uh.space
         self.mesh = self.space.mesh
         self.pde = pde
+        self.dtype = np.float_
 
     def estimate(self):
         cellmeasure = self.mesh.entity_measure('cell')
@@ -107,7 +108,11 @@ class MaxwellNedelecFEMResidualEstimator2d():
         edgemeasure = self.mesh.entity_measure('edge')
 
         curl_val = self.space.curl_value(self.uh, bc)  # (NC, )
-        mu = self.pde.mu(ps) ** -1  # (NC, 2)
+
+        if np.ndim(self.pde.mu(ps)) == 1:
+            mu = (self.pde.mu(ps) ** -1)[:, None]  # (NC, 2)
+        else:
+            mu = self.pde.mu(ps) ** -1
 
         n = self.mesh.face_unit_normal()  # (NC, 2)
         nn = np.zeros_like(n)
@@ -119,7 +124,7 @@ class MaxwellNedelecFEMResidualEstimator2d():
         J = edgemeasure * np.sum((curl[face2cell[:, 0]] - curl[face2cell[:, 1]]) * nn, axis=-1) ** 2
 
         NC = self.mesh.number_of_cells()
-        J1 = np.zeros(NC)
+        J1 = np.zeros(NC, dtype=self.dtype)
         np.add.at(J1, face2cell[:, 0], J)
         np.add.at(J1, face2cell[:, 1], J)
         return np.sqrt(J1)
@@ -143,7 +148,7 @@ class MaxwellNedelecFEMResidualEstimator2d():
 
 
         NC = self.mesh.number_of_cells()
-        J2 = np.zeros(NC)
+        J2 = np.zeros(NC, dtype=self.dtype)
         np.add.at(J2, face2cell[:, 0], J)
         np.add.at(J2, face2cell[:, 1], J)
         return np.sqrt(J2)
