@@ -28,7 +28,7 @@ class UniformMesh2d(Mesh2d):
 
         self.itype = itype 
         self.ftype = ftype 
-        self.meshtype = 'StructureQuadMesh2d'
+        self.meshtype = 'UniformMesh2d'
 
     def uniform_refine(self, n=1, returnim=False):
         if returnim:

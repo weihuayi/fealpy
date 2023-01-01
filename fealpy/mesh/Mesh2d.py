@@ -60,13 +60,13 @@ class Mesh2d(object):
 
     def entity_barycenter(self, etype=2, index=np.s_[:]):
         node = self.node
-        if etype in ['cell', 2]:
+        if etype in {'cell', 2}:
             cell = self.ds.cell
             bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]
-        elif etype in ['edge', 'face', 1]:
+        elif etype in {'edge', 'face', 1}:
             edge = self.ds.edge
             bc = np.sum(node[edge[index], :], axis=1)/edge.shape[1]
-        elif etype in ['node', 0]:
+        elif etype in {'node', 0}:
             bc = node[index]
         else:
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 

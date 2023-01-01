@@ -72,7 +72,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.meshdata = {}
         self.hedgecolor = None
 
-        self.newnode2edge = {}
+        self.newnode2node = {}
         self.retainnode = {}
         self.deletnode2edge = {}
 
@@ -691,8 +691,6 @@ class HalfEdgeMesh2d(Mesh2d):
         subdomain = self.ds.subdomain
         isMainHEdge = self.ds.main_halfedge_flag()
 
-        #新点到新半边的映射
-        self.newnode2edge, = np.where(isMarkedHEdge[hedge])
 
         # 即是主半边, 也是标记加密的半边
         flag0 = isMarkedHEdge & isMainHEdge
@@ -700,6 +698,9 @@ class HalfEdgeMesh2d(Mesh2d):
         NE1 = flag0.sum()
         newNode = node.increase_size(NE1)
         newNode[:] = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
+        
+        #新点到老点的映射
+        self.newnode2node = np.c_[halfedge[flag0, 0, None], halfedge[idx, 0, None]]
 
         edge2NewNode = np.zeros(NE*2, dtype=np.int_)
         edge2NewNode[flag0] = np.arange(NE1)+NN
@@ -1895,8 +1896,11 @@ class HalfEdgeMesh2d(Mesh2d):
         cellstart = self.ds.cellstart
         if options['method'] == 'mean':
             options['numrefine'][cellstart:] = np.around(
-                    np.log2(eta/(theta*np.mean(eta)))
+                    np.log2(eta/(theta*np.mean(eta)))/1
                 )
+            #options['numrefine'][cellstart:] = np.around(
+            #        np.log2(eta/(theta*np.mean(eta)))
+            #    )
         elif options['method'] == 'max':
             options['numrefine'][cellstart:] = np.around(
                     np.log2(eta/(theta*np.max(eta)))
