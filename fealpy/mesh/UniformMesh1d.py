@@ -1,5 +1,8 @@
 
 import numpy as np
+from scipy.sparse import csr_matrix
+from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
+from types import ModuleType
 
 class UniformMesh1d():
     """
@@ -34,11 +37,22 @@ class UniformMesh1d():
         self.itype = itype
         self.ftype = ftype
 
+    def geo_dimension(self):
+        return 1
+
+    def top_dimension(self):
+        return 1
+
+    def number_of_nodes(self):
+        return self.NN
+
+    def number_of_cells(self):
+        return self.NC
+
     def uniform_refine(self, n=1, returnim=False):
         if returnim:
             nodeImatrix = []
         for i in range(n):
-            print('h1', self.h)
             self.extent = [i * 2 for i in self.extent]
             self.h = self.h/2
             self.nx = self.extent[1] - self.extent[0]
@@ -79,7 +93,7 @@ class UniformMesh1d():
         GD = self.geo_dimension()
         nx = self.nx
         if etype in {'cell', 1}:
-            box = [self.origin + self.h / 2, self.origin + (nx - 1) * self.h]
+            box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
             bc = np.linspace(box[0], box[1], nx)
             return bc
         elif etype in {'node', 0}:
@@ -113,7 +127,7 @@ class UniformMesh1d():
             F = f(bc)
         return F
 
-    def error(self, h, u, uh):
+    def error(self, u, uh):
         """
         @brief 计算真解在网格点处与数值解的误差
 
@@ -121,6 +135,7 @@ class UniformMesh1d():
         @param[in] uh
         """
 
+        h = self.h
         node = self.node
         uI = u(node)
         e = uI - uh
@@ -208,3 +223,42 @@ class UniformMesh1d():
                                       init_func=init_func,
                                       interval=interval)
         ani.save(fname)
+
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        return show_mesh_1d(axes, self,
+                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
+                linewidths=linewidths, markersize=markersize,
+                showaxis=showaxis)
+
+    def find_node(self, axes, node=None,
+            index=None, showindex=False,
+            color='r', markersize=100,
+            fontsize=20, fontcolor='k'):
+
+        if node is None:
+            node = self.node
+
+        find_node(axes, node,
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
+    def find_cell(self, axes,
+            index=None, showindex=False,
+            color='g', markersize=150,
+            fontsize=24, fontcolor='g'):
+
+        find_entity(axes, self, entity='cell',
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
