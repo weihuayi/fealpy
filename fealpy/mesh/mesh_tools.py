@@ -16,8 +16,16 @@ def find_node(
         showindex=False, color='r',
         markersize=20, fontsize=24, fontcolor='k', multiindex=None):
 
+    if len(node.shape) == 1:
+        GD = 1
+    else:
+        GD = node.shape[-1]
+        node = node.reshape(-1, GD)
+
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]
+        GD = 2
+
     if index is None:
         index = range(node.shape[0])
     elif (type(index) is np.int_):
@@ -38,8 +46,7 @@ def find_node(
         color = mapper.to_rgba(color)
 
     bc = node[index]
-    dim = node.shape[1]
-    if dim == 2:
+    if GD == 2:
         axes.scatter(bc[..., 0], bc[..., 1], c=color, s=markersize)
         if showindex:
             if multiindex is not None:
@@ -94,7 +101,8 @@ def find_entity(
         color='r', markersize=20,
         fontsize=24, fontcolor='k', multiindex=None):
 
-    bc = mesh.entity_barycenter(entity)
+    GD = mesh.geo_dimension()
+    bc = mesh.entity_barycenter(entity).reshape(-1, GD)
     if index is None:
         if entity == 'node':
             NN = mesh.number_of_nodes()
@@ -143,6 +151,8 @@ def find_entity(
 
     bc = bc[index]
     if GD == 1:
+        if len(bc.shape) == 1:
+            bc = bc.reshape(-1, 1)
         n = len(bc)
         axes.scatter(bc[:, 0], np.zeros(n), c=color, s=markersize)
         if showindex:
@@ -340,7 +350,7 @@ def show_mesh_2d(
     cell = mesh.entity('cell')
 
     if mesh.meshtype not in {'polygon', 'hepolygon', 'halfedge', 'halfedge2d'}:
-        if mesh.meshtype == 'StructureQuadMesh2d':
+        if mesh.meshtype in {'StructureQuadMesh2d', 'UniformMesh2d'}:
             node = node.reshape(-1, 2)
         if mesh.geo_dimension() == 2:
             poly = PolyCollection(node[cell[:, mesh.ds.ccw], :])

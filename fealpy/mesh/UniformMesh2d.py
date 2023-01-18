@@ -78,8 +78,8 @@ class UniformMesh2d(Mesh2d):
         nx = self.ds.nx
         ny = self.ds.ny
         if etype in {'cell', 2}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0], 
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
             bc = np.zeros((nx, ny, 2), dtype=self.ftype)
             bc[..., 0], bc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx),
@@ -87,7 +87,7 @@ class UniformMesh2d(Mesh2d):
             return bc
         elif etype in {'edge', 'face', 1}:
 
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             xbc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
             xbc[..., 0], xbc[..., 1] = np.mgrid[
@@ -95,7 +95,7 @@ class UniformMesh2d(Mesh2d):
                     box[2]:box[3]:complex(0, ny+1)]
 
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
             ybc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
             ybc[..., 0], ybc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx+1),
@@ -103,7 +103,7 @@ class UniformMesh2d(Mesh2d):
             return xbc, ybc 
 
         elif etype in {'edgex'}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0],
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
             bc[..., 0], bc[..., 1] = np.mgrid[
@@ -113,7 +113,7 @@ class UniformMesh2d(Mesh2d):
 
         elif etype in {'edgey'}:
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1]]
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
             bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
             bc[..., 0], bc[..., 1] = np.mgrid[
                     box[0]:box[1]:complex(0, nx+1),

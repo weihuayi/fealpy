@@ -195,11 +195,14 @@ class Mesh2d(object):
             color='r', markersize=10,
             fontsize=10, fontcolor='r', multiindex=None):
 
+        GD = self.geo_dimension()
+
         if node is None:
             node = self.node
 
+
         if (index is None) and (showindex == True):
-            NN = node.shape[0] 
+            NN = self.number_of_nodes() 
             index = np.array(range(NN))
 
         find_node(axes, node,
