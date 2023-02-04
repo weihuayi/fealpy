@@ -2,36 +2,38 @@ import numpy as np
 from ..functionspace import LagrangeFiniteElementSpace
 
 
-
 class MaxwellNedelecFEMResidualEstimator2d():
-    def __init__(self, uh, pde, dtype=None):
+    def __init__(self, uh, dtype=None):
         self.uh = uh
         self.space = uh.space
         self.mesh = self.space.mesh
-        self.pde = pde
-        self.dtype = np.float_
+        self.dtype = np.float64 if dtype == None else dtype
 
-    def estimate(self):
+    def estimate(self, eps=None, mu=None, source=None, kappa=1):
         cellmeasure = self.mesh.entity_measure('cell')
         ch = np.sqrt(cellmeasure)
 
-        R1 = self.cell_error_one() ** 2
-        R2 = self.cell_error_two() ** 2
-        J1 = self.edge_one_error() ** 2
-        J2 = self.edge_two_error() ** 2
-        eta = ch ** 2 * (R1 + R2) * ch * (J1 + J2)
-        eta = ch * J2
-        return eta ** 0.5
+        R1 = self.cell_error_one(source, mu, kappa, eps)
+        R2 = self.cell_error_two(source, kappa, eps)
+        J1 = self.edge_one_error(mu)
+        J2 = self.edge_two_error(eps, source, kappa)
+        eta = ch ** 2 * (R1 + R2) + ch * (J1 + J2)
+        return eta
 
-
-    def cell_error_one(self, q=1):
+    def cell_error_one(self, source=None, mu=None, kappa=1, eps=None):
         p = 2
-        lspace = LagrangeFiniteElementSpace(self.mesh, p=2, spacetype='D')
+        lspace = LagrangeFiniteElementSpace(self.mesh, p=p, spacetype='D')
 
         luh = lspace.function()
 
         qf = self.mesh.integrator(q=8)
         bcs, ws = qf.get_quadrature_points_and_weights()
+        point = self.mesh.bc_to_point(bcs)
+        cellmeasure = self.mesh.entity_measure('cell')
+
+        NC = self.mesh.number_of_cells()
+        NQ = len(bcs)
+        val = np.zeros(shape=(NQ, NC, 2))  # 被积函数
 
         '''
         1. 估计单元内的后验误差
@@ -46,73 +48,103 @@ class MaxwellNedelecFEMResidualEstimator2d():
         ps = self.mesh.bc_to_point(ib)
 
         # 1/μ ▽ × Eₕ
-        luh[:] = self.uh.curl_value(ib).flatten() / self.pde.mu(ps).flatten()
+        if mu == None:
+            luh[:] = self.uh.curl_value(ib).flatten()
+        else:
+            luh[:] = self.uh.curl_value(ib).flatten() / mu(ps).flatten()
+
+        grad_luh = lspace.grad_value(luh, bcs)
+        p_x = grad_luh[..., 0]  # (NQ, NC)
+        p_y = grad_luh[..., 1]
 
         '''
         若 u 是一个标量, 那么 ▽ × u = (∂ᵧu, -∂ₓu)ᵀ
         '''
-        grad_luh = lspace.grad_value(luh, ib)
-        p_x = grad_luh[..., 0]  # (NQ, NC)
-        p_y = grad_luh[..., 1]
-
         # cuh 存储了 (∂ᵧu, -∂ₓu)ᵀ
-        cuh = np.zeros_like(grad_luh)  # (NQ, NC, dim=2)
-        cuh[..., 0] = p_y
-        cuh[..., 1] = -p_x
+        val[..., 0] = p_y
+        val[..., 1] = -p_x
 
-        '''
-        计算 mass = k²𝜀Eₕ - F
-        '''
-        k2 = self.pde.kappa ** 2
-        eps = self.pde.eps(ps)  # (NQ, NC, 2, 2)
-        eh = self.uh(ib)  # (NQ, NC, 2)
-        f = self.pde.source(ib)
-        mass = k2 * np.einsum('qcij, qci -> qcj', eps, eh)
-        R1 = (cuh - mass) ** 2
+        k2 = kappa ** 2
+        eh = self.space.value(self.uh, bcs)
+
+        if eps == None:
+            val[:] -= k2 * eh
+        else:
+            eps = eps(point)
+            val[:] -= k2 * np.einsum('qcij, qci -> qcj', eps, eh)
+
+        if source == None:
+            val = 0 - val
+        else:
+            f = source(point)
+            val = f - val
 
         '''
         下面是对 R1 在每个单元上做积分
         '''
-        cellmeasure = self.mesh.entity_measure('cell')
-        intR1 = np.einsum('i, qja, j -> j', ws, R1, cellmeasure)
-        return np.sqrt(intR1)
+        val = np.power(val, 2)
+        intR1 = np.einsum('i, ija, j -> j', ws, val, cellmeasure)
+        return intR1
 
-    def cell_error_two(self):
+    def cell_error_two(self, source=None, kappa=1, eps=None):
         p = 2
         lspace = LagrangeFiniteElementSpace(self.mesh, p=p, spacetype='D')
 
         qf = self.mesh.integrator(q=8)
         bcs, ws = qf.get_quadrature_points_and_weights()
+        point = self.mesh.bc_to_point(bcs)
+        cellmeasure = self.mesh.entity_measure('cell')
+
+        NC = self.mesh.number_of_cells()
+        NQ = len(bcs)
+        val = np.zeros(shape=(NQ, NC))  # 被积函数
 
         aval = lspace.function(dim=2)
         ib = self.mesh.multi_index_matrix(p) / p
         ps = self.mesh.bc_to_point(ib)
 
-        k2 = self.pde.kappa ** 2
-        F = self.pde.source(ps)
-        eps = self.pde.eps(ps)
-        q = np.einsum('ijbq, ijw -> ijq', eps, self.uh.value(ib))
-        aval[:] = (k2 * q + F).reshape(-1, 2)
+        k2 = kappa ** 2
 
-        R2 = lspace.div_value(aval, ib) ** 2
+        if eps == None:
+            qq = k2 * self.uh.value(ib)
+        else:
+            eps = self.pde.eps(ps)
+            qq = k2 * np.einsum('ijbw, ijw -> ijw', eps, self.uh.value(ib))
+
+        if source is not None:
+            qq = source(ps) + qq
+
+        '''
+        eps : (NQ, NC, 2, 2)
+        uh : (NQ, NC, 2)
+        '''
+
+        # (NQ, NC) ==> gdof
+        aval[:] = qq.reshape(-1, 2)
+        val[:] = lspace.div_value(aval, bcs)
+
         '''
         下面是对 R2 在每个单元上做积分
         '''
-        cellmeasure = self.mesh.entity_measure('cell')
-        intR2 = np.einsum('i, qj, j -> j', ws, R2, cellmeasure)
-        return np.sqrt(intR2)
+        val = np.power(val, 2)
+        intR2 = np.einsum('i, qj, j -> j', ws, val, cellmeasure)
+        return intR2
 
-    def edge_one_error(self):
+    def edge_one_error(self, mu=None):
         bc = np.array([1 / 3, 1 / 3, 1 / 3])
         ps = self.mesh.bc_to_point(bc)
         edgemeasure = self.mesh.entity_measure('edge')
 
         curl_val = self.space.curl_value(self.uh, bc)  # (NC, )
 
-        if np.ndim(self.pde.mu(ps)) == 1:
-            mu = (self.pde.mu(ps) ** -1)[:, None]  # (NC, 2)
+        if mu == None:
+            curl = curl_val[:, None]
+        elif np.ndim(mu(ps)) == 1:
+            mu = (mu(ps) ** -1)[:, None]  # (NC, 2)
+            curl = np.einsum('ci, c -> ci', mu, curl_val)
         else:
-            mu = self.pde.mu(ps) ** -1
+            mu = mu(ps) ** -1
+            curl = np.einsum('ci, c -> ci', mu, curl_val)
 
         n = self.mesh.face_unit_normal()  # (NC, 2)
         nn = np.zeros_like(n)
@@ -120,39 +152,47 @@ class MaxwellNedelecFEMResidualEstimator2d():
         nn[..., 1] = -n[..., 0]
 
         face2cell = self.mesh.ds.face_to_cell()
-        curl = np.einsum('ci, c -> ci', mu, curl_val)
+
         J = edgemeasure * np.sum((curl[face2cell[:, 0]] - curl[face2cell[:, 1]]) * nn, axis=-1) ** 2
 
         NC = self.mesh.number_of_cells()
         J1 = np.zeros(NC, dtype=self.dtype)
         np.add.at(J1, face2cell[:, 0], J)
         np.add.at(J1, face2cell[:, 1], J)
-        return np.sqrt(J1)
+        return J1
 
-    def edge_two_error(self):
+    def edge_two_error(self, eps=None, source=None, kappa=1):
         bc = np.array([1 / 3, 1 / 3, 1 / 3])
         ps = self.mesh.bc_to_point(bc)
 
         val = self.space.value(self.uh, bc)  # (NC, )
-        eps = self.pde.eps(ps)  # (NC, 2, 2)
-        F = self.pde.source(ps)
+        if eps == None:
+            NC = self.mesh.number_of_cells()
+            eps = np.zeros(shape=(NC, 2, 2), dtype=self.dtype)
+            eps[..., 0, 0] = 1
+            eps[..., 1, 1] = 1
+        else:
+            eps = eps(ps)  # (NC, 2, 2)
+
 
         nu = self.mesh.face_unit_normal()  # 单位法向
         face2cell = self.mesh.ds.face_to_cell()
 
-        mass = self.pde.kappa ** 2 * np.einsum('cii, ci -> ci', eps, val)
-        a = mass + F
+        mass = kappa ** 2 * np.einsum('cii, ci -> ci', eps, val)
+
+        if source is not None:
+            a = mass + source(ps)
+        else:
+            a = mass
 
         edgemeasure = self.mesh.entity_measure('edge')
-        J = edgemeasure *  np.sum((a[face2cell[:, 0]] - a[face2cell[:, 1]]) * nu, axis=-1) ** 2
-
+        J = edgemeasure * np.sum((a[face2cell[:, 0]] - a[face2cell[:, 1]]) * nu, axis=-1) ** 2
 
         NC = self.mesh.number_of_cells()
         J2 = np.zeros(NC, dtype=self.dtype)
         np.add.at(J2, face2cell[:, 0], J)
         np.add.at(J2, face2cell[:, 1], J)
-        return np.sqrt(J2)
-
+        return J2
 
 
 class MaxwellNedelecFEMResidualEstimator3d():
@@ -163,9 +203,7 @@ class MaxwellNedelecFEMResidualEstimator3d():
         self.pde = pde
 
     def estimate(self, q=1):
-
         lspace = LagrangeFiniteElementSpace(self.mesh, p=1, spacetype='D')
 
         qf = mesh.integrator(q)
         bcs, ws = qf.get_quadrature_points_and_weights()
-
