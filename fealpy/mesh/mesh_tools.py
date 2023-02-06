@@ -18,9 +18,9 @@ def find_node(
 
     if len(node.shape) == 1:
         GD = 1
+        node = node.reshape(-1, GD)
     else:
         GD = node.shape[-1]
-        node = node.reshape(-1, GD)
 
     if node.shape[1] == 1:
         node = np.r_['1', node, np.zeros_like(node)]

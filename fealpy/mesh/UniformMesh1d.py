@@ -1,6 +1,6 @@
 
 import numpy as np
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, coo_matrix, diags
 from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from types import ModuleType
 
@@ -157,7 +157,7 @@ class UniformMesh1d():
 
     def laplace_operator(self):
         """
-        @brief 组装 u'' 对应的有限差分离散矩阵
+        @brief 组装 u'' 对应的有限差分离散矩阵，注意没有处理边界
         """
         h = self.h
         cx = 1/(h**2)
@@ -173,6 +173,30 @@ class UniformMesh1d():
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A.tocsr()
 
+    def laplace_operator_with_dbc(self):
+        """
+        @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
+        """
+        h = self.h
+        cx = 1/(h**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        val = np.full(NN, 2*cx)
+        val[0] = 1
+        val[-1] = 1
+        A = csr_matrix((val, (k, k)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(-cx, (NN-2, ))
+        I = k[1:-1]
+        J = k[0:-2]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+       
+        J = k[2:]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+
     def wave_equation(self, r, theta):
         n0 = self.NC -1
         A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
@@ -185,6 +209,9 @@ class UniformMesh1d():
         return A0, A1, A2
 
     def show_function(self, plot, uh):
+        """
+        @brief 画出定义在网格上的离散函数
+        """
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
