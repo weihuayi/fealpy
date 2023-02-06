@@ -376,6 +376,73 @@ class StructureQuadMesh(Mesh2d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+    
+    def laplace_operator_coef(self,coef):
+        """
+        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x 方向和 y
+        方向都均匀剖分，但步长可以不一样
+        coef is a function, and the input is the coordinate.
+        The output is two coefficients c11 and c22 in matrix \kappa = [[c11, 0], [0, c22]] for equation
+                                  -\nabla \cdot (\kappa \nabla u) = f
+        The example of coef is: def coef(x,y):
+                                    if x > 0 and y > 0:
+                                        return 1.0, 1.0
+                                    else:
+                                        return 2.0, 2.0
+        """
+
+        n0 = self.ds.nx + 1
+        n1 = self.ds.ny + 1
+        cx = 1/(self.hx**2)
+        cy = 1/(self.hy**2)
+        NN = self.number_of_nodes()
+        k = np.arange(NN).reshape(n0, n1)
+
+        A_center = np.zeros(NN) 
+        A_left = np.zeros(NN-n1)
+        A_right = np.zeros(NN-n1)
+        A_upper = np.zeros(NN-n0)
+        A_low = np.zeros(NN-n0)
+        left_idx = 0
+        right_idx = 0
+        upper_idx = 0
+        low_idx = 0
+
+        for i in range(NN):
+            nodex = self.node[i,0]
+            nodey = self.node[i,1]
+            c11,c22 = coef(nodex, nodey) 
+            A_center[i] = 2 * (c11*cx + c22*cy)
+            
+            if nodex - 0.5 * self.hx > self.box[0]:
+                A_left[left_idx] = -c11 * cx
+                left_idx += 1
+
+            if nodex + 0.5 * self.hx < self.box[1]:
+                A_right[right_idx] = -c11 * cx
+                right_idx += 1
+
+            if nodey - 0.5 * self.hy > self.box[2]:
+                A_low[low_idx] = -c22 * cy
+                low_idx += 1
+
+            if nodey + 0.5 * self.hy < self.box[3]:
+                A_upper[upper_idx] = -c22 * cy
+                upper_idx += 1
+
+        A = diags(A_center.reshape(1,-1), [0], shape=(NN, NN), format='coo')
+
+        I = k[1:, :].flat
+        J = k[0:-1, :].flat
+        A += coo_matrix((A_left, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((A_right, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        I = k[:, 1:].flat
+        J = k[:, 0:-1].flat
+        A += coo_matrix((A_low, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((A_upper, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A.tocsr()
 
     def show_function(self, plot, uh, cmap='jet'):
         """
