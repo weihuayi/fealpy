@@ -13,8 +13,7 @@ class UniformMesh3d(Mesh3d):
     """
     def __init__(self, extent, 
             h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            ftype=np.float64, itype=np.int_
-            ):
+            itype=np.int_, ftype=np.float64):
         self.extent = extent
         self.h = h 
         self.origin = origin

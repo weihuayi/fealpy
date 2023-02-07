@@ -1,7 +1,6 @@
-
 import numpy as np
 from scipy.sparse import csr_matrix, coo_matrix, diags
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
+from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
 
 class UniformMesh1d():
@@ -65,9 +64,6 @@ class UniformMesh1d():
 
         if returnim:
             return nodeImatrix
-
-    def geo_dimension(self):
-        return 1
 
     @property
     def node(self):
@@ -164,14 +160,14 @@ class UniformMesh1d():
         NN = self.number_of_nodes()
         k = np.arange(NN)
 
-        A = diags([2*cx], [0], shape=(NN, NN), format='coo')
+        A = diags([2*cx], [0], shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(-cx, (NN-1, ))
         I = k[1:]
         J = k[0:-1]
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
-        return A.tocsr()
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
 
     def laplace_operator_with_dbc(self):
         """

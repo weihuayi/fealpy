@@ -10,7 +10,6 @@ class StructureMesh2d(Mesh2d):
     """
     def __init__(self, node, itype=np.int_):
         """
-        @param[in] node  ndarray with shape nx X ny X 2
         """
         self.node = node # (nx+1, ny+1, GD)
         nx = node.shape[0] - 1
