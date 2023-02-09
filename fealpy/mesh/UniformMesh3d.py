@@ -13,8 +13,7 @@ class UniformMesh3d(Mesh3d):
     """
     def __init__(self, extent, 
             h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            ftype=np.float64, itype=np.int_
-            ):
+            itype=np.int_, ftype=np.float64):
         self.extent = extent
         self.h = h 
         self.origin = origin
@@ -393,27 +392,27 @@ class UniformMesh3d(Mesh3d):
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1, n2)
 
-        A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='coo')
+        A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(-cx, (NN - n1 * n2,))
         I = k[1:, :, :].flat
         J = k[0:-1, :, :].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cy, (NN - n0 * n2,))
         I = k[:, 1:, :].flat
         J = k[:, 0:-1, :].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cz, (NN - n0 * n1,))
         I = k[:, :, 1:].flat
         J = k[:, :, 0:-1].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        return A.tocsr()
+        return A
 
     def show_function(self, plot, uh, cmap='jet'):
         """
