@@ -1,7 +1,7 @@
 
 import numpy as np
 from types import ModuleType
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix, diags  
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
