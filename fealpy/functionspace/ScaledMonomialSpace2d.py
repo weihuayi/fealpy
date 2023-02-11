@@ -77,6 +77,7 @@ class ScaledMonomialSpace2d():
         self.cellbarycenter = mesh.entity_barycenter('cell') if bc is None else bc
         self.p = p
         self.cellmeasure = mesh.entity_measure('cell')
+
         self.cellsize = np.sqrt(self.cellmeasure)
         self.dof = SMDof2d(mesh, p)
         self.GD = 2
@@ -238,6 +239,7 @@ class ScaledMonomialSpace2d():
                 phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
                 phi[..., start+i] = phi[..., start-1]*phi[..., 2]
                 start += i+1
+        #print(phi.shape)
         return phi
 
     @cartesian
@@ -1014,6 +1016,16 @@ class ScaledMonomialSpace2d():
                     '...im, ...in->...imn',
                     self.basis(x, index),
                     mspace.basis(x, index)
+                    )
+        C = self.integralalg.integral(f, celltype=True)
+        return C
+
+    def matrix_H_in(self):
+        def f(x, index):
+            phi = self.basis(x, index)
+            return np.einsum(
+                    '...im, ...in->...imn',
+                    phi, phi
                     )
         C = self.integralalg.integral(f, celltype=True)
         return C

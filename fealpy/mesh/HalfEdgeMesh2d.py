@@ -2059,6 +2059,21 @@ class HalfEdgeMesh2d(Mesh2d):
                 multiindex=multiindex, linewidth=linewidth)
 
     def split_to_trimesh(self):
+        """
+        @brief 在每个单元中心生成一个节点，将单元分成多个三角形单元.
+                         3-------2
+                         |\     /|
+                         | \   / |
+                         |  \ /  |
+                         |   4   |
+                         |  / \  |
+                         | /   \ |
+                         |/     \|
+                         0-------1
+                (0, 1, 2, 3) splite to [(4, 0, 1), (4, 1, 2), (4, 2, 3), (4, 3, 0)]
+        @return 分割后的三角形网格，以及每个三角形单元的第一条边对应原来多边形
+                网格中的半边编号
+        """
         node = self.entity('node')
         halfedge = self.entity('halfedge')
         cstart = self.ds.cellstart
@@ -2076,6 +2091,43 @@ class HalfEdgeMesh2d(Mesh2d):
         newcell[:, 1] = halfedge[halfedge[flag, 4], 0]
         newcell[:, 0] = halfedge[flag, 1]-cstart+NN
         return TriangleMesh(newnode, newcell), np.where(flag)[0]
+
+    def split_to_trimesh_1(self):
+        """
+        @brief 在每个单元中心生成一个节点，将单元分成多个三角形单元.
+                         3-------2
+                         |\     /|
+                         | \   / |
+                         |  \ /  |
+                         |   4   |
+                         |  / \  |
+                         | /   \ |
+                         |/     \|
+                         0-------1
+                (0, 1, 2, 3) split to [(4, 0, 1), (4, 1, 2), (4, 2, 3), (4, 3, 0)]
+        @return 分割后的三角形网格，以及每个三角形单元的第一条边对应原来多边形
+                网格中的半边编号
+        """
+        node     = self.entity('node')
+        halfedge = self.entity('halfedge')
+        cstart   = self.ds.cellstart
+        hcell    = self.ds.hcell
+
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        newnode      = np.zeros((NC+NN, node.shape[1]), dtype=np.float_)
+        newnode[:NN] = node[:]
+        newnode[NN:] = self.entity_barycenter('cell')
+
+        NV = self.ds.number_of_vertices_of_cells()
+        NTC = np.sum(NV)
+
+        idx, _, num = self.ds.cell_to_halfedge(returnLocalnum=True)
+        newcell       = np.zeros((NTC, 3), dtype=np.int_)
+        newcell[:, 2] = halfedge[idx, 0]
+        newcell[:, 1] = halfedge[halfedge[idx, 4], 0]
+        newcell[:, 0] = halfedge[idx, 1]-cstart+NN
+        return TriangleMesh(newnode, newcell), idx, num[idx]
 
     def to_dual_mesh(self, projection=None):
         isbdedge = self.ds.boundary_edge_flag()

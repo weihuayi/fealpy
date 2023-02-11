@@ -1,4 +1,5 @@
 import numpy as np
+import time
 from numpy.linalg import inv
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye
 
@@ -170,6 +171,51 @@ class NonConformingVirtualElementSpace2d():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
 
         DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+        def f(x):
+            x[0, :] = 0
+            return x
+
+        tG = list(map(f, G))
+
+        f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+        K = list(map(f1, zip(DD, PI1, tG)))
+
+        f2 = lambda x: np.repeat(x, x.shape[0])
+        f3 = lambda x: np.tile(x, x.shape[0])
+        f4 = lambda x: x.flatten()
+
+        I = np.concatenate(list(map(f2, cd)))
+        J = np.concatenate(list(map(f3, cd)))
+        val = np.concatenate(list(map(f4, K)))
+        gdof = self.number_of_global_dofs()
+        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        return A
+
+    def stiff_matrix_test_time(self):
+        """
+        @brief 用于测试计算刚度矩阵的时间
+        """
+        p = self.p
+        H = self.smspace.matrix_H_in()
+        D = self.matrix_D(H)
+        B = self.matrix_B()
+        G1 = self.matrix_G(B, D)
+        G = self.matrix_G_test(self.smspace.integralalg)
+
+        cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+        if p > 1:
+            ldof = (p-1)*p//2
+            def f(x):
+                G[x[0]][:, 0] = 0
+                G[x[0]][0, :] = x[1][0, :]
+            list(map(f, zip(np.arange(len(H)), G1)))
+        else:
+            pass
+        PI1 = self.matrix_PI_1(G, B)
 
         def f(x):
             x[0, :] = 0
@@ -471,7 +517,6 @@ class NonConformingVirtualElementSpace2d():
 
         G = integralalg.integral(u, celltype=True)
         return G
-
 
     def matrix_C(self, H, PI1):
         p = self.p
