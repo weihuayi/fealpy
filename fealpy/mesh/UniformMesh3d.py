@@ -1,8 +1,7 @@
 
 import numpy as np
 from types import ModuleType
-from scipy.sparse import coo_matrix, csr_matrix
-from scipy.sparse.linalg import spsolve
+from scipy.sparse import csr_matrix, diags  
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
@@ -10,23 +9,25 @@ from ..geometry import project
 
 class UniformMesh3d(Mesh3d):
     """
-    @brief 
+    @brief 三维 x 和 y 和 z 方向均匀离散的结构网格
     """
     def __init__(self, extent, 
-            h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            ftype=np.float64, itype=np.int_
-            ):
+        h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
+        itype=np.int_, ftype=np.float64):
         self.extent = extent
         self.h = h 
         self.origin = origin
 
-        nx = extent[1] - extent[0]
-        ny = extent[3] - extent[2]
-        nz = extent[5] - extent[4]
-        self.ds = StructureMesh3dDataStructure(nx, ny, nz)
+        self.nx = extent[1] - extent[0]
+        self.ny = extent[3] - extent[2]
+        self.nz = extent[5] - extent[4]
+        self.NC = self.nx * self.ny *  self.nz
+        self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
 
         self.ftype = ftype
         self.ityep = itype
+        self.meshtype = 'UniformMesh3d'
 
     def geo_dimension(self):
         return 3
@@ -65,9 +66,9 @@ class UniformMesh3d(Mesh3d):
         ny = self.ds.ny
         nz = self.ds.nz
         if etype in {'cell', 3}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + (nx-1)*self.h[0], 
-                   self.origin[1] + self.h[1]/2, self.origin[1] + (ny-1)*self.h[1], 
-                   self.origin[2] + self.h[2]/2, self.origin[2] + (nz-1)*self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1], 
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz-1)*self.h[2]]
             bc = np.zeros((nx, ny, nz, GD), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                     box[0]:box[1]:complex(0, nx),
@@ -76,125 +77,125 @@ class UniformMesh3d(Mesh3d):
             return bc
 
         elif etype in {'facex'}: # 法线和 x 轴平行的面
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             bc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
             return bc
 
         elif etype in {'facey'}: # 法线和 y 轴平行的面
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             bc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
             return bc
 
         elif etype in {'facez'}: # 法线和 z 轴平行的面
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
-                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+                   self.origin[2], self.origin[2] + nz*self.h[2]]
             bc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx),
                                                  box[2]:box[3]:complex(0, ny),
-                                                 box[2]:box[3]:complex(0, nz + 1)]
+                                                 box[4]:box[5]:complex(0, nz + 1)]
             return bc
 
         elif etype in {'face', 2}: # 所有的面
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             xbc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
             xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
 
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             ybc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
             ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
 
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1] + self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
-                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+                   self.origin[2], self.origin[2] + nz*self.h[2]]
             zbc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
             zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx),
                                                  box[2]:box[3]:complex(0, ny),
-                                                 box[2]:box[3]:complex(0, nz + 1)]
+                                                 box[4]:box[5]:complex(0, nz + 1)]
 
             return xbc, ybc, zbc
 
         elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2], self.origin[2] + nz*self.h[2]]
             bc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                      box[0]:box[1]:complex(0, nx),
                                      box[2]:box[3]:complex(0, ny + 1),
-                                     box[2]:box[3]:complex(0, nz + 1)]
+                                     box[4]:box[5]:complex(0, nz + 1)]
             return bc
         elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1]+ self.h[1] / 2, self.origin[1] + (ny - 1) * self.h[1],
-                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
+                   self.origin[2], self.origin[2] + nz*self.h[2]]
             bc = np.zeros((nx + 1, ny, nz + 1, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny),
-                                                 box[2]:box[3]:complex(0, nz + 1)]
+                                                 box[4]:box[5]:complex(0, nz + 1)]
             return bc
         elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             bc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
             bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
             return bc
         elif etype in {'edge', 1}: # 所有的边
-            box = [self.origin[0] + self.h[0] / 2, self.origin[0] + (nx - 1) * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2], self.origin[2] + nz * self.h[2]]
+            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2], self.origin[2] + nz*self.h[2]]
             xbc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
             xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz + 1)]
+                                                 box[4]:box[5]:complex(0, nz + 1)]
 
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1)*self.h[2]]
             ybc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
             ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
 
-            box = [self.origin[0], self.origin[0] + nx * self.h[0],
-                   self.origin[1], self.origin[1] + ny * self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1) * self.h[2]]
+            box = [self.origin[0], self.origin[0] + nx*self.h[0],
+                   self.origin[1], self.origin[1] + ny*self.h[1],
+                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
             zbc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
             zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
                                                  box[0]:box[1]:complex(0, nx + 1),
                                                  box[2]:box[3]:complex(0, ny + 1),
-                                                 box[2]:box[3]:complex(0, nz)]
+                                                 box[4]:box[5]:complex(0, nz)]
 
             return xbc, ybc, zbc
         elif etype in {'node', 0}:
@@ -400,27 +401,27 @@ class UniformMesh3d(Mesh3d):
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1, n2)
 
-        A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='coo')
+        A = diags([2 * (cx + cy + cz)], [0], shape=(NN, NN), format='csr')
 
         val = np.broadcast_to(-cx, (NN - n1 * n2,))
         I = k[1:, :, :].flat
         J = k[0:-1, :, :].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cy, (NN - n0 * n2,))
         I = k[:, 1:, :].flat
         J = k[:, 0:-1, :].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         val = np.broadcast_to(-cz, (NN - n0 * n1,))
         I = k[:, :, 1:].flat
         J = k[:, :, 0:-1].flat
-        A += coo_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        return A.tocsr()
+        return A
 
     def mass_matrix(self):
         h = self.h
@@ -716,6 +717,7 @@ class UniformMesh3d(Mesh3d):
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
+        @brief 输出为 vtk 数据格式
 
         """
         from pyevtk.hl import gridToVTK

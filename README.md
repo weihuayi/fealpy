@@ -87,3 +87,12 @@ H. Wei and Y. Huang, FEALPy: Finite Element Analysis Library in Python, https://
 	year = {Xiangtan University, 2017-2022},
 }
 ```
+
+
+
+
+
+
+
+
+

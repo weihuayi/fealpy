@@ -3,7 +3,7 @@
 
 import argparse
 import numpy as np
-from fealpy.mesh import StructureQuadMesh
+from fealpy.mesh import UniformMesh2d
 from fealpy.timeintegratoralg import UniformTimeLine
 import matplotlib.pyplot as plt
 
@@ -38,8 +38,10 @@ R = args.R
 T0 = 0
 T1 = NT
 
+h = 100/NS
+
 domain = [0, 100, 0, 100] # 笛卡尔坐标空间
-mesh = StructureQuadMesh(domain, nx = NS, ny = NS) # 建立结构网格对象
+mesh = UniformMesh2d((0, NS, 0, NS), h=(h, h), origin=(0, 0)) # 建立结构网格对象
 timeline = UniformTimeLine(T0, T1, NT)
 dt = timeline.dt
 

@@ -595,7 +595,7 @@ class CLagrangeQuadrangleDof2d():
 
         gdof = self.number_of_global_dofs()
         edge2dof = self.edge_to_dof()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         isBdDof[edge2dof[index]] = True
         return isBdDof
 
