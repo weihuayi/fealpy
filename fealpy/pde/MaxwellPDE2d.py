@@ -42,6 +42,15 @@ class MaxwellPDE2d():
         return f 
 
     @cartesian
+    def curl_solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        curlF = self.curlF(x, y)
+        if type(curlF) is not np.ndarray:
+            curlF = np.ones(x.shape, dtype=np.float_)*curlF
+        return curlF
+
+    @cartesian
     def source(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]
@@ -55,8 +64,9 @@ class MaxwellPDE2d():
         return ccf - self.solution(p)
 
     @cartesian
-    def dirichlet(self, p):
-        return self.solution(p)
+    def dirichlet(self, p, t):
+        val = self.solution(p)
+        return np.einsum('...ed, ed->...e', val, t)
 
     @cartesian
     def neumann(self, p, n):
@@ -85,13 +95,13 @@ class MaxwellPDE2d():
 class SinData(MaxwellPDE2d):
     def __init__(self):
         C = CoordSys3D('C')
-        f = sym.sin(2*sym.pi*C.y)*C.i + sym.sin(2*sym.pi*C.x)*C.j
-        f = sym.sin(2*sym.pi*C.y)*C.i + sym.sin(2*sym.pi*C.x)*C.j
+        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
+        #f = sym.sin(C.y)*C.i + sym.sin(C.x)*C.j
         super(SinData, self).__init__(f)
 
-    def init_mesh(self, n=1):
+    def init_mesh(self, nx=1, ny=1, meshtype='tri'):
         box = [0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
+        mesh = MeshFactory.boxmesh2d(box, nx=nx, ny=ny, meshtype=meshtype)
         return mesh
 
 

@@ -45,10 +45,7 @@ class PolygonMeshIntegralAlg():
         index = index or np.s_[:]
         ps = mesh.edge_bc_to_point(bcs, index=index)
         val = u(ps) # TODO: 这里默认为空间坐标, 是否存在重心坐标的形式?
-        if edgetype is True:
-            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure[index])
-        else:
-            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure[index])
+        e = np.einsum('q, qe..., e->e...', ws, val, self.edgemeasure[index])
         return e
 
     def face_integral(self, u, q=None, index=None):

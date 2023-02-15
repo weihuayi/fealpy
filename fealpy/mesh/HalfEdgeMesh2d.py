@@ -446,6 +446,11 @@ class HalfEdgeMesh2d(Mesh2d):
             else:
                 edge = self.entity('edge')[index]
                 p = np.einsum('...j, ejk->...ek', bc, node[edge]) # (NQ, NE, 2)
+        elif self.ds.NV is None:
+            TD = bc.shape[-1] - 1 # bc.shape == (NQ, TD+1)
+            node = self.entity('node')
+            entity = self.entity(etype=TD)[index] # default  cell
+            p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
 
     def entity(self, etype=2):
@@ -1991,7 +1996,7 @@ class HalfEdgeMesh2d(Mesh2d):
     def adjust_number(self, isMarked, method='node'):
         L = len(isMarked)
         l = (~isMarked).sum()
-        idxmap = np.arange(L)
+        idxmap = np.zeros(L, dtype=np.int_)-10
         idxmap[~isMarked] = np.arange(l)
         halfedge = self.entity('halfedge')
         if method == 'node':
@@ -2526,8 +2531,14 @@ class HalfEdgeMesh2dDataStructure():
 
         edge2cell = self.edge_to_cell()
         if return_sparse == False:
-            cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
-            cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
+            if self.NV is None:
+                cellLocation = np.zeros(NC+1, dtype=self.itype)
+                cellLocation[1:] = np.cumsum(NEC)
+                cell2edgeSign = np.zeros(cellLocation[-1], dtype=np.bool_)
+                cell2edgeSign[cellLocation[edge2cell[:, 0]] + edge2cell[:, 2]]=True
+            else:
+                cell2edgeSign = np.zeros((NC, NEC), dtype=np.bool_)
+                cell2edgeSign[edge2cell[:, 0], edge2cell[:, 2]] = True
         else:
             val = np.ones(NE, dtype=np.bool_)
             cell2edgeSign = csr_matrix(
