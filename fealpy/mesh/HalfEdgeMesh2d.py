@@ -956,6 +956,16 @@ class HalfEdgeMesh2d(Mesh2d):
             halfedgeNew[NC1:, 3] = pre
             halfedgeNew[NC1:, 4] = np.arange(NE*2, NE*2+NC1)
 
+            if ('HB' in options) and (options['HB'] is not None):
+                NC0 = NC-cstart
+                HB0 = np.zeros([NC0+NC1, 2], dtype=np.int_)
+                HB0[:, 0] = np.arange(NC0+NC1)
+                HB0[:NC0, 1] = np.arange(NC0)
+                HB0[NC0:, 1] = cidx-cstart
+                HB = options['HB']
+                HB0[:, 1] = HB[HB0[:, 1], 1]
+                options['HB'] = HB0
+
             flag = isMarkedHEdge[halfedgeNew[NC1:, 2]]
             current = np.where(flag)[0]+NC1
             nexpre = halfedge[halfedgeNew[current, 2], 3]
@@ -1304,6 +1314,12 @@ class HalfEdgeMesh2d(Mesh2d):
             cidxmap0 = np.arange(NC)
             cidxmap0[cell0] = np.arange(len(cell0))
             halfedge[:, 1] = cidxmap0[halfedge[:, 1]]
+
+            if ('HB' in options) and (options['HB'] is not None):
+                HB = np.zeros((NC-cstart, 2), dtype=np.int)
+                HB[:, 0] = np.arange(NC-cstart)
+                HB[:, 1] = cidxmap0[cidxmap[cstart:]]-cstart
+                options['HB'] = HB
 
             if 'numrefine' in options:
                 num = options['numrefine']
@@ -1766,6 +1782,12 @@ class HalfEdgeMesh2d(Mesh2d):
         clevel = self.celldata['level']
         isMarkedCell[:cstart] = False
 
+        if ('HB' in options) and (options['HB'] is not None):
+            HB = np.zeros((NC-cstart, 2), dtype=np.int)
+            HB[:, 0] = np.arange(NC-cstart)
+            HB[:, 1] = np.arange(NC-cstart)
+            options['HB'] = HB
+
         isMarkedHEdge = self.mark_halfedge(isMarkedCell, method='nvb')
         flag = np.array(True)
         while flag.any():
@@ -1796,6 +1818,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
             self.refine_cell(isNewCell, flag, method='tri', options=options)
 
+
     def coarsen_triangle_nvb(self, isMarkedCell, options={}):
         NC = self.number_of_all_cells()
         NN = self.number_of_nodes()
@@ -1815,12 +1838,26 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
         isMarkedCell[:cstart] = True
 
+        nex, pre, opp = halfedge[:, 2], halfedge[:, 3], halfedge[:, 4]
+
         #标记要删除的半边
-        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (hlevel[:]==0) & (color==0)
+        isMarkedHEdge = isMarkedCell[halfedge[:, 1]] & (hlevel[:]==0) & (color[:]==0)
         isMarkedHEdge = isMarkedHEdge & (clevel[halfedge[:, 1]]>0)
         isMarkedHEdge = isMarkedHEdge & isMarkedHEdge[halfedge[:, 4]]
 
-        isMarkedHEdge = self.coarsen_cell(isMarkedCell, isMarkedHEdge, method='tri')
+        #只考虑对着的四个四边形都被标记的情况或者两个边界上的三角形都被标记的情况
+        isMarkedHEdge = isMarkedHEdge & (color[halfedge[:, 3]] == 1)
+
+        isMarkedHEdge = isMarkedHEdge & (isMarkedHEdge[opp[nex[opp[nex]]]] | (halfedge[opp[nex], 1] < cstart))
+        isMarkedHEdge[opp[isMarkedHEdge]] = True
+
+        if ('HB' in options) and (options['HB'] is not None):
+            HB = np.zeros((NC-cstart, 2), dtype=np.int)
+            HB[:, 0] = np.arange(NC-cstart)
+            HB[:, 1] = np.arange(NC-cstart)
+            options['HB'] = HB
+
+        isMarkedHEdge = self.coarsen_cell(isMarkedCell, isMarkedHEdge, method='tri', options=options)
 
         #修改颜色
         color = color[~isMarkedHEdge]
@@ -1842,21 +1879,7 @@ class HalfEdgeMesh2d(Mesh2d):
 
         #修改颜色
         color = color[~flag]
-
-        #生成新的单元
-        NV = self.ds.number_of_vertices_of_all_cells()
-        isNewCell = NV==4
-        flag = (color==1) & isNewCell[halfedge[:, 1]]
-        NC1 = flag.sum()
-
-        #修改半边颜色
-        color[flag] = 0
-        color = np.r_[color, np.zeros(NC1*2, dtype=np.int_)]
-        color[halfedge[flag, 2]] = 1
-        color[halfedge[halfedge[flag, 3], 3]] = 1
         self.hedgecolor = color
-
-        self.refine_cell(isNewCell, flag, method='tri', options=options)
 
     def adaptive_options(
             self,
