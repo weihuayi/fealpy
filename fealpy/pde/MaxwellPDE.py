@@ -31,6 +31,7 @@ class MaxwellPDE():
 
         # 构造 curl(curl(f))
         ccf = curl(cf)
+        print(ccf)
         ccfx = ccf.dot(C.i).subs({C.x:x, C.y:y, C.z:z})
         ccfy = ccf.dot(C.j).subs({C.x:x, C.y:y, C.z:z})
         ccfz = ccf.dot(C.k).subs({C.x:x, C.y:y, C.z:z})
@@ -129,7 +130,7 @@ class SinData(MaxwellPDE):
         #f = 1*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.x*sym.sin(sym.pi*C.z)*C.k 
         #f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + C.z*C.k 
-        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.z)*C.k 
+        f = sym.sin(sym.pi*C.z)*C.i + sym.sin(sym.pi*C.x)*C.j + sym.sin(sym.pi*C.y)*C.k 
         #f = sym.sin(sym.pi*C.x)*C.i + sym.sin(sym.pi*C.y)*C.j + sym.sin(sym.pi*C.z)*C.k 
         #f = C.x**3*C.i + C.y**3*C.j + C.z**3*C.k
         #f = C.y*C.i + 2*C.x*C.j + C.z*C.k

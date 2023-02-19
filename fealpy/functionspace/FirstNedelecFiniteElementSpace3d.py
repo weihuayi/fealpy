@@ -73,7 +73,7 @@ class FirstNedelecFiniteElementSpace3d:
         else:
             self.dof = dof
 
-        self.integralalg = FEMeshIntegralAlg(self.mesh, 3)
+        self.integralalg = FEMeshIntegralAlg(self.mesh, 2)
         self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
