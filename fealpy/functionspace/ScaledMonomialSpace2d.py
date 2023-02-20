@@ -846,6 +846,7 @@ class ScaledMonomialSpace2d():
         """
 
         p = self.p
+        if q is None: q = p
         mesh = self.mesh
         node = mesh.entity('node')
         edge = mesh.entity('edge')
@@ -855,7 +856,7 @@ class ScaledMonomialSpace2d():
         cell2dof = self.cell_to_dof()
         edge2cell = mesh.ds.edge_to_cell()
 
-        qf = mesh.integrator(p+4)
+        qf = mesh.integrator(q)
         bcs, ws = qf.quadpts, qf.weights
         tri_0 = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
         a_0 = self.triangle_measure(tri_0)#NE
