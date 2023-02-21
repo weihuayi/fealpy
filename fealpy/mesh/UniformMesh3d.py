@@ -1,7 +1,7 @@
 
 import numpy as np
 from types import ModuleType
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix, diags  
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
 
@@ -9,22 +9,25 @@ from ..geometry import project
 
 class UniformMesh3d(Mesh3d):
     """
-    @brief 
+    @brief 三维 x 和 y 和 z 方向均匀离散的结构网格
     """
     def __init__(self, extent, 
-            h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            itype=np.int_, ftype=np.float64):
+        h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
+        itype=np.int_, ftype=np.float64):
         self.extent = extent
         self.h = h 
         self.origin = origin
 
-        nx = extent[1] - extent[0]
-        ny = extent[3] - extent[2]
-        nz = extent[5] - extent[4]
-        self.ds = StructureMesh3dDataStructure(nx, ny, nz)
+        self.nx = extent[1] - extent[0]
+        self.ny = extent[3] - extent[2]
+        self.nz = extent[5] - extent[4]
+        self.NC = self.nx * self.ny *  self.nz
+        self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
 
         self.ftype = ftype
         self.ityep = itype
+        self.meshtype = 'UniformMesh3d'
 
     def geo_dimension(self):
         return 3
