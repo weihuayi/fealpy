@@ -166,6 +166,7 @@ class NonConformingVirtualElementSpace2d():
         G = self.G
         D = self.D
         PI1 = self.PI1
+        G1 = self.matrix_G_test(self.smspace.integralalg)
 
         cell2dof, cell2dofLocation = self.dof.cell2dof, self.dof.cell2dofLocation
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
@@ -243,6 +244,7 @@ class NonConformingVirtualElementSpace2d():
         # the projector matrix
         D = self.D
         H = self.H
+        H = self.smspace.matrix_H_in() #TODO
         C = self.C
 
         # the dof arrays
