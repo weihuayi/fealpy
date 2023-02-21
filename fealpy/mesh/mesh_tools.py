@@ -46,6 +46,7 @@ def find_node(
         color = mapper.to_rgba(color)
 
     bc = node[index]
+    print(bc)
     if GD == 2:
         axes.scatter(bc[..., 0], bc[..., 1], c=color, s=markersize)
         if showindex:

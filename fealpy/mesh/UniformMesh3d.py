@@ -1,36 +1,53 @@
 
 import numpy as np
 from types import ModuleType
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import csr_matrix, diags
 from .Mesh3d import Mesh3d
 from .StructureMesh3dDataStructure import StructureMesh3dDataStructure
+from .mesh_tools import show_mesh_3d
 
 from ..geometry import project
 
 class UniformMesh3d(Mesh3d):
     """
-    @brief 
+    @brief x, y, z 三个方向均匀剖分的三维网格
     """
+
     def __init__(self, extent, 
             h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
-            itype=np.int_, ftype=np.float64):
+            ftype=np.float64, itype=np.int_
+            ):
+        """
+        @param[in] extent 与首个网格单元的偏移量
+        @param[in] h 部分步长
+        @param[in] origin 起始点的坐标
+        """
         self.extent = extent
-        self.h = h 
+        self.h = h
         self.origin = origin
 
-        nx = extent[1] - extent[0]
-        ny = extent[3] - extent[2]
-        nz = extent[5] - extent[4]
-        self.ds = StructureMesh3dDataStructure(nx, ny, nz)
+        self.nx = extent[1] - extent[0]
+        self.ny = extent[3] - extent[2]
+        self.nz = extent[5] - extent[4]
+        self.NC = self.nx * self.ny * self.nz
+        self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+        self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
 
         self.ftype = ftype
         self.ityep = itype
+        self.meshtype = 'UniformMesh3d'
 
     def geo_dimension(self):
         return 3
 
     def top_dimension(self):
         return 3
+
+    def number_of_nodes(self):
+        return self.NN
+
+    def number_of_cells(self):
+        return self.NC
 
     @property
     def node(self):
@@ -385,9 +402,13 @@ class UniformMesh3d(Mesh3d):
         n1 = self.ds.ny + 1
         n2 = self.ds.nz + 1
 
-        cx = 1 / (self.hx ** 2)
-        cy = 1 / (self.hy ** 2)
-        cz = 1 / (self.hz ** 2)
+        hx = self.h[0]
+        hy = self.h[1]
+        hz = self.h[2]
+
+        cx = 1 / (hx ** 2)
+        cy = 1 / (hy ** 2)
+        cz = 1 / (hz ** 2)
 
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1, n2)
@@ -417,6 +438,7 @@ class UniformMesh3d(Mesh3d):
     def show_function(self, plot, uh, cmap='jet'):
         """
         @brief 显示一个定义在网格节点上的函数
+        @error  'AxesSubplot' object has no attribute 'plot_surface'
         """
         if isinstance(plot, ModuleType):
             fig = plot.figure()
@@ -445,6 +467,41 @@ class UniformMesh3d(Mesh3d):
 
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
+
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+        """
+        @error 'UniformMesh3d' object has no attribute 'boundary_face'
+        """
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        return show_mesh_3d(axes, self,
+                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
+                linewidths=linewidths, markersize=markersize,
+                showaxis=showaxis)
+    
+    def error(self, h, nx, ny, nz, u, uh):
+        """
+        @brief 计算真解在网格点处与数值解的误差
+        @param[in] u
+        @param[in] uh
+        """
+        e = u - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+
+        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1) * (nz - 1)) * np.sum(e ** 2))
+
+        return emax, e0, el2
+
 
 
     def cell_location(self, p):
