@@ -419,6 +419,73 @@ class ConformingVirtualElementSpace2d():
         A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
         return A
 
+    def stiff_matrix_test_time(self, cfun=None):
+        """
+        @brief 用于测试计算刚度矩阵的时间
+        """
+        area = self.smspace.cellmeasure
+
+        def f(x):
+            x[0, :] = 0
+            return x
+
+        p = self.p
+        H = self.smspace.matrix_H_in()
+        D = self.matrix_D(H)
+        B = self.matrix_B()
+        G = self.matrix_G(B, D)
+        G1 = self.matrix_G_test(self.smspace.integralalg)
+        PI1 = self.PI1
+
+        cell2dof, cell2dofLocation = self.cell_to_dof()
+        NC = len(cell2dofLocation) - 1
+        cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
+        DD = np.vsplit(D, cell2dofLocation[1:-1])
+
+        if p == 1:
+            tG = np.array([(0, 0, 0), (0, 1, 0), (0, 0, 1)])
+            if cfun is None:
+                def f1(x):
+                    M = np.eye(x[1].shape[1])
+                    M -= x[0]@x[1]
+                    N = x[1].shape[1]
+                    A = np.zeros((N, N))
+                    idx = np.arange(N)
+                    A[idx, idx] = 2
+                    A[idx[:-1], idx[1:]] = -1
+                    A[idx[1:], idx[:-1]] = -1
+                    A[0, -1] = -1
+                    A[-1, 0] = -1
+                    return x[1].T@tG@x[1] + M.T@A@M
+                #f1 = lambda x: x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+                K = list(map(f1, zip(DD, PI1)))
+            else:
+                cellbarycenter = self.smspace.cellbarycenter
+                k = cfun(cellbarycenter)
+                f1 = lambda x: (x[1].T@tG@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[2]
+                K = list(map(f1, zip(DD, PI1, k)))
+        else:
+            tG = list(map(f, G))
+            if cfun is None:
+                f1 = lambda x: x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1])
+                K = list(map(f1, zip(DD, PI1, tG)))
+            else:
+                cellbarycenter = self.smspace.cellbarycenter
+                k = cfun(cellbarycenter)
+                f1 = lambda x: (x[1].T@x[2]@x[1] + (np.eye(x[1].shape[1]) - x[0]@x[1]).T@(np.eye(x[1].shape[1]) - x[0]@x[1]))*x[3]
+                K = list(map(f1, zip(DD, PI1, tG, k)))
+
+        f2 = lambda x: np.repeat(x, x.shape[0])
+        f3 = lambda x: np.tile(x, x.shape[0])
+        f4 = lambda x: x.flatten()
+
+        I = np.concatenate(list(map(f2, cd)))
+        J = np.concatenate(list(map(f3, cd)))
+        val = np.concatenate(list(map(f4, K)))
+        gdof = self.number_of_global_dofs()
+        A = csr_matrix((val, (I, J)), shape=(gdof, gdof), dtype=np.float)
+        return A
+
     def mass_matrix(self, cfun=None):
         area = self.smspace.cellmeasure
         p = self.p
@@ -757,6 +824,14 @@ class ConformingVirtualElementSpace2d():
             DD = np.vsplit(D, cell2dofLocation[1:-1])
             g = lambda x: x[0]@x[1]
             G = list(map(g, zip(BB, DD)))
+        return G
+
+    def matrix_G_test(self, integralalg):
+        def u(x, index=None):
+            gphi = self.smspace.grad_basis(x, index=index)
+            return np.einsum('ijkm, ijpm->ijkp', gphi, gphi, optimize=True)
+
+        G = integralalg.integral(u, celltype=True)
         return G
 
     def matrix_C(self, H, PI1):
