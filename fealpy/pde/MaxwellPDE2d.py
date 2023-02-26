@@ -29,6 +29,7 @@ class MaxwellPDE2d():
         self.curlcurlFx = sym.lambdify(('x', 'y'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y'), ccfy, "numpy")
 
+    @cartesian
     def solution(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]
