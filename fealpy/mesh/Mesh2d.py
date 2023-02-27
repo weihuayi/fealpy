@@ -200,11 +200,6 @@ class Mesh2d(object):
         if node is None:
             node = self.node
 
-
-        if (index is None) and (showindex == True):
-            NN = self.number_of_nodes() 
-            index = np.array(range(NN))
-
         find_node(axes, node,
                 index=index, showindex=showindex,
                 color=color, markersize=markersize,
