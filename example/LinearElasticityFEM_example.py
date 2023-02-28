@@ -53,12 +53,13 @@ elif GD == 3:
 
 pde = PDE()
 mesh = pde.init_mesh(n=n)
+NN = mesh.number_of_nodes()
 
 space = LagrangeFiniteElementSpace(mesh, p=p)
 
 
 
-uh = space.function(dim=GD)
+uh = space.function(dim=GD) # (NDof, GD)
 A = space.linear_elasticity_matrix(pde.lam, pde.mu, q=p+2)
 F = space.source_vector(pde.source, dim=GD)
 
@@ -78,7 +79,7 @@ uh.T.flat[:] = spsolve(A, F)
 mesh.add_plot(plt)
 
 # 画出变形网格
-mesh.node += scale*uh
+mesh.node += scale*uh[:NN]
 mesh.add_plot(plt)
 
 plt.show()
