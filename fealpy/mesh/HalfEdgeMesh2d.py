@@ -811,7 +811,7 @@ class HalfEdgeMesh2d(Mesh2d):
         hlevel = self.halfedgedata['level']
         hedge = self.ds.hedge
         hcell = self.ds.hcell
-        cstart = self.ds.cellstart
+        cellstart = self.ds.cellstart
         subdomain = self.ds.subdomain
 
         NC1 = isMarkedHEdge.sum()
@@ -823,7 +823,7 @@ class HalfEdgeMesh2d(Mesh2d):
             #生成新的节点
             if bc is None:
                 bc = self.cell_barycenter()
-                node.extend(bc[isMarkedCell[cstart:NC]])
+                node.extend(bc[isMarkedCell[cellstart:NC]])
             else:
                 node.extend(bc[isMarkedCell[:NC]])
             cell2newNode = np.zeros(NC, dtype=np.int_)
@@ -889,6 +889,7 @@ class HalfEdgeMesh2d(Mesh2d):
                 flag0 = isNonMarkedCell[cellstart:]
                 flag1 = isMarkedCell[cellstart:]
                 NHB0 = flag0.sum()
+                NHE = len(halfedge)
                 NHB = NHB0 + NHE
                 HB = np.zeros((NHB, 2), dtype=np.int)
                 HB[:, 0] = range(NHB)
