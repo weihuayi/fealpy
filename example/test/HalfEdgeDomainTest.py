@@ -137,7 +137,7 @@ class HalfEdgeDomainTest:
             vertices = np.array([
                 ( 0.0, 0.0), ( 1.0, 0.0), ( 1.0,  1.0), (0.0,  1.0),
                 (-1.0, 1.0), (-1.0, 0.0), (-1.0, -1.0), (0.0, -1.0)], dtype=np.float)
-            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1], dtype=np.bool)
+            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1], dtype=np.bool_)
             facets = np.array([
                 (0, 1), (1, 2), (2, 3), (3, 4), 
                 (4, 5), (5, 6), (6, 7), (7, 0)], dtype=np.int)
@@ -155,7 +155,7 @@ class HalfEdgeDomainTest:
             vertices = np.zeros((n, 2), dtype=np.float)
             vertices[:, 0] = np.cos(theta)
             vertices[:, 1] = np.sin(theta)
-            fixed = np.zeros(n, dtype=np.bool)
+            fixed = np.zeros(n, dtype=np.bool_)
             facets = np.zeros((n, 2), dtype=np.int)
             facets[:, 0] = range(0, n)
             facets[:-1, 1] = range(1, n)

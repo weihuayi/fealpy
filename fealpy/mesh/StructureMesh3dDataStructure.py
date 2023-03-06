@@ -265,8 +265,8 @@ class StructureMesh3dDataStructure():
         cell = self.cell
 
         I = np.repeat(range(NC), V)
-        val = np.ones(self.V * NC, dtype=np.bool)
-        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool)
+        val = np.ones(self.V * NC, dtype=np.bool_)
+        cell2node = csr_matrix((val, (I, cell.flatten())), shape=(NC, NN), dtype=np.bool_)
         return cell2node
 
     def total_face(self):
@@ -390,8 +390,8 @@ class StructureMesh3dDataStructure():
             N = self.N
             NF = self.NF
             I = np.repeat(range(NF), 4)
-            val = np.ones(4 * NF, dtype=np.bool)
-            face2node = csr_matrix((val, (I, face.flat)), shape=(NF, N), dtype=np.bool)
+            val = np.ones(4 * NF, dtype=np.bool_)
+            face2node = csr_matrix((val, (I, face.flat)), shape=(NF, N), dtype=np.bool_)
             return face2node
 
     def face_to_edge(self, return_sparse=False):
@@ -460,8 +460,8 @@ class StructureMesh3dDataStructure():
             NF = self.NF
             I = np.repeat(range(NF), 2)
             J = self.face2cell[:, [0, 1]].flatten()
-            val = np.ones(2 * NF, dtype=np.bool)
-            face2cell = csr_matrix((val, (I, J)), shape=(NF, NC), dtype=np.bool)
+            val = np.ones(2 * NF, dtype=np.bool_)
+            face2cell = csr_matrix((val, (I, J)), shape=(NF, NC), dtype=np.bool_)
             return face2cell
 
     def edge_to_node(self, return_sparse=False):
@@ -477,8 +477,8 @@ class StructureMesh3dDataStructure():
             edge = self.edge
             I = np.repeat(range(NE), 2)
             J = edge.flatten()
-            val = np.ones(2 * NE, dtype=np.bool)
-            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool)
+            val = np.ones(2 * NE, dtype=np.bool_)
+            edge2node = csr_matrix((val, (I, J)), shape=(NE, NN), dtype=np.bool_)
             return edge2node
 
     def edge_to_edge(self):
@@ -498,8 +498,8 @@ class StructureMesh3dDataStructure():
         FE = face2edge.shape[1]
         I = face2edge.flatten()
         J = np.repeat(range(NF), FE)
-        val = np.ones(FE * NF, dtype=np.bool)
-        edge2face = csr_matrix((val, (I, J)), shape=(NE, NF), dtype=np.bool)
+        val = np.ones(FE * NF, dtype=np.bool_)
+        edge2face = csr_matrix((val, (I, J)), shape=(NE, NF), dtype=np.bool_)
         return edge2face
 
     def edge_to_cell(self, localidx=False):
@@ -512,8 +512,8 @@ class StructureMesh3dDataStructure():
         I = cell2edge.flatten()
         E = self.E
         J = np.repeat(range(NC), E)
-        val = np.ones(E * NC, dtype=np.bool)
-        edge2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool)
+        val = np.ones(E * NC, dtype=np.bool_)
+        edge2cell = csr_matrix((val, (I, J)), shape=(NE, NC), dtype=np.bool_)
         return edge2cell
 
     def node_to_node(self):
@@ -526,8 +526,8 @@ class StructureMesh3dDataStructure():
         edge = self.edge
         I = edge.flatten()
         J = edge[:, [1, 0]].flatten()
-        val = np.ones((2 * NE,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
+        val = np.ones((2 * NE,), dtype=np.bool_)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
     def node_to_edge(self):
@@ -540,8 +540,8 @@ class StructureMesh3dDataStructure():
         edge = self.edge
         I = edge.flatten()
         J = np.repeat(range(NE), 2)
-        val = np.ones(2 * NE, dtype=np.bool)
-        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE), dtype=np.bool)
+        val = np.ones(2 * NE, dtype=np.bool_)
+        node2edge = csr_matrix((val, (I, J)), shape=(NN, NE), dtype=np.bool_)
         return node2edge
 
     def node_to_face(self):
@@ -556,8 +556,8 @@ class StructureMesh3dDataStructure():
 
         I = face.flatten()
         J = np.repeat(range(NF), FV)
-        val = np.ones(FV * NF, dtype=np.bool)
-        node2face = csr_matrix((val, (I, J)), shape=(NN, NF), dtype=np.bool)
+        val = np.ones(FV * NF, dtype=np.bool_)
+        node2face = csr_matrix((val, (I, J)), shape=(NN, NF), dtype=np.bool_)
         return node2face
 
     def node_to_cell(self, return_local_index=False):
@@ -577,8 +577,8 @@ class StructureMesh3dDataStructure():
             val = ranges(V * np.ones(NC, dtype=np.int), start=1)
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int)
         else:
-            val = np.ones(V * NC, dtype=np.bool)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool)
+            val = np.ones(V * NC, dtype=np.bool_)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool_)
         return node2cell
 
     def boundary_node_flag(self):
@@ -588,7 +588,7 @@ class StructureMesh3dDataStructure():
         NN = self.NN
         face = self.face
         isBdFace = self.boundary_face_flag()
-        isBdPoint = np.zeros((NN,), dtype=np.bool)
+        isBdPoint = np.zeros((NN,), dtype=np.bool_)
         isBdPoint[face[isBdFace, :]] = True
         return isBdPoint
 
@@ -599,7 +599,7 @@ class StructureMesh3dDataStructure():
         NE = self.NE
         face2edge = self.face_to_edge()
         isBdFace = self.boundary_face_flag()
-        isBdEdge = np.zeros((NE,), dtype=np.bool)
+        isBdEdge = np.zeros((NE,), dtype=np.bool_)
         isBdEdge[face2edge[isBdFace, :]] = True
         return isBdEdge
 
@@ -618,7 +618,7 @@ class StructureMesh3dDataStructure():
         NC = self.NC
         face2cell = self.face_to_cell()
         isBdFace = self.boundary_face_flag()
-        isBdCell = np.zeros((NC,), dtype=np.bool)
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdCell[face2cell[isBdFace, 0]] = True
         return isBdCell
 
@@ -666,7 +666,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NE = self.NE
-        isXDEdge = np.zeros(NE, dtype=np.bool)
+        isXDEdge = np.zeros(NE, dtype=np.bool_)
         isXDEdge[:nx * (ny + 1) * (nz + 1)] = True
         return isXDEdge
 
@@ -675,7 +675,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NE = self.NE
-        isYDEdge = np.zeros(NE, dtype=np.bool)
+        isYDEdge = np.zeros(NE, dtype=np.bool_)
         isYDEdge[nx * (ny + 1) * (nz + 1):-(nx + 1) * (ny + 1) * nz] = True
         return isYDEdge
 
@@ -684,7 +684,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NE = self.NE
-        isZDEdge = np.zeros(NE, dtype=np.bool)
+        isZDEdge = np.zeros(NE, dtype=np.bool_)
         isZDEdge[-(nx + 1) * (ny + 1) * nz:] = True
         return isZDEdge
 
@@ -712,7 +712,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NF = self.NF
-        isZDFace = np.zeros(NF, dtype=np.bool)
+        isZDFace = np.zeros(NF, dtype=np.bool_)
         isZDFace[:(nx + 1) * ny * nz] = True
         return isZDFace
 
@@ -721,7 +721,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NF = self.NF
-        isYDFace = np.zeros(NF, dtype=np.bool)
+        isYDFace = np.zeros(NF, dtype=np.bool_)
         isYDFace[(nx + 1) * ny * nz:-nx * ny * (nz + 1)] = True
         return isYDFace
 
@@ -730,6 +730,6 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         NF = self.NF
-        isXDFace = np.zeros(NF, dtype=np.bool)
+        isXDFace = np.zeros(NF, dtype=np.bool_)
         isXDFace[-nx * ny * (nz + 1):] = True
         return isXDFace

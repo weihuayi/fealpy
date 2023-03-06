@@ -50,9 +50,9 @@ def HG(mesh, phi, phiSign, h):
 
     edge = mesh.ds.edge
     
-    isZEdge = np.zeros(NE, dtype=np.bool)
-    isYEdge = np.zeros(NE, dtype=np.bool)
-    isXEdge = np.zeros(NE, dtype=np.bool)
+    isZEdge = np.zeros(NE, dtype=np.bool_)
+    isYEdge = np.zeros(NE, dtype=np.bool_)
+    isXEdge = np.zeros(NE, dtype=np.bool_)
 
     N0 = 0
     N1 = nz*(ny+1)*(nx+1)
@@ -182,14 +182,14 @@ isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
 A = point[edge[isCutEdge, 0]].copy()
 B = point[edge[isCutEdge, 1]].copy()
 cutPoint = find_cut_point(interface, A, B)
-isCutPoint = np.zeros(N, dtype=np.bool)
+isCutPoint = np.zeros(N, dtype=np.bool_)
 isCutPoint[edge[isCutEdge]] = True
 
-isXEdge = np.zeros(NE, dtype=np.bool)
+isXEdge = np.zeros(NE, dtype=np.bool_)
 isXEdge[-nx*(ny+1)*(nz+1):] = True
-isYEdge = np.zeros(NE, dtype=np.bool)
+isYEdge = np.zeros(NE, dtype=np.bool_)
 isYEdge[ny*(nz+1)*(nx+1):ny*(nz+1)*(nx+1)+nx*(ny+1)*(nz+1)] = True
-isZEdge = np.zeros(NE, dtype=np.bool)
+isZEdge = np.zeros(NE, dtype=np.bool_)
 isZEdge[0:nz*(nx+1)*(ny+1)] = True
 
 A = point[edge[isCutEdge, 0]]

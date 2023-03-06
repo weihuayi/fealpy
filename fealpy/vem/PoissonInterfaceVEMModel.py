@@ -65,15 +65,15 @@ class PoissonInterfaceVEMModel():
         edge2cell = mesh.ds.edge_to_cell()
 
         self.isInterfaceEdge = (self.isIntCell[edge2cell[:, 0]] != self.isIntCell[edge2cell[:, 1]])
-        self.isInterfaceNode = np.zeros(N, dtype=np.bool)
+        self.isInterfaceNode = np.zeros(N, dtype=np.bool_)
         self.isInterfaceNode[edge[self.isInterfaceEdge]] = True
 
         self.interfaceEdge = edge[self.isInterfaceEdge]
 
-        self.isExtNode = np.zeros(N, dtype=np.bool)
+        self.isExtNode = np.zeros(N, dtype=np.bool_)
         self.isExtNode[cell[np.repeat(~self.isIntCell, NV)]] = True
 
-        self.isIntNode = np.zeros(N, dtype=np.bool)
+        self.isIntNode = np.zeros(N, dtype=np.bool_)
         self.isIntNode[cell[np.repeat(self.isIntCell, NV)]] = True
         
     def reinit(self, mesh, p=None):

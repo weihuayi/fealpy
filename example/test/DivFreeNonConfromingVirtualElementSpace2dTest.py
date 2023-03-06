@@ -57,7 +57,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
             AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
             FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
             x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
-            isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
+            isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
             gdof = udof + pdof + 1
 
             FF -= AA@x
@@ -112,7 +112,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
         FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
         x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
-        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
         gdof = udof + pdof + 1
 
         FF -= AA@x
@@ -183,7 +183,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
         FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
         x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
-        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
         gdof = udof + pdof + 1
 
         FF -= AA@x
@@ -251,7 +251,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         AA = bmat([[A, P.T, None], [P, None, C[:, None]], [None, C, None]], format='csr')
         FF = np.block([F, np.zeros(pdof+1, dtype=uspace.ftype)])
         x = np.block([uh, ph, np.zeros((1, ), dtype=uspace.ftype)])
-        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool)]
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof+1, dtype=np.bool_)]
         gdof = udof + pdof + 1
 
         FF -= AA@x
@@ -317,7 +317,7 @@ class DivFreeNonConformingVirtualElementSpace2dTest:
         AA = bmat([[A, P[1:].T], [P[1:], None]], format='csr')
         FF = np.block([F, np.zeros(pdof-1, dtype=uspace.ftype)])
         x = np.block([uh, ph[1:]])
-        isBdDof = np.r_['0', isBdDof, np.zeros(pdof-1, dtype=np.bool)]
+        isBdDof = np.r_['0', isBdDof, np.zeros(pdof-1, dtype=np.bool_)]
         gdof = udof + pdof - 1
 
         FF -= AA@x

@@ -43,7 +43,7 @@ class HalfEdgeDomain():
         self.NE = len(halfedge) # 区域半边的个数
         
         # 默认初始顶点都是固定点
-        self.fixed = np.ones(self.NV, dtype=np.bool) if fixed is None else fixed
+        self.fixed = np.ones(self.NV, dtype=np.bool_) if fixed is None else fixed
 
         # 边界的水平集函数描述 
         self.boundary = boundary
@@ -190,7 +190,7 @@ class HalfEdgeDomain():
             self.vertices = np.r_['0', vertices, ec] 
             self.fixed = np.r_['0', 
                     self.fixed,
-                    np.zeros_like(ec[:, 0], dtype=np.bool)] 
+                    np.zeros_like(ec[:, 0], dtype=np.bool_)] 
             self.NV += NE1//2
             self.NE += NE1 
         else:
@@ -245,7 +245,7 @@ class HalfEdgeDomain():
                 self.vertices = vertices 
                 self.fixed = np.r_['0', 
                         self.fixed, 
-                        np.zeros_like(ec[:, 0], dtype=np.bool)]
+                        np.zeros_like(ec[:, 0], dtype=np.bool_)]
                 self.NV += NE//2
                 self.NE *= 2
             else:
@@ -291,9 +291,9 @@ class HalfEdgeDomain():
         rv[isInfVertices, 0] = range(nv, nv+nn)
 
         edge = rp[isInfVertices]
-        val = np.ones(nn, dtype=np.bool)
-        m0 = csr_matrix((val, (range(nn), edge[:, 0])), shape=(nn, NG), dtype=np.bool)
-        m1 = csr_matrix((val, (range(nn), edge[:, 1])), shape=(nn, NG), dtype=np.bool)
+        val = np.ones(nn, dtype=np.bool_)
+        m0 = csr_matrix((val, (range(nn), edge[:, 0])), shape=(nn, NG), dtype=np.bool_)
+        m1 = csr_matrix((val, (range(nn), edge[:, 1])), shape=(nn, NG), dtype=np.bool_)
         _, nex = (m0*m1.T).nonzero()
         _, pre = (m1*m0.T).nonzero()
 
@@ -329,7 +329,7 @@ class HalfEdgeDomain():
         node = ve
         NN = node.shape[0]
         NC = NG
-        flag =  np.ones(NE, dtype=np.bool)
+        flag =  np.ones(NE, dtype=np.bool_)
         idx = np.arange(NE)
         node2halfedge = np.zeros((NN, 3), dtype=itype)
         node2halfedge[halfedge[:, 0], 0] = idx 
@@ -423,7 +423,7 @@ class HalfEdgeDomain():
                 isNGenerator[~isIntersect] = False
 
             isNotSGenerator = (gindex[e0] != gindex[e1])
-            isMarkedHEdge = np.zeros(NE, dtype=np.bool)
+            isMarkedHEdge = np.zeros(NE, dtype=np.bool_)
             isMarkedHEdge[isMainHEdge][~isNGenerator & isNotSGenerator] =True
             if np.any(isMarkedHEdge):
                 nn = isMarkedHEdge.sum()//2
@@ -450,7 +450,7 @@ class HalfEdgeDomain():
 
         isIntersect, ec = self.is_intersect(p0, p1, v0, v1, returnin=True)
         NE = len(halfedge1)
-        isMarkedHEdge = np.zeros(NE, dtype=np.bool)
+        isMarkedHEdge = np.zeros(NE, dtype=np.bool_)
         isMarkedHEdge[isMainHEdge][isNotSGenerator] =True
         nn = isMarkedHEdge.sum()//2
         vertices[end:end+nn], halfedge1 = self.halfedge_adaptive_refine(

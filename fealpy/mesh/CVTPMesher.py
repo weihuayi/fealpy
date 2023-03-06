@@ -60,7 +60,7 @@ class CVTPMesher:
             mesh.init_level_info()
             mesh.refine_halfedge(isMarkedHEdge)
             self.dof = np.r_['0',
-                    dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
+                    dof,np.zeros_like(ec[:, 0], dtype=np.bool_)]
 
     def boundary_adaptive_refine(self, n = 2, times = None):
         """
@@ -112,7 +112,7 @@ class CVTPMesher:
                 mesh.init_level_info()
                 mesh.refine_halfedge(isMarkedHEdge)
                 self.dof = np.r_['0',
-                        dof,np.zeros_like(ec[:, 0], dtype=np.bool)]
+                        dof,np.zeros_like(ec[:, 0], dtype=np.bool_)]
                 halfedge = mesh.ds.halfedge
                 times = np.hstack((times,i*np.ones(int((len(halfedge)-l)/2))))
                 l = len(halfedge)
@@ -600,7 +600,7 @@ class CVTPMesher:
         np.add.at(valence, rp[:, 0], 1)
         np.add.at(valence, rp[:, 1], 1)
         bp = self.hedge2bnode[halfedge[:,1]<cstart]#无界区域和洞的种子点编号
-        ap = np.ones(NP,dtype = np.bool)
+        ap = np.ones(NP,dtype = np.bool_)
         ap[bp] = False
         npoints[:] /= valence[:,None]
         energy = np.sum(np.sum((npoints[ap]-points[ap])**2,axis=1)*area[ap])

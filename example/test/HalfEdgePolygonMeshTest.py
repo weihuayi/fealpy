@@ -65,7 +65,7 @@ class HalfEdgePolygonMeshTest:
 
         mesh = PolygonMesh(node, cell, cellLocation)
         mesh = HalfEdgePolygonMesh.from_polygonmesh(mesh)
-        isMarkedCell = np.zeros(5, dtype=np.bool)
+        isMarkedCell = np.zeros(5, dtype=np.bool_)
         isMarkedCell[-1] = True
         isMarkedCell[-2] = True
         mesh.refine(isMarkedCell)
@@ -73,20 +73,20 @@ class HalfEdgePolygonMeshTest:
 
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
             isMarkedCell[2] = True
             mesh.refine(isMarkedCell)
 
 
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
             isMarkedCell[1] = True
             mesh.refine(isMarkedCell)
 
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
             isMarkedCell[13] = True
             mesh.refine(isMarkedCell)
 
@@ -178,12 +178,12 @@ class HalfEdgePolygonMeshTest:
         val = np.zeros(2*NE, dtype=np.int)
         mesh.set_data(name, val, 'halfedge')
         
-        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
         isMarkedCell[2] = True
         mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
         
         NC = mesh.number_of_cells()
-        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
         isMarkedCell[6] = True
         mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
         
@@ -191,25 +191,25 @@ class HalfEdgePolygonMeshTest:
             
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
             isMarkedCell[3] = True
             mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
             
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
             isMarkedCell[1] = True
             mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
             
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
             isMarkedCell[5] = True
             isMarkedCell[13] = True
             mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)
         if True:
             NC = mesh.number_of_cells()
-            isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+            isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
             isMarkedCell[0] = True
             isMarkedCell[1] = True
             mesh.refine_with_flag(isMarkedCell, rflag=name, dflag=False)

@@ -237,7 +237,7 @@ class LShapeRSinData:
         bc = mesh.entity_barycenter('cell')
         isDelCell = ((bc[:, 0] > 0) & (bc[:, 1] < 0))
         cell = cell[~isDelCell]
-        isValidNode = np.zeros(NN, dtype=np.bool)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
         isValidNode[cell] = True
         node = node[isValidNode]
 

@@ -77,7 +77,7 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
 
 
         NC = pmesh.number_of_cells()
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
 
         # Case 1
         NE = pmesh.number_of_edges()
@@ -121,9 +121,9 @@ class AdaptiveMarker2d(AdaptiveMarkerBase):
             l = np.sqrt(np.sum(normal**2, axis=1))
             cosa = np.sum(normal[edge00[:, 0]]*normal[edge00[:, 1]], axis=1)/(l[edge00[:, 0]]*l[edge00[:, 1]])
             a = np.arccos(cosa)*180/np.pi
-            isBigCurvatureEdge =  np.zeros(NE, dtype=np.bool)
+            isBigCurvatureEdge =  np.zeros(NE, dtype=np.bool_)
             isBigCurvatureEdge[isInterfaceBdEdge] = (a > 5)
-            isMarkedCell0 = np.zeros(NC, dtype=np.bool)
+            isMarkedCell0 = np.zeros(NC, dtype=np.bool_)
             isMarkedCell0[edge2cell[isBigCurvatureEdge, 0:2]] = True
             isMarkedCell = isMarkedCell | (isMarkedCell0 & isInterfaceCell)
 
@@ -268,7 +268,7 @@ class AdaptiveMarker3d():
         isInterfaceFace = self.interface_face_flag(pmesh)
         face2cell = pmesh.ds.face2cell
         NC = pmesh.number_of_cells()
-        isInterfaceCell = np.zeros(NC, dtype=np.bool)
+        isInterfaceCell = np.zeros(NC, dtype=np.bool_)
         isInterfaceCell[face2cell[isInterfaceFace, 0:2]] = True
         return isInterfaceCell 
 
@@ -298,7 +298,7 @@ class AdaptiveMarker3d():
         cell2node = pmesh.ds.cell_to_node()
         isInterfaceNode= np.asarray(isInterfaceCell@cell2node).reshape(-1)
 
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
 
         # Case 1
         isLeafCell = treemesh.is_leaf_cell()

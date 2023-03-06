@@ -104,7 +104,7 @@ for i in range(maxit):
 
     tuspace.set_dirichlet_bc(tuh, pde.dirichlet)
     x = np.block([tuh, tph])
-    isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+tpdof, dtype=np.bool)])
+    isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+tpdof, dtype=np.bool_)])
     gdof = tudof + tpdof
     FF -= AA@x
     bdIdx = np.zeros(gdof, dtype=np.int)

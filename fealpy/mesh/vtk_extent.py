@@ -117,7 +117,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
                 else:
                     val1 = val
 
-                if val1.dtype == np.bool:
+                if val1.dtype == np.bool_:
                     d = vnp.numpy_to_vtk(val1.astype(np.int_))
                 else:
                     d = vnp.numpy_to_vtk(val1[:])
@@ -135,7 +135,7 @@ def write_to_vtu(fname, node, NC, cellType, cell, nodedata=None, celldata=None):
                 else:
                     val1 = val
 
-                if val1.dtype == np.bool:
+                if val1.dtype == np.bool_:
                     d = vnp.numpy_to_vtk(val1.astype(np.int_))
                 else:
                     d = vnp.numpy_to_vtk(val1[:])
@@ -185,7 +185,7 @@ def write_polyhedron_mesh_to_vtu(fname, mesh, nodedata=None, celldata=None):
                 else:
                     val1 = val
 
-                if val1.dtype == np.bool:
+                if val1.dtype == np.bool_:
                     d = vnp.numpy_to_vtk(val1.astype(np.int_))
                 else:
                     d = vnp.numpy_to_vtk(val1[:])
@@ -203,7 +203,7 @@ def write_polyhedron_mesh_to_vtu(fname, mesh, nodedata=None, celldata=None):
                 else:
                     val1 = val
 
-                if val1.dtype == np.bool:
+                if val1.dtype == np.bool_:
                     d = vnp.numpy_to_vtk(val1.astype(np.int_))
                 else:
                     d = vnp.numpy_to_vtk(val1[:])

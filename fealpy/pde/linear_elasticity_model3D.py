@@ -202,7 +202,7 @@ class GenLinearElasticitymodel3D():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (3,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x0 = p[...,0]
         x1 = p[...,1]
         x2 = p[...,2]
@@ -218,7 +218,7 @@ class GenLinearElasticitymodel3D():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (3,)+p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x0 = p[...,0]
         x1 = p[...,1]
         x2 = p[...,2]
@@ -441,7 +441,7 @@ class GenLinearElasticitymodels():
     def is_neumann_boundary(self, p):
         if self.is_neumannbd is None:
             shape = p.shape[:-1]
-            return np.zeros(shape,dtype = np.bool)
+            return np.zeros(shape,dtype = np.bool_)
         else:
             dim = self.dim
             if dim == 2:
@@ -457,7 +457,7 @@ class GenLinearElasticitymodels():
     def is_dirichlet_boundary(self, p):
         if self.is_dirichletbd is None:
             shape = p.shape[:-1]
-            return np.zeros(shape,dtype = np.bool)
+            return np.zeros(shape,dtype = np.bool_)
         else:
             dim = self.dim
             if dim == 2:

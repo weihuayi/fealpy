@@ -29,7 +29,7 @@ class DFNCVEMDof2d():
 
     def boundary_dof(self):
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdEdge = self.mesh.ds.boundary_edge_flag()
         isBdDof[edge2dof[isBdEdge]] = True
@@ -947,7 +947,7 @@ class DivFreeNonConformingVirtualElementSpace2d:
         p = self.p
         NE = self.mesh.number_of_edges()
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.dof.edge_to_dof()
         isBdEdge = self.mesh.ds.boundary_edge_flag()
         isBdDof[edge2dof[isBdEdge]] = True

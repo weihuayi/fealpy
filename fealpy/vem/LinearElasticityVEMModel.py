@@ -183,7 +183,7 @@ class LinearElasticityVEMModel():
         # update the third line of B
         if p < 3:
             ipoints = self.space.interpolation_points()
-            mask = np.zeros(cell2dof.shape[0], dtype=np.bool)
+            mask = np.zeros(cell2dof.shape[0], dtype=np.bool_)
             idx = cell2dofLocation[0:-1].reshape(-1, 1) + p*NV + np.arange(1:p
             mask[cell2dofLocation[
 

@@ -472,7 +472,7 @@ class DartMesh3d():
                     else:
                         val1 = val
 
-                    if val1.dtype == np.bool:
+                    if val1.dtype == np.bool_:
                         d = vnp.numpy_to_vtk(val1.astype(np.int_))
                     else:
                         d = vnp.numpy_to_vtk(val1[:])
@@ -491,7 +491,7 @@ class DartMesh3d():
                     else:
                         val1 = val
 
-                    if val1.dtype == np.bool:
+                    if val1.dtype == np.bool_:
                         d = vnp.numpy_to_vtk(val1.astype(np.int_))
                     else:
                         d = vnp.numpy_to_vtk(val1[:])

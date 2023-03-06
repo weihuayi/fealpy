@@ -43,18 +43,18 @@ class AMGSolver():
         Ass = (As + As.T)/2 # 无向图的对称矩阵
 
         # 把孤立点放到 F 集合
-        isF = np.zeros(N, dtype=np.bool) # 细点
+        isF = np.zeros(N, dtype=np.bool_) # 细点
         dgIn = np.asarray(As.sum(axis=1)).reshape(-1) # 接入强联接顶点的数目
         isF[digIn == 0] = True # 孤立点是细点
 
         # 发现一个逼近的极大独立集做为粗点
-        isC = np.zeros(N, dtype=np.bool) # C: coarse node
+        isC = np.zeros(N, dtype=np.bool_) # C: coarse node
         U = np.arange(N)                 # U: undecided node 
         degFin = np.zeros(N, dtype=np.int) # number of F nodes strong connected to
 
         while isC.sum() < N/2 and U.shape[0] > 20:
             # S: selected set, changing in the coarsening
-            isS = np.zeros(N, dtype=np.bool)
+            isS = np.zeros(N, dtype=np.bool_)
             degInAll = digIn + degFin
             flag = (np.randdom.rand(N) < 0.85*degInAll/degInAll.mean()) & \
                     (degInAll > 0)
