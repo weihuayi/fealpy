@@ -75,6 +75,23 @@ class TriangleMesh(Mesh2d):
         entity = self.entity(etype=TD)[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
+    
+    def point_to_bc(self, point):
+        i_cell = self.location(point)
+        node = self.node
+        cell = self.entity('cell')
+        i_cellmeasure = self.cell_area()[i_cell]
+        i_cell = node[cell[i_cell]]
+        point = point[:,np.newaxis, :]
+        v = i_cell - point
+        area0 = 0.5* np.abs(np.cross(v[:, 1, :], v[:, 2, :]))
+        area1 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 2, :]))
+        area2 = 0.5* np.abs(np.cross(v[:, 0, :], v[:, 1, :]))
+        result = np.zeros((i_cell.shape[0], 3))
+        result[:, 0] = area0/i_cellmeasure
+        result[:, 1] = area1/i_cellmeasure
+        result[:, 2] = area2/i_cellmeasure
+        return result
 
     def edge_bc_to_point(self, bc, index=np.s_[:]):
         """
