@@ -1382,7 +1382,7 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
 
         # 可以移除的网格节点
-        isRNode = np.ones(NN, dtype=np.bool)
+        isRNode = np.ones(NN, dtype=np.bool_)
         flag = (hlevel == hlevel[halfedge[:, 4]])
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
         flag = (clevel[halfedge[:, 1]]>0)
@@ -1509,7 +1509,7 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
 
         # 可以移除的网格节点
-        isRNode = np.ones(NN, dtype=np.bool)
+        isRNode = np.ones(NN, dtype=np.bool_)
         flag = (hlevel == hlevel[halfedge[:, 4]])
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
         flag = (clevel[halfedge[:, 1]]>0)
@@ -2042,10 +2042,10 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()
-        flag = np.zeros(NC, dtype=np.bool)
+        flag = np.zeros(NC, dtype=np.bool_)
         flag[idx] = True
         nc = self.number_of_all_cells()
-        isMarkedCell = np.zeros(nc, dtype=np.bool)
+        isMarkedCell = np.zeros(nc, dtype=np.bool_)
         isMarkedCell[self.ds.cellstart:] = flag
         return isMarkedCell
 
@@ -2662,7 +2662,7 @@ class HalfEdgeMesh2dDataStructure():
         halfedge = self.halfedge
         I = halfedge[:, 0] 
         J = halfedge[halfedge[:, 4], 0] 
-        val = np.ones(2*NE, dtype=np.bool)
+        val = np.ones(2*NE, dtype=np.bool_)
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
@@ -2764,7 +2764,7 @@ class HalfEdgeMesh2dDataStructure():
         subdomain = self.subdomain # DynamicArray
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
-        isBdNode = np.zeros(NN, dtype=np.bool)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[halfedge[isBdHEdge, 0]] = True 
         return isBdNode
 
@@ -2796,7 +2796,7 @@ class HalfEdgeMesh2dDataStructure():
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
 
-        isBdCell = np.zeros(NC, dtype=np.bool)
+        isBdCell = np.zeros(NC, dtype=np.bool_)
         idx = halfedge[isBdHEdge, 1] - cstart
         isBdCell[idx] = True
         return isBdCell
@@ -2817,7 +2817,7 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
-        isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
+        isMainHEdge = np.zeros(2*self.NE, dtype=np.bool_)
         isMainHEdge[self.hedge[:]] = True
         return isMainHEdge
 

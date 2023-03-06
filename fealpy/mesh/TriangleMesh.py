@@ -623,7 +623,7 @@ class TriangleMesh(Mesh2d):
         _, loc = tree.query(points)
         start = start[loc] # 设置一个初始单元位置
 
-        isNotOK = np.ones(NP, dtype=np.bool)
+        isNotOK = np.ones(NP, dtype=np.bool_)
         while np.any(isNotOK):
             idx = start[isNotOK]
             pp = points[isNotOK]
@@ -777,7 +777,7 @@ class TriangleMesh(Mesh2d):
             print('Current number of cells:', NC)
 
         if isMarkedCell is None:
-            isMarkedCell = np.ones(NC, dtype=np.bool)
+            isMarkedCell = np.ones(NC, dtype=np.bool_)
 
         cell = self.entity('cell')
         edge = self.entity('edge')
@@ -785,7 +785,7 @@ class TriangleMesh(Mesh2d):
         cell2edge = self.ds.cell_to_edge()
         cell2cell = self.ds.cell_to_cell()
 
-        isCutEdge = np.zeros((NE,), dtype=np.bool)
+        isCutEdge = np.zeros((NE,), dtype=np.bool_)
 
         if options['disp']:
             print('The initial number of marked elements:', isMarkedCell.sum())
@@ -1172,7 +1172,7 @@ class TriangleMesh(Mesh2d):
         # 当前的二分边的数目
         nCut = 0
         # 非协调边的标记数组 
-        nonConforming = np.ones(4*NN, dtype=np.bool)
+        nonConforming = np.ones(4*NN, dtype=np.bool_)
         while len(markedCell) != 0:
             # 标记最长边
             self.label(node, cell, markedCell)
@@ -1194,7 +1194,7 @@ class TriangleMesh(Mesh2d):
                 NE = len(ncEdge)
                 I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
-                val = np.ones(len(I), dtype=np.bool)
+                val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
@@ -1209,7 +1209,7 @@ class TriangleMesh(Mesh2d):
                 cellCutEdge.sort(axis=0)
                 s = csr_matrix(
                     (
-                        np.ones(NE, dtype=np.bool),
+                        np.ones(NE, dtype=np.bool_),
                         (
                             cellCutEdge[0, :],
                             cellCutEdge[1, :]
@@ -1229,7 +1229,7 @@ class TriangleMesh(Mesh2d):
                 # 新点和旧点的邻接矩阵 
                 I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
-                val = np.ones(len(I), dtype=np.bool)
+                val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
@@ -1259,7 +1259,7 @@ class TriangleMesh(Mesh2d):
 
             # 找到非协调的单元 
             checkEdge, = np.nonzero(nonConforming[:nCut])
-            isCheckNode = np.zeros(NN, dtype=np.bool)
+            isCheckNode = np.zeros(NN, dtype=np.bool_)
             isCheckNode[cutEdge[checkEdge]] = True
             isCheckCell = np.sum(
                     isCheckNode[cell[:NC]],
@@ -1268,7 +1268,7 @@ class TriangleMesh(Mesh2d):
             checkCell, = np.nonzero(isCheckCell)
             I = np.repeat(checkCell, 3)
             J = cell[checkCell].reshape(-1)
-            val = np.ones(len(I), dtype=np.bool)
+            val = np.ones(len(I), dtype=np.bool_)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j = np.nonzero(
                     cell2node[:, cutEdge[checkEdge, 0]].multiply(
@@ -1675,7 +1675,7 @@ class TriangleMeshWithInfinityNode:
         NE = self.number_of_edges()
         cell2edge = self.ds.cell_to_edge()
         isInfCell = self.is_infinity_cell()
-        isBdEdge = np.zeros(NE, dtype=np.bool)
+        isBdEdge = np.zeros(NE, dtype=np.bool_)
         isBdEdge[cell2edge[isInfCell, 0]] = True
         return isBdEdge
 
@@ -1683,7 +1683,7 @@ class TriangleMeshWithInfinityNode:
         N = self.number_of_nodes()
         edge = self.ds.edge
         isBdEdge = self.is_boundary_edge()
-        isBdNode = np.zeros(N, dtype=np.bool)
+        isBdNode = np.zeros(N, dtype=np.bool_)
         isBdNode[edge[isBdEdge, :]] = True
         return isBdNode
 

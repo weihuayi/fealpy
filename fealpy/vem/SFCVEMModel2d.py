@@ -289,7 +289,7 @@ class SFCVEMModel2d():
         edge2dof = edge2dof[isContactEdge]
 
         gdof = space.number_of_global_dofs()
-        isContactDof = np.zeros(gdof, dtype=np.bool)
+        isContactDof = np.zeros(gdof, dtype=np.bool_)
         isContactDof[edge2dof] = True
 
         bc = DirichletBC(self.space, self.pde.dirichlet,

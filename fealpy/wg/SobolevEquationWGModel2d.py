@@ -146,7 +146,7 @@ class SobolevEquationWGModel2d:
         dirichlet = lambda x: self.pde.dirichlet(x, t1)
         isDDof = self.space.set_dirichlet_bc(uh, dirichlet)
         gdof = self.space.number_of_global_dofs()
-        flag = np.zeros(gdof, dtype=np.bool)
+        flag = np.zeros(gdof, dtype=np.bool_)
         isDDof = np.r_[flag, flag, isDDof]
 
         x = np.zeros(3*gdof, dtype=self.space.ftype)

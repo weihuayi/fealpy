@@ -42,7 +42,7 @@ class LagrangeFiniteElementSpace3d:
         cellIdx = self.cellIdx
         ldof = self.number_of_local_dofs()
         localEdge = self.mesh.ds.localEdge
-        isEdgeDof = np.zeros((ldof, 6), dtype=np.bool)
+        isEdgeDof = np.zeros((ldof, 6), dtype=np.bool_)
         for i in range(6):
             isEdgeDof[i,:] = (cellIdx[localEdge[-(i+1),0],:] == 0) & (cellIdx[localEdge[-(i+1),1],:] == 0 )
         return isEdgeDof

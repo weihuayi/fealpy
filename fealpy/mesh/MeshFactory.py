@@ -369,7 +369,7 @@ def special_boxmesh2d(box, n=10,
     NE = qmesh.number_of_edges()
     NC = qmesh.number_of_cells()
     if meshtype == 'fishbone':
-        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell = np.zeros((n, n), dtype=np.bool_)
         isLeftCell[0::2, :] = True
         isLeftCell = isLeftCell.reshape(-1)
         lcell = cell[isLeftCell]
@@ -398,7 +398,7 @@ def special_boxmesh2d(box, n=10,
         newCell[3*NC:4*NC, 1:3] = cell[:, [3, 0]] 
         return TriangleMesh(newNode, newCell)
     elif meshtype == 'rice':
-        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell = np.zeros((n, n), dtype=np.bool_)
         isLeftCell[0, 0::2] = True
         isLeftCell[1, 1::2] = True
         if n > 2:

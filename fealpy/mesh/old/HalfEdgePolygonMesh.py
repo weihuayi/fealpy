@@ -325,7 +325,7 @@ class HalfEdgePolygonMesh(Mesh2d):
 
         halfedge = np.r_['0', halfedge, halfedge1]
 
-        flag = np.zeros(NC+NHE+1, dtype=np.bool)
+        flag = np.zeros(NC+NHE+1, dtype=np.bool_)
         np.add.at(flag, halfedge[:, 1], True)
         idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
         NC = flag.sum()
@@ -436,7 +436,7 @@ class HalfEdgePolygonMesh(Mesh2d):
 
         halfedge = np.r_['0', halfedge, halfedge2]
 
-        flag = np.zeros(NC+NHE+1, dtype=np.bool)
+        flag = np.zeros(NC+NHE+1, dtype=np.bool_)
         np.add.at(flag, halfedge[:, 1], True)
         idxmap = np.zeros(NC+NHE+1, dtype=self.itype)
         NC = flag.sum()
@@ -449,7 +449,7 @@ class HalfEdgePolygonMesh(Mesh2d):
 
     def refine_marker(self, eta, theta, method="L2"):
         NC = self.number_of_cells()
-        isMarkedCell = np.zeros(NC+1, dtype=np.bool)
+        isMarkedCell = np.zeros(NC+1, dtype=np.bool_)
         isMarkedCell[:-1] = mark(eta, theta, method=method)
         return isMarkedCell
 
@@ -517,10 +517,10 @@ class HalfEdgePolygonMeshDataStructure():
         isInHEdge = (halfedge[:, 1] != NC)
 
         if sparse:
-            val = np.ones(isInHEdge.sum(), dtype=np.bool)
+            val = np.ones(isInHEdge.sum(), dtype=np.bool_)
             I = halfedge[isInHEdge, 1]
             J = halfedge[isInHEdge, 0]
-            cell2node = csr_matrix((val, (I.flat, J.flat)), shape=(NC, NN), dtype=np.bool)
+            cell2node = csr_matrix((val, (I.flat, J.flat)), shape=(NC, NN), dtype=np.bool_)
             return cell2node
         else:
             NV = self.number_of_vertices_of_cells()
@@ -552,9 +552,9 @@ class HalfEdgePolygonMeshDataStructure():
         J[halfedge[isMainHEdge, 4]] = range(NE)
         if sparse:
             isInHEdge = (halfedge[:, 1] != NC)
-            val = np.ones(2*NE, dtype=np.bool)
+            val = np.ones(2*NE, dtype=np.bool_)
             cell2edge = csr_matrix((val[isInHEdge], (halfedge[isInHEdge, 1],
-                J[isInHEdge])), shape=(NC, NE), dtype=np.bool)
+                J[isInHEdge])), shape=(NC, NE), dtype=np.bool_)
             return cell2edge
         else:
             NV = self.number_of_vertices_of_cells()
@@ -581,11 +581,11 @@ class HalfEdgePolygonMeshDataStructure():
         NC = self.NC
         halfedge = self.halfedge
         isInHEdge = (halfedge[:, 1] != NC)
-        val = np.ones(isInHEdge.sum(), dtype=np.bool)
+        val = np.ones(isInHEdge.sum(), dtype=np.bool_)
         I = halfedge[isInHEdge, 1]
         J = halfedge[halfedge[isInHEdge, 4], 1]
-        cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool)
-        cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool)
+        cell2cell = coo_matrix((val, (I, J)), shape=(NC, NC), dtype=np.bool_)
+        cell2cell+= coo_matrix((val, (J, I)), shape=(NC, NC), dtype=np.bool_)
         return cell2cell.tocsr()
 
     def edge_to_node(self, sparse=False):
@@ -599,9 +599,9 @@ class HalfEdgePolygonMeshDataStructure():
             edge[:, 1] = halfedge[isMainHEdge, 0]
             return edge
         else:
-            val = np.ones((NE,), dtype=np.bool)
-            edge2node = coo_matrix((val, (range(NE), halfedge[isMainHEdge,0])), shape=(NE, NN), dtype=np.bool)
-            edge2node+= coo_matrix((val, (range(NE), halfedge[halfedge[isMainHEdge, 4], 0])), shape=(NE, NN), dtype=np.bool)
+            val = np.ones((NE,), dtype=np.bool_)
+            edge2node = coo_matrix((val, (range(NE), halfedge[isMainHEdge,0])), shape=(NE, NN), dtype=np.bool_)
+            edge2node+= coo_matrix((val, (range(NE), halfedge[halfedge[isMainHEdge, 4], 0])), shape=(NE, NN), dtype=np.bool_)
             return edge2node.tocsr()
 
     def edge_to_edge(self):
@@ -619,8 +619,8 @@ class HalfEdgePolygonMeshDataStructure():
         J[halfedge[isMainHEdge, 4]] = range(NE)
         if sparse:
             isInHEdge = (halfedge[:, 1] != NC)
-            val = np.ones(2*NE, dtype=np.bool)
-            edge2cell = csr_matrix((val[isInHEdge], (J[isInHEdge], halfedge[isInHEdge, 1])), shape=(NE, NC), dtype=np.bool)
+            val = np.ones(2*NE, dtype=np.bool_)
+            edge2cell = csr_matrix((val[isInHEdge], (J[isInHEdge], halfedge[isInHEdge, 1])), shape=(NE, NC), dtype=np.bool_)
             return edge2cell
         else:
             edge2cell = np.zeros((NE, 4), dtype=self.itype)
@@ -630,7 +630,7 @@ class HalfEdgePolygonMeshDataStructure():
             current = halfedge[self.cell2hedge[:-1], 2] # 下一个边
             end = current.copy()
             lidx = np.zeros_like(current)
-            isNotOK = np.ones_like(current, dtype=np.bool)
+            isNotOK = np.ones_like(current, dtype=np.bool_)
             while np.any(isNotOK):
                 idx = J[current[isNotOK]]
                 flag = (halfedge[current[isNotOK], 5] == 1)
@@ -652,8 +652,8 @@ class HalfEdgePolygonMeshDataStructure():
         edge = self.edge_to_node()
         I = edge[:, 0:2].flat
         J = edge[:, 1::-1].flat
-        val = np.ones(2*NE, dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool)
+        val = np.ones(2*NE, dtype=np.bool_)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
     def node_to_cell(self, sparse=True):
@@ -664,10 +664,10 @@ class HalfEdgePolygonMeshDataStructure():
         halfedge = self.halfedge
 
         isInHEdge = (halfedge[:, 1] != NC)
-        val = np.ones(isInHEdge.sum(), dtype=np.bool)
+        val = np.ones(isInHEdge.sum(), dtype=np.bool_)
         I = halfedge[isInHEdge, 0]
         J = halfedge[isInHEdge, 1]
-        node2cell = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NC), dtype=np.bool)
+        node2cell = csr_matrix((val, (I.flat, J.flat)), shape=(NN, NC), dtype=np.bool_)
         return node2cell
 
 
@@ -675,7 +675,7 @@ class HalfEdgePolygonMeshDataStructure():
         NN = self.NN
         edge = self.edge_to_node()
         isBdEdge = self.boundary_edge_flag()
-        isBdNode = np.zeros(NN, dtype=np.bool)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[edge[isBdEdge,:]] = True
         return isBdNode
 
@@ -692,7 +692,7 @@ class HalfEdgePolygonMeshDataStructure():
         NC = self.NC
         edge2cell = self.edge_to_cell()
         isBdEdge = edge2cell[:, 0] == edge2cell[:, 1]
-        isBdCell = np.zeros(NC, dtype=np.bool)
+        isBdCell = np.zeros(NC, dtype=np.bool_)
         isBdCell[edge2cell[isBdEdge, 0:2]] = True
         return isBdCell
 

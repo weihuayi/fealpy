@@ -49,7 +49,7 @@ class AdaptiveMarker():
             valueSign[np.abs(value) < 1e-12] = 0
 
             isLeafCell = qtmesh.is_leaf_cell()
-            isBranchCell = np.zeros(NC, dtype=np.bool)
+            isBranchCell = np.zeros(NC, dtype=np.bool_)
             isBranchCell[parent[isLeafCell, 0]] = True 
 
             branchCell = cell[isBranchCell, :]

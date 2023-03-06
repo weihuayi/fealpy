@@ -603,7 +603,7 @@ class CLagrangeWedgeDof3d():
 
         gdof = self.number_of_global_dofs()
         tface2dof = self.tri_face_to_dof()
-        istBdDof = np.zeros(gdof, dtype=np.bool)
+        istBdDof = np.zeros(gdof, dtype=np.bool_)
         istBdDof[tface2dof[index]] = True
         return istBdDof
 
@@ -620,7 +620,7 @@ class CLagrangeWedgeDof3d():
 
         gdof = self.number_of_global_dofs()
         qface2dof = self.quad_face_to_dof()
-        isqBdDof = np.zeros(gdof, dtype=np.bool)
+        isqBdDof = np.zeros(gdof, dtype=np.bool_)
         isqBdDof[qface2dof[index]] = True
         return isqBdDof
 

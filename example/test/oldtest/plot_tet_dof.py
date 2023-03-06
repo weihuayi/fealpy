@@ -46,7 +46,7 @@ idx = np.cumsum(np.cumsum(idx))
 d = Delaunay(ipoints)
 mesh2 = TetrahedronMesh(ipoints, d.simplices)
 face = mesh2.ds.face
-isFace = np.zeros(len(face), dtype=np.bool)
+isFace = np.zeros(len(face), dtype=np.bool_)
 for i in range(len(idx)-1):
     flag = np.sum((face >= idx[i]) & (face < idx[i+1]), axis=-1) == 3
     isFace[flag] = True
