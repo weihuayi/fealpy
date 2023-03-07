@@ -282,13 +282,13 @@ class StructureIntervalMeshDataStructure():
 
     def boundary_node_flag(self):
         NN = self.NN
-        isBdNode = np.zeros(NN, dtype=np.bool)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[[0, -1]] = True
         return isBdNode
 
     def boundary_cell_flag(self):
         NC = self.NC
-        isBdCell = np.zeros((NC,), dtype=np.bool)
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdCell[[0, -1]] = True
         return isBdCell
 

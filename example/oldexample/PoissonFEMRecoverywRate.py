@@ -25,7 +25,7 @@ class Meshtype():
         node = qmesh.entity('node')
         cell = qmesh.entity('cell')
         NC = qmesh.number_of_cells()
-        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell = np.zeros((n, n), dtype=np.bool_)
         isLeftCell[0::2, :] = True
         isLeftCell = isLeftCell.reshape(-1)
         lcell = cell[isLeftCell]
@@ -67,7 +67,7 @@ class Meshtype():
         cell = qmesh.entity('cell')
         NC = qmesh.number_of_cells()
 
-        isLeftCell = np.zeros((n, n), dtype=np.bool)
+        isLeftCell = np.zeros((n, n), dtype=np.bool_)
         isLeftCell[0, 0::2] = True
         isLeftCell[1, 1::2] = True
         if n > 2:

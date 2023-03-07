@@ -241,17 +241,17 @@ class Quadtree(QuadrangleMesh):
             isLeafCell = self.is_leaf_cell()
 
             # Construct
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell = np.zeros(NC, dtype=np.bool_)
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
             # Find the cutted edge
             cell2edge = self.ds.cell_to_edge()
 
-            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge = np.zeros(NE, dtype=np.bool_)
             isCutEdge[cell2edge[isNeedCutCell, :]] = True
 
-            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge = np.zeros(NE, dtype=np.bool_)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
             isCuttedEdge = isCuttedEdge & isCutEdge
 
@@ -340,7 +340,7 @@ class Quadtree(QuadrangleMesh):
         child = self.child
 
         isLeafCell = self.is_leaf_cell()
-        isBranchCell = np.zeros(NC, dtype=np.bool)
+        isBranchCell = np.zeros(NC, dtype=np.bool_)
         isBranchCell[parent[isLeafCell & (~isRootCell), 0]] = True
 
         idx, = np.nonzero(isBranchCell)
@@ -356,10 +356,10 @@ class Quadtree(QuadrangleMesh):
                         options['numrefine'][child[idx]], axis=-1
                     ) + 1
 
-            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell = np.ones(NC, dtype=np.bool_)
             isRemainCell[child[idx, :]] = False
 
-            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode = np.zeros(NN, dtype=np.bool_)
             isRemainNode[cell[isRemainCell, :]] = True
 
             NNC = isRemainCell.sum()
@@ -439,7 +439,7 @@ class Quadtree(QuadrangleMesh):
         leafCellIdx = self.leaf_cell_index()
         NC = self.number_of_cells()
         isMarked = mark(eta, theta, method=method)
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
 
@@ -465,17 +465,17 @@ class Quadtree(QuadrangleMesh):
             isLeafCell = self.is_leaf_cell()
 
             # Construct
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell = np.zeros(NC, dtype=np.bool_)
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
             # Find the cutted edge
             cell2edge = self.ds.cell_to_edge()
 
-            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge = np.zeros(NE, dtype=np.bool_)
             isCutEdge[cell2edge[isNeedCutCell, :]] = True
 
-            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge = np.zeros(NE, dtype=np.bool_)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
             isCuttedEdge = isCuttedEdge & isCutEdge
 
@@ -571,7 +571,7 @@ class Quadtree(QuadrangleMesh):
         leafCellIdx = self.leaf_cell_index()
         isMarked = mark(eta, beta, method="COARSEN")
         NC = self.number_of_cells()
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
 
@@ -589,7 +589,7 @@ class Quadtree(QuadrangleMesh):
         child = self.child
 
         isLeafCell = self.is_leaf_cell()
-        isBranchCell = np.zeros(NC, dtype=np.bool)
+        isBranchCell = np.zeros(NC, dtype=np.bool_)
         isBranchCell[parent[isLeafCell & (~isRootCell), 0]] = True
 
         idx, = np.nonzero(isBranchCell)
@@ -602,10 +602,10 @@ class Quadtree(QuadrangleMesh):
             node = self.node
             cell = self.ds.cell
 
-            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell = np.ones(NC, dtype=np.bool_)
             isRemainCell[child[idx, :]] = False
 
-            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode = np.zeros(NN, dtype=np.bool_)
             isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
@@ -735,16 +735,16 @@ class Quadtree(QuadrangleMesh):
             pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
 
             PNE = pedge.shape[0]
-            val = np.ones(PNE, dtype=np.bool)
+            val = np.ones(PNE, dtype=np.bool_)
             p2pe = coo_matrix(
                     (val, (pedge[:,0], range(PNE))),
-                    shape=(N, PNE), dtype=np.bool)
+                    shape=(N, PNE), dtype=np.bool_)
             p2pe += coo_matrix(
                     (val, (pedge[:,1], range(PNE))),
-                    shape=(N, PNE), dtype=np.bool)
+                    shape=(N, PNE), dtype=np.bool_)
             p2pe = p2pe.tocsr()
             NES = np.asarray(p2pe.sum(axis=1)).reshape(-1) 
-            isPast = np.zeros(PNE, dtype=np.bool)
+            isPast = np.zeros(PNE, dtype=np.bool_)
             for i in range(4):
                 currentIdx = cornerLocation[:, i]
                 endIdx = cornerLocation[:, i+1]

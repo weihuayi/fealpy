@@ -376,8 +376,8 @@ class IntervalMeshDataStructure():
         cell = self.cell
         I = cell.flatten()
         J = cell[:,[1,0]].flatten()
-        val = np.ones((2*NC,), dtype=np.bool)
-        node2node = csr_matrix((val, (I, J)), shape=(NN, NN),dtype=np.bool)
+        val = np.ones((2*NC,), dtype=np.bool_)
+        node2node = csr_matrix((val, (I, J)), shape=(NN, NN),dtype=np.bool_)
         return node2node
 
     def boundary_node_flag(self):
@@ -387,7 +387,7 @@ class IntervalMeshDataStructure():
     def boundary_cell_flag(self):
         NC = self.NC
         node2cell = self.node2cell
-        isBdCell = np.zeros((NC,), dtype=np.bool)
+        isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdNode = self.boundary_node_flag()
         isBdCell[node2cell[isBdNode, 0]] = True
         return isBdCell 

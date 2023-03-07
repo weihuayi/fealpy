@@ -194,7 +194,7 @@ class ObstacleVEMModel2d():
     def get_non_active_flag(self):
         p = self.vemspace.p
         gdof = self.vemspace.number_of_global_dofs()
-        flag = np.ones(gdof, dtype=np.bool)
+        flag = np.ones(gdof, dtype=np.bool_)
         NC = self.mesh.number_of_cells()
         if p > 1:
             flag[:-NC] = False

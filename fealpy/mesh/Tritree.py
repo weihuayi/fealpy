@@ -209,7 +209,7 @@ class Tritree(TriangleMesh):
         NC = self.number_of_cells()
         if isMarkedCell is None:
             idx = self.leaf_cell_index()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
             isMarkedCell[idx] = True
 
         if sum(isMarkedCell) > 0:
@@ -256,7 +256,7 @@ class Tritree(TriangleMesh):
                 flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
 
             cell2edge = self.ds.cell_to_edge()
-            refineFlag = np.zeros(NE, dtype=np.bool)
+            refineFlag = np.zeros(NE, dtype=np.bool_)
             refineFlag[cell2edge[isMarkedCell]] = True
             refineFlag[flag0 | flag1] = False
 
@@ -347,7 +347,7 @@ class Tritree(TriangleMesh):
         NC = self.number_of_cells()
         if isMarkedCell is None:
             idx = self.leaf_cell_index()
-            isMarkedCell = np.zeros(NC, dtype=np.bool)
+            isMarkedCell = np.zeros(NC, dtype=np.bool_)
             isMarkedCell[idx] = True
 
         if sum(isMarkedCell) > 0:
@@ -365,10 +365,10 @@ class Tritree(TriangleMesh):
             isMarkedCell[isRootCell] = False
 
             """
-            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool_)
             isMarkedParentCell[parent[isMarkedCell, 0]] = True
             """
-            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool_)
             flag = isNotLeafCell & isLeafCell[child[:,0]]
             idx, = np.nonzero(flag)
             np.logical_and.at(isMarkedParentCell, idx, isMarkedCell[child[flag, 0]])
@@ -384,10 +384,10 @@ class Tritree(TriangleMesh):
                     isMarkedParentCell[flag] = False
                 else:
                     break
-            isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
+            isNeedRemovedCell = np.zeros(NC, dtype=np.bool_)
             isNeedRemovedCell[child[isMarkedParentCell, :]] = True
 
-            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode = np.zeros(NN, dtype=np.bool_)
             isRemainNode[cell[~isNeedRemovedCell, :]] = True
 
             if ('numrefine' in options) and (options['numrefine'] is not None):
@@ -497,7 +497,7 @@ class Tritree(TriangleMesh):
         cell21[N1:2*N1, 1] = cell[RCell, edge2cell[flag1, 3]]
         cell21[N1:2*N1, 2] = cell[self.child[edge2cell[flag1, 0], 3], edge2cell[flag1, 2]]
 
-        isLRCell = np.zeros(NC, dtype=np.bool)
+        isLRCell = np.zeros(NC, dtype=np.bool_)
         isLRCell[LCell] = True
         isLRCell[RCell] = True
 
@@ -623,7 +623,7 @@ class Tritree(TriangleMesh):
             eta = eta0[leafCellIdx]
 
         isMarked = mark(eta, theta, method)
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell
 
@@ -673,7 +673,7 @@ class Tritree(TriangleMesh):
                 flag3 = ((~isMarkedCell[RCell]) & isLeafCell[RCell]) & (isMarkedCell[idx1[:, 0]] | isMarkedCell[idx1[:, 1]])
 
             cell2edge = self.ds.cell_to_edge()
-            refineFlag = np.zeros(NE, dtype=np.bool)
+            refineFlag = np.zeros(NE, dtype=np.bool_)
             refineFlag[cell2edge[isMarkedCell]] = True
             refineFlag[flag0 | flag1] = False
 
@@ -775,7 +775,7 @@ class Tritree(TriangleMesh):
         else:
             eta0 = eta
         isMarked = mark(eta0[leafCellIdx], beta, method)
-        isMarkedCell = np.zeros(NC, dtype=np.bool)
+        isMarkedCell = np.zeros(NC, dtype=np.bool_)
         isMarkedCell[leafCellIdx[isMarked]] = True
         return isMarkedCell 
 
@@ -796,7 +796,7 @@ class Tritree(TriangleMesh):
 
             isMarkedCell[isRootCell] = False
 
-            isMarkedParentCell = np.zeros(NC, dtype=np.bool)
+            isMarkedParentCell = np.zeros(NC, dtype=np.bool_)
             isMarkedParentCell[parent[isMarkedCell, 0]] = True
 
             cell2cell = self.ds.cell_to_cell()
@@ -808,10 +808,10 @@ class Tritree(TriangleMesh):
                 else:
                     break
 
-            isNeedRemovedCell = np.zeros(NC, dtype=np.bool)
+            isNeedRemovedCell = np.zeros(NC, dtype=np.bool_)
             isNeedRemovedCell[child[isMarkedParentCell, :]] = True
 
-            isRemainNode = np.zeros(NN, dtype=np.bool)
+            isRemainNode = np.zeros(NN, dtype=np.bool_)
             isRemainNode[cell[~isNeedRemovedCell, :]] = True
 
             cell = cell[~isNeedRemovedCell]

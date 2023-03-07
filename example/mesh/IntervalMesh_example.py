@@ -45,7 +45,7 @@ print('cell length:', length)
 print('cell barycenter:', bc)
 
 
-#isMarkedCell = np.zeros((NC, ), dtype=np.bool)
+#isMarkedCell = np.zeros((NC, ), dtype=np.bool_)
 #isMarkedCell[0] = True
 #mesh.refine(isMarkedCell)
 

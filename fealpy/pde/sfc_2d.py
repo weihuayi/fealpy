@@ -118,7 +118,7 @@ class SFCModelData1:
         return np.zeros(p.shape[0:-1])
 
     def is_dirichlet(self, p):
-        return np.zeros(p.shape[0:-1], dtype=np.bool)
+        return np.zeros(p.shape[0:-1], dtype=np.bool_)
 
     def is_contact(self, p):
         eps = 1e-14
@@ -195,7 +195,7 @@ class SFCModelData2:
 
     def is_dirichlet(self, p):
         shape = p.shape[:-1]
-        flag = np.zeros(shape, dtype=np.bool)
+        flag = np.zeros(shape, dtype=np.bool_)
         # flag[0] = True
         return flag
 

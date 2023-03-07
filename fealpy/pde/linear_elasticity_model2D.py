@@ -226,7 +226,7 @@ class GenLinearElasticitymodel2D():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x0 = p[..., 0]
         x1 = p[..., 1]
         if self.is_neumannbd_nn is not None:
@@ -239,7 +239,7 @@ class GenLinearElasticitymodel2D():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x0 = p[...,0]
         x1 = p[...,1]
         if self.is_dirichletbd_n is not None:
@@ -357,7 +357,7 @@ class DisplacementTestmodel():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (2,) + p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_dirichlet_idx[0] = (((y==0)|(y==1))|((x==0)|(x==1)))
@@ -367,7 +367,7 @@ class DisplacementTestmodel():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_neumannbd_idx[1] = ((x==0)|((y==0)|(y==1)))
@@ -467,7 +467,7 @@ class StressTestmodel():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (2,) + p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_dirichlet_idx[0] = (x==1)
@@ -477,7 +477,7 @@ class StressTestmodel():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_neumannbd_idx[0] = ((x==0)|((y==0)|(y==1)))
@@ -571,7 +571,7 @@ class StressTestmodel1():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (2,) + p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_dirichlet_idx[0] = (y==1)
@@ -581,7 +581,7 @@ class StressTestmodel1():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_neumannbd_idx[0] = ((y==0)|((x==0)|(x==1)))
@@ -652,7 +652,7 @@ class Stress_concentrationTestmodel():
     @cartesian
     def is_dirichlet_boundary(self, p):
         shape = (2,) + p.shape[:-1]
-        is_dirichlet_idx = np.zeros(shape,dtype = np.bool)
+        is_dirichlet_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_dirichlet_idx[0] = ((y==0)|((y==1)&((x>0.4)&(x<0.6))))
@@ -663,7 +663,7 @@ class Stress_concentrationTestmodel():
     @cartesian
     def is_neumann_boundary(self, p):
         shape = (2,)+p.shape[:-1]
-        is_neumannbd_idx = np.zeros(shape,dtype = np.bool)
+        is_neumannbd_idx = np.zeros(shape,dtype = np.bool_)
         x = p[...,0]
         y = p[...,1]
         is_neumannbd_idx[0] = (((y==1)&((x>=0.6)|(x<=0.4)))|((x==0)|(x==1)))

@@ -23,7 +23,7 @@ class NCVEMDof2d():
             flag = threshold(bc)
             idx  = idx[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdDof[edge2dof[idx]] = True
         return isBdDof
