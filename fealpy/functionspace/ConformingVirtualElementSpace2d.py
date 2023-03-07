@@ -18,7 +18,7 @@ class CVEMDof2d():
     def boundary_dof(self, threshold=None):
         idx = self.mesh.ds.boundary_edge_index()
         if threshold is not None:
-            bc = self.mesh.entity_barycenter('edge', index=idx)
+            bc = self.mesh.entity_barycenter('edge')[idx]
             flag = threshold(bc)
             idx  = idx[flag]
         gdof = self.number_of_global_dofs()
@@ -649,7 +649,7 @@ class ConformingVirtualElementSpace2d():
         end = NN + (p - 1)*NE
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = gD(ipoints[isDDof[:end]])
+        uh[isDDof] = gD(ipoints[isDDof[:end]])[:, None]
         return isDDof
 
     def interpolation(self, u, HB=None):

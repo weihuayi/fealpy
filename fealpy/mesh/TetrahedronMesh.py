@@ -992,4 +992,29 @@ class TetrahedronMesh(Mesh3d):
         print("Face2cell:\n", self.ds.face2cell)
         print("Cell2face:\n", self.ds.cell_to_face())
 
+    def print_cformat(self):
+        def print_cpp_array(arr):
+            print("int arr[{}][{}] = {{".format(arr.shape[0], arr.shape[1]))
+            for i in range(arr.shape[0]):
+                if(i%4==3):
+                    print("{" + ", ".join(str(x) for x in arr[i]) + "},", end='\n')
+                elif(i%4==0):
+                    print("    {" + ", ".join(str(x) for x in arr[i]) + "},", end='')
+                else:
+                    print("{" + ", ".join(str(x) for x in arr[i]) + "},", end='')
+            print("};")
+
+        print("Node:")
+        print_cpp_array(self.node)
+        print("Cell:")
+        print_cpp_array(self.ds.cell)
+        print("Edge:")
+        print_cpp_array(self.ds.edge)
+        print("Face:")
+        print_cpp_array(self.ds.face)
+        print("Face2cell:")
+        print_cpp_array(self.ds.face2cell)
+        print("Cell2face:")
+        print_cpp_array(self.ds.cell_to_face())
+
 

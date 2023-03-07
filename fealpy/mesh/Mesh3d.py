@@ -224,10 +224,18 @@ class Mesh3dDataStructure():
                 return_inverse=True,
                 axis=0)
 
-        self.face = totalFace[i0]
-
         NF = i0.shape[0]
         self.NF = NF
+        ########## 以下代码用于测试 openfinite 中的代码，可以删除 ########
+        idx = np.argsort(i0)
+        idx_inverse = np.zeros_like(idx)
+        idx_inverse[idx] = np.arange(len(idx))
+        i0 = i0[idx]
+        j = idx_inverse[j]
+        ##################################################################
+
+        self.face = totalFace[i0]
+
 
         self.face2cell = np.zeros((NF, 4), dtype=self.itype)
 
@@ -241,11 +249,21 @@ class Mesh3dDataStructure():
         self.face2cell[:, 3] = i1 % NFC
 
         totalEdge = self.total_edge()
-        self.edge, i2, j = np.unique(
+        _, i2, j = np.unique(
                 np.sort(totalEdge, axis=1),
                 return_index=True,
                 return_inverse=True,
                 axis=0)
+
+        ########## 以下代码用于测试 openfinite 中的代码，可以删除 ########
+        idx = np.argsort(i2)
+        idx_inverse = np.zeros_like(idx)
+        idx_inverse[idx] = np.arange(len(idx))
+        i2 = i2[idx]
+        j = idx_inverse[j]
+        ##################################################################
+
+        self.edge = totalEdge[i2]
         NEC = self.NEC
         self.cell2edge = np.reshape(j, (NC, NEC))
         self.NE = self.edge.shape[0]
