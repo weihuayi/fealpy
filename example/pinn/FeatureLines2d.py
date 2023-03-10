@@ -32,13 +32,15 @@ pinn = Sequential(
     Tanh(),
     Linear(16, 8),
     Tanh(),
-    Linear(8, 2)
+    Linear(8, 4),
+    Tanh(),
+    Linear(4, 2)
 )
 
 
-optimizer = Adam(pinn.parameters(), lr=0.01)
+optimizer = Adam(pinn.parameters(), lr=0.001)
 s = InitialValue(pinn)
-lm = LearningMachine(s, optimizer)
+lm = LearningMachine(s)
 
 def pde(p: torch.Tensor, u):
     cp = u(p)
@@ -48,14 +50,15 @@ def pde(p: torch.Tensor, u):
 sampler1 = ISampler(10000, [[-0.1, 0.1], [0, 1], [0, 1]], requires_grad=True)
 
 
-for epoch in range(2000):
+for epoch in range(10000):
     optimizer.zero_grad()
     mse_f = lm.loss(sampler1, pde)
     mse_f.backward()
     optimizer.step()
-    if epoch % 100 == 0:
+    if epoch % 200 == 0:
         print(f"Epoch: {epoch} | Loss: {mse_f.data}")
 
+torch.save(s.state_dict(), "FeatureLines.pth")
 
 ### Draw the result
 

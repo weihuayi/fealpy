@@ -5,17 +5,24 @@ from numpy.typing import NDArray
 import torch
 from torch import Tensor
 from torch.nn import Module
-from torch.optim import Optimizer
 from torch.autograd import Variable
 
 from .sampler import Sampler
 from .nntyping import TensorFunction, VectorFunction, Operator
 
 
+class ZeroMapping(Module):
+    def forward(self, p: Tensor):
+        return torch.zeros_like(p)
+
+
 class Solution(Module):
-    def __init__(self, net: Module) -> None:
+    def __init__(self, net: Optional[Module]=None) -> None:
         super().__init__()
-        self.__net = net
+        if net:
+            self.__net = net
+        else:
+            self.__net = ZeroMapping()
 
     @property
     def net(self):
@@ -76,10 +83,8 @@ class Solution(Module):
 
 class LearningMachine():
     """Neural network trainer."""
-    def __init__(self, s: Solution, optimizer: Optimizer,
-                 cost_function: Optional[Module]=None) -> None:
+    def __init__(self, s: Solution, cost_function: Optional[Module]=None) -> None:
         self.__solution = s
-        self.optimizer = optimizer
 
         if cost_function:
             self.cost = cost_function
@@ -92,7 +97,7 @@ class LearningMachine():
 
 
     def loss(self, sampler: Sampler, func: Operator,
-             target: Optional[Tensor]=None) -> Tensor:
+             target: Optional[Tensor]=None, output_samples: bool=False) -> Tensor:
         """
         Calculate loss value.
 
@@ -103,6 +108,8 @@ class LearningMachine():
             A function get x and u(x) as args. (e.g A pde or boundary condition.)
         target: Tensor or None.
             If `None`, the output will be compared with zero tensor.
+        output_samples: bool. Defaults to `False`.
+            Return samples from the `sampler` if `True`.
 
         Notes
         ---
@@ -115,17 +122,18 @@ class LearningMachine():
         """
         inputs = sampler.run()
         outputs = func(inputs, self.solution.forward)
-        if target:
-            return self.cost(outputs, target)
-        else:
-            return self.cost(outputs, torch.zeros_like(outputs))
+        if not target:
+            target = torch.zeros_like(outputs)
+        if output_samples:
+            return self.cost(outputs, target), inputs
+        return self.cost(outputs, target)
 
 
-def mkf(length: int, *inputs: torch.Tensor):
+def mkf(length: int, *inputs: Tensor):
     """Make features"""
     ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
     for i, item in enumerate(inputs):
-        if isinstance(item, torch.Tensor):
+        if isinstance(item, Tensor):
             ret[:, i] = item[:, 0]
         else:
             ret[:, i] = item
@@ -161,7 +169,7 @@ class TFC2dSpaceTimeDirichletBC(_2dSpaceTime):
     Solution on space(1d)-time(1d) domain with dirichlet boundary conditions,
     based on Theory of Functional Connections.
     """
-    def forward(self, p: torch.Tensor) -> torch.Tensor:
+    def forward(self, p: Tensor) -> Tensor:
         m = p.shape[0]
         l = self._re - self._le
         t = p[..., 0:1]

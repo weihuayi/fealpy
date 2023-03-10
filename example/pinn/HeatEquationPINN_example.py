@@ -24,7 +24,7 @@ optimizer = Adam(pinn.parameters(), lr=0.001)
 sampler = ISampler(1000, [[0, 1], [0, 2]], requires_grad=True)
 
 s = TFC2dSpaceTimeDirichletBC(pinn)
-lm = LearningMachine(s, optimizer)
+lm = LearningMachine(s)
 
 # 设置初边值条件
 @s.set_initial
