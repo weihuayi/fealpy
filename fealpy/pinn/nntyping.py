@@ -1,10 +1,12 @@
 from typing import Callable, Optional, Union
 
-import torch
-import numpy as np
+from torch import Tensor
+from numpy.typing import NDArray
 
 dtype = Optional[bool]
-TensorOrArray = Union[torch.Tensor, np.ndarray]
+TensorOrArray = Union[Tensor, NDArray]
 
-TensorFunction = Callable[[torch.Tensor], torch.Tensor]
-VectorFunction = Callable[[np.ndarray], np.ndarray]
+TensorFunction = Callable[[Tensor], Tensor]
+VectorFunction = Callable[[NDArray], NDArray]
+
+Operator = Callable[[Tensor, TensorFunction], Tensor]

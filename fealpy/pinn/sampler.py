@@ -90,6 +90,17 @@ class HybridSampler(Sampler):
         return torch.cat([s.run() for s in self.samplers], dim=1)
 
 
+class ConstantSampler(Sampler):
+    def __init__(self, value: torch.Tensor, requires_grad: bool = False) -> None:
+        assert value.ndim == 2
+        super().__init__(0, requires_grad)
+        self.value = value
+        self.m, self.nd = value.shape
+
+    def run(self) -> torch.Tensor:
+        return self.value.clone()
+
+
 class ISampler(Sampler):
     """Generate samples independently in each axis."""
     def __init__(self, m: SupportsIndex, ranges: Any,
@@ -127,7 +138,7 @@ class ISampler(Sampler):
 
 class BoxEdgeSampler(JoinedSampler):
     """Generate samples on the edges of a multidimensional rectangle."""
-    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool = False) -> None:
+    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool=False) -> None:
         """
         Generate samples on the edges of a multidimensional rectangle.
 

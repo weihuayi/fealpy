@@ -1,86 +1,39 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Union
 
 import numpy as np
 from numpy.typing import NDArray
 import torch
+from torch import Tensor
 from torch.nn import Module
-from torch.optim import Optimizer
 from torch.autograd import Variable
 
 from .sampler import Sampler
-from .nntyping import TensorFunction, VectorFunction
+from .nntyping import TensorFunction, VectorFunction, Operator
 
 
-class LearningMachine():
-    """Neural network trainer."""
-    def __init__(self, net: Module, optimizer: Optimizer,
-                 cost_function: Optional[Module]=None) -> None:
-        self.__net = net
-        self.optimizer = optimizer
-        self.loss_list: List[Tuple[float, TensorFunction, Sampler]] = []
-        self.loss_summary = torch.zeros((1, ))
+class ZeroMapping(Module):
+    def forward(self, p: Tensor):
+        return torch.zeros_like(p)
 
-        if cost_function:
-            self.cost = cost_function
+
+class Solution(Module):
+    def __init__(self, net: Optional[Module]=None) -> None:
+        super().__init__()
+        if net:
+            self.__net = net
         else:
-            self.cost = torch.nn.MSELoss(reduction='mean')
+            self.__net = ZeroMapping()
 
     @property
     def net(self):
         return self.__net
 
-    @property
-    def loss_data(self):
-        return self.loss_summary.data.numpy()
-
-    def function(self, p: torch.Tensor) -> torch.Tensor:
-        """
-        Define how the neural network `self.net` constituts the solution. This defaults to
-
-        ```
-            def function(self, p):
-                return self.net(p)
-        ```
-
-        Override this method to customize.
-        """
-        return self.net(p)
-
-    def add_loss(self, coef: float, func: TensorFunction, sampler: Sampler):
-        self.loss_list.append([coef, func, sampler])
-
-    def backward(self):
-        self.optimizer.zero_grad()
-        self.loss_summary = torch.zeros((1, ))
-
-        for coef, func, sampler in self.loss_list:
-            ret = func(sampler.run())
-            loss = self.cost(ret, torch.zeros((sampler.m, 1)))
-            self.loss_summary = coef*loss + self.loss_summary
-        self.loss_summary.backward()
-
-    def step(self):
-        self.optimizer.step()
-
-    def iterations(self, n_iter: int):
-        """A for-loop for training the neural network. This include `backward()` and `step()`.
-
-        Example
-        ---
-        ```
-            for epoch in lm.iterations(1000):
-                if epoch % 100 == 0:
-                    print(f"Epoch: {epoch}, Loss: {lm.loss_data}")
-        ```
-        """
-        for i in range(n_iter):
-            self.backward()
-            self.step()
-            yield i
+    def forward(self, p: Tensor):
+        return self.__net(p)
 
     def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
         """
-        From bc in mesh cells to outputs of the network.
+        From bc in mesh cells to outputs of the solution.
 
         Return
         ---
@@ -88,11 +41,11 @@ class LearningMachine():
         """
         points = mesh.cell_bc_to_point(bc)
         points_tensor = torch.tensor(points, dtype=torch.float32)
-        return self.function(points_tensor).detach().numpy()
+        return self.forward(points_tensor).detach().numpy()
 
     def estimate_error(self, other: VectorFunction, space):
         """
-        Calculate error between the network and `other` in finite element space `space`.
+        Calculate error between the solution and `other` in finite element space `space`.
 
         Parameters
         ---
@@ -123,23 +76,71 @@ class LearningMachine():
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
         mesh_pt = [Variable(torch.from_numpy(x).float(), requires_grad=True) for x in flat_mesh]
-        pt_u: torch.Tensor = self.function(torch.cat(mesh_pt, dim=1))
+        pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
         u_plot: NDArray = pt_u.data.cpu().numpy()
         return u_plot.reshape(mesh[0].shape), mesh
 
 
-def mkf(length: int, *inputs: torch.Tensor):
+class LearningMachine():
+    """Neural network trainer."""
+    def __init__(self, s: Solution, cost_function: Optional[Module]=None) -> None:
+        self.__solution = s
+
+        if cost_function:
+            self.cost = cost_function
+        else:
+            self.cost = torch.nn.MSELoss(reduction='mean')
+
+    @property
+    def solution(self):
+        return self.__solution
+
+
+    def loss(self, sampler: Sampler, func: Operator,
+             target: Optional[Tensor]=None, output_samples: bool=False) -> Tensor:
+        """
+        Calculate loss value.
+
+        Args
+        ---
+        sampler: Sampler.
+        func: Operator.
+            A function get x and u(x) as args. (e.g A pde or boundary condition.)
+        target: Tensor or None.
+            If `None`, the output will be compared with zero tensor.
+        output_samples: bool. Defaults to `False`.
+            Return samples from the `sampler` if `True`.
+
+        Notes
+        ---
+        Arg `func` should be defined like:
+        ```
+            def equation(p: Tensor, u: TensorFunction) -> Tensor:
+                ...
+        ```
+        Here `u` may be a function of `p`.
+        """
+        inputs = sampler.run()
+        outputs = func(inputs, self.solution.forward)
+        if not target:
+            target = torch.zeros_like(outputs)
+        if output_samples:
+            return self.cost(outputs, target), inputs
+        return self.cost(outputs, target)
+
+
+def mkf(length: int, *inputs: Tensor):
     """Make features"""
     ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
     for i, item in enumerate(inputs):
-        if isinstance(item, torch.Tensor):
+        if isinstance(item, Tensor):
             ret[:, i] = item[:, 0]
         else:
             ret[:, i] = item
     return ret
 
 
-class _2dSpaceTime(LearningMachine):
+class _2dSpaceTime(Solution):
     _lef: Optional[TensorFunction] = None
     _le: float = 0
     _ref: Optional[TensorFunction] = None
@@ -165,10 +166,10 @@ class _2dSpaceTime(LearningMachine):
 
 class TFC2dSpaceTimeDirichletBC(_2dSpaceTime):
     """
-    Learning Machine working on
-    space(1d)-time(1d) domain with dirichlet boundary conditions, based on Theory of Functional Connections.
+    Solution on space(1d)-time(1d) domain with dirichlet boundary conditions,
+    based on Theory of Functional Connections.
     """
-    def function(self, p: torch.Tensor) -> torch.Tensor:
+    def forward(self, p: Tensor) -> Tensor:
         m = p.shape[0]
         l = self._re - self._le
         t = p[..., 0:1]
