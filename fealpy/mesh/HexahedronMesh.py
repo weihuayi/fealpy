@@ -23,6 +23,7 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
         [4, 0], [3, 0], [5, 0], [0, 2], 
         [2, 4], [4, 3], [3, 5], [5, 2], 
         [1, 4], [1, 3], [1, 5], [2, 1]])
+    ccw = np.array([0, 1, 2, 3])
     NVC = 8
     NEC = 12
     NFC = 6
@@ -36,7 +37,7 @@ class HexahedronMeshDataStructure(Mesh3dDataStructure):
     def face_to_edge_sign(self):
         face2edge = self.face_to_edge()
         edge = self.edge
-        face2edgeSign = np.zeros((NF, 4), dtype=np.bool)
+        face2edgeSign = np.zeros((NF, 4), dtype=np.bool_)
         for i in range(4):
             face2edgeSign[:, i] = (face[:, i] == edge[face2edge[:, i], 0])
         return face2edgeSign

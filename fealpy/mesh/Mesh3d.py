@@ -102,8 +102,7 @@ class Mesh3d():
         if isinstance(plot, ModuleType):
             from mpl_toolkits.mplot3d import Axes3D
             fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca(projection='3d')
+            axes = plot.subplot(projection='3d')
         else:
             axes = plot
 

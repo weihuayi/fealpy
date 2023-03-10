@@ -77,7 +77,7 @@ for i in range(maxit):
     x[0:ugdof][isBdDof] = uso[:,0][isBdDof]
     x[ugdof:2*ugdof][isBdDof] = uso[isBdDof][:,1]
    
-    isBdDof = np.block([isBdDof, isBdDof, np.zeros(pgdof, dtype=np.bool)])
+    isBdDof = np.block([isBdDof, isBdDof, np.zeros(pgdof, dtype=np.bool_)])
 
     FF -= AA@x
     bdIdx = np.zeros(gdof, dtype=np.int_)

@@ -30,9 +30,9 @@ def find_node(
         index = range(node.shape[0])
     elif (type(index) is np.int_):
         index = np.array([index], dtype=np.int_)
-    elif (type(index) is np.ndarray) and (index.dtype == np.bool):
+    elif (type(index) is np.ndarray) and (index.dtype == np.bool_):
         index, = np.nonzero(index)
-    elif (type(index) is list) and (type(index[0]) is np.bool):
+    elif (type(index) is list) and (type(index[0]) is np.bool_):
         index, = np.nonzero(index)
     else:
         pass
@@ -119,7 +119,7 @@ def find_entity(
         else:
             pass #TODO: raise a error
     elif (type(index) is np.ndarray) :
-        if index.dtype == np.bool:
+        if index.dtype == np.bool_:
             index, = np.nonzero(index)
     elif (type(index) is list) & (type(index[0]) is np.bool_):
         index, = np.nonzero(index)
@@ -436,8 +436,6 @@ def show_mesh_3d(
                linewidths=linewidths,
                color=edgecolor)
         return axes.add_collection3d(edges)
-
-    face = mesh.boundary_face(threshold=threshold)
 
     face = mesh.entity('face')
     isBdFace = mesh.ds.boundary_face_flag()

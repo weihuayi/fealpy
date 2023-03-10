@@ -77,17 +77,17 @@ class Quadtree(QuadrangleMesh):
             isLeafCell = self.is_leaf_cell()
 
             # Construct 
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell = np.zeros(NC, dtype=np.bool_)
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
             # Find the cutted edge  
             cell2edge = self.ds.cell_to_edge()
 
-            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge = np.zeros(NE, dtype=np.bool_)
             isCutEdge[cell2edge[isNeedCutCell, :]] = True
 
-            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge = np.zeros(NE, dtype=np.bool_)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
             isCuttedEdge = isCuttedEdge & isCutEdge
 
@@ -174,7 +174,7 @@ class Quadtree(QuadrangleMesh):
             parent = self.parent
             child = self.child
 
-            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell = np.ones(NC, dtype=np.bool_)
             isRemainCell[child[idx, :]] = False
 
             isNotRootCell = (~self.is_root_cell())
@@ -188,7 +188,7 @@ class Quadtree(QuadrangleMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode = np.zeros(N, dtype=np.bool_)
             isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
@@ -315,16 +315,16 @@ class Quadtree(QuadrangleMesh):
             pcell[cornerLocation[:, 0:-1]] = cell[isLeafCell, :]
 
             PNE = pedge.shape[0]
-            val = np.ones(PNE, dtype=np.bool)
+            val = np.ones(PNE, dtype=np.bool_)
             p2pe = coo_matrix(
                     (val, (pedge[:,0], range(PNE))),
-                    shape=(N, PNE), dtype=np.bool)
+                    shape=(N, PNE), dtype=np.bool_)
             p2pe += coo_matrix(
                     (val, (pedge[:,1], range(PNE))),
-                    shape=(N, PNE), dtype=np.bool)
+                    shape=(N, PNE), dtype=np.bool_)
             p2pe = p2pe.tocsr()
             NES = np.asarray(p2pe.sum(axis=1)).reshape(-1) 
-            isPast = np.zeros(PNE, dtype=np.bool)
+            isPast = np.zeros(PNE, dtype=np.bool_)
             for i in range(4):
                 currentIdx = cornerLocation[:, i]
                 endIdx = cornerLocation[:, i+1]
@@ -417,17 +417,17 @@ class Octree(HexahedronMesh):
             isLeafCell = self.is_leaf_cell()
 
             # Construct cellCenter
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell = np.zeros(NC, dtype=np.bool_)
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
             # Construct edgeCenter 
             cell2edge = self.ds.cell_to_edge()
 
-            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge = np.zeros(NE, dtype=np.bool_)
             isCutEdge[cell2edge[isNeedCutCell, :]] = True
 
-            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge = np.zeros(NE, dtype=np.bool_)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
             isCuttedEdge = isCuttedEdge & isCutEdge
 
@@ -455,10 +455,10 @@ class Octree(HexahedronMesh):
 
             # Construct faceCenter and face2center
             cell2face = self.ds.cell_to_face()
-            isCutFace = np.zeros(NF, dtype=np.bool)
+            isCutFace = np.zeros(NF, dtype=np.bool_)
             isCutFace[cell2face[isNeedCutCell, :]] = True
 
-            isCuttedFace = np.zeros(NF, dtype=np.bool)
+            isCuttedFace = np.zeros(NF, dtype=np.bool_)
             isCuttedFace[cell2face[~isLeafCell, :]] = True 
             isCuttedFace = isCuttedFace & isCutFace
 
@@ -550,7 +550,7 @@ class Octree(HexahedronMesh):
             child = self.child
 
             
-            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell = np.ones(NC, dtype=np.bool_)
             isRemainCell[idx] = False
             isRemainCell[child[parent[idx, 0], :]] = False
 
@@ -565,7 +565,7 @@ class Octree(HexahedronMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode = np.zeros(N, dtype=np.bool_)
             isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
@@ -684,7 +684,7 @@ class Octree(HexahedronMesh):
             N = self.number_of_nodes()
             NE = self.number_of_edges()
             face2edge = self.ds.face_to_edge()
-            isLeafEdge = np.zeros(NE, dtype=np.bool)
+            isLeafEdge = np.zeros(NE, dtype=np.bool_)
             pface2edge = face2edge[isLeafFace]
             isLeafEdge[pface2edge] = True
             pedge = edge[isLeafEdge]

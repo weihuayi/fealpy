@@ -157,7 +157,7 @@ class ReducedDivFreeNonConformingVirtualElementSpace2dTest:
             AA = bmat([[A, P.T], [P, None]], format='csr')
             FF = np.block([F, np.zeros(pdof, dtype=uspace.ftype)])
             x = np.block([uh, ph])
-            isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+pdof, dtype=np.bool)])
+            isBdDof = np.block([isBdDof, isBdDof, np.zeros(NC*idof+pdof, dtype=np.bool_)])
 
             gdof = udof + pdof
             FF -= AA@x

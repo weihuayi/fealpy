@@ -10,6 +10,7 @@ from ..decorator import timer
 class TetrahedronMeshDataStructure(Mesh3dDataStructure):
     OFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     SFace = np.array([(1, 2, 3),  (0, 2, 3), (0, 1, 3), (0, 1, 2)])  
+    ccw = np.array([0, 1, 2])
 
     localFace = np.array([(1, 2, 3),  (0, 3, 2), (0, 1, 3), (0, 2, 1)])
     localEdge = np.array([(0, 1), (0, 2), (0, 3), (1, 2), (1, 3), (2, 3)])
@@ -476,7 +477,7 @@ class TetrahedronMesh(Mesh3d):
         self.celldata['cell'][start] = 1
 
         localFace = self.ds.localFace
-        isNotOK = np.ones(NP, dtype=np.bool)
+        isNotOK = np.ones(NP, dtype=np.bool_)
         while np.any(isNotOK):
             idx = start[isNotOK] # 试探的单元编号
             pp = points[isNotOK] # 还没有找到所在单元的点的坐标
@@ -785,7 +786,7 @@ class TetrahedronMesh(Mesh3d):
         nCut = 0
 
         # 非协调边的标记数组 
-        nonConforming = np.ones(8*NN, dtype=np.bool)
+        nonConforming = np.ones(8*NN, dtype=np.bool_)
         IM = eye(NN)
         while len(markedCell) != 0:
             # 标记最长边
@@ -809,7 +810,7 @@ class TetrahedronMesh(Mesh3d):
                 NE = len(ncEdge)
                 I = cutEdge[ncEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[ncEdge][:, [0, 1]].reshape(-1)
-                val = np.ones(len(I), dtype=np.bool)
+                val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
@@ -824,12 +825,12 @@ class TetrahedronMesh(Mesh3d):
                 cellCutEdge.sort(axis=0)
                 s = csr_matrix(
                     (
-                        np.ones(NE, dtype=np.bool),
+                        np.ones(NE, dtype=np.bool_),
                         (
                             cellCutEdge[0, ...],
                             cellCutEdge[1, ...]
                         )
-                    ), shape=(NN, NN), dtype=np.bool)
+                    ), shape=(NN, NN), dtype=np.bool_)
                 # 获得唯一的边 
                 i, j = s.nonzero()
                 nNew = len(i)
@@ -855,7 +856,7 @@ class TetrahedronMesh(Mesh3d):
                 # 新点和旧点的邻接矩阵 
                 I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
-                val = np.ones(len(I), dtype=np.bool)
+                val = np.ones(len(I), dtype=np.bool_)
                 nv2v = csr_matrix(
                         (val, (I, J)),
                         shape=(NN, NN))
@@ -887,7 +888,7 @@ class TetrahedronMesh(Mesh3d):
 
             # 找到非协调的单元 
             checkEdge, = np.nonzero(nonConforming[:nCut])
-            isCheckNode = np.zeros(NN, dtype=np.bool)
+            isCheckNode = np.zeros(NN, dtype=np.bool_)
             isCheckNode[cutEdge[checkEdge]] = True
             isCheckCell = np.sum(
                     isCheckNode[cell[:NC]],
@@ -896,7 +897,7 @@ class TetrahedronMesh(Mesh3d):
             checkCell, = np.nonzero(isCheckCell)
             I = np.repeat(checkCell, 4)
             J = cell[checkCell].reshape(-1)
-            val = np.ones(len(I), dtype=np.bool)
+            val = np.ones(len(I), dtype=np.bool_)
             cell2node = csr_matrix((val, (I, J)), shape=(NC, NN))
             i, j = np.nonzero(
                     cell2node[:, cutEdge[checkEdge, 0]].multiply(

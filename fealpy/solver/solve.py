@@ -135,7 +135,7 @@ def active_set_solver(dmodel, uh, gh, maxit=5000, dirichlet=None,
     lam = space.function()
 
     gdof = space.number_of_global_dofs()
-    I = np.ones(gdof, dtype=np.bool)
+    I = np.ones(gdof, dtype=np.bool_)
     
     k = 0
     while k < maxit:

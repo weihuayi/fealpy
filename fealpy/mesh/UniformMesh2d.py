@@ -68,7 +68,7 @@ class UniformMesh2d(Mesh2d):
         node[..., 0], node[..., 1] = np.mgrid[
                                      box[0]:box[1]:complex(0, nx + 1),
                                      box[2]:box[3]:complex(0, ny + 1)]
-        return node
+        return node.reshape(-1, 2)
 
     def entity_barycenter(self, etype=2):
         """

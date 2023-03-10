@@ -21,7 +21,7 @@ class CVTPMesherTest:
             (0, 1),(1, 2),(2, 3),(3, 0)], dtype=np.int)
         subdomain = np.array([
             (1, 0),(1, 0),(1, 0),(1, 0)], dtype=np.int)
-        dof =np.array([1,1,1,1],dtype=np.bool)
+        dof =np.array([1,1,1,1],dtype=np.bool_)
         mesh = HalfEdgeMesh2d.from_edges(vertices, facets, subdomain)
         voromesher = CVTPMesher(mesh)
         voromesher.vorocrust_boundary_matching(n=2)
@@ -62,7 +62,7 @@ class CVTPMesherTest:
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0,  1.0),(0.0,  1.0),
                 (-1.0, 1.0),(-1.0, 0.0),(-1.0, -1.0),(0.0, -1.0)],dtype=np.float)
-            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1],dtype=np.bool)
+            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1],dtype=np.bool_)
             facets = np.array([
                (0, 1), (1, 2), (2, 3), (3, 4), 
                (4, 5), (5, 6), (6, 7), (7, 0)],dtype=np.int)
@@ -82,7 +82,7 @@ class CVTPMesherTest:
             vertices = np.zeros((n, 2), dtype=np.float)
             vertices[:, 0] = np.cos(theta)
             vertices[:, 1] = np.sin(theta)
-            fixed = np.zeros(n, dtype=np.bool)
+            fixed = np.zeros(n, dtype=np.bool_)
             facets = np.zeros((n,2), dtype=np.int)
             facets[:, 0] = range(0, n)
             facets[:-1, 1] = range(1, n)
@@ -265,7 +265,7 @@ class CVTPMesherTest:
             vertices = np.array([
                 ( 0.0, 0.0),( 1.0, 0.0),( 1.0,  1.0),(0.0,  1.0),
                (-1.0, 1.0),(-1.0, 0.0),(-1.0, -1.0),(0.0, -1.0)],dtype=np.float)
-            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1],dtype=np.bool)
+            fixed = np.array([1, 1, 1, 0, 1, 0, 1, 1],dtype=np.bool_)
             facets = np.array([
                (0, 1), (1, 2), (2, 3), (3, 4), 
                (4, 5), (5, 6), (6, 7), (7, 0)],dtype=np.int)
@@ -284,7 +284,7 @@ class CVTPMesherTest:
             vertices = np.zeros((n, 2), dtype=np.float)
             vertices[:, 0] = np.cos(theta)
             vertices[:, 1] = np.sin(theta)
-            fixed = np.zeros(n, dtype=np.bool)
+            fixed = np.zeros(n, dtype=np.bool_)
             facets = np.zeros((n,2), dtype=np.int)
             facets[:, 0] = range(0, n)
             facets[:-1, 1] = range(1, n)
@@ -306,7 +306,7 @@ class CVTPMesherTest:
             vertices2[:, 1] = -np.sin(theta)
             vertices = np.vstack((vertices1,vertices2))
             n = len(vertices)
-            fixed = np.zeros(n, dtype=np.bool)
+            fixed = np.zeros(n, dtype=np.bool_)
             fixed[4:] = False
             facets = np.zeros((n,2), dtype=np.int)
             facets[:4, 0] = range(0, 4)

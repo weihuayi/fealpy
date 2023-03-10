@@ -22,7 +22,7 @@ class CVEMDof2d():
             flag = threshold(bc)
             idx  = idx[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdDof[edge2dof[idx]] = True
         return isBdDof
@@ -649,7 +649,8 @@ class ConformingVirtualElementSpace2d():
         end = NN + (p - 1)*NE
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=threshold)
-        uh[isDDof] = gD(ipoints[isDDof[:end]])[:, None]
+        a = gD(ipoints[isDDof[:end]])[:, None]
+        uh[isDDof] = gD(ipoints[isDDof[:end]])
         return isDDof
 
     def interpolation(self, u, HB=None):

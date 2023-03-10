@@ -39,7 +39,7 @@ class WGDof3d:
                 flag = threshold(bc)
                 index = index[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         face2dof = self.face_to_dof()
         isBdDof[face2dof[index]] = True
         return isBdDof

@@ -51,8 +51,8 @@ def find_cut_point(phi, p0, p1):
     phi1 = phi(p1)
     phic = phi(cutPoint)
 
-    isLeft = np.zeros(p0.shape[0], dtype=np.bool)
-    isRight = np.zeros(p0.shape[0], dtype=np.bool)
+    isLeft = np.zeros(p0.shape[0], dtype=np.bool_)
+    isRight = np.zeros(p0.shape[0], dtype=np.bool_)
     vec = p1 - p0
     h = np.sqrt(np.sum(vec**2, axis=1))
 
@@ -123,11 +123,11 @@ def interfacemesh2d(box, phi, n):
     ncut = cutNode.shape[0]
 
     # find interface cell and point
-    isInterfaceCell = np.zeros(NC, dtype=np.bool)
+    isInterfaceCell = np.zeros(NC, dtype=np.bool_)
     edge2cell =  mesh.ds.edge_to_cell()
     isInterfaceCell[edge2cell[isCutEdge, 0:2]] = True
     isInterfaceCell[np.sum(np.abs(phiSign[cell]), axis=1) < 3] = True
-    isInterfaceNode = np.zeros(N, dtype=np.bool)
+    isInterfaceNode = np.zeros(N, dtype=np.bool_)
     isInterfaceNode[cell[isInterfaceCell,:]] = True
 
     # Find specical cells
@@ -207,7 +207,7 @@ class InterfaceMesh2d():
         phiSign = self.phiSign 
 
         isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
-        isCutCell = np.zeros(NC, dtype=np.bool)
+        isCutCell = np.zeros(NC, dtype=np.bool_)
 
         edge2cell =  mesh.ds.edge_to_cell()
         isCutCell[edge2cell[isCutEdge, 0:2]] = True
@@ -261,7 +261,7 @@ class InterfaceMesh2d():
         N = self.N2 
         cell = self.mesh.ds.cell
         node = self.node
-        isInterfaceNode = np.zeros(N, dtype=np.bool)
+        isInterfaceNode = np.zeros(N, dtype=np.bool_)
         isCutCell = self.is_cut_cell()
         isInterfaceNode[cell[isCutCell]] = True
         isInterfaceNode[self.N0:] = True
@@ -407,7 +407,7 @@ class InterfaceMesh3d():
         N = self.N2 
         cell = self.mesh.ds.cell
         node = self.node
-        isInterfaceNode = np.zeros(N, dtype=np.bool)
+        isInterfaceNode = np.zeros(N, dtype=np.bool_)
         isCutCell = self.is_cut_cell()
         isInterfaceNode[cell[isCutCell]] = True
         isInterfaceNode[self.N0:] = True
@@ -553,7 +553,7 @@ class InterfaceMesh3d():
 
         NP = np.max(pface2cell)+1
 
-        isCutPoly = np.zeros(NP, dtype=np.bool)
+        isCutPoly = np.zeros(NP, dtype=np.bool_)
         isCutPoly[pface2cell] = True
 
         cutPolyIdx = np.zeros(NP, dtype=np.int)
@@ -585,7 +585,7 @@ class InterfaceMesh3d():
 
         node = T.node
         N = T.number_of_nodes()
-        isInterfaceNode = np.zeros(N, dtype=np.bool)
+        isInterfaceNode = np.zeros(N, dtype=np.bool_)
         isInterfaceNode[tface0] = True
         NN = np.sum(isInterfaceNode)
         idxMap = np.zeros(N, dtype=np.int)

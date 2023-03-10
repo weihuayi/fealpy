@@ -43,7 +43,7 @@ class AdaptiveMarker():
         valueSign[np.abs(value) < 1e-12] = 0
 
         isLeafCell = octree.is_leaf_cell()
-        isBranchCell = np.zeros(NC, dtype=np.bool)
+        isBranchCell = np.zeros(NC, dtype=np.bool_)
         isBranchCell[tree[isLeafCell, 0]] = True 
 
         branchCell = cell[isBranchCell, :]

@@ -61,7 +61,7 @@ class SurfaceParabolicFEMModel():
         return A, b
 
     def is_boundary_dof(self, p):
-        isBdDof = np.zeros(p.shape[0], dtype=np.bool)
+        isBdDof = np.zeros(p.shape[0], dtype=np.bool_)
         isBdDof[0] = True
         return isBdDof
 

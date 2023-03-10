@@ -968,7 +968,7 @@ class HuZhangFiniteElementSpace():
                 index = index[flag_idx] #(NFbd,)
                 NFbd = len(index)
 
-                bd_index_type = np.zeros((3,NFbd),dtype=np.bool)
+                bd_index_type = np.zeros((3,NFbd),dtype=np.bool_)
                 bd_index_type[0] = flag[0][flag_idx] #第0个分量表示给的法向投影
                 bd_index_type[1] = flag[1][flag_idx] #第1个分量表示给的切向投影
                 bd_index_type[2] = flag[2][flag_idx] #第2个分量表示给的切向投影
@@ -978,8 +978,8 @@ class HuZhangFiniteElementSpace():
                 frame[:,0] = n
                 t0 = frame[:,1]
                 t1 = frame[:,2]
-                isBdDof = np.zeros(gdof,dtype=np.bool)#判断是否为固定顶点
-                Is_inner_face_idx = np.ones(NFbd,dtype=np.bool)#找出内边
+                isBdDof = np.zeros(gdof,dtype=np.bool_)#判断是否为固定顶点
+                Is_inner_face_idx = np.ones(NFbd,dtype=np.bool_)#找出内边
                 f2bd = self.dof.face_to_dof()[index]#(NFbd,ldof)
                 ipoint = ipoint[f2bd] #(NFbd,ldof,gdim)
                 facebd2dof = self.face2dof[index] #(NFbd,ldof,tdim)
