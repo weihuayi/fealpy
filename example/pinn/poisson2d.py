@@ -70,12 +70,11 @@ print(f"Error: {error}")
 
 from matplotlib import cm
 import matplotlib.pyplot as plt
-from fealpy.pinn.plot import meshgrid_mapping
 fig = plt.figure()
 
 x = np.linspace(0, 1, 30)
 y = np.linspace(0, 1, 30)
-u, (X, Y) = meshgrid_mapping(pinn, x, y)
+u, (X, Y) = lm.meshgrid_mapping(x, y)
 
 axes = fig.add_subplot(1, 1, 1, projection='3d')
 axes.plot_surface(X, Y, u, cmap=cm.RdYlBu_r, edgecolor='blue', linewidth=0.0003, antialiased=True)
