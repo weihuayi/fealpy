@@ -1,3 +1,10 @@
+"""
+FeatureLines2d
+--------------
+
+根据给定的速度场 `velocity_field` 训练生成各物质点的运动轨迹。
+并将结果以网络参数保存为 FeatureLines.pth 文件。
+"""
 
 import numpy as np
 import torch
@@ -38,7 +45,7 @@ pinn = Sequential(
 )
 
 
-optimizer = Adam(pinn.parameters(), lr=0.001)
+optimizer = Adam(pinn.parameters(), lr=0.002)
 s = InitialValue(pinn)
 lm = LearningMachine(s)
 
