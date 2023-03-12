@@ -25,7 +25,9 @@ class InitialValue(Solution):
         return self.net(p) - self.net(torch.cat([torch.zeros_like(t), xy], dim=1)) + xy
 
 pinn = Sequential(
-    Linear(3, 32),
+    Linear(3, 64),
+    Tanh(),
+    Linear(64, 32),
     Tanh(),
     Linear(32, 16),
     Tanh(),
@@ -86,8 +88,8 @@ domain = [0, 1, 0, 1]
 
 mse_cost_function = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.Adam(phi.parameters(), lr=0.0005)
-sampler1 = ISampler(10000, [[0, 0.5], [0, 1], [0, 1]], requires_grad=True)
-sampler2 = ISampler(10000, [[0.125, 0.375], [0, 1], [0, 1]], requires_grad=True)
+sampler1 = ISampler(10000, [[0, 1], [0, 1], [0, 1]], requires_grad=True)
+sampler2 = ISampler(1000, [[0.25, 0.75], [0, 1], [0, 1]], requires_grad=True)
 
 
 def velocity_field(p: torch.Tensor):
@@ -108,7 +110,7 @@ def levelset_equation(tx: torch.Tensor, phi):
     return phi_t + u_phi_x
 
 
-iterations = 100
+iterations = 10000
 
 for epoch in range(iterations):
     optimizer.zero_grad()
@@ -117,21 +119,20 @@ for epoch in range(iterations):
     mse_f = lm.loss(sampler1, levelset_equation)
 
     pts = sampler2.run()
-    phi_c = phi(pts)
     m = pts.shape[0]
+    delta = torch.ones((m, 1)) * 0.25
+    phi_c = phi(pts)
 
-    time_c = pts[:, 0:1]
-    time_delta = 0.125*torch.ones((m, 1))
+    pts_f = fl(torch.cat([delta, pts[:, 1:3]], dim=1))
+    phi_f = phi(torch.cat([pts[:, 0:1] + delta, pts_f], dim=1))
 
-    pts_p = fl(torch.cat([-time_delta, pts[:, 1:3]], dim=1))
-    phi_p = phi(torch.cat([time_c - time_delta, pts_p], dim=1))
-    pts_f = fl(torch.cat([time_delta, pts[:, 1:3]], dim=1))
-    phi_f = phi(torch.cat([time_c + time_delta, pts_p], dim=1))
+    pts_p = fl(torch.cat([-delta, pts[:, 1:3]], dim=1))
+    phi_p = phi(torch.cat([pts[:, 0:1] - delta, pts_p], dim=1))
 
-    mse_fl = mse_cost_function(phi_c, phi_p) + mse_cost_function(phi_c, phi_f)
+    mse_fl = mse_cost_function(phi_c, phi_f) + mse_cost_function(phi_c, phi_p)
 
     # backward
-    loss = 0.8*mse_f + 0.2*mse_fl
+    loss = 1.0*mse_f
     loss.backward()
     optimizer.step()
 
@@ -170,7 +171,7 @@ def circle2(p):
 domain = [0, 1, 0, 1]
 mesh = MF.boxmesh2d(domain, nx=100, ny=100, meshtype='tri')
 
-timeline = UniformTimeLine(0, 0.5, 100)
+timeline = UniformTimeLine(0, 1, 100)
 dt = timeline.dt
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
@@ -187,7 +188,7 @@ measure = space.function()
 
 solver = LevelSetFEMFastSolver(A)
 
-for i in range(1000):
+for i in range(100):
 
     t1 = timeline.next_time_level()
     print("t1=", t1)
@@ -204,7 +205,7 @@ for i in range(1000):
     # 时间步进一层
     timeline.advance()
 
-final_phi = phi.fixed([0, ], [0.5, ])
+final_phi = phi.fixed([0, ], [1.0, ])
 error = final_phi.estimate_error(phi0, squeeze=True)
 
 print(f"计算误差：{error}")
@@ -215,7 +216,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 
-t = [0, 0.125, 0.25, 0.375, 0.5]
+t = [0, 0.25, 0.5, 0.75, 1.0]
 x = np.linspace(domain[0], domain[1], 100)
 y = np.linspace(domain[2], domain[3], 100)
 ms_x, ms_y = np.meshgrid(x, y)

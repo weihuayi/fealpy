@@ -33,7 +33,9 @@ def velocity_field(p: torch.Tensor):
 
 
 pinn = Sequential(
-    Linear(3, 32),
+    Linear(3, 64),
+    Tanh(),
+    Linear(64, 32),
     Tanh(),
     Linear(32, 16),
     Tanh(),
@@ -45,24 +47,27 @@ pinn = Sequential(
 )
 
 
-optimizer = Adam(pinn.parameters(), lr=0.002)
+optimizer = Adam(pinn.parameters(), lr=0.0001, weight_decay=1e-5)
 s = InitialValue(pinn)
 lm = LearningMachine(s)
+
+state_dict = torch.load("FeatureLines.pth")
+s.load_state_dict(state_dict)
 
 def pde(p: torch.Tensor, u):
     cp = u(p)
     cp_t = grad_of_fts(cp, p, ft_idx=0, create_graph=True)
     return velocity_field(cp) - cp_t
 
-sampler1 = ISampler(10000, [[-0.1, 0.1], [0, 1], [0, 1]], requires_grad=True)
+sampler1 = ISampler(10000, [[-0.25, 0.25], [0, 1], [0, 1]], requires_grad=True)
 
 
-for epoch in range(10000):
+for epoch in range(2000):
     optimizer.zero_grad()
     mse_f = lm.loss(sampler1, pde)
     mse_f.backward()
     optimizer.step()
-    if epoch % 200 == 0:
+    if epoch % 500 == 0:
         print(f"Epoch: {epoch} | Loss: {mse_f.data}")
 
 torch.save(s.state_dict(), "FeatureLines.pth")
@@ -71,7 +76,7 @@ torch.save(s.state_dict(), "FeatureLines.pth")
 
 from matplotlib import pyplot as plt
 
-t = torch.linspace(-0.1, 0.1, 20)
+t = torch.linspace(-0.25, 0.25, 20)
 x = torch.linspace(0, 1, 10)
 y = torch.linspace(0, 1, 10)
 
