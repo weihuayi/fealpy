@@ -101,7 +101,7 @@ class ContinummDFModel2d:
         s[:, 1, 0] = val
         return s
 
-    def stress(self, phi, s, D):
+    def stress(self, phi, s):
         """
         @brief 给定应变计算相应的应力
         @param[in] s 单元应变数组，（NC, 2, 2)
@@ -200,7 +200,7 @@ class ContinummDFModel2d:
         val0 = 1.0 / (1.0 + np.exp(-2 * k * x))
         return val
 
-    def dsigma_depsilon(self, phi, s):
+    def dsigma_depsilon(self, phi, s, bcs):
         """
         @brief 计算应力关于应变的导数矩阵
         @param phi 单元重心处的相场函数值, (NC, )
@@ -257,42 +257,38 @@ class ContinummDFModel2d:
         D = (D + D.swapaxes(1,2))/2
         return D
 
-    def disp_matrix(self, mesh, D):
-
+    def disp_matrix(self, phi, uh, s):
         NN = mesh.number_of_nodes()
-        cm = mesh.entity_measure('cell')
-        gphi = mesh.grad_lambda()  # (NC, 3, 2)
-
-        C00 = np.einsum('ij, ik->ijk', gphi[:, :, 0], gphi[:, :, 0])  # (NC, 3, 3)
-        C11 = np.einsum('ij, ik->ijk', gphi[:, :, 1], gphi[:, :, 1])  # (NC, 3, 3)
-        C01 = np.einsum('ij, ik->ijk', gphi[:, :, 0], gphi[:, :, 1])  # (NC, 3, 3)
-        C10 = np.einsum('ij, ik->ijk', gphi[:, :, 1], gphi[:, :, 0])
+        cellmeasure = mesh.entity_measure('cell')
+        space = uh.space
+       
+        qf = mesh.integrator(4, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        grad = space.grad_basis(bcs)
+        D = self.dsigma_depsilon(phi, s, bcs)
+        
+        C00 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 0], grad[..., 0], cellmeasure)
+        C01 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 0], grad[..., 1], cellmeasure)
+        C11 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 1], grad[..., 1], cellmeasure)
+        C10 = np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., 1], grad[..., 0], cellmeasure)
 
         D00 = D[:, 0, 0][:, None, None] * C00
         D00 += D[:, 0, 2][:, None, None] * (C01 + C10)
         D00 += D[:, 2, 2][:, None, None] * C11
-
-        D00 *= cm[:, None, None]
 
         D01 = D[:, 0, 1][:, None, None] * C01
         D01 += D[:, 1, 2][:, None, None] * C11
         D01 += D[:, 0, 2][:, None, None] * C00
         D01 += D[:, 2, 2][:, None, None] * C10
 
-        D01 *= cm[:, None, None]
-
         D10 = D[:, 0, 1][:, None, None] * C10
         D10 += D[:, 1, 2][:, None, None] * C11
         D10 += D[:, 0, 2][:, None, None] * C00
         D10 += D[:, 2, 2][:, None, None] * C01
 
-        D10 *= cm[:, None, None]
-
         D11 = D[:, 1, 1][:, None, None] * C11
         D11 += D[:, 1, 2][:, None, None] * (C01 + C10)
         D11 += D[:, 2, 2][:, None, None] * C00
-
-        D11 *= cm[:, None, None]
 
         cell = mesh.entity('cell')
         shape = D00.shape
@@ -334,23 +330,27 @@ class ContinummDFModel2d:
 
         return A
 
-    def disp_residual(self, S, A, uh):
+    def disp_residual(self, S, uh):
         """
         @brief 计算位移右端项
         @param S 每个单元上的应变矩阵, （NC, 2, 2)
         """
-        cell = mesh.entity('cell')
+        space = uh.space
 
+        cell = mesh.entity('cell')
         NN = mesh.number_of_nodes()
         cm = mesh.entity_measure('cell')
-        gphi = mesh.grad_lambda()  # (NC, 3, 2)
+       
+        qf = mesh.integrator(4, 'cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        gphi = space.grad_basis(bcs)
         
         bb = np.zeros((cell.shape[0], 3, 2), dtype=np.float64)
         
-        b0 = np.einsum('i, ij, i->ij', cm, gphi[..., 0], S[:, 0, 0])
-        b1 = np.einsum('i, ij, i->ij', cm, gphi[..., 1], S[:, 0, 1])
-        b2 = np.einsum('i, ij, i->ij', cm, gphi[..., 1], S[:, 1, 1])
-        b3 = np.einsum('i, ij, i->ij', cm, gphi[..., 0], S[:, 1, 0])
+        b0 = np.einsum('i, j, ijk, j->jk', ws, cm, gphi[..., 0], S[:, 0, 0])
+        b1 = np.einsum('i, j, ijk, j->jk', ws, cm, gphi[..., 1], S[:, 0, 1])
+        b2 = np.einsum('i, j, ijk, j->jk', ws, cm, gphi[..., 1], S[:, 1, 1])
+        b3 = np.einsum('i, j, ijk, j->jk', ws, cm, gphi[..., 0], S[:, 1, 0])
         bb[:, :, 0] = b0 + b1
         bb[:, :, 1] = b2 + b3
         
@@ -476,12 +476,12 @@ parser.add_argument('--GD',
         help='模型问题的维数, 默认求解 2 维问题.')
 
 parser.add_argument('--nrefine',
-        default=0, type=int,
+        default=4, type=int,
         help='初始网格加密的次数, 默认初始加密 4 次.')
 
 parser.add_argument('--maxit',
-        default=1, type=int,
-        help='默认网格加密次数, 默认加密 1 次')
+        default=5, type=int,
+        help='默认网格加密次数, 默认加密 5 次')
 
 
 parser.add_argument('--iteration',
@@ -507,8 +507,6 @@ mesh = model.init_mesh(n)
 
 space = LagrangeFiniteElementSpace(mesh, p=p)
 
-K = space.linear_elasticity_matrix(model.la, model.mu, q=1)  # 线弹性刚度矩阵
-
 uh = space.function(dim=GD)
 phi = space.function()
 
@@ -522,9 +520,10 @@ for i in range(maxit):
 
     du = np.zeros(NN*2, dtype=np.float64)
     
-    isBdNode = model.is_disp_top_boundary(node)
-    isBdDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isBdNode]
-    du[isBdDof] = 1e-5
+    isTNode = model.is_disp_top_boundary(node)
+    uh[isTNode, 1] += 1e-5
+
+    isTDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isTNode]
     
     isDDof = model.is_disp_bottom_boundary(node)
 
@@ -535,30 +534,27 @@ for i in range(maxit):
         
         s = model.strain(mesh, uh)
         
-        D = model.dsigma_depsilon(phi, s)
-        A = model.disp_matrix(mesh, D)
+        A = model.disp_matrix(phi, uh, s)
         
-        S = model.stress(phi, s, D)
-        F = model.disp_residual(S, A, uh)
+        S = model.stress(phi, s)
+        F = model.disp_residual(S, uh)
         R0 = F.T.flat
         
         # 边界条件处理
         R0 -= A@du
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isDDof] = 1
-        bdIdx[isBdDof] =1
+        bdIdx[isTDof] =1
         Tbd =spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         A = T@A@T + Tbd
-        R0[isDDof] = x[isDDof]
-        R0[isBdDof] = x[isBdDof]
+        R0[isDDof] = du[isDDof]
+        R0[isTDof] = du[isTDof]
 
         print("求解位移增量")
-#        du[isInDof] = spsolve(A[isInDof, :][:, isInDof], R0[isInDof])
-#        uh.T.flat[isInDof] += du[isInDof]
-
         du = spsolve(A, R0)
-        uh.T.flat[:] += du
+        uh.T.flat += du
+
         print('uh:', uh)
 
         s = model.strain(mesh, uh)
@@ -575,9 +571,10 @@ for i in range(maxit):
 
         print("求解相场增量")
         phi += spsolve(A, R1)
-        error = np.max(np.abs(R0))
+        error1 = np.max(np.abs(R0))
 
-#        error = max(np.max(np.abs(R0)), np.max(np.abs(R1)))
+        error = max(np.max(np.abs(R0)), np.max(np.abs(R1)))
+        print("error1:", error1)
         print("error:", error)
         if error < accuracy:
             break
@@ -585,11 +582,8 @@ for i in range(maxit):
     eta = recovery_estimate(phi)
 
     if i < maxit - 1:
-#        options = mesh.adaptive_options()
         isMarkedCell = mark(eta, theta = 0.2)
-#        mesh.bisect(isMarkedCell)
         mesh.adaptive_refine(isMarkedCell, method='rg')
-        #mesh.adaptive(eta, options)
         
         space = LagrangeFiniteElementSpace(mesh, p=1)
         uh_new, phi_new = refine_interpolation(mesh, uh, phi)
@@ -604,6 +598,3 @@ fig, axes = plt.subplots()
 mesh.node += uh
 mesh.add_plot(axes)
 plt.show()
-'''
-adaptive_mesh(mesh, d0=0.499, d1=1, h=0.001)
-'''
