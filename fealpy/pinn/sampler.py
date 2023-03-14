@@ -185,6 +185,12 @@ class _MeshSampler(Sampler):
         self.mesh = mesh
 
 
+def _inverse(p, *idx):
+        mask = np.array(idx, dtype=np.int_)
+        p[:, mask] = 1 - p[:, mask]
+        return p
+
+
 class TriangleMeshSampler(_MeshSampler):
     """Sampler in a triangle mesh."""
     def run(self) -> torch.Tensor:
@@ -198,7 +204,25 @@ class TriangleMeshSampler(_MeshSampler):
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
 
 
-# class TetrahedronSampler(_MeshSampler):
-#     """Sampler in a tetrahedron mesh."""
-#     def run(self) -> torch.Tensor:
-#         bcs = np.zeros((self.m_cell, 4))
+class TetrahedronMeshSampler(_MeshSampler):
+    """Sampler in a tetrahedron mesh."""
+    def run(self) -> torch.Tensor:
+        bcs = np.zeros((self.m_cell, 4))
+        u_0 = np.random.rand(self.m_cell, 3)
+        bcs[:, 1:4] = u_0
+        ui = [
+            _inverse(u_0.copy(), 0, 1),
+            _inverse(u_0.copy(), 1, 2),
+            _inverse(u_0.copy(), 2, 0)
+        ]
+
+        for i in range(3):
+            mask = np.sum(ui[i], -1) < 1
+            bcs[mask, 1:4] = ui[i][mask, :]
+
+        bcs[:, 0] = 1 - np.sum(bcs[:, 1:4], -1)
+        mask = bcs[:, 0] < 0
+        bcs[mask, 1:4] += 0.5*bcs[mask, 0:1]
+        bcs[mask, 0] = 1 - np.sum(bcs[mask, 1:4], -1)
+        ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 3))
+        return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
