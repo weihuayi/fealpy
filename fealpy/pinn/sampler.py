@@ -73,7 +73,7 @@ class HybridSampler(Sampler):
 
     @property
     def nd(self):
-        return sum(x.m for x in self.samplers)
+        return sum(x.nd for x in self.samplers)
 
     def add(self, sampler: Sampler):
         if isinstance(sampler, HybridSampler):
@@ -183,6 +183,7 @@ class _MeshSampler(Sampler):
         m = self.m_cell * mesh.entity('cell').shape[0]
         super().__init__(m=m, requires_grad=requires_grad)
         self.mesh = mesh
+        self.nd = mesh.top_dimension()
 
 
 def _inverse(p, *idx):

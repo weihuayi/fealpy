@@ -60,8 +60,8 @@ class Solution(Module):
         space: FiniteElementSpace.
         fn_type: 'bc' or 'val'. Defaults to 'bc'.
         squeeze: bool. Defaults to `False`.
-            Squeeze the solution automatically if the last dim has shape (1). This is useful when
-            estimating error between 1-output network and a function in finite element space.
+            Squeeze the solution automatically if the last dim has shape (1). This is sometimes useful
+            when estimating error for an 1-output network.
 
         Return
         ---
@@ -79,6 +79,8 @@ class Solution(Module):
 
             def f(bc):
                 val = self.from_cell_bc(bc, space.mesh)
+                if squeeze:
+                    val = val.squeeze(-1)
                 return (val - other(space.mesh.cell_bc_to_point(bc)))**2
 
         elif fn_type == 'bc':
