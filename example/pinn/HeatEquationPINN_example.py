@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 
-from fealpy.pinn.machine import TFC2dSpaceTimeDirichletBC
+from fealpy.pinn.machine import TFC2dSpaceTimeDirichletBC, LearningMachine
 from fealpy.pinn import gradient, ISampler
 
 # 定义神经网络
@@ -23,38 +23,40 @@ pinn = nn.Sequential(
 optimizer = Adam(pinn.parameters(), lr=0.001)
 sampler = ISampler(1000, [[0, 1], [0, 2]], requires_grad=True)
 
-ml = TFC2dSpaceTimeDirichletBC(pinn, optimizer)
+s = TFC2dSpaceTimeDirichletBC(pinn)
+lm = LearningMachine(s)
 
 # 设置初边值条件
-@ml.set_initial
+@s.set_initial
 def inital(x: torch.Tensor):
     return torch.sin(torch.pi * x)
 
-@ml.set_left_edge(x=0.0)
+@s.set_left_edge(x=0.0)
 def left_edge(t: torch.Tensor):
     return torch.zeros_like(t)
 
-@ml.set_right_edge(x=2.0)
+@s.set_right_edge(x=2.0)
 def right_edge(t: torch.Tensor):
     return torch.zeros_like(t)
 
-# 定义 PDE 并将其加入损失项
-def heat_equation(p: torch.Tensor):
-    phi = ml.function(p)
+# 定义 PDE
+def heat_equation(p: torch.Tensor, u):
+    phi = u(p)
     phi_t, phi_x = gradient(phi, p, create_graph=True, split=True)
     _, phi_xx = gradient(phi_x, p, create_graph=True, split=True)
     return phi_t - 0.1*phi_xx
 
-ml.add_loss(1.0, heat_equation, sampler)
 
 # 开始训练
 for epoch in range(1000):
-    ml.backward()
-    ml.step()
+    optimizer.zero_grad()
+    mse_f = lm.loss(sampler, heat_equation)
+    mse_f.backward()
+    optimizer.step()
 
     if epoch % 100 == 0:
         with torch.no_grad():
-            print(f"Epoch: {epoch}| Loss: {ml.loss_data}")
+            print(f"Epoch: {epoch}| Loss: {mse_f.data}")
 
 
 ### Draw the result
@@ -66,7 +68,7 @@ import numpy as np
 t = np.linspace(0, 1, 20, dtype=np.float32)
 x = np.linspace(0, 2, 20, dtype=np.float32)
 
-phi, (mt, mx) = ml.meshgrid_mapping(t, x)
+phi, (mt, mx) = s.meshgrid_mapping(t, x)
 
 fig = plt.figure()
 ax = fig.add_subplot(projection='3d')
