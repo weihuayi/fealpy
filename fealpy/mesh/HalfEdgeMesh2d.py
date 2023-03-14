@@ -684,7 +684,7 @@ class HalfEdgeMesh2d(Mesh2d):
                     break
         return isMarkedHEdge
 
-    def refine_halfedge(self, isMarkedHEdge):
+    def refine_halfedge(self, isMarkedHEdge, newnode=None):
 
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
@@ -704,7 +704,10 @@ class HalfEdgeMesh2d(Mesh2d):
         idx = halfedge[flag0, 4]
         NE1 = flag0.sum()
         newNode = node.increase_size(NE1)
-        newNode[:] = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
+        if newnode is None:
+            newNode[:] = (node[halfedge[flag0, 0]] + node[halfedge[idx, 0]])/2
+        elif isinstance(newnode, np.ndarray):
+            newNode[:] = newnode
 
         edge2NewNode = np.zeros(NE*2, dtype=np.int_)
         edge2NewNode[flag0] = np.arange(NE1)+NN

@@ -14,6 +14,7 @@ from .StructureQuadMesh import StructureQuadMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .PolyhedronMesh import PolyhedronMesh 
 from .TriangleMesh import TriangleMesh
+from fealpy.mesh import MeshFactory as mf
 
 
 def msign(x):
@@ -75,7 +76,7 @@ def find_cut_point(phi, p0, p1):
         isRight[:] = False 
     return cutPoint
 
-def interfacemesh2d(box, phi, n):
+def interfacemesh2d(box, phi, n, meshtype='quad'):
     """ Generate a interface-fitted mesh 
 
     Parameters
@@ -101,7 +102,8 @@ def interfacemesh2d(box, phi, n):
     hy = (box[3] - box[2])/n
     h = min(hx, hy)
 
-    mesh = rectangledomainmesh(box, nx=n, ny=n, meshtype='quad') 
+    mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype=meshtype) 
+    ne = mesh.number_of_nodes_of_cells()
 
     N = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
@@ -157,24 +159,24 @@ def interfacemesh2d(box, phi, n):
     NS = np.sum(~isInterfaceCell)
     NT = tri.shape[0]
     pnode = np.concatenate((node, cutNode, auxNode), axis=0)
-    pcell = np.zeros(NS*4 + NT*3, dtype=np.int) 
+    pcell = np.zeros(NS*ne + NT*3, dtype=np.int) 
     pcellLocation = np.zeros(NS + NT + 1, dtype=np.int) 
 
-    sview = pcell[:4*NS].reshape(NS, 4)
+    sview = pcell[:ne*NS].reshape(NS, ne)
     sview[:] = cell[~isInterfaceCell,:]
 
-    tview = pcell[4*NS:].reshape(NT, 3)
+    tview = pcell[ne*NS:].reshape(NT, 3)
     tview[:] = tri
-    pcellLocation[:NS] = range(0, 4*NS, 4)
-    pcellLocation[NS:-1] = range(4*NS, 4*NS+3*NT, 3)
-    pcellLocation[-1] = 4*NS+3*NT
+    pcellLocation[:NS] = range(0, ne*NS, ne)
+    pcellLocation[NS:-1] = range(ne*NS, ne*NS+3*NT, 3)
+    pcellLocation[-1] = ne*NS+3*NT
     pmesh = PolygonMesh(pnode, pcell, pcellLocation)
 
     pmesh.nodeMarker = np.zeros(pmesh.number_of_nodes(), dtype=np.int)
     pmesh.nodeMarker[:N] = phiSign
 
-    pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
-    pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
+    #pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
+    #pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
 
     return pmesh    
 

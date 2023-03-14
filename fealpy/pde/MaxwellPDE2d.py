@@ -52,6 +52,19 @@ class MaxwellPDE2d():
         return curlF
 
     @cartesian
+    def curl_curl_solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        ccFx = self.curlcurlFx(x, y)
+        ccFy = self.curlcurlFy(x, y)
+        if type(ccFx) is not np.ndarray:
+            ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
+        if type(ccFy) is not np.ndarray:
+            ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
+        ccf = np.c_[ccFx, ccFy] 
+        return ccf
+
+    @cartesian
     def source(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]

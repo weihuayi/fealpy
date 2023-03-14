@@ -163,7 +163,7 @@ class ConformingVirtualElementSpace2d():
             val = np.sum(uh[idx]*self.area)
             return val
 
-    def project_to_smspace(self, uh):
+    def project_to_smspace(self, uh, method='H1'):
         """
         Project a conforming vem function uh into polynomial space.
         """
@@ -174,7 +174,11 @@ class ConformingVirtualElementSpace2d():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.smspace.function(dim=dim)
-        S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+
+        if method=='H1':
+            S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+        elif method=='L2':
+            S[:] = np.concatenate(list(map(g, zip(self.PI0, cd))))
         return S
 
     def grad_recovery(self, uh):
@@ -353,6 +357,7 @@ class ConformingVirtualElementSpace2d():
                     )
         C = self.integralalg.integral(f, celltype=True)
         H = space1.matrix_H()
+
         PI0 = inv(H)@C
         SS = mspace.function()
         SS[:] = np.einsum('ikj, ij->ik', PI0, S[smspace.cell_to_dof()]).reshape(-1)

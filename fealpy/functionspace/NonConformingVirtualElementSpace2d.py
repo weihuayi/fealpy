@@ -135,7 +135,7 @@ class NonConformingVirtualElementSpace2d():
 
         self.PI0 = self.matrix_PI_0(self.H, self.C)
 
-    def project_to_smspace(self, uh):
+    def project_to_smspace(self, uh, method='H1'):
         """
         Project a non conforming vem function uh into polynomial space.
         """
@@ -145,7 +145,10 @@ class NonConformingVirtualElementSpace2d():
         cd = np.hsplit(cell2dof, cell2dofLocation[1:-1])
         g = lambda x: x[0]@uh[x[1]]
         S = self.smspace.function()
-        S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+        if method=='H1':
+            S[:] = np.concatenate(list(map(g, zip(self.PI1, cd))))
+        elif method=='L2':
+            S[:] = np.concatenate(list(map(g, zip(self.PI0, cd))))
         return S
 
     def project_to_smspace_L2(self, uh):
