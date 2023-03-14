@@ -1,4 +1,4 @@
-from typing import Optional, List, Literal
+from typing import Optional, List, Literal, Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -33,10 +33,7 @@ class Solution(Module):
 
     def fixed(self, feature_idx: List[int], value: List[int]):
         assert len(feature_idx) == len(value)
-        ret = _Fixed(self)
-        ret._fixed_idx = torch.tensor(feature_idx, dtype=torch.long)
-        ret._fixed_value = torch.tensor(value, dtype=torch.float32)
-        return ret
+        return _Fixed(self, feature_idx, value)
 
     def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
         """
@@ -122,15 +119,19 @@ class Solution(Module):
 
 
 class _Fixed(Solution):
-
-    _fixed_idx = torch.zeros((1, ), dtype=torch.long)
-    _fixed_value = torch.zeros((1, ), dtype=torch.float)
+    def __init__(self, net: Optional[Module],
+                 idx: List[int],
+                 values: List[float]
+        ) -> None:
+        super().__init__(net)
+        self._fixed_idx = torch.tensor(idx, dtype=torch.long)
+        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(-1)
 
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
         size = p.shape[:-1] + (total_feature, )
         fixed_p = torch.zeros(size, dtype=torch.float)
-        fixed_p[..., self._fixed_idx] = self._fixed_value.unsqueeze(-1)
+        fixed_p[..., self._fixed_idx] = self._fixed_value
 
         feature_mask = torch.ones((total_feature, ), dtype=torch.bool)
         feature_mask[self._fixed_idx] = False

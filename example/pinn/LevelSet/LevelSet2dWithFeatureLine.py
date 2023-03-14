@@ -1,4 +1,5 @@
 from typing import Callable
+from time import time
 
 import numpy as np
 import torch
@@ -15,6 +16,7 @@ Function = Callable[[torch.Tensor], torch.Tensor]
 
 ### Load Feature Line Model
 
+t1 = time()
 print("载入特征线模型...")
 state_dict = torch.load("FeatureLines.pth")
 
@@ -46,26 +48,24 @@ fl.training = False
 ### Define Levelset Model
 
 print("训练水平集...")
-class Net(nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
 
-        self.hidden_l1 = nn.Linear(3, 64)
-        self.hidden_l2 = nn.Linear(64, 32)
-        self.hidden_l3 = nn.Linear(32, 16)
-        self.hidden_l4 = nn.Linear(16, 8)
-        self.hidden_l5 = nn.Linear(8, 4)
-        self.hidden_l6 = nn.Linear(4, 2)
-        self.output_layer = nn.Linear(2, 1)
-
-    def forward(self, x):
-        out = torch.tanh(self.hidden_l1(x))
-        out = torch.tanh(self.hidden_l2(out))
-        out = torch.tanh(self.hidden_l3(out))
-        out = torch.tanh(self.hidden_l4(out))
-        out = torch.tanh(self.hidden_l5(out))
-        out = torch.tanh(self.hidden_l6(out))
-        return self.output_layer(out)
+pinn2 = Sequential(
+    Linear(3, 128),
+    Tanh(),
+    Linear(128, 64),
+    Tanh(),
+    Linear(64, 32),
+    Tanh(),
+    Linear(32, 16),
+    Tanh(),
+    Linear(16, 8),
+    Tanh(),
+    Linear(8, 4),
+    Tanh(),
+    Linear(4, 2),
+    Tanh(),
+    Linear(2, 1)
+)
 
 
 def circle(p: torch.Tensor):
@@ -82,14 +82,16 @@ class InitialValue2(Solution):
         return self.net(p) + circle(x) - self.net(torch.cat([torch.zeros_like(t), x], dim=-1))
 
 
-phi = InitialValue2(Net())
+phi = InitialValue2(pinn2)
 lm = LearningMachine(phi)
 domain = [0, 1, 0, 1]
+T = 4.0
+TAU = 0.25
 
 mse_cost_function = nn.MSELoss(reduction='mean')
 optimizer = torch.optim.Adam(phi.parameters(), lr=0.0005)
 sampler1 = ISampler(10000, [[0, 1], [0, 1], [0, 1]], requires_grad=True)
-sampler2 = ISampler(1000, [[0.25, 0.75], [0, 1], [0, 1]], requires_grad=True)
+sampler2 = ISampler(1000, [[TAU, T-TAU], [0, 1], [0, 1]], requires_grad=True)
 
 
 def velocity_field(p: torch.Tensor):
@@ -120,7 +122,7 @@ for epoch in range(iterations):
 
     pts = sampler2.run()
     m = pts.shape[0]
-    delta = torch.ones((m, 1)) * 0.25
+    delta = torch.ones((m, 1)) * TAU
     phi_c = phi(pts)
 
     pts_f = fl(torch.cat([delta, pts[:, 1:3]], dim=1))
@@ -132,17 +134,19 @@ for epoch in range(iterations):
     mse_fl = mse_cost_function(phi_c, phi_f) + mse_cost_function(phi_c, phi_p)
 
     # backward
-    loss = 1.0*mse_f
+    loss = 0.5*mse_f + 0.5*mse_fl
     loss.backward()
     optimizer.step()
 
     with torch.autograd.no_grad():
         if (epoch) % 500 == 0:
             print(f"Epoch: {epoch} | Loss: {loss.data}")
-
+t2 = time()
+print(f"求解用时：{t2 - t1}")
 
 ### Estimate error
 
+t3 = time()
 print("FEM 求解...")
 from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.mesh import MeshFactory as MF
@@ -171,7 +175,7 @@ def circle2(p):
 domain = [0, 1, 0, 1]
 mesh = MF.boxmesh2d(domain, nx=100, ny=100, meshtype='tri')
 
-timeline = UniformTimeLine(0, 1, 100)
+timeline = UniformTimeLine(0, T, 100)
 dt = timeline.dt
 
 space = LagrangeFiniteElementSpace(mesh, p=1)
@@ -204,8 +208,10 @@ for i in range(100):
 
     # 时间步进一层
     timeline.advance()
+t4 = time()
+print(f"求解用时：{t4 - t3}")
 
-final_phi = phi.fixed([0, ], [1.0, ])
+final_phi = phi.fixed([0, ], [T, ])
 error = final_phi.estimate_error(phi0, squeeze=True)
 
 print(f"计算误差：{error}")
@@ -216,7 +222,7 @@ from matplotlib import pyplot as plt
 from matplotlib import cm
 from matplotlib import colors
 
-t = [0, 0.25, 0.5, 0.75, 1.0]
+t = [0, 0.25*T, 0.5*T, 0.75*T, T]
 x = np.linspace(domain[0], domain[1], 100)
 y = np.linspace(domain[2], domain[3], 100)
 ms_x, ms_y = np.meshgrid(x, y)
