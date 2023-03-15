@@ -1,13 +1,13 @@
 from typing import (
     List,
-    SupportsIndex
+    SupportsIndex,
+    Any
 )
 import torch
 from torch.autograd import Variable
 import numpy as np
 
 from .nntyping import TensorOrArray
-
 
 __all__ = [
     "ISampler",
@@ -22,9 +22,15 @@ class Sampler():
         self.m = int(m)
         self.requires_grad = bool(requires_grad)
 
-    def __add__(self, other):
+    def __and__(self, other):
         if isinstance(other, Sampler):
-            return CompoundSampler(self, other)
+            return JoinedSampler(self, other)
+        else:
+            return NotImplemented
+
+    def __or__(self, other):
+        if isinstance(other, Sampler):
+            return HybridSampler(self, other)
         else:
             return NotImplemented
 
@@ -32,45 +38,72 @@ class Sampler():
         raise NotImplementedError
 
 
-class CompoundSampler(Sampler):
+class JoinedSampler(Sampler):
+    """Generate samples joined from different samplers in dim-0."""
     def __init__(self, *samplers: Sampler) -> None:
         self.samplers: List[Sampler] = []
         for sampler in samplers:
             self.add(sampler)
-
-    def __add__(self, other):
-        if isinstance(other, Sampler):
-            ret = CompoundSampler(*self.samplers)
-            ret.add(other)
-            return ret
-        else:
-            return NotImplemented
 
     @property
     def m(self):
         return sum(x.m for x in self.samplers)
 
     def add(self, sampler: Sampler):
-        if isinstance(sampler, CompoundSampler):
+        if isinstance(sampler, JoinedSampler):
             for sub in sampler.samplers:
                 self.add(sub)
         else:
             if self.nd <= 0:
                 self.nd = sampler.nd
             elif sampler.nd != self.nd:
-                raise ValueError('Cannot add samplers with different dimension.')
+                raise ValueError('Cannot join samplers generating samples with different number of features.')
             self.samplers.append(sampler)
 
     def run(self) -> torch.Tensor:
-        results = []
-        for sampler in self.samplers:
-            results.append(sampler.run())
-        return torch.cat(results, dim=0)
+        return torch.cat([s.run() for s in self.samplers], dim=0)
+
+
+class HybridSampler(Sampler):
+    """Generate samples with features from different samplers in dim-1."""
+    def __init__(self, *samplers: Sampler) -> None:
+        self.samplers: List[Sampler] = []
+        for sampler in samplers:
+            self.add(sampler)
+
+    @property
+    def nd(self):
+        return sum(x.m for x in self.samplers)
+
+    def add(self, sampler: Sampler):
+        if isinstance(sampler, HybridSampler):
+            for sub in sampler.samplers:
+                self.add(sub)
+        else:
+            if self.m <= 0:
+                self.m = sampler.m
+            elif sampler.m != self.m:
+                raise ValueError('Cannot hybrid samplers generating different number of samples.')
+            self.samplers.append(sampler)
+
+    def run(self) -> torch.Tensor:
+        return torch.cat([s.run() for s in self.samplers], dim=1)
+
+
+class ConstantSampler(Sampler):
+    def __init__(self, value: torch.Tensor, requires_grad: bool = False) -> None:
+        assert value.ndim == 2
+        super().__init__(0, requires_grad)
+        self.value = value
+        self.m, self.nd = value.shape
+
+    def run(self) -> torch.Tensor:
+        return self.value.clone()
 
 
 class ISampler(Sampler):
     """Generate samples independently in each axis."""
-    def __init__(self, m: SupportsIndex, ranges: TensorOrArray,
+    def __init__(self, m: SupportsIndex, ranges: Any,
                  requires_grad: bool=False) -> None:
         """
         Generate samples independently in each axis.
@@ -103,9 +136,9 @@ class ISampler(Sampler):
         return Variable(torch.from_numpy(ret).float(), requires_grad=self.requires_grad)
 
 
-class BoxEdgeSampler(CompoundSampler):
+class BoxEdgeSampler(JoinedSampler):
     """Generate samples on the edges of a multidimensional rectangle."""
-    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool = False) -> None:
+    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool=False) -> None:
         """
         Generate samples on the edges of a multidimensional rectangle.
 
@@ -133,17 +166,16 @@ class BoxEdgeSampler(CompoundSampler):
             self.add(ISampler(m=m_edge, ranges=range2, requires_grad=requires_grad))
 
 
-class TriangleMeshSampler(Sampler):
-    """Sampler in a triangle mesh."""
+class _MeshSampler(Sampler):
     def __init__(self, m_cell: SupportsIndex, mesh, requires_grad: bool=False) -> None:
         """
-        Generate samples in every cells of a triangle mesh.
+        Generate samples in every cells of a mesh.
 
         Parameters
         ---
         m_cell: int.
             Number of samples in each cell.
-        mesh: TriangleMesh.
+        mesh: Mesh.
         requires_grad: bool. Defaults to `False`.
             See `torch.autograd.grad`.
         """
@@ -152,6 +184,9 @@ class TriangleMeshSampler(Sampler):
         super().__init__(m=m, requires_grad=requires_grad)
         self.mesh = mesh
 
+
+class TriangleMeshSampler(_MeshSampler):
+    """Sampler in a triangle mesh."""
     def run(self) -> torch.Tensor:
         bcs = np.zeros((self.m_cell, 3))
         bcs[:, 1:3] = np.random.rand(self.m_cell, 2)
@@ -161,3 +196,9 @@ class TriangleMeshSampler(Sampler):
         bcs[reflect_state, 0] = - bcs[reflect_state, 0]
         ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 2))
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
+
+
+# class TetrahedronSampler(_MeshSampler):
+#     """Sampler in a tetrahedron mesh."""
+#     def run(self) -> torch.Tensor:
+#         bcs = np.zeros((self.m_cell, 4))

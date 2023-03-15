@@ -523,14 +523,10 @@ for i in range(maxit):
     du = np.zeros(NN*2, dtype=np.float64)
     
     isBdNode = model.is_disp_top_boundary(node)
-    uh[isBdNode, 1] += 1e-5
-#    isInDof = np.r_['0', np.ones(NN, dtype=np.bool_), ~isBdNode]
-
     isBdDof = np.r_['0', np.zeros(NN, dtype=np.bool_), isBdNode]
-#    du[isBdDof] = 1e-5
+    du[isBdDof] = 1e-5
     
     isDDof = model.is_disp_bottom_boundary(node)
-#    isInDof = np.logical_not(np.logical_or(isBdDof, isDDof))
 
     k = 0
     while k < iteration:
@@ -547,8 +543,7 @@ for i in range(maxit):
         R0 = F.T.flat
         
         # 边界条件处理
-        x = du.T.flat
-        R0 -= A@x
+        R0 -= A@du
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isDDof] = 1
         bdIdx[isBdDof] =1
