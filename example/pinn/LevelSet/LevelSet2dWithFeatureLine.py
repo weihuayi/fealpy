@@ -11,8 +11,6 @@ from fealpy.pinn.machine import Solution, LearningMachine
 from fealpy.pinn.sampler import ISampler
 from fealpy.pinn.grad import grad_by_fts
 
-Function = Callable[[torch.Tensor], torch.Tensor]
-
 
 ### Load Feature Line Model
 
@@ -49,24 +47,6 @@ fl.training = False
 
 print("训练水平集...")
 
-pinn2 = Sequential(
-    Linear(3, 128),
-    Tanh(),
-    Linear(128, 64),
-    Tanh(),
-    Linear(64, 32),
-    Tanh(),
-    Linear(32, 16),
-    Tanh(),
-    Linear(16, 8),
-    Tanh(),
-    Linear(8, 4),
-    Tanh(),
-    Linear(4, 2),
-    Tanh(),
-    Linear(2, 1)
-)
-
 
 def circle(p: torch.Tensor):
     x = p[..., 0:1]
@@ -80,18 +60,6 @@ class InitialValue2(Solution):
         t = p[..., 0:1]
         x = p[..., 1:3]
         return self.net(p) + circle(x) - self.net(torch.cat([torch.zeros_like(t), x], dim=-1))
-
-
-phi = InitialValue2(pinn2)
-lm = LearningMachine(phi)
-domain = [0, 1, 0, 1]
-T = 4.0
-TAU = 0.25
-
-mse_cost_function = nn.MSELoss(reduction='mean')
-optimizer = torch.optim.Adam(phi.parameters(), lr=0.0005)
-sampler1 = ISampler(10000, [[0, 1], [0, 1], [0, 1]], requires_grad=True)
-sampler2 = ISampler(1000, [[TAU, T-TAU], [0, 1], [0, 1]], requires_grad=True)
 
 
 def velocity_field(p: torch.Tensor):
@@ -112,7 +80,36 @@ def levelset_equation(tx: torch.Tensor, phi):
     return phi_t + u_phi_x
 
 
-iterations = 10000
+pinn2 = Sequential(
+    Linear(3, 64),
+    Tanh(),
+    Linear(64, 32),
+    Tanh(),
+    Linear(32, 16),
+    Tanh(),
+    Linear(16, 8),
+    Tanh(),
+    Linear(8, 4),
+    Tanh(),
+    Linear(4, 2),
+    Tanh(),
+    Linear(2, 1)
+)
+
+
+phi = InitialValue2(pinn2)
+lm = LearningMachine(phi)
+domain = [0, 1, 0, 1]
+T = 1.0
+TAU = 0.01
+
+mse_cost_function = nn.MSELoss(reduction='mean')
+optimizer = torch.optim.Adam(phi.parameters(), lr=0.001)
+sampler1 = ISampler(10000, [[0, 1], [0, 1], [0, 1]], requires_grad=True)
+sampler2 = ISampler(10000, [[TAU, T-TAU], [0, 1], [0, 1]], requires_grad=True)
+
+
+iterations = 5000
 
 for epoch in range(iterations):
     optimizer.zero_grad()
@@ -134,7 +131,7 @@ for epoch in range(iterations):
     mse_fl = mse_cost_function(phi_c, phi_f) + mse_cost_function(phi_c, phi_p)
 
     # backward
-    loss = 0.5*mse_f + 0.5*mse_fl
+    loss = 0.1*mse_f + 1000*mse_fl
     loss.backward()
     optimizer.step()
 
@@ -144,72 +141,18 @@ for epoch in range(iterations):
 t2 = time()
 print(f"求解用时：{t2 - t1}")
 
+
 ### Estimate error
 
-t3 = time()
-print("FEM 求解...")
-from fealpy.timeintegratoralg import UniformTimeLine
 from fealpy.mesh import MeshFactory as MF
 from fealpy.functionspace import LagrangeFiniteElementSpace
-from fealpy.decorator import cartesian
-from fealpy.solver import LevelSetFEMFastSolver
-
-
-@cartesian
-def velocity_field2(p):
-    x = p[..., 0]
-    y = p[..., 1]
-    u = np.zeros(p.shape)
-    u[..., 0] = np.sin((np.pi*x))**2 * np.sin(2*np.pi*y)
-    u[..., 1] = -np.sin((np.pi*y))**2 * np.sin(2*np.pi*x)
-    return u
-
-@cartesian
-def circle2(p):
-    x = p[...,0]
-    y = p[...,1]
-    val = np.sqrt((x-0.5)**2+(y-0.75)**2)-0.15
-    return val
+from fealpy.functionspace.Function import Function
 
 
 domain = [0, 1, 0, 1]
 mesh = MF.boxmesh2d(domain, nx=100, ny=100, meshtype='tri')
-
-timeline = UniformTimeLine(0, T, 100)
-dt = timeline.dt
-
-space = LagrangeFiniteElementSpace(mesh, p=1)
-phi0 = space.interpolation(circle2)
-u = space.interpolation(velocity_field2, dim=2)
-
-
-M = space.mass_matrix()
-C = space.convection_matrix(c = u).T
-A = M + dt/2*C
-
-diff = []
-measure = space.function()
-
-solver = LevelSetFEMFastSolver(A)
-
-for i in range(100):
-
-    t1 = timeline.next_time_level()
-    print("t1=", t1)
-
-    #计算面积
-    measure[phi0 > 0] = 0
-    measure[phi0 <=0] = 1
-    diff.append(abs(space.integralalg.integral(measure) - (np.pi)*0.15**2))
-
-    b = M@phi0 - dt/2*(C@phi0)
-
-    phi0[:] = solver.solve(b, tol=1e-12)
-
-    # 时间步进一层
-    timeline.advance()
-t4 = time()
-print(f"求解用时：{t4 - t3}")
+space = LagrangeFiniteElementSpace(mesh, p=5)
+phi0 = Function(space, array=np.load('LevelSet2d_5.npy'))
 
 final_phi = phi.fixed([0, ], [T, ])
 error = final_phi.estimate_error(phi0, squeeze=True)
