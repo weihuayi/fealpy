@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional, Union
+from typing import Optional, List, Literal, Callable
 
 import numpy as np
 from numpy.typing import NDArray
@@ -31,34 +31,68 @@ class Solution(Module):
     def forward(self, p: Tensor):
         return self.__net(p)
 
+    def fixed(self, feature_idx: List[int], value: List[int]):
+        assert len(feature_idx) == len(value)
+        return _Fixed(self, feature_idx, value)
+
     def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
         """
         From bc in mesh cells to outputs of the solution.
 
         Return
         ---
-        outputs: 2-D Array. Outputs in every integral points and every cells.
+        outputs: 2-D Array. Outputs in every bc points and every cells.
         """
         points = mesh.cell_bc_to_point(bc)
         points_tensor = torch.tensor(points, dtype=torch.float32)
         return self.forward(points_tensor).detach().numpy()
 
-    def estimate_error(self, other: VectorFunction, space):
+    def estimate_error(self, other: VectorFunction, space=None,
+                       fn_type: Literal['bc', 'val']='bc', squeeze: bool=False):
         """
         Calculate error between the solution and `other` in finite element space `space`.
 
         Parameters
         ---
         other: VectorFunction.
+            The function to be compared with. If `other` is `Function`(functions in finite element
+            spaces), there is no need to specify `space` and `fn_type`.
         space: FiniteElementSpace.
+        fn_type: 'bc' or 'val'. Defaults to 'bc'.
+        squeeze: bool. Defaults to `False`.
+            Squeeze the solution automatically if the last dim has shape (1). This is sometimes useful
+            when estimating error for an 1-output network.
 
         Return
         ---
         error: float.
         """
-        def f(bc):
-            val = self.from_cell_bc(bc, space.mesh)
-            return (val - other(bc))**2
+        from ..functionspace.Function import Function
+        if isinstance(other, Function):
+            if space is not None:
+                if other.space is not space:
+                    print("Warning: Trying to calculate in another finite element space.")
+            else:
+                space = other.space
+
+        if fn_type == 'val':
+
+            def f(bc):
+                val = self.from_cell_bc(bc, space.mesh)
+                if squeeze:
+                    val = val.squeeze(-1)
+                return (val - other(space.mesh.cell_bc_to_point(bc)))**2
+
+        elif fn_type == 'bc':
+
+            def f(bc):
+                val = self.from_cell_bc(bc, space.mesh)
+                if squeeze:
+                    val = val.squeeze(-1)
+                return (val - other(bc))**2
+
+        else:
+            raise ValueError('Invalid function type.')
 
         return np.sqrt(space.integralalg.integral(f, False))
 
@@ -78,7 +112,34 @@ class Solution(Module):
         mesh_pt = [Variable(torch.from_numpy(x).float(), requires_grad=True) for x in flat_mesh]
         pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
         u_plot: NDArray = pt_u.data.cpu().numpy()
-        return u_plot.reshape(mesh[0].shape), mesh
+        assert u_plot.ndim == 2
+        nf = u_plot.shape[-1]
+        if nf <= 1:
+            return u_plot.reshape(mesh[0].shape), mesh
+        else:
+            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf)], mesh
+
+
+class _Fixed(Solution):
+    def __init__(self, net: Optional[Module],
+                 idx: List[int],
+                 values: List[float]
+        ) -> None:
+        super().__init__(net)
+        self._fixed_idx = torch.tensor(idx, dtype=torch.long)
+        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(-1)
+
+    def forward(self, p: Tensor):
+        total_feature = p.shape[-1] + len(self._fixed_idx)
+        size = p.shape[:-1] + (total_feature, )
+        fixed_p = torch.zeros(size, dtype=torch.float)
+        fixed_p[..., self._fixed_idx] = self._fixed_value
+
+        feature_mask = torch.ones((total_feature, ), dtype=torch.bool)
+        feature_mask[self._fixed_idx] = False
+        fixed_p[..., feature_mask] = p
+
+        return self.net.forward(fixed_p)
 
 
 class LearningMachine():
