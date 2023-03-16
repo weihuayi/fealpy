@@ -544,7 +544,7 @@ class ScaledMonomialSpace3d():
         mesh1 = TetrahedronMesh(node1, d.simplices)
 
         face = mesh1.entity('face')
-        isFace = np.zeros(len(face), dtype=np.bool)
+        isFace = np.zeros(len(face), dtype=np.bool_)
         for i in range(len(idx)-1):
             flag = np.sum((face >= idx[i]) & (face < idx[i+1]), axis=-1) == 3
             isFace[flag] = True

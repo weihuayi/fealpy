@@ -266,7 +266,7 @@ class CLagrangeHexahedronMeshDof():
 
         gdof = self.number_of_global_dofs()
         face2dof = self.face_to_dof()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         isBdDof[face2dof[index]] = True
         return isBdDof
 

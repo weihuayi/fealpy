@@ -422,7 +422,7 @@ class HalfEdgeMeshTest:
         # 边界点固定标记, 在网格生成与自适应算法中不能移除
         # 1: 固定
         # 0: 自由
-        fflag = np.ones(4, dtype=np.bool)
+        fflag = np.ones(4, dtype=np.bool_)
 
         #  dflag 单元所处的子区域的标记编号
         #  0: 表示外部无界区域

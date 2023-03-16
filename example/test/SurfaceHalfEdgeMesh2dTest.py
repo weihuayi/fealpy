@@ -33,7 +33,7 @@ class SurfaceHalfEdgemesh2dTest():
         NN = mesh.number_of_nodes()
         NE = mesh.number_of_edges()
         NC = mesh.number_of_cells()
-        val = np.ones((NE,), dtype=np.bool)
+        val = np.ones((NE,), dtype=np.bool_)
 
         cell2cell = coo_matrix(
                 (val, (edge2cell[:, 0], edge2cell[:, 1])),
@@ -51,7 +51,7 @@ class SurfaceHalfEdgemesh2dTest():
 
         cedge = edge[index]
         nc = len(cedge)
-        val = np.ones(nc, dtype=np.bool)
+        val = np.ones(nc, dtype=np.bool_)
         cn2cn = coo_matrix((val, (cedge[:, 0], cedge[:, 1])), shape=(NN, NN))
         cn2cn += coo_matrix((val, (cedge[:, 1], cedge[:, 0])), shape=(NN, NN))
         cn2cn = cn2cn.tocsr()

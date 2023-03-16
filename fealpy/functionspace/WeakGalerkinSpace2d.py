@@ -38,7 +38,7 @@ class WGDof2d():
                 flag = threshold(bc)
                 index = index[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdDof[edge2dof[index]] = True
         return isBdDof
@@ -53,7 +53,7 @@ class WGDof2d():
                 flag = threshold(bc)
                 index = index[flag]
         gdof = self.number_of_global_dofs()
-        isBdDof = np.zeros(gdof, dtype=np.bool)
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
         edge2dof = self.edge_to_dof()
         isBdDof[edge2dof[index]] = True
         return isBdDof

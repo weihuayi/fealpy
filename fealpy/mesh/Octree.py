@@ -58,17 +58,17 @@ class Octree(HexahedronMesh):
             isLeafCell = self.is_leaf_cell()
 
             # Construct cellCenter
-            isNeedCutCell = np.zeros(NC, dtype=np.bool)
+            isNeedCutCell = np.zeros(NC, dtype=np.bool_)
             isNeedCutCell[idx] = True
             isNeedCutCell = isNeedCutCell & isLeafCell
 
             # Construct edgeCenter 
             cell2edge = self.ds.cell_to_edge()
 
-            isCutEdge = np.zeros(NE, dtype=np.bool)
+            isCutEdge = np.zeros(NE, dtype=np.bool_)
             isCutEdge[cell2edge[isNeedCutCell, :]] = True
 
-            isCuttedEdge = np.zeros(NE, dtype=np.bool)
+            isCuttedEdge = np.zeros(NE, dtype=np.bool_)
             isCuttedEdge[cell2edge[~isLeafCell, :]] = True
             isCuttedEdge = isCuttedEdge & isCutEdge
 
@@ -96,10 +96,10 @@ class Octree(HexahedronMesh):
 
             # Construct faceCenter and face2center
             cell2face = self.ds.cell_to_face()
-            isCutFace = np.zeros(NF, dtype=np.bool)
+            isCutFace = np.zeros(NF, dtype=np.bool_)
             isCutFace[cell2face[isNeedCutCell, :]] = True
 
-            isCuttedFace = np.zeros(NF, dtype=np.bool)
+            isCuttedFace = np.zeros(NF, dtype=np.bool_)
             isCuttedFace[cell2face[~isLeafCell, :]] = True 
             isCuttedFace = isCuttedFace & isCutFace
 
@@ -191,7 +191,7 @@ class Octree(HexahedronMesh):
             child = self.child
 
             
-            isRemainCell = np.ones(NC, dtype=np.bool)
+            isRemainCell = np.ones(NC, dtype=np.bool_)
             isRemainCell[idx] = False
             isRemainCell[child[parent[idx, 0], :]] = False
 
@@ -206,7 +206,7 @@ class Octree(HexahedronMesh):
                 else:
                     NNC0 = NNC1
 
-            isRemainNode = np.zeros(N, dtype=np.bool)
+            isRemainNode = np.zeros(N, dtype=np.bool_)
             isRemainNode[cell[isRemainCell, :]] = True
 
             cell = cell[isRemainCell]
@@ -325,7 +325,7 @@ class Octree(HexahedronMesh):
             N = self.number_of_nodes()
             NE = self.number_of_edges()
             face2edge = self.ds.face_to_edge()
-            isLeafEdge = np.zeros(NE, dtype=np.bool)
+            isLeafEdge = np.zeros(NE, dtype=np.bool_)
             pface2edge = face2edge[isLeafFace]
             isLeafEdge[pface2edge] = True
             pedge = edge[isLeafEdge]

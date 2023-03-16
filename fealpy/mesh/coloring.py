@@ -23,7 +23,7 @@ def opt_coloring(mesh, c):
 
     edge = mesh.ds.edge
 
-    nc = np.zeros((NN, mc), dtype=np.bool)
+    nc = np.zeros((NN, mc), dtype=np.bool_)
     np.add.at(nc, (edge[:, 0], c[edge[:, 1]]-1), True)
     np.add.at(nc, (edge[:, 1], c[edge[:, 0]]-1), True)
 

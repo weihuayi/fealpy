@@ -46,7 +46,7 @@ def HG(mesh, phi, phiSign, h):
 
     edge = mesh.ds.edge
 
-    isXEdge = np.zeros(NE, dtype=np.bool)
+    isXEdge = np.zeros(NE, dtype=np.bool_)
     isXEdge[ny*(nx+1):] = True
     
     dx0[edge[isXEdge, 0]] = (phi[edge[isXEdge, 1]] - phi[edge[isXEdge, 0]])/dx
@@ -133,10 +133,10 @@ isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0
 A = point[edge[isCutEdge, 0]].copy()
 B = point[edge[isCutEdge, 1]].copy()
 cutPoint = find_cut_point(interface, A, B)
-isCutPoint = np.zeros(N, dtype=np.bool)
+isCutPoint = np.zeros(N, dtype=np.bool_)
 isCutPoint[edge[isCutEdge]] = True
 
-isXEdge = np.zeros(NE, dtype=np.bool)
+isXEdge = np.zeros(NE, dtype=np.bool_)
 isXEdge[ny*(nx+1):] = True
 
 A = point[edge[isCutEdge, 0]]

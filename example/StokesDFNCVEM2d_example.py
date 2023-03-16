@@ -71,7 +71,7 @@ for i in range(maxit):
 
     uspace.set_dirichlet_bc(uh, pde.dirichlet)
     x = np.block([uh.T.flat, ph])
-    isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool)])
+    isBdDof = np.block([isBdDof, isBdDof, np.zeros(pdof, dtype=np.bool_)])
 
     gdof = 2*udof + pdof
     FF -= AA@x
