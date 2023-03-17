@@ -118,21 +118,17 @@ class ISampler(Sampler):
             See `torch.autograd.grad`.
         """
         super().__init__(m=m, requires_grad=requires_grad)
-        self.ranges = np.array(ranges)
-        if len(self.ranges.shape) == 2:
-            self.nd = self.ranges.shape[0]
+        ranges_arr = np.array(ranges, np.float32)
+        if len(ranges_arr.shape) == 2:
+            self.nd = ranges_arr.shape[0]
         else:
             raise ValueError
+        self.lows = ranges_arr[:, 0].reshape(1, self.nd)
+        self.highs = ranges_arr[:, 1].reshape(1, self.nd)
+        self.deltas = self.highs - self.lows
 
     def run(self) -> torch.Tensor:
-        ret = np.zeros((self.m, self.nd))
-        for i in range(self.nd):
-            low = self.ranges[i, 0]
-            high = self.ranges[i, 1]
-            if abs(high - low) < 1e-16:
-                ret[..., i] = low
-            else:
-                ret[..., i] = torch.rand(self.m)*(high - low) + low
+        ret = np.random.rand(self.m, self.nd) * self.deltas + self.lows
         return Variable(torch.from_numpy(ret).float(), requires_grad=self.requires_grad)
 
 
@@ -180,50 +176,49 @@ class _MeshSampler(Sampler):
             See `torch.autograd.grad`.
         """
         self.m_cell = int(m_cell)
-        m = self.m_cell * mesh.entity('cell').shape[0]
+        node = mesh.node
+        cell = mesh.entity('cell')
+
+        m = self.m_cell * cell.shape[0]
         super().__init__(m=m, requires_grad=requires_grad)
         self.mesh = mesh
         self.nd = mesh.top_dimension()
 
+        bcs_example = np.zeros((m_cell, self.nd+1))
+        self._path_info = np.einsum_path('...j, ijk->...ik', bcs_example, node[cell])[0]
 
-def _inverse(p, *idx):
-        mask = np.array(idx, dtype=np.int_)
-        p[:, mask] = 1 - p[:, mask]
-        return p
+    def cell_bc_to_point(self, bcs) -> np.ndarray:
+        """The optimized version of method `mesh.cell_bc_to_point()`
+        to support faster sampling."""
+        node = self.mesh.node
+        cell = self.mesh.entity('cell')
+        return np.einsum('...j, ijk->...ik', bcs, node[cell], optimize=self._path_info)
+
+
+def random_weights(m: int, n: int):
+    """Generate m samples, each sample has features like (X1, X2, ..., Xn)
+    such that the sum of Xi is 1.0.
+
+    Return
+    ---
+    ndarray with shape (m, n)."""
+    u = np.zeros((m, n+1))
+    u[:, n] = 1.0
+    u[:, 1:n] = np.sort(np.random.rand(m, n-1), axis=1)
+    return u[:, 1:n+1] - u[:, 0:n]
 
 
 class TriangleMeshSampler(_MeshSampler):
     """Sampler in a triangle mesh."""
     def run(self) -> torch.Tensor:
-        bcs = np.zeros((self.m_cell, 3))
-        bcs[:, 1:3] = np.random.rand(self.m_cell, 2)
-        bcs[:, 0] = 1 - bcs[:, 1] - bcs[:, 2]
-        reflect_state = bcs[:, 0] < 0
-        bcs[reflect_state, 1:3] = 1 - bcs[reflect_state, 1:3]
-        bcs[reflect_state, 0] = - bcs[reflect_state, 0]
-        ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 2))
+        bcs = random_weights(self.m_cell, 3)
+        ret = self.cell_bc_to_point(bcs).reshape((-1, 2))
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
 
 
 class TetrahedronMeshSampler(_MeshSampler):
     """Sampler in a tetrahedron mesh."""
     def run(self) -> torch.Tensor:
-        bcs = np.zeros((self.m_cell, 4))
-        u_0 = np.random.rand(self.m_cell, 3)
-        bcs[:, 1:4] = u_0
-        ui = [
-            _inverse(u_0.copy(), 0, 1),
-            _inverse(u_0.copy(), 1, 2),
-            _inverse(u_0.copy(), 2, 0)
-        ]
-
-        for i in range(3):
-            mask = np.sum(ui[i], -1) < 1
-            bcs[mask, 1:4] = ui[i][mask, :]
-
-        bcs[:, 0] = 1 - np.sum(bcs[:, 1:4], -1)
-        mask = bcs[:, 0] < 0
-        bcs[mask, 1:4] += 0.5*bcs[mask, 0:1]
-        bcs[mask, 0] = 1 - np.sum(bcs[mask, 1:4], -1)
-        ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 3))
+        bcs = random_weights(self.m_cell, 4)
+        ret = self.cell_bc_to_point(bcs).reshape((-1, 3))
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
