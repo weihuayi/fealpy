@@ -122,7 +122,7 @@ class ISampler(Sampler):
         if len(ranges_arr.shape) == 2:
             self.nd = ranges_arr.shape[0]
         else:
-            raise ValueError
+            raise ValueError(f"Unexpected `ranges` shape {ranges_arr.shape}.")
         self.lows = ranges_arr[:, 0].reshape(1, self.nd)
         self.highs = ranges_arr[:, 1].reshape(1, self.nd)
         self.deltas = self.highs - self.lows
@@ -196,12 +196,15 @@ class _MeshSampler(Sampler):
 
 
 def random_weights(m: int, n: int):
-    """Generate m samples, each sample has features like (X1, X2, ..., Xn)
-    such that the sum of Xi is 1.0.
+    """Generate m samples, each sample has features like (X1, X2, ..., Xn), (n >= 2),
+    such that the sum of Xi is 1.0. Raise ValueError if `n < 2`.
 
     Return
     ---
     ndarray with shape (m, n)."""
+    m, n = int(m), int(n)
+    if n < 2:
+        raise ValueError(f'Integer `n` should be larger than 1 but got {n}.')
     u = np.zeros((m, n+1))
     u[:, n] = 1.0
     u[:, 1:n] = np.sort(np.random.rand(m, n-1), axis=1)
