@@ -1,4 +1,4 @@
-from typing import Optional, List, Literal, Callable
+from typing import Optional, List, Literal
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,8 +7,7 @@ from torch import Tensor
 from torch.nn import Module
 from torch.autograd import Variable
 
-from .sampler import Sampler
-from .nntyping import TensorFunction, VectorFunction, Operator
+from .nntyping import TensorFunction, VectorFunction, Operator, GeneralSampler
 
 
 class ZeroMapping(Module):
@@ -157,7 +156,7 @@ class LearningMachine():
         return self.__solution
 
 
-    def loss(self, sampler: Sampler, func: Operator,
+    def loss(self, sampler: GeneralSampler, func: Operator,
              target: Optional[Tensor]=None, output_samples: bool=False) -> Tensor:
         """
         Calculate loss value.

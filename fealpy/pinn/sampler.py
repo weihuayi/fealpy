@@ -1,21 +1,21 @@
 from typing import (
     List,
     SupportsIndex,
-    Any
+    Any,
+    Generic,
+    TypeVar
 )
 import torch
 from torch.autograd import Variable
 import numpy as np
 
-from .nntyping import TensorOrArray
+from ..mesh.TriangleMesh import TriangleMesh
+from ..mesh.TetrahedronMesh import TetrahedronMesh
+from .nntyping import TensorOrArray, Mesh
 
-__all__ = [
-    "ISampler",
-    "BoxEdgeSampler",
-    "TriangleMeshSampler"
-]
 
 class Sampler():
+    """The base class of all types of samplers."""
     m: int = 0
     nd: int = 0
     def __init__(self, m: SupportsIndex=0, requires_grad: bool=False) -> None:
@@ -162,8 +162,10 @@ class BoxEdgeSampler(JoinedSampler):
             self.add(ISampler(m=m_edge, ranges=range2, requires_grad=requires_grad))
 
 
-class _MeshSampler(Sampler):
-    def __init__(self, m_cell: SupportsIndex, mesh, requires_grad: bool=False) -> None:
+_MT = TypeVar("_MT", bound=Mesh)
+
+class _MeshSampler(Sampler, Generic[_MT]):
+    def __init__(self, m_cell: SupportsIndex, mesh:_MT, requires_grad: bool=False) -> None:
         """
         Generate samples in every cells of a mesh.
 
@@ -211,7 +213,7 @@ def random_weights(m: int, n: int):
     return u[:, 1:n+1] - u[:, 0:n]
 
 
-class TriangleMeshSampler(_MeshSampler):
+class TriangleMeshSampler(_MeshSampler[TriangleMesh]):
     """Sampler in a triangle mesh."""
     def run(self) -> torch.Tensor:
         bcs = random_weights(self.m_cell, 3)
@@ -219,7 +221,7 @@ class TriangleMeshSampler(_MeshSampler):
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
 
 
-class TetrahedronMeshSampler(_MeshSampler):
+class TetrahedronMeshSampler(_MeshSampler[TetrahedronMesh]):
     """Sampler in a tetrahedron mesh."""
     def run(self) -> torch.Tensor:
         bcs = random_weights(self.m_cell, 4)
