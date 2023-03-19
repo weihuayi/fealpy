@@ -8,26 +8,56 @@ from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
 from ..geometry import project
 
-
 class UniformMesh2d(Mesh2d):
     """
-    @brief 二维 x 和 y 方向均匀离散的结构网格
+    @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
-    def __init__(self, extent, 
+    def __init__(self, extent,
             h=(1.0, 1.0), origin=(0.0, 0.0),
             itype=np.int_, ftype=np.float64):
+        """
+        @brief Initialize the 2D uniform mesh.
+
+        @param[in] extent A tuple representing the range of the mesh in the x and y directions.
+        @param[in] h A tuple representing the mesh step sizes in the x and y directions, default: (1.0, 1.0).
+        @param[in] origin A tuple representing the coordinates of the starting point, default: (0.0, 0.0).
+        @param[in] itype Integer type to be used, default: np.int_.
+        @param[in] ftype Floating point type to be used, default: np.float64.
+
+        @note The extent parameter defines the index range in the x and y directions.
+              We can define an index range starting from 0, e.g., [0, 10, 0, 10],
+              or starting from a non-zero value, e.g., [2, 12, 3, 13]. The flexibility
+              in the index range is mainly for handling different scenarios
+              and data subsets, such as:
+              - Subgrids
+              - Parallel computing
+              - Data cropping
+              - Handling irregular data
+
+        @example
+        from fealpy.mesh import UniformMesh2d
+
+        I = [0, 1, 0, 1]
+        h = (0.1, 0.1)
+        nx = int((I[1] - I[0])/h[0])
+        ny = int((I[3] - I[2])/h[1])
+        mesh = UniformMesh2d([0, nx, 0, ny], h=h, origin=(I[0], I[2]))
+
+        """
+
         self.extent = extent
-        self.h = h 
+        self.h = h
         self.origin = origin
 
         self.nx = self.extent[1] - self.extent[0]
         self.ny = self.extent[3] - self.extent[2]
         self.NC = self.nx * self.ny
         self.NN = (self.nx + 1) * (self.ny + 1)
+        # 为有限元计算设置的网格数据结构
         self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
-        self.itype = itype 
-        self.ftype = ftype 
+        self.itype = itype
+        self.ftype = ftype
         self.meshtype = 'UniformMesh2d'
 
     def uniform_refine(self, n=1, returnim=False):
