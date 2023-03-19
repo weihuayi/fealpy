@@ -1,9 +1,6 @@
 import numpy as np
 
-from .Operator import Operator
-
-
-class BilinearForm(Operator):
+class BilinearForm:
     """
     """
     def __init__(self, space):
@@ -40,6 +37,17 @@ class BilinearForm(Operator):
     def assembly(self):
         """
         @brief 调用积分子组装矩阵
+        """
+
+    def fast_assembly(self):
+        """
+        @brief 免数值积分组装
+        """
+
+    def parallel_assembly(self):
+        """
+        @brief 多线程数值积分组装
+        @note 特别当三维情形，
         """
 
 

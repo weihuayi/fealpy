@@ -3,26 +3,28 @@ import numpy as np
 
 class MassIntegrator:
 
-    def assembly_cell_matrix(self, mesh, b0, b1=None, c=None, q=3, cellmeasure=None):
+    def __init__(self, c=None, q=3):
+        self.coef = c
+        self.q = q
+
+    def assembly_cell_matrix(self, mesh, b0, index=np.s_[:], cellmeasure=None):
         """
         """
+        q = self.q
+        c = self.coef
+
         if cellmeasure is None:
-            cellmeasure = mesh.entity_measure('cell')
+            cellmeasure = mesh.entity_measure('cell', index=index)
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        ps = mesh.bc_to_point(bcs)
+        ps = mesh.bc_to_point(bcs, index=index)
 
-        phi0 = b0(bcs) # (NQ, NC, ldof, ...)
-
-        if b1 is not None:
-            phi1 = b1(bcs) # (NQ, NC, ldof, ...)
-        else:
-            phi1 = phi0
+        phi0 = b0(bcs, index=index) # (NQ, NC, ldof, ...)
 
         if c is None:
-            M = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, self.cellmeasure, optimize=True)
+            M = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
             if callable(c):
                 if hasattr(c, 'coordtype'):
@@ -31,22 +33,13 @@ class MassIntegrator:
                     elif c.coordtype == 'cartesian':
                         c = c(ps)
                 else:
-                    raise ValueError('''
-                    You should add decorator "cartesian" or "barycentric" on
-                    function `basis0`
+                    raise ValueError('''''')
 
-                    from fealpy.decorator import cartesian, barycentric
-
-                    @cartesian
-                    def basis0(p):
-                        ...
-
-                    @barycentric
-                    def basis0(p):
-                        ...
-
-                    ''')
-
-            M = np.einsum('q, qc, qci..., qcj..., c->cij', ws, c, phi0, phi1, self.cellmeasure, optimize=True)
+            M = np.einsum('q, qc, qci..., qcj..., c->cij', ws, c, phi0, phi0, cellmeasure, optimize=True)
 
         return M
+
+    def fast_assembly_cell_matrix(self, mesh, p):
+        """
+        """
+        assert mesh.meshtype in ['tri', 'tet']

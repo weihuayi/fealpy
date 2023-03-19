@@ -6,7 +6,7 @@ class DiffusionIntegrator:
     (c \grad u, \grad v)
     """
 
-    def assembly_cell_matrix(self, mesh, b0, b1=None, c=None, q=3, cellmeasure=None):
+    def assembly_cell_matrix(self, mesh, b0, c=None, q=3, cellmeasure=None):
         """
         """
         if cellmeasure is None:
