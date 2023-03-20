@@ -178,7 +178,7 @@ class _MeshSampler(Sampler, Generic[_MT]):
             See `torch.autograd.grad`.
         """
         self.m_cell = int(m_cell)
-        node = mesh.node
+        node = mesh.entity('node')
         cell = mesh.entity('cell')
 
         m = self.m_cell * cell.shape[0]
@@ -192,7 +192,7 @@ class _MeshSampler(Sampler, Generic[_MT]):
     def cell_bc_to_point(self, bcs) -> np.ndarray:
         """The optimized version of method `mesh.cell_bc_to_point()`
         to support faster sampling."""
-        node = self.mesh.node
+        node = self.mesh.entity('node')
         cell = self.mesh.entity('cell')
         return np.einsum('...j, ijk->...ik', bcs, node[cell], optimize=self._path_info)
 
