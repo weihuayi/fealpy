@@ -23,7 +23,7 @@ def grad_by_fts(scaler_out: Tensor, vector_in: Tensor,
     if len(scaler_out.shape) != 2:
         raise Exception("Arg 'scaler_out' must has samples in dim-0 and only 1 feature in dim-1.")
     if scaler_out.shape[1] != 1:
-        print("Warning: for multiple features, gradients of them will be added.")
+        raise ValueError("For multiple features, gradients of them will be added.")
     g = grad(
         outputs=scaler_out,
         inputs=vector_in,

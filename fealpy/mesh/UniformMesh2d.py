@@ -8,57 +8,122 @@ from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 
 from ..geometry import project
 
-
 class UniformMesh2d(Mesh2d):
     """
-    @brief 二维 x 和 y 方向均匀离散的结构网格
+    @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
-    def __init__(self, extent, 
+    def __init__(self, extent,
             h=(1.0, 1.0), origin=(0.0, 0.0),
             itype=np.int_, ftype=np.float64):
+        """
+        @brief Initialize the 2D uniform mesh.
+
+        @param[in] extent A tuple representing the range of the mesh in the x and y directions.
+        @param[in] h A tuple representing the mesh step sizes in the x and y directions, default: (1.0, 1.0).
+        @param[in] origin A tuple representing the coordinates of the starting point, default: (0.0, 0.0).
+        @param[in] itype Integer type to be used, default: np.int_.
+        @param[in] ftype Floating point type to be used, default: np.float64.
+
+        @note The extent parameter defines the index range in the x and y directions.
+              We can define an index range starting from 0, e.g., [0, 10, 0, 10],
+              or starting from a non-zero value, e.g., [2, 12, 3, 13]. The flexibility
+              in the index range is mainly for handling different scenarios
+              and data subsets, such as:
+              - Subgrids
+              - Parallel computing
+              - Data cropping
+              - Handling irregular data
+
+        @example
+        from fealpy.mesh import UniformMesh2d
+
+        I = [0, 1, 0, 1]
+        h = (0.1, 0.1)
+        nx = int((I[1] - I[0])/h[0])
+        ny = int((I[3] - I[2])/h[1])
+        mesh = UniformMesh2d([0, nx, 0, ny], h=h, origin=(I[0], I[2]))
+
+        """
+
         self.extent = extent
-        self.h = h 
+        self.h = h
         self.origin = origin
 
         self.nx = self.extent[1] - self.extent[0]
         self.ny = self.extent[3] - self.extent[2]
-        self.NC = self.nx * self.ny
         self.NN = (self.nx + 1) * (self.ny + 1)
+        self.NC = self.nx * self.ny
+        # 为有限元计算设置的网格数据结构
         self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
 
-        self.itype = itype 
-        self.ftype = ftype 
+        self.itype = itype
+        self.ftype = ftype
         self.meshtype = 'UniformMesh2d'
 
-    def uniform_refine(self, n=1, returnim=False):
-        if returnim:
-            nodeImatrix = []
-        for i in range(n):
-            print('h1', self.h[0])
-            self.extent = [i * 2 for i in self.extent]
-            self.h = [i / 2 for i in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
-
-            self.NC = self.nx * self.ny
-            self.NN = (self.nx + 1) * (self.ny + 1)
-            self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
-
-            if returnim:
-                A = self.interpolation_matrix()
-                nodeImatrix.append(A)
-
-        if returnim:
-            return nodeImatrix
 
     def geo_dimension(self):
+        """
+        @brief Get the geometry dimension of the mesh.
+        
+        @return The geometry dimension (2 for 2D mesh).
+        """
         return 2
 
     def top_dimension(self):
+        """
+        @brief Get the topological dimension of the mesh.
+        
+        @return The topological dimension (2 for 2D mesh).
+        """
         return 2
+
+    def number_of_nodes(self):
+        """
+        @brief Get the number of nodes in the mesh.
+
+        @return The number of nodes.
+        """
+        return self.NN
+
+    def number_of_cells(self):
+        """
+        @brief Get the number of cells in the mesh.
+
+        @return The number of cells.
+        """
+        return self.NC
+
+    def number_of_faces(self):
+        """
+        @brief Get the number of faces in the mesh.
+
+        @note `face` is the 1D entity 
+
+        @return The number of faces.
+        """
+        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
+
+    def number_of_edges(self):
+        """
+        @brief Get the number of edges in the mesh.
+
+        @note `edge` is the 1D entity 
+
+        @return The number of edges.
+        """
+        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
 
     @property
     def node(self):
+        """
+        @brief Get the coordinates of the nodes in the mesh.
+
+        @return A NumPy array of shape (NN, 2) containing the coordinates of the nodes.
+
+        @details This function calculates the coordinates of the nodes in the mesh based on the
+                 mesh's origin, step size, and the number of cells in the x and y directions.
+                 It returns a NumPy array with the coordinates of each node.
+        """
         GD = self.geo_dimension()
         nx = self.ds.nx
         ny = self.ds.ny
@@ -68,11 +133,20 @@ class UniformMesh2d(Mesh2d):
         node[..., 0], node[..., 1] = np.mgrid[
                                      box[0]:box[1]:complex(0, nx + 1),
                                      box[2]:box[3]:complex(0, ny + 1)]
-        return node.reshape(-1, 2)
+        return node
 
     def entity_barycenter(self, etype=2):
         """
-        @brief 
+        @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
+
+        @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
+        1, 'edgex', 'edgey', 'facex', 'facey', 'node', or 0.
+
+        @return The cell or node array based on the input entity type.
+
+        @throws ValueError if the given etype is invalid.
+
+        @todo 检查索引范围不从 0 开始时，会不会有问题
         """
         GD = self.geo_dimension()
         nx = self.ds.nx
@@ -102,7 +176,7 @@ class UniformMesh2d(Mesh2d):
                     box[2]:box[3]:complex(0, ny)]
             return xbc, ybc 
 
-        elif etype in {'edgex'}:
+        elif etype in {'edgex', 'facex'}:
             box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
                    self.origin[1],               self.origin[1] + ny*self.h[1]]
             bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
@@ -111,7 +185,7 @@ class UniformMesh2d(Mesh2d):
                     box[2]:box[3]:complex(0, ny+1)]
             return bc
 
-        elif etype in {'edgey'}:
+        elif etype in {'edgey', 'facey'}:
             box = [self.origin[0],               self.origin[0] + nx*self.h[0],
                    self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
             bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
@@ -124,13 +198,54 @@ class UniformMesh2d(Mesh2d):
         else:
             raise ValueError('the entity type `{}` is not correct!'.format(etype))
 
-    def error(self, h, nx, ny, u, uh):
+    def uniform_refine(self, n=1, returnim=False):
         """
-        @brief 计算真解在网格点处与数值解的误差
+        @brief Perform uniform refinement on the mesh.
 
-        @param[in] u
-        @param[in] uh
+        @param[in] n The number of refinement iterations to perform, default: 1.
+        @param[in] returnim If True, returns a list of interpolation matrices for each refinement iteration, default: False.
+
+        @return A list of interpolation matrices if returnim is True, otherwise None.
+
+        @details This function performs n iterations of uniform refinement on the mesh.
+                 For each iteration, it updates the mesh extent, step size, number of cells, and number of nodes,
+                 as well as the data structure. If returnim is True, it also calculates and returns the
+                 interpolation matrices for each iteration.
         """
+        if returnim:
+            nodeImatrix = []
+        for i in range(n):
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [i / 2 for i in self.h]
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+
+            self.NC = self.nx * self.ny
+            self.NN = (self.nx + 1) * (self.ny + 1)
+            self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
+
+            if returnim:
+                A = self.interpolation_matrix()
+                nodeImatrix.append(A)
+
+        if returnim:
+            return nodeImatrix
+
+    def error(self, u, uh, errortype='all'):
+        """
+        @brief Compute the error between the true solution and the numerical solution.
+
+        @param[in] u The true solution as a function.
+        @param[in] uh The numerical solution as an 2D array.
+        @param[in] errortype The error type, which can be 'all', 'max', 'L2' or 'H1'
+        """
+
+        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
+
+        h = self.h
+        nx = self.nx
+        ny = self.ny
+
         e = u - uh
 
         emax = np.max(np.abs(e))
@@ -159,12 +274,12 @@ class UniformMesh2d(Mesh2d):
         @param[in] ex 非负整数，把离散函数向外扩展一定宽度  
         """
 
-        nx = self.ds.nx
-        ny = self.ds.ny
+        nx = self.nx
+        ny = self.ny
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
             uh = np.zeros((nx+1+2*ex, ny+1+2*ex), dtype=dtype)
-        elif etype in {'edge', 1}:
+        elif etype in {'edge','face', 1}:
             ex = np.zeros((nx, ny+1), dtype=dtype)
             ey = np.zeros((nx+1, ny), dtype=dtype)
             uh = (ex, ey)
@@ -353,6 +468,12 @@ class UniformMesh2d(Mesh2d):
         
 
     def interpolation(self, f, intertype='node'):
+        """
+        This function is deprecated and will be removed in a future version.
+        Please use the interpolate() instead.
+        """
+        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
         nx = self.ds.nx
         ny = self.ds.ny
         node = self.node
@@ -368,6 +489,26 @@ class UniformMesh2d(Mesh2d):
             ybc = self.entity_barycenter('edgey')
             F = f(ybc)
         elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
+    def interpolate(self, f, intertype='node'):
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype in {'node', 0}:
+            F = f(node)
+        elif intertype in {'edge', 'face', 1}:
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype in {'edgex'}:
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype in {'edgey'}:
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype in {'cell'}:
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F

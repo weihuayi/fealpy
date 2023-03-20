@@ -204,7 +204,7 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
 
     idx = np.arange(N).reshape(nx+1, ny+1)
     if meshtype in {'tri', 'triangle'}:
-        cell = np.zeros((2*NC, 3), dtype=np.int)
+        cell = np.zeros((2*NC, 3), dtype=np.int_)
         cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
         cell[:NC, 1] = idx[1:,1:].flatten(order='F')
         cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
@@ -388,7 +388,7 @@ def special_boxmesh2d(box, n=10,
         bc = qmesh.entity_barycenter('cell') 
         newNode = np.r_['0', node, bc]
 
-        newCell = np.zeros((4*NC, 3), dtype=np.int) 
+        newCell = np.zeros((4*NC, 3), dtype=np.int_) 
         newCell[0:NC, 0] = range(NN, NN+NC)
         newCell[0:NC, 1:3] = cell[:, 0:2]
         
@@ -468,7 +468,7 @@ def lshape_mesh(n=4):
         (3, 6, 2),
         (5, 2, 6),
         (4, 7, 3),
-        (6, 3, 7)], dtype=np.int)
+        (6, 3, 7)], dtype=np.int_)
     mesh = TriangleMesh(point, cell)
     mesh.uniform_refine(n)
     return mesh
@@ -545,7 +545,7 @@ def uncross_mesh(box, n=10, r="1"):
         bc = qmesh.barycenter('cell') + ll/4
         newNode = np.r_['0',node, bc]
 
-    newCell = np.zeros((4*NC, 3), dtype=np.int) 
+    newCell = np.zeros((4*NC, 3), dtype=np.int_) 
     newCell[0:NC, 0] = range(NN, NN+NC)
     newCell[0:NC, 1:3] = cell[:, 0:2]
         

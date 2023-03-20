@@ -10,18 +10,43 @@ from ..geometry import project
 
 class UniformMesh3d(Mesh3d):
     """
-    @brief x, y, z 三个方向均匀剖分的三维网格
+    @brief A class for representing a three-dimensional structured mesh with uniform discretization in x, y, and z directions.
     """
-
     def __init__(self, extent, 
             h=(1.0, 1.0, 1.0), origin=(0.0, 0.0, 0.0),
             ftype=np.float64, itype=np.int_
             ):
         """
-        @param[in] extent 与首个网格单元的偏移量
-        @param[in] h 部分步长
-        @param[in] origin 起始点的坐标
+        @brief Initialize the 3D uniform mesh.
+
+        @param[in] extent A tuple representing the range of the mesh in the x, y, and z directions.
+        @param[in] h A tuple representing the mesh step sizes in the x, y, and z directions, default: (1.0, 1.0, 1.0).
+        @param[in] origin A tuple representing the coordinates of the starting point, default: (0.0, 0.0, 0.0).
+        @param[in] ftype Floating point type to be used, default: np.float64.
+        @param[in] itype Integer type to be used, default: np.int_.
+
+        @note The extent parameter defines the index range in the x, y, and z directions.
+              We can define an index range starting from 0, e.g., [0, 10, 0, 10, 0, 10],
+              or starting from a non-zero value, e.g., [2, 12, 3, 13, 4, 14]. The flexibility
+              in the index range is mainly for handling different scenarios
+              and data subsets, such as:
+              - Subgrids
+              - Parallel computing
+              - Data cropping
+              - Handling irregular data
+
+        @example 
+        from fealpy.mesh import UniformMesh3d
+
+        I = [0, 1, 0, 1, 0, 1]
+        h = (0.1, 0.1, 0.1)
+        nx = int((I[1] - I[0])/h[0])
+        ny = int((I[3] - I[2])/h[1])
+        nz = int((I[5] - I[4])/h[2])
+        mesh = UniformMesh3d([0, nx, 0, ny, 0, nz], h=h, origin=(I[0], I[2], I[4]))
+
         """
+
         self.extent = extent
         self.h = h
         self.origin = origin
