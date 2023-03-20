@@ -27,6 +27,7 @@ class QuadrangleMeshDataStructure(Mesh2dDataStructure):
         super().__init__(NN, cell)
 
 
+## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
 class QuadrangleMesh(Mesh2d):
     """
     @brief 非结构四边形网格数据结构对象
@@ -297,3 +298,37 @@ class QuadrangleMesh(Mesh2d):
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
                     nodedata=self.nodedata,
                     celldata=self.celldata)
+
+
+    @classmethod
+    def from_gmsh_polygon_gmsh(cls, vertices, h):
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("polygon_mesh")
+
+        # 添加多边形的点和线段
+        points = []
+        for i, vertex in enumerate(vertices):
+            points.append(gmsh.model.geo.addPoint(*vertex, meshSize=h))
+            if i > 0:
+                gmsh.model.geo.addLine(points[-2], points[-1])
+        gmsh.model.geo.addLine(points[-1], points[0])
+
+        gmsh.model.geo.addCurveLoop(list(range(1, len(points) + 1)), 1)
+        gmsh.model.geo.addPlaneSurface([1], 1)
+
+        gmsh.model.geo.synchronize()
+        gmsh.model.mesh.generate(2)
+
+        # 获取生成的网格的顶点和四边形单元
+        node_tags, coord, _ = gmsh.model.mesh.getNodes()
+        node = np.array(coord).reshape(-1, 3)[:, :2]  # 提取2D坐标
+        element_tags, cells = gmsh.model.mesh.getElements(2, 1)
+
+        # 从标签转换为索引
+        cells = np.array(cells, dtype=np.int64).reshape(-1, 4)
+
+        gmsh.finalize()
+
+        return cls(nodes, quad_cells)
+

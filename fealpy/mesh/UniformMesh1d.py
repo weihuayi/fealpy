@@ -16,7 +16,7 @@ class UniformMesh1d():
         @brief Initialize the mesh.
 
         @param[in] extent A tuple representing the range of the mesh in the x direction.
-        @param[in] h Mesh step size.
+        @param[in] h: Mesh step size.
         @param[in] origin Coordinate of the starting point.
         @param[in] itype Integer type to be used, default: np.int_.
         @param[in] ftype Floating point type to be used, default: np.float64.

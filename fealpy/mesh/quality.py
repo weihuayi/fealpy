@@ -151,6 +151,7 @@ class TriRadiusRatio(QualityMetric):
         val[:, 2, 2] = 0
         B = csr_matrix((val, (I, J)), shape=(NN, NN))
         return A, B
+
 class TetRadiusRatio(QualityMetric):
     def quality(self, mesh):
         """
