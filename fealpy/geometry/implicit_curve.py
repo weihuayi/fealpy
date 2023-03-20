@@ -90,6 +90,88 @@ class CircleCurve():
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
         return p, d 
 
+class DoubleCircleCurve():
+    """
+    @brief 两个圆相交的曲线
+    """
+    def __init__(self, l = 1.0, radius=np.sqrt(2)):
+        self.circle0 = CircleCurve([-l, 0.0], radius);
+        self.circle1 = CircleCurve([l, 0.0], radius);
+        self.b = np.sqrt(radius**2 - l**2)
+        self.l = l
+        self.k = self.b/l
+        self.box = [-3, 3, -2, 2]
+
+    def init_mesh(self, n):
+        pass
+
+    def __call__(self, p):
+        k = self.k
+        b = self.b
+        l = self.l
+
+        center0 = self.circle0.center
+        center1 = self.circle1.center
+
+        x = p[..., 0]
+        y = p[..., 1]
+        yflag = y>0
+        flag0 = yflag & (y<b) & (x < -y/k + l) &(x > y/k-l)
+        flag1 = (~yflag) & (y>-b) & (x < y/k + l) &(x > -y/k-l)
+
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        val[flag0] = -np.sqrt(x[flag0]**2 + (y[flag0]-b)**2)
+        val[flag1] = -np.sqrt(x[flag1]**2 + (y[flag1]+b)**2)
+
+        xflag = x>0
+        flag23 = ~(flag0|flag1)
+        flag2 = xflag & flag23
+        flag3 = (~xflag) & flag23
+        val[flag2] = self.circle1(p[flag2])
+        val[flag3] = self.circle0(p[flag3])
+        return val 
+
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        k = self.k
+        b = self.b
+        l = self.l
+
+        val = self(p)
+
+        center0 = self.circle0.center
+        center1 = self.circle1.center
+
+        x = p[..., 0]
+        y = p[..., 1]
+        yflag = y>0
+        flag0 = yflag & (y<b) & (x < -y/k + l) &(x > y/k-l) # Omega0
+        flag1 = (~yflag) & (y>-b) & (x < y/k + l) &(x > -y/k-l) # Omega1
+
+        xflag = x>0
+        flag23 = ~(flag0|flag1)
+        flag2 = xflag & flag23 # Omega2
+        flag3 = (~xflag) & flag23 # Omega3
+
+        gval = np.zeros(p.shape, dtype=np.float64)
+        gval[flag0, 0] = x[flag0]/val[flag0] 
+        gval[flag1, 0] = x[flag1]/val[flag1] 
+        gval[flag2, 0] = (x[flag2]-l)/val[flag2] 
+        gval[flag3, 0] = (x[flag3]+l)/val[flag3] 
+
+    def distvalue(self, p):
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        return d, n
+
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
+
 class FoldCurve():
     def __init__(self, a=6):
         self.a = a

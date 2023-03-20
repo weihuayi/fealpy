@@ -465,7 +465,7 @@ class HalfEdgeMesh2d(Mesh2d):
         else:
             raise ValueError("`entitytype` is wrong!")
 
-    def entity_barycenter(self, etype='cell', index=None):
+    def entity_barycenter(self, etype='cell', index=np.s_[:]):
         node = self.entity('node')
         GD = self.geo_dimension()
         if etype in {'cell', 2}:
@@ -481,6 +481,10 @@ class HalfEdgeMesh2d(Mesh2d):
             bc = np.sum(node[edge, :], axis=1).reshape(-1, GD)/edge.shape[1]
         elif etype in {'node', 0}:
             bc = node
+        elif etype in {'halfedge'}:
+            halfedge = self.entity('halfedge')
+            bc = 0.5*(node[halfedge[index, 0]] + node[halfedge[halfedge[index,
+                4], 0]])
         return bc
 
     def node_normal(self):
@@ -2248,6 +2252,76 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.hnode = DynamicArray((self.ds.NN, ), dtype=self.itype)
         self.ds.hnode[self.ds.halfedge[:, 0]] = np.arange(2*self.ds.NE)
 
+    def to_vtk0(self, fname=None):
+        import vtk
+        import vtk.util.numpy_support as vnp
+
+        NC = self.number_of_cells()
+
+        node = self.entity('node')
+        cell, cellLoc = self.ds.cell_to_node()
+
+        if node.shape[1] == 2:
+            node = np.c_[node, np.zeros((len(node), 1), dtype=np.float_)]
+        points = vtk.vtkPoints()
+        points.SetData(vnp.numpy_to_vtk(node))
+
+        uGrid = vtk.vtkUnstructuredGrid()
+        uGrid.SetPoints(points)
+
+        cells = np.split(cell, cellLoc[1:-1])
+        vtk_cells = vtk.vtkCellArray()
+        for c in cells:
+            vtk_cell = vtk.vtkPolygon()
+            vtk_cell.GetPointIds().SetNumberOfIds(len(c))
+            for i, point_id in enumerate(c):
+                vtk_cell.GetPointIds().SetId(i, point_id)
+            vtk_cells.InsertNextCell(vtk_cell)
+        uGrid.SetCells(vtk.VTK_POLYGON, vtk_cells)
+
+        pdata = uGrid.GetPointData()
+        if self.nodedata:
+            nodedata = self.nodedata
+            for key, val in nodedata.items():
+                if val is not None:
+                    if len(val.shape) == 2 and val.shape[1] == 2:
+                        shape = (val.shape[0], 3)
+                        val1 = np.zeros(shape, dtype=val.dtype)
+                        val1[:, 0:2] = val
+                    else:
+                        val1 = val
+
+                    if val1.dtype == np.bool_:
+                        d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                    else:
+                        d = vnp.numpy_to_vtk(val1[:])
+                    d.SetName(key)
+                    pdata.AddArray(d)
+
+        if self.celldata:
+            celldata = self.celldata
+            cdata = uGrid.GetCellData()
+            for key, val in celldata.items():
+                if val is not None:
+                    if len(val.shape) == 2 and val.shape[1] == 2:
+                        shape = (val.shape[0], 3)
+                        val1 = np.zeros(shape, dtype=val.dtype)
+                        val1[:, 0:2] = val
+                    else:
+                        val1 = val
+
+                    if val1.dtype == np.bool_:
+                        d = vnp.numpy_to_vtk(val1.astype(np.int_))
+                    else:
+                        d = vnp.numpy_to_vtk(val1[:])
+
+                    d.SetName(key)
+                    cdata.AddArray(d)
+
+        writer = vtk.vtkXMLUnstructuredGridWriter()
+        writer.SetFileName(fname)
+        writer.SetInputData(uGrid)
+        writer.Write()
 
 
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
