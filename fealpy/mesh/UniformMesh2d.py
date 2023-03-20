@@ -274,12 +274,12 @@ class UniformMesh2d(Mesh2d):
         @param[in] ex 非负整数，把离散函数向外扩展一定宽度  
         """
 
-        nx = self.ds.nx
-        ny = self.ds.ny
+        nx = self.nx
+        ny = self.ny
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
             uh = np.zeros((nx+1+2*ex, ny+1+2*ex), dtype=dtype)
-        elif etype in {'edge', 1}:
+        elif etype in {'edge','face', 1}:
             ex = np.zeros((nx, ny+1), dtype=dtype)
             ey = np.zeros((nx+1, ny), dtype=dtype)
             uh = (ex, ey)
@@ -325,116 +325,6 @@ class UniformMesh2d(Mesh2d):
 
         return idxMap
 
-    def mass_matrix(self):
-        h = self.h
-        Mc = np.array([[4., 2., 2., 1.],
-                       [2., 4., 1., 2.],
-                       [2., 1., 4., 2.],
-                       [1., 2., 2., 4.]], dtype=np.float_)*h[0]*h[1]/36
-        cell2node = self.entity('cell')
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-
-        data = np.broadcast_to(Mc, (NC, 4, 4))
-        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
-        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
-        M = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return M
-
-    def stiff_matrix(self):
-        h = self.h
-        S0c = np.array([[ 2.,  1., -2., -1.],
-                        [ 1.,  2., -1., -2.],
-                        [-2., -1.,  2.,  1.],
-                        [-1., -2.,  1.,  2.]], dtype=np.float_)*h[1]/h[0]/6
-        S1c = np.array([[ 2., -2.,  1., -1.],
-                        [-2.,  2., -1.,  1.],
-                        [ 1., -1.,  2., -2.],
-                        [-1.,  1., -2.,  2.]], dtype=np.float_)*h[0]/h[1]/6
-        Sc = S0c + S1c
-        cell2node = self.entity('cell')
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-
-        data = np.broadcast_to(Sc, (NC, 4, 4))
-        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
-        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
-        S = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return S
-
-    def nabla_2_matrix(self):
-        h = self.h
-        N2c = np.array([[ 1., -1., -1.,  1.],
-                        [-1.,  1.,  1., -1.],
-                        [-1.,  1.,  1., -1.],
-                        [ 1., -1., -1.,  1.]], dtype=np.float_)*4/(h[1]*h[0])
-        cell2node = self.entity('cell')
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-
-        data = np.broadcast_to(N2c, (NC, 4, 4))
-        I = np.broadcast_to(cell2node[..., None], (NC, 4, 4))
-        J = np.broadcast_to(cell2node[:, None, :], (NC, 4, 4))
-        N2 = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return N2
-
-    def nabla_jump_matrix(self):
-        h, nx, ny = self.h, self.ds.nx, self.ds.ny
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-
-        Jumpe = np.array([[ 2.,  1., -4., -2.,  2.,  1.],
-                          [ 1.,  2., -2., -4.,  1.,  2.],
-                          [-4., -2.,  8.,  4., -4., -2.],
-                          [-2., -4.,  4.,  8., -2., -4.],
-                          [ 2.,  1., -4., -2.,  2.,  1.],
-                          [ 1.,  2., -2., -4.,  1.,  2.]])*(h[1]/h[0]/h[0]/6)
-        edge = self.entity('edge')
-        edgex = edge[:nx*(ny+1)].reshape(nx, ny+1, 2)
-        edgey = edge[nx*(ny+1):].reshape(nx+1, ny, 2)
-
-        edgey2dof = np.zeros([nx-1, ny, 6], dtype=np.int_)
-        edgey2dof[..., 0:2] = edgey[1:-1]-ny-1
-        edgey2dof[..., 2:4] = edgey[1:-1]
-        edgey2dof[..., 4:6] = edgey[1:-1]+ny+1
-
-        data = np.broadcast_to(Jumpe, (nx-1, ny, 6, 6))
-        I = np.broadcast_to(edgey2dof[..., None], data.shape)
-        J = np.broadcast_to(edgey2dof[..., None, :], data.shape)
-        Jump = csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
-
-        edgex2dof = np.zeros([nx, ny-1, 6], dtype=np.int_)
-        edgex2dof[..., 0:2] = edgex[:, 1:-1]-1
-        edgex2dof[..., 2:4] = edgex[:, 1:-1]
-        edgex2dof[..., 4:6] = edgex[:, 1:-1]+1
-
-        data = np.broadcast_to(Jumpe, (nx, ny-1, 6, 6))
-        I = np.broadcast_to(edgex2dof[..., None], data.shape)
-        J = np.broadcast_to(edgex2dof[..., None, :], data.shape)
-        Jump += csr_matrix((data.flat, (I.flat, J.flat)), shape=(NN, NN))
-        return Jump
-
-    def source_vector(self, f):
-        cellarea = self.cell_area()
-        cell2node = self.entity('cell')
-        cellbar = self.entity_barycenter('cell')
-
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-
-        node = self.entity('node')
-        cell = self.entity('cell')
-
-        #fval = f(node[cell])*cellarea/4 # (NC, )
-
-        fval = f(cellbar).reshape(-1) # (NC, )
-        fval = fval*cellarea/4
-        fval = np.broadcast_to(fval[:, None], (NC, 4))
-
-        F = np.zeros(NN, dtype=np.float_)
-        np.add.at(F, cell2node, fval)
-        return F
-
     def value(self, p, f):
         """
         @brief 根据已知网格节点上的值，构造函数，求出非网格节点处的值
@@ -466,6 +356,12 @@ class UniformMesh2d(Mesh2d):
         
 
     def interpolation(self, f, intertype='node'):
+        """
+        This function is deprecated and will be removed in a future version.
+        Please use the interpolate() instead.
+        """
+        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
         nx = self.ds.nx
         ny = self.ds.ny
         node = self.node
@@ -481,6 +377,26 @@ class UniformMesh2d(Mesh2d):
             ybc = self.entity_barycenter('edgey')
             F = f(ybc)
         elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
+    def interpolate(self, f, intertype='node'):
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype in {'node', 0}:
+            F = f(node)
+        elif intertype in {'edge', 'face', 1}:
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype in {'edgex'}:
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype in {'edgey'}:
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype in {'cell'}:
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F
