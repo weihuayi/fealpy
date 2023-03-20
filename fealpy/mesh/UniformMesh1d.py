@@ -113,6 +113,15 @@ class UniformMesh1d():
 
     @property
     def node(self):
+        """
+        @brief Get the coordinates of the nodes in the mesh.
+
+        @return A NumPy array of shape (NN, ) containing the coordinates of the nodes.
+
+        @details This function calculates the coordinates of the nodes in the mesh based on the
+                 mesh's origin, step size, and the number of cells in the x directions.
+                 It returns a NumPy array with the coordinates of each node.
+        """
         GD = self.geo_dimension()
         nx = self.nx
         node = np.linspace(self.origin, self.origin + nx * self.h, nx+1)
@@ -219,7 +228,7 @@ class UniformMesh1d():
             F = f(bc)
         return F
 
-    def error(self, u, uh, errortype='max'):
+    def error(self, u, uh, errortype='all'):
         """
         @brief Compute the error between the true solution and the numerical solution.
 
