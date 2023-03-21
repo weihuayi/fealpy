@@ -1,6 +1,7 @@
 import gmsh
 import numpy as np
 import matplotlib.pyplot as plt
+from scipy.sparse import csr_matrix,bmat
 from fealpy.mesh import TetrahedronMesh
 from fealpy.mesh import QuadrangleMesh
 
@@ -124,13 +125,52 @@ def quality_matrix(mesh):
     C0 = 0.5*(-C0 + C0.swapaxes(-1, -2))
     C1 = 0.5*(C1  - C1.swapaxes(-1, -2))
     C2 = 0.5*(-C2 + C2.swapaxes(-1, -2))
-    return A,K,d0
+
+    B0 = -d0[:,0,None,None]*K
+    B1 = d0[:,1,None,None]*K
+    B2 = -d0[:,2,None,None]*K
+
+    ld0 = np.sum(d0**2,axis=-1)
+
+    A  /= ld0[:,None,None]
+    B0 /= ld0[:,None,None]
+    B1 /= ld0[:,None,None]
+    B2 /= ld0[:,None,None]
+
+    S  /= s_sum[:,None,None]
+
+    C0 /= 3*cm[:,None,None]
+    C1 /= 3*cm[:,None,None]
+    C2 /= 3*cm[:,None,None]
+
+    A  += S
+    B0 -= C0
+    B1 -= C1
+    B2 -= C2
+
+    mu = s_sum*np.sqrt(ld0)/(108*cm**2)
+
+    A  *= mu[:,None,None]/NC
+    B0 *= mu[:,None,None]/NC
+    B1 *= mu[:,None,None]/NC
+    B2 *= mu[:,None,None]/NC
+
+    I = np.broadcast_to(cell[:, :, None], (NC, 4, 4))
+    J = np.broadcast_to(cell[:, None, :], (NC, 4, 4))
+    A  = csr_matrix((A.flat, (I.flat, J.flat)), shape=(NN, NN))
+    B0 = csr_matrix((B0.flat, (I.flat, J.flat)), shape=(NN, NN))
+    B1 = csr_matrix((B1.flat, (I.flat, J.flat)), shape=(NN, NN))
+    B2 = csr_matrix((B2.flat, (I.flat, J.flat)), shape=(NN, NN))
+    return A,B0,B1,B2
 
 mesh = TetrahedronMesh.one_tetrahedron_mesh()
-A,K,d0 = quality_matrix(mesh)
-print(A)
-print(K)
-print(d0)
+
+opt = quality_matrix(mesh)
+A,B0,B1,B2 = quality_matrix(mesh)
+M = bmat([[A, B2, B1], [B2.T, A, B0], [B1.T, B0.T, A]])
+node1 = mesh.entity('node').copy()
+x = node1.T.flatten()
+print("b",M@x)
 
 
 # Create the 3D plot
