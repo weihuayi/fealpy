@@ -443,7 +443,7 @@ def show_mesh_3d(
     if threshold is None:
         face = face[isBdFace][:, mesh.ds.ccw]
     else:
-        bc = self.entity_barycenter('cell')
+        bc = mesh.entity_barycenter('cell')
         isKeepCell = threshold(bc)
         face2cell = mesh.ds.face_to_cell()
         isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1

@@ -48,8 +48,19 @@ class TetrahedronMeshDataStructure(Mesh3dDataStructure):
 
 
 ## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
+## @defgroup MeshQuality
 class TetrahedronMesh(Mesh3d):
     def __init__(self, node, cell, showmemory=False):
+        """
+        @brief Initializes a TetrahedronMesh object.
+        
+        @param[in] node The node array representing the vertices of the tetrahedral mesh.
+        @param[in] cell The cell array representing the connectivity of the tetrahedral mesh.
+        @param[in] showmemory Optional boolean to show memory usage (default is False).
+        
+        This method initializes a TetrahedronMesh object by setting up its attributes
+        and data structures based on the provided node and cell arrays.
+        """
         self.node = node
         NN = node.shape[0]
         self.ds = TetrahedronMeshDataStructure(NN, cell)
@@ -157,6 +168,20 @@ class TetrahedronMesh(Mesh3d):
             multiIndex[:, 0] = np.arange(p, -1, -1)
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return multiIndex
+
+    def grad_lambda(self):
+        localFace = self.ds.localFace
+        node = self.node
+        cell = self.ds.cell
+        NC = self.number_of_cells()
+        Dlambda = np.zeros((NC, 4, 3), dtype=self.ftype)
+        volume = self.cell_volume()
+        for i in range(4):
+            j,k,m = localFace[i]
+            vjk = node[cell[:,k],:] - node[cell[:,j],:]
+            vjm = node[cell[:,m],:] - node[cell[:,j],:]
+            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
+        return Dlambda
 
     def interpolation_points(self, p):
         """
@@ -615,6 +640,7 @@ class TetrahedronMesh(Mesh3d):
         else:
             return c
 
+    ## @ingroup MeshQuality
     def cell_quality(self):
         """
         @brief  计算单元的质量，这里的质量定义单元外接球的半径比上 3 倍的内接球的半径
@@ -628,10 +654,12 @@ class TetrahedronMesh(Mesh3d):
         R = ld/vol/12.0
         r = 3.0*vol/ss
         return R/r/3.0
-
+    
+    ## @ingroup MeshQuality
     def grad_quality(self):
         """
         @brief 计算单元质量关于节点坐标的导数
+
         """
 
         NN = self.number_of_nodes()
@@ -679,26 +707,13 @@ class TetrahedronMesh(Mesh3d):
 
         g *= q.reshape(-1, 1, 1)
         w *= q.reshape(-1, 1)
-        grad = np.zeros((N, 3), dtype=self.ftype)
+        grad = np.zeros((NN, 3), dtype=self.ftype)
         np.add.at(grad, cell.flatten(), g.reshape(-1, 3))
-        wgt = np.zeros(N, dtype=self.ftype)
+        wgt = np.zeros(NN, dtype=self.ftype)
         np.add.at(wgt, cell.flat, w.flat)
 
         return grad/wgt.reshape(-1, 1)
 
-    def grad_lambda(self):
-        localFace = self.ds.localFace
-        node = self.node
-        cell = self.ds.cell
-        NC = self.number_of_cells()
-        Dlambda = np.zeros((NC, 4, 3), dtype=self.ftype)
-        volume = self.cell_volume()
-        for i in range(4):
-            j,k,m = localFace[i]
-            vjk = node[cell[:,k],:] - node[cell[:,j],:]
-            vjm = node[cell[:,m],:] - node[cell[:,j],:]
-            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
-        return Dlambda
 
     def label(self, node=None, cell=None, cellidx=None):
         """
@@ -998,6 +1013,26 @@ class TetrahedronMesh(Mesh3d):
         """
         vol = self.cell_volume()
         return np.all(vol > threshold)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def one_tetrahedron_mesh(cls, meshtype='equ'):
+        """
+        """
+        if meshtype == 'equ':
+            node = np.array([
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.5, np.sqrt(3)/2, 0.0],
+                [0.5, np.sqrt(3)/6, np.sqrt(2/3)]], dtype=np.float64)
+        elif meshtype == 'iso':
+            node = np.array([
+                [0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0]], dtype=np.float64)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+        return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
