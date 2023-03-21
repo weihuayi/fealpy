@@ -134,7 +134,7 @@ class ISampler(Sampler):
 
 class BoxEdgeSampler(JoinedSampler):
     """Generate samples on the edges of a multidimensional rectangle."""
-    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool=False) -> None:
+    def __init__(self, m_edge: SupportsIndex, p1: List[float], p2: List[float], requires_grad: bool=False) -> None:
         """
         Generate samples on the edges of a multidimensional rectangle.
 
@@ -148,14 +148,14 @@ class BoxEdgeSampler(JoinedSampler):
             See `torch.autograd.grad`.
         """
         super().__init__()
-        p1, p2 = torch.Tensor(p1), torch.Tensor(p2)
-        if len(p1.shape) != 1:
+        t1, t2 = torch.tensor(p1), torch.tensor(p2)
+        if len(t1.shape) != 1:
             raise ValueError
-        if p1.shape != p2.shape:
+        if t1.shape != t2.shape:
             raise ValueError
-        data = torch.vstack([p1, p2]).T
+        data = torch.vstack([t1, t2]).T
         range1, range2 = data.clone(), data.clone()
-        for d in range(p1.shape[0]):
+        for d in range(t1.shape[0]):
             range1[d, :] = data[d, 0]
             range2[d, :] = data[d, 1]
             self.add(ISampler(m=m_edge, ranges=range1, requires_grad=requires_grad))

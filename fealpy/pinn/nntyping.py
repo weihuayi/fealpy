@@ -25,6 +25,8 @@ Operator = Callable[[Tensor, TensorFunction], Tensor]
 @runtime_checkable
 class GeneralSampler(Protocol):
     """A protocol class for all samplers."""
-    m: int
-    nd: int
+    @property
+    def m(self) -> int: ...
+    @property
+    def nd(self) -> int: ...
     def run(self) -> Tensor: ...

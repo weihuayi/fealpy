@@ -1,15 +1,16 @@
 from typing import (
     Optional, List, Literal, Union,
-    Tuple
+    Tuple, Callable
 )
 
 import numpy as np
 from numpy.typing import NDArray
 import torch
 from torch import Tensor
-from torch.nn import Module, Identity
+from torch.nn import Module
 from torch.autograd import Variable
 
+from .tools import mkfs
 from .nntyping import TensorFunction, VectorFunction, Operator, GeneralSampler
 
 
@@ -26,6 +27,13 @@ class Solution(Module):
         else:
             self.__net = ZeroMapping()
 
+    def _call_impl(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
+                   **kwargs):
+        p = mkfs(*input, f_shape=f_shape)
+        return super()._call_impl(p, **kwargs)
+
+    __call__: Callable[..., Tensor] = _call_impl
+
     @property
     def net(self):
         return self.__net
@@ -41,9 +49,10 @@ class Solution(Module):
         """
         From bc in mesh cells to outputs of the solution.
 
-        Return
-        ---
-        outputs: 2-D Array. Outputs in every bc points and every cells.
+        Returns:
+        --------
+        NDArray.
+            Outputs in every bc points and every cells.
         """
         points = mesh.cell_bc_to_point(bc)
         points_tensor = torch.tensor(points, dtype=torch.float32)
@@ -54,8 +63,8 @@ class Solution(Module):
         """
         Calculate error between the solution and `other` in finite element space `space`.
 
-        Parameters
-        ---
+        Parameters:
+        -----------
         other: VectorFunction.
             The function to be compared with. If `other` is `Function`(functions in finite element
             spaces), there is no need to specify `space` and `fn_type`.
@@ -65,8 +74,8 @@ class Solution(Module):
             Squeeze the solution automatically if the last dim has shape (1). This is sometimes useful
             when estimating error for an 1-output network.
 
-        Return
-        ---
+        Returns
+        -------
         error: float.
         """
         from ..functionspace.Function import Function
@@ -160,7 +169,7 @@ class LearningMachine():
 
 
     def loss(self, sampler: GeneralSampler, func: Operator,
-             target: Optional[Tensor]=None, output_samples: bool=False) -> Union[Tensor, Tuple[Tensor, Tensor]]:
+             target: Optional[Tensor]=None, output_samples: bool=False):
         """
         Calculate loss value.
 
@@ -187,9 +196,10 @@ class LearningMachine():
         outputs = func(inputs, self.solution.forward)
         if not target:
             target = torch.zeros_like(outputs)
+        ret: Tensor = self.cost(outputs, target)
         if output_samples:
-            return self.cost(outputs, target), inputs
-        return self.cost(outputs, target)
+            return ret, inputs
+        return ret
 
 
 def mkf(length: int, *inputs: Union[Tensor, float]):
@@ -201,70 +211,6 @@ def mkf(length: int, *inputs: Union[Tensor, float]):
         else:
             ret[:, i] = item
     return ret
-
-
-def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None) -> Tensor:
-    """
-    Concatenate input tensors or floats into a single output tensor.
-
-    Parameters:
-    -----------
-    *inputs: Union[Tensor, float]
-        Any number of tensors or floats to be concatenated into a single output tensor.
-
-    f_shape: Tuple[int, ...], optional (default=None)
-        If the input is a float, it will be converted to a tensor with shape f_shape.
-        If f_shape is not provided, the default shape is (1,).
-
-    Returns:
-    --------
-    Tensor
-        The concatenated output tensor, with the size of the last dimension equal to the sum
-        of the sizes of the last dimensions of all input tensors or floats.
-
-    Examples:
-    ---------
-    >>> import torch
-    >>> a = torch.randn(2, 3)
-    >>> b = 1.5
-    >>> c = torch.tensor([0.1, 0.2, 0.3])
-    >>> result = mkfs(a, b, c, f_shape=(3,))
-    >>> result.shape
-    (2, 5)
-    """
-    a = inputs[0]
-
-    if len(inputs) == 1:
-        if isinstance(a, Tensor):
-            return a
-
-        if f_shape is None:
-            f_shape = (1, )
-        return torch.tensor(a).expand(f_shape)
-
-    b = inputs[1]
-
-    if isinstance(a, Tensor):
-
-        if not isinstance(b, Tensor):
-            shape = tuple(a.shape[:-1]) + (1, )
-            b = torch.tensor(b).expand(shape)
-
-    else:
-
-        if isinstance(b, Tensor):
-            return mkfs(b, a, *inputs[2:])
-
-        if f_shape is None:
-            f_shape = (1, )
-        a = torch.tensor(a).expand(f_shape)
-        b = torch.tensor(b).expand(f_shape)
-
-    cated = torch.cat([a, b], dim=-1)
-
-    if len(inputs) == 2:
-        return cated
-    return mkfs(cated, *inputs[2:], f_shape=f_shape)
 
 
 class _2dSpaceTime(Solution):
