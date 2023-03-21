@@ -1,4 +1,7 @@
-from typing import Optional, List, Literal, Callable
+from typing import (
+    Optional, List, Literal, Union,
+    Tuple, Callable
+)
 
 import numpy as np
 from numpy.typing import NDArray
@@ -7,8 +10,8 @@ from torch import Tensor
 from torch.nn import Module
 from torch.autograd import Variable
 
-from .sampler import Sampler
-from .nntyping import TensorFunction, VectorFunction, Operator
+from .tools import mkfs
+from .nntyping import TensorFunction, VectorFunction, Operator, GeneralSampler
 
 
 class ZeroMapping(Module):
@@ -24,6 +27,13 @@ class Solution(Module):
         else:
             self.__net = ZeroMapping()
 
+    def _call_impl(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
+                   **kwargs):
+        p = mkfs(*input, f_shape=f_shape)
+        return super()._call_impl(p, **kwargs)
+
+    __call__: Callable[..., Tensor] = _call_impl
+
     @property
     def net(self):
         return self.__net
@@ -31,7 +41,7 @@ class Solution(Module):
     def forward(self, p: Tensor):
         return self.__net(p)
 
-    def fixed(self, feature_idx: List[int], value: List[int]):
+    def fixed(self, feature_idx: List[int], value: List[float]):
         assert len(feature_idx) == len(value)
         return _Fixed(self, feature_idx, value)
 
@@ -39,9 +49,10 @@ class Solution(Module):
         """
         From bc in mesh cells to outputs of the solution.
 
-        Return
-        ---
-        outputs: 2-D Array. Outputs in every bc points and every cells.
+        Returns:
+        --------
+        NDArray.
+            Outputs in every bc points and every cells.
         """
         points = mesh.cell_bc_to_point(bc)
         points_tensor = torch.tensor(points, dtype=torch.float32)
@@ -52,8 +63,8 @@ class Solution(Module):
         """
         Calculate error between the solution and `other` in finite element space `space`.
 
-        Parameters
-        ---
+        Parameters:
+        -----------
         other: VectorFunction.
             The function to be compared with. If `other` is `Function`(functions in finite element
             spaces), there is no need to specify `space` and `fn_type`.
@@ -63,8 +74,8 @@ class Solution(Module):
             Squeeze the solution automatically if the last dim has shape (1). This is sometimes useful
             when estimating error for an 1-output network.
 
-        Return
-        ---
+        Returns
+        -------
         error: float.
         """
         from ..functionspace.Function import Function
@@ -157,8 +168,8 @@ class LearningMachine():
         return self.__solution
 
 
-    def loss(self, sampler: Sampler, func: Operator,
-             target: Optional[Tensor]=None, output_samples: bool=False) -> Tensor:
+    def loss(self, sampler: GeneralSampler, func: Operator,
+             target: Optional[Tensor]=None, output_samples: bool=False):
         """
         Calculate loss value.
 
@@ -185,12 +196,13 @@ class LearningMachine():
         outputs = func(inputs, self.solution.forward)
         if not target:
             target = torch.zeros_like(outputs)
+        ret: Tensor = self.cost(outputs, target)
         if output_samples:
-            return self.cost(outputs, target), inputs
-        return self.cost(outputs, target)
+            return ret, inputs
+        return ret
 
 
-def mkf(length: int, *inputs: Tensor):
+def mkf(length: int, *inputs: Union[Tensor, float]):
     """Make features"""
     ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
     for i, item in enumerate(inputs):

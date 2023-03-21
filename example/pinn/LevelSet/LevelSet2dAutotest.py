@@ -81,16 +81,19 @@ def levelset_equation(tx: torch.Tensor, phi):
     return phi_t + u_phi_x
 
 sets = {
-    "tau": [0.01, 0.1],
-    "nf": [2000, 10000],
-    "nfl": [2000, 10000],
-    "lr": [0.001],
-    "weights": [(1.0, 1.0), (1.0, 0.0)]
+    "tau": [0.001, 0.003, 0.01, 0.03, 0.1, 0.25],
+    "nfl": [1000, 10000],
 }
 
 at = AutoTest(sets)
 at.set_autosave('levelset2d.json', mode='replace')
-for TAU, Nf, Nfl, lr, ws in at.run():
+
+lr = 0.0005
+Nf = 10000
+
+for TAU, Nfl in at.run():
+
+    ws = [1.0, 1/TAU**2]
 
     pinn2 = Sequential(
         Linear(3, 64),
