@@ -27,6 +27,8 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, NN, cell):
         super().__init__(NN,cell)
 
+## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
+## @defgroup MeshQuality
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
         """
@@ -1630,6 +1632,38 @@ class TriangleMesh(Mesh2d):
             NN = self.number_of_nodes()
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_square_domain_with_fracture(cls):
+        node = np.array([
+            [0.0, 0.0],
+            [0.0, 0.5],
+            [0.0, 0.5],
+            [0.0, 1.0],
+            [0.5, 0.0],
+            [0.5, 0.5],
+            [0.5, 1.0],
+            [1.0, 0.0],
+            [1.0, 0.5],
+            [1.0, 1.0]], dtype=np.float64)
+
+        cell = np.array([
+            [1, 0, 5],
+            [4, 5, 0],
+            [2, 5, 3],
+            [6, 3, 5],
+            [4, 7, 5],
+            [8, 5, 7],
+            [6, 5, 9],
+            [8, 9, 5]], dtype=np.int_)
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_unit_circle_gmsh(cls, h):
+        pass
 
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):
