@@ -30,5 +30,16 @@ d0 = (v30_sq * v10_vec.cross(v20_vec) +
       v10_sq * v20_vec.cross(v30_vec) +
       v20_sq * v30_vec.cross(v10_vec)).simplify()
 
+c23 = d0.dot(v20_vec.cross(v30_vec)).simplify()
+c31 = d0.dot(v30_vec.cross(v10_vec)).simplify()
+c12 = d0.dot(v10_vec.cross(v20_vec)).simplify()
 print("d0:", d0)
 print("d0:", d0.evalf())
+print("c23:", c23)
+print("c23 (evaluated):", c23.evalf())
+print("c23:", c23)
+print("c31 (evaluated):", c31.evalf())
+print("c23:", c23)
+print("c12 (evaluated):", c12.evalf())
+
+
