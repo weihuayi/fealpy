@@ -267,7 +267,7 @@ class UniformMesh2d(Mesh2d):
         """
         return self.h
 
-    def function(self, etype='node', dtype=None, ex=0):
+    def function(self, etype='node', dim=None, dtype=None, ex=0):
         """
         @brief 返回定义在节点、网格边、或者网格单元上离散函数（数组），元素取值为0
 
@@ -278,7 +278,11 @@ class UniformMesh2d(Mesh2d):
         ny = self.ny
         dtype = self.ftype if dtype is None else dtype
         if etype in {'node', 0}:
-            uh = np.zeros((nx+1+2*ex, ny+1+2*ex), dtype=dtype)
+            if dim is None:
+                uh = np.zeros((nx+1+2*ex, ny+1+2*ex), dtype=dtype)
+            else:
+                uh = np.zeros((nx+1+2*ex, ny+1+2*ex, dim), dtype=dtype)
+
         elif etype in {'edge','face', 1}:
             ex = np.zeros((nx, ny+1), dtype=dtype)
             ey = np.zeros((nx+1, ny), dtype=dtype)
