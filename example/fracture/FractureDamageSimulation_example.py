@@ -78,15 +78,6 @@ class Brittle_Facture_simulator():
 
         self.eps = 1e-6 # 极小值，用来保持数值稳定性
 
-    def macaulay_operation(self, alpha):
-        """
-        @brief 麦考利运算
-        """
-        val = np.abs(alpha)
-        p = (alpha + val) / 2.0
-        m = (alpha - val) / 2.0
-        return p, m
-
 #mesh = TriangleMesh.from_square_domain_with_fracture()
 
 #mesh.uniform_refine(4)
