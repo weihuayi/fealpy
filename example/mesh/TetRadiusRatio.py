@@ -306,13 +306,13 @@ class TetRadiusRatio():
         newNode[isBdNode, :] = node[isBdNode, :]        
         b = -B*node[:, 1] -C*node[:, 2] - A*newNode[:, 0]
         newNode[isFreeNode, 0], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-6)
+                b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-12)
         b = B*node[:, 0] - A*newNode[:, 1] - D*node[:, 2]
         newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 1], tol=1e-6)
+                b[isFreeNode], x0=node[isFreeNode, 1], tol=1e-12)
         b = C*node[:,0]+D*node[:,1]-A*newNode[:,2]
         newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 2], tol=1e-6)
+                b[isFreeNode], x0=node[isFreeNode, 2], tol=1e-12)
         node[isFreeNode, :] = newNode[isFreeNode, :]
         return node
 

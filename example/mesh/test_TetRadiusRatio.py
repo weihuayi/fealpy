@@ -39,7 +39,7 @@ def test2():
     node = mesh.entity('node')
     cell = mesh.entity('cell')
     node[cell[-1,2]]=np.average(node[cell[-1]],axis=0)
-    mesh.uniform_refine(n=2)
+    #mesh.uniform_refine(n=2)
     opt = TetRadiusRatio(mesh)
     q = opt.get_quality()
     print('初始网格：minq=',np.min(q),'avgq=',np.mean(q),'maxq=',np.max(q))
@@ -62,8 +62,34 @@ def test3():
     opt.iterate_solver(method='Bjacobi')
     return mesh
 
+def test4():
+    mesh = TetrahedronMesh.from_unit_sphere_gmsh(0.1)
+
+    cm = mesh.entity_measure('cell')
+    print(np.all(cm > 0))
+    opt = TetRadiusRatio(mesh)
+    q = opt.get_quality()
+    print('初始网格：minq=',np.min(q),'avgq=',np.mean(q),'maxq=',np.max(q))
+    opt.iterate_solver(method='Bjacobi')
+    return mesh
+
+def test5():
+    mesh = TetrahedronMesh.from_unit_cube(nx=10, ny=10, nz=10)
+    node = mesh.entity('node')
+    isBdNode = mesh.ds.boundary_node_flag()
+
+    node[~isBdNode] += 0.001*np.random.rand(node[~isBdNode].shape[0], node[~isBdNode].shape[1])
+
+    cm = mesh.entity_measure('cell')
+    print(np.all(cm > 0))
+    opt = TetRadiusRatio(mesh)
+    q = opt.get_quality()
+    print('初始网格：minq=',np.min(q),'avgq=',np.mean(q),'maxq=',np.max(q))
+    opt.iterate_solver(method='Bjacobi')
+    return mesh
+
 #mesh = test0()
-mesh=test1()
+mesh=test5()
 fig = plt.figure()
 axes = fig.add_subplot(111, projection='3d')
 #mesh.add_plot(axes, threshold=lambda p: p[..., 0] > 0.0)
