@@ -5,9 +5,21 @@ from fealpy.mesh.TriMesher import distmesh2d
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform
 
+from fealpy.functionspace import LagrangeFiniteElementSpace
+
 class Brittle_Facture_model():
     def __init__(self):
-        pass
+        self.E = 200 # 杨氏模量
+        self.nu = 0.2 # 泊松比
+        self.Gc = 1 # 材料的临界能量释放率
+        self.l0 = 0.02 # 尺度参数，断裂裂纹的宽度
+
+        self.mu = E / (1 + nu) / 2.0 # 剪切模量
+        self.la = E * mu / (1 + nu) / (1- 2*nu) # 拉梅常数
+        self.kappa = la + 2 * mu /3 # 压缩模量
+
+        self.eps = 1e-6 # 极小值，用来保持数值稳定性
+
 
     def init_mesh(self):
         """
@@ -62,31 +74,11 @@ class Brittle_Facture_model():
         """
         pass
 
-class Brittle_Facture_simulator():
-    def __init__(self, model):
-        self.model = model
-        self.mesh = model.mesh
-        
-        self.E = 200 # 杨氏模量
-        self.nu = 0.2 # 泊松比
-        self.Gc = 1 # 材料的临界能量释放率
-        self.l0 = 0.02 # 尺度参数，断裂裂纹的宽度
 
-        self.mu = E / (1 + nu) / 2.0 # 剪切模量
-        self.la = E * mu / (1 + nu) / (1- 2*nu) # 拉梅常数
-        self.kappa = la + 2 * mu /3 # 压缩模量
-
-        self.eps = 1e-6 # 极小值，用来保持数值稳定性
-
-#mesh = TriangleMesh.from_square_domain_with_fracture()
-
-#mesh.uniform_refine(4)
 model = Brittle_Facture_model()
 mesh = model.init_mesh()
 node = mesh.entity('node')
-for i in range(node.shape[0]):
-    if is_inter_boundary(node)[i] == True:
-        print(node[i])
+
 
 fig = plt.figure()
 axes = fig.add_subplot(111)
