@@ -300,35 +300,60 @@ class QuadrangleMesh(Mesh2d):
                     celldata=self.celldata)
 
 
+    ## @ingroup MeshGenerators
     @classmethod
-    def from_gmsh_polygon_gmsh(cls, vertices, h):
+    def from_polygon_gmsh(cls, vertices, h):
+        """
+        Generate a quadrilateral mesh for a polygonal region by gmsh.
+
+        @param vertices List of tuples representing vertices of the polygon
+        @param h Parameter controlling mesh density
+        @return QuadrilateralMesh instance
+        """
         import gmsh
         gmsh.initialize()
-        gmsh.model.add("polygon_mesh")
+        gmsh.model.add("Polygon")
 
-        # 添加多边形的点和线段
-        points = []
+        # 创建多边形
+        lc = h  # 设置网格大小
+        polygon_points = []
         for i, vertex in enumerate(vertices):
-            points.append(gmsh.model.geo.addPoint(*vertex, meshSize=h))
-            if i > 0:
-                gmsh.model.geo.addLine(points[-2], points[-1])
-        gmsh.model.geo.addLine(points[-1], points[0])
+            point = gmsh.model.geo.addPoint(vertex[0], vertex[1], 0, lc)
+            polygon_points.append(point)
 
-        gmsh.model.geo.addCurveLoop(list(range(1, len(points) + 1)), 1)
-        gmsh.model.geo.addPlaneSurface([1], 1)
+        # 添加线段和循环
+        lines = []
+        for i in range(len(polygon_points)):
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i+1) % len(polygon_points)])
+            lines.append(line)
+        curve_loop = gmsh.model.geo.addCurveLoop(lines)
 
+        # 创建平面表面
+        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+        # 同步几何模型
         gmsh.model.geo.synchronize()
+
+        # 添加物理组
+        gmsh.model.addPhysicalGroup(2, [surface], tag=1)
+        gmsh.model.setPhysicalName(2, 1, "Polygon")
+
+        # 生成网格
         gmsh.model.mesh.generate(2)
 
-        # 获取生成的网格的顶点和四边形单元
-        node_tags, coord, _ = gmsh.model.mesh.getNodes()
-        node = np.array(coord).reshape(-1, 3)[:, :2]  # 提取2D坐标
-        element_tags, cells = gmsh.model.mesh.getElements(2, 1)
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)
 
-        # 从标签转换为索引
-        cells = np.array(cells, dtype=np.int64).reshape(-1, 4)
+        # 获取四边形单元信息
+        quadrilateral_type = 3  # 四边形单元的类型编号为 3
+        quad_tags, quad_connectivity = gmsh.model.mesh.getElementsByType(quadrilateral_type)
+        cell = np.array(quad_connectivity, dtype=np.uint64).reshape(-1, 4) - 1
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of quadrilaterals: {cell.shape[0]}")
 
         gmsh.finalize()
 
-        return cls(nodes, quad_cells)
-
+        return cls(node, cell)
