@@ -14,19 +14,11 @@ from .tools import mkfs
 from .nntyping import TensorFunction, VectorFunction, Operator, GeneralSampler
 
 
-class ZeroMapping(Module):
-    def forward(self, p: Tensor):
-        return torch.zeros_like(p)
-
-
-class Solution(Module):
-    def __init__(self, net: Optional[Module]=None) -> None:
-        super().__init__()
-        if net:
-            self.__net = net
-        else:
-            self.__net = ZeroMapping()
-
+class TensorMapping(Module):
+    """
+    @brief A function whose input and output are tensors. The `forward` method
+           is not implemented, override it to build a function.
+    """
     def _call_impl(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
                    **kwargs):
         p = mkfs(*input, f_shape=f_shape)
@@ -34,25 +26,20 @@ class Solution(Module):
 
     __call__: Callable[..., Tensor] = _call_impl
 
-    @property
-    def net(self):
-        return self.__net
-
-    def forward(self, p: Tensor):
-        return self.__net(p)
-
     def fixed(self, feature_idx: List[int], value: List[float]):
         assert len(feature_idx) == len(value)
         return _Fixed(self, feature_idx, value)
 
     def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
         """
-        From bc in mesh cells to outputs of the solution.
+        @brief From bc in mesh cells to outputs of the solution.
 
-        Returns:
-        --------
-        NDArray.
-            Outputs in every bc points and every cells.
+        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number
+                   of bc points and TD is the topology dimension of the mesh.
+
+        @return: NDArray with shape (b, c, ...). Outputs in every bc points and every cells.
+                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'
+                 is the shape of the function value.
         """
         points = mesh.cell_bc_to_point(bc)
         points_tensor = torch.tensor(points, dtype=torch.float32)
@@ -61,22 +48,16 @@ class Solution(Module):
     def estimate_error(self, other: VectorFunction, space=None,
                        fn_type: Literal['bc', 'val']='bc', squeeze: bool=False):
         """
-        Calculate error between the solution and `other` in finite element space `space`.
+        @brief Calculate error between the solution and `other` in finite element space `space`.
 
-        Parameters:
-        -----------
-        other: VectorFunction.
-            The function to be compared with. If `other` is `Function`(functions in finite element
-            spaces), there is no need to specify `space` and `fn_type`.
-        space: FiniteElementSpace.
-        fn_type: 'bc' or 'val'. Defaults to 'bc'.
-        squeeze: bool. Defaults to `False`.
-            Squeeze the solution automatically if the last dim has shape (1). This is sometimes useful
-            when estimating error for an 1-output network.
+        @param other: VectorFunction. The function to be compared with. If `other` is `Function`
+                      (functions in finite element spaces), there is no need to specify `space` and `fn_type`.
+        @param space: FiniteElementSpace.
+        @param fn_type: 'bc' or 'val'. Defaults to 'bc'.
+        @param squeeze: bool. Defaults to `False`. Squeeze the solution automatically if the last dim has shape (1).
+                        This is sometimes useful when estimating error for an 1-output network.
 
-        Returns
-        -------
-        error: float.
+        @return: error: float.
         """
         from ..functionspace.Function import Function
         if isinstance(other, Function):
@@ -109,14 +90,11 @@ class Solution(Module):
 
     def meshgrid_mapping(self, *xi: NDArray):
         """
-        Parameters
-        ---
-        *xi: ArrayLike.
-            See `numpy.meshgrid`.
+        @brief Calculate the function value in a meshgrid.
 
-        Return
-        ---
-        outputs, (X1, X2, ..., Xn)
+        @param *xi: ArrayLike. See `numpy.meshgrid`.
+
+        @return: outputs, (X1, X2, ..., Xn)
         """
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
@@ -129,6 +107,37 @@ class Solution(Module):
             return u_plot.reshape(mesh[0].shape), mesh
         else:
             return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf)], mesh
+
+
+class ZeroMapping(Module):
+    def forward(self, p: Tensor):
+        return torch.zeros_like(p)
+
+
+class Solution(TensorMapping):
+    """
+    @brief A function based on a submodule.
+    """
+    def __init__(self, net: Optional[Module]=None) -> None:
+        """
+        @brief Initialize a function based on a submodule.
+               When `net` is a neural network module, this can be regarded as a sulotion of
+               PDEs in PINN models.
+
+        @param net: A Module in torch. Defaults to `None`.
+        """
+        super().__init__()
+        if net:
+            self.__net = net
+        else:
+            self.__net = ZeroMapping()
+
+    @property
+    def net(self):
+        return self.__net
+
+    def forward(self, p: Tensor):
+        return self.__net(p)
 
 
 class _Fixed(Solution):
@@ -171,21 +180,17 @@ class LearningMachine():
     def loss(self, sampler: GeneralSampler, func: Operator,
              target: Optional[Tensor]=None, output_samples: bool=False):
         """
-        Calculate loss value.
+        @brief Calculate loss value.
 
-        Args
-        ---
-        sampler: Sampler.
-        func: Operator.
-            A function get x and u(x) as args. (e.g A pde or boundary condition.)
-        target: Tensor or None.
-            If `None`, the output will be compared with zero tensor.
-        output_samples: bool. Defaults to `False`.
-            Return samples from the `sampler` if `True`.
+        @param sampler: Sampler.
+        @param func: Operator.
+                     A function get x and u(x) as args. (e.g A pde or boundary condition.)
+        @param target: Tensor or None.
+                       If `None`, the output will be compared with zero tensor.
+        @param output_samples: bool. Defaults to `False`.
+                               Return samples from the `sampler` if `True`.
 
-        Notes
-        ---
-        Arg `func` should be defined like:
+        @note Arg `func` should be defined like:
         ```
             def equation(p: Tensor, u: TensorFunction) -> Tensor:
                 ...

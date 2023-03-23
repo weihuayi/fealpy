@@ -47,7 +47,7 @@ class Sampler():
         """
         @brief Generates samples.
 
-        @return: A tensor with shape (m, nd) representing the generated samples.
+        @return: A tensor with shape (m, nd) containing the generated samples.
         """
         raise NotImplementedError
 
@@ -126,6 +126,9 @@ class HybridSampler(Sampler):
 
 
 class ConstantSampler(Sampler):
+    """
+    A sampler generating constants.
+    """
     def __init__(self, value: torch.Tensor, requires_grad: bool = False) -> None:
         assert value.ndim == 2
         super().__init__(0, requires_grad)
@@ -174,13 +177,13 @@ class ISampler(Sampler):
         return Variable(torch.from_numpy(ret).float(), requires_grad=self.requires_grad)
 
 
-class BoxEdgeSampler(JoinedSampler):
-    """Generate samples on the edges of a multidimensional rectangle."""
+class BoxBoundarySampler(JoinedSampler):
+    """Generate samples on the boundaries of a multidimensional rectangle."""
     def __init__(self, m_edge: int, p1: List[float], p2: List[float], requires_grad: bool=False) -> None:
         """
-        Generate samples on the edges of a multidimensional rectangle.
+        @brief Generate samples on the boundaries of a multidimensional rectangle.
 
-        @param m: int. Number of samples in each edge.
+        @param m: int. Number of samples in each boundary.
         @param p1, p2: Object that can be converted to `torch.Tensor`.
                        Points at both ends of the diagonal.
         @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
@@ -205,7 +208,7 @@ _MT = TypeVar("_MT", bound=Mesh)
 class _MeshSampler(Sampler, Generic[_MT]):
     def __init__(self, m_cell: int, mesh:_MT, requires_grad: bool=False) -> None:
         """
-        Generate samples in every cells of a mesh.
+        @brief Generate samples in every cells of a mesh.
 
         @param m_cell: int. Number of samples in each cell.
         @param mesh: Mesh.
@@ -236,7 +239,7 @@ class _MeshSampler(Sampler, Generic[_MT]):
 
 def random_weights(m: int, n: int):
     """
-    Generate m random samples, where each sample has n features (n >= 2),
+    @brief Generate m random samples, where each sample has n features (n >= 2),
     such that the sum of each feature is 1.0.
 
     @param m: The number of samples to generate.
