@@ -1,5 +1,5 @@
 from typing import (
-    Optional, List, Literal, Union,
+    Optional, List, Literal,
     Tuple, Callable
 )
 
@@ -11,7 +11,7 @@ from torch.nn import Module
 from torch.autograd import Variable
 
 from .tools import mkfs
-from .nntyping import TensorFunction, VectorFunction, Operator, GeneralSampler
+from .nntyping import VectorFunction, Operator, GeneralSampler
 
 
 class TensorMapping(Module):
@@ -205,59 +205,3 @@ class LearningMachine():
         if output_samples:
             return ret, inputs
         return ret
-
-
-def mkf(length: int, *inputs: Union[Tensor, float]):
-    """Make features"""
-    ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
-    for i, item in enumerate(inputs):
-        if isinstance(item, Tensor):
-            ret[:, i] = item[:, 0]
-        else:
-            ret[:, i] = item
-    return ret
-
-
-class _2dSpaceTime(Solution):
-    _lef: Optional[TensorFunction] = None
-    _le: float = 0
-    _ref: Optional[TensorFunction] = None
-    _re: float = 1
-    _if: Optional[TensorFunction] = None
-
-    def set_left_edge(self, x: float=0.0):
-        self._le = float(x)
-        return self._set_lef
-    def _set_lef(self, bc: TensorFunction):
-        self._lef = bc
-        return bc
-    def set_right_edge(self, x: float=1.0):
-        self._re = float(x)
-        return self._set_ref
-    def _set_ref(self, bc: TensorFunction):
-        self._ref = bc
-        return bc
-    def set_initial(self, ic: TensorFunction):
-        self._if = ic
-        return ic
-
-
-class TFC2dSpaceTimeDirichletBC(_2dSpaceTime):
-    """
-    Solution on space(1d)-time(1d) domain with dirichlet boundary conditions,
-    based on Theory of Functional Connections.
-    """
-    def forward(self, p: Tensor) -> Tensor:
-        m = p.shape[0]
-        l = self._re - self._le
-        t = p[..., 0:1]
-        x = p[..., 1:2]
-        x_0 = torch.cat([torch.zeros_like(t), x], dim=1)
-        t_0 = torch.cat([t, torch.ones_like(x)*self._le], dim=1)
-        t_1 = torch.cat([t, torch.ones_like(x)*self._re], dim=1)
-        return self._if(x)\
-            + (self._re-x)/l * (self._lef(t)-self._if(mkf(m, self._le)))\
-            + (x-self._le)/l * (self._ref(t)-self._if(mkf(m, self._re)))\
-            + self.net(p) - self.net(x_0)\
-            - (self._re-x)/l * (self.net(t_0)-self.net(mkf(m, 0, self._le)))\
-            - (x-self._le)/l * (self.net(t_1)-self.net(mkf(m, 0, self._re)))
