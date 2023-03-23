@@ -3,9 +3,11 @@ import numpy as np
 class BilinearForm:
     """
     """
-    def __init__(self, space):
-        self.space = space
+    def __init__(self, space0, space1=None， atype=None):
+        self.space0 = space0
+        self.space1 = space0 if space1 is None else space1
         self.M = None # 需要组装的矩阵 
+        self.atype = atype # 矩阵组装的方式，None、fast、ref
         self.dintegrators = [] # 区域积分子
         self.bintegrators = [] # 边界积分子
 

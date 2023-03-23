@@ -7,11 +7,12 @@ class MassIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, mesh, b0, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         """
         q = self.q
-        c = self.coef
+        coef = self.coef
+        mesh = space.mesh
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
@@ -23,15 +24,15 @@ class MassIntegrator:
 
         phi0 = b0(bcs, index=index) # (NQ, NC, ldof, ...)
 
-        if c is None:
+        if coef is None:
             M = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
-            if callable(c):
+            if callable(coef):
                 if hasattr(c, 'coordtype'):
-                    if c.coordtype == 'barycentric':
-                        c = c(bcs)
-                    elif c.coordtype == 'cartesian':
-                        c = c(ps)
+                    if coef.coordtype == 'barycentric':
+                        c = coef(bcs)
+                    elif coef.coordtype == 'cartesian':
+                        c = coef(ps)
                 else:
                     raise ValueError('''''')
 
@@ -39,7 +40,14 @@ class MassIntegrator:
 
         return M
 
-    def fast_assembly_cell_matrix(self, mesh, p):
+    def fast_assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         """
+        mesh = space.mesh 
         assert mesh.meshtype in ['tri', 'tet']
+
+    def assembly_cell_matrix_ref(self, space0, _, index=np.s_[:], cellmeasure=None):
+        """
+        @note 基于参考单元的矩阵组装
+        """
+        pass

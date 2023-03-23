@@ -1016,7 +1016,7 @@ class TetrahedronMesh(Mesh3d):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def one_tetrahedron_mesh(cls, meshtype='equ'):
+    def from_one_tetrahedron(cls, meshtype='equ'):
         """
         """
         if meshtype == 'equ':
