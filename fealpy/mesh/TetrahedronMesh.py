@@ -1080,6 +1080,14 @@ class TetrahedronMesh(Mesh3d):
 
         gmsh.finalize()
 
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

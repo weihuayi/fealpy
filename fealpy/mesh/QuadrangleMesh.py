@@ -338,12 +338,15 @@ class QuadrangleMesh(Mesh2d):
         gmsh.model.addPhysicalGroup(2, [surface], tag=1)
         gmsh.model.setPhysicalName(2, 1, "Polygon")
 
+        # 设置网格算法选项，使用 Quadrangle 2D 算法
+        gmsh.option.setNumber("Mesh.Algorithm", 8)
+        gmsh.option.setNumber("Mesh.RecombineAll", 1)
         # 生成网格
         gmsh.model.mesh.generate(2)
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
 
         # 获取四边形单元信息
         quadrilateral_type = 3  # 四边形单元的类型编号为 3
@@ -356,4 +359,12 @@ class QuadrangleMesh(Mesh2d):
 
         gmsh.finalize()
 
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+    
         return cls(node, cell)
