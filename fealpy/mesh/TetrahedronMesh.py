@@ -1072,7 +1072,7 @@ class TetrahedronMesh(Mesh3d):
         # 获取四面体单元信息
         tetrahedron_type = 4  # 四面体单元的类型编号为 4
         tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
-        cell = np.array(tetrahedron_connectivity, dtype=np.uint64).reshape(-1, 4) - 1
+        cell = np.array(tetrahedron_connectivity, dtype=np.int_).reshape(-1, 4) - 1
 
         # 输出节点和单元数量
         print(f"Number of nodes: {node.shape[0]}")
