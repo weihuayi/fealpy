@@ -1632,6 +1632,21 @@ class TriangleMesh(Mesh2d):
             NN = self.number_of_nodes()
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_one_triangle(cls, meshtype='iso'):
+        if meshtype == 'equ':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, np.sqrt(3)/2]], dtype=np.float64)
+        elif meshtype == 'iso':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.0]], dtype=np.float64)
+        cell = np.array([[0, 1, 2]], dtype=np.int_)
+        return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
