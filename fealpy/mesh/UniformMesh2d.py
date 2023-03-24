@@ -346,7 +346,7 @@ class UniformMesh2d(Mesh2d):
         a = (p[..., 0] - x0) / hx
         b = (p[..., 1] - y0) / hy
         F = f[i, j] * (1-a) * (1-b)  + f[i + 1, j] * a * (1-b) \
-            + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * (a * b 
+            + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * a * b 
         return F
 
     def gradient(self, f, order=1):
