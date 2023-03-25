@@ -125,6 +125,29 @@ class EdgeMesh():
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
+
+    def interpolation_points(self, p):
+
+        GD = self.geo_dimension()
+        node = self.entity('node') 
+
+        if p == 1:
+            return node
+        else:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            gdof = NN + NC*(p-1) 
+            ipoint = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoint[:NN] = node
+            cell = self.entity('cell') 
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            GD = mesh.geo_dimension()
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                    node[cell]).reshape(-1, GD)
+
+            return ipoint
     
     def add_plot(self, plot, 
             nodecolor='r',
