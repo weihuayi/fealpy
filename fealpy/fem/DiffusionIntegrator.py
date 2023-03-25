@@ -3,27 +3,33 @@ import numpy as np
 
 class DiffusionIntegrator:
     """
-    @note (c \grad u, \grad v)
+    @note (c \\grad u, \\grad v)
     """    
     def __init__(self, c=None, q=3):
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         @note 没有参考单元的组装方式
         """
         coef = self.coef
         q = self.q
-        mesh = space.mesh
+        mesh = space0.mesh
+        GD = mesh.geo_dimension()
+        NC = mesh.number_of_cells()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
+        NQ = len(ws)
+
+        if index != np.s_[:]:
+            NC = len(index)
 
 
-        phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space0.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
         if coef is None:
@@ -32,9 +38,9 @@ class DiffusionIntegrator:
             if callable(coef):
                 if hasattr(coef, 'coordtype'):
                     if coef.coordtype == 'barycentric':
-                        coef = coef(bcs)
+                        coef = coef(bcs, index=index)
                     elif coef.coordtype == 'cartesian':
-                        ps = mesh.bc_to_point(bcs)
+                        ps = mesh.bc_to_point(bcs, index=index)
                         coef = coef(ps)
                 else:
                     raise ValueError('''
@@ -55,21 +61,24 @@ class DiffusionIntegrator:
             if np.isscalar(coef):
                 D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
                 D*=coef
-            elif coef.ndim == 2: #(NQ, NC)
-                D = np.einsum('q, qc, qci..., qcj..., c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
-            elif coef.ndim == 4:# (NQ, NC, GD, GD)
-                phi0 = np.einsum('qcln, qcin->qcil', coef, phi0)
-                D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1,
-                        cellmeasure, optimize=True)
+            elif isinstance(coef, np.ndarray): 
+                if coef.shape == (NC, ): 
+                    D = np.einsum('q, c, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                elif coef.shape == (NQ, NC):
+                    D = np.einsum('q, qc, qcim, qcjm, c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+                else:
+                    n = len(coef.shape)
+                    shape = (4-n)*(1, ) + coef.shape
+                    D = np.einsum('q, qcmn, qcin, qcjm, c->cij', ws, coef.reshape(shape), phi0, phi1, cellmeasure, optimize=True)
             else:
                 raise ValueError("coef 的维度超出了支持范围")
 
         return D
 
-    def fast_assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         """
-        mesh = space.mesh 
+        mesh = space0.mesh 
         assert mesh.meshtype in ['tri', 'tet']
 
 
