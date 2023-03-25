@@ -12,7 +12,7 @@ class MassIntegrator:
         """
         q = self.q
         coef = self.coef
-        mesh = space.mesh
+        mesh = space0.mesh
 
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
