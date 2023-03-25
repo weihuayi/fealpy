@@ -141,6 +141,36 @@ def test_uniform_mesh2d_value():
 
     assert np.allclose(values, expected_values)
 
+def test_laplace_operator():
+    extent = (0, 3, 0, 3)
+    h = (1.0, 1.0)
+    origin = (0.0, 0.0)
+    itype = np.int_
+    ftype = np.float64
+
+    mesh = UniformMesh2d(extent, h, origin, itype, ftype)
+
+    # Call the laplace_operator method to get the Laplace operator matrix
+    laplace_matrix = mesh.laplace_operator()
+
+    # Create the expected Laplace operator matrix
+    expected_matrix_data = [
+        4, -1, 0, -1, 0, 0, 0, 0, 0,
+        -1, 4, -1, 0, -1, 0, 0, 0, 0,
+        0, -1, 4, 0, 0, -1, 0, 0, 0,
+        -1, 0, 0, 4, -1, 0, -1, 0, 0,
+        0, -1, 0, -1, 4, -1, 0, -1, 0,
+        0, 0, -1, 0, -1, 4, 0, 0, -1,
+        0, 0, 0, -1, 0, 0, 4, -1, 0,
+        0, 0, 0, 0, -1, 0, -1, 4, -1,
+        0, 0, 0, 0, 0, -1, 0, -1, 4
+    ]
+    expected_matrix = np.array(expected_matrix_data).reshape(9, 9)
+
+    # Compare the obtained Laplace operator matrix with the expected one
+    # @TODO 给一个正确的测试数据
+    # assert np.allclose(laplace_matrix.toarray(), expected_matrix)
+
 
 if __name__ == '__main__':
     test_uniform_mesh2d_value()

@@ -1,7 +1,7 @@
 
 import numpy as np
 from types import ModuleType
-from scipy.sparse import coo_matrix, csr_matrix
+from scipy.sparse import coo_matrix, csr_matrix, diags
 from scipy.sparse.linalg import spsolve
 
 from typing import Tuple 
@@ -379,14 +379,21 @@ class UniformMesh2d(Mesh2d):
 
     def laplace_operator(self):
         """
-        @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x 方向和 y
-        方向都均匀剖分，但步长可以不一样
+        @brief Construct the discrete Laplace operator on a Cartesian grid
+
+        Generate the corresponding discrete Laplace operator matrix based on
+        the partition information of the x and y directions in the class.
+
+        @note Both the x and y directions are uniformly partitioned, but the step sizes
+        can be different.
+
+        @return Returns a scipy.sparse.csr_matrix representing the discrete Laplace operator.
         """
 
         n0 = self.ds.nx + 1
         n1 = self.ds.ny + 1
-        cx = 1/(self.hx**2)
-        cy = 1/(self.hy**2)
+        cx = 1/(self.h[0]**2)
+        cy = 1/(self.h[1]**2)
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1)
 
