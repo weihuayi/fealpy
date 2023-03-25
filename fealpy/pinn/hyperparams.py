@@ -1,5 +1,5 @@
 
-from typing import List, Dict, Literal, Optional
+from typing import List, Dict, Literal, Optional, Any
 from time import time
 import json
 import os
@@ -154,7 +154,7 @@ class _Saver():
             self._mode = mode
         else:
             raise ValueError(f'Unknown mode {mode}')
-        self._data = []
+        self._data: List[Dict[str, Any]] = []
 
     @property
     def filename(self):

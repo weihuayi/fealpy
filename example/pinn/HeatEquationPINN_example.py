@@ -3,7 +3,8 @@ import torch
 import torch.nn as nn
 from torch.optim import Adam
 
-from fealpy.pinn.machine import TFC2dSpaceTimeDirichletBC, LearningMachine
+from fealpy.pinn.machine import LearningMachine
+from fealpy.pinn.boundary import TFC2dSpaceTimeDirichletBC
 from fealpy.pinn import gradient, ISampler
 
 # 定义神经网络

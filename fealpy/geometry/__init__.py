@@ -19,6 +19,7 @@ from .implicit_curve import LameCurve
 from .implicit_curve import PearShapedCurve
 from .implicit_curve import SpiricSectionsCurve
 from .implicit_curve import DoubleCircleCurve
+from .implicit_curve import DoubleBandY 
 
 from .implicit_surface import ScaledSurface
 from .implicit_surface import SphereSurface

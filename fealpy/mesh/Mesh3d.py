@@ -95,16 +95,18 @@ class Mesh3d():
     def add_plot(
             self, plot,
             nodecolor='k', edgecolor='k', facecolor='w', cellcolor='w',
-            aspect='equal',
+            aspect=[1, 1, 1],
             linewidths=0.5, markersize=20,
             showaxis=False, alpha=0.8, shownode=False, showedge=False, threshold=None):
 
         if isinstance(plot, ModuleType):
             from mpl_toolkits.mplot3d import Axes3D
             fig = plot.figure()
-            axes = plot.subplot(projection='3d')
+            axes = fig.add_subplot(111, projection='3d')
         else:
             axes = plot
+        axes.set_box_aspect(aspect)
+        axes.set_proj_type('ortho')
 
         return show_mesh_3d(
                 axes, self,

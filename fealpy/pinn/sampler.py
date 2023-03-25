@@ -1,24 +1,33 @@
 from typing import (
     List,
-    SupportsIndex,
-    Any
+    Any,
+    Generic,
+    TypeVar,
+    Generator
 )
 import torch
 from torch.autograd import Variable
 import numpy as np
 
-from .nntyping import TensorOrArray
+from ..mesh.TriangleMesh import TriangleMesh
+from ..mesh.TetrahedronMesh import TetrahedronMesh
+from .nntyping import Mesh
 
-__all__ = [
-    "ISampler",
-    "BoxEdgeSampler",
-    "TriangleMeshSampler"
-]
 
 class Sampler():
+    """
+    The base class for all types of samplers.
+    """
     m: int = 0
     nd: int = 0
-    def __init__(self, m: SupportsIndex=0, requires_grad: bool=False) -> None:
+    def __init__(self, m: int=0, requires_grad: bool=False) -> None:
+        """
+        @brief Initializes a Sampler instance.
+
+        @param m: The number of samples to generate.
+        @param requires_grad: A boolean indicating whether the samples should
+                              require gradient computation. Defaults to `False`.
+        """
         self.m = int(m)
         self.requires_grad = bool(requires_grad)
 
@@ -35,7 +44,23 @@ class Sampler():
             return NotImplemented
 
     def run(self) -> torch.Tensor:
+        """
+        @brief Generates samples.
+
+        @return: A tensor with shape (m, nd) containing the generated samples.
+        """
         raise NotImplementedError
+
+    def load(self, epoch: int=1) -> Generator[torch.Tensor, None, None]:
+        """
+        @brief Return a generator to call `sampler.run()`.
+
+        @param epoch: Iteration number, defaults to 1.
+
+        @return: Generator.
+        """
+        for _ in range(epoch):
+            yield self.run()
 
 
 class JoinedSampler(Sampler):
@@ -61,6 +86,11 @@ class JoinedSampler(Sampler):
             self.samplers.append(sampler)
 
     def run(self) -> torch.Tensor:
+        """
+        @brief Run joined samplers.
+
+        @return: Samples concatenated in dim-0.
+        """
         return torch.cat([s.run() for s in self.samplers], dim=0)
 
 
@@ -87,10 +117,18 @@ class HybridSampler(Sampler):
             self.samplers.append(sampler)
 
     def run(self) -> torch.Tensor:
+        """
+        @brief Run hybrid samplers.
+
+        @return: Samples concatenated in dim-1.
+        """
         return torch.cat([s.run() for s in self.samplers], dim=1)
 
 
 class ConstantSampler(Sampler):
+    """
+    A sampler generating constants.
+    """
     def __init__(self, value: torch.Tensor, requires_grad: bool = False) -> None:
         assert value.ndim == 2
         super().__init__(0, requires_grad)
@@ -102,128 +140,135 @@ class ConstantSampler(Sampler):
 
 
 class ISampler(Sampler):
-    """Generate samples independently in each axis."""
-    def __init__(self, m: SupportsIndex, ranges: Any,
+    """
+    A sampler that generates samples independently in each axis.
+    """
+    def __init__(self, m: int, ranges: Any,
                  requires_grad: bool=False) -> None:
         """
-        Generate samples independently in each axis.
+        @brief Initializes an ISampler instance.
 
-        Parameters
-        ---
-        m: int.
-            Number of samples.
-        ranges: Object that can be converted to `numpy.ndarray`.
-            Ranges in each sampling axes.
-        requires_grad: bool. Defaults to `False`.
-            See `torch.autograd.grad`.
+        @param m: The number of samples to generate.
+        @param ranges: An object that can be converted to a `numpy.ndarray`,
+                       representing the ranges in each sampling axis.
+        @param requires_grad: A boolean indicating whether the samples should
+                              require gradient computation. Defaults to `False`.
+                              See `torch.autograd.grad`
+
+        @throws ValueError: If `ranges` has an unexpected shape.
         """
         super().__init__(m=m, requires_grad=requires_grad)
-        self.ranges = np.array(ranges)
-        if len(self.ranges.shape) == 2:
-            self.nd = self.ranges.shape[0]
+        ranges_arr = np.array(ranges, np.float32)
+        if len(ranges_arr.shape) == 2:
+            self.nd = ranges_arr.shape[0]
         else:
-            raise ValueError
+            raise ValueError(f"Unexpected `ranges` shape {ranges_arr.shape}.")
+        self.lows = ranges_arr[:, 0].reshape(1, self.nd)
+        self.highs = ranges_arr[:, 1].reshape(1, self.nd)
+        self.deltas = self.highs - self.lows
 
     def run(self) -> torch.Tensor:
-        ret = np.zeros((self.m, self.nd))
-        for i in range(self.nd):
-            low = self.ranges[i, 0]
-            high = self.ranges[i, 1]
-            if abs(high - low) < 1e-16:
-                ret[..., i] = low
-            else:
-                ret[..., i] = torch.rand(self.m)*(high - low) + low
+        """
+        @brief Generates independent samples in each axis.
+
+        @return: A tensor with shape (m, nd) containing the generated samples.
+        """
+        ret = np.random.rand(self.m, self.nd) * self.deltas + self.lows
         return Variable(torch.from_numpy(ret).float(), requires_grad=self.requires_grad)
 
 
-class BoxEdgeSampler(JoinedSampler):
-    """Generate samples on the edges of a multidimensional rectangle."""
-    def __init__(self, m_edge: SupportsIndex, p1: TensorOrArray, p2: TensorOrArray, requires_grad: bool=False) -> None:
+class BoxBoundarySampler(JoinedSampler):
+    """Generate samples on the boundaries of a multidimensional rectangle."""
+    def __init__(self, m_edge: int, p1: List[float], p2: List[float], requires_grad: bool=False) -> None:
         """
-        Generate samples on the edges of a multidimensional rectangle.
+        @brief Generate samples on the boundaries of a multidimensional rectangle.
 
-        Parameters
-        ---
-        m: int.
-            Number of samples in each edge.
-        p1, p2: Object that can be converted to `torch.Tensor`.
-            Points at both ends of the diagonal.
-        requires_grad: bool. Defaults to `False`.
-            See `torch.autograd.grad`.
+        @param m: int. Number of samples in each boundary.
+        @param p1, p2: Object that can be converted to `torch.Tensor`.
+                       Points at both ends of the diagonal.
+        @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
         """
         super().__init__()
-        p1, p2 = torch.Tensor(p1), torch.Tensor(p2)
-        if len(p1.shape) != 1:
+        t1, t2 = torch.tensor(p1), torch.tensor(p2)
+        if len(t1.shape) != 1:
             raise ValueError
-        if p1.shape != p2.shape:
+        if t1.shape != t2.shape:
             raise ValueError
-        data = torch.vstack([p1, p2]).T
+        data = torch.vstack([t1, t2]).T
         range1, range2 = data.clone(), data.clone()
-        for d in range(p1.shape[0]):
+        for d in range(t1.shape[0]):
             range1[d, :] = data[d, 0]
             range2[d, :] = data[d, 1]
             self.add(ISampler(m=m_edge, ranges=range1, requires_grad=requires_grad))
             self.add(ISampler(m=m_edge, ranges=range2, requires_grad=requires_grad))
 
 
-class _MeshSampler(Sampler):
-    def __init__(self, m_cell: SupportsIndex, mesh, requires_grad: bool=False) -> None:
-        """
-        Generate samples in every cells of a mesh.
+_MT = TypeVar("_MT", bound=Mesh)
 
-        Parameters
-        ---
-        m_cell: int.
-            Number of samples in each cell.
-        mesh: Mesh.
-        requires_grad: bool. Defaults to `False`.
-            See `torch.autograd.grad`.
+class _MeshSampler(Sampler, Generic[_MT]):
+    def __init__(self, m_cell: int, mesh:_MT, requires_grad: bool=False) -> None:
+        """
+        @brief Generate samples in every cells of a mesh.
+
+        @param m_cell: int. Number of samples in each cell.
+        @param mesh: Mesh.
+        @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
         """
         self.m_cell = int(m_cell)
-        m = self.m_cell * mesh.entity('cell').shape[0]
+        node = mesh.entity('node')
+        cell = mesh.entity('cell')
+
+        m = self.m_cell * cell.shape[0]
         super().__init__(m=m, requires_grad=requires_grad)
         self.mesh = mesh
-        self.nd = mesh.top_dimension()
+        TD = mesh.top_dimension()
+        self.nd = node.shape[1]
+
+        bcs_example = np.zeros((m_cell, TD+1))
+        self._path_info = np.einsum_path('...j, ijk->...ik', bcs_example, node[cell])[0]
+
+    def cell_bc_to_point(self, bcs) -> np.ndarray:
+        """
+        The optimized version of method `mesh.cell_bc_to_point()`
+        to support faster sampling.
+        """
+        node = self.mesh.entity('node')
+        cell = self.mesh.entity('cell')
+        return np.einsum('...j, ijk->...ik', bcs, node[cell], optimize=self._path_info)
 
 
-def _inverse(p, *idx):
-        mask = np.array(idx, dtype=np.int_)
-        p[:, mask] = 1 - p[:, mask]
-        return p
+def random_weights(m: int, n: int):
+    """
+    @brief Generate m random samples, where each sample has n features (n >= 2),
+    such that the sum of each feature is 1.0.
+
+    @param m: The number of samples to generate.
+    @param n: The number of features in each sample.
+
+    @return: An ndarray with shape (m, n), where each row represents a random sample.
+
+    @throws ValueError: If n < 2.
+    """
+    m, n = int(m), int(n)
+    if n < 2:
+        raise ValueError(f'Integer `n` should be larger than 1 but got {n}.')
+    u = np.zeros((m, n+1))
+    u[:, n] = 1.0
+    u[:, 1:n] = np.sort(np.random.rand(m, n-1), axis=1)
+    return u[:, 1:n+1] - u[:, 0:n]
 
 
-class TriangleMeshSampler(_MeshSampler):
+class TriangleMeshSampler(_MeshSampler[TriangleMesh]):
     """Sampler in a triangle mesh."""
     def run(self) -> torch.Tensor:
-        bcs = np.zeros((self.m_cell, 3))
-        bcs[:, 1:3] = np.random.rand(self.m_cell, 2)
-        bcs[:, 0] = 1 - bcs[:, 1] - bcs[:, 2]
-        reflect_state = bcs[:, 0] < 0
-        bcs[reflect_state, 1:3] = 1 - bcs[reflect_state, 1:3]
-        bcs[reflect_state, 0] = - bcs[reflect_state, 0]
-        ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 2))
+        bcs = random_weights(self.m_cell, 3)
+        ret = self.cell_bc_to_point(bcs).reshape((-1, 2))
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)
 
 
-class TetrahedronMeshSampler(_MeshSampler):
+class TetrahedronMeshSampler(_MeshSampler[TetrahedronMesh]):
     """Sampler in a tetrahedron mesh."""
     def run(self) -> torch.Tensor:
-        bcs = np.zeros((self.m_cell, 4))
-        u_0 = np.random.rand(self.m_cell, 3)
-        bcs[:, 1:4] = u_0
-        ui = [
-            _inverse(u_0.copy(), 0, 1),
-            _inverse(u_0.copy(), 1, 2),
-            _inverse(u_0.copy(), 2, 0)
-        ]
-
-        for i in range(3):
-            mask = np.sum(ui[i], -1) < 1
-            bcs[mask, 1:4] = ui[i][mask, :]
-
-        bcs[:, 0] = 1 - np.sum(bcs[:, 1:4], -1)
-        mask = bcs[:, 0] < 0
-        bcs[mask, 1:4] += 0.5*bcs[mask, 0:1]
-        bcs[mask, 0] = 1 - np.sum(bcs[mask, 1:4], -1)
-        ret: np.ndarray = self.mesh.cell_bc_to_point(bcs).reshape((-1, 3))
+        bcs = random_weights(self.m_cell, 4)
+        ret = self.cell_bc_to_point(bcs).reshape((-1, 3))
         return torch.tensor(ret, dtype=torch.float32, requires_grad=self.requires_grad)

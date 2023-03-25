@@ -94,9 +94,10 @@ class DoubleCircleCurve():
     """
     @brief 两个圆相交的曲线
     """
-    def __init__(self, l = 1.0, radius=np.sqrt(2)):
-        self.circle0 = CircleCurve([-l, 0.0], radius);
-        self.circle1 = CircleCurve([l, 0.0], radius);
+    def __init__(self, l = 1.0, radius=np.sqrt(2), center=np.array([0, 0])):
+        self.circle0 = CircleCurve(center-np.array([l, 0]), radius)
+        self.circle1 = CircleCurve(center+np.array([l, 0]), radius)
+        self.center = center
         self.b = np.sqrt(radius**2 - l**2)
         self.l = l
         self.k = self.b/l
@@ -110,11 +111,8 @@ class DoubleCircleCurve():
         b = self.b
         l = self.l
 
-        center0 = self.circle0.center
-        center1 = self.circle1.center
-
-        x = p[..., 0]
-        y = p[..., 1]
+        x = p[..., 0] - self.center[0]
+        y = p[..., 1] - self.center[1]
         yflag = y>0
         flag0 = yflag & (y<b) & (x < -y/k + l) &(x > y/k-l)
         flag1 = (~yflag) & (y>-b) & (x < y/k + l) &(x > -y/k-l)
@@ -141,11 +139,8 @@ class DoubleCircleCurve():
 
         val = self(p)
 
-        center0 = self.circle0.center
-        center1 = self.circle1.center
-
-        x = p[..., 0]
-        y = p[..., 1]
+        x = p[..., 0] - self.center[0]
+        y = p[..., 1] - self.center[1]
         yflag = y>0
         flag0 = yflag & (y<b) & (x < -y/k + l) &(x > y/k-l) # Omega0
         flag1 = (~yflag) & (y>-b) & (x < y/k + l) &(x > -y/k-l) # Omega1
@@ -160,6 +155,84 @@ class DoubleCircleCurve():
         gval[flag1, 0] = x[flag1]/val[flag1] 
         gval[flag2, 0] = (x[flag2]-l)/val[flag2] 
         gval[flag3, 0] = (x[flag3]+l)/val[flag3] 
+        return gval
+
+    def distvalue(self, p):
+        p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)
+        return d, n
+
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
+
+class DoubleBandY():
+    def __init__(self, ylist=[0.24, 0.26, 0.74, 0.76]):
+        self.ylist = ylist
+        self.cen = [0.5*(ylist[0]+ylist[1]), 0.25*sum(ylist), 0.5*(ylist[2]+ylist[3])]
+
+    def init_mesh(self, n):
+        pass
+
+    def __call__(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+
+        flag0 = y < self.cen[0]
+        flag1 = (~flag0) & (y<self.cen[1])
+        flag2 = (~flag0) & (~flag1) & (y<self.cen[2])
+        flag3 = (~flag0) & (~flag1) & (~flag2)
+
+        val = np.zeros(p.shape[:-1], dtype=np.float64)
+        val[flag0] = self.ylist[0]-y[flag0]
+        val[flag1] = y[flag1]-self.ylist[1] 
+        val[flag2] = self.ylist[2]-y[flag2]
+        val[flag3] = y[flag3]-self.ylist[3] 
+        return val 
+
+    def value(self, p):
+        return self(p)
+
+    def gradient(self, p):
+        k = self.k
+        b = self.b
+        l = self.l
+
+        val = self(p)
+
+        x = p[..., 0] - self.center[0]
+        y = p[..., 1] - self.center[1]
+        yflag = y>0
+        flag0 = yflag & (y<b) & (x < -y/k + l) &(x > y/k-l) # Omega0
+        flag1 = (~yflag) & (y>-b) & (x < y/k + l) &(x > -y/k-l) # Omega1
+
+        xflag = x>0
+        flag23 = ~(flag0|flag1)
+        flag2 = xflag & flag23 # Omega2
+        flag3 = (~xflag) & flag23 # Omega3
+
+        gval = np.zeros(p.shape, dtype=np.float64)
+        gval[flag0, 0] = x[flag0]/val[flag0] 
+        gval[flag1, 0] = x[flag1]/val[flag1] 
+        gval[flag2, 0] = (x[flag2]-l)/val[flag2] 
+        gval[flag3, 0] = (x[flag3]+l)/val[flag3] 
+
+        x = p[..., 0]
+        y = p[..., 1]
+
+        flag0 = y < self.cen[0]
+        flag1 = (~flag0) & (y<self.cen1[1])
+        flag2 = (~flag0) & (~flag1) & (y<self.cen1[2])
+        flag3 = (~flag0) & (~flag1) & (~flag2)
+
+        gval = np.zeros(p.shape, dtype=np.float64)
+        gval[flag0, 1] = -1
+        gval[flag1, 1] =  1
+        gval[flag2, 1] = -1
+        gval[flag3, 1] =  1
+        return gval
 
     def distvalue(self, p):
         p, d, n= project(self, p, maxit=200, tol=1e-8, returngrad=True, returnd=True)

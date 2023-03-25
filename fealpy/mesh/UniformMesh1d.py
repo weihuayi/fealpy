@@ -16,7 +16,7 @@ class UniformMesh1d():
         @brief Initialize the mesh.
 
         @param[in] extent A tuple representing the range of the mesh in the x direction.
-        @param[in] h Mesh step size.
+        @param[in] h: Mesh step size.
         @param[in] origin Coordinate of the starting point.
         @param[in] itype Integer type to be used, default: np.int_.
         @param[in] ftype Floating point type to be used, default: np.float64.
@@ -332,27 +332,21 @@ class UniformMesh1d():
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A
 
-    def laplace_operator_with_dbc(self):
+    def apply_dirichlet_bc(self, uh, A, f):
         """
         @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
-        h = self.h
-        cx = 1/(h**2)
-        NN = self.number_of_nodes()
-        k = np.arange(NN)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
+        isBdNode[[0,-1]] = True
 
-        val = np.full(NN, 2*cx)
-        val[0] = 1
-        val[-1] = 1
-        A = csr_matrix((val, (k, k)), shape=(NN, NN), dtype=self.ftype)
-
-        val = np.broadcast_to(-cx, (NN-2, ))
-        I = k[1:-1]
-        J = k[0:-2]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-       
-        J = k[2:]
-        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        f -= A@uh
+        f[isBdNode] = uh[isBdNode]
+    
+        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        bdIdx[isBdNode] = 1
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
         return A
 
 
