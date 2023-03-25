@@ -2,13 +2,17 @@ import numpy as np
 
 
 class MassIntegrator:
+    """
+    @note (c u, v)
+    """    
 
     def __init__(self, c=None, q=3):
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space, _, index=np.s_[:], cellmeasure=None):
         """
+        @note 没有参考单元的组装方式
         """
         q = self.q
         coef = self.coef
@@ -22,21 +26,42 @@ class MassIntegrator:
 
         ps = mesh.bc_to_point(bcs, index=index)
 
-        phi0 = b0(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi1 = phi0
 
         if coef is None:
-            M = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+            M = np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
         else:
             if callable(coef):
-                if hasattr(c, 'coordtype'):
+                if hasattr(coef, 'coordtype'):
                     if coef.coordtype == 'barycentric':
-                        c = coef(bcs)
+                        coef = coef(bcs)
                     elif coef.coordtype == 'cartesian':
-                        c = coef(ps)
+                        coef = coef(ps)
                 else:
-                    raise ValueError('''''')
+                    raise ValueError('''
+                    You should add decorator "cartesian" or "barycentric" on
+                    function `basis0`
 
-            M = np.einsum('q, qc, qci..., qcj..., c->cij', ws, c, phi0, phi0, cellmeasure, optimize=True)
+                    from fealpy.decorator import cartesian, barycentric
+
+                    @cartesian
+                    def basis0(p):
+                        ...
+
+                    @barycentric
+                    def basis0(p):
+                        ...
+
+                    ''')
+
+            if np.isscalar(coef):
+                M = np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+                M*=coef
+            elif coef.ndim == 2: #(NQ, NC)
+                M = np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
+            else:
+                raise ValueError("coef 的维度超出了支持范围")
 
         return M
 

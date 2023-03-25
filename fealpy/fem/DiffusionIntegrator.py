@@ -3,8 +3,8 @@ import numpy as np
 
 class DiffusionIntegrator:
     """
-    (c \grad u, \grad v)
-    """
+    @note (c \grad u, \grad v)
+    """    
     def __init__(self, c=None, q=3):
         self.coef = c
         self.q = q
@@ -53,18 +53,14 @@ class DiffusionIntegrator:
 
                     ''')
             if np.isscalar(coef):
-                subscripts = 'q, qcim, qcjm, c->cij'
-                D = np.einsum(subscripts, ws, phi0, phi1, cellmeasure, optimize=True)
+                D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1, cellmeasure, optimize=True)
                 D*=coef
-            elif coef.ndim == 1:
-                subscripts = 'q, qc, qcin, qcjm, c->cij'
-                D = np.einsum(subscripts, ws, coef, phi0, phi1, cellmeasure, optimize=True)
-            elif coef.ndim == 2:
-                subscripts = 'q, qcm, qcim, qcjm, c->cij'
-                D = np.einsum(subscripts, ws, coef, phi0, phi1, cellmeasure, optimize=True)
-            elif coef.ndim == 3:
-                subscripts = 'q, qcmn, qcin, qcjm, c->cij'
-                D = np.einsum(subscripts, ws, coef, phi0, phi1, cellmeasure, optimize=True)
+            elif coef.ndim == 2: #(NQ, NC)
+                D = np.einsum('q, qc, qci..., qcj..., c->cij', ws, coef, phi0, phi1, cellmeasure, optimize=True)
+            elif coef.ndim == 4:# (NQ, NC, GD, GD)
+                phi0 = np.einsum('qcln, qcin->qcil', coef, phi0)
+                D = np.einsum('q, qci..., qcj..., c->cij', ws, phi0, phi1,
+                        cellmeasure, optimize=True)
             else:
                 raise ValueError("coef 的维度超出了支持范围")
 
