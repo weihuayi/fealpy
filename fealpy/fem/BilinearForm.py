@@ -3,7 +3,7 @@ import numpy as np
 class BilinearForm:
     """
     """
-    def __init__(self, space0, space1=None， atype=None):
+    def __init__(self, space0, space1=None, atype=None):
         self.space0 = space0
         self.space1 = space0 if space1 is None else space1
         self.M = None # 需要组装的矩阵 

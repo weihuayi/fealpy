@@ -10,7 +10,7 @@ class MassIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
         @note 没有参考单元的组装方式
         """
@@ -26,7 +26,7 @@ class MassIntegrator:
 
         ps = mesh.bc_to_point(bcs, index=index)
 
-        phi0 = space.basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space0.basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
         if coef is None:
@@ -58,17 +58,18 @@ class MassIntegrator:
             if np.isscalar(coef):
                 M = np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
                 M*=coef
-            elif coef.ndim == 2: #(NQ, NC)
+            elif isinstance(coef, np.ndarray): 
                 M = np.einsum('q, qc, qci, qcj, c->cij', ws, coef, phi0, phi0, cellmeasure, optimize=True)
             else:
-                raise ValueError("coef 的维度超出了支持范围")
+                raise ValueError("coef is not correct!")
 
         return M
 
-    def fast_assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix_fast(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
+        @brief 基于无数值积分的组装方式
         """
-        mesh = space.mesh 
+        mesh = space0.mesh 
         assert mesh.meshtype in ['tri', 'tet']
 
     def assembly_cell_matrix_ref(self, space0, _, index=np.s_[:], cellmeasure=None):
