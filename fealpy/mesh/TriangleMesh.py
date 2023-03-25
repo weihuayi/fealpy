@@ -1804,6 +1804,58 @@ class TriangleMesh(Mesh2d):
     
         return cls(node, cell)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_torus_surface(cls, R, r, nu, nv):
+        """
+        @brief Generate a structured triangular mesh on a torus surface.
+
+        @param R  The major radius of the torus (distance from the center of the torus to the center of the tube).
+        @param r  The minor radius of the torus (radius of the tube).
+        @param nu The number of discrete segments in the u-direction.
+        @param nv The number of discrete segments in the v-direction.
+
+        @return  the triangular mesh.
+
+        @details This function generates a structured triangular mesh on a torus surface with major radius R,
+                 minor radius r, and nu and nv discrete segments in the u and v directions, respectively.
+                 The output consists of a tuple containing the nodes and cells of the mesh. The nodes are
+                 represented as an Nx3 array of 3D coordinates, and the cells are represented as an Mx3
+                 array of node indices for each triangle.
+        @todo 检查生成曲面单元的法向是否指向外部
+        """
+        NN = nu*nv
+        NC = nu*nv
+        node = np.zeros((NN, 3), dtype=np.float64)
+
+        U, V = np.mgrid[0:2*np.pi:nu*1j, 0:2*np.pi:nv*1j]
+        X = (R + r * np.cos(V)) * np.cos(U)
+        Y = (R + r * np.cos(V)) * np.sin(U)
+        Z = r * np.sin(V)
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
+
+        idx = np.zeros((nu+1, nv+1), np.uint32)
+        idx[0:-1, 0:-1] = np.arange(NN).reshape(nu, nv)
+        idx[-1, :] = idx[0, :]
+        idx[:, -1] = idx[:, 0]
+        cell = np.zeros((2*NC, 3), dtype=np.uint32)
+        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_unit_sphere_surface(cls):
+        pass
+
+
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):
         edge = mesh.ds.edge
