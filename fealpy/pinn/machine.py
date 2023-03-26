@@ -147,15 +147,15 @@ class TensorMapping(Module):
         """
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
-        mesh_pt = [Variable(torch.from_numpy(x).float(), requires_grad=True) for x in flat_mesh]
+        mesh_pt = [torch.from_numpy(x).float() for x in flat_mesh]
         pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
-        u_plot: NDArray = pt_u.data.cpu().numpy()
+        u_plot: NDArray = pt_u.detach().numpy()
         assert u_plot.ndim == 2
         nf = u_plot.shape[-1]
         if nf <= 1:
             return u_plot.reshape(mesh[0].shape), mesh
         else:
-            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf)], mesh
+            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf, axis=-1)], mesh
 
 
 class ZeroMapping(Module):
