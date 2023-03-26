@@ -126,6 +126,61 @@ class EdgeMesh():
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
+    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+        """
+        """
+        TD = self.top_dimension()
+        multiIndex = self.multi_index_matrix(p)
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_dofs()
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.grad_lambda()
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
+        return gphi #(..., NC, ldof, GD)
+
+
+    def grad_lambda(self):
+        """
+        @brief 重心坐标的梯度
+        """
+        node = self.entity('node')
+        cell = self.entity('cell')
+        NC = self.number_of_cells()
+        v = node[cell[:, 1]] - node[cell[:, 0]]
+        GD = self.geo_dimension()
+        Dlambda = np.zeros((NC, 2, GD), dtype=mesh.ftype)
+        h2 = np.sum(v**2, axis=-1)
+        v /=h2.reshape(-1, 1)
+        Dlambda[:, 0, :] = -v
+        Dlambda[:, 1, :] = v
+        return Dlambda
+
     def interpolation_points(self, p):
 
         GD = self.geo_dimension()

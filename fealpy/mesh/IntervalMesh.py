@@ -122,7 +122,7 @@ class IntervalMesh():
         NC = self.number_of_cells()
         v = node[cell[:, 1]] - node[cell[:, 0]]
         GD = self.geo_dimension()
-        Dlambda = np.zeros((NC, 2, GD), dtype=np.float)
+        Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
         h2 = np.sum(v**2, axis=-1)
         v /=h2.reshape(-1, 1)
         Dlambda[:, 0, :] = -v

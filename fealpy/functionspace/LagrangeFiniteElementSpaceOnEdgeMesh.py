@@ -2,6 +2,9 @@ import numpy as np
 
 
 class CEdgeMeshFEMDof():
+    """
+    @brief EdgeMesh 上的分片 p 次连续元的自由度管理类
+    """
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
@@ -62,29 +65,56 @@ class CEdgeMeshFEMDof():
         return gdof
 
     def interpolation_points(self):
+        return self.mesh.interpolation_points(self.p)
+
+class DEdgeMeshFEMDof():
+    """
+    @brief EdgeMesh 上的分片 p 次间断元的自由度管理类
+    """
+    def __init__(self, mesh, p):
+        self.mesh = mesh
+        self.p = p
+        self.multiIndex = mesh.multi_index_matrix() 
+        self.cell2dof = self.cell_to_dof()
+
+    def is_boundary_dof(self, threshold=None):
+        if type(threshold) is np.ndarray:
+            index = threshold
+        else:
+            index = self.mesh.ds.boundary_node_index()
+            if callable(threshold):
+                bc = self.mesh.entity_barycenter('node', index=index)
+                flag = threshold(bc)
+                index = index[flag]
+
+        gdof = self.number_of_global_dofs()
+        isBdDof = np.zeros(gdof, dtype=np.bool_)
+        isBdDof[index] = True
+        return isBdDof
+
+    def entity_to_dof(self, etype='cell', index=np.s_[:]):
+        return self.cell_to_dof()[index]
+
+    def cell_to_dof(self):
         p = self.p
         mesh = self.mesh
-        cell = mesh.ds.cell
-        node = mesh.node
+        cell = mesh.entity('cell')
+        ldof = self.number_of_local_dofs()
+        cell2dof = np.arange(NC*(p+1)).reshape(NC, p+1)
+        return cell2dof
 
-        if p == 1:
-            return node
-        else:
-            NN = mesh.number_of_nodes()
-            gdof = self.number_of_global_dofs()
-            shape = (gdof,) + node.shape[1:]
-            ipoint = np.zeros(shape, dtype=np.float64)
-            ipoint[:NN] = node
-            NC = mesh.number_of_cells()
-            cell = mesh.ds.cell
-            w = np.zeros((p-1,2), dtype=np.float64)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            GD = mesh.geo_dimension()
-            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                    node[cell]).reshape(-1, GD)
+    def number_of_local_dofs(self, _):
+        return self.p + 1
 
-            return ipoint
+    def number_of_global_dofs(self):
+        p = self.p
+        mesh = self.mesh
+        NC = mesh.number_of_cells()
+        gdof = NC*(p+1)
+        return gdof
+
+    def interpolation_points(self):
+        return self.mesh.interpolation_points(self.p)
 
 class LagrangeFiniteElementSpaceOnEdgeMesh():
     def __init__(self, mesh, p=1, spacetype='C', dof=None):
@@ -93,18 +123,18 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
         self.p = p
         if dof is None:
             if spacetype == 'C':
+                self.dof = CEdgeMeshLFEMDof(mesh, p)
             elif spacetype == 'D':
+                self.dof = DEdgeMeshLFEMDof(mesh, p)
         else:
             self.dof = dof
-            self.TD = mesh.top_dimension() 
 
+        self.TD = mesh.top_dimension() 
         self.GD = mesh.geo_dimension()
 
         self.spacetype = spacetype
         self.itype = mesh.itype
         self.ftype = mesh.ftype
-
-        self.multi_index_matrix = multi_index_matrix 
 
     def __str__(self):
         return "Lagrange finite element space on edge mesh!"
@@ -113,7 +143,16 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
         return self.dof.number_of_global_dofs()
 
     def number_of_local_dofs(self, doftype='cell'):
-        if self.spacetype == 'C':
-            return self.dof.number_of_local_dofs(doftype=doftype)
-        elif self.spacetype == 'D':
-            return self.dof.number_of_local_dofs()
+        return self.dof.number_of_local_dofs(doftype=doftype)
+
+    @barycentric
+    def basis(self, bc, index=np.s_[:], p=None):
+        p = self.p
+        phi = self.mesh.shape_function(bc, p=p)
+        return phi[..., None, :]
+
+    @barycentric
+    def grad_basis(self, bc, index=np.s_[:], p=None):
+        p = self.p
+        phi = self.mesh.shape_function(bc, p=p)
+        return phi[..., None, :]
