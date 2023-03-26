@@ -23,7 +23,7 @@ from .LagrangeTriangleMesh import LagrangeTriangleMesh
 
 from .distmesh import DistMesh2d
 
-from .interface_mesh_generator import InterfaceMesh2d
+#from .interface_mesh_generator import InterfaceMesh2d
 
 def write_to_vtu(fname, mesh, nodedata=None, celldata=None, p=1):
     if p == 1:

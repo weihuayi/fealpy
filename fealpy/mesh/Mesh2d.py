@@ -184,7 +184,7 @@ class Mesh2d(object):
         else:
             axes = plot
         axes.set_box_aspect(aspect)
-        axes.set_proj_type('ortho')
+        #axes.set_proj_type('ortho')
         return show_mesh_2d(axes, self,
                 nodecolor=nodecolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,

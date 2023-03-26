@@ -76,7 +76,7 @@ def find_cut_point(phi, p0, p1):
         isRight[:] = False 
     return cutPoint
 
-def interfacemesh2d(box, phi, n, meshtype='quad'):
+def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
     """ Generate a interface-fitted mesh 
 
     Parameters
@@ -98,11 +98,11 @@ def interfacemesh2d(box, phi, n, meshtype='quad'):
         'h' is the split step 
     """
 
-    hx = (box[1] - box[0])/n
-    hy = (box[3] - box[2])/n
+    hx = (box[1] - box[0])/nx
+    hy = (box[3] - box[2])/ny
     h = min(hx, hy)
 
-    mesh = mf.boxmesh2d(box, nx=n, ny=n, meshtype=meshtype) 
+    mesh = mf.boxmesh2d(box, nx=nx, ny=ny, meshtype=meshtype) 
     ne = mesh.number_of_nodes_of_cells()
 
     N = mesh.number_of_nodes()
