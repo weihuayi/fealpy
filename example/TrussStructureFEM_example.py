@@ -39,7 +39,7 @@ edge = np.array([
     [4, 3], [2, 3], [4, 5], [2, 9], [6, 5], 
     [8, 3], [7, 4], [6, 3], [2, 7], [9, 4],
     [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=np.int_)
-mesh = TrussMesh(node, edge)
+mesh = EdgeMesh(node, edge)
 
 GD = mesh.geo_dimension()
 NN = mesh.number_of_nodes()
