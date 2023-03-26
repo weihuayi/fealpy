@@ -58,8 +58,8 @@ class _BoxSetter():
 
 class LevelSetDBCSolution(Solution, _BCSetter, _LSSetter):
     """
-    @brief A solution of problems with dirichlet boundary conditions, and the boundary
-           is given through a level-set function. Use the decorators `@set_bc` and
+    @brief A solution of problems with dirichlet boundary conditions, and the boundary\
+           is given through a level-set function. Use the decorators `@set_bc` and\
            `@set_level_set` to set the boundary infomation before training.
     """
     def forward(self, p: Tensor):

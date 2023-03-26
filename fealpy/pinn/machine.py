@@ -49,11 +49,11 @@ class TensorMapping(Module):
         """
         @brief From bc in mesh cells to outputs of the solution.
 
-        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number
+        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number\
                    of bc points and TD is the topology dimension of the mesh.
 
-        @return: NDArray with shape (b, c, ...). Outputs in every bc points and every cells.
-                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'
+        @return: NDArray with shape (b, c, ...). Outputs in every bc points and every cells.\
+                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'\
                  is the shape of the function value.
         """
         points = mesh.cell_bc_to_point(bc)
