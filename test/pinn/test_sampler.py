@@ -4,7 +4,7 @@ from fealpy.pinn.sampler import (
     JoinedSampler,
     HybridSampler,
     ISampler,
-    BoxEdgeSampler,
+    BoxBoundarySampler,
     TriangleMeshSampler,
     TetrahedronMeshSampler
 )
@@ -27,8 +27,8 @@ class TestSimple():
         _valified_range(out[:, 1], 1, 3)
 
 
-    def test_boxedgesampler(self):
-        s = BoxEdgeSampler(50, [0, 0, 0], [1, 1, 1])
+    def test_boxboundarysampler(self):
+        s = BoxBoundarySampler(50, [0, 0, 0], [1, 1, 1])
         assert s.m == 300
         assert s.nd == 3
 
