@@ -171,7 +171,7 @@ class Mesh2d(object):
     def add_plot(
             self, plot,
             nodecolor='w', edgecolor='k',
-            cellcolor=[0.5, 0.9, 0.45], aspect='equal',
+            cellcolor=[0.5, 0.9, 0.45], aspect=None,
             linewidths=1, markersize=50,
             showaxis=False, showcolorbar=False, 
             cmax=None, cmin=None, 
@@ -183,8 +183,14 @@ class Mesh2d(object):
             axes = fig.gca()
         else:
             axes = plot
-        axes.set_box_aspect(aspect)
-        #axes.set_proj_type('ortho')
+        GD = self.geo_dimension()
+        if (aspect is None) and (GD == 3):
+            axes.set_box_aspect((1, 1, 1))
+            axes.set_proj_type('ortho')
+
+        if (aspect is None) and (GD == 2):
+            axes.set_box_aspect(1)
+
         return show_mesh_2d(axes, self,
                 nodecolor=nodecolor, edgecolor=edgecolor,
                 cellcolor=cellcolor, aspect=aspect,

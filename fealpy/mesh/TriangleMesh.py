@@ -27,7 +27,7 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, NN, cell):
         super().__init__(NN,cell)
 
-## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
+## @defgroup MeshGenerators TriangleMesh Common Region Mesh Generators
 ## @defgroup MeshQuality
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
