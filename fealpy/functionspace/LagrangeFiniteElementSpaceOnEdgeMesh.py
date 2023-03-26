@@ -1,15 +1,16 @@
 import numpy as np
+from .Function import Function
+from ..decorator import barycentric
 
 
-class CEdgeMeshFEMDof():
+class CEdgeMeshLFEMDof():
     """
     @brief EdgeMesh 上的分片 p 次连续元的自由度管理类
     """
     def __init__(self, mesh, p):
         self.mesh = mesh
         self.p = p
-        self.multiIndex = mesh.multi_index_matrix() 
-        self.cell2dof = self.cell_to_dof()
+        self.multiIndex = mesh.multi_index_matrix(p) 
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -33,13 +34,13 @@ class CEdgeMeshFEMDof():
             NN = self.mesh.number_of_nodes()
             return np.arange(NN)[index]
 
-    def cell_to_dof(self):
+    def cell_to_dof(self, index=np.s_[:]):
         p = self.p
         mesh = self.mesh
         cell = mesh.entity('cell')
 
         if p == 1:
-            return cell
+            return cell[index]
         else:
             NN = mesh.number_of_nodes()
             NC = mesh.number_of_cells()
@@ -47,7 +48,7 @@ class CEdgeMeshFEMDof():
             cell2dof = np.zeros((NC, ldof), dtype=mesh.itype)
             cell2dof[:, [0, -1]] = cell
             cell2dof[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
-            return cell2dof
+            return cell2dof[index]
 
     def number_of_local_dofs(self, doftype='cell'):
         if doftype in {'cell', 'edge', 1}:
@@ -67,7 +68,7 @@ class CEdgeMeshFEMDof():
     def interpolation_points(self):
         return self.mesh.interpolation_points(self.p)
 
-class DEdgeMeshFEMDof():
+class DEdgeMeshLFEMDof():
     """
     @brief EdgeMesh 上的分片 p 次间断元的自由度管理类
     """
@@ -75,7 +76,6 @@ class DEdgeMeshFEMDof():
         self.mesh = mesh
         self.p = p
         self.multiIndex = mesh.multi_index_matrix() 
-        self.cell2dof = self.cell_to_dof()
 
     def is_boundary_dof(self, threshold=None):
         if type(threshold) is np.ndarray:
@@ -117,10 +117,11 @@ class DEdgeMeshFEMDof():
         return self.mesh.interpolation_points(self.p)
 
 class LagrangeFiniteElementSpaceOnEdgeMesh():
-    def __init__(self, mesh, p=1, spacetype='C', dof=None):
+    def __init__(self, mesh, p=1, spacetype='C', dof=None, doforder='nodes'):
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
+        self.doforder = doforder # 扩展为向量空间时
         if dof is None:
             if spacetype == 'C':
                 self.dof = CEdgeMeshLFEMDof(mesh, p)
@@ -137,7 +138,7 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
         self.ftype = mesh.ftype
 
     def __str__(self):
-        return "Lagrange finite element space on edge mesh!"
+        return "Lagrange finite element space on edge mesh, which can be used on the structure of Truss and Frame simulation!"
 
     def number_of_global_dofs(self):
         return self.dof.number_of_global_dofs()
@@ -145,14 +146,56 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
     def number_of_local_dofs(self, doftype='cell'):
         return self.dof.number_of_local_dofs(doftype=doftype)
 
+    def cell_to_dof(self):
+        return self.dof.cell_to_dof()
+
     @barycentric
-    def basis(self, bc, index=np.s_[:], p=None):
+    def basis(self, bc, index=np.s_[:]):
         p = self.p
         phi = self.mesh.shape_function(bc, p=p)
         return phi[..., None, :]
 
     @barycentric
-    def grad_basis(self, bc, index=np.s_[:], p=None):
-        p = self.p
-        phi = self.mesh.shape_function(bc, p=p)
-        return phi[..., None, :]
+    def grad_basis(self, bc, index=np.s_[:]):
+        return self.mesh.grad_shape_function(bc, p=self.p, index=index)
+
+    @barycentric
+    def value(self, uh, bc, index=np.s_[:]):
+        phi = self.basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index=index)
+
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, phi, uh[cell2dof])
+        return val
+
+    @barycentric
+    def grad_value(self, uh, bc, index=np.s_[:]):
+        """
+        """
+        gphi = self.grad_basis(bc, index=index)
+        cell2dof = self.dof.cell_to_dof(index=index)
+        dim = len(uh.shape) - 1
+        s0 = 'abcdefg'
+        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
+        val = np.einsum(s1, gphi, uh[cell2dof[index]])
+        return val
+
+    def function(self, dim=None, array=None, dtype=np.float64):
+        return Function(self, dim=dim, array=array, 
+                coordtype='barycentric', dtype=dtype)
+
+    def array(self, dim=None, dtype=np.float64):
+        gdof = self.number_of_global_dofs()
+        if (dim is None):
+            dim = (1, )
+        if type(dim) is int:
+            dim = (dim, )
+
+        if self.doforder == 'nodes':
+            shape = dim + (gdof, )
+        elif self.doforder == 'vdims':
+            shape = (gdof, ) + dim
+
+        return np.zeros(shape, dtype=dtype)

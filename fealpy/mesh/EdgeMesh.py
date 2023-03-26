@@ -1,23 +1,26 @@
 import numpy as np
-
+from types import ModuleType
 from fealpy.quadrature import GaussLegendreQuadrature
 
+## @defgroup MeshGenerators Meshgeneration algorithms on commonly used domain 
+## @defgroup MeshQuality
 class EdgeMesh():
     def __init__(self, node, cell):
         self.node = node
-        self.itype = edge.dtype
+        self.itype = cell.dtype
         self.ftype = node.dtype
 
         self.meshtype = 'edge'
         
         self.NN = node.shape[0]
+        self.GD = node.shape[1]
         self.ds = EdgeMeshDataStructure(self.NN, cell)
 
         self.nodedata = {}
         self.celldata = {}
 
     def geo_dimension(self):
-        return self.node.shape[1]
+        return self.GD
 
     def top_dimension(self):
         return 1
@@ -43,11 +46,11 @@ class EdgeMesh():
         elif etype in {'cell', 'edge', 1}:
             return self.ds.cell
     
-    def entity_measure(self, etype='node'):
-        if etype in {'node', 'face', 0}:
+    def entity_measure(self, etype='cell'):
+        if etype in {'cell', 'edge', 1}:
+            return self.cell_length() 
+        elif etype in {'node', 'face', 0}:
             return 0.0 
-        elif etype in {'cell', 'edge', 1}:
-            return self.edge_length() 
 
     def bc_to_point(self, bc, index=np.s_[:], node=None):
         """
@@ -69,13 +72,13 @@ class EdgeMesh():
         h = np.sqrt(np.sum(v**2, axis=1))
         return h
 
-    def unit_cell_tangent(self):
+    def cell_unit_tangent(self):
         """
         @brief 计算每个单元的单位切向
         """
         node = self.entity('node')
         cell = self.entity('cell')
-        v = node[edge[:, 0]] - node[edge[:, 1]]
+        v = node[cell[:, 0]] - node[cell[:, 1]]
         h = np.sqrt(np.sum(v**2, axis=1))
         return v/h[:, None]
 
@@ -85,16 +88,8 @@ class EdgeMesh():
         """
         pass
 
-    def cell_bc_to_point(self, bc, index=np.s_[:]):
-        """
-        @brief 把重心坐标积分点变换到实际网格单元上的笛卡尔坐标点
-        """
-        node = self.node
-        entity = self.entity('cell')[index]
-        p = np.einsum('...j, ijk->...ik', bc, node[entity])
-        return p
 
-    def multi_index_matrix(self, p, etype=2):
+    def multi_index_matrix(self, p):
         """
         @brief 获取单元上 p 次的多重指标矩阵
 
@@ -164,7 +159,6 @@ class EdgeMesh():
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
         return gphi #(..., NC, ldof, GD)
 
-
     def grad_lambda(self):
         """
         @brief 重心坐标的梯度
@@ -208,7 +202,7 @@ class EdgeMesh():
             nodecolor='r',
             edgecolor='k', 
             linewidths=1, 
-            aspect='equal',
+            aspect=None,
             markersize=10,
             box=None,
             disp=None,
@@ -219,15 +213,20 @@ class EdgeMesh():
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             if GD == 3:
-                from mpl_toolkits.mplot3d import Axes3D
+                import mpl_toolkits.mplot3d as a3
                 axes = fig.add_subplot(111, projection='3d')
             else:
                 axes = fig.add_subplot(111)
         else:
             axes = plot
 
-        axes.set_box_aspect(aspect)
-        axes.set_proj_type('ortho')
+        if (aspect is None) and (GD == 3):
+            axes.set_box_aspect((1, 1, 1))
+            axes.set_proj_type('ortho')
+
+        if (aspect is None) and (GD == 2):
+            axes.set_box_aspect(1)
+
 
         node = self.entity('node')
         if GD == 2:
@@ -249,10 +248,10 @@ class EdgeMesh():
         axes.set_xlim([box[0], box[1]+0.01])
         axes.set_ylim([box[2]-0.01, box[3]])
 
-        vts = node[edge]
+        vts = node[cell]
         if GD == 3:
             axes.set_zlim(box[4:6])
-            edges = Axes3D.art3d.Line3DCollection(
+            edges = a3.art3d.Line3DCollection(
                    vts,
                    linewidths=linewidths,
                    color=edgecolor)
@@ -264,6 +263,34 @@ class EdgeMesh():
                     linewidths=linewidths,
                     color=edgecolor)
             return axes.add_collection(edges)
+
+    
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_triangle_mesh(cls, mesh):
+        pass
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_tetrahedron_mesh(cls, mesh):
+        pass
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_tower(cls):
+        node = np.array([
+            [-950, 0, 5080], [950, 0, 5080], [-950, 950, 2540], 
+            [950, 950, 2540], [950, -950, 2540], [-950, -950, 2540],
+            [-2540, 2540, 0], [2540, 2540, 0], [2540, -2540, 0], 
+            [-2540, -2540, 0]], dtype=np.float64)
+        cell = np.array([
+            [0, 1], [3, 0], [1, 2], [1, 5], [0, 4], 
+            [1, 3], [1, 4], [0, 2], [0, 5], [2, 5],
+            [4, 3], [2, 3], [4, 5], [2, 9], [6, 5], 
+            [8, 3], [7, 4], [6, 3], [2, 7], [9, 4],
+            [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=np.int_)
+        return cls(node, cell)
+
 
 
 class EdgeMeshDataStructure():
