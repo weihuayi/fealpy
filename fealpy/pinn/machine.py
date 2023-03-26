@@ -119,14 +119,14 @@ class TensorMapping(Module):
             val = self.from_numpy(ps).detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
-            diff = (val - other(ps))**power
+            diff = np.abs(val - other(ps))**power
 
         elif coordtype in {'barycentric', 'b'}:
 
             val = self.from_cell_bc(bcs, mesh).detach().numpy()
             if squeeze:
                 val = val.squeeze(-1)
-            diff = (val - other(bcs))**power
+            diff = np.abs(val - other(bcs))**power
 
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
