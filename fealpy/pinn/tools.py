@@ -54,12 +54,14 @@ def mkfs(*inputs: Union[Tensor, float], f_shape: Optional[Tuple[int, ...]]=None)
     else:
 
         if isinstance(b, Tensor):
-            return mkfs(b, a, *inputs[2:])
+            shape = tuple(b.shape[:-1]) + (1, )
+            a = torch.tensor(a).expand(shape)
 
-        if f_shape is None:
-            f_shape = (1, )
-        a = torch.tensor(float(a)).expand(f_shape)
-        b = torch.tensor(float(b)).expand(f_shape)
+        else:
+            if f_shape is None:
+                f_shape = (1, )
+            a = torch.tensor(float(a)).expand(f_shape)
+            b = torch.tensor(float(b)).expand(f_shape)
 
     cated = torch.cat([a, b], dim=-1)
 

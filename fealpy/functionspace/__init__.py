@@ -5,6 +5,7 @@ from .ScaledMonomialSpace3d import ScaledMonomialSpace3d
 from .LagrangeFiniteElementSpace import LagrangeFiniteElementSpace
 from .BernsteinFiniteElementSpace import BernsteinFiniteElementSpace
 
+from .LagrangeFiniteElementSpaceOnEdgeMesh import LagrangeFiniteElementSpaceOnEdgeMesh
 from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
 
 # H(div)

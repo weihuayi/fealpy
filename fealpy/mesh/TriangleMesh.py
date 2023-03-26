@@ -27,14 +27,13 @@ class TriangleMeshDataStructure(Mesh2dDataStructure):
     def __init__(self, NN, cell):
         super().__init__(NN,cell)
 
-## @defgroup MeshGenerators TetrhedronMesh Common Region Mesh Generators
+## @defgroup MeshGenerators TriangleMesh Common Region Mesh Generators
 ## @defgroup MeshQuality
 class TriangleMesh(Mesh2d):
     def __init__(self, node, cell):
         """
-        @brief TriangleMesh 对象的构造函数
+        @brief TriangleMesh 对象的初始化函数
 
-        @note Magic function
         """
 
         assert cell.shape[-1] == 3
@@ -1632,6 +1631,21 @@ class TriangleMesh(Mesh2d):
             NN = self.number_of_nodes()
             isTypeBCell, cellType = self.mark_interface_cell_with_type(phi, interface)
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_one_triangle(cls, meshtype='iso'):
+        if meshtype == 'equ':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.5, np.sqrt(3)/2]], dtype=np.float64)
+        elif meshtype == 'iso':
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.0]], dtype=np.float64)
+        cell = np.array([[0, 1, 2]], dtype=np.int_)
+        return cls(node, cell)
 
     ## @ingroup MeshGenerators
     @classmethod
@@ -1663,7 +1677,184 @@ class TriangleMesh(Mesh2d):
     ## @ingroup MeshGenerators
     @classmethod
     def from_unit_circle_gmsh(cls, h):
+        """
+        Generate a triangular mesh for a unit circle by gmsh.
+
+        @param h Parameter controlling mesh density
+        @return TriangleMesh instance
+        """
+        gmsh.initialize()
+        gmsh.model.add("UnitCircle")
+
+        # 创建单位圆
+        circle_center = gmsh.model.geo.addPoint(0, 0, 0, h)
+        circle_points = [gmsh.model.geo.addPoint(np.cos(angle), np.sin(angle), 0, h) for angle in np.linspace(0, 2 * np.pi, 4, endpoint=False)]
+
+        # 添加圆弧和循环
+        arcs = [gmsh.model.geo.addCircleArc(circle_points[i], circle_center, circle_points[(i + 1) % len(circle_points)]) for i in range(len(circle_points))]
+        curve_loop = gmsh.model.geo.addCurveLoop(arcs)
+
+        # 创建平面表面
+        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+        # 同步几何模型
+        gmsh.model.geo.synchronize()
+
+        # 添加物理组
+        gmsh.model.addPhysicalGroup(2, [surface], tag=1)
+        gmsh.model.setPhysicalName(2, 1, "UnitCircle")
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
+
+        # 获取三角形单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+        cell = np.array(tri_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        gmsh.finalize()
+
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+
+        return cls(node, cell)
+
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_polygon_gmsh(cls, vertices, h):
+        """
+        Generate a quadrilateral mesh for a polygonal region by gmsh.
+
+        @param vertices List of tuples representing vertices of the polygon
+        @param h Parameter controlling mesh density
+        @return QuadrilateralMesh instance
+        """
+        import gmsh
+        gmsh.initialize()
+        gmsh.model.add("Polygon")
+
+        # 创建多边形
+        lc = h  # 设置网格大小
+        polygon_points = []
+        for i, vertex in enumerate(vertices):
+            point = gmsh.model.geo.addPoint(vertex[0], vertex[1], 0, lc)
+            polygon_points.append(point)
+
+        # 添加线段和循环
+        lines = []
+        for i in range(len(polygon_points)):
+            line = gmsh.model.geo.addLine(polygon_points[i], polygon_points[(i+1) % len(polygon_points)])
+            lines.append(line)
+        curve_loop = gmsh.model.geo.addCurveLoop(lines)
+
+        # 创建平面表面
+        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+
+        # 同步几何模型
+        gmsh.model.geo.synchronize()
+
+        # 添加物理组
+        gmsh.model.addPhysicalGroup(2, [surface], tag=1)
+        gmsh.model.setPhysicalName(2, 1, "Polygon")
+
+        # 生成网格
+        gmsh.model.mesh.generate(2)
+
+        # 获取节点信息
+        node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
+
+        # 获取四边形单元信息
+        cell_type = 2  # 三角形单元的类型编号为 3
+        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
+        cell = np.array(cell_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
+
+        # 输出节点和单元数量
+        print(f"Number of nodes: {node.shape[0]}")
+        print(f"Number of cells: {cell.shape[0]}")
+
+        gmsh.finalize()
+
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
+    
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_torus_surface(cls, R, r, nu, nv):
+        """
+        @brief Generate a structured triangular mesh on a torus surface.
+
+        @param R  The major radius of the torus (distance from the center of the torus to the center of the tube).
+        @param r  The minor radius of the torus (radius of the tube).
+        @param nu The number of discrete segments in the u-direction.
+        @param nv The number of discrete segments in the v-direction.
+
+        @return  the triangular mesh.
+
+        @details This function generates a structured triangular mesh on a torus surface with major radius R,
+                 minor radius r, and nu and nv discrete segments in the u and v directions, respectively.
+                 The output consists of a tuple containing the nodes and cells of the mesh. The nodes are
+                 represented as an Nx3 array of 3D coordinates, and the cells are represented as an Mx3
+                 array of node indices for each triangle.
+        @todo 检查生成曲面单元的法向是否指向外部
+        """
+        NN = nu*nv
+        NC = nu*nv
+        node = np.zeros((NN, 3), dtype=np.float64)
+
+        U, V = np.mgrid[0:2*np.pi:nu*1j, 0:2*np.pi:nv*1j]
+        X = (R + r * np.cos(V)) * np.cos(U)
+        Y = (R + r * np.cos(V)) * np.sin(U)
+        Z = r * np.sin(V)
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        node[:, 2] = Z.flatten()
+
+        idx = np.zeros((nu+1, nv+1), np.uint32)
+        idx[0:-1, 0:-1] = np.arange(NN).reshape(nu, nv)
+        idx[-1, :] = idx[0, :]
+        idx[:, -1] = idx[:, 0]
+        cell = np.zeros((2*NC, 3), dtype=np.uint32)
+        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_unit_sphere_surface(cls):
         pass
+
 
 class TriangleMeshWithInfinityNode:
     def __init__(self, mesh):

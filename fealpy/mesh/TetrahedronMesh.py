@@ -1016,7 +1016,7 @@ class TetrahedronMesh(Mesh3d):
 
     ## @ingroup MeshGenerators
     @classmethod
-    def one_tetrahedron_mesh(cls, meshtype='equ'):
+    def from_one_tetrahedron(cls, meshtype='equ'):
         """
         """
         if meshtype == 'equ':
@@ -1079,6 +1079,14 @@ class TetrahedronMesh(Mesh3d):
         print(f"Number of tetrahedra: {cell.shape[0]}")
 
         gmsh.finalize()
+
+        NN = len(node)
+        isValidNode = np.zeros(NN, dtype=np.bool_)
+        isValidNode[cell] = True
+        node = node[isValidNode]
+        idxMap = np.zeros(NN, dtype=cell.dtype)
+        idxMap[isValidNode] = range(isValidNode.sum())
+        cell = idxMap[cell]
 
         return cls(node, cell)
 

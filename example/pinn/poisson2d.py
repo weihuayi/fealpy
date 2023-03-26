@@ -1,7 +1,7 @@
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.mesh import MeshFactory as Mf
 from fealpy.pinn import LearningMachine, gradient, Solution
-from fealpy.pinn.sampler import BoxEdgeSampler, TriangleMeshSampler
+from fealpy.pinn.sampler import BoxBoundarySampler, TriangleMeshSampler
 
 import torch
 import torch.nn as nn
@@ -44,7 +44,7 @@ s = Solution(pinn)
 lm = LearningMachine(s)
 # sampler1 = ISampler(300, [[0, 1], [0, 1]], requires_grad=True)
 sampler1 = TriangleMeshSampler(5, mesh, requires_grad=True)
-sampler2 = BoxEdgeSampler(3000, [0, 0], [1, 1])
+sampler2 = BoxBoundarySampler(3000, [0, 0], [1, 1])
 
 
 for epoch in range(1200):

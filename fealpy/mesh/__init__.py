@@ -14,6 +14,7 @@ from .StructureIntervalMesh import StructureIntervalMesh
 from .StructureQuadMesh import StructureQuadMesh
 from .StructureHexMesh import StructureHexMesh
 
+from .EdgeMesh import EdgeMesh
 from .TriangleMesh import TriangleMesh, TriangleMeshWithInfinityNode
 from .PolygonMesh import PolygonMesh
 from .QuadrangleMesh import QuadrangleMesh
