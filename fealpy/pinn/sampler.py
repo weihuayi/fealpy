@@ -11,7 +11,7 @@ import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.TetrahedronMesh import TetrahedronMesh
-from .nntyping import Mesh
+from .nntyping import MeshLike
 
 
 class Sampler():
@@ -203,7 +203,7 @@ class BoxBoundarySampler(JoinedSampler):
             self.add(ISampler(m=m_edge, ranges=range2, requires_grad=requires_grad))
 
 
-_MT = TypeVar("_MT", bound=Mesh)
+_MT = TypeVar("_MT", bound=MeshLike)
 
 class _MeshSampler(Sampler, Generic[_MT]):
     def __init__(self, m_cell: int, mesh:_MT, requires_grad: bool=False) -> None:

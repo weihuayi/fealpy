@@ -10,7 +10,7 @@ from torch.nn import Module
 from torch.autograd import Variable
 
 from .tools import mkfs
-from .nntyping import VectorFunction, Operator, GeneralSampler
+from .nntyping import VectorFunction, Operator, GeneralSampler, MeshLike
 
 
 class TensorMapping(Module):
@@ -45,31 +45,49 @@ class TensorMapping(Module):
         """
         return _Extracted(self, idx)
 
-    def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
+    def from_numpy(self, ps: NDArray) -> Tensor:
+        """
+        @brief Accept numpy array as input, and return in Tensor type.
+
+        @param ps: NDArray.
+
+        @return: Tensor.
+
+        @note: This is a method with coordtype 'cartesian'.
+        """
+        pt = torch.from_numpy(ps).float()
+        return self.forward(pt)
+
+    from_numpy.__dict__['coordtype'] = 'cartesian'
+
+    def from_cell_bc(self, bc: NDArray, mesh) -> Tensor:
         """
         @brief From bc in mesh cells to outputs of the solution.
 
         @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number\
                    of bc points and TD is the topology dimension of the mesh.
 
-        @return: NDArray with shape (b, c, ...). Outputs in every bc points and every cells.\
+        @return: Tensor with shape (b, c, ...). Outputs in every bc points and every cells.\
                  In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'\
-                 is the shape of the function value.
+                 is the shape of the function output.
+
+        @note: This is a method with coordtype 'barycentric'.
         """
         points = mesh.cell_bc_to_point(bc)
-        points_tensor = torch.tensor(points, dtype=torch.float32)
-        return self.forward(points_tensor).detach().numpy()
+        return self.from_numpy(points)
 
     from_cell_bc.__dict__['coordtype'] = 'barycentric'
 
-    def estimate_error(self, other: VectorFunction, space=None, split: bool=False,
-                       coordtype: str='b', squeeze: bool=False):
+    def estimate_error(self, other: VectorFunction, mesh: Optional[MeshLike]=None, power: int=2, q: int=3,
+                       split: bool=False, coordtype: str='b', squeeze: bool=False):
         """
         @brief Calculate error between the solution and `other` in finite element space `space`.
 
-        @param other: VectorFunction. The function to be compared with. If `other` is `Function`\
-                      (functions in finite element spaces), there is no need to specify `space` and `fn_type`.
-        @param space: FiniteElementSpace.
+        @param other: VectorFunction. The function(target) to be compared with.
+        @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
+                     element space, use mesh of the space instead and this parameter will be ignored.
+        @param power: int. Defaults to 2, which means to measure L-2 error by default.
+        @param q: int. The index of quadratures.
         @param split: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
                       where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
                       the output has the same shape to the funtion output. Defaults to `False`.
@@ -82,38 +100,39 @@ class TensorMapping(Module):
         """
         from ..functionspace.Function import Function
         if isinstance(other, Function):
-            if space is not None:
-                if other.space is not space:
-                    print("Warning: Trying to calculate in another finite element space.")
-            else:
-                space = other.space
+            mesh = other.space.mesh
+
+        if mesh is None:
+            raise ValueError("Param 'mesh' is required if the target is not a function in finite element space.")
 
         o_coordtype = getattr(other, 'coordtype', None)
         if o_coordtype is not None:
             coordtype = o_coordtype
 
+        qf = mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = mesh.entity_measure('cell')
+
         if coordtype in {'cartesian', 'c'}:
 
-            def f(ps):
-                val = self(ps)
-                if squeeze:
-                    val = val.squeeze(-1)
-                return (val - other(ps))**2
-            f.__dict__['coordtype'] = 'cartesian'
+            ps = mesh.cell_bc_to_point(bcs)
+            val = self.from_numpy(ps).detach().numpy()
+            if squeeze:
+                val = val.squeeze(-1)
+            diff = (val - other(ps))**power
 
         elif coordtype in {'barycentric', 'b'}:
 
-            def f(bc):
-                val = self.from_cell_bc(bc, space.mesh)
-                if squeeze:
-                    val = val.squeeze(-1)
-                return (val - other(bc))**2
-            f.__dict__['coordtype'] = 'barycentric'
+            val = self.from_cell_bc(bcs, mesh).detach().numpy()
+            if squeeze:
+                val = val.squeeze(-1)
+            diff = (val - other(bcs))**power
 
         else:
             raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
-        e: np.ndarray = np.sqrt(space.integralalg.cell_integral(f))
+        e = np.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
+
         if split:
             return e
         return e.sum(axis=0)
