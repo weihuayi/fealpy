@@ -9,13 +9,14 @@ class EdgeMeshSpace():
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
         self.dof = self.cell_to_dof()
-        if len(mesh.node.shape) == 1:
-            self.GD = 1
-        else:
-            self.GD = mesh.node.shape[1]
+        self.GD = mesh.GD
+        self.TD = mesh.top_dimension()
     
     def geo_dimension(self):
         return self.GD
+    
+    def top_dimension(self):
+        return self.TD
 
     def cell_to_dof(self):
         '''
