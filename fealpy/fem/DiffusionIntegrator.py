@@ -71,7 +71,7 @@ class DiffusionIntegrator:
                     shape = (4-n)*(1, ) + coef.shape
                     D = np.einsum('q, qcmn, qcin, qcjm, c->cij', ws, coef.reshape(shape), phi0, phi1, cellmeasure, optimize=True)
             else:
-                raise ValueError("coef 的维度超出了支持范围")
+                raise ValueError("coef不支持该类型")
 
         return D
 

@@ -10,4 +10,5 @@ from .BilinearForm import BilinearForm
 from .TrussStructureIntegrator import TrussStructureIntegrator
 from .MassIntegrator import MassIntegrator
 from .DiffusionIntegrator import DiffusionIntegrator
+from .ConvectionIntegrator import ConvectionIntegrator
 
