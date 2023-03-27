@@ -1116,7 +1116,7 @@ class TetrahedronMesh(Mesh3d):
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):
         """
-        Generate a tetrahedral mesh for a unit cube.
+        Generate a tetrahedral mesh for a box domain.
         
         @param nx Number of divisions along the x-axis (default: 10)
         @param ny Number of divisions along the y-axis (default: 10)
@@ -1124,19 +1124,19 @@ class TetrahedronMesh(Mesh3d):
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TetrahedronMesh instance
         """ 
-        N = (nx+1)*(ny+1)*(nz+1)
+        NN = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
-        node = np.zeros((N, 3), dtype=np.float64)
+        node = np.zeros((NN, 3), dtype=np.float64)
         X, Y, Z = np.mgrid[
-                box[0]:box[1]:complex(0, nx+1), 
-                box[2]:box[3]:complex(0, ny+1),
-                box[4]:box[5]:complex(0, nz+1)
+                box[0]:box[1]:(nx+1)*1j, 
+                box[2]:box[3]:(ny+1)*1j,
+                box[4]:box[5]:(nz+1)*1j
                 ]
-        node[:, 0] = X.flatten()
-        node[:, 1] = Y.flatten()
-        node[:, 2] = Z.flatten()
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+        node[:, 2] = Z.flat
 
-        idx = np.arange(N).reshape(nx+1, ny+1, nz+1)
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
         c = idx[:-1, :-1, :-1]
 
         cell = np.zeros((NC, 8), dtype=np.int_)
