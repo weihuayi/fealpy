@@ -347,7 +347,7 @@ class UniformMesh1d():
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A
+        return A, f
 
 
     def wave_equation(self, r, theta):
