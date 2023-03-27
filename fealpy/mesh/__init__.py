@@ -2,7 +2,7 @@
 mesh
 ====
 
-This module provide mesh 
+This module provide mesh
 
 '''
 
@@ -21,7 +21,6 @@ from .QuadrangleMesh import QuadrangleMesh
 from .TetrahedronMesh import TetrahedronMesh
 from .IntervalMesh import IntervalMesh
 from .HexahedronMesh import HexahedronMesh
-from .TrussMesh import TrussMesh
 
 from .SurfaceTriangleMesh import SurfaceTriangleMesh
 from .PrismMesh import PrismMesh
