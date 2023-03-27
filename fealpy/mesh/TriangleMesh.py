@@ -293,8 +293,14 @@ class TriangleMesh(Mesh2d):
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return multiIndex
 
-    def number_of_local_ipoints(self, p):
-        return (p+1)*(p+2)//2
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        p = self.p
+        if iptype in {'cell', 2}:
+            return (p+1)*(p+2)//2 
+        elif iptype in {'face', 'edge',  1}:
+            return self.p + 1
+        elif iptype in {'node', 0}:
+            return 1
     
     def number_of_global_ipoints(self, p):
         NP = self.number_of_nodes()

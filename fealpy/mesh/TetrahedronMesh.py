@@ -228,11 +228,19 @@ class TetrahedronMesh(Mesh3d):
                     node[cell,:]).reshape(-1, GD)
         return ipoints
 
-    def number_of_local_ipoints(self, p):
+    def number_of_local_ipoints(self, p, iptype='cell'):
         """
         @brief 每个四面体单元上插值点的个数
         """
-        return (p+1)*(p+2)*(p+3)//6
+        p = self.p
+        if iptype in {'cell', 3}:
+            return (p+1)*(p+2)*(p+3)//6
+        elif iptype in {'face', 2}:
+            return (p+1)*(p+2)//2 
+        elif iptype in {'edge', 1}:
+            return self.p + 1
+        elif iptype in {'node', 0}:
+            return 1
     
     def number_of_global_ipoints(self, p):
         """

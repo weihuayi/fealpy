@@ -118,10 +118,16 @@ class DEdgeMeshLFEMDof():
 
 class LagrangeFiniteElementSpaceOnEdgeMesh():
     def __init__(self, mesh, p=1, spacetype='C', dof=None, doforder='nodes'):
+        """
+        @param[in] doforder 向量空间自由度排序的约定，'nodes'(default) and 'vdims'
+
+        @note  'nodes': x_0, x_1, x_2, ..., y_0, y_1, ..., z_0, z_1, ...
+               'vdims': x_0, y_0, z_0, x_1, y_1, z_1, ...
+        """
         self.mesh = mesh
         self.cellmeasure = mesh.entity_measure('cell')
         self.p = p
-        self.doforder = doforder # 扩展为向量空间时
+        self.doforder = doforder # 扩展为向量空间时, 自由度的排序规则 
         if dof is None:
             if spacetype == 'C':
                 self.dof = CEdgeMeshLFEMDof(mesh, p)
@@ -161,25 +167,51 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
 
     @barycentric
     def value(self, uh, bc, index=np.s_[:]):
-        phi = self.basis(bc, index=index)
+        gdof = self.number_of_global_dofs()
+        phi = self.basis(bc, index=index) # (NQ, NC, ldof)
         cell2dof = self.dof.cell_to_dof(index=index)
 
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, phi, uh[cell2dof])
-        return val
+        if self.doforder == 'nodes':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (..., gdof)
+            # uh[..., cell2dof].shape == (..., NC, ldof)
+            # val.shape == (NQ, ..., NC)
+            s1 = '...ci, {}ci->...{}c'.format(s0[:dim], s0[:dim])
+            val = np.einsum(s1, phi, uh[..., cell2dof])
+        elif self.doforder == 'vdims':
+            # phi.shape == (NQ, NC, ldof)
+            # uh.shape == (gdof, ...)
+            # uh[cell2dof, ...].shape == (NC, ldof, ...)
+            # val.shape == (NQ, NC, ...)
+            s1 = '...ci, ci{}->...c{}'.format(s0[:dim], s0[:dim])
+            val = np.einsum(s1, phi, uh[cell2dof, ...])
+            return val
 
     @barycentric
     def grad_value(self, uh, bc, index=np.s_[:]):
         """
         """
-        gphi = self.grad_basis(bc, index=index)
+        gdof = self.number_of_global_dofs()
+        gphi = self.grad_basis(bc, index=index) # (NQ, NC, ldof, GD)
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
-        s1 = '...ijm, ij{}->...i{}m'.format(s0[:dim], s0[:dim])
-        val = np.einsum(s1, gphi, uh[cell2dof[index]])
+        if self.doforder == 'nodes':
+            # gphi.shape == (NQ, NC, ldof, GD)
+            # uh.shape == (..., gdof)
+            # uh[..., cell2dof].shape == (..., NC, ldof)
+            # val.shape == (NQ, ..., GD, NC)
+            s1 = '...cim, {}ci->...{}mc'.format(s0[:dim], s0[:dim])
+            val = np.einsum(s1, gphi, uh[..., cell2dof])
+        elif self.doforder == 'vdims':
+            # gphi.shape == (NQ, NC, ldof, GD)
+            # uh.shape == (gdof, ...)
+            # uh[cell2dof, ...].shape == (NC, ldof, ...)
+            # val.shape == (NQ, NC, ..., GD)
+            s1 = '...cim, ci{}->...c{}m'.format(s0[:dim], s0[:dim])
+            val = np.einsum(s1, gphi, uh[cell2dof[index], ...])
         return val
 
     def function(self, dim=None, array=None, dtype=np.float64):
@@ -189,7 +221,7 @@ class LagrangeFiniteElementSpaceOnEdgeMesh():
     def array(self, dim=None, dtype=np.float64):
         gdof = self.number_of_global_dofs()
         if (dim is None):
-            dim = (1, )
+            dim = tuple() 
         if type(dim) is int:
             dim = (dim, )
 
