@@ -1408,7 +1408,7 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
 
         # 可以移除的网格节点
-        isRNode = np.ones(NN, dtype=np.bool)
+        isRNode = np.ones(NN, dtype=np.bool_)
         flag = (hlevel == hlevel[halfedge[:, 4]])
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
         flag = (clevel[halfedge[:, 1]]>0)
@@ -1535,7 +1535,7 @@ class HalfEdgeMesh2d(Mesh2d):
         isMainHEdge = self.ds.main_halfedge_flag()
 
         # 可以移除的网格节点
-        isRNode = np.ones(NN, dtype=np.bool)
+        isRNode = np.ones(NN, dtype=np.bool_)
         flag = (hlevel == hlevel[halfedge[:, 4]])
         np.logical_and.at(isRNode, halfedge[:, 0], flag)
         flag = (clevel[halfedge[:, 1]]>0)
@@ -2075,10 +2075,10 @@ class HalfEdgeMesh2d(Mesh2d):
 
     def mark_helper(self, idx):
         NC = self.number_of_cells()
-        flag = np.zeros(NC, dtype=np.bool)
+        flag = np.zeros(NC, dtype=np.bool_)
         flag[idx] = True
         nc = self.number_of_all_cells()
-        isMarkedCell = np.zeros(nc, dtype=np.bool)
+        isMarkedCell = np.zeros(nc, dtype=np.bool_)
         isMarkedCell[self.ds.cellstart:] = flag
         return isMarkedCell
 
@@ -2252,7 +2252,7 @@ class HalfEdgeMesh2d(Mesh2d):
         self.ds.hnode = DynamicArray((self.ds.NN, ), dtype=self.itype)
         self.ds.hnode[self.ds.halfedge[:, 0]] = np.arange(2*self.ds.NE)
 
-    def to_vtk0(self, fname=None):
+    def to_vtk(self, fname=None):
         import vtk
         import vtk.util.numpy_support as vnp
 
@@ -2322,52 +2322,6 @@ class HalfEdgeMesh2d(Mesh2d):
         writer.SetFileName(fname)
         writer.SetInputData(uGrid)
         writer.Write()
-
-
-    def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
-        """
-
-        Parameters
-        ----------
-        points: vtkPoints object
-        cells:  vtkCells object
-        pdata:
-        cdata:
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
-        """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
-
-        node = self.entity('node')
-        GD = self.geo_dimension()
-        if GD == 2:
-            node = np.concatenate((node, np.zeros((node.shape[0], 1), dtype=self.ftype)), axis=1)
-        cell = self.entity(etype)[index]
-        NV = cell.shape[-1]
-
-        cell = np.r_['1', np.zeros((len(cell), 1), dtype=cell.dtype), cell]
-        cell[:, 0] = NV
-
-        if etype == 'cell':
-            cellType = 5
-        elif etype == 'edge':
-            cellType = 3
-
-        nodedata = self.nodedata.copy()
-        nodedata.pop('level')
-        celldata = self.celldata.copy()
-        celldata.pop('level')
-
-        NC = len(cell)
-        if fname is None:
-            return node, cell.flatten(), cellType, NC 
-        else:
-            print("Writting to vtk...")
-            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=nodedata,
-                    celldata=celldata)
 
     def grad_lambda(self):
         """
@@ -2948,7 +2902,7 @@ class HalfEdgeMesh2dDataStructure():
         halfedge = self.halfedge
         I = halfedge[:, 0] 
         J = halfedge[halfedge[:, 4], 0] 
-        val = np.ones(2*NE, dtype=np.bool)
+        val = np.ones(2*NE, dtype=np.bool_)
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN), dtype=np.bool_)
         return node2node
 
@@ -3050,7 +3004,7 @@ class HalfEdgeMesh2dDataStructure():
         subdomain = self.subdomain # DynamicArray
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
-        isBdNode = np.zeros(NN, dtype=np.bool)
+        isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[halfedge[isBdHEdge, 0]] = True 
         return isBdNode
 
@@ -3082,7 +3036,7 @@ class HalfEdgeMesh2dDataStructure():
         hflag = subdomain[halfedge[:, 1]] > 0
         isBdHEdge = hflag & (~hflag[halfedge[:, 4]])
 
-        isBdCell = np.zeros(NC, dtype=np.bool)
+        isBdCell = np.zeros(NC, dtype=np.bool_)
         idx = halfedge[isBdHEdge, 1] - cstart
         isBdCell[idx] = True
         return isBdCell
@@ -3103,7 +3057,7 @@ class HalfEdgeMesh2dDataStructure():
         return idx
 
     def main_halfedge_flag(self):
-        isMainHEdge = np.zeros(2*self.NE, dtype=np.bool)
+        isMainHEdge = np.zeros(2*self.NE, dtype=np.bool_)
         isMainHEdge[self.hedge[:]] = True
         return isMainHEdge
 

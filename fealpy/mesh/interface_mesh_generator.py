@@ -144,8 +144,8 @@ def interfacemesh2d(box, phi, nx, ny, meshtype='tri'):
     dt = Delaunay(interfaceNode)
     tri = dt.simplices 
     NI = np.sum(isInterfaceNode)
-    isUn4cessaryCell = (np.sum(tri < NI, axis=1) == 3)
-    tri = tri[~isUn4cessaryCell, :]
+    isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
+    tri = tri[~isUnnecessaryCell, :]
 
     interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
     interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode) 

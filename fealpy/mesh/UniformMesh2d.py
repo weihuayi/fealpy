@@ -467,20 +467,20 @@ class UniformMesh2d(Mesh2d):
         nx = self.ds.nx
         ny = self.ds.ny
         node = self.node
-        if intertype == 'node':
+        if intertype in {'node', 0}:
             F = f(node)
-        elif intertype == 'edge':
+        elif intertype in {'edge', 'face', 1}:
             xbc, ybc = self.entity_barycenter('edge')
             F = f(xbc), f(ybc)
-        elif intertype == 'edgex':
+        elif intertype in {'edgex'}:
             xbc = self.entity_barycenter('edgex')
             F = f(xbc)
-        elif intertype == 'edgey':
+        elif intertype in {'edgey'}:
             ybc = self.entity_barycenter('edgey')
             F = f(ybc)
-        elif intertype == 'cell':
+        elif intertype in {'cell'}:
             bc = self.entity_barycenter('cell')
-            F = f(bc)
+            F = f(bc)eturn F
         return F
 
     def cell_location(self, p):

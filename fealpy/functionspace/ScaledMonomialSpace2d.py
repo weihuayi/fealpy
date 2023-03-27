@@ -239,7 +239,6 @@ class ScaledMonomialSpace2d():
                 phi[..., start:start+i] = phi[..., start-i:start]*phi[..., [1]]
                 phi[..., start+i] = phi[..., start-1]*phi[..., 2]
                 start += i+1
-        #print(phi.shape)
         return phi
 
     @cartesian
