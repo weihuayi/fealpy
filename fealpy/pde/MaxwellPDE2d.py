@@ -29,6 +29,8 @@ class MaxwellPDE2d():
         self.curlcurlFx = sym.lambdify(('x', 'y'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y'), ccfy, "numpy")
 
+        print(ccf)
+        print(ccf-f)
     @cartesian
     def solution(self, p):
         x = p[..., 0, None]
@@ -111,6 +113,7 @@ class SinData(MaxwellPDE2d):
         C = CoordSys3D('C')
         f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
         #f = sym.sin(C.y)*C.i + sym.sin(C.x)*C.j
+        #f = C.x*C.y*(1-C.x)*(1-C.y)*C.i + sym.sin(sym.pi*C.x)*sym.sin(sym.pi*C.y)*C.j
         super(SinData, self).__init__(f)
 
     def init_mesh(self, nx=1, ny=1, meshtype='tri'):

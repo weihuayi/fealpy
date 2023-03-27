@@ -302,11 +302,11 @@ class Mesh2dDataStructure():
         self.NE = NE
 
         ########## 以下代码用于测试 openfinite 中的代码，可以删除 ########
-        idx = np.argsort(i0)
-        idx_inverse = np.zeros_like(idx)
-        idx_inverse[idx] = np.arange(len(idx))
-        i0 = i0[idx]
-        j = idx_inverse[j]
+        #idx = np.argsort(i0)
+        #idx_inverse = np.zeros_like(idx)
+        #idx_inverse[idx] = np.arange(len(idx))
+        #i0 = i0[idx]
+        #j = idx_inverse[j]
         ##################################################################
 
         self.edge2cell = np.zeros((NE, 4), dtype=self.itype)

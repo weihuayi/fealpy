@@ -37,7 +37,7 @@ NDof = np.zeros(maxit, dtype=np.int_)
 for i in range(maxit):
     print("The {}-th computation:".format(i))
 
-    mesh = pde.init_mesh(2**i)
+    mesh = pde.init_mesh(nx=2**i, ny=2**i)
     space = SecondNedelecFiniteElementSpace2d(mesh, p=int(sys.argv[1]))
     gdof = space.dof.number_of_global_dofs()
     NDof[i] = gdof

@@ -2404,6 +2404,131 @@ class HalfEdgeMesh2d(Mesh2d):
             Dlambda[:, 2, :] = np.cross(n, v2)/length.reshape((-1,1))
         return Dlambda
 
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_interface_cut_box(cls, interface, box, nx=10, ny=10):
+        """
+        @brief 生成界面网格, 要求每个单元与界面只能交两个点或者不想交。
+            步骤为:
+                1. 生成笛卡尔网格
+                2. 找到相交的半边
+                3. 加密相交的半边
+                4. 找到新生成的半边
+                5. 对新生成的半边添加下一条半边或上一条半边
+        @note : 1. 每个单元与界面只能交两个点或者不相交
+                2. 相交的单元会被分为两个单元，界面内部的单元将继承原来单元的编号
+        """
+
+        from .QuadrangleMesh import QuadrangleMesh
+        from .interface_mesh_generator import find_cut_point 
+
+        ## 1. 生成笛卡尔网格
+        N = (nx+1)*(ny+1)
+        NC = nx*ny
+        node = np.zeros((N,2))
+        X, Y = np.mgrid[box[0]:box[1]:complex(0,nx+1), box[2]:box[3]:complex(0,ny+1)]
+        node[:, 0] = X.flatten()
+        node[:, 1] = Y.flatten()
+        NN = len(node)
+
+        idx = np.arange(N).reshape(nx+1, ny+1)
+        cell = np.zeros((NC,4), dtype=np.int_)
+        cell[:,0] = idx[0:-1, 0:-1].flat
+        cell[:,1] = idx[1:, 0:-1].flat
+        cell[:,2] = idx[1:, 1:].flat
+        cell[:,3] = idx[0:-1, 1:].flat
+        mesh = cls.from_mesh(QuadrangleMesh(node, cell))
+
+        NN = mesh.number_of_nodes()
+        NC = mesh.number_of_all_cells()
+        NE = mesh.number_of_edges()
+
+        node = mesh.node
+        cell = mesh.entity('cell')
+        halfedge = mesh.entity('halfedge')
+        cstart = mesh.ds.cellstart
+
+        isMainHEdge = mesh.ds.main_halfedge_flag()
+
+        phiValue = interface(node[:])
+        #phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
+        phiSign = np.sign(phiValue)
+
+        # 2. 找到相交的半边
+        edge = mesh.entity('edge')
+        isCutHEdge = phiValue[halfedge[:, 0]]*phiValue[halfedge[halfedge[:, 4], 0]] < 0 
+
+        cutHEdge, = np.where(isCutHEdge&isMainHEdge)
+        cutEdge = mesh.ds.halfedge_to_edge(cutHEdge)
+
+        e0 = node[edge[cutEdge, 0]]
+        e1 = node[edge[cutEdge, 1]]
+        cutNode = find_cut_point(interface, e0, e1)
+
+        mesh.refine_halfedge(isCutHEdge, newnode = cutNode)
+
+        newHE = np.where((halfedge[:, 0] >= NN)&(halfedge[:, 1]>=cstart))[0]
+        ## 注意这里要把 newHE 区分为界面内部和界面外部的
+        cen = mesh.entity_barycenter('halfedge', index=newHE)
+        isinnewHE = interface(cen)<0
+        newHEin = newHE[isinnewHE]
+        newHEout = newHE[~isinnewHE]
+
+        idx = np.argsort(halfedge[newHEout, 1])
+        newHE[::2] = newHEout[idx]
+        idx = np.argsort(halfedge[newHEin, 1])
+        newHE[1::2] = newHEin[idx]
+        newHE = newHE.reshape(-1, 2)
+        ################################################
+
+        ne = len(newHE)
+        NE = len(halfedge)//2
+
+        mesh.number_cut_cell = ne
+
+        halfedgeNew = halfedge.increase_size(ne*2)
+        halfedgeNew[:ne, 0] = halfedge[newHE[:, 1], 0]
+        halfedgeNew[:ne, 1] = halfedge[newHE[:, 1], 1]
+        halfedgeNew[:ne, 2] = halfedge[newHE[:, 1], 2]
+        halfedgeNew[:ne, 3] = newHE[:, 0] 
+        halfedgeNew[:ne, 4] = np.arange(NE*2+ne, NE*2+ne*2)
+
+        halfedgeNew[ne:, 0] = halfedge[newHE[:, 0], 0]
+        halfedgeNew[ne:, 1] = np.arange(NC, NC+ne)
+        halfedgeNew[ne:, 2] = halfedge[newHE[:, 0], 2]
+        halfedgeNew[ne:, 3] = newHE[:, 1] 
+        halfedgeNew[ne:, 4] = np.arange(NE*2, NE*2+ne) 
+
+        halfedge[halfedge[newHE[:, 0], 2], 3] = np.arange(NE*2+ne, NE*2+ne*2)
+        halfedge[halfedge[newHE[:, 1], 2], 3] = np.arange(NE*2, NE*2+ne)
+        halfedge[newHE[:, 0], 2] = np.arange(NE*2, NE*2+ne)
+        halfedge[newHE[:, 1], 2] = np.arange(NE*2+ne, NE*2+ne*2)
+
+        isNotOK = np.ones(ne, dtype=np.bool_)
+        current = np.arange(NE*2+ne, NE*2+ne*2)
+        while np.any(isNotOK):
+            halfedge[current[isNotOK], 1] = np.arange(NC, NC+ne)[isNotOK]
+            current[isNotOK] = halfedge[current[isNotOK], 2]
+            isNotOK = current != np.arange(NE*2+ne, NE*2+ne*2)
+
+
+        #增加主半边
+        mesh.ds.hedge.extend(np.arange(NE*2, NE*2+ne))
+
+        #更新subdomain
+        subdomainNew = mesh.ds.subdomain.increase_size(ne)
+        subdomainNew[:] = mesh.ds.subdomain[halfedge[newHE[:, 0], 1]]
+
+        #更新起始边
+        mesh.ds.hcell.increase_size(ne)
+        mesh.ds.hcell[halfedge[:, 1]] = np.arange(len(halfedge)) # 的编号
+
+        mesh.ds.NN = mesh.node.size
+        mesh.ds.NC += ne 
+        mesh.ds.NE = halfedge.size//2
+
+        mesh.init_level_info()
+        return mesh
 
     def print(self):
         print("hcell:\n")

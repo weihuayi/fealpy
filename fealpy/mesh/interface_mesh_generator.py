@@ -76,7 +76,7 @@ def find_cut_point(phi, p0, p1):
         isRight[:] = False 
     return cutPoint
 
-def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
+def interfacemesh2d(box, phi, nx, ny, meshtype='tri'):
     """ Generate a interface-fitted mesh 
 
     Parameters
@@ -102,8 +102,7 @@ def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
     hy = (box[3] - box[2])/ny
     h = min(hx, hy)
 
-    mesh = mf.boxmesh2d(box, nx=nx, ny=ny, meshtype=meshtype) 
-    ne = mesh.number_of_nodes_of_cells()
+    mesh = mf.boxmesh2d(box, nx=nx, ny=ny, meshtype='quad') 
 
     N = mesh.number_of_nodes()
     NC = mesh.number_of_cells()
@@ -116,7 +115,7 @@ def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
     #phiValue[np.abs(phiValue) < 0.1*h**2] = 0.0
     phiSign = np.sign(phiValue)
 
-    # Step 1: find the nodes near interface
+    # Step 1: find the nodes 4ar interface
     edge = mesh.ds.edge
     isCutEdge = phiSign[edge[:, 0]]*phiSign[edge[:, 1]] < 0 
     e0 = node[edge[isCutEdge, 0]]
@@ -145,8 +144,8 @@ def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
     dt = Delaunay(interfaceNode)
     tri = dt.simplices 
     NI = np.sum(isInterfaceNode)
-    isUnnecessaryCell = (np.sum(tri < NI, axis=1) == 3)
-    tri = tri[~isUnnecessaryCell, :]
+    isUn4cessaryCell = (np.sum(tri < NI, axis=1) == 3)
+    tri = tri[~isUn4cessaryCell, :]
 
     interfaceNodeIdx = np.zeros(interfaceNode.shape[0], dtype=np.int)
     interfaceNodeIdx[:NI], = np.nonzero(isInterfaceNode) 
@@ -155,30 +154,40 @@ def interfacemesh2d(box, phi, nx, ny, meshtype='quad'):
     tri = interfaceNodeIdx[tri]
 
     # Get the final mesh in PolygonMesh 
+    if meshtype=='poly':
+        NS = np.sum(~isInterfaceCell)
+        NT = tri.shape[0]
+        pnode = np.concatenate((node, cutNode, auxNode), axis=0)
+        pcell = np.zeros(NS*4 + NT*3, dtype=np.int) 
+        pcellLocation = np.zeros(NS + NT + 1, dtype=np.int) 
 
-    NS = np.sum(~isInterfaceCell)
-    NT = tri.shape[0]
-    pnode = np.concatenate((node, cutNode, auxNode), axis=0)
-    pcell = np.zeros(NS*ne + NT*3, dtype=np.int) 
-    pcellLocation = np.zeros(NS + NT + 1, dtype=np.int) 
+        sview = pcell[:4*NS].reshape(NS, 4)
+        sview[:] = cell[~isInterfaceCell,:]
 
-    sview = pcell[:ne*NS].reshape(NS, ne)
-    sview[:] = cell[~isInterfaceCell,:]
+        tview = pcell[4*NS:].reshape(NT, 3)
+        tview[:] = tri
+        pcellLocation[:NS] = range(0, 4*NS, 4)
+        pcellLocation[NS:-1] = range(4*NS, 4*NS+3*NT, 3)
+        pcellLocation[-1] = 4*NS+3*NT
+        pmesh = PolygonMesh(pnode, pcell, pcellLocation)
 
-    tview = pcell[ne*NS:].reshape(NT, 3)
-    tview[:] = tri
-    pcellLocation[:NS] = range(0, ne*NS, ne)
-    pcellLocation[NS:-1] = range(ne*NS, ne*NS+3*NT, 3)
-    pcellLocation[-1] = ne*NS+3*NT
-    pmesh = PolygonMesh(pnode, pcell, pcellLocation)
+        pmesh.nodeMarker = np.zeros(pmesh.number_of_nodes(), dtype=np.int)
+        pmesh.nodeMarker[:N] = phiSign
 
-    pmesh.nodeMarker = np.zeros(pmesh.number_of_nodes(), dtype=np.int)
-    pmesh.nodeMarker[:N] = phiSign
+        #pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
+        #pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
+        return pmesh    
+    elif meshtype == 'tri':
+        NS = np.sum(~isInterfaceCell)
+        NT = tri.shape[0]
+        pnode = np.concatenate((node, cutNode, auxNode), axis=0)
+        pcell = np.zeros((NS*2 + NT, 3), dtype=np.int) 
 
-    #pmesh.cellMarker = np.ones(pmesh.number_of_cells(), dtype=np.int)
-    #pmesh.cellMarker[phi(pmesh.barycenter()) < 0] = -1
+        pcell[:NS] = cell[~isInterfaceCell][:, [0, 1, 2]]
+        pcell[NS:NS*2] = cell[~isInterfaceCell][:, [3, 0, 2]]
+        pcell[2*NS:] = tri
+        return TriangleMesh(pnode, pcell)
 
-    return pmesh    
 
     
 class InterfaceMesh2d():
