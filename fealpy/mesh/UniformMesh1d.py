@@ -1,6 +1,6 @@
 import numpy as np
 import warnings
-from scipy.sparse import csr_matrix, coo_matrix, diags
+from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
 
@@ -336,6 +336,7 @@ class UniformMesh1d():
         """
         @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
+        NN = self.number_of_nodes()
         isBdNode = np.zeros(NN, dtype=np.bool_)
         isBdNode[[0,-1]] = True
 
@@ -347,7 +348,7 @@ class UniformMesh1d():
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A
+        return A, f
 
 
     def wave_equation(self, r, theta):

@@ -8,6 +8,8 @@ from .BernsteinFiniteElementSpace import BernsteinFiniteElementSpace
 from .LagrangeFiniteElementSpaceOnEdgeMesh import LagrangeFiniteElementSpaceOnEdgeMesh
 from .CrouzeixRaviartFiniteElementSpace import CrouzeixRaviartFiniteElementSpace
 
+from .LagrangeFESpace import LagrangeFESpace
+
 # H(div)
 from .RaviartThomasFiniteElementSpace2d import RaviartThomasFiniteElementSpace2d
 from .RaviartThomasFiniteElementSpace3d import RaviartThomasFiniteElementSpace3d

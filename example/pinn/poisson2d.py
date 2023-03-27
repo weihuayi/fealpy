@@ -66,9 +66,9 @@ from fealpy.functionspace import LagrangeFiniteElementSpace
 
 mesh2 = Mf.boxmesh2d([0, 1, 0, 1], nx=10, ny=10)
 space = LagrangeFiniteElementSpace(mesh2)
-error = s.estimate_error(pde.solution, space)
+error = s.estimate_error(pde.solution, mesh2, squeeze=True)
 
-print(f"Error: {error}")
+print(f"Error: {np.sqrt(error)}")
 
 ### Draw the result
 

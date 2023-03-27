@@ -1,6 +1,5 @@
 from typing import (
-    Optional, List, Literal,
-    Tuple, Callable
+    Optional, Tuple, Callable, Sequence
 )
 
 import numpy as np
@@ -11,12 +10,12 @@ from torch.nn import Module
 from torch.autograd import Variable
 
 from .tools import mkfs
-from .nntyping import VectorFunction, Operator, GeneralSampler
+from .nntyping import VectorFunction, Operator, GeneralSampler, MeshLike
 
 
 class TensorMapping(Module):
     """
-    @brief A function whose input and output are tensors. The `forward` method
+    @brief A function whose input and output are tensors. The `forward` method\
            is not implemented, override it to build a function.
     """
     def _call_impl(self, *input: Tensor, f_shape:Optional[Tuple[int, ...]]=None,
@@ -26,67 +25,117 @@ class TensorMapping(Module):
 
     __call__: Callable[..., Tensor] = _call_impl
 
-    def fixed(self, feature_idx: List[int], value: List[float]):
-        assert len(feature_idx) == len(value)
-        return _Fixed(self, feature_idx, value)
+    def fixed(self, idx: Sequence[int], value: Sequence[float]):
+        """
+        @brief Return a module wrapped from this. The input of the wrapped module can provide\
+               some features for the input of the original, and the rest features are fixed.
 
-    def from_cell_bc(self, bc: NDArray, mesh) -> NDArray:
+        @param idx: Sequence[int]. The indices of features to be fixed.
+        @param value: Sequence[int]. Values of data in fixed features.
+        """
+        assert len(idx) == len(value)
+        return _Fixed(self, idx, value)
+
+    def extracted(self, *idx: int):
+        """
+        @brief Return a module wrapped from this. The output features of the wrapped module are extracted\
+               from the original one.
+
+        @param *idx: int. Indices of features to extract.
+        """
+        return _Extracted(self, idx)
+
+    def from_numpy(self, ps: NDArray) -> Tensor:
+        """
+        @brief Accept numpy array as input, and return in Tensor type.
+
+        @param ps: NDArray.
+
+        @return: Tensor.
+
+        @note: This is a method with coordtype 'cartesian'.
+        """
+        pt = torch.from_numpy(ps).float()
+        return self.forward(pt)
+
+    from_numpy.__dict__['coordtype'] = 'cartesian'
+
+    def from_cell_bc(self, bc: NDArray, mesh) -> Tensor:
         """
         @brief From bc in mesh cells to outputs of the solution.
 
-        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number
+        @param bc: NDArray containing bc points. It may has a shape (m, TD+1) where m is the number\
                    of bc points and TD is the topology dimension of the mesh.
 
-        @return: NDArray with shape (b, c, ...). Outputs in every bc points and every cells.
-                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'
-                 is the shape of the function value.
+        @return: Tensor with shape (b, c, ...). Outputs in every bc points and every cells.\
+                 In the shape (b, c, ...), 'b' represents bc points, 'c' represents cells, and '...'\
+                 is the shape of the function output.
+
+        @note: This is a method with coordtype 'barycentric'.
         """
         points = mesh.cell_bc_to_point(bc)
-        points_tensor = torch.tensor(points, dtype=torch.float32)
-        return self.forward(points_tensor).detach().numpy()
+        return self.from_numpy(points)
 
-    def estimate_error(self, other: VectorFunction, space=None,
-                       fn_type: Literal['bc', 'val']='bc', squeeze: bool=False):
+    from_cell_bc.__dict__['coordtype'] = 'barycentric'
+
+    def estimate_error(self, other: VectorFunction, mesh: Optional[MeshLike]=None, power: int=2, q: int=3,
+                       split: bool=False, coordtype: str='b', squeeze: bool=False):
         """
         @brief Calculate error between the solution and `other` in finite element space `space`.
 
-        @param other: VectorFunction. The function to be compared with. If `other` is `Function`
-                      (functions in finite element spaces), there is no need to specify `space` and `fn_type`.
-        @param space: FiniteElementSpace.
-        @param fn_type: 'bc' or 'val'. Defaults to 'bc'.
-        @param squeeze: bool. Defaults to `False`. Squeeze the solution automatically if the last dim has shape (1).
+        @param other: VectorFunction. The function(target) to be compared with.
+        @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
+                     element space, use mesh of the space instead and this parameter will be ignored.
+        @param power: int. Defaults to 2, which means to measure L-2 error by default.
+        @param q: int. The index of quadratures.
+        @param split: bool. Split error values from each cell if `True`, and the shape of return will be (NC, ...)\
+                      where 'NC' refers to number of cells, and '...' is the shape of function output. If `False`,\
+                      the output has the same shape to the funtion output. Defaults to `False`.
+        @param coordtype: `'barycentric'`(`'b'`) or `'cartesian'`(`'c'`). Defaults to `'b'`. This parameter will be\
+                          ignored if `other` has attribute `coordtype`.
+        @param squeeze: bool. Defaults to `False`. Squeeze the function output before calculation.\
                         This is sometimes useful when estimating error for an 1-output network.
 
-        @return: error: float.
+        @return: error.
         """
         from ..functionspace.Function import Function
         if isinstance(other, Function):
-            if space is not None:
-                if other.space is not space:
-                    print("Warning: Trying to calculate in another finite element space.")
-            else:
-                space = other.space
+            mesh = other.space.mesh
 
-        if fn_type == 'val':
+        if mesh is None:
+            raise ValueError("Param 'mesh' is required if the target is not a function in finite element space.")
 
-            def f(bc):
-                val = self.from_cell_bc(bc, space.mesh)
-                if squeeze:
-                    val = val.squeeze(-1)
-                return (val - other(space.mesh.cell_bc_to_point(bc)))**2
+        o_coordtype = getattr(other, 'coordtype', None)
+        if o_coordtype is not None:
+            coordtype = o_coordtype
 
-        elif fn_type == 'bc':
+        qf = mesh.integrator(q, etype='cell')
+        bcs, ws = qf.get_quadrature_points_and_weights()
+        cellmeasure = mesh.entity_measure('cell')
 
-            def f(bc):
-                val = self.from_cell_bc(bc, space.mesh)
-                if squeeze:
-                    val = val.squeeze(-1)
-                return (val - other(bc))**2
+        if coordtype in {'cartesian', 'c'}:
+
+            ps = mesh.cell_bc_to_point(bcs)
+            val = self.from_numpy(ps).detach().numpy()
+            if squeeze:
+                val = val.squeeze(-1)
+            diff = np.abs(val - other(ps))**power
+
+        elif coordtype in {'barycentric', 'b'}:
+
+            val = self.from_cell_bc(bcs, mesh).detach().numpy()
+            if squeeze:
+                val = val.squeeze(-1)
+            diff = np.abs(val - other(bcs))**power
 
         else:
-            raise ValueError('Invalid function type.')
+            raise ValueError(f"Invalid coordtype '{coordtype}'.")
 
-        return np.sqrt(space.integralalg.integral(f, False))
+        e = np.einsum('q, qc..., c -> c...', ws, diff, cellmeasure)
+
+        if split:
+            return e
+        return e.sum(axis=0)
 
     def meshgrid_mapping(self, *xi: NDArray):
         """
@@ -98,15 +147,15 @@ class TensorMapping(Module):
         """
         mesh = np.meshgrid(*xi)
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
-        mesh_pt = [Variable(torch.from_numpy(x).float(), requires_grad=True) for x in flat_mesh]
+        mesh_pt = [torch.from_numpy(x).float() for x in flat_mesh]
         pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
-        u_plot: NDArray = pt_u.data.cpu().numpy()
+        u_plot: NDArray = pt_u.detach().numpy()
         assert u_plot.ndim == 2
         nf = u_plot.shape[-1]
         if nf <= 1:
             return u_plot.reshape(mesh[0].shape), mesh
         else:
-            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf)], mesh
+            return [sub_u.reshape(mesh[0].shape) for sub_u in np.split(u_plot, nf, axis=-1)], mesh
 
 
 class ZeroMapping(Module):
@@ -142,12 +191,12 @@ class Solution(TensorMapping):
 
 class _Fixed(Solution):
     def __init__(self, net: Optional[Module],
-                 idx: List[int],
-                 values: List[float]
+                 idx: Sequence[int],
+                 values: Sequence[float]
         ) -> None:
         super().__init__(net)
         self._fixed_idx = torch.tensor(idx, dtype=torch.long)
-        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(-1)
+        self._fixed_value = torch.tensor(values, dtype=torch.float32).unsqueeze(0)
 
     def forward(self, p: Tensor):
         total_feature = p.shape[-1] + len(self._fixed_idx)
@@ -160,6 +209,17 @@ class _Fixed(Solution):
         fixed_p[..., feature_mask] = p
 
         return self.net.forward(fixed_p)
+
+
+class _Extracted(Solution):
+    def __init__(self, net: Optional[Module],
+                 idx: Sequence[int]
+        ) -> None:
+        super().__init__(net)
+        self._extracted_idx = torch.tensor(idx, dtype=torch.long)
+
+    def forward(self, p: Tensor):
+        return self.net.forward(p)[..., self._extracted_idx]
 
 
 class LearningMachine():
@@ -183,11 +243,11 @@ class LearningMachine():
         @brief Calculate loss value.
 
         @param sampler: Sampler.
-        @param func: Operator.
+        @param func: Operator.\
                      A function get x and u(x) as args. (e.g A pde or boundary condition.)
-        @param target: Tensor or None.
+        @param target: Tensor or None.\
                        If `None`, the output will be compared with zero tensor.
-        @param output_samples: bool. Defaults to `False`.
+        @param output_samples: bool. Defaults to `False`.\
                                Return samples from the `sampler` if `True`.
 
         @note Arg `func` should be defined like:

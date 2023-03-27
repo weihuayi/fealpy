@@ -1639,6 +1639,62 @@ class TriangleMesh(Mesh2d):
 
     ## @ingroup MeshGenerators
     @classmethod
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+        """
+        Generate a triangle mesh for a unit square.
+        
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TriangleMesh instance
+        """ 
+        return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        Generate a triangle mesh for a box domain .
+        
+        @param box 
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TriangleMesh instance
+        """ 
+        NN = (nx+1)*(ny+1)
+        NC = nx*ny
+        node = np.zeros((NN,2))
+        X, Y = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j, 
+                box[2]:box[3]:(ny+1)*1j]
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+
+        idx = np.arange(NN).reshape(nx+1, ny+1)
+        cell = np.zeros((2*NC, 3), dtype=np.int_)
+        cell[:NC, 0] = idx[1:,0:-1].flatten(order='F')
+        cell[:NC, 1] = idx[1:,1:].flatten(order='F')
+        cell[:NC, 2] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 0] = idx[0:-1, 1:].flatten(order='F')
+        cell[NC:, 1] = idx[0:-1, 0:-1].flatten(order='F')
+        cell[NC:, 2] = idx[1:, 1:].flatten(order='F')
+
+        if threshold is not None:
+            bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+            isDelCell = threshold(bc) 
+            cell = cell[~isDelCell]
+            isValidNode = np.zeros(NN, dtype=np.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = np.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
     def from_one_triangle(cls, meshtype='iso'):
         if meshtype == 'equ':
             node = np.array([
