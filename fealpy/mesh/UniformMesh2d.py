@@ -61,7 +61,7 @@ class UniformMesh2d(Mesh2d):
         self.NC: int = self.nx * self.ny
 
         # Data structure for finite element computation
-        self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype=itype)
+        self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
         self.itype: type = itype
         self.ftype: type = ftype
@@ -129,6 +129,7 @@ class UniformMesh2d(Mesh2d):
         @details This function calculates the coordinates of the nodes in the mesh based on the
                  mesh's origin, step size, and the number of cells in the x and y directions.
                  It returns a NumPy array with the coordinates of each node.
+        @note 有限差分法用这个接口
         """
         GD = self.geo_dimension()
         nx = self.nx
@@ -139,68 +140,91 @@ class UniformMesh2d(Mesh2d):
         node[..., 0], node[..., 1] = np.mgrid[
                                      box[0]:box[1]:(nx + 1)*1j,
                                      box[2]:box[3]:(ny + 1)*1j]
-        return node
+        return node # (nx+1, ny+1, 2)
+
+    def cell_barycenter(self):
+        """
+        @note 用于有限差分法
+        """
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
+        bc = np.zeros((nx, ny, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                box[0]:box[1]:nx*1j,
+                box[2]:box[3]:ny*1j]
+        return bc
+
+    def edge_barycenter(self):
+        """
+        @note 用于有限差分法
+        """
+        bcx = self.edgex_barycenter()
+        bcy = self.edgey_barycenter()
+        return bcx, bcy
+
+    def edgex_barycenter(self):
+        """
+        @note 用于有限差分法
+        """
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
+               self.origin[1],               self.origin[1] + ny*self.h[1]]
+        bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                box[0]:box[1]:nx*1j,
+                box[2]:box[3]:(ny+1)*1j]
+        return bc
+
+    def edgey_barycenter(self):
+        """
+        @note 用于有限差分法
+        """
+        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
+        bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j,
+                box[2]:box[3]:ny*1j]
+        return bc
+
+
+    def entity(self, etype=2):
+        """
+        @note 有限元法默认调用该接口
+        """
+        if etype in {'cell', 2}:
+            return self.ds.cell
+        elif etype in {'edge', 'face', 1}:
+            return self.ds.edge
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, 2) # (NN, 2)
+        else:
+            raise ValueError("`etype` is wrong!")
 
     def entity_barycenter(self, etype=2):
         """
         @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
 
         @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
-        1, 'edgex', 'edgey', 'facex', 'facey', 'node', or 0.
+        1, 'node', or 0.
 
         @return The cell or node array based on the input entity type.
 
         @throws ValueError if the given etype is invalid.
 
+        @note 这是一个有限元的接口
+
         @todo 检查索引范围不从 0 开始时，会不会有问题
         """
-        GD = self.geo_dimension()
-        nx = self.nx
-        ny = self.ny
         if etype in {'cell', 2}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-            bc = np.zeros((nx, ny, 2), dtype=self.ftype)
-            bc[..., 0], bc[..., 1] = np.mgrid[
-                    box[0]:box[1]:nx*1j,
-                    box[2]:box[3]:ny*1j]
-            return bc
+            return self.cell_barycenter().reshape(-1, 2)
         elif etype in {'edge', 'face', 1}:
-
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
-                   self.origin[1],               self.origin[1] + ny*self.h[1]]
-            xbc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-            xbc[..., 0], xbc[..., 1] = np.mgrid[
-                    box[0]:box[1]:nx*1j,
-                    box[2]:box[3]:(ny+1)*1j]
-
-            box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-            ybc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-            ybc[..., 0], ybc[..., 1] = np.mgrid[
-                    box[0]:box[1]:(nx+1)*1j,
-                    box[2]:box[3]:ny*1j]
-            return xbc, ybc 
-
-        elif etype in {'edgex', 'facex'}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
-                   self.origin[1],               self.origin[1] + ny*self.h[1]]
-            bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-            bc[..., 0], bc[..., 1] = np.mgrid[
-                    box[0]:box[1]:nx*1j,
-                    box[2]:box[3]:(ny+1)*1j]
-            return bc
-
-        elif etype in {'edgey', 'facey'}:
-            box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-            bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-            bc[..., 0], bc[..., 1] = np.mgrid[
-                    box[0]:box[1]:(nx+1)*1j,
-                    box[2]:box[3]:ny*1j]
-            return bc
+            bcx, bcy = self.edge_barycenter()
+            return np.concatenate((bcx.reshape(-1, 2), bcy.reshape(-1, 2)), axis=0) 
         elif etype in {'node', 0}:
-            return self.node
+            return self.node.reshape(-1, 2)
         else:
             raise ValueError(f'the entity type `{etype}` is not correct!')
 

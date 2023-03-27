@@ -3,15 +3,21 @@ import warnings
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
+from typing import Tuple 
+
+from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
 
 
 class UniformMesh1d():
     """
     @brief A class for representing a uniformly partitioned one-dimensional mesh.
     """
-    def __init__(self, extent,
-            h=1.0, origin=0.0,
-            itype=np.int_, ftype=np.float64):
+    def __init__(self, 
+            extent: Tuple[int, int],
+            h: float = 1.0,
+            origin: float = 0.0,
+            itype: type = np.int_,
+            ftype: type = np.float64):
         """
         @brief Initialize the mesh.
 
@@ -53,6 +59,9 @@ class UniformMesh1d():
 
         self.itype = itype
         self.ftype = ftype
+
+        # Data structure for finite element computation
+        self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
     def geo_dimension(self):
         """
