@@ -11,7 +11,7 @@ import numpy as np
 
 from ..mesh.TriangleMesh import TriangleMesh
 from ..mesh.TetrahedronMesh import TetrahedronMesh
-from .nntyping import Mesh
+from .nntyping import MeshLike
 
 
 class Sampler():
@@ -25,7 +25,7 @@ class Sampler():
         @brief Initializes a Sampler instance.
 
         @param m: The number of samples to generate.
-        @param requires_grad: A boolean indicating whether the samples should
+        @param requires_grad: A boolean indicating whether the samples should\
                               require gradient computation. Defaults to `False`.
         """
         self.m = int(m)
@@ -149,10 +149,10 @@ class ISampler(Sampler):
         @brief Initializes an ISampler instance.
 
         @param m: The number of samples to generate.
-        @param ranges: An object that can be converted to a `numpy.ndarray`,
+        @param ranges: An object that can be converted to a `numpy.ndarray`,\
                        representing the ranges in each sampling axis.
-        @param requires_grad: A boolean indicating whether the samples should
-                              require gradient computation. Defaults to `False`.
+        @param requires_grad: A boolean indicating whether the samples should\
+                              require gradient computation. Defaults to `False`.\
                               See `torch.autograd.grad`
 
         @throws ValueError: If `ranges` has an unexpected shape.
@@ -184,7 +184,7 @@ class BoxBoundarySampler(JoinedSampler):
         @brief Generate samples on the boundaries of a multidimensional rectangle.
 
         @param m: int. Number of samples in each boundary.
-        @param p1, p2: Object that can be converted to `torch.Tensor`.
+        @param p1, p2: Object that can be converted to `torch.Tensor`.\
                        Points at both ends of the diagonal.
         @param requires_grad: bool. Defaults to `False`. See `torch.autograd.grad`.
         """
@@ -203,7 +203,7 @@ class BoxBoundarySampler(JoinedSampler):
             self.add(ISampler(m=m_edge, ranges=range2, requires_grad=requires_grad))
 
 
-_MT = TypeVar("_MT", bound=Mesh)
+_MT = TypeVar("_MT", bound=MeshLike)
 
 class _MeshSampler(Sampler, Generic[_MT]):
     def __init__(self, m_cell: int, mesh:_MT, requires_grad: bool=False) -> None:
@@ -239,7 +239,7 @@ class _MeshSampler(Sampler, Generic[_MT]):
 
 def random_weights(m: int, n: int):
     """
-    @brief Generate m random samples, where each sample has n features (n >= 2),
+    @brief Generate m random samples, where each sample has n features (n >= 2),\
     such that the sum of each feature is 1.0.
 
     @param m: The number of samples to generate.
