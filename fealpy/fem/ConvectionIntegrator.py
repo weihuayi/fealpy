@@ -3,14 +3,14 @@ import numpy as np
 
 class ConvectionIntegrator:
     """
-    @note (c \cdot \nabla u, v)
+    @note (c \\cdot \\nabla u, v)
     """    
 
     def __init__(self, c=None, q=3):
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None):
         """
         @note 没有参考单元的组装方式
         """
@@ -24,16 +24,16 @@ class ConvectionIntegrator:
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
 
-        ps = mesh.bc_to_point(bcs, index=index)
 
-        phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
-        phi1 = space.basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        gphi = space.grad_basis(bcs, index=index) 
+        phi = space.basis(bcs, index=index) 
 
         if callable(coef):
             if hasattr(coef, 'coordtype'):
                 if coef.coordtype == 'barycentric':
-                    coef = coef(bcs)
+                    coef = coef(bcs, index)
                 elif coef.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
                     coef = coef(ps)
             else:
                 raise ValueError('''
@@ -51,13 +51,13 @@ class ConvectionIntegrator:
                     ...
 
                 ''')
-
-            if coef.ndim == 2: #(NQ, NC)
-                M = np.einsum('q, qci, qcj, c->cij', ws, phi0, phi0, cellmeasure, optimize=True)
+            if coef.ndim == 3: #(NQ, NC, GD)
+                shape = (3-len(coef.shape))*(1, ) + coef.shape
+                C = np.einsum('q, qcn, qck, qcmn, c->ckm',ws,coef.reshape(shape),phi,gphi,cellmeasure) 
             else:
                 raise ValueError("coef 的维度超出了支持范围")
 
-        return M
+        return C
 
     def fast_assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
         """
