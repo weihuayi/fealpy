@@ -45,10 +45,7 @@ class PolygonMeshIntegralAlg():
         index = index or np.s_[:]
         ps = mesh.edge_bc_to_point(bcs, index=index)
         val = u(ps) # TODO: 这里默认为空间坐标, 是否存在重心坐标的形式?
-        if edgetype is True:
-            e = np.einsum('i, ij..., j->j...', ws, val, self.edgemeasure[index])
-        else:
-            e = np.einsum('i, ij..., j->...', ws, val, self.edgemeasure[index])
+        e = np.einsum('q, qe..., e->e...', ws, val, self.edgemeasure[index])
         return e
 
     def face_integral(self, u, q=None, index=None):
@@ -78,13 +75,13 @@ class PolygonMeshIntegralAlg():
 
         tri = [bc[edge2cell[:, 0]], node[edge[:, 0]], node[edge[:, 1]]]
         a = self.triangle_measure(tri)
-        pp = np.einsum('ij, jkm->ikm', bcs, tri)
+        pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
         val = u(pp, edge2cell[:, 0])
 
         shape = (NC, ) + val.shape[2:]
         e = np.zeros(shape, dtype=np.float64)
 
-        ee = np.einsum('i, ij..., j->j...', ws, val, a)
+        ee = np.einsum('i, ij..., j->j...', ws, val, a, optimize=True)
         np.add.at(e, edge2cell[:, 0], ee)
 
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
@@ -95,9 +92,9 @@ class PolygonMeshIntegralAlg():
                     node[edge[isInEdge, 0]]
                     ]
             a = self.triangle_measure(tri)
-            pp = np.einsum('ij, jkm->ikm', bcs, tri)
+            pp = np.einsum('ij, jkm->ikm', bcs, tri, optimize=True)
             val = u(pp, edge2cell[isInEdge, 1])
-            ee = np.einsum('i, ij..., j->j...', ws, val, a)
+            ee = np.einsum('i, ij..., j->j...', ws, val, a, optimize=True)
             np.add.at(e, edge2cell[isInEdge, 1], ee)
 
         if celltype is True:

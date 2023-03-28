@@ -73,7 +73,7 @@ class FirstNedelecFiniteElementSpace3d:
         else:
             self.dof = dof
 
-        self.integralalg = FEMeshIntegralAlg(self.mesh, 3)
+        self.integralalg = FEMeshIntegralAlg(self.mesh, 2)
         self.integrator = self.integralalg.integrator
 
         self.itype = self.mesh.itype
@@ -319,7 +319,7 @@ class FirstNedelecFiniteElementSpace3d:
 
         face2edge = mesh.ds.face_to_edge()[index]
 
-        if 0: #节点型自由度
+        if 1: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
             point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
             gval = gD(point) #(NF, 3, 3)
