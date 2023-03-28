@@ -24,13 +24,13 @@ class UniformMesh1d():
             itype: type = np.int_,
             ftype: type = np.float64):
         """
-        @brief Initialize the mesh.
+        @brief Initialize the 1D uniform mesh.
 
-        @param[in] extent A tuple representing the range of the mesh in the x direction.
+        @param[in] extent: A tuple representing the range of the mesh in the x direction.
         @param[in] h: Mesh step size.
-        @param[in] origin Coordinate of the starting point.
-        @param[in] itype Integer type to be used, default: np.int_.
-        @param[in] ftype Floating point type to be used, default: np.float64.
+        @param[in] origin: Coordinate of the starting point.
+        @param[in] itype: Integer type to be used, default: np.int_.
+        @param[in] ftype: Floating point type to be used, default: np.float64.
 
         @note The extent parameter defines the index range in the x direction.
               We can define an index range starting from 0, e.g., [0, 10],
@@ -53,11 +53,12 @@ class UniformMesh1d():
         mesh = UniformMesh1d([0, nx], h=h, origin=I[0])
 
         """
-
+        # Mesh properties
         self.extent = extent
         self.h = h
         self.origin = origin
 
+        # Mesh dimensions
         self.nx = extent[1] - extent[0]
         self.NC = self.nx
         self.NN = self.NC + 1
@@ -68,24 +69,10 @@ class UniformMesh1d():
         # Data structure for finite element computation
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
-    ## @ingroup FEMInterface
-    def geo_dimension(self):
-        """
-        @brief Get the geometry dimension of the mesh.
-        
-        @return The geometry dimension (1 for 1D mesh).
-        """
-        return 1
 
-    ## @ingroup FEMInterface
-    def top_dimension(self):
-        """
-        @brief Get the topological dimension of the mesh.
-        
-        @return The topological dimension (1 for 1D mesh).
-        """
-        return 1
-
+    """
+    Grid GeneralInterface
+    """
     ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
@@ -95,12 +82,27 @@ class UniformMesh1d():
         """
         return self.NN
 
-    ## @ingroup FEMInterface 
+    ## @ingroup GeneralInterface
+    def number_of_edges(self):
+        """
+        @brief Get the number of nodes in the mesh.
+
+        @note `edge` is the 1D entity.
+
+        @return The number of edges.
+
+        """
+        return self.NC
+
+    ## @ingroup GeneralInterface
     def number_of_faces(self):
         """
         @brief Get the number of nodes in the mesh.
 
-        @return The number of nodes.
+        @note `face` is the 0D entity
+
+        @return The number of faces.
+
         """
         return self.NN
 
@@ -139,6 +141,129 @@ class UniformMesh1d():
         if returnim:
             return nodeImatrix
 
+    ## @ingroup GeneralInterface
+    def cell_length(self):
+        """
+        @brief 返回单元的长度，注意这里只返回一个值（因为所有单元长度相同）
+        """
+        return self.h
+
+    ## @ingroup GeneralInterface
+    def cell_location(self, p):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup GeneralInterface
+    def show_function(self, plot, uh):
+        """
+        @brief 画出定义在网格上的离散函数
+        """
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        node = self.node
+        line = axes.plot(node, uh)
+        return line
+
+    ## @ingroup GeneralInterface
+    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+                       init=None, fargs=None,
+                       frames=1000, lw=2, interval=50):
+        """
+        @brief
+        """
+        import matplotlib.animation as animation
+
+        line, = axes.plot([], [], lw=lw)
+        axes.set_xlim(box[0], box[1])
+        axes.set_ylim(box[2], box[3])
+        x = self.node
+
+        def init_func():
+            if callable(init):
+                init()
+            return line
+
+        def func(n, *fargs):
+            uh, t = forward(n)
+            line.set_data((x, uh))
+            s = "frame=%05d, time=%0.8f" % (n, t)
+            print(s)
+            axes.set_title(s)
+            return line
+
+        ani = animation.FuncAnimation(fig, func, frames=frames,
+                                      init_func=init_func,
+                                      interval=interval)
+        ani.save(fname)
+
+    ## @ingroup GeneralInterface
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+        """
+        @brief
+        """
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+        return show_mesh_1d(axes, self,
+                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
+                linewidths=linewidths, markersize=markersize,
+                showaxis=showaxis)
+
+    ## @ingroup GeneralInterface
+    def find_node(self, axes, node=None,
+            index=None, showindex=False,
+            color='r', markersize=100,
+            fontsize=20, fontcolor='k'):
+        """
+        @brief
+        """
+
+        if node is None:
+            node = self.node
+
+        find_node(axes, node,
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
+    ## @ingroup GeneralInterface
+    def find_cell(self, axes,
+            index=None, showindex=False,
+            color='g', markersize=150,
+            fontsize=24, fontcolor='g'):
+        """
+        @brief
+        """
+
+        find_entity(axes, self, entity='cell',
+                index=index, showindex=showindex,
+                color=color, markersize=markersize,
+                fontsize=fontsize, fontcolor=fontcolor)
+
+    ## @ingroup GeneralInterface
+    def to_vtk_file(self, filename, celldata=None, nodedata=None):
+        """
+        @brief
+        """
+        pass
+
+
+    """
+    Grid FDMInterface
+    """
     ## @ingroup FDMInterface
     @property
     def node(self):
@@ -150,7 +275,7 @@ class UniformMesh1d():
         @details This function calculates the coordinates of the nodes in the mesh based on the
                  mesh's origin, step size, and the number of cells in the x directions.
                  It returns a NumPy array with the coordinates of each node.
-        @note 约定有限差分调用这个接口
+
         """
         GD = self.geo_dimension()
         nx = self.nx
@@ -160,90 +285,12 @@ class UniformMesh1d():
     ## @ingroup FDMInterface
     def cell_barycenter(self):
         """
+        @brief
         """
         nx = self.nx
         box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
         bc = np.linspace(box[0], box[1], nx)
         return bc
-
-    ## @ingroup FEMInterface
-    def integrator(self, q, etype='cell'):
-        return GaussLegendreQuadrature(q)
-
-    ## @ingroup FEMInterface
-    def bc_to_point(self, bc, index=np.s_[:]):
-        pass
-
-    ## @ingroup FEMInterface
-    def shape_function(self, bc, p=1):
-        pass
-
-    ## @ingroup FEMInterface
-    def grad_shape_function(self, bc, p=1):
-        pass
-
-    ## @ingroup FEMInterface
-    def multi_index_matrix(self, p, etype=1):
-        pass
-
-    ## @ingroup FEMInterface
-    def cell_to_ipoint(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def interpolation_points(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def number_of_local_ipoints(self, p, iptype='cell'):
-        pass
-    
-    ## @ingroup FEMInterface
-    def number_of_global_ipoints(self, p):
-        pass
-
-    ## @ingroup FEMInterface
-    def entity(self, etype):
-        """
-        @brief Get the entity (either cell or node) based on the given entity type.
-
-        @param[in] etype The type of entity, either 'cell', 1, 'node', 'face' or 0.
-
-        @return The cell or node array based on the input entity type.
-
-        @throws ValueError if the given etype is invalid.
-        @note 约定有限元方法调用这个接口
-        """
-        if etype in {'cell', 1}:
-            NN = self.NN
-            NC = self.NC
-            cell = np.zeros((NC, 2), dtype=np.int)
-            cell[:, 0] = range(NC)
-            cell[:, 1] = range(1, NN)
-            return cell
-        elif etype in {'node', 'face', 0}:
-            return self.node.reshape(-1, 1)
-        else:
-            raise ValueError("`etype` is wrong!")
-
-    ## @ingroup FEMInterface
-    def entity_barycenter(self, etype):
-        """
-        @brief Calculate the barycenter of the specified entity.
-
-        @param[in] etype The type of entity, either 'cell', 1, 'node', 'face' or 0.
-
-        @return The barycenter of the given entity type.
-
-        @throws ValueError if the given etype is invalid.
-        @note 有限元调用的接口
-        """
-        if etype in {'cell', 1}:
-            return self.cell_barycenter().reshape(-1, 1)
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, 1)
-        else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FDMInterface
     def function(self, etype='node', dtype=None, ex=0):
@@ -268,6 +315,20 @@ class UniformMesh1d():
             raise ValueError(f'the entity `{etype}` is not correct!')
         return uh
 
+    ## @ingroup FDMInterface
+    def gradient(self, f, order=1):
+        """
+        @brief 求网格函数 f 的梯度
+        """
+        pass
+
+    ## @ingroup FDMInterface
+    def value(self, p, f):
+        """
+        @brief
+        """
+        pass
+   
     ## @ingroup FDMInterface
     def interpolation(self, f, intertype='node'):
         """
@@ -445,89 +506,128 @@ class UniformMesh1d():
 
         return A0, A1, A2
 
-    ## @ingroup GeneralInterface
-    def show_function(self, plot, uh):
+    ## @ingroup FDMInterface
+    def fast_sweeping_method(self, phi0):
+    	"""
+        @brief 均匀网格上的 fast sweeping method
+        @param[in] phi 是一个离散的水平集函数
         """
-        @brief 画出定义在网格上的离散函数
+        pass
+
+
+    """
+    Grid FEMInterface
+    """
+    ## @ingroup FEMInterface
+    def geo_dimension(self):
         """
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
+        @brief Get the geometry dimension of the mesh.
+        
+        @return The geometry dimension (1 for 1D mesh).
+        """
+        return 1
+
+    ## @ingroup FEMInterface
+    def top_dimension(self):
+        """
+        @brief Get the topological dimension of the mesh.
+        
+        @return The topological dimension (1 for 1D mesh).
+        """
+        return 1
+   
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def integrator(self, q, etype='cell'):
+        return GaussLegendreQuadrature(q)
+
+    ## @ingroup FEMInterface
+    def bc_to_point(self, bc, index=np.s_[:]):
+        pass
+
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def entity(self, etype):
+        """
+        @brief Get the entity (either cell or node) based on the given entity type.
+
+        @param[in] etype The type of entity, either 'cell', 'edge' or 1, 'node', 'face' or 0.
+
+        @return The cell or node array based on the input entity type.
+
+        @throws ValueError if the given etype is invalid.
+        """
+        if etype in {'cell', 'edge', 1}:
+            return self.ds.cell
+        elif etype in {'node', 'face', 0}:
+            return self.node.reshape(-1, 1)
         else:
-            axes = plot
-        node = self.node
-        line = axes.plot(node, uh)
-        return line
+            raise ValueError("`etype` is wrong!")
 
-    ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
-                       init=None, fargs=None,
-                       frames=1000, lw=2, interval=50):
+    ## @ingroup FEMInterface
+    def entity_barycenter(self, etype):
+        """
+        @brief Calculate the barycenter of the specified entity.
 
-        import matplotlib.animation as animation
+        @param[in] etype The type of entity, either 'cell', 1, 'node', 'face' or 0.
 
-        line, = axes.plot([], [], lw=lw)
-        axes.set_xlim(box[0], box[1])
-        axes.set_ylim(box[2], box[3])
-        x = self.node
+        @return The barycenter of the given entity type.
 
-        def init_func():
-            if callable(init):
-                init()
-            return line
-
-        def func(n, *fargs):
-            uh, t = forward(n)
-            line.set_data((x, uh))
-            s = "frame=%05d, time=%0.8f" % (n, t)
-            print(s)
-            axes.set_title(s)
-            return line
-
-        ani = animation.FuncAnimation(fig, func, frames=frames,
-                                      init_func=init_func,
-                                      interval=interval)
-        ani.save(fname)
-
-    ## @ingroup GeneralInterface
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
-
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
+        @throws ValueError if the given etype is invalid.
+        """
+        if etype in {'cell', 1}:
+            return self.cell_barycenter().reshape(-1, 1)
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, 1)
         else:
-            axes = plot
-        return show_mesh_1d(axes, self,
-                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis)
+            raise ValueError('the entity type `{etype}` is not correct!')
 
-    ## @ingroup GeneralInterface
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=100,
-            fontsize=20, fontcolor='k'):
+    ## @ingroup FEMInterface
+    def entity_measure(self, etype):
+        """
+        @brief
+        """
+        pass
 
-        if node is None:
-            node = self.node
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def multi_index_matrix(self, p, etype=1):
+        pass
 
-        find_node(axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+    ## @ingroup FEMInterface
+    def shape_function(self, bc, p=1):
+        pass
 
-    ## @ingroup GeneralInterface
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=150,
-            fontsize=24, fontcolor='g'):
+    ## @ingroup FEMInterface
+    def grad_shape_function(self, bc, p=1):
+        pass
+   
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        pass
+    
+    ## @ingroup FEMInterface
+    def number_of_global_ipoints(self, p):
+        pass
 
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+    ## @ingroup FEMInterface
+    def interpolation_points(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def node_to_ipoint(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def edge_to_ipoint(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def face_to_ipoint(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def cell_to_ipoint(self, p):
+        pass
+

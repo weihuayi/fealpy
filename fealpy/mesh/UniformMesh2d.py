@@ -1,33 +1,36 @@
-
 import numpy as np
-from types import ModuleType
+import warnings
 from scipy.sparse import coo_matrix, csr_matrix, diags
-from scipy.sparse.linalg import spsolve
-
-from typing import Tuple 
-
+from types import ModuleType
+from typing import Tuple
 from .Mesh2d import Mesh2d
-from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
+# from scipy.sparse.linalg import spsolve
 
+# 这个数据接口为有限元服务
+from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 from ..geometry import project
 
+# @defgroup FEMInterface                                                                                                                                            
+## @defgroup FDMInterface
+## @defgroup GeneralInterface
 class UniformMesh2d(Mesh2d):
     """
     @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
-    def __init__(self, extent: Tuple[int, int, int, int],
-             h: Tuple[float, float] = (1.0, 1.0),
-             origin: Tuple[float, float] = (0.0, 0.0),
-             itype: type = np.int_,
-             ftype: type = np.float64):
+    def __init__(self, 
+            extent: Tuple[int, int, int, int],
+            h: Tuple[float, float] = (1.0, 1.0),
+            origin: Tuple[float, float] = (0.0, 0.0),
+            itype: type = np.int_,
+            ftype: type = np.float64):
         """
         @brief Initialize the 2D uniform mesh.
 
-        @param[in] extent A tuple representing the range of the mesh in the x and y directions.
-        @param[in] h A tuple representing the mesh step sizes in the x and y directions, default: (1.0, 1.0).
-        @param[in] origin A tuple representing the coordinates of the starting point, default: (0.0, 0.0).
-        @param[in] itype Integer type to be used, default: np.int_.
-        @param[in] ftype Floating point type to be used, default: np.float64.
+        @param[in] extent: A tuple representing the range of the mesh in the x and y directions.
+        @param[in] h: A tuple representing the mesh step sizes in the x and y directions, default: (1.0, 1.0).
+        @param[in] origin: A tuple representing the coordinates of the starting point, default: (0.0, 0.0).
+        @param[in] itype: Integer type to be used, default: np.int_.
+        @param[in] ftype: Floating point type to be used, default: np.float64.
 
         @note The extent parameter defines the index range in the x and y directions.
               We can define an index range starting from 0, e.g., [0, 10, 0, 10],
@@ -60,29 +63,16 @@ class UniformMesh2d(Mesh2d):
         self.NN: int = (self.nx + 1) * (self.ny + 1)
         self.NC: int = self.nx * self.ny
 
+        self.itype: type = itype
+        self.ftype: type = ftype
+
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
-        self.itype: type = itype
-        self.ftype: type = ftype
-        self.meshtype: str = 'UniformMesh2d'
-
-    def geo_dimension(self):
-        """
-        @brief Get the geometry dimension of the mesh.
-        
-        @return The geometry dimension (2 for 2D mesh).
-        """
-        return 2
-
-    def top_dimension(self):
-        """
-        @brief Get the topological dimension of the mesh.
-        
-        @return The topological dimension (2 for 2D mesh).
-        """
-        return 2
-
+    """
+    Grid GeneralInterface
+    """
+    ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
         @brief Get the number of nodes in the mesh.
@@ -91,24 +81,7 @@ class UniformMesh2d(Mesh2d):
         """
         return self.NN
 
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
-
-    def number_of_faces(self):
-        """
-        @brief Get the number of faces in the mesh.
-
-        @note `face` is the 1D entity 
-
-        @return The number of faces.
-        """
-        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
-
+    ## @ingroup GeneralInterface
     def number_of_edges(self):
         """
         @brief Get the number of edges in the mesh.
@@ -119,116 +92,28 @@ class UniformMesh2d(Mesh2d):
         """
         return (self.nx+1)*self.ny + (self.ny+1)*self.nx
 
-    @property
-    def node(self):
+    ## @ingroup GeneralInterface
+    def number_of_faces(self):
         """
-        @brief Get the coordinates of the nodes in the mesh.
+        @brief Get the number of faces in the mesh.
 
-        @return A NumPy array of shape (NN, 2) containing the coordinates of the nodes.
+        @note `face` is the 1D entity 
 
-        @details This function calculates the coordinates of the nodes in the mesh based on the
-                 mesh's origin, step size, and the number of cells in the x and y directions.
-                 It returns a NumPy array with the coordinates of each node.
-        @note 有限差分法用这个接口
+        @return The number of faces.
         """
-        GD = self.geo_dimension()
-        nx = self.nx
-        ny = self.ny
-        box = [self.origin[0], self.origin[0] + nx * self.h[0],
-               self.origin[1], self.origin[1] + ny * self.h[1]]
-        node = np.zeros((nx + 1, ny + 1, GD), dtype=self.ftype)
-        node[..., 0], node[..., 1] = np.mgrid[
-                                     box[0]:box[1]:(nx + 1)*1j,
-                                     box[2]:box[3]:(ny + 1)*1j]
-        return node # (nx+1, ny+1, 2)
+        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
 
-    def cell_barycenter(self):
+    ## @ingroup GeneralInterface
+    def number_of_cells(self):
         """
-        @note 用于有限差分法
+        @brief Get the number of cells in the mesh.
+
+        @return The number of cells.
         """
-        GD = self.geo_dimension()
-        nx = self.nx
-        ny = self.ny
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-        bc = np.zeros((nx, ny, 2), dtype=self.ftype)
-        bc[..., 0], bc[..., 1] = np.mgrid[
-                box[0]:box[1]:nx*1j,
-                box[2]:box[3]:ny*1j]
-        return bc
+        return self.NC
 
-    def edge_barycenter(self):
-        """
-        @note 用于有限差分法
-        """
-        bcx = self.edgex_barycenter()
-        bcy = self.edgey_barycenter()
-        return bcx, bcy
-
-    def edgex_barycenter(self):
-        """
-        @note 用于有限差分法
-        """
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
-               self.origin[1],               self.origin[1] + ny*self.h[1]]
-        bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
-        bc[..., 0], bc[..., 1] = np.mgrid[
-                box[0]:box[1]:nx*1j,
-                box[2]:box[3]:(ny+1)*1j]
-        return bc
-
-    def edgey_barycenter(self):
-        """
-        @note 用于有限差分法
-        """
-        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
-        bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
-        bc[..., 0], bc[..., 1] = np.mgrid[
-                box[0]:box[1]:(nx+1)*1j,
-                box[2]:box[3]:ny*1j]
-        return bc
-
-
-    def entity(self, etype=2):
-        """
-        @note 有限元法默认调用该接口
-        """
-        if etype in {'cell', 2}:
-            return self.ds.cell
-        elif etype in {'edge', 'face', 1}:
-            return self.ds.edge
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, 2) # (NN, 2)
-        else:
-            raise ValueError("`etype` is wrong!")
-
-    def entity_barycenter(self, etype=2):
-        """
-        @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
-
-        @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
-        1, 'node', or 0.
-
-        @return The cell or node array based on the input entity type.
-
-        @throws ValueError if the given etype is invalid.
-
-        @note 这是一个有限元的接口
-
-        @todo 检查索引范围不从 0 开始时，会不会有问题
-        """
-        if etype in {'cell', 2}:
-            return self.cell_barycenter().reshape(-1, 2)
-        elif etype in {'edge', 'face', 1}:
-            bcx, bcy = self.edge_barycenter()
-            return np.concatenate((bcx.reshape(-1, 2), bcy.reshape(-1, 2)), axis=0) 
-        elif etype in {'node', 0}:
-            return self.node.reshape(-1, 2)
-        else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
-
-    def uniform_refine(self, n=1):
+    ## @ingroup GeneralInterface
+    def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         @brief Perform uniform refinement on the mesh.
 
@@ -241,31 +126,221 @@ class UniformMesh2d(Mesh2d):
                  For each iteration, it updates the mesh extent, step size, number of cells, and number of nodes,
                  as well as the data structure. If returnim is True, it also calculates and returns the
                  interpolation matrices for each iteration.
+        
         """
-        for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
-            self.h = [i / 2 for i in self.h]
-            self.nx = self.extent[1] - self.extent[0]
-            self.ny = self.extent[3] - self.extent[2]
+        pass 
 
-            self.NC = self.nx * self.ny
-            self.NN = (self.nx + 1) * (self.ny + 1)
-            self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
-
-
-
+    ## @ingroup GeneralInterface
     def cell_area(self):
         """
         @brief 返回单元的面积，注意这里只返回一个值（因为所有单元面积相同）
         """
         return self.h[0]*self.h[1]
 
+    ## @ingroup GeneralInterface
     def edge_length(self, index=np.s_[:]):
         """
         @brief 返回边长，注意这里返回两个值，一个 x 方向，一个 y 方向
         """
-        return self.h
+        return self.h[0], sef.h[1]
 
+    ## @ingroup GeneralInterface
+    def cell_location(self, p):
+        """
+        @brief 给定一组点，确定所有点所在的单元
+
+        """
+        hx = self.h[0]
+        hy = self.h[1]
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        v = p - np.array(self.origin, dtype=self.ftype)
+        n0 = v[..., 0]//hx
+        n1 = v[..., 1]//hy
+
+        return n0.astype('int64'), n1.astype('int64')
+
+    ## @ingroup GeneralInterface
+    def show_function(self, plot, uh, cmap='jet'):
+        """
+        @brief 显示一个定义在网格节点上的函数
+        """
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            axes = fig.add_subplot(111, projection='3d')
+        else:
+            axes = plot
+        node = self.node
+        return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
+
+    ## @ingroup GeneralInterface
+    def show_animation(self, fig, axes, box,
+                       init, forward, fname='test.mp4',
+                       fargs=None, frames=1000, lw=2, interval=50):
+        """
+        @brief
+        """
+        import matplotlib.animation as animation
+
+        data = init(axes)
+        def func(n, *fargs):
+            Ez, t = forward(n)
+            data.set_array(Ez)
+            s = "frame=%05d, time=%0.8f"%(n, t)
+            print(s)
+            axes.set_title(s)
+            axes.set_aspect('equal')
+            #fig.colorbar(data)
+            return data 
+       
+        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
+        ani.save(fname)
+
+    ## @ingroup GeneralInterface
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup GeneralInterface
+    def find_node(self, axes, node=None,
+            index=None, showindex=False,
+            color='r', markersize=100,
+            fontsize=20, fontcolor='k'):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup GeneralInterface
+    def find_edge(self, axes, node=None,
+            index=None, showindex=False,
+            color='b', markersize=125,
+            fontsize=22, fontcolor='b'):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup GeneralInterface
+    def find_cell(self, axes,
+            index=None, showindex=False,
+            color='g', markersize=150,
+            fontsize=24, fontcolor='g'):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup GeneralInterface
+    def to_vtk_file(self, filename, celldata=None, nodedata=None):
+        """
+        @brief
+        """
+        from pyevtk.hl import gridToVTK
+
+        nx = self.ds.nx
+        ny = self.ds.ny
+        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+               self.origin[1], self.origin[1] + ny*self.h[1]]
+	
+        x = np.linspace(box[0], box[1], nx+1)
+        y = np.linspace(box[2], box[3], ny+1)
+        z = np.zeros(1)
+        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
+
+        return filename
+
+    """
+    Gird FDMInterface
+    """
+    ## @ingroup FDMInterface
+    @property
+    def node(self):
+        """
+        @brief Get the coordinates of the nodes in the mesh.
+
+        @return A NumPy array of shape (NN, 2) containing the coordinates of the nodes.
+
+        @details This function calculates the coordinates of the nodes in the mesh based on the
+                 mesh's origin, step size, and the number of cells in the x and y directions.
+                 It returns a NumPy array with the coordinates of each node.
+
+        """
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0], self.origin[0] + nx * self.h[0],
+               self.origin[1], self.origin[1] + ny * self.h[1]]
+        node = np.zeros((nx + 1, ny + 1, GD), dtype=self.ftype)
+        node[..., 0], node[..., 1] = np.mgrid[
+                                     box[0]:box[1]:(nx + 1)*1j,
+                                     box[2]:box[3]:(ny + 1)*1j]
+        return node 
+
+    ## @ingroup FDMInterface
+    def cell_barycenter(self):
+        """
+        @brief
+        """
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
+        bc = np.zeros((nx, ny, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                                 box[0]:box[1]:nx*1j,
+                                 box[2]:box[3]:ny*1j]
+        return bc
+
+    ## @ingroup FDMInterface
+    def edge_barycenter(self):
+        """
+        @brief
+        """
+        bcx = self.edgex_barycenter()
+        bcy = self.edgey_barycenter()
+        return bcx, bcy
+
+    ## @ingroup FDMInterface
+    def edgex_barycenter(self):
+        """
+        @brief
+        """
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
+               self.origin[1],               self.origin[1] + ny*self.h[1]]
+        bc = np.zeros((nx, ny+1, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                                 box[0]:box[1]:nx*1j,
+                                 box[2]:box[3]:(ny+1)*1j]
+        return bc
+
+    ## @ingroup FDMInterface
+    def edgey_barycenter(self):
+        """
+        @breif
+        """
+        GD = self.geo_dimension()
+        nx = self.nx
+        ny = self.ny
+        box = [self.origin[0],               self.origin[0] + nx*self.h[0],
+               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
+        bc = np.zeros((nx+1, ny, 2), dtype=self.ftype)
+        bc[..., 0], bc[..., 1] = np.mgrid[
+                                 box[0]:box[1]:(nx+1)*1j,
+                                 box[2]:box[3]:ny*1j]
+        return bc
+
+    ## @ingroup FDMInterface
     def function(self, etype='node', dim=None, dtype=None, ex=0):
         """
         @brief Return a discrete function (array) defined on nodes, mesh edges, or mesh cells with elements set to 0.
@@ -308,42 +383,38 @@ class UniformMesh2d(Mesh2d):
 
         return uh
 
-    def interpolate(self, f, intertype='node'):
-        nx = self.ds.nx
-        ny = self.ds.ny
-        node = self.node
-        if intertype in {'node', 0}:
-            F = f(node)
-        elif intertype in {'edge', 'face', 1}:
-            xbc, ybc = self.entity_barycenter('edge')
-            F = f(xbc), f(ybc)
-        elif intertype in {'edgex'}:
-            xbc = self.entity_barycenter('edgex')
-            F = f(xbc)
-        elif intertype in {'edgey'}:
-            ybc = self.entity_barycenter('edgey')
-            F = f(ybc)
-        elif intertype in {'cell'}:
-            bc = self.entity_barycenter('cell')
-            F = f(bc)
-        return F
-
-    def cell_location(self, p):
+    ## @ingroup FDMInterface
+    def gradient(self, f, order=1):
         """
-        @brief 给定一组点，确定所有点所在的单元
-
+        @brief 求网格函数 f 的梯度
         """
         hx = self.h[0]
         hy = self.h[1]
-        nx = self.ds.nx
-        ny = self.ds.ny
+        fx, fy = np.gradient(f, hx, hy, edge_order=order)
+        return fx, fy
+        
+    ## @ingroup FDMInterface
+    def divergence(self, f_x, f_y, order=1):
+        """
+        @brief 求向量网格函数 (fx, fy) 的散度
+        """
 
-        v = p - np.array(self.origin, dtype=self.ftype)
-        n0 = v[..., 0]//hx
-        n1 = v[..., 1]//hy
+        hx = self.h[0]
+        hy = self.h[1]
+        f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
+        f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
+        return fxx + fyy
 
-        return n0.astype('int64'), n1.astype('int64')
+    ## @ingroup FDMInterface
+    def laplace(self, f, order=1):
+        hx = self.h[0]
+        hy = self.h[1]
+        fx, fy = np.gradient(f, hx, hy, edge_order=order)
+        fxx,fxy = np.gradient(fx, hx, edge_order=order)
+        fyx,fyy = np.gradient(fy, hy, edge_order=order)
+        return fxx + fyy 
 
+    ## @ingroup FDMInterface
     def value(self, p, f):
         """
         @brief Compute the values of a function at given non-grid points based on known values at grid nodes.
@@ -373,34 +444,89 @@ class UniformMesh2d(Mesh2d):
             + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * a * b 
         return F
 
-    def gradient(self, f, order=1):
+    ## @ingroup FDMInterface
+    def interpolation(self, f, intertype='node'):
         """
-        @brief 求网格函数 f 的梯度
+        This function is deprecated and will be removed in a future version.
+        Please use the interpolate() instead.
         """
-        hx = self.h[0]
-        hy = self.h[1]
-        fx, fy = np.gradient(f, hx, hy, edge_order=order)
-        return fx, fy
-        
-    def div(self, f_x, f_y, order=1):
+        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'edge':
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype == 'edgex':
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype == 'edgey':
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
+    ## @ingroup FDMInterface
+    def interpolate(self, f, intertype='node'):
         """
-        @brief 求向量网格函数 (fx, fy) 的散度
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype in {'node', 0}:
+            F = f(node)
+        elif intertype in {'edge', 'face', 1}:
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype in {'edgex'}:
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype in {'edgey'}:
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype in {'cell'}:
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
+    ## @ingroup FDMInterface
+    def error(self, u, uh, errortype='all'):
+        """
+        @brief Compute the error between the true solution and the numerical solution.
+
+        @param[in] u The true solution as a function.
+        @param[in] uh The numerical solution as an 2D array.
+        @param[in] errortype The error type, which can be 'all', 'max', 'L2' or 'H1'
         """
 
-        hx = self.h[0]
-        hy = self.h[1]
-        f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
-        f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
-        return fxx + fyy
+        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
 
-    def laplace(self, f, order=1):
-        hx = self.h[0]
-        hy = self.h[1]
-        fx, fy = np.gradient(f, hx, hy, edge_order=order)
-        fxx,fxy = np.gradient(fx, hx, edge_order=order)
-        fyx,fyy = np.gradient(fy, hy, edge_order=order)
-        return fxx + fyy 
+        h = self.h
+        nx = self.nx
+        ny = self.ny
 
+        e = u - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+
+        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
+
+        return emax, e0, el2
+
+    ## @ingroup FDMInterface
+    def elliptic_operator(self, d=2, c=None, r=None):
+        """
+        @brief Assemble the finite difference matrix for a general elliptic operator.
+        """
+        pass
+   
+    ## @ingroup FDMInterface
     def laplace_operator(self):
         """
         @brief Construct the discrete Laplace operator on a Cartesian grid
@@ -437,145 +563,21 @@ class UniformMesh2d(Mesh2d):
 
         return A
 
-    def show_function(self, plot, uh, cmap='jet'):
+    ## @ingroup FDMInterface
+    def apply_dirichlet_bc(self, uh, A, f):
         """
-        @brief 显示一个定义在网格节点上的函数
+        @brief
         """
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            axes = fig.add_subplot(111, projection='3d')
-        else:
-            axes = plot
-        node = self.node
-        return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
+        pass
 
-
-    def show_animation(self, 
-            fig, axes, box, init, forward, 
-            fname='test.mp4',
-            fargs=None, frames=1000, lw=2, interval=50):
-        import matplotlib.animation as animation
-
-        data = init(axes)
-        def func(n, *fargs):
-            Ez, t = forward(n)
-            data.set_array(Ez)
-            s = "frame=%05d, time=%0.8f"%(n, t)
-            print(s)
-            axes.set_title(s)
-            axes.set_aspect('equal')
-            #fig.colorbar(data)
-            return data 
-
-        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
-        ani.save(fname)
-
-
-    def error(self, u, uh, errortype='all'):
+    ## @ingroup FDMInterface
+    def wave_equation(self, r, theta):
         """
-        @brief Compute the error between the true solution and the numerical solution.
-
-        @param[in] u The true solution as a function.
-        @param[in] uh The numerical solution as an 2D array.
-        @param[in] errortype The error type, which can be 'all', 'max', 'L2' or 'H1'
+        @brief
         """
+        pass
 
-        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
-
-        h = self.h
-        nx = self.nx
-        ny = self.ny
-
-        e = u - uh
-
-        emax = np.max(np.abs(e))
-        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
-
-        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
-
-        return emax, e0, el2
-
-    def data_edge_to_cell(self, Ex, Ey):
-        """
-        @brief 把定义在边上的数组转换到单元上
-        """
-        dx = self.function(etype='cell')
-        dy = self.function(etype='cell')
-
-        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
-        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
-
-        return dx, dy
-
-    def function_remap(self, tmesh, p=2):
-        """
-        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
-
-        @example 
-        phi.flat[idxMap] = uh
-        """
-        nx = self.ds.nx
-        ny = self.ds.ny
-
-        NN = self.number_of_nodes()
-        idxMap = np.arange(NN)
-
-        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
-                ny+1, 2)
-        idxMap[idx] = range(tmesh.number_of_nodes())
-
-        return idxMap
-
-
-
-    def interpolation(self, f, intertype='node'):
-        """
-        This function is deprecated and will be removed in a future version.
-        Please use the interpolate() instead.
-        """
-        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
-                      "Please use the interpolate() instead.", DeprecationWarning)
-        nx = self.ds.nx
-        ny = self.ds.ny
-        node = self.node
-        if intertype == 'node':
-            F = f(node)
-        elif intertype == 'edge':
-            xbc, ybc = self.entity_barycenter('edge')
-            F = f(xbc), f(ybc)
-        elif intertype == 'edgex':
-            xbc = self.entity_barycenter('edgex')
-            F = f(xbc)
-        elif intertype == 'edgey':
-            ybc = self.entity_barycenter('edgey')
-            F = f(ybc)
-        elif intertype == 'cell':
-            bc = self.entity_barycenter('cell')
-            F = f(bc)
-        return F
-
-
-
-
-    def to_vtk_file(self, filename, celldata=None, nodedata=None):
-        """
-
-
-        """
-        from pyevtk.hl import gridToVTK
-
-        nx = self.ds.nx
-        ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
-               self.origin[1], self.origin[1] + ny*self.h[1]]
-	
-        x = np.linspace(box[0], box[1], nx+1)
-        y = np.linspace(box[2], box[3], ny+1)
-        z = np.zeros(1)
-        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
-
-        return filename
-
+    ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
     	"""
         @brief 均匀网格上的 fast sweeping method
@@ -605,15 +607,12 @@ class UniformMesh2d(Mesh2d):
     	phi[isNearNode] = np.abs(d) #界面附近的点用精确值
     	phi[~isNearNode] = m  # 其它点用一个比较大的值
     	
-    	
-    	
     	a = np.zeros(ns+1, dtype=np.float64)
     	b = np.zeros(ns+1, dtype=np.float64)
     	c = np.zeros(ns+1, dtype=np.float64)
     	d = np.zeros(int(k*ns+1), dtype=np.float64)
     	e = np.zeros(int(k*ns+1), dtype=np.float64)
     	f = np.zeros(int(k*ns+1), dtype=np.float64)
-    	
     	
     	n = 0
     	for i in range(1, int(k*ns+2)):
@@ -625,7 +624,6 @@ class UniformMesh2d(Mesh2d):
     	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
     	    n += 1
     	    
-    	    
     	for i in range(int(k*ns+1), 0, -1):
     	    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
     	    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
@@ -635,7 +633,6 @@ class UniformMesh2d(Mesh2d):
     	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
     	    n += 1
     	    
-    	    
     	for j in range(1, ns+2):
     	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
     	    e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
@@ -644,7 +641,6 @@ class UniformMesh2d(Mesh2d):
     	    f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
     	    phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
     	    n += 1
-    	    
     	    
     	for j in range(ns+1, 0, -1):
     	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
@@ -656,129 +652,127 @@ class UniformMesh2d(Mesh2d):
     	    n += 1
     	    
     	return sign*phi[1:-1, 1:-1]
+
+
+    """
+    Gird FEMInterface
+    """
+    ## @ingroup FEMInterface
+    def geo_dimension(self):
+        """
+        @brief Get the geometry dimension of the mesh.
         
-    
+        @return The geometry dimension (2 for 2D mesh).
+        """
+        return 2
+
+    ## @ingroup FEMInterface
+    def top_dimension(self):
+        """
+        @brief Get the topological dimension of the mesh.
         
+        @return The topological dimension (2 for 2D mesh).
+        """
+        return 2
+
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def integrator(self, q, etype='cell'):
+        return GaussLegendreQuadrature(q)
+
+    ## @ingroup FEMInterface
+    def bc_to_point(self, bc, index=np.s_[:]):
+        pass
+
+    ####=================================================#### 
+    ## @ingroup FEMInterface 
+    def entity(self, etype):
+        """
+        @brief Get the entity (either cell or node) based on the given entity type.
+
+        @param[in] etype The type of entity, either 'cell', 2, 'edge', 'face' or 1, `node', 0.
+
+        @return The cell, edeg, face, or node array based on the input entity type.
+
+        @throws ValueError if the given etype is invalid.
+        """
+        if etype in {'cell', 2}:
+            return self.ds.cell
+        elif etype in {'edge', 'face', 1}:
+            return self.ds.edge
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, 2) 
+        else:
+            raise ValueError("`etype` is wrong!")
+
+    ## @ingroup FEMInterface 
+    def entity_barycenter(self, etype):
+        """
+        @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
+
+        @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
+        1, 'node', or 0.
+
+        @return The cell or node array based on the input entity type.
+
+        @throws ValueError if the given etype is invalid.
+        """
+        if etype in {'cell', 2}:
+            return self.cell_barycenter().reshape(-1, 2)
+        elif etype in {'edge', 'face', 1}:
+            bcx, bcy = self.edge_barycenter()
+            return np.concatenate((bcx.reshape(-1, 2), bcy.reshape(-1, 2)), axis=0) 
+        elif etype in {'node', 0}:
+            return self.node.reshape(-1, 2)
+        else:
+            raise ValueError(f'the entity type `{etype}` is not correct!')
+
+    ## @ingroup FEMInterface
+    def entity_measure(self, etype):
+        """
+        @brief
+        """
+        pass
+
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def multi_index_matrix(self, p, etype=1):
+        pass
+
+    ## @ingroup FEMInterface
+    def shape_function(self, bc, p=1):
+        pass
+
+    ## @ingroup FEMInterface
+    def grad_shape_function(self, bc, p=1):
+        pass
+
+    ####=================================================#### 
+    ## @ingroup FEMInterface
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        pass
     
-    def interpolation_with_sample_points(self, x, y, alpha=[10, 0.001, 0.01, 0.1]):
-        '''!
-        @brief 将 x, y 插值为网格函数
-        @param x : 样本点
-        @param y : 样本点的值
-        '''
-        h, origin, nx, ny = self.h, self.origin, self.ds.nx, self.ds.ny
-        cell = self.entity('cell').reshape(nx, ny, 4)
+    ## @ingroup FEMInterface
+    def number_of_global_ipoints(self, p):
+        pass
 
-        NS = len(x) 
-        NN = self.number_of_nodes()
+    ## @ingroup FEMInterface
+    def interpolation_points(self, p):
+        pass
 
-        Xp = (x-origin)/h # (NS, 2)
-        cellIdx = Xp.astype(np.int_) # 样本点所在单元
-        val = Xp - cellIdx 
+    ## @ingroup FEMInterface
+    def node_to_ipoint(self, p):
+        pass
 
-        I = np.repeat(np.arange(NS), 4)
-        J = cell[cellIdx[:, 0], cellIdx[:, 1]]
-        data = np.zeros([NS, 4], dtype=np.float_)
-        data[:, 0] = (1-val[:, 0])*(1-val[:, 1])
-        data[:, 1] = (1-val[:, 0])*val[:, 1]
-        data[:, 2] = val[:, 0]*val[:, 1]
-        data[:, 3] = val[:, 0]*(1-val[:, 1])
+    ## @ingroup FEMInterface
+    def edge_to_ipoint(self, p):
+        pass
 
-        A = csr_matrix((data.flat, (I, J.flat)), (NS, NN), dtype=np.float_)
-        B = self.stiff_matrix()
-        C = self.nabla_2_matrix()
-        D = self.nabla_jump_matrix()
+    ## @ingroup FEMInterface
+    def face_to_ipoint(self, p):
+        pass
 
-        S = alpha[0]*A.T@A + alpha[1]*B + alpha[2]*C + alpha[3]*D
-        F = alpha[0]*A.T@y
-        f = spsolve(S, F).reshape(nx+1, ny+1)
-        return UniformMesh2dFunction(self, f)
-    def t2sidx(self):
-        """
-        @brief 已知结构三角形网格点的值，将其排列到结构四边形网格上
-        @example a[s2tidx] = uh
-        """
-        snx = self.ds.nx
-        sny = self.ds.ny
-        idx1= np.arange(0,sny+1,2)+np.arange(0,(sny+1)*(snx+1),2*(sny+1)).reshape(-1,1)
-        idx1 = idx1.flatten()
-        a = np.array([1,sny+1,sny+2])
-        b = np.arange(0,sny,2).reshape(-1,1)
-        c = np.append(a+b,[(sny+1)*2-1])
-        e = np.arange(0,(sny+1)*snx,2*(sny+1)).reshape(-1,1)
-        idx2 = (e+c).flatten()
-        idx3  = np.arange((sny+1)*snx+1,(snx+1)*(sny+1),2)
-        idx = np.r_[idx1,idx2,idx3]
-        return idx
-
-    def  s2tidx(self):
-    	"""
-    	@brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
-    	@example a[s2tidx] = uh
-    	"""
-    	tnx = int(self.ds.nx/2)
-    	tny = int(self.ds.ny/2)
-    	a = np.arange(tny+1)
-    	b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
-    	idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
-    	idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
-    	idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
-    	idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
-    	c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
-    	d = np.arange(tny)*3
-    	d = 3*np.arange(tny).reshape(-1,1)+c
-    	e = np.append(d.flatten(),[d.flatten()[-1]+1])
-    	idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
-    	
-    	idx = np.c_[idx1[:tnx],idx2]
-    	idx = np.append(idx.flatten(),[idx1[-1,:]])
-    	idx = idx.astype(int)
-    	return idx
-    	
-    	
-class UniformMesh2dFunction():
-    def __init__(self, mesh, f):
-        self.mesh = mesh # (nx+1, ny+1)
-        self.f = f   # (nx+1, ny+1)
-        self.fx, self.fy = mesh.gradient(f) 
-
-    def __call__(self, p):
-        mesh = self.mesh
-        F = mesh.value(p, self.f)
-        return F
-    
-    def value(self, p):
-        mesh = self.mesh
-        F = mesh.value(p, self.f)
-        return F
-
-    def gradient(self, p):
-        mesh = self.mesh
-        fx = self.fx
-        fy = self.fy
-        gf = np.zeros_like(p)
-        gf[..., 0] = mesh.value(p, fx)
-        gf[..., 1] = mesh.value(p, fy)
-        return gf
-        
-    def project(self, p):
-        """
-        @brief 把曲线附近的点投影到曲线上
-        """
-        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
-        return p, d 
-
-    @classmethod
-    def from_sample_points(self, x, y, nx=10, ny=10):
-        '''!
-        @param x, y : 样本点和值
-        '''
-        minx, miny = np.min(x[..., 0]), np.min(x[..., 1])
-        maxx, maxy = np.max(x[..., 0]), np.max(x[..., 1])
-
-        h = np.array([(maxx-minx)/nx, (maxy-miny)/ny])
-        mesh = UniformMesh2d([0, nx+1, 0, ny+1], h, np.array([minx, miny])) 
-        return mesh.interpolation_with_sample_points(x, y)
-
-
+    ## @ingroup FEMInterface
+    def cell_to_ipoint(self, p):
+        pass
 
