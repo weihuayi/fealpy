@@ -360,8 +360,7 @@ class FirstNedelecFiniteElementSpace2d:
                 M = np.einsum('i, ijkd, ijmd, j->jkm', c * ws, phi, phi,
                               self.cellmeasure, optimize=True)
             else:
-                M = np.einsum('i, ijdn, ijkn, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
-
+                M = np.einsum('i, ij, ijkd, ijmd, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
 
@@ -400,7 +399,7 @@ class FirstNedelecFiniteElementSpace2d:
             if isinstance(c, (int, float)):
                 M = np.einsum('i, ijk, ijm, j->jkm', c * ws, phi, phi, cellmeasure, optimize=True)
             else:
-                M = np.einsum('i, ij, ijk, ijm, j->jkm', ws, c, phi, phi, cellmeasure, optimize=True)
+                M = np.einsum('q, qc, qck..., qcm..., c->ckm', ws, c, phi, phi, cellmeasure, optimize=True)
 
         cell2dof = self.cell_to_dof()
         gdof = self.number_of_global_dofs()
@@ -443,7 +442,8 @@ class FirstNedelecFiniteElementSpace2d:
         measure = self.integralalg.edgemeasure[index]
         gdof = self.number_of_global_dofs()
         idx = edge2dof[index].reshape(-1)
-        uh[idx] = np.einsum('q, qe, e->e', ws, val, measure, optimize=True)
+        uh[idx] = np.einsum('q, qe, e->e', ws, val, measure, optimize=True)[:,
+                None]
         isDDof = np.zeros(gdof, dtype=np.bool_)
         isDDof[idx] = True
         return isDDof

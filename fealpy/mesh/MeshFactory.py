@@ -23,7 +23,7 @@ from .LagrangeTriangleMesh import LagrangeTriangleMesh
 
 from .distmesh import DistMesh2d
 
-from .interface_mesh_generator import InterfaceMesh2d
+#from .interface_mesh_generator import InterfaceMesh2d
 
 def write_to_vtu(fname, mesh, nodedata=None, celldata=None, p=1):
     if p == 1:
@@ -201,6 +201,7 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
     node[:, 0] = X.flatten()
     node[:, 1] = Y.flatten()
     NN = len(node)
+    print(N)
 
     idx = np.arange(N).reshape(nx+1, ny+1)
     if meshtype in {'tri', 'triangle'}:
@@ -251,7 +252,11 @@ def boxmesh2d(box, nx=10, ny=10, meshtype='tri', threshold=None,
         pnode, pcell, pcellLocation = mesh.to_polygonmesh()
         return PolygonMesh(pnode, pcell, pcellLocation)
     elif meshtype == 'noconvex':
-        mesh = StructureQuadMesh(box, nx, ny)
+        mesh0 = StructureQuadMesh(box, nx, ny)
+        node0 = mesh0.entity("node")
+        cell0 = mesh0.entity("cell")[:, [0, 2, 3, 1]]
+        mesh = QuadrangleMesh(node0, cell0)
+
         edge = mesh.entity("edge")
         node = mesh.entity("node")
         cell = mesh.entity("cell")

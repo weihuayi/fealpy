@@ -166,7 +166,7 @@ class NedelecDof():
         return NC*cdof+NE*edof+NF*fdof
 
 class SecondNedelecFiniteElementSpace3d():
-    def __init__(self, mesh, p, space=None):
+    def __init__(self, mesh, p, space=None, q = None):
         self.p = p
         self.mesh = mesh
         self.dof = NedelecDof(mesh, p)
@@ -177,7 +177,7 @@ class SecondNedelecFiniteElementSpace3d():
             self.lspace = space
 
         self.cellmeasure = mesh.entity_measure('cell')
-        self.integralalg = FEMeshIntegralAlg(mesh, p+3, cellmeasure=self.cellmeasure)
+        self.integralalg = FEMeshIntegralAlg(mesh, p+2, cellmeasure=self.cellmeasure)
         self.integrator = self.integralalg.integrator
 
     @barycentric
