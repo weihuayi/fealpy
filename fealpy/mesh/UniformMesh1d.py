@@ -217,7 +217,7 @@ class UniformMesh1d():
         if etype in {'cell', 1}:
             NN = self.NN
             NC = self.NC
-            cell = np.zeros((NC, 2), dtype=np.int)
+            cell = np.zeros((NC, 2), dtype=self.itype)
             cell[:, 0] = range(NC)
             cell[:, 1] = range(1, NN)
             return cell

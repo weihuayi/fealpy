@@ -164,17 +164,17 @@ class TriangleMesh(Mesh2d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index])
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
-    def grad_lambda(self):
+    def grad_lambda(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
-        NC = self.number_of_cells()
-        v0 = node[cell[:, 2]] - node[cell[:, 1]]
-        v1 = node[cell[:, 0]] - node[cell[:, 2]]
-        v2 = node[cell[:, 1]] - node[cell[:, 0]]
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
         GD = self.geo_dimension()
         nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
@@ -190,10 +190,9 @@ class TriangleMesh(Mesh2d):
             Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
             Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
             Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
-        self.glambda = Dlambda
         return Dlambda
 
-    def rot_lambda(self):
+    def rot_lambda(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()

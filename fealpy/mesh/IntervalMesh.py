@@ -7,20 +7,6 @@ from ..quadrature import GaussLegendreQuadrature
 
 class IntervalMesh():
     def __init__(self, node, cell):
-        """
-
-        Parameters
-        ----------
-        node : numpy.ndarray with shape (NN, 1)
-        cell : numpy.ndarray with shape (NC, 2)
-
-        See Also
-        --------
-
-        Notes
-        -----
-
-        """
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
         else:
@@ -31,33 +17,28 @@ class IntervalMesh():
 
         self.nodedata = {}
         self.celldata = {}
-        self.edgedata = self.celldata # Notice celldata, edgedata, facedta are  
-        self.facedata = self.celldata # same thing.
+        self.edgedata = self.celldata # celldata and edgedata are the same thing
+        self.facedata = self.nodedata # facedata and nodedata are the same thing 
 
         self.itype = cell.dtype
         self.ftype = node.dtype
 
 
     def integrator(self, k, etype='cell'):
-        """
-
-        Notes
-        -----
-            返回第 k 个高斯积分公式。
-        """
         return GaussLegendreQuadrature(k)
 
     def number_of_nodes(self):
         return self.ds.NN
 
-    def number_of_cells(self):
-        return self.ds.NC
+    def number_of_faces(self):
+        return self.ds.NN
 
     def number_of_edges(self):
         return self.ds.NC
 
-    def number_of_faces(self):
-        return self.ds.NN
+    def number_of_cells(self):
+        return self.ds.NC
+
 
     def number_of_entities(self, etype):
         if etype in {'cell', 'edge', 1}:
@@ -65,7 +46,7 @@ class IntervalMesh():
         elif etype in {'node', 'face', 0}:
             return self.ds.NN
         else:
-            raise ValueError("`dim` must be 0 or 1!")
+            raise ValueError(f"etype {etype} must be 0 or 1!") #TODO
 
     def entity(self, etype=1):
         if etype in {'cell', 'edge', 1}:
@@ -168,8 +149,8 @@ class IntervalMesh():
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index])
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
     def grad_lambda(self, index=np.s_[:]):
@@ -178,7 +159,7 @@ class IntervalMesh():
         """
         node = self.entity('node')
         cell = self.entity('cell')
-        NC = self.number_of_cells()
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
         v = node[cell[index, 1]] - node[cell[index, 0]]
         GD = self.geo_dimension()
         Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
