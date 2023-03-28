@@ -666,7 +666,7 @@ class UniformMesh3d(Mesh3d):
 
     ## @ingroup FEMInterface
     def top_dimension(self):
-         """
+        """
         @brief Get the topological dimension of the mesh.
          
         @return The topological dimension (3 for 3D mesh).
@@ -768,3 +768,4 @@ class UniformMesh3d(Mesh3d):
 
     ## @ingroup FEMInterface
     def cell_to_ipoint(self, p):
+        pass
