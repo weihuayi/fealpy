@@ -1,13 +1,18 @@
 import numpy as np
 import warnings
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
-from .mesh_tools import find_node, find_entity, show_mesh_1d
 from types import ModuleType
 from typing import Tuple 
 
+# 这个数据结构为有限元接口服务
+from ..quadrature import GaussLegendreQuadrature
 from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
+from .mesh_tools import find_node, find_entity, show_mesh_1d
 
 
+## @defgroup FEMInterface 
+## @defgroup FDMInterface
+## @defgroup GeneralInterface
 class UniformMesh1d():
     """
     @brief A class for representing a uniformly partitioned one-dimensional mesh.
@@ -63,6 +68,7 @@ class UniformMesh1d():
         # Data structure for finite element computation
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
+    ## @ingroup FEMInterface
     def geo_dimension(self):
         """
         @brief Get the geometry dimension of the mesh.
@@ -71,6 +77,7 @@ class UniformMesh1d():
         """
         return 1
 
+    ## @ingroup FEMInterface
     def top_dimension(self):
         """
         @brief Get the topological dimension of the mesh.
@@ -79,6 +86,7 @@ class UniformMesh1d():
         """
         return 1
 
+    ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
         @brief Get the number of nodes in the mesh.
@@ -87,6 +95,16 @@ class UniformMesh1d():
         """
         return self.NN
 
+    ## @ingroup FEMInterface 
+    def number_of_faces(self):
+        """
+        @brief Get the number of nodes in the mesh.
+
+        @return The number of nodes.
+        """
+        return self.NN
+
+    ## @ingroup GeneralInterface
     def number_of_cells(self):
         """
         @brief Get the number of cells in the mesh.
@@ -95,6 +113,7 @@ class UniformMesh1d():
         """
         return self.NC
 
+    ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, returnim=False):
         """
         @brief Perform a uniform refinement of the mesh.
@@ -120,6 +139,7 @@ class UniformMesh1d():
         if returnim:
             return nodeImatrix
 
+    ## @ingroup FDMInterface
     @property
     def node(self):
         """
@@ -130,12 +150,59 @@ class UniformMesh1d():
         @details This function calculates the coordinates of the nodes in the mesh based on the
                  mesh's origin, step size, and the number of cells in the x directions.
                  It returns a NumPy array with the coordinates of each node.
+        @note 约定有限差分调用这个接口
         """
         GD = self.geo_dimension()
         nx = self.nx
         node = np.linspace(self.origin, self.origin + nx * self.h, nx+1)
         return node
 
+    ## @ingroup FDMInterface
+    def cell_barycenter(self):
+        """
+        """
+        nx = self.nx
+        box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
+        bc = np.linspace(box[0], box[1], nx)
+        return bc
+
+    ## @ingroup FEMInterface
+    def integrator(self, q, etype='cell'):
+        return GaussLegendreQuadrature(q)
+
+    ## @ingroup FEMInterface
+    def bc_to_point(self, bc, index=np.s_[:]):
+        pass
+
+    ## @ingroup FEMInterface
+    def shape_function(self, bc, p=1):
+        pass
+
+    ## @ingroup FEMInterface
+    def grad_shape_function(self, bc, p=1):
+        pass
+
+    ## @ingroup FEMInterface
+    def multi_index_matrix(self, p, etype=1):
+        pass
+
+    ## @ingroup FEMInterface
+    def cell_to_ipoint(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def interpolation_points(self, p):
+        pass
+
+    ## @ingroup FEMInterface
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        pass
+    
+    ## @ingroup FEMInterface
+    def number_of_global_ipoints(self, p):
+        pass
+
+    ## @ingroup FEMInterface
     def entity(self, etype):
         """
         @brief Get the entity (either cell or node) based on the given entity type.
@@ -145,6 +212,7 @@ class UniformMesh1d():
         @return The cell or node array based on the input entity type.
 
         @throws ValueError if the given etype is invalid.
+        @note 约定有限元方法调用这个接口
         """
         if etype in {'cell', 1}:
             NN = self.NN
@@ -154,10 +222,11 @@ class UniformMesh1d():
             cell[:, 1] = range(1, NN)
             return cell
         elif etype in {'node', 'face', 0}:
-            return self.node
+            return self.node.reshape(-1, 1)
         else:
             raise ValueError("`etype` is wrong!")
 
+    ## @ingroup FEMInterface
     def entity_barycenter(self, etype):
         """
         @brief Calculate the barycenter of the specified entity.
@@ -167,18 +236,16 @@ class UniformMesh1d():
         @return The barycenter of the given entity type.
 
         @throws ValueError if the given etype is invalid.
+        @note 有限元调用的接口
         """
-        GD = self.geo_dimension()
-        nx = self.nx
         if etype in {'cell', 1}:
-            box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
-            bc = np.linspace(box[0], box[1], nx)
-            return bc
+            return self.cell_barycenter().reshape(-1, 1)
         elif etype in {'node', 0}:
-            return self.node
+            return self.node.reshape(-1, 1)
         else:
-            raise ValueError('the entity type `{}` is not correct!'.format(etype))
+            raise ValueError(f'the entity type `{}` is not correct!'.format(etype))
 
+    ## @ingroup FDMInterface
     def function(self, etype='node', dtype=None, ex=0):
         """
         @brief Returns an array defined on nodes or cells with all elements set to 0.
@@ -201,6 +268,7 @@ class UniformMesh1d():
             raise ValueError('the entity `{}` is not correct!'.format(entity))
         return uh
 
+    ## @ingroup FDMInterface
     def interpolation(self, f, intertype='node'):
         """
         This function is deprecated and will be removed in a future version.
@@ -217,6 +285,7 @@ class UniformMesh1d():
             F = f(bc)
         return F
 
+    ## @ingroup FDMInterface
     def interpolate(self, f, intertype='node'):
         """
         @brief Interpolate the given function f on the mesh based on the specified interpolation type.
@@ -237,6 +306,7 @@ class UniformMesh1d():
             F = f(bc)
         return F
 
+    ## @ingroup FDMInterface
     def error(self, u, uh, errortype='all'):
         """
         @brief Compute the error between the true solution and the numerical solution.
@@ -270,6 +340,7 @@ class UniformMesh1d():
             e1 = np.sqrt(np.sum(de ** 2) / h + e0 ** 2)
             return e1
 
+    ## @ingroup FDMInterface
     def elliptic_operator(self, d=1, c=None, r=None):
         """
         @brief Assemble the finite difference matrix for a general elliptic operator.
@@ -320,6 +391,7 @@ class UniformMesh1d():
 
         return A
 
+    ## @ingroup FDMInterface
     def laplace_operator(self):
         """
         @brief Assemble the finite difference matrix for the Laplace operator u''.
@@ -341,6 +413,7 @@ class UniformMesh1d():
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A
 
+    ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, uh, A, f):
         """
         @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
@@ -360,6 +433,7 @@ class UniformMesh1d():
         return A, f
 
 
+    ## @ingroup FDMInterface
     def wave_equation(self, r, theta):
         n0 = self.NC -1
         A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
@@ -371,6 +445,7 @@ class UniformMesh1d():
 
         return A0, A1, A2
 
+    ## @ingroup GeneralInterface
     def show_function(self, plot, uh):
         """
         @brief 画出定义在网格上的离散函数
@@ -385,6 +460,7 @@ class UniformMesh1d():
         line = axes.plot(node, uh)
         return line
 
+    ## @ingroup GeneralInterface
     def show_animation(self, fig, axes, box, forward, fname='test.mp4',
                        init=None, fargs=None,
                        frames=1000, lw=2, interval=50):
@@ -414,6 +490,7 @@ class UniformMesh1d():
                                       interval=interval)
         ani.save(fname)
 
+    ## @ingroup GeneralInterface
     def add_plot(self, plot,
             nodecolor='k', cellcolor='k',
             aspect='equal', linewidths=1, markersize=20,
@@ -430,6 +507,7 @@ class UniformMesh1d():
                 linewidths=linewidths, markersize=markersize,
                 showaxis=showaxis)
 
+    ## @ingroup GeneralInterface
     def find_node(self, axes, node=None,
             index=None, showindex=False,
             color='r', markersize=100,
@@ -443,6 +521,7 @@ class UniformMesh1d():
                 color=color, markersize=markersize,
                 fontsize=fontsize, fontcolor=fontcolor)
 
+    ## @ingroup GeneralInterface
     def find_cell(self, axes,
             index=None, showindex=False,
             color='g', markersize=150,

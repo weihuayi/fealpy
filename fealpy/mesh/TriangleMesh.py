@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
 from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
@@ -1340,6 +1341,8 @@ class TriangleMesh(Mesh2d):
         -----
         线性元的刚度矩阵
         """
+        warnings.warn("The linear_stiff_matrix() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
 
         NN = self.number_of_nodes()
 
