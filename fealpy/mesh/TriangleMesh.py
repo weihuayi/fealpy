@@ -131,13 +131,9 @@ class TriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def grad_shape_function(self, bc, index=np.s_[:], p=None):
-
-        if p is None:
-            p= self.p
+    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
 
         TD = self.top_dimension()
-
         multiIndex = self.multi_index_matrix(p)
 
         c = np.arange(1, p+1, dtype=self.itype)
@@ -295,7 +291,6 @@ class TriangleMesh(Mesh2d):
             return multiIndex
 
     def number_of_local_ipoints(self, p, iptype='cell'):
-        p = self.p
         if iptype in {'cell', 2}:
             return (p+1)*(p+2)//2 
         elif iptype in {'face', 'edge',  1}:
@@ -304,14 +299,10 @@ class TriangleMesh(Mesh2d):
             return 1
     
     def number_of_global_ipoints(self, p):
-        NP = self.number_of_nodes()
-        if p > 1:
-            NE = self.number_of_edges()
-            NP += (p-1)*NE
-        if p > 2:
-            NC = self.number_of_cells()
-            NP += (p-2)*(p-1)*NC//2
-        return NP
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-2)*(p-1)/2*NC
     
     def interpolation_points(self, p):
         """
@@ -382,6 +373,7 @@ class TriangleMesh(Mesh2d):
 
             isEdgeIPoint = self.multi_index_matrix(p, 'cell') == 0
             edge2ipoint = self.edge_to_ipoint(p)
+            
 
             cell2edgeSign = self.ds.cell_to_edge_sign()
             cell2edge = self.ds.cell_to_edge()
