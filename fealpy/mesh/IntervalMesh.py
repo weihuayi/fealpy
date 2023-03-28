@@ -27,6 +27,12 @@ class IntervalMesh():
     def integrator(self, k, etype='cell'):
         return GaussLegendreQuadrature(k)
 
+    def geo_dimension(self):
+        return self.node.shape[-1]
+
+    def top_dimension(self):
+        return 1
+
     def number_of_nodes(self):
         return self.ds.NN
 
@@ -39,7 +45,6 @@ class IntervalMesh():
     def number_of_cells(self):
         return self.ds.NC
 
-
     def number_of_entities(self, etype):
         if etype in {'cell', 'edge', 1}:
             return self.ds.NC
@@ -48,51 +53,54 @@ class IntervalMesh():
         else:
             raise ValueError(f"etype {etype} must be 0 or 1!") #TODO
 
+    def bc_to_point(self, bc, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            把重心坐标转换为实际空间坐标
+        """
+        node = self.node if node is None else node
+        cell = self.entity('cell')
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
+        return p
+
     def entity(self, etype=1):
         if etype in {'cell', 'edge', 1}:
             return self.ds.cell
         elif etype in {'node', 'face', 0}:
             return self.node
         else:
-            raise ValueError("`entitytype` is wrong!")
+            raise ValueError("`entitytype` is wrong!")#TODO
 
-    def vtk_cell_type(self):
-        VTK_LINE = 3
-        return VTK_LINE
-
-    def to_vtk(self, etype='edge', index=np.s_[:], fname=None):
+    def entity_measure(self, etype=1, index=np.s_[:], node=None):
         """
+        """
+        if etype in {1, 'cell', 'edge'}:
+            return self.cell_length(index=index, node=None)
+        elif etype in {0, 'face', 'node'}:
+            return 0
+        else:
+            raise ValueError("`etype` is wrong!")
 
-        Parameters
-        ----------
+    def entity_barycenter(self, etype=1, index=np.s_[:], node=None):
+        """
 
         Notes
         -----
-        把网格转化为 VTK 的格式
+            返回网格实体的重心坐标。
+
+            注意，这里用户可以提供一个新个网格节点数组。
         """
-        from .vtk_extent import vtk_cell_index, write_to_vtu
-
-        node = self.entity('node')
-        GD = self.geo_dimension()
-        if GD < 3:
-            node = np.c_[node, np.zeros((node.shape[0], 3-GD))]
-
-        cell = self.entity(etype)[index]
-        NV = cell.shape[-1]
-        NC = len(cell)
-
-        cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
-        cell[:, 0] = NV
-
-        cellType = self.vtk_cell_type()  # segment 
-
-        if fname is None:
-            return node, cell.flatten(), cellType, NC 
+        node = self.entity('node') if node is None else node
+        if etype in {1, 'cell',  'edge'}:
+            cell = self.ds.cell
+            bc = np.sum(node[cell[index]], axis=1)/cell.shape[-1]
+        elif etype in {'node', 'face', 0}:
+            bc = node[index]
         else:
-            print("Writting to vtk...")
-            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
-                    nodedata=self.nodedata,
-                    celldata=self.celldata)
+            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+        return bc
 
     def shape_function(self, bc, p=1):
         """
@@ -113,9 +121,6 @@ class IntervalMesh():
         return phi
 
     def grad_shape_function(self, bc, p=1, index=np.s_[:]):
-
-        if p is None:
-            p= self.p
 
         TD = self.top_dimension()
 
@@ -165,44 +170,70 @@ class IntervalMesh():
         Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
         h2 = np.sum(v**2, axis=-1)
         v /=h2.reshape(-1, 1)
-        Dlambda[index, 0, :] = -v
-        Dlambda[index, 1, :] = v
+        Dlambda[:, 0, :] = -v
+        Dlambda[:, 1, :] = v
         return Dlambda
 
-    def geo_dimension(self):
-        return self.node.shape[-1]
-
-    def top_dimension(self):
-        return 1
-
-    def entity_measure(self, etype=1, index=np.s_[:], node=None):
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        if iptype in {'cell', 'edge', 1}:
+            return p+1 
+        elif iptype in {'node', 'face', 0}:
+            return 1
+    
+    def number_of_global_ipoints(self, p):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NC
+    
+    def interpolation_points(self, p):
         """
+        @brief 获取三角形网格上所有 p 次插值点
         """
-        if etype in {1, 'cell', 'edge'}:
-            return self.cell_length(index=index, node=None)
-        elif etype in {0, 'face', 'node'}:
-            return 0
-        else:
-            raise ValueError("`etype` is wrong!")
+        cell = self.entity('cell')
+        node = self.entity('node')
+        if p == 1:
+            return node
 
-    def entity_barycenter(self, etype=1, index=np.s_[:], node=None):
+
+    def vtk_cell_type(self):
+        VTK_LINE = 3
+        return VTK_LINE
+
+    def to_vtk(self, etype='edge', index=np.s_[:], fname=None):
         """
+
+        Parameters
+        ----------
 
         Notes
         -----
-            返回网格实体的重心坐标。
-
-            注意，这里用户可以提供一个新个网格节点数组。
+        把网格转化为 VTK 的格式
         """
-        node = self.entity('node') if node is None else node
-        if etype in {1, 'cell',  'edge'}:
-            cell = self.ds.cell
-            bc = np.sum(node[cell[index]], axis=1)/cell.shape[-1]
-        elif etype in {'node', 'face', 0}:
-            bc = node[index]
+        from .vtk_extent import vtk_cell_index, write_to_vtu
+
+        node = self.entity('node')
+        GD = self.geo_dimension()
+        if GD < 3:
+            node = np.c_[node, np.zeros((node.shape[0], 3-GD))]
+
+        cell = self.entity(etype)[index]
+        NV = cell.shape[-1]
+        NC = len(cell)
+
+        cell = np.c_[np.zeros((NC, 1), dtype=cell.dtype), cell]
+        cell[:, 0] = NV
+
+        cellType = self.vtk_cell_type()  # segment 
+
+        if fname is None:
+            return node, cell.flatten(), cellType, NC 
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
-        return bc
+            print("Writting to vtk...")
+            write_to_vtu(fname, node, NC, cellType, cell.flatten(),
+                    nodedata=self.nodedata,
+                    celldata=self.celldata)
+
+
 
     def cell_length(self, index=np.s_[:], node=None):
         """
@@ -217,17 +248,6 @@ class IntervalMesh():
         return np.sqrt(np.sum((node[cell[index, 1]] - node[cell[index, 0]])**2,
                         axis=-1))
 
-    def bc_to_point(self, bc, index=np.s_[:], node=None):
-        """
-
-        Notes
-        -----
-            把重心坐标转换为实际空间坐标
-        """
-        node = self.node if node is None else node
-        cell = self.entity('cell')
-        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
-        return p
 
     def cell_normal(self, index=np.s_[:], node=None):
         """

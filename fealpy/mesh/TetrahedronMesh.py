@@ -169,18 +169,18 @@ class TetrahedronMesh(Mesh3d):
             multiIndex[:, 1] = p - multiIndex[:, 0]
             return multiIndex
 
-    def grad_lambda(self):
+    def grad_lambda(self, index=np.s_[:]):
         localFace = self.ds.localFace
         node = self.node
         cell = self.ds.cell
-        NC = self.number_of_cells()
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
         Dlambda = np.zeros((NC, 4, 3), dtype=self.ftype)
-        volume = self.cell_volume()
+        volume = self.entity_measure('cell', index=index)
         for i in range(4):
             j,k,m = localFace[i]
-            vjk = node[cell[:,k],:] - node[cell[:,j],:]
-            vjm = node[cell[:,m],:] - node[cell[:,j],:]
-            Dlambda[:,i,:] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
+            vjk = node[cell[index, k],:] - node[cell[index, j],:]
+            vjm = node[cell[index, m],:] - node[cell[index, j],:]
+            Dlambda[:, i, :] = np.cross(vjm, vjk)/(6*volume.reshape(-1, 1))
         return Dlambda
 
     def shape_function(self, bc, p=1):
@@ -235,8 +235,8 @@ class TetrahedronMesh(Mesh3d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index])
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
     def interpolation_points(self, p):
@@ -481,19 +481,6 @@ class TetrahedronMesh(Mesh3d):
             return VTK_LINE
 
     def to_vtk(self, etype='cell', index=np.s_[:], fname=None):
-        """
-
-        Parameters
-        ----------
-        points: vtkPoints object
-        cells:  vtkCells object
-        pdata:  
-        cdata:
-
-        Notes
-        -----
-        把网格转化为 VTK 的格式
-        """
         from .vtk_extent import vtk_cell_index, write_to_vtu
 
         node = self.entity('node')
@@ -525,16 +512,6 @@ class TetrahedronMesh(Mesh3d):
                     celldata=celldata)
 
     def location(self, points):
-        """
-        @brief 计算给定点所在的四面体单元
-
-        这里假设：
-
-        1. 网格中没有洞
-        2. 区域还要是凸的
-
-        """
-
 
         NN = self.number_of_nodes()
         NC = self.number_of_cells()

@@ -195,27 +195,23 @@ class TriangleMesh(Mesh2d):
     def rot_lambda(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
-        NC = self.number_of_cells()
-        v0 = node[cell[:, 2], :] - node[cell[:, 1], :]
-        v1 = node[cell[:, 0], :] - node[cell[:, 2], :]
-        v2 = node[cell[:, 1], :] - node[cell[:, 0], :]
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2], :] - node[cell[index, 1], :]
+        v1 = node[cell[index, 0], :] - node[cell[index, 2], :]
+        v2 = node[cell[index, 1], :] - node[cell[index, 0], :]
         GD = self.geo_dimension()
         nv = np.cross(v2, -v1)
         Rlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
         if GD == 2:
             length = nv
-            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
         elif GD == 3:
-            length = np.sqrt(np.square(nv).sum(axis=1))
-            Rlambda[:,0,:] = v0/length.reshape((-1, 1))
-            Rlambda[:,1,:] = v1/length.reshape((-1, 1))
-            Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+            length = np.sqrt(np.sum(nv**2, axis=-1))
+
+        Rlambda[:,0,:] = v0/length.reshape((-1, 1))
+        Rlambda[:,1,:] = v1/length.reshape((-1, 1))
+        Rlambda[:,2,:] = v2/length.reshape((-1, 1))
+
         return Rlambda
-
-
-
 
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
