@@ -9,13 +9,14 @@ class DiffusionIntegrator:
         self.coef = c
         self.q = q
 
-    def assembly_cell_matrix(self, space0, _, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
+            out=None):
         """
         @note 没有参考单元的组装方式
         """
         coef = self.coef
         q = self.q
-        mesh = space0.mesh
+        mesh = space.mesh
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
         if cellmeasure is None:

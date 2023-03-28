@@ -128,9 +128,22 @@ class UniformMesh2d(Mesh2d):
                  interpolation matrices for each iteration.
         
         """
+<<<<<<< HEAD
         pass 
 
     ## @ingroup GeneralInterface
+=======
+        for i in range(n):
+            self.extent = [i * 2 for i in self.extent]
+            self.h = [i / 2 for i in self.h]
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+
+            self.NC = self.nx * self.ny
+            self.NN = (self.nx + 1) * (self.ny + 1)
+            self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
+
+>>>>>>> upstream/master
     def cell_area(self):
         """
         @brief 返回单元的面积，注意这里只返回一个值（因为所有单元面积相同）
@@ -577,7 +590,101 @@ class UniformMesh2d(Mesh2d):
         """
         pass
 
+<<<<<<< HEAD
     ## @ingroup FDMInterface
+=======
+        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
+
+        h = self.h
+        nx = self.nx
+        ny = self.ny
+
+        e = u - uh
+
+        emax = np.max(np.abs(e))
+        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+
+        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
+
+        return emax, e0, el2
+
+    def data_edge_to_cell(self, Ex, Ey):
+        """
+        @brief 把定义在边上的数组转换到单元上
+        """
+        dx = self.function(etype='cell')
+        dy = self.function(etype='cell')
+
+        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
+        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
+
+        return dx, dy
+
+    def function_remap(self, tmesh, p=2):
+        """
+        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
+
+        @example 
+        phi.flat[idxMap] = uh
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        NN = self.number_of_nodes()
+        idxMap = np.arange(NN)
+
+        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
+                ny+1, 2)
+        idxMap[idx] = range(tmesh.number_of_nodes())
+
+        return idxMap
+
+    def interpolation(self, f, intertype='node'):
+        """
+        This function is deprecated and will be removed in a future version.
+        Please use the interpolate() instead.
+        """
+        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'edge':
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype == 'edgex':
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype == 'edgey':
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
+
+    def to_vtk_file(self, filename, celldata=None, nodedata=None):
+        """
+
+
+        """
+        from pyevtk.hl import gridToVTK
+
+        nx = self.ds.nx
+        ny = self.ds.ny
+        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+               self.origin[1], self.origin[1] + ny*self.h[1]]
+	
+        x = np.linspace(box[0], box[1], nx+1)
+        y = np.linspace(box[2], box[3], ny+1)
+        z = np.zeros(1)
+        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
+
+        return filename
+
+>>>>>>> upstream/master
     def fast_sweeping_method(self, phi0):
     	"""
         @brief 均匀网格上的 fast sweeping method
@@ -652,6 +759,7 @@ class UniformMesh2d(Mesh2d):
     	    n += 1
     	    
     	return sign*phi[1:-1, 1:-1]
+<<<<<<< HEAD
 
 
     """
@@ -771,6 +879,84 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FEMInterface
     def face_to_ipoint(self, p):
         pass
+=======
+
+    def t2sidx(self):
+        """
+        @brief 已知结构三角形网格点的值，将其排列到结构四边形网格上
+        @example a[s2tidx] = uh
+        """
+        snx = self.ds.nx
+        sny = self.ds.ny
+        idx1= np.arange(0,sny+1,2)+np.arange(0,(sny+1)*(snx+1),2*(sny+1)).reshape(-1,1)
+        idx1 = idx1.flatten()
+        a = np.array([1,sny+1,sny+2])
+        b = np.arange(0,sny,2).reshape(-1,1)
+        c = np.append(a+b,[(sny+1)*2-1])
+        e = np.arange(0,(sny+1)*snx,2*(sny+1)).reshape(-1,1)
+        idx2 = (e+c).flatten()
+        idx3  = np.arange((sny+1)*snx+1,(snx+1)*(sny+1),2)
+        idx = np.r_[idx1,idx2,idx3]
+        return idx
+
+    def  s2tidx(self):
+    	"""
+    	@brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
+    	@example a[s2tidx] = uh
+    	"""
+    	tnx = int(self.ds.nx/2)
+    	tny = int(self.ds.ny/2)
+    	a = np.arange(tny+1)
+    	b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
+    	idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
+    	idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
+    	idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
+    	idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
+    	c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
+    	d = np.arange(tny)*3
+    	d = 3*np.arange(tny).reshape(-1,1)+c
+    	e = np.append(d.flatten(),[d.flatten()[-1]+1])
+    	idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
+    	
+    	idx = np.c_[idx1[:tnx],idx2]
+    	idx = np.append(idx.flatten(),[idx1[-1,:]])
+    	idx = idx.astype(int)
+    	return idx
+    	
+    	
+class UniformMesh2dFunction():
+    def __init__(self, mesh, f):
+        self.mesh = mesh # (nx+1, ny+1)
+        self.f = f   # (nx+1, ny+1)
+        self.fx, self.fy = mesh.gradient(f) 
+
+    def __call__(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
+    
+    def value(self, p):
+        mesh = self.mesh
+        F = mesh.value(p, self.f)
+        return F
+
+    def gradient(self, p):
+        mesh = self.mesh
+        fx = self.fx
+        fy = self.fy
+        gf = np.zeros_like(p)
+        gf[..., 0] = mesh.value(p, fx)
+        gf[..., 1] = mesh.value(p, fy)
+        return gf
+        
+    def project(self, p):
+        """
+        @brief 把曲线附近的点投影到曲线上
+        """
+        p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
+        return p, d 
+
+>>>>>>> upstream/master
 
     ## @ingroup FEMInterface
     def cell_to_ipoint(self, p):

@@ -44,14 +44,23 @@ class BilinearForm:
         @brief 数值积分组装
         """
         space = self.space
-        integrator  = self.dintegrators[0]
-        M = integrator.assembly_cell_matrix(space)
+        mesh = space.mesh
 
-        gdof = space.number_of_global_dofs()
-        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+        if isinstance(space, tuple) and len(space) > 1:
+            pass
+        else:
+            ldof = space.number_of_local_dofs()
+            NC = mesh.number_of_cells() 
+            M = np.zeros((NC, ldof, ldof), dtype=mesh.ftype)
+            for inte in self.dintegrators:
+                inte.assembly_cell_matrix(space, out=M)
 
-        self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            cell2dof = space.cell_to_dof()
+            I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+            J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+            gdof = space.number_of_global_dofs()
+            self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
 
     def fast_assembly(self):

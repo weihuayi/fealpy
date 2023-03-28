@@ -1015,6 +1015,3 @@ class UniformMesh3d(Mesh3d):
 
     ## @ingroup FEMInterface
     def cell_to_ipoint(self, p):
-        pass
-
-

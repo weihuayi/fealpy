@@ -44,7 +44,7 @@ class StructureMesh3dDataStructure():
         idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
         c = idx[:-1, :-1, :-1]
 
-        cell = np.zeros((NC, 8), dtype=np.int)
+        cell = np.zeros((NC, 8), dtype=np.int_)
         nyz = (ny + 1) * (nz + 1)
         cell[:, 0] = c.flatten()
         cell[:, 1] = cell[:, 0] + 1
@@ -68,7 +68,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
-        face = np.zeros((NF, 4), dtype=np.int)
+        face = np.zeros((NF, 4), dtype=np.int_)
 
         NF0 = 0
         NF1 = (nx + 1) * ny * nz
@@ -88,7 +88,7 @@ class StructureMesh3dDataStructure():
         face[NF0:NF1, 3] = face[NF0:NF1, 2] + 1
         NF2 = NF0 + ny * nz
         N = nz * (ny + 1)
-        idx1 = np.zeros((nx, nz), dtype=np.int)
+        idx1 = np.zeros((nx, nz), dtype=np.int_)
         idx1 = np.arange(NF2, NF2 + nz)
         idx1 = idx1 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx1 = idx1.flatten()
@@ -102,7 +102,7 @@ class StructureMesh3dDataStructure():
         face[NF0:NF1, 2] = face[NF0:NF1, 0] + (ny + 1) * (nz + 1)
         face[NF0:NF1, 3] = face[NF0:NF1, 2] + nz + 1
         N = ny * (nz + 1)
-        idx2 = np.zeros((nx, ny), dtype=np.int)
+        idx2 = np.zeros((nx, ny), dtype=np.int_)
         idx2 = np.arange(NF0, NF0 + ny * (nz + 1), nz + 1)
         idx2 = idx2 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx2 = idx2.flatten()
@@ -120,7 +120,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         idx = np.arange(NC).reshape(nx, ny, nz)
-        face2cell = np.zeros((NF, 4), dtype=np.int)
+        face2cell = np.zeros((NF, 4), dtype=np.int_)
 
         # x direction
         NF0 = 0
@@ -186,7 +186,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         idx = np.arange(NN).reshape(nx + 1, ny + 1, nz + 1)
-        edge = np.zeros((NE, 2), dtype=np.int)
+        edge = np.zeros((NE, 2), dtype=np.int_)
 
         NE0 = 0
         NE1 = nx * (ny + 1) * (nz + 1)
@@ -220,7 +220,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
 
-        cell2edge = np.zeros((NC, 12), dtype=np.int)
+        cell2edge = np.zeros((NC, 12), dtype=np.int_)
 
         idx0 = np.arange(nx * (ny + 1) * (nz + 1)).reshape(nx, ny + 1, nz + 1)
         cell2edge[:, 0] = idx0[:, :-1, :-1].flatten()
@@ -290,7 +290,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
 
-        cell2face = np.zeros((NC, 6), dtype=np.int)
+        cell2face = np.zeros((NC, 6), dtype=np.int_)
 
         # x direction
         idx0 = np.arange((nx + 1) * ny * nz).reshape(nx + 1, ny, nz)
@@ -324,7 +324,7 @@ class StructureMesh3dDataStructure():
         ny = self.ny
         nz = self.nz
         idx = np.arange(NC).reshape(nx, ny, nz)
-        cell2cell = np.zeros((NC, 6), dtype=np.int)
+        cell2cell = np.zeros((NC, 6), dtype=np.int_)
 
         # x direction
         NE0 = 0
@@ -337,13 +337,13 @@ class StructureMesh3dDataStructure():
 
         # y direction
         N = ny * nz
-        idx0 = np.zeros((nx, nz), dtype=np.int)
+        idx0 = np.zeros((nx, nz), dtype=np.int_)
         idx0 = np.arange(NE0, NE0 + nz)
         idx0 = idx0 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx0 = idx0.flatten()
 
         NE1 = NE0 + nz * (ny - 1)
-        idx1 = np.zeros((nx, nz), dtype=np.int)
+        idx1 = np.zeros((nx, nz), dtype=np.int_)
         idx1 = np.arange(NE1, NE1 + nz)
         idx1 = idx1 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx1 = idx1.flatten()
@@ -358,13 +358,13 @@ class StructureMesh3dDataStructure():
 
         # z direction
         N = ny * nz
-        idx2 = np.zeros((nx, ny), dtype=np.int)
+        idx2 = np.zeros((nx, ny), dtype=np.int_)
         idx2 = np.arange(NE0, NE0 + N, nz)
         idx2 = idx2 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx2 = idx2.flatten()
 
         NE1 = NE0 + (nz - 1)
-        idx3 = np.zeros((nx, ny), dtype=np.int)
+        idx3 = np.zeros((nx, ny), dtype=np.int_)
         idx3 = np.arange(NE1, NE1 + N, nz)
         idx3 = idx3 + np.arange(0, N * nx, N).reshape(nx, 1)
         idx3 = idx3.flatten()
@@ -405,7 +405,7 @@ class StructureMesh3dDataStructure():
         nx = self.nx
         ny = self.ny
         nz = self.nz
-        face2edge = np.zeros((NF, 4), dtype=np.int)
+        face2edge = np.zeros((NF, 4), dtype=np.int_)
 
         # x direction
         NE0 = 0
@@ -574,8 +574,8 @@ class StructureMesh3dDataStructure():
         J = np.repeat(range(NC), V)
 
         if return_local_index == True:
-            val = ranges(V * np.ones(NC, dtype=np.int), start=1)
-            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int)
+            val = ranges(V * np.ones(NC, dtype=np.int_), start=1)
+            node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.int_)
         else:
             val = np.ones(V * NC, dtype=np.bool_)
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=np.bool_)

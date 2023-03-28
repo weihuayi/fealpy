@@ -28,6 +28,23 @@ import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
+from mumps import DMumpsContext
+from scipy.sparse.linalg import minres, gmres, cg
+
+def Solve(A, b):
+    ctx = DMumpsContext()
+    ctx.set_silent()
+    ctx.set_centralized_sparse(A)
+
+    ctx.set_rhs(b)
+    ctx.run(job=6)
+    ctx.destroy() # Cleanup
+    '''
+    x, _ = minres(A, b, x0=b, tol=1e-10)
+    #x, _ = gmres(A, b, tol=1e-10)
+    '''
+    return b
+
 pde = PDE()
 maxit = 4
 errorType = ['$|| E - E_h||_{\Omega,0}$']
@@ -55,11 +72,12 @@ for i in range(maxit):
 
     Eh = space.function()
     B, b = bc.apply(B, b, Eh)
-    Eh[:] = spsolve(B, b)
+    Eh[:] = Solve(B, b)
     # 计算误差
 
     errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)
     print(errorMatrix)
+    #mesh.uniform_refine()
 
 showmultirate(plt, 1, NDof, errorMatrix,  errorType, propsize=20)
 show_error_table(NDof, errorType, errorMatrix)

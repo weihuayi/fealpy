@@ -29,6 +29,7 @@ class MaxwellPDE2d():
         self.curlcurlFx = sym.lambdify(('x', 'y'), ccfx, "numpy")
         self.curlcurlFy = sym.lambdify(('x', 'y'), ccfy, "numpy")
 
+    @cartesian
     def solution(self, p):
         x = p[..., 0, None]
         y = p[..., 1, None]
@@ -40,6 +41,28 @@ class MaxwellPDE2d():
             Fy = np.ones(x.shape, dtype=np.float_)*Fy
         f = np.c_[Fx, Fy] 
         return f 
+
+    @cartesian
+    def curl_solution(self, p):
+        x = p[..., 0]
+        y = p[..., 1]
+        curlF = self.curlF(x, y)
+        if type(curlF) is not np.ndarray:
+            curlF = np.ones(x.shape, dtype=np.float_)*curlF
+        return curlF
+
+    @cartesian
+    def curl_curl_solution(self, p):
+        x = p[..., 0, None]
+        y = p[..., 1, None]
+        ccFx = self.curlcurlFx(x, y)
+        ccFy = self.curlcurlFy(x, y)
+        if type(ccFx) is not np.ndarray:
+            ccFx = np.ones(x.shape, dtype=np.float_)*ccFx
+        if type(ccFy) is not np.ndarray:
+            ccFy = np.ones(x.shape, dtype=np.float_)*ccFy
+        ccf = np.c_[ccFx, ccFy] 
+        return ccf
 
     @cartesian
     def source(self, p):
@@ -55,8 +78,9 @@ class MaxwellPDE2d():
         return ccf - self.solution(p)
 
     @cartesian
-    def dirichlet(self, p):
-        return self.solution(p)
+    def dirichlet(self, p, t):
+        val = self.solution(p)
+        return np.einsum('...ed, ed->...e', val, t)
 
     @cartesian
     def neumann(self, p, n):
@@ -85,13 +109,14 @@ class MaxwellPDE2d():
 class SinData(MaxwellPDE2d):
     def __init__(self):
         C = CoordSys3D('C')
-        f = sym.sin(2*sym.pi*C.y)*C.i + sym.sin(2*sym.pi*C.x)*C.j
-        f = sym.sin(2*sym.pi*C.y)*C.i + sym.sin(2*sym.pi*C.x)*C.j
+        f = sym.sin(sym.pi*C.y)*C.i + sym.sin(sym.pi*C.x)*C.j
+        #f = sym.sin(C.y)*C.i + sym.sin(C.x)*C.j
+        #f = C.x*C.y*(1-C.x)*(1-C.y)*C.i + sym.sin(sym.pi*C.x)*sym.sin(sym.pi*C.y)*C.j
         super(SinData, self).__init__(f)
 
-    def init_mesh(self, n=1):
+    def init_mesh(self, nx=1, ny=1, meshtype='tri'):
         box = [0, 1, 0, 1]
-        mesh = MeshFactory.boxmesh2d(box, nx=n, ny=n, meshtype='tri')
+        mesh = MeshFactory.boxmesh2d(box, nx=nx, ny=ny, meshtype=meshtype)
         return mesh
 
 
