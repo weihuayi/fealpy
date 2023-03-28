@@ -6,7 +6,8 @@ class TrussStructureIntegrator:
         self.E = E  # 杨氏模量
         self.A = A  # 单元横截面积
 
-    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None):
+    def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
+            out=None):
         """
         @brief 
         """
@@ -26,9 +27,16 @@ class TrussStructureIntegrator:
         R *=c/l[:, None, None]
 
         K = np.zeros((NC, 2*GD, 2*GD), dtype=np.float64)
-        K[:, :GD, :GD] = R
-        K[:, -GD:, :GD] = -R
-        K[:, :GD, -GD:] = -R
-        K[:, -GD:, -GD:] = R
 
-        return (R, -R), (-R, R) 
+        if space.doforder == 'nodes':
+            K[:, 0:2*GD:GD, 0:2*GD:GD] = R
+            K[:, 0:2*GD:GD, 1:2*GD:GD] = -R
+            K[:, -GD:, :GD] = -R
+            K[:, -GD:, -GD:] = R
+        elif space.doforder == 'vdims':
+            K[:, :GD, :GD] = R
+            K[:, -GD:, :GD] = -R
+            K[:, :GD, -GD:] = -R
+            K[:, -GD:, -GD:] = R
+
+        return K 
