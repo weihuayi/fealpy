@@ -16,6 +16,7 @@ from fealpy.boundarycondition import DirichletBC  #导入边界条件包
 # solver
 from scipy.sparse import bmat
 from scipy.sparse.linalg import spsolve, cg
+from scipy.sparse import csr_matrix, spdiags, eye, bmat
 
 #from fealpy.pde.MaxwellPDE import XXX3dData as PDE
 #from fealpy.pde.MaxwellPDE import Sin3dData as PDE
@@ -28,7 +29,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
 pde = PDE()
-maxit = 4
+maxit = 5
 errorType = ['$|| E - E_h||_{\Omega,0}$']
 errorMatrix = np.zeros((1, maxit), dtype=np.float64)
 NDof = np.zeros(maxit, dtype=np.int_)
@@ -50,7 +51,16 @@ for i in range(maxit):
     B = A-M 
 
     Eh = space.function()
-    B, b = bc.apply(B, b, Eh)
+    #B, b = bc.apply(B, b, Eh)
+    isDDof = space.set_dirichlet_bc(pde.dirichlet, Eh)
+    b[isDDof] = Eh[isDDof]
+
+    bdIdx = np.zeros(B.shape[0], dtype=np.int_)
+    bdIdx[isDDof] = 1
+    Tbd = spdiags(bdIdx, 0, B.shape[0], B.shape[0])
+    T = spdiags(1-bdIdx, 0, B.shape[0], B.shape[0])
+    B = T@B + Tbd
+
     Eh[:] = spsolve(B, b)
     # 计算误差
     errorMatrix[0, i] = space.integralalg.error(pde.solution, Eh)

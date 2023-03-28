@@ -151,6 +151,10 @@ class SecondNedelecFiniteElementSpace2d():
         ldof = self.dof.number_of_local_dofs()
         e2ldof = self.dof.edge_to_local_dof()
 
+        node = mesh.entity('node')
+        edge = mesh.entity('edge')
+        cell = mesh.entity('cell')
+
         c2e = mesh.ds.cell_to_edge()
         e2n = mesh.edge_unit_normal()
         e2t = mesh.edge_unit_tangent()
@@ -260,6 +264,19 @@ class SecondNedelecFiniteElementSpace2d():
         return val
 
     @barycentric
+    def curl_value(self, uh, bc, index=np.s_[:]):
+        '''@
+        @brief 计算一个有限元函数在每个单元的 bc 处的值
+        @param bc : (..., GD+1)
+        @return val : (..., NC, GD)
+        '''
+        phi = self.curl_basis(bc)
+        c2d = self.dof.cell_to_dof()
+        # uh[c2d].shape = (NC, ldof); phi.shape = (..., NC, ldof, GD)
+        val = np.einsum("cl, ...cl->...c", uh[c2d], phi)
+        return val
+
+    @barycentric
     def div_value(self, uh, bc, index=np.s_[:]):
         pass
 
@@ -275,7 +292,7 @@ class SecondNedelecFiniteElementSpace2d():
     def face_value(self, uh, bc, index=np.s_[:]):
         pass
 
-    def mass_matrix(self):
+    def mass_matrix(self, c = 1):
         mesh = self.mesh
         NC = mesh.number_of_cells()
         ldof = self.dof.number_of_local_dofs()
@@ -285,14 +302,20 @@ class SecondNedelecFiniteElementSpace2d():
 
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
         phi = self.basis(bcs) #(NQ, NC, ldof, GD)
-        mass = np.einsum("qclg, qcdg, c, q->cld", phi, phi, cm, ws)
+
+        if callable(c): 
+            points = mesh.bc_to_point(bcs) #(NQ, NC, GD)
+            cval = c(points)               #(NQ, NC)
+            mass = np.einsum("qc, qclg, qcdg, c, q->cld", cval, phi, phi, cm, ws)
+        else:
+            mass = c*np.einsum("qclg, qcdg, c, q->cld", phi, phi, cm, ws)
 
         I = np.broadcast_to(c2d[:, :, None], shape=mass.shape)
         J = np.broadcast_to(c2d[:, None, :], shape=mass.shape)
         M = csr_matrix((mass.flat, (I.flat, J.flat)), shape=(gdof, gdof))
         return M 
 
-    def curl_matrix(self):
+    def curl_matrix(self, c=1):
         mesh = self.mesh
         NC = mesh.number_of_cells()
         ldof = self.dof.number_of_local_dofs()
@@ -303,7 +326,13 @@ class SecondNedelecFiniteElementSpace2d():
         bcs, ws = self.integrator.get_quadrature_points_and_weights()
 
         cphi = self.curl_basis(bcs) #(NQ, NC, ldof)
-        A = np.einsum("qcl, qcd, c, q->cld", cphi, cphi, cm, ws) #(NC, ldof, ldof)
+
+        if callable(c): 
+            points = mesh.bc_to_point(bcs) #(NQ, NC, GD)
+            cval = c(points)               #(NQ, NC)
+            A = np.einsum("qc, qcl, qcd, c, q->cld", cval, cphi, cphi, cm, ws) #(NC, ldof, ldof)
+        else:
+            A = c*np.einsum("qcl, qcd, c, q->cld", cphi, cphi, cm, ws) #(NC, ldof, ldof)
 
         I = np.broadcast_to(c2d[:, :, None], shape=A.shape)
         J = np.broadcast_to(c2d[:, None, :], shape=A.shape)
@@ -405,14 +434,15 @@ class SecondNedelecFiniteElementSpace2d():
             index = self.mesh.ds.boundary_edge_index()
 
         edge2dof = self.dof.edge_to_dof()[index]
-        e2v = self.edge_dof_vector(index=index) #(NE, p+1, 3)
+        e2v = self.edge_dof_vector(index=index) #(NE, p+1, 2)
 
         bcs = self.lspace.multi_index_matrix[1](p)/p
-        point = mesh.bc_to_point(bcs, index=index).swapaxes(0, 1)
+        point = mesh.bc_to_point(bcs, index=index)#(p+1, NE, GD)
 
-        gval = gD(point) #(NE, p+1, 3)
+        t = mesh.edge_unit_tangent(index=index)
+        gval = gD(point, t)[..., None]*t
 
-        uh[edge2dof] = np.sum(gval*e2v, axis=-1)
+        uh[edge2dof] = np.sum(gval.swapaxes(0, 1)*e2v, axis=-1)
 
         isDDof = np.zeros(gdof, dtype=np.bool_)
         isDDof[edge2dof] = True
