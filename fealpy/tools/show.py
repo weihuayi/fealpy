@@ -56,7 +56,7 @@ def show_error_table(N, errorType, errorMatrix,
         out.close()
 
 def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
-        ms=4, propsize=10):
+        ms=4, propsize=10, computerate=True):
     if isinstance(plot, ModuleType):
         fig = plot.figure()
         fig.set_facecolor('white')
@@ -70,23 +70,24 @@ def showmultirate(plot, k, N, errorMatrix, labellist, optionlist=None, lw=1,
     m, n = errorMatrix.shape
     for i in range(m):
         if len(N.shape) == 1:
-            showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
+            showrate(axes, k, N, errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms, computerate=computerate)
         else:
-            showrate(axes, k, N[i], errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms)
+            showrate(axes, k, N[i], errorMatrix[i], optionlist[i], label=labellist[i], lw=lw, ms=ms, computerate=computerate)
     axes.legend(loc=3, framealpha=0.2, fancybox=True, prop={'size': propsize})
     return axes
 
-def showrate(axes, k, N, error, option, label=None, lw=1, ms=4):
+def showrate(axes, k, N, error, option, label=None, lw=1, ms=4, computerate=True):
     axes.set_xlim(left=N[0]/2, right=N[-1]*2)
     line0, = axes.loglog(N, error, option, lw=lw, ms=ms, label=label)
-    if isinstance(k, int):
-        c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
-        s = 0.75*error[k]/N[k]**c[0]
-        line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
-                lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
-    else:
-        c = np.polyfit(np.log(N[k]), np.log(error[k]), 1)
-        s = 0.75*error[k[0]]/N[k[0]]**c[0]
-        line1, = axes.loglog(N[k], s*N[k]**c[0], label='C$N^{%0.4f}$'%(c[0]),
-                lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+    if computerate:
+        if isinstance(k, int):
+            c = np.polyfit(np.log(N[k:]), np.log(error[k:]), 1)
+            s = 0.75*error[k]/N[k]**c[0]
+            line1, = axes.loglog(N[k:], s*N[k:]**c[0], label='C$N^{%0.4f}$'%(c[0]),
+                    lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
+        else:
+            c = np.polyfit(np.log(N[k]), np.log(error[k]), 1)
+            s = 0.75*error[k[0]]/N[k[0]]**c[0]
+            line1, = axes.loglog(N[k], s*N[k]**c[0], label='C$N^{%0.4f}$'%(c[0]),
+                    lw=lw, ls=line0.get_linestyle(), color=line0.get_color())
 
