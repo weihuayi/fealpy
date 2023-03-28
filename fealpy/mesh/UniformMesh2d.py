@@ -10,7 +10,7 @@ from .Mesh2d import Mesh2d
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 from ..geometry import project
 
-# @defgroup FEMInterface                                                                                                                                            
+## @defgroup FEMInterface                                                                                                                                            
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
 class UniformMesh2d(Mesh2d):
@@ -69,9 +69,6 @@ class UniformMesh2d(Mesh2d):
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
-    """
-    Grid GeneralInterface
-    """
     ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
@@ -128,11 +125,6 @@ class UniformMesh2d(Mesh2d):
                  interpolation matrices for each iteration.
         
         """
-<<<<<<< HEAD
-        pass 
-
-    ## @ingroup GeneralInterface
-=======
         for i in range(n):
             self.extent = [i * 2 for i in self.extent]
             self.h = [i / 2 for i in self.h]
@@ -143,7 +135,7 @@ class UniformMesh2d(Mesh2d):
             self.NN = (self.nx + 1) * (self.ny + 1)
             self.ds = StructureMesh2dDataStructure(self.nx, self.ny, itype=self.itype)
 
->>>>>>> upstream/master
+    ## @ingroup GeneralInterface
     def cell_area(self):
         """
         @brief 返回单元的面积，注意这里只返回一个值（因为所有单元面积相同）
@@ -269,16 +261,13 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
-    """
-    Gird FDMInterface
-    """
     ## @ingroup FDMInterface
     @property
     def node(self):
         """
         @brief Get the coordinates of the nodes in the mesh.
 
-        @return A NumPy array of shape (NN, 2) containing the coordinates of the nodes.
+        @return A NumPy array of shape (nx+1, ny+1, 2) containing the coordinates of the nodes.
 
         @details This function calculates the coordinates of the nodes in the mesh based on the
                  mesh's origin, step size, and the number of cells in the x and y directions.
@@ -590,80 +579,6 @@ class UniformMesh2d(Mesh2d):
         """
         pass
 
-<<<<<<< HEAD
-    ## @ingroup FDMInterface
-=======
-        assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
-
-        h = self.h
-        nx = self.nx
-        ny = self.ny
-
-        e = u - uh
-
-        emax = np.max(np.abs(e))
-        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
-
-        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
-
-        return emax, e0, el2
-
-    def data_edge_to_cell(self, Ex, Ey):
-        """
-        @brief 把定义在边上的数组转换到单元上
-        """
-        dx = self.function(etype='cell')
-        dy = self.function(etype='cell')
-
-        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
-        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
-
-        return dx, dy
-
-    def function_remap(self, tmesh, p=2):
-        """
-        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
-
-        @example 
-        phi.flat[idxMap] = uh
-        """
-        nx = self.ds.nx
-        ny = self.ds.ny
-
-        NN = self.number_of_nodes()
-        idxMap = np.arange(NN)
-
-        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
-                ny+1, 2)
-        idxMap[idx] = range(tmesh.number_of_nodes())
-
-        return idxMap
-
-    def interpolation(self, f, intertype='node'):
-        """
-        This function is deprecated and will be removed in a future version.
-        Please use the interpolate() instead.
-        """
-        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
-                      "Please use the interpolate() instead.", DeprecationWarning)
-        nx = self.ds.nx
-        ny = self.ds.ny
-        node = self.node
-        if intertype == 'node':
-            F = f(node)
-        elif intertype == 'edge':
-            xbc, ybc = self.entity_barycenter('edge')
-            F = f(xbc), f(ybc)
-        elif intertype == 'edgex':
-            xbc = self.entity_barycenter('edgex')
-            F = f(xbc)
-        elif intertype == 'edgey':
-            ybc = self.entity_barycenter('edgey')
-            F = f(ybc)
-        elif intertype == 'cell':
-            bc = self.entity_barycenter('cell')
-            F = f(bc)
-        return F
 
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
@@ -684,7 +599,6 @@ class UniformMesh2d(Mesh2d):
 
         return filename
 
->>>>>>> upstream/master
     def fast_sweeping_method(self, phi0):
     	"""
         @brief 均匀网格上的 fast sweeping method
@@ -759,12 +673,7 @@ class UniformMesh2d(Mesh2d):
     	    n += 1
     	    
     	return sign*phi[1:-1, 1:-1]
-<<<<<<< HEAD
 
-
-    """
-    Gird FEMInterface
-    """
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
@@ -783,7 +692,6 @@ class UniformMesh2d(Mesh2d):
         """
         return 2
 
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
         return GaussLegendreQuadrature(q)
@@ -792,7 +700,6 @@ class UniformMesh2d(Mesh2d):
     def bc_to_point(self, bc, index=np.s_[:]):
         pass
 
-    ####=================================================#### 
     ## @ingroup FEMInterface 
     def entity(self, etype):
         """
@@ -842,7 +749,6 @@ class UniformMesh2d(Mesh2d):
         """
         pass
 
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
         pass
@@ -855,7 +761,6 @@ class UniformMesh2d(Mesh2d):
     def grad_shape_function(self, bc, p=1):
         pass
 
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
         pass
@@ -879,7 +784,10 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FEMInterface
     def face_to_ipoint(self, p):
         pass
-=======
+
+    ## @ingroup FEMInterface
+    def cell_to_ipoint(self, p):
+        pass
 
     def t2sidx(self):
         """
@@ -922,6 +830,63 @@ class UniformMesh2d(Mesh2d):
     	idx = np.append(idx.flatten(),[idx1[-1,:]])
     	idx = idx.astype(int)
     	return idx
+
+    def data_edge_to_cell(self, Ex, Ey):
+        """
+        @brief 把定义在边上的数组转换到单元上
+        """
+        dx = self.function(etype='cell')
+        dy = self.function(etype='cell')
+
+        dx[:] = (Ex[:, :-1] + Ex[:, 1:])/2.0
+        dy[:] = (Ey[:-1, :] + Ey[1:, :])/2.0
+
+        return dx, dy
+
+    def function_remap(self, tmesh, p=2):
+        """
+        @brief 获取结构三角形和结构四边形网格上的自由度映射关系
+
+        @example 
+        phi.flat[idxMap] = uh
+        """
+        nx = self.ds.nx
+        ny = self.ds.ny
+
+        NN = self.number_of_nodes()
+        idxMap = np.arange(NN)
+
+        idx = np.arange(0, nx*(ny+1), 2*(ny+1)).reshape(-1, 1) + np.arange(0,
+                ny+1, 2)
+        idxMap[idx] = range(tmesh.number_of_nodes())
+
+        return idxMap
+
+    def interpolation(self, f, intertype='node'):
+        """
+        This function is deprecated and will be removed in a future version.
+        Please use the interpolate() instead.
+        """
+        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
+        nx = self.ds.nx
+        ny = self.ds.ny
+        node = self.node
+        if intertype == 'node':
+            F = f(node)
+        elif intertype == 'edge':
+            xbc, ybc = self.entity_barycenter('edge')
+            F = f(xbc), f(ybc)
+        elif intertype == 'edgex':
+            xbc = self.entity_barycenter('edgex')
+            F = f(xbc)
+        elif intertype == 'edgey':
+            ybc = self.entity_barycenter('edgey')
+            F = f(ybc)
+        elif intertype == 'cell':
+            bc = self.entity_barycenter('cell')
+            F = f(bc)
+        return F
     	
     	
 class UniformMesh2dFunction():
@@ -956,9 +921,4 @@ class UniformMesh2dFunction():
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
         return p, d 
 
->>>>>>> upstream/master
-
-    ## @ingroup FEMInterface
-    def cell_to_ipoint(self, p):
-        pass
 

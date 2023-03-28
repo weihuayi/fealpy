@@ -70,9 +70,6 @@ class UniformMesh1d():
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
 
-    """
-    Grid GeneralInterface
-    """
     ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
@@ -135,7 +132,7 @@ class UniformMesh1d():
             self.NN = self.NC + 1
 
             if returnim:
-                A = self.interpolation_matrix()
+                A = self.interpolation_matrix() #TODO: 实现这个功能
                 nodeImatrix.append(A)
 
         if returnim:
@@ -260,10 +257,6 @@ class UniformMesh1d():
         """
         pass
 
-
-    """
-    Grid FDMInterface
-    """
     ## @ingroup FDMInterface
     @property
     def node(self):
@@ -316,18 +309,19 @@ class UniformMesh1d():
         return uh
 
     ## @ingroup FDMInterface
+    def value(self, p, f):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup FDMInterface
     def gradient(self, f, order=1):
         """
         @brief 求网格函数 f 的梯度
         """
         pass
 
-    ## @ingroup FDMInterface
-    def value(self, p, f):
-        """
-        @brief
-        """
-        pass
    
     ## @ingroup FDMInterface
     def interpolation(self, f, intertype='node'):
@@ -342,7 +336,7 @@ class UniformMesh1d():
         if intertype == 'node':
             F = f(node)
         elif intertype == 'cell':
-            bc = self.entity_barycenter('cell')
+            bc = self.cell_barycenter('cell')
             F = f(bc)
         return F
 
@@ -363,7 +357,7 @@ class UniformMesh1d():
         if intertype in {'node', 'face', 0}:
             F = f(node)
         elif intertype in {'cell', 1}:
-            bc = self.entity_barycenter('cell')
+            bc = self.cell_barycenter('cell')
             F = f(bc)
         return F
 
@@ -515,9 +509,6 @@ class UniformMesh1d():
         pass
 
 
-    """
-    Grid FEMInterface
-    """
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
@@ -536,7 +527,6 @@ class UniformMesh1d():
         """
         return 1
    
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
         return GaussLegendreQuadrature(q)
@@ -545,7 +535,6 @@ class UniformMesh1d():
     def bc_to_point(self, bc, index=np.s_[:]):
         pass
 
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def entity(self, etype):
         """
@@ -589,7 +578,6 @@ class UniformMesh1d():
         """
         pass
 
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
         pass
@@ -602,7 +590,6 @@ class UniformMesh1d():
     def grad_shape_function(self, bc, p=1):
         pass
    
-    ####=================================================#### 
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
         pass

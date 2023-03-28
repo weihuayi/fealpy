@@ -66,9 +66,6 @@ class UniformMesh3d(Mesh3d):
         # Data structure for finite element computation
         self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
 
-    """
-    Grid GeneralInterface
-    """
     ## @ingroup GeneralInterface
     def number_of_nodes(self):
         """
@@ -160,94 +157,13 @@ class UniformMesh3d(Mesh3d):
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh, cmap='jet'):
         """
-        @brief 显示一个定义在网格节点上的函数
-        @error  'AxesSubplot' object has no attribute 'plot_surface'
         """
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            axes = fig.add_subplot(111, projection='3d')
-        else:
-            axes = plot
-        node = self.node
-        return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
+        pass
 
     ## @ingroup GeneralInterface
     def show_animation(self, fig, axes, box, 
                        init, forward, fname='test.mp4',
                        fargs=None, frames=1000, lw=2, interval=50):
-        """
-        @brief
-        """
-        import matplotlib.animation as animation
-
-        data = init(axes)
-        def func(n, *fargs):
-            Ez, t = forward(n)
-            data.set_data(Ez)
-            s = "frame=%05d, time=%0.8f"%(n, t)
-            print(s)
-            axes.set_title(s)
-            #fig.colorbar(data)
-            return data 
-
-        ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
-        ani.save(fname)
-
-    ## @ingroup GeneralInterface
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
-        """
-        @error 'UniformMesh3d' object has no attribute 'boundary_face'
-        """
-
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
-        else:
-            axes = plot
-        return show_mesh_3d(axes, self,
-                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis)
-
-    ## @ingroup GeneralInterface
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=100,
-            fontsize=20, fontcolor='k'):
-        """
-        @brief
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def find_edge(self, axes, node=None,
-            index=None, showindex=False,
-            color='b', markersize=120,
-            fontsize=22, fontcolor='b'):
-        """
-        @brief
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def find_face(self, axes, node=None,
-            index=None, showindex=False,
-            color='y', markersize=130,
-            fontsize=23, fontcolor='y'):
-        """
-        @brief
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=150,
-            fontsize=24, fontcolor='g'):
         """
         @brief
         """
@@ -276,16 +192,13 @@ class UniformMesh3d(Mesh3d):
 
         return filename
 
-    """
-    Grid FDMInterface
-    """
     ## @ingroup FDMInterface
     @property
     def node(self):
         """
         @brief Get the coordinates of the nodes in the mesh.
 
-        @return A NumPy array of shape (NN, 3) containing the coordinates of the nodes.
+        @return A NumPy array of shape (nx+1, ny+1, nz+1, 3) containing the coordinates of the nodes.
 
         @details This function calculates the coordinates of the nodes in the mesh based on the
         mesh's origin, step size, and the number of cells in the x and y directions.
@@ -331,37 +244,9 @@ class UniformMesh3d(Mesh3d):
         """
         @brief
         """
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        xbc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
-        xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx),
-                                                box[2]:box[3]:complex(0, ny + 1),
-                                                box[4]:box[5]:complex(0, nz + 1)]
-
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1)*self.h[2]]
-        ybc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-        ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx + 1),
-                                                box[2]:box[3]:complex(0, ny + 1),
-                                                box[4]:box[5]:complex(0, nz)]
-
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        zbc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-        zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx + 1),
-                                                box[2]:box[3]:complex(0, ny + 1),
-                                                box[4]:box[5]:complex(0, nz)]
-
+        xbc = self.edgex_barycenter()
+        ybc = self.edgey_barycenter()
+        zbc = self.edgez_barycenter()
         return xbc, ybc, zbc
 
     ## @ingroup FDMInterface
@@ -426,37 +311,9 @@ class UniformMesh3d(Mesh3d):
         """
         @brief
         """ 
-        GD = self.geo_dimension()
-        nx = self.ds.nx
-        ny = self.ds.ny
-        nz = self.ds.nz
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        xbc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
-        xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx + 1),
-                                                box[2]:box[3]:complex(0, ny),
-                                                box[4]:box[5]:complex(0, nz)]
-
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1],
-               self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-        ybc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
-        ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx),
-                                                box[2]:box[3]:complex(0, ny + 1),
-                                                box[4]:box[5]:complex(0, nz)]
-
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-               self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-               self.origin[2], self.origin[2] + nz*self.h[2]]
-        zbc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
-        zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
-                                                box[0]:box[1]:complex(0, nx),
-                                                box[2]:box[3]:complex(0, ny),
-                                                box[4]:box[5]:complex(0, nz + 1)]
-
+        xbc = self.facex_barycenter()
+        ybc = self.facey_barycenter()
+        zbc = self.facez_barycenter()
         return xbc, ybc, zbc
 
     ## @ingroup FDMInterface
@@ -551,10 +408,10 @@ class UniformMesh3d(Mesh3d):
             ey = np.zeros((nx+1, ny, nz+1), dtype=dtype)
             ez = np.zeros((nx+1, ny+1, nz), dtype=dtype)
             uh = (ex, ey, ez)
-        elif etype in {'cell', 2}:
+        elif etype in {'cell', 3}:
             uh = np.zeros((nx+2*ex, ny+2*ex, nz+2*ex), dtype=dtype)
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+            raise ValueError(f'the entity `{entity}` is not correct!') 
 
         return uh
 
@@ -675,6 +532,37 @@ class UniformMesh3d(Mesh3d):
     def interpolate(self, f, intertype='node'):
         """
         """
+        if intertype == 'node':
+            node = self.node
+            F = f(node)
+        elif intertype in {'facex'}: # 法线和 x 轴平行的面
+            xbc = self.facex_barycenter()
+            F = f(xbc)
+        elif intertype in {'facey'}: # 法线和 y 轴平行的面
+            ybc = self.facey_barycenter()
+            F = f(ybc)
+        elif intertype in {'facez'}: # 法线和 z 轴平行的面
+            zbc = self.facez_barycenter()
+            F = f(zbc)
+        elif intertype in {'face', 2}: # 所有的面
+            xbc, ybc, zbc = self.face_barycenter()
+            F = f(xbc), f(ybc), f(zbc)
+        elif intertype in {'edgex'}: # 切向与 x 轴平行的边
+            xbc = self.edgex_barycenter()
+            F = f(xbc)
+        elif intertype in {'edgey'}: # 切向与 y 轴平行的边
+            ybc = self.edgey_barycenter()
+            F = f(ybc)
+        elif intertype in {'edgez'}: # 切向与 z 轴平行的边
+            zbc = self.edgez_barycenter('edgez')
+            F = f(zbc)
+        elif intertype in {'edge', 1}: # 所有的边
+            xbc, ybc, zbc = self.edge_barycenter()
+            F = f(xbc), f(ybc), f(zbc)
+        elif intertype in {'cell', 3}:
+            bc = self.cell_barycenter()
+            F = f(bc)
+        return F
         pass
 
     ## @ingroup FDMInterface
@@ -767,10 +655,6 @@ class UniformMesh3d(Mesh3d):
         """
         pass
 
-
-    """
-    Grid FEMInterface
-    """
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
@@ -789,16 +673,14 @@ class UniformMesh3d(Mesh3d):
         """
         return 3
 
-    ####=================================================####
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
-        return GaussLegendreQuadrature(q)
+        pass
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
         pass
 
-    ####=================================================####
     ## @ingroup FEMInterface
     def entity(self, etype):
         """
@@ -830,143 +712,16 @@ class UniformMesh3d(Mesh3d):
         nx = self.ds.nx
         ny = self.ds.ny
         nz = self.ds.nz
-        if etype in {'cell', 3}:
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1], 
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz-1)*self.h[2]]
-            bc = np.zeros((nx, ny, nz, GD), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                    box[0]:box[1]:complex(0, nx),
-                    box[2]:box[3]:complex(0, ny),
-                    box[4]:box[5]:complex(0, nz)]
-            return bc
-
-        elif etype in {'facex'}: # 法线和 x 轴平行的面
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            bc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny),
-                                                 box[4]:box[5]:complex(0, nz)]
-            return bc
-
-        elif etype in {'facey'}: # 法线和 y 轴平行的面
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            bc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz)]
-            return bc
-
-        elif etype in {'facez'}: # 法线和 z 轴平行的面
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-                   self.origin[2], self.origin[2] + nz*self.h[2]]
-            bc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx),
-                                                 box[2]:box[3]:complex(0, ny),
-                                                 box[4]:box[5]:complex(0, nz + 1)]
-            return bc
-
+        if etype in {'cell', 3}: # 所有单元
+            return self.cell_barycenter().reshape(-1, 3) 
         elif etype in {'face', 2}: # 所有的面
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            xbc = np.zeros((nx + 1, ny, nz, 3), dtype=self.ftype)
-            xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny),
-                                                 box[4]:box[5]:complex(0, nz)]
-
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            ybc = np.zeros((nx, ny + 1, nz, 3), dtype=self.ftype)
-            ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz)]
-
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-                   self.origin[2], self.origin[2] + nz*self.h[2]]
-            zbc = np.zeros((nx, ny, nz + 1, 3), dtype=self.ftype)
-            zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx),
-                                                 box[2]:box[3]:complex(0, ny),
-                                                 box[4]:box[5]:complex(0, nz + 1)]
-
-            return xbc, ybc, zbc
-
-        elif etype in {'edgex'}: # 切向与 x 轴平行的边
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2], self.origin[2] + nz*self.h[2]]
-            bc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                     box[0]:box[1]:complex(0, nx),
-                                     box[2]:box[3]:complex(0, ny + 1),
-                                     box[4]:box[5]:complex(0, nz + 1)]
-            return bc
-        elif etype in {'edgey'}: # 切向与 y 轴平行的边
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny - 1)*self.h[1],
-                   self.origin[2], self.origin[2] + nz*self.h[2]]
-            bc = np.zeros((nx + 1, ny, nz + 1, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny),
-                                                 box[4]:box[5]:complex(0, nz + 1)]
-            return bc
-        elif etype in {'edgez'}: # 切向与 z 轴平行的边
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            bc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-            bc[..., 0], bc[..., 1], bc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz)]
-            return bc
+            pass
         elif etype in {'edge', 1}: # 所有的边
-            box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx - 1)*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2], self.origin[2] + nz*self.h[2]]
-            xbc = np.zeros((nx, ny + 1, nz + 1, 3), dtype=self.ftype)
-            xbc[..., 0], xbc[..., 1], xbc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz + 1)]
-
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2] + self.h[2] / 2, self.origin[2] + (nz - 1)*self.h[2]]
-            ybc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-            ybc[..., 0], ybc[..., 1], ybc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz)]
-
-            box = [self.origin[0], self.origin[0] + nx*self.h[0],
-                   self.origin[1], self.origin[1] + ny*self.h[1],
-                   self.origin[2] + self.h[2]/2, self.origin[2] + self.h[2]/2 + (nz - 1)*self.h[2]]
-            zbc = np.zeros((nx + 1, ny + 1, nz, 3), dtype=self.ftype)
-            zbc[..., 0], zbc[..., 1], zbc[..., 2] = np.mgrid[
-                                                 box[0]:box[1]:complex(0, nx + 1),
-                                                 box[2]:box[3]:complex(0, ny + 1),
-                                                 box[4]:box[5]:complex(0, nz)]
-
-            return xbc, ybc, zbc
+            pass
         elif etype in {'node', 0}:
-            return node
+            return self.node.reshape(-1, 3)
         else:
-            raise ValueError('the entity type `{}` is not correct!'.format(etype)) 
+            raise ValueError(f'the entity type `{etype}` is not correct!') 
 
     ## @ingroup FEMInterface
     def entity_measure(self, etype):
@@ -975,7 +730,6 @@ class UniformMesh3d(Mesh3d):
         """
         pass
 
-    ####=================================================####
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
         pass
@@ -988,7 +742,6 @@ class UniformMesh3d(Mesh3d):
     def grad_shape_function(self, bc, p=1):
         pass
 
-    ####=================================================####
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
         pass
