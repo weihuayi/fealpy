@@ -243,7 +243,7 @@ class UniformMesh1d():
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 1)
         else:
-            raise ValueError(f'the entity type `{}` is not correct!'.format(etype))
+            raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FDMInterface
     def function(self, etype='node', dtype=None, ex=0):
@@ -265,7 +265,7 @@ class UniformMesh1d():
         elif etype in {'cell', 1}:
             uh = np.zeros(nx, dtype=dtype)
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity))
+            raise ValueError(f'the entity `{etype}` is not correct!')
         return uh
 
     ## @ingroup FDMInterface
