@@ -325,13 +325,7 @@ class UniformMesh2d(Mesh2d):
 
         return idxMap
 
-    def interpolation(self, f, intertype='node'):
-        """
-        This function is deprecated and will be removed in a future version.
-        Please use the interpolate() instead.
-        """
-        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
-                      "Please use the interpolate() instead.", DeprecationWarning)
+    def interpolate(self, f, intertype='node'):
         nx = self.ds.nx
         ny = self.ds.ny
         node = self.node
