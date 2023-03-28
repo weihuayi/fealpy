@@ -272,9 +272,7 @@ class FirstNedelecFiniteElementSpace2d:
     @barycentric
     def curl_value(self, uh, bc, index=np.s_[:]):
         cphi = self.curl_basis(bc, index=index)
-        print('cphi : ', cphi[:, 1000])
         cell2dof = self.cell_to_dof()
-        print(uh[cell2dof[0]])
         dim = len(uh.shape) - 1
         s0 = 'abcdefg'
         s1 = '...ij, ij{}->...i{}'.format(s0[:dim], s0[:dim])

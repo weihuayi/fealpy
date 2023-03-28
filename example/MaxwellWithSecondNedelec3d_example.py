@@ -55,8 +55,7 @@ for i in range(maxit):
     print("The {}-th computation:".format(i))
 
     mesh = pde.init_mesh(2**i)
-    space = SecondNedelecFiniteElementSpace3d(mesh, p=int(sys.argv[1]),
-            q=int(sys.argv[1]))
+    space = SecondNedelecFiniteElementSpace3d(mesh, p=int(sys.argv[1]))
     if sys.argv[2]=='b':
         bspace = BernsteinFiniteElementSpace(mesh, p = int(sys.argv[1]))
         space = SecondNedelecFiniteElementSpace3d(mesh, p=int(sys.argv[1]),

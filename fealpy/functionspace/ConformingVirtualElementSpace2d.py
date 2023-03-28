@@ -654,7 +654,6 @@ class ConformingVirtualElementSpace2d():
         end = NN + (p - 1)*NE
         ipoints = self.interpolation_points()
         isDDof = self.boundary_dof(threshold=threshold)
-        a = gD(ipoints[isDDof[:end]])[:, None]
         uh[isDDof] = gD(ipoints[isDDof[:end]])
         return isDDof
 

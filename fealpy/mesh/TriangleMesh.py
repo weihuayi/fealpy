@@ -1,4 +1,5 @@
 import numpy as np
+import warnings
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
 from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
@@ -130,13 +131,9 @@ class TriangleMesh(Mesh2d):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def grad_shape_function(self, bc, index=np.s_[:], p=None):
-
-        if p is None:
-            p= self.p
+    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
 
         TD = self.top_dimension()
-
         multiIndex = self.multi_index_matrix(p)
 
         c = np.arange(1, p+1, dtype=self.itype)
@@ -167,17 +164,17 @@ class TriangleMesh(Mesh2d):
             idx.remove(i)
             R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
 
-        Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index])
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
 
-    def grad_lambda(self):
+    def grad_lambda(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
-        NC = self.number_of_cells()
-        v0 = node[cell[:, 2]] - node[cell[:, 1]]
-        v1 = node[cell[:, 0]] - node[cell[:, 2]]
-        v2 = node[cell[:, 1]] - node[cell[:, 0]]
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        v0 = node[cell[index, 2]] - node[cell[index, 1]]
+        v1 = node[cell[index, 0]] - node[cell[index, 2]]
+        v2 = node[cell[index, 1]] - node[cell[index, 0]]
         GD = self.geo_dimension()
         nv = np.cross(v1, v2)
         Dlambda = np.zeros((NC, 3, GD), dtype=self.ftype)
@@ -193,10 +190,9 @@ class TriangleMesh(Mesh2d):
             Dlambda[:, 0] = np.cross(n, v0)/length[:, None]
             Dlambda[:, 1] = np.cross(n, v1)/length[:, None]
             Dlambda[:, 2] = np.cross(n, v2)/length[:, None]
-        self.glambda = Dlambda
         return Dlambda
 
-    def rot_lambda(self):
+    def rot_lambda(self, index=np.s_[:]):
         node = self.node
         cell = self.ds.cell
         NC = self.number_of_cells()
@@ -294,7 +290,6 @@ class TriangleMesh(Mesh2d):
             return multiIndex
 
     def number_of_local_ipoints(self, p, iptype='cell'):
-        p = self.p
         if iptype in {'cell', 2}:
             return (p+1)*(p+2)//2 
         elif iptype in {'face', 'edge',  1}:
@@ -303,14 +298,10 @@ class TriangleMesh(Mesh2d):
             return 1
     
     def number_of_global_ipoints(self, p):
-        NP = self.number_of_nodes()
-        if p > 1:
-            NE = self.number_of_edges()
-            NP += (p-1)*NE
-        if p > 2:
-            NC = self.number_of_cells()
-            NP += (p-2)*(p-1)*NC//2
-        return NP
+        NN = self.number_of_nodes()
+        NE = self.number_of_edges()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NE + (p-2)*(p-1)/2*NC
     
     def interpolation_points(self, p):
         """
@@ -381,6 +372,7 @@ class TriangleMesh(Mesh2d):
 
             isEdgeIPoint = self.multi_index_matrix(p, 'cell') == 0
             edge2ipoint = self.edge_to_ipoint(p)
+            
 
             cell2edgeSign = self.ds.cell_to_edge_sign()
             cell2edge = self.ds.cell_to_edge()
@@ -1340,6 +1332,8 @@ class TriangleMesh(Mesh2d):
         -----
         线性元的刚度矩阵
         """
+        warnings.warn("The linear_stiff_matrix() is deprecated and will be removed in a future version. "
+                      "Please use the interpolate() instead.", DeprecationWarning)
 
         NN = self.number_of_nodes()
 

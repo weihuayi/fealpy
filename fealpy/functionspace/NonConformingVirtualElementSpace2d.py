@@ -247,7 +247,6 @@ class NonConformingVirtualElementSpace2d():
         # the projector matrix
         D = self.D
         H = self.H
-        H = self.smspace.matrix_H_in() #TODO
         C = self.C
 
         # the dof arrays
