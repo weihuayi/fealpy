@@ -4,7 +4,6 @@ from scipy.sparse import coo_matrix, csr_matrix, diags
 from types import ModuleType
 from typing import Tuple
 from .Mesh2d import Mesh2d
-# from scipy.sparse.linalg import spsolve
 
 # 这个数据接口为有限元服务
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
@@ -65,6 +64,8 @@ class UniformMesh2d(Mesh2d):
 
         self.itype: type = itype
         self.ftype: type = ftype
+
+        self.meshtype = 'UniformMesh2d'
 
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
@@ -147,7 +148,7 @@ class UniformMesh2d(Mesh2d):
         """
         @brief 返回边长，注意这里返回两个值，一个 x 方向，一个 y 方向
         """
-        return self.h[0], sef.h[1]
+        return self.h[0], self.h[1]
 
     ## @ingroup GeneralInterface
     def cell_location(self, p):
@@ -203,24 +204,24 @@ class UniformMesh2d(Mesh2d):
         ani.save(fname)
 
     ## @ingroup GeneralInterface
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
-        """
-        @brief
-        """
-        pass
+    #def add_plot(self, plot,
+            #nodecolor='k', cellcolor='k',
+            #aspect='equal', linewidths=1, markersize=20,
+            #showaxis=False):
+        #"""
+        #@brief
+        #"""
+        #pass
 
     ## @ingroup GeneralInterface
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=100,
-            fontsize=20, fontcolor='k'):
-        """
-        @brief
-        """
-        pass
+    #def find_node(self, axes, node=None,
+            #index=None, showindex=False,
+            #color='r', markersize=100,
+            #fontsize=20, fontcolor='k'):
+        #"""
+        #@brief
+        #"""
+        #pass
 
     ## @ingroup GeneralInterface
     def find_edge(self, axes, node=None,
@@ -743,11 +744,11 @@ class UniformMesh2d(Mesh2d):
             raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
-    def entity_measure(self, etype):
-        """
-        @brief
-        """
-        pass
+    #def entity_measure(self, etype):
+        #"""
+        #@brief
+        #"""
+        #pass
 
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
