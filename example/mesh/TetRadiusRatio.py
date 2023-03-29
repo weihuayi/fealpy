@@ -222,8 +222,6 @@ class TetRadiusRatio():
                 if np.max(np.abs(q[1]-q[0]))<1e-8:
                     print("jacobi迭代次数为%d次"%(i+1))
                     break
-                if avgq0<avgq1:
-                    print("平均质量上升，终止迭代，jacobi迭代次数为%d次"%(i+1))
                 q[0] = q[1]
             print("jacobi迭代次数为500次")
             
@@ -240,8 +238,6 @@ class TetRadiusRatio():
                 if np.max(np.abs(q[1]-q[0]))<1e-8:
                     print("Bjacobi迭代次数为%d次"%(i+1))
                     break
-                if avgq0<avgq:
-                    print("平均质量上升，终止迭代，jacobi迭代次数为%d次"%(i+1))
                 q[0] = q[1]
         
         if method=='BGauss':
