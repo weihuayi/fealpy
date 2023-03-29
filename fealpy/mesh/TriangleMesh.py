@@ -1,11 +1,11 @@
 import numpy as np
 import warnings
-from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, bmat, eye
+from scipy.sparse import coo_matrix, csr_matrix, bmat, eye
 from scipy.spatial import KDTree
 from .Mesh2d import Mesh2d, Mesh2dDataStructure
 from ..quadrature import TriangleQuadrature
 from ..quadrature import GaussLegendreQuadrature
-from fealpy.mesh.TriangleMeshData import gphigphiphi,phiphi,gphigphi,gphiphi,phigphiphi,phiphiphi
+
 
 class TriangleMeshDataStructure(Mesh2dDataStructure):
 
@@ -60,7 +60,7 @@ class TriangleMesh(Mesh2d):
 
     def integrator(self, q, etype='cell'):
         """
-        @brief 获取不同维度网格实体上的积分公式 
+        @brief 获取不同维度网格实体上的积分公式
         """
         if etype in {'cell', 2}:
             return TriangleQuadrature(q)
@@ -77,7 +77,7 @@ class TriangleMesh(Mesh2d):
         entity = self.entity(etype=TD)[index]
         p = np.einsum('...j, ijk->...ik', bc, node[entity])
         return p
-    
+
     def point_to_bc(self, point):
         i_cell = self.location(point)
         node = self.node
@@ -115,9 +115,9 @@ class TriangleMesh(Mesh2d):
 
     def shape_function(self, bc, p=1):
         """
-        @brief 
+        @brief
         """
-        TD = bc.shape[-1] - 1 
+        TD = bc.shape[-1] - 1
         multiIndex = self.multi_index_matrix(p)
         c = np.arange(1, p+1, dtype=np.int_)
         P = 1.0/np.multiply.accumulate(c)
@@ -265,7 +265,7 @@ class TriangleMesh(Mesh2d):
         """
         @brief 获取三角形上的 p 次的多重指标矩阵
 
-        @param[in] p positive integer 
+        @param[in] p positive integer
 
         @return multiIndex  ndarray with shape (ldof, 3)
         """
@@ -287,18 +287,18 @@ class TriangleMesh(Mesh2d):
 
     def number_of_local_ipoints(self, p, iptype='cell'):
         if iptype in {'cell', 2}:
-            return (p+1)*(p+2)//2 
+            return (p+1)*(p+2)//2
         elif iptype in {'face', 'edge',  1}:
             return self.p + 1
         elif iptype in {'node', 0}:
             return 1
-    
+
     def number_of_global_ipoints(self, p):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
         return NN + (p-1)*NE + (p-2)*(p-1)/2*NC
-    
+
     def interpolation_points(self, p):
         """
         @brief 获取三角形网格上所有 p 次插值点
@@ -308,7 +308,7 @@ class TriangleMesh(Mesh2d):
         if p == 1:
             return node
         if p > 1:
-            NN = self.number_of_nodes() 
+            NN = self.number_of_nodes()
             GD = self.geo_dimension()
 
             gdof = self.number_of_global_ipoints(p)
@@ -333,11 +333,11 @@ class TriangleMesh(Mesh2d):
             ipoints[NN+(p-1)*NE:, :] = np.einsum('ij, kj...->ki...', w,
                     node[cell, :]).reshape(-1, GD)
         return ipoints
-    
-    
+
+
     def edge_to_ipoint(self, p):
         """
-        @brief 获取网格边与插值点的对应关系 
+        @brief 获取网格边与插值点的对应关系
         """
         NE = self.number_of_edges()
         NN = self.number_of_nodes()
@@ -348,10 +348,10 @@ class TriangleMesh(Mesh2d):
         if p > 1:
             edge2ipoints[:, 1:-1] = NN + np.arange(NE*(p-1)).reshape(NE, p-1)
         return edge2ipoints
-    
+
     def cell_to_ipoint(self, p):
         """
-        @brief 获取网格中的三角形单元与插值点的对应关系 
+        @brief 获取网格中的三角形单元与插值点的对应关系
         """
         cell = self.entity('cell')
         NN = self.number_of_nodes()
@@ -368,7 +368,7 @@ class TriangleMesh(Mesh2d):
 
             isEdgeIPoint = self.multi_index_matrix(p, 'cell') == 0
             edge2ipoint = self.edge_to_ipoint(p)
-            
+
 
             cell2edgeSign = self.ds.cell_to_edge_sign()
             cell2edge = self.ds.cell_to_edge()
@@ -423,7 +423,7 @@ class TriangleMesh(Mesh2d):
 
         NC = len(cell)
         if fname is None:
-            return node, cell.flatten(), cellType, NC 
+            return node, cell.flatten(), cellType, NC
         else:
             print("Writting to vtk...")
             write_to_vtu(fname, node, NC, cellType, cell.flatten(),
@@ -529,7 +529,7 @@ class TriangleMesh(Mesh2d):
         isNotOK = np.ones(len(segment), dtype=np.bool_)
         jdx = 3
         while isNotOK.any():
-            idx = start[isNotOK] # 当前单元 
+            idx = start[isNotOK] # 当前单元
 
             pp0 = p0[isNotOK]
             pp1 = p1[isNotOK]
@@ -565,7 +565,7 @@ class TriangleMesh(Mesh2d):
             # 移动到下一个单元
             tmp = start[idx0[~isOK]]
             start[idx0[~isOK]] = cell2cell[idx[~isOK], lidx[~isOK]]
-            isNotOK[idx0[isOK]] = False 
+            isNotOK[idx0[isOK]] = False
             _, jdx = np.where((cell2cell[start[isNotOK]].T==tmp).T)
 
             # 这些单元标记为穿过单元
@@ -624,23 +624,23 @@ class TriangleMesh(Mesh2d):
             pp = points[isNotOK]
 
             v0 = node[cell[idx, 0]] - pp # 所在单元的三个顶点
-            v1 = node[cell[idx, 1]] - pp 
+            v1 = node[cell[idx, 1]] - pp
             v2 = node[cell[idx, 2]] - pp
 
             a = np.zeros((len(idx), 3), dtype=self.ftype)
             a[:, 0] = np.cross(v1, v2)
             a[:, 1] = np.cross(v2, v0)
             a[:, 2] = np.cross(v0, v1)
-            lidx = np.argmin(a, axis=-1) 
+            lidx = np.argmin(a, axis=-1)
 
             # 最小面积小于 0, 说明点在单元外
-            isOutCell = a[range(a.shape[0]), lidx] < 0.0 
+            isOutCell = a[range(a.shape[0]), lidx] < 0.0
 
             idx0, = np.nonzero(isNotOK)
             start[idx0[isOutCell]] = cell2cell[idx[isOutCell], lidx[isOutCell]]
             isNotOK[idx0[~isOutCell]] = False
 
-        return start 
+        return start
 
     def circumcenter(self, index=np.s_[:], returnradius=False):
         """
@@ -705,7 +705,7 @@ class TriangleMesh(Mesh2d):
             isNonDelaunayEdge = (asum > np.pi) & (edge2cell[:,0] != edge2cell[:,1])
 
             return isNonDelaunayEdge
-            
+
             if np.sum(isNonDelaunayEdge) == 0:
                 break
             # Find dependent set of swap edges
@@ -721,7 +721,7 @@ class TriangleMesh(Mesh2d):
                 pnext = np.array([1, 2, 0])
                 idx = edge2cell[isNonDelaunayEdge, 2]
                 p0 = cell[edge2cell[isNonDelaunayEdge, 0], idx]
-                p1 = cell[edge2cell[isNonDelaunayEdge, 0], pnext[idx]] 
+                p1 = cell[edge2cell[isNonDelaunayEdge, 0], pnext[idx]]
                 idx = edge2cell[isNonDelaunayEdge, 3]
                 p2 = cell[edge2cell[isNonDelaunayEdge, 1], idx]
                 p3 = cell[edge2cell[isNonDelaunayEdge, 1], pnext[idx]]
@@ -758,7 +758,7 @@ class TriangleMesh(Mesh2d):
         return options
 
     def bisect(self, isMarkedCell=None, options={'disp':True}):
-        
+
         if options['disp']:
             print('Bisection begining......')
 
@@ -865,10 +865,10 @@ class TriangleMesh(Mesh2d):
                         bcr[:, 2] = 1/2*bc[:, 0] + bc[:, 1]
 
                         value = np.r_['0', value, np.zeros((nc, ldof), dtype=self.ftype)]
-                        
+
                         phi = self.shape_function(bcr, p=p)
                         value[NC:, :] = np.einsum('cj,kj->ck', value[idx], phi)
-                        
+
                         phi = self.shape_function(bcl, p=p)
                         value[idx, :] = np.einsum('cj,kj->ck', value[idx], phi)
 
@@ -899,7 +899,7 @@ class TriangleMesh(Mesh2d):
 
     def coarsen(self, isMarkedCell=None, options={}):
         """
-        @brief 
+        @brief
 
         https://lyc102.github.io/ifem/afem/coarsen/
         """
@@ -907,7 +907,7 @@ class TriangleMesh(Mesh2d):
         if isMarkedCell is None:
             return
 
-        
+
         NN = self.number_of_nodes()
         NC = self.number_of_cells()
 
@@ -973,24 +973,24 @@ class TriangleMesh(Mesh2d):
         if ('data' in options) and (options['data'] is not None):
             # value.shape == (NC, (p+1)*(p+2)//2)
             lidx = np.r_[t0, t2, t4]
-            ridx = np.r_[t1, t3, t5] 
+            ridx = np.r_[t1, t3, t5]
             for key, value in options['data'].items():
                 ldof = value.shape[1]
                 p = int((np.sqrt(8*ldof+1) - 3)/2)
                 bc = self.multi_index_matrix(p=p)/p
                 bcl = np.zeros_like(bc)
-                bcl[:, 0] = 2*bc[:, 2] 
-                bcl[:, 1] = bc[:, 0] 
-                bcl[:, 2] = bc[:, 1] - bc[:, 2] 
+                bcl[:, 0] = 2*bc[:, 2]
+                bcl[:, 1] = bc[:, 0]
+                bcl[:, 2] = bc[:, 1] - bc[:, 2]
 
                 bcr = np.zeros_like(bc)
-                bcr[:, 0] = 2*bc[:, 1] 
-                bcr[:, 1] = bc[:, 2] - bc[:, 1] 
-                bcr[:, 2] = bc[:, 0] 
-                
+                bcr[:, 0] = 2*bc[:, 1]
+                bcr[:, 1] = bc[:, 2] - bc[:, 1]
+                bcr[:, 2] = bc[:, 0]
+
                 phi = self.shape_function(bcl, p=p) # (NQ, ldof)
-                value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi) 
-                
+                value[lidx, :] = np.einsum('ci, qi->cq', value[lidx, :], phi)
+
                 phi = self.shape_function(bcr, p=p) # (NQ, ldof)
                 value[lidx, :]+= np.einsum('ci, qi->cq', value[ridx, :], phi)
                 value[lidx] /= 2
@@ -1166,7 +1166,7 @@ class TriangleMesh(Mesh2d):
 
         # 当前的二分边的数目
         nCut = 0
-        # 非协调边的标记数组 
+        # 非协调边的标记数组
         nonConforming = np.ones(4*NN, dtype=np.bool_)
         while len(markedCell) != 0:
             # 标记最长边
@@ -1177,11 +1177,11 @@ class TriangleMesh(Mesh2d):
             p1 = cell[markedCell, 1]
             p2 = cell[markedCell, 2]
 
-            # 找到新的二分边和新的中点 
+            # 找到新的二分边和新的中点
             nMarked = len(markedCell)
             p3 = np.zeros(nMarked, dtype=self.itype)
 
-            if nCut == 0: # 如果是第一次循环 
+            if nCut == 0: # 如果是第一次循环
                 idx = np.arange(nMarked) # cells introduce new cut edges
             else:
                 # all non-conforming edges
@@ -1198,7 +1198,7 @@ class TriangleMesh(Mesh2d):
                 idx, = np.nonzero(p3 == 0)
 
             if len(idx) != 0:
-                # 把需要二分的边唯一化 
+                # 把需要二分的边唯一化
                 NE = len(idx)
                 cellCutEdge = np.array([p1[idx], p2[idx]])
                 cellCutEdge.sort(axis=0)
@@ -1210,7 +1210,7 @@ class TriangleMesh(Mesh2d):
                             cellCutEdge[1, :]
                         )
                     ), shape=(NN, NN))
-                # 获得唯一的边 
+                # 获得唯一的边
                 i, j = s.nonzero()
                 nNew = len(i)
                 newCutEdge = np.arange(nCut, nCut+nNew)
@@ -1221,7 +1221,7 @@ class TriangleMesh(Mesh2d):
                 nCut += nNew
                 NN += nNew
 
-                # 新点和旧点的邻接矩阵 
+                # 新点和旧点的邻接矩阵
                 I = cutEdge[newCutEdge][:, [2, 2]].reshape(-1)
                 J = cutEdge[newCutEdge][:, [0, 1]].reshape(-1)
                 val = np.ones(len(I), dtype=np.bool_)
@@ -1236,7 +1236,7 @@ class TriangleMesh(Mesh2d):
             cellGeneration = np.max(
                     generation[cell[markedCell[idx]]],
                     axis=-1)
-            # 第几代点 
+            # 第几代点
             generation[p3[idx]] = cellGeneration + 1
             cell[markedCell, 0] = p3
             cell[markedCell, 1] = p0
@@ -1252,14 +1252,14 @@ class TriangleMesh(Mesh2d):
             NC = NC + nMarked
             del cellGeneration, p0, p1, p2, p3
 
-            # 找到非协调的单元 
+            # 找到非协调的单元
             checkEdge, = np.nonzero(nonConforming[:nCut])
             isCheckNode = np.zeros(NN, dtype=np.bool_)
             isCheckNode[cutEdge[checkEdge]] = True
             isCheckCell = np.sum(
                     isCheckNode[cell[:NC]],
                     axis= -1) > 0
-            # 找到所有包含检查节点的单元编号 
+            # 找到所有包含检查节点的单元编号
             checkCell, = np.nonzero(isCheckCell)
             I = np.repeat(checkCell, 3)
             J = cell[checkCell].reshape(-1)
@@ -1337,13 +1337,13 @@ class TriangleMesh(Mesh2d):
         gphi = self.grad_lambda()
 
         if callable(c):
-            bc = np.array([1/3, 1/3, 1/3], dtype=self.ftype) 
+            bc = np.array([1/3, 1/3, 1/3], dtype=self.ftype)
             if c.coordtype == 'cartesian':
                 ps = self.bc_to_point(bc)
                 c = c(ps)
             elif c.coordtype == 'barycentric':
                 c = c(bc)
-        
+
         if c is not None:
             area *= c
 
@@ -1413,7 +1413,7 @@ class TriangleMesh(Mesh2d):
 
     def mark_interface_cell_with_curvature(self, phi, hmax=None):
         """
-        @brief 标记曲率大的单元 
+        @brief 标记曲率大的单元
         """
 
         if callable(phi):
@@ -1431,11 +1431,11 @@ class TriangleMesh(Mesh2d):
         isInterfaceCell = self.mark_interface_cell(phi)
         isInterfaceNode = np.zeros(NN, dtype=np.bool_)
         # 界面单元的顶点称为界面节点
-        isInterfaceNode[cell[isInterfaceCell]] = True 
+        isInterfaceNode[cell[isInterfaceCell]] = True
 
         # case: Fig 2(a) in p6
         # 一个网格点周围的单元全为界面单元，则周围这些单元以该网格节点为顶点的角度
-        # 之和为 360 
+        # 之和为 360
         angle = np.zeros(NN, dtype=self.itype)
         np.add.at(angle, cell[isInterfaceCell, :], np.array([90, 45, 45]))
         is360 = (angle == 360)
@@ -1443,7 +1443,7 @@ class TriangleMesh(Mesh2d):
 
         # case: Fig 2(b) in p6
         isInteriorEdge = ~self.ds.boundary_edge_flag()
-        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1) 
+        isInterfaceBEdge = (isInterfaceCell[edge2cell[:, 0:2]].sum(axis=1) == 1)
         valence = np.zeros(NN, dtype=self.itype)
         if np.any(isInterfaceBEdge):
             np.add.at(valence, edge[isInterfaceBEdge], 1)
@@ -1467,7 +1467,7 @@ class TriangleMesh(Mesh2d):
         ta = tangle[edge[isInterfaceEdge][:, 1::-1]]
         np.add.at(tangle, edge[isInterfaceEdge], ta)
 
-        
+
         flag = np.abs(tangle) > 170
         print("转角:", flag.sum())
 
@@ -1477,7 +1477,7 @@ class TriangleMesh(Mesh2d):
 
         v = node[cell[:, 2]] - node[cell[:, 1]]
         l = np.sqrt(np.sum(v**2, axis=1))
-        if hmax is None: 
+        if hmax is None:
             lmax = np.max(l)
             isBigSizeCell = (l > lmax*lmax) & isInterfaceCell
         else:
@@ -1535,7 +1535,7 @@ class TriangleMesh(Mesh2d):
             isTransitionTypeBCell[idx[isNotTB]] = False
 
         # Case 2:
-        n2 = cell2cell[:, 2] 
+        n2 = cell2cell[:, 2]
         flag = isTransitionTypeBCell & isInterfaceCell[n2] & cellType[n2]
         if np.any(flag):
             idx, = np.nonzero(flag)
@@ -1567,7 +1567,7 @@ class TriangleMesh(Mesh2d):
             isTransitionTypeBCell[idx[isNotTB]] = False
 
         # Case 4:
-        n2 = cell2cell[:, 2] 
+        n2 = cell2cell[:, 2]
         flag = isTransitionTypeBCell & isInterfaceCell[n2] & (~cellType[n2])
         if np.any(flag):
             idx, = np.nonzero(flag)
@@ -1579,7 +1579,7 @@ class TriangleMesh(Mesh2d):
             isNotTB = interface(m0)*interface(m1) < 0.0
             isTransitionTypeBCell[idx[isNotTB]] = False
 
-        
+
         isTypeBCell = isMark & (~cellType) & (~isTransitionTypeBCell)
         return isTypeBCell, cellType
 
@@ -1632,12 +1632,12 @@ class TriangleMesh(Mesh2d):
     def from_unit_square(cls, nx=10, ny=10, threshold=None):
         """
         Generate a triangle mesh for a unit square.
-        
+
         @param nx Number of divisions along the x-axis (default: 10)
         @param ny Number of divisions along the y-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
-        """ 
+        """
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
 
     ## @ingroup MeshGenerators
@@ -1645,18 +1645,18 @@ class TriangleMesh(Mesh2d):
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
         """
         Generate a triangle mesh for a box domain .
-        
-        @param box 
+
+        @param box
         @param nx Number of divisions along the x-axis (default: 10)
         @param ny Number of divisions along the y-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
         @return TriangleMesh instance
-        """ 
+        """
         NN = (nx+1)*(ny+1)
         NC = nx*ny
         node = np.zeros((NN,2))
         X, Y = np.mgrid[
-                box[0]:box[1]:(nx+1)*1j, 
+                box[0]:box[1]:(nx+1)*1j,
                 box[2]:box[3]:(ny+1)*1j]
         node[:, 0] = X.flat
         node[:, 1] = Y.flat
@@ -1672,7 +1672,7 @@ class TriangleMesh(Mesh2d):
 
         if threshold is not None:
             bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
-            isDelCell = threshold(bc) 
+            isDelCell = threshold(bc)
             cell = cell[~isDelCell]
             isValidNode = np.zeros(NN, dtype=np.bool_)
             isValidNode[cell] = True
@@ -1735,6 +1735,7 @@ class TriangleMesh(Mesh2d):
         @param h Parameter controlling mesh density
         @return TriangleMesh instance
         """
+        import gmsh
         gmsh.initialize()
         gmsh.model.add("UnitCircle")
 
@@ -1766,7 +1767,7 @@ class TriangleMesh(Mesh2d):
         # 获取三角形单元信息
         cell_type = 2  # 三角形单元的类型编号为 2
         cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-        cell = np.array(tri_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
+        cell = np.array(cell_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
 
         # 输出节点和单元数量
         print(f"Number of nodes: {node.shape[0]}")
@@ -1853,7 +1854,7 @@ class TriangleMesh(Mesh2d):
         idxMap = np.zeros(NN, dtype=cell.dtype)
         idxMap[isValidNode] = range(isValidNode.sum())
         cell = idxMap[cell]
-    
+
         return cls(node, cell)
 
     ## @ingroup MeshGenerators
@@ -1984,7 +1985,7 @@ class TriangleMeshWithInfinityNode:
         NV = np.asarray((node2cell > 0).sum(axis=1)).reshape(-1)
         NV[isBdNode] += 1
         NV = NV[:-1]
-        
+
         PNC = len(NV)
         pcell = np.zeros(NV.sum(), dtype=self.itype)
         pcellLocation = np.zeros(PNC+1, dtype=self.itype)
@@ -1998,7 +1999,7 @@ class TriangleMeshWithInfinityNode:
         currentCellIdx[cell[:NC, 0]] = range(NC)
         currentCellIdx[cell[:NC, 1]] = range(NC)
         currentCellIdx[cell[:NC, 2]] = range(NC)
-        pcell[pcellLocation[:-1]] = currentCellIdx 
+        pcell[pcellLocation[:-1]] = currentCellIdx
 
         currentIdx = pcellLocation[:-1]
         N = self.number_of_nodes() - 1
@@ -2025,4 +2026,3 @@ class TriangleMeshWithInfinityNode:
             currentIdx += 1
 
         return pnode, pcell, pcellLocation
-
