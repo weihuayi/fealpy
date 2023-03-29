@@ -502,12 +502,11 @@ class UniformMesh1d():
 
     ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
-    	"""
+        """
         @brief 均匀网格上的 fast sweeping method
         @param[in] phi 是一个离散的水平集函数
         """
         pass
-
 
     ## @ingroup FEMInterface
     def geo_dimension(self):
