@@ -10,14 +10,14 @@ from .Mesh2d import Mesh2d
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
 from ..geometry import project
 
-## @defgroup FEMInterface                                                                                                                                            
+## @defgroup FEMInterface
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
 class UniformMesh2d(Mesh2d):
     """
     @brief A class for representing a two-dimensional structured mesh with uniform discretization in both x and y directions.
     """
-    def __init__(self, 
+    def __init__(self,
             extent: Tuple[int, int, int, int],
             h: Tuple[float, float] = (1.0, 1.0),
             origin: Tuple[float, float] = (0.0, 0.0),
@@ -83,7 +83,7 @@ class UniformMesh2d(Mesh2d):
         """
         @brief Get the number of edges in the mesh.
 
-        @note `edge` is the 1D entity 
+        @note `edge` is the 1D entity
 
         @return The number of edges.
         """
@@ -94,7 +94,7 @@ class UniformMesh2d(Mesh2d):
         """
         @brief Get the number of faces in the mesh.
 
-        @note `face` is the 1D entity 
+        @note `face` is the 1D entity
 
         @return The number of faces.
         """
@@ -123,7 +123,7 @@ class UniformMesh2d(Mesh2d):
                  For each iteration, it updates the mesh extent, step size, number of cells, and number of nodes,
                  as well as the data structure. If returnim is True, it also calculates and returns the
                  interpolation matrices for each iteration.
-        
+
         """
         for i in range(n):
             self.extent = [i * 2 for i in self.extent]
@@ -147,7 +147,7 @@ class UniformMesh2d(Mesh2d):
         """
         @brief 返回边长，注意这里返回两个值，一个 x 方向，一个 y 方向
         """
-        return self.h[0], sef.h[1]
+        return self.h[0], self.h[1]
 
     ## @ingroup GeneralInterface
     def cell_location(self, p):
@@ -197,8 +197,8 @@ class UniformMesh2d(Mesh2d):
             axes.set_title(s)
             axes.set_aspect('equal')
             #fig.colorbar(data)
-            return data 
-       
+            return data
+
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
 
@@ -251,9 +251,9 @@ class UniformMesh2d(Mesh2d):
 
         nx = self.ds.nx
         ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
                self.origin[1], self.origin[1] + ny*self.h[1]]
-	
+
         x = np.linspace(box[0], box[1], nx+1)
         y = np.linspace(box[2], box[3], ny+1)
         z = np.zeros(1)
@@ -283,7 +283,7 @@ class UniformMesh2d(Mesh2d):
         node[..., 0], node[..., 1] = np.mgrid[
                                      box[0]:box[1]:(nx + 1)*1j,
                                      box[2]:box[3]:(ny + 1)*1j]
-        return node 
+        return node
 
     ## @ingroup FDMInterface
     def cell_barycenter(self):
@@ -293,7 +293,7 @@ class UniformMesh2d(Mesh2d):
         GD = self.geo_dimension()
         nx = self.nx
         ny = self.ny
-        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0], 
+        box = [self.origin[0] + self.h[0]/2, self.origin[0] + self.h[0]/2 + (nx-1)*self.h[0],
                self.origin[1] + self.h[1]/2, self.origin[1] + self.h[1]/2 + (ny-1)*self.h[1]]
         bc = np.zeros((nx, ny, 2), dtype=self.ftype)
         bc[..., 0], bc[..., 1] = np.mgrid[
@@ -381,7 +381,7 @@ class UniformMesh2d(Mesh2d):
         elif etype in {'cell', 2}:
             uh = np.zeros((nx+2*ex, ny+2*ex), dtype=dtype)
         else:
-            raise ValueError(f'the entity `{entity}` is not correct!') 
+            raise ValueError(f'the entity `{etype}` is not correct!')
 
         return uh
 
@@ -394,7 +394,7 @@ class UniformMesh2d(Mesh2d):
         hy = self.h[1]
         fx, fy = np.gradient(f, hx, hy, edge_order=order)
         return fx, fy
-        
+
     ## @ingroup FDMInterface
     def divergence(self, f_x, f_y, order=1):
         """
@@ -405,7 +405,7 @@ class UniformMesh2d(Mesh2d):
         hy = self.h[1]
         f_xx,f_xy = np.gradient(f_x, hx, edge_order=order)
         f_yx,f_yy = np.gradient(f_y, hy, edge_order=order)
-        return fxx + fyy
+        return f_xx + f_yy
 
     ## @ingroup FDMInterface
     def laplace(self, f, order=1):
@@ -414,7 +414,7 @@ class UniformMesh2d(Mesh2d):
         fx, fy = np.gradient(f, hx, hy, edge_order=order)
         fxx,fxy = np.gradient(fx, hx, edge_order=order)
         fyx,fyy = np.gradient(fy, hy, edge_order=order)
-        return fxx + fyy 
+        return fxx + fyy
 
     ## @ingroup FDMInterface
     def value(self, p, f):
@@ -443,7 +443,7 @@ class UniformMesh2d(Mesh2d):
         a = (p[..., 0] - x0) / hx
         b = (p[..., 1] - y0) / hy
         F = f[i, j] * (1-a) * (1-b)  + f[i + 1, j] * a * (1-b) \
-            + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * a * b 
+            + f[i, j + 1] * (1-a) * b + f[i + 1, j + 1] * a * b
         return F
 
     ## @ingroup FDMInterface
@@ -527,7 +527,7 @@ class UniformMesh2d(Mesh2d):
         @brief Assemble the finite difference matrix for a general elliptic operator.
         """
         pass
-   
+
     ## @ingroup FDMInterface
     def laplace_operator(self):
         """
@@ -589,9 +589,9 @@ class UniformMesh2d(Mesh2d):
 
         nx = self.ds.nx
         ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0], 
+        box = [self.origin[0], self.origin[0] + nx*self.h[0],
                self.origin[1], self.origin[1] + ny*self.h[1]]
-	
+
         x = np.linspace(box[0], box[1], nx+1)
         y = np.linspace(box[2], box[3], ny+1)
         z = np.zeros(1)
@@ -600,85 +600,85 @@ class UniformMesh2d(Mesh2d):
         return filename
 
     def fast_sweeping_method(self, phi0):
-    	"""
+        """
         @brief 均匀网格上的 fast sweeping method
         @param[in] phi 是一个离散的水平集函数
 
         @note 注意，我们这里假设 x 和 y 方向剖分的段数相等
-    	"""
-    	m = 2
-    	nx = self.ds.nx
-    	ny = self.ds.ny
-    	k = nx/ny
-    	ns = ny
-    	h = self.h[0]
-    	
-    	phi = self.function(ex=1)
-    	isNearNode = self.function(dtype=np.bool_, ex=1)
-    	
-    	# 把水平集函数转化为离散的网格函数
-    	node = self.entity('node')
-    	phi[1:-1, 1:-1] = phi0
-    	sign = np.sign(phi[1:-1, 1:-1])
-    	
-    	# 标记界面附近的点
-    	isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
-    	lsfun = UniformMesh2dFunction(self, phi[1:-1, 1:-1])
-    	_, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
-    	phi[isNearNode] = np.abs(d) #界面附近的点用精确值
-    	phi[~isNearNode] = m  # 其它点用一个比较大的值
-    	
-    	a = np.zeros(ns+1, dtype=np.float64)
-    	b = np.zeros(ns+1, dtype=np.float64)
-    	c = np.zeros(ns+1, dtype=np.float64)
-    	d = np.zeros(int(k*ns+1), dtype=np.float64)
-    	e = np.zeros(int(k*ns+1), dtype=np.float64)
-    	f = np.zeros(int(k*ns+1), dtype=np.float64)
-    	
-    	n = 0
-    	for i in range(1, int(k*ns+2)):
-    	    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-    	    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-    	    flag = np.abs(a-b) >= h
-    	    c[flag] = np.minimum(a[flag], b[flag]) + h
-    	    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-    	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
-    	    n += 1
-    	    
-    	for i in range(int(k*ns+1), 0, -1):
-    	    a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
-    	    b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
-    	    flag = np.abs(a-b) >= h 
-    	    c[flag] = np.minimum(a[flag], b[flag]) + h
-    	    c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
-    	    phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
-    	    n += 1
-    	    
-    	for j in range(1, ns+2):
-    	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
-    	    e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-    	    flag = np.abs(d-e) >= h 
-    	    f[flag] = np.minimum(d[flag], e[flag]) + h
-    	    f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
-    	    phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
-    	    n += 1
-    	    
-    	for j in range(ns+1, 0, -1):
-    	    d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
-    	    e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
-    	    flag = np.abs(d-e) >= h
-    	    f[flag] = np.minimum(d[flag], e[flag]) + h
-    	    f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
-    	    phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
-    	    n += 1
-    	    
-    	return sign*phi[1:-1, 1:-1]
+        """
+        m = 2
+        nx = self.ds.nx
+        ny = self.ds.ny
+        k = nx/ny
+        ns = ny
+        h = self.h[0]
+
+        phi = self.function(ex=1)
+        isNearNode = self.function(dtype=np.bool_, ex=1)
+
+        # 把水平集函数转化为离散的网格函数
+        node = self.entity('node')
+        phi[1:-1, 1:-1] = phi0
+        sign = np.sign(phi[1:-1, 1:-1])
+
+        # 标记界面附近的点
+        isNearNode[1:-1, 1:-1] = np.abs(phi[1:-1, 1:-1]) < 2*h
+        lsfun = UniformMesh2dFunction(self, phi[1:-1, 1:-1])
+        _, d = lsfun.project(node[isNearNode[1:-1, 1:-1]])
+        phi[isNearNode] = np.abs(d) #界面附近的点用精确值
+        phi[~isNearNode] = m  # 其它点用一个比较大的值
+
+        a = np.zeros(ns+1, dtype=np.float64)
+        b = np.zeros(ns+1, dtype=np.float64)
+        c = np.zeros(ns+1, dtype=np.float64)
+        d = np.zeros(int(k*ns+1), dtype=np.float64)
+        e = np.zeros(int(k*ns+1), dtype=np.float64)
+        f = np.zeros(int(k*ns+1), dtype=np.float64)
+
+        n = 0
+        for i in range(1, int(k*ns+2)):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h
+            c[flag] = np.minimum(a[flag], b[flag]) + h
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+            n += 1
+
+        for i in range(int(k*ns+1), 0, -1):
+            a[:] = np.minimum(phi[i-1, 1:-1], phi[i+1, 1:-1])
+            b[:] = np.minimum(phi[i, 0:ns+1], phi[i, 2:])
+            flag = np.abs(a-b) >= h
+            c[flag] = np.minimum(a[flag], b[flag]) + h
+            c[~flag] = (a[~flag] + b[~flag] + np.sqrt(2*h*h - (a[~flag] - b[~flag])**2))/2
+            phi[i, 1:-1] = np.minimum(c, phi[i, 1:-1])
+            n += 1
+
+        for j in range(1, ns+2):
+            d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
+            e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(d-e) >= h
+            f[flag] = np.minimum(d[flag], e[flag]) + h
+            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
+            n += 1
+
+        for j in range(ns+1, 0, -1):
+            d[:] = np.minimum(phi[0:int(k*ns+1), j], phi[2:, j])
+            e[:] = np.minimum(phi[1:-1, j-1], phi[1:-1, j+1])
+            flag = np.abs(d-e) >= h
+            f[flag] = np.minimum(d[flag], e[flag]) + h
+            f[~flag] = (d[~flag] + e[~flag] + np.sqrt(2*h*h - (d[~flag] - e[~flag])**2))/2
+            phi[1:-1, j] = np.minimum(f, phi[1:-1, j])
+            n += 1
+
+        return sign*phi[1:-1, 1:-1]
 
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
         @brief Get the geometry dimension of the mesh.
-        
+
         @return The geometry dimension (2 for 2D mesh).
         """
         return 2
@@ -687,7 +687,7 @@ class UniformMesh2d(Mesh2d):
     def top_dimension(self):
         """
         @brief Get the topological dimension of the mesh.
-        
+
         @return The topological dimension (2 for 2D mesh).
         """
         return 2
@@ -700,7 +700,7 @@ class UniformMesh2d(Mesh2d):
     def bc_to_point(self, bc, index=np.s_[:]):
         pass
 
-    ## @ingroup FEMInterface 
+    ## @ingroup FEMInterface
     def entity(self, etype):
         """
         @brief Get the entity (either cell or node) based on the given entity type.
@@ -716,11 +716,11 @@ class UniformMesh2d(Mesh2d):
         elif etype in {'edge', 'face', 1}:
             return self.ds.edge
         elif etype in {'node', 0}:
-            return self.node.reshape(-1, 2) 
+            return self.node.reshape(-1, 2)
         else:
             raise ValueError("`etype` is wrong!")
 
-    ## @ingroup FEMInterface 
+    ## @ingroup FEMInterface
     def entity_barycenter(self, etype):
         """
         @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
@@ -736,7 +736,7 @@ class UniformMesh2d(Mesh2d):
             return self.cell_barycenter().reshape(-1, 2)
         elif etype in {'edge', 'face', 1}:
             bcx, bcy = self.edge_barycenter()
-            return np.concatenate((bcx.reshape(-1, 2), bcy.reshape(-1, 2)), axis=0) 
+            return np.concatenate((bcx.reshape(-1, 2), bcy.reshape(-1, 2)), axis=0)
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 2)
         else:
@@ -764,7 +764,7 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
         pass
-    
+
     ## @ingroup FEMInterface
     def number_of_global_ipoints(self, p):
         pass
@@ -808,28 +808,28 @@ class UniformMesh2d(Mesh2d):
         return idx
 
     def  s2tidx(self):
-    	"""
-    	@brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
-    	@example a[s2tidx] = uh
-    	"""
-    	tnx = int(self.ds.nx/2)
-    	tny = int(self.ds.ny/2)
-    	a = np.arange(tny+1)
-    	b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
-    	idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
-    	idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
-    	idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
-    	idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
-    	c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
-    	d = np.arange(tny)*3
-    	d = 3*np.arange(tny).reshape(-1,1)+c
-    	e = np.append(d.flatten(),[d.flatten()[-1]+1])
-    	idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
-    	
-    	idx = np.c_[idx1[:tnx],idx2]
-    	idx = np.append(idx.flatten(),[idx1[-1,:]])
-    	idx = idx.astype(int)
-    	return idx
+        """
+        @brief 已知结构四边形网格点的值，将其排列到结构三角形网格上
+        @example a[s2tidx] = uh
+        """
+        tnx = int(self.ds.nx/2)
+        tny = int(self.ds.ny/2)
+        a = np.arange(tny+1)
+        b = 3*np.arange(tny).reshape(-1,1)+(tnx+1)*(tny+1)
+        idx1 = np.zeros((tnx+1,2*tny+1))#sny+1
+        idx1[:,0::2] = a+np.arange(tnx+1).reshape(-1,1)*(tny+1)
+        idx1[:,1::2] = b.flatten()+np.arange(tnx+1).reshape(-1,1)*(2*tny+1+tny)
+        idx1[-1,1::2] = np.arange((2*tnx+1)*(2*tny+1)-tny,(2*tnx+1)*(2*tny+1))
+        c = np.array([(tnx+1)*(tny+1)+1,(tnx+1)*(tny+1)+2])
+        d = np.arange(tny)*3
+        d = 3*np.arange(tny).reshape(-1,1)+c
+        e = np.append(d.flatten(),[d.flatten()[-1]+1])
+        idx2 = np.arange(tnx).reshape(-1,1)*(2*tny+1+tny)+e
+
+        idx = np.c_[idx1[:tnx],idx2]
+        idx = np.append(idx.flatten(),[idx1[-1,:]])
+        idx = idx.astype(int)
+        return idx
 
     def data_edge_to_cell(self, Ex, Ey):
         """
@@ -847,7 +847,7 @@ class UniformMesh2d(Mesh2d):
         """
         @brief 获取结构三角形和结构四边形网格上的自由度映射关系
 
-        @example 
+        @example
         phi.flat[idxMap] = uh
         """
         nx = self.ds.nx
@@ -887,19 +887,19 @@ class UniformMesh2d(Mesh2d):
             bc = self.entity_barycenter('cell')
             F = f(bc)
         return F
-    	
-    	
+
+
 class UniformMesh2dFunction():
     def __init__(self, mesh, f):
         self.mesh = mesh # (nx+1, ny+1)
         self.f = f   # (nx+1, ny+1)
-        self.fx, self.fy = mesh.gradient(f) 
+        self.fx, self.fy = mesh.gradient(f)
 
     def __call__(self, p):
         mesh = self.mesh
         F = mesh.value(p, self.f)
         return F
-    
+
     def value(self, p):
         mesh = self.mesh
         F = mesh.value(p, self.f)
@@ -913,12 +913,10 @@ class UniformMesh2dFunction():
         gf[..., 0] = mesh.value(p, fx)
         gf[..., 1] = mesh.value(p, fy)
         return gf
-        
+
     def project(self, p):
         """
         @brief 把曲线附近的点投影到曲线上
         """
         p, d = project(self, p, maxit=200, tol=1e-8, returnd=True)
-        return p, d 
-
-
+        return p, d
