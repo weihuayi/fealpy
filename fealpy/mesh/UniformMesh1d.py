@@ -86,7 +86,7 @@ class UniformMesh1d():
 
         @note `edge` is the 1D entity.
 
-        @return The number of edges.
+       return The number of edges.
 
         """
         return self.NC
@@ -290,9 +290,9 @@ class UniformMesh1d():
         """
         @brief Returns an array defined on nodes or cells with all elements set to 0.
 
-        @param[in] etype The type of entity, either 'node' or 'cell' (default: 'node').
-        @param[in] dtype Data type for the array (default: None, which means self.ftype will be used).
-        @param[in] ex Non-negative integer to extend the discrete function outward by a certain width (default: 0).
+        @param[in] etype: The type of entity, either 'node' or 'cell' (default: 'node').
+        @param[in] dtype: Data type for the array (default: None, which means self.ftype will be used).
+        @param[in] ex: Non-negative integer to extend the discrete function outward by a certain width (default: 0).
 
         @return An array with all elements set to 0, defined on nodes or cells.
 
@@ -305,7 +305,7 @@ class UniformMesh1d():
         elif etype in {'cell', 1}:
             uh = np.zeros(nx, dtype=dtype)
         else:
-            raise ValueError(f'the entity `{etype}` is not correct!')
+            raise ValueError('the entity `{etype}` is not correct!')
         return uh
 
     ## @ingroup FDMInterface
@@ -320,7 +320,9 @@ class UniformMesh1d():
         """
         @brief 求网格函数 f 的梯度
         """
-        pass
+        hx = self.h
+        fx = np.gradient(f, hx, edge_order=order)
+        return fx 
 
    
     ## @ingroup FDMInterface
@@ -475,17 +477,17 @@ class UniformMesh1d():
         """
         NN = self.number_of_nodes()
         isBdNode = np.zeros(NN, dtype=np.bool_)
-        isBdNode[[0,-1]] = True
+        isBdNode[[0, -1]] = True
 
-        f -= A@uh
-        f[isBdNode] = uh[isBdNode]
+        F = f - A@uh
+        F[isBdNode] = uh[isBdNode]
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isBdNode] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A, f
+        return A, F
 
 
     ## @ingroup FDMInterface
