@@ -368,3 +368,35 @@ class QuadrangleMesh(Mesh2d):
         cell = idxMap[cell]
     
         return cls(node, cell)
+
+
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        NN = (nx+1)*(ny+1)
+        NC = nx*ny
+        node = np.zeros((NN,2))
+        X, Y = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j,
+                box[2]:box[3]:(ny+1)*1j]
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+
+        idx = np.arange(NN).reshape(nx+1, ny+1)
+        cell = np.zeros((NC, 4), dtype=np.int_)
+        cell[:, 0] = idx[0:-1, 0:-1].flat
+        cell[:, 1] = idx[1:, 0:-1].flat
+        cell[:, 2] = idx[1:, 1:].flat
+        cell[:, 3] = idx[0:-1, 1:].flat
+
+        if threshold is not None:
+            bc = np.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = np.zeros(NN, dtype=np.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = np.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        return cls(node, cell)
