@@ -367,3 +367,67 @@ class HexahedronMesh(Mesh3d):
         print("Face2cell:\n", self.ds.face2cell)
 
 
+
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1, 0, 1], nx=10, ny=10, nz=10, threshold=None):
+        """
+        Generate a hexahedral mesh for a box domain.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param nz Number of divisions along the z-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TetrahedronMesh instance
+        """
+        NN = (nx+1)*(ny+1)*(nz+1)
+        NC = nx*ny*nz
+        node = np.zeros((NN, 3), dtype=np.float64)
+        X, Y, Z = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j,
+                box[2]:box[3]:(ny+1)*1j,
+                box[4]:box[5]:(nz+1)*1j
+                ]
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+        node[:, 2] = Z.flat
+
+        idx = np.arange(NN).reshape(nx+1, ny+1, nz+1)
+        c = idx[:-1, :-1, :-1]
+
+        cell = np.zeros((NC, 8), dtype=np.int_)
+        nyz = (ny + 1)*(nz + 1)
+        cell[:, 0] = c.flatten()
+        cell[:, 1] = cell[:, 0] + nyz
+        cell[:, 2] = cell[:, 1] + nz + 1
+        cell[:, 3] = cell[:, 0] + nz + 1
+        cell[:, 4] = cell[:, 0] + 1
+        cell[:, 5] = cell[:, 4] + nyz
+        cell[:, 6] = cell[:, 5] + nz + 1
+        cell[:, 7] = cell[:, 4] + nz + 1
+
+        if threshold is not None:
+            bc = np.sum(node[cell, :], axis=1)/cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = np.zeros(NN, dtype=np.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = np.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        return cls(node, cell)
+
+    @classmethod
+    def from_unit_cube(cls, nx=10, ny=10, nz=10, threshold=None):
+        """
+        Generate a hexahedral mesh for a unit cube.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param nz Number of divisions along the z-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TetrahedronMesh instance
+        """
+        return cls.from_box(box=[0, 1, 0, 1, 0, 1], nx=nx, ny=ny, nz=nz, threshold=threshold)
+

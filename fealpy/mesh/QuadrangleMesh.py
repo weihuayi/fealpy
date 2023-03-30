@@ -373,7 +373,7 @@ class QuadrangleMesh(Mesh2d):
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
         """
-        Generate a triangle mesh for a rectangular domain.
+        Generate a quadrilateral mesh for a rectangular domain.
 
         :param box: list of four float values representing the x- and y-coordinates of the lower left and upper right corners of the domain (default: [0, 1, 0, 1])
         :param nx: number of cells along the x-axis (default: 10)
@@ -422,3 +422,36 @@ class QuadrangleMesh(Mesh2d):
         @return TriangleMesh instance
         """
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
+
+
+    @classmethod
+    def from_one_quadrangle(cls, meshtype='square'):
+        """
+        Generate a quadrilateral mesh for a single quadrangle.
+
+        @param meshtype Type of quadrangle mesh, options are 'square', 'zhengfangxing', 'rectangle', 'rec', 'juxing', 'rhombus', 'lingxing' (default: 'square')
+        @return QuadrangleMesh instance
+        """
+        if meshtype in {'square', 'zhengfangxing'}:
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.0, 1.0]], dtype=np.float64)
+        elif meshtype in {'rectangle', 'rec', 'juxing'}:
+            node = np.array([
+                [0.0, 0.0],
+                [2.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0]], dtype=np.float64)
+        elif meshtype in {'rhombus', 'lingxing'}:
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.5, np.sqrt(3) / 2],
+                [0.5, np.sqrt(3) / 2]], dtype=np.float64)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+        return cls(node, cell)
+
+
+
