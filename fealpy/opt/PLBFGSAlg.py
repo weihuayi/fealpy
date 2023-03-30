@@ -18,21 +18,19 @@ class PLBFGS(Optimizer):
     def __init__(self, problem: Problem, options: Options) -> None:
         super().__init__(problem, options)
 
-        x = problem["x0"]
-        ND = x.shape[0]
         self.S = deque() 
         self.Y = deque() 
         # if self.P is None, 表示没有预条件子
-        self.P: MatrixLike= options['Preconditioner']
+        self.P: MatrixLike = options['Preconditioner']
 
     @classmethod
     def get_options(
         cls, *,
-        Preconditioner: NDArray,
-        Display = False,
-        MaxIterations = 500,
-        StepTolerance = 1e-8,
-        NormGradTolerance = 1e-6,
+        Preconditioner: MatrixLike,
+        Display: bool = False,
+        MaxIterations: int = 500,
+        StepTolerance: float = 1e-8,
+        NormGradTolerance: float = 1e-6,
         NumGrad = 10,
     ) -> Options:
 
@@ -90,7 +88,7 @@ class PLBFGS(Optimizer):
         j = 0
         for i in range(1, options['MaxIterations']):
             d = -self.hessian_gradient_prod(g)
-            gtd = np.sum(g*d)
+            gtd = np.dot(g, d)
 
             if gtd >= 0 or np.isnan(gtd):
                 print('Not descent direction, quit at iteration {i} witht statt {f:%12.11g}, grad:{gnorm:%12.11g}, diff:{diff:%12.11g}')
