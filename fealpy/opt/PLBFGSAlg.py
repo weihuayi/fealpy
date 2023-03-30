@@ -1,32 +1,36 @@
+from collections import deque
+from typing import Union
+
 import numpy as np
 from numpy.linalg import norm, inv
 from numpy.typing import NDArray
-from scipy.linalg import cholesky
+
+from scipy.sparse import spmatrix  # 代表 scipy 的稀疏矩阵
+from scipy.sparse.linalg import LinearOperator
 
 from .optimizer_base import Optimizer, Problem, Options
 from .line_search import wolfe_line_search
 
+# 表示变量可以是 LinearOperator、稀疏矩阵或密集矩阵
+MatrixLike = Union[LinearOperator, spmatrix, np.ndarray, None]
 
 class PLBFGS(Optimizer):
     def __init__(self, problem: Problem, options: Options) -> None:
         super().__init__(problem, options)
 
-        self.pflag = True
-        x = problem["x0"]
-        ND = x.shape[0]
-        self.S = [] 
-        self.Y = [] 
-        P = options['Preconditioner']
-        self.L = cholesky((P+P.T)/2)
+        self.S = deque() 
+        self.Y = deque() 
+        # if self.P is None, 表示没有预条件子
+        self.P: MatrixLike = options['Preconditioner']
 
     @classmethod
     def get_options(
         cls, *,
-        Preconditioner: NDArray,
-        Display = False,
-        MaxIterations = 500,
-        StepTolerance = 1e-8,
-        NormGradTolerance = 1e-6,
+        Preconditioner: MatrixLike,
+        Display: bool = False,
+        MaxIterations: int = 500,
+        StepTolerance: float = 1e-8,
+        NormGradTolerance: float = 1e-6,
         NumGrad = 10,
     ) -> Options:
 
@@ -52,11 +56,10 @@ class PLBFGS(Optimizer):
             alpha[i] = np.dot(self.S[i], q)*rho[i]
             q = q - alpha[i]*self.Y[i]
 
-        invL = inv(self.L)
-        if self.pflag:
-            r = invL.T@(invL@q)
+        if self.P is not None:
+            r = self.P@q
         else:
-            r = invL@q
+            r = q
 
         for i in range(0, N):
             beta = rho[i] * (np.dot(self.Y[i], r))
@@ -75,24 +78,20 @@ class PLBFGS(Optimizer):
         pg = g
 
         alpha = 1
+        diff = np.inf
 
         if options['Display'] == 'iter':
-            print("The initial status F(x): %12.11g, grad:%12.11g, diff:%12.11g"%(f, gnorm))
+            print(f"The initial status F(x): {f:%12.11g}, grad:{gnorm:%12.11g}, diff:{diff:%12.11g}")
 
 
         flag = 0 # The convergence flag
         j = 0
         for i in range(1, options['MaxIterations']):
             d = -self.hessian_gradient_prod(g)
-            gtd = np.sum(g*d)
-
-            if np.abs(gtd) > 1e4:
-                print('The norm of the desent direction is too big! Normalize it!\n')
-                d = d/norm(d)
-                gtd = np.sum(g*d)
+            gtd = np.dot(g, d)
 
             if gtd >= 0 or np.isnan(gtd):
-                print('Not descent direction, quit at iteration %d, f = %g, gnorm = %5.1g\n'%(i, f, gnorm))
+                print('Not descent direction, quit at iteration {i} witht statt {f:%12.11g}, grad:{gnorm:%12.11g}, diff:{diff:%12.11g}')
                 break
 
             pg = g
@@ -119,8 +118,8 @@ class PLBFGS(Optimizer):
                     if options['Display'] == 'iter':
                         print(f'restart with step length {alpha}.')
                     ND = x.shape[0]
-                    self.S = np.zeros((ND, 0), dtype=np.float64)
-                    self.Y = np.zeros((ND, 0), dtype=np.float64)
+                    self.S = deque()
+                    self.Y = deque() 
                     j = 0
                     continue
 
@@ -146,10 +145,10 @@ class PLBFGS(Optimizer):
                     self.Y.append(y)
                     j += 1
                 else:
-                    self.S[:, :-1] = self.S[:, 1:]
-                    self.S[:, -1] = s
-                    self.Y[:, :-1] = self.Y[:, 1:]
-                    self.Y[:, -1] = y
+                    self.S.popleft()
+                    self.S.append(s)
+                    self.Y.popleft()
+                    self.Y.append(y)
 
         if flag == 0:
             flag = 3

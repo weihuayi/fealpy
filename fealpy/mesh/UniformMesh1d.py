@@ -471,15 +471,18 @@ class UniformMesh1d():
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, uh, A, f):
+    def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
         @brief 组装 u_xx 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
-        NN = self.number_of_nodes()
-        isBdNode = np.zeros(NN, dtype=np.bool_)
-        isBdNode[[0, -1]] = True
+        if uh is None:
+            uh = self.function('node')
 
-        F = f - A@uh
+        node = self.node
+        isBdNode = self.ds.boundary_node_flag()
+        uh[isBdNode]  = gD(node[isBdNode])
+
+        f -= A@uh
         F[isBdNode] = uh[isBdNode]
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
@@ -487,7 +490,7 @@ class UniformMesh1d():
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A, F
+        return A, f 
 
 
     ## @ingroup FDMInterface
