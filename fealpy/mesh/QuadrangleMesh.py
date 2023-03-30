@@ -372,6 +372,15 @@ class QuadrangleMesh(Mesh2d):
 
     @classmethod
     def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        Generate a triangle mesh for a rectangular domain.
+
+        :param box: list of four float values representing the x- and y-coordinates of the lower left and upper right corners of the domain (default: [0, 1, 0, 1])
+        :param nx: number of cells along the x-axis (default: 10)
+        :param ny: number of cells along the y-axis (default: 10)
+        :param threshold: optional function to filter cells based on their barycenter coordinates (default: None)
+        :return: TriangleMesh instance
+        """
         NN = (nx+1)*(ny+1)
         NC = nx*ny
         node = np.zeros((NN,2))
@@ -400,3 +409,16 @@ class QuadrangleMesh(Mesh2d):
             cell = idxMap[cell]
 
         return cls(node, cell)
+
+
+    @classmethod
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+        """
+        Generate a quadrilateral mesh for a unit square.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return TriangleMesh instance
+        """
+        return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
