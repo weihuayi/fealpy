@@ -7,6 +7,7 @@ from .Mesh2d import Mesh2d
 
 # 这个数据接口为有限元服务
 from .StructureMesh2dDataStructure import StructureMesh2dDataStructure
+from ..quadrature import TensorProductQuadrature, GaussLegendreQuadrature
 from ..geometry import project
 
 ## @defgroup FEMInterface
@@ -580,26 +581,7 @@ class UniformMesh2d(Mesh2d):
         """
         pass
 
-
-    def to_vtk_file(self, filename, celldata=None, nodedata=None):
-        """
-
-
-        """
-        from pyevtk.hl import gridToVTK
-
-        nx = self.ds.nx
-        ny = self.ds.ny
-        box = [self.origin[0], self.origin[0] + nx*self.h[0],
-               self.origin[1], self.origin[1] + ny*self.h[1]]
-
-        x = np.linspace(box[0], box[1], nx+1)
-        y = np.linspace(box[2], box[3], ny+1)
-        z = np.zeros(1)
-        gridToVTK(filename, x, y, z, cellData=celldata, pointData=nodedata)
-
-        return filename
-
+    ## @ingroup FDMInterface
     def fast_sweeping_method(self, phi0):
         """
         @brief 均匀网格上的 fast sweeping method
@@ -695,7 +677,11 @@ class UniformMesh2d(Mesh2d):
 
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
-        return GaussLegendreQuadrature(q)
+        qf = GaussLegendreQuadrature(q)
+        if etype in {'cell', 2}:
+            return TensorProductQuadrature((qf, qf)) 
+        elif etype in {'edge', 'face', 1}:
+            return qf 
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
@@ -862,32 +848,6 @@ class UniformMesh2d(Mesh2d):
         idxMap[idx] = range(tmesh.number_of_nodes())
 
         return idxMap
-
-    def interpolation(self, f, intertype='node'):
-        """
-        This function is deprecated and will be removed in a future version.
-        Please use the interpolate() instead.
-        """
-        warnings.warn("The interpolation() is deprecated and will be removed in a future version. "
-                      "Please use the interpolate() instead.", DeprecationWarning)
-        nx = self.ds.nx
-        ny = self.ds.ny
-        node = self.node
-        if intertype == 'node':
-            F = f(node)
-        elif intertype == 'edge':
-            xbc, ybc = self.entity_barycenter('edge')
-            F = f(xbc), f(ybc)
-        elif intertype == 'edgex':
-            xbc = self.entity_barycenter('edgex')
-            F = f(xbc)
-        elif intertype == 'edgey':
-            ybc = self.entity_barycenter('edgey')
-            F = f(ybc)
-        elif intertype == 'cell':
-            bc = self.entity_barycenter('cell')
-            F = f(bc)
-        return F
 
 
 class UniformMesh2dFunction():

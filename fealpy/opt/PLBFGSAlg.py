@@ -14,8 +14,8 @@ class PLBFGS(Optimizer):
         self.pflag = True
         x = problem["x0"]
         ND = x.shape[0]
-        self.S = np.zeros((ND, 0), dtype=np.float64)
-        self.Y = np.zeros((ND, 0), dtype=np.float64)
+        self.S = [] 
+        self.Y = [] 
         P = options['Preconditioner']
         self.L = cholesky((P+P.T)/2)
 
@@ -43,16 +43,14 @@ class PLBFGS(Optimizer):
 
 
     def hessian_gradient_prod(self, g: NDArray) -> NDArray:
-        N = self.S.shape[1]
+        N = len(self.S)
         q = g
         rho = np.zeros((N, ), dtype=np.float64)
         alpha = np.zeros((N, ), dtype=np.float64)
         for i in range(N-1, -1, -1):
-            s = self.S[:, i]
-            y = self.Y[:, i]
-            rho[i] = 1/np.sum(s*y)
-            alpha[i] = np.sum(s*q)*rho[i]
-            q = q - alpha[i]*y
+            rho[i] = 1/np.dot(self.S[i], self.Y[i])
+            alpha[i] = np.dot(self.S[i], q)*rho[i]
+            q = q - alpha[i]*self.Y[i]
 
         invL = inv(self.L)
         if self.pflag:
@@ -61,10 +59,8 @@ class PLBFGS(Optimizer):
             r = invL@q
 
         for i in range(0, N):
-            s = self.S[:, i]
-            y = self.Y[:, i]
-            beta = rho[i] * (np.sum(y*r))
-            r = r + (alpha[i] - beta)*s
+            beta = rho[i] * (np.dot(self.Y[i], r))
+            r = r + (alpha[i] - beta)*self.S[i]
 
         return r
 
@@ -140,14 +136,14 @@ class PLBFGS(Optimizer):
 
             s = alpha*d
             y = g - pg
-            sty = np.sum(s*y)
+            sty = np.dot(s, y)
 
             if sty < 0:
                 print(f'bfgs: sty <= 0, skipping BFGS update at iteration {i}.')
             else:
                 if i < options['NumGrad']:
-                    self.S = np.hstack((self.S, s[:, None]))
-                    self.Y = np.hstack((self.Y, y[:, None]))
+                    self.S.append(s) 
+                    self.Y.append(y)
                     j += 1
                 else:
                     self.S[:, :-1] = self.S[:, 1:]
