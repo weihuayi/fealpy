@@ -9,6 +9,7 @@ class StructureMesh1dDataStructure():
         @param NN    : int, number of nodes
         @param itype : dtype, data type of indices
         """
+        self.nx = NN-1
         self.NN = NN
         self.NC = NN-1 
         self.itype = itype 

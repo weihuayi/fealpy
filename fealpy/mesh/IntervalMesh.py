@@ -102,6 +102,13 @@ class IntervalMesh():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
+    def multi_index_matrix(self, p):
+        ldof = p+1
+        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+        multiIndex[:, 0] = np.arange(p, -1, -1)
+        multiIndex[:, 1] = p - multiIndex[:, 0]
+        return multiIndex
+
     def shape_function(self, bc, p=1):
         """
         @brief 
