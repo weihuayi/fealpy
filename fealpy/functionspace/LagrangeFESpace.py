@@ -380,6 +380,7 @@ class LagrangeFESpace():
         self.p = p
         assert spacetype in {'C', 'D'} 
         self.spacetype = spacetype
+        self.doforder = doforder
 
         mname = type(mesh).__name__
         self.dof = self.DOF[spacetype][mname](mesh, p)
