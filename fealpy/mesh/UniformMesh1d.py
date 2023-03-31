@@ -491,13 +491,10 @@ class UniformMesh1d():
 
         node = self.node
         isBdNode = self.ds.boundary_node_flag()
-        print("isBdNode:", isBdNode)
-        print("node[isBdNode]:", node[isBdNode])
-        print("gD(node[isBdNode]):", gD(node[isBdNode]))
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh
-        F[isBdNode] = uh[isBdNode]
+        f[isBdNode] = uh[isBdNode]
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isBdNode] = 1
