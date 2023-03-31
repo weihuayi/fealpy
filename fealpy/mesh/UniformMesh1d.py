@@ -154,7 +154,7 @@ class UniformMesh1d():
         hx = self.h
         nx = self.ds.nx
 
-        v = ps - np.arrayself.origin, dtype=self.ftype)
+        v = ps - np.array(self.origin, dtype=self.ftype)
         n0 = v//hx
 
         return n0.astype('int64')
@@ -490,6 +490,9 @@ class UniformMesh1d():
 
         node = self.node
         isBdNode = self.ds.boundary_node_flag()
+        print("isBdNode:", isBdNode)
+        print("node[isBdNode]:", node[isBdNode])
+        print("gD(node[isBdNode]):", gD(node[isBdNode]))
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh
