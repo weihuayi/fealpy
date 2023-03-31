@@ -2,16 +2,16 @@ import numpy as np
 from scipy.sparse import csr_matrix
 
 class StructureMesh1dDataStructure():
-    def __init__(self, NN, itype):
+    def __init__(self, nx, itype):
         """
         @brief Initialize 1D structured mesh data structure
 
         @param NN    : int, number of nodes
         @param itype : dtype, data type of indices
         """
-        self.nx = NN-1
-        self.NN = NN
-        self.NC = NN-1 
+        self.nx = nx 
+        self.NN = nx + 1
+        self.NC = nx 
         self.itype = itype 
 
     @property
