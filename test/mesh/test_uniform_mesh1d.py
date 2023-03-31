@@ -58,4 +58,11 @@ def test_function():
     assert f_node.shape == (11,)
     assert np.all(f_node == 0)
 
+def test_cell_location():
+    mesh = UniformMesh1d([0, 10], h=1.0)
+    ps = np.array([0.5, 1.7, 3.0, 8.9, 9.01])
+    idx = mesh.cell_location(ps)
+    expect_location = np.array([0, 1, 3, 8, 9]) 
+    np.testing.assert_array_equal(mesh.cell_location(ps), expected_locations)
+
 

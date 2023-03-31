@@ -149,12 +149,13 @@ class UniformMesh1d():
     def cell_location(self, ps):
         """
         @brief 给定一组点，确定所有点所在的单元
+        @todo 如果 ps 取最右边的端点应该会出问题！
 
         """
         hx = self.h
         nx = self.ds.nx
 
-        v = ps - np.arrayself.origin, dtype=self.ftype)
+        v = ps - self.origin
         n0 = v//hx
 
         return n0.astype('int64')
