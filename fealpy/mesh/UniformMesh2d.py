@@ -572,7 +572,18 @@ class UniformMesh2d(Mesh2d):
         """
         @brief
         """
-        pass
+        NN = self.number_of_nodes()
+        isBdNode = mesh.ds.boundary_node_flag()
+
+        F = f - A@uh
+        F[isBdNode] = uh[isBdNode]
+
+        bdIdx = np.zeros(A.shape[0], dtype=np.int_)
+        bdIdx[isBdNode] = 1
+        D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
+        D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
+        A = D0@A@D0 + D1
+        return A, F
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):

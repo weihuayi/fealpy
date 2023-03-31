@@ -6,7 +6,7 @@ class StructureMesh1dDataStructure():
         """
         @brief Initialize 1D structured mesh data structure
 
-        @param NN    : int, number of nodes
+        @param NC    : int
         @param itype : dtype, data type of indices
         """
         self.nx = nx 
