@@ -146,11 +146,18 @@ class UniformMesh1d():
         return self.h
 
     ## @ingroup GeneralInterface
-    def cell_location(self, p):
+    def cell_location(self, ps):
         """
-        @brief
+        @brief 给定一组点，确定所有点所在的单元
+
         """
-        pass
+        hx = self.h
+        nx = self.ds.nx
+
+        v = ps - np.arrayself.origin, dtype=self.ftype)
+        n0 = v//hx
+
+        return n0.astype('int64')
 
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh):
@@ -286,13 +293,14 @@ class UniformMesh1d():
         return bc
 
     ## @ingroup FDMInterface
-    def function(self, etype='node', dtype=None, ex=0):
+    def function(self, etype='node', dtype=None, ex=0, flat=False):
         """
         @brief Returns an array defined on nodes or cells with all elements set to 0.
 
         @param[in] etype: The type of entity, either 'node' or 'cell' (default: 'node').
         @param[in] dtype: Data type for the array (default: None, which means self.ftype will be used).
         @param[in] ex: Non-negative integer to extend the discrete function outward by a certain width (default: 0).
+        @param[in] flat 是否展开为一维向量，默认不展开
 
         @return An array with all elements set to 0, defined on nodes or cells.
 
@@ -306,7 +314,10 @@ class UniformMesh1d():
             uh = np.zeros(nx, dtype=dtype)
         else:
             raise ValueError('the entity `{etype}` is not correct!')
-        return uh
+        if flat is False:
+            return uh
+        else:
+            return uh.flat
 
     ## @ingroup FDMInterface
     def value(self, p, f):
@@ -323,7 +334,6 @@ class UniformMesh1d():
         hx = self.h
         fx = np.gradient(f, hx, edge_order=order)
         return fx 
-
    
     ## @ingroup FDMInterface
     def interpolation(self, f, intertype='node'):
@@ -537,10 +547,13 @@ class UniformMesh1d():
 
     ## @ingroup FEMInterface
     def bc_to_point(self, bc, index=np.s_[:]):
-        pass
+        node = self.node if node is None else node
+        cell = self.entity('cell', index=index)
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
+        return p
 
     ## @ingroup FEMInterface
-    def entity(self, etype):
+    def entity(self, etype, index=np.s_[:]):
         """
         @brief Get the entity (either cell or node) based on the given entity type.
 
@@ -551,14 +564,14 @@ class UniformMesh1d():
         @throws ValueError if the given etype is invalid.
         """
         if etype in {'cell', 'edge', 1}:
-            return self.ds.cell
+            return self.ds.cell[index]
         elif etype in {'node', 'face', 0}:
-            return self.node.reshape(-1, 1)
+            return self.node[index].reshape(-1, 1)
         else:
-            raise ValueError("`etype` is wrong!")
+            raise ValueError(f"The entiry type `{etype}` is not support!")
 
     ## @ingroup FEMInterface
-    def entity_barycenter(self, etype):
+    def entity_barycenter(self, etype, index=np.s_[:]):
         """
         @brief Calculate the barycenter of the specified entity.
 
@@ -569,56 +582,159 @@ class UniformMesh1d():
         @throws ValueError if the given etype is invalid.
         """
         if etype in {'cell', 1}:
-            return self.cell_barycenter().reshape(-1, 1)
+            return self.cell_barycenter().reshape(-1, 1)[index]
         elif etype in {'node', 0}:
-            return self.node.reshape(-1, 1)
+            return self.node.reshape(-1, 1)[index]
         else:
-            raise ValueError('the entity type `{etype}` is not correct!')
+            raise ValueError(f'the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
-    def entity_measure(self, etype):
-        """
-        @brief
-        """
+    def entity_measure(self, etype, index=np.s_[:]):
+        if etype in {1, 'cell', 'edge'}:
+            NC = self.number_of_cells() if index == np.s_[:] else len(index)
+            return np.broadcast_to(self.cell_length(), shape=NC)
+        elif etype in {0, 'face', 'node'}:
+            return 0
+        else:
+            raise ValueError(f"The entity type '{etype}` is not correct!")
         pass
 
     ## @ingroup FEMInterface
     def multi_index_matrix(self, p, etype=1):
-        pass
+        ldof = p+1
+        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
+        multiIndex[:, 0] = np.arange(p, -1, -1)
+        multiIndex[:, 1] = p - multiIndex[:, 0]
+        return multiIndex
 
     ## @ingroup FEMInterface
     def shape_function(self, bc, p=1):
-        pass
+        """
+        @brief 
+        """
+        TD = bc.shape[-1] - 1 
+        multiIndex = self.multi_index_matrix(p)
+        c = np.arange(1, p+1, dtype=np.int_)
+        P = 1.0/np.multiply.accumulate(c)
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+        idx = np.arange(TD+1)
+        phi = np.prod(A[..., multiIndex, idx], axis=-1)
+        return phi
 
     ## @ingroup FEMInterface
-    def grad_shape_function(self, bc, p=1):
-        pass
+    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
+        TD = self.top_dimension()
+
+        multiIndex = self.multi_index_matrix(p)
+
+        c = np.arange(1, p+1, dtype=self.itype)
+        P = 1.0/np.multiply.accumulate(c)
+
+        t = np.arange(0, p)
+        shape = bc.shape[:-1]+(p+1, TD+1)
+        A = np.ones(shape, dtype=self.ftype)
+        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
+
+        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
+        FF[..., range(p), range(p)] = p
+        np.cumprod(FF, axis=-2, out=FF)
+        F = np.zeros(shape, dtype=self.ftype)
+        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
+        F[..., 1:, :] *= P.reshape(-1, 1)
+
+        np.cumprod(A, axis=-2, out=A)
+        A[..., 1:, :] *= P.reshape(-1, 1)
+
+        Q = A[..., multiIndex, range(TD+1)]
+        M = F[..., multiIndex, range(TD+1)]
+        ldof = self.number_of_local_ipoints(p)
+        shape = bc.shape[:-1]+(ldof, TD+1)
+        R = np.zeros(shape, dtype=self.ftype)
+        for i in range(TD+1):
+            idx = list(range(TD+1))
+            idx.remove(i)
+            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
+
+        Dlambda = self.grad_lambda(index=index)
+        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
+        return gphi #(..., NC, ldof, GD)
+
+    ## @ingroup FEMInterface
+    def grad_lambda(self, index=np.s_[:]):
+        """
+        @brief 计算所有单元上重心坐标函数的导数
+        """
+        node = self.entity('node')
+        cell = self.entity('cell')
+        GD = self.geo_dimension()
+        NC = self.number_of_cells() if index == np.s_[:] else len(index)
+        Dlambda = np.zeros((NC, 2, GD), dtype=self.ftype)
+        Dlambda[:, 0, :] = -1/self.h
+        Dlambda[:, 1, :] = 1/self.h 
+        return Dlambda
    
     ## @ingroup FEMInterface
     def number_of_local_ipoints(self, p, iptype='cell'):
-        pass
+        return p+1
     
     ## @ingroup FEMInterface
     def number_of_global_ipoints(self, p):
-        pass
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NC
 
     ## @ingroup FEMInterface
     def interpolation_points(self, p):
-        pass
+        """
+        @brief 获取网格上的所有插值点
+        """
+        node = self.entity('node')
+        cell = self.entity('cell')
+        if p == 1:
+            return node
+        if p > 1:
+            NN = self.number_of_nodes()
+            GD = self.geo_dimension()
+
+            gdof = self.number_of_global_ipoints(p)
+            ipoints = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoints[:NN, :] = node
+
+            NC = self.number_of_cells()
+
+            w = np.zeros((p-1, 2), dtype=np.float64)
+            w[:, 0] = np.arange(p-1, 0, -1)/p
+            w[:, 1] = w[-1::-1, 0]
+            ipoints[NN:NN+(p-1)*NC, :] = np.einsum('ij, ...jm->...im', w, node[cell,:]).reshape(-1, GD)
 
     ## @ingroup FEMInterface
     def node_to_ipoint(self, p):
-        pass
+        NN = self.number_of_nodes()
+        return np.arange(NN)
 
     ## @ingroup FEMInterface
     def edge_to_ipoint(self, p):
-        pass
+        return self.cell_to_ipoint(p)
 
     ## @ingroup FEMInterface
     def face_to_ipoint(self, p):
-        pass
+        NN = self.number_of_nodes()
+        return np.arange(NN)
 
     ## @ingroup FEMInterface
     def cell_to_ipoint(self, p):
-        pass
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+
+        cell = self.entity('cell')
+        cell2ipoints = np.zeros((NC, p+1), dtype=np.itype)
+        cell2ipoints[:, [0, -1]] = cell 
+        if p > 1:
+            cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
+        return cell2ipoints
 
