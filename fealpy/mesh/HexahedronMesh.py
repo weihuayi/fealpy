@@ -377,7 +377,7 @@ class HexahedronMesh(Mesh3d):
         @param ny Number of divisions along the y-axis (default: 10)
         @param nz Number of divisions along the z-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
-        @return TetrahedronMesh instance
+        @return HexahedronMesh instance
         """
         NN = (nx+1)*(ny+1)*(nz+1)
         NC = nx*ny*nz
@@ -427,7 +427,7 @@ class HexahedronMesh(Mesh3d):
         @param ny Number of divisions along the y-axis (default: 10)
         @param nz Number of divisions along the z-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
-        @return TetrahedronMesh instance
+        @return HexahedronMesh instance
         """
         return cls.from_box(box=[0, 1, 0, 1, 0, 1], nx=nx, ny=ny, nz=nz, threshold=threshold)
 

@@ -379,7 +379,7 @@ class QuadrangleMesh(Mesh2d):
         :param nx: number of cells along the x-axis (default: 10)
         :param ny: number of cells along the y-axis (default: 10)
         :param threshold: optional function to filter cells based on their barycenter coordinates (default: None)
-        :return: TriangleMesh instance
+        :return: QuadrangleMesh instance
         """
         NN = (nx+1)*(ny+1)
         NC = nx*ny
@@ -419,7 +419,7 @@ class QuadrangleMesh(Mesh2d):
         @param nx Number of divisions along the x-axis (default: 10)
         @param ny Number of divisions along the y-axis (default: 10)
         @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
-        @return TriangleMesh instance
+        @return QuadrangleMesh instance
         """
         return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
 
@@ -432,19 +432,19 @@ class QuadrangleMesh(Mesh2d):
         @param meshtype Type of quadrangle mesh, options are 'square', 'zhengfangxing', 'rectangle', 'rec', 'juxing', 'rhombus', 'lingxing' (default: 'square')
         @return QuadrangleMesh instance
         """
-        if meshtype in {'square', 'zhengfangxing'}:
+        if meshtype in {'square'}:
             node = np.array([
                 [0.0, 0.0],
                 [1.0, 0.0],
                 [1.0, 1.0],
                 [0.0, 1.0]], dtype=np.float64)
-        elif meshtype in {'rectangle', 'rec', 'juxing'}:
+        elif meshtype in {'rectangle'}:
             node = np.array([
                 [0.0, 0.0],
                 [2.0, 0.0],
                 [2.0, 1.0],
                 [0.0, 1.0]], dtype=np.float64)
-        elif meshtype in {'rhombus', 'lingxing'}:
+        elif meshtype in {'rhombus'}:
             node = np.array([
                 [0.0, 0.0],
                 [1.0, 0.0],
