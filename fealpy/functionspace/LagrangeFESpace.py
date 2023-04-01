@@ -380,6 +380,7 @@ class LagrangeFESpace():
         self.p = p
         assert spacetype in {'C', 'D'} 
         self.spacetype = spacetype
+        self.doforder = doforder
 
         mname = type(mesh).__name__
         self.dof = self.DOF[spacetype][mname](mesh, p)
@@ -409,16 +410,10 @@ class LagrangeFESpace():
         return self.dof.cell2dof[index]
 
     def face_to_dof(self, index=np.s_[:]):
-        return self.dof.face_to_dof()
+        return self.dof.face_to_dof() #TODO: index
 
     def edge_to_dof(self, index=np.s_[:]):
-        return self.dof.edge_to_dof()
-
-    def boundary_dof(self, threshold=None):
-        if self.spacetype == 'C':
-            return self.dof.boundary_dof(threshold=threshold)
-        else:
-            raise ValueError('This space is a discontinuous space!')
+        return self.dof.edge_to_dof() #TODO：index
 
     def is_boundary_dof(self, threshold=None):
         if self.spacetype == 'C':

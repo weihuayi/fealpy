@@ -368,3 +368,90 @@ class QuadrangleMesh(Mesh2d):
         cell = idxMap[cell]
     
         return cls(node, cell)
+
+
+    @classmethod
+    def from_box(cls, box=[0, 1, 0, 1], nx=10, ny=10, threshold=None):
+        """
+        Generate a quadrilateral mesh for a rectangular domain.
+
+        :param box: list of four float values representing the x- and y-coordinates of the lower left and upper right corners of the domain (default: [0, 1, 0, 1])
+        :param nx: number of cells along the x-axis (default: 10)
+        :param ny: number of cells along the y-axis (default: 10)
+        :param threshold: optional function to filter cells based on their barycenter coordinates (default: None)
+        :return: QuadrangleMesh instance
+        """
+        NN = (nx+1)*(ny+1)
+        NC = nx*ny
+        node = np.zeros((NN,2))
+        X, Y = np.mgrid[
+                box[0]:box[1]:(nx+1)*1j,
+                box[2]:box[3]:(ny+1)*1j]
+        node[:, 0] = X.flat
+        node[:, 1] = Y.flat
+
+        idx = np.arange(NN).reshape(nx+1, ny+1)
+        cell = np.zeros((NC, 4), dtype=np.int_)
+        cell[:, 0] = idx[0:-1, 0:-1].flat
+        cell[:, 1] = idx[1:, 0:-1].flat
+        cell[:, 2] = idx[1:, 1:].flat
+        cell[:, 3] = idx[0:-1, 1:].flat
+
+        if threshold is not None:
+            bc = np.sum(node[cell, :], axis=1) / cell.shape[1]
+            isDelCell = threshold(bc)
+            cell = cell[~isDelCell]
+            isValidNode = np.zeros(NN, dtype=np.bool_)
+            isValidNode[cell] = True
+            node = node[isValidNode]
+            idxMap = np.zeros(NN, dtype=cell.dtype)
+            idxMap[isValidNode] = range(isValidNode.sum())
+            cell = idxMap[cell]
+
+        return cls(node, cell)
+
+
+    @classmethod
+    def from_unit_square(cls, nx=10, ny=10, threshold=None):
+        """
+        Generate a quadrilateral mesh for a unit square.
+
+        @param nx Number of divisions along the x-axis (default: 10)
+        @param ny Number of divisions along the y-axis (default: 10)
+        @param threshold Optional function to filter cells based on their barycenter coordinates (default: None)
+        @return QuadrangleMesh instance
+        """
+        return cls.from_box(box=[0, 1, 0, 1], nx=nx, ny=ny, threshold=threshold)
+
+
+    @classmethod
+    def from_one_quadrangle(cls, meshtype='square'):
+        """
+        Generate a quadrilateral mesh for a single quadrangle.
+
+        @param meshtype Type of quadrangle mesh, options are 'square', 'zhengfangxing', 'rectangle', 'rec', 'juxing', 'rhombus', 'lingxing' (default: 'square')
+        @return QuadrangleMesh instance
+        """
+        if meshtype in {'square'}:
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.0, 1.0],
+                [0.0, 1.0]], dtype=np.float64)
+        elif meshtype in {'rectangle'}:
+            node = np.array([
+                [0.0, 0.0],
+                [2.0, 0.0],
+                [2.0, 1.0],
+                [0.0, 1.0]], dtype=np.float64)
+        elif meshtype in {'rhombus'}:
+            node = np.array([
+                [0.0, 0.0],
+                [1.0, 0.0],
+                [1.5, np.sqrt(3) / 2],
+                [0.5, np.sqrt(3) / 2]], dtype=np.float64)
+        cell = np.array([[0, 1, 2, 3]], dtype=np.int_)
+        return cls(node, cell)
+
+
+

@@ -3,6 +3,7 @@ import time
 from scipy.sparse import csc_matrix, csr_matrix, spdiags, triu, tril, find, hstack, eye, bmat
 from scipy.sparse.linalg import cg, inv, dsolve, spsolve
 from scipy.linalg import norm
+from scipy.optimize import minimize,fmin_l_bfgs_b,fmin_cg
 from pyamg import *
 
 class TetRadiusRatio():
@@ -208,40 +209,41 @@ class TetRadiusRatio():
         NC = self.mesh.number_of_cells()
         node = self.mesh.entity('node')
         isFreeNode = self.get_free_node_info()        
-        q = np.zeros((2, NC), dtype=np.float_)
+        q = np.zeros((2, NC), dtype=np.float64)
         if method=='jacobi':
-            for i in range(0,500):
+            for i in range(0,100):
                 A, B0, B1, B2 = self.grad()
-                node1=self.Jacobi(node, A, B2, B1, B0, isFreeNode)		
+                node=self.Jacobi(node, A, B0, B1, B2, isFreeNode)		
                             ## count quality
                 q[1] = self.get_quality()
                 minq = np.min(q[1])
                 avgq = np.mean(q[1])
+                avgq0 = np.mean(q[0])
                 if np.max(np.abs(q[1]-q[0]))<1e-8:
                     print("jacobi迭代次数为%d次"%(i+1))
                     break
                 q[0] = q[1]
-                node=node1
             print("jacobi迭代次数为500次")
             
         if method=='Bjacobi':
             for i in range(0,100):
                 A, B0, B1, B2 = self.grad()
-                node1 = self.BlockJacobi(node, A, B2, B1, B0, isFreeNode)
+                node = self.BlockJacobi(node, A, B0, B1, B2, isFreeNode)
                             ## count quality
                 q[1] = self.get_quality()
                 minq = np.min(q[1])
                 avgq = np.mean(q[1])
+                avgq0 = np.mean(q[0])
                 print('minq=',minq,'avgq=',avgq,'maxq=',np.max(q[1]))                
-                if np.max(np.abs(q[1]-q[0]))<1e-5:
+                if np.max(np.abs(q[1]-q[0]))<1e-8:
                     print("Bjacobi迭代次数为%d次"%(i+1))
                     break
                 q[0] = q[1]
-                node[:]=node1
+        
         if method=='BGauss':
             for i in range(0,500):
-                A, B, D, C = self.grad()
-                node1 = self.BlockGauss(node, A, B, C, D, isFreeNode)
+                A, B0, B1, B2 = self.grad()
+                node1 = self.BlockGauss(node, A, B0, B1, B2, isFreeNode)
                             ## count quality
                 q[1] = self.get_quality()
                 minq = np.min(q)
@@ -251,72 +253,46 @@ class TetRadiusRatio():
                     print("BGauss迭代次数为%d次"%(i+1))
                     break
                 q[0] = q[1]
-                node=node1
-        if method=='cg':
-            for i in range(0,5):
-                A, B, D, C = self.grad()
-
-                A = bmat([[A, B, C], [B.T, A, D], [C.T, D.T, A]])
-
-                node111 = self.mesh.entity('node').copy()
-
-                bbb = node111.T.flatten()
-                print("aaaaaa", A@bbb)
-
-                node111[isFreeNode] = 0
-
-                b = node111.T.flatten()
-
-                #F = -A@b
-
-                flag = np.r_[~isFreeNode, ~isFreeNode, ~isFreeNode]
-                bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-                bdIdx[flag] = 1
-
-                Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
-                T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
-                A = T@A + Tbd
-                #F[flag] = b[flag]
-
-                #val, _ = cg(A, F, tol=1e-6)
-                val = spsolve(A, b)
-                node[:] = val.reshape(3, -1).T
+        
         return node
-    def Jacobi(self, node, A, B , C, D, isFreeNode):
+    def Jacobi(self, node, A, B0, B1, B2, isFreeNode):
         NN = self.mesh.number_of_nodes() 
         D = spdiags(1.0/A.diagonal(), 0, NN, NN)
         M = -(triu(A, 1) + tril(A, -1))
-        X = D*(M*node[:, 0] - B*node[:, 1] - C*node[:,2])
-        Y = D*(B*node[:, 0] + M*node[:, 1] - D*node[:,2])
-        Z = D*(C*node[:, 0] + D*node[:, 1] + M*node[:,2])
+        X = D*(M*node[:, 0] - B2*node[:, 1] - B1*node[:,2])
+        Y = D*(B2*node[:, 0] + M*node[:, 1] - B0*node[:,2])
+        Z = D*(B1*node[:, 0] + B0*node[:, 1] + M*node[:,2])
         p = np.zeros((NN, 3)) 
         p[isFreeNode, 0] = X[isFreeNode] - node[isFreeNode, 0]
         p[isFreeNode, 1] = Y[isFreeNode] - node[isFreeNode, 1]
         p[isFreeNode, 2] = Z[isFreeNode] - node[isFreeNode, 2]
-        node +=100*p/NN
+        node +=2*p/NN
         #node[isFreeNode,0]=X[isFreeNode]
         #node[isFreeNode,1]=Y[isFreeNode]
         return node
 
-
-    def BlockJacobi(self, node, A, B, C, D, isFreeNode):
-        NN = self.mesh.number_of_nodes() 
+    def BlockJacobi(self, node, A, B0, B1, B2, isFreeNode):
+        NN = self.mesh.number_of_nodes()
         isBdNode = np.logical_not(isFreeNode)
         newNode = np.zeros((NN, 3), dtype=np.float)
         newNode[isBdNode, :] = node[isBdNode, :]        
-        b = -B*node[:, 1] -C*node[:, 2] - A*newNode[:, 0]
+        b = -B2*node[:, 1] -B1*node[:, 2] - A*newNode[:, 0]
         newNode[isFreeNode, 0], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-12)
-        b = B*node[:, 0] - A*newNode[:, 1] - D*node[:, 2]
+                b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-6)
+        b = B2*node[:, 0] - A*newNode[:, 1] - B0*node[:, 2]
         newNode[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 1], tol=1e-12)
-        b = C*node[:,0]+D*node[:,1]-A*newNode[:,2]
+                b[isFreeNode], x0=node[isFreeNode, 1], tol=1e-6)
+        b = B1*node[:,0]+B0*node[:,1]-A*newNode[:,2]
         newNode[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
-                b[isFreeNode], x0=node[isFreeNode, 2], tol=1e-12)
-        node[isFreeNode, :] = newNode[isFreeNode, :]
+                b[isFreeNode], x0=node[isFreeNode, 2], tol=1e-6)
+        #node[isFreeNode, :] = newNode[isFreeNode, :]
+        p = np.zeros((NN,3))
+        p[isFreeNode,:] = newNode[isFreeNode,:] - node[isFreeNode,:]
+        #node += 0.7*p
+        node += 0.3*p
         return node
 
-    def BlockGauss(self, node, A, B, C, D, isFreeNode):
+    def BlockGauss(self, node, A, B0, B1, B2, isFreeNode):
         NN = self.mesh.number_of_nodes() 
         isBdNode = np.logical_not(isFreeNode)
         newNode = np.zeros((NN, 3), dtype=np.float)
@@ -324,13 +300,17 @@ class TetRadiusRatio():
         newNode[isBdNode, :] = node[np.ix_(isBdNode, [0, 1, 2])]
         ml = smoothed_aggregation_solver(A[np.ix_(isFreeNode, isFreeNode)])
         M = ml.aspreconditioner(cycle='W')
-        b = -B*node[:, 1] - -C*node[:, 2] - A*newNode[:, 0]
+        b = -B2*node[:, 1] - B1*node[:, 2] - A*newNode[:, 0]
         node[isFreeNode, 0], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
                 b[isFreeNode], x0=node[isFreeNode, 0], tol=1e-6, M=M)
-        b = B*node[:, 0] - A*newNode[:, 1] - D*node[:, 2]
+        b = B2*node[:, 0] - A*newNode[:, 1] - B0*node[:, 2]
         node[isFreeNode, 1], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
                 b[isFreeNode], x0=node[isFreeNode, 1], tol=1e-6, M=M)
-        b = C*node[:, 0] + D*node[:, 1] - A*newNode[:, 2]
+        b = B1*node[:, 0] + B0*node[:, 1] - A*newNode[:, 2]
         node[isFreeNode, 2], info = cg(A[np.ix_(isFreeNode, isFreeNode)],
                 b[isFreeNode], x0=node[isFreeNode, 2], tol=1e-6, M=M)
+
         return node
+
+
+        

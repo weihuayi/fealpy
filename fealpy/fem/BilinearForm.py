@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 class BilinearForm:
     """
@@ -44,14 +45,42 @@ class BilinearForm:
         @brief 数值积分组装
         """
         space = self.space
-        integrator  = self.dintegrators[0]
-        M = integrator.assembly_cell_matrix(space)
+        mesh = space[0].mesh
 
-        gdof = space.number_of_global_dofs()
-        I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
-        J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+        if isinstance(space, tuple) and len(space) > 1:
+            NC = mesh.number_of_cells() 
+            GD = mesh.GD
+            M = self.dintegrators[0].assembly_cell_matrix(space)
+            c2f = space[0].dof.cell_to_dof()
+            NN =mesh.number_of_nodes()
+            #cell = mesh.entity('cell')
+            #cell2dof = np.zeros((cell.shape[0], 2*GD), dtype=np.int_)
+            
+            if space0.doforder == 'vdims':
+                for i in range(GD):
+                    cell2dof[:, i::GD] = cell + NN*i
+            
+            elif space0.doforder == 'nodes':
+                for i in range(GD):
+                    cell2dof[:, i::GD] = cell*GD + i
+            
+            I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+            J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+            self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN*GD, NN*GD))
+        
+        else:
+            ldof = space.number_of_local_dofs()
+            NC = mesh.number_of_cells() 
+            M = np.zeros((NC, ldof, ldof), dtype=mesh.ftype)
+            for inte in self.dintegrators:
+                inte.assembly_cell_matrix(space, out=M)
 
-        self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
+            cell2dof = space.cell_to_dof()
+            I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+            J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+
+            gdof = space.number_of_global_dofs()
+            self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(gdof, gdof))
 
 
     def fast_assembly(self):
