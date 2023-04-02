@@ -322,12 +322,11 @@ class FirstNedelecFiniteElementSpace3d:
         if 1: #节点型自由度
             locEdge = np.array([[1, 2], [2, 0], [0, 1]], dtype=np.int_)
             point = 0.5*(np.sum(node[face[:, locEdge][index]], axis=-2))
-            gval = gD(point) #(NF, 3, 3)
-
-            vec = mesh.edge_tangent()[face2edge]#(NF, 3, 3)
+            vec = mesh.edge_tangent()[face2edge]
+            gval = gD(point, vec) #(NF, 3)
 
             face2dof = self.dof.face_to_dof()[index]
-            uh[face2dof] = np.sum(gval*vec, axis=-1) 
+            uh[face2dof] = gval 
         else: #积分型自由度
             bcs, ws = self.integralalg.edgeintegrator.get_quadrature_points_and_weights()
             ps = mesh.bc_to_point(bcs)[:, face2edge]
