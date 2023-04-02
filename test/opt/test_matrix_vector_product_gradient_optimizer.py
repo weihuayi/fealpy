@@ -2,14 +2,11 @@ import numpy as np
 from scipy.sparse.linalg import LinearOperator
 import pytest
 from fealpy.mesh import TriangleMesh
-from fealpy.opt import Problem
-
+from fealpy.opt import Problem,MatrixVectorProductGradientOptimizer
 
 class TriMeshProblem(Problem):
-    def __init__(self, mesh):
+    def __init__(self,mesh:TriangleMesh):
         self.mesh = mesh
-        self['objective'] = self.quality
-        
         node = mesh.entity('node')
         self.isBdNode = mesh.ds.boundary_node_flag()
 
@@ -112,10 +109,8 @@ class TriMeshProblem(Problem):
 
         return (node1[isFreeNode, :] - node[isFreeNode, :]).T.flat
 
-
-
 def test_triangle_mesh_opt():
-    mesh = TriangleMesh.from_unit_circle_gmsh()
+    mesh = TriangleMesh.from_unit_circle_gmsh(h=0.1)
     problem = TriMeshProblem(mesh)
     NDof = len(problem['x0'])
     problem['Preconditioner'] = LinearOperator((NDof, NDof), problem.block_jacobi_preconditioner)
@@ -123,3 +118,5 @@ def test_triangle_mesh_opt():
     opt = MatrixVextorProductGradientOptimizer(problem)
     opt.run()
 
+if __name__ == "__main__":
+    test_triangle_mesh_opt()
