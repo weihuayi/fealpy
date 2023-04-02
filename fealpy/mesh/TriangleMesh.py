@@ -1740,53 +1740,37 @@ class TriangleMesh(Mesh2d):
         gmsh.model.add("UnitCircle")
 
         # 创建单位圆
-        circle_center = gmsh.model.geo.addPoint(0, 0, 0, h)
-        circle_points = [gmsh.model.geo.addPoint(np.cos(angle), np.sin(angle), 0, h) for angle in np.linspace(0, 2 * np.pi, 4, endpoint=False)]
-
-        # 添加圆弧和循环
-        arcs = [gmsh.model.geo.addCircleArc(circle_points[i], circle_center, circle_points[(i + 1) % len(circle_points)]) for i in range(len(circle_points))]
-        curve_loop = gmsh.model.geo.addCurveLoop(arcs)
-
-        # 创建平面表面
-        surface = gmsh.model.geo.addPlaneSurface([curve_loop])
+        gmsh.model.occ.addDisk(0.0,0.0,0.0,1,1,1)
 
         # 同步几何模型
-        gmsh.model.geo.synchronize()
+        gmsh.model.occ.synchronize()
 
-        # 添加物理组
-        gmsh.model.addPhysicalGroup(2, [surface], tag=1)
-        gmsh.model.setPhysicalName(2, 1, "UnitCircle")
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
 
         # 生成网格
         gmsh.model.mesh.generate(2)
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
+        node = node_coords.reshape((-1,3))[:,:2]
+        
+        # 节点编号映射
+        nodetags_map = dict({j:i for i,j in enumerate(node_tags)})
 
-        # 获取三角形单元信息
-        cell_type = 2  # 三角形单元的类型编号为 2
-        cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
-        cell = np.array(cell_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
+        # 获取单元信息
+        cell_type = 2 # 三角形单元的类型编号为 2
+        cell_tags,cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
 
-        # 输出节点和单元数量
-        print(f"Number of nodes: {node.shape[0]}")
-        print(f"Number of cells: {cell.shape[0]}")
+        # 节点编号映射到单元
+        evid = np.array([nodetags_map[j] for j in cell_connectivity])
+        cell = evid.reshape((cell_tags.shape[-1],-1))
 
         gmsh.finalize()
 
-        NN = len(node)
-        isValidNode = np.zeros(NN, dtype=np.bool_)
-        isValidNode[cell] = True
-        node = node[isValidNode]
-        idxMap = np.zeros(NN, dtype=cell.dtype)
-        idxMap[isValidNode] = range(isValidNode.sum())
-        cell = idxMap[cell]
-
         # 输出节点和单元数量
         print(f"Number of nodes: {node.shape[0]}")
         print(f"Number of cells: {cell.shape[0]}")
-
 
         return cls(node, cell)
 
@@ -1795,11 +1779,11 @@ class TriangleMesh(Mesh2d):
     @classmethod
     def from_polygon_gmsh(cls, vertices, h):
         """
-        Generate a quadrilateral mesh for a polygonal region by gmsh.
+        Generate a triangle mesh for a polygonal region by gmsh.
 
         @param vertices List of tuples representing vertices of the polygon
         @param h Parameter controlling mesh density
-        @return QuadrilateralMesh instance
+        @return TriangleMesh instance
         """
         import gmsh
         gmsh.initialize()
@@ -1836,8 +1820,8 @@ class TriangleMesh(Mesh2d):
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
         node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)[:, 0:2].copy()
 
-        # 获取四边形单元信息
-        cell_type = 2  # 三角形单元的类型编号为 3
+        # 获取三角形单元信息
+        cell_type = 2  # 三角形单元的类型编号为 2
         cell_tags, cell_connectivity = gmsh.model.mesh.getElementsByType(cell_type)
         cell = np.array(cell_connectivity, dtype=np.uint64).reshape(-1, 3) - 1
 
