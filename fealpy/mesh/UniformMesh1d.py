@@ -494,7 +494,7 @@ class UniformMesh1d():
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh
-        F[isBdNode] = uh[isBdNode]
+        f[isBdNode] = uh[isBdNode]
     
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isBdNode] = 1

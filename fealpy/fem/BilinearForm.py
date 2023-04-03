@@ -1,4 +1,5 @@
 import numpy as np
+from scipy.sparse import csr_matrix
 
 class BilinearForm:
     """
@@ -44,10 +45,29 @@ class BilinearForm:
         @brief 数值积分组装
         """
         space = self.space
-        mesh = space.mesh
+        mesh = space[0].mesh
 
         if isinstance(space, tuple) and len(space) > 1:
-            pass
+            NC = mesh.number_of_cells() 
+            GD = mesh.GD
+            M = self.dintegrators[0].assembly_cell_matrix(space)
+            c2f = space[0].dof.cell_to_dof()
+            NN =mesh.number_of_nodes()
+            #cell = mesh.entity('cell')
+            #cell2dof = np.zeros((cell.shape[0], 2*GD), dtype=np.int_)
+            
+            if space0.doforder == 'vdims':
+                for i in range(GD):
+                    cell2dof[:, i::GD] = cell + NN*i
+            
+            elif space0.doforder == 'nodes':
+                for i in range(GD):
+                    cell2dof[:, i::GD] = cell*GD + i
+            
+            I = np.broadcast_to(cell2dof[:, :, None], shape=M.shape)
+            J = np.broadcast_to(cell2dof[:, None, :], shape=M.shape)
+            self.M = csr_matrix((M.flat, (I.flat, J.flat)), shape=(NN*GD, NN*GD))
+        
         else:
             ldof = space.number_of_local_dofs()
             NC = mesh.number_of_cells() 

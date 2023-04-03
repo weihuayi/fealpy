@@ -10,7 +10,8 @@ ObjFunc = Callable[
 ]
 
 Float = Union[float, np.floating]
-
+# 表示变量可以是 LinearOperator、稀疏矩阵或密集矩阵
+MatrixLike = Union[LinearOperator, spmatrix, np.ndarray, None]
 
 class Problem(TypedDict):
     """
@@ -23,53 +24,22 @@ class Problem(TypedDict):
     x0: NDArray
     objective: ObjFunc
 
-
-class Options(TypedDict, total=False):
-    """
-    @brief Options for optimizers.
-
-    @param MaxIters: int.
-    @param MaxFunEvals: int.
-    @param NormGradTol: float.
-    @param FunValDiff: float.
-    @param StepLength: float.
-    @param StepTol: float.
-    @param Disp: bool.
-    @param Output: bool.
-    @param Preconditioner: NDArray.
-    """
-
-    MaxIters: int
-    MaxFunEvals: int
-    NormGradTol: float
-    FunValDiff: float
-    StepLength: float
-    StepTol: float
-    Disp: bool
-    Output: bool
-    Preconditioner: NDArray
-
-
-options = Options()
-
-# TODO: Finish this
+    Preconditioner: MatrixLike = None
+    MaxIters: int = 1000
+    MaxFunEvals: int = 10000
+    NormGradTol: float = 1e-6
+    FunValDiff: float = 1e-6
+    StepLength: float = 1.0
+    StepLengthTol: float = 1e-8
+    NumGrad: int = 10
+    Print: bool = True
 
 
 class Optimizer():
-    def __init__(self, problem: Problem, options: Options) -> None:
+    def __init__(self, problem: Problem) -> None:
         self.problem = problem
-        self.options = options
-
         self.debug: bool = False
         self.__NF: int = 0
-
-
-    @classmethod
-    def get_options(cls, *args, **kwargs):
-        options = Options()
-        options.update(kwargs)
-        return options
-
 
     @property
     def NF(self) -> int:
