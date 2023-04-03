@@ -3,17 +3,17 @@ import warnings
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
 from typing import Tuple 
+from .Mesh1d import Mesh1d
+
 
 # 这个数据结构为有限元接口服务
 from ..quadrature import GaussLegendreQuadrature
 from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
-from .mesh_tools import find_node, find_entity, show_mesh_1d
-
 
 ## @defgroup FEMInterface 
 ## @defgroup FDMInterface
 ## @defgroup GeneralInterface
-class UniformMesh1d():
+class UniformMesh1d(Mesh1d):
     """
     @brief A class for representing a uniformly partitioned one-dimensional mesh.
     """
@@ -115,12 +115,10 @@ class UniformMesh1d():
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, returnim=False):
         """
-        @brief Perform a uniform refinement of the mesh.
-
-        @param[in] n Number of refinements to perform (default: 1).
-        @param[in] returnim Boolean flag to return the interpolation matrix (default: False).
-
-        @return If returnim is True, a list of interpolation matrices is returned.
+        @brief: Perform a uniform refinement of the mesh.
+        @param[in] n: Number of refinements to perform (default: 1).
+        @param[in] returnim: Boolean flag to return the interpolation matrix (default: False).
+        @return: If returnim is True, a list of interpolation matrices is returned.
         """
         if returnim:
             nodeImatrix = []
@@ -207,42 +205,6 @@ class UniformMesh1d():
                                       interval=interval)
         ani.save(fname)
 
-    ## @ingroup GeneralInterface
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
-        """
-        @brief
-        """
-
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
-        else:
-            axes = plot
-        return show_mesh_1d(axes, self,
-                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis)
-
-    ## @ingroup GeneralInterface
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=100,
-            fontsize=20, fontcolor='k'):
-        """
-        @brief
-        """
-
-        if node is None:
-            node = self.node
-
-        find_node(axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
 
     ## @ingroup GeneralInterface
     def find_cell(self, axes,
@@ -269,11 +231,9 @@ class UniformMesh1d():
     @property
     def node(self):
         """
-        @brief Get the coordinates of the nodes in the mesh.
-
-        @return A NumPy array of shape (NN, ) containing the coordinates of the nodes.
-
-        @details This function calculates the coordinates of the nodes in the mesh based on the
+        @brief: Get the coordinates of the nodes in the mesh.
+        @return: A NumPy array of shape (NN, ) containing the coordinates of the nodes.
+        @details: This function calculates the coordinates of the nodes in the mesh based on the
                  mesh's origin, step size, and the number of cells in the x directions.
                  It returns a NumPy array with the coordinates of each node.
 
@@ -284,9 +244,28 @@ class UniformMesh1d():
         return node
 
     ## @ingroup FDMInterface
+    def edge_barycenter(self):
+        """
+        @brief
+        Note: 一维中，edge 和 cell 相同
+        """
+        nx = self.nx
+        box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
+        bc = np.linspace(box[0], box[1], nx)
+        return bc
+
+    ## @ingroup FDMInterface
+    def face_barycenter(self):
+        """
+        @brief
+        """
+        pass
+
+    ## @ingroup FDMInterface
     def cell_barycenter(self):
         """
         @brief
+        Note: 一维中，edge 和 cell 相同
         """
         nx = self.nx
         box = [self.origin + self.h/2, self.origin + self.h/2 + (nx - 1) * self.h]
@@ -556,11 +535,9 @@ class UniformMesh1d():
     ## @ingroup FEMInterface
     def entity(self, etype, index=np.s_[:]):
         """
-        @brief Get the entity (either cell or node) based on the given entity type.
-
-        @param[in] etype The type of entity, either 'cell', 'edge' or 1, 'node', 'face' or 0.
-
-        @return The cell or node array based on the input entity type.
+        @brief: Get the entity (either cell or node) based on the given entity type.
+        @param[in] etype: The type of entity, either 'cell', 'edge' or 1, 'node', 'face' or 0.
+        @return: The cell or node array based on the input entity type.
 
         @throws ValueError if the given etype is invalid.
         """
@@ -569,25 +546,23 @@ class UniformMesh1d():
         elif etype in {'node', 'face', 0}:
             return self.node[index].reshape(-1, 1)
         else:
-            raise ValueError(f"The entiry type `{etype}` is not support!")
+            raise ValueError("The entiry type `{etype}` is not support!")
 
     ## @ingroup FEMInterface
     def entity_barycenter(self, etype, index=np.s_[:]):
         """
-        @brief Calculate the barycenter of the specified entity.
-
-        @param[in] etype The type of entity, either 'cell', 1, 'node', 'face' or 0.
-
-        @return The barycenter of the given entity type.
-
+        print("node:", node)
+        @brief: Calculate the barycenter of the specified entity.
+        @param[in] etype: The type of entity, either 'cell', 'edge', 1, 'node', 'face' 0.
+        @return: The barycenter of the given entity type.
         @throws ValueError if the given etype is invalid.
         """
-        if etype in {'cell', 1}:
+        if etype in {'edge', 'cell', 1}:
             return self.cell_barycenter().reshape(-1, 1)[index]
-        elif etype in {'node', 0}:
+        elif etype in {'node', 'face', 0}:
             return self.node.reshape(-1, 1)[index]
         else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
+            raise ValueError('the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
     def entity_measure(self, etype, index=np.s_[:]):
