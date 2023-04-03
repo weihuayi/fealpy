@@ -8,7 +8,7 @@ from .optimizer_base import Optimizer, Problem
 from .line_search import wolfe_line_search
 
 
-class MatrixVextorProductGradientOptimizer(Optimizer):
+class MatrixVectorProductGradientOptimizer(Optimizer):
     def __init__(self, problem: Problem) -> None:
         super().__init__(problem)
         self.P = problem['Preconditioner']
@@ -31,15 +31,15 @@ class MatrixVextorProductGradientOptimizer(Optimizer):
             g = galpha
             gnorm = norm(g)
 
-            if alpha < options['StepLengthTol']:
+            if alpha < problem['StepLengthTol']:
                 break
 
-            if options['Print']:
+            if problem['Print']:
                 print(f'current step {i}, StepLength = {alpha}, ', end='')
                 print(f'nfval = {self.NF}, f = {f}, gnorm = {gnorm}')
 
-            if gnorm < options['NormGradTol']:
-                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {options['NormGradTol']}")
+            if gnorm < problem['NormGradTol']:
+                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {problem['NormGradTol']}")
                 break
 
         return x, f, g
