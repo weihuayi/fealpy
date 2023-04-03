@@ -40,10 +40,10 @@ class Mesh:
     def shape_function(self, p):
         raise NotImplementedError
 
-    def grad_shape_function(self, p, index=np.s_[:])
+    def grad_shape_function(self, p, index=np.s_[:]):
         raise NotImplementedError
 
-    def interpolation_points(self)
+    def interpolation_points(self):
         raise NotImplementedError
 
     def cell_to_ipoint(self, p, index=np.s_[:]):
@@ -150,10 +150,13 @@ class Mesh:
 
         GD = self.geo_dimension()
         node = self.entity('node')
+        print("node:", node)
         bc = self.entity_barycenter('edge', index=index)
+        print("bc:", bc)
 
         if GD == 1:
             node = np.r_['1', bc, np.zeros_like(node)]
+            print("node:", node)
             GD = 2
 
         if index == np.s_[:]:
