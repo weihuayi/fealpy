@@ -104,3 +104,48 @@ class Mesh1d(Mesh):
         Dlambda = self.grad_lambda(index=index)
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
         return gphi #(..., NC, ldof, GD)
+
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+
+        axes.set_aspect(aspect)
+        if showaxis == False:
+            axes.set_axis_off()
+        else:
+            axes.set_axis_on()
+
+        node = self.entity('node')
+
+        if len(node.shape) == 1:
+            node = node[:, None]
+
+        if node.shape[1] == 1:
+            node = np.r_['1', node, np.zeros_like(node)]
+
+        GD = self.geo_dimension()
+        if GD == 2:
+            axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
+        elif GD == 3:
+            axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
+
+        cell = self.entity('cell')
+        vts = node[cell, :]
+
+        if GD < 3:
+            from matplotlib.collections import LineCollection
+            lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor)
+            return axes.add_collection(lines)
+        else:
+            import mpl_toolkits.mplot3d as a3
+            from mpl_toolkits.mplot3d.art3d import Line3DCollection
+            lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor)
+            return axes.add_collection3d(vts)
