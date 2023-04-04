@@ -3,8 +3,9 @@ from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril,
 from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 from ..common import ranges
 from types import ModuleType
+from .Mesh import Mesh
 
-class Mesh2d(object):
+class Mesh2d(Mesh):
     """ The base class of TriangleMesh and QuadrangleMesh
         The class is just a abstract class, and you can not use it directly.
     """
@@ -177,6 +178,10 @@ class Mesh2d(object):
             cmax=None, cmin=None, 
             colorbarshrink=1.0, cmap='jet', box=None):
 
+        from matplotlib.collections import PolyCollection, PatchCollection
+        import matplotlib.cm as cm
+        from matplotlib.patches import Polygon
+
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
@@ -192,55 +197,79 @@ class Mesh2d(object):
         if (aspect is None) and (GD == 2):
             axes.set_box_aspect(1)
 
-        return show_mesh_2d(axes, self,
-                nodecolor=nodecolor, edgecolor=edgecolor,
-                cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis, showcolorbar=showcolorbar,
-                colorbarshrink=colorbarshrink, cmap=cmap, box=box, cmax=cmax, cmin=cmin)
+        if showaxis == False:
+            axes.set_axis_off()
+        else:
+            axes.set_axis_on()
 
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=10,
-            fontsize=10, fontcolor='r', multiindex=None):
+        if (type(nodecolor) is np.ndarray) & np.isreal(nodecolor[0]):
+            cmax = cmax or nodecolor.max()
+            cmin = cmin or nodecolor.min()
+            norm = colors.Normalize(vmin=cmin, vmax=cmax)
+            mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
+            nodecolor = mapper.to_rgba(nodecolor)
 
-        GD = self.geo_dimension()
+        if isinstance(cellcolor, np.ndarray) & np.isreal(cellcolor[0]):
+            cmax = cmax or cellcolor.max()
+            cmin = cmin or cellcolor.min()
+            norm = colors.Normalize(vmin=cmin, vmax=cmax)
+            mapper = cm.ScalarMappable(norm=norm, cmap=cmap)
+            mapper.set_array(cellcolor)
+            cellcolor = mapper.to_rgba(cellcolor)
+            if showcolorbar:
+                f = axes.get_figure()
+                f.colorbar(mapper, shrink=colorbarshrink, ax=axes)
 
-        if node is None:
-            node = self.node
+        node = self.entity('node')
+        cell = self.entity('cell')
 
-        find_node(axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
+        if self.meshtype not in {'polygon', 'hepolygon', 'halfedge', 'halfedge2d'}:
+            if self.geo_dimension() == 2:
+                poly = PolyCollection(node[cell[:, self.ds.ccw], :])
+            else:
+                poly = a3.art3d.Poly3DCollection(node[cell[:, self.ds.ccw], :])
+        else:
+            if self.meshtype == 'polygon':
+                cell, cellLocation = cell
+                NC = self.number_of_cells()
+                patches = [
+                        Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                        for i in range(NC)]
+            elif self.ds.NV in {3, 4}:
+                NC = self.number_of_cells()
+                patches = [
+                        Polygon(node[cell[i], :], True)
+                        for i in range(NC)]
+            else:
+                cell, cellLocation = cell
+                NC = self.number_of_cells()
+                patches = [
+                        Polygon(node[cell[cellLocation[i]:cellLocation[i+1]], :], True)
+                        for i in range(NC)]
+            poly = PatchCollection(patches)
 
+        poly.set_edgecolor(edgecolor)
+        poly.set_linewidth(linewidths)
+        poly.set_facecolors(cellcolor)
 
-    def find_edge(self, axes, 
-            index=None, showindex=False,
-            color='g', markersize=20, 
-            fontsize=13, fontcolor='g', multiindex=None):
+        if box is None:
+            if self.geo_dimension() == 2:
+                box = np.zeros(4, dtype=np.float64)
+            else:
+                box = np.zeros(6, dtype=np.float64)
 
-        find_entity(axes, self, entity='edge',
-                index=index, showindex=showindex, 
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
+            box[0::2] = np.min(node, axis=0)
+            box[1::2] = np.max(node, axis=0)
 
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='y', markersize=30,
-            fontsize=15, fontcolor='k', multiindex=None):
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex, 
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
+        tol = np.max(self.entity_measure('edge'))/100
+        axes.set_xlim([box[0]-tol, box[1]+0.01]+tol)
+        axes.set_ylim([box[2]-tol, box[3]+0.01]+tol)
 
-    def print(self):
-        print("node:\n", self.node)
-        print("cell:\n", self.ds.cell)
-        print("edge:\n", self.ds.edge)
-        print("edge2cell:\n", self.ds.edge2cell)
-        print("cell2edge:\n", self.ds.cell_to_edge())
-        print("cell2cell:\n", self.ds.cell_to_cell())
+        if self.geo_dimension() == 3:
+            axes.set_zlim(box[4:6])
+
+        return axes.add_collection(poly)
+
 
 class Mesh2dDataStructure():
     """ The topology data structure of mesh 2d

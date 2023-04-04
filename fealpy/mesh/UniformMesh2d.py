@@ -1,3 +1,4 @@
+import numpy as np
 import warnings
 from scipy.sparse import coo_matrix, csr_matrix, diags
 from types import ModuleType
@@ -51,6 +52,7 @@ class UniformMesh2d(Mesh2d):
         mesh = UniformMesh2d([0, nx, 0, ny], h=h, origin=(I[0], I[2]))
 
         """
+        super().__init__()
         # Mesh properties
         self.extent: Tuple[int, int, int, int] = extent
         self.h: Tuple[float, float] = h
