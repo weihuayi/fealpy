@@ -459,9 +459,7 @@ class UniformMesh1d(Mesh1d):
             uh = self.function('node')
 
         node = self.node
-        print("node1:", node)
         isBdNode = self.ds.boundary_node_flag()
-        print("isBdNode:", isBdNode)
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh

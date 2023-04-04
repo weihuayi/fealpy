@@ -88,7 +88,6 @@ class Mesh:
         else:
             raise ValueError("the type of index is not correct!")
 
-
         if (type(color) is np.ndarray) and (np.isreal(color[0])):
             umax = color.max()
             umin = color.min()
@@ -158,7 +157,6 @@ class Mesh:
                 fontsize=fontsize, 
                 fontcolor=fontcolor)
 
-
     def find_face(self, axes, 
             index=np.s_[:], 
             showindex=False,
@@ -206,7 +204,6 @@ class Mesh:
             index, = np.nonzero(index)
         else:
             raise ValueError("the type of index is not correct!")
-        print("index:", index)
         if (type(color) is np.ndarray) & (np.isreal(color[0])):
             umax = color.max()
             umin = color.min()
@@ -215,7 +212,6 @@ class Mesh:
             color = mapper.to_rgba(color)
 
         bc = bc[index]
-        print("bc:", bc)
         if GD == 2:
             axes.scatter(bc[:, 0], bc[:, 1], c=color, s=markersize)
             if showindex:

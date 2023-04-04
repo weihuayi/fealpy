@@ -1,6 +1,6 @@
 import numpy as np
+
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_2d
 from ..common import ranges
 from types import ModuleType
 from .Mesh import Mesh
@@ -131,7 +131,7 @@ class Mesh2d(Mesh):
         edge2cell = self.ds.edge_to_cell()
         isInEdge = (edge2cell[:, 0] != edge2cell[:, 1])
         w = np.array([[0, -1], [1, 0]])
-        v= (node[edge[:, 1], :] - node[edge[:, 0], :])@w
+        v =  (node[edge[:, 1], :] - node[edge[:, 0], :])
         val = np.sum(v*node[edge[:, 0], :], axis=1)
         a = np.bincount(edge2cell[:, 0], weights=val, minlength=NC)
         a+= np.bincount(edge2cell[isInEdge, 1], weights=-val[isInEdge], minlength=NC)

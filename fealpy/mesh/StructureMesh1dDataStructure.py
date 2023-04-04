@@ -101,9 +101,7 @@ class StructureMesh1dDataStructure():
         @return isBdNode : np.array, dtype=np.bool_
             An array of booleans where True indicates a boundary node.
         """
-        print("NN_pre:", self.NN)
         isBdNode = np.zeros(self.NN, dtype=np.bool_)
-        print("isBdNode_pre:", isBdNode)
         isBdNode[0] = True
         isBdNode[-1] = True
         return isBdNode 
