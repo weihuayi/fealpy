@@ -129,9 +129,13 @@ class UniformMesh1d(Mesh1d):
             self.NC = self.nx
             self.NN = self.NC + 1
 
+
             if returnim:
                 A = self.interpolation_matrix() #TODO: 实现这个功能
                 nodeImatrix.append(A)
+
+        # Data structure for finite element computation
+        self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=self.itype)
 
         if returnim:
             return nodeImatrix
