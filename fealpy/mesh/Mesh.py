@@ -147,9 +147,39 @@ class Mesh:
             showindex=False,
             color='r', markersize=20,
             fontsize=24, fontcolor='k'):
+        return self.find_entity(axes, 'edge', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+
+    def find_face(self):
+        return self.find_entity(axes, 'face', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+    def find_cell(self):
+        return self.find_entity(axes, 'cell', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+    def find_entity(self, axes, 
+            etype, 
+            index=np.s_[:], 
+            showindex=False,
+            color='r', markersize=20,
+            fontsize=24, fontcolor='k'):
 
         GD = self.geo_dimension()
-        bc = self.entity_barycenter('edge', index=index)
+        bc = self.entity_barycenter(etype, index=index)
 
         if GD == 1:
             node = np.r_['1', bc, np.zeros_like(bc)]
@@ -190,10 +220,3 @@ class Mesh:
                             str(index[i]),
                             multialignment='center',
                             fontsize=fontsize, color=fontcolor)
-
-    def find_face(self):
-        raise NotImplementedError
-
-    def find_cell(self):
-        raise NotImplementedError
-
