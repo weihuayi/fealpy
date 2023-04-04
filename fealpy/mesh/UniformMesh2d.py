@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+
 from scipy.sparse import coo_matrix, csr_matrix, diags
 from types import ModuleType
 from typing import Tuple
