@@ -149,14 +149,10 @@ class Mesh:
             fontsize=24, fontcolor='k'):
 
         GD = self.geo_dimension()
-        node = self.entity('node')
-        print("node:", node)
         bc = self.entity_barycenter('edge', index=index)
-        print("bc:", bc)
 
         if GD == 1:
-            node = np.r_['1', bc, np.zeros_like(node)]
-            print("node:", node)
+            node = np.r_['1', bc, np.zeros_like(bc)]
             GD = 2
 
         if index == np.s_[:]:
