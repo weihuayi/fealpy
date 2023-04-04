@@ -3,8 +3,14 @@ import matplotlib.pyplot as plt
 
 from fealpy.decorator import cartesian, barycentric 
 from fealpy.mesh import UniformMesh1d
+from scipy.sparse import diags
 
 class PDEModel:
+    """
+    -u''(x) = 16\pi^2\sin(4\pi x), 
+       u(0) = 0,\quad u(1) = 0.
+    真解：u(x) = \sin(4\pi x).
+    """
     def domain(self):
         """
         @brief: Get the domain of the PDE model
@@ -46,9 +52,99 @@ class PDEModel:
         """
         return self.solution(p)
 
-pde = PDEModel()
-domain = pde.domain()
+class PDEModel_1:
+    """
+    -u''(x) = 9\pi^2\cos(3\pi x), \\
+    u(0) = 0,\quad u(1) = 0.
+    真解： u(x) = \sin(3\pi x).
+    """
+    @cartesian
+    def domain(self):
+        """
+        @brief 得到 PDE 模型的区域
+        @return: 表示 PDE 模型的区域的列表
+        """
+        return [0, 1]
+        
+    @cartesian
+    def solution(self, p):
+        """
+        @brief 计算 PDE 模型的精确解
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点的精确解
+        """
+        return np.sin(3*np.pi*p)
+        
+    @cartesian
+    def source(self, p):
+        """
+        @brief: 计算 PDE 模型的原项 
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点处的源项
+        """
+        return 9*np.pi**2*np.cos(3*np.pi*p)
 
+    @cartesian
+    def gradient(self, p):
+        """
+        @brief: 计算 PDE 模型的真解的梯度
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点处真解的梯度
+        """
+        return 3*np.pi*np.cos(np.pi*p)
+    
+    @cartesian    
+    def dirichlet(self, p):
+        """
+        @brief: 模型的 Dirichlet 边界条件
+        """
+        return self.solution(p)
+
+class PDEModel_2:
+    @cartesian
+    def domain(self):
+        """
+        @brief 得到 PDE 模型的区域
+        @return: 表示 PDE 模型的区域的列表
+        """
+        return [-1, 1]
+
+    @cartesian
+    def solution(self, p):
+        """
+        @brief 计算 PDE 模型的精确解
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点的精确解
+        """
+        return (np.e**(-p**2))*(1-p**2)
+
+    @cartesian
+    def source(self, p):
+        """
+        @brief: 计算 PDE 模型的原项 
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点处的源项
+        """
+        return (np.e**(-p**2))*(4*p**4-16*p**2+6)
+
+    @cartesian    
+    def gradient(self, p):
+        """
+        @brief: 计算 PDE 模型的真解的梯度
+        @param p: 自标量 x 的数组
+        @return: PDE 模型在给定点处真解的梯度
+        """
+        return (np.e**(-p**2))*(2*p**3-4*p)
+
+    @cartesian    
+    def dirichlet(self, p):
+        """
+        @brief: 模型的 Dirichlet 边界条件
+        """
+        return self.solution(p)
+
+pde = PDEModel_2()
+domain = pde.domain()
 # test
 print('domain :', domain)
 print(np.abs(pde.solution(0)) < 1e-12)
@@ -89,7 +185,8 @@ A = mesh.laplace_operator()
 print("未处理边界的矩阵A:\n", A.toarray())
 uh = mesh.function() # 返回网格节点处的函数值，默认值为 0
 f = mesh.interpolate(pde.source, 'node')
-
+NN = mesh.number_of_nodes() # PDEmodel_2 need 
+A += diags([2], [0], shape=(NN, NN), format='csr') # PDEmoodel_2 need
 A, f = mesh.apply_dirichlet_bc(gD=pde.dirichlet, A=A, f=f)
 print("处理完边界之后的矩阵A:\n", A.toarray())
 print("处理完边界之后的右端项f:", f)
@@ -131,6 +228,8 @@ for i in range(maxit):
     A = mesh.laplace_operator() 
     uh = mesh.function() 
     f = mesh.interpolate(pde.source, 'node')
+    NN = mesh.number_of_nodes() # PDEmodel_2 need 
+    A += diags([2], [0], shape=(NN, NN), format='csr') # PDEmoodel_2 need
     A, f = mesh.apply_dirichlet_bc(gD=pde.dirichlet, A=A, f=f)
     uh[:] = spsolve(A, f) 
     grad_uh = mesh.gradient(f=uh[:], order=1)
