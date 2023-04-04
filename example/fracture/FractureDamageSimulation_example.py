@@ -1,11 +1,55 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fealpy.mesh.TriMesher import distmesh2d
+
+from fealpy.mesh import TriangleMesh 
 from fealpy.geometry import dcircle, drectangle
 from fealpy.geometry import ddiff, huniform
+from fealpy.mesh.DistMesher2d import DistMesher2d 
 
-from fealpy.functionspace import LagrangeFiniteElementSpace
+from fealpy.functionspace import LagrangeFESpace
+from fealpy.fem import BilinearForm
+from fealpy.fem import ProvidesSymmetricTangentOperatorIntegrator
+
+class SquareWithCircleHoleDomain:
+    def __init__(self, fh=huniform):
+        """
+        """
+        self.fh = fh
+        self.box = [0, 1, 0, 1]
+        vertices = np.array([
+            (0.0, 0.0), 
+            (1.0, 0.0), 
+            (1.0, 1.0),
+            (0.0, 1.0)],dtype=np.float64)
+
+        fd1 = lambda p: dcircle(p, [0.5, 0.5], 0.2)
+        fd2 = lambda p: drectangle(p, [0.0, 1, 0.0, 1])
+        fd = lambda p: ddiff(fd2(p), fd1(p))
+
+        self.facets = {0:vertices, 1:fd}
+
+
+    def __call__(self, p):
+        """
+        @brief 符号距离函数
+        """
+        return self.facets[1](p) 
+
+    def signed_dist_function(self, p):
+        return self(p)
+
+    def sizing_function(self, p):
+        return self.fh(p)
+
+    def facet(self, dim):
+        return self.facets[dim]
+
+    def meshing_facet_0d(self):
+        return self.facets[0]
+
+    def meshing_facet_1d(self, hmin, fh=None):
+        pass
 
 class Brittle_Facture_model():
     def __init__(self):
@@ -19,26 +63,6 @@ class Brittle_Facture_model():
         self.kappa = self.la + 2 * self.mu /3 # 压缩模量
 
         self.eps = 1e-6 # 极小值，用来保持数值稳定性
-
-
-    def init_mesh(self):
-        """
-        @brief 生成实始网格, 正方形区域，内部有一个半径为 0.2 的洞
-        """
-        fd1 = lambda p: dcircle(p, [0.5, 0.5], 0.2)
-        fd2 = lambda p: drectangle(p, [0.0, 1, 0.0, 1])
-        fd = lambda p: ddiff(fd2(p), fd1(p))
-
-        fh = huniform
-        bbox = [0, 1, 0, 1]
-        pfix = np.array([
-            (0.0, 0.0), 
-            (1.0, 0.0), 
-            (1.0, 1.0),
-            (0.0, 1)],dtype=np.float64)
-
-        mesh = distmesh2d(hmin=0.02, fd=fd, fh=fh, bbox=bbox, pfix=pfix)
-        return mesh
 
     def top_boundary_disp(self):
         """
@@ -75,12 +99,25 @@ class Brittle_Facture_model():
         return np.abs((p[..., 0]-0.5)**2 + np.abs(p[..., 1]-0.5)**2 - 0.04) < 0.001
 
 
-model = Brittle_Facture_model()
-mesh = model.init_mesh()
-node = mesh.entity('node')
-for i in range(node.shape[0]):
-    if model.is_inter_boundary(node)[i] == True:
-        print(node[i])
+#model = Brittle_Facture_model()
+
+#domain = SquareWithCircleHoleDomain() 
+#mesh = TriangleMesh.from_domain_distmesh(domain, 0.05, maxit=100)
+
+mesh = TriangleMesh.from_one_triangle(meshtype='equ')
+
+GD = mesh.geo_dimension()
+space = LagrangeFESpace(mesh, p=1)
+
+d = space.function()
+H = space.function()
+u = space.function(dim=GD)
+
+bform = BilinearForm(GD*(space, ))
+integrator = ProvidesSymmetricTangentOperatorIntegrator()
+
+bform.add_domain_integrator(integrator)
+
 
 fig = plt.figure()
 axes = fig.add_subplot(111)

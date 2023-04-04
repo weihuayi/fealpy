@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
 from typing import Tuple 
@@ -129,9 +130,13 @@ class UniformMesh1d(Mesh1d):
             self.NC = self.nx
             self.NN = self.NC + 1
 
+
             if returnim:
                 A = self.interpolation_matrix() #TODO: 实现这个功能
                 nodeImatrix.append(A)
+
+        # Data structure for finite element computation
+        self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=self.itype)
 
         if returnim:
             return nodeImatrix
@@ -205,20 +210,6 @@ class UniformMesh1d(Mesh1d):
                                       interval=interval)
         ani.save(fname)
 
-
-    ## @ingroup GeneralInterface
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=150,
-            fontsize=24, fontcolor='g'):
-        """
-        @brief
-        """
-
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
 
     ## @ingroup GeneralInterface
     def to_vtk_file(self, filename, celldata=None, nodedata=None):

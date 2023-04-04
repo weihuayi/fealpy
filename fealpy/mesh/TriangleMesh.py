@@ -297,7 +297,7 @@ class TriangleMesh(Mesh2d):
         NN = self.number_of_nodes()
         NE = self.number_of_edges()
         NC = self.number_of_cells()
-        return NN + (p-1)*NE + (p-2)*(p-1)/2*NC
+        return NN + (p-1)*NE + (p-2)*(p-1)//2*NC
 
     def interpolation_points(self, p):
         """
@@ -1725,6 +1725,14 @@ class TriangleMesh(Mesh2d):
             [8, 9, 5]], dtype=np.int_)
 
         return cls(node, cell)
+
+    ## @ingroup MeshGenerators
+    @classmethod
+    def from_domain_distmesh(cls, domain, hmin, maxit=100):
+        from .DistMesher2d import DistMesher2d 
+        mesher = DistMesher2d(domain, hmin)
+        mesh = mesher.meshing(maxit=maxit)
+        return mesh
 
     ## @ingroup MeshGenerators
     @classmethod

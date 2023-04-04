@@ -315,14 +315,9 @@ def show_mesh_1d(
 def show_mesh_2d(
         axes, mesh,
         nodecolor='k', edgecolor='k',
-        cellcolor='grey', aspect='equal',
+        cellcolor='grey', aspect=1.0,
         linewidths=1, markersize=20,
         showaxis=False, showcolorbar=False, cmax=None, cmin=None, colorbarshrink=None, cmap='jet', box=None):
-
-    try:
-        axes.set_aspect(aspect)
-    except NotImplementedError:
-        pass
 
     if showaxis == False:
         axes.set_axis_off()

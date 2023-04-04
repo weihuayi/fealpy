@@ -2,11 +2,11 @@ import numpy as np
 
 from types import ModuleType
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
-from .mesh_tools import unique_row, find_entity, show_mesh_3d, find_node
 from ..common import ranges
+from .Mesh import Mesh
 
 
-class Mesh3d():
+class Mesh3d(Mesh):
     def __init__(self):
         pass
 
@@ -108,69 +108,57 @@ class Mesh3d():
         axes.set_box_aspect(aspect)
         axes.set_proj_type('ortho')
 
-        return show_mesh_3d(
-                axes, self,
-                nodecolor=nodecolor, edgecolor=edgecolor,
-                facecolor=facecolor, cellcolor=cellcolor,
-                aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis, alpha=alpha, shownode=shownode,
-                showedge=showedge,
-                threshold=threshold)
+        if showaxis == False:
+            axes.set_axis_off()
+        else:
+            axes.set_axis_on()
 
-    def find_node(
-            self, axes,
-            node=None,
-            index=None, showindex=False,
-            color='r', markersize=40,
-            fontsize=24, fontcolor='k', multiindex=None):
+        if (type(nodecolor) is np.ndarray) & np.isreal(nodecolor[0]):
+            cmax = nodecolor.max()
+            cmin = nodecolor.min()
+            norm = colors.Normalize(vmin=cmin, vmax=cmax)
+            mapper = cm.ScalarMappable(norm=norm, cmap='rainbow')
+            nodecolor = mapper.to_rgba(nodecolor)
 
-        if node is None:
-            node = self.node
-        find_node(
-                axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor, multiindex=multiindex)
+        node = self.node
+        if shownode:
+            axes.scatter(
+                    node[:, 0], node[:, 1], node[:, 2],
+                    color=nodecolor, s=markersize)
 
-    def find_edge(
-            self, axes,
-            index=None, showindex=False,
-            color='g', markersize=80,
-            fontsize=24, fontcolor='k'):
+        if showedge:
+            edge = self.ds.edge
+            vts = node[edge]
+            edges = a3.art3d.Line3DCollection(
+                   vts,
+                   linewidths=linewidths,
+                   color=edgecolor)
+            return axes.add_collection3d(edges)
 
-        find_entity(
-                axes, self, entity='edge',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+        face = self.entity('face')
+        isBdFace = self.ds.boundary_face_flag()
+        if threshold is None:
+            face = face[isBdFace][:, self.ds.ccw]
+        else:
+            bc = self.entity_barycenter('cell')
+            isKeepCell = threshold(bc)
+            face2cell = self.ds.face_to_cell()
+            isInterfaceFace = np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 1
+            isBdFace = (np.sum(isKeepCell[face2cell[:, 0:2]], axis=-1) == 2) & isBdFace
+            face = face[isBdFace | isInterfaceFace][:, self.ds.ccw]
 
-    def find_face(
-            self, axes,
-            index=None, showindex=False,
-            color='k', markersize=120,
-            fontsize=24, fontcolor='k'):
-        find_entity(
-                axes, self,  entity='face',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-    def find_cell(
-            self, axes,
-            index=None, showindex=False,
-            color='r', markersize=20,
-            fontsize=24, fontcolor='k'):
-        find_entity(
-                axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-    def print(self):
-        print('cell:\n', self.ds.cell)
-        print('face:\n', self.ds.face)
-        print('face2cell:\n', self.ds.face2cell)
+        faces = a3.art3d.Poly3DCollection(
+                node[face],
+                facecolor=facecolor,
+                linewidths=linewidths,
+                edgecolor=edgecolor,
+                alpha=alpha)
+        h = axes.add_collection3d(faces)
+        box = np.zeros((2, 3), dtype=np.float)
+        box[0, :] = np.min(node, axis=0)
+        box[1, :] = np.max(node, axis=0)
+        axes.scatter(box[:, 0], box[:, 1], box[:, 2], s=0)
+        return h
 
 
 class Mesh3dDataStructure():

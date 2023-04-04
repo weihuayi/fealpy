@@ -46,16 +46,11 @@ class BilinearForm:
         """
         space = self.space
         mesh = space[0].mesh
+        GD = mesh.geo_dimension()
 
-        if isinstance(space, tuple) and len(space) > 1:
-            NC = mesh.number_of_cells() 
-            GD = mesh.GD
+        if isinstance(space, tuple) and len(space) == GD:
             M = self.dintegrators[0].assembly_cell_matrix(space)
-            c2f = space[0].dof.cell_to_dof()
-            NN =mesh.number_of_nodes()
-            #cell = mesh.entity('cell')
-            #cell2dof = np.zeros((cell.shape[0], 2*GD), dtype=np.int_)
-            
+
             if space0.doforder == 'vdims':
                 for i in range(GD):
                     cell2dof[:, i::GD] = cell + NN*i

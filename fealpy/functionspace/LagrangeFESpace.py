@@ -554,7 +554,7 @@ class LagrangeFESpace():
             shape = dim + (gdof, )
         elif self.doforder == 'vdims':
             shape = (gdof, ) + dim
-
+        print(shape)
         return np.zeros(shape, dtype=dtype)
 
 

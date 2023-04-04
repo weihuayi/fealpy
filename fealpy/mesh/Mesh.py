@@ -61,9 +61,12 @@ class Mesh:
     def add_plot(self):
         raise NotImplementedError
 
-    def find_node(self, axes, node=None, index=np.s_[:],
-            showindex=False, color='r',
-            markersize=20, fontsize=24, fontcolor='k', multiindex=None):
+    def find_node(self, axes, node=None, 
+            index=np.s_[:],
+            showindex=False, 
+            color='r', markersize=20, 
+            fontsize=16, fontcolor='k', 
+            multiindex=None):
 
         if node is None:
             node = self.entity('node')
@@ -84,7 +87,6 @@ class Mesh:
             index, = np.nonzero(index)
         else:
             raise ValueError("the type of index is not correct!")
-
 
         if (type(color) is np.ndarray) and (np.isreal(color[0])):
             umax = color.max()
@@ -143,22 +145,55 @@ class Mesh:
                         axes.text(bc[i, 0], bc[i, 1], bc[i, 2], str(index[i]),
                                  multialignment='center', fontsize=fontsize, color=fontcolor) 
 
-    def find_edge(self, axes, index=np.s_[:], 
+    def find_edge(self, axes, 
+            index=np.s_[:], 
+            showindex=False,
+            color='g', markersize=22,
+            fontsize=18, fontcolor='k'):
+        return self.find_entity(axes, 'edge', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+    def find_face(self, axes, 
+            index=np.s_[:], 
+            showindex=False,
+            color='b', markersize=24,
+            fontsize=20, fontcolor='k'):
+        return self.find_entity(axes, 'face', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+    def find_cell(self, axes, 
+            index=np.s_[:], 
+            showindex=False,
+            color='y', markersize=26,
+            fontsize=22, fontcolor='k'):
+        return self.find_entity(axes, 'cell', 
+                showindex=showindex,
+                color=color, 
+                markersize=markersize,
+                fontsize=fontsize, 
+                fontcolor=fontcolor)
+
+    def find_entity(self, axes, 
+            etype, 
+            index=np.s_[:], 
             showindex=False,
             color='r', markersize=20,
             fontsize=24, fontcolor='k'):
 
         GD = self.geo_dimension()
-        node = self.entity('node')
-        print("node:", node)
-        bc = self.entity_barycenter('edge', index=index)
-        print("bc:", bc)
+        bc = self.entity_barycenter(etype, index=index)
 
         if GD == 1:
-            node = np.r_['1', bc, np.zeros_like(node)]
-            print("node:", node)
+            bc = np.r_['1', bc, np.zeros_like(bc)]
             GD = 2
-
         if index == np.s_[:]:
             index = range(bc.shape[0])
         elif (type(index) is np.int_):
@@ -169,7 +204,6 @@ class Mesh:
             index, = np.nonzero(index)
         else:
             raise ValueError("the type of index is not correct!")
-
         if (type(color) is np.ndarray) & (np.isreal(color[0])):
             umax = color.max()
             umin = color.min()
@@ -194,10 +228,3 @@ class Mesh:
                             str(index[i]),
                             multialignment='center',
                             fontsize=fontsize, color=fontcolor)
-
-    def find_face(self):
-        raise NotImplementedError
-
-    def find_cell(self):
-        raise NotImplementedError
-
