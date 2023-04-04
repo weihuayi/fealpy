@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+
 from scipy.sparse import coo_matrix, csr_matrix, diags
 from types import ModuleType
 from typing import Tuple
@@ -700,15 +701,12 @@ class UniformMesh2d(Mesh2d):
             raise ValueError("`etype` is wrong!")
 
     ## @ingroup FEMInterface
-    def entity_barycenter(self, etype):
+    def entity_barycenter(self, etype, index=np.s_[:]):
         """
-        @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
-
-        @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
+        @brief: Get the entity (cell, {face, edge}, or  node) based on the given entity type.
+        @param[in] etype: The type of entity can be 'cell', 2, 'face', 'edge',
         1, 'node', or 0.
-
-        @return The cell or node array based on the input entity type.
-
+        @return: The cell or node array based on the input entity type.
         @throws ValueError if the given etype is invalid.
         """
         if etype in {'cell', 2}:
@@ -719,7 +717,7 @@ class UniformMesh2d(Mesh2d):
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 2)
         else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
+            raise ValueError('the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
     #def entity_measure(self, etype):

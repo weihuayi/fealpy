@@ -1,5 +1,6 @@
 import numpy as np
 import warnings
+
 from scipy.sparse import csr_matrix, coo_matrix, diags, spdiags
 from types import ModuleType
 from typing import Tuple 
@@ -459,9 +460,7 @@ class UniformMesh1d(Mesh1d):
             uh = self.function('node')
 
         node = self.node
-        print("node1:", node)
         isBdNode = self.ds.boundary_node_flag()
-        print("isBdNode:", isBdNode)
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh
