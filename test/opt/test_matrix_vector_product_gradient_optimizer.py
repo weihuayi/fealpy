@@ -10,8 +10,9 @@ class TriMeshProblem(Problem):
         self.mesh = mesh
         node = mesh.entity('node')
         self.isBdNode = mesh.ds.boundary_node_flag()
+        x0 = np.array(node[~self.isBdNode, :].T.flat)
 
-        super().__init__(node[~self.isBdNode, :].T.flat, self.quality)
+        super().__init__(x0, self.quality)
 
     def quality(self, x):
         GD = self.mesh.geo_dimension()
@@ -19,7 +20,10 @@ class TriMeshProblem(Problem):
         node = np.full_like(node0, 0.0)
 
         node[self.isBdNode, :] = node0[self.isBdNode, :]
-        node[~self.isBdNode, :].T.flat[:] = x
+        #node[~self.isBdNode, :].T.flat[:] = x
+        NI = np.sum(~self.isBdNode)
+        node[~self.isBdNode,0] = x[:NI]
+        node[~self.isBdNode,1] = x[NI:]
 
         cell = self.mesh.entity('cell')
         NC = self.mesh.number_of_cells() 
@@ -96,7 +100,10 @@ class TriMeshProblem(Problem):
         node = np.full_like(node0, 0.0)
 
         node[isBdNode, :] = node0[isBdNode, :]
-        node[isFreeNode, :].T.flat[:] = x
+        #node[isFreeNode, :].T.flat[:] = x
+        NI = np.sum(isFreeNode)
+        node[isFreeNode,0] = x[:NI]
+        node[isFreeNode,1] = x[NI:]
 
         A, B = self.grad_matrix(node=node)
 
@@ -113,9 +120,8 @@ class TriMeshProblem(Problem):
 def test_triangle_mesh_opt():
     #mesh = TriangleMesh.from_unit_circle_gmsh(h=0.1)
     mesh = TriangleMesh.from_one_triangle('equ')
-    mesh.uniform_refine(n=4)
+    mesh.uniform_refine(n=2)
     area = mesh.entity_measure('cell')
-    print(area)
     problem = TriMeshProblem(mesh)
     NDof = len(problem.x0)
     problem.Preconditioner = LinearOperator((NDof, NDof), problem.block_jacobi_preconditioner)
