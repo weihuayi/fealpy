@@ -1,4 +1,3 @@
-import numpy as np
 import warnings
 from scipy.sparse import coo_matrix, csr_matrix, diags
 from types import ModuleType
@@ -203,26 +202,6 @@ class UniformMesh2d(Mesh2d):
 
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
-
-    ## @ingroup GeneralInterface
-    #def add_plot(self, plot,
-            #nodecolor='k', cellcolor='k',
-            #aspect='equal', linewidths=1, markersize=20,
-            #showaxis=False):
-        #"""
-        #@brief
-        #"""
-        #pass
-
-    ## @ingroup GeneralInterface
-    #def find_node(self, axes, node=None,
-            #index=None, showindex=False,
-            #color='r', markersize=100,
-            #fontsize=20, fontcolor='k'):
-        #"""
-        #@brief
-        #"""
-        #pass
 
     ## @ingroup GeneralInterface
     def find_edge(self, axes, node=None,

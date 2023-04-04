@@ -211,20 +211,6 @@ class UniformMesh1d(Mesh1d):
 
 
     ## @ingroup GeneralInterface
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=150,
-            fontsize=24, fontcolor='g'):
-        """
-        @brief
-        """
-
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
-
-    ## @ingroup GeneralInterface
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
         @brief
@@ -473,7 +459,9 @@ class UniformMesh1d(Mesh1d):
             uh = self.function('node')
 
         node = self.node
+        print("node1:", node)
         isBdNode = self.ds.boundary_node_flag()
+        print("isBdNode:", isBdNode)
         uh[isBdNode]  = gD(node[isBdNode])
 
         f -= A@uh
