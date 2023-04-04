@@ -268,7 +268,96 @@ class StructureHexMesh(Mesh3d):
         A += coo_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A.tocsr()
+    
+    def laplace_operator_coef(self,coef):
+        """
+        coef is a function, and the input is the coordinate.
+        The output is three coefficients c11, c22 and c33 in matrix \kappa = [[c11, 0, 0], [0, c22, 0], [0, 0, c33]] for equation
+                                  -\nabla \cdot (\kappa \nabla u) = f
+        The example of coef is: def coef(x,y):
+                                    if x > 0 and y > 0:
+                                        return 1.0, 1.0, 1.0
+                                    else:
+                                        return 2.0, 2.0, 2.0
+        """
+        n0 = self.ds.nx + 1
+        n1 = self.ds.ny + 1
+        n2 = self.ds.nz + 1
 
+        cx = 1 / (self.hx ** 2)
+        cy = 1 / (self.hy ** 2)
+        cz = 1 / (self.hz ** 2)
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN).reshape(n0, n1, n2)
+        
+        node = self.node
+
+        A_center = np.zeros(NN) 
+        A_left = np.zeros(NN-n0*n2)
+        A_right = np.zeros(NN-n0*n2)
+        A_upper = np.zeros(NN-n0*n1)
+        A_low = np.zeros(NN-n0*n1)
+        A_front = np.zeros(NN-n1*n2)
+        A_end = np.zeros(NN-n1*n2)
+
+        left_idx = 0
+        right_idx = 0
+        upper_idx = 0
+        low_idx = 0
+        front_idx = 0
+        end_idx = 0
+
+        for i in range(NN):
+            nodex = node[i,0]
+            nodey = node[i,1]
+            nodez = node[i,2]
+            c11,c22,c33 = coef(nodex, nodey, nodez) 
+            A_center[i] = 2 * (c11*cx + c22*cy + c33*cz)
+            
+            if nodex - 0.5 * self.hx > self.box[0]:
+                A_end[end_idx] = -c11 * cx
+                end_idx += 1
+
+            if nodex + 0.5 * self.hx < self.box[1]:
+                A_front[front_idx] = -c11 * cx
+                front_idx += 1
+
+            if nodey - 0.5 * self.hy > self.box[2]:
+                A_left[left_idx] = -c22 * cy
+                left_idx += 1
+
+            if nodey + 0.5 * self.hy < self.box[3]:
+                A_right[right_idx] = -c22 * cy
+                right_idx += 1
+
+            if nodez - 0.5 * self.hz > self.box[4]:
+                A_low[low_idx] = -c22 * cy
+                low_idx += 1
+
+            if nodez + 0.5 * self.hz < self.box[5]:
+                A_upper[upper_idx] = -c22 * cy
+                upper_idx += 1
+
+        A = diags(A_center.reshape(1,-1), [0], shape=(NN, NN), format='coo')
+
+        I = k[1:, :, :].flat
+        J = k[0:-1, :, :].flat
+        A += coo_matrix((A_end, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((A_front, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        I = k[:, 1:, :].flat
+        J = k[:, 0:-1, :].flat
+        A += coo_matrix((A_left, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((A_right, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        I = k[:, :, 1:].flat
+        J = k[:, :, 0:-1].flat
+        A += coo_matrix((A_low, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += coo_matrix((A_upper, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        return A.tocsr()
+    
     def function(self, etype='node', dtype=None):
         """
         @brief 返回定义在节点、网格边、网格面、或网格单元上离散函数（数组），元素取值为0
