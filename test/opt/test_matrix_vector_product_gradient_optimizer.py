@@ -1,5 +1,6 @@
 import numpy as np
-from scipy.sparse.linalg import LinearOperator
+from scipy.sparse.linalg import LinearOperator, cg
+from scipy.sparse import csr_matrix
 import pytest
 from fealpy.mesh import TriangleMesh
 from fealpy.opt import Problem,MatrixVectorProductGradientOptimizer
@@ -10,12 +11,12 @@ class TriMeshProblem(Problem):
         node = mesh.entity('node')
         self.isBdNode = mesh.ds.boundary_node_flag()
 
-        self['x0'] = node[~self.isBdNode, :].T.flat 
-        self['objective'] = self.quality
+        super().__init__(node[~self.isBdNode, :].T.flat, self.quality)
 
     def quality(self, x):
+        GD = self.mesh.geo_dimension()
         node0 = self.mesh.entity('node')
-        node = np.full_like(node0)
+        node = np.full_like(node0, 0.0)
 
         node[self.isBdNode, :] = node0[self.isBdNode, :]
         node[~self.isBdNode, :].T.flat[:] = x
@@ -35,7 +36,7 @@ class TriMeshProblem(Problem):
 
         A, B = self.grad_matrix(node=node)
 
-        gradp = np.full_like(x).reshape(GD, -1)
+        gradp = np.full_like(x, 0.0).reshape(GD, -1)
         gradp[0, :] = (A@node[:, 0] + B@node[:, 1])[~self.isBdNode]
         gradp[1, :] = (B.T@node[:, 0] + A@node[:, 1])[~self.isBdNode]
         return np.mean(quality), gradp.flat
@@ -57,7 +58,7 @@ class TriMeshProblem(Problem):
         v2 = node[idxj] - node[idxi]
 
         area = 0.5*(-v2[:, [0]]*v1[:, [1]] + v2[:, [1]]*v1[:, [0]])
-        l2 = np.zeros((NC, 3), dtype=np.float)
+        l2 = np.zeros((NC, 3), dtype=np.float64)
         l2[:, 0] = np.sum(v0**2, axis=1)
         l2[:, 1] = np.sum(v1**2, axis=1)
         l2[:, 2] = np.sum(v2**2, axis=1)
@@ -92,14 +93,14 @@ class TriMeshProblem(Problem):
         isFreeNode = ~isBdNode
 
         node0 = self.mesh.entity('node')
-        node = np.full_like(node0)
+        node = np.full_like(node0, 0.0)
 
         node[isBdNode, :] = node0[isBdNode, :]
         node[isFreeNode, :].T.flat[:] = x
 
         A, B = self.grad_matrix(node=node)
 
-        node1 = np.full_like(node)
+        node1 = np.full_like(node, 0.0)
         node1[isBdNode, :] = node[isBdNode, :]        
 
         b = -B*node[:, 1] - A*node1[:, 0]
@@ -110,12 +111,16 @@ class TriMeshProblem(Problem):
         return (node1[isFreeNode, :] - node[isFreeNode, :]).T.flat
 
 def test_triangle_mesh_opt():
-    mesh = TriangleMesh.from_unit_circle_gmsh(h=0.1)
+    #mesh = TriangleMesh.from_unit_circle_gmsh(h=0.1)
+    mesh = TriangleMesh.from_one_triangle('equ')
+    mesh.uniform_refine(n=4)
+    area = mesh.entity_measure('cell')
+    print(area)
     problem = TriMeshProblem(mesh)
-    NDof = len(problem['x0'])
-    problem['Preconditioner'] = LinearOperator((NDof, NDof), problem.block_jacobi_preconditioner)
-    problem['StepLength'] = 0.3
-    opt = MatrixVextorProductGradientOptimizer(problem)
+    NDof = len(problem.x0)
+    problem.Preconditioner = LinearOperator((NDof, NDof), problem.block_jacobi_preconditioner)
+    problem.StepLength = 0.3
+    opt = MatrixVectorProductGradientOptimizer(problem)
     opt.run()
 
 if __name__ == "__main__":

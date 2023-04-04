@@ -1,8 +1,9 @@
 import numpy as np
 
-
+from types import ModuleType
 from .Mesh import Mesh
 
+## @defgroup GeneralInterface
 class Mesh1d(Mesh):
     def number_of_nodes(self):
         """
@@ -103,13 +104,12 @@ class Mesh1d(Mesh):
 
         Dlambda = self.grad_lambda(index=index)
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi #(..., NC, ldof, GD)
+        return gphi 
 
     def add_plot(self, plot,
             nodecolor='k', cellcolor='k',
             aspect='equal', linewidths=1, markersize=20,
             showaxis=False):
-
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             fig.set_facecolor('white')
@@ -149,3 +149,5 @@ class Mesh1d(Mesh):
             from mpl_toolkits.mplot3d.art3d import Line3DCollection
             lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor)
             return axes.add_collection3d(vts)
+
+
