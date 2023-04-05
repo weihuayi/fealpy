@@ -28,15 +28,15 @@ class TrussStructureIntegrator:
         K = np.zeros((NC, 2*GD, 2*GD), dtype=np.float64)
 
         if space0.doforder == 'nodes':
-            K[:, 0:2*GD:2, 0:2*GD:2] = R
-            K[:, 0:2*GD:2, 1:2*GD:2] = -R
-            K[:, 1:2*GD:2, 0:2*GD:2] = -R
-            K[:, 1:2*GD:2, 1:2*GD:2] = R
-
-        elif space0.doforder == 'vdims':
             K[:, :GD, :GD] = R
             K[:, -GD:, :GD] = -R
             K[:, :GD, -GD:] = -R
             K[:, -GD:, -GD:] = R
+
+        elif space0.doforder == 'vdims':
+            K[:, 0:2*GD:2, 0:2*GD:2] = R
+            K[:, 0:2*GD:2, 1:2*GD:2] = -R
+            K[:, 1:2*GD:2, 0:2*GD:2] = -R
+            K[:, 1:2*GD:2, 1:2*GD:2] = R
 
         return K 
