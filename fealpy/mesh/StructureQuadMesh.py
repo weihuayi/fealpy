@@ -24,6 +24,7 @@ class StructureQuadMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+
     def uniform_refine(self, n=1, returnim=False):
         if returnim:
             nodeImatrix = []

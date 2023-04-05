@@ -6,21 +6,6 @@ from types import ModuleType
 from .Mesh import Mesh
 
 class Mesh2d(Mesh):
-    """ The base class of TriangleMesh and QuadrangleMesh
-        The class is just a abstract class, and you can not use it directly.
-    """
-    def number_of_nodes(self):
-        return self.ds.NN
-
-    def number_of_edges(self):
-        return self.ds.NE
-
-    def number_of_faces(self):
-        return self.ds.NE
-
-    def number_of_cells(self):
-        return self.ds.NC
-
     def number_of_nodes_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
 
@@ -32,9 +17,6 @@ class Mesh2d(Mesh):
 
     def number_of_vertices_of_cells(self):
         return self.ds.number_of_vertices_of_cells()
-
-    def geo_dimension(self):
-        return self.node.shape[1]
 
     def top_dimension(self):
         return 2
@@ -60,7 +42,7 @@ class Mesh2d(Mesh):
             raise ValueError("`entitytype` is wrong!")
 
     def entity_barycenter(self, etype=2, index=np.s_[:]):
-        node = self.node
+        node = self.entity('node')
         if etype in {'cell', 2}:
             cell = self.ds.cell
             bc = np.sum(node[cell[index], :], axis=1)/cell.shape[1]

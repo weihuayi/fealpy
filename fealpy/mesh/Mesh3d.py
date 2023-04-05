@@ -11,7 +11,7 @@ class Mesh3d(Mesh):
         pass
 
     def number_of_nodes(self):
-        return self.node.shape[0]
+        return self.ds.NN
 
     def number_of_edges(self):
         return self.ds.NE
@@ -32,7 +32,7 @@ class Mesh3d(Mesh):
         return self.ds.number_of_faces_of_cells()
 
     def geo_dimension(self):
-        return self.node.shape[1]
+        return 3 
 
     def top_dimension(self):
         return 3

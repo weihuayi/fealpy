@@ -73,45 +73,8 @@ class UniformMesh2d(Mesh2d):
         # Data structure for finite element computation
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
-    ## @ingroup GeneralInterface
-    def number_of_nodes(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @return The number of nodes.
-        """
-        return self.NN
-
-    ## @ingroup GeneralInterface
-    def number_of_edges(self):
-        """
-        @brief Get the number of edges in the mesh.
-
-        @note `edge` is the 1D entity
-
-        @return The number of edges.
-        """
-        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
-
-    ## @ingroup GeneralInterface
-    def number_of_faces(self):
-        """
-        @brief Get the number of faces in the mesh.
-
-        @note `face` is the 1D entity
-
-        @return The number of faces.
-        """
-        return (self.nx+1)*self.ny + (self.ny+1)*self.nx
-
-    ## @ingroup GeneralInterface
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
+    def geo_dimension(self):
+        return 2
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
@@ -130,8 +93,8 @@ class UniformMesh2d(Mesh2d):
 
         """
         for i in range(n):
-            self.extent = [i * 2 for i in self.extent]
-            self.h = [i / 2 for i in self.h]
+            self.extent = [i*2 for i in self.extent]
+            self.h = [h/2.0 for h in self.h]
             self.nx = self.extent[1] - self.extent[0]
             self.ny = self.extent[3] - self.extent[2]
 
@@ -535,18 +498,12 @@ class UniformMesh2d(Mesh2d):
         @brief
         """
         if uh is None:
-            uh = self.function('node').reshape(-1, )
+            uh = self.function('node').reshape(-1)
         
         GD = self.geo_dimension()
-        node = self.node.reshape(-1, GD)
+        node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
-        print("uh:", uh)
-        print("node:", node)
-        print("isBdNode:", isBdNode)
-        print("node[isBdNode]:", node[isBdNode])
         uh[isBdNode]  = gD(node[isBdNode])
-        print("A@uh:", (A@uh).shape)
-        print("f:", f.shape)
         f = f.reshape(-1, )
         f -= A@uh
         f[isBdNode] = uh[isBdNode]

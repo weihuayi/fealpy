@@ -58,6 +58,9 @@ class TriangleMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+    def geo_dimension(self):
+        return self.node.shape[-1]
+
     def integrator(self, q, etype='cell'):
         """
         @brief 获取不同维度网格实体上的积分公式

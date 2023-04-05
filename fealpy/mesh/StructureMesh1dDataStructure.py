@@ -12,6 +12,10 @@ class StructureMesh1dDataStructure():
         self.nx = nx 
         self.NN = nx + 1
         self.NC = nx 
+
+        self.NE = self.NC
+        self.NF = self.NN
+
         self.itype = itype 
 
     @property

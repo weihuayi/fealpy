@@ -2,9 +2,10 @@ import numpy as np
 
 
 class TrussStructureIntegrator:
-    def __init__(self, E, A):
+    def __init__(self, E, A, q=3):
         self.E = E  # 杨氏模量
         self.A = A  # 单元横截面积
+        self.q = q # 积分公式
 
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
             out=None):
@@ -18,25 +19,39 @@ class TrussStructureIntegrator:
 
         assert  len(space) == GD
 
-        c = self.E*self.A
-        NC = mesh.number_of_cells()
-        l = mesh.entity_measure('cell')
-        tan = mesh.cell_unit_tangent()
-        R = np.einsum('ik, im->ikm', tan, tan)
-        R *=c/l[:, None, None]
+        if cellmeasure is None:
+            cellmeasure = mesh.entity_measure('cell', index=index)
 
-        K = np.zeros((NC, 2*GD, 2*GD), dtype=np.float64)
+        NC = len(cellmeasure)
+
+        c = self.E*self.A
+        tan = mesh.cell_unit_tangent(index=index)
+        R = np.einsum('ik, im->ikm', tan, tan)
+        R *=c/cellmeasure[:, None, None]
+
+        ldof = 2 # 一个单元两个自由度, @TODO 高次元的情形？本科毕业论文
+        if out is None:
+            K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
+        else:
+            assert out.shape == (NC, GD*ldof, GD*ldof)
+            K = out
 
         if space0.doforder == 'nodes':
-            K[:, :GD, :GD] = R
-            K[:, -GD:, :GD] = -R
-            K[:, :GD, -GD:] = -R
-            K[:, -GD:, -GD:] = R
-
+            for i in range(2):
+                for j in range(i, 2):
+                    if i == j:
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += R
+                    else:
+                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] -= R
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] -= R
         elif space0.doforder == 'vdims':
-            K[:, 0:2*GD:2, 0:2*GD:2] = R
-            K[:, 0:2*GD:2, 1:2*GD:2] = -R
-            K[:, 1:2*GD:2, 0:2*GD:2] = -R
-            K[:, 1:2*GD:2, 1:2*GD:2] = R
+            for i in range(2):
+                for j in range(i, 2):
+                    if i == j:
+                        K[:, i::GD, i::GD] += R 
+                    else:
+                        K[:, i::GD, j::GD] -= R 
+                        K[:, j::GD, i::GD] -= R 
 
-        return K 
+        if out is None:
+            return K

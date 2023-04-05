@@ -5,44 +5,6 @@ from .Mesh import Mesh
 
 ## @defgroup GeneralInterface
 class Mesh1d(Mesh):
-    def number_of_nodes(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @return The number of nodes.
-        """
-        return self.NN
-
-    def number_of_edges(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `edge` is the 1D entity.
-
-       return The number of edges.
-
-        """
-        return self.NC
-
-    def number_of_faces(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `face` is the 0D entity
-
-        @return The number of faces.
-
-        """
-        return self.NN
-
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
-
     def multi_index_matrix(self, p, etype=1):
         ldof = p+1
         multiIndex = np.zeros((ldof, 2), dtype=np.int_)

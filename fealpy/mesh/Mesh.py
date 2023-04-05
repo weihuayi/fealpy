@@ -1,17 +1,18 @@
 import numpy as np
 
 class Mesh:
-    def number_of_cells(self):
-        raise NotImplementedError
 
     def number_of_nodes(self):
-        raise NotImplementedError
+        return self.ds.NN
 
     def number_of_edges(self):
-        raise NotImplementedError
+        return self.ds.NE
 
     def number_of_faces(self):
-        raise NotImplementedError
+        return self.ds.NF
+
+    def number_of_cells(self):
+        return self.ds.NC
 
     def geo_dimension(self):
         raise NotImplementedError
