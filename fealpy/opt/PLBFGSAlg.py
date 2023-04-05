@@ -1,50 +1,49 @@
 from collections import deque
-from typing import Union
+from typing import Union, Deque
 
 import numpy as np
-from numpy.linalg import norm, inv
+from numpy.linalg import norm
 from numpy.typing import NDArray
 
 from scipy.sparse import spmatrix  # 代表 scipy 的稀疏矩阵
 from scipy.sparse.linalg import LinearOperator
 
-from .optimizer_base import Optimizer, Problem, Options
+from .optimizer_base import Optimizer, Problem, Float, ObjFunc
 from .line_search import wolfe_line_search
 
 # 表示变量可以是 LinearOperator、稀疏矩阵或密集矩阵
 MatrixLike = Union[LinearOperator, spmatrix, np.ndarray, None]
 
 class PLBFGS(Optimizer):
-    def __init__(self, problem: Problem, options: Options) -> None:
-        super().__init__(problem, options)
+    def __init__(self, problem: Problem) -> None:
+        super().__init__(problem)
 
-        self.S = deque() 
-        self.Y = deque() 
+        self.S: Deque[Float] = deque()
+        self.Y: Deque[Float] = deque()
         # if self.P is None, 表示没有预条件子
-        self.P: MatrixLike = options['Preconditioner']
+        self.P: MatrixLike = problem.Preconditioner
 
     @classmethod
     def get_options(
         cls, *,
+        x0: NDArray,
+        objective: ObjFunc,
         Preconditioner: MatrixLike,
-        Display: bool = False,
-        MaxIterations: int = 500,
-        StepTolerance: float = 1e-8,
-        NormGradTolerance: float = 1e-6,
+        MaxIters: int = 500,
+        StepLengthTol: float = 1e-8,
+        NormGradTol: float = 1e-6,
         NumGrad = 10,
-    ) -> Options:
+    ) -> Problem:
 
-        options = {
-            "Preconditioner": Preconditioner,
-            "Display": Display,
-            "MaxIterations": MaxIterations,
-            "StepTolerance": StepTolerance,
-            "NormGradTolerance": NormGradTolerance,
-            "NumGrad": NumGrad
-        }
-
-        return super().get_options(**options)
-
+        return Problem(
+            x0=x0,
+            objective=objective,
+            Preconditioner=Preconditioner,
+            MaxIters=MaxIters,
+            StepLengthTol=StepLengthTol,
+            NormGradTol=NormGradTol,
+            NumGrad=NumGrad
+        )
 
     def hessian_gradient_prod(self, g: NDArray) -> NDArray:
         N = len(self.S)
@@ -69,8 +68,7 @@ class PLBFGS(Optimizer):
 
 
     def run(self):
-        options = self.options
-        x = self.problem['x0']
+        x = self.problem.x0
         flag = True
 
         f, g = self.fun(x)
@@ -78,15 +76,11 @@ class PLBFGS(Optimizer):
         pg = g
 
         alpha = 1
-        diff = np.inf
-
-        if options['Display'] == 'iter':
-            print(f"The initial status F(x): {f:%12.11g}, grad:{gnorm:%12.11g}, diff:{diff:%12.11g}")
-
+        # diff = np.inf
 
         flag = 0 # The convergence flag
         j = 0
-        for i in range(1, options['MaxIterations']):
+        for i in range(1, self.problem.MaxIters):
             d = -self.hessian_gradient_prod(g)
             gtd = np.dot(g, d)
 
@@ -101,35 +95,35 @@ class PLBFGS(Optimizer):
                 flag = 1
                 break
 
-            if alpha > self.options['StepTolerance']:
+            if alpha > self.problem.StepLengthTol:
                 x = xalpha
                 f = falpha
                 g = galpha
                 gnorm = norm(g)
             else:
-                if options['Display'] == 'iter':
-                    print('The step length alpha %g is smaller than tolerance %g!\n'%(alpha, options['StepTolerance']))
+                # if options['Display'] == 'iter':
+                #     print('The step length alpha %g is smaller than tolerance %g!\n'%(alpha, options['StepTolerance']))
 
                 if j == 0:
                     flag = 2
                     break
                 else:
                     alpha = 1
-                    if options['Display'] == 'iter':
-                        print(f'restart with step length {alpha}.')
+                    # if options['Display'] == 'iter':
+                    #     print(f'restart with step length {alpha}.')
                     ND = x.shape[0]
                     self.S = deque()
-                    self.Y = deque() 
+                    self.Y = deque()
                     j = 0
                     continue
 
 
-            if options['Display'] == 'iter':
-                print(f'current step {i}, alpha = {alpha}, ', end='')
-                print(f'nfval = {self.NF}, maxd = {np.max(np.abs(x))}, f = {f}, gnorm = {gnorm}')
+            # if options['Display'] == 'iter':
+            #     print(f'current step {i}, alpha = {alpha}, ', end='')
+            #     print(f'nfval = {self.NF}, maxd = {np.max(np.abs(x))}, f = {f}, gnorm = {gnorm}')
 
-            if gnorm < options['NormGradTolerance']:
-                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {options['NormGradTolerance']}")
+            if gnorm < self.problem.NormGradTol:
+                print(f"The norm of current gradient is {gnorm}, which is smaller than the tolerance {self.problem.NormGradTol}")
                 flag = 1 # convergence
                 break
 
@@ -140,8 +134,8 @@ class PLBFGS(Optimizer):
             if sty < 0:
                 print(f'bfgs: sty <= 0, skipping BFGS update at iteration {i}.')
             else:
-                if i < options['NumGrad']:
-                    self.S.append(s) 
+                if i < self.problem.NumGrad:
+                    self.S.append(s)
                     self.Y.append(y)
                     j += 1
                 else:
