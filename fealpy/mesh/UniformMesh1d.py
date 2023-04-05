@@ -347,11 +347,11 @@ class UniformMesh1d(Mesh1d):
     ## @ingroup FDMInterface
     def error(self, u, uh, errortype='all'):
         """
-        @brief Compute the error between the true solution and the numerical solution.
-
-        @param[in] u The true solution as a function.
-        @param[in] uh The numerical solution as an array.
-        @param[in] errortype The error type, which can be 'all', 'max', 'L2' or 'H1'
+        @brief        Compute the error between the true solution and the numerical solution.
+ 
+        @param[in]    u: The true solution as a function.
+        @param[in]    uh: The numerical solution as an array.
+        @param[in]    errortype: The error type, which can be 'all', 'max', 'L2' or 'H1'
         """
 
         h = self.h
