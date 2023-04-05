@@ -3,15 +3,15 @@ from typing import Optional
 import torch
 from torch.nn import Module
 from torch import Tensor
-from .modules import Solution
+from .modules import TensorMapping
 
 from .nntyping import Operator, GeneralSampler
 
 
 class LearningMachine():
     """Neural network trainer."""
-    def __init__(self, s: Solution, cost_function: Optional[Module]=None) -> None:
-        self.__solution = s
+    def __init__(self, s: TensorMapping, cost_function: Optional[Module]=None) -> None:
+        self.__module = s
 
         if cost_function:
             self.cost = cost_function
@@ -20,7 +20,7 @@ class LearningMachine():
 
     @property
     def solution(self):
-        return self.__solution
+        return self.__module
 
 
     def loss(self, sampler: GeneralSampler, func: Operator,
@@ -44,10 +44,20 @@ class LearningMachine():
         Here `u` may be a function of `p`.
         """
         inputs = sampler.run()
+        param = next(self.solution.parameters())
+
+        if param is not None:
+            device = param.device
+            if device[0:4] == "cuda":
+                inputs = inputs.cuda(int(device[5:]))
+
         outputs = func(inputs, self.solution.forward)
+
         if not target:
             target = torch.zeros_like(outputs)
+
         ret: Tensor = self.cost(outputs, target)
+
         if output_samples:
             return ret, inputs
         return ret

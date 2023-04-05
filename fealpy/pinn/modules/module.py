@@ -80,7 +80,8 @@ class TensorMapping(Module):
     def estimate_error(self, other: VectorFunction, mesh: Optional[MeshLike]=None, power: int=2, q: int=3,
                        split: bool=False, coordtype: str='b', squeeze: bool=False):
         """
-        @brief Calculate error between the solution and `other` in finite element space `space`.
+        @brief Calculate error between the solution and `other` in finite element space `space`. Use this when all\
+               parameters are in CPU memory.
 
         @param other: VectorFunction. The function(target) to be compared with.
         @param mesh: MeshLike, optional. A mesh in which the error is estimated. If `other` is a function in finite\
@@ -148,7 +149,7 @@ class TensorMapping(Module):
         flat_mesh = [np.ravel(x).reshape(-1, 1) for x in mesh]
         mesh_pt = [torch.from_numpy(x).float() for x in flat_mesh]
         pt_u: torch.Tensor = self.forward(torch.cat(mesh_pt, dim=1))
-        u_plot: NDArray = pt_u.detach().numpy()
+        u_plot: NDArray = pt_u.cpu().detach().numpy()
         assert u_plot.ndim == 2
         nf = u_plot.shape[-1]
         if nf <= 1:
@@ -201,6 +202,8 @@ class _Fixed(Solution):
         total_feature = p.shape[-1] + len(self._fixed_idx)
         size = p.shape[:-1] + (total_feature, )
         fixed_p = torch.zeros(size, dtype=torch.float)
+        if p.is_cuda:
+            fixed_p = fixed_p.cuda()
         fixed_p[..., self._fixed_idx] = self._fixed_value
 
         feature_mask = torch.ones((total_feature, ), dtype=torch.bool)
