@@ -5,7 +5,7 @@ from fealpy.decorator import cartesian, barycentric
 from fealpy.mesh import UniformMesh1d
 from scipy.sparse import diags
 
-class PDEModel:
+class PDEModel_1:
     """
     -u''(x) = 16\pi^2\sin(4\pi x), 
        u(0) = 0,\quad u(1) = 0.
@@ -52,7 +52,7 @@ class PDEModel:
         """
         return self.solution(p)
 
-class PDEModel_1:
+class PDEModel_2:
     """
     -u''(x) = 9\pi^2\cos(3\pi x), \\
     u(0) = 0,\quad u(1) = 0.
@@ -100,7 +100,7 @@ class PDEModel_1:
         """
         return self.solution(p)
 
-class PDEModel_2:
+class PDEModel_3:
     @cartesian
     def domain(self):
         """
@@ -143,7 +143,7 @@ class PDEModel_2:
         """
         return self.solution(p)
 
-pde = PDEModel_2()
+pde = PDEModel_3()
 domain = pde.domain()
 # test
 print('domain :', domain)
@@ -185,8 +185,8 @@ A = mesh.laplace_operator()
 print("未处理边界的矩阵A:\n", A.toarray())
 uh = mesh.function() # 返回网格节点处的函数值，默认值为 0
 f = mesh.interpolate(pde.source, 'node')
-NN = mesh.number_of_nodes() # PDEmodel_2 need 
-A += diags([2], [0], shape=(NN, NN), format='csr') # PDEmoodel_2 need
+NN = mesh.number_of_nodes() # PDEModel_3 才需要 
+A += diags([2], [0], shape=(NN, NN), format='csr') # PDEModel_3 才需要
 A, f = mesh.apply_dirichlet_bc(gD=pde.dirichlet, A=A, f=f)
 print("处理完边界之后的矩阵A:\n", A.toarray())
 print("处理完边界之后的右端项f:", f)
