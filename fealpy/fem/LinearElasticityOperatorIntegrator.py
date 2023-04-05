@@ -45,15 +45,16 @@ class LinearElasticityOperatorIntegrator:
             for i in range(GD):
                 for j in range(i, GD):
                     if i == j:
-                        K[:, i*GD:(i+1)*GD, i*GD:(i+1)*GD] += D 
-                        K[:, i*GD:(i+1)*GD, i*GD:(i+1)*GD] += (mu + lam)*A[imap[(i, i)]]
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += D 
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += (mu + lam)*A[imap[(i, i)]]
                     else:
-                        K[:, i*GD:(i+1)*GD, j*GD:(j+1)*GD] += lam*A[imap[(i, j)]] 
-                        K[:, i*GD:(i+1)*GD, j*GD:(j+1)*GD] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j*GD:(j+1)*GD, i*GD:(i+1)*GD] += K[:, i*GD:(i+1)*GD, j*GD:(j+1)*GD].tranpose(0, 2, 1)
+                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += lam*A[imap[(i, j)]] 
+                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += K[:,
+                                i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof].tranpose(0, 2, 1)
         elif space[0].doforder == 'vdims':
-            for i in range(GD):
-                for j in range(i, GD):
+            for i in range(ldof):
+                for j in range(i, ldof):
                     if i == j:
                         K[:, i::GD, i::GD] += D 
                         K[:, i::GD, i::GD] += (mu + lam)*A[imap[(i, i)]]
