@@ -34,6 +34,9 @@ class StructureMesh2dDataStructure:
         self.NN = (nx + 1) * (ny + 1)
         self.NE = ny * (nx + 1) + nx * (ny + 1)
         self.NC = nx * ny
+
+        self.NF = self.NE
+
         self.itype = itype
 
     def number_of_nodes_of_cells(self):
