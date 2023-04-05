@@ -498,18 +498,12 @@ class UniformMesh2d(Mesh2d):
         @brief
         """
         if uh is None:
-            uh = self.function('node').reshape(-1, )
+            uh = self.function('node').reshape(-1)
         
         GD = self.geo_dimension()
-        node = self.node.reshape(-1, GD)
+        node = self.entity('node')
         isBdNode = self.ds.boundary_node_flag()
-        print("uh:", uh)
-        print("node:", node)
-        print("isBdNode:", isBdNode)
-        print("node[isBdNode]:", node[isBdNode])
         uh[isBdNode]  = gD(node[isBdNode])
-        print("A@uh:", (A@uh).shape)
-        print("f:", f.shape)
         f = f.reshape(-1, )
         f -= A@uh
         f[isBdNode] = uh[isBdNode]
