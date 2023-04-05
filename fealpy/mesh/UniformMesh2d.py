@@ -1,6 +1,7 @@
 import numpy as np
 import warnings
-from scipy.sparse import coo_matrix, csr_matrix, diags
+
+from scipy.sparse import coo_matrix, csr_matrix, diags, spdiags
 from types import ModuleType
 from typing import Tuple
 from .Mesh2d import Mesh2d
@@ -168,25 +169,6 @@ class UniformMesh2d(Mesh2d):
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
         ani.save(fname)
 
-    ## @ingroup GeneralInterface
-    def find_edge(self, axes, node=None,
-            index=None, showindex=False,
-            color='b', markersize=125,
-            fontsize=22, fontcolor='b'):
-        """
-        @brief
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=150,
-            fontsize=24, fontcolor='g'):
-        """
-        @brief
-        """
-        pass
 
     ## @ingroup GeneralInterface
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
@@ -292,7 +274,6 @@ class UniformMesh2d(Mesh2d):
     def function(self, etype='node', dim=None, dtype=None, ex=0):
         """
         @brief Return a discrete function (array) defined on nodes, mesh edges, or mesh cells with elements set to 0.
-
         @param etype: The entity type can be 'node', 'edge', 'face', 'edgex', 'edgey', 'cell', or their corresponding numeric values.
         @type etype: str or int
         @param dim: The dimension of the discrete function, default: None.
@@ -512,22 +493,33 @@ class UniformMesh2d(Mesh2d):
         return A
 
     ## @ingroup FDMInterface
-    def apply_dirichlet_bc(self, uh, A, f):
+    def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
         @brief
         """
-        NN = self.number_of_nodes()
-        isBdNode = mesh.ds.boundary_node_flag()
-
-        F = f - A@uh
-        F[isBdNode] = uh[isBdNode]
+        if uh is None:
+            uh = self.function('node').reshape(-1, )
+        
+        GD = self.geo_dimension()
+        node = self.node.reshape(-1, GD)
+        isBdNode = self.ds.boundary_node_flag()
+        print("uh:", uh)
+        print("node:", node)
+        print("isBdNode:", isBdNode)
+        print("node[isBdNode]:", node[isBdNode])
+        uh[isBdNode]  = gD(node[isBdNode])
+        print("A@uh:", (A@uh).shape)
+        print("f:", f.shape)
+        f = f.reshape(-1, )
+        f -= A@uh
+        f[isBdNode] = uh[isBdNode]
 
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
         bdIdx[isBdNode] = 1
         D0 = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         D1 = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         A = D0@A@D0 + D1
-        return A, F
+        return A, f 
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):
@@ -663,15 +655,12 @@ class UniformMesh2d(Mesh2d):
             raise ValueError("`etype` is wrong!")
 
     ## @ingroup FEMInterface
-    def entity_barycenter(self, etype):
+    def entity_barycenter(self, etype, index=np.s_[:]):
         """
-        @brief Get the entity (cell, {face, edge}, or  node) based on the given entity type.
-
-        @param[in] etype The type of entity can be 'cell', 2, 'face', 'edge',
+        @brief: Get the entity (cell, {face, edge}, or  node) based on the given entity type.
+        @param[in] etype: The type of entity can be 'cell', 2, 'face', 'edge',
         1, 'node', or 0.
-
-        @return The cell or node array based on the input entity type.
-
+        @return: The cell or node array based on the input entity type.
         @throws ValueError if the given etype is invalid.
         """
         if etype in {'cell', 2}:
@@ -682,7 +671,7 @@ class UniformMesh2d(Mesh2d):
         elif etype in {'node', 0}:
             return self.node.reshape(-1, 2)
         else:
-            raise ValueError(f'the entity type `{etype}` is not correct!')
+            raise ValueError('the entity type `{etype}` is not correct!')
 
     ## @ingroup FEMInterface
     #def entity_measure(self, etype):
