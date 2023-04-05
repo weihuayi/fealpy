@@ -250,7 +250,7 @@ class UniformMesh1d(Mesh1d):
         """
         @brief
         """
-        pass
+        return self.node
 
     ## @ingroup FDMInterface
     def cell_barycenter(self):
@@ -473,6 +473,15 @@ class UniformMesh1d(Mesh1d):
         A = D0@A@D0 + D1
         return A, f 
 
+    def parabolic_forward(self):
+        pass
+
+    def parabolic_backward(self):
+        pass
+
+    def parabolic_crank_nicholson(self):
+        pass
+
 
     ## @ingroup FDMInterface
     def wave_equation(self, r, theta):
@@ -503,15 +512,6 @@ class UniformMesh1d(Mesh1d):
         """
         return 1
 
-    ## @ingroup FEMInterface
-    def top_dimension(self):
-        """
-        @brief Get the topological dimension of the mesh.
-        
-        @return The topological dimension (1 for 1D mesh).
-        """
-        return 1
-   
     ## @ingroup FEMInterface
     def integrator(self, q, etype='cell'):
         return GaussLegendreQuadrature(q)

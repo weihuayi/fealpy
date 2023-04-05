@@ -66,7 +66,7 @@ class Mesh:
             index=np.s_[:],
             showindex=False, 
             color='r', markersize=20, 
-            fontsize=16, fontcolor='k', 
+            fontsize=16, fontcolor='r', 
             multiindex=None):
 
         if node is None:
@@ -150,7 +150,7 @@ class Mesh:
             index=np.s_[:], 
             showindex=False,
             color='g', markersize=22,
-            fontsize=18, fontcolor='k'):
+            fontsize=18, fontcolor='g'):
         return self.find_entity(axes, 'edge', 
                 showindex=showindex,
                 color=color, 
@@ -162,7 +162,7 @@ class Mesh:
             index=np.s_[:], 
             showindex=False,
             color='b', markersize=24,
-            fontsize=20, fontcolor='k'):
+            fontsize=20, fontcolor='b'):
         return self.find_entity(axes, 'face', 
                 showindex=showindex,
                 color=color, 
@@ -174,7 +174,7 @@ class Mesh:
             index=np.s_[:], 
             showindex=False,
             color='y', markersize=26,
-            fontsize=22, fontcolor='k'):
+            fontsize=22, fontcolor='y'):
         return self.find_entity(axes, 'cell', 
                 showindex=showindex,
                 color=color, 
