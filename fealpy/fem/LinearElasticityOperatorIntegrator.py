@@ -36,7 +36,12 @@ class LinearElasticityOperatorIntegrator:
         grad = space[0].grad_basis(bcs, index=index) # (NQ, NC, ldof, GD)
 
         NC = len(cellmeasure)
-        K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
+
+        if out is None:
+            K = np.zeros((NC, GD*ldof, GD*ldof), dtype=np.float64)
+        else:
+            assert out.shape == (NC, GD*ldof, GD*ldof)
+            K = out
 
         A = [np.einsum('i, ijm, ijn, j->jmn', ws, grad[..., i], grad[..., j], cellmeasure, optimize=True) for i, j in idx]
 
@@ -50,20 +55,21 @@ class LinearElasticityOperatorIntegrator:
                     else:
                         K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += lam*A[imap[(i, j)]] 
                         K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += K[:,
-                                i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof].tranpose(0, 2, 1)
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += lam*A[imap[(i, j)]].tranpose(0, 2, 1)
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] += mu*A[imap[(i, j)]]
         elif space[0].doforder == 'vdims':
-            for i in range(ldof):
-                for j in range(i, ldof):
+            for i in range(GD):
+                for j in range(i, GD):
                     if i == j:
                         K[:, i::GD, i::GD] += D 
                         K[:, i::GD, i::GD] += (mu + lam)*A[imap[(i, i)]]
                     else:
                         K[:, i::GD, j::GD] += lam*A[imap[(i, j)]] 
                         K[:, i::GD, j::GD] += mu*A[imap[(i, j)]].transpose(0, 2, 1)
-                        K[:, j::GD, i::GD] += K[:, i::GD, j::GD].tranpose(0, 2, 1)
-
-        return K
+                        K[:, j::GD, i::GD] += lam*A[imap[(i, j)]].tranpose(0, 2, 1)
+                        K[:, j::GD, i::GD] += mu*A[imap[(i, j)]]
+        if out is None:
+            return K
 
 
     def assembly_cell_matrix_fast(self, space, index=np.s_[:], cellmeasure=None):
