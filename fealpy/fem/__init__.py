@@ -15,3 +15,7 @@ from .ConvectionIntegrator import ConvectionIntegrator
 
 from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangentOperatorIntegrator
 
+
+from .LinearForm import LinearForm
+from .SourceIntegrator import SourceIntegrator
+
