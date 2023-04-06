@@ -35,6 +35,9 @@ class Mesh3d(Mesh):
         return 3 
 
     def top_dimension(self):
+        """
+        @brief
+        """
         return 3
 
     def entity(self, etype='cell'):

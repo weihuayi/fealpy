@@ -74,6 +74,9 @@ class UniformMesh2d(Mesh2d):
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
     def geo_dimension(self):
+        """
+        @brief
+        """
         return 2
 
     ## @ingroup GeneralInterface
