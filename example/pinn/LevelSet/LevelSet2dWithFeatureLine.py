@@ -7,10 +7,12 @@ from torch import nn
 from torch.nn import Sequential, Linear, Tanh
 from torch.autograd import Variable
 
-from fealpy.pinn.machine import Solution, LearningMachine
-from fealpy.pinn.sampler import ISampler
-from fealpy.pinn.grad import grad_by_fts
-
+from fealpy.pinn import (
+    LearningMachine,
+    ISampler,
+    grad_by_fts
+)
+from fealpy.pinn.modules import Solution
 
 ### Load Feature Line Model
 

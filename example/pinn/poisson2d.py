@@ -1,6 +1,7 @@
 from fealpy.pde.poisson_2d import CosCosData
 from fealpy.mesh import MeshFactory as Mf
-from fealpy.pinn import LearningMachine, gradient, Solution
+from fealpy.pinn import LearningMachine, gradient
+from fealpy.pinn.modules import Solution
 from fealpy.pinn.sampler import BoxBoundarySampler, TriangleMeshSampler
 
 import torch
