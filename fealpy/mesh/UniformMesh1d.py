@@ -179,7 +179,7 @@ class UniformMesh1d(Mesh1d):
         return line
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+    def show_animation(self, fig, axes, box, advance, fname='test.mp4',
                        init=None, fargs=None,
                        frames=1000, lw=2, interval=50):
         """
@@ -198,7 +198,7 @@ class UniformMesh1d(Mesh1d):
             return line
 
         def func(n, *fargs):
-            uh, t = forward(n)
+            uh, t = advance(n)
             line.set_data((x, uh))
             s = "frame=%05d, time=%0.8f" % (n, t)
             print(s)
@@ -473,25 +473,108 @@ class UniformMesh1d(Mesh1d):
         A = D0@A@D0 + D1
         return A, f 
 
-    def parabolic_forward(self):
-        pass
+    def parabolic_operator_forward(self, tau):
+        """
+        @brief 生成抛物方程的向前差分迭代矩阵
 
-    def parabolic_backward(self):
-        pass
+        @param[in] tau float, 当前时间步长
+        """
 
-    def parabolic_crank_nicholson(self):
-        pass
+        r = tau/self.h**2 
+        if r > 0.5:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1 - 2 * r], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def parabolic_operator_backward(self, tau):
+        """
+        @brief 生成抛物方程的向后差分迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1+2*r], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(-r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def parabolic_operator_crank_nicholson(self, tau):
+        """
+        @brief 生成抛物方程的 CN 差分格式的迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1 + r], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(-r/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        B = diags([- 1 - r], [0], shape=(NN, NN), format='csr')
+        B += csr_matrix((-val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((-val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A, B
 
 
     ## @ingroup FDMInterface
-    def wave_equation(self, r, theta):
-        n0 = self.NC -1
+    def wave_operator(self, tau, theta=0.5):
+        """
+        @brief 生成波动方程的离散矩阵
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+
+        A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
+        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
+        A2 = diags([- 1 - 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
+
+
         A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
         A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
         A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(- r**2 * theta, (NN-1, ))
+        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * (1 - 2 * theta), (NN-1, ))
+        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * theta, (NN-1, ))
+        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A0, A1, A2
 
