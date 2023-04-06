@@ -136,14 +136,15 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup GeneralInterface
     def show_function(self, plot, uh, cmap='jet'):
         """
-        @brief 显示一个定义在网格节点上的函数
+        @brief    显示一个定义在网格节点上的函数
+        @param    uh 网格节点上的函数值(二维数组)
         """
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             axes = fig.add_subplot(111, projection='3d')
         else:
             axes = plot
-        node = self.node
+        node = self.node # 获取二维节点上的网格坐标
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 
     ## @ingroup GeneralInterface
@@ -273,7 +274,7 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FDMInterface
     def function(self, etype='node', dim=None, dtype=None, ex=0):
         """
-        @brief Return a discrete function (array) defined on nodes, mesh edges, or mesh cells with elements set to 0.
+        @brief: Return a discrete function (array) defined on nodes, mesh edges, or mesh cells with elements set to 0.
         @param etype: The entity type can be 'node', 'edge', 'face', 'edgex', 'edgey', 'cell', or their corresponding numeric values.
         @type etype: str or int
         @param dim: The dimension of the discrete function, default: None.
@@ -426,27 +427,37 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FDMInterface
     def error(self, u, uh, errortype='all'):
         """
-        @brief Compute the error between the true solution and the numerical solution.
+        @brief       Compute the error between the true solution and the numerical solution.
 
-        @param[in] u The true solution as a function.
-        @param[in] uh The numerical solution as an 2D array.
-        @param[in] errortype The error type, which can be 'all', 'max', 'L2' or 'H1'
+        @param[in]   u: The true solution as a function.
+        @param[in]   uh: The numerical solution as an 2D array.
+        @param[in]   errortype: The error type, which can be 'all', 'max', 'L2' or 'l2'
         """
 
         assert (uh.shape[0] == self.nx+1) and (uh.shape[1] == self.ny+1)
-
-        h = self.h
+        hx = self.h[0]
+        hy = self.h[1]
         nx = self.nx
         ny = self.ny
+        node = self.node
+        uI = u(node)
+        e = uI - uh
 
-        e = u - uh
+        if errortype == 'all':
+            emax = np.max(np.abs(e))
+            e0 = np.sqrt(hx * hy * 2 * np.sum(e ** 2))
+            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
 
-        emax = np.max(np.abs(e))
-        e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
-
-        el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
-
-        return emax, e0, el2
+            return emax, e0, el2
+        elif errortype == 'max':
+            emax = np.max(np.abs(e))
+            return emax
+        elif errortype == 'L2':
+            e0 = np.sqrt(h ** 2 * np.sum(e ** 2))
+            return e0
+        elif errortype == 'l2':
+            el2 = np.sqrt(1 / ((nx - 1) * (ny - 1)) * np.sum(e ** 2))
+            return el2
 
     ## @ingroup FDMInterface
     def elliptic_operator(self, d=2, c=None, r=None):
@@ -495,10 +506,10 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
-        @brief
+        @brief: 组装 \Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
         if uh is None:
-            uh = self.function('node').reshape(-1)
+            uh = self.function('node').reshape(-1, )
         
         GD = self.geo_dimension()
         node = self.entity('node')
