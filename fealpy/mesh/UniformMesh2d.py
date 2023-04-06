@@ -136,7 +136,7 @@ class UniformMesh2d(Mesh2d):
 
         return n0.astype('int64'), n1.astype('int64')
 
-## @ingroup GeneralInterface
+    ## @ingroup GeneralInterface
     def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='jet'):
             
         """
