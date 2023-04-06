@@ -3,7 +3,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 
-from fealpy.pinn.machine import Solution
+from fealpy.pinn.modules import Solution
 from fealpy.mesh import MeshFactory as Mf
 
 
