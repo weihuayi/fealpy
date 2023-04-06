@@ -1,8 +1,6 @@
 import numpy as np 
-import matplotlib.pyplot as plt 
 
-from fealpy.decorator import cartesian, barycentric 
-from fealpy.mesh import UniformMesh1d
+from fealpy.decorator import cartesian 
 from scipy.sparse import diags
 
 class PDEModel_1:
@@ -58,7 +56,6 @@ class PDEModel_2:
     u(0) = 0,\quad u(1) = 0.
     真解： u(x) = \sin(3\pi x).
     """
-    @cartesian
     def domain(self):
         """
         @brief 得到 PDE 模型的区域
@@ -101,7 +98,6 @@ class PDEModel_2:
         return self.solution(p)
 
 class PDEModel_3:
-    @cartesian
     def domain(self):
         """
         @brief 得到 PDE 模型的区域
@@ -151,9 +147,18 @@ print(np.abs(pde.solution(0)) < 1e-12)
 print(np.abs(pde.solution(1)) < 1e-12)
 print(np.abs(pde.solution(1/8) - 1) < 1e-12)
 
+from fealpy.mesh import UniformMesh1d
+import matplotlib.pyplot as plt 
+
 hx = 0.1
 nx = int((domain[1] - domain[0])/hx)
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
+print("NN:", mesh.number_of_nodes())
+print("NE:", mesh.number_of_edges())
+print("NF:", mesh.number_of_faces())
+print("NC:", mesh.number_of_cells())
+print("gd:", mesh.geo_dimension())
+print("td:", mesh.top_dimension())
 
 fig = plt.figure(1)
 axes = fig.gca() 

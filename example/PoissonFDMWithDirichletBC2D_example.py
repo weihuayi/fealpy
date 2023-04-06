@@ -1,6 +1,6 @@
 import numpy as np
 
-from fealpy.decorator import cartesian, barycentric
+from fealpy.decorator import cartesian
 
 # 定义一个 PDE 的模型类
 class PDEModel:
@@ -76,13 +76,19 @@ hy = 0.2
 nx = int((domain[1] - domain[0])/hx)
 ny = int((domain[3] - domain[2])/hy)
 mesh = UniformMesh2d((0, nx, 0, ny), h=(hx, hy), origin=(domain[0], domain[2]))
+print("NN:", mesh.number_of_nodes())
+print("NE:", mesh.number_of_edges())
+print("NF:", mesh.number_of_faces())
+print("NC:", mesh.number_of_cells())
+print("gd:", mesh.geo_dimension())
+print("td:", mesh.top_dimension())
 NN = mesh.number_of_nodes()
 NC = mesh.number_of_cells()
 
 # 画出网格
 fig = plt.figure(1)
 axes = fig.gca()
-mesh.add_plot(axes, aspect=1)
+mesh.add_plot(axes)
 mesh.find_node(axes, showindex=True)
 mesh.find_edge(axes, showindex=True) 
 mesh.find_cell(axes, showindex=True)
@@ -127,12 +133,12 @@ print("处理完边界之后的右端项f:", f)
 
 from scipy.sparse.linalg import spsolve
 
-uh = mesh.function().reshape(-1, ) 
-uh[:] = spsolve(A, f) # 返回网格节点处的数值解
+uh = mesh.function() 
+uh.flat[:] = spsolve(A, f) # 返回网格节点处的数值解
 print("数值解uh:", uh[:])
 fig = plt.figure(4)
 axes = fig.add_subplot(111, projection='3d')
-mesh.show_function(axes, uh.reshape(6, 6))
+mesh.show_function(axes, uh)
 plt.title("Numerical solution after processing the boundary conditions")
 plt.show()
 
@@ -140,22 +146,11 @@ plt.show()
 ############################# 计算误差 ########################################
 et = ['$|| u - u_h||_{\infty}$', '$|| u - u_h||_{0}$', '$|| u - u_h ||_{l2}$']
 eu = np.zeros(len(et), dtype=np.float64) 
-uh = uh.reshape(6, 6)
 eu[0], eu[1], eu[2] = mesh.error(pde.solution, uh)
 et = np.array(et)
 print(np.vstack((et, eu)))
 print("----------------------------------------------------------------------")
 
-# grad_uh = mesh.gradient(f=uh[:], order=1)
-# print("grad_uh:\n", grad_uh.shape)
-# print("----------------------------------------------------------------------")
-
-# egradt = ['$|| \nabla u - \nabla u_h||_{\infty}$', '$|| \nabla u - \nabla u_h||_{0}$', '$|| \nabla u - \nabla u_h ||_{l2}$'] 
-# egradu = np.zeros(len(et), dtype=np.float64) 
-# egradu[0], egradu[1], egradu[2] = mesh.error(pde.gradient, grad_uh)
-# egradt = np.array(egradt)
-# print(np.vstack((egradt, egradu)))
-# print("----------------------------------------------------------------------")
 ##############################  测试收敛阶 ###################################
 maxit = 5
 em = np.zeros((len(et), maxit), dtype=np.float64)
@@ -163,22 +158,15 @@ em = np.zeros((len(et), maxit), dtype=np.float64)
 
 for i in range(maxit):
     A = mesh.laplace_operator() 
-    uh = mesh.function().reshape(-1, ) 
+    uh = mesh.function()
     f = mesh.interpolate(pde.source, 'node')
     A, f = mesh.apply_dirichlet_bc(gD=pde.dirichlet, A=A, f=f)
-    uh[:] = spsolve(A, f) 
-  #  grad_uh = mesh.gradient(f=uh[:], order=1)
-    NN = mesh.number_of_nodes()
-    print("NN:", NN)
-    uh = uh.reshape(int(np.sqrt(NN)), int(np.sqrt(NN)))
+    uh.flat[:] = spsolve(A, f) 
     em[0, i], em[1, i], em[2, i] = mesh.error(pde.solution, uh)
-   # egradm[0, i], egradm[1, i], egradm[2, i] = mesh.error(pde.gradient, grad_uh)
 
     if i < maxit:
         mesh.uniform_refine()
 
 print("em:\n", em)
 print("em_ratio:", em[:, 0:-1]/em[:, 1:])
-# print("egradm:\n", egradm)
-#print("egradm_ratio:", egradm[:, 0:-1]/egradm[:, 1:])
 

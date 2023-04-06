@@ -30,6 +30,12 @@ class Mesh1d(Mesh):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
+    def top_dimension(self):
+        """
+        @brief
+        """
+        return 1
+
     ## @ingroup FEMInterface
     def grad_shape_function(self, bc, p=1, index=np.s_[:]):
         TD = self.top_dimension()

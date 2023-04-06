@@ -74,6 +74,9 @@ class UniformMesh2d(Mesh2d):
         self.ds: StructureMesh2dDataStructure = StructureMesh2dDataStructure(self.nx, self.ny, itype)
 
     def geo_dimension(self):
+        """
+        @brief
+        """
         return 2
 
     ## @ingroup GeneralInterface
@@ -134,7 +137,8 @@ class UniformMesh2d(Mesh2d):
         return n0.astype('int64'), n1.astype('int64')
 
     ## @ingroup GeneralInterface
-    def show_function(self, plot, uh, cmap='jet'):
+    def show_function(self, plot, uh, aspect=[1, 1, 1], cmap='jet'):
+            
         """
         @brief    显示一个定义在网格节点上的函数
         @param    uh 网格节点上的函数值(二维数组)
@@ -144,6 +148,10 @@ class UniformMesh2d(Mesh2d):
             axes = fig.add_subplot(111, projection='3d')
         else:
             axes = plot
+
+        axes.set_box_aspect(aspect)
+        axes.set_proj_type('ortho')
+
         node = self.node # 获取二维节点上的网格坐标
         return axes.plot_surface(node[..., 0], node[..., 1], uh, cmap=cmap)
 

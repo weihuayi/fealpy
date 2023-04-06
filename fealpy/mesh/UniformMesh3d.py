@@ -626,9 +626,9 @@ class UniformMesh3d(Mesh3d):
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
-        @brief Get the geometry dimension of the mesh.
+        @brief:    Get the geometry dimension of the mesh.
          
-        @return The geometry dimension (3 for 3D mesh).
+        @return:   The geometry dimension (3 for 3D mesh).
         """
         return 3
 

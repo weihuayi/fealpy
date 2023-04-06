@@ -6,7 +6,6 @@ from types import ModuleType
 from typing import Tuple 
 from .Mesh1d import Mesh1d
 
-
 # 这个数据结构为有限元接口服务
 from ..quadrature import GaussLegendreQuadrature
 from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
@@ -16,7 +15,7 @@ from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
 ## @defgroup GeneralInterface
 class UniformMesh1d(Mesh1d):
     """
-    @brief A class for representing a uniformly partitioned one-dimensional mesh.
+    @brief    A class for representing a uniformly partitioned one-dimensional mesh.
     """
     def __init__(self, 
             extent: Tuple[int, int],
@@ -25,13 +24,13 @@ class UniformMesh1d(Mesh1d):
             itype: type = np.int_,
             ftype: type = np.float64):
         """
-        @brief Initialize the 1D uniform mesh.
+        @brief        Initialize the 1D uniform mesh.
 
-        @param[in] extent: A tuple representing the range of the mesh in the x direction.
-        @param[in] h: Mesh step size.
-        @param[in] origin: Coordinate of the starting point.
-        @param[in] itype: Integer type to be used, default: np.int_.
-        @param[in] ftype: Floating point type to be used, default: np.float64.
+        @param[in]    extent: A tuple representing the range of the mesh in the x direction.
+        @param[in]    h: Mesh step size.
+        @param[in]    origin: Coordinate of the starting point.
+        @param[in]    itype: Integer type to be used, default: np.int_.
+        @param[in]    ftype: Floating point type to be used, default: np.float64.
 
         @note The extent parameter defines the index range in the x direction.
               We can define an index range starting from 0, e.g., [0, 10],
@@ -71,47 +70,47 @@ class UniformMesh1d(Mesh1d):
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
 
-    ## @ingroup GeneralInterface
-    def number_of_nodes(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @return The number of nodes.
-        """
-        return self.NN
-
-    ## @ingroup GeneralInterface
-    def number_of_edges(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `edge` is the 1D entity.
-
-       return The number of edges.
-
-        """
-        return self.NC
-
-    ## @ingroup GeneralInterface
-    def number_of_faces(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `face` is the 0D entity
-
-        @return The number of faces.
-
-        """
-        return self.NN
-
-    ## @ingroup GeneralInterface
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
+##    ## @ingroup GeneralInterface
+##    def number_of_nodes(self):
+##        """
+##        @brief Get the number of nodes in the mesh.
+##
+##        @return The number of nodes.
+##        """
+##        return self.NN
+##
+##    ## @ingroup GeneralInterface
+##    def number_of_edges(self):
+##        """
+##        @brief Get the number of nodes in the mesh.
+##
+##        @note `edge` is the 1D entity.
+##
+##       return The number of edges.
+##
+##        """
+##        return self.NC
+##
+##    ## @ingroup GeneralInterface
+##    def number_of_faces(self):
+##        """
+##        @brief Get the number of nodes in the mesh.
+##
+##        @note `face` is the 0D entity
+##
+##        @return The number of faces.
+##
+##        """
+##        return self.NN
+##
+##    ## @ingroup GeneralInterface
+##    def number_of_cells(self):
+##        """
+##        @brief Get the number of cells in the mesh.
+##
+##        @return The number of cells.
+##        """
+##        return self.NC
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, returnim=False):
