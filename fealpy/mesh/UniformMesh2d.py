@@ -172,7 +172,6 @@ class UniformMesh2d(Mesh2d):
             print(s)
             axes.set_title(s)
             axes.set_aspect('equal')
-            #fig.colorbar(data)
             return data
 
         ani = animation.FuncAnimation(fig, func, frames=frames, interval=interval)
