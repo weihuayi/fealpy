@@ -69,49 +69,6 @@ class UniformMesh1d(Mesh1d):
         # Data structure for finite element computation
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
 
-
-##    ## @ingroup GeneralInterface
-##    def number_of_nodes(self):
-##        """
-##        @brief Get the number of nodes in the mesh.
-##
-##        @return The number of nodes.
-##        """
-##        return self.NN
-##
-##    ## @ingroup GeneralInterface
-##    def number_of_edges(self):
-##        """
-##        @brief Get the number of nodes in the mesh.
-##
-##        @note `edge` is the 1D entity.
-##
-##       return The number of edges.
-##
-##        """
-##        return self.NC
-##
-##    ## @ingroup GeneralInterface
-##    def number_of_faces(self):
-##        """
-##        @brief Get the number of nodes in the mesh.
-##
-##        @note `face` is the 0D entity
-##
-##        @return The number of faces.
-##
-##        """
-##        return self.NN
-##
-##    ## @ingroup GeneralInterface
-##    def number_of_cells(self):
-##        """
-##        @brief Get the number of cells in the mesh.
-##
-##        @return The number of cells.
-##        """
-##        return self.NC
-
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, returnim=False):
         """
