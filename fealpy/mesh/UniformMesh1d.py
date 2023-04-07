@@ -429,6 +429,15 @@ class UniformMesh1d(Mesh1d):
         A = D0@A@D0 + D1
         return A, f 
 
+    ## @ingroup FDMInterface
+    def update_dirichlet_bc(self, gD, uh):
+        """
+        @brief 更新网格函数 uh 的 Dirichlet 边界值
+        """
+        node = self.node
+        isBdNode = self.ds.boundary_node_flag()
+        uh[isBdNode]  = gD(node[isBdNode])
+
     def parabolic_operator_forward(self, tau):
         """
         @brief 生成抛物方程的向前差分迭代矩阵
@@ -490,9 +499,10 @@ class UniformMesh1d(Mesh1d):
         A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
         A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
-        B = diags([- 1 - r], [0], shape=(NN, NN), format='csr')
-        B += csr_matrix((-val, (I, J)), shape=(NN, NN), dtype=self.ftype)
-        B += csr_matrix((-val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        B = diags([1 - r], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(r/2, (NN-1, ))
+        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
         return A, B
 
 
