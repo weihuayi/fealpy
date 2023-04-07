@@ -1,102 +1,104 @@
 import numpy as np
+from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
-from fealpy.decorator import cartesian
+from fealpy.pde.parabolic_1d import SinExpPDEData
 from fealpy.mesh import UniformMesh1d
 
-class ParabolicPDEModel:
 
-    def __init__(self, D=[0, 1], T=[0, 1]):
-        """
-        @brief 模型初始化函数
-        @param[in] D 模型空间定义域
-        @param[in] T 模型时间定义域
-        """
-        self._domain = D 
-        self._duration = T 
+# PDE 模型
+pde = SinExpPDEData()
 
-    def domain(self):
-        """
-        @brief 空间区间
-        """
-        return self._domain
-
-    def duration(self):
-        """
-        @brief 时间区间
-        """
-        return self._duration 
-        
-    @cartesian
-    def solution(self, p, t):
-        """
-        @brief 真解函数
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-
-        @return 真解函数值
-        """
-        return np.sin(4*pi*p)*np.exp(10*t) 
-
-    @cartesian
-    def init_solution(self, p):
-        """
-        @brief 真解函数
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-
-        @return 真解函数值
-        """
-        return np.sin(4*pi*p) 
-        
-    @cartesian
-    def source(self, p):
-        """
-        @brief 方程右端项 
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-
-        @return 方程右端函数值
-        """
-        return 5*np.exp(5*t)*np.sin(4*np.pi*x) + 16*np.pi**2*np.exp(5*t)*np.sin(4*np.pi*x)
-    
-    @cartesian
-    def gradient(self, p, t):
-        """
-        @brief 真解导数 
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-
-        @return 真解导函数值
-        """
-        return 4*np.pi*np.cos(4*np.pi*p)
-    
-    @cartesian    
-    def dirichlet(self, p, t):
-        """
-        @brief Dirichlet 边界条件
-
-        @param[in] p numpy.ndarray, 空间点
-        @param[in] t float, 时间点 
-        """
-        return self.solution(p, t)
-
-
-pde = ParabolicPDEModel()
-
+# 空间离散
 domain = pde.domain()
-
-nx = 10
+nx = 40 
 hx = (domain[1] - domain[0])/nx
-
 mesh = UniformMesh1d([0, nx], h=hx, origin=domain[0])
+node = mesh.node
+isBdNode = mesh.ds.boundary_node_flag()
+
+# 时间离散
+duration = pde.duration()
+nt = 3200 
+tau = (duration[1] - duration[0])/nt 
+
+uh0 = mesh.interpolate(pde.init_solution, intertype='node')
+
+
+def advance_forward(n):
+    """
+    @brief 时间步进格式为向前欧拉方法
+
+    @param[in] n int, 表示第 `n` 个时间步（当前时间步） 
+    """
+    t = duration[0] + n*tau
+    if n == 0:
+        return uh0, t
+    else:
+        A = mesh.parabolic_operator_forward(tau)
+        source = lambda p: pde.source(p, t + tau)
+        f = mesh.interpolate(source, intertype='node')
+        uh0[:] = A@uh0 + tau*f
+        gD = lambda p: pde.dirichlet(p, t+tau)
+        mesh.update_dirichlet_bc(gD, uh0)
+        
+        solution = lambda p: pde.solution(p, t + tau)
+        e = mesh.error(solution, uh0, errortype='max')
+        print(f"the max error is {e}")
+        return uh0, t
+    
+def advance_backward(n):
+    """
+    @brief 时间步进格式为向后欧拉方法
+
+    @param[in] n int, 表示第 `n` 个时间步（当前时间步） 
+    """
+    t = duration[0] + n*tau
+    if n == 0:
+        return uh0, t
+    else:
+        A = mesh.parabolic_operator_backward(tau)
+        source = lambda p: pde.source(p, t + tau)
+        f = mesh.interpolate(source, intertype='node')
+        f *= tau
+        f += uh0
+        gD = lambda p: pde.dirichlet(p, t+tau)
+        A, f = mesh.apply_dirichlet_bc(gD, A, f)
+        uh0[:] = spsolve(A, f)
+
+        solution = lambda p: pde.solution(p, t + tau)
+        e = mesh.error(solution, uh0, errortype='max')
+        print(f"the max error is {e}")
+
+        return uh0, t
+
+def advance_crank_nicholson(n):
+    """
+    @brief 时间步进格式为 CN 方法  
+    """
+    t = duration[0] + n*tau
+    if n == 0:
+        return uh0, t
+    else:
+        A, B = mesh.parabolic_operator_crank_nicholson(tau)
+        source = lambda p: pde.source(p, t + tau)
+        f = mesh.interpolate(source, intertype='node')
+        f *= tau
+        f += B@uh0
+        gD = lambda p: pde.dirichlet(p, t+tau)
+        A, f = mesh.apply_dirichlet_bc(gD, A, f)
+        uh0[:] = spsolve(A, f)
+
+        solution = lambda p: pde.solution(p, t + tau)
+        e = mesh.error(solution, uh0, errortype='max')
+        print(f"the max error is {e}")
+
+        return uh0, t
+
+
 
 fig, axes = plt.subplots()
-mesh.add_plot(axes)
-mesh.find_node(axes, showindex=True)
-mesh.find_cell(axes, showindex=True)
+box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
+fig, axes = plt.subplots()
+mesh.show_animation(fig, axes, box, advance_crank_nicholson, frames=nt + 1)
 plt.show()

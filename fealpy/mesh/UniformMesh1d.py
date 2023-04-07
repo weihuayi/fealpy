@@ -6,7 +6,6 @@ from types import ModuleType
 from typing import Tuple 
 from .Mesh1d import Mesh1d
 
-
 # 这个数据结构为有限元接口服务
 from ..quadrature import GaussLegendreQuadrature
 from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
@@ -16,7 +15,7 @@ from .StructureMesh1dDataStructure import StructureMesh1dDataStructure
 ## @defgroup GeneralInterface
 class UniformMesh1d(Mesh1d):
     """
-    @brief A class for representing a uniformly partitioned one-dimensional mesh.
+    @brief    A class for representing a uniformly partitioned one-dimensional mesh.
     """
     def __init__(self, 
             extent: Tuple[int, int],
@@ -25,13 +24,13 @@ class UniformMesh1d(Mesh1d):
             itype: type = np.int_,
             ftype: type = np.float64):
         """
-        @brief Initialize the 1D uniform mesh.
+        @brief        Initialize the 1D uniform mesh.
 
-        @param[in] extent: A tuple representing the range of the mesh in the x direction.
-        @param[in] h: Mesh step size.
-        @param[in] origin: Coordinate of the starting point.
-        @param[in] itype: Integer type to be used, default: np.int_.
-        @param[in] ftype: Floating point type to be used, default: np.float64.
+        @param[in]    extent: A tuple representing the range of the mesh in the x direction.
+        @param[in]    h: Mesh step size.
+        @param[in]    origin: Coordinate of the starting point.
+        @param[in]    itype: Integer type to be used, default: np.int_.
+        @param[in]    ftype: Floating point type to be used, default: np.float64.
 
         @note The extent parameter defines the index range in the x direction.
               We can define an index range starting from 0, e.g., [0, 10],
@@ -69,49 +68,6 @@ class UniformMesh1d(Mesh1d):
 
         # Data structure for finite element computation
         self.ds: StructureMesh1dDataStructure = StructureMesh1dDataStructure(self.nx, itype=itype)
-
-
-    ## @ingroup GeneralInterface
-    def number_of_nodes(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @return The number of nodes.
-        """
-        return self.NN
-
-    ## @ingroup GeneralInterface
-    def number_of_edges(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `edge` is the 1D entity.
-
-       return The number of edges.
-
-        """
-        return self.NC
-
-    ## @ingroup GeneralInterface
-    def number_of_faces(self):
-        """
-        @brief Get the number of nodes in the mesh.
-
-        @note `face` is the 0D entity
-
-        @return The number of faces.
-
-        """
-        return self.NN
-
-    ## @ingroup GeneralInterface
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
 
     ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, returnim=False):
@@ -179,7 +135,7 @@ class UniformMesh1d(Mesh1d):
         return line
 
     ## @ingroup GeneralInterface
-    def show_animation(self, fig, axes, box, forward, fname='test.mp4',
+    def show_animation(self, fig, axes, box, advance, fname='test.mp4',
                        init=None, fargs=None,
                        frames=1000, lw=2, interval=50):
         """
@@ -198,7 +154,7 @@ class UniformMesh1d(Mesh1d):
             return line
 
         def func(n, *fargs):
-            uh, t = forward(n)
+            uh, t = advance(n)
             line.set_data((x, uh))
             s = "frame=%05d, time=%0.8f" % (n, t)
             print(s)
@@ -473,25 +429,118 @@ class UniformMesh1d(Mesh1d):
         A = D0@A@D0 + D1
         return A, f 
 
-    def parabolic_forward(self):
-        pass
+    ## @ingroup FDMInterface
+    def update_dirichlet_bc(self, gD, uh):
+        """
+        @brief 更新网格函数 uh 的 Dirichlet 边界值
+        """
+        node = self.node
+        isBdNode = self.ds.boundary_node_flag()
+        uh[isBdNode]  = gD(node[isBdNode])
 
-    def parabolic_backward(self):
-        pass
+    def parabolic_operator_forward(self, tau):
+        """
+        @brief 生成抛物方程的向前差分迭代矩阵
 
-    def parabolic_crank_nicholson(self):
-        pass
+        @param[in] tau float, 当前时间步长
+        """
+
+        r = tau/self.h**2 
+        if r > 0.5:
+            raise ValueError(f"The r: {r} should be smaller than 0.5")
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1 - 2 * r], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def parabolic_operator_backward(self, tau):
+        """
+        @brief 生成抛物方程的向后差分迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1+2*r], [0], shape=(NN, NN), format='csr')
+
+        val = np.broadcast_to(-r, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A
+
+    def parabolic_operator_crank_nicholson(self, tau):
+        """
+        @brief 生成抛物方程的 CN 差分格式的迭代矩阵
+
+        @param[in] tau float, 当前时间步长
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+        k = np.arange(NN)
+
+        A = diags([1 + r], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(-r/2, (NN-1, ))
+        I = k[1:]
+        J = k[0:-1]
+        A += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        B = diags([1 - r], [0], shape=(NN, NN), format='csr')
+        val = np.broadcast_to(r/2, (NN-1, ))
+        B += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        B += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+        return A, B
 
 
     ## @ingroup FDMInterface
-    def wave_equation(self, r, theta):
-        n0 = self.NC -1
+    def wave_operator(self, tau, theta=0.5):
+        """
+        @brief 生成波动方程的离散矩阵
+        """
+        r = tau/self.h**2 
+
+        NN = self.number_of_nodes()
+
+        A0 = diags([1 + 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
+        A1 = diags([2 - 2 * r**2 * (1 - 2 * theta)], [0], shape=(NN, NN), format='csr')
+        A2 = diags([- 1 - 2 * r**2 * theta], [0], shape=(NN, NN), format='csr')
+
+
         A0 = diags([1+2*r**2*theta, -r**2*theta, -r**2*theta], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
         A1 = diags([2 - 2*r**2*(1-2*theta), r**2*(1-2*theta), r**2*(1-2*theta)], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
         A2 = diags([-1 - 2*r**2*theta, r**2*theta, r**2*theta], 
                 [0, 1, -1], shape=(n0, n0), format='csr')
+
+        I = k[1:]
+        J = k[0:-1]
+
+        val = np.broadcast_to(- r**2 * theta, (NN-1, ))
+        A0 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A0 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * (1 - 2 * theta), (NN-1, ))
+        A1 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A1 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
+
+        val = np.broadcast_to(r**2 * theta, (NN-1, ))
+        A2 += csr_matrix((val, (I, J)), shape=(NN, NN), dtype=self.ftype)
+        A2 += csr_matrix((val, (J, I)), shape=(NN, NN), dtype=self.ftype)
 
         return A0, A1, A2
 

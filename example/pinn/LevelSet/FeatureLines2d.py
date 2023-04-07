@@ -11,9 +11,12 @@ import torch
 from torch.nn import Sequential, Linear, Tanh
 from torch.optim import Adam
 
-from fealpy.pinn.machine import LearningMachine, Solution
-from fealpy.pinn.sampler import ISampler
-from fealpy.pinn.grad import grad_of_fts
+from fealpy.pinn import (
+    LearningMachine,
+    ISampler,
+    grad_of_fts
+)
+from fealpy.pinn.modules import Solution
 
 
 class InitialValue(Solution):
