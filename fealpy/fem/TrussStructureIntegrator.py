@@ -40,18 +40,18 @@ class TrussStructureIntegrator:
             for i in range(2):
                 for j in range(i, 2):
                     if i == j:
-                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += R
+                        K[:, i::GD, i::GD] += R[i, i] 
                     else:
-                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] -= R
-                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] -= R
+                        K[:, i::GD, j::GD] -= R[i, j] 
+                        K[:, j::GD, i::GD] -= R[j, i] 
         elif space0.doforder == 'vdims':
             for i in range(2):
                 for j in range(i, 2):
                     if i == j:
-                        K[:, i::GD, i::GD] += R 
+                        K[:, i*ldof:(i+1)*ldof, i*ldof:(i+1)*ldof] += R
                     else:
-                        K[:, i::GD, j::GD] -= R 
-                        K[:, j::GD, i::GD] -= R 
+                        K[:, i*ldof:(i+1)*ldof, j*ldof:(j+1)*ldof] -= R
+                        K[:, j*ldof:(j+1)*ldof, i*ldof:(i+1)*ldof] -= R
 
         if out is None:
             return K
