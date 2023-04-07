@@ -29,9 +29,9 @@ class EdgeMesh(Mesh1d):
         elif etype in {'cell', 'edge', 1}:
             return self.ds.cell
     
-    def entity_measure(self, etype='cell'):
+    def entity_measure(self, etype='cell', index=np.s_[:]):
         if etype in {'cell', 'edge', 1}:
-            return self.cell_length() 
+            return self.cell_length()[index] 
         elif etype in {'node', 'face', 0}:
             return 0.0 
 
@@ -55,7 +55,7 @@ class EdgeMesh(Mesh1d):
         h = np.sqrt(np.sum(v**2, axis=1))
         return h
 
-    def cell_unit_tangent(self):
+    def cell_unit_tangent(self, index=np.s_[:]):
         """
         @brief 计算每个单元的单位切向
         """
@@ -73,7 +73,7 @@ class EdgeMesh(Mesh1d):
 
     def add_plot(self, plot, 
             nodecolor='r',
-            edgecolor='k', 
+            cellcolor='k', 
             linewidths=1, 
             aspect=None,
             markersize=10,
@@ -83,10 +83,10 @@ class EdgeMesh(Mesh1d):
             ):
 
         GD = self.geo_dimension()
+        import mpl_toolkits.mplot3d as a3
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             if GD == 3:
-                import mpl_toolkits.mplot3d as a3
                 axes = fig.add_subplot(111, projection='3d')
             else:
                 axes = fig.add_subplot(111)
@@ -124,18 +124,18 @@ class EdgeMesh(Mesh1d):
         vts = node[cell]
         if GD == 3:
             axes.set_zlim(box[4:6])
-            edges = a3.art3d.Line3DCollection(
+            cells = a3.art3d.Line3DCollection(
                    vts,
                    linewidths=linewidths,
-                   color=edgecolor)
-            return axes.add_collection3d(edges)
+                   color=cellcolor)
+            return axes.add_collection3d(cells)
         elif GD == 2:
             from matplotlib.collections import LineCollection
-            edges = LineCollection(
+            cells = LineCollection(
                     vts,
                     linewidths=linewidths,
-                    color=edgecolor)
-            return axes.add_collection(edges)
+                    color=cellcolor)
+            return axes.add_collection(cells)
 
     
     ## @ingroup MeshGenerators
