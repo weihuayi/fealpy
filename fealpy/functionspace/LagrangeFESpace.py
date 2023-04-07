@@ -266,13 +266,20 @@ class EdgeMeshCLFEDof():
             raise ValueError(f"Unsupported etype: {etype}. Supported types are: 'cell', 'edge', 1, 'node', 'face', and 0.")
 
     def cell_to_dof(self, index=np.s_[:]):
-        return self.mesh.cell_to_ipoint(self.p)
+        return self.mesh.cell_to_ipoint(self.p)[index]
+#        cell = self.mesh.entity('cell')
+#        GD = self.mesh.geo_dimension()
+#        NN = self.mesh.number_of_nodes()
+#        cell2dof = np.zeros((cell.shape[0], 2*GD), dtype=np.int_)
+#        for i in range(GD):
+#            cell2dof[:, i::GD] = cell + NN*i 
+#        return cell2dof
 
     def number_of_local_dofs(self, doftype='cell'):
-        return self.mesh.number_of_local_ipoints(iptype=doftype)
+        return self.mesh.number_of_local_ipoints(self.p, iptype=doftype)
 
     def number_of_global_dofs(self):
-        return self.mesh.number_of_global_ipoints()
+        return self.mesh.number_of_global_ipoints(self.p)
 
     def interpolation_points(self):
         return self.mesh.interpolation_points(self.p)
@@ -407,7 +414,7 @@ class LagrangeFESpace():
         return self.dof.interpolation_points()
 
     def cell_to_dof(self, index=np.s_[:]):
-        return self.dof.cell2dof[index]
+        return self.dof.cell_to_dof()[index]
 
     def face_to_dof(self, index=np.s_[:]):
         return self.dof.face_to_dof() #TODO: index
@@ -535,9 +542,9 @@ class LagrangeFESpace():
         if callable(gD):
             gD = gD(ipoints[isDDof])
 
-        if (len(uh.shape) == 1) or (space.doforder == 'vdims'):
+        if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
             uh[isDDof] = gD 
-        elif space.doforder == 'nodes':
+        elif self.doforder == 'nodes':
             if isinstance(gD, (int, float)):
                 uh[..., isDDof] = gD 
             elif isinstance(gD, np.ndarray):
@@ -546,9 +553,9 @@ class LagrangeFESpace():
                 raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
 
         if len(uh.shape) > 1:
-            if space.doforder == 'nodes':
+            if self.doforder == 'nodes':
                 shape = (len(uh.shape)-1)*(1, ) + isDDof.shape
-            elif space.doforder == 'vdims':
+            elif self.doforder == 'vdims':
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
             isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape) 
         return isDDof
@@ -568,7 +575,7 @@ class LagrangeFESpace():
             shape = dim + (gdof, )
         elif self.doforder == 'vdims':
             shape = (gdof, ) + dim
-        print(shape)
+        print('It is function array shape:', shape)
         return np.zeros(shape, dtype=dtype)
 
 

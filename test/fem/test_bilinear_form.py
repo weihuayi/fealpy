@@ -27,24 +27,25 @@ def test_truss_structure():
 
     K = bform.M
 
+    uh = space.function(dim=GD)
+    
     # 加载力的条件 
-    F = np.zeros((NN, GD), dtype=np.float64)
+    F = np.zeros((uh.shape[0], GD), dtype=np.float64)
     idx, f = mesh.meshdata['force_bc']
     F[idx] = f 
 
-    uh = space.function(dim=GD)
     idx, disp = mesh.meshdata['disp_bc']
     bc = DirichletBC(space, disp, threshold=idx)
-    A, F = bc.apply(K, F, uh)
+    A, F = bc.apply(K, F.flat, uh)
 
     uh.flat[:] = spsolve(A, F)
-
+    print('uh:', uh)
     fig = plt.figure()
     axes = fig.add_subplot(1, 1, 1, projection='3d') 
     mesh.add_plot(axes)
 
     mesh.node += uh
-    mesh.add_plot(axes, nodecolor='b', edgecolor='m')
+    mesh.add_plot(axes, nodecolor='b', cellcolor='m')
     plt.show()
 
 
