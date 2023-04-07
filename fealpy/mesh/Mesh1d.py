@@ -2,9 +2,65 @@ import numpy as np
 
 from types import ModuleType
 from .Mesh import Mesh
+from ..quadrature import GaussLegendreQuadrature
 
 ## @defgroup GeneralInterface
 class Mesh1d(Mesh):
+
+    def bc_to_point(self, bc, index=np.s_[:], node=None):
+        """
+
+        Notes
+        -----
+            把重心坐标转换为实际空间坐标
+        """
+        node = self.node if node is None else node
+        cell = self.entity('cell')
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
+        return p
+
+    def number_of_local_ipoints(self, p):
+        return p+1
+
+    def number_of_global_ipoints(self, p):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NC
+
+    def interpolation_points(self):
+        GD = self.geo_dimension()
+        node = self.entity('node') 
+
+        if p == 1:
+            return node
+        else:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            gdof = NN + NC*(p-1) 
+            ipoint = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoint[:NN] = node
+            cell = self.entity('cell') 
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            GD = mesh.geo_dimension()
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                    node[cell]).reshape(-1, GD)
+
+            return ipoint
+
+    def cell_to_ipoint(self, p, index=np.s_[:]):
+        raise NotImplementedError
+
+    def edge_to_ipoint(self, p, index=np.s_[:]):
+        raise NotImplementedError
+
+    def face_to_ipoint(self, p, index=np.s_[:]):
+        raise NotImplementedError
+
+    def node_to_ipoint(self, p, index=np.s_[:]):
+        raise NotImplementedError
+
     def multi_index_matrix(self, p, etype=1):
         ldof = p+1
         multiIndex = np.zeros((ldof, 2), dtype=np.int_)

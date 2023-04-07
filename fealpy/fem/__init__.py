@@ -19,3 +19,6 @@ from .ProvidesSymmetricTangentOperatorIntegrator import ProvidesSymmetricTangent
 from .LinearForm import LinearForm
 from .SourceIntegrator import SourceIntegrator
 
+
+from .DirichletBC import DirichletBC
+

@@ -43,6 +43,12 @@ class Mesh:
 
     def grad_shape_function(self, p, index=np.s_[:]):
         raise NotImplementedError
+    
+    def number_of_local_ipoints(self, p):
+        raise NotImplementedError
+
+    def number_of_global_ipoints(self, p):
+        raise NotImplementedError
 
     def interpolation_points(self):
         raise NotImplementedError
