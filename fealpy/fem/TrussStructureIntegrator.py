@@ -10,7 +10,7 @@ class TrussStructureIntegrator:
     def assembly_cell_matrix(self, space, index=np.s_[:], cellmeasure=None,
             out=None):
         """
-        @brief 
+        @brief 组装单元网格
         """
         assert isinstance(space, tuple) 
         space0 = space[0]

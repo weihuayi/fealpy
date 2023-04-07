@@ -55,7 +55,7 @@ class SourceIntegrator():
         elif isinstance(f, np.ndarray):
             assert len(f) == NC
             val = f
-        else：
+        else:
             val = np.broadcast_to(f, shape=(NC, )) 
 
         bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)

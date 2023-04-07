@@ -531,12 +531,26 @@ class LagrangeFESpace():
         """
         ipoints = self.interpolation_points() # TODO: 直接获取过滤后的插值点
         isDDof = self.is_boundary_dof(threshold=threshold)
+
         if callable(gD):
-            uh[isDDof] = gD(ipoints[isDDof]) #TODO: 考虑更多的情况，如gD 是数组 
-        elif isinstance(gD, (int, float, np.ndarray)):
+            gD = gD(ipoints[isDDof])
+
+        if (len(uh.shape) == 1) or (space.doforder == 'vdims'):
             uh[isDDof] = gD 
-        else:
-            raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
+        elif space.doforder == 'nodes':
+            if isinstance(gD, (int, float)):
+                uh[..., isDDof] = gD 
+            elif isinstance(gD, np.ndarray):
+                uh[..., isDDof] = gD.T
+            else:
+                raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
+
+        if len(uh.shape) > 1:
+            if space.doforder == 'nodes':
+                shape = (len(uh.shape)-1)*(1, ) + isDDof.shape
+            elif space.doforder == 'vdims':
+                shape = isDDof.shape + (len(uh.shape)-1)*(1, )
+            isDDof = np.broadcast_to(isDDof.reshape(shape), shape=uh.shape) 
         return isDDof
 
     def function(self, dim=None, array=None, dtype=np.float64):
