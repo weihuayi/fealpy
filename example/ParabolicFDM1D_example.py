@@ -1,10 +1,9 @@
 import numpy as np
-from scipy.sparse.linalg import spsolve
 import matplotlib.pyplot as plt
 
+from scipy.sparse.linalg import spsolve
 from fealpy.pde.parabolic_1d import SinExpPDEData
 from fealpy.mesh import UniformMesh1d
-
 
 # PDE 模型
 pde = SinExpPDEData()
@@ -96,9 +95,7 @@ def advance_crank_nicholson(n):
         return uh0, t
 
 
-
 fig, axes = plt.subplots()
 box = [0, 1, -1.5, 1.5] # 图像显示的范围 0 <= x <= 1, -1.5 <= y <= 1.5
-fig, axes = plt.subplots()
-mesh.show_animation(fig, axes, box, advance_crank_nicholson, frames=nt + 1)
+mesh.show_animation(fig, axes, box, advance_forward, frames=nt + 1)
 plt.show()

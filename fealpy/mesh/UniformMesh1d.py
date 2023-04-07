@@ -139,7 +139,7 @@ class UniformMesh1d(Mesh1d):
                        init=None, fargs=None,
                        frames=1000, lw=2, interval=50):
         """
-        @brief
+        @brief:    在一维一致网格中生成一个动画
         """
         import matplotlib.animation as animation
 
