@@ -21,7 +21,7 @@ class DirichletBC():
         isDDof = space.set_dirichlet_bc(gD, uh, threshold=self.threshold) # isDDof.shape == uh.shape
         F -= A@uh.flat
         bdIdx = np.zeros(A.shape[0], dtype=np.int_)
-        bdIdx[isDDof] = 1
+        bdIdx[isDDof.flat] = 1
         Tbd = spdiags(bdIdx, 0, A.shape[0], A.shape[0])
         T = spdiags(1-bdIdx, 0, A.shape[0], A.shape[0])
         A = T@A@T + Tbd
