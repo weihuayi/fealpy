@@ -4,8 +4,9 @@ from scipy.sparse import csr_matrix
 from types import ModuleType
 
 from ..quadrature import GaussLegendreQuadrature
+from .Mesh1d import Mesh1d
 
-class IntervalMesh():
+class IntervalMesh(Mesh1d):
     def __init__(self, node, cell):
         if node.ndim == 1:
             self.node = node.reshape(-1, 1)
@@ -24,34 +25,8 @@ class IntervalMesh():
         self.ftype = node.dtype
 
 
-    def integrator(self, k, etype='cell'):
-        return GaussLegendreQuadrature(k)
-
     def geo_dimension(self):
         return self.node.shape[-1]
-
-    def top_dimension(self):
-        return 1
-
-    def number_of_nodes(self):
-        return self.ds.NN
-
-    def number_of_faces(self):
-        return self.ds.NN
-
-    def number_of_edges(self):
-        return self.ds.NC
-
-    def number_of_cells(self):
-        return self.ds.NC
-
-    def number_of_entities(self, etype):
-        if etype in {'cell', 'edge', 1}:
-            return self.ds.NC
-        elif etype in {'node', 'face', 0}:
-            return self.ds.NN
-        else:
-            raise ValueError(f"etype {etype} must be 0 or 1!") #TODO
 
     def bc_to_point(self, bc, index=np.s_[:], node=None):
         """
@@ -102,69 +77,6 @@ class IntervalMesh():
             raise ValueError('the entity `{}` is not correct!'.format(entity)) 
         return bc
 
-    def multi_index_matrix(self, p):
-        ldof = p+1
-        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-        multiIndex[:, 0] = np.arange(p, -1, -1)
-        multiIndex[:, 1] = p - multiIndex[:, 0]
-        return multiIndex
-
-    def shape_function(self, bc, p=1):
-        """
-        @brief 
-        """
-        TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
-    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
-
-        TD = self.top_dimension()
-
-        multiIndex = self.multi_index_matrix(p)
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_ipoints(p)
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
-        Dlambda = self.grad_lambda(index=index)
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi #(..., NC, ldof, GD)
-
     def grad_lambda(self, index=np.s_[:]):
         """
         @brief 计算所有单元上重心坐标函数的导数
@@ -180,27 +92,6 @@ class IntervalMesh():
         Dlambda[:, 0, :] = -v
         Dlambda[:, 1, :] = v
         return Dlambda
-
-    def number_of_local_ipoints(self, p, iptype='cell'):
-        if iptype in {'cell', 'edge', 1}:
-            return p+1 
-        elif iptype in {'node', 'face', 0}:
-            return 1
-    
-    def number_of_global_ipoints(self, p):
-        NN = self.number_of_nodes()
-        NC = self.number_of_cells()
-        return NN + (p-1)*NC
-    
-    def interpolation_points(self, p):
-        """
-        @brief 获取三角形网格上所有 p 次插值点
-        """
-        cell = self.entity('cell')
-        node = self.entity('node')
-        if p == 1:
-            return node
-
 
     def vtk_cell_type(self):
         VTK_LINE = 3
@@ -303,7 +194,7 @@ class IntervalMesh():
             newNode = (node[cell[:, 0]] + node[cell[:, 1]])/2
             self.node = np.r_['0', node, newNode]
             p = np.r_['-1', cell, cell2newNode.reshape(-1,1)]
-            ncell = np.zeros((2*NC, 2), dtype=np.int)
+            ncell = np.zeros((2*NC, 2), dtype=self.itype)
             ncell[0:NC, 0] = cell[:, 0]
             ncell[0:NC, 1] = range(NN, NN+NC)
             ncell[NC:, 0] = range(NN, NN+NC)
@@ -333,64 +224,35 @@ class IntervalMesh():
 
             self.ds.reinit(NN+N, newCell)
 
+    @classmethod
+    def from_interval_domain(cls, domain, nx=10):
+        node = np.linspace(domain[0], domain[1], nx+1, dtype=np.float64).reshape(-1, 1)
+        cell = np.zeros((nx, 2), dtype=np.int_)
+        cell[:, 0] = np.arange(0, nx)
+        cell[:, 1] = np.arange(1, nx+1)
+        return cls(node, cell)
 
-    def add_plot(self, plot,
-            nodecolor='k', cellcolor='k',
-            aspect='equal', linewidths=1, markersize=20,
-            showaxis=False):
+    @classmethod
+    def from_circle_boundary(cls, center=(0, 0), radius=1.0, n=10):
+        dt = 2*np.pi/n
+        theta  = np.arange(0, 2*np.pi, dt)
 
-        if isinstance(plot, ModuleType):
-            fig = plot.figure()
-            fig.set_facecolor('white')
-            axes = fig.gca()
-        else:
-            axes = plot
-        return show_mesh_1d(axes, self,
-                nodecolor=nodecolor, cellcolor=cellcolor, aspect=aspect,
-                linewidths=linewidths, markersize=markersize,
-                showaxis=showaxis)
+        node = np.zeros((n, 2),dtype = np.float64)
+        cell = np.zeros((n, 2),dtype = np.int_)
 
-    def find_node(self, axes, node=None,
-            index=None, showindex=False,
-            color='r', markersize=200,
-            fontsize=24, fontcolor='k'):
 
-        if node is None:
-            node = self.node
-        find_node(axes, node,
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+        node[:, 0] = r*np.cos(theta)
+        node[:, 1] = r*np.sin(theta)
 
-    def find_edge(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=250,
-            fontsize=24, fontcolor='g'):
+        node[:, 0] = node[:,0] + center[0]
+        node[:, 1] = node[:,1] + center[1]
 
-        find_entity(axes, self, entity='edge',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
+        cell[:, 0] = np.arange(n)
+        cell[:, 1][:-1] = np.arange(1,n)
 
-    def find_face(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=250,
-            fontsize=24, fontcolor='g'):
+        return cls(node, cell)
 
-        find_entity(axes, self, entity='edge',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
 
-    def find_cell(self, axes,
-            index=None, showindex=False,
-            color='g', markersize=250,
-            fontsize=24, fontcolor='g'):
-
-        find_entity(axes, self, entity='cell',
-                index=index, showindex=showindex,
-                color=color, markersize=markersize,
-                fontsize=fontsize, fontcolor=fontcolor)
 
 class IntervalMeshDataStructure():
     def __init__(self, NN, cell):
@@ -415,7 +277,7 @@ class IntervalMeshDataStructure():
                 return_index=True, return_inverse=True)
         self.node2cell = np.zeros((NN, 4), dtype=self.itype)
 
-        i1 = np.zeros(NN, dtype=np.int) 
+        i1 = np.zeros(NN, dtype=self.itype) 
         i1[j] = np.arange(2*NC)
 
         self.node2cell[:, 0] = i0//2 
@@ -429,7 +291,7 @@ class IntervalMeshDataStructure():
     def cell_to_cell(self):
         NC = self.NC
         node2cell = self.node2cell
-        cell2cell = np.zeros((NC, 2), dtype=np.int)
+        cell2cell = np.zeros((NC, 2), dtype=self.itype)
         cell2cell[node2cell[:, 0], node2cell[:, 2]] = node2cell[:, 1]
         cell2cell[node2cell[:, 1], node2cell[:, 3]] = node2cell[:, 0]
         return cell2cell

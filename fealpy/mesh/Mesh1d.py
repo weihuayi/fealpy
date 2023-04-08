@@ -7,6 +7,12 @@ from ..quadrature import GaussLegendreQuadrature
 ## @defgroup GeneralInterface
 class Mesh1d(Mesh):
 
+    def top_dimension(self):
+        """
+        @brief
+        """
+        return 1
+
     def bc_to_point(self, bc, index=np.s_[:], node=None):
         """
 
@@ -106,11 +112,6 @@ class Mesh1d(Mesh):
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
 
-    def top_dimension(self):
-        """
-        @brief
-        """
-        return 1
 
     ## @ingroup FEMInterface
     def grad_shape_function(self, bc, p=1, index=np.s_[:]):

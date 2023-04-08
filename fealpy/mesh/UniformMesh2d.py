@@ -178,6 +178,10 @@ class UniformMesh2d(Mesh2d):
         ani.save(fname)
 
 
+    def show_animation_vtk(self):
+        import vtk
+
+
     ## @ingroup GeneralInterface
     def to_vtk_file(self, filename, celldata=None, nodedata=None):
         """
