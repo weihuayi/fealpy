@@ -5,7 +5,7 @@ import torch
 from torch import Tensor
 
 from .nntyping import TensorFunction
-from .machine import Solution, ZeroMapping
+from .modules import Solution, ZeroMapping
 
 
 class _BCSetter():

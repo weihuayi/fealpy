@@ -1,46 +1,91 @@
 import numpy as np
 
-
+from types import ModuleType
 from .Mesh import Mesh
+from ..quadrature import GaussLegendreQuadrature
 
+## @defgroup GeneralInterface
 class Mesh1d(Mesh):
-    def number_of_nodes(self):
+
+    def top_dimension(self):
         """
-        @brief Get the number of nodes in the mesh.
-
-        @return The number of nodes.
+        @brief
         """
-        return self.NN
+        return 1
 
-    def number_of_edges(self):
+    def bc_to_point(self, bc, index=np.s_[:], node=None):
         """
-        @brief Get the number of nodes in the mesh.
 
-        @note `edge` is the 1D entity.
-
-       return The number of edges.
-
+        Notes
+        -----
+            把重心坐标转换为实际空间坐标
         """
-        return self.NC
+        node = self.node if node is None else node
+        cell = self.entity('cell')
+        p = np.einsum('...j, ijk->...ik', bc, node[cell[index]])
+        return p
 
-    def number_of_faces(self):
+    def integrator(self, k, etype='cell'):
         """
-        @brief Get the number of nodes in the mesh.
 
-        @note `face` is the 0D entity
-
-        @return The number of faces.
-
+        Notes
+        -----
+            返回第 k 个高斯积分公式。
         """
-        return self.NN
+        return GaussLegendreQuadrature(k)
 
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
+    def number_of_local_ipoints(self, p, iptype='cell'):
+        return p+1
 
-        @return The number of cells.
+    def number_of_global_ipoints(self, p):
+        NN = self.number_of_nodes()
+        NC = self.number_of_cells()
+        return NN + (p-1)*NC
+
+    def interpolation_points(self, p):
+        GD = self.geo_dimension()
+        node = self.entity('node') 
+
+        if p == 1:
+            return node
+        else:
+            NN = self.number_of_nodes()
+            NC = self.number_of_cells()
+            gdof = NN + NC*(p-1) 
+            ipoint = np.zeros((gdof, GD), dtype=self.ftype)
+            ipoint[:NN] = node
+            cell = self.entity('cell') 
+            w = np.zeros((p-1,2), dtype=np.float64)
+            w[:,0] = np.arange(p-1, 0, -1)/p
+            w[:,1] = w[-1::-1, 0]
+            GD = self.geo_dimension()
+            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
+                    node[cell]).reshape(-1, GD)
+
+            return ipoint
+
+    def cell_to_ipoint(self, p):
         """
-        return self.NC
+        @brief 获取网格边与插值点的对应关系
+        """
+        NC = self.number_of_cells()
+        NN = self.number_of_nodes()
+
+        cell = self.entity('cell')
+        cell2ipoints = np.zeros((NC, p+1), dtype=np.int_)
+        cell2ipoints[:, [0, -1]] = cell
+        if p > 1:
+            cell2ipoints[:, 1:-1] = NN + np.arange(NC*(p-1)).reshape(NC, p-1)
+        return cell2ipoints
+    
+    def edge_to_ipoint(self, p, index=np.s_[:]):
+        return self.cell_to_ipoint()
+
+    def face_to_ipoint(self, p, index=np.s_[:]):
+        return self.node_to_ipoint()
+
+    def node_to_ipoint(self, p, index=np.s_[:]):
+        raise NotImplementedError
 
     def multi_index_matrix(self, p, etype=1):
         ldof = p+1
@@ -66,6 +111,7 @@ class Mesh1d(Mesh):
         idx = np.arange(TD+1)
         phi = np.prod(A[..., multiIndex, idx], axis=-1)
         return phi
+
 
     ## @ingroup FEMInterface
     def grad_shape_function(self, bc, p=1, index=np.s_[:]):
@@ -103,4 +149,50 @@ class Mesh1d(Mesh):
 
         Dlambda = self.grad_lambda(index=index)
         gphi = np.einsum('...ij, kjm->...kim', R, Dlambda)
-        return gphi #(..., NC, ldof, GD)
+        return gphi 
+
+    def add_plot(self, plot,
+            nodecolor='k', cellcolor='k',
+            aspect='equal', linewidths=1, markersize=20,
+            showaxis=False):
+        if isinstance(plot, ModuleType):
+            fig = plot.figure()
+            fig.set_facecolor('white')
+            axes = fig.gca()
+        else:
+            axes = plot
+
+        axes.set_aspect(aspect)
+        if showaxis == False:
+            axes.set_axis_off()
+        else:
+            axes.set_axis_on()
+
+        node = self.entity('node')
+
+        if len(node.shape) == 1:
+            node = node[:, None]
+
+        if node.shape[1] == 1:
+            node = np.r_['1', node, np.zeros_like(node)]
+
+        GD = self.geo_dimension()
+        if GD == 2:
+            axes.scatter(node[:, 0], node[:, 1], color=nodecolor, s=markersize)
+        elif GD == 3:
+            axes.scatter(node[:, 0], node[:, 1], node[:, 2], color=nodecolor, s=markersize)
+
+        cell = self.entity('cell')
+        vts = node[cell, :]
+
+        if GD < 3:
+            from matplotlib.collections import LineCollection
+            lines = LineCollection(vts, linewidths=linewidths, colors=cellcolor)
+            return axes.add_collection(lines)
+        else:
+            import mpl_toolkits.mplot3d as a3
+            from mpl_toolkits.mplot3d.art3d import Line3DCollection
+            lines = Line3DCollection(vts, linewidths=linewidths, colors=cellcolor)
+            return axes.add_collection3d(vts)
+
+

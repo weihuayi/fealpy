@@ -51,6 +51,9 @@ class QuadrangleMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+    def geo_dimension(self):
+        return self.node.shape[-1]
+
     def integrator(self, q, etype='cell'):
         qf = GaussLegendreQuadrature(q)
         if etype in {'cell', 2}:

@@ -4,9 +4,13 @@ import torch
 from torch import nn
 from torch.nn import Sequential, Linear, Tanh
 
-from fealpy.pinn.machine import Solution, LearningMachine
-from fealpy.pinn.sampler import ISampler
-from fealpy.pinn.grad import grad_by_fts
+
+from fealpy.pinn import (
+    LearningMachine,
+    ISampler,
+    grad_by_fts
+)
+from fealpy.pinn.modules import Solution
 from fealpy.pinn.hyperparams import AutoTest
 
 from fealpy.mesh import MeshFactory as MF

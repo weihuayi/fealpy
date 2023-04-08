@@ -1,10 +1,10 @@
 import numpy as np
 from types import ModuleType
-from fealpy.quadrature import GaussLegendreQuadrature
+from .Mesh1d import Mesh1d
 
 ## @defgroup MeshGenerators Meshgeneration algorithms on commonly used domain 
 ## @defgroup MeshQuality
-class EdgeMesh():
+class EdgeMesh(Mesh1d):
     def __init__(self, node, cell):
         self.node = node
         self.itype = cell.dtype
@@ -18,27 +18,10 @@ class EdgeMesh():
 
         self.nodedata = {}
         self.celldata = {}
+        self.meshdata = {}
 
     def geo_dimension(self):
         return self.GD
-
-    def top_dimension(self):
-        return 1
-
-    def integrator(self, k, etype='cell'):
-        """
-
-        Notes
-        -----
-            返回第 k 个高斯积分公式。
-        """
-        return GaussLegendreQuadrature(k)
-
-    def number_of_nodes(self):
-        return self.ds.NN
-
-    def number_of_cells(self):
-        return self.ds.cell.shape[0]
 
     def entity(self, etype='node'):
         if etype in {'node', 'face', 0}:
@@ -46,9 +29,9 @@ class EdgeMesh():
         elif etype in {'cell', 'edge', 1}:
             return self.ds.cell
     
-    def entity_measure(self, etype='cell'):
+    def entity_measure(self, etype='cell', index=np.s_[:]):
         if etype in {'cell', 'edge', 1}:
-            return self.cell_length() 
+            return self.cell_length()[index] 
         elif etype in {'node', 'face', 0}:
             return 0.0 
 
@@ -72,7 +55,7 @@ class EdgeMesh():
         h = np.sqrt(np.sum(v**2, axis=1))
         return h
 
-    def cell_unit_tangent(self):
+    def cell_unit_tangent(self, index=np.s_[:]):
         """
         @brief 计算每个单元的单位切向
         """
@@ -88,119 +71,9 @@ class EdgeMesh():
         """
         pass
 
-
-    def multi_index_matrix(self, p):
-        """
-        @brief 获取单元上 p 次的多重指标矩阵
-
-        @param[in] p positive integer 
-
-        @return multiIndex  ndarray with shape (ldof, 2)
-        """
-        ldof = p+1
-        multiIndex = np.zeros((ldof, 2), dtype=np.int_)
-        multiIndex[:, 0] = np.arange(p, -1, -1)
-        multiIndex[:, 1] = p - multiIndex[:, 0]
-        return multiIndex
-
-    def shape_function(self, bc, p=1):
-        """
-        @brief 计算单元上的形函数在积分点 bc 处的值
-        """
-        TD = bc.shape[-1] - 1 
-        multiIndex = self.multi_index_matrix(p)
-        c = np.arange(1, p+1, dtype=np.int_)
-        P = 1.0/np.multiply.accumulate(c)
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-        idx = np.arange(TD+1)
-        phi = np.prod(A[..., multiIndex, idx], axis=-1)
-        return phi
-
-    def grad_shape_function(self, bc, p=1, index=np.s_[:]):
-        """
-        """
-        TD = self.top_dimension()
-        multiIndex = self.multi_index_matrix(p)
-
-        c = np.arange(1, p+1, dtype=self.itype)
-        P = 1.0/np.multiply.accumulate(c)
-
-        t = np.arange(0, p)
-        shape = bc.shape[:-1]+(p+1, TD+1)
-        A = np.ones(shape, dtype=self.ftype)
-        A[..., 1:, :] = p*bc[..., np.newaxis, :] - t.reshape(-1, 1)
-
-        FF = np.einsum('...jk, m->...kjm', A[..., 1:, :], np.ones(p))
-        FF[..., range(p), range(p)] = p
-        np.cumprod(FF, axis=-2, out=FF)
-        F = np.zeros(shape, dtype=self.ftype)
-        F[..., 1:, :] = np.sum(np.tril(FF), axis=-1).swapaxes(-1, -2)
-        F[..., 1:, :] *= P.reshape(-1, 1)
-
-        np.cumprod(A, axis=-2, out=A)
-        A[..., 1:, :] *= P.reshape(-1, 1)
-
-        Q = A[..., multiIndex, range(TD+1)]
-        M = F[..., multiIndex, range(TD+1)]
-        ldof = self.number_of_local_dofs()
-        shape = bc.shape[:-1]+(ldof, TD+1)
-        R = np.zeros(shape, dtype=self.ftype)
-        for i in range(TD+1):
-            idx = list(range(TD+1))
-            idx.remove(i)
-            R[..., i] = M[..., i]*np.prod(Q[..., idx], axis=-1)
-
-        Dlambda = self.grad_lambda()
-        gphi = np.einsum('...ij, kjm->...kim', R, Dlambda[index,:,:])
-        return gphi #(..., NC, ldof, GD)
-
-    def grad_lambda(self):
-        """
-        @brief 重心坐标的梯度
-        """
-        node = self.entity('node')
-        cell = self.entity('cell')
-        NC = self.number_of_cells()
-        v = node[cell[:, 1]] - node[cell[:, 0]]
-        GD = self.geo_dimension()
-        Dlambda = np.zeros((NC, 2, GD), dtype=mesh.ftype)
-        h2 = np.sum(v**2, axis=-1)
-        v /=h2.reshape(-1, 1)
-        Dlambda[:, 0, :] = -v
-        Dlambda[:, 1, :] = v
-        return Dlambda
-
-    def interpolation_points(self, p):
-
-        GD = self.geo_dimension()
-        node = self.entity('node') 
-
-        if p == 1:
-            return node
-        else:
-            NN = self.number_of_nodes()
-            NC = self.number_of_cells()
-            gdof = NN + NC*(p-1) 
-            ipoint = np.zeros((gdof, GD), dtype=self.ftype)
-            ipoint[:NN] = node
-            cell = self.entity('cell') 
-            w = np.zeros((p-1,2), dtype=np.float64)
-            w[:,0] = np.arange(p-1, 0, -1)/p
-            w[:,1] = w[-1::-1, 0]
-            GD = mesh.geo_dimension()
-            ipoint[NN:NN+(p-1)*NC] = np.einsum('ij, kj...->ki...', w,
-                    node[cell]).reshape(-1, GD)
-
-            return ipoint
-    
     def add_plot(self, plot, 
             nodecolor='r',
-            edgecolor='k', 
+            cellcolor='k', 
             linewidths=1, 
             aspect=None,
             markersize=10,
@@ -210,10 +83,10 @@ class EdgeMesh():
             ):
 
         GD = self.geo_dimension()
+        import mpl_toolkits.mplot3d as a3
         if isinstance(plot, ModuleType):
             fig = plot.figure()
             if GD == 3:
-                import mpl_toolkits.mplot3d as a3
                 axes = fig.add_subplot(111, projection='3d')
             else:
                 axes = fig.add_subplot(111)
@@ -251,18 +124,18 @@ class EdgeMesh():
         vts = node[cell]
         if GD == 3:
             axes.set_zlim(box[4:6])
-            edges = a3.art3d.Line3DCollection(
+            cells = a3.art3d.Line3DCollection(
                    vts,
                    linewidths=linewidths,
-                   color=edgecolor)
-            return axes.add_collection3d(edges)
+                   color=cellcolor)
+            return axes.add_collection3d(cells)
         elif GD == 2:
             from matplotlib.collections import LineCollection
-            edges = LineCollection(
+            cells = LineCollection(
                     vts,
                     linewidths=linewidths,
-                    color=edgecolor)
-            return axes.add_collection(edges)
+                    color=cellcolor)
+            return axes.add_collection(cells)
 
     
     ## @ingroup MeshGenerators
@@ -289,7 +162,12 @@ class EdgeMesh():
             [4, 3], [2, 3], [4, 5], [2, 9], [6, 5], 
             [8, 3], [7, 4], [6, 3], [2, 7], [9, 4],
             [8, 5], [9, 5], [2, 6], [7, 3], [8, 4]], dtype=np.int_)
-        return cls(node, cell)
+        mesh = cls(node, cell)
+
+        mesh.meshdata['disp_bc'] = (np.array([6, 7, 8, 9], dtype=np.int_), np.zeros(3))
+        mesh.meshdata['force_bc'] = (np.array([0, 1], dtype=np.int_), np.array([0, 900, 0]))
+
+        return mesh 
 
 
 

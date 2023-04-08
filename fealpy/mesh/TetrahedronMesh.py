@@ -1083,46 +1083,35 @@ class TetrahedronMesh(Mesh3d):
         gmsh.model.add("UnitSphere")
 
         # 创建球体
-        lc = 0.1  # 设置网格大小
-        R = 1.0  # 单位球半径
-        volume = gmsh.model.occ.addSphere(0, 0, 0, R)
+        gmsh.model.occ.addSphere(0.0,0.0,0.0,1,1)
 
         # 同步几何模型
         gmsh.model.occ.synchronize()
 
-        # 添加物理组
-        gmsh.model.addPhysicalGroup(3, [volume], tag=1)
-        gmsh.model.setPhysicalName(3, 1, "Sphere")
-
-        # 设置网格大小
-        gmsh.option.setNumber("Mesh.CharacteristicLengthMax", lc)
+        # 设置网格尺寸
+        gmsh.model.mesh.setSize(gmsh.model.getEntities(0),h)
 
         # 生成网格
         gmsh.model.mesh.generate(3)
 
         # 获取节点信息
         node_tags, node_coords, _ = gmsh.model.mesh.getNodes()
-        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3)
+        node = np.array(node_coords, dtype=np.float64).reshape(-1, 3) 
+        
+        #节点的编号映射 
+        nodetags_map = dict({j:i for i,j in enumerate(ntags)})
 
         # 获取四面体单元信息
         tetrahedron_type = 4  # 四面体单元的类型编号为 4
         tetrahedron_tags, tetrahedron_connectivity = gmsh.model.mesh.getElementsByType(tetrahedron_type)
-        cell = np.array(tetrahedron_connectivity, dtype=np.int_).reshape(-1, 4) - 1
+        evid = np.array([node_tags[j] for j in tetrahedron_connectivity])
+        cell = evid.reshape((tetrahedron_tags.shape[-1],-1))
 
         # 输出节点和单元数量
         print(f"Number of nodes: {node.shape[0]}")
         print(f"Number of tetrahedra: {cell.shape[0]}")
 
         gmsh.finalize()
-
-        NN = len(node)
-        isValidNode = np.zeros(NN, dtype=np.bool_)
-        isValidNode[cell] = True
-        node = node[isValidNode]
-        idxMap = np.zeros(NN, dtype=cell.dtype)
-        idxMap[isValidNode] = range(isValidNode.sum())
-        cell = idxMap[cell]
-
         return cls(node, cell)
 
     ## @ingroup MeshGenerators

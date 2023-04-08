@@ -67,51 +67,19 @@ class UniformMesh3d(Mesh3d):
         self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz)
 
     ## @ingroup GeneralInterface
-    def number_of_nodes(self):
-        """
-        @brief Get the number of nodes in the mesh.
- 
-        @return The number of nodes.
-        """
-        return self.NN
-        
-    ## @ingroup GeneralInterface
-    def number_of_edges(self):
-        """
-        @brief Get the number of edges in the mesh.
-
-        @note `edge` is the 1D entity
-
-        @return The number of edges.
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def number_of_faces(self):
-        """
-        @brief Get the number of faces in the mesh.
-
-        @note `face` is the 2D entity
-        
-        @return The number of faces.
-        """
-        pass
-
-    ## @ingroup GeneralInterface
-    def number_of_cells(self):
-        """
-        @brief Get the number of cells in the mesh.
-
-        @return The number of cells.
-        """
-        return self.NC
-
-    ## @ingroup GeneralInterface
     def uniform_refine(self, n=1, surface=None, interface=None, returnim=False):
         """
         @brief
         """
-        pass
+        for i in range(n):
+            self.extent = [i*2 for i in self.extent]
+            self.h = [h/2.0 for h in self.h]
+            self.nx = self.extent[1] - self.extent[0]
+            self.ny = self.extent[3] - self.extent[2]
+            self.nz = self.extent[5] - self.extent[4]
+            self.NC = self.nx * self.ny * self.nz
+            self.NN = (self.nx + 1) * (self.ny + 1) * (self.nz + 1)
+            self.ds = StructureMesh3dDataStructure(self.nx, self.ny, self.nz, itype=self.itype)
 
     ## @ingroup GeneralInterface
     def cell_volume(self):
@@ -658,9 +626,9 @@ class UniformMesh3d(Mesh3d):
     ## @ingroup FEMInterface
     def geo_dimension(self):
         """
-        @brief Get the geometry dimension of the mesh.
+        @brief:    Get the geometry dimension of the mesh.
          
-        @return The geometry dimension (3 for 3D mesh).
+        @return:   The geometry dimension (3 for 3D mesh).
         """
         return 3
 

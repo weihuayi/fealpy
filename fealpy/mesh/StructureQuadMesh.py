@@ -24,6 +24,7 @@ class StructureQuadMesh(Mesh2d):
         self.facedata = self.edgedata
         self.meshdata = {}
 
+
     def uniform_refine(self, n=1, returnim=False):
         if returnim:
             nodeImatrix = []
@@ -397,6 +398,7 @@ class StructureQuadMesh(Mesh2d):
         cy = 1/(self.hy**2)
         NN = self.number_of_nodes()
         k = np.arange(NN).reshape(n0, n1)
+        node = self.node
 
         A_center = np.zeros(NN) 
         A_left = np.zeros(NN-n1)
@@ -409,8 +411,8 @@ class StructureQuadMesh(Mesh2d):
         low_idx = 0
 
         for i in range(NN):
-            nodex = self.node[i,0]
-            nodey = self.node[i,1]
+            nodex = node[i,0]
+            nodey = node[i,1]
             c11,c22 = coef(nodex, nodey) 
             A_center[i] = 2 * (c11*cx + c22*cy)
             

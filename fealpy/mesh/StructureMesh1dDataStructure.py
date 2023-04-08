@@ -4,22 +4,24 @@ from scipy.sparse import csr_matrix
 class StructureMesh1dDataStructure():
     def __init__(self, nx, itype):
         """
-        @brief Initialize 1D structured mesh data structure
+        @brief    Initialize 1D structured mesh data structure
 
-        @param NC    : int
-        @param itype : dtype, data type of indices
+        @param    nx: int, 网格剖分数
+        @param    itype : dtype, data type of indices
         """
         self.nx = nx 
         self.NN = nx + 1
         self.NC = nx 
+        self.NE = self.NC
+        self.NF = self.NN
         self.itype = itype 
 
     @property
     def cell(self):
         """
-        @brief Generate all the cells in the mesh
+        @brief    Generate all the cells in the mesh
 
-        @return cell : ndarray, shape (NC, 2), contains node indices of each cell
+        @return   cell : ndarray, shape (NC, 2), contains node indices of each cell
         """
         NC = self.NC
         cell = np.zeros((NC, 2), dtype=self.itype)

@@ -177,7 +177,7 @@ class DistMesh2d():
         F[L0-L<0] = 0
         FV = (F/L).reshape((-1,1))*vec
 
-        dxdt = np.zeros((N, 2), dtype=np.float)
+        dxdt = np.zeros((N, 2), dtype=np.float64)
         dxdt[:, 0] += np.bincount(edge[:,0], weights=FV[:,0], minlength=N)
         dxdt[:, 1] += np.bincount(edge[:,0], weights=FV[:,1], minlength=N)
         dxdt[:, 0] -= np.bincount(edge[:,1], weights=FV[:,0], minlength=N)
@@ -243,7 +243,7 @@ class DistMesh3d:
                 bbox[0]:bbox[1]:complex(0, M),
                 bbox[2]:bbox[3]:complex(0, N),
                 bbox[4]:bbox[5]:complex(0, Q)]
-        p = np.zeros((M*N*Q, 3), dtype=np.float)
+        p = np.zeros((M*N*Q, 3), dtype=np.float64)
         p[:, 0] = mg[0].flatten()
         p[:, 1] = mg[1].flatten()
         p[:, 2] = mg[2].flatten()
@@ -303,7 +303,7 @@ class DistMesh3d:
         F[L0-L<0] = 0
         FV = (F/L).reshape((-1,1))*vec
 
-        dxdt = np.zeros((N, 3), dtype=np.float)
+        dxdt = np.zeros((N, 3), dtype=np.float64)
         for i in range(3):
             dxdt[:, i] += np.bincount(edge[:, 0], weights=FV[:, i], minlength=N)
             dxdt[:, i] -= np.bincount(edge[:, 1], weights=FV[:, i], minlength=N)
