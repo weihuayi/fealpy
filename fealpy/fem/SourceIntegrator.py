@@ -23,38 +23,54 @@ class SourceIntegrator():
         @brief 组装单元向量
 
         @param[in] space 
+
+        @todo 考虑向量和张量空间的情形
+        
+        @note 该函数有如下的情形需要考虑： 
+            * f 是标量 
+            * f 是标量函数 (NQ, NC)，基是标量函数 (NQ, NC, ldof)
+            * f 是向量函数 (NQ, NC, GD)， 基是向量函数 (NQ, NC, ldof, GD)
         """
         f = self.f
         q = self.q
 
 
         mesh = space.mesh
-
-        GD = mesh.geo_dimension()
-        NC = mesh.number_of_cells()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
         NC = len(cellmeasure)
+        ldof = space.number_of_local_dofs() 
+        if out is None:
+            bb = np.zeros((NC, gdof), dtype=space.ftype)
+        else:
+            bb = out
+
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-        NQ = len(ws)
 
-        phi = space.basis(bcs) #@TODO: 考虑非重心坐标的情形
-        if callable(f):
-            if f.coordtype == 'cartesian':
-                ps = mesh.bc_to_point(bcs)
+        phi = space.basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
+
+        if callable(f) and hasattr(f, coordtype):
+            if hasattr(f, coordtype):
+                if f.coordtype == 'barycentric':
+                    val = f(bcs, index=index)
+                elif f.coordtype == 'cartesian':
+                    ps = mesh.bc_to_point(bcs, index=index)
+                    val = f(ps)
+            else: # 默认是笛卡尔
+                ps = mesh.bc_to_point(bcs, index=index)
                 val = f(ps)
-            elif f.coordtype == 'barycentric':
-                val = f(bcs)
-
-        if isinstance(f, np.ndarray):
-            assert len(f) == NC
-            val = f
         else:
-            val = np.broadcast_to(f, shape=(NC, )) 
+            val = f
 
-        bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
+        if isinstance(val, (int, float)):
+            bb += val*np.einsum('q, qc, qci, c->ci', ws, phi, cellmeasure, optimize=True)
+        elif isinstance(val, np.ndarray): 
+            bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+        else:
+            raise ValueError("We need to consider more cases!")
 
-        return b
+        if out is None:
+            return bb 
         

@@ -578,4 +578,6 @@ class LagrangeFESpace():
         print('It is function array shape:', shape)
         return np.zeros(shape, dtype=dtype)
 
+    def show_function(self, axes):
+        pass
 
