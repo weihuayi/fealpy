@@ -6,6 +6,28 @@ import pytest
 
 from fealpy.fem import BilinearForm
 
+def test_interval_mesh():
+    from fealpy.pde.elliptic_1d import SinPDEData as PDE
+    from fealpy.mesh import IntervalMesh
+    from fealpy.functionspace import LagrangeFESpace as Space
+    from fealpy.fem import DiffusionIntegrator
+    from fealpy.fem import LinearForm
+    from fealpy.fem import DirichletBC
+
+
+    pde = PDE()
+    domain = pde.domain()
+    mesh = IntervalMesh.from_interval_domain(domain, nx=10)
+    space = LagrangeFESpace(mesh, p=1)
+    
+    bform = BilinearForm(space)
+    bform.add_domain_integrator(DiffusionIntegrator())
+    bform.assembly()
+
+    K = bform.M
+
+    bc = DirichletBC(space, disp, threshold=idx)
+
 
 def test_truss_structure():
 
