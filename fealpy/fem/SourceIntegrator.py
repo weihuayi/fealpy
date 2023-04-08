@@ -22,17 +22,13 @@ class SourceIntegrator():
         """
         @brief 组装单元向量
 
-        @param[in] 
+        @param[in] space 
         """
         f = self.f
         q = self.q
 
 
-        #TODO: 考虑 space 是一个张量空间的情形
-        if isinstance(space, tuple): # space 是一个向量型空间
-            mesh = space[0].mesh
-        else: # space 是一个标量空间
-            mesh = space.mesh
+        mesh = space.mesh
 
         GD = mesh.geo_dimension()
         NC = mesh.number_of_cells()
@@ -51,8 +47,8 @@ class SourceIntegrator():
                 val = f(ps)
             elif f.coordtype == 'barycentric':
                 val = f(bcs)
-            bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, cellmeasure)
-        elif isinstance(f, np.ndarray):
+
+        if isinstance(f, np.ndarray):
             assert len(f) == NC
             val = f
         else:
@@ -60,9 +56,5 @@ class SourceIntegrator():
 
         bb = np.einsum('i, ijm, ijkm, j->jk', ws, val, phi, self.cellmeasure)
 
-        gdof = gdof or cell2dof.max()
-        dtype = phi.dtype if dtype is None else dtype
-        b = np.zeros(gdof, dtype=dtype)
-        np.add.at(b, cell2dof, bb)
         return b
         
