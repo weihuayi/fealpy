@@ -52,7 +52,7 @@ class Mesh2d(Mesh):
         elif etype in {'node', 0}:
             bc = node[index]
         else:
-            raise ValueError('the entity `{}` is not correct!'.format(entity)) 
+            raise ValueError('the entity `{}` is not correct!'.format(entity))
         return bc
 
     def node_size(self):
@@ -156,12 +156,13 @@ class Mesh2d(Mesh):
             nodecolor='w', edgecolor='k',
             cellcolor=[0.5, 0.9, 0.45], aspect=None,
             linewidths=1, markersize=50,
-            showaxis=False, showcolorbar=False, 
-            cmax=None, cmin=None, 
+            showaxis=False, showcolorbar=False,
+            cmax=None, cmin=None,
             colorbarshrink=1.0, cmap='jet', box=None):
 
         from matplotlib.collections import PolyCollection, PatchCollection
         import matplotlib.cm as cm
+        from matplotlib import colors
         from matplotlib.patches import Polygon
 
         if isinstance(plot, ModuleType):
@@ -326,7 +327,7 @@ class Mesh2dDataStructure():
         self.edge = totalEdge[i0, :]
 
     def cell_to_node(self, return_sparse=False):
-        """ 
+        """
         """
         NN = self.NN
         NC = self.NC
@@ -361,9 +362,9 @@ class Mesh2dDataStructure():
             I = edge2cell[:, [0, 1]].flat
             J = np.repeat(range(NE), 2)
             cell2edge = csr_matrix(
-                    (val, (I, J)), 
+                    (val, (I, J)),
                     shape=(NC, NE), dtype=np.bool_)
-            return cell2edge 
+            return cell2edge
 
     def cell_to_edge_sign(self):
         NE = self.NE
@@ -399,9 +400,9 @@ class Mesh2dDataStructure():
             I = edge2cell[:, [0, 1]].flat
             J = np.repeat(range(NE), 2)
             cell2edge = csr_matrix(
-                    (val, (I, J)), 
+                    (val, (I, J)),
                     shape=(NC, NE))
-            return cell2edge 
+            return cell2edge
 
 
     def cell_to_cell(self, return_sparse=False, return_boundary=True, return_array=False):
@@ -410,7 +411,7 @@ class Mesh2dDataStructure():
         if return_array:
              return_sparse = False
              return_boundary = False
- 
+
         NC = self.NC
         edge2cell = self.edge2cell
         if (return_sparse == False) & (return_array == False):
@@ -483,14 +484,14 @@ class Mesh2dDataStructure():
 
     def node_to_node(self, return_array=False):
 
-        """ 
+        """
         Notes
         -----
             节点与节点的相邻关系
 
         TODO
         ----
-            曲边元的边包含两个以上的点, 
+            曲边元的边包含两个以上的点,
         """
 
         NN = self.NN
@@ -502,7 +503,7 @@ class Mesh2dDataStructure():
         val = np.ones((2*NE,), dtype=np.bool_)
         node2node = csr_matrix((val, (I, J)), shape=(NN, NN))
         if return_array == False:
-            return node2node 
+            return node2node
         else:
             nn = node2node.sum(axis=1).reshape(-1)
             _, adj = node2node.nonzero()
@@ -541,14 +542,14 @@ class Mesh2dDataStructure():
         NC = self.NC
         NVC = self.NVC
 
-        I = self.cell.flat 
+        I = self.cell.flat
         J = np.repeat(range(NC), NVC)
 
         if return_localidx == False:
             val = np.ones(NVC*NC, dtype=np.bool_)
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC))
         else:
-            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1) 
+            val = ranges(NVC*np.ones(NC, dtype=self.itype), start=1)
             node2cell = csr_matrix((val, (I, J)), shape=(NN, NC), dtype=self.itype)
         return node2cell
 
@@ -597,25 +598,25 @@ class Mesh2dDataStructure():
         isBdCell = np.zeros((NC,), dtype=np.bool_)
         isBdEdge = self.boundary_edge_flag()
         isBdCell[edge2cell[isBdEdge,0]] = True
-        return isBdCell 
+        return isBdCell
 
     def boundary_node_index(self):
         isBdPoint = self.boundary_node_flag()
         idx, = np.nonzero(isBdPoint)
-        return idx 
+        return idx
 
     def boundary_edge_index(self):
         isBdEdge = self.boundary_edge_flag()
         idx, = np.nonzero(isBdEdge)
-        return idx 
+        return idx
 
     def boundary_face_index(self):
         isBdEdge = self.boundary_edge_flag()
         idx, = np.nonzero(isBdEdge)
-        return idx 
+        return idx
 
     def boundary_cell_index(self):
         isBdCell = self.boundary_cell_flag()
         idx, = np.nonzero(isBdCell)
-        return idx 
+        return idx
 
