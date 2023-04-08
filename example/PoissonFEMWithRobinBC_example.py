@@ -78,9 +78,7 @@ for i in range(maxit):
         mesh.uniform_refine()
 
 if GD == 2:
-    fig = plt.figure()
-    axes = fig.gca(projection='3d')
-    uh.add_plot(axes, cmap='rainbow')
+    uh.add_plot(plt, cmap='rainbow')
 elif GD == 3:
     print('The 3d function plot is not been implemented!')
 
