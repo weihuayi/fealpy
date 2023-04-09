@@ -30,7 +30,7 @@ class DiffusionIntegrator:
             NC = len(index)
 
 
-        phi0 = space0.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
+        phi0 = space.grad_basis(bcs, index=index) # (NQ, NC, ldof, ...)
         phi1 = phi0
 
         if coef is None:

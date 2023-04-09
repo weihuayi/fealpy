@@ -3,14 +3,17 @@ import matplotlib.pyplot as plt
 from scipy.sparse import csr_matrix
 from scipy.sparse.linalg import spsolve
 import pytest
+import ipdb
 
 from fealpy.fem import BilinearForm
+from fealpy.quadrature import FEMeshIntegralAlg
 
 def test_interval_mesh():
     from fealpy.pde.elliptic_1d import SinPDEData as PDE
     from fealpy.mesh import IntervalMesh
     from fealpy.functionspace import LagrangeFESpace as Space
     from fealpy.fem import DiffusionIntegrator
+    from fealpy.fem import ScalarSourceIntegrator
     from fealpy.fem import LinearForm
     from fealpy.fem import DirichletBC
 
@@ -20,11 +23,11 @@ def test_interval_mesh():
     nx = 10
     maxit = 4
 
-    fig, axes = plt.subplots(1, 4, sharey=True)
+    em = np.zeros((2, 4), dtype=np.float64)
 
     for i in range(maxit):
         mesh = IntervalMesh.from_interval_domain(domain, nx=nx * 2**i)
-        space = LagrangeFESpace(mesh, p=1)
+        space = Space(mesh, p=1)
 
         bc = DirichletBC(space, pde.dirichlet)
         
@@ -33,7 +36,7 @@ def test_interval_mesh():
         bform.assembly()
 
         lform = LinearForm(space)
-        lform.add_domain_integrator(SourceIntegrator(pde.source))
+        lform.add_domain_integrator(ScalarSourceIntegrator(pde.source))
         lform.assembly()
 
         A = bform.get_matrix()
@@ -42,8 +45,14 @@ def test_interval_mesh():
         uh = space.function()
         A, f = bc.apply(A, f, uh)
         uh[:] = spsolve(A, f)
-        
-        ips = space.interpolation_points()
 
-    plt.show()
+        alg = FEMeshIntegralAlg(mesh, 3)
+        em[0, i] = alg.error(pde.solution, uh)
+        em[1, i] = alg.error(pde.gradient, uh.grad_value)
+
+    print(em)
+
+
+if __name__ == "__main__":
+    test_interval_mesh()
 

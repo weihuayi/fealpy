@@ -4,7 +4,7 @@ from numpy.typing import NDArray
 from typing import TypedDict, Callable, Tuple, Union
 
 
-class SourceIntegrator():
+class VectorSourceIntegrator():
 
     def __init__(self, 
             f: Union[Callable, int, float, NDArray], 
@@ -34,8 +34,12 @@ class SourceIntegrator():
         f = self.f
         q = self.q
 
+        if isinstance(space, tuple):
+            mesh = space[0].mesh # 向量空间是由标量空间组合而成
+        else:
+            mesh = space.mesh # 向量空间的基函数是向量函数
 
-        mesh = space.mesh
+        GD = mesh.geo_dimension()
         if cellmeasure is None:
             cellmeasure = mesh.entity_measure('cell', index=index)
 
@@ -48,30 +52,33 @@ class SourceIntegrator():
 
         qf = mesh.integrator(q, 'cell')
         bcs, ws = qf.get_quadrature_points_and_weights()
-
-        phi = space.basis(bcs, index=index) #TODO: 考虑非重心坐标的情形
+        if isinstance(space, tuple):
+            phi = space[0].basis(bcs, index=index)
+        else:
+            phi = space.basis(bcs, index=index)
 
         if callable(f):
             if hasattr(f, 'coordtype'):
-                if f.coordtype == 'barycentric':
-                    val = f(bcs, index=index)
-                elif f.coordtype == 'cartesian':
+                if f.coordtype == 'cartesian':
                     ps = mesh.bc_to_point(bcs, index=index)
                     val = f(ps)
+                elif f.coordtype == 'barycentric':
+                    val = f(bcs, index=index)
             else: # 默认是笛卡尔
                 ps = mesh.bc_to_point(bcs, index=index)
                 val = f(ps)
         else:
             val = f
 
-        if isinstance(val, (int, float)):
-            bb += val*np.einsum('q, qc, qci, c->ci', ws, phi, cellmeasure, optimize=True)
-        elif isinstance(val, np.ndarray): 
-            if val.shape[-1] == 1:
-                val = val[..., 0]
-            bb += np.einsum('q, qc, qci, c->ci', ws, val, phi, cellmeasure, optimize=True)
+        if not isinstance(space, tuple):
+            bb += np.einsum('q, qcd, qcid, c->ci', ws, val, phi, cellmeasure, optimize=True)
         else:
-            raise ValueError("We need to consider more cases!")
+            if space[0].doforder == 'sdofs':
+                bb += np.einsum('q, qcd, qci, c->cdi', ws, val, phi, cellmeasure, optimize=True)
+            elif space[0].doforder == 'vdims':
+                bb += np.einsum('q, qcd, qci, c->cid', ws, val, phi, cellmeasure, optimize=True)
+            else:
+                raise ValueError(f"we don't support the space[0].doforder type: {space[0].doforder}")
 
         if out is None:
             return bb 

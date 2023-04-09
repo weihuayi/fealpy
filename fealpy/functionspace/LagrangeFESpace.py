@@ -371,17 +371,17 @@ class LagrangeFESpace():
             mesh, 
             p: int=1, 
             spacetype: str='C', 
-            doforder: str='nodes'):
+            doforder: str='sdofs'):
         """
         @brief Initialize the Lagrange finite element space.
 
         @param mesh The mesh object.
         @param p The order of interpolation polynomial, default is 1.
         @param spacetype The space type, either 'C' or 'D'.
-        @param doforder The convention for ordering degrees of freedom in vector space, either 'nodes' (default) or 'vdims'.
+        @param doforder The convention for ordering degrees of freedom in vector space, either 'sdofs' (default) or 'vdims'.
 
-        @note 'nodes': x_0, x_1, ..., y_0, y_1, ..., z_0, z_1, ...
-              'vdims': x_0, y_0, z_0, x_1, y_1, z_1, ...
+        @note 'sdofs': 标量自由度优先排序，例如 x_0, x_1, ..., y_0, y_1, ..., z_0, z_1, ...
+              'vdims': 向量分量优先排序，例如 x_0, y_0, z_0, x_1, y_1, z_1, ...
         """
         self.mesh = mesh
         self.p = p
@@ -469,7 +469,7 @@ class LagrangeFESpace():
 
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
-        if self.doforder == 'nodes':
+        if self.doforder == 'sdofs':
             # phi.shape == (NQ, NC, ldof)
             # uh.shape == (..., gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)
@@ -484,7 +484,7 @@ class LagrangeFESpace():
             s1 = f"...ci, ci{s0[:dim]}->...c{s0[:dim]}"
             val = np.einsum(s1, phi, uh[cell2dof, ...])
         else:
-            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'nodes' and 'vdims'.")
+            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
         return val
 
 
@@ -501,7 +501,7 @@ class LagrangeFESpace():
         cell2dof = self.dof.cell_to_dof(index=index)
         dim = len(uh.shape) - 1
         s0 = 'abdefg'
-        if self.doforder == 'nodes':
+        if self.doforder == 'sdofs':
             # gphi.shape == (NQ, NC, ldof, GD)
             # uh.shape == (..., gdof)
             # uh[..., cell2dof].shape == (..., NC, ldof)
@@ -516,7 +516,7 @@ class LagrangeFESpace():
             s1 = '...cim, ci{}->...c{}m'.format(s0[:dim], s0[:dim])
             val = np.einsum(s1, gphi, uh[cell2dof[index], ...])
         else:
-            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'nodes' and 'vdims'.")
+            raise ValueError(f"Unsupported doforder: {self.doforder}. Supported types are: 'sdofs' and 'vdims'.")
 
         return val
 
@@ -542,9 +542,12 @@ class LagrangeFESpace():
         if callable(gD):
             gD = gD(ipoints[isDDof])
 
+
         if (len(uh.shape) == 1) or (self.doforder == 'vdims'):
+            if len(uh.shape) == 1 and gD.shape[-1] == 1:
+                gD = gD[..., 0]
             uh[isDDof] = gD 
-        elif self.doforder == 'nodes':
+        elif self.doforder == 'sdofs':
             if isinstance(gD, (int, float)):
                 uh[..., isDDof] = gD 
             elif isinstance(gD, np.ndarray):
@@ -553,7 +556,7 @@ class LagrangeFESpace():
                 raise ValueError("Unsupported type for gD. Must be a callable, int, float, or numpy.ndarray.")
 
         if len(uh.shape) > 1:
-            if self.doforder == 'nodes':
+            if self.doforder == 'sdofs':
                 shape = (len(uh.shape)-1)*(1, ) + isDDof.shape
             elif self.doforder == 'vdims':
                 shape = isDDof.shape + (len(uh.shape)-1)*(1, )
@@ -571,7 +574,7 @@ class LagrangeFESpace():
         if type(dim) is int:
             dim = (dim, )
 
-        if self.doforder == 'nodes':
+        if self.doforder == 'sdofs':
             shape = dim + (gdof, )
         elif self.doforder == 'vdims':
             shape = (gdof, ) + dim
