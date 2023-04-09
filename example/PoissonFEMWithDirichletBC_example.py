@@ -82,9 +82,7 @@ for i in range(maxit):
 
 
 if GD == 2:
-    fig = plt.figure()
-    axes = fig.add_subplot(1, 1, 1, projection='3d')
-    uh.add_plot(axes, cmap='rainbow')
+    uh.add_plot(plt, cmap='rainbow')
 elif GD == 3:
     print('The 3d function plot is not been implemented!')
 

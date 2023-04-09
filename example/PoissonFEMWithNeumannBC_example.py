@@ -76,11 +76,8 @@ for i in range(maxit):
 
 
 if GD == 2:
-    fig = plt.figure()
-    axes = fig.gca(projection='3d')
-    uh.add_plot(axes, cmap='rainbow')
+    uh.add_plot(plt, cmap='rainbow')
 elif GD == 3:
-    from mpl_toolkits.mplot3d import Axes3D
     print('The 3d function plot is not been implemented!')
 
 showmultirate(plt, 0, NDof, errorMatrix,  errorType, propsize=20)
