@@ -1,5 +1,4 @@
 import numpy as np
-from .mesh_tools import unique_row, find_node, find_entity, show_mesh_1d
 from scipy.sparse import csr_matrix
 from types import ModuleType
 

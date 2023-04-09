@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.sparse import coo_matrix, csc_matrix, csr_matrix, spdiags, eye, tril, triu
 from scipy.sparse import triu, tril, find, hstack
-from .mesh_tools import unique_row
 from .Mesh3d import Mesh3d, Mesh3dDataStructure 
 
 class HexahedronMeshDataStructure(Mesh3dDataStructure):

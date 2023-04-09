@@ -383,8 +383,8 @@ class StructureQuadMesh(Mesh2d):
         @brief 构造笛卡尔网格上的 Laplace 离散算子，其中 x 方向和 y
         方向都均匀剖分，但步长可以不一样
         coef is a function, and the input is the coordinate.
-        The output is two coefficients c11 and c22 in matrix \kappa = [[c11, 0], [0, c22]] for equation
-                                  -\nabla \cdot (\kappa \nabla u) = f
+        The output is two coefficients c11 and c22 in matrix \\kappa = [[c11, 0], [0, c22]] for equation
+                                  -\\nabla \\cdot (\\kappa \\nabla u) = f
         The example of coef is: def coef(x,y):
                                     if x > 0 and y > 0:
                                         return 1.0, 1.0

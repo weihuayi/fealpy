@@ -517,7 +517,7 @@ class UniformMesh2d(Mesh2d):
     ## @ingroup FDMInterface
     def apply_dirichlet_bc(self, gD, A, f, uh=None):
         """
-        @brief: 组装 \Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
+        @brief: 组装 \\Delta u 对应的有限差分矩阵，考虑了 Dirichlet 边界
         """
         if uh is None:
             uh = self.function('node').reshape(-1, )
