@@ -80,7 +80,10 @@ class LevelSetDBCSolution(Solution, _BCSetter, _LSSetter):
 
 class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
     """
-    @brief !Not Fully Implemented!
+    @brief A solution of problems with dirichlet boundary conditions in a box area.\
+           This is based on Theory of Functional Connection in 1d, 2d and 3d.
+
+    @note !Not Fully Implemented! Now only 1d and 2d are supported.
     """
     def forward(self, p: Tensor):
         shape = p.shape[:-1] + (1,)
@@ -93,9 +96,19 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
         u = self.net
         c = self.boundary_condition
         b = self.boundary_box()
+        M = torch.zeros(shape_m, dtype=torch.float32, device=p.device)
 
         if self.GD == 1:
-            ...
+            c1 = mkfs(b[0], f_shape=shape, device=p.device)
+            c2 = mkfs(b[1], f_shape=shape, device=p.device)
+            M[0, ...] = up
+            M[1, ...] = c(c1) - u(c1)
+            M[2, ...] = c(c2) - u(c2)
+
+            lp = b[1] - b[0]
+            vp = mkfs(1, (b[1]-p)/lp, (p-b[0])/lp)
+
+            return torch.einsum("i...f, ...i -> ...f", M, vp)
 
         elif self.GD == 2:
             x, y = torch.split(p, 1, dim=-1)
@@ -107,8 +120,6 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
             c_2 = mkfs(b[1], b[2], f_shape=shape, device=p.device)
             c_3 = mkfs(b[0], b[3], f_shape=shape, device=p.device)
             c_4 = mkfs(b[1], b[3], f_shape=shape, device=p.device)
-
-            M = torch.zeros(shape_m, dtype=torch.float32, device=p.device)
 
             M[0, 0, ...] = up
             M[0, 1, ...] = c(x_1) - u(x_1)
@@ -131,10 +142,11 @@ class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
 
             return torch.einsum("ij...f, ...i, ...j -> ...f", M, vx, vy)
 
-        if self.GD == 3:
+        elif self.GD == 3:
             raise NotImplementedError
 
 
+### old implementations
 def mkf(length: int, *inputs: Union[Tensor, float]):
     """Make features"""
     ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
