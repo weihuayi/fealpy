@@ -46,9 +46,9 @@ def test_interval_mesh():
         A, f = bc.apply(A, f, uh)
         uh[:] = spsolve(A, f)
 
-        alg = FEMeshIntegralAlg(mesh, 3)
-        em[0, i] = alg.error(pde.solution, uh)
-        em[1, i] = alg.error(pde.gradient, uh.grad_value)
+        ipdb.set_trace()
+        em[0, i] = mesh.error(pde.solution, uh, q=3)
+        em[1, i] = mesh.error(pde.gradient, uh.grad_value, q=3)
 
     print(em)
 

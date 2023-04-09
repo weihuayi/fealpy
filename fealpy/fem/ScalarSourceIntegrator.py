@@ -36,7 +36,7 @@ class ScalarSourceIntegrator():
         NC = len(cellmeasure)
         ldof = space.number_of_local_dofs() 
         if out is None:
-            bb = np.zeros((NC, gdof), dtype=space.ftype)
+            bb = np.zeros((NC, ldof), dtype=space.ftype)
         else:
             bb = out
 
