@@ -3,11 +3,6 @@ from ..decorator import cartesian
 
 
 class SinSinPDEData:
-    """
-    -u''(x) = 16\pi^2\sin(4\pi x), 
-       u(0) = 0,\quad u(1) = 0.
-    真解：u(x) = \sin(4\pi x).
-    """
     def domain(self):
         """
         @brief 得到 PDE 模型的区域

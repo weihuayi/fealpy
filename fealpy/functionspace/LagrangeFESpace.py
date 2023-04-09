@@ -371,7 +371,7 @@ class LagrangeFESpace():
             mesh, 
             p: int=1, 
             spacetype: str='C', 
-            doforder: str='sdofs'):
+            doforder: str='vdims'):
         """
         @brief Initialize the Lagrange finite element space.
 
@@ -578,7 +578,6 @@ class LagrangeFESpace():
             shape = dim + (gdof, )
         elif self.doforder == 'vdims':
             shape = (gdof, ) + dim
-        print('It is function array shape:', shape)
         return np.zeros(shape, dtype=dtype)
 
     def show_function(self, axes):
