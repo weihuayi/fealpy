@@ -4,9 +4,12 @@ from typing import Union, Optional, List
 import torch
 from torch import Tensor
 
-from .nntyping import TensorFunction
-from .modules import Solution, ZeroMapping
+from ..nntyping import TensorFunction
+from ..modules import Solution, ZeroMapping
+from ..tools import mkfs
 
+
+### Boundary setting tools
 
 class _BCSetter():
     _bc: Optional[TensorFunction] = None
@@ -42,19 +45,27 @@ class _LSSetter():
 
 class _BoxSetter():
     _box: List[float] = []
+    GD: int = 0
     def boundary_box(self):
         if len(self._box) >= 2:
             assert len(self._box) % 2 == 0
             return self._box
-        else:
-            return ValueError
+        raise ValueError('Use `set_box` method to set boundary before using.')
 
     def set_box(self, box: List[float]):
         """
         @brief Using a box boundary.
-        """
-        self._box = list(box)
 
+        @param box: a list containing floats to specify bounds in each axis.\
+                    For example, `[0, 1, 0, 1]`.
+        """
+        assert len(box) >= 2
+        assert len(box) % 2 == 0
+        self._box = list(box)
+        self.GD = len(box) // 2
+
+
+### TFC applications
 
 class LevelSetDBCSolution(Solution, _BCSetter, _LSSetter):
     """
@@ -67,6 +78,75 @@ class LevelSetDBCSolution(Solution, _BCSetter, _LSSetter):
         return -lsv * self.__net(p) + (1+lsv) * self.boundary_condition(p)
 
 
+class BoxDBCSolution(Solution, _BCSetter, _BoxSetter):
+    """
+    @brief A solution of problems with dirichlet boundary conditions in a box area.\
+           This is based on Theory of Functional Connection in 1d, 2d and 3d.
+
+    @note !Not Fully Implemented! Now only 1d and 2d are supported.
+    """
+    def forward(self, p: Tensor):
+        shape = p.shape[:-1] + (1,)
+        up = self.net(p)
+        shape_m = (3,)*self.GD + up.shape
+
+        if self.GD != p.shape[-1]:
+            raise ValueError('Geometry dimension of inputs mismatch the box boundary.')
+
+        u = self.net
+        c = self.boundary_condition
+        b = self.boundary_box()
+        M = torch.zeros(shape_m, dtype=torch.float32, device=p.device)
+
+        if self.GD == 1:
+            c1 = mkfs(b[0], f_shape=shape, device=p.device)
+            c2 = mkfs(b[1], f_shape=shape, device=p.device)
+            M[0, ...] = up
+            M[1, ...] = c(c1) - u(c1)
+            M[2, ...] = c(c2) - u(c2)
+
+            lp = b[1] - b[0]
+            vp = mkfs(1, (b[1]-p)/lp, (p-b[0])/lp)
+
+            return torch.einsum("i...f, ...i -> ...f", M, vp)
+
+        elif self.GD == 2:
+            x, y = torch.split(p, 1, dim=-1)
+            y_1 = mkfs(b[0], y)
+            y_2 = mkfs(b[1], y)
+            x_1 = mkfs(x, b[2])
+            x_2 = mkfs(x, b[3])
+            c_1 = mkfs(b[0], b[2], f_shape=shape, device=p.device)
+            c_2 = mkfs(b[1], b[2], f_shape=shape, device=p.device)
+            c_3 = mkfs(b[0], b[3], f_shape=shape, device=p.device)
+            c_4 = mkfs(b[1], b[3], f_shape=shape, device=p.device)
+
+            M[0, 0, ...] = up
+            M[0, 1, ...] = c(x_1) - u(x_1)
+            M[0, 2, ...] = c(x_2) - u(x_2)
+            M[1, 0, ...] = c(y_1) - u(y_1)
+            M[1, 1, ...] = u(c_1) - c(c_1)
+            M[1, 2, ...] = u(c_3) - c(c_3)
+            M[2, 0, ...] = c(y_2) - u(y_2)
+            M[2, 1, ...] = u(c_2) - c(c_2)
+            M[2, 2, ...] = u(c_4) - c(c_4)
+
+            lx = b[1] - b[0]
+            ly = b[3] - b[2]
+
+            vx = mkfs(1, (b[1]-x)/lx, (x-b[0])/lx)
+            vy = mkfs(1, (b[3]-y)/ly, (y-b[2])/ly)
+
+            # if getattr(self, 'einsum_path', None) is None:
+            #     self.einsum_path = torch.einsum
+
+            return torch.einsum("ij...f, ...i, ...j -> ...f", M, vx, vy)
+
+        elif self.GD == 3:
+            raise NotImplementedError
+
+
+### old implementations
 def mkf(length: int, *inputs: Union[Tensor, float]):
     """Make features"""
     ret = torch.zeros((length, len(inputs)), dtype=torch.float32)
